@@ -55,8 +55,8 @@ namespace GameSystems.EditorTools
 
         public string StatName(string id)
         {
-            if (string.IsNullOrEmpty(id)) return "(통계 없음)";
-            return OfType<StatData>().FirstOrDefault(s => s.Id == id)?.DisplayName ?? $"(없는 통계: {id})";
+            if (string.IsNullOrEmpty(id)) return "(수치 없음)";
+            return OfType<StatData>().FirstOrDefault(s => s.Id == id)?.DisplayName ?? $"(없는 수치: {id})";
         }
 
         public string AchievementName(string id)

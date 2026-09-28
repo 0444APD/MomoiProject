@@ -59,7 +59,7 @@ namespace GameSystems.Samples
                 for (int i = 0; i < 10; i++) session.Do(new AttackAction { target = "오크" });
             });
             session.Debug.Register("샘플", "상자 열기", () => session.Do(new OpenChestAction()), "드롭 난수 스트림으로 골드를 얻습니다.");
-            session.Debug.Register("샘플", "턴 종료 (확정)", session.Commit, "확정해야 누적 통계와 도전과제에 반영됩니다.");
+            session.Debug.Register("샘플", "턴 종료 (확정)", session.Commit, "확정해야 누적 수치와 도전과제에 반영됩니다.");
             session.Debug.Register("샘플", "무르기", () => session.Undo(), "확정 전 마지막 행동을 되돌립니다.");
         }
 

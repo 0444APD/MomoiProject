@@ -3,8 +3,8 @@ using UnityEngine;
 
 namespace GameSystems.Data
 {
-    [Database("통계", Group = "진행", Order = 10, IdPrefix = "stat")]
-    [CreateAssetMenu(menuName = "Game Systems/통계", fileName = "NewStat")]
+    [Database("수치", Group = "진행", Order = 10, IdPrefix = "stat")]
+    [CreateAssetMenu(menuName = "Game Systems/수치", fileName = "NewStat")]
     public sealed class StatData : GameData
     {
         [FieldLabel("범위")] public StatScope scope = StatScope.Total;
@@ -42,7 +42,7 @@ namespace GameSystems.Data
                 if (!string.IsNullOrEmpty(rule.field) && TypeResolver.NumberGetter(type, rule.field, out var error) == null)
                     context.Error($"규칙 {i + 1}: {error}");
                 if (aggregate != StatAggregate.Sum && string.IsNullOrEmpty(rule.field))
-                    context.Warning($"규칙 {i + 1}: 횟수 반영은 합계형 통계에서만 의미가 있습니다.");
+                    context.Warning($"규칙 {i + 1}: 횟수 반영은 합계형 수치에서만 의미가 있습니다.");
             }
         }
     }

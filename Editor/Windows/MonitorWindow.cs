@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 
 namespace GameSystems.EditorTools
 {
-    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 통계, 행동(확정·무르기), 디버그 명령.
+    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 수치, 행동(확정·무르기), 디버그 명령.
     public sealed class MonitorWindow : EditorWindow
     {
         enum Tab
@@ -23,7 +23,7 @@ namespace GameSystems.EditorTools
             Commands,
         }
 
-        static readonly string[] TabNames = { "타임라인", "상태", "도전과제", "통계", "이벤트", "행동", "명령" };
+        static readonly string[] TabNames = { "타임라인", "상태", "도전과제", "수치", "이벤트", "행동", "명령" };
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
@@ -114,7 +114,7 @@ namespace GameSystems.EditorTools
                 if (!_session.Options.AutoCommit)
                 {
                     var toggle = new GsButton(CommitToggleText(), null, GsButtonKind.Ghost);
-                    toggle.tooltip = "켜면 테스트 이벤트를 발생시킨 뒤 곧바로 확정합니다(도전과제·누적 통계가 즉시 반영).\n끄면 확정 대기로 남아 무르기를 시험할 수 있습니다.";
+                    toggle.tooltip = "켜면 테스트 이벤트를 발생시킨 뒤 곧바로 확정합니다(도전과제·누적 수치가 즉시 반영).\n끄면 확정 대기로 남아 무르기를 시험할 수 있습니다.";
                     toggle.AddManipulator(new Clickable(() =>
                     {
                         _commitAfterTest = !_commitAfterTest;
@@ -422,7 +422,7 @@ namespace GameSystems.EditorTools
             }
         }
 
-        // ── 상태·통계 (관찰 계약 트리) ─────────────────────────
+        // ── 상태·수치 (관찰 계약 트리) ─────────────────────────
 
         void BuildInspect(IInspectable inspectable)
         {
@@ -551,7 +551,7 @@ namespace GameSystems.EditorTools
                 if (unlocked)
                 {
                     var reset = new GsButton("초기화", () => _session.Achievements.ResetProgress(id), GsButtonKind.Ghost);
-                    reset.tooltip = "직접 수정: 달성 표시만 지웁니다(통계는 그대로).";
+                    reset.tooltip = "직접 수정: 달성 표시만 지웁니다(수치는 그대로).";
                     card.AddToStats(reset);
                 }
                 else
@@ -563,7 +563,7 @@ namespace GameSystems.EditorTools
                         else
                             ShowFeedback(error, GsNoticeKind.Warning);
                     });
-                    fill.tooltip = "게임과 같은 경로: 부족한 통계만큼 실제 이벤트를 발생시킵니다(무르기 가능, 다른 통계·도전과제도 함께 반응).";
+                    fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 발생시킵니다(무르기 가능, 다른 수치·도전과제도 함께 반응).";
                     card.AddToStats(fill);
                     card.AddToStats(Gs.HSpace(6));
                     var force = new GsButton("강제 달성", () => _session.Achievements.Unlock(id, "모니터에서 강제 달성"), GsButtonKind.Ghost);
@@ -574,7 +574,7 @@ namespace GameSystems.EditorTools
             }
         }
 
-        // ── 통계: 직접 수정 / 이벤트로 반영 ─────────────────────
+        // ── 수치: 직접 수정 / 이벤트로 반영 ─────────────────────
 
         void BuildStats()
         {
@@ -585,14 +585,14 @@ namespace GameSystems.EditorTools
             if (definitions.Count == 0)
             {
                 var empty = Gs.Box("gs-empty");
-                empty.Add(Gs.Label("정의된 통계가 없습니다", "gs-heading"));
+                empty.Add(Gs.Label("정의된 수치가 없습니다", "gs-heading"));
                 scroll.Add(empty);
                 return;
             }
 
-            var panel = Gs.Panel("통계", "값 칸 클릭: 직접 수정(값만 덮어씀, 규칙·도전과제 연쇄 없음)  ·  이벤트로: 게임과 같은 경로로 반영", out _, out var body);
+            var panel = Gs.Panel("수치", "값 칸 클릭: 직접 수정(값만 덮어씀, 규칙·도전과제 연쇄 없음)  ·  이벤트로: 게임과 같은 경로로 반영", out _, out var body);
             var header = Gs.Box("gs-sheet__header");
-            foreach (var (title, width) in new[] { ("통계", 220f), ("범위 · 집계", 130f), ("현재 값 (직접 수정)", 150f), ("이벤트로 반영", 300f) })
+            foreach (var (title, width) in new[] { ("수치", 220f), ("범위 · 집계", 130f), ("현재 값 (직접 수정)", 150f), ("이벤트로 반영", 300f) })
             {
                 var cell = Gs.Label(title);
                 cell.style.width = width;
@@ -656,7 +656,7 @@ namespace GameSystems.EditorTools
                         ShowFeedback(error, GsNoticeKind.Warning);
                 }, GsButtonKind.Ghost);
                 fire.tooltip = isSum
-                    ? "이 통계의 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킵니다. 같은 이벤트를 받는 다른 통계와 도전과제도 함께 반응합니다."
+                    ? "이 수치의 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킵니다. 같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응합니다."
                     : "입력한 값을 이벤트로 한 번 기록합니다(최고치·최저치 규칙은 게임과 똑같이 적용).";
 
                 var eventCell = Gs.Row();
@@ -742,12 +742,12 @@ namespace GameSystems.EditorTools
                 body.Add(row);
             }
 
-            // 이 이벤트가 움직이는 통계(반영 규칙)를 보여줘 결과를 예상할 수 있게 한다.
+            // 이 이벤트가 움직이는 수치(반영 규칙)를 보여줘 결과를 예상할 수 있게 한다.
             var affected = _session.Stats.Definitions
                 .SelectMany(d => d.Rules.Where(r => r.eventType == selected.FullName).Select(r => $"{d.DisplayName} ← {(string.IsNullOrEmpty(r.field) ? "횟수" : r.field)}"))
                 .ToList();
             body.Add(Gs.Space(14));
-            body.Add(Gs.Label(affected.Count > 0 ? "반응하는 통계:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 통계가 없습니다.", "gs-caption"));
+            body.Add(Gs.Label(affected.Count > 0 ? "반응하는 수치:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 수치가 없습니다.", "gs-caption"));
             body.Add(Gs.Space(16));
 
             var actions = Gs.Row();
@@ -816,7 +816,7 @@ namespace GameSystems.EditorTools
         string CommitToggleText() => _commitAfterTest ? "테스트 후 즉시 확정: 켜짐" : "테스트 후 즉시 확정: 꺼짐";
 
         string PendingNote() =>
-            _session != null && _session.State.UncommittedCount > 0 ? $" (확정 대기 {_session.State.UncommittedCount} — 확정해야 누적 통계·도전과제에 반영)" : "";
+            _session != null && _session.State.UncommittedCount > 0 ? $" (확정 대기 {_session.State.UncommittedCount} — 확정해야 누적 수치·도전과제에 반영)" : "";
 
         void ShowFeedback(string text, GsNoticeKind kind)
         {

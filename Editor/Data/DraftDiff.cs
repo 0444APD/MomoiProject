@@ -13,6 +13,9 @@ namespace GameSystems.EditorTools
         public string Label;
         public string Old;
         public string New;
+        // 오브젝트 참조(스프라이트 등)면 확인 창에서 전후 이미지를 보여준다.
+        public UnityEngine.Object OldObject;
+        public UnityEngine.Object NewObject;
     }
 
     // 원본과 편집 중 사본을 최상위 필드 단위로 비교한다(조건 블록처럼 안쪽이 바뀐 것도 잡는다).
@@ -35,6 +38,8 @@ namespace GameSystems.EditorTools
                     Label = GsPropertyEditor.LabelOf(property, field),
                     Old = before == null ? "(없음)" : Text(before),
                     New = Text(property),
+                    OldObject = property.propertyType == SerializedPropertyType.ObjectReference ? before?.objectReferenceValue : null,
+                    NewObject = property.propertyType == SerializedPropertyType.ObjectReference ? property.objectReferenceValue : null,
                 });
             }
             return changes;
@@ -66,7 +71,7 @@ namespace GameSystems.EditorTools
 
             if (property.propertyType == SerializedPropertyType.Generic && property.hasVisibleChildren)
             {
-                if (PropertyUtil.GetBoxed(property) is StatRule rule) return rule.Describe("이 통계");
+                if (PropertyUtil.GetBoxed(property) is StatRule rule) return rule.Describe("이 수치");
                 return string.Join(" · ", PropertyUtil.Children(property).Select(Text).Where(t => !string.IsNullOrEmpty(t)));
             }
 

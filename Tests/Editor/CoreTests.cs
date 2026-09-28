@@ -287,7 +287,7 @@ namespace GameSystems.Tests
         static StatCompareCondition AtLeast(string stat, double value) => new StatCompareCondition { stat = stat, op = CompareOp.AtLeast, value = value };
 
         [Test]
-        public void 이벤트_규칙이_통계를_집계한다()
+        public void 이벤트_규칙이_수치를_집계한다()
         {
             _session.Events.Publish(new TestKill { Count = 2, Combo = 5 });
             _session.Events.Publish(new TestKill { Count = 1, Combo = 2 });
@@ -297,7 +297,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 이번_판_통계만_초기화된다()
+        public void 이번_판_수치만_초기화된다()
         {
             _session.Events.Publish(new TestKill());
             _session.Stats.ResetRun();
@@ -392,7 +392,7 @@ namespace GameSystems.Tests
         public void 조건_문장은_이름을_채운다()
         {
             var condition = new AllOfCondition { conditions = { AtLeast("kills", 100), new AchievementUnlockedCondition { achievement = "x" } } };
-            Assert.AreEqual("처치 수 ≥ 100 그리고 'x' 달성", condition.Describe(_session));
+            Assert.AreEqual("처치 수 100 이상 그리고 x 달성", condition.Describe(_session));
         }
     }
 

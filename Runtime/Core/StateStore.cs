@@ -5,7 +5,7 @@ using System.Globalization;
 namespace GameSystems
 {
     // Session: 게임 내용. 되감기·무르기 대상.
-    // Meta: 도전과제·누적 통계 같은 프로필 상태. 확정(Commit)된 행동만 반영된다.
+    // Meta: 도전과제·누적 수치 같은 프로필 상태. 확정(Commit)된 행동만 반영된다.
     public enum StateZone
     {
         Session,

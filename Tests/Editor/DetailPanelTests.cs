@@ -77,7 +77,7 @@ namespace GameSystems.Tests
             panel.Close();
         }
 
-        // 시트의 '···'은 어느 열에서든 열 수 있어야 한다(제목 필드는 스크롤 영역 밖 헤더에 있다).
+        // 시트 더블클릭은 어느 열에서든 열 수 있어야 한다(제목 필드는 스크롤 영역 밖 헤더에 있다).
         [Test]
         public void 어느_필드로_열어도_예외가_없다()
         {
@@ -115,8 +115,8 @@ namespace GameSystems.Tests
                 var changes = DraftDiff.Compute(new SerializedObject(original), new SerializedObject(draft));
                 Assert.AreEqual(1, changes.Count);
                 Assert.AreEqual("condition", changes[0].Path);
-                StringAssert.Contains("≥ 5", changes[0].Old);
-                StringAssert.Contains("≥ 7", changes[0].New);
+                StringAssert.Contains("5 이상", changes[0].Old);
+                StringAssert.Contains("7 이상", changes[0].New);
             }
             finally
             {
@@ -138,7 +138,7 @@ namespace GameSystems.Tests
 
             Assert.AreEqual(2, sheet.childCount, "헤더 + 행 1개");
             Assert.AreEqual(0, sheet.Query<GsInlineProperty>().ToList().Count, "시트 셀은 편집 부품을 두지 않는다");
-            Assert.AreEqual(2, sheet.Query(className: "gs-cell__more").ToList().Count, "셀마다 '···' 버튼");
+            Assert.AreEqual(2, sheet.Query(className: "gs-sheet__resizer").ToList().Count, "열마다 폭 조절 손잡이");
 
             Object opened = null;
             string openedPath = null;

@@ -55,7 +55,7 @@ namespace GameSystems
             return new Subscription(() => list.Remove(entry));
         }
 
-        // 타입 무관하게 모든 이벤트를 받는다(통계 규칙 등).
+        // 타입 무관하게 모든 이벤트를 받는다(수치 규칙 등).
         public IDisposable SubscribeAll(Action<object> listener)
         {
             if (listener == null) throw new ArgumentNullException(nameof(listener));

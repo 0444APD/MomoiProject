@@ -248,7 +248,7 @@ namespace GameSystems.EditorTools
 
         VisualElement Sheet()
         {
-            var panel = Gs.Panel("시트", "읽기 전용 · 셀에 마우스를 올리면 '···' → 상세 패널에서 보고 편집한다 (더블클릭도 가능)", out _, out var body);
+            var panel = Gs.Panel("시트", "읽기 전용 · 행을 더블클릭하면 상세 패널에서 보고 편집한다 · 머리줄 경계를 끌어 열 폭 조절", out _, out var body);
             _sheet = new GsSheet(Gs.Surface) { Thumbnail = TextureOf };
             _sheet.OpenRequested += OpenDetail;
             body.Add(_sheet);
@@ -342,7 +342,7 @@ namespace GameSystems.EditorTools
             body.Add(new GsNotice("정보 알림: 덜 중요한 안내는 옅게 표시한다.", GsNoticeKind.Info));
             body.Add(new GsNotice("검증 통과", GsNoticeKind.Ok));
             body.Add(new GsNotice("경고: 확인이 필요한 항목이 있다.", GsNoticeKind.Warning));
-            body.Add(new GsNotice("오류: 존재하지 않는 통계를 참조한다.", GsNoticeKind.Error));
+            body.Add(new GsNotice("오류: 존재하지 않는 수치를 참조한다.", GsNoticeKind.Error));
             return panel;
         }
 

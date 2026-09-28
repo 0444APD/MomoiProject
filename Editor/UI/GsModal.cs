@@ -94,7 +94,7 @@ namespace GameSystems.EditorTools.UI
                 var scroll = new ScrollView();
                 scroll.style.maxHeight = 300;
                 scroll.style.marginTop = 14;
-                foreach (var change in changes) scroll.Add(new GsChangeView(change.Label, change.Old, change.New, "gs-change-row"));
+                foreach (var change in changes) scroll.Add(new GsChangeView(change.Label, change.Old, change.New, "gs-change-row", change.OldObject, change.NewObject));
                 box.Add(scroll);
             }
 
@@ -126,7 +126,8 @@ namespace GameSystems.EditorTools.UI
         readonly Label _old;
         readonly Label _new;
 
-        public GsChangeView(string header, string oldText, string newText, string extraClass = null)
+        public GsChangeView(string header, string oldText, string newText, string extraClass = null,
+                            UnityEngine.Object oldImage = null, UnityEngine.Object newImage = null)
         {
             if (!string.IsNullOrEmpty(extraClass)) AddToClassList(extraClass);
             if (!string.IsNullOrEmpty(header))
@@ -134,17 +135,30 @@ namespace GameSystems.EditorTools.UI
                 var label = Gs.Label(header, "gs-detail__label");
                 Add(label);
             }
+            var images = IsImage(oldImage) || IsImage(newImage);
             var row = Gs.Box("gs-change");
             var oldBox = Gs.Box("gs-change__box", "gs-change__old");
+            if (images) oldBox.Add(Thumbnail(oldImage));
             _old = Gs.Label(oldText);
             oldBox.Add(_old);
             row.Add(oldBox);
             row.Add(Gs.Box("gs-change__chevron"));
             var newBox = Gs.Box("gs-change__box", "gs-change__new");
+            if (images) newBox.Add(Thumbnail(newImage));
             _new = Gs.Label(newText);
             newBox.Add(_new);
             row.Add(newBox);
             Add(row);
+        }
+
+        static bool IsImage(UnityEngine.Object o) => o is Sprite || o is Texture2D;
+
+        static VisualElement Thumbnail(UnityEngine.Object image)
+        {
+            var thumb = Gs.Box("gs-change__thumb");
+            if (image is Sprite sprite) thumb.style.backgroundImage = new StyleBackground(sprite);
+            else if (image is Texture2D texture) thumb.style.backgroundImage = new StyleBackground(texture);
+            return thumb;
         }
 
         public void Set(string oldText, string newText)

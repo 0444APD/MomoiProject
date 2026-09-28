@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace GameSystems
 {
-    // 플레이 시작 시 세션을 만들고, 데이터베이스를 읽어 통계·도전과제를 정의하고, 매 프레임 세션을 진행시킨다.
+    // 플레이 시작 시 세션을 만들고, 데이터베이스를 읽어 수치·도전과제를 정의하고, 매 프레임 세션을 진행시킨다.
     // Session은 싱글 게임용 기본 인스턴스다. 멀티플레이·테스트는 GameSession을 직접 만든다.
     public static class GameSystemsRuntime
     {

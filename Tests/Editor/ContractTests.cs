@@ -94,7 +94,7 @@ namespace GameSystems.Tests
 
         sealed class FakeNames : INameResolver
         {
-            public string StatName(string id) => "통계:" + id;
+            public string StatName(string id) => "수치:" + id;
             public string AchievementName(string id) => "도전과제:" + id;
         }
     }

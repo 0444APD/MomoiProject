@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
@@ -130,7 +131,7 @@ namespace GameSystems.EditorTools.UI
             return container;
         }
 
-        // ── 일반 목록(통계 규칙, 태그 등) ─────────────────────────
+        // ── 일반 목록(수치 규칙, 태그 등) ─────────────────────────
         static VisualElement PlainList(SerializedProperty list, Type elementType, Action onValue, Action onStructure)
         {
             var container = Gs.Col();
@@ -213,10 +214,49 @@ namespace GameSystems.EditorTools.UI
             var value = PropertyUtil.GetBoxed(element);
             switch (value)
             {
-                case StatRule rule: return rule.Describe("이 통계");
+                case StatRule rule: return rule.Describe("이 수치");
                 case null: return "";
             }
             return string.Join("  ·  ", PropertyUtil.Children(element).Select(PropertyUtil.Summary).Where(s => !string.IsNullOrEmpty(s)));
+        }
+
+        // "{stat} {value} {op}" → [처치 수] [100] [이상]. 필드 단어는 클릭하면 바꾸고, 나머지 글자는 옅은 고정 글자.
+        public static VisualElement Sentence(SerializedProperty block, string template, HashSet<string> used, Action onValue)
+        {
+            var row = Gs.Box("gs-sentence");
+            int index = 0;
+            while (index < template.Length)
+            {
+                var open = template.IndexOf('{', index);
+                if (open < 0)
+                {
+                    AddWords(row, template.Substring(index));
+                    break;
+                }
+                if (open > index) AddWords(row, template.Substring(index, open - index));
+                var close = template.IndexOf('}', open);
+                if (close < 0) break;
+                var name = template.Substring(open + 1, close - open - 1);
+                var child = block.FindPropertyRelative(name);
+                if (child != null && !child.hasVisibleChildren)
+                {
+                    used.Add(name);
+                    var token = new GsInlineProperty(child);
+                    token.AddToClassList("gs-token");
+                    token.Changed += () => onValue?.Invoke();
+                    var field = PropertyUtil.GetField(child, out _);
+                    token.tooltip = LabelOf(child, field);
+                    row.Add(token);
+                }
+                index = close + 1;
+            }
+            return row;
+        }
+
+        static void AddWords(VisualElement row, string text)
+        {
+            var trimmed = text.Trim();
+            if (trimmed.Length > 0) row.Add(Gs.Label(trimmed, "gs-sentence__word"));
         }
 
         public static string KindName(Type baseType)
@@ -263,10 +303,9 @@ namespace GameSystems.EditorTools.UI
             AddToClassList("gs-block");
             tooltip = BlockTypes.Description(type) ?? "";
 
+            // 머리줄은 블록 이름만(분류를 앞에 붙이면 "수치 수치 비교"처럼 겹친다).
             var header = Gs.Box("gs-block__header");
-            header.Add(Gs.Label(BlockTypes.Category(type), "gs-caption"));
-            header.Add(Gs.HSpace(8));
-            header.Add(Gs.Label(BlockTypes.DisplayName(type), "gs-heading"));
+            header.Add(Gs.Label(BlockTypes.DisplayName(type), "gs-caption"));
             header.Add(Gs.Spacer());
 
             var swap = new GsButton("바꾸기", () => GsPropertyEditor.ShowTypeMenu(baseType, newType =>
@@ -296,8 +335,15 @@ namespace GameSystems.EditorTools.UI
             header.Add(remove);
             Add(header);
 
+            // 문장 템플릿이 있으면 한 줄 문장으로: 단어(필드)마다 클릭해 바꾼다. 템플릿에 없는 필드만 아래에 따로 그린다.
+            var used = new HashSet<string>();
+            var sentence = BlockTypes.Sentence(type);
+            if (!string.IsNullOrEmpty(sentence) && sentence.Contains("{"))
+                Add(GsPropertyEditor.Sentence(property, sentence, used, onValue));
+
             foreach (var child in PropertyUtil.Children(property))
             {
+                if (used.Contains(child.name)) continue;
                 var element = GsPropertyEditor.BuildProperty(child, onValue, onStructure);
                 // 복합 조건의 하위 조건은 들여쓴 줄로 묶는다.
                 if (child.isArray || child.propertyType == SerializedPropertyType.ManagedReference)

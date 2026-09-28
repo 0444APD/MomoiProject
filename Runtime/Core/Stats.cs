@@ -41,7 +41,7 @@ namespace GameSystems
         Last,
     }
 
-    // "이벤트가 발생하면 필드 값을 통계에 반영한다" 규칙. field가 비어 있으면 1(횟수)을 반영한다.
+    // "이벤트가 발생하면 필드 값을 수치에 반영한다" 규칙. field가 비어 있으면 1(횟수)을 반영한다.
     [Serializable]
     public class StatRule
     {
@@ -105,13 +105,13 @@ namespace GameSystems
             events.SubscribeAll(OnEvent);
         }
 
-        public string InspectName => "통계";
+        public string InspectName => "수치";
         public IEnumerable<StatDefinition> Definitions => _definitions.Values;
 
         public void Define(StatDefinition definition)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
-            if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[GameSystems] 통계 ID가 비어 있습니다.");
+            if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[GameSystems] 수치 ID가 비어 있습니다.");
 
             _definitions[definition.Id] = definition;
             var zone = definition.Scope == StatScope.Run ? StateZone.Session : StateZone.Meta;
@@ -125,7 +125,7 @@ namespace GameSystems
             var type = TypeResolver.Find(rule.eventType);
             if (type == null)
             {
-                _journal.Append(JournalKind.Warning, "Stats", $"통계 '{stat.DisplayName}' 규칙의 이벤트 타입을 찾을 수 없습니다: {rule.eventType}");
+                _journal.Append(JournalKind.Warning, "Stats", $"수치 '{stat.DisplayName}' 규칙의 이벤트 타입을 찾을 수 없습니다: {rule.eventType}");
                 return;
             }
 
@@ -139,7 +139,7 @@ namespace GameSystems
                 getter = TypeResolver.NumberGetter(type, rule.field, out var error);
                 if (getter == null)
                 {
-                    _journal.Append(JournalKind.Warning, "Stats", $"통계 '{stat.DisplayName}' 규칙 오류: {error}");
+                    _journal.Append(JournalKind.Warning, "Stats", $"수치 '{stat.DisplayName}' 규칙 오류: {error}");
                     return;
                 }
             }
@@ -162,7 +162,7 @@ namespace GameSystems
 
         public double Get(string id) => _state.GetNumber(StateKeys.Stat(RequireDefined(id).Id));
 
-        // 통계의 집계 방식에 따라 값을 반영한다(Sum: 더함, Max/Min: 기록 갱신, Last: 덮어씀).
+        // 수치의 집계 방식에 따라 값을 반영한다(Sum: 더함, Max/Min: 기록 갱신, Last: 덮어씀).
         public void Report(string id, double value)
         {
             var definition = RequireDefined(id);
@@ -189,7 +189,7 @@ namespace GameSystems
 
         public void Set(string id, double value) => _state.Set(StateKeys.Stat(RequireDefined(id).Id), value);
 
-        // 이번 판(Run) 통계를 초기값으로 되돌린다.
+        // 이번 판(Run) 수치를 초기값으로 되돌린다.
         public void ResetRun()
         {
             foreach (var definition in _definitions.Values)
@@ -200,7 +200,7 @@ namespace GameSystems
         StatDefinition RequireDefined(string id)
         {
             if (id != null && _definitions.TryGetValue(id, out var definition)) return definition;
-            throw new InvalidOperationException($"[GameSystems] 정의되지 않은 통계 '{id}'입니다.");
+            throw new InvalidOperationException($"[GameSystems] 정의되지 않은 수치 '{id}'입니다.");
         }
 
         static object DefaultValue(StatDefinition definition)

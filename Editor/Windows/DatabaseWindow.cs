@@ -324,14 +324,22 @@ namespace GameSystems.EditorTools
 
         void BuildSheet(List<GameData> items, ResolvedView view)
         {
-            // 시트는 읽기 전용. 셀의 '···'(또는 더블클릭)으로 상세 패널을 연다.
+            // 시트는 읽기 전용. 행을 더블클릭하면 그 셀의 필드로 상세 패널을 연다.
+            // 열 폭은 탭(타입)마다 저장된다: 머리줄 경계를 끌면 ProjectSettings의 보기 설정에 기록.
+            var typeView = ViewSettings.Get(SelectedType);
             var sheet = new GsSheet(Gs.Background)
             {
                 Thumbnail = view.Image == null ? null : (Func<UnityEngine.Object, UnityEngine.Object>)(o => new SerializedObject(o).FindProperty(view.Image.Path)?.objectReferenceValue),
                 Trailing = o => ((GameData)o).Id,
+                TrailingWidth = typeView.WidthOf(GsSheet.TrailingKey, 110),
                 HasError = o => _issues.Any(i => i.Asset == o && i.Severity == ValidationSeverity.Error),
             };
-            sheet.Build(view.Columns.Select(c => new SheetColumn { Title = c.Label, Width = ColumnWidth(c), Path = c.Path, Bold = c.Path == "displayName" }).ToList(),
+            sheet.ColumnResized += (key, width) =>
+            {
+                typeView.SetWidth(key, Mathf.Round(width));
+                ViewSettings.Save();
+            };
+            sheet.Build(view.Columns.Select(c => new SheetColumn { Title = c.Label, Width = typeView.WidthOf(c.Path, ColumnWidth(c)), Path = c.Path, Bold = c.Path == "displayName" }).ToList(),
                         items.Cast<UnityEngine.Object>());
             var selected = items.FirstOrDefault(i => i.Id == _selectedId);
             if (selected != null) sheet.Select(selected, false);
@@ -343,7 +351,9 @@ namespace GameSystems.EditorTools
         }
         static float ColumnWidth(FieldEntry column)
         {
-            if (column.Path == "displayName") return 210;
+            if (column.Path == "displayName") return 200;
+            // 설명처럼 긴 글은 넓게(ID보다 설명이 길어야 맞다).
+            if (column.Kind == FieldKind.Text && column.Path.IndexOf("desc", StringComparison.OrdinalIgnoreCase) >= 0) return 320;
             switch (column.Kind)
             {
                 case FieldKind.Number:
@@ -426,7 +436,7 @@ namespace GameSystems.EditorTools
             var options = new DetailOptions
             {
                 Subtitle = $"{info?.DisplayName}  ·  {item.Id}",
-                Image = view.Image == null ? null : (Func<SerializedObject, UnityEngine.Object>)(so => so.FindProperty(view.Image.Path)?.objectReferenceValue),
+                ImagePath = view.Image?.Path,
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
                 Summary = draft => DescribeItem((GameData)draft),
@@ -465,9 +475,10 @@ namespace GameSystems.EditorTools
             switch (item)
             {
                 case AchievementData achievement:
-                    var condition = achievement.condition != null ? achievement.condition.Describe(names) : "(조건 없음)";
+                    // 두 줄 문장: 조건 … 달성 시 / 보상 … 획득
+                    var condition = achievement.condition != null ? $"{achievement.condition.Describe(names)} 달성 시" : "(조건 없음)";
                     var rewards = achievement.rewards.Where(r => r != null).Select(r => r.Describe(names)).ToList();
-                    return rewards.Count > 0 ? $"{condition}  →  {string.Join(", ", rewards)}" : condition;
+                    return $"조건   {condition}\n보상   {(rewards.Count > 0 ? string.Join(", ", rewards) : "없음")}";
                 case StatData stat:
                     var scope = stat.scope == StatScope.Run ? "이번 판" : "누적";
                     var rules = stat.rules.Where(r => r != null).Select(r => r.Describe(stat.DisplayName)).ToList();

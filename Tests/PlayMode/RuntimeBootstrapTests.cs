@@ -15,7 +15,7 @@ namespace GameSystems.Tests
             yield return null;
             var session = GameSystemsRuntime.Session;
             Assert.IsNotNull(session, "런타임이 자동으로 시작되어야 한다");
-            Assert.IsNotEmpty(session.Stats.Definitions, "데이터베이스의 통계가 정의되어야 한다");
+            Assert.IsNotEmpty(session.Stats.Definitions, "데이터베이스의 수치가 정의되어야 한다");
             Assert.IsNotEmpty(session.Achievements.Definitions, "데이터베이스의 도전과제가 정의되어야 한다");
             Assert.IsFalse(session.Options.AutoCommit, "샘플은 턴제 흐름(수동 확정)을 쓴다");
         }
@@ -42,7 +42,7 @@ namespace GameSystems.Tests
         }
 
         [UnityTest]
-        public IEnumerator 무르기는_이번_판_통계를_되돌린다()
+        public IEnumerator 무르기는_이번_판_수치를_되돌린다()
         {
             yield return null;
             var session = GameSystemsRuntime.Session;

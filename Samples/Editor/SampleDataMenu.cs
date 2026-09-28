@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace GameSystems.Samples
 {
-    // 샘플 통계·도전과제 에셋을 만든다. 이미 있으면 건너뛴다.
+    // 샘플 수치·도전과제 에셋을 만든다. 이미 있으면 건너뛴다.
     public static class SampleDataMenu
     {
         [MenuItem("Game Systems/샘플/샘플 데이터 만들기", priority = 40)]
@@ -62,7 +62,7 @@ namespace GameSystems.Samples
             Achievement("부자", "골드를 1000 모았다.",
                 new StatCompareCondition { stat = gold.Id, op = CompareOp.AtLeast, value = 1000 });
 
-            // 이번 판 통계는 되감기 대상임을 보여주는 용도(확정 전에도 즉시 바뀐다).
+            // 이번 판 수치는 되감기 대상임을 보여주는 용도(확정 전에도 즉시 바뀐다).
             _ = killsRun;
 
             AssetDatabase.SaveAssets();

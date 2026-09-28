@@ -56,7 +56,7 @@ namespace GameSystems
 
             Debug.Register("세션", "확정 (Commit)", Commit, "확정 대기 중인 행동을 모두 확정합니다.");
             Debug.Register("세션", "무르기 (Undo)", () => Undo(), "확정되지 않은 마지막 행동을 되돌립니다.");
-            Debug.Register("세션", "이번 판 통계 초기화", () => Stats.ResetRun());
+            Debug.Register("세션", "이번 판 수치 초기화", () => Stats.ResetRun());
         }
 
         public IEnumerable<IInspectable> Inspectables
@@ -170,7 +170,7 @@ namespace GameSystems
         public string StatName(string id)
         {
             var definition = Stats.Find(id);
-            return definition?.DisplayName ?? (string.IsNullOrEmpty(id) ? "(통계 없음)" : id);
+            return definition?.DisplayName ?? (string.IsNullOrEmpty(id) ? "(수치 없음)" : id);
         }
 
         public string AchievementName(string id)

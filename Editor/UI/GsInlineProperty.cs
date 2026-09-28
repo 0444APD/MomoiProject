@@ -146,7 +146,7 @@ namespace GameSystems.EditorTools.UI
                     ShowEnumMenu();
                     return;
                 case SerializedPropertyType.String when IsStatRef:
-                    ShowIdMenu(EditorDatabase.Instance.OfType<StatData>().Cast<GameData>(), "통계");
+                    ShowIdMenu(EditorDatabase.Instance.OfType<StatData>().Cast<GameData>(), "수치");
                     return;
                 case SerializedPropertyType.String when IsAchievementRef:
                     ShowIdMenu(EditorDatabase.Instance.OfType<AchievementData>().Cast<GameData>(), "도전과제");

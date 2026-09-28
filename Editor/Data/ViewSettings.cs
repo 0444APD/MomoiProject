@@ -122,6 +122,32 @@ namespace GameSystems.EditorTools
         public List<string> columns = new List<string>();
         public bool customStats;
         public bool customColumns;
+        // 시트 열 폭(열 경로 → 폭). 머리줄 경계를 끌면 저장된다.
+        public List<ColumnWidth> widths = new List<ColumnWidth>();
+
+        public float WidthOf(string path, float fallback)
+        {
+            foreach (var w in widths) if (w.path == path) return w.width;
+            return fallback;
+        }
+
+        public void SetWidth(string path, float width)
+        {
+            foreach (var w in widths)
+            {
+                if (w.path != path) continue;
+                w.width = width;
+                return;
+            }
+            widths.Add(new ColumnWidth { path = path, width = width });
+        }
+    }
+
+    [Serializable]
+    public sealed class ColumnWidth
+    {
+        public string path;
+        public float width;
     }
 
     public sealed class ResolvedView

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -12,11 +13,13 @@ namespace GameSystems.EditorTools.UI
         // 제목으로 쓸 필드(패널 위쪽에 크게, 편집 가능).
         public string TitlePath = "displayName";
         public string Subtitle;
-        // 왼쪽 정사각형 이미지. 편집 중 사본에서 읽으므로 이미지 필드를 바꾸면 바로 반영된다.
+        // 이미지로 쓸 필드 경로. 지정하면 이미지를 클릭해 바꿀 수 있고, 그 필드는 정보 영역에 따로 나오지 않는다.
+        public string ImagePath;
+        // 필드가 아닌 곳에서 오는 이미지(읽기 전용).
         public Func<SerializedObject, UnityEngine.Object> Image;
         public Color Placeholder = Gs.Palette[6];
         public HashSet<string> Hidden = new HashSet<string>();
-        // 이 필드로 스크롤하고 강조한다(시트의 '…'에서 연 경우).
+        // 이 필드로 스크롤하고 강조한다(시트에서 셀을 더블클릭해 연 경우).
         public string FocusPath;
         // 편집 중 사본을 검증해 (오류 여부, 문장) 목록을 돌려준다.
         public Func<UnityEngine.Object, List<(bool error, string message)>> Validate;
@@ -26,7 +29,7 @@ namespace GameSystems.EditorTools.UI
         public Action<UnityEngine.Object> Saved;
     }
 
-    // 모든 카드·시트가 공유하는 상세 보기·편집 패널(카드 B 구조: 정사각형 이미지 + 내용).
+    // 모든 카드·시트가 공유하는 상세 보기·편집 패널.
     // 편집은 이 패널 안에서만, 원본이 아닌 사본에 한다. 되돌리기·저장은 확인을 거친다.
     public sealed class GsDetailPanel : VisualElement
     {
@@ -82,34 +85,30 @@ namespace GameSystems.EditorTools.UI
             return panel;
         }
 
-        // 창 크기에 맞춘 16:9 비율. 이미지는 패널 높이와 같은 정사각형.
+        // 창 크기에 맞춰 넉넉한 세로 크기.
         void Fit()
         {
-            var width = Mathf.Min(940f, Mathf.Max(640f, _host.layout.width - 64f));
-            var height = Mathf.Clamp(width * 9f / 16f, 380f, Mathf.Max(380f, _host.layout.height - 56f));
+            var width = Mathf.Min(960f, Mathf.Max(700f, _host.layout.width - 64f));
+            var height = Mathf.Clamp(width * 0.8f, 520f, Mathf.Max(520f, _host.layout.height - 48f));
             style.width = width;
             style.height = height;
-            var media = Mathf.Min(height, width - 400f);
-            _media.style.width = media;
-            _media.style.height = height;
         }
 
+        // 위: [정사각형 이미지] [제목 · 정보 · 요약]   아래: 전체 폭 정보 영역   맨 아래: 되돌리기 · 저장
         void Build()
         {
+            var top = Gs.Box("gs-detail__top");
+            Add(top);
+
             _media = Gs.Box("gs-detail__media");
-            _media.style.alignItems = Align.Center;
-            _media.style.justifyContent = Justify.Center;
-            _initial = Gs.Label("", "gs-display");
-            _initial.style.fontSize = 64;
-            _initial.style.opacity = 0.35f;
+            _initial = Gs.Label("", "gs-detail__initial");
+            _initial.pickingMode = PickingMode.Ignore;
             _media.Add(_initial);
-            Add(_media);
+            top.Add(_media);
+            BuildImagePicker();
 
-            var main = Gs.Col("gs-detail__main");
-            Add(main);
-
-            var header = Gs.Box("gs-detail__header");
             var titles = Gs.Col("gs-grow");
+            titles.style.minWidth = 0;
             _titleSlot = Gs.Col();
             titles.Add(_titleSlot);
             if (!string.IsNullOrEmpty(_options.Subtitle))
@@ -118,19 +117,23 @@ namespace GameSystems.EditorTools.UI
                 subtitle.style.marginTop = 6;
                 titles.Add(subtitle);
             }
-            header.Add(titles);
+            _summary = Gs.Label("", "gs-preview");
+            _summary.style.marginTop = 12;
+            _summary.style.marginBottom = 0;
+            titles.Add(_summary);
+            top.Add(titles);
+
             var close = new GsButton("✕", RequestClose, GsButtonKind.Ghost);
             close.tooltip = "닫기 (Esc)";
-            header.Add(close);
-            main.Add(header);
+            top.Add(close);
 
             _body = new ScrollView(ScrollViewMode.Vertical);
             _body.AddToClassList("gs-detail__body");
-            _body.contentContainer.style.paddingLeft = 26;
-            _body.contentContainer.style.paddingRight = 22;
-            _body.contentContainer.style.paddingTop = 18;
+            _body.contentContainer.style.paddingLeft = 24;
+            _body.contentContainer.style.paddingRight = 24;
+            _body.contentContainer.style.paddingTop = 20;
             _body.contentContainer.style.paddingBottom = 8;
-            main.Add(_body);
+            Add(_body);
 
             var footer = Gs.Box("gs-detail__footer");
             _status = Gs.Label("", "gs-caption");
@@ -147,11 +150,48 @@ namespace GameSystems.EditorTools.UI
             footer.Add(Gs.HSpace(8));
             _save = new GsButton("저장", Save, GsButtonKind.Primary);
             footer.Add(_save);
-            main.Add(footer);
+            Add(footer);
 
             BuildBody();
         }
 
+        ObjectFieldProxy _picker;
+
+        // 이미지 필드가 있으면 이미지를 클릭해 바꾼다. Unity 오브젝트 선택 창을 그대로 쓰기 위해
+        // 투명한 ObjectField의 선택 버튼을 이미지 전체에 덮는다(끌어다 놓기도 된다).
+        void BuildImagePicker()
+        {
+            var path = _options.ImagePath;
+            var property = string.IsNullOrEmpty(path) ? null : _draftObject.FindProperty(path);
+            if (property == null || property.propertyType != SerializedPropertyType.ObjectReference) return;
+            _options.Hidden.Add(path);
+            PropertyUtil.GetField(property, out var type);
+
+            _picker = new ObjectFieldProxy(type ?? typeof(Sprite));
+            _picker.Changed += value =>
+            {
+                _draftObject.Update();
+                _draftObject.FindProperty(path).objectReferenceValue = value;
+                _draftObject.ApplyModifiedPropertiesWithoutUndo();
+                RefreshState();
+            };
+            _media.Add(_picker.Element);
+            _media.AddToClassList("gs-detail__media--editable");
+            var hint = Gs.Box("gs-detail__media-hint");
+            hint.pickingMode = PickingMode.Ignore;
+            var hintLabel = Gs.Label("변경");
+            hintLabel.pickingMode = PickingMode.Ignore;
+            hint.Add(hintLabel);
+            _media.Add(hint);
+            _media.tooltip = "클릭해서 이미지 바꾸기 (끌어다 놓기도 됨)";
+        }
+
+        UnityEngine.Object CurrentImage()
+        {
+            if (!string.IsNullOrEmpty(_options.ImagePath))
+                return _draftObject.FindProperty(_options.ImagePath)?.objectReferenceValue;
+            return _options.Image?.Invoke(_draftObject);
+        }
         void BuildBody()
         {
             _draftObject.Update();
@@ -168,8 +208,6 @@ namespace GameSystems.EditorTools.UI
                 _titleSlot.Add(ValueWithHistory(titleProperty.propertyPath, title, _titleSlot, "gs-display"));
             }
 
-            _summary = Gs.Label("", "gs-preview");
-            _body.Add(_summary);
             _notices = Gs.Col();
             _body.Add(_notices);
 
@@ -274,7 +312,8 @@ namespace GameSystems.EditorTools.UI
             _revert.SetEnabled(count > 0);
             _save.SetEnabled(count > 0);
 
-            var image = _options.Image?.Invoke(_draftObject);
+            var image = CurrentImage();
+            _picker?.SetValue(image);
             if (image is Sprite sprite) _media.style.backgroundImage = new StyleBackground(sprite);
             else if (image is Texture2D texture) _media.style.backgroundImage = new StyleBackground(texture);
             else
@@ -361,5 +400,24 @@ namespace GameSystems.EditorTools.UI
         {
             if (_draft != null) UnityEngine.Object.DestroyImmediate(_draft);
         }
+    }
+
+    // 이미지 위에 투명하게 덮는 오브젝트 선택기(Unity 선택 창·끌어다 놓기를 그대로 쓴다).
+    sealed class ObjectFieldProxy
+    {
+        readonly ObjectField _field;
+
+        public event Action<UnityEngine.Object> Changed;
+
+        public ObjectFieldProxy(Type type)
+        {
+            _field = new ObjectField { objectType = type, allowSceneObjects = false };
+            _field.AddToClassList("gs-detail__picker");
+            _field.RegisterValueChangedCallback(e => Changed?.Invoke(e.newValue));
+        }
+
+        public VisualElement Element => _field;
+
+        public void SetValue(UnityEngine.Object value) => _field.SetValueWithoutNotify(value);
     }
 }

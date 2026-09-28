@@ -38,18 +38,18 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 없는_통계_참조와_빈_조건을_잡는다()
+        public void 없는_수치_참조와_빈_조건을_잡는다()
         {
             var achievement = Make<AchievementData>("achievement_0001", "업적");
-            achievement.condition = new StatCompareCondition { stat = "없는통계", value = 1 };
+            achievement.condition = new StatCompareCondition { stat = "없는수치", value = 1 };
             var empty = Make<AchievementData>("achievement_0002", "빈 업적");
             var issues = DataValidator.Validate(new List<GameData> { achievement, empty });
-            Assert.IsTrue(issues.Any(i => i.Asset == achievement && i.Message.Contains("존재하지 않는 통계")));
+            Assert.IsTrue(issues.Any(i => i.Asset == achievement && i.Message.Contains("존재하지 않는 수치")));
             Assert.IsTrue(issues.Any(i => i.Asset == empty && i.Message.Contains("조건이 없습니다")));
         }
 
         [Test]
-        public void 합계형이_아닌_통계에_더하기_보상은_오류()
+        public void 합계형이_아닌_수치에_더하기_보상은_오류()
         {
             var stat = Make<StatData>("stat_0001", "최고 콤보");
             stat.aggregate = StatAggregate.Max;

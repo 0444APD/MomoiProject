@@ -10,6 +10,8 @@ namespace GameSystems
         public string DisplayName { get; }
         public string Category { get; set; }
         public string Description { get; set; }
+        // 편집 화면의 한 줄 문장. {필드이름}은 클릭해 바꾸는 단어, 나머지는 고정 글자. 예: "{stat} {value} {op}"
+        public string Sentence { get; set; }
 
         public BlockInfoAttribute(string displayName)
         {
@@ -109,23 +111,23 @@ namespace GameSystems
     public enum CompareOp
     {
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("≥ 이상")]
+        [UnityEngine.InspectorName("이상")]
 #endif
         AtLeast,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("≤ 이하")]
+        [UnityEngine.InspectorName("이하")]
 #endif
         AtMost,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("> 초과")]
+        [UnityEngine.InspectorName("초과")]
 #endif
         GreaterThan,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("< 미만")]
+        [UnityEngine.InspectorName("미만")]
 #endif
         LessThan,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("= 같음")]
+        [UnityEngine.InspectorName("일치")]
 #endif
         Equal,
     }
@@ -145,15 +147,16 @@ namespace GameSystems
             }
         }
 
-        public static string Symbol(CompareOp op)
+        // 문장에 쓰는 말: "처치 수 100 이상"
+        public static string Word(CompareOp op)
         {
             switch (op)
             {
-                case CompareOp.AtLeast: return "≥";
-                case CompareOp.AtMost: return "≤";
-                case CompareOp.GreaterThan: return ">";
-                case CompareOp.LessThan: return "<";
-                default: return "=";
+                case CompareOp.AtLeast: return "이상";
+                case CompareOp.AtMost: return "이하";
+                case CompareOp.GreaterThan: return "초과";
+                case CompareOp.LessThan: return "미만";
+                default: return "일치";
             }
         }
     }

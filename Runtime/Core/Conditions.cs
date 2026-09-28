@@ -6,10 +6,10 @@ using System.Linq;
 namespace GameSystems
 {
     [Serializable]
-    [BlockInfo("통계 비교", Category = "통계", Description = "통계 값을 기준값과 비교합니다.")]
+    [BlockInfo("수치 비교", Category = "수치", Description = "수치 값을 기준값과 비교합니다.", Sentence = "{stat} {value} {op}")]
     public sealed class StatCompareCondition : Condition
     {
-        [StatRef, FieldLabel("통계")] public string stat;
+        [StatRef, FieldLabel("수치")] public string stat;
         [FieldLabel("비교")] public CompareOp op = CompareOp.AtLeast;
         [FieldLabel("기준값")] public double value;
 
@@ -22,12 +22,12 @@ namespace GameSystems
         }
 
         public override string Describe(INameResolver names) =>
-            $"{names.StatName(stat)} {CompareOps.Symbol(op)} {value.ToString("0.##", CultureInfo.InvariantCulture)}";
+            $"{names.StatName(stat)} {value.ToString("0.##", CultureInfo.InvariantCulture)} {CompareOps.Word(op)}";
 
         public override void Validate(IValidationContext context)
         {
-            if (string.IsNullOrEmpty(stat)) context.Error("비교할 통계가 선택되지 않았습니다.");
-            else if (!context.StatExists(stat)) context.Error($"존재하지 않는 통계 '{stat}'을 참조합니다.");
+            if (string.IsNullOrEmpty(stat)) context.Error("비교할 수치가 선택되지 않았습니다.");
+            else if (!context.StatExists(stat)) context.Error($"존재하지 않는 수치 '{stat}'을 참조합니다.");
         }
 
         public override bool TryGetProgress(GameSession session, out double current, out double target)
@@ -150,7 +150,7 @@ namespace GameSystems
         public override double PollInterval => condition?.PollInterval ?? 0;
 
         public override string Describe(INameResolver names) =>
-            condition == null ? "아님 (조건 없음)" : $"아님 ({condition.Describe(names)})";
+            condition == null ? "(조건 없음) 아님" : $"({condition.Describe(names)}) 아님";
 
         public override void Validate(IValidationContext context)
         {
@@ -160,7 +160,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("도전과제 달성", Category = "도전과제", Description = "다른 도전과제를 달성했는지 확인합니다.")]
+    [BlockInfo("도전과제 달성", Category = "도전과제", Description = "다른 도전과제를 달성했는지 확인합니다.", Sentence = "{achievement} 달성")]
     public sealed class AchievementUnlockedCondition : Condition
     {
         [AchievementRef, FieldLabel("도전과제")] public string achievement;
@@ -173,7 +173,7 @@ namespace GameSystems
             if (!string.IsNullOrEmpty(achievement)) stateKeys.Add(StateKeys.Achievement(achievement));
         }
 
-        public override string Describe(INameResolver names) => $"'{names.AchievementName(achievement)}' 달성";
+        public override string Describe(INameResolver names) => $"{names.AchievementName(achievement)} 달성";
 
         public override void Validate(IValidationContext context)
         {
@@ -183,10 +183,10 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("통계 더하기", Category = "통계", Description = "합계형 통계에 값을 더합니다. 재화 지급에도 씁니다.")]
+    [BlockInfo("획득", Category = "수치", Description = "골드·경험치 같은 합계형 수치를 얻습니다(음수면 차감).", Sentence = "{stat} {amount} 획득")]
     public sealed class AddToStatReward : Reward
     {
-        [StatRef, FieldLabel("통계")] public string stat;
+        [StatRef, FieldLabel("수치")] public string stat;
         [FieldLabel("수량")] public double amount = 1;
 
         public override RewardEffect Effect => RewardEffect.Reversible;
@@ -194,18 +194,20 @@ namespace GameSystems
         public override void Grant(GameSession session) => session.Stats.Report(stat, amount);
 
         public override string Describe(INameResolver names) =>
-            $"{names.StatName(stat)} {(amount >= 0 ? "+" : "")}{amount.ToString("0.##", CultureInfo.InvariantCulture)}";
+            amount >= 0
+                ? $"{names.StatName(stat)} {amount.ToString("0.##", CultureInfo.InvariantCulture)} 획득"
+                : $"{names.StatName(stat)} {(-amount).ToString("0.##", CultureInfo.InvariantCulture)} 차감";
 
         public override void Validate(IValidationContext context)
         {
             if (string.IsNullOrEmpty(stat))
             {
-                context.Error("보상 대상 통계가 선택되지 않았습니다.");
+                context.Error("보상 대상 수치가 선택되지 않았습니다.");
                 return;
             }
             var info = context.FindStat(stat);
-            if (info == null) context.Error($"존재하지 않는 통계 '{stat}'을 참조합니다.");
-            else if (info.Value.Aggregate != StatAggregate.Sum) context.Error($"'통계 더하기'는 합계형 통계에만 쓸 수 있습니다 ('{stat}'은 합계형이 아님).");
+            if (info == null) context.Error($"존재하지 않는 수치 '{stat}'을 참조합니다.");
+            else if (info.Value.Aggregate != StatAggregate.Sum) context.Error($"'획득'은 합계형 수치에만 쓸 수 있습니다 ('{stat}'은 합계형이 아님).");
         }
     }
 }

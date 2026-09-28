@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace GameSystems
 {
-    // 테스트용 이벤트 발생. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 통계 규칙 → 확정 → 도전과제 → 보상)를 탄다.
+    // 테스트용 이벤트 발생. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 수치 규칙 → 확정 → 도전과제 → 보상)를 탄다.
     // 행동으로 기록되므로 무르기·확정·인과 추적이 그대로 적용된다.
     [Serializable]
     public sealed class SimulatedEventAction : GameAction
@@ -25,7 +25,7 @@ namespace GameSystems
         }
     }
 
-    // 통계 하나를 이벤트로 움직이는 계획.
+    // 수치 하나를 이벤트로 움직이는 계획.
     public sealed class EventPlan
     {
         public readonly List<object> Events = new List<object>();
@@ -111,10 +111,10 @@ namespace GameSystems
             return false;
         }
 
-        // ── 통계를 이벤트로 움직이기 ─────────────────────────────
+        // ── 수치를 이벤트로 움직이기 ─────────────────────────────
 
         // 합계형: amount만큼 더한다. 최고·최저·마지막 값형: amount를 한 번 기록한다.
-        // 통계의 반영 규칙을 거꾸로 따라가 필요한 이벤트를 만든다. 같은 이벤트를 받는 다른 통계도 게임에서처럼 함께 움직인다.
+        // 수치의 반영 규칙을 거꾸로 따라가 필요한 이벤트를 만든다. 같은 이벤트를 받는 다른 수치도 게임에서처럼 함께 움직인다.
         public static bool TryPlanForStat(StatSystem stats, string statId, double amount, out EventPlan plan, out string error)
         {
             plan = null;
@@ -122,7 +122,7 @@ namespace GameSystems
             var definition = stats.Find(statId);
             if (definition == null)
             {
-                error = $"정의되지 않은 통계 '{statId}'입니다.";
+                error = $"정의되지 않은 수치 '{statId}'입니다.";
                 return false;
             }
             if (definition.Rules.Count == 0)
@@ -155,7 +155,7 @@ namespace GameSystems
                         // 횟수 규칙: 이벤트 1회 = multiplier만큼 반영.
                         if (definition.Aggregate != StatAggregate.Sum)
                         {
-                            reasons.Add($"{name}: 횟수 규칙은 합계형 통계에서만 이벤트로 재현할 수 있음");
+                            reasons.Add($"{name}: 횟수 규칙은 합계형 수치에서만 이벤트로 재현할 수 있음");
                             continue;
                         }
                         var count = (int)Math.Round(raw);
@@ -191,7 +191,7 @@ namespace GameSystems
 
         // ── 도전과제 조건 채우기 ─────────────────────────────────
 
-        // 조건 트리를 따라가 아직 부족한 통계 차이를 계산한다. (통계 id, 반영할 값) 목록.
+        // 조건 트리를 따라가 아직 부족한 수치 차이를 계산한다. (수치 id, 반영할 값) 목록.
         public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out string error)
         {
             steps = new List<(string, double)>();
@@ -203,7 +203,7 @@ namespace GameSystems
                 return false;
             }
             Collect(session, definition.Condition, steps, problems, new HashSet<string> { achievementId });
-            // 같은 통계를 여러 조건이 보면 가장 큰 요구치 하나로 합친다.
+            // 같은 수치를 여러 조건이 보면 가장 큰 요구치 하나로 합친다.
             steps = steps.GroupBy(s => s.stat).Select(g => (g.Key, g.Max(s => s.amount))).ToList();
             error = problems.Count > 0 ? string.Join(" / ", problems) : null;
             return problems.Count == 0 && steps.Count > 0;
@@ -218,7 +218,7 @@ namespace GameSystems
                     var definition = session.Stats.Find(compare.stat);
                     if (definition == null)
                     {
-                        problems.Add($"없는 통계 '{compare.stat}'");
+                        problems.Add($"없는 수치 '{compare.stat}'");
                         return;
                     }
                     var current = session.Stats.Get(compare.stat);

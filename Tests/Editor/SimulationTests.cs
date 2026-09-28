@@ -28,7 +28,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 이벤트로_반영하면_같은_이벤트를_받는_다른_통계도_움직인다()
+        public void 이벤트로_반영하면_같은_이벤트를_받는_다른_수치도_움직인다()
         {
             Assert.IsTrue(_session.TrySimulateStat("kills", 3, commit: true, out var description, out var error), error);
             Assert.AreEqual(3, _session.Stats.Get("kills"));
@@ -46,7 +46,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 최고치_통계는_값을_한_번_기록한다()
+        public void 최고치_수치는_값을_한_번_기록한다()
         {
             Assert.IsTrue(_session.TrySimulateStat("combo", 7, commit: true, out _, out var error), error);
             Assert.AreEqual(7, _session.Stats.Get("combo"));
@@ -65,7 +65,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 규칙이_없는_통계는_이유와_함께_거절한다()
+        public void 규칙이_없는_수치는_이유와_함께_거절한다()
         {
             Assert.IsFalse(_session.TrySimulateStat("gold", 10, commit: true, out _, out var error));
             StringAssert.Contains("반영 규칙이 없어", error);
