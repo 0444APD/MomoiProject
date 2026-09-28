@@ -14,6 +14,7 @@ public class DialoguePanel : ISystemPanel
     private Vector2 _scroll;
     const string Symbol      = "SYSTEM_DIALOGUE";
     const string ReadySymbol = "GAME_SYSTEMS_READY";
+    const string TmpSymbol   = "DOTWEEN_TEXTMESHPRO";
 
     public void OnEnable()  { }
     public void OnDisable() { }
@@ -23,7 +24,16 @@ public class DialoguePanel : ISystemPanel
         DrawAddonHeader();
         if (!IsSymbolDefined(Symbol)) return;
 
-#if SYSTEM_DIALOGUE
+        if (!IsSymbolDefined(TmpSymbol))
+        {
+            EditorGUILayout.HelpBox(
+                "Dialogue는 DOTween Pro의 TextMeshPro 모듈이 필요합니다.\n" +
+                "Tools > Demigiant > DOTween Utility Panel > Setup DOTween... 에서 TextMeshPro를 켜세요.",
+                MessageType.Warning);
+            return;
+        }
+
+#if SYSTEM_DIALOGUE && GAME_SYSTEMS_READY && DOTWEEN_TEXTMESHPRO
         EditorGUILayout.Space(4);
         DrawRuntimeInfo();
 #endif
@@ -70,7 +80,7 @@ public class DialoguePanel : ISystemPanel
                 MessageType.Info);
     }
 
-#if SYSTEM_DIALOGUE
+#if SYSTEM_DIALOGUE && GAME_SYSTEMS_READY && DOTWEEN_TEXTMESHPRO
     // ── 런타임 상태 표시 ────────────────────────────────────────────────
     void DrawRuntimeInfo()
     {

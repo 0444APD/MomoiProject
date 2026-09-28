@@ -34,7 +34,7 @@ public class InventoryPanel : ISystemPanel
         return;
 #endif
 
-#if SYSTEM_INVENTORY
+#if SYSTEM_INVENTORY && GAME_SYSTEMS_READY
         EditorGUILayout.Space(4);
         DrawControls();
 #endif
@@ -81,7 +81,7 @@ public class InventoryPanel : ISystemPanel
                 MessageType.Info);
     }
 
-#if SYSTEM_INVENTORY
+#if SYSTEM_INVENTORY && GAME_SYSTEMS_READY
     // ── 활성화 시 컨트롤 ────────────────────────────────────────────────
     void DrawControls()
     {

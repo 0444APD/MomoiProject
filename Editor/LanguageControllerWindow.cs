@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && ODIN_INSPECTOR
+ï»¿#if UNITY_EDITOR && GAME_SYSTEMS_READY
 using UnityEditor;
 using UnityEngine;
 using Sirenix.OdinInspector;
@@ -7,18 +7,18 @@ using System.Collections.Generic;
 
 public class LanguageControllerWindow : OdinEditorWindow {
 
-    [MenuItem("Tools/·±Å¸ÀÓ ¾ğ¾î ÄÁÆ®·Ñ·¯")]
+    [MenuItem("Tools/ëŸ°íƒ€ì„ ì–¸ì–´ ì»¨íŠ¸ë¡¤ëŸ¬")]
     private static void OpenWindow() {
-        GetWindow<LanguageControllerWindow>("¾ğ¾î ÄÁÆ®·Ñ·¯").Show();
+        GetWindow<LanguageControllerWindow>("ì–¸ì–´ ì»¨íŠ¸ë¡¤ëŸ¬").Show();
     }
 
-    [Title("½Ç½Ã°£ ¾ğ¾î º¯°æ (Play Mode Àü¿ë)")]
-    [ValueDropdown("GetLanguageList")] // µå·Ó´Ù¿î Ç×¸ñÀ» Á¦°øÇÒ ÇÔ¼ö ÁöÁ¤
+    [Title("ì‹¤ì‹œê°„ ì–¸ì–´ ë³€ê²½ (Play Mode ì „ìš©)")]
+    [ValueDropdown("GetLanguageList")] // ë“œë¡­ë‹¤ìš´ í•­ëª©ì„ ì œê³µí•  í•¨ìˆ˜ ì§€ì •
     [HideLabel]
     [OnValueChanged("OnLanguageChanged")]
     public string testLanguage = "Kr";
 
-    // µå·Ó´Ù¿î ¸Ş´º¿¡ Ç¥½ÃÇÒ ÀÓÀÇÀÇ string ¹è¿­À» ¹İÈ¯ÇÏ´Â ÇÔ¼ö
+    // ë“œë¡­ë‹¤ìš´ ë©”ë‰´ì— í‘œì‹œí•  ì„ì˜ì˜ string ë°°ì—´ì„ ë°˜í™˜í•˜ëŠ” í•¨ìˆ˜
     private IEnumerable<string> GetLanguageList() {
         return new string[] { "Kr", "En", "Jp", "Cn" };
     }
@@ -32,12 +32,12 @@ public class LanguageControllerWindow : OdinEditorWindow {
 
     private void OnLanguageChanged() {
         if (!Application.isPlaying) {
-            Debug.LogWarning("[¾ğ¾î ÄÁÆ®·Ñ·¯] ÀÌ ±â´ÉÀº °ÔÀÓÀÌ ½ÇÇà Áß(Play Mode)ÀÏ ¶§¸¸ ÀÛµ¿ÇÕ´Ï´Ù.");
+            Debug.LogWarning("[ì–¸ì–´ ì»¨íŠ¸ë¡¤ëŸ¬] ì´ ê¸°ëŠ¥ì€ ê²Œì„ì´ ì‹¤í–‰ ì¤‘(Play Mode)ì¼ ë•Œë§Œ ì‘ë™í•©ë‹ˆë‹¤.");
             return;
         }
 
         LanguageManager.ChangeLanguage(testLanguage);
-        Debug.Log($"[¾ğ¾î ÄÁÆ®·Ñ·¯] ·±Å¸ÀÓ ¾ğ¾î°¡ {testLanguage}(À¸)·Î º¯°æµÇ¾ú½À´Ï´Ù.");
+        Debug.Log($"[ì–¸ì–´ ì»¨íŠ¸ë¡¤ëŸ¬] ëŸ°íƒ€ì„ ì–¸ì–´ê°€ {testLanguage}(ìœ¼)ë¡œ ë³€ê²½ë˜ì—ˆìŠµë‹ˆë‹¤.");
     }
 }
 #endif

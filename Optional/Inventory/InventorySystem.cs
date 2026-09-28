@@ -1,9 +1,4 @@
-#if SYSTEM_INVENTORY
-// Inventory System은 Addressables 패키지가 필수입니다.
-#if !Addressable
-#error "[InventorySystem] SYSTEM_INVENTORY는 Addressables 패키지를 필요로 합니다 (com.unity.addressables)"
-#endif
-
+#if SYSTEM_INVENTORY && GAME_SYSTEMS_READY
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;

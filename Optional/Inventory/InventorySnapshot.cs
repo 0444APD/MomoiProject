@@ -1,4 +1,4 @@
-#if SYSTEM_INVENTORY
+#if SYSTEM_INVENTORY && GAME_SYSTEMS_READY
 
 using System;
 using System.Collections.Generic;

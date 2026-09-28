@@ -1,10 +1,10 @@
-#if UNITY_EDITOR && !Addressable
+ï»¿#if UNITY_EDITOR && !Addressable
 using UnityEditor;
 using UnityEditor.Build;
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using UnityEngine; // Debug.Log¸¦ »ç¿ëÇÏ±â À§ÇØ Ãß°¡
+using UnityEngine; // Debug.Logë¥¼ ì‚¬ìš©í•˜ê¸° ìœ„í•´ ì¶”ê°€
 
 [InitializeOnLoad]
 public class AddressableSymalManager {
@@ -14,7 +14,7 @@ public class AddressableSymalManager {
         UpdateSymbol();
     }
 
-    // MenuItem ¼Ó¼ºÀ» Ãß°¡ÇÏ¿© ¿¡µğÅÍ »ó´Ü ¸Ş´º¿¡¼­ Å¬¸¯À¸·Î ½ÇÇàÇÒ ¼ö ÀÖ°Ô ¸¸µì´Ï´Ù.
+    // MenuItem ì†ì„±ì„ ì¶”ê°€í•˜ì—¬ ì—ë””í„° ìƒë‹¨ ë©”ë‰´ì—ì„œ í´ë¦­ìœ¼ë¡œ ì‹¤í–‰í•  ìˆ˜ ìˆê²Œ ë§Œë“­ë‹ˆë‹¤.
     public static void UpdateSymbol() {
         bool isInstalled = AppDomain.CurrentDomain.GetAssemblies()
             .Any(assembly => assembly.GetName().Name == "Unity.Addressables");
@@ -40,13 +40,13 @@ public class AddressableSymalManager {
             isChanged = true;
         }
 
-        // ¼öµ¿ ½ÇÇà ½Ã °á°ú¸¦ ÄÜ¼Ö¿¡¼­ È®ÀÎÇÒ ¼ö ÀÖµµ·Ï ·Î±×¸¦ Ãß°¡Çß½À´Ï´Ù.
+        // ìˆ˜ë™ ì‹¤í–‰ ì‹œ ê²°ê³¼ë¥¼ ì½˜ì†”ì—ì„œ í™•ì¸í•  ìˆ˜ ìˆë„ë¡ ë¡œê·¸ë¥¼ ì¶”ê°€í–ˆìŠµë‹ˆë‹¤.
         if (isChanged) {
             PlayerSettings.SetScriptingDefineSymbols(namedBuildTarget, string.Join(";", allDefines));
-            Debug.Log($"[SymbolManager] ½Éº¼ ¾÷µ¥ÀÌÆ® ¿Ï·á: {SymbolName} {(isInstalled ? "Ãß°¡µÊ" : "Á¦°ÅµÊ")}");
+            Debug.Log($"[SymbolManager] ì‹¬ë³¼ ì—…ë°ì´íŠ¸ ì™„ë£Œ: {SymbolName} {(isInstalled ? "ì¶”ê°€ë¨" : "ì œê±°ë¨")}");
         }
         else {
-            Debug.Log($"[SymbolManager] º¯°æ »çÇ×ÀÌ ¾ø½À´Ï´Ù. (ÇöÀç »óÅÂ: {(isInstalled ? "¼³Ä¡µÊ" : "¹Ì¼³Ä¡")})");
+            Debug.Log($"[SymbolManager] ë³€ê²½ ì‚¬í•­ì´ ì—†ìŠµë‹ˆë‹¤. (í˜„ì¬ ìƒíƒœ: {(isInstalled ? "ì„¤ì¹˜ë¨" : "ë¯¸ì„¤ì¹˜")})");
         }
     }
 }

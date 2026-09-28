@@ -1,6 +1,6 @@
-#if UNITY_EDITOR && !NEWTONSOFT_JSON
+ï»¿#if UNITY_EDITOR && !NEWTONSOFT_JSON
 using UnityEditor;
-using UnityEditor.Build; // NamedBuildTargetÀ» »ç¿ëÇÏ±â À§ÇØ ÇÊ¿äÇÕ´Ï´Ù.
+using UnityEditor.Build; // NamedBuildTargetì„ ì‚¬ìš©í•˜ê¸° ìœ„í•´ í•„ìš”í•©ë‹ˆë‹¤.
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -15,30 +15,30 @@ public class NewtonsoftSymbolManager {
 
 
     private static void UpdateSymbol() {
-        // ÇöÀç À¯´ÏÆ¼ µµ¸ŞÀÎ¿¡ ·ÎµåµÈ ¾î¼Àºí¸® Áß Newtonsoft.JsonÀÌ ÀÖ´ÂÁö °Ë»ç
+        // í˜„ì¬ ìœ ë‹ˆí‹° ë„ë©”ì¸ì— ë¡œë“œëœ ì–´ì…ˆë¸”ë¦¬ ì¤‘ Newtonsoft.Jsonì´ ìˆëŠ”ì§€ ê²€ì‚¬
         bool isInstalled = AppDomain.CurrentDomain.GetAssemblies()
             .Any(assembly => assembly.GetName().Name == "Newtonsoft.Json");
 
-        // ÃÖ½Å À¯´ÏÆ¼ ±ÇÀå ¹æ½Ä: NamedBuildTarget »ç¿ë
+        // ìµœì‹  ìœ ë‹ˆí‹° ê¶Œì¥ ë°©ì‹: NamedBuildTarget ì‚¬ìš©
         BuildTargetGroup targetGroup = EditorUserBuildSettings.selectedBuildTargetGroup;
 
-        // BuildTargetGroupÀÌ UnknownÀÏ °æ¿ì ¿¹¿Ü°¡ ¹ß»ıÇÒ ¼ö ÀÖÀ¸¹Ç·Î ¹æ¾î ÄÚµå Ãß°¡
+        // BuildTargetGroupì´ Unknownì¼ ê²½ìš° ì˜ˆì™¸ê°€ ë°œìƒí•  ìˆ˜ ìˆìœ¼ë¯€ë¡œ ë°©ì–´ ì½”ë“œ ì¶”ê°€
         if (targetGroup == BuildTargetGroup.Unknown) return;
 
         NamedBuildTarget namedBuildTarget = NamedBuildTarget.FromBuildTargetGroup(targetGroup);
 
-        // »õ·Î¿î API¸¦ »ç¿ëÇÏ¿© ½Éº¼ ¸ñ·Ï °¡Á®¿À±â
+        // ìƒˆë¡œìš´ APIë¥¼ ì‚¬ìš©í•˜ì—¬ ì‹¬ë³¼ ëª©ë¡ ê°€ì ¸ì˜¤ê¸°
         string definesString = PlayerSettings.GetScriptingDefineSymbols(namedBuildTarget);
         List<string> allDefines = definesString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList();
 
         bool hasSymbol = allDefines.Contains(SymbolName);
 
-        // Newtonsoft°¡ ÀÖ´Âµ¥ ½Éº¼ÀÌ ¾øÀ¸¸é Ãß°¡
+        // Newtonsoftê°€ ìˆëŠ”ë° ì‹¬ë³¼ì´ ì—†ìœ¼ë©´ ì¶”ê°€
         if (isInstalled && !hasSymbol) {
             allDefines.Add(SymbolName);
             PlayerSettings.SetScriptingDefineSymbols(namedBuildTarget, string.Join(";", allDefines));
         }
-        // Newtonsoft°¡ ¾ø´Âµ¥ ½Éº¼ÀÌ ³²¾ÆÀÖÀ¸¸é Á¦°Å
+        // Newtonsoftê°€ ì—†ëŠ”ë° ì‹¬ë³¼ì´ ë‚¨ì•„ìˆìœ¼ë©´ ì œê±°
         else if (!isInstalled && hasSymbol) {
             allDefines.Remove(SymbolName);
             PlayerSettings.SetScriptingDefineSymbols(namedBuildTarget, string.Join(";", allDefines));

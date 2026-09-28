@@ -1,3 +1,4 @@
+#if GAME_SYSTEMS_READY
 using UnityEditor;
 using UnityEngine;
 using System.IO;
@@ -132,3 +133,4 @@ public class SaveManagerPanel : ISystemPanel
         }
     }
 }
+#endif

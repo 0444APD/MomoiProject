@@ -1,3 +1,4 @@
+#if GAME_SYSTEMS_READY
 using UnityEditor;
 using UnityEngine;
 using System;
@@ -167,3 +168,4 @@ public class EventsPanel : ISystemPanel {
         EditorGUILayout.TextArea(code, style);
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if GAME_SYSTEMS_READY
 using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
@@ -201,3 +202,4 @@ public class LogsPanel : ISystemPanel {
         EditorGUILayout.TextArea(code, style);
     }
 }
+#endif

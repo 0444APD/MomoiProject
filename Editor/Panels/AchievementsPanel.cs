@@ -1,3 +1,4 @@
+#if GAME_SYSTEMS_READY
 using UnityEditor;
 using UnityEngine;
 
@@ -209,3 +210,4 @@ public class AchievementsPanel : ISystemPanel {
         EditorGUILayout.TextArea(code, style);
     }
 }
+#endif

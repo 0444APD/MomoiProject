@@ -1,4 +1,4 @@
-#if SYSTEM_DIALOGUE
+#if SYSTEM_DIALOGUE && GAME_SYSTEMS_READY && DOTWEEN_TEXTMESHPRO
 using UnityEngine.Timeline;
 
 [TrackColor(1f, 0.5f, 0f)]

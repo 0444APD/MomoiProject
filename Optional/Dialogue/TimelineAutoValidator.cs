@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && SYSTEM_DIALOGUE
+#if UNITY_EDITOR && SYSTEM_DIALOGUE && GAME_SYSTEMS_READY && DOTWEEN_TEXTMESHPRO
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Timeline;

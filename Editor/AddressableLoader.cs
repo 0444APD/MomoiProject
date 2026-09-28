@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && Addressable
+ï»¿#if UNITY_EDITOR && GAME_SYSTEMS_READY
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
@@ -13,44 +13,44 @@ public class AddressableLoader {
         string[] settingGuids = AssetDatabase.FindAssets("t:AddressableLoaderSettings");
 
         if (settingGuids.Length == 0) {
-            Debug.LogError("[AddressableLoader] AddressableLoaderSettings ¿¡¼ÂÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù. Project Ã¢¿¡¼­ ¿ìÅ¬¸¯ -> Create -> Tools -> Addressable Loader Settings¸¦ ¸¸µé¾î °æ·Î¸¦ ¼¼ÆÃÇØ ÁÖ¼¼¿ä.");
+            Debug.LogError("[AddressableLoader] AddressableLoaderSettings ì—ì…‹ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. Project ì°½ì—ì„œ ìš°í´ë¦­ -> Create -> Tools -> Addressable Loader Settingsë¥¼ ë§Œë“¤ì–´ ê²½ë¡œë¥¼ ì„¸íŒ…í•´ ì£¼ì„¸ìš”.");
             return;
         }
 
         var settingsData = AssetDatabase.LoadAssetAtPath<AddressableLoaderSettings>(AssetDatabase.GUIDToAssetPath(settingGuids[0]));
         if (settingsData.targetRootFolders.Count == 0) {
-            Debug.LogWarning("[AddressableLoader] µî·ÏµÈ ·çÆ® Æú´õ °æ·Î°¡ ¾ø½À´Ï´Ù. ¼¼ÆÃ ¿¡¼ÂÀ» È®ÀÎÇØ ÁÖ¼¼¿ä.");
+            Debug.LogWarning("[AddressableLoader] ë“±ë¡ëœ ë£¨íŠ¸ í´ë” ê²½ë¡œê°€ ì—†ìŠµë‹ˆë‹¤. ì„¸íŒ… ì—ì…‹ì„ í™•ì¸í•´ ì£¼ì„¸ìš”.");
             return;
         }
 
         bool hasError = false;
 
-        // ¾ö°İÇÑ °èÃş ±¸Á¶ °Ë»ç ¹× ¹®Á¦ ÆÄÀÏ »ó¼¼ ·Î±ë
+        // ì—„ê²©í•œ ê³„ì¸µ êµ¬ì¡° ê²€ì‚¬ ë° ë¬¸ì œ íŒŒì¼ ìƒì„¸ ë¡œê¹…
         foreach (string rootFolder in settingsData.targetRootFolders) {
             if (!AssetDatabase.IsValidFolder(rootFolder)) {
-                Debug.LogError($"[AddressableLoader] À¯È¿ÇÏÁö ¾ÊÀº Æú´õ °æ·ÎÀÔ´Ï´Ù: {rootFolder}");
+                Debug.LogError($"[AddressableLoader] ìœ íš¨í•˜ì§€ ì•Šì€ í´ë” ê²½ë¡œì…ë‹ˆë‹¤: {rootFolder}");
                 hasError = true;
                 continue;
             }
 
-            // [±ÔÄ¢ 1] ·çÆ® Æú´õ ¹Ù·Î ¾Æ·¡¿¡´Â Æú´õ(¶óº§)¸¸ ÀÖ¾î¾ß ÇÔ
+            // [ê·œì¹™ 1] ë£¨íŠ¸ í´ë” ë°”ë¡œ ì•„ë˜ì—ëŠ” í´ë”(ë¼ë²¨)ë§Œ ìˆì–´ì•¼ í•¨
             var filesInRoot = Directory.GetFiles(rootFolder).Where(f => !f.EndsWith(".meta")).ToArray();
             if (filesInRoot.Length > 0) {
                 foreach (var file in filesInRoot) {
                     string cleanPath = file.Replace("\\", "/");
-                    Debug.LogError($"[AddressableLoader] ±×·ì(·çÆ®) Æú´õ ¹Ù·Î ¾Æ·¡¿¡ ÆÄÀÏÀÌ Á¸ÀçÇÕ´Ï´Ù. ÆÄÀÏÀº ¹İµå½Ã ¶óº§ Æú´õ ¾È¿¡ ³Ö¾îÁÖ¼¼¿ä.\n¹®Á¦ ÆÄÀÏ: {cleanPath}");
+                    Debug.LogError($"[AddressableLoader] ê·¸ë£¹(ë£¨íŠ¸) í´ë” ë°”ë¡œ ì•„ë˜ì— íŒŒì¼ì´ ì¡´ì¬í•©ë‹ˆë‹¤. íŒŒì¼ì€ ë°˜ë“œì‹œ ë¼ë²¨ í´ë” ì•ˆì— ë„£ì–´ì£¼ì„¸ìš”.\në¬¸ì œ íŒŒì¼: {cleanPath}");
                 }
                 hasError = true;
             }
 
-            // [±ÔÄ¢ 2] ¶óº§ Æú´õ ¾È¿¡´Â ÆÄÀÏ¸¸ ÀÖ¾î¾ß ÇÔ (ÇÏÀ§ Æú´õ Á¸Àç ½Ã ¿¡·¯)
+            // [ê·œì¹™ 2] ë¼ë²¨ í´ë” ì•ˆì—ëŠ” íŒŒì¼ë§Œ ìˆì–´ì•¼ í•¨ (í•˜ìœ„ í´ë” ì¡´ì¬ ì‹œ ì—ëŸ¬)
             var labelFolders = Directory.GetDirectories(rootFolder);
             foreach (var labelFolder in labelFolders) {
                 var subFolders = Directory.GetDirectories(labelFolder);
                 if (subFolders.Length > 0) {
                     foreach (var subFolder in subFolders) {
                         string cleanPath = subFolder.Replace("\\", "/");
-                        Debug.LogError($"[AddressableLoader] ¶óº§ Æú´õ ¾È¿¡ ¶Ç ´Ù¸¥ ÇÏÀ§ Æú´õ°¡ Á¸ÀçÇÕ´Ï´Ù. 2ÁßÃ¸ ±¸Á¶±îÁö¸¸ Çã¿ëµË´Ï´Ù.\n¹®Á¦ Æú´õ: {cleanPath}");
+                        Debug.LogError($"[AddressableLoader] ë¼ë²¨ í´ë” ì•ˆì— ë˜ ë‹¤ë¥¸ í•˜ìœ„ í´ë”ê°€ ì¡´ì¬í•©ë‹ˆë‹¤. 2ì¤‘ì²© êµ¬ì¡°ê¹Œì§€ë§Œ í—ˆìš©ë©ë‹ˆë‹¤.\në¬¸ì œ í´ë”: {cleanPath}");
                     }
                     hasError = true;
                 }
@@ -58,21 +58,21 @@ public class AddressableLoader {
         }
 
         if (hasError) {
-            Debug.LogError("[AddressableLoader] °èÃş ±¸Á¶ ±ÔÄ¢ À§¹İÀÌ ¹ß°ßµÇ¾î ¾îµå·¹¼­ºí µî·ÏÀ» Áß´ÜÇÕ´Ï´Ù. À§ ¿¡·¯ ·Î±×µéÀ» È®ÀÎÇØ ÁÖ¼¼¿ä.");
+            Debug.LogError("[AddressableLoader] ê³„ì¸µ êµ¬ì¡° ê·œì¹™ ìœ„ë°˜ì´ ë°œê²¬ë˜ì–´ ì–´ë“œë ˆì„œë¸” ë“±ë¡ì„ ì¤‘ë‹¨í•©ë‹ˆë‹¤. ìœ„ ì—ëŸ¬ ë¡œê·¸ë“¤ì„ í™•ì¸í•´ ì£¼ì„¸ìš”.");
             return;
         }
 
-        // 3. ¾îµå·¹¼­ºí ¼¼ÆÃ ¿¡¼Â °¡Á®¿À±â
+        // 3. ì–´ë“œë ˆì„œë¸” ì„¸íŒ… ì—ì…‹ ê°€ì ¸ì˜¤ê¸°
         AddressableAssetSettings addressableSettings = AddressableAssetSettingsDefaultObject.Settings;
         if (addressableSettings == null) {
-            Debug.LogError("[AddressableLoader] AddressableAssetSettings¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù. Window > Asset Management > Addressables > Groups Ã¢À» ¿­¾îÁÖ¼¼¿ä.");
+            Debug.LogError("[AddressableLoader] AddressableAssetSettingsë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. Window > Asset Management > Addressables > Groups ì°½ì„ ì—´ì–´ì£¼ì„¸ìš”.");
             return;
         }
 
-        string logResult = "[¾îµå·¹¼­ºí ÀÚµ¿ µî·Ï °á°ú]\n";
+        string logResult = "[ì–´ë“œë ˆì„œë¸” ìë™ ë“±ë¡ ê²°ê³¼]\n";
         int totalFiles = 0;
 
-        // 4. ±¸Á¶¸¦ ±â¹İÀ¸·Î ¾îµå·¹¼­ºí ±×·ì/¶óº§/ÁÖ¼Ò ¼¼ÆÃ
+        // 4. êµ¬ì¡°ë¥¼ ê¸°ë°˜ìœ¼ë¡œ ì–´ë“œë ˆì„œë¸” ê·¸ë£¹/ë¼ë²¨/ì£¼ì†Œ ì„¸íŒ…
         foreach (string rootFolder in settingsData.targetRootFolders) {
             string groupName = Path.GetFileName(rootFolder);
 
@@ -110,11 +110,11 @@ public class AddressableLoader {
             }
 
             if (groupFileCount > 0) {
-                logResult += $"[{groupName} ±×·ì] : {groupFileCount}°³ ÆÄÀÏ µî·Ï ¿Ï·á\n";
+                logResult += $"[{groupName} ê·¸ë£¹] : {groupFileCount}ê°œ íŒŒì¼ ë“±ë¡ ì™„ë£Œ\n";
             }
         }
 
-        logResult += $"ÃÑ {totalFiles}°³ÀÇ ¿¡¼ÂÀÌ Ã³¸®µÇ¾ú½À´Ï´Ù.";
+        logResult += $"ì´ {totalFiles}ê°œì˜ ì—ì…‹ì´ ì²˜ë¦¬ë˜ì—ˆìŠµë‹ˆë‹¤.";
         Debug.Log(logResult);
 
         EditorUtility.SetDirty(addressableSettings);

@@ -3,8 +3,10 @@ using Sirenix.OdinInspector;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+#if UNITY_EDITOR
 using UnityEditor.AddressableAssets;
 using UnityEditor.Callbacks;
+#endif
 using UnityEngine;
 
 // --- [������ ����ü] ---

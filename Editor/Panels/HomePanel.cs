@@ -94,6 +94,7 @@ public class HomePanel : ISystemPanel
     {
         EditorGUILayout.LabelField("시스템 상태", EditorStyles.boldLabel);
 
+#if GAME_SYSTEMS_READY
         var playStyle = new GUIStyle(EditorStyles.helpBox);
         bool isPlaying = Application.isPlaying;
 
@@ -109,6 +110,9 @@ public class HomePanel : ISystemPanel
         {
             EditorGUILayout.HelpBox("시스템 상태는 플레이 모드에서 실시간으로 확인할 수 있습니다.", MessageType.Info);
         }
+#else
+        EditorGUILayout.HelpBox("필수 패키지가 모두 설치되면 시스템이 활성화됩니다.", MessageType.Warning);
+#endif
     }
 
     private void DrawInfoRow(string label, string value)

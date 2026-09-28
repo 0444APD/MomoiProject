@@ -1,3 +1,4 @@
+#if GAME_SYSTEMS_READY
 using UnityEditor;
 using UnityEngine;
 #if Addressable
@@ -207,3 +208,4 @@ public class AddressablesPanel : ISystemPanel {
             new GUIStyle(EditorStyles.helpBox) { fontSize = 11, wordWrap = false });
     }
 }
+#endif
