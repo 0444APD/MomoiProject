@@ -77,47 +77,54 @@ namespace GameSystems.EditorTools.UI
             EnableInClassList("gs-inline--broken", broken);
         }
 
-        (string text, bool empty, bool broken) Display()
+        (string text, bool empty, bool broken) Display() => Describe(_property, _field);
+
+        // 값의 표시 문장. 시트 셀·변경 표시 등에서도 같은 규칙으로 쓴다(ID는 이름으로, 끊긴 참조는 표시).
+        public static (string text, bool empty, bool broken) Describe(SerializedProperty property, FieldInfo field = null)
         {
+            if (field == null) field = PropertyUtil.GetField(property, out _);
             var db = EditorDatabase.Instance;
-            if (_property.propertyType == SerializedPropertyType.String)
+            if (property.propertyType == SerializedPropertyType.String)
             {
-                var id = _property.stringValue;
-                if (IsStatRef || IsAchievementRef)
+                var id = property.stringValue;
+                if (field != null && (field.IsDefined(typeof(StatRefAttribute), false) || field.IsDefined(typeof(AchievementRefAttribute), false)))
                 {
                     if (string.IsNullOrEmpty(id)) return ("선택 안 됨", true, false);
                     var target = db.FindById(id);
                     return target != null ? (target.DisplayName, false, false) : ($"없는 항목: {id}", false, true);
                 }
-                if (IsEventTypeRef)
+                if (field != null && field.IsDefined(typeof(EventTypeRefAttribute), false))
                 {
                     if (string.IsNullOrEmpty(id)) return ("선택 안 됨", true, false);
                     var type = TypeResolver.Find(id);
                     return type != null ? (EventBus.DisplayNameOf(type), false, false) : ($"없는 이벤트: {id}", false, true);
                 }
-                if (EventFieldRef != null)
+                var fieldRef = field?.GetCustomAttribute<EventFieldRefAttribute>();
+                if (fieldRef != null)
                 {
                     if (string.IsNullOrEmpty(id)) return ("횟수 (필드 없음)", true, false);
-                    var eventType = TypeResolver.Find(Sibling(EventFieldRef.EventTypeField)?.stringValue);
+                    var eventType = TypeResolver.Find(Sibling(property, fieldRef.EventTypeField)?.stringValue);
                     if (eventType != null && TypeResolver.NumberGetter(eventType, id, out _) == null) return ($"없는 필드: {id}", false, true);
                     return (id, false, false);
                 }
                 return string.IsNullOrEmpty(id) ? ("비어 있음", true, false) : (id, false, false);
             }
 
-            if (_property.propertyType == SerializedPropertyType.ObjectReference && _property.objectReferenceValue == null)
+            if (property.propertyType == SerializedPropertyType.ObjectReference && property.objectReferenceValue == null)
                 return ("없음", true, false);
 
-            var summary = PropertyUtil.Summary(_property);
+            var summary = PropertyUtil.Summary(property);
             return (summary, string.IsNullOrEmpty(summary), false);
         }
 
-        SerializedProperty Sibling(string name)
+        SerializedProperty Sibling(string name) => Sibling(_property, name);
+
+        static SerializedProperty Sibling(SerializedProperty property, string name)
         {
-            var path = _property.propertyPath;
+            var path = property.propertyPath;
             var index = path.LastIndexOf('.');
             var siblingPath = index < 0 ? name : path.Substring(0, index + 1) + name;
-            return _property.serializedObject.FindProperty(siblingPath);
+            return property.serializedObject.FindProperty(siblingPath);
         }
 
         void OnClick(ClickEvent evt)

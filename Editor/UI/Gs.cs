@@ -25,7 +25,8 @@ namespace GameSystems.EditorTools.UI
 
         public static readonly string[] PaletteNames = { "코랄", "탠저린", "레몬", "라임", "민트", "틸", "스카이", "페리윙클", "라벤더", "핑크" };
 
-        public static readonly Color Accent = Hex("#F86927");
+        // 포인트 컬러: 핫핑크 rgb(253, 93, 131)
+        public static readonly Color Accent = Hex("#FD5D83");
         public static readonly Color Background = Hex("#0E0F11");
         public static readonly Color Surface = Hex("#16171A");
         public static readonly Color Surface2 = Hex("#1D1E22");
@@ -72,6 +73,10 @@ namespace GameSystems.EditorTools.UI
         }
 
         public static Color WithAlpha(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
+
+        // 배경 위에 반투명 색을 얹었을 때의 실제 색(그라데이션 가림막 색을 배경과 맞출 때 쓴다).
+        public static Color Blend(Color background, Color overlay, float alpha) =>
+            new Color(Mathf.Lerp(background.r, overlay.r, alpha), Mathf.Lerp(background.g, overlay.g, alpha), Mathf.Lerp(background.b, overlay.b, alpha), 1f);
 
         public static Color Hex(string hex) => ColorUtility.TryParseHtmlString(hex, out var color) ? color : Color.magenta;
 
@@ -135,7 +140,7 @@ namespace GameSystems.EditorTools.UI
             var header = Box("gs-panel__header");
             var titles = Col();
             titles.Add(Label(title, "gs-title"));
-            if (!string.IsNullOrEmpty(caption)) titles.Add(Label(caption, "gs-caption"));
+            if (!string.IsNullOrEmpty(caption)) titles.Add(Label(caption, "gs-caption", "gs-panel__caption"));
             header.Add(titles);
             header.Add(Spacer());
             tools = Row();

@@ -39,6 +39,34 @@ namespace GameSystems.EditorTools.UI
             return FieldRow(label, property, onValue);
         }
 
+        // 제목 없이 내용만(상세 패널의 "헤더 · 내용" 배치에서 헤더는 패널이 그린다).
+        public static VisualElement BuildContent(SerializedProperty property, Action onValue, Action onStructure)
+        {
+            var field = PropertyUtil.GetField(property, out _);
+            if (property.propertyType == SerializedPropertyType.ManagedReference)
+                return new BlockEditor(property, field?.FieldType ?? typeof(object), onValue, onStructure, null);
+
+            if (property.isArray && property.propertyType == SerializedPropertyType.Generic)
+            {
+                var elementType = PropertyUtil.ElementType(field?.FieldType);
+                return PropertyUtil.IsManagedReferenceList(field)
+                    ? BlockList(property, elementType, onValue, onStructure)
+                    : PlainList(property, elementType, onValue, onStructure);
+            }
+
+            if (property.propertyType == SerializedPropertyType.Generic && property.hasVisibleChildren)
+            {
+                var group = Gs.Col();
+                foreach (var child in PropertyUtil.Children(property))
+                    group.Add(BuildProperty(child, onValue, onStructure));
+                return group;
+            }
+
+            var inline = new GsInlineProperty(property);
+            inline.Changed += () => onValue?.Invoke();
+            return inline;
+        }
+
         public static string LabelOf(SerializedProperty property, FieldInfo field)
         {
             var custom = field?.GetCustomAttribute<FieldLabelAttribute>();

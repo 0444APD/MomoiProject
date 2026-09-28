@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using GameSystems.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
@@ -6,11 +7,14 @@ using UnityEngine.UIElements;
 
 namespace GameSystems.EditorTools
 {
-    // 살아 있는 스타일 가이드: 디자인 토큰, 분류 팔레트, 카드 A·B·C, 시트, 부품, 모션, 필터 실험.
+    // 살아 있는 스타일 가이드: 디자인 토큰, 분류 팔레트, 카드 A·B·C, 시트, 상세 패널, 부품, 모션, 필터 실험.
     public sealed class ShowcaseWindow : EditorWindow
     {
         readonly List<ShowcaseItem> _items = new List<ShowcaseItem>();
         readonly List<Texture2D> _textures = new List<Texture2D>();
+        VisualElement _root;
+        VisualElement _cardsBody;
+        GsSheet _sheet;
 
         [MenuItem("Game Systems/UI 샘플", priority = 20)]
         public static void Open()
@@ -33,13 +37,13 @@ namespace GameSystems.EditorTools
         internal void Build(VisualElement host)
         {
             host.Clear();
-            var root = Gs.Col();
-            Gs.Apply(root);
-            host.Add(root);
+            _root = Gs.Col();
+            Gs.Apply(_root);
+            host.Add(_root);
 
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
-            root.Add(scroll);
+            _root.Add(scroll);
             var page = scroll.contentContainer;
             page.style.paddingLeft = 40;
             page.style.paddingRight = 40;
@@ -47,8 +51,9 @@ namespace GameSystems.EditorTools
             page.style.paddingBottom = 60;
 
             page.Add(Gs.Label("UI 샘플", "gs-display"));
-            page.Add(Gs.Space(4));
-            page.Add(Gs.Label("Game Systems 디자인 시스템의 모든 부품. 새 도구는 이 부품들을 조립해서 만든다.", "gs-caption"));
+            var intro = Gs.Label("Game Systems 디자인 시스템의 모든 부품. 새 도구는 이 부품(패널 단위)을 조립해서 만든다.", "gs-caption");
+            intro.style.marginTop = 6;
+            page.Add(intro);
             page.Add(Gs.Space(28));
 
             EnsureSamples();
@@ -77,15 +82,38 @@ namespace GameSystems.EditorTools
             {
                 var item = CreateInstance<ShowcaseItem>();
                 item.hideFlags = HideFlags.DontSave;
+                item.name = names[i];
                 item.displayName = names[i];
                 item.rarity = (ShowcaseItem.Rarity)(i % 4);
                 item.price = 120 * (i + 1);
                 item.weight = 0.5f + i * 0.7f;
                 item.owned = i % 2 == 0;
-                item.description = i % 2 == 0 ? "오래된 전설이 깃든 물건" : "";
+                item.description = i % 2 == 0 ? "오래된 전설이 깃든 물건. 새벽빛을 받으면 칼날에 희미한 문양이 떠오른다고 전해진다." : "";
                 _items.Add(item);
                 _textures.Add(MakeTexture(Gs.Palette[(i * 2) % Gs.Palette.Length], Gs.Palette[(i * 2 + 5) % Gs.Palette.Length]));
             }
+        }
+
+        Texture2D TextureOf(Object item) => _textures[Mathf.Max(0, _items.IndexOf(item as ShowcaseItem))];
+
+        // 모든 카드·시트가 같은 상세 패널을 연다.
+        void OpenDetail(Object item, string focusPath = null)
+        {
+            var index = _items.IndexOf(item as ShowcaseItem);
+            GsDetailPanel.Open(_root, item, new DetailOptions
+            {
+                Subtitle = "UI 샘플 아이템",
+                Image = _ => _textures[Mathf.Max(0, index)],
+                Placeholder = Gs.Palette[index % Gs.Palette.Length],
+                FocusPath = focusPath,
+                Saved = _ => RefreshItems(),
+            });
+        }
+
+        void RefreshItems()
+        {
+            BuildCards();
+            BuildSheet();
         }
 
         // 샘플 이미지: 두 색 대각 그라데이션 + 옅은 원.
@@ -114,13 +142,13 @@ namespace GameSystems.EditorTools
 
         VisualElement Tokens()
         {
-            var panel = Gs.Panel("디자인 토큰", "다크 테마 · 포인트 컬러 1개 · 분류 팔레트 10색", out _, out var body);
+            var panel = Gs.Panel("디자인 토큰", "다크 테마 · 포인트 컬러 1개(핫핑크) · 분류 팔레트 10색", out _, out var body);
 
             var surfaces = Gs.Row("gs-wrap");
             surfaces.Add(Swatch("배경", Gs.Background, "#0E0F11"));
             surfaces.Add(Swatch("패널", Gs.Surface, "#16171A"));
             surfaces.Add(Swatch("패널 2", Gs.Surface2, "#1D1E22"));
-            surfaces.Add(Swatch("포인트", Gs.Accent, "#F86927"));
+            surfaces.Add(Swatch("포인트", Gs.Accent, "#FD5D83"));
             body.Add(surfaces);
             body.Add(Gs.Space(16));
 
@@ -165,27 +193,34 @@ namespace GameSystems.EditorTools
 
         VisualElement Cards()
         {
-            var panel = Gs.Panel("카드", "A 세로형 · B 가로형 · C 바형 — 정보의 양과 중요도에 따라 고른다", out _, out var body);
+            var panel = Gs.Panel("카드", "A 세로형 · B 가로형 · C 바형 — 클릭하면 모두 같은 상세 패널이 열린다", out _, out _cardsBody);
+            BuildCards();
+            return panel;
+        }
 
-            body.Add(Gs.Label("A. 세로형", "gs-caption"));
-            body.Add(Gs.Space(8));
+        void BuildCards()
+        {
+            if (_cardsBody == null) return;
+            _cardsBody.Clear();
+
+            _cardsBody.Add(Gs.Label("A. 세로형", "gs-caption"));
+            _cardsBody.Add(Gs.Space(8));
             var vertical = Gs.Row("gs-wrap");
             for (int i = 0; i < 4; i++) vertical.Add(MakeCard(i, CardLayout.Vertical));
-            body.Add(vertical);
+            _cardsBody.Add(vertical);
 
-            body.Add(Gs.Label("B. 가로형 (16:9)", "gs-caption"));
-            body.Add(Gs.Space(8));
+            _cardsBody.Add(Gs.Label("B. 가로형 (16:9)", "gs-caption"));
+            _cardsBody.Add(Gs.Space(8));
             var horizontal = Gs.Row("gs-wrap");
             for (int i = 0; i < 2; i++) horizontal.Add(MakeCard(i + 1, CardLayout.Horizontal));
-            body.Add(horizontal);
+            _cardsBody.Add(horizontal);
 
-            body.Add(Gs.Label("C. 바형", "gs-caption"));
-            body.Add(Gs.Space(8));
+            _cardsBody.Add(Gs.Label("C. 바형", "gs-caption"));
+            _cardsBody.Add(Gs.Space(8));
             var bars = Gs.Col();
             bars.style.maxWidth = 620;
             for (int i = 0; i < 3; i++) bars.Add(MakeCard(i + 2, CardLayout.Bar));
-            body.Add(bars);
-            return panel;
+            _cardsBody.Add(bars);
         }
 
         GsCard MakeCard(int index, CardLayout layout)
@@ -202,71 +237,43 @@ namespace GameSystems.EditorTools
 
             if (layout != CardLayout.Bar)
             {
-                AddInlineStat(card, "가격", so.FindProperty("price"));
-                AddInlineStat(card, "무게", so.FindProperty("weight"));
+                card.AddStat("가격", item.price.ToString());
+                card.AddStat("무게", item.weight.ToString("0.#"));
             }
-            card.RegisterCallback<ClickEvent>(_ => card.SetSelected(!card.ClassListContains("gs-card--selected")));
+            card.RegisterCallback<ClickEvent>(_ => OpenDetail(item));
             return card;
-        }
-
-        static void AddInlineStat(GsCard card, string label, SerializedProperty property)
-        {
-            var box = Gs.Box("gs-card__stat");
-            box.Add(Gs.Label(label, "gs-card__stat-label"));
-            box.Add(new GsInlineProperty(property));
-            card.AddToStats(box);
         }
 
         // ── 시트 ───────────────────────────────────────────────
 
         VisualElement Sheet()
         {
-            var panel = Gs.Panel("시트", "값은 평소 글자로 보이고, 클릭하면 편집으로 바뀐다 (Enter 적용 · Esc 취소)", out _, out var body);
-            var header = Gs.Box("gs-sheet__header");
-            header.Add(SheetCell(Gs.Label(""), 40));
-            foreach (var (title, width) in new[] { ("이름", 180f), ("등급", 110f), ("가격", 100f), ("무게", 100f), ("보유", 90f), ("설명", 220f) })
-                header.Add(SheetCell(Gs.Label(title), width));
-            body.Add(header);
-
-            for (int i = 0; i < _items.Count; i++)
-            {
-                var so = new SerializedObject(_items[i]);
-                var row = Gs.Box("gs-sheet__row");
-                var thumb = Gs.Box("gs-sheet__thumb");
-                thumb.style.backgroundImage = new StyleBackground(_textures[i]);
-                row.Add(SheetCell(thumb, 40));
-                var name = new GsInlineProperty(so.FindProperty("displayName"));
-                name.Q<Label>().AddToClassList("gs-heading");
-                row.Add(SheetCell(name, 180));
-                row.Add(SheetCell(new GsInlineProperty(so.FindProperty("rarity")), 110));
-                row.Add(SheetCell(new GsInlineProperty(so.FindProperty("price")), 100));
-                row.Add(SheetCell(new GsInlineProperty(so.FindProperty("weight")), 100));
-                row.Add(SheetCell(new GsInlineProperty(so.FindProperty("owned")), 90));
-                row.Add(SheetCell(new GsInlineProperty(so.FindProperty("description")), 220));
-                var index = i;
-                row.RegisterCallback<ClickEvent>(_ =>
-                {
-                    foreach (var r in body.Query(className: "gs-sheet__row").ToList()) r.RemoveFromClassList("gs-sheet__row--selected");
-                    row.AddToClassList("gs-sheet__row--selected");
-                });
-                body.Add(row);
-            }
+            var panel = Gs.Panel("시트", "읽기 전용 · 셀에 마우스를 올리면 '···' → 상세 패널에서 보고 편집한다 (더블클릭도 가능)", out _, out var body);
+            _sheet = new GsSheet(Gs.Surface) { Thumbnail = TextureOf };
+            _sheet.OpenRequested += OpenDetail;
+            body.Add(_sheet);
+            BuildSheet();
             return panel;
         }
 
-        static VisualElement SheetCell(VisualElement content, float width)
+        void BuildSheet()
         {
-            var cell = Gs.Box("gs-sheet__cell");
-            cell.style.width = width;
-            cell.Add(content);
-            return cell;
+            _sheet?.Build(new[]
+            {
+                new SheetColumn { Title = "이름", Width = 170, Path = "displayName", Bold = true },
+                new SheetColumn { Title = "등급", Width = 100, Path = "rarity" },
+                new SheetColumn { Title = "가격", Width = 90, Path = "price" },
+                new SheetColumn { Title = "무게", Width = 90, Path = "weight" },
+                new SheetColumn { Title = "보유", Width = 80, Path = "owned" },
+                new SheetColumn { Title = "설명", Width = 220, Path = "description" },
+            }, _items.Cast<Object>());
         }
 
         // ── 부품 ───────────────────────────────────────────────
 
         VisualElement Components()
         {
-            var panel = Gs.Panel("부품", "버튼 · 분할 선택 · 검색 · 배지 · 진행 바 · 알림", out _, out var body);
+            var panel = Gs.Panel("부품", "버튼 · 분할 선택 · 검색 · 배지 · 진행 바 · 알림 · 확인 창", out _, out var body);
 
             var buttons = Gs.Row();
             buttons.Add(new GsButton("+ 새로 만들기", null, GsButtonKind.Primary));
@@ -278,6 +285,12 @@ namespace GameSystems.EditorTools
             var disabled = new GsButton("비활성", null);
             disabled.SetEnabled(false);
             buttons.Add(disabled);
+            buttons.Add(Gs.HSpace(8));
+            buttons.Add(new GsButton("확인 창 열기", () => GsDialog.Confirm(_root, "변경 사항 저장", "아래 2개 항목을 저장합니다.", "저장", null, new List<FieldChange>
+            {
+                new FieldChange { Label = "가격", Old = "120", New = "150" },
+                new FieldChange { Label = "등급", Old = "일반", New = "희귀" },
+            }), GsButtonKind.Ghost));
             body.Add(buttons);
             body.Add(Gs.Space(16));
 
@@ -321,6 +334,9 @@ namespace GameSystems.EditorTools
                 progressLabel.text = "0 / 100";
             }, GsButtonKind.Ghost));
             body.Add(progressRow);
+            body.Add(Gs.Space(16));
+
+            body.Add(new GsChangeView("변경 표시", "120", "150"));
             body.Add(Gs.Space(16));
 
             body.Add(new GsNotice("정보 알림: 덜 중요한 안내는 옅게 표시한다.", GsNoticeKind.Info));

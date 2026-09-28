@@ -22,7 +22,6 @@ namespace GameSystems.EditorTools
         VisualElement _root;
         VisualElement _sidebar;
         VisualElement _content;
-        VisualElement _detail;
         VisualElement _viewSettingsPanel;
         Label _title;
         Label _caption;
@@ -133,19 +132,6 @@ namespace GameSystems.EditorTools
             _viewSettingsPanel.style.display = DisplayStyle.None;
             body.Add(_viewSettingsPanel);
 
-            var detailScroll = new ScrollView(ScrollViewMode.Vertical);
-            detailScroll.style.width = 400;
-            detailScroll.style.flexShrink = 0;
-            detailScroll.style.backgroundColor = Gs.Surface;
-            detailScroll.style.borderLeftWidth = 1;
-            detailScroll.style.borderLeftColor = new Color(1, 1, 1, 0.06f);
-            _detail = detailScroll.contentContainer;
-            _detail.style.paddingLeft = 24;
-            _detail.style.paddingRight = 24;
-            _detail.style.paddingTop = 28;
-            _detail.style.paddingBottom = 40;
-            _root.Add(detailScroll);
-
             RefreshAll();
         }
 
@@ -156,15 +142,6 @@ namespace GameSystems.EditorTools
                 var types = DataTypes.All;
                 var info = types.FirstOrDefault(t => t.Type.FullName == _selectedType) ?? types.FirstOrDefault();
                 return info?.Type;
-            }
-        }
-
-        GameData SelectedItem
-        {
-            get
-            {
-                var type = SelectedType;
-                return type == null ? null : EditorDatabase.Instance.OfType(type).FirstOrDefault(d => d.Id == _selectedId);
             }
         }
 
@@ -185,7 +162,6 @@ namespace GameSystems.EditorTools
             _issues = DataValidator.ValidateAll();
             RebuildSidebar();
             RebuildContent();
-            RebuildDetail();
         }
 
         // ── 사이드바 ───────────────────────────────────────────
@@ -348,56 +324,23 @@ namespace GameSystems.EditorTools
 
         void BuildSheet(List<GameData> items, ResolvedView view)
         {
-            var sheet = Gs.Col();
-            var header = Gs.Box("gs-sheet__header");
-            if (view.Image != null) header.Add(Cell(Gs.Label(""), 40));
-            foreach (var column in view.Columns) header.Add(Cell(Gs.Label(column.Label.ToUpperInvariant()), ColumnWidth(column)));
-            header.Add(Cell(Gs.Label("ID"), 130));
-            sheet.Add(header);
-
-            foreach (var item in items)
+            // 시트는 읽기 전용. 셀의 '···'(또는 더블클릭)으로 상세 패널을 연다.
+            var sheet = new GsSheet(Gs.Background)
             {
-                var so = new SerializedObject(item);
-                var row = Gs.Box("gs-sheet__row");
-                row.EnableInClassList("gs-sheet__row--selected", item.Id == _selectedId);
-                row.RegisterCallback<ClickEvent>(_ => Select(item));
-
-                if (view.Image != null)
-                {
-                    var thumb = Gs.Box("gs-sheet__thumb");
-                    SetBackground(thumb, so.FindProperty(view.Image.Path)?.objectReferenceValue);
-                    row.Add(Cell(thumb, 40));
-                }
-
-                foreach (var column in view.Columns)
-                {
-                    var property = so.FindProperty(column.Path);
-                    VisualElement cell;
-                    if (property == null) cell = Gs.Label("—", "gs-text-3");
-                    else if (column.Kind == FieldKind.Other) cell = Gs.Label(PropertyUtil.Summary(property), "gs-text-2", "gs-nowrap");
-                    else
-                    {
-                        var inline = new GsInlineProperty(property);
-                        inline.Changed += QueueRefresh;
-                        if (column.Path == "displayName") inline.Q<Label>().AddToClassList("gs-heading");
-                        cell = inline;
-                    }
-                    row.Add(Cell(cell, ColumnWidth(column)));
-                }
-
-                var idLabel = Gs.Label(item.Id, "gs-caption", "gs-nowrap");
-                var hasError = _issues.Any(i => i.Asset == item && i.Severity == ValidationSeverity.Error);
-                var idCell = Gs.Row();
-                idCell.Add(idLabel);
-                if (hasError) idCell.Add(new GsBadge("오류", Gs.Danger) { style = { marginLeft = 8 } });
-                row.Add(Cell(idCell, 130));
-                sheet.Add(row);
-            }
+                Thumbnail = view.Image == null ? null : (Func<UnityEngine.Object, UnityEngine.Object>)(o => new SerializedObject(o).FindProperty(view.Image.Path)?.objectReferenceValue),
+                Trailing = o => ((GameData)o).Id,
+                HasError = o => _issues.Any(i => i.Asset == o && i.Severity == ValidationSeverity.Error),
+            };
+            sheet.Build(view.Columns.Select(c => new SheetColumn { Title = c.Label, Width = ColumnWidth(c), Path = c.Path, Bold = c.Path == "displayName" }).ToList(),
+                        items.Cast<UnityEngine.Object>());
+            var selected = items.FirstOrDefault(i => i.Id == _selectedId);
+            if (selected != null) sheet.Select(selected, false);
+            sheet.Selected += o => _selectedId = ((GameData)o).Id;
+            sheet.OpenRequested += (o, path) => OpenDetail((GameData)o, path);
             _content.Add(sheet);
             if (_animate) GsMotion.Appear(sheet.Children().Skip(1));
             _animate = false;
         }
-
         static float ColumnWidth(FieldEntry column)
         {
             if (column.Path == "displayName") return 210;
@@ -409,14 +352,6 @@ namespace GameSystems.EditorTools
                 case FieldKind.Other: return 150;
                 default: return 170;
             }
-        }
-
-        static VisualElement Cell(VisualElement content, float width)
-        {
-            var cell = Gs.Box("gs-sheet__cell");
-            cell.style.width = width;
-            cell.Add(content);
-            return cell;
         }
 
         void BuildCards(List<GameData> items, ResolvedView view, CardLayout layout)
@@ -431,7 +366,7 @@ namespace GameSystems.EditorTools
                 var so = new SerializedObject(item);
                 var card = new GsCard(layout);
                 card.SetSelected(item.Id == _selectedId);
-                card.RegisterCallback<ClickEvent>(_ => Select(item));
+                card.RegisterCallback<ClickEvent>(_ => OpenDetail(item));
 
                 if (view.Image != null) card.SetImage(so.FindProperty(view.Image.Path)?.objectReferenceValue, placeholder);
                 else if (layout == CardLayout.Bar) card.SetImage(null, placeholder);
@@ -454,12 +389,7 @@ namespace GameSystems.EditorTools
                 {
                     var property = so.FindProperty(stat.Path);
                     if (property == null) continue;
-                    var box = Gs.Box("gs-card__stat");
-                    box.Add(Gs.Label(stat.Label, "gs-card__stat-label"));
-                    var inline = new GsInlineProperty(property);
-                    inline.Changed += QueueRefresh;
-                    box.Add(inline);
-                    card.AddToStats(box);
+                    card.AddStat(stat.Label, GsInlineProperty.Describe(property).text);
                 }
                 grid.Add(card);
             }
@@ -474,19 +404,6 @@ namespace GameSystems.EditorTools
             return property == null ? "" : PropertyUtil.Summary(property);
         }
 
-        static void SetBackground(VisualElement element, UnityEngine.Object image)
-        {
-            if (image is Sprite sprite) element.style.backgroundImage = new StyleBackground(sprite);
-            else if (image is Texture2D texture) element.style.backgroundImage = new StyleBackground(texture);
-        }
-
-        void Select(GameData item)
-        {
-            _selectedId = item.Id;
-            RebuildContent();
-            RebuildDetail();
-        }
-
         void CreateItem()
         {
             var type = SelectedType;
@@ -496,100 +413,51 @@ namespace GameSystems.EditorTools
             _search = "";
             _searchField.Value = "";
             RefreshAll();
+            OpenDetail(created);
         }
 
-        // ── 상세 패널 ───────────────────────────────────────────
+        // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
 
-        void RebuildDetail()
+        void OpenDetail(GameData item, string focusPath = null)
         {
-            if (_detail == null) return;
-            _detail.Clear();
-            var item = SelectedItem;
-            if (item == null)
-            {
-                var empty = Gs.Box("gs-empty");
-                empty.Add(Gs.Label("항목을 선택하세요", "gs-heading"));
-                empty.Add(Gs.Space(6));
-                empty.Add(Gs.Label("시트의 행이나 카드를 클릭하면 여기서 자세히 편집합니다.", "gs-caption"));
-                _detail.Add(empty);
-                return;
-            }
-
-            var so = new SerializedObject(item);
-            var view = ViewSettings.Resolve(item.GetType());
-
-            if (view.Image != null)
-            {
-                var image = so.FindProperty(view.Image.Path)?.objectReferenceValue;
-                if (image != null)
-                {
-                    var preview = new VisualElement();
-                    preview.style.width = 72;
-                    preview.style.height = 72;
-                    preview.style.borderTopLeftRadius = preview.style.borderTopRightRadius = preview.style.borderBottomLeftRadius = preview.style.borderBottomRightRadius = 14;
-                    preview.style.marginBottom = 16;
-                    SetBackground(preview, image);
-                    _detail.Add(preview);
-                }
-            }
-
-            var nameProperty = so.FindProperty("displayName");
-            if (nameProperty != null)
-            {
-                var name = new GsInlineProperty(nameProperty);
-                name.Q<Label>().AddToClassList("gs-display");
-                name.Changed += QueueRefresh;
-                _detail.Add(name);
-            }
-
+            _selectedId = item.Id;
             var info = DataTypes.Find(item.GetType());
-            var meta = Gs.Row();
-            meta.style.marginTop = 4;
-            meta.Add(Gs.Label($"{info?.DisplayName}  ·  {item.Id}", "gs-caption"));
-            _detail.Add(meta);
-            _detail.Add(Gs.Space(18));
-
-            var previewText = Gs.Label(DescribeItem(item), "gs-preview");
-            if (!string.IsNullOrEmpty(previewText.text)) _detail.Add(previewText);
-
-            foreach (var issue in _issues.Where(i => i.Asset == item))
-                _detail.Add(new GsNotice(issue.Message, issue.Severity == ValidationSeverity.Error ? GsNoticeKind.Error : GsNoticeKind.Warning));
-
-            void OnValue()
+            var view = ViewSettings.Resolve(item.GetType());
+            var options = new DetailOptions
             {
-                so.Update();
-                previewText.text = DescribeItem(item);
-                QueueRefresh();
-            }
-
-            foreach (var property in PropertyUtil.TopLevel(so))
-            {
-                if (property.propertyPath == "displayName") continue;
-                _detail.Add(GsPropertyEditor.BuildProperty(property, OnValue, () => RebuildDetailSoon()));
-            }
-
-            _detail.Add(Gs.Space(24));
-            var actions = Gs.Row();
-            actions.Add(new GsButton("에셋 위치", () => EditorGUIUtility.PingObject(item), GsButtonKind.Ghost));
+                Subtitle = $"{info?.DisplayName}  ·  {item.Id}",
+                Image = view.Image == null ? null : (Func<SerializedObject, UnityEngine.Object>)(so => so.FindProperty(view.Image.Path)?.objectReferenceValue),
+                Placeholder = Gs.PaletteFor(item.GetType().Name),
+                FocusPath = focusPath,
+                Summary = draft => DescribeItem((GameData)draft),
+                Validate = draft => ValidateDraft(item, (GameData)draft),
+                Saved = _ =>
+                {
+                    EditorDatabase.MarkDirty();
+                    QueueRefresh();
+                },
+            };
+            options.Actions.Add(("에셋 위치", _ => EditorGUIUtility.PingObject(item)));
             if (_issues.Any(i => i.Asset == item && i.Message.Contains("중복")))
-                actions.Add(new GsButton("ID 재발급", () =>
+                options.Actions.Add(("ID 재발급", panel =>
                 {
                     EditorDatabase.Instance.AssignNewId(item);
-                    _selectedId = item.Id;
-                    RefreshAll();
-                }, GsButtonKind.Ghost));
-            actions.Add(Gs.Spacer());
-            actions.Add(new GsButton("삭제", () => Delete(item), GsButtonKind.Ghost));
-            _detail.Add(actions);
+                    panel.Close();
+                    QueueRefresh();
+                }));
+            options.Actions.Add(("삭제", panel => Delete(item, panel)));
+            GsDetailPanel.Open(_root, item, options);
         }
 
-        void RebuildDetailSoon() => _root.schedule.Execute(() =>
+        // 편집 중 사본을 원본 자리에 넣고 검증한다(저장 전에 오류를 미리 보여준다).
+        static List<(bool error, string message)> ValidateDraft(GameData original, GameData draft)
         {
-            _issues = DataValidator.ValidateAll();
-            RebuildDetail();
-            RebuildContent();
-            RebuildSidebar();
-        });
+            var list = EditorDatabase.Instance.All.Select(d => d == original ? draft : d).ToList();
+            return DataValidator.Validate(list)
+                .Where(i => i.Asset == draft)
+                .Select(i => (i.Severity == ValidationSeverity.Error, i.Message))
+                .ToList();
+        }
 
         static string DescribeItem(GameData item)
         {
@@ -608,14 +476,16 @@ namespace GameSystems.EditorTools
             return null;
         }
 
-        void Delete(GameData item)
+        void Delete(GameData item, GsDetailPanel panel)
         {
-            if (!EditorUtility.DisplayDialog("항목 삭제", $"'{item.DisplayName}'을(를) 삭제할까요?\n에셋은 휴지통으로 이동합니다.", "삭제", "취소")) return;
-            AssetDatabase.MoveAssetToTrash(AssetDatabase.GetAssetPath(item));
-            _selectedId = null;
-            EditorDatabase.Instance.Sync();
+            GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 에셋은 휴지통으로 이동합니다.", "삭제", () =>
+            {
+                panel.Close();
+                AssetDatabase.MoveAssetToTrash(AssetDatabase.GetAssetPath(item));
+                _selectedId = null;
+                EditorDatabase.Instance.Sync();
+            });
         }
-
         // ── 보기 설정 ──────────────────────────────────────────
 
         void ToggleViewSettings()

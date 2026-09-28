@@ -14,9 +14,9 @@
     --gs-text: #F2F2F3;
     --gs-text-2: rgba(242, 242, 243, 0.62);
     --gs-text-3: rgba(242, 242, 243, 0.36);
-    --gs-accent: #F86927;
-    --gs-accent-hover: #FF7B3D;
-    --gs-accent-soft: rgba(248, 105, 39, 0.14);
+    --gs-accent: #FD5D83;
+    --gs-accent-hover: #FF7899;
+    --gs-accent-soft: rgba(253, 93, 131, 0.14);
     --gs-danger: #FB9795;
     --gs-success: #71D6A3;
     --gs-warning: #E8D66B;
@@ -128,7 +128,8 @@
 .gs-segmented__item:hover { background-color: var(--gs-hover); }
 .gs-root .gs-segmented__item:hover Label { color: var(--gs-text-2); }
 .gs-segmented__item--active { background-color: var(--gs-surface-2); }
-.gs-root .gs-segmented__item--active Label { color: var(--gs-text); -unity-font-style: bold; }
+/* 굵기를 바꾸면 글자 폭이 달라져 전체 폭이 흔들린다 → 색과 배경만 바꾼다 */
+.gs-root .gs-segmented__item--active Label { color: var(--gs-text); }
 
 /* ── 배지 (색은 분류 팔레트에서 코드로 지정) ──────────── */
 .gs-badge {
@@ -212,19 +213,19 @@
 .gs-root .gs-card__stat-label { font-size: 10px; color: var(--gs-text-3); }
 .gs-root .gs-card__stat-value { font-size: 13px; margin-top: 1px; }
 
-/* A. 세로형: 이미지가 위를 채움, 정사각형보다 약간 세로로 김 */
-.gs-card--vertical { width: 200px; height: 250px; flex-direction: column; }
-.gs-card--vertical .gs-card__media { height: 128px; }
+/* A. 세로형: 정사각형 이미지가 위를 채움 (카드 폭 200 = 테두리 2 + 이미지 198) */
+.gs-card--vertical { width: 200px; height: 320px; flex-direction: column; }
+.gs-card--vertical .gs-card__media { height: 198px; }
 
-/* B. 가로형: 이미지가 왼쪽을 채움, 16:9 */
+/* B. 가로형: 16:9 카드, 정사각형 이미지가 왼쪽을 채움 (카드 높이 216 = 테두리 2 + 이미지 214) */
 .gs-card--horizontal { width: 384px; height: 216px; flex-direction: row; }
-.gs-card--horizontal .gs-card__media { width: 44%; height: 100%; }
+.gs-card--horizontal .gs-card__media { width: 214px; height: 100%; }
 .gs-card--horizontal .gs-card__body { padding: 18px 20px; }
 
-/* C. 바형: 작은 이미지 + 한두 줄 */
-.gs-card--bar { height: 56px; flex-direction: row; align-items: center; padding: 0 14px; margin: 0 0 8px 0; border-radius: 12px; }
+/* C. 바형: 이미지 상·하·좌 여백을 10으로 같게 (높이 66 = 테두리 2 + 여백 10 + 이미지 44 + 여백 10) */
+.gs-card--bar { height: 66px; flex-direction: row; align-items: center; padding: 0 14px 0 10px; margin: 0 0 8px 0; border-radius: 14px; }
 .gs-card--bar:hover { translate: 0 0; }
-.gs-card--bar .gs-card__media { width: 34px; height: 34px; border-radius: 8px; }
+.gs-card--bar .gs-card__media { width: 44px; height: 44px; border-radius: 10px; }
 .gs-card--bar .gs-card__body { padding: 0 0 0 12px; flex-direction: row; align-items: center; }
 .gs-card--bar .gs-card__badges { margin-top: 0; margin-left: 10px; }
 .gs-card--bar .gs-card__stats { margin-top: 0; }
@@ -375,3 +376,100 @@
 .gs-root .unity-scroller__low-button,
 .gs-root .unity-scroller__high-button { display: none; }
 .gs-root .unity-scroller__slider .unity-base-slider__tracker { background-color: rgba(0, 0, 0, 0); border-width: 0; }
+
+/* ── 패널 제목과 설명 사이 간격 ────────────────────────── */
+.gs-root .gs-panel__caption { margin-top: 6px; }
+
+/* ── 시트 셀: 읽기 전용 + 마우스를 올리면 '…' (끝부분은 흐리게 가려짐) ── */
+.gs-cell { flex-direction: row; align-items: center; height: 44px; overflow: hidden; }
+.gs-root .gs-cell__text { white-space: nowrap; overflow: hidden; flex-shrink: 1; }
+.gs-cell__fade {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 64px;
+    display: none;
+}
+.gs-cell__more {
+    position: absolute;
+    right: 6px;
+    top: 11px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 7px;
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    justify-content: center;
+    display: none;
+    cursor: link;
+    transition-property: background-color, border-color;
+    transition-duration: 0.12s;
+}
+.gs-cell__more:hover { background-color: var(--gs-accent); border-color: var(--gs-accent); }
+.gs-root .gs-cell__more Label { font-size: 11px; color: var(--gs-text-2); -unity-font-style: bold; letter-spacing: 1px; }
+.gs-root .gs-cell__more:hover Label { color: #FFFFFF; }
+.gs-cell--hover .gs-cell__fade,
+.gs-cell--hover .gs-cell__more { display: flex; }
+
+/* ── 모달 ─────────────────────────────────────────────── */
+.gs-modal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(4, 4, 6, 0.62);
+    transition-property: opacity;
+    transition-duration: 0.18s;
+}
+.gs-modal--hidden { opacity: 0; }
+.gs-modal__content {
+    transition-property: scale, opacity;
+    transition-duration: 0.22s, 0.18s;
+    transition-timing-function: ease-out-back, ease-out-cubic;
+}
+.gs-modal--hidden .gs-modal__content { scale: 0.96 0.96; opacity: 0; }
+
+/* ── 상세 패널 (카드 B 구조: 정사각형 이미지 + 내용) ───── */
+.gs-detail {
+    flex-direction: row;
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    border-radius: 16px;
+    overflow: hidden;
+}
+.gs-detail__media { flex-shrink: 0; background-color: var(--gs-surface-2); -unity-background-scale-mode: scale-and-crop; }
+.gs-detail__main { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.gs-detail__header { flex-direction: row; align-items: flex-start; padding: 22px 22px 14px 26px; border-bottom-width: 1px; border-color: var(--gs-border); }
+.gs-detail__body { flex-grow: 1; }
+.gs-detail__footer { flex-direction: row; align-items: center; padding: 14px 22px 16px 26px; border-top-width: 1px; border-color: var(--gs-border); }
+.gs-detail__section { margin-bottom: 18px; }
+.gs-root .gs-detail__label { font-size: 10px; color: var(--gs-text-3); -unity-font-style: bold; letter-spacing: 0.5px; margin-bottom: 6px; }
+.gs-detail__section--changed > .gs-detail__label { color: var(--gs-accent); }
+
+/* ── 변경 표시: [이전] › [현재] ─────────────────────────── */
+.gs-change { flex-direction: row; align-items: center; flex-wrap: wrap; }
+.gs-change__box { padding: 4px 9px; border-radius: 7px; max-width: 100%; }
+.gs-change__old { background-color: var(--gs-surface-2); }
+.gs-root .gs-change__old Label { color: var(--gs-text-3); }
+.gs-change__new { background-color: var(--gs-accent-soft); }
+.gs-root .gs-change__new Label { color: var(--gs-text); }
+.gs-root .gs-change__arrow { color: var(--gs-accent); margin: 0 8px; -unity-font-style: bold; }
+.gs-change-row { padding: 10px 0; border-bottom-width: 1px; border-color: var(--gs-border); }
+
+/* ── 확인 창 ──────────────────────────────────────────── */
+.gs-dialog {
+    width: 460px;
+    padding: 24px 24px 18px 24px;
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    border-radius: 16px;
+}
+.gs-dialog__buttons { flex-direction: row; justify-content: flex-end; margin-top: 20px; }
+.gs-dialog__buttons > * { margin-left: 8px; }
