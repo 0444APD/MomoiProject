@@ -54,18 +54,19 @@ namespace GameSystems.Tests
             session.Actions.Register<DataFlowKill>(_ => session.Events.Publish(new TestKill { Count = 1 }));
 
             for (int i = 0; i < 3; i++) session.Do(new DataFlowKill());
-            Assert.IsFalse(session.Achievements.IsUnlocked(hunter.Id), "턴 확정 전");
+            Assert.IsTrue(session.Achievements.IsUnlocked(hunter.Id), "세 번째 처치 직후 달성(확정 전)");
+            Assert.AreEqual(0, session.Stats.Get(gold.Id), "보상은 확정 전 미지급");
             session.Commit();
 
             Assert.AreEqual(3, session.Stats.Get(kills.Id));
             Assert.IsTrue(session.Achievements.IsUnlocked(hunter.Id));
             Assert.AreEqual(100, session.Stats.Get(gold.Id));
 
-            // 인과 사슬: 보상 ← 달성 ← 처치 수 변화(확정) ← 세 번째 처치 행동.
+            // 인과 사슬: 보상 ← 달성 ← 처치 수 변화(확정 대기) ← 적 처치 이벤트 ← 세 번째 처치 행동.
             var reward = session.Journal.Entries.Last(e => e.Kind == JournalKind.Reward);
             var chain = session.Journal.CauseChain(reward.Id);
             CollectionAssert.AreEqual(
-                new[] { JournalKind.Action, JournalKind.State, JournalKind.Achievement, JournalKind.Reward },
+                new[] { JournalKind.Action, JournalKind.Event, JournalKind.State, JournalKind.Achievement, JournalKind.Reward },
                 chain.Select(e => e.Kind).ToArray(),
                 string.Join(" → ", chain.Select(e => e.Message)));
         }

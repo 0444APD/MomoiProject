@@ -306,26 +306,42 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 확정_시점에_달성되고_보상이_지급된다()
+        public void 달성은_행동_직후_보상은_확정_시()
         {
             Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
             _session.Do(new TestKillAction());
-            _session.EndFrame(0.016);
-            Assert.IsFalse(_session.Achievements.IsUnlocked("first"), "확정 전에는 평가하지 않는다");
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "조건을 만족하는 순간 달성된다(확정 대기 중인 값 포함)");
+            Assert.AreEqual(0, _session.Stats.Get("gold"), "보상은 확정 전에는 지급되지 않는다");
+            Assert.AreEqual(1, _session.Achievements.DeferredRewardCount);
             _session.Commit();
-            Assert.IsTrue(_session.Achievements.IsUnlocked("first"));
             Assert.AreEqual(50, _session.Stats.Get("gold"));
+            Assert.AreEqual(0, _session.Achievements.DeferredRewardCount);
         }
 
         [Test]
-        public void 무른_행동으로는_달성되지_않는다_되감기_파밍_차단()
+        public void 무르기는_값만_되돌리고_달성은_유지된다()
         {
-            Achievement("first", AtLeast("kills", 1));
+            Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
             _session.Do(new TestKillAction());
             _session.Undo();
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "한 번 달성한 것은 무르기로 취소되지 않는다");
+            Assert.AreEqual(0, _session.Stats.Get("kills"), "값은 되돌아간다");
             _session.Commit();
-            Assert.IsFalse(_session.Achievements.IsUnlocked("first"));
+            Assert.AreEqual(50, _session.Stats.Get("gold"), "달성이 유지되므로 보상은 확정 때 지급된다");
+        }
+
+        [Test]
+        public void 무르기를_반복해도_값은_쌓이지_않는다_파밍_차단()
+        {
+            Achievement("hunter", AtLeast("kills", 3));
+            for (int i = 0; i < 10; i++)
+            {
+                _session.Do(new TestKillAction());
+                _session.Undo();
+            }
+            _session.Commit();
             Assert.AreEqual(0, _session.Stats.Get("kills"));
+            Assert.IsFalse(_session.Achievements.IsUnlocked("hunter"), "한 번의 행동으로 닿지 않는 목표는 무르기 반복으로 달성할 수 없다");
         }
 
         [Test]
@@ -335,7 +351,6 @@ namespace GameSystems.Tests
             Achievement("gold999", AtLeast("gold", 999));
             var before = _session.Achievements.Watcher.EvaluationCount;
             _session.Do(new TestKillAction());
-            _session.Commit();
             Assert.AreEqual(1, _session.Achievements.Watcher.EvaluationCount - before, "처치 수를 보는 조건 하나만 평가된다");
         }
 

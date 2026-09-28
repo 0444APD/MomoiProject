@@ -27,13 +27,16 @@ namespace GameSystems.EditorTools
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
-        // 테스트 이벤트 직후 확정까지 할지(수동 확정 세션에서만 의미가 있다).
-        [SerializeField] bool _commitAfterTest = true;
+        // 테스트 이벤트 직후 확정까지 할지(수동 확정 세션에서만 의미가 있다). 기본은 꺼짐: 무르기를 시험할 수 있게.
+        [SerializeField] bool _autoCommitTests;
         [SerializeField] string _eventTypeName;
+        [SerializeField] string _selectedAchievement;
+        [SerializeField] string _selectedStat;
 
         readonly Dictionary<string, double> _statAmounts = new Dictionary<string, double>();
         readonly Dictionary<string, Dictionary<string, object>> _eventDrafts = new Dictionary<string, Dictionary<string, object>>();
         VisualElement _feedback;
+        VisualElement _dock;
 
         // 테스트에서 런타임 없이 세션을 주입하기 위한 통로.
         internal static Func<GameSession> SessionSource = () => GameSystemsRuntime.Session;
@@ -114,17 +117,19 @@ namespace GameSystems.EditorTools
                 if (!_session.Options.AutoCommit)
                 {
                     var toggle = new GsButton(CommitToggleText(), null, GsButtonKind.Ghost);
-                    toggle.tooltip = "켜면 테스트 이벤트를 발생시킨 뒤 곧바로 확정합니다(도전과제·누적 수치가 즉시 반영).\n끄면 확정 대기로 남아 무르기를 시험할 수 있습니다.";
+                    toggle.tooltip = "켜면 테스트 이벤트를 발생시킨 뒤 곧바로 확정합니다(무르기 불가, 보상 즉시 지급).\n끄면 확정 대기로 남아 무르기를 시험할 수 있습니다.";
                     toggle.AddManipulator(new Clickable(() =>
                     {
-                        _commitAfterTest = !_commitAfterTest;
+                        _autoCommitTests = !_autoCommitTests;
                         toggle.Text = CommitToggleText();
                     }));
                     header.Add(toggle);
                     header.Add(Gs.HSpace(12));
                 }
-                var commit = new GsButton("확정", () => _session.Commit());
-                var undo = new GsButton("무르기", () => _session.Undo());
+                var commit = new GsButton("확정", CommitAll);
+                commit.tooltip = "확정 대기 중인 행동을 모두 확정하고, 미뤄 둔 도전과제 보상을 지급합니다.";
+                var undo = new GsButton("무르기", UndoLast);
+                undo.tooltip = "확정되지 않은 마지막 행동을 되돌립니다. 값만 돌아가고 달성한 도전과제는 유지됩니다.";
                 header.Add(undo);
                 header.Add(Gs.HSpace(8));
                 header.Add(commit);
@@ -136,6 +141,11 @@ namespace GameSystems.EditorTools
 
             _body = Gs.Col("gs-grow");
             main.Add(_body);
+
+            // 선택한 항목의 조작 버튼이 뜨는 자리(오른쪽 아래 고정).
+            _dock = Gs.Box("gs-panel", "gs-dock");
+            _dock.style.display = DisplayStyle.None;
+            main.Add(_dock);
 
             BuildSidebar();
 
@@ -196,7 +206,7 @@ namespace GameSystems.EditorTools
             if (_paused) return;
             // 입력 중인 칸이 있으면 화면을 다시 그리지 않는다(입력값이 날아가지 않게).
             var focused = _root.focusController?.focusedElement as VisualElement;
-            if (focused != null && _body.Contains(focused)) return;
+            if (focused != null && (_body.Contains(focused) || _dock.Contains(focused))) return;
             var last = _session.Journal.LastId;
             if (last == _lastJournalId && _session.State.UncommittedCount == _lastUncommitted) return;
             _lastJournalId = last;
@@ -221,6 +231,7 @@ namespace GameSystems.EditorTools
         void BuildTab()
         {
             _body.Clear();
+            ShowDock(null);
             switch (_tab)
             {
                 case Tab.Timeline: BuildTimeline(); break;
@@ -513,12 +524,13 @@ namespace GameSystems.EditorTools
             return box;
         }
 
-        // ── 도전과제 ───────────────────────────────────────────
+        // ── 도전과제: 카드 선택 → 작업 패널에서 이벤트로 달성 / 강제 달성 ──
 
         void BuildAchievements()
         {
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
+            scroll.contentContainer.style.paddingBottom = DockClearance;
             _body.Add(scroll);
             var definitions = _session.Achievements.Definitions.ToList();
             if (definitions.Count == 0)
@@ -531,55 +543,81 @@ namespace GameSystems.EditorTools
 
             foreach (var definition in definitions)
             {
-                var unlocked = _session.Achievements.IsUnlocked(definition.Id);
+                var id = definition.Id;
+                var unlocked = _session.Achievements.IsUnlocked(id);
                 var card = new GsCard(CardLayout.Bar);
-                card.SetImage(null, unlocked ? Gs.Success : Gs.PaletteFor(definition.Id));
+                card.SetImage(null, unlocked ? Gs.Success : Gs.PaletteFor(id));
                 card.Title = definition.DisplayName;
                 card.Subtitle = definition.Condition?.Describe(_session) ?? "(조건 없음)";
                 card.AddBadge(unlocked ? "달성" : "진행 중", unlocked ? Gs.Success : Gs.Palette[7]);
 
-                if (!unlocked && _session.Achievements.TryGetProgress(definition.Id, out var current, out var target))
+                if (!unlocked && _session.Achievements.TryGetProgress(id, out var current, out var target))
                 {
                     var progress = new GsProgress();
                     progress.style.width = 140;
                     progress.SetValue(current, target);
                     card.AddToStats(progress);
-                    card.AddToStats(Gs.Label($"{current:0.##} / {target:0.##}", "gs-caption") );
+                    card.AddToStats(Gs.Label($"{current:0.##} / {target:0.##}", "gs-caption"));
                 }
 
-                var id = definition.Id;
-                if (unlocked)
+                card.SetSelected(id == _selectedAchievement);
+                card.tooltip = "클릭해서 선택 → 오른쪽 아래에서 달성 처리";
+                card.RegisterCallback<ClickEvent>(_ =>
                 {
-                    var reset = new GsButton("초기화", () => _session.Achievements.ResetProgress(id), GsButtonKind.Ghost);
-                    reset.tooltip = "직접 수정: 달성 표시만 지웁니다(수치는 그대로).";
-                    card.AddToStats(reset);
-                }
-                else
-                {
-                    var fill = new GsButton("이벤트로 채우기", () =>
-                    {
-                        if (_session.TrySimulateAchievement(id, _commitAfterTest, out var error))
-                            ShowFeedback($"'{definition.DisplayName}' 조건을 이벤트로 채웠습니다" + (PendingNote()), GsNoticeKind.Ok);
-                        else
-                            ShowFeedback(error, GsNoticeKind.Warning);
-                    });
-                    fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 발생시킵니다(무르기 가능, 다른 수치·도전과제도 함께 반응).";
-                    card.AddToStats(fill);
-                    card.AddToStats(Gs.HSpace(6));
-                    var force = new GsButton("강제 달성", () => _session.Achievements.Unlock(id, "모니터에서 강제 달성"), GsButtonKind.Ghost);
-                    force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다(보상은 지급).";
-                    card.AddToStats(force);
-                }
+                    _selectedAchievement = id;
+                    BuildTab();
+                });
                 scroll.Add(card);
             }
+
+            var selected = _session.Achievements.Find(_selectedAchievement);
+            if (selected == null) return;
+
+            var isUnlocked = _session.Achievements.IsUnlocked(selected.Id);
+            var dock = DockPanel(selected.DisplayName, isUnlocked ? "달성함" : "아직 달성하지 않음");
+            var buttons = Gs.Row();
+            if (isUnlocked)
+            {
+                var reset = new GsButton("초기화", () =>
+                {
+                    _session.Achievements.ResetProgress(selected.Id);
+                    ShowFeedback($"'{selected.DisplayName}' 달성 표시를 지웠습니다 (수치는 그대로)", GsNoticeKind.Info);
+                });
+                reset.tooltip = "직접 수정: 달성 표시만 지웁니다(수치는 그대로).";
+                buttons.Add(reset);
+            }
+            else
+            {
+                var force = new GsButton("강제 달성", () =>
+                {
+                    _session.Achievements.Unlock(selected.Id, "모니터에서 강제 달성");
+                    ShowFeedback($"'{selected.DisplayName}' 강제 달성" + RewardNote(), GsNoticeKind.Ok);
+                });
+                force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다.";
+                buttons.Add(force);
+                buttons.Add(Gs.HSpace(8));
+                var fill = new GsButton("이벤트로 달성", () =>
+                {
+                    if (_session.TrySimulateAchievement(selected.Id, _autoCommitTests, out var error))
+                        ShowFeedback($"'{selected.DisplayName}' 조건을 이벤트로 채웠습니다" + PendingNote() + RewardNote(), GsNoticeKind.Ok);
+                    else
+                        ShowFeedback(error, GsNoticeKind.Warning);
+                }, GsButtonKind.Primary);
+                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 발생시킵니다.\n무르면 수치는 돌아가고 달성은 유지됩니다.";
+                GsMotion.AddPressSpring(fill);
+                buttons.Add(fill);
+            }
+            dock.Add(buttons);
+            ShowDock(dock);
         }
 
-        // ── 수치: 직접 수정 / 이벤트로 반영 ─────────────────────
+        // ── 수치: 행 선택 → 작업 패널에서 직접 수정 / 이벤트로 기록 ──
 
         void BuildStats()
         {
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
+            scroll.contentContainer.style.paddingBottom = DockClearance;
             _body.Add(scroll);
             var definitions = _session.Stats.Definitions.ToList();
             if (definitions.Count == 0)
@@ -590,9 +628,9 @@ namespace GameSystems.EditorTools
                 return;
             }
 
-            var panel = Gs.Panel("수치", "값 칸 클릭: 직접 수정(값만 덮어씀, 규칙·도전과제 연쇄 없음)  ·  이벤트로: 게임과 같은 경로로 반영", out _, out var body);
+            var panel = Gs.Panel("수치", "행을 클릭하면 오른쪽 아래에서 값을 바꾸거나 이벤트로 기록합니다", out _, out var body);
             var header = Gs.Box("gs-sheet__header");
-            foreach (var (title, width) in new[] { ("수치", 220f), ("범위 · 집계", 130f), ("현재 값 (직접 수정)", 150f), ("이벤트로 반영", 300f) })
+            foreach (var (title, width) in new[] { ("수치", 240f), ("범위 · 집계", 150f), ("현재 값", 150f), ("", 200f) })
             {
                 var cell = Gs.Label(title);
                 cell.style.width = width;
@@ -605,72 +643,104 @@ namespace GameSystems.EditorTools
                 var id = definition.Id;
                 var key = StateKeys.Stat(id);
                 var row = Gs.Box("gs-sheet__row");
-
-                var name = Gs.Label(definition.DisplayName ?? id, "gs-nowrap");
-                name.style.width = 220;
-                row.Add(name);
-                var tag = Gs.Label((definition.Scope == StatScope.Run ? "이번 판" : "누적") + " · " + StatSystem.AggregateText(definition.Aggregate), "gs-caption");
-                tag.style.width = 130;
-                row.Add(tag);
-
-                var value = StateValue(new InspectNode(definition.DisplayName, StateStore.Format(_session.State.Get(key)), key));
-                value.style.width = 150;
-                value.style.flexGrow = 0;
-                row.Add(value);
-
-                var isSum = definition.Aggregate == StatAggregate.Sum;
-                if (!_statAmounts.TryGetValue(id, out var amount)) amount = isSum ? 1 : Math.Max(0, _session.Stats.Get(id) is var v && !double.IsNaN(v) ? v : 0);
-                var amountField = new DoubleField { value = amount };
-                amountField.style.width = 70;
-                amountField.AddToClassList("gs-inline");
-                var plan = Gs.Label("", "gs-caption", "gs-nowrap");
-                plan.style.flexShrink = 1;
-
-                void UpdatePlan()
+                row.EnableInClassList("gs-sheet__row--selected", id == _selectedStat);
+                row.RegisterCallback<ClickEvent>(_ =>
                 {
-                    if (EventSimulator.TryPlanForStat(_session.Stats, id, amountField.value, out var p, out var error))
-                    {
-                        plan.text = "→ " + p.Description;
-                        plan.tooltip = "";
-                        plan.style.color = StyleKeyword.Null;
-                    }
-                    else
-                    {
-                        plan.text = "이벤트로 만들 수 없음";
-                        plan.tooltip = error;
-                        plan.style.color = Gs.Warning;
-                    }
-                }
-
-                amountField.RegisterValueChangedCallback(e =>
-                {
-                    _statAmounts[id] = e.newValue;
-                    UpdatePlan();
+                    _selectedStat = id;
+                    BuildTab();
                 });
 
-                var fire = new GsButton(isSum ? "이벤트로 +" : "이벤트로 기록", () =>
-                {
-                    if (_session.TrySimulateStat(id, amountField.value, _commitAfterTest, out var description, out var error))
-                        ShowFeedback($"{description} 발생" + PendingNote(), GsNoticeKind.Ok);
-                    else
-                        ShowFeedback(error, GsNoticeKind.Warning);
-                }, GsButtonKind.Ghost);
-                fire.tooltip = isSum
-                    ? "이 수치의 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킵니다. 같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응합니다."
-                    : "입력한 값을 이벤트로 한 번 기록합니다(최고치·최저치 규칙은 게임과 똑같이 적용).";
-
-                var eventCell = Gs.Row();
-                eventCell.style.width = 300;
-                eventCell.Add(fire);
-                eventCell.Add(amountField);
-                eventCell.Add(Gs.HSpace(8));
-                eventCell.Add(plan);
-                row.Add(eventCell);
-                UpdatePlan();
+                var name = Gs.Label(definition.DisplayName ?? id, "gs-nowrap");
+                name.style.width = 240;
+                row.Add(name);
+                var tag = Gs.Label(ScopeText(definition), "gs-caption");
+                tag.style.width = 150;
+                row.Add(tag);
+                var value = Gs.Label(StateStore.Format(_session.State.Get(key)));
+                value.style.width = 150;
+                row.Add(value);
+                if (_session.State.HasPending(key))
+                    row.Add(Gs.Label($"확정값 {StateStore.Format(_session.State.GetCommitted(key))}", "gs-caption"));
                 body.Add(row);
             }
             scroll.Add(panel);
+
+            var selected = _session.Stats.Find(_selectedStat);
+            if (selected == null) return;
+
+            var statKey = StateKeys.Stat(selected.Id);
+            var dock = DockPanel(selected.DisplayName ?? selected.Id, $"현재 {StateStore.Format(_session.State.Get(statKey))}  ·  {ScopeText(selected)}");
+
+            // 이벤트로: 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킨다(게임과 같은 경로).
+            var isSum = selected.Aggregate == StatAggregate.Sum;
+            var now = _session.Stats.Get(selected.Id);
+            if (double.IsNaN(now)) now = 0;
+            if (!_statAmounts.TryGetValue(selected.Id, out var amount)) amount = isSum ? 1 : Math.Max(0, now);
+            var eventRow = Gs.Row();
+            eventRow.Add(DockLabel(isSum ? "더할 값" : "기록할 값"));
+            var amountField = new DoubleField { value = amount };
+            amountField.AddToClassList("gs-inline");
+            amountField.style.width = 100;
+            eventRow.Add(amountField);
+            eventRow.Add(Gs.HSpace(8));
+            var fire = new GsButton(isSum ? "이벤트로 더하기" : "이벤트로 기록", () =>
+            {
+                if (_session.TrySimulateStat(selected.Id, amountField.value, _autoCommitTests, out var description, out var error))
+                    ShowFeedback($"{description} 발생" + PendingNote() + RewardNote(), GsNoticeKind.Ok);
+                else
+                    ShowFeedback(error, GsNoticeKind.Warning);
+            }, GsButtonKind.Primary);
+            fire.tooltip = "게임과 같은 경로: 같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, 무를 수 있습니다.";
+            GsMotion.AddPressSpring(fire);
+            eventRow.Add(fire);
+            dock.Add(eventRow);
+
+            var plan = Gs.Label("", "gs-caption");
+            plan.style.marginTop = 6;
+            plan.style.marginBottom = 14;
+            plan.style.whiteSpace = WhiteSpace.Normal;
+            void UpdatePlan()
+            {
+                if (EventSimulator.TryPlanForStat(_session.Stats, selected.Id, amountField.value, out var p, out var error))
+                {
+                    plan.text = "발생할 이벤트: " + p.Description;
+                    plan.style.color = StyleKeyword.Null;
+                }
+                else
+                {
+                    plan.text = error;
+                    plan.style.color = Gs.Warning;
+                }
+            }
+            amountField.RegisterValueChangedCallback(e =>
+            {
+                _statAmounts[selected.Id] = e.newValue;
+                UpdatePlan();
+            });
+            UpdatePlan();
+            dock.Add(plan);
+
+            // 직접 수정: 값만 덮어쓴다(이벤트·다른 수치는 반응하지 않고 기록에만 남는다).
+            var directRow = Gs.Row();
+            directRow.Add(DockLabel("값"));
+            var direct = new DoubleField { value = now };
+            direct.AddToClassList("gs-inline");
+            direct.style.width = 100;
+            directRow.Add(direct);
+            directRow.Add(Gs.HSpace(8));
+            var apply = new GsButton("직접 수정", () =>
+            {
+                _session.State.Set(statKey, direct.value);
+                ShowFeedback($"{selected.DisplayName} = {StateStore.Format(direct.value)} (직접 수정)", GsNoticeKind.Info);
+            });
+            apply.tooltip = "값만 덮어씁니다. 이벤트·다른 수치·반영 규칙은 움직이지 않습니다.";
+            directRow.Add(apply);
+            dock.Add(directRow);
+            ShowDock(dock);
         }
+
+        static string ScopeText(StatDefinition definition) =>
+            (definition.Scope == StatScope.Run ? "이번 판" : "누적") + " · " + StatSystem.AggregateText(definition.Aggregate);
 
         // ── 이벤트 발생기 ───────────────────────────────────────
 
@@ -710,7 +780,7 @@ namespace GameSystems.EditorTools
 
             var form = Gs.Panel(EventBus.DisplayNameOf(selected), selected.FullName, out _, out var body);
             form.style.flexGrow = 1;
-            form.style.marginBottom = 16;
+            form.style.marginBottom = DockClearance;
             split.Add(form);
 
             if (!_eventDrafts.TryGetValue(selected.FullName, out var draft))
@@ -734,11 +804,10 @@ namespace GameSystems.EditorTools
             foreach (var member in members)
             {
                 var row = Gs.Box("gs-field-row");
-                var label = Gs.Label(member.Name, "gs-field-row__label");
-                label.style.width = 140;
+                var label = Gs.Label($"{member.Name} ({TypeName(EventSimulator.MemberType(member))})", "gs-field-row__label");
+                label.style.width = 180;
                 row.Add(label);
                 row.Add(EventFieldEditor(member, draft));
-                row.Add(Gs.Label(EventSimulator.MemberType(member).Name, "gs-caption"));
                 body.Add(row);
             }
 
@@ -748,20 +817,22 @@ namespace GameSystems.EditorTools
                 .ToList();
             body.Add(Gs.Space(14));
             body.Add(Gs.Label(affected.Count > 0 ? "반응하는 수치:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 수치가 없습니다.", "gs-caption"));
-            body.Add(Gs.Space(16));
 
+            var dock = DockPanel(EventBus.DisplayNameOf(selected), "행동으로 기록되어 무르기·확정·인과 추적이 게임과 똑같이 적용됩니다");
             var actions = Gs.Row();
             var repeat = new DoubleField { value = 1 };
-            repeat.style.width = 60;
+            repeat.style.width = 70;
             repeat.AddToClassList("gs-inline");
+            actions.Add(repeat);
+            actions.Add(DockUnit("회"));
             var fire = new GsButton("이벤트 발생", () =>
             {
                 try
                 {
                     var count = Math.Max(1, Math.Min(1000, (int)Math.Round(repeat.value)));
                     var events = Enumerable.Range(0, count).Select(_ => EventSimulator.Create(selected, draft)).ToList();
-                    _session.SimulateEvents(events, "모니터 이벤트 발생기", _commitAfterTest);
-                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생" + PendingNote(), GsNoticeKind.Ok);
+                    _session.SimulateEvents(events, "모니터 이벤트 발생기", _autoCommitTests);
+                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생" + PendingNote() + RewardNote(), GsNoticeKind.Ok);
                 }
                 catch (Exception e)
                 {
@@ -770,12 +841,29 @@ namespace GameSystems.EditorTools
             }, GsButtonKind.Primary);
             GsMotion.AddPressSpring(fire);
             actions.Add(fire);
-            actions.Add(Gs.HSpace(10));
-            actions.Add(repeat);
-            actions.Add(Gs.Label("회", "gs-caption"));
-            body.Add(actions);
-            body.Add(Gs.Space(8));
-            body.Add(Gs.Label("행동으로 기록되어 무르기·확정·인과 추적이 게임과 똑같이 적용됩니다.", "gs-caption"));
+            dock.Add(actions);
+            ShowDock(dock);
+        }
+
+        // 필드 이름 뒤에 붙이는 친숙한 타입 이름.
+        internal static string TypeName(Type type)
+        {
+            if (type.IsEnum) return type.Name;
+            switch (Type.GetTypeCode(type))
+            {
+                case TypeCode.Int32: return "int";
+                case TypeCode.Int64: return "long";
+                case TypeCode.Int16: return "short";
+                case TypeCode.Byte: return "byte";
+                case TypeCode.UInt32: return "uint";
+                case TypeCode.UInt64: return "ulong";
+                case TypeCode.Single: return "float";
+                case TypeCode.Double: return "double";
+                case TypeCode.Decimal: return "decimal";
+                case TypeCode.Boolean: return "bool";
+                case TypeCode.String: return "string";
+                default: return type.Name;
+            }
         }
 
         static VisualElement EventFieldEditor(System.Reflection.MemberInfo member, Dictionary<string, object> draft)
@@ -823,10 +911,77 @@ namespace GameSystems.EditorTools
             return editor;
         }
 
-        string CommitToggleText() => _commitAfterTest ? "테스트 후 즉시 확정: 켜짐" : "테스트 후 즉시 확정: 꺼짐";
+        // ── 작업 패널(오른쪽 아래) ───────────────────────────────
+        // 선택한 항목을 조작하는 버튼은 항상 같은 자리에 뜬다.
+
+        const float DockClearance = 150;
+
+        static VisualElement DockPanel(string title, string caption)
+        {
+            var panel = Gs.Col();
+            panel.Add(Gs.Label(title, "gs-heading"));
+            if (!string.IsNullOrEmpty(caption))
+            {
+                var sub = Gs.Label(caption, "gs-caption");
+                sub.style.marginTop = 4;
+                sub.style.marginBottom = 14;
+                sub.style.whiteSpace = WhiteSpace.Normal;
+                panel.Add(sub);
+            }
+            return panel;
+        }
+
+        static Label DockLabel(string text)
+        {
+            var label = Gs.Label(text, "gs-caption");
+            label.style.width = 64;
+            return label;
+        }
+
+        static Label DockUnit(string text)
+        {
+            var label = Gs.Label(text, "gs-caption");
+            label.style.marginLeft = 6;
+            label.style.marginRight = 12;
+            return label;
+        }
+
+        void ShowDock(VisualElement content)
+        {
+            if (_dock == null) return;
+            _dock.Clear();
+            _dock.style.display = content == null ? DisplayStyle.None : DisplayStyle.Flex;
+            if (content != null) _dock.Add(content);
+        }
+
+        string CommitToggleText() => _autoCommitTests ? "테스트 후 즉시 확정: 켜짐" : "테스트 후 즉시 확정: 꺼짐";
 
         string PendingNote() =>
-            _session != null && _session.State.UncommittedCount > 0 ? $" (확정 대기 {_session.State.UncommittedCount} — 확정해야 누적 수치·도전과제에 반영)" : "";
+            _session != null && _session.State.UncommittedCount > 0 ? $"  ·  확정 대기 {_session.State.UncommittedCount} (무르기 가능)" : "";
+
+        string RewardNote() =>
+            _session != null && _session.Achievements.DeferredRewardCount > 0 ? $"  ·  보상 {_session.Achievements.DeferredRewardCount}건은 확정 시 지급" : "";
+
+        void UndoLast()
+        {
+            var pending = _session.State.Uncommitted;
+            var label = pending.Count > 0 ? pending[pending.Count - 1].Label : null;
+            if (_session.Undo())
+                ShowFeedback($"무름: {label ?? "마지막 행동"}  ·  값은 되돌리고 달성한 도전과제는 유지", GsNoticeKind.Info);
+            else
+                ShowFeedback(_session.Options.AutoCommit
+                    ? "무를 행동이 없습니다. 자동 확정 세션이라 행동이 곧바로 확정됩니다."
+                    : "무를 행동이 없습니다. 확정된 행동은 무를 수 없습니다.", GsNoticeKind.Warning);
+        }
+
+        void CommitAll()
+        {
+            var count = _session.State.UncommittedCount;
+            var rewards = _session.Achievements.DeferredRewardCount;
+            _session.Commit();
+            if (count == 0 && rewards == 0) ShowFeedback("확정할 행동이 없습니다.", GsNoticeKind.Info);
+            else ShowFeedback($"확정: 행동 {count}개" + (rewards > 0 ? $"  ·  보상 {rewards}건 지급" : ""), GsNoticeKind.Ok);
+        }
 
         void ShowFeedback(string text, GsNoticeKind kind)
         {

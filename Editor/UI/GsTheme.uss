@@ -588,3 +588,13 @@
 .gs-root .gs-dropdown__detail { font-size: 11px; color: var(--gs-text-3); margin-top: 2px; white-space: normal; }
 .gs-root .gs-dropdown__caption { font-size: 11px; color: var(--gs-text-3); margin-left: 12px; flex-shrink: 0; }
 .gs-root .gs-dropdown__empty { color: var(--gs-text-3); padding: 12px 10px; }
+/* ── 작업 패널(모니터 오른쪽 아래) ───────────────────── */
+.gs-dock {
+    position: absolute;
+    right: 28px;
+    bottom: 20px;
+    width: 340px;
+    padding: 18px 20px;
+    border-color: var(--gs-border-strong);
+    background-color: var(--gs-surface);
+}

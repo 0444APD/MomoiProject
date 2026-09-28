@@ -168,7 +168,7 @@ namespace GameSystems
             else
             {
                 _active.MetaChanges.Add(change);
-                _journal.Append(JournalKind.State, "State", Describe(key, old, normalized) + " (확정 대기)", key, old, normalized, _active.Id);
+                _lastEntry[key] = _journal.Append(JournalKind.State, "State", Describe(key, old, normalized) + " (확정 대기)", key, old, normalized, _active.Id).Id;
                 PendingChanged?.Invoke(key);
             }
         }

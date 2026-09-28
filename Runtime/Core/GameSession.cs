@@ -74,6 +74,8 @@ namespace GameSystems
         public ActionRecord Do(GameAction action)
         {
             var record = Actions.Execute(action);
+            // 행동 직후 평가: 도전과제는 확정을 기다리지 않고 달성된다(보상은 확정 시 지급).
+            Achievements.Flush();
             if (Options.AutoCommit) Commit();
             return record;
         }
@@ -81,6 +83,7 @@ namespace GameSystems
         public void Commit()
         {
             State.Commit();
+            Achievements.GrantDeferred();
             Achievements.Flush();
         }
 
@@ -113,7 +116,7 @@ namespace GameSystems
         {
             if (!EventSimulator.TryPlanForAchievement(this, achievementId, out var steps, out error))
             {
-                if (error == null) error = "이미 조건을 만족합니다. 확정하면 달성됩니다.";
+                if (error == null) error = "이미 조건을 만족합니다.";
                 return false;
             }
             var events = new List<object>();
@@ -138,8 +141,7 @@ namespace GameSystems
         {
             Clock.Advance(deltaTime);
             Achievements.Poll(Clock.Time);
-            // 확정 대기 중인 행동이 있으면 평가를 미룬다(무를 수 있는 상태로 달성되지 않게).
-            if (State.UncommittedCount == 0 && !State.InTransaction) Achievements.Flush();
+            if (!State.InTransaction) Achievements.Flush();
         }
 
         // ── 저장 ───────────────────────────────────────────────
