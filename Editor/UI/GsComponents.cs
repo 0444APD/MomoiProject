@@ -155,6 +155,8 @@ namespace GameSystems.EditorTools.UI
             }
         }
 
+        public void FocusInput() => _field.Focus();
+
         void UpdatePlaceholder() => _placeholder.style.display = string.IsNullOrEmpty(_field.value) ? DisplayStyle.Flex : DisplayStyle.None;
     }
 

@@ -534,16 +534,17 @@ namespace GameSystems.EditorTools
                 value.Add(valueLabel);
                 value.RegisterCallback<ClickEvent>(_ =>
                 {
-                    var menu = new GenericMenu();
-                    menu.AddItem(new GUIContent("자동"), string.IsNullOrEmpty(current), () => Apply(null));
-                    menu.AddItem(new GUIContent("없음"), current == "-", () => Apply("-"));
-                    menu.AddSeparator("");
+                    var items = new List<GsDropdownItem>
+                    {
+                        new GsDropdownItem("자동", () => Apply(null)) { Detail = "필드 이름과 종류로 알아서 고릅니다", Selected = string.IsNullOrEmpty(current) },
+                        new GsDropdownItem("없음", () => Apply("-")) { Selected = current == "-" },
+                    };
                     foreach (var field in fields.Where(f => FieldCatalog.Accepts(slot, f.Kind)))
                     {
                         var path = field.Path;
-                        menu.AddItem(new GUIContent(field.Label), current == path, () => Apply(path));
+                        items.Add(new GsDropdownItem(field.Label, () => Apply(path)) { Group = "필드", Caption = path, Selected = current == path });
                     }
-                    menu.ShowAsContext();
+                    GsDropdown.Show(value, items, placeholder: "필드 검색");
                 });
                 row.Add(value);
                 _viewSettingsPanel.Add(row);
@@ -601,14 +602,15 @@ namespace GameSystems.EditorTools
                     chip.style.marginBottom = 6;
                     chips.Add(chip);
                 }
-                var add = new GsButton("+", () =>
+                GsButton add = null;
+                add = new GsButton("+", () =>
                 {
-                    var menu = new GenericMenu();
+                    var items = new List<GsDropdownItem>();
                     foreach (var field in fields.Where(f => FieldCatalog.Accepts(slot, f.Kind)))
                     {
                         var path = field.Path;
                         if (isCustom() && paths.Contains(path)) continue;
-                        menu.AddItem(new GUIContent(field.Label), false, () =>
+                        items.Add(new GsDropdownItem(field.Label, () =>
                         {
                             if (!isCustom())
                             {
@@ -620,9 +622,10 @@ namespace GameSystems.EditorTools
                             ViewSettings.Save();
                             RebuildViewSettings();
                             RebuildContent();
-                        });
+                        }) { Caption = path });
                     }
-                    menu.ShowAsContext();
+                    if (items.Count == 0) items.Add(new GsDropdownItem("더 추가할 필드가 없습니다") { Disabled = true });
+                    GsDropdown.Show(add, items, placeholder: "필드 검색");
                 }, GsButtonKind.Ghost);
                 chips.Add(add);
                 _viewSettingsPanel.Add(chips);

@@ -302,6 +302,33 @@ namespace GameSystems.EditorTools
             var search = new GsSearchField("검색   tag:  invalid");
             search.style.width = 240;
             controls.Add(search);
+            controls.Add(Gs.HSpace(12));
+
+            // 드롭다운: 항목이 많으면 검색창(한글 초성 검색 가능), 그룹 머리글, 현재 값 표시, ↑↓ Enter Esc.
+            var chosen = "처치 수 (누적)";
+            GsButton dropdown = null;
+            dropdown = new GsButton(chosen + "  ▾", () =>
+            {
+                var groups = new[]
+                {
+                    ("전투", new[] { "처치 수 (누적)", "처치 수 (이번 판)", "최고 콤보", "받은 피해", "치명타 횟수" }),
+                    ("재화", new[] { "골드", "보석", "경험치" }),
+                    ("탐험", new[] { "연 상자 수", "발견한 지역", "이동 거리" }),
+                };
+                var items = new List<GsDropdownItem>();
+                foreach (var (group, names) in groups)
+                    foreach (var name in names)
+                    {
+                        var n = name;
+                        items.Add(new GsDropdownItem(n, () =>
+                        {
+                            chosen = n;
+                            dropdown.Text = n + "  ▾";
+                        }) { Group = group, Selected = n == chosen, Caption = group == "재화" ? "합계" : null });
+                    }
+                GsDropdown.Show(dropdown, items, placeholder: "수치 검색 (초성 가능: ㅊㅊ)");
+            });
+            controls.Add(dropdown);
             body.Add(controls);
             body.Add(Gs.Space(16));
 

@@ -178,7 +178,9 @@ Stats 정의도 블록으로 만든다: "이벤트 [적 처치 ▾] 발생 시 �
 
 참고 이미지: `Documentation~/design-references/ref-01-metric-dashboard.jpg`, `ref-02-crypto-dashboard.jpg` (어두운 대시보드). 포인트 컬러는 참고 이미지의 주황 대신 **핫핑크 rgb(253, 93, 131) #FD5D83** (2026-09-28 변경).
 
-**재사용 원칙: 커스텀 UI는 패널 단위로 재활용한다.** 시트(`GsSheet`), 상세 패널(`GsDetailPanel`), 확인 창(`GsDialog`), 변경 표시(`GsChangeView`)는 한 번 만들어 모든 창이 같이 쓴다.
+**재사용 원칙: 커스텀 UI는 패널 단위로 재활용한다.** 시트(`GsSheet`), 상세 패널(`GsDetailPanel`), 확인 창(`GsDialog`), 변경 표시(`GsChangeView`), 드롭다운(`GsDropdown`)은 한 번 만들어 모든 창이 같이 쓴다.
+
+**드롭다운**: 모든 선택 목록은 `GsDropdown`을 쓴다(Unity 기본 메뉴·DropdownField 사용 금지). 항목이 8개 이상이면 검색창이 생기고 이름·캡션·그룹·**한글 초성**(`ㅊㅊ` → 처치 수)으로 찾는다. 그룹 머리글, 현재 값 표시(✓), 설명 줄, 비활성 항목, 키보드(↑↓ Enter Esc) 지원.
 
 **톤**
 - 다크 테마. 배경은 거의 검정, 패널은 배경보다 한 단계 밝은 짙은 회색.

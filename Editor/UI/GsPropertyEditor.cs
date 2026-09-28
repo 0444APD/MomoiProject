@@ -117,7 +117,8 @@ namespace GameSystems.EditorTools.UI
                 }));
             }
 
-            var add = new GsButton($"+ {KindName(elementType)} 추가", () => ShowTypeMenu(elementType, type =>
+            GsButton add = null;
+            add = new GsButton($"+ {KindName(elementType)} 추가", () => ShowTypeMenu(add, elementType, type =>
             {
                 list.serializedObject.Update();
                 var index = list.arraySize;
@@ -266,16 +267,19 @@ namespace GameSystems.EditorTools.UI
             return "항목";
         }
 
-        public static void ShowTypeMenu(Type baseType, Action<Type> onPick)
+        public static void ShowTypeMenu(VisualElement anchor, Type baseType, Action<Type> onPick)
         {
-            var menu = new GenericMenu();
-            foreach (var type in BlockTypes.ConcreteTypes(baseType))
+            var items = BlockTypes.ConcreteTypes(baseType).Select(type =>
             {
                 var picked = type;
-                menu.AddItem(new GUIContent($"{BlockTypes.Category(type)}/{BlockTypes.DisplayName(type)}"), false, () => onPick(picked));
-            }
-            if (menu.GetItemCount() == 0) menu.AddDisabledItem(new GUIContent("사용할 수 있는 블록이 없습니다"));
-            menu.ShowAsContext();
+                return new GsDropdownItem(BlockTypes.DisplayName(type), () => onPick(picked))
+                {
+                    Group = BlockTypes.Category(type),
+                    Detail = BlockTypes.Description(type),
+                };
+            }).ToList();
+            if (items.Count == 0) items.Add(new GsDropdownItem("사용할 수 있는 블록이 없습니다") { Disabled = true });
+            GsDropdown.Show(anchor, items, placeholder: $"{KindName(baseType)} 검색");
         }
     }
 
@@ -287,7 +291,8 @@ namespace GameSystems.EditorTools.UI
             var value = property.managedReferenceValue;
             if (value == null)
             {
-                var pick = new GsButton($"+ {GsPropertyEditor.KindName(baseType)} 선택", () => GsPropertyEditor.ShowTypeMenu(baseType, type =>
+                GsButton pick = null;
+                pick = new GsButton($"+ {GsPropertyEditor.KindName(baseType)} 선택", () => GsPropertyEditor.ShowTypeMenu(pick, baseType, type =>
                 {
                     property.serializedObject.Update();
                     property.managedReferenceValue = Activator.CreateInstance(type);
@@ -308,7 +313,8 @@ namespace GameSystems.EditorTools.UI
             header.Add(Gs.Label(BlockTypes.DisplayName(type), "gs-caption"));
             header.Add(Gs.Spacer());
 
-            var swap = new GsButton("바꾸기", () => GsPropertyEditor.ShowTypeMenu(baseType, newType =>
+            GsButton swap = null;
+            swap = new GsButton("바꾸기", () => GsPropertyEditor.ShowTypeMenu(swap, baseType, newType =>
             {
                 property.serializedObject.Update();
                 property.managedReferenceValue = Activator.CreateInstance(newType);

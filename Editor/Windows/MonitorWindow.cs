@@ -797,10 +797,20 @@ namespace GameSystems.EditorTools
             }
             else if (type.IsEnum)
             {
-                var names = Enum.GetNames(type).ToList();
-                var field = new DropdownField(names, Math.Max(0, names.IndexOf(current?.ToString())));
-                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
-                editor = field;
+                // 디자인 시스템 드롭다운: 평소엔 값 글자, 클릭하면 목록.
+                var box = Gs.Box("gs-inline--editable");
+                var label = Gs.Label(current?.ToString() ?? Enum.GetNames(type).FirstOrDefault() ?? "", "gs-inline__value");
+                box.Add(label);
+                box.RegisterCallback<ClickEvent>(_ =>
+                {
+                    var items = Enum.GetNames(type).Select(name => new GsDropdownItem(name, () =>
+                    {
+                        draft[member.Name] = name;
+                        label.text = name;
+                    }) { Selected = name == label.text }).ToList();
+                    GsDropdown.Show(box, items);
+                });
+                editor = box;
             }
             else
             {

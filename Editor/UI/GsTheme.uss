@@ -523,3 +523,37 @@
 .gs-inline.gs-token:hover { background-color: rgba(255, 255, 255, 0.10); }
 .gs-root .gs-token .gs-inline__value { color: var(--gs-text); white-space: nowrap; }
 .gs-change__thumb { width: 48px; height: 48px; border-radius: 8px; margin-right: 12px; flex-shrink: 0; background-color: var(--gs-surface); -unity-background-scale-mode: scale-and-crop; }
+
+/* ── 드롭다운 (검색·그룹·현재 값 표시) ─────────────────── */
+.gs-dropdown-layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.gs-dropdown {
+    position: absolute;
+    padding: 6px;
+    border-radius: 12px;
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    transition-property: opacity, translate;
+    transition-duration: 0.12s, 0.14s;
+    transition-timing-function: ease-out-cubic;
+}
+.gs-dropdown--hidden { opacity: 0; translate: 0 -4px; }
+.gs-dropdown .gs-search { height: 30px; margin: 0 0 6px 0; background-color: var(--gs-surface); }
+.gs-dropdown__list { max-height: 320px; }
+.gs-root .gs-dropdown__group { font-size: 10px; color: var(--gs-text-3); -unity-font-style: bold; letter-spacing: 0.4px; margin: 8px 10px 4px 10px; }
+.gs-dropdown__item {
+    flex-direction: row;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 10px 5px 6px;
+    border-radius: 8px;
+    cursor: link;
+}
+.gs-dropdown__item--active { background-color: rgba(255, 255, 255, 0.06); }
+.gs-dropdown__item--disabled { opacity: 0.45; cursor: arrow; }
+.gs-root .gs-dropdown__check { width: 18px; color: var(--gs-accent); -unity-font-style: bold; -unity-text-align: middle-center; }
+.gs-root .gs-dropdown__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-root .gs-dropdown__item--selected .gs-dropdown__label { color: var(--gs-accent); }
+.gs-root .gs-dropdown__detail { font-size: 11px; color: var(--gs-text-3); margin-top: 2px; white-space: normal; }
+.gs-root .gs-dropdown__caption { font-size: 11px; color: var(--gs-text-3); margin-left: 12px; flex-shrink: 0; }
+.gs-root .gs-dropdown__empty { color: var(--gs-text-3); padding: 12px 10px; }

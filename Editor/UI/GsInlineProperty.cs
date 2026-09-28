@@ -165,67 +165,66 @@ namespace GameSystems.EditorTools.UI
 
         void ShowEnumMenu()
         {
-            var menu = new GenericMenu();
             var names = _property.enumDisplayNames;
+            var items = new List<GsDropdownItem>();
             for (int i = 0; i < names.Length; i++)
             {
                 var index = i;
-                menu.AddItem(new GUIContent(names[i]), _property.enumValueIndex == i, () =>
+                items.Add(new GsDropdownItem(names[i], () =>
                 {
                     _property.serializedObject.Update();
                     _property.enumValueIndex = index;
                     Apply();
-                });
+                }) { Selected = _property.enumValueIndex == i });
             }
-            menu.ShowAsContext();
+            GsDropdown.Show(this, items);
         }
 
-        void ShowIdMenu(IEnumerable<GameData> items, string kind)
+        void ShowIdMenu(IEnumerable<GameData> data, string kind)
         {
-            var menu = new GenericMenu();
-            var list = items.OrderBy(d => d.DisplayName).ToList();
-            if (list.Count == 0) menu.AddDisabledItem(new GUIContent($"{kind}이(가) 아직 없습니다 — 데이터베이스에서 먼저 만드세요"));
-            foreach (var item in list)
+            var list = data.OrderBy(d => d.DisplayName).ToList();
+            var items = list.Select(d =>
             {
-                var id = item.Id;
-                menu.AddItem(new GUIContent($"{item.DisplayName}   ({id})"), _property.stringValue == id, () => SetString(id));
-            }
-            menu.ShowAsContext();
+                var id = d.Id;
+                return new GsDropdownItem(d.DisplayName, () => SetString(id)) { Caption = id, Selected = _property.stringValue == id };
+            }).ToList();
+            if (items.Count == 0) items.Add(new GsDropdownItem($"{kind}이(가) 아직 없습니다 — 데이터베이스에서 먼저 만드세요") { Disabled = true });
+            GsDropdown.Show(this, items, placeholder: $"{kind} 검색");
         }
 
         void ShowEventTypeMenu()
         {
-            var menu = new GenericMenu();
-            var types = TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf).ToList();
-            if (types.Count == 0) menu.AddDisabledItem(new GUIContent("[GameEvent]가 붙은 이벤트 타입이 없습니다"));
-            foreach (var type in types)
+            var items = TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf).Select(type =>
             {
                 var name = type.FullName;
-                menu.AddItem(new GUIContent($"{EventBus.DisplayNameOf(type)}   ({type.Name})"), _property.stringValue == name, () => SetString(name));
-            }
-            menu.ShowAsContext();
+                return new GsDropdownItem(EventBus.DisplayNameOf(type), () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name };
+            }).ToList();
+            if (items.Count == 0) items.Add(new GsDropdownItem("[GameEvent]가 붙은 이벤트 타입이 없습니다") { Disabled = true });
+            GsDropdown.Show(this, items, placeholder: "이벤트 검색");
         }
 
         void ShowEventFieldMenu()
         {
-            var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("횟수 (필드 없음)"), string.IsNullOrEmpty(_property.stringValue), () => SetString(""));
+            var items = new List<GsDropdownItem>
+            {
+                new GsDropdownItem("횟수 (필드 없음)", () => SetString("")) { Detail = "이벤트가 한 번 발생할 때마다 1", Selected = string.IsNullOrEmpty(_property.stringValue) },
+            };
             var eventType = TypeResolver.Find(Sibling(EventFieldRef.EventTypeField)?.stringValue);
             if (eventType == null)
             {
-                menu.AddDisabledItem(new GUIContent("이벤트를 먼저 선택하세요"));
+                items.Add(new GsDropdownItem("이벤트를 먼저 선택하세요") { Disabled = true });
             }
             else
             {
                 foreach (var member in TypeResolver.NumericMembers(eventType))
                 {
                     var name = member.Name;
-                    menu.AddItem(new GUIContent(name), _property.stringValue == name, () => SetString(name));
+                    var type = member is FieldInfo f ? f.FieldType : ((PropertyInfo)member).PropertyType;
+                    items.Add(new GsDropdownItem(name, () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name });
                 }
             }
-            menu.ShowAsContext();
+            GsDropdown.Show(this, items);
         }
-
         void SetString(string value)
         {
             _property.serializedObject.Update();
