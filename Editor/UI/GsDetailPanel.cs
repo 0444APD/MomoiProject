@@ -162,14 +162,10 @@ namespace GameSystems.EditorTools.UI
             var titleProperty = _draftObject.FindProperty(_options.TitlePath);
             if (titleProperty != null)
             {
-                var titleChange = new GsChangeView(null, "", "");
-                titleChange.style.marginBottom = 6;
-                _titleSlot.Add(titleChange);
                 var title = new GsInlineProperty(titleProperty);
                 title.Q<Label>().AddToClassList("gs-display");
                 title.Changed += OnValueChanged;
-                _titleSlot.Add(title);
-                _sections[titleProperty.propertyPath] = (_titleSlot, titleChange, c => titleChange.Set(c.Old, c.New));
+                _titleSlot.Add(ValueWithHistory(titleProperty.propertyPath, title, _titleSlot, "gs-display"));
             }
 
             _summary = Gs.Label("", "gs-preview");
@@ -190,28 +186,11 @@ namespace GameSystems.EditorTools.UI
 
                 if (isLeaf)
                 {
-                    // 단순 값: 위 [이전] · V 화살표 · 아래 현재값(편집). 바뀌지 않았으면 현재값만 보인다.
-                    var inline = (GsInlineProperty)content;
-                    inline.Multiline = true;
-                    var column = Gs.Col();
-                    var oldBox = Gs.Box("gs-change__box", "gs-change__old");
-                    var oldLabel = Gs.Label("");
-                    oldBox.Add(oldLabel);
-                    var chevron = Gs.Box("gs-change__chevron");
-                    column.Add(oldBox);
-                    column.Add(chevron);
-                    column.Add(content);
-                    section.Add(column);
-                    _sections[path] = (section, oldBox, c =>
-                    {
-                        oldLabel.text = c.Old;
-                        chevron.style.display = oldBox.style.display;
-                    });
-                    chevron.style.display = DisplayStyle.None;
+                    section.Add(ValueWithHistory(path, (GsInlineProperty)content, section, null));
                 }
                 else
                 {
-                    // 조건·목록: 위에 문장 단위 [이전] › [현재], 아래 편집기
+                    // 조건·목록: 위에 문장 단위 이전 / V / 현재, 아래 편집기
                     var change = new GsChangeView(null, "", "");
                     change.style.marginBottom = 10;
                     section.Add(change);
@@ -231,6 +210,30 @@ namespace GameSystems.EditorTools.UI
                 schedule.Execute(() => _body.ScrollTo(target)).StartingIn(60);
                 schedule.Execute(() => RefreshState()).StartingIn(1600);
             }
+        }
+
+        // 단순 값: 바뀌지 않았으면 값 칸만. 바뀌면 원래 자리에 같은 크기·같은 글자 위치의 [이전] 칸이 남고,
+        // 그 아래 V 화살표와 현재 값(편집 칸)이 붙는다 → 원래 글자는 움직이지 않는다.
+        VisualElement ValueWithHistory(string path, GsInlineProperty inline, VisualElement owner, string labelClass)
+        {
+            inline.Multiline = true;
+            var column = Gs.Col("gs-detail__value");
+            var oldBox = Gs.Box("gs-change__box", "gs-change__old");
+            var oldLabel = labelClass == null ? Gs.Label("") : Gs.Label("", labelClass);
+            oldBox.Add(oldLabel);
+            var chevron = Gs.Box("gs-change__chevron");
+            chevron.style.display = DisplayStyle.None;
+            column.Add(oldBox);
+            column.Add(chevron);
+            column.Add(inline);
+            _sections[path] = (owner, oldBox, _ =>
+            {
+                // 이전 값은 원본을 값 칸과 같은 규칙으로 표시한다(ID는 이름으로 등).
+                var original = _originalObject.FindProperty(path);
+                oldLabel.text = original != null ? GsInlineProperty.Describe(original).text : "없음";
+                chevron.style.display = oldBox.style.display;
+            });
+            return column;
         }
 
         void OnValueChanged() => RefreshState();
