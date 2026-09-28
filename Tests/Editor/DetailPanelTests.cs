@@ -77,6 +77,32 @@ namespace GameSystems.Tests
             panel.Close();
         }
 
+        // 시트의 '···'은 어느 열에서든 열 수 있어야 한다(제목 필드는 스크롤 영역 밖 헤더에 있다).
+        [Test]
+        public void 어느_필드로_열어도_예외가_없다()
+        {
+            var panel = GsDetailPanel.Open(_host, _item);
+            foreach (var property in PropertyUtil.TopLevel(new SerializedObject(_item)).Select(p => p.propertyPath).ToList())
+            {
+                var path = property;
+                Assert.DoesNotThrow(() => panel.FocusField(path), path);
+            }
+            panel.Close();
+
+            var stat = ScriptableObject.CreateInstance<StatData>();
+            try
+            {
+                var statPanel = GsDetailPanel.Open(_host, stat);
+                foreach (var path in new[] { "displayName", "tags", "scope", "aggregate", "rules" })
+                    Assert.DoesNotThrow(() => statPanel.FocusField(path), path);
+                statPanel.Close();
+            }
+            finally
+            {
+                Object.DestroyImmediate(stat);
+            }
+        }
+
         [Test]
         public void 조건_블록_안쪽의_변화도_문장으로_잡는다()
         {

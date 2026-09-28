@@ -202,14 +202,23 @@ namespace GameSystems.EditorTools.UI
 
             RefreshState();
 
-            if (!string.IsNullOrEmpty(_options.FocusPath) && _sections.TryGetValue(_options.FocusPath, out var focus))
+            if (!string.IsNullOrEmpty(_options.FocusPath))
             {
-                var target = focus.section;
+                var path = _options.FocusPath;
                 _options.FocusPath = null;
-                target.AddToClassList("gs-detail__section--changed");
-                schedule.Execute(() => _body.ScrollTo(target)).StartingIn(60);
-                schedule.Execute(() => RefreshState()).StartingIn(1600);
+                schedule.Execute(() => FocusField(path)).StartingIn(60);
             }
+        }
+
+        // 필드를 강조하고, 스크롤 영역 안에 있으면 그 위치로 스크롤한다.
+        // 제목처럼 헤더에 있는 필드는 항상 보이므로 스크롤하지 않는다(ScrollView 밖 요소로 ScrollTo하면 예외).
+        internal void FocusField(string path)
+        {
+            if (path == null || !_sections.TryGetValue(path, out var focus)) return;
+            var target = focus.section;
+            target.AddToClassList("gs-detail__section--changed");
+            if (_body.contentContainer.Contains(target)) _body.ScrollTo(target);
+            schedule.Execute(() => RefreshState()).StartingIn(1600);
         }
 
         // 단순 값: 바뀌지 않았으면 값 칸만. 바뀌면 원래 자리에 같은 크기·같은 글자 위치의 [이전] 칸이 남고,
