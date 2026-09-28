@@ -244,6 +244,8 @@ namespace GameSystems.EditorTools.UI
                     used.Add(name);
                     var token = new GsInlineProperty(child);
                     token.AddToClassList("gs-token");
+                    // 첫 단어는 문장의 주어: 뒤 내용과 간격을 더 둔다.
+                    if (used.Count == 1) token.AddToClassList("gs-token--subject");
                     token.Changed += () => onValue?.Invoke();
                     var field = PropertyUtil.GetField(child, out _);
                     token.tooltip = LabelOf(child, field);
@@ -305,13 +307,7 @@ namespace GameSystems.EditorTools.UI
             }
 
             var type = value.GetType();
-            AddToClassList("gs-block");
             tooltip = BlockTypes.Description(type) ?? "";
-
-            // 머리줄은 블록 이름만(분류를 앞에 붙이면 "수치 수치 비교"처럼 겹친다).
-            var header = Gs.Box("gs-block__header");
-            header.Add(Gs.Label(BlockTypes.DisplayName(type), "gs-caption"));
-            header.Add(Gs.Spacer());
 
             GsButton swap = null;
             swap = new GsButton("바꾸기", () => GsPropertyEditor.ShowTypeMenu(swap, baseType, newType =>
@@ -321,8 +317,7 @@ namespace GameSystems.EditorTools.UI
                 property.serializedObject.ApplyModifiedProperties();
                 onStructure?.Invoke();
             }), GsButtonKind.Ghost);
-            swap.AddToClassList("gs-block__remove");
-            header.Add(swap);
+            swap.AddToClassList("gs-block__action");
 
             var remove = new GsButton("✕", () =>
             {
@@ -336,33 +331,49 @@ namespace GameSystems.EditorTools.UI
                 property.serializedObject.ApplyModifiedProperties();
                 onStructure?.Invoke();
             }, GsButtonKind.Ghost);
-            remove.AddToClassList("gs-block__remove");
+            remove.AddToClassList("gs-block__action");
             remove.tooltip = "삭제";
-            header.Add(remove);
-            Add(header);
 
-            // 문장 템플릿이 있으면 한 줄 문장으로: 단어(필드)마다 클릭해 바꾼다. 템플릿에 없는 필드만 아래에 따로 그린다.
             var used = new HashSet<string>();
             var sentence = BlockTypes.Sentence(type);
             if (!string.IsNullOrEmpty(sentence) && sentence.Contains("{"))
-                Add(GsPropertyEditor.Sentence(property, sentence, used, onValue));
+            {
+                // 문장 블록: 겉패널 없이 한 줄. [단어] 패널마다 클릭해 바꾸고, 바꾸기·삭제는 마우스를 올리면 오른쪽 끝에.
+                AddToClassList("gs-block-line");
+                var line = Gs.Box("gs-block-line__row");
+                var words = GsPropertyEditor.Sentence(property, sentence, used, onValue);
+                words.AddToClassList("gs-grow");
+                line.Add(words);
+                line.Add(swap);
+                line.Add(remove);
+                Add(line);
+            }
+            else
+            {
+                // 묶음 블록(모두 만족 등): 이름 한 줄 + 들여쓴 하위 문장들.
+                AddToClassList("gs-block-group");
+                var header = Gs.Box("gs-block__header");
+                header.Add(Gs.Label(BlockTypes.DisplayName(type), "gs-caption"));
+                header.Add(Gs.Spacer());
+                header.Add(swap);
+                header.Add(remove);
+                Add(header);
+            }
 
             foreach (var child in PropertyUtil.Children(property))
             {
                 if (used.Contains(child.name)) continue;
-                var element = GsPropertyEditor.BuildProperty(child, onValue, onStructure);
-                // 복합 조건의 하위 조건은 들여쓴 줄로 묶는다.
+                // 하위 조건 목록은 제목 없이 내용만, 들여쓴 줄로 묶는다.
                 if (child.isArray || child.propertyType == SerializedPropertyType.ManagedReference)
                 {
                     var nested = Gs.Box("gs-block__children");
-                    nested.Add(element);
+                    nested.Add(GsPropertyEditor.BuildContent(child, onValue, onStructure));
                     Add(nested);
                 }
                 else
                 {
-                    Add(element);
+                    Add(GsPropertyEditor.BuildProperty(child, onValue, onStructure));
                 }
             }
-        }
-    }
+        }    }
 }

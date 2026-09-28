@@ -23,8 +23,9 @@ namespace GameSystems.EditorTools.UI
         public string FocusPath;
         // 편집 중 사본을 검증해 (오류 여부, 문장) 목록을 돌려준다.
         public Func<UnityEngine.Object, List<(bool error, string message)>> Validate;
-        // 내용 맨 위 요약 문장(예: 조건 → 보상). 편집 중 사본으로 계산해 바로 갱신된다.
-        public Func<UnityEngine.Object, string> Summary;
+        // 제목 아래 요약: (머리말, 내용) 줄 목록. 예: ("조건", "처치 수 1 이상 달성 시"), ("보상", "골드 50 획득").
+        // 편집 중 사본으로 계산해 바로 갱신된다.
+        public Func<UnityEngine.Object, IList<(string label, string text)>> Summary;
         public List<(string label, Action<GsDetailPanel> action)> Actions = new List<(string, Action<GsDetailPanel>)>();
         public Action<UnityEngine.Object> Saved;
     }
@@ -47,7 +48,7 @@ namespace GameSystems.EditorTools.UI
         VisualElement _titleSlot;
         ScrollView _body;
         VisualElement _notices;
-        Label _summary;
+        VisualElement _summary;
         Label _status;
         GsButton _revert;
         GsButton _save;
@@ -117,9 +118,7 @@ namespace GameSystems.EditorTools.UI
                 subtitle.style.marginTop = 6;
                 titles.Add(subtitle);
             }
-            _summary = Gs.Label("", "gs-preview");
-            _summary.style.marginTop = 12;
-            _summary.style.marginBottom = 0;
+            _summary = Gs.Box("gs-summary");
             titles.Add(_summary);
             top.Add(titles);
 
@@ -325,9 +324,19 @@ namespace GameSystems.EditorTools.UI
             var titleText = title != null && title.propertyType == SerializedPropertyType.String ? title.stringValue : null;
             _initial.text = image == null && !string.IsNullOrEmpty(titleText) ? titleText.Substring(0, 1) : "";
 
-            var summary = _options.Summary?.Invoke(_draft);
-            _summary.text = summary ?? "";
-            _summary.style.display = string.IsNullOrEmpty(summary) ? DisplayStyle.None : DisplayStyle.Flex;
+            _summary.Clear();
+            var lines = _options.Summary?.Invoke(_draft);
+            if (lines != null)
+            {
+                foreach (var (label, text) in lines)
+                {
+                    var row = Gs.Box("gs-summary__row");
+                    row.Add(Gs.Label(label, "gs-summary__label"));
+                    row.Add(Gs.Label(text, "gs-summary__text"));
+                    _summary.Add(row);
+                }
+            }
+            _summary.style.display = _summary.childCount == 0 ? DisplayStyle.None : DisplayStyle.Flex;
 
             _notices.Clear();
             if (_options.Validate != null)

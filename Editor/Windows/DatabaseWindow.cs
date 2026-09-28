@@ -469,24 +469,29 @@ namespace GameSystems.EditorTools
                 .ToList();
         }
 
-        static string DescribeItem(GameData item)
+        // 상세 패널 제목 아래 요약: 머리말과 내용을 나눈 줄들.
+        static IList<(string label, string text)> DescribeItem(GameData item)
         {
             var names = EditorDatabase.Instance;
             switch (item)
             {
                 case AchievementData achievement:
-                    // 두 줄 문장: 조건 … 달성 시 / 보상 … 획득
-                    var condition = achievement.condition != null ? $"{achievement.condition.Describe(names)} 달성 시" : "(조건 없음)";
                     var rewards = achievement.rewards.Where(r => r != null).Select(r => r.Describe(names)).ToList();
-                    return $"조건   {condition}\n보상   {(rewards.Count > 0 ? string.Join(", ", rewards) : "없음")}";
+                    return new List<(string, string)>
+                    {
+                        ("조건", achievement.condition != null ? $"{achievement.condition.Describe(names)} 달성 시" : "조건 없음"),
+                        ("보상", rewards.Count > 0 ? string.Join(",  ", rewards) : "없음"),
+                    };
                 case StatData stat:
-                    var scope = stat.scope == StatScope.Run ? "이번 판" : "누적";
                     var rules = stat.rules.Where(r => r != null).Select(r => r.Describe(stat.DisplayName)).ToList();
-                    return rules.Count > 0 ? $"{scope} · {StatSystem.AggregateText(stat.aggregate)}\n" + string.Join("\n", rules) : $"{scope} · {StatSystem.AggregateText(stat.aggregate)} · 반영 규칙 없음";
+                    return new List<(string, string)>
+                    {
+                        ("방식", $"{(stat.scope == StatScope.Run ? "이번 판" : "누적")} · {StatSystem.AggregateText(stat.aggregate)}"),
+                        ("반영", rules.Count > 0 ? string.Join("\n", rules) : "반영 규칙 없음"),
+                    };
             }
             return null;
         }
-
         void Delete(GameData item, GsDetailPanel panel)
         {
             GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 에셋은 휴지통으로 이동합니다.", "삭제", () =>
