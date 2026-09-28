@@ -142,8 +142,8 @@ namespace GameSystems.EditorTools
             _body = Gs.Col("gs-grow");
             main.Add(_body);
 
-            // 선택한 항목의 조작 버튼이 뜨는 자리(오른쪽 아래 고정).
-            _dock = Gs.Box("gs-panel", "gs-dock");
+            // 선택한 항목을 조작하는 줄(본문 아래, 오른쪽 정렬). 본문은 이 줄 위에서 끝난다.
+            _dock = Gs.Row("gs-dock");
             _dock.style.display = DisplayStyle.None;
             main.Add(_dock);
 
@@ -530,7 +530,6 @@ namespace GameSystems.EditorTools
         {
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
-            scroll.contentContainer.style.paddingBottom = DockClearance;
             _body.Add(scroll);
             var definitions = _session.Achievements.Definitions.ToList();
             if (definitions.Count == 0)
@@ -571,10 +570,14 @@ namespace GameSystems.EditorTools
             }
 
             var selected = _session.Achievements.Find(_selectedAchievement);
-            if (selected == null) return;
+            if (selected == null)
+            {
+                ShowDock(Gs.Row());
+                return;
+            }
 
             var isUnlocked = _session.Achievements.IsUnlocked(selected.Id);
-            var dock = DockPanel(selected.DisplayName, isUnlocked ? "달성함" : "아직 달성하지 않음");
+            var dock = Gs.Row();
             var buttons = Gs.Row();
             if (isUnlocked)
             {
@@ -617,7 +620,6 @@ namespace GameSystems.EditorTools
         {
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
-            scroll.contentContainer.style.paddingBottom = DockClearance;
             _body.Add(scroll);
             var definitions = _session.Stats.Definitions.ToList();
             if (definitions.Count == 0)
@@ -666,23 +668,40 @@ namespace GameSystems.EditorTools
             scroll.Add(panel);
 
             var selected = _session.Stats.Find(_selectedStat);
-            if (selected == null) return;
+            if (selected == null)
+            {
+                ShowDock(Gs.Row());
+                return;
+            }
 
             var statKey = StateKeys.Stat(selected.Id);
-            var dock = DockPanel(selected.DisplayName ?? selected.Id, $"현재 {StateStore.Format(_session.State.Get(statKey))}  ·  {ScopeText(selected)}");
-
-            // 이벤트로: 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킨다(게임과 같은 경로).
+            var dock = Gs.Row();
             var isSum = selected.Aggregate == StatAggregate.Sum;
             var now = _session.Stats.Get(selected.Id);
             if (double.IsNaN(now)) now = 0;
+
+            // 직접 수정: 값만 덮어쓴다(이벤트·다른 수치는 반응하지 않고 기록에만 남는다).
+            var direct = new DoubleField { value = now };
+            direct.AddToClassList("gs-inline");
+            direct.style.width = 90;
+            dock.Add(direct);
+            dock.Add(Gs.HSpace(8));
+            var apply = new GsButton("직접 수정", () =>
+            {
+                _session.State.Set(statKey, direct.value);
+                ShowFeedback($"{selected.DisplayName} = {StateStore.Format(direct.value)} (직접 수정)", GsNoticeKind.Info);
+            });
+            apply.tooltip = "값만 덮어씁니다. 이벤트·다른 수치·반영 규칙은 움직이지 않습니다.";
+            dock.Add(apply);
+            dock.Add(Gs.HSpace(28));
+
+            // 이벤트로: 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킨다(게임과 같은 경로).
             if (!_statAmounts.TryGetValue(selected.Id, out var amount)) amount = isSum ? 1 : Math.Max(0, now);
-            var eventRow = Gs.Row();
-            eventRow.Add(DockLabel(isSum ? "더할 값" : "기록할 값"));
             var amountField = new DoubleField { value = amount };
             amountField.AddToClassList("gs-inline");
-            amountField.style.width = 100;
-            eventRow.Add(amountField);
-            eventRow.Add(Gs.HSpace(8));
+            amountField.style.width = 90;
+            dock.Add(amountField);
+            dock.Add(Gs.HSpace(8));
             var fire = new GsButton(isSum ? "이벤트로 더하기" : "이벤트로 기록", () =>
             {
                 if (_session.TrySimulateStat(selected.Id, amountField.value, _autoCommitTests, out var description, out var error))
@@ -690,27 +709,15 @@ namespace GameSystems.EditorTools
                 else
                     ShowFeedback(error, GsNoticeKind.Warning);
             }, GsButtonKind.Primary);
-            fire.tooltip = "게임과 같은 경로: 같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, 무를 수 있습니다.";
             GsMotion.AddPressSpring(fire);
-            eventRow.Add(fire);
-            dock.Add(eventRow);
+            dock.Add(fire);
 
-            var plan = Gs.Label("", "gs-caption");
-            plan.style.marginTop = 6;
-            plan.style.marginBottom = 14;
-            plan.style.whiteSpace = WhiteSpace.Normal;
+            // 발생할 이벤트는 버튼 설명으로 보여 준다.
             void UpdatePlan()
             {
-                if (EventSimulator.TryPlanForStat(_session.Stats, selected.Id, amountField.value, out var p, out var error))
-                {
-                    plan.text = "발생할 이벤트: " + p.Description;
-                    plan.style.color = StyleKeyword.Null;
-                }
-                else
-                {
-                    plan.text = error;
-                    plan.style.color = Gs.Warning;
-                }
+                fire.tooltip = EventSimulator.TryPlanForStat(_session.Stats, selected.Id, amountField.value, out var p, out var error)
+                    ? "발생할 이벤트: " + p.Description + "\n같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, 무를 수 있습니다."
+                    : error;
             }
             amountField.RegisterValueChangedCallback(e =>
             {
@@ -718,24 +725,6 @@ namespace GameSystems.EditorTools
                 UpdatePlan();
             });
             UpdatePlan();
-            dock.Add(plan);
-
-            // 직접 수정: 값만 덮어쓴다(이벤트·다른 수치는 반응하지 않고 기록에만 남는다).
-            var directRow = Gs.Row();
-            directRow.Add(DockLabel("값"));
-            var direct = new DoubleField { value = now };
-            direct.AddToClassList("gs-inline");
-            direct.style.width = 100;
-            directRow.Add(direct);
-            directRow.Add(Gs.HSpace(8));
-            var apply = new GsButton("직접 수정", () =>
-            {
-                _session.State.Set(statKey, direct.value);
-                ShowFeedback($"{selected.DisplayName} = {StateStore.Format(direct.value)} (직접 수정)", GsNoticeKind.Info);
-            });
-            apply.tooltip = "값만 덮어씁니다. 이벤트·다른 수치·반영 규칙은 움직이지 않습니다.";
-            directRow.Add(apply);
-            dock.Add(directRow);
             ShowDock(dock);
         }
 
@@ -780,7 +769,7 @@ namespace GameSystems.EditorTools
 
             var form = Gs.Panel(EventBus.DisplayNameOf(selected), selected.FullName, out _, out var body);
             form.style.flexGrow = 1;
-            form.style.marginBottom = DockClearance;
+            form.style.marginBottom = 4;
             split.Add(form);
 
             if (!_eventDrafts.TryGetValue(selected.FullName, out var draft))
@@ -818,7 +807,7 @@ namespace GameSystems.EditorTools
             body.Add(Gs.Space(14));
             body.Add(Gs.Label(affected.Count > 0 ? "반응하는 수치:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 수치가 없습니다.", "gs-caption"));
 
-            var dock = DockPanel(EventBus.DisplayNameOf(selected), "행동으로 기록되어 무르기·확정·인과 추적이 게임과 똑같이 적용됩니다");
+            var dock = Gs.Row();
             var actions = Gs.Row();
             var repeat = new DoubleField { value = 1 };
             repeat.style.width = 70;
@@ -911,32 +900,8 @@ namespace GameSystems.EditorTools
             return editor;
         }
 
-        // ── 작업 패널(오른쪽 아래) ───────────────────────────────
+        // ── 작업 줄(본문 아래, 오른쪽 정렬) ─────────────────────
         // 선택한 항목을 조작하는 버튼은 항상 같은 자리에 뜬다.
-
-        const float DockClearance = 150;
-
-        static VisualElement DockPanel(string title, string caption)
-        {
-            var panel = Gs.Col();
-            panel.Add(Gs.Label(title, "gs-heading"));
-            if (!string.IsNullOrEmpty(caption))
-            {
-                var sub = Gs.Label(caption, "gs-caption");
-                sub.style.marginTop = 4;
-                sub.style.marginBottom = 14;
-                sub.style.whiteSpace = WhiteSpace.Normal;
-                panel.Add(sub);
-            }
-            return panel;
-        }
-
-        static Label DockLabel(string text)
-        {
-            var label = Gs.Label(text, "gs-caption");
-            label.style.width = 64;
-            return label;
-        }
 
         static Label DockUnit(string text)
         {
