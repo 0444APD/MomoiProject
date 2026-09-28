@@ -27,7 +27,14 @@ namespace GameSystems
     // 알림 전용 이벤트 버스. 구독자는 이벤트를 읽기만 한다(값 수정 파이프라인은 별도 Modifiers 층의 몫).
     public sealed class EventBus
     {
-        readonly Dictionary<Type, List<Delegate>> _handlers = new Dictionary<Type, List<Delegate>>();
+        // 구독자는 타입을 모르는 호출(PublishObject)에서도 부를 수 있게 object 래퍼로 보관한다.
+        sealed class Handler
+        {
+            public Action<object> Invoke;
+            public Delegate Original;
+        }
+
+        readonly Dictionary<Type, List<Handler>> _handlers = new Dictionary<Type, List<Handler>>();
         readonly List<Action<object>> _listeners = new List<Action<object>>();
         readonly Journal _journal;
 
@@ -42,9 +49,10 @@ namespace GameSystems
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
             if (!_handlers.TryGetValue(typeof(T), out var list))
-                _handlers[typeof(T)] = list = new List<Delegate>();
-            list.Add(handler);
-            return new Subscription(() => list.Remove(handler));
+                _handlers[typeof(T)] = list = new List<Handler>();
+            var entry = new Handler { Invoke = o => handler((T)o), Original = handler };
+            list.Add(entry);
+            return new Subscription(() => list.Remove(entry));
         }
 
         // 타입 무관하게 모든 이벤트를 받는다(통계 규칙 등).
@@ -55,7 +63,10 @@ namespace GameSystems
             return new Subscription(() => _listeners.Remove(listener));
         }
 
-        public void Publish<T>(T evt)
+        public void Publish<T>(T evt) => PublishObject(evt);
+
+        // 런타임에만 타입을 아는 이벤트(모니터의 테스트 이벤트 등)도 게임과 똑같은 경로로 발행한다.
+        public void PublishObject(object evt)
         {
             if (evt == null) throw new ArgumentNullException(nameof(evt));
             var entry = _journal.Append(JournalKind.Event, "Events", Describe(evt));
@@ -65,13 +76,15 @@ namespace GameSystems
                 if (_handlers.TryGetValue(evt.GetType(), out var list))
                 {
                     foreach (var handler in list.ToArray())
-                        Invoke(() => ((Action<T>)handler)(evt), handler);
+                        Invoke(() => handler.Invoke(evt), handler.Original);
                 }
                 foreach (var listener in _listeners.ToArray())
                     Invoke(() => listener(evt), listener);
             }
             Published?.Invoke(evt);
         }
+
+        public int SubscriberCount(Type eventType) => _handlers.TryGetValue(eventType, out var list) ? list.Count : 0;
 
         void Invoke(Action call, Delegate target)
         {

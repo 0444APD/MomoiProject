@@ -18,14 +18,32 @@ namespace GameSystems.EditorTools
             State,
             Achievements,
             Stats,
+            Events,
             Actions,
             Commands,
         }
 
-        static readonly string[] TabNames = { "타임라인", "상태", "도전과제", "통계", "행동", "명령" };
+        static readonly string[] TabNames = { "타임라인", "상태", "도전과제", "통계", "이벤트", "행동", "명령" };
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
+        // 테스트 이벤트 직후 확정까지 할지(수동 확정 세션에서만 의미가 있다).
+        [SerializeField] bool _commitAfterTest = true;
+        [SerializeField] string _eventTypeName;
+
+        readonly Dictionary<string, double> _statAmounts = new Dictionary<string, double>();
+        readonly Dictionary<string, Dictionary<string, object>> _eventDrafts = new Dictionary<string, Dictionary<string, object>>();
+        VisualElement _feedback;
+
+        // 테스트에서 런타임 없이 세션을 주입하기 위한 통로.
+        internal static Func<GameSession> SessionSource = () => GameSystemsRuntime.Session;
+        internal static int TabCount => TabNames.Length;
+
+        internal void ShowTab(int index)
+        {
+            _tab = (Tab)index;
+            Build(rootVisualElement);
+        }
 
         VisualElement _root;
         VisualElement _sidebar;
@@ -64,7 +82,7 @@ namespace GameSystems.EditorTools
         internal void Build(VisualElement host)
         {
             host.Clear();
-            _session = GameSystemsRuntime.Session;
+            _session = SessionSource();
             _lastJournalId = -1;
             _root = Gs.Row();
             Gs.Apply(_root);
@@ -93,6 +111,18 @@ namespace GameSystems.EditorTools
             header.Add(Gs.Spacer());
             if (_session != null)
             {
+                if (!_session.Options.AutoCommit)
+                {
+                    var toggle = new GsButton(CommitToggleText(), null, GsButtonKind.Ghost);
+                    toggle.tooltip = "켜면 테스트 이벤트를 발생시킨 뒤 곧바로 확정합니다(도전과제·누적 통계가 즉시 반영).\n끄면 확정 대기로 남아 무르기를 시험할 수 있습니다.";
+                    toggle.AddManipulator(new Clickable(() =>
+                    {
+                        _commitAfterTest = !_commitAfterTest;
+                        toggle.Text = CommitToggleText();
+                    }));
+                    header.Add(toggle);
+                    header.Add(Gs.HSpace(12));
+                }
                 var commit = new GsButton("확정", () => _session.Commit());
                 var undo = new GsButton("무르기", () => _session.Undo());
                 header.Add(undo);
@@ -100,6 +130,9 @@ namespace GameSystems.EditorTools
                 header.Add(commit);
             }
             main.Add(header);
+
+            _feedback = Gs.Col();
+            main.Add(_feedback);
 
             _body = Gs.Col("gs-grow");
             main.Add(_body);
@@ -154,13 +187,16 @@ namespace GameSystems.EditorTools
 
         void Tick()
         {
-            if (_session == null || _session != GameSystemsRuntime.Session)
+            if (_session == null || _session != SessionSource())
             {
-                if (GameSystemsRuntime.Session != _session) Build(rootVisualElement);
+                if (SessionSource() != _session) Build(rootVisualElement);
                 return;
             }
             UpdateInfo();
             if (_paused) return;
+            // 입력 중인 칸이 있으면 화면을 다시 그리지 않는다(입력값이 날아가지 않게).
+            var focused = _root.focusController?.focusedElement as VisualElement;
+            if (focused != null && _body.Contains(focused)) return;
             var last = _session.Journal.LastId;
             if (last == _lastJournalId && _session.State.UncommittedCount == _lastUncommitted) return;
             _lastJournalId = last;
@@ -190,7 +226,8 @@ namespace GameSystems.EditorTools
                 case Tab.Timeline: BuildTimeline(); break;
                 case Tab.State: BuildInspect(_session.State); break;
                 case Tab.Achievements: BuildAchievements(); break;
-                case Tab.Stats: BuildInspect(_session.Stats); break;
+                case Tab.Stats: BuildStats(); break;
+                case Tab.Events: BuildEvents(); break;
                 case Tab.Actions: BuildActions(); break;
                 case Tab.Commands: BuildCommands(); break;
             }
@@ -511,12 +548,285 @@ namespace GameSystems.EditorTools
                 }
 
                 var id = definition.Id;
-                var action = unlocked
-                    ? new GsButton("초기화", () => _session.Achievements.ResetProgress(id), GsButtonKind.Ghost)
-                    : new GsButton("강제 달성", () => _session.Achievements.Unlock(id, "모니터에서 강제 달성"), GsButtonKind.Ghost);
-                card.AddToStats(action);
+                if (unlocked)
+                {
+                    var reset = new GsButton("초기화", () => _session.Achievements.ResetProgress(id), GsButtonKind.Ghost);
+                    reset.tooltip = "직접 수정: 달성 표시만 지웁니다(통계는 그대로).";
+                    card.AddToStats(reset);
+                }
+                else
+                {
+                    var fill = new GsButton("이벤트로 채우기", () =>
+                    {
+                        if (_session.TrySimulateAchievement(id, _commitAfterTest, out var error))
+                            ShowFeedback($"'{definition.DisplayName}' 조건을 이벤트로 채웠습니다" + (PendingNote()), GsNoticeKind.Ok);
+                        else
+                            ShowFeedback(error, GsNoticeKind.Warning);
+                    });
+                    fill.tooltip = "게임과 같은 경로: 부족한 통계만큼 실제 이벤트를 발생시킵니다(무르기 가능, 다른 통계·도전과제도 함께 반응).";
+                    card.AddToStats(fill);
+                    card.AddToStats(Gs.HSpace(6));
+                    var force = new GsButton("강제 달성", () => _session.Achievements.Unlock(id, "모니터에서 강제 달성"), GsButtonKind.Ghost);
+                    force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다(보상은 지급).";
+                    card.AddToStats(force);
+                }
                 scroll.Add(card);
             }
+        }
+
+        // ── 통계: 직접 수정 / 이벤트로 반영 ─────────────────────
+
+        void BuildStats()
+        {
+            var scroll = new ScrollView();
+            scroll.style.flexGrow = 1;
+            _body.Add(scroll);
+            var definitions = _session.Stats.Definitions.ToList();
+            if (definitions.Count == 0)
+            {
+                var empty = Gs.Box("gs-empty");
+                empty.Add(Gs.Label("정의된 통계가 없습니다", "gs-heading"));
+                scroll.Add(empty);
+                return;
+            }
+
+            var panel = Gs.Panel("통계", "값 칸 클릭: 직접 수정(값만 덮어씀, 규칙·도전과제 연쇄 없음)  ·  이벤트로: 게임과 같은 경로로 반영", out _, out var body);
+            var header = Gs.Box("gs-sheet__header");
+            foreach (var (title, width) in new[] { ("통계", 220f), ("범위 · 집계", 130f), ("현재 값 (직접 수정)", 150f), ("이벤트로 반영", 300f) })
+            {
+                var cell = Gs.Label(title);
+                cell.style.width = width;
+                header.Add(cell);
+            }
+            body.Add(header);
+
+            foreach (var definition in definitions)
+            {
+                var id = definition.Id;
+                var key = StateKeys.Stat(id);
+                var row = Gs.Box("gs-sheet__row");
+
+                var name = Gs.Label(definition.DisplayName ?? id, "gs-nowrap");
+                name.style.width = 220;
+                row.Add(name);
+                var tag = Gs.Label((definition.Scope == StatScope.Run ? "이번 판" : "누적") + " · " + StatSystem.AggregateText(definition.Aggregate), "gs-caption");
+                tag.style.width = 130;
+                row.Add(tag);
+
+                var value = StateValue(new InspectNode(definition.DisplayName, StateStore.Format(_session.State.Get(key)), key));
+                value.style.width = 150;
+                value.style.flexGrow = 0;
+                row.Add(value);
+
+                var isSum = definition.Aggregate == StatAggregate.Sum;
+                if (!_statAmounts.TryGetValue(id, out var amount)) amount = isSum ? 1 : Math.Max(0, _session.Stats.Get(id) is var v && !double.IsNaN(v) ? v : 0);
+                var amountField = new DoubleField { value = amount };
+                amountField.style.width = 70;
+                amountField.AddToClassList("gs-inline");
+                var plan = Gs.Label("", "gs-caption", "gs-nowrap");
+                plan.style.flexShrink = 1;
+
+                void UpdatePlan()
+                {
+                    if (EventSimulator.TryPlanForStat(_session.Stats, id, amountField.value, out var p, out var error))
+                    {
+                        plan.text = "→ " + p.Description;
+                        plan.tooltip = "";
+                        plan.style.color = StyleKeyword.Null;
+                    }
+                    else
+                    {
+                        plan.text = "이벤트로 만들 수 없음";
+                        plan.tooltip = error;
+                        plan.style.color = Gs.Warning;
+                    }
+                }
+
+                amountField.RegisterValueChangedCallback(e =>
+                {
+                    _statAmounts[id] = e.newValue;
+                    UpdatePlan();
+                });
+
+                var fire = new GsButton(isSum ? "이벤트로 +" : "이벤트로 기록", () =>
+                {
+                    if (_session.TrySimulateStat(id, amountField.value, _commitAfterTest, out var description, out var error))
+                        ShowFeedback($"{description} 발생" + PendingNote(), GsNoticeKind.Ok);
+                    else
+                        ShowFeedback(error, GsNoticeKind.Warning);
+                }, GsButtonKind.Ghost);
+                fire.tooltip = isSum
+                    ? "이 통계의 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킵니다. 같은 이벤트를 받는 다른 통계와 도전과제도 함께 반응합니다."
+                    : "입력한 값을 이벤트로 한 번 기록합니다(최고치·최저치 규칙은 게임과 똑같이 적용).";
+
+                var eventCell = Gs.Row();
+                eventCell.style.width = 300;
+                eventCell.Add(fire);
+                eventCell.Add(amountField);
+                eventCell.Add(Gs.HSpace(8));
+                eventCell.Add(plan);
+                row.Add(eventCell);
+                UpdatePlan();
+                body.Add(row);
+            }
+            scroll.Add(panel);
+        }
+
+        // ── 이벤트 발생기 ───────────────────────────────────────
+
+        void BuildEvents()
+        {
+            var split = Gs.Row("gs-grow");
+            split.style.alignItems = Align.Stretch;
+            _body.Add(split);
+
+            var types = TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf).ToList();
+            var list = new ScrollView();
+            list.style.width = 240;
+            list.style.flexShrink = 0;
+            list.style.marginRight = 16;
+            split.Add(list);
+
+            if (types.Count == 0)
+            {
+                list.Add(Gs.Label("[GameEvent]가 붙은 이벤트 타입이 없습니다.", "gs-caption"));
+                return;
+            }
+
+            var selected = types.FirstOrDefault(t => t.FullName == _eventTypeName) ?? types[0];
+            foreach (var type in types)
+            {
+                var t = type;
+                var item = new GsNavItem(EventBus.DisplayNameOf(type), Gs.PaletteFor(type.FullName), () =>
+                {
+                    _eventTypeName = t.FullName;
+                    BuildTab();
+                });
+                item.SetCount(_session.Events.SubscriberCount(type) > 0 ? $"구독 {_session.Events.SubscriberCount(type)}" : "");
+                item.SetActive(type == selected);
+                item.tooltip = type.FullName;
+                list.Add(item);
+            }
+
+            var form = Gs.Panel(EventBus.DisplayNameOf(selected), selected.FullName, out _, out var body);
+            form.style.flexGrow = 1;
+            form.style.marginBottom = 16;
+            split.Add(form);
+
+            if (!_eventDrafts.TryGetValue(selected.FullName, out var draft))
+            {
+                draft = new Dictionary<string, object>();
+                try
+                {
+                    var sample = EventSimulator.CreateDefault(selected);
+                    foreach (var member in EventSimulator.EditableMembers(selected)) draft[member.Name] = EventSimulator.GetValue(member, sample);
+                }
+                catch (Exception e)
+                {
+                    body.Add(new GsNotice(e.Message.Replace("[GameSystems] ", ""), GsNoticeKind.Error));
+                    return;
+                }
+                _eventDrafts[selected.FullName] = draft;
+            }
+
+            var members = EventSimulator.EditableMembers(selected).ToList();
+            if (members.Count == 0) body.Add(Gs.Label("채울 값이 없는 이벤트입니다.", "gs-caption"));
+            foreach (var member in members)
+            {
+                var row = Gs.Box("gs-field-row");
+                var label = Gs.Label(member.Name, "gs-field-row__label");
+                label.style.width = 140;
+                row.Add(label);
+                row.Add(EventFieldEditor(member, draft));
+                row.Add(Gs.Label(EventSimulator.MemberType(member).Name, "gs-caption"));
+                body.Add(row);
+            }
+
+            // 이 이벤트가 움직이는 통계(반영 규칙)를 보여줘 결과를 예상할 수 있게 한다.
+            var affected = _session.Stats.Definitions
+                .SelectMany(d => d.Rules.Where(r => r.eventType == selected.FullName).Select(r => $"{d.DisplayName} ← {(string.IsNullOrEmpty(r.field) ? "횟수" : r.field)}"))
+                .ToList();
+            body.Add(Gs.Space(14));
+            body.Add(Gs.Label(affected.Count > 0 ? "반응하는 통계:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 통계가 없습니다.", "gs-caption"));
+            body.Add(Gs.Space(16));
+
+            var actions = Gs.Row();
+            var repeat = new DoubleField { value = 1 };
+            repeat.style.width = 60;
+            repeat.AddToClassList("gs-inline");
+            var fire = new GsButton("이벤트 발생", () =>
+            {
+                try
+                {
+                    var count = Math.Max(1, Math.Min(1000, (int)Math.Round(repeat.value)));
+                    var events = Enumerable.Range(0, count).Select(_ => EventSimulator.Create(selected, draft)).ToList();
+                    _session.SimulateEvents(events, "모니터 이벤트 발생기", _commitAfterTest);
+                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생" + PendingNote(), GsNoticeKind.Ok);
+                }
+                catch (Exception e)
+                {
+                    ShowFeedback(e.Message.Replace("[GameSystems] ", ""), GsNoticeKind.Error);
+                }
+            }, GsButtonKind.Primary);
+            GsMotion.AddPressSpring(fire);
+            actions.Add(fire);
+            actions.Add(Gs.HSpace(10));
+            actions.Add(repeat);
+            actions.Add(Gs.Label("회", "gs-caption"));
+            body.Add(actions);
+            body.Add(Gs.Space(8));
+            body.Add(Gs.Label("행동으로 기록되어 무르기·확정·인과 추적이 게임과 똑같이 적용됩니다.", "gs-caption"));
+        }
+
+        static VisualElement EventFieldEditor(System.Reflection.MemberInfo member, Dictionary<string, object> draft)
+        {
+            var type = EventSimulator.MemberType(member);
+            draft.TryGetValue(member.Name, out var current);
+            VisualElement editor;
+            if (type == typeof(string))
+            {
+                var field = new TextField { value = current as string ?? "" };
+                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
+                editor = field;
+            }
+            else if (type == typeof(bool))
+            {
+                var field = new Toggle { value = current is bool b && b };
+                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
+                editor = field;
+            }
+            else if (type.IsEnum)
+            {
+                var names = Enum.GetNames(type).ToList();
+                var field = new DropdownField(names, Math.Max(0, names.IndexOf(current?.ToString())));
+                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
+                editor = field;
+            }
+            else
+            {
+                var field = new DoubleField { value = current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture) };
+                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
+                editor = field;
+            }
+            editor.AddToClassList("gs-inline");
+            editor.style.width = 200;
+            return editor;
+        }
+
+        string CommitToggleText() => _commitAfterTest ? "테스트 후 즉시 확정: 켜짐" : "테스트 후 즉시 확정: 꺼짐";
+
+        string PendingNote() =>
+            _session != null && _session.State.UncommittedCount > 0 ? $" (확정 대기 {_session.State.UncommittedCount} — 확정해야 누적 통계·도전과제에 반영)" : "";
+
+        void ShowFeedback(string text, GsNoticeKind kind)
+        {
+            if (_feedback == null) return;
+            _feedback.Clear();
+            var notice = new GsNotice(text, kind);
+            notice.AddToClassList("gs-appear");
+            _feedback.Add(notice);
+            notice.schedule.Execute(() => notice.AddToClassList("gs-appear--hidden")).StartingIn(4000);
+            notice.schedule.Execute(() => notice.RemoveFromHierarchy()).StartingIn(4400);
         }
 
         // ── 행동 ───────────────────────────────────────────────

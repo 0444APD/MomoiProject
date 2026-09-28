@@ -151,5 +151,35 @@ namespace GameSystems.Tests
             Assert.DoesNotThrow(() => showcase.Build(new VisualElement()));
             Object.DestroyImmediate(showcase);
         }
+
+        [Test]
+        public void 모니터의_모든_탭이_실행_중인_세션으로_구성된다()
+        {
+            var session = new GameSession(new SessionOptions { AutoCommit = false });
+            var kills = new StatDefinition { Id = "kills", DisplayName = "처치", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
+            kills.Rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
+            session.Stats.Define(kills);
+            session.Stats.Define(new StatDefinition { Id = "gold", DisplayName = "골드", Scope = StatScope.Total, Aggregate = StatAggregate.Sum });
+            session.Achievements.Define(new AchievementDefinition { Id = "a", DisplayName = "업적", Condition = new StatCompareCondition { stat = "kills", value = 5 } });
+            session.TrySimulateStat("kills", 2, false, out _, out _);
+
+            var previous = MonitorWindow.SessionSource;
+            MonitorWindow.SessionSource = () => session;
+            var monitor = ScriptableObject.CreateInstance<MonitorWindow>();
+            try
+            {
+                for (int tab = 0; tab < MonitorWindow.TabCount; tab++)
+                {
+                    var index = tab;
+                    Assert.DoesNotThrow(() => monitor.ShowTab(index), $"탭 {index}");
+                    Assert.Greater(monitor.rootVisualElement.Query<VisualElement>().ToList().Count, 10, $"탭 {index}이 비어 있다");
+                }
+            }
+            finally
+            {
+                MonitorWindow.SessionSource = previous;
+                Object.DestroyImmediate(monitor);
+            }
+        }
     }
 }

@@ -43,6 +43,12 @@ namespace GameSystems
             Achievements = new AchievementSystem(this);
             Debug = new DebugCommands();
 
+            // 테스트 이벤트는 게임 행동과 같은 경로로 처리된다(무르기·확정·기록 동일).
+            Actions.Register<SimulatedEventAction>(action =>
+            {
+                foreach (var evt in action.Events) Events.PublishObject(evt);
+            });
+
             Actions.TransactionStarted += id => _randomBefore[id] = Random.ExportStates();
             Actions.TransactionAborted += RestoreRandom;
             State.TransactionUndone += tx => RestoreRandom(tx.Id);
@@ -79,6 +85,46 @@ namespace GameSystems
         }
 
         public bool Undo() => State.UndoLast();
+
+        // ── 테스트 이벤트 ──────────────────────────────────────
+        // 값을 덮어쓰지 않고 실제 이벤트를 발생시켜 게임과 같은 연쇄 반응을 일으킨다. commit이면 곧바로 확정까지 한다.
+
+        public ActionRecord SimulateEvents(IEnumerable<object> events, string reason = null, bool commit = false)
+        {
+            var action = new SimulatedEventAction { reason = reason };
+            action.Events.AddRange(events);
+            if (action.Events.Count == 0) throw new ArgumentException("[GameSystems] 발생시킬 이벤트가 없습니다.");
+            var record = Do(action);
+            if (commit && !Options.AutoCommit) Commit();
+            return record;
+        }
+
+        public bool TrySimulateStat(string statId, double amount, bool commit, out string description, out string error)
+        {
+            description = null;
+            if (!EventSimulator.TryPlanForStat(Stats, statId, amount, out var plan, out error)) return false;
+            description = plan.Description;
+            SimulateEvents(plan.Events, $"{StatName(statId)} {(Stats.Find(statId).Aggregate == StatAggregate.Sum ? "+" : "기록 ")}{amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}", commit);
+            return true;
+        }
+
+        // 도전과제 조건을 이벤트로 채운다. 필요한 이벤트 전체가 하나의 행동(무르기 단위)이 된다.
+        public bool TrySimulateAchievement(string achievementId, bool commit, out string error)
+        {
+            if (!EventSimulator.TryPlanForAchievement(this, achievementId, out var steps, out error))
+            {
+                if (error == null) error = "이미 조건을 만족합니다. 확정하면 달성됩니다.";
+                return false;
+            }
+            var events = new List<object>();
+            foreach (var (stat, amount) in steps)
+            {
+                if (!EventSimulator.TryPlanForStat(Stats, stat, amount, out var plan, out error)) return false;
+                events.AddRange(plan.Events);
+            }
+            SimulateEvents(events, $"'{AchievementName(achievementId)}' 조건 채우기", commit);
+            return true;
+        }
 
         void RestoreRandom(long transactionId)
         {
