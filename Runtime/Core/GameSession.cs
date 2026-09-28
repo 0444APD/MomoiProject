@@ -10,6 +10,10 @@ namespace GameSystems
         // false: Commit()을 부를 때까지 확정 대기(턴제 무르기·되감기 게임).
         public bool AutoCommit = true;
         public int JournalCapacity = 4096;
+        // 저장 데이터 버전. 출시 후 데이터 구조를 바꾸면 올리고 GameSession.Migrations에 변환을 등록한다.
+        public int SaveVersion = 1;
+        // Modify를 거치지 않은 데이터 수정 검사(행동마다·프레임마다 값 전체 비교). 출시 빌드에서는 끈다.
+        public bool DetectUntrackedChanges = true;
     }
 
     // 한 플레이어(또는 한 판)의 모든 시스템을 묶는 인스턴스. static 전역 상태를 두지 않는다.
@@ -26,6 +30,7 @@ namespace GameSystems
         public AchievementSystem Achievements { get; }
         public DebugCommands Debug { get; }
         public SessionOptions Options { get; }
+        public SaveMigrations Migrations { get; } = new SaveMigrations();
 
         // 확정 전 행동별 난수 상태. 무르면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, 무르기 악용 차단).
         readonly Dictionary<long, Dictionary<string, ulong[]>> _randomBefore = new Dictionary<long, Dictionary<string, ulong[]>>();
@@ -35,7 +40,7 @@ namespace GameSystems
             Options = options ?? new SessionOptions();
             Clock = new GameClock();
             Journal = new Journal(Options.JournalCapacity) { TickSource = () => Clock.Tick };
-            State = new StateStore(Journal);
+            State = new StateStore(Journal) { DetectUntrackedChanges = Options.DetectUntrackedChanges };
             Events = new EventBus(Journal);
             Random = new RandomStreams(Options.Seed);
             Actions = new ActionDispatcher(Journal, State, Clock);
@@ -74,6 +79,7 @@ namespace GameSystems
         public ActionRecord Do(GameAction action)
         {
             var record = Actions.Execute(action);
+            if (State.DetectUntrackedChanges) State.CheckUntrackedChanges();
             // 행동 직후 평가: 도전과제는 확정을 기다리지 않고 달성된다(보상은 확정 시 지급).
             Achievements.Flush();
             if (Options.AutoCommit) Commit();
@@ -141,7 +147,11 @@ namespace GameSystems
         {
             Clock.Advance(deltaTime);
             Achievements.Poll(Clock.Time);
-            if (!State.InTransaction) Achievements.Flush();
+            if (!State.InTransaction)
+            {
+                if (State.DetectUntrackedChanges) State.CheckUntrackedChanges();
+                Achievements.Flush();
+            }
         }
 
         // ── 저장 ───────────────────────────────────────────────
@@ -152,7 +162,7 @@ namespace GameSystems
             if (State.UncommittedCount > 0) Commit();
             var root = new Dictionary<string, object>
             {
-                ["version"] = 1.0,
+                ["version"] = (double)Options.SaveVersion,
                 ["state"] = State.Export(StateZone.Meta),
             };
             return MiniJson.Serialize(root);
@@ -162,8 +172,14 @@ namespace GameSystems
         {
             if (string.IsNullOrEmpty(json)) return;
             if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[GameSystems] 저장 데이터 형식이 올바르지 않습니다.");
+            var version = root.TryGetValue("version", out var v) && v is double number ? (int)number : 1;
+            if (version > Options.SaveVersion)
+                throw new FormatException($"[GameSystems] 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}). 게임을 업데이트하세요.");
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
+            {
+                if (version < Options.SaveVersion) Migrations.Run(values, version, Options.SaveVersion, Journal);
                 State.Import(values, StateZone.Meta);
+            }
             Journal.Append(JournalKind.System, "Save", $"메타 상태 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
         }
 

@@ -51,6 +51,8 @@
 
 - **행동은 데이터다.** 모든 플레이어 행동은 `session.Do(행동)`을 거친다. 행동 하나가 무르기 단위다.
 - **모든 게임 상태는 상태 저장소(`State`)에 둔다.** 세션 구역(게임 내용, 되감김)과 메타 구역(도전과제·누적 수치, 되감기지 않음)으로 나뉜다.
+- **클래스·컬렉션도 그대로 담는다.** `var inv = state.DefineData("m:inventory", StateZone.Meta, new Inventory());` 로 등록하고 `state.Modify<Inventory>("m:inventory", i => i.items[0].level++);` 로 바꾼다. 필드 형식·깊이에 상관없이 바뀐 곳이 경로 단위(`items[#12].level 3 → 4`)로 기록되고, 무르면 같은 인스턴스가 제자리로 돌아오며, 저장·불러오기도 자동이다. 목록 요소에는 내부 ID가 자동으로 붙는다. 담을 수 없는 것은 함수 필드와 순환 참조뿐이고 등록할 때 알려 준다. Modify 없이 직접 고치면 개발 빌드에서 경고한다.
+- **저장 데이터 버전.** 출시 후 구조를 바꾸면 `SessionOptions.SaveVersion`을 올리고 `session.Migrations`에 변환(`RenameKey`, `MoveField`, `Add`)을 등록한다. 필드 이름만 바뀌면 `[FormerlySerializedAs]`로 충분하다.
 - **확정(Commit)** 전의 행동은 무를 수 있다. 무르면 상태와 난수가 함께 되돌아간다. 도전과제는 조건을 만족하는 즉시 달성되고 무르기로 취소되지 않는다. 값만 되돌아가므로 되풀이해도 쌓이지 않는다(되감기 파밍 불가). 달성 보상은 확정 시 지급한다.
 - **모든 변화는 통합 기록(Journal)에 원인과 함께 남는다.** 모니터에서 보상 한 줄을 선택하면 그 원인 행동까지 거슬러 올라간다.
 - 싱글 게임은 `GameSystemsRuntime.Session` 하나를 쓴다. 멀티플레이·테스트는 `new GameSession(...)`으로 독립 세션을 만든다.

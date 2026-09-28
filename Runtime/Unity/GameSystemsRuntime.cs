@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.IO;
 using GameSystems.Data;
 using UnityEngine;
@@ -36,11 +37,15 @@ namespace GameSystems
         {
             if (Session != null) return Session;
 
-            var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks };
+            // Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
+            var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };
             Configuring?.Invoke(options);
             var session = new GameSession(options);
 
             var database = GameDatabase.Load();
+            // 데이터 값 안의 에셋 참조는 데이터베이스 ID로 저장·복원한다.
+            DataModel.ReferenceToId = value => value is GameData data && !string.IsNullOrEmpty(data.Id) ? data.Id : null;
+            DataModel.IdToReference = (id, type) => database == null ? null : database.Entries.FirstOrDefault(e => e != null && e.Id == id && type.IsInstanceOfType(e));
             if (database == null)
             {
                 session.Journal.Append(JournalKind.Warning, "Runtime", "GameDatabase를 찾을 수 없습니다. 에디터에서 데이터베이스 창을 한 번 열면 자동으로 만들어집니다.");
