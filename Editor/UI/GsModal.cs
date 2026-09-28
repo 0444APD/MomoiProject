@@ -120,7 +120,7 @@ namespace GameSystems.EditorTools.UI
                  new DialogButton(confirmText, GsButtonKind.Primary, onConfirm));
     }
 
-    // [이전] › [현재]
+    // 위 [이전] · V 화살표 · 아래 [현재]
     public sealed class GsChangeView : VisualElement
     {
         readonly Label _old;
@@ -139,7 +139,7 @@ namespace GameSystems.EditorTools.UI
             _old = Gs.Label(oldText);
             oldBox.Add(_old);
             row.Add(oldBox);
-            row.Add(Gs.Label("›", "gs-change__arrow"));
+            row.Add(Gs.Box("gs-change__chevron"));
             var newBox = Gs.Box("gs-change__box", "gs-change__new");
             _new = Gs.Label(newText);
             newBox.Add(_new);

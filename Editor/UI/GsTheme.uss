@@ -452,14 +452,29 @@
 .gs-root .gs-detail__label { font-size: 10px; color: var(--gs-text-3); -unity-font-style: bold; letter-spacing: 0.5px; margin-bottom: 6px; }
 .gs-detail__section--changed > .gs-detail__label { color: var(--gs-accent); }
 
-/* ── 변경 표시: [이전] › [현재] ─────────────────────────── */
-.gs-change { flex-direction: row; align-items: center; flex-wrap: wrap; }
-.gs-change__box { padding: 4px 9px; border-radius: 7px; max-width: 100%; }
+/* ── 변경 표시: 위 [이전] · V 화살표 · 아래 [현재] (긴 내용도 줄바꿈되어 잘리지 않는다) ── */
+.gs-change { flex-direction: column; align-items: stretch; }
+.gs-change__box { padding: 6px 10px; border-radius: 7px; }
+.gs-root .gs-change__box Label { white-space: normal; }
 .gs-change__old { background-color: var(--gs-surface-2); }
 .gs-root .gs-change__old Label { color: var(--gs-text-3); }
 .gs-change__new { background-color: var(--gs-accent-soft); }
 .gs-root .gs-change__new Label { color: var(--gs-text); }
-.gs-root .gs-change__arrow { color: var(--gs-accent); margin: 0 8px; -unity-font-style: bold; }
+/* V자 화살표: 오른쪽·아래 테두리만 있는 정사각형을 45도 돌린다(글꼴에 기대지 않음) */
+.gs-change__chevron {
+    width: 8px;
+    height: 8px;
+    margin: 2px 0 8px 14px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-color: var(--gs-accent);
+    rotate: 45deg;
+}
+
+/* 상세 패널 안에서는 긴 값도 줄바꿈해 전부 보여준다 */
+.gs-root .gs-detail .gs-inline__value { white-space: normal; }
+.gs-detail .gs-inline { flex-shrink: 1; min-width: 0; }
+.gs-detail .gs-inline TextField { flex-shrink: 1; min-width: 0; }
 .gs-change-row { padding: 10px 0; border-bottom-width: 1px; border-color: var(--gs-border); }
 
 /* ── 확인 창 ──────────────────────────────────────────── */

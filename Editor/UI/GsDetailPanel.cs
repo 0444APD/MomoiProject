@@ -190,23 +190,24 @@ namespace GameSystems.EditorTools.UI
 
                 if (isLeaf)
                 {
-                    // 단순 값: [이전] › 현재값(편집)
-                    var row = Gs.Row();
+                    // 단순 값: 위 [이전] · V 화살표 · 아래 현재값(편집). 바뀌지 않았으면 현재값만 보인다.
+                    var inline = (GsInlineProperty)content;
+                    inline.Multiline = true;
+                    var column = Gs.Col();
                     var oldBox = Gs.Box("gs-change__box", "gs-change__old");
                     var oldLabel = Gs.Label("");
                     oldBox.Add(oldLabel);
-                    var arrow = Gs.Label("›", "gs-change__arrow");
-                    row.Add(oldBox);
-                    row.Add(arrow);
-                    content.AddToClassList("gs-grow");
-                    row.Add(content);
-                    section.Add(row);
+                    var chevron = Gs.Box("gs-change__chevron");
+                    column.Add(oldBox);
+                    column.Add(chevron);
+                    column.Add(content);
+                    section.Add(column);
                     _sections[path] = (section, oldBox, c =>
                     {
                         oldLabel.text = c.Old;
-                        arrow.style.display = oldBox.style.display;
+                        chevron.style.display = oldBox.style.display;
                     });
-                    arrow.style.display = DisplayStyle.None;
+                    chevron.style.display = DisplayStyle.None;
                 }
                 else
                 {

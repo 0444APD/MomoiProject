@@ -25,6 +25,9 @@ namespace GameSystems.EditorTools.UI
 
         public event Action Changed;
 
+        // 긴 글을 여러 줄로 편집한다(상세 패널). Enter는 적용, Shift+Enter는 줄바꿈.
+        public bool Multiline { get; set; }
+
         public GsInlineProperty(SerializedProperty property)
         {
             _property = property.Copy();
@@ -248,7 +251,7 @@ namespace GameSystems.EditorTools.UI
                     e.StopPropagation();
                     EndEdit(false);
                 }
-                else if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+                else if ((e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) && !(Multiline && e.shiftKey))
                 {
                     e.StopPropagation();
                     EndEdit(true);
@@ -292,7 +295,9 @@ namespace GameSystems.EditorTools.UI
             switch (_property.propertyType)
             {
                 case SerializedPropertyType.String:
-                    return new TextField { value = _property.stringValue, multiline = false };
+                    var text = new TextField { value = _property.stringValue, multiline = Multiline };
+                    if (Multiline) text.style.whiteSpace = WhiteSpace.Normal;
+                    return text;
                 case SerializedPropertyType.Integer:
                     return new LongField { value = _property.longValue };
                 case SerializedPropertyType.Float:
