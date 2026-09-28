@@ -1,0 +1,155 @@
+using System.Collections.Generic;
+using System.Linq;
+using GameSystems.Data;
+using GameSystems.EditorTools;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace GameSystems.Tests
+{
+    public class ValidatorTests
+    {
+        readonly List<Object> _created = new List<Object>();
+
+        T Make<T>(string id, string name) where T : GameData
+        {
+            var data = ScriptableObject.CreateInstance<T>();
+            data.EditorAssignId(id);
+            data.EditorSetDisplayName(name);
+            _created.Add(data);
+            return data;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            foreach (var o in _created) Object.DestroyImmediate(o);
+            _created.Clear();
+        }
+
+        [Test]
+        public void 중복_ID를_잡는다()
+        {
+            var a = Make<StatData>("stat_0001", "A");
+            var b = Make<StatData>("stat_0001", "B");
+            var issues = DataValidator.Validate(new List<GameData> { a, b });
+            Assert.AreEqual(2, issues.Count(i => i.Message.Contains("중복")));
+        }
+
+        [Test]
+        public void 없는_통계_참조와_빈_조건을_잡는다()
+        {
+            var achievement = Make<AchievementData>("achievement_0001", "업적");
+            achievement.condition = new StatCompareCondition { stat = "없는통계", value = 1 };
+            var empty = Make<AchievementData>("achievement_0002", "빈 업적");
+            var issues = DataValidator.Validate(new List<GameData> { achievement, empty });
+            Assert.IsTrue(issues.Any(i => i.Asset == achievement && i.Message.Contains("존재하지 않는 통계")));
+            Assert.IsTrue(issues.Any(i => i.Asset == empty && i.Message.Contains("조건이 없습니다")));
+        }
+
+        [Test]
+        public void 합계형이_아닌_통계에_더하기_보상은_오류()
+        {
+            var stat = Make<StatData>("stat_0001", "최고 콤보");
+            stat.aggregate = StatAggregate.Max;
+            var achievement = Make<AchievementData>("achievement_0001", "업적");
+            achievement.condition = new StatCompareCondition { stat = "stat_0001", value = 1 };
+            achievement.rewards.Add(new AddToStatReward { stat = "stat_0001", amount = 1 });
+            var issues = DataValidator.Validate(new List<GameData> { stat, achievement });
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("합계형")));
+        }
+
+        [Test]
+        public void 순환_참조를_잡는다()
+        {
+            var a = Make<AchievementData>("achievement_0001", "A");
+            var b = Make<AchievementData>("achievement_0002", "B");
+            a.condition = new AchievementUnlockedCondition { achievement = "achievement_0002" };
+            b.condition = new AchievementUnlockedCondition { achievement = "achievement_0001" };
+            var issues = DataValidator.Validate(new List<GameData> { a, b });
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("순환")));
+        }
+
+        [Test]
+        public void 잘못된_이벤트_규칙을_잡는다()
+        {
+            var stat = Make<StatData>("stat_0001", "처치");
+            stat.rules.Add(new StatRule { eventType = "Nope.Missing" });
+            stat.rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = "Missing" });
+            var issues = DataValidator.Validate(new List<GameData> { stat });
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("찾을 수 없습니다")));
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("필드가 없습니다")));
+        }
+
+        [Test]
+        public void 정상_데이터는_통과한다()
+        {
+            var stat = Make<StatData>("stat_0001", "처치");
+            stat.rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
+            var achievement = Make<AchievementData>("achievement_0001", "업적");
+            achievement.condition = new StatCompareCondition { stat = "stat_0001", value = 5 };
+            Assert.IsEmpty(DataValidator.Validate(new List<GameData> { stat, achievement }).Where(i => i.Severity == ValidationSeverity.Error));
+        }
+    }
+
+    public class DataToolTests
+    {
+        [Test]
+        public void 데이터베이스_타입은_GameData_상속으로_판별된다()
+        {
+            var types = DataTypes.All.Select(t => t.Type).ToList();
+            CollectionAssert.Contains(types, typeof(StatData));
+            CollectionAssert.Contains(types, typeof(AchievementData));
+            CollectionAssert.DoesNotContain(types, typeof(GameDatabase), "[HideInDatabase]는 제외");
+        }
+
+        [Test]
+        public void 필드_목록은_저장되는_필드만_종류와_함께()
+        {
+            var fields = FieldCatalog.For(typeof(AchievementData));
+            Assert.AreEqual(FieldKind.Image, fields.First(f => f.Path == "icon").Kind);
+            Assert.AreEqual(FieldKind.Text, fields.First(f => f.Path == "displayName").Kind);
+            Assert.IsFalse(fields.Any(f => f.Path == "id"), "숨긴 필드(ID)는 목록에 없다");
+        }
+
+        [Test]
+        public void 자동_추론_보기()
+        {
+            var view = ViewSettings.Resolve(typeof(AchievementData));
+            Assert.AreEqual("icon", view.Image?.Path);
+            Assert.AreEqual("displayName", view.Title?.Path);
+            Assert.AreEqual("description", view.Subtitle?.Path);
+        }
+
+        [Test]
+        public void 끊긴_연결에_비슷한_필드를_제안한다()
+        {
+            var fields = FieldCatalog.For(typeof(AchievementData));
+            var suggestion = ViewSettings.Suggest(fields, "icons", Slot.Image);
+            Assert.AreEqual("icon", suggestion?.Path);
+        }
+    }
+
+    public class WindowSmokeTests
+    {
+        [Test]
+        public void 창들이_예외_없이_구성된다()
+        {
+            var host = new VisualElement();
+
+            var database = ScriptableObject.CreateInstance<DatabaseWindow>();
+            Assert.DoesNotThrow(() => database.Build(host));
+            Assert.Greater(host.Query<VisualElement>().ToList().Count, 10);
+            Object.DestroyImmediate(database);
+
+            var monitor = ScriptableObject.CreateInstance<MonitorWindow>();
+            Assert.DoesNotThrow(() => monitor.Build(new VisualElement()));
+            Object.DestroyImmediate(monitor);
+
+            var showcase = ScriptableObject.CreateInstance<ShowcaseWindow>();
+            Assert.DoesNotThrow(() => showcase.Build(new VisualElement()));
+            Object.DestroyImmediate(showcase);
+        }
+    }
+}

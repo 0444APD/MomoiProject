@@ -1,0 +1,377 @@
+/* ───────────────────────────────────────────────────────────
+   Game Systems 디자인 시스템
+   다크 테마 · 포인트 컬러 1개 · 보일 듯 말 듯한 외곽선 · 넉넉한 여백
+   ─────────────────────────────────────────────────────────── */
+
+.gs-root {
+    --gs-bg: #0E0F11;
+    --gs-surface: #16171A;
+    --gs-surface-2: #1D1E22;
+    --gs-surface-hover: #1F2024;
+    --gs-border: rgba(255, 255, 255, 0.06);
+    --gs-border-strong: rgba(255, 255, 255, 0.13);
+    --gs-hover: rgba(255, 255, 255, 0.04);
+    --gs-text: #F2F2F3;
+    --gs-text-2: rgba(242, 242, 243, 0.62);
+    --gs-text-3: rgba(242, 242, 243, 0.36);
+    --gs-accent: #F86927;
+    --gs-accent-hover: #FF7B3D;
+    --gs-accent-soft: rgba(248, 105, 39, 0.14);
+    --gs-danger: #FB9795;
+    --gs-success: #71D6A3;
+    --gs-warning: #E8D66B;
+
+    flex-grow: 1;
+    background-color: var(--gs-bg);
+    color: var(--gs-text);
+    font-size: 12px;
+}
+
+/* 기본 Label 여백 제거 — 간격은 레이아웃이 책임진다 */
+.gs-root Label {
+    color: var(--gs-text);
+    margin: 0;
+    padding: 0;
+    white-space: normal;
+}
+
+/* ── 글자 위계 ─────────────────────────────────────────── */
+.gs-root .gs-display { font-size: 22px; -unity-font-style: bold; }
+.gs-root .gs-title { font-size: 15px; -unity-font-style: bold; }
+.gs-root .gs-heading { font-size: 13px; -unity-font-style: bold; }
+.gs-root .gs-body { font-size: 12px; }
+.gs-root .gs-text-2 { color: var(--gs-text-2); }
+.gs-root .gs-text-3 { color: var(--gs-text-3); }
+.gs-root .gs-caption { font-size: 11px; color: var(--gs-text-3); }
+.gs-root .gs-mono { -unity-font-style: normal; letter-spacing: 0.2px; }
+.gs-root .gs-accent-text { color: var(--gs-accent); }
+.gs-root .gs-nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── 레이아웃 도우미 ───────────────────────────────────── */
+.gs-row { flex-direction: row; align-items: center; }
+.gs-col { flex-direction: column; }
+.gs-grow { flex-grow: 1; flex-shrink: 1; }
+.gs-wrap { flex-wrap: wrap; }
+.gs-gap-s > * { margin-right: 6px; }
+.gs-gap > * { margin-right: 12px; }
+.gs-spacer { flex-grow: 1; }
+
+/* ── 패널 ─────────────────────────────────────────────── */
+.gs-panel {
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    border-radius: 14px;
+    padding: 20px;
+}
+
+.gs-panel__header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.gs-divider {
+    height: 1px;
+    background-color: var(--gs-border);
+    margin: 12px 0;
+}
+
+/* ── 버튼 (Unity 기본 버튼 모양을 쓰지 않는 자체 버튼) ──── */
+.gs-button {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px;
+    border-radius: 9px;
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    transition-property: background-color, border-color, scale;
+    transition-duration: 0.14s, 0.14s, 0.12s;
+    transition-timing-function: ease-out-cubic;
+    cursor: link;
+}
+.gs-button:hover { background-color: #25262B; border-color: var(--gs-border-strong); }
+.gs-button:active { scale: 0.97 0.97; }
+.gs-button Label { font-size: 12px; }
+
+.gs-button--primary { background-color: var(--gs-accent); border-color: var(--gs-accent); }
+.gs-button--primary:hover { background-color: var(--gs-accent-hover); border-color: var(--gs-accent-hover); }
+.gs-root .gs-button--primary Label { color: #FFFFFF; -unity-font-style: bold; }
+
+/* 평소엔 글자처럼 보이는 버튼 — 정보 우선 원칙 */
+.gs-button--ghost { background-color: rgba(0, 0, 0, 0); border-color: rgba(0, 0, 0, 0); padding: 5px 8px; }
+.gs-button--ghost:hover { background-color: var(--gs-hover); border-color: rgba(0, 0, 0, 0); }
+.gs-root .gs-button--ghost Label { color: var(--gs-text-3); }
+.gs-root .gs-button--ghost:hover Label { color: var(--gs-text); }
+
+.gs-button:disabled { opacity: 0.4; }
+
+/* ── 분할 선택(보기 전환 등) ───────────────────────────── */
+.gs-segmented {
+    flex-direction: row;
+    padding: 3px;
+    border-radius: 10px;
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border);
+}
+.gs-segmented__item {
+    padding: 5px 12px;
+    border-radius: 7px;
+    transition-property: background-color;
+    transition-duration: 0.14s;
+    cursor: link;
+}
+.gs-root .gs-segmented__item Label { color: var(--gs-text-3); font-size: 11px; }
+.gs-segmented__item:hover { background-color: var(--gs-hover); }
+.gs-root .gs-segmented__item:hover Label { color: var(--gs-text-2); }
+.gs-segmented__item--active { background-color: var(--gs-surface-2); }
+.gs-root .gs-segmented__item--active Label { color: var(--gs-text); -unity-font-style: bold; }
+
+/* ── 배지 (색은 분류 팔레트에서 코드로 지정) ──────────── */
+.gs-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+.gs-root .gs-badge Label { font-size: 10px; -unity-font-style: bold; }
+
+/* ── 검색창 ───────────────────────────────────────────── */
+.gs-search {
+    flex-direction: row;
+    align-items: center;
+    padding: 0 12px;
+    height: 34px;
+    border-radius: 10px;
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    transition-property: border-color;
+    transition-duration: 0.15s;
+}
+.gs-search--focused { border-color: var(--gs-border-strong); }
+.gs-search__icon { width: 8px; height: 8px; border-radius: 5px; border-width: 1.5px; border-color: var(--gs-text-3); margin-right: 10px; }
+.gs-search .unity-base-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--gs-text);
+    padding: 0;
+    font-size: 12px;
+}
+.gs-search TextField { flex-grow: 1; margin: 0; }
+.gs-search__placeholder { position: absolute; left: 30px; }
+
+/* ── 진행 바 ──────────────────────────────────────────── */
+.gs-progress {
+    height: 6px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+.gs-progress__fill {
+    height: 100%;
+    border-radius: 3px;
+    background-color: var(--gs-accent);
+    transition-property: width;
+    transition-duration: 0.35s;
+    transition-timing-function: ease-out-cubic;
+}
+.gs-progress--done .gs-progress__fill { background-color: var(--gs-success); }
+
+/* ── 카드 ─────────────────────────────────────────────── */
+.gs-card {
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin: 0 14px 14px 0;
+    transition-property: translate, border-color, background-color;
+    transition-duration: 0.18s, 0.18s, 0.18s;
+    transition-timing-function: ease-out-cubic;
+}
+.gs-card:hover { translate: 0 -2px; border-color: var(--gs-border-strong); background-color: var(--gs-surface-hover); }
+.gs-card--selected { border-color: var(--gs-accent); }
+.gs-card--selected:hover { border-color: var(--gs-accent); }
+
+.gs-card__media {
+    background-color: var(--gs-surface-2);
+    -unity-background-scale-mode: scale-and-crop;
+    flex-shrink: 0;
+}
+.gs-card__media-empty { flex-grow: 1; align-items: center; justify-content: center; }
+.gs-card__body { padding: 14px 16px 16px 16px; flex-grow: 1; flex-shrink: 1; }
+.gs-root .gs-card__title { font-size: 14px; -unity-font-style: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-root .gs-card__subtitle { font-size: 11px; color: var(--gs-text-3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-card__badges { flex-direction: row; flex-wrap: wrap; margin-top: 10px; }
+.gs-card__stats { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
+.gs-card__stat { margin-right: 16px; }
+.gs-root .gs-card__stat-label { font-size: 10px; color: var(--gs-text-3); }
+.gs-root .gs-card__stat-value { font-size: 13px; margin-top: 1px; }
+
+/* A. 세로형: 이미지가 위를 채움, 정사각형보다 약간 세로로 김 */
+.gs-card--vertical { width: 200px; height: 250px; flex-direction: column; }
+.gs-card--vertical .gs-card__media { height: 128px; }
+
+/* B. 가로형: 이미지가 왼쪽을 채움, 16:9 */
+.gs-card--horizontal { width: 384px; height: 216px; flex-direction: row; }
+.gs-card--horizontal .gs-card__media { width: 44%; height: 100%; }
+.gs-card--horizontal .gs-card__body { padding: 18px 20px; }
+
+/* C. 바형: 작은 이미지 + 한두 줄 */
+.gs-card--bar { height: 56px; flex-direction: row; align-items: center; padding: 0 14px; margin: 0 0 8px 0; border-radius: 12px; }
+.gs-card--bar:hover { translate: 0 0; }
+.gs-card--bar .gs-card__media { width: 34px; height: 34px; border-radius: 8px; }
+.gs-card--bar .gs-card__body { padding: 0 0 0 12px; flex-direction: row; align-items: center; }
+.gs-card--bar .gs-card__badges { margin-top: 0; margin-left: 10px; }
+.gs-card--bar .gs-card__stats { margin-top: 0; }
+
+/* ── 인라인 값(평소엔 글자, 클릭하면 편집) ───────────── */
+.gs-inline {
+    flex-direction: row;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    margin-left: -8px;
+    border-radius: 6px;
+    transition-property: background-color;
+    transition-duration: 0.12s;
+}
+.gs-inline--editable { cursor: link; }
+.gs-inline--editable:hover { background-color: var(--gs-hover); }
+.gs-root .gs-inline__value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-root .gs-inline__empty { color: var(--gs-text-3); }
+.gs-inline--editing { background-color: var(--gs-surface-2); }
+.gs-inline--broken { background-color: rgba(251, 151, 149, 0.10); }
+.gs-root .gs-inline--broken .gs-inline__value { color: var(--gs-danger); }
+
+/* 편집 중에 나타나는 Unity 입력 필드를 테마에 맞춘다 */
+.gs-inline .unity-base-field { margin: 0; flex-grow: 1; }
+.gs-inline .unity-base-text-field__input,
+.gs-inline .unity-object-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--gs-text);
+    padding: 0;
+    font-size: 12px;
+}
+.gs-inline .unity-base-field__label { display: none; }
+
+/* ── 시트 ─────────────────────────────────────────────── */
+.gs-sheet__header {
+    flex-direction: row;
+    padding: 0 12px 10px 12px;
+    border-bottom-width: 1px;
+    border-color: var(--gs-border);
+}
+.gs-root .gs-sheet__header Label { font-size: 10px; color: var(--gs-text-3); -unity-font-style: bold; letter-spacing: 0.4px; }
+.gs-sheet__row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    border-bottom-width: 1px;
+    border-color: rgba(255, 255, 255, 0.035);
+    transition-property: background-color;
+    transition-duration: 0.12s;
+}
+.gs-sheet__row:hover { background-color: rgba(255, 255, 255, 0.022); }
+.gs-sheet__row--selected { background-color: var(--gs-accent-soft); }
+.gs-sheet__row--selected:hover { background-color: var(--gs-accent-soft); }
+.gs-sheet__cell { padding-right: 14px; flex-shrink: 0; overflow: hidden; }
+.gs-sheet__thumb { width: 26px; height: 26px; border-radius: 6px; background-color: var(--gs-surface-2); -unity-background-scale-mode: scale-and-crop; }
+
+/* ── 사이드바 ─────────────────────────────────────────── */
+.gs-sidebar {
+    width: 228px;
+    flex-shrink: 0;
+    padding: 20px 14px;
+    background-color: var(--gs-surface);
+    border-right-width: 1px;
+    border-color: var(--gs-border);
+}
+.gs-root .gs-sidebar__group { font-size: 10px; color: var(--gs-text-3); -unity-font-style: bold; letter-spacing: 0.6px; margin: 18px 0 6px 12px; }
+.gs-nav-item {
+    flex-direction: row;
+    align-items: center;
+    padding: 9px 12px;
+    border-radius: 10px;
+    margin-bottom: 2px;
+    transition-property: background-color;
+    transition-duration: 0.14s;
+    cursor: link;
+}
+.gs-nav-item:hover { background-color: var(--gs-hover); }
+.gs-root .gs-nav-item Label { color: var(--gs-text-2); }
+.gs-root .gs-nav-item:hover Label { color: var(--gs-text); }
+.gs-nav-item--active { background-color: var(--gs-accent); }
+.gs-nav-item--active:hover { background-color: var(--gs-accent-hover); }
+.gs-root .gs-nav-item--active Label { color: #FFFFFF; -unity-font-style: bold; }
+.gs-root .gs-nav-item__count { font-size: 10px; color: var(--gs-text-3); }
+.gs-root .gs-nav-item--active .gs-nav-item__count { color: rgba(255, 255, 255, 0.75); }
+.gs-nav-dot { width: 6px; height: 6px; border-radius: 3px; margin-right: 10px; }
+
+/* ── 상태 표시 ────────────────────────────────────────── */
+.gs-notice {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background-color: var(--gs-surface-2);
+    margin-bottom: 8px;
+}
+.gs-notice--error { background-color: rgba(251, 151, 149, 0.10); }
+.gs-notice--warning { background-color: rgba(232, 214, 107, 0.08); }
+.gs-notice--ok { background-color: rgba(113, 214, 163, 0.08); }
+.gs-root .gs-notice--error Label { color: var(--gs-danger); }
+.gs-root .gs-notice--warning Label { color: var(--gs-warning); }
+.gs-root .gs-notice--ok Label { color: var(--gs-success); }
+
+.gs-empty {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+}
+
+/* ── 블록 편집기 ──────────────────────────────────────── */
+.gs-block {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    margin-bottom: 8px;
+}
+.gs-block__header { flex-direction: row; align-items: center; margin-bottom: 6px; }
+.gs-block__children { margin-top: 8px; padding-left: 12px; border-left-width: 1px; border-color: var(--gs-border-strong); }
+.gs-block__remove { opacity: 0; transition-property: opacity; transition-duration: 0.12s; }
+.gs-block:hover > .gs-block__header > .gs-block__remove { opacity: 1; }
+.gs-root .gs-preview { font-size: 13px; color: var(--gs-text); padding: 12px 14px; border-radius: 10px; background-color: var(--gs-accent-soft); margin-bottom: 12px; }
+
+.gs-field-row { flex-direction: row; align-items: center; min-height: 30px; }
+.gs-root .gs-field-row__label { width: 96px; flex-shrink: 0; font-size: 11px; color: var(--gs-text-3); }
+
+/* ── 모션 ─────────────────────────────────────────────── */
+.gs-appear {
+    transition-property: opacity, translate;
+    transition-duration: 0.28s, 0.32s;
+    transition-timing-function: ease-out-cubic;
+}
+.gs-appear--hidden { opacity: 0; translate: 0 10px; }
+
+/* ── 타임라인(모니터) ─────────────────────────────────── */
+.gs-log-row { flex-direction: row; align-items: center; height: 34px; padding: 0 12px; border-radius: 8px; }
+.gs-log-row:hover { background-color: var(--gs-hover); }
+.gs-log-row--chain { background-color: var(--gs-accent-soft); }
+.gs-log-row--dim { opacity: 0.35; }
+
+/* 스크롤바를 옅게 */
+.gs-root .unity-scroller--vertical { width: 8px; }
+.gs-root .unity-scroller__slider .unity-base-slider__dragger { background-color: rgba(255, 255, 255, 0.10); border-width: 0; border-radius: 4px; }
+.gs-root .unity-scroller__low-button,
+.gs-root .unity-scroller__high-button { display: none; }
+.gs-root .unity-scroller__slider .unity-base-slider__tracker { background-color: rgba(0, 0, 0, 0); border-width: 0; }

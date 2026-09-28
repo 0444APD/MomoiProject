@@ -1,0 +1,16 @@
+{
+    "name": "GameSystems.Unity",
+    "rootNamespace": "GameSystems",
+    "references": [
+        "GameSystems.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

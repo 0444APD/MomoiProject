@@ -1,0 +1,136 @@
+using System;
+using System.Collections.Generic;
+
+namespace GameSystems
+{
+    public sealed class SessionOptions
+    {
+        public ulong Seed = 1;
+        // true: 행동마다 즉시 확정(되감기가 없는 일반 게임).
+        // false: Commit()을 부를 때까지 확정 대기(턴제 무르기·되감기 게임).
+        public bool AutoCommit = true;
+        public int JournalCapacity = 4096;
+    }
+
+    // 한 플레이어(또는 한 판)의 모든 시스템을 묶는 인스턴스. static 전역 상태를 두지 않는다.
+    // 멀티플레이어에서는 플레이어·매치마다 세션을 만들고, 테스트에서는 독립된 세션을 만든다.
+    public sealed class GameSession : INameResolver
+    {
+        public Journal Journal { get; }
+        public StateStore State { get; }
+        public EventBus Events { get; }
+        public GameClock Clock { get; }
+        public RandomStreams Random { get; }
+        public ActionDispatcher Actions { get; }
+        public StatSystem Stats { get; }
+        public AchievementSystem Achievements { get; }
+        public DebugCommands Debug { get; }
+        public SessionOptions Options { get; }
+
+        // 확정 전 행동별 난수 상태. 무르면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, 무르기 악용 차단).
+        readonly Dictionary<long, Dictionary<string, ulong[]>> _randomBefore = new Dictionary<long, Dictionary<string, ulong[]>>();
+
+        public GameSession(SessionOptions options = null)
+        {
+            Options = options ?? new SessionOptions();
+            Clock = new GameClock();
+            Journal = new Journal(Options.JournalCapacity) { TickSource = () => Clock.Tick };
+            State = new StateStore(Journal);
+            Events = new EventBus(Journal);
+            Random = new RandomStreams(Options.Seed);
+            Actions = new ActionDispatcher(Journal, State, Clock);
+            Stats = new StatSystem(State, Events, Journal);
+            Achievements = new AchievementSystem(this);
+            Debug = new DebugCommands();
+
+            Actions.TransactionStarted += id => _randomBefore[id] = Random.ExportStates();
+            Actions.TransactionAborted += RestoreRandom;
+            State.TransactionUndone += tx => RestoreRandom(tx.Id);
+            State.TransactionCommitted += tx => _randomBefore.Remove(tx.Id);
+
+            Debug.Register("세션", "확정 (Commit)", Commit, "확정 대기 중인 행동을 모두 확정합니다.");
+            Debug.Register("세션", "무르기 (Undo)", () => Undo(), "확정되지 않은 마지막 행동을 되돌립니다.");
+            Debug.Register("세션", "이번 판 통계 초기화", () => Stats.ResetRun());
+        }
+
+        public IEnumerable<IInspectable> Inspectables
+        {
+            get
+            {
+                yield return Stats;
+                yield return Achievements;
+                yield return Actions;
+                yield return State;
+                yield return Random;
+            }
+        }
+
+        public ActionRecord Do(GameAction action)
+        {
+            var record = Actions.Execute(action);
+            if (Options.AutoCommit) Commit();
+            return record;
+        }
+
+        public void Commit()
+        {
+            State.Commit();
+            Achievements.Flush();
+        }
+
+        public bool Undo() => State.UndoLast();
+
+        void RestoreRandom(long transactionId)
+        {
+            if (!_randomBefore.TryGetValue(transactionId, out var states)) return;
+            Random.Restore(states);
+            _randomBefore.Remove(transactionId);
+        }
+
+        // 호스트(Unity 등)가 매 프레임 호출한다.
+        public void EndFrame(double deltaTime)
+        {
+            Clock.Advance(deltaTime);
+            Achievements.Poll(Clock.Time);
+            // 확정 대기 중인 행동이 있으면 평가를 미룬다(무를 수 있는 상태로 달성되지 않게).
+            if (State.UncommittedCount == 0 && !State.InTransaction) Achievements.Flush();
+        }
+
+        // ── 저장 ───────────────────────────────────────────────
+        // 메타 구역(프로필)만 저장한다. 세션 구역은 판이 끝나면 사라지는 게임 내용이다.
+
+        public string ExportMeta()
+        {
+            if (State.UncommittedCount > 0) Commit();
+            var root = new Dictionary<string, object>
+            {
+                ["version"] = 1.0,
+                ["state"] = State.Export(StateZone.Meta),
+            };
+            return MiniJson.Serialize(root);
+        }
+
+        public void ImportMeta(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return;
+            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[GameSystems] 저장 데이터 형식이 올바르지 않습니다.");
+            if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
+                State.Import(values, StateZone.Meta);
+            Journal.Append(JournalKind.System, "Save", $"메타 상태 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
+        }
+
+        // ── 이름 조회 ───────────────────────────────────────────
+
+        public string StatName(string id)
+        {
+            var definition = Stats.Find(id);
+            return definition?.DisplayName ?? (string.IsNullOrEmpty(id) ? "(통계 없음)" : id);
+        }
+
+        public string AchievementName(string id)
+        {
+            var definition = Achievements.Find(id);
+            return definition?.DisplayName ?? (string.IsNullOrEmpty(id) ? "(도전과제 없음)" : id);
+        }
+    }
+}
