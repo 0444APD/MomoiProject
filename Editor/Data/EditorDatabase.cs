@@ -124,6 +124,37 @@ namespace GameSystems.EditorTools
             return false;
         }
 
+        public static bool IsReleased => AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath)?.IsReleased ?? false;
+
+        const string ReleasedMenu = "Game Systems/출시됨 (저장 호환 유지)";
+
+        [MenuItem(ReleasedMenu, priority = 40)]
+        static void ToggleReleased()
+        {
+            var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
+            if (database == null)
+            {
+                Debug.LogWarning("[GameSystems] GameDatabase가 아직 없습니다. 데이터베이스 창을 한 번 여세요.");
+                return;
+            }
+            var next = !database.IsReleased;
+            var message = next
+                ? "출시 상태로 바꿉니다. 앞으로 ID 이름을 바꾸거나 데이터 구조를 바꿔도 기존 저장을 지우지 않고 이어받습니다(ID 변경 이력 기록, 구조 변경은 저장 버전 변환 필요)."
+                : "개발 중 상태로 바꿉니다. 데이터 구조가 호환되지 않게 바뀌면 저장을 변환하지 않고 지웁니다.";
+            if (!EditorUtility.DisplayDialog("출시 상태", message, "바꾸기", "취소")) return;
+            Undo.RecordObject(database, "출시 상태 변경");
+            database.EditorSetReleased(next);
+            EditorUtility.SetDirty(database);
+            AssetDatabase.SaveAssetIfDirty(database);
+        }
+
+        [MenuItem(ReleasedMenu, true)]
+        static bool ToggleReleasedValidate()
+        {
+            Menu.SetChecked(ReleasedMenu, IsReleased);
+            return true;
+        }
+
         public sealed class IdUsage
         {
             public GameData Owner;
@@ -168,8 +199,9 @@ namespace GameSystems.EditorTools
             return ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
         }
 
-        // ID를 바꾼다. 이 ID를 가리키는 모든 필드, 에셋 파일 이름, 생성 코드(GameIds)가 함께 바뀌고,
-        // 예전 이름으로 저장된 플레이어 데이터는 런타임이 새 이름으로 이어받는다(GameDatabase 변경 이력).
+        // ID를 바꾼다. 이 ID를 가리키는 모든 필드, 에셋 파일 이름, 생성 코드(GameIds)가 함께 바뀐다.
+        // 출시 후: 예전 이름으로 저장된 플레이어 데이터를 런타임이 새 이름으로 이어받도록 변경 이력을 남긴다.
+        // 개발 중: 이력을 남기지 않는다(호환되지 않는 저장은 런타임이 지우고 새로 시작).
         public int Rename(GameData data, string newId)
         {
             var oldId = data.Id;
@@ -197,7 +229,7 @@ namespace GameSystems.EditorTools
             if (System.IO.Path.GetFileNameWithoutExtension(path) == oldId) AssetDatabase.RenameAsset(path, newId);
 
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
-            if (database != null)
+            if (database != null && database.IsReleased)
             {
                 database.EditorAddRename(data.GetType().FullName, oldId, newId);
                 EditorUtility.SetDirty(database);

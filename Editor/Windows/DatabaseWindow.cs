@@ -448,7 +448,10 @@ namespace GameSystems.EditorTools
             var message = usages.Count == 0
                 ? "이 ID를 가리키는 곳이 없습니다."
                 : $"이 ID를 가리키는 {usages.Count}곳이 함께 바뀝니다: " + string.Join(", ", usages.Take(5).Select(u => u.Label)) + (usages.Count > 5 ? " …" : "");
-            GsDialog.Form(_root, "ID 바꾸기", message + "\n저장 파일의 예전 ID 값은 새 ID로 이어지고, GameIds 코드도 다시 만들어집니다.",
+            var saveNote = EditorDatabase.IsReleased
+                ? "\n출시 상태: 저장 파일의 예전 ID 값은 새 ID로 이어집니다."
+                : "\n개발 중: 이 ID로 저장된 데이터는 다음 플레이 때 초기화됩니다(변환하지 않음).";
+            GsDialog.Form(_root, "ID 바꾸기", message + saveNote + " GameIds 코드도 다시 만들어집니다.",
                 new[] { new DialogField { Key = "id", Label = "새 ID", Value = item.Id } },
                 "바꾸기",
                 values => values["id"] == item.Id ? "지금과 같은 ID입니다." : db.CanUseId(values["id"], item, out var error) ? null : error,

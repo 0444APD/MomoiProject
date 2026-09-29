@@ -80,6 +80,11 @@ namespace GameSystems.Tests
         public Guid guid;
     }
 
+    [Serializable] public sealed class SchemaV1 { public string name; public int level; public TestElement element; }
+    [Serializable] public sealed class SchemaAdded { public string name; public int level; public TestElement element; public int rarity; }
+    [Serializable] public sealed class SchemaRemoved { public string name; public TestElement element; }
+    [Serializable] public sealed class SchemaRetyped { public string name; public string level; public TestElement element; }
+
     [Serializable]
     public sealed class DataAction : GameAction
     {
@@ -519,6 +524,40 @@ namespace GameSystems.Tests
             resumed.ImportRun(json);
             resumed.State.Define("run.turn", StateZone.Session, 1);
             Assert.AreEqual(7, resumed.State.Get<int>("run.turn"));
+        }
+        static Dictionary<string, string> SchemaOf(Type type)
+        {
+            var schema = new Dictionary<string, string>();
+            DataModel.Schema(type, "hero", schema);
+            return schema;
+        }
+
+        [Test]
+        public void 구조_호환_추가는_호환_삭제와_형식_변경은_비호환()
+        {
+            var saved = SchemaOf(typeof(SchemaV1));
+            Assert.IsTrue(DataModel.IsCompatible(saved, SchemaOf(typeof(SchemaAdded)), out _), "필드 추가는 기본값으로 채우면 된다");
+            Assert.IsFalse(DataModel.IsCompatible(saved, SchemaOf(typeof(SchemaRemoved)), out var removed));
+            StringAssert.Contains("hero.level", removed);
+            Assert.IsFalse(DataModel.IsCompatible(saved, SchemaOf(typeof(SchemaRetyped)), out var retyped));
+            StringAssert.Contains("형식이 바뀌었습니다", retyped);
+            Assert.IsTrue(saved.ContainsKey("hero.element=Fire"), "enum 값 이름도 구조에 들어간다(없어지면 비호환)");
+        }
+
+        [Test]
+        public void 저장_파일에_구조가_남고_키가_사라지면_비호환()
+        {
+            var session = new GameSession();
+            session.State.Define("m:hero", StateZone.Meta, new SchemaV1());
+            session.SaveSchema = SchemaOf(typeof(SchemaV1));
+            var json = session.ExportMeta();
+
+            Assert.IsTrue(GameSession.IsSaveCompatible(json, SchemaOf(typeof(SchemaAdded)), out _));
+            var renamed = new Dictionary<string, string>();
+            DataModel.Schema(typeof(SchemaV1), "champion", renamed);
+            Assert.IsFalse(GameSession.IsSaveCompatible(json, renamed, out var reason), "키 이름이 바뀌면 비호환");
+            StringAssert.Contains("hero", reason);
+            Assert.IsTrue(GameSession.IsSaveCompatible("{\"version\":1,\"state\":{}}", renamed, out _), "구조 정보가 없는 예전 파일은 호환으로 본다");
         }
     }
 }

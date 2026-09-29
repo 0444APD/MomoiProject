@@ -837,6 +837,79 @@ namespace GameSystems
             return Convert.ChangeType(text, keyType, CultureInfo.InvariantCulture);
         }
 
+        // ── 구조 서명(저장 호환 판단) ───────────────────────────
+        // 타입을 "경로 → 형식" 목록으로 펼친다. 예: items[].level → Int32, element=Fire → enum
+        // 저장할 때의 목록과 지금 목록을 비교해, 저장된 경로가 모두 같은 형식으로 남아 있으면 호환(추가는 호환).
+
+        public static void Schema(Type type, string prefix, IDictionary<string, string> into)
+        {
+            Schema(type, prefix, into, new HashSet<Type>());
+        }
+
+        static void Schema(Type type, string prefix, IDictionary<string, string> into, HashSet<Type> visiting)
+        {
+            var info = Of(type);
+            switch (info.Kind)
+            {
+                case DataKind.Scalar:
+                    into[prefix] = (Nullable.GetUnderlyingType(type) ?? type).Name;
+                    return;
+                case DataKind.Enum:
+                    into[prefix] = "enum " + type.Name;
+                    // enum은 이름으로 저장되므로, 저장된 값 이름이 없어지면 호환되지 않는다.
+                    foreach (var name in Enum.GetNames(type)) into[prefix + "=" + name] = "enum value";
+                    return;
+                case DataKind.Reference:
+                    into[prefix] = "ref " + type.Name;
+                    return;
+                case DataKind.Unsupported:
+                    return;
+            }
+            if (!visiting.Add(type))
+            {
+                into[prefix] = "recursive " + type.Name;
+                return;
+            }
+            switch (info.Kind)
+            {
+                case DataKind.List:
+                case DataKind.Array:
+                case DataKind.Collection:
+                    into[prefix] = "list";
+                    Schema(info.ElementType, prefix + "[]", into, visiting);
+                    break;
+                case DataKind.Dictionary:
+                    into[prefix] = "map " + info.KeyType.Name;
+                    Schema(info.ElementType, prefix + "[]", into, visiting);
+                    break;
+                default:
+                    into[prefix] = "object";
+                    foreach (var field in info.Fields) Schema(field.Type, Join(prefix, field.Name), into, visiting);
+                    break;
+            }
+            visiting.Remove(type);
+        }
+
+        // 저장 당시 구조(saved)가 지금 구조(current)에 모두 같은 형식으로 남아 있는지. 아니면 첫 차이를 reason에.
+        public static bool IsCompatible(IDictionary<string, string> saved, IDictionary<string, string> current, out string reason)
+        {
+            foreach (var pair in saved)
+            {
+                if (!current.TryGetValue(pair.Key, out var now))
+                {
+                    reason = $"'{pair.Key}'가 없어졌거나 이름이 바뀌었습니다";
+                    return false;
+                }
+                if (now != pair.Value)
+                {
+                    reason = $"'{pair.Key}'의 형식이 바뀌었습니다({pair.Value} → {now})";
+                    return false;
+                }
+            }
+            reason = null;
+            return true;
+        }
+
         // ── 표시 ───────────────────────────────────────────────
 
         public static string Summary(object value)

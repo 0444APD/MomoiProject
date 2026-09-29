@@ -63,7 +63,10 @@ namespace GameSystems
                     catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[GameSystems] ", "")); }
                 }
                 foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
-                // ID 이름이 바뀐 항목은 예전 이름으로 저장된 값을 이어받는다.
+                // 저장 호환: 지금 데이터 구조를 저장 파일에 남기고, 개발 중이면 호환되지 않는 저장을 지운다.
+                session.SaveSchema = BuildSchema(database);
+                if (!database.IsReleased) ResetIncompatibleSaves(session);
+                // ID 이름이 바뀐 항목은 예전 이름으로 저장된 값을 이어받는다(출시 후에만 이력이 쌓인다).
                 foreach (var rename in database.Renames)
                 {
                     if (rename.dataType == typeof(StatData).FullName) session.State.AddAlias(StateKeys.Stat(rename.oldId), StateKeys.Stat(rename.newId));
@@ -136,6 +139,44 @@ namespace GameSystems
             catch (Exception e)
             {
                 session.Journal.Append(JournalKind.Error, "Save", "프로필 불러오기 실패: " + e.Message);
+            }
+        }
+
+        // 데이터베이스가 정의한 저장 대상(상태 키·수치·도전과제)의 구조.
+        static System.Collections.Generic.Dictionary<string, string> BuildSchema(GameDatabase database)
+        {
+            var schema = new System.Collections.Generic.Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var key in database.All<StateKeyData>())
+            {
+                var type = key.ValueType;
+                if (type != null) DataModel.Schema(type, key.Id, schema);
+            }
+            foreach (var stat in database.All<StatData>()) schema[StateKeys.Stat(stat.Id)] = nameof(Double);
+            foreach (var achievement in database.All<AchievementData>()) schema[StateKeys.Achievement(achievement.Id)] = nameof(Boolean);
+            return schema;
+        }
+
+        // 개발 중: 저장된 키·필드가 없어졌거나 이름·형식이 바뀌었으면 변환하지 않고 저장을 지운다(추가만 된 경우는 그대로 이어감).
+        static void ResetIncompatibleSaves(GameSession session)
+        {
+            foreach (var path in new[] { SavePath, RunSavePath })
+            {
+                if (!File.Exists(path)) continue;
+                string reason;
+                try
+                {
+                    if (GameSession.IsSaveCompatible(File.ReadAllText(path), session.SaveSchema, out reason)) continue;
+                }
+                catch (Exception e)
+                {
+                    reason = e.Message;
+                }
+                DeleteProfile();
+                DeleteRun();
+                var message = $"개발 중 데이터 구조가 바뀌어 저장을 초기화했습니다: {reason}. (출시 후에는 초기화하지 않고 이어받습니다)";
+                session.Journal.Append(JournalKind.Warning, "Save", message);
+                Debug.LogWarning("[GameSystems] " + message);
+                return;
             }
         }
 

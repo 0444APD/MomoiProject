@@ -52,6 +52,9 @@ namespace GameSystems
         public DebugCommands Debug { get; }
         public SessionOptions Options { get; }
         public SaveMigrations Migrations => Options.Migrations;
+        // 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식). 불러올 때 호환 여부를 판단하는 데 쓴다.
+        // 런타임이 데이터베이스(상태 키·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
+        public Dictionary<string, string> SaveSchema;
 
         // 행동별 실행 전 난수 상태. Undo하면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, Undo 악용 차단).
         readonly Dictionary<long, Dictionary<string, ulong[]>> _randomBefore = new Dictionary<long, Dictionary<string, ulong[]>>();
@@ -264,6 +267,7 @@ namespace GameSystems
                 ["version"] = (double)Options.SaveVersion,
                 ["state"] = State.Export(StateZone.Meta),
             };
+            AddSchema(root);
             return MiniJson.Serialize(root);
         }
 
@@ -302,6 +306,7 @@ namespace GameSystems
                 ["random"] = random,
                 ["state"] = State.Export(StateZone.Session),
             };
+            AddSchema(root);
             return MiniJson.Serialize(root);
         }
 
@@ -345,6 +350,31 @@ namespace GameSystems
             State.ResetZone(StateZone.Session);
             ClearUndo();
             Journal.Append(JournalKind.System, "Session", "새 판 시작");
+        }
+
+        void AddSchema(Dictionary<string, object> root)
+        {
+            if (SaveSchema == null || SaveSchema.Count == 0) return;
+            var schema = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var pair in SaveSchema) schema[pair.Key] = pair.Value;
+            root["schema"] = schema;
+        }
+
+        // 저장 파일(프로필·판)이 지금 데이터 구조와 호환되는지. 구조 정보가 없는 파일은 호환으로 본다.
+        // 개발 중에는 호환되지 않는 저장을 변환하지 않고 지운다(GameSystemsRuntime).
+        public static bool IsSaveCompatible(string json, IDictionary<string, string> current, out string reason)
+        {
+            reason = null;
+            if (string.IsNullOrEmpty(json) || current == null) return true;
+            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root))
+            {
+                reason = "저장 파일 형식이 올바르지 않습니다";
+                return false;
+            }
+            if (!root.TryGetValue("schema", out var value) || !(value is Dictionary<string, object> saved)) return true;
+            var savedSchema = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var pair in saved) savedSchema[pair.Key] = pair.Value as string ?? "";
+            return DataModel.IsCompatible(savedSchema, current, out reason);
         }
 
         void ClearUndo()
