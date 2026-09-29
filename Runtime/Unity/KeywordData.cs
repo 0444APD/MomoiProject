@@ -10,6 +10,10 @@ namespace GameSystems.Data
     {
         [FieldLabel("그룹"), DataRef(typeof(KeywordGroupData))] public string group = "";
         [FieldLabel("설명")] public string description = "";
+        // 문장 속 용어([[id]])로 쓸 때의 모양. 비워 두면 이름 글자만 나온다.
+        // TextMeshPro 스타일 시트의 스타일 이름(색·굵기 등)과 스프라이트 애셋의 아이콘 이름.
+        [FieldLabel("용어 스타일")] public string textStyle = "";
+        [FieldLabel("용어 아이콘")] public string textIcon = "";
         // 그룹 안에서의 순서(끌어서 바꾼다).
         [HideInInspector] public int order;
 

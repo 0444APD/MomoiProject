@@ -38,6 +38,57 @@ namespace GameSystems.Samples
             DatabaseWindow.ShowItem(item);
         }
 
+        // 다국어 예시: 한국어(원문)·영어 표와 문장 몇 개. 있는 키는 건드리지 않는다.
+        [MenuItem("Game Systems/샘플/샘플 텍스트 만들기", priority = 42)]
+        public static void CreateTexts()
+        {
+            var settings = TextSheetTools.EnsureSettings();
+            if (settings.Find("en") == null)
+            {
+                settings.languages.Add(new LocalizationSettings.Language { code = "en", nativeName = "English" });
+                EditorUtility.SetDirty(settings);
+            }
+            foreach (var language in settings.languages)
+                if (language.table == null) language.table = TextSheetTools.EnsureTable(language.code);
+            EditorUtility.SetDirty(settings);
+
+            AddTexts(settings.Find("ko").table, new[]
+            {
+                ("ui.start", "시작하기"),
+                ("gold.name", "골드"),
+                ("sample.reward", "{item:을} {count}개 얻었습니다."),
+                ("sample.goldEarned", "{amount, number} [[gold:을]] 얻었습니다."),
+                ("sample.enemy", "{enemy:이} 나타났다!"),
+                ("sample.inbox", "새 편지 {n}통"),
+                ("sample.burn", "[[burn:이]] 번졌다."),
+                ("burn.name", "화상"),
+                ("template.dragonArmor.name", "용의 비늘 갑옷"),
+            });
+            AddTexts(settings.Find("en").table, new[]
+            {
+                ("ui.start", "Start"),
+                ("gold.name", "gold"),
+                ("sample.reward", "You got {count, plural, one {a} other {#}} {item}."),
+                ("sample.goldEarned", "You earned {amount, number} [[gold]]."),
+                ("sample.enemy", "{enemy} appeared!"),
+                ("sample.inbox", "{n, plural, =0 {No new letters} one {# new letter} other {# new letters}}"),
+                ("sample.burn", "[[burn:cap]] spreads."),
+                ("burn.name", "burn"),
+                ("template.dragonArmor.name", "{count, plural, one {Dragon Scale Armor} other {Dragon Scale Armors}}"),
+            });
+            AssetDatabase.SaveAssets();
+            GameLanguage.Reload();
+            Selection.activeObject = settings;
+        }
+
+        static void AddTexts(TextTable table, (string key, string text)[] lines)
+        {
+            var existing = new System.Collections.Generic.HashSet<string>(table.entries.Select(e => e.key));
+            foreach (var (key, text) in lines)
+                if (existing.Add(key)) table.entries.Add(new TextTable.Entry { key = key, text = text });
+            EditorUtility.SetDirty(table);
+        }
+
         // 배치모드용: Unity.exe -batchmode -quit -executeMethod GameSystems.Samples.SampleDataMenu.CreateDataBatch
         public static void CreateDataBatch()
         {
