@@ -23,6 +23,7 @@ namespace GameSystems
         List,       // IList 구현(List<T> 등)
         Array,
         Dictionary,
+        Collection, // 그 밖의 컬렉션: HashSet·SortedSet·LinkedList·Queue·Stack 등
         Unsupported,
     }
 
@@ -43,6 +44,10 @@ namespace GameSystems
         public Type KeyType;
         public IReadOnlyList<DataField> Fields = Array.Empty<DataField>();
         public string Problem;
+        // Collection 전용: 순서가 없는 집합인지, 요소를 꺼내고 다시 채우는 방법.
+        public bool Unordered;
+        internal Func<object, List<object>> ReadItems;
+        internal Action<object, List<object>> WriteItems;
 
         // 요소마다 내부 ID를 붙여 추적하는 타입(참조형 클래스). 구조체·값은 순번으로 다룬다.
         public bool HasIdentity => Kind == DataKind.Object && !Type.IsValueType;
@@ -133,6 +138,9 @@ namespace GameSystems
 
         public static DataType Of(Type type)
         {
+            // int? 같은 nullable은 속의 타입으로 다룬다(값이 없으면 null).
+            var underlying = Nullable.GetUnderlyingType(type);
+            if (underlying != null) return Of(underlying);
             lock (Cache)
             {
                 if (Cache.TryGetValue(type, out var cached)) return cached;
@@ -144,7 +152,8 @@ namespace GameSystems
         }
 
         public static bool IsScalarType(Type type) =>
-            type == typeof(string) || type == typeof(bool) || TypeResolver.IsNumeric(type) || type == typeof(char);
+            type == typeof(string) || type == typeof(bool) || TypeResolver.IsNumeric(type) || type == typeof(char) ||
+            type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(TimeSpan) || type == typeof(Guid);
 
         public static bool IsReferenceType(Type type)
         {
@@ -204,6 +213,7 @@ namespace GameSystems
                 info.ElementType = list.GetGenericArguments()[0];
                 return;
             }
+            if (TryCollection(info)) return;
             if (type.IsPrimitive || type == typeof(object))
             {
                 info.Kind = DataKind.Unsupported;
@@ -237,6 +247,46 @@ namespace GameSystems
         {
             if (type.IsGenericType && type.GetGenericTypeDefinition() == definition) return type;
             return type.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == definition);
+        }
+
+        // 리스트·딕셔너리가 아닌 컬렉션: 요소를 꺼내고(ReadItems) 비운 뒤 다시 채우는(WriteItems) 방법을 정해 둔다.
+        static bool TryCollection(DataType info)
+        {
+            var type = info.Type;
+            if (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Queue<>) || type.GetGenericTypeDefinition() == typeof(Stack<>)))
+            {
+                var isStack = type.GetGenericTypeDefinition() == typeof(Stack<>);
+                var clear = type.GetMethod("Clear", Type.EmptyTypes);
+                var add = type.GetMethod(isStack ? "Push" : "Enqueue");
+                info.Kind = DataKind.Collection;
+                info.ElementType = type.GetGenericArguments()[0];
+                info.ReadItems = value => ((IEnumerable)value).Cast<object>().ToList();
+                info.WriteItems = (target, items) =>
+                {
+                    clear.Invoke(target, null);
+                    // 스택은 위에서부터 나열되므로 거꾸로 쌓아야 같은 모양이 된다.
+                    if (isStack)
+                        for (int i = items.Count - 1; i >= 0; i--) add.Invoke(target, new[] { items[i] });
+                    else
+                        foreach (var item in items) add.Invoke(target, new[] { item });
+                };
+                return true;
+            }
+
+            var collection = FindGeneric(type, typeof(ICollection<>));
+            if (collection == null) return false;
+            var clearMethod = collection.GetMethod("Clear");
+            var addMethod = collection.GetMethod("Add");
+            info.Kind = DataKind.Collection;
+            info.ElementType = collection.GetGenericArguments()[0];
+            info.Unordered = FindGeneric(type, typeof(ISet<>)) != null;
+            info.ReadItems = value => ((IEnumerable)value).Cast<object>().ToList();
+            info.WriteItems = (target, items) =>
+            {
+                clearMethod.Invoke(target, null);
+                foreach (var item in items) addMethod.Invoke(target, new[] { item });
+            };
+            return true;
         }
 
         static bool HasAttribute(MemberInfo member, string name) =>
@@ -278,6 +328,7 @@ namespace GameSystems
                     break;
                 case DataKind.List:
                 case DataKind.Array:
+                case DataKind.Collection:
                     Validate(info.ElementType, path + "[]", problems, seen);
                     break;
                 case DataKind.Dictionary:
@@ -289,12 +340,30 @@ namespace GameSystems
         // ── 복제 ───────────────────────────────────────────────
         // primary: 만든 복제본을 게임에서 쓸 실제 인스턴스로 등록한다(불러오기·복원 시).
 
-        public static object Clone(object value, DataIdentity identity, bool primary = false) =>
-            Clone(value, new HashSet<object>(ReferenceEqualityComparer.Instance), identity, primary, "", 0);
+        sealed class CloneState
+        {
+            public readonly HashSet<object> Visiting = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            public DataIdentity Identity;
+            public bool Primary;
+            public int Nodes;
+        }
 
-        static object Clone(object value, HashSet<object> visiting, DataIdentity identity, bool primary, string path, int depth)
+        public static object Clone(object value, DataIdentity identity, bool primary = false) =>
+            Clone(value, identity, primary, out _);
+
+        // nodes: 복제한 요소 수(값 크기 경고에 쓴다).
+        public static object Clone(object value, DataIdentity identity, bool primary, out int nodes)
+        {
+            var state = new CloneState { Identity = identity, Primary = primary };
+            var copy = Clone(value, state, "", 0);
+            nodes = state.Nodes;
+            return copy;
+        }
+
+        static object Clone(object value, CloneState state, string path, int depth)
         {
             if (value == null) return null;
+            state.Nodes++;
             var info = Of(value.GetType());
             switch (info.Kind)
             {
@@ -306,7 +375,7 @@ namespace GameSystems
                     throw new InvalidOperationException($"[GameSystems] '{path}'에 담을 수 없는 값입니다: {info.Problem}.");
             }
             if (depth > MaxDepth) throw new InvalidOperationException($"[GameSystems] '{path}'가 너무 깊습니다(순환 참조일 수 있습니다).");
-            if (!info.Type.IsValueType && !visiting.Add(value))
+            if (!info.Type.IsValueType && !state.Visiting.Add(value))
                 throw new InvalidOperationException($"[GameSystems] '{path}'에 순환 참조가 있습니다. 서로를 가리키는 대신 ID로 참조하세요.");
             try
             {
@@ -317,7 +386,7 @@ namespace GameSystems
                         var source = (Array)value;
                         var copy = Array.CreateInstance(info.ElementType, source.Length);
                         for (int i = 0; i < source.Length; i++)
-                            copy.SetValue(CloneElement(source.GetValue(i), visiting, identity, primary, $"{path}[{i}]", depth), i);
+                            copy.SetValue(CloneElement(source.GetValue(i), state, $"{path}[{i}]", depth), i);
                         return copy;
                     }
                     case DataKind.List:
@@ -325,7 +394,16 @@ namespace GameSystems
                         var source = (IList)value;
                         var copy = (IList)Create(info.Type);
                         for (int i = 0; i < source.Count; i++)
-                            copy.Add(CloneElement(source[i], visiting, identity, primary, $"{path}[{i}]", depth));
+                            copy.Add(CloneElement(source[i], state, $"{path}[{i}]", depth));
+                        return copy;
+                    }
+                    case DataKind.Collection:
+                    {
+                        var items = info.ReadItems(value);
+                        var copies = new List<object>(items.Count);
+                        for (int i = 0; i < items.Count; i++) copies.Add(CloneElement(items[i], state, $"{path}[{i}]", depth));
+                        var copy = Create(info.Type);
+                        info.WriteItems(copy, copies);
                         return copy;
                     }
                     case DataKind.Dictionary:
@@ -333,29 +411,29 @@ namespace GameSystems
                         var source = (IDictionary)value;
                         var copy = (IDictionary)Create(info.Type);
                         foreach (DictionaryEntry pair in source)
-                            copy[pair.Key] = Clone(pair.Value, visiting, identity, primary, $"{path}[{pair.Key}]", depth + 1);
+                            copy[pair.Key] = Clone(pair.Value, state, $"{path}[{pair.Key}]", depth + 1);
                         return copy;
                     }
                     default:
                     {
                         var copy = Create(info.Type);
                         foreach (var field in info.Fields)
-                            field.Field.SetValue(copy, Clone(field.Field.GetValue(value), visiting, identity, primary, Join(path, field.Name), depth + 1));
+                            field.Field.SetValue(copy, Clone(field.Field.GetValue(value), state, Join(path, field.Name), depth + 1));
                         return copy;
                     }
                 }
             }
             finally
             {
-                if (!info.Type.IsValueType) visiting.Remove(value);
+                if (!info.Type.IsValueType) state.Visiting.Remove(value);
             }
         }
 
-        static object CloneElement(object element, HashSet<object> visiting, DataIdentity identity, bool primary, string path, int depth)
+        static object CloneElement(object element, CloneState state, string path, int depth)
         {
-            var copy = Clone(element, visiting, identity, primary, path, depth + 1);
-            if (identity != null && element != null && copy != null && Of(element.GetType()).HasIdentity)
-                identity.Assign(copy, identity.IdOf(element), primary);
+            var copy = Clone(element, state, path, depth + 1);
+            if (state.Identity != null && element != null && copy != null && Of(element.GetType()).HasIdentity)
+                state.Identity.Assign(copy, state.Identity.IdOf(element), state.Primary);
             return copy;
         }
 
@@ -417,15 +495,27 @@ namespace GameSystems
                 }
                 case DataKind.List:
                 case DataKind.Array:
-                    DiffList((IList)before, (IList)after, info, path, identity, changes, depth);
+                    DiffList((IList)before, (IList)after, info.ElementType, false, path, identity, changes, depth);
+                    return;
+                case DataKind.Collection:
+                    DiffList(info.ReadItems(before), info.ReadItems(after), info.ElementType, info.Unordered, path, identity, changes, depth);
                     return;
             }
         }
 
-        static void DiffList(IList before, IList after, DataType info, string path, DataIdentity identity, List<DataChange> changes, int depth)
+        static void DiffList(IList before, IList after, Type elementType, bool unordered, string path, DataIdentity identity, List<DataChange> changes, int depth)
         {
-            var element = Of(info.ElementType);
-            bool tracked = identity != null && (element.HasIdentity || info.ElementType.IsInterface || info.ElementType.IsAbstract || info.ElementType == typeof(object));
+            var element = Of(elementType);
+            bool tracked = identity != null && (element.HasIdentity || elementType.IsInterface || elementType.IsAbstract || elementType == typeof(object));
+            if (!tracked && unordered)
+            {
+                // 순서 없는 집합의 값 요소: 내용이 같은지만 본다.
+                var a = before.Cast<object>().ToList();
+                var b = after.Cast<object>().ToList();
+                if (a.Count != b.Count || a.Any(x => !b.Contains(x)))
+                    changes.Add(new DataChange { Kind = DataChangeKind.Set, Path = path, Old = before, New = after });
+                return;
+            }
             if (!tracked)
             {
                 if (before.Count != after.Count)
@@ -470,7 +560,7 @@ namespace GameSystems
             }
             var keptBefore = beforeIds.Where(afterById.ContainsKey).ToList();
             var keptAfter = afterIds.Where(beforeById.ContainsKey).ToList();
-            if (!keptBefore.SequenceEqual(keptAfter)) changes.Add(new DataChange { Kind = DataChangeKind.Reorder, Path = path });
+            if (!unordered && !keptBefore.SequenceEqual(keptAfter)) changes.Add(new DataChange { Kind = DataChangeKind.Reorder, Path = path });
         }
 
         // ── 제자리 복원 ─────────────────────────────────────────
@@ -519,6 +609,12 @@ namespace GameSystems
                     if (t.Length != s.Length) return Clone(source, identity, true);
                     var items = RestoreElements(ToList(t), ToList(s), identity);
                     for (int i = 0; i < items.Count; i++) t.SetValue(items[i], i);
+                    return target;
+                }
+                case DataKind.Collection:
+                {
+                    var items = RestoreElements(info.ReadItems(target), info.ReadItems(source), identity);
+                    info.WriteItems(target, items);
                     return target;
                 }
                 case DataKind.List:
@@ -583,8 +679,16 @@ namespace GameSystems
             switch (info.Kind)
             {
                 case DataKind.Scalar:
-                    if (value is bool || value is string) return value;
-                    if (value is char c) return c.ToString();
+                    switch (value)
+                    {
+                        case bool _:
+                        case string _: return value;
+                        case char c: return c.ToString();
+                        case DateTime time: return time.ToString("o", CultureInfo.InvariantCulture);
+                        case DateTimeOffset offset: return offset.ToString("o", CultureInfo.InvariantCulture);
+                        case TimeSpan span: return span.ToString("c", CultureInfo.InvariantCulture);
+                        case Guid guid: return guid.ToString("D");
+                    }
                     return Convert.ToDouble(value, CultureInfo.InvariantCulture);
                 case DataKind.Enum:
                     return value.ToString();
@@ -596,10 +700,11 @@ namespace GameSystems
                 }
                 case DataKind.Array:
                 case DataKind.List:
+                case DataKind.Collection:
                 {
                     var list = new List<object>();
                     int i = 0;
-                    foreach (var item in (IList)value) list.Add(ToTree(item, info.ElementType, identity, warnings, $"{path}[{i++}]"));
+                    foreach (var item in (IEnumerable)value) list.Add(ToTree(item, info.ElementType, identity, warnings, $"{path}[{i++}]"));
                     return list;
                 }
                 case DataKind.Dictionary:
@@ -627,6 +732,7 @@ namespace GameSystems
         public static object FromTree(object tree, Type declared, DataIdentity identity, List<string> warnings, string path = "")
         {
             if (tree == null) return declared.IsValueType ? Activator.CreateInstance(declared) : null;
+            declared = Nullable.GetUnderlyingType(declared) ?? declared;
             var type = declared;
             if (tree is Dictionary<string, object> typed && typed.TryGetValue("$type", out var typeName) && typeName is string name)
             {
@@ -642,6 +748,10 @@ namespace GameSystems
                     case DataKind.Scalar:
                         if (type == typeof(string)) return tree as string ?? Convert.ToString(tree, CultureInfo.InvariantCulture);
                         if (type == typeof(char)) return tree is string s && s.Length > 0 ? s[0] : '\0';
+                        if (type == typeof(DateTime)) return DateTime.Parse((string)tree, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+                        if (type == typeof(DateTimeOffset)) return DateTimeOffset.Parse((string)tree, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+                        if (type == typeof(TimeSpan)) return TimeSpan.ParseExact((string)tree, "c", CultureInfo.InvariantCulture);
+                        if (type == typeof(Guid)) return Guid.Parse((string)tree);
                         return Convert.ChangeType(tree, type, CultureInfo.InvariantCulture);
                     case DataKind.Enum:
                         if (tree is string enumName && Enum.IsDefined(type, enumName)) return Enum.Parse(type, enumName);
@@ -663,6 +773,15 @@ namespace GameSystems
                         if (tree is List<object> items)
                             for (int i = 0; i < items.Count; i++) list.Add(FromElement(items[i], info.ElementType, identity, warnings, $"{path}[{i}]"));
                         return list;
+                    }
+                    case DataKind.Collection:
+                    {
+                        var collection = Create(type);
+                        var values = new List<object>();
+                        if (tree is List<object> items)
+                            for (int i = 0; i < items.Count; i++) values.Add(FromElement(items[i], info.ElementType, identity, warnings, $"{path}[{i}]"));
+                        info.WriteItems(collection, values);
+                        return collection;
                     }
                     case DataKind.Dictionary:
                     {
@@ -731,9 +850,13 @@ namespace GameSystems
                 case float f: return f.ToString("0.##", CultureInfo.InvariantCulture);
                 case IFormattable number when TypeResolver.IsNumeric(value.GetType()): return number.ToString(null, CultureInfo.InvariantCulture);
                 case Enum e: return e.ToString();
+                case DateTime time: return time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                case TimeSpan span: return span.ToString("c", CultureInfo.InvariantCulture);
                 case ICollection collection: return $"{FriendlyName(value.GetType())} {collection.Count}개";
             }
             var info = Of(value.GetType());
+            if (info.Kind == DataKind.Collection) return $"{FriendlyName(value.GetType())} {info.ReadItems(value).Count}개";
+            if (info.Kind == DataKind.Scalar) return Convert.ToString(value, CultureInfo.InvariantCulture);
             if (info.Kind == DataKind.Reference) return value.ToString();
             // 이름처럼 보이는 필드가 있으면 그 값으로 부른다.
             var label = info.Fields.FirstOrDefault(f => f.Type == typeof(string) &&
@@ -746,6 +869,8 @@ namespace GameSystems
         public static string FriendlyName(Type type)
         {
             if (type.IsArray) return FriendlyName(type.GetElementType()) + "[]";
+            var underlying = Nullable.GetUnderlyingType(type);
+            if (underlying != null) return FriendlyName(underlying) + "?";
             if (!type.IsGenericType) return type.Name;
             var name = type.Name.Substring(0, type.Name.IndexOf('`'));
             return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(FriendlyName))}>";

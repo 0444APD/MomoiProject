@@ -48,14 +48,14 @@ namespace GameSystems.Tests
             var session = GameSystemsRuntime.Session;
             var runKills = session.Stats.Definitions.First(s => s.Scope == StatScope.Run).Id;
             var before = session.Stats.Get(runKills);
-            var totalBefore = session.State.GetCommitted(StateKeys.Stat(KillsTotal(session)));
+            var totalBefore = session.State.Get(StateKeys.Stat(KillsTotal(session)));
 
             session.Debug.All.First(c => c.Name == "오크 공격 ×10").Execute();
             Assert.Greater(session.State.UncommittedCount, 0);
             while (session.Undo()) { }
 
             Assert.AreEqual(before, session.Stats.Get(runKills));
-            Assert.AreEqual(totalBefore, session.State.GetCommitted(StateKeys.Stat(KillsTotal(session))), "확정 전 무른 행동은 누적에 남지 않는다");
+            Assert.AreEqual(totalBefore, session.State.Get(StateKeys.Stat(KillsTotal(session))), "확정 전 무른 행동은 누적에 남지 않는다");
         }
 
         static string KillsTotal(GameSession session) =>

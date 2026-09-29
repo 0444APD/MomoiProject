@@ -661,8 +661,6 @@ namespace GameSystems.EditorTools
                 var value = Gs.Label(StateStore.Format(_session.State.Get(key)));
                 value.style.width = 150;
                 row.Add(value);
-                if (_session.State.HasPending(key))
-                    row.Add(Gs.Label($"확정값 {StateStore.Format(_session.State.GetCommitted(key))}", "gs-caption"));
                 body.Add(row);
             }
             scroll.Add(panel);

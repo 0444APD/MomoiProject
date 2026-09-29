@@ -67,28 +67,28 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 세션_변화는_즉시_메타_변화는_확정_시_적용된다()
+        public void 세션과_메타_모두_즉시_반영되고_확정은_굳히기만_한다()
         {
             _session.Do(new TestKillAction());
             Assert.AreEqual(7, _session.State.GetNumber("s:hp"));
-            Assert.AreEqual(5, _session.State.GetNumber("m:gold"), "행동 중 읽기는 대기 중인 값을 본다");
-            Assert.AreEqual(0.0, _session.State.GetCommitted("m:gold"), "확정 전에는 메타에 반영되지 않는다");
+            Assert.AreEqual(5, _session.State.GetNumber("m:gold"), "메타도 즉시 반영된다");
             _session.Commit();
-            Assert.AreEqual(5.0, _session.State.GetCommitted("m:gold"));
+            Assert.AreEqual(5, _session.State.GetNumber("m:gold"));
+            Assert.IsFalse(_session.Undo(), "확정 후에는 무를 수 없다");
         }
 
         [Test]
-        public void 대기_중인_메타_변화는_누적되어_보인다()
+        public void 확정_전_변화는_누적되어_보인다()
         {
             _session.Do(new TestKillAction());
             _session.Do(new TestKillAction());
             Assert.AreEqual(10, _session.State.GetNumber("m:gold"));
             _session.Commit();
-            Assert.AreEqual(10.0, _session.State.GetCommitted("m:gold"));
+            Assert.AreEqual(10, _session.State.GetNumber("m:gold"));
         }
 
         [Test]
-        public void 무르기는_세션을_되돌리고_메타_대기분을_버린다()
+        public void 무르기는_세션과_메타를_함께_되돌린다()
         {
             _session.Do(new TestKillAction());
             _session.Do(new TestKillAction());
@@ -100,7 +100,7 @@ namespace GameSystems.Tests
             Assert.AreEqual(0, _session.State.GetNumber("m:gold"));
             Assert.IsFalse(_session.Undo(), "더 무를 행동이 없다");
             _session.Commit();
-            Assert.AreEqual(0.0, _session.State.GetCommitted("m:gold"), "무른 행동은 확정되지 않는다");
+            Assert.AreEqual(0, _session.State.GetNumber("m:gold"), "무른 행동은 확정되지 않는다");
         }
 
         [Test]

@@ -29,9 +29,8 @@ namespace GameSystems
         public ConditionWatcher(GameSession session)
         {
             _session = session;
-            // 확정된 변화와 확정 대기 중인 변화 모두에 반응한다(달성은 조건을 만족하는 순간 일어난다).
+            // 값이 바뀌는 즉시 반응한다(달성은 조건을 만족하는 순간 일어난다).
             session.State.Changed += OnStateChanged;
-            session.State.PendingChanged += OnStateChanged;
         }
 
         public int EvaluationCount { get; private set; }
