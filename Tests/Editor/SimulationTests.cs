@@ -55,7 +55,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 테스트_이벤트도_무를_수_있다()
+        public void 테스트_이벤트도_Undo할_수_있다()
         {
             _session.TrySimulateStat("kills", 5, out _, out _);
             Assert.AreEqual(5, _session.Stats.Get("kills"));

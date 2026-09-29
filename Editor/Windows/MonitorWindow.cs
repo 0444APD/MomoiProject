@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 
 namespace GameSystems.EditorTools
 {
-    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 수치, 행동(무르기), 디버그 명령.
+    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 수치, 행동(Undo), 디버그 명령.
     public sealed class MonitorWindow : EditorWindow
     {
         enum Tab
@@ -116,7 +116,7 @@ namespace GameSystems.EditorTools
             header.Add(Gs.Spacer());
             if (_session != null)
             {
-                var undo = new GsButton("무르기", UndoLast);
+                var undo = new GsButton("Undo", UndoLast);
                 undo.tooltip = _session.Options.History == HistoryMode.Snapshots
                     ? "마지막 스냅샷으로 되감습니다. 행동이 바꾼 값·시간이 돌아가고, 달성한 도전과제와 보상은 유지됩니다."
                     : "마지막 행동을 되돌립니다(몇 번이든 뒤에서부터). 행동이 바꾼 값이 돌아가고, 달성한 도전과제와 보상은 유지됩니다.";
@@ -233,7 +233,7 @@ namespace GameSystems.EditorTools
         }
 
         // ── 타임라인 ───────────────────────────────────────────
-        // 묶어 보기: 원인이 없는 기록(행동·무르기·되감기·시스템)을 한 줄로 두고, 그 때문에 일어난 기록을 아래에 접어 둔다.
+        // 묶어 보기: 원인이 없는 기록(행동·Undo·되감기·시스템)을 한 줄로 두고, 그 때문에 일어난 기록을 아래에 접어 둔다.
         // 행동 → 이벤트 → 수치 변화 → 달성 → 보상처럼 여러 단계로 이어지며, 단계마다 접고 펼칠 수 있다.
         // 시간순: 모든 기록을 최신순으로 평평하게 본다.
 
@@ -333,7 +333,7 @@ namespace GameSystems.EditorTools
                 _grouped = index == 0;
                 RefreshTimeline();
             };
-            mode.tooltip = "묶어 보기: 행동(또는 무르기·되감기) 한 줄 아래에 그로 인해 일어난 기록을 접어 둡니다.";
+            mode.tooltip = "묶어 보기: 행동(또는 Undo·되감기) 한 줄 아래에 그로 인해 일어난 기록을 접어 둡니다.";
             viewTools.Add(mode);
             viewTools.Add(Gs.HSpace(12));
             var expandAll = new GsButton("모두 펼치기", () =>
@@ -567,7 +567,7 @@ namespace GameSystems.EditorTools
                 case JournalKind.Event: return "이벤트";
                 case JournalKind.State: return "상태";
                 case JournalKind.Snapshot: return "스냅샷";
-                case JournalKind.Undo: return "무르기";
+                case JournalKind.Undo: return "Undo";
                 case JournalKind.Achievement: return "도전과제";
                 case JournalKind.Reward: return "보상";
                 case JournalKind.Warning: return "경고";
@@ -766,7 +766,7 @@ namespace GameSystems.EditorTools
                     else
                         ShowFeedback(error, GsNoticeKind.Warning);
                 }, GsButtonKind.Primary);
-                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 발생시킵니다.\n무르면 수치는 돌아가고 달성은 유지됩니다.";
+                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 발생시킵니다.\nUndo하면 수치는 돌아가고 달성은 유지됩니다.";
                 GsMotion.AddPressSpring(fill);
                 buttons.Add(fill);
             }
@@ -874,7 +874,7 @@ namespace GameSystems.EditorTools
             void UpdatePlan()
             {
                 fire.tooltip = EventSimulator.TryPlanForStat(_session.Stats, selected.Id, amountField.value, out var p, out var error)
-                    ? "발생할 이벤트: " + p.Description + "\n같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, 무를 수 있습니다."
+                    ? "발생할 이벤트: " + p.Description + "\n같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, Undo할 수 있습니다."
                     : error;
             }
             amountField.RegisterValueChangedCallback(e =>
@@ -1081,7 +1081,7 @@ namespace GameSystems.EditorTools
         {
             switch (_session.Options.History)
             {
-                case HistoryMode.Actions: return $"무를 수 있는 행동 {_session.UndoCount}";
+                case HistoryMode.Actions: return $"Undo할 수 있는 행동 {_session.UndoCount}";
                 case HistoryMode.Snapshots: return $"되감기 스냅샷 {_session.UndoCount} ({_session.Options.SnapshotInterval:0.##}초 간격)";
                 default: return "되돌리기 없음";
             }
@@ -1092,7 +1092,7 @@ namespace GameSystems.EditorTools
             var history = _session.State.History;
             var label = _session.Options.History == HistoryMode.Actions && history.Count > 0 ? history[history.Count - 1].Label : null;
             if (_session.Undo())
-                ShowFeedback((label != null ? $"무름: {label}" : "되감기") + "  ·  행동이 바꾼 값은 돌아가고 달성한 도전과제·보상은 유지", GsNoticeKind.Info);
+                ShowFeedback((label != null ? $"Undo됨: {label}" : "되감기") + "  ·  행동이 바꾼 값은 돌아가고 달성한 도전과제·보상은 유지", GsNoticeKind.Info);
             else
                 ShowFeedback(_session.Options.History == HistoryMode.None ? "이 세션은 되돌리기를 쓰지 않습니다(SessionOptions.History)." : "되돌릴 행동이 없습니다.", GsNoticeKind.Warning);
         }

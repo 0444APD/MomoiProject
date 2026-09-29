@@ -85,7 +85,7 @@ namespace GameSystems
         public virtual IEnumerable<Condition> Children => Array.Empty<Condition>();
     }
 
-    // 보상이 어디에 영향을 주는지. 도전과제 보상은 어느 쪽이든 무르기·되감기로 취소되지 않는다(달성과 같다).
+    // 보상이 어디에 영향을 주는지. 도전과제 보상은 어느 쪽이든 Undo·되감기로 취소되지 않는다(달성과 같다).
     public enum RewardEffect
     {
         // 게임 상태(저장소) 안에서만 일어난다.

@@ -7,7 +7,7 @@ namespace GameSystems
 {
     // Session: 게임 내용(이번 판). 판이 끝나면 사라진다.
     // Meta: 도전과제·누적 수치·인벤토리 같은 프로필 상태. 저장된다.
-    // 두 구역은 저장 여부만 다르고 쓰는 법·무르기 규칙은 같다.
+    // 두 구역은 저장 여부만 다르고 쓰는 법·Undo 규칙은 같다.
     public enum StateZone
     {
         Session,
@@ -29,7 +29,7 @@ namespace GameSystems
         public override string ToString() => Id;
     }
 
-    // 단순 값 하나의 변화(무르기용).
+    // 단순 값 하나의 변화(Undo용).
     public sealed class StateChange
     {
         public long TransactionId;
@@ -40,7 +40,7 @@ namespace GameSystems
     }
 
     // 데이터 값 하나가 한 행동 안에서 바뀐 기록. Before는 행동 전 첫 모습, After는 마지막 모습.
-    // 같은 행동 안에서 같은 값을 여러 번 고쳐도 기록은 하나로 합친다(무르기 메모리 절약).
+    // 같은 행동 안에서 같은 값을 여러 번 고쳐도 기록은 하나로 합친다(Undo 메모리 절약).
     public sealed class DataRecord
     {
         public string Key;
@@ -50,7 +50,7 @@ namespace GameSystems
         public List<DataChange> Changes = new List<DataChange>();
     }
 
-    // 행동 하나로 일어난 변화의 묶음. 무르기 한 단위.
+    // 행동 하나로 일어난 변화의 묶음. Undo 한 단위.
     public sealed class Transaction
     {
         public long Id;
@@ -62,7 +62,7 @@ namespace GameSystems
 
     // 모든 게임 상태가 사는 곳.
     //
-    // 규칙은 하나: 값은 바꾸는 즉시 반영된다. 행동은 실행되면 끝이고, 이력(History)에 쌓여 언제든 뒤에서부터 무를 수 있다.
+    // 규칙은 하나: 값은 바꾸는 즉시 반영된다. 행동은 실행되면 끝이고, 이력(History)에 쌓여 언제든 뒤에서부터 Undo할 수 있다.
     // 이력에 남지 않는 변화: 행동 밖의 변화, Permanent 안의 변화(도전과제 달성·보상처럼 되돌리지 않을 일).
     // 실시간 게임은 이력을 끄고(RecordHistory = false) 세션이 일정 간격 스냅샷으로 되감는다.
     //
@@ -70,7 +70,7 @@ namespace GameSystems
     // 리스트·배열·딕셔너리·집합·큐·스택(필드 깊이 무관). 모든 타입이 같은 문법을 쓴다.
     //   등록  Define(키, 구역, 기본값)          읽기  Get<T>(키)
     //   교체  Set(키, 값)                       부분 수정  Modify<T>(키, 값 => ...)   ← 클래스·컬렉션
-    // 데이터 값의 변화는 경로 단위로 기록되고(예: 인벤토리.items[#12].level 3 → 4), 무르면 게임 코드가 쥔
+    // 데이터 값의 변화는 경로 단위로 기록되고(예: 인벤토리.items[#12].level 3 → 4), Undo하면 게임 코드가 쥔
     // 인스턴스를 그대로 둔 채 제자리로 돌아간다. 컬렉션 요소에는 내부 ID가 자동으로 붙는다.
     // Modify를 거치지 않은 직접 수정은 DetectUntrackedChanges가 켜져 있으면 찾아내 경고한다.
     public sealed class StateStore : IInspectable
@@ -102,12 +102,12 @@ namespace GameSystems
         Transaction _active;
         long _nextTransactionId = 1;
 
-        // 값이 바뀌었을 때(무르기로 돌아갈 때 포함).
+        // 값이 바뀌었을 때(Undo로 돌아갈 때 포함).
         public event Action<string> Changed;
         // 데이터 값이 바뀌었을 때 바뀐 경로 목록과 함께.
         public event Action<string, IReadOnlyList<DataChange>> DataChanged;
         public event Action<Transaction> TransactionUndone;
-        // 이력 한도를 넘어 가장 오래된 행동이 무르기 대상에서 빠졌을 때.
+        // 이력 한도를 넘어 가장 오래된 행동이 Undo 대상에서 빠졌을 때.
         public event Action<Transaction> TransactionForgotten;
 
         public StateStore(Journal journal)
@@ -116,11 +116,11 @@ namespace GameSystems
         }
 
         public string InspectName => "상태";
-        // 무를 수 있는 행동 수와 목록(오래된 것부터).
+        // Undo할 수 있는 행동 수와 목록(오래된 것부터).
         public int HistoryCount => _history.Count;
         public IReadOnlyList<Transaction> History => _history;
         public bool InTransaction => _active != null;
-        // false면 행동을 이력에 남기지 않는다(실시간 게임: 스냅샷으로 되감음, 또는 무르기가 없는 게임).
+        // false면 행동을 이력에 남기지 않는다(실시간 게임: 스냅샷으로 되감음, 또는 Undo가 없는 게임).
         public bool RecordHistory = true;
         // 이력에 남길 최대 행동 수. 0이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 늘어난다).
         public int HistoryLimit;
@@ -328,7 +328,7 @@ namespace GameSystems
         }
 
         // 클래스·컬렉션의 일부를 바꾼다. 예: state.Modify<Inventory>("player:inventory", inv => inv.items[0].level++);
-        // 바뀐 곳을 찾아 경로로 기록하고, 행동 안이면 무르기 단위에 넣는다. 예외가 나면 바꾸기 전으로 되돌린다.
+        // 바뀐 곳을 찾아 경로로 기록하고, 행동 안이면 Undo 단위에 넣는다. 예외가 나면 바꾸기 전으로 되돌린다.
         public void Modify<T>(string key, Action<T> change) where T : class
         {
             if (change == null) throw new ArgumentNullException(nameof(change));
@@ -419,7 +419,7 @@ namespace GameSystems
             return string.IsNullOrEmpty(change.Path) ? $"{slot.Label}{text}" : $"{slot.Label}.{text}";
         }
 
-        // 마지막 기록 이후 Modify 없이 바뀐 곳이 있으면 받아들이고 경고를 남긴다(무르기·원인 기록에서는 빠진다).
+        // 마지막 기록 이후 Modify 없이 바뀐 곳이 있으면 받아들이고 경고를 남긴다(Undo·원인 기록에서는 빠진다).
         public int CheckUntrackedChanges()
         {
             int count = 0;
@@ -434,7 +434,7 @@ namespace GameSystems
             if (changes.Count == 0) return false;
             var where = changes[0].Path + (changes.Count > 1 ? $" 외 {changes.Count - 1}곳" : "");
             _lastEntry[key] = _journal.Append(JournalKind.Warning, "State",
-                $"'{slot.Label}'이(가) Modify를 거치지 않고 바뀌었습니다({where}). 무르기와 원인 기록에서 빠집니다. state.Modify(\"{key}\", …)로 바꾸세요.", key).Id;
+                $"'{slot.Label}'이(가) Modify를 거치지 않고 바뀌었습니다({where}). Undo와 원인 기록에서 빠집니다. state.Modify(\"{key}\", …)로 바꾸세요.", key).Id;
             slot.Shadow = CloneShadow(slot);
             Changed?.Invoke(key);
             DataChanged?.Invoke(key, changes);
@@ -457,7 +457,7 @@ namespace GameSystems
             var tx = _active;
             _active = null;
             if (!RecordHistory) return;
-            // 값이 바뀌지 않은 행동(빗나감 등)도 하나의 무르기 단위로 남긴다(난수 소비도 되돌려야 하므로).
+            // 값이 바뀌지 않은 행동(빗나감 등)도 하나의 Undo 단위로 남긴다(난수 소비도 되돌려야 하므로).
             _history.Add(tx);
             if (HistoryLimit > 0 && _history.Count > HistoryLimit)
             {
@@ -476,7 +476,7 @@ namespace GameSystems
             Revert(tx, "중단");
         }
 
-        // 이 안의 변화는 무르기 이력에 넣지 않는다(도전과제 달성·보상처럼 한 번 일어나면 되돌리지 않을 일).
+        // 이 안의 변화는 Undo 이력에 넣지 않는다(도전과제 달성·보상처럼 한 번 일어나면 되돌리지 않을 일).
         // 예: using (state.Permanent()) state.Set("achievement:first", true);
         public IDisposable Permanent() => new PermanentScope(this);
 
@@ -495,18 +495,18 @@ namespace GameSystems
             public void Dispose() => _store._active = _suspended;
         }
 
-        // 마지막 행동을 되돌린다. 이력에 남은 행동은 언제든(몇 번이든) 뒤에서부터 무를 수 있다.
+        // 마지막 행동을 되돌린다. 이력에 남은 행동은 언제든(몇 번이든) 뒤에서부터 Undo할 수 있다.
         public bool UndoLast()
         {
             if (_active != null)
-                throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 무를 수 없습니다.");
+                throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 Undo할 수 없습니다.");
             if (_history.Count == 0) return false;
 
             var tx = _history[_history.Count - 1];
             _history.RemoveAt(_history.Count - 1);
 
-            var entry = _journal.Append(JournalKind.Undo, "State", $"무르기: {tx.Label}", transactionId: tx.Id);
-            using (_journal.Cause(entry.Id)) Revert(tx, "무르기");
+            var entry = _journal.Append(JournalKind.Undo, "State", $"Undo: {tx.Label}", transactionId: tx.Id);
+            using (_journal.Cause(entry.Id)) Revert(tx, "Undo");
             TransactionUndone?.Invoke(tx);
             return true;
         }
@@ -566,7 +566,7 @@ namespace GameSystems
         }
 
         // 스냅샷(Export로 만든 트리)으로 되돌린다. 바뀐 곳은 기록하고 알린다(인스턴스·요소 ID 유지).
-        // 실시간 게임의 되감기가 쓴다. 이 되돌림은 무르기 이력에 남지 않는다.
+        // 실시간 게임의 되감기가 쓴다. 이 되돌림은 Undo 이력에 남지 않는다.
         public void Restore(Dictionary<string, object> tree, StateZone zone, string reason)
         {
             if (_active != null)
@@ -672,7 +672,7 @@ namespace GameSystems
                 node.Note = TypeText(slot);
             }
             foreach (var group in groups.Values) root.Children.Add(group);
-            root.Add("무를 수 있는 행동", _history.Count.ToString(CultureInfo.InvariantCulture));
+            root.Add("Undo할 수 있는 행동", _history.Count.ToString(CultureInfo.InvariantCulture));
         }
 
         // ── 도우미 ─────────────────────────────────────────────

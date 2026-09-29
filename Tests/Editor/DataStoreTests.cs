@@ -121,7 +121,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 무르면_같은_인스턴스가_제자리로_돌아온다()
+        public void Undo하면_같은_인스턴스가_제자리로_돌아온다()
         {
             Do(inv => inv.items.Add(Sword()));
             var sword = _inventory.items[0];
@@ -141,7 +141,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 제거를_무르면_빠졌던_인스턴스가_같은_ID로_돌아온다()
+        public void 제거를_Undo하면_빠졌던_인스턴스가_같은_ID로_돌아온다()
         {
             Do(inv =>
             {
@@ -397,7 +397,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 한_행동_안의_여러_수정은_무르기_기록_하나로_합친다()
+        public void 한_행동_안의_여러_수정은_Undo_기록_하나로_합친다()
         {
             Do(inv =>
             {

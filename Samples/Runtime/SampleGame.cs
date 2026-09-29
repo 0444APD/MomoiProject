@@ -36,7 +36,7 @@ namespace GameSystems.Samples
     // 샘플 연결: 세션이 시작되면 행동 처리기와 디버그 명령을 등록한다.
     public static class SampleGame
     {
-        // 게임 상태는 반드시 상태 저장소에 둔다(static 변수에 두면 무르기·되감기에서 빠진다).
+        // 게임 상태는 반드시 상태 저장소에 둔다(static 변수에 두면 Undo·되감기에서 빠진다).
         const string ComboKey = "sample:combo";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
@@ -57,7 +57,7 @@ namespace GameSystems.Samples
                 for (int i = 0; i < 10; i++) session.Do(new AttackAction { target = "오크" });
             });
             session.Debug.Register("샘플", "상자 열기", () => session.Do(new OpenChestAction()), "드롭 난수 스트림으로 골드를 얻습니다.");
-            session.Debug.Register("샘플", "무르기", () => session.Undo(), "마지막 행동을 되돌립니다(몇 번이든 뒤에서부터).");
+            session.Debug.Register("샘플", "Undo", () => session.Undo(), "마지막 행동을 되돌립니다(몇 번이든 뒤에서부터).");
         }
 
         static void Attack(GameSession session, AttackAction action)

@@ -6,7 +6,7 @@ namespace GameSystems
     // 되돌리기 방식.
     public enum HistoryMode
     {
-        // 행동마다 바뀐 값을 기록해 한 행동씩 무른다(턴제·퍼즐 등). 기본.
+        // 행동마다 바뀐 값을 기록해 한 행동씩 Undo한다(턴제·퍼즐 등). 기본.
         Actions,
         // 행동을 기록하지 않고 일정 간격 스냅샷을 쌓아 한 스냅샷씩 되감는다(실시간 게임).
         Snapshots,
@@ -20,7 +20,7 @@ namespace GameSystems
         public int JournalCapacity = 4096;
         // 되돌리기 방식. 어느 방식이든 게임 코드는 session.Undo() 하나로 되돌린다.
         public HistoryMode History = HistoryMode.Actions;
-        // Actions: 무를 수 있는 최대 행동 수. 0이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 늘어난다).
+        // Actions: Undo할 수 있는 최대 행동 수. 0이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 늘어난다).
         public int HistoryLimit;
         // Snapshots: 스냅샷 간격(게임 시간 초)과 보관 개수.
         public double SnapshotInterval = 1.0;
@@ -52,7 +52,7 @@ namespace GameSystems
         public SessionOptions Options { get; }
         public SaveMigrations Migrations => Options.Migrations;
 
-        // 행동별 실행 전 난수 상태. 무르면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, 무르기 악용 차단).
+        // 행동별 실행 전 난수 상태. Undo하면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, Undo 악용 차단).
         readonly Dictionary<long, Dictionary<string, ulong[]>> _randomBefore = new Dictionary<long, Dictionary<string, ulong[]>>();
 
         sealed class Snapshot
@@ -87,7 +87,7 @@ namespace GameSystems
             Achievements = new AchievementSystem(this);
             Debug = new DebugCommands();
 
-            // 테스트 이벤트는 게임 행동과 같은 경로로 처리된다(무르기·기록 동일).
+            // 테스트 이벤트는 게임 행동과 같은 경로로 처리된다(Undo·기록 동일).
             Actions.Register<SimulatedEventAction>(action =>
             {
                 foreach (var evt in action.Events) Events.PublishObject(evt);
@@ -103,7 +103,7 @@ namespace GameSystems
                 if (Options.History != HistoryMode.Actions) _randomBefore.Remove(record.TransactionId);
             };
 
-            Debug.Register("세션", "무르기 (Undo)", () => Undo(), "마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌립니다.");
+            Debug.Register("세션", "Undo (Undo)", () => Undo(), "마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌립니다.");
             Debug.Register("세션", "이번 판 수치 초기화", () => Stats.ResetRun());
         }
 
@@ -217,7 +217,7 @@ namespace GameSystems
             return true;
         }
 
-        // 도전과제 조건을 이벤트로 채운다. 필요한 이벤트 전체가 하나의 행동(무르기 단위)이 된다.
+        // 도전과제 조건을 이벤트로 채운다. 필요한 이벤트 전체가 하나의 행동(Undo 단위)이 된다.
         public bool TrySimulateAchievement(string achievementId, out string error)
         {
             if (!EventSimulator.TryPlanForAchievement(this, achievementId, out var steps, out error))

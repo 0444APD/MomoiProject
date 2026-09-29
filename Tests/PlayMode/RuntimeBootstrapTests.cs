@@ -17,7 +17,7 @@ namespace GameSystems.Tests
             Assert.IsNotNull(session, "런타임이 자동으로 시작되어야 한다");
             Assert.IsNotEmpty(session.Stats.Definitions, "데이터베이스의 수치가 정의되어야 한다");
             Assert.IsNotEmpty(session.Achievements.Definitions, "데이터베이스의 도전과제가 정의되어야 한다");
-            Assert.AreEqual(HistoryMode.Actions, session.Options.History, "샘플은 행동 단위 무르기를 쓴다");
+            Assert.AreEqual(HistoryMode.Actions, session.Options.History, "샘플은 행동 단위 Undo를 쓴다");
         }
 
         [UnityTest]
@@ -41,7 +41,7 @@ namespace GameSystems.Tests
         }
 
         [UnityTest]
-        public IEnumerator 무르기는_이번_판_수치를_되돌린다()
+        public IEnumerator Undo는_이번_판_수치를_되돌린다()
         {
             yield return null;
             var session = GameSystemsRuntime.Session;
@@ -55,7 +55,7 @@ namespace GameSystems.Tests
             for (int i = 0; i < 10; i++) session.Undo();
 
             Assert.AreEqual(before, session.Stats.Get(runKills));
-            Assert.AreEqual(totalBefore, session.State.Get(StateKeys.Stat(KillsTotal(session))), "무른 행동은 누적에 남지 않는다");
+            Assert.AreEqual(totalBefore, session.State.Get(StateKeys.Stat(KillsTotal(session))), "Undo한 행동은 누적에 남지 않는다");
         }
 
         static string KillsTotal(GameSession session) =>

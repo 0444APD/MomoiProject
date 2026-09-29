@@ -76,7 +76,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 무르기는_세션과_메타를_함께_되돌린다()
+        public void Undo는_세션과_메타를_함께_되돌린다()
         {
             _session.Do(new TestKillAction());
             _session.Do(new TestKillAction());
@@ -86,22 +86,22 @@ namespace GameSystems.Tests
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
             Assert.AreEqual(0, _session.State.GetNumber("m:gold"));
-            Assert.IsFalse(_session.Undo(), "더 무를 행동이 없다");
+            Assert.IsFalse(_session.Undo(), "더 Undo할 행동이 없다");
         }
 
         [Test]
-        public void 무르기는_되돌린_값마다_기록을_남기고_무르기_한_줄_아래로_묶인다()
+        public void Undo는_되돌린_값마다_기록을_남기고_Undo_한_줄_아래로_묶인다()
         {
             _session.Do(new TestKillAction());
             _session.Undo();
-            var undo = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Undo && e.Message.StartsWith("무르기: 테스트"));
+            var undo = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Undo && e.Message.StartsWith("Undo: 테스트"));
             var rollbacks = _session.Journal.Consequences(undo.Id);
             Assert.AreEqual(2, rollbacks.Count, "체력·골드 두 값의 롤백이 각각 기록된다");
             Assert.IsTrue(rollbacks.All(e => e.Kind == JournalKind.Undo && e.CauseId == undo.Id));
             Assert.IsTrue(rollbacks.Any(e => e.Message.Contains("체력") && e.Message.Contains("7 → 10")));
         }
         [Test]
-        public void 이미_한_행동은_언제든_무를_수_있다()
+        public void 이미_한_행동은_언제든_Undo할_수_있다()
         {
             for (int i = 0; i < 3; i++) _session.Do(new TestKillAction());
             _session.EndFrame(1);
@@ -113,7 +113,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 이력_한도를_넘으면_오래된_행동부터_무를_수_없게_된다()
+        public void 이력_한도를_넘으면_오래된_행동부터_Undo할_수_없게_된다()
         {
             var session = new GameSession(new SessionOptions { HistoryLimit = 2 });
             session.State.Define("s:n", StateZone.Session, 0);
@@ -153,7 +153,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 행동_상태는_무르기를_따라간다()
+        public void 행동_상태는_Undo를_따라간다()
         {
             var first = _session.Do(new TestKillAction());
             var second = _session.Do(new TestKillAction());
@@ -264,7 +264,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 무르면_난수도_되돌아가_같은_행동이_같은_결과를_낸다()
+        public void Undo하면_난수도_되돌아가_같은_행동이_같은_결과를_낸다()
         {
             var session = new GameSession(new SessionOptions { Seed = 3 });
             var rolls = new List<ulong>();
@@ -337,12 +337,12 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 무르기는_행동이_바꾼_값만_되돌리고_달성과_보상은_유지된다()
+        public void Undo는_행동이_바꾼_값만_되돌리고_달성과_보상은_유지된다()
         {
             Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
             _session.Do(new TestKillAction());
             _session.Undo();
-            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "한 번 달성한 것은 무르기로 취소되지 않는다");
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "한 번 달성한 것은 Undo로 취소되지 않는다");
             Assert.AreEqual(0, _session.Stats.Get("kills"), "행동이 바꾼 값은 되돌아간다");
             Assert.AreEqual(50, _session.Stats.Get("gold"), "보상은 유지된다");
             _session.Do(new TestKillAction());
@@ -350,7 +350,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 무르기를_반복해도_값은_쌓이지_않는다_파밍_차단()
+        public void Undo를_반복해도_값은_쌓이지_않는다_파밍_차단()
         {
             Achievement("hunter", AtLeast("kills", 3));
             for (int i = 0; i < 10; i++)
@@ -359,7 +359,7 @@ namespace GameSystems.Tests
                 _session.Undo();
             }
             Assert.AreEqual(0, _session.Stats.Get("kills"));
-            Assert.IsFalse(_session.Achievements.IsUnlocked("hunter"), "한 번의 행동으로 닿지 않는 목표는 무르기 반복으로 달성할 수 없다");
+            Assert.IsFalse(_session.Achievements.IsUnlocked("hunter"), "한 번의 행동으로 닿지 않는 목표는 Undo 반복으로 달성할 수 없다");
         }
 
         [Test]

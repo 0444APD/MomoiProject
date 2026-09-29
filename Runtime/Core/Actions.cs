@@ -29,7 +29,7 @@ namespace GameSystems
     {
         // 실행됨(행동은 실행되는 즉시 끝난다).
         Done,
-        // 무르기·되감기로 되돌려짐.
+        // Undo·되감기로 되돌려짐.
         Undone,
         // 실행 중 오류로 변경이 모두 취소됨.
         Failed,
@@ -162,7 +162,7 @@ namespace GameSystems
             switch (status)
             {
                 case ActionStatus.Done: return "실행";
-                case ActionStatus.Undone: return "무름";
+                case ActionStatus.Undone: return "Undo됨";
                 default: return "실패";
             }
         }
