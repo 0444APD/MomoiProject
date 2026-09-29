@@ -400,6 +400,8 @@ namespace GameSystems.EditorTools.UI
                 // 문장 블록: 겉패널 없이 한 줄. [단어] 패널마다 클릭해 바꾸고, 바꾸기·삭제는 마우스를 올리면 오른쪽 끝에.
                 AddToClassList("gs-block-line");
                 var line = Gs.Box("gs-block-line__row");
+                // 식은 코드처럼, 뜻은 마우스를 올리면 문장으로.
+                line.tooltip = Explain(value);
                 var words = GsPropertyEditor.Sentence(property, sentence, used, onValue);
                 words.AddToClassList("gs-grow");
                 line.Add(words);
@@ -415,8 +417,15 @@ namespace GameSystems.EditorTools.UI
                 var header = Gs.Box("gs-block__header");
                 var chevron = Gs.Label(collapsed ? "▸" : "▾", "gs-block__chevron");
                 header.Add(chevron);
+                var keyword = BlockTypes.Keyword(type);
+                if (!string.IsNullOrEmpty(keyword))
+                {
+                    var token = Gs.Label(keyword, "gs-token", "gs-token--keyword");
+                    token.tooltip = Explain(value);
+                    header.Add(token);
+                }
                 var children = (value as Condition)?.Children.Count() ?? (value as ValueFilter)?.Children.Count() ?? 0;
-                header.Add(Gs.Label(BlockTypes.DisplayName(type) + (children > 0 ? $"  ·  {children}개" : ""), "gs-caption"));
+                header.Add(Gs.Label((string.IsNullOrEmpty(keyword) ? BlockTypes.DisplayName(type) : "") + (children > 0 ? $"  {children}개" : ""), "gs-caption"));
                 var summary = Gs.Label(collapsed ? Summary(value) : "", "gs-caption", "gs-nowrap", "gs-block__summary");
                 summary.style.display = collapsed ? DisplayStyle.Flex : DisplayStyle.None;
                 header.Add(summary);
@@ -463,6 +472,9 @@ namespace GameSystems.EditorTools.UI
             button.tooltip = tip;
             return button;
         }
+
+        static string Explain(object value) =>
+            value is Condition condition ? condition.Explain(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Explain() : "";
 
         static string Summary(object value) =>
             value is Condition condition ? condition.Describe(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Describe() : "";

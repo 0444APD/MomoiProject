@@ -12,6 +12,8 @@ namespace GameSystems
         public string Description { get; set; }
         // 편집 화면의 한 줄 문장. {필드이름}은 클릭해 바꾸는 단어, 나머지는 고정 글자. 예: "{stat} {value} {op}"
         public string Sentence { get; set; }
+        // 묶음 블록의 코드식 표시(AND·OR·NOT).
+        public string Keyword { get; set; }
 
         public BlockInfoAttribute(string displayName)
         {
@@ -67,6 +69,9 @@ namespace GameSystems
         public abstract void CollectDependencies(ICollection<string> stateKeys);
         public abstract string Describe(INameResolver names);
 
+        // 마우스를 올렸을 때 보이는 설명 문장(없으면 Describe).
+        public virtual string Explain(INameResolver names) => Describe(names);
+
         // 시간 기반 조건만 0보다 크게 선언한다(초 단위 확인 주기).
         public virtual double PollInterval => 0;
 
@@ -100,6 +105,9 @@ namespace GameSystems
     {
         public abstract void Grant(GameSession session);
         public abstract string Describe(INameResolver names);
+
+        // 마우스를 올렸을 때 보이는 설명 문장(없으면 Describe).
+        public virtual string Explain(INameResolver names) => Describe(names);
         public abstract RewardEffect Effect { get; }
 
         public virtual void Validate(IValidationContext context)
@@ -110,23 +118,23 @@ namespace GameSystems
     public enum CompareOp
     {
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("이상")]
+        [UnityEngine.InspectorName(">=")]
 #endif
         AtLeast,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("이하")]
+        [UnityEngine.InspectorName("<=")]
 #endif
         AtMost,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("초과")]
+        [UnityEngine.InspectorName(">")]
 #endif
         GreaterThan,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("미만")]
+        [UnityEngine.InspectorName("<")]
 #endif
         LessThan,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("일치")]
+        [UnityEngine.InspectorName("==")]
 #endif
         Equal,
     }
@@ -146,6 +154,32 @@ namespace GameSystems
             }
         }
 
+        // 코드처럼 보이는 기호: 처치 수 >= 100
+        public static string Symbol(CompareOp op)
+        {
+            switch (op)
+            {
+                case CompareOp.AtLeast: return ">=";
+                case CompareOp.AtMost: return "<=";
+                case CompareOp.GreaterThan: return ">";
+                case CompareOp.LessThan: return "<";
+                default: return "==";
+            }
+        }
+
+        // 설명 문장: "처치 수가 100 이상이라면"
+        public static string Natural(string left, CompareOp op, string right)
+        {
+            switch (op)
+            {
+                case CompareOp.AtLeast: return $"{Josa.IGa(left)} {right} 이상이라면";
+                case CompareOp.AtMost: return $"{Josa.IGa(left)} {right} 이하라면";
+                case CompareOp.GreaterThan: return $"{Josa.IGa(left)} {right}보다 크다면";
+                case CompareOp.LessThan: return $"{Josa.IGa(left)} {right}보다 작다면";
+                default: return $"{Josa.IGa(left)} {right}{Josa.RaMyeon(right)}";
+            }
+        }
+
         // 문장에 쓰는 말: "처치 수 100 이상"
         public static string Word(CompareOp op)
         {
@@ -158,5 +192,23 @@ namespace GameSystems
                 default: return "일치";
             }
         }
+    }
+
+    // 한국어 조사: 앞 글자의 받침에 맞춰 이/가, 을/를, 와/과, (이)라면.
+    public static class Josa
+    {
+        static bool? HasFinal(string word)
+        {
+            if (string.IsNullOrEmpty(word)) return null;
+            var c = word.TrimEnd()[word.TrimEnd().Length - 1];
+            if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28 != 0;
+            if (char.IsDigit(c)) return "013678".IndexOf(c) >= 0;
+            return null;
+        }
+
+        public static string IGa(string word) => word + (HasFinal(word) switch { true => "이", false => "가", _ => "(이)가" });
+        public static string EulReul(string word) => word + (HasFinal(word) switch { true => "을", false => "를", _ => "을(를)" });
+        public static string WaGwa(string word) => word + (HasFinal(word) switch { true => "과", false => "와", _ => "와(과)" });
+        public static string RaMyeon(string word) => HasFinal(word) switch { true => "이라면", false => "라면", _ => "(이)라면" };
     }
 }

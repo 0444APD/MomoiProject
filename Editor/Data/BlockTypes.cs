@@ -26,6 +26,7 @@ namespace GameSystems.EditorTools
         public static string Description(Type type) => type.GetCustomAttribute<BlockInfoAttribute>()?.Description;
 
         public static string Sentence(Type type) => type.GetCustomAttribute<BlockInfoAttribute>()?.Sentence;
+        public static string Keyword(Type type) => type.GetCustomAttribute<BlockInfoAttribute>()?.Keyword;
 
         [UnityEditor.Callbacks.DidReloadScripts]
         static void ClearTypeCache() => TypeResolver.ClearCache();

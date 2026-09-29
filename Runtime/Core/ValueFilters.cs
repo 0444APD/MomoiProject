@@ -16,17 +16,20 @@ namespace GameSystems
     public abstract class ValueFilter
     {
         public abstract bool Test(object root);
+        // 코드처럼 보이는 식(요약·기록용): 등급 >= 3 && (태그 contains boss || !(이름 == 활))
         public abstract string Describe();
+        // 마우스를 올렸을 때 보이는 설명 문장.
+        public virtual string Explain() => Describe();
         public virtual IEnumerable<ValueFilter> Children => Array.Empty<ValueFilter>();
 
         // root 타입 기준 검증. 문제는 errors에 문장으로.
         public abstract void Validate(Type root, List<string> errors);
 
-        public static string DescribeOrAll(ValueFilter filter) => filter == null ? "항상" : filter.Describe();
+        public static string DescribeOrAll(ValueFilter filter) => filter == null ? "true" : filter.Describe();
     }
 
     [Serializable]
-    [BlockInfo("필드 검사", Category = "필드", Description = "필드 하나를 비교합니다.", Sentence = "{path} {value} {op}")]
+    [BlockInfo("필드 검사", Category = "필드", Description = "필드 하나를 비교합니다.", Sentence = "{path} {op} {value}")]
     public sealed class FieldFilter : ValueFilter
     {
         [FieldPath, FieldLabel("필드")] public string path = "";
@@ -35,7 +38,8 @@ namespace GameSystems
 
         public override bool Test(object root) => FieldOps.Test(root, path, op, value);
 
-        public override string Describe() => FieldOps.Sentence(PathLabel(path), op, value);
+        public override string Describe() => FieldOps.Code(PathLabel(path), op, value);
+        public override string Explain() => FieldOps.Natural(PathLabel(path), op, value);
 
         public static string PathLabel(string path) =>
             string.IsNullOrEmpty(path) ? "(필드 없음)" : path.Replace("[]", "의 각 항목").Replace(".", " › ");
@@ -61,7 +65,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("모두 만족", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).")]
+    [BlockInfo("모두 만족", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).", Keyword = "AND")]
     public sealed class AllFilter : ValueFilter
     {
 #if UNITY_2020_1_OR_NEWER
@@ -71,7 +75,8 @@ namespace GameSystems
 
         public override IEnumerable<ValueFilter> Children => filters.Where(f => f != null);
         public override bool Test(object root) => Children.All(f => f.Test(root));
-        public override string Describe() => Children.Any() ? "(" + string.Join(" 그리고 ", Children.Select(f => f.Describe())) + ")" : "(비어 있음: 항상 참)";
+        public override string Describe() => Children.Any() ? "(" + string.Join(" && ", Children.Select(f => f.Describe())) + ")" : "true";
+        public override string Explain() => "아래 조건을 모두 만족한다면";
 
         public override void Validate(Type root, List<string> errors)
         {
@@ -80,7 +85,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("하나라도 만족", Category = "논리", Description = "안의 조건 중 하나만 만족해도 됩니다(또는).")]
+    [BlockInfo("하나라도 만족", Category = "논리", Description = "안의 조건 중 하나만 만족해도 됩니다(또는).", Keyword = "OR")]
     public sealed class AnyFilter : ValueFilter
     {
 #if UNITY_2020_1_OR_NEWER
@@ -90,7 +95,8 @@ namespace GameSystems
 
         public override IEnumerable<ValueFilter> Children => filters.Where(f => f != null);
         public override bool Test(object root) => Children.Any(f => f.Test(root));
-        public override string Describe() => Children.Any() ? "(" + string.Join(" 또는 ", Children.Select(f => f.Describe())) + ")" : "(비어 있음: 항상 거짓)";
+        public override string Describe() => Children.Any() ? "(" + string.Join(" || ", Children.Select(f => f.Describe())) + ")" : "false";
+        public override string Explain() => "아래 조건 중 하나라도 만족한다면";
 
         public override void Validate(Type root, List<string> errors)
         {
@@ -100,7 +106,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("아님", Category = "논리", Description = "안의 조건이 거짓일 때 참입니다.")]
+    [BlockInfo("아님", Category = "논리", Description = "안의 조건이 거짓일 때 참입니다.", Keyword = "NOT")]
     public sealed class NotFilter : ValueFilter
     {
 #if UNITY_2020_1_OR_NEWER
@@ -110,7 +116,8 @@ namespace GameSystems
 
         public override IEnumerable<ValueFilter> Children => filter == null ? Array.Empty<ValueFilter>() : new[] { filter };
         public override bool Test(object root) => filter == null || !filter.Test(root);
-        public override string Describe() => $"아님({DescribeOrAll(filter)})";
+        public override string Describe() => $"!({DescribeOrAll(filter)})";
+        public override string Explain() => "아래 조건을 만족하지 않는다면";
 
         public override void Validate(Type root, List<string> errors)
         {
@@ -122,27 +129,27 @@ namespace GameSystems
     public enum ElementMode
     {
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("하나라도")]
+        [UnityEngine.InspectorName("any")]
 #endif
         Any,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("모두")]
+        [UnityEngine.InspectorName("all")]
 #endif
         All,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("하나도 없음")]
+        [UnityEngine.InspectorName("none")]
 #endif
         None,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("개 이상")]
+        [UnityEngine.InspectorName("count >=")]
 #endif
         CountAtLeast,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("개 이하")]
+        [UnityEngine.InspectorName("count <=")]
 #endif
         CountAtMost,
 #if UNITY_2020_1_OR_NEWER
-        [UnityEngine.InspectorName("개")]
+        [UnityEngine.InspectorName("count ==")]
 #endif
         CountEqual,
     }
@@ -151,7 +158,7 @@ namespace GameSystems
     // 예: 아이템 중 [태그 boss 포함 그리고 등급 3 이상]인 것이 2개 이상
     [Serializable]
     [BlockInfo("목록 항목 검사", Category = "목록", Description = "목록의 각 항목에 조건을 적용해, 만족하는 항목이 하나라도·모두·없음·N개인지 봅니다.",
-               Sentence = "{path} 중 조건을 만족하는 항목이 {count} {mode}")]
+               Sentence = "{path} {mode} {count}")]
     public sealed class ElementFilter : ValueFilter
     {
         [FieldPath, FieldPathScope, FieldLabel("목록")] public string path = "";
@@ -181,15 +188,29 @@ namespace GameSystems
 
         public override string Describe()
         {
-            var what = $"{FieldFilter.PathLabel(path)} 중 [{DescribeOrAll(filter)}]인 항목이";
+            var inner = $"{FieldFilter.PathLabel(path)}: {DescribeOrAll(filter)}";
             switch (mode)
             {
-                case ElementMode.Any: return $"{what} 하나라도 있음";
-                case ElementMode.All: return $"{FieldFilter.PathLabel(path)}의 모든 항목이 [{DescribeOrAll(filter)}]";
-                case ElementMode.None: return $"{what} 없음";
-                case ElementMode.CountAtLeast: return $"{what} {count}개 이상";
-                case ElementMode.CountAtMost: return $"{what} {count}개 이하";
-                default: return $"{what} {count}개";
+                case ElementMode.Any: return $"any({inner})";
+                case ElementMode.All: return $"all({inner})";
+                case ElementMode.None: return $"none({inner})";
+                case ElementMode.CountAtLeast: return $"count({inner}) >= {count}";
+                case ElementMode.CountAtMost: return $"count({inner}) <= {count}";
+                default: return $"count({inner}) == {count}";
+            }
+        }
+
+        public override string Explain()
+        {
+            var what = $"{FieldFilter.PathLabel(path)}의 항목 중 아래 조건을 만족하는 것이";
+            switch (mode)
+            {
+                case ElementMode.Any: return $"{what} 하나라도 있다면";
+                case ElementMode.All: return $"{FieldFilter.PathLabel(path)}의 모든 항목이 아래 조건을 만족한다면";
+                case ElementMode.None: return $"{what} 하나도 없다면";
+                case ElementMode.CountAtLeast: return $"{what} {count}개 이상이라면";
+                case ElementMode.CountAtMost: return $"{what} {count}개 이하라면";
+                default: return $"{what} {count}개라면";
             }
         }
 

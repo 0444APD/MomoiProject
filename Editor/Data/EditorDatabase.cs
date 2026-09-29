@@ -239,6 +239,22 @@ namespace GameSystems.EditorTools
             return usages.Count;
         }
 
+        // 프로젝트에서 프리팹 에셋을 지우면 그 프리팹을 가리키던 도감 항목도 지운다(연결만 남은 빈 항목이 생기지 않게).
+        public int RemoveOrphanPrefabEntries()
+        {
+            int removed = 0;
+            foreach (var entry in OfType<PrefabData>().ToList())
+            {
+                if (entry.prefab != null || string.IsNullOrEmpty(entry.PrefabGuid)) continue;
+                if (!string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(entry.PrefabGuid))) continue;
+                AssetDatabase.MoveAssetToTrash(AssetDatabase.GetAssetPath(entry));
+                Debug.Log($"[GameSystems] 프리팹이 지워져 도감 항목 '{entry.DisplayName}'을(를) 정리했습니다.");
+                removed++;
+            }
+            if (removed > 0) MarkDirty();
+            return removed;
+        }
+
         // ID 없는 항목(Create 메뉴로 만든 것 등)에 ID를 부여하고, 런타임용 GameDatabase 목록을 맞춘다.
         public void Sync()
         {
@@ -290,7 +306,7 @@ namespace GameSystems.EditorTools
 
         static void OnPostprocessAllAssets(string[] imported, string[] deleted, string[] moved, string[] movedFrom)
         {
-            bool relevant = deleted.Any(p => p.EndsWith(".asset", StringComparison.OrdinalIgnoreCase)) ||
+            bool relevant = deleted.Any(p => p.EndsWith(".asset", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase)) ||
                             imported.Concat(moved).Any(p => p.EndsWith(".asset", StringComparison.OrdinalIgnoreCase) &&
                                                             typeof(GameData).IsAssignableFrom(AssetDatabase.GetMainAssetTypeAtPath(p)));
             if (!relevant || _scheduled) return;
@@ -298,6 +314,7 @@ namespace GameSystems.EditorTools
             EditorApplication.delayCall += () =>
             {
                 _scheduled = false;
+                EditorDatabase.Instance.RemoveOrphanPrefabEntries();
                 EditorDatabase.Instance.Sync();
             };
         }

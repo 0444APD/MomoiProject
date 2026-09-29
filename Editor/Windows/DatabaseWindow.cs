@@ -488,7 +488,15 @@ namespace GameSystems.EditorTools
             };
             options.Actions.Add(("에셋 위치", _ => EditorGUIUtility.PingObject(item)));
             options.Actions.Add(("ID 바꾸기", panel => RenameId(item, panel)));
-            options.Actions.Add(("삭제", panel => Delete(item, panel)));
+            if (item is PrefabData prefabEntry)
+            {
+                // 프리팹은 도감에서 지우지 않는다. 프로젝트 창의 프리팹으로 이동해 거기서 지운다(항목은 자동 정리).
+                options.Actions.Add(("프로젝트에서 보기", _ => ShowInProject(prefabEntry.prefab)));
+            }
+            else
+            {
+                options.Actions.Add(("삭제", panel => Delete(item, panel)));
+            }
             GsDetailPanel.Open(_root, item, options);
         }
 
@@ -512,7 +520,7 @@ namespace GameSystems.EditorTools
                     var rewards = achievement.rewards.Where(r => r != null).Select(r => r.Describe(names)).ToList();
                     return new List<(string, string)>
                     {
-                        ("조건", achievement.condition != null ? $"{achievement.condition.Describe(names)} 달성 시" : "조건 없음"),
+                        ("조건", achievement.condition != null ? achievement.condition.Describe(names) : "조건 없음"),
                         ("보상", rewards.Count > 0 ? string.Join(",  ", rewards) : "없음"),
                     };
                 case StatData stat:
@@ -525,8 +533,26 @@ namespace GameSystems.EditorTools
             }
             return null;
         }
+        static void ShowInProject(UnityEngine.Object asset)
+        {
+            if (asset == null)
+            {
+                Debug.LogWarning("[GameSystems] 연결된 프리팹이 없습니다.");
+                return;
+            }
+            EditorUtility.FocusProjectWindow();
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+        }
+
         void Delete(GameData item, GsDetailPanel panel)
         {
+            if (item is PrefabData)
+            {
+                GsDialog.Show(_root, "도감에서 지울 수 없습니다", "프리팹은 프로젝트 창에서 직접 지우세요. '프로젝트에서 보기'로 이동할 수 있고, 프리팹을 지우면 이 항목도 자동으로 정리됩니다.", null,
+                    new DialogButton("확인", GsButtonKind.Primary, null));
+                return;
+            }
             // 어딘가에서 가리키는 항목은 지우지 못하게 막고 사용처를 보여 준다(지우면 끊긴 참조가 생긴다).
             var usages = EditorDatabase.Instance.FindUsages(item);
             if (usages.Count > 0)

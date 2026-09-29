@@ -216,6 +216,55 @@ namespace GameSystems
         public static string Sentence(string pathLabel, FieldOp op, string value) =>
             NeedsValue(op) ? $"{pathLabel} {value} {Word(op)}" : $"{pathLabel} {Word(op)}";
 
+        // 코드처럼 보이는 기호: 등급 >= 3, 태그 contains boss
+        public static string Symbol(FieldOp op)
+        {
+            switch (op)
+            {
+                case FieldOp.Equal: return "==";
+                case FieldOp.NotEqual: return "!=";
+                case FieldOp.AtLeast: return ">=";
+                case FieldOp.AtMost: return "<=";
+                case FieldOp.Greater: return ">";
+                case FieldOp.Less: return "<";
+                case FieldOp.IsTrue: return "== true";
+                case FieldOp.IsFalse: return "== false";
+                case FieldOp.Contains: return "contains";
+                case FieldOp.NotContains: return "!contains";
+                case FieldOp.CountAtLeast: return "count >=";
+                case FieldOp.CountAtMost: return "count <=";
+                case FieldOp.CountEqual: return "count ==";
+                case FieldOp.IsEmpty: return "is empty";
+                default: return "is not empty";
+            }
+        }
+
+        public static string Code(string pathLabel, FieldOp op, string value) =>
+            NeedsValue(op) ? $"{pathLabel} {Symbol(op)} {value}" : $"{pathLabel} {Symbol(op)}";
+
+        // 설명 문장: "등급이 3 이상이라면", "태그에 boss를 포함한다면"
+        public static string Natural(string pathLabel, FieldOp op, string value)
+        {
+            switch (op)
+            {
+                case FieldOp.AtLeast: return $"{Josa.IGa(pathLabel)} {value} 이상이라면";
+                case FieldOp.AtMost: return $"{Josa.IGa(pathLabel)} {value} 이하라면";
+                case FieldOp.Greater: return $"{Josa.IGa(pathLabel)} {value}보다 크다면";
+                case FieldOp.Less: return $"{Josa.IGa(pathLabel)} {value}보다 작다면";
+                case FieldOp.Equal: return $"{Josa.IGa(pathLabel)} {value}{Josa.RaMyeon(value)}";
+                case FieldOp.NotEqual: return $"{Josa.IGa(pathLabel)} {Josa.IGa(value)} 아니라면";
+                case FieldOp.IsTrue: return $"{Josa.IGa(pathLabel)} 참이라면";
+                case FieldOp.IsFalse: return $"{Josa.IGa(pathLabel)} 거짓이라면";
+                case FieldOp.Contains: return $"{pathLabel}에 {Josa.IGa(value)} 들어 있다면";
+                case FieldOp.NotContains: return $"{pathLabel}에 {Josa.IGa(value)} 없다면";
+                case FieldOp.CountAtLeast: return $"{pathLabel}의 개수가 {value} 이상이라면";
+                case FieldOp.CountAtMost: return $"{pathLabel}의 개수가 {value} 이하라면";
+                case FieldOp.CountEqual: return $"{pathLabel}의 개수가 {value}개라면";
+                case FieldOp.IsEmpty: return $"{Josa.IGa(pathLabel)} 비어 있다면";
+                default: return $"{Josa.IGa(pathLabel)} 비어 있지 않다면";
+            }
+        }
+
         // 경로의 값들이 조건을 만족하는지. 값이 여러 개([] 경로)면 하나라도 만족하면 참(개수·비어 있음은 전체 기준).
         public static bool Test(object root, string path, FieldOp op, string value)
         {

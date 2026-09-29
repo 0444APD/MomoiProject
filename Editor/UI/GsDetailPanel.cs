@@ -23,7 +23,7 @@ namespace GameSystems.EditorTools.UI
         public string FocusPath;
         // 편집 중 사본을 검증해 (오류 여부, 문장) 목록을 돌려준다.
         public Func<UnityEngine.Object, List<(bool error, string message)>> Validate;
-        // 제목 아래 요약: (머리말, 내용) 줄 목록. 예: ("조건", "처치 수 1 이상 달성 시"), ("보상", "골드 50 획득").
+        // 제목 아래 요약: (머리말, 내용) 줄 목록. 예: ("조건", "처치 수 >= 1"), ("보상", "골드 50 획득").
         // 편집 중 사본으로 계산해 바로 갱신된다.
         public Func<UnityEngine.Object, IList<(string label, string text)>> Summary;
         public List<(string label, Action<GsDetailPanel> action)> Actions = new List<(string, Action<GsDetailPanel>)>();

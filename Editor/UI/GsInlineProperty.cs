@@ -91,7 +91,7 @@ namespace GameSystems.EditorTools.UI
             if (field == null) field = PropertyUtil.GetField(property, out _);
             var db = EditorDatabase.Instance;
             if (field != null && field.IsDefined(typeof(FieldOpRefAttribute), false) && property.propertyType == SerializedPropertyType.Enum)
-                return (FieldOps.Word((FieldOp)property.intValue), false, false);
+                return (FieldOps.Symbol((FieldOp)property.intValue), false, false);
             if (field != null && field.IsDefined(typeof(FieldPathAttribute), false) && property.propertyType == SerializedPropertyType.String)
             {
                 if (string.IsNullOrEmpty(property.stringValue)) return ("필드 선택", true, false);
@@ -328,12 +328,12 @@ namespace GameSystems.EditorTools.UI
             var path = PathSibling(attr.PathField);
             var type = path == null ? null : FieldPathContext.LeafType(path, out _);
             var ops = type == null ? (IReadOnlyList<FieldOp>)Enum.GetValues(typeof(FieldOp)).Cast<FieldOp>().ToList() : FieldOps.For(type);
-            var items = ops.Select(op => new GsDropdownItem(FieldOps.Word(op), () =>
+            var items = ops.Select(op => new GsDropdownItem(FieldOps.Symbol(op), () =>
             {
                 _property.serializedObject.Update();
                 _property.intValue = (int)op;
                 Apply();
-            }) { Selected = _property.intValue == (int)op }).ToList();
+            }) { Caption = FieldOps.Word(op), Selected = _property.intValue == (int)op }).ToList();
             if (type == null) items.Insert(0, new GsDropdownItem("필드를 먼저 고르면 맞는 비교만 보입니다") { Disabled = true });
             GsDropdown.Show(this, items);
         }

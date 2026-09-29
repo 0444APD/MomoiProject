@@ -456,7 +456,7 @@ namespace GameSystems.Tests
         public void 조건_문장은_이름을_채운다()
         {
             var condition = new AllOfCondition { conditions = { AtLeast("kills", 100), new AchievementUnlockedCondition { achievement = "x" } } };
-            Assert.AreEqual("처치 수 100 이상 그리고 x 달성", condition.Describe(_session));
+            Assert.AreEqual("처치 수 >= 100 && x 달성", condition.Describe(_session));
         }
     }
 

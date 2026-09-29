@@ -232,9 +232,14 @@ namespace GameSystems.EditorTools.UI
             AddListTools(here);
         }
 
-        // 목록 폴더: 맨 아래 '+ 추가'(요소 형식의 기본값으로).
+        // 목록 폴더: 맨 아래 '+ 추가'(요소 형식의 기본값으로). 딕셔너리는 키를 먼저 정한다.
         void AddListTools(Crumb here)
         {
+            if (_browse && here.Apply != null && here.Value is IDictionary map)
+            {
+                AddDictionaryTools(here, map);
+                return;
+            }
             if (!_browse || here.Apply == null || !(here.Value is IList list) || list.IsFixedSize) return;
             var elementType = FieldPaths.ElementTypeOf(here.Value.GetType());
             if (elementType == null) return;
@@ -311,10 +316,13 @@ namespace GameSystems.EditorTools.UI
             var elementType = FieldPaths.ElementTypeOf(value.GetType());
             if (value is IDictionary map)
             {
+                // 딕셔너리: 한 요소 = 한 줄([키] 값). 값은 바로 고치고, 요소는 빼거나 새 키로 더한다.
                 foreach (DictionaryEntry pair in map)
                 {
                     var key = pair.Key;
-                    list.Add(ValueEntry($"[{pair.Key}]", pair.Value, elementType ?? pair.Value?.GetType(), here.Member, v => map[key] = v, null));
+                    var entry = ValueEntry($"[{ValueChoices.Display(here.Member, key)}]", pair.Value, elementType ?? pair.Value?.GetType(), null, v => map[key] = v, null);
+                    entry.Remove = () => map.Remove(key);
+                    list.Add(entry);
                 }
                 return list;
             }
@@ -371,6 +379,81 @@ namespace GameSystems.EditorTools.UI
         }
 
         Action<Action> ApplyFor(Entry entry) => entry.Apply ?? _trail[_trail.Count - 1].Apply;
+
+        void AddDictionaryTools(Crumb here, IDictionary map)
+        {
+            var types = here.Value.GetType().GetInterfaces().Concat(new[] { here.Value.GetType() })
+                .FirstOrDefault(t => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IDictionary<,>))?.GetGenericArguments();
+            if (types == null) return;
+            var keyType = types[0];
+            var valueType = types[1];
+
+            void AddWithKey(object key)
+            {
+                if (key == null || map.Contains(key)) return;
+                object value;
+                try
+                {
+                    value = valueType == typeof(string) ? "" : valueType.IsValueType ? Activator.CreateInstance(valueType) :
+                            valueType.IsAbstract || valueType.IsInterface ? null : DataModel.Create(valueType);
+                }
+                catch (Exception)
+                {
+                    value = null;
+                }
+                here.Apply(() => map.Add(key, value));
+                Changed?.Invoke();
+                Refresh();
+            }
+
+            GsButton add = null;
+            add = new GsButton("+ 키 추가", () =>
+            {
+                // 키가 enum이거나 ID 참조면 목록에서 고르고(이미 있는 키는 제외), 아니면 글자로 입력한다.
+                var choices = ValueChoices.For(here.Member, keyType);
+                if (choices != null)
+                {
+                    var items = choices.Where(c => !map.Contains(c.Value)).Select(c => new GsDropdownItem(c.Label, () => AddWithKey(c.Value)) { Caption = c.Caption, Group = c.Group }).ToList();
+                    if (items.Count == 0) items.Add(new GsDropdownItem("더할 수 있는 키가 없습니다") { Disabled = true });
+                    GsDropdown.Show(add, items, placeholder: "키 검색");
+                    return;
+                }
+                var host = panel?.visualTree.Q(className: "gs-root") ?? parent;
+                GsDialog.Form(host, "키 추가", $"{StorableTypes.Label(keyType)} 키", new[] { new DialogField { Key = "key", Label = "키", Value = "" } }, "추가",
+                    values =>
+                    {
+                        if (!TryParseKey(values["key"], keyType, out var parsed)) return $"'{values["key"]}'를 {StorableTypes.Label(keyType)}(으)로 읽을 수 없습니다.";
+                        return map.Contains(parsed) ? "이미 있는 키입니다." : null;
+                    },
+                    values =>
+                    {
+                        if (TryParseKey(values["key"], keyType, out var parsed)) AddWithKey(parsed);
+                    });
+            }, GsButtonKind.Ghost);
+            add.style.alignSelf = Align.FlexStart;
+            add.style.marginTop = 6;
+            _list.Add(add);
+        }
+
+        static bool TryParseKey(string text, Type keyType, out object key)
+        {
+            key = null;
+            try
+            {
+                if (keyType == typeof(string))
+                {
+                    if (string.IsNullOrEmpty(text)) return false;
+                    key = text;
+                }
+                else if (keyType.IsEnum) key = Enum.Parse(keyType, text);
+                else key = Convert.ChangeType(text, keyType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
 
         // ── 한 줄 ──────────────────────────────────────────────
 

@@ -657,3 +657,5 @@
 .gs-layout-editor__row { margin-bottom: 10px; }
 .gs-layout-editor__stepper { flex-direction: row; align-items: center; margin-right: 12px; margin-bottom: 6px; }
 .gs-layout-editor__number { min-width: 22px; -unity-text-align: middle-center; }
+/* 코드식 조건: AND·OR·NOT 머리말 */
+.gs-token--keyword { color: var(--gs-accent); -unity-font-style: bold; margin-right: 10px; }

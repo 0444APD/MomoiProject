@@ -115,8 +115,8 @@ namespace GameSystems.Tests
                 var changes = DraftDiff.Compute(new SerializedObject(original), new SerializedObject(draft));
                 Assert.AreEqual(1, changes.Count);
                 Assert.AreEqual("condition", changes[0].Path);
-                StringAssert.Contains("5 이상", changes[0].Old);
-                StringAssert.Contains("7 이상", changes[0].New);
+                StringAssert.Contains(">= 5", changes[0].Old);
+                StringAssert.Contains(">= 7", changes[0].New);
             }
             finally
             {

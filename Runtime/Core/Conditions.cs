@@ -6,7 +6,7 @@ using System.Linq;
 namespace GameSystems
 {
     [Serializable]
-    [BlockInfo("수치 비교", Category = "수치", Description = "수치 값을 기준값과 비교합니다.", Sentence = "{stat} {value} {op}")]
+    [BlockInfo("수치 비교", Category = "수치", Description = "수치 값을 기준값과 비교합니다.", Sentence = "{stat} {op} {value}")]
     public sealed class StatCompareCondition : Condition
     {
         [StatRef, FieldLabel("수치")] public string stat;
@@ -22,7 +22,10 @@ namespace GameSystems
         }
 
         public override string Describe(INameResolver names) =>
-            $"{names.StatName(stat)} {value.ToString("0.##", CultureInfo.InvariantCulture)} {CompareOps.Word(op)}";
+            $"{names.StatName(stat)} {CompareOps.Symbol(op)} {value.ToString("0.##", CultureInfo.InvariantCulture)}";
+
+        public override string Explain(INameResolver names) =>
+            CompareOps.Natural(names.StatName(stat), op, value.ToString("0.##", CultureInfo.InvariantCulture));
 
         public override void Validate(IValidationContext context)
         {
@@ -69,7 +72,7 @@ namespace GameSystems
         }
     }
     [Serializable]
-    [BlockInfo("모두 만족", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다.")]
+    [BlockInfo("모두 만족", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).", Keyword = "AND")]
     public sealed class AllOfCondition : Condition
     {
 #if UNITY_2020_1_OR_NEWER
@@ -88,7 +91,8 @@ namespace GameSystems
 
         public override double PollInterval => MinPoll(Children);
 
-        public override string Describe(INameResolver names) => Join(Children, names, " 그리고 ");
+        public override string Describe(INameResolver names) => Join(Children, names, " && ");
+        public override string Explain(INameResolver names) => "아래 조건을 모두 만족한다면";
 
         public override void Validate(IValidationContext context)
         {
@@ -131,7 +135,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("하나라도 만족", Category = "논리", Description = "안의 조건 중 하나만 만족하면 됩니다.")]
+    [BlockInfo("하나라도 만족", Category = "논리", Description = "안의 조건 중 하나만 만족하면 됩니다(또는).", Keyword = "OR")]
     public sealed class AnyOfCondition : Condition
     {
 #if UNITY_2020_1_OR_NEWER
@@ -150,7 +154,8 @@ namespace GameSystems
 
         public override double PollInterval => AllOfCondition.MinPoll(Children);
 
-        public override string Describe(INameResolver names) => AllOfCondition.Join(Children, names, " 또는 ");
+        public override string Describe(INameResolver names) => AllOfCondition.Join(Children, names, " || ");
+        public override string Explain(INameResolver names) => "아래 조건 중 하나라도 만족한다면";
 
         public override void Validate(IValidationContext context)
         {
@@ -160,7 +165,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("아님", Category = "논리", Description = "안의 조건을 만족하지 않아야 합니다.")]
+    [BlockInfo("아님", Category = "논리", Description = "안의 조건을 만족하지 않아야 합니다.", Keyword = "NOT")]
     public sealed class NotCondition : Condition
     {
 #if UNITY_2020_1_OR_NEWER
@@ -177,7 +182,9 @@ namespace GameSystems
         public override double PollInterval => condition?.PollInterval ?? 0;
 
         public override string Describe(INameResolver names) =>
-            condition == null ? "(조건 없음) 아님" : $"({condition.Describe(names)}) 아님";
+            condition == null ? "!(true)" : $"!({condition.Describe(names)})";
+
+        public override string Explain(INameResolver names) => "아래 조건을 만족하지 않는다면";
 
         public override void Validate(IValidationContext context)
         {
@@ -201,6 +208,7 @@ namespace GameSystems
         }
 
         public override string Describe(INameResolver names) => $"{names.AchievementName(achievement)} 달성";
+        public override string Explain(INameResolver names) => $"{Josa.EulReul(names.AchievementName(achievement))} 달성했다면";
 
         public override void Validate(IValidationContext context)
         {
