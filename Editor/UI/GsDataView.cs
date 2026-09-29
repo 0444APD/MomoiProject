@@ -628,4 +628,9 @@ namespace GameSystems.EditorTools.UI
             return box;
         }
     }
+
+    static class GsDataViewImages
+    {
+        public static bool IsImage(UnityEngine.Object value) => value is Sprite || value is Texture2D;
+    }
 }

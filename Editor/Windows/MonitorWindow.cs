@@ -28,6 +28,8 @@ namespace GameSystems.EditorTools
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
+        // 타임라인: 이 값(상태 키)과 관련된 기록만.
+        [SerializeField] string _keyFilter = "";
         [SerializeField] string _eventTypeName;
         [SerializeField] string _selectedAchievement;
         [SerializeField] string _selectedStat;
@@ -325,6 +327,32 @@ namespace GameSystems.EditorTools
                 RefreshTimeline();
             };
             tools.Add(search);
+            tools.Add(Gs.HSpace(8));
+
+            GsButton keyFilter = null;
+            keyFilter = new GsButton(KeyFilterText(), () =>
+            {
+                var state = _session.State;
+                var used = new HashSet<string>(_session.Journal.Entries.Where(e => !string.IsNullOrEmpty(e.Key)).Select(e => e.Key));
+                var items = new List<GsDropdownItem>
+                {
+                    new GsDropdownItem("모든 값", () =>
+                    {
+                        _keyFilter = "";
+                        keyFilter.Text = KeyFilterText();
+                        RefreshTimeline();
+                    }) { Selected = string.IsNullOrEmpty(_keyFilter) },
+                };
+                items.AddRange(state.Keys.Where(used.Contains).OrderBy(k => k, StringComparer.Ordinal).Select(key => new GsDropdownItem(state.LabelOf(key), () =>
+                {
+                    _keyFilter = key;
+                    keyFilter.Text = KeyFilterText();
+                    RefreshTimeline();
+                }) { Caption = key, Group = IdRules.GroupOf(key), Selected = _keyFilter == key }));
+                GsDropdown.Show(keyFilter, items, placeholder: "값 검색");
+            }, GsButtonKind.Ghost);
+            keyFilter.tooltip = "이 값이 바뀐 기록만 봅니다(묶어 보기에서는 그 원인 줄도 함께).";
+            tools.Add(keyFilter);
             tools.Add(Gs.HSpace(12));
 
             foreach (JournalKind kind in Enum.GetValues(typeof(JournalKind)))
@@ -416,6 +444,9 @@ namespace GameSystems.EditorTools
             RefreshTimeline();
         }
 
+        string KeyFilterText() =>
+            string.IsNullOrEmpty(_keyFilter) || _session == null ? "모든 값 ▾" : (_session.State.IsDefined(_keyFilter) ? _session.State.LabelOf(_keyFilter) : _keyFilter) + " ▾";
+
         // deep: 이 기록 아래의 모든 단계에도 적용한다.
         void SetExpanded(long id, bool expanded, bool deep)
         {
@@ -434,9 +465,12 @@ namespace GameSystems.EditorTools
             foreach (var entry in all) byId[entry.Id] = entry;
 
             bool Matches(JournalEntry e) =>
-                string.IsNullOrEmpty(_search) ||
-                (e.Message ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                (e.Key ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0;
+                (string.IsNullOrEmpty(_keyFilter) || e.Key == _keyFilter) &&
+                (string.IsNullOrEmpty(_search) ||
+                 (e.Message ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 (e.Code ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 (e.Key ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0);
+            var filtering = !string.IsNullOrEmpty(_search) || !string.IsNullOrEmpty(_keyFilter);
 
             _rows.Clear();
             _children.Clear();
@@ -456,7 +490,7 @@ namespace GameSystems.EditorTools
             {
                 if (_hiddenKinds.Contains(entry.Kind) || !Matches(entry)) continue;
                 visible.Add(entry.Id);
-                if (string.IsNullOrEmpty(_search)) continue;
+                if (!filtering) continue;
                 for (var cause = entry.CauseId; cause != 0 && byId.TryGetValue(cause, out var parent); cause = parent.CauseId)
                 {
                     if (_hiddenKinds.Contains(parent.Kind)) continue;

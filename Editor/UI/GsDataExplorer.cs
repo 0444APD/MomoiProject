@@ -69,6 +69,7 @@ namespace GameSystems.EditorTools.UI
         readonly VisualElement _breadcrumb;
         readonly VisualElement _list;
         readonly GsButton _pickFolder;
+        readonly GsButton _viewToggle;
 
         public event Action Changed;
 
@@ -86,6 +87,13 @@ namespace GameSystems.EditorTools.UI
             _breadcrumb = Gs.Row("gs-grow");
             _breadcrumb.AddToClassList("gs-explorer__crumbs");
             toolbar.Add(_breadcrumb);
+            _viewToggle = new GsButton("목록으로", () =>
+            {
+                _cards = !_cards;
+                Refresh();
+            }, GsButtonKind.Ghost);
+            _viewToggle.tooltip = "클래스 목록을 카드 격자 / 줄 목록으로 바꿔 봅니다.";
+            toolbar.Add(_viewToggle);
             if (!browse)
             {
                 _pickFolder = new GsButton("이 폴더 선택", () => Pick(_trail[_trail.Count - 1].Path), GsButtonKind.Ghost);
@@ -211,6 +219,8 @@ namespace GameSystems.EditorTools.UI
             }
 
             var here = _trail[_trail.Count - 1];
+            _viewToggle.style.display = _browse && IsClassCollection(here) ? DisplayStyle.Flex : DisplayStyle.None;
+            _viewToggle.Text = _cards ? "목록으로" : "카드로";
             if (_pickFolder != null)
                 _pickFolder.style.display = here.Path.Length > 0 && FieldPaths.ElementTypeOf(here.Type) != null ? DisplayStyle.Flex : DisplayStyle.None;
 
@@ -228,8 +238,71 @@ namespace GameSystems.EditorTools.UI
                 _list.Add(Gs.Label(_browse ? "비어 있습니다" : "더 들어갈 항목이 없습니다", "gs-caption", "gs-explorer__empty"));
                 return;
             }
-            foreach (var entry in entries) _list.Add(Row(entry));
+            // 클래스 목록은 카드 격자(기본), 값 목록은 시트 줄. 도구줄에서 바꿀 수 있다.
+            if (_browse && IsClassCollection(here) && _cards)
+            {
+                var grid = Gs.Row("gs-explorer__cards");
+                foreach (var entry in entries) grid.Add(Card(entry));
+                _list.Add(grid);
+            }
+            else
+            {
+                foreach (var entry in entries) _list.Add(Row(entry));
+            }
             AddListTools(here);
+        }
+
+        bool _cards = true;
+
+        static bool IsClassCollection(Crumb here)
+        {
+            if (here.Children != null || here.Value == null || !FieldPaths.IsCollectionValue(here.Value)) return false;
+            var element = FieldPaths.ElementTypeOf(here.Value.GetType());
+            return element != null && (DataModel.Of(element).Kind == DataKind.Object || element.IsAbstract || element.IsInterface);
+        }
+
+        // 클래스 한 개 = 카드 한 장: 첫 스프라이트 필드를 이미지로, 이름을 제목으로, 앞쪽 값 몇 개를 수치로.
+        VisualElement Card(Entry entry)
+        {
+            var card = new GsCard(CardLayout.Vertical);
+            card.AddToClassList("gs-explorer__card");
+            var value = entry.Value;
+            UnityEngine.Object image = null;
+            var stats = new List<(string label, string text)>();
+            if (value != null)
+            {
+                foreach (var member in FieldPaths.MembersOf(value.GetType()))
+                {
+                    var v = FieldPaths.Read(value, member.Name);
+                    if (image == null && v is UnityEngine.Object o && GsDataViewImages.IsImage(o)) image = o;
+                    else if (stats.Count < 3 && member.ElementType == null && DataModel.Of(member.Type).Kind != DataKind.Object && !(v is UnityEngine.Object))
+                        stats.Add((LabelOf(member.Info, member.Name), ValueChoices.Display(member.Info, v)));
+                }
+            }
+            card.SetImage(image, Gs.PaletteFor(value?.GetType().Name));
+            card.Title = value == null ? "(비어 있음)" : DataModel.Summary(value);
+            card.Subtitle = entry.Label;
+            foreach (var (label, text) in stats) card.AddStat(label, text);
+            card.RegisterCallback<ClickEvent>(e =>
+            {
+                if (e.target is VisualElement target && (target is GsButton || target.GetFirstAncestorOfType<GsButton>() != null)) return;
+                if (entry.IsFolder) Enter(entry);
+            });
+            var apply = ApplyFor(entry);
+            if (entry.Remove != null && apply != null)
+            {
+                var remove = new GsButton("✕", () =>
+                {
+                    apply(entry.Remove);
+                    Changed?.Invoke();
+                    Refresh();
+                }, GsButtonKind.Ghost);
+                remove.AddToClassList("gs-explorer__card-remove");
+                remove.tooltip = "목록에서 빼기";
+                card.Add(remove);
+            }
+            card.tooltip = "클릭해서 열기";
+            return card;
         }
 
         // 목록 폴더: 맨 아래 '+ 추가'(요소 형식의 기본값으로). 딕셔너리는 키를 먼저 정한다.

@@ -659,3 +659,10 @@
 .gs-layout-editor__number { min-width: 22px; -unity-text-align: middle-center; }
 /* 코드식 조건: AND·OR·NOT 머리말 */
 .gs-token--keyword { color: var(--gs-accent); -unity-font-style: bold; margin-right: 10px; }
+
+/* 탐색기: 클래스 목록 카드 격자 */
+.gs-explorer__cards { flex-direction: row; flex-wrap: wrap; padding-top: 6px; }
+.gs-explorer__card { margin: 0 12px 12px 0; width: 180px; height: 280px; }
+.gs-explorer__card .gs-card__media { height: 150px; }
+.gs-explorer__card-remove { position: absolute; top: 6px; right: 6px; opacity: 0; }
+.gs-explorer__card:hover .gs-explorer__card-remove { opacity: 1; }
