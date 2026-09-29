@@ -985,6 +985,47 @@ namespace GameSystems
             return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(FriendlyName))}>";
         }
 
+        // 컬렉션 종류 이름: 배열 · 리스트 · 딕셔너리 · 컬렉션(그 밖). 컬렉션이 아니면 null.
+        public static string CollectionWord(Type type)
+        {
+            if (type == null) return null;
+            if (type.IsArray) return "배열";
+            if (type.IsGenericType)
+            {
+                var definition = type.GetGenericTypeDefinition();
+                if (definition == typeof(List<>)) return "리스트";
+                if (definition == typeof(Dictionary<,>) || definition == typeof(SortedDictionary<,>)) return "딕셔너리";
+                if (definition == typeof(HashSet<>)) return "집합";
+            }
+            if (typeof(System.Collections.IDictionary).IsAssignableFrom(type)) return "딕셔너리";
+            if (type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type)) return "컬렉션";
+            return null;
+        }
+
+        // 화면용 형식 이름: "SampleEquipment 리스트", "int 배열", "string → int 딕셔너리", 그 밖은 C# 이름.
+        public static string TypeCaption(Type type)
+        {
+            if (type == null) return "";
+            var word = CollectionWord(type);
+            if (word == null) return ShortName(type);
+            if (type.IsArray) return $"{ShortName(type.GetElementType())} {word}";
+            var args = type.IsGenericType ? type.GetGenericArguments() : Type.EmptyTypes;
+            if (args.Length == 2) return $"{ShortName(args[0])} → {ShortName(args[1])} {word}";
+            if (args.Length == 1) return $"{ShortName(args[0])} {word}";
+            return word;
+        }
+
+        static string ShortName(Type type)
+        {
+            if (type == typeof(int)) return "int";
+            if (type == typeof(long)) return "long";
+            if (type == typeof(float)) return "float";
+            if (type == typeof(double)) return "double";
+            if (type == typeof(bool)) return "bool";
+            if (type == typeof(string)) return "string";
+            return CollectionWord(type) != null ? TypeCaption(type) : FriendlyName(type);
+        }
+
         static string KeyText(object key) => key is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : key?.ToString() ?? "";
 
         static string Join(string path, string name) => string.IsNullOrEmpty(path) ? name : path + "." + name;

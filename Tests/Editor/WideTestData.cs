@@ -34,7 +34,7 @@ namespace GameSystems.Tests
         [FieldLabel("색")] public Color tint = Color.magenta;
         [FieldLabel("2D 좌표")] public Vector2 offset = new Vector2(1, 2);
         [FieldLabel("숫자 목록")] public List<int> numbers = new List<int> { 1, 2, 3 };
-        [FieldLabel("글자 목록")] public List<string> words = new List<string> { "하나" };
+        [FieldLabel("string 리스트")] public List<string> words = new List<string> { "하나" };
         [FieldLabel("클래스")] public WideNested nested = new WideNested { label = "안쪽", amount = 5 };
         [FieldLabel("클래스 목록")] public List<WideNested> nestedList = new List<WideNested> { new WideNested { label = "첫째" } };
         [FieldLabel("조건"), SerializeReference] public Condition condition;

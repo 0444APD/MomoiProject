@@ -25,7 +25,7 @@ namespace GameSystems.Data
 
     // 필드 규칙: "이 클래스의 이 필드는 여기서 고른다(, 필수다)". 코드·어트리뷰트 없이 에디터에서 연결한다.
     // 모든 편집 칸(도감·탐색기·이벤트 발생기·조건식 값)과 ID 바꾸기·검증이 이 규칙을 따른다.
-    // 키워드: string 필드는 그룹에서 하나, string 목록 필드는 여러 개를 고른다. 그룹을 비우면 모든 키워드.
+    // 키워드: string 필드는 그룹에서 하나, string 배열·리스트 필드는 여러 개를 고른다. 그룹을 비우면 모든 키워드.
     // 보통은 '키워드 연결' 창에서 필드와 그룹을 이어 만들고, 이 도감 탭은 확인·유지보수용이다.
     [Database("필드 규칙", Group = "식별자", Order = 4, IdPrefix = "rule")]
     [CreateAssetMenu(menuName = "Game Systems/필드 규칙", fileName = "NewFieldRule")]

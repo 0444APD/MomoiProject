@@ -78,7 +78,7 @@ namespace GameSystems
         }
     }
     [Serializable]
-    [BlockInfo("모두 만족", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).", Keyword = "AND")]
+    [BlockInfo("&& AND", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).", Keyword = "AND")]
     public sealed class AllOfCondition : Condition
     {
 #if UNITY_2020_1_OR_NEWER
@@ -103,7 +103,7 @@ namespace GameSystems
 
         public override void Validate(IValidationContext context)
         {
-            if (!Children.Any()) context.Error("'모두 만족' 안에 조건이 없습니다.");
+            if (!Children.Any()) context.Error("'&& AND' 안에 조건이 없습니다.");
             foreach (var child in Children) child.Validate(context);
         }
 
@@ -148,7 +148,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("하나라도 만족", Category = "논리", Description = "안의 조건 중 하나만 만족하면 됩니다(또는).", Keyword = "OR")]
+    [BlockInfo("|| OR", Category = "논리", Description = "안의 조건 중 하나만 만족하면 됩니다(또는).", Keyword = "OR")]
     public sealed class AnyOfCondition : Condition
     {
 #if UNITY_2020_1_OR_NEWER
@@ -173,13 +173,13 @@ namespace GameSystems
 
         public override void Validate(IValidationContext context)
         {
-            if (!Children.Any()) context.Error("'하나라도 만족' 안에 조건이 없습니다.");
+            if (!Children.Any()) context.Error("'|| OR' 안에 조건이 없습니다.");
             foreach (var child in Children) child.Validate(context);
         }
     }
 
     [Serializable]
-    [BlockInfo("아님", Category = "논리", Description = "안의 조건을 만족하지 않아야 합니다.", Keyword = "NOT")]
+    [BlockInfo("! NOT", Category = "논리", Description = "안의 조건을 만족하지 않아야 합니다.", Keyword = "NOT")]
     public sealed class NotCondition : Condition
     {
 #if UNITY_2020_1_OR_NEWER
@@ -203,7 +203,7 @@ namespace GameSystems
 
         public override void Validate(IValidationContext context)
         {
-            if (condition == null) context.Error("'아님' 안에 조건이 없습니다.");
+            if (condition == null) context.Error("'! NOT' 안에 조건이 없습니다.");
             else condition.Validate(context);
         }
     }

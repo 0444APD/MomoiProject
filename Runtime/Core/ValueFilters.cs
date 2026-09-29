@@ -72,7 +72,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("모두 만족", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).", Keyword = "AND")]
+    [BlockInfo("&& AND", Category = "논리", Description = "안의 조건을 모두 만족해야 합니다(그리고).", Keyword = "AND")]
     public sealed class AllFilter : ValueFilter
     {
 #if UNITY_2020_1_OR_NEWER
@@ -93,7 +93,7 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("하나라도 만족", Category = "논리", Description = "안의 조건 중 하나만 만족해도 됩니다(또는).", Keyword = "OR")]
+    [BlockInfo("|| OR", Category = "논리", Description = "안의 조건 중 하나만 만족해도 됩니다(또는).", Keyword = "OR")]
     public sealed class AnyFilter : ValueFilter
     {
 #if UNITY_2020_1_OR_NEWER
@@ -109,13 +109,13 @@ namespace GameSystems
 
         public override void Validate(Type root, List<string> errors)
         {
-            if (!Children.Any()) errors.Add("'하나라도 만족'이 비어 있어 항상 거짓입니다.");
+            if (!Children.Any()) errors.Add("'|| OR'이 비어 있어 항상 거짓입니다.");
             foreach (var child in Children) child.Validate(root, errors);
         }
     }
 
     [Serializable]
-    [BlockInfo("아님", Category = "논리", Description = "안의 조건이 거짓일 때 참입니다.", Keyword = "NOT")]
+    [BlockInfo("! NOT", Category = "논리", Description = "안의 조건이 거짓일 때 참입니다.", Keyword = "NOT")]
     public sealed class NotFilter : ValueFilter
     {
 #if UNITY_2020_1_OR_NEWER
@@ -131,7 +131,7 @@ namespace GameSystems
 
         public override void Validate(Type root, List<string> errors)
         {
-            if (filter == null) errors.Add("'아님' 안에 조건이 없습니다.");
+            if (filter == null) errors.Add("'! NOT' 안에 조건이 없습니다.");
             filter?.Validate(root, errors);
         }
     }
@@ -167,11 +167,11 @@ namespace GameSystems
     // 목록의 각 항목에 안쪽 조건을 적용하고 몇 개가 만족하는지로 판정한다.
     // 예: 아이템 중 [태그 boss 포함 그리고 등급 3 이상]인 것이 2개 이상
     [Serializable]
-    [BlockInfo("목록 항목 검사", Category = "목록", Description = "목록의 각 항목에 조건을 적용해, 만족하는 항목이 하나라도·모두·없음·N개인지 봅니다.",
+    [BlockInfo("배열·리스트 항목 검사", Category = "배열·리스트", Description = "배열·리스트의 각 항목에 조건을 적용해, 만족하는 항목이 하나라도·모두·없음·N개인지 봅니다.",
                Sentence = "{path} {mode} {count}")]
     public sealed class ElementFilter : ValueFilter
     {
-        [FieldPath, FieldPathScope, FieldLabel("목록")] public string path = "";
+        [FieldPath, FieldPathScope, FieldLabel("배열·리스트")] public string path = "";
         [FieldLabel("판정")] public ElementMode mode = ElementMode.Any;
         [FieldLabel("개수")] public int count = 1;
 #if UNITY_2020_1_OR_NEWER
@@ -249,7 +249,7 @@ namespace GameSystems
         {
             if (string.IsNullOrEmpty(path))
             {
-                errors.Add("검사할 목록이 선택되지 않았습니다.");
+                errors.Add("검사할 배열·리스트가 선택되지 않았습니다.");
                 return;
             }
             var type = FieldPaths.TypeAt(root, path, out var error);
@@ -259,7 +259,7 @@ namespace GameSystems
                 return;
             }
             if (FieldPaths.ElementTypeOf(type) == null && !path.Contains(FieldPaths.Each))
-                errors.Add($"'{FieldFilter.PathLabel(path)}'는 목록이 아닙니다.");
+                errors.Add($"'{FieldFilter.PathLabel(path)}'는 배열·리스트가 아닙니다.");
             filter?.Validate(ElementRoot(root, path), errors);
         }
     }

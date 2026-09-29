@@ -19,14 +19,14 @@ namespace GameSystems.Samples
             DatabaseWindow.Open();
         }
 
-        // 상세 패널 점검용 항목: 필드 종류·개수가 많고, 긴 글(5줄 넘음)과 빈 칸이 들어 있다. 만들고 바로 상세 패널을 연다.
+        // 상세 패널 점검용 항목: 필드 종류·개수가 많고, 긴 글(10줄 넘음)과 빈 칸이 들어 있다. 만들고 바로 상세 패널을 연다.
         [MenuItem("Game Systems/샘플/필드 시험 항목 만들기", priority = 41)]
         public static void CreateFieldTest()
         {
             var db = EditorDatabase.Instance;
             db.Sync();
             var item = (SampleFieldTestData)db.Create(typeof(SampleFieldTestData), db.NextId(DataTypes.Find(typeof(SampleFieldTestData))));
-            item.longText = string.Join("\n", Enumerable.Range(1, 12).Select(i => $"{i}번째 줄: 긴 글은 칸이 늘어나다가 5줄을 넘으면 칸 안에서 스크롤됩니다."));
+            item.longText = string.Join("\n", Enumerable.Range(1, 16).Select(i => $"{i}번째 줄: 긴 글은 칸이 늘어나다가 10줄을 넘으면 칸 안에서 스크롤됩니다."));
             item.stat = db.OfType<StatData>().FirstOrDefault()?.Id ?? "";
             item.achievement = db.OfType<AchievementData>().FirstOrDefault()?.Id ?? "";
             item.condition = new AllOfCondition();
@@ -101,7 +101,7 @@ namespace GameSystems.Samples
         {
             if (db.FindById("player.inventory") != null) return false;
             // 키워드 그룹 + 필드 연결: 코드의 빈 string 필드가 에디터 설정만으로 드롭다운이 된다.
-            // string 필드는 하나, string 목록 필드는 여러 개를 고른다.
+            // string 필드는 하나, string 배열·리스트 필드는 여러 개를 고른다.
             Keywords("equipmentSlot", "weapon", "armor", "accessory");
             Keywords("grade", "common", "rare", "legendary");
             Keywords("equipmentTag", "melee", "ranged", "dot", "pierce");

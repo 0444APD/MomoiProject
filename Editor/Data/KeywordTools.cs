@@ -17,10 +17,10 @@ namespace GameSystems.EditorTools
         public static IEnumerable<KeywordData> KeywordsOf(string group) =>
             CodexGroups.Items(typeof(KeywordData), group).Cast<KeywordData>();
 
-        // string 목록 필드면 여러 개, string 필드면 하나.
+        // string 배열·리스트 필드면 여러 개, string 필드면 하나.
         public static bool IsMulti(FieldInfo field) => field != null && field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) == typeof(string);
 
-        // 키워드를 연결할 수 있는 필드: string 또는 string 목록.
+        // 키워드를 연결할 수 있는 필드: string 또는 string 배열·리스트.
         public static bool IsKeywordField(FieldInfo field) =>
             field != null && (field.FieldType == typeof(string) || FieldPaths.ElementTypeOf(field.FieldType) == typeof(string));
 

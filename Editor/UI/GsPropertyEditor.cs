@@ -69,17 +69,34 @@ namespace GameSystems.EditorTools.UI
             return inline;
         }
 
+        // 칸 이름표 = 코드의 변수 이름(항목·필드는 코드 이름으로 식별한다). 목록 요소는 [번호].
         public static string LabelOf(SerializedProperty property, FieldInfo field)
         {
-            var custom = field?.GetCustomAttribute<FieldLabelAttribute>();
-            return custom != null ? custom.Text : property.displayName;
+            if (property.propertyPath.EndsWith("]", StringComparison.Ordinal))
+            {
+                var open = property.propertyPath.LastIndexOf('[');
+                return open >= 0 ? property.propertyPath.Substring(open) : property.displayName;
+            }
+            return field?.Name ?? property.name;
+        }
+
+        // 마우스를 올리면 보일 설명: [FieldLabel]·[Tooltip] 글자(있으면).
+        public static string HintOf(MemberInfo member)
+        {
+            if (member == null) return null;
+            var label = member.GetCustomAttribute<FieldLabelAttribute>()?.Text;
+            var tip = member.GetCustomAttribute<TooltipAttribute>()?.tooltip;
+            if (label == null) return tip;
+            return tip == null ? label : label + "\n" + tip;
         }
 
         public static VisualElement FieldRow(string label, SerializedProperty property, Action onValue)
         {
             var inline = new GsInlineProperty(property) { Multiline = property.propertyType == SerializedPropertyType.String };
             inline.Changed += () => onValue?.Invoke();
-            return GsField.For(label, inline);
+            var box = GsField.For(label, inline);
+            box.tooltip = HintOf(PropertyUtil.GetField(property, out _));
+            return box;
         }
 
         static VisualElement Section(string label, VisualElement content)

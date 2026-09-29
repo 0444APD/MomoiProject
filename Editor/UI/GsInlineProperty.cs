@@ -230,10 +230,10 @@ namespace GameSystems.EditorTools.UI
         GsDropdown OpenMenu(IEnumerable<GsDropdownItem> items, bool? searchable = null, string placeholder = "검색")
         {
             var field = Field;
-            field?.SetActive(true);
+            field?.MenuOpened();
             var menu = GsDropdown.Show(field?.Box ?? (VisualElement)this, items, searchable, placeholder);
-            if (menu != null) menu.Closed += () => field?.SetActive(false);
-            else field?.SetActive(false);
+            if (menu != null) menu.Closed += () => field?.MenuClosed();
+            else field?.MenuClosed();
             return menu;
         }
 
@@ -552,7 +552,7 @@ namespace GameSystems.EditorTools.UI
             if (_editor == null) return;
 
             AddToClassList("gs-inline--editing");
-            Field?.SetActive(true);
+            Field?.SetEditing(true);
             _value.style.display = DisplayStyle.None;
             Add(_editor);
 
@@ -610,7 +610,7 @@ namespace GameSystems.EditorTools.UI
                     var text = new TextField { value = _property.stringValue, multiline = Multiline };
                     if (Multiline)
                     {
-                        // 긴 글은 칸이 늘어나며 5줄까지, 그 이상은 칸 안에서 스크롤.
+                        // 긴 글은 칸이 늘어나며 10줄까지, 그 이상은 칸 안에서 스크롤.
                         text.style.whiteSpace = WhiteSpace.Normal;
                         text.style.maxHeight = GsField.MaxValueHeight;
                         text.verticalScrollerVisibility = ScrollerVisibility.Auto;
@@ -671,7 +671,7 @@ namespace GameSystems.EditorTools.UI
 
             editor.RemoveFromHierarchy();
             RemoveFromClassList("gs-inline--editing");
-            Field?.SetActive(false);
+            Field?.SetEditing(false);
             _value.style.display = DisplayStyle.Flex;
             if (commit) Apply();
             else Refresh();

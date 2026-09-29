@@ -21,7 +21,7 @@ namespace GameSystems.Tests
         {
             _data = ScriptableObject.CreateInstance<WideTestData>();
             _data.hideFlags = HideFlags.DontSave;
-            _data.longText = string.Join("\n", Enumerable.Range(1, 12).Select(i => $"{i}번째 줄"));
+            _data.longText = string.Join("\n", Enumerable.Range(1, 16).Select(i => $"{i}번째 줄"));
             _host = new VisualElement();
             Gs.Apply(_host);
             _host.style.width = 1200;
@@ -47,27 +47,46 @@ namespace GameSystems.Tests
         [Test]
         public void 값_하나짜리_필드는_모두_입력_칸이다()
         {
-            foreach (var label in new[] { "정수", "큰 정수", "실수", "배정밀도", "짧은 글", "긴 글", "빈 글", "참거짓", "enum", "프리팹", "색", "추가 1", "추가 3", "추가 6" })
+            // 칸 이름표는 변수 이름이다.
+            foreach (var label in new[] { "integer", "bigInteger", "ratio", "precise", "shortText", "longText", "emptyText", "toggle", "mood", "prefab", "tint", "extra1", "extra3", "extra6" })
                 Assert.IsNotNull(Field(label), $"'{label}' 입력 칸이 없습니다");
         }
 
         [Test]
         public void 클래스_안쪽_값도_입력_칸이다()
         {
-            Assert.IsNotNull(Field("안쪽 이름"), "클래스 안쪽 값도 입력 칸 모양이어야 합니다");
+            Assert.IsNotNull(Field("label"), "클래스 안쪽 값도 입력 칸 모양이어야 합니다");
+        }
+
+        [Test]
+        public void 컬렉션은_배열_리스트로_부른다()
+        {
+            Assert.AreEqual("int 배열", DataModel.TypeCaption(typeof(int[])));
+            Assert.AreEqual("WideNested 리스트", DataModel.TypeCaption(typeof(List<WideNested>)));
+            Assert.AreEqual("string → int 딕셔너리", DataModel.TypeCaption(typeof(Dictionary<string, int>)));
+            var heads = _panel.Query<Label>(className: "gs-detail__type").ToList().Select(l => l.text).ToList();
+            Assert.Contains("WideNested 리스트", heads, "클래스 리스트 필드 제목 옆에 형식이 보여야 합니다");
+        }
+
+        [Test]
+        public void 논리_블록은_연산자로_부른다()
+        {
+            Assert.AreEqual("&& AND", BlockTypes.DisplayName(typeof(AllOfCondition)));
+            Assert.AreEqual("|| OR", BlockTypes.DisplayName(typeof(AnyOfCondition)));
+            Assert.AreEqual("! NOT", BlockTypes.DisplayName(typeof(NotCondition)));
         }
 
         [Test]
         public void 빈_값은_비어_있음_모양()
         {
-            Assert.IsTrue(Field("빈 글").ClassListContains("gs-field--empty"));
-            Assert.IsFalse(Field("짧은 글").ClassListContains("gs-field--empty"));
+            Assert.IsTrue(Field("emptyText").ClassListContains("gs-field--empty"));
+            Assert.IsFalse(Field("shortText").ClassListContains("gs-field--empty"));
         }
 
         [Test]
-        public void 긴_글은_5줄까지만_늘어난다()
+        public void 긴_글은_10줄까지만_늘어난다()
         {
-            var scroll = Field("긴 글").Q<ScrollView>(className: "gs-inline__scroll");
+            var scroll = Field("longText").Q<ScrollView>(className: "gs-inline__scroll");
             Assert.IsNotNull(scroll, "긴 값은 칸 안에서 스크롤돼야 합니다");
             Assert.AreEqual(GsField.MaxValueHeight, scroll.style.maxHeight.value.value, 0.01f);
         }
@@ -75,7 +94,7 @@ namespace GameSystems.Tests
         [Test]
         public void 오류는_칸에_표시된다()
         {
-            var field = Field("정수");
+            var field = Field("integer");
             field.SetError("정수가 너무 큽니다");
             Assert.IsTrue(field.ClassListContains("gs-field--error"));
             field.SetError(null);

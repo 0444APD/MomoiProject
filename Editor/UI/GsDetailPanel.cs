@@ -257,12 +257,20 @@ namespace GameSystems.EditorTools.UI
             var content = UsesExplorer(property, field) ? EmbeddedExplorer(property, field) : GsPropertyEditor.BuildContent(property, OnValueChanged, OnStructureChanged);
             if (content is GsInlineProperty inline)
             {
-                // 값 하나: 입력 칸 모양(상자 안 위쪽 이름표, 아래 값). 바뀌면 이전 값이 값 위에 함께 보인다.
-                section.Add(GsField.For(label, inline, ValueWithHistory(path, inline, section, null)));
+                // 값 하나: 입력 칸 모양(상자 안 위쪽 이름표, 아래 값). 바뀐 뒤 값만 보인다.
+                var box = GsField.For(label, inline, ValueWithHistory(path, inline, section, null));
+                box.tooltip = GsPropertyEditor.HintOf(field);
+                section.Add(box);
             }
             else
             {
-                section.Add(Gs.Label(label.ToUpperInvariant(), "gs-detail__label"));
+                // 클래스·배열·리스트: 변수 이름 + 형식(예: nestedList · SampleFieldNested 리스트).
+                var head = Gs.Row("gs-detail__section-head");
+                head.Add(Gs.Label(label, "gs-detail__label"));
+                var caption = field != null ? DataModel.TypeCaption(field.FieldType) : "";
+                if (!string.IsNullOrEmpty(caption)) head.Add(Gs.Label(caption, "gs-detail__type"));
+                head.tooltip = GsPropertyEditor.HintOf(field);
+                section.Add(head);
                 var change = new GsChangeView(null, "", "");
                 change.style.marginBottom = 10;
                 section.Add(change);
@@ -560,7 +568,8 @@ namespace GameSystems.EditorTools.UI
             {
                 var isChanged = changed.Contains(pair.Key);
                 pair.Value.section.EnableInClassList("gs-detail__section--changed", isChanged);
-                pair.Value.change.style.display = isChanged ? DisplayStyle.Flex : DisplayStyle.None;
+                // 이전 값은 보이지 않는다(바뀐 뒤 값만). 바뀐 칸은 이름표 색으로만 알린다.
+                pair.Value.change.style.display = DisplayStyle.None;
                 if (isChanged) pair.Value.update(_changes.First(c => c.Path == pair.Key));
                 else pair.Value.update(new FieldChange());
             }

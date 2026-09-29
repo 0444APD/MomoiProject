@@ -362,7 +362,7 @@ namespace GameSystems.EditorTools.UI
                 list.Add(new Entry
                 {
                     Label = LabelOf(member.Info, member.Name),
-                    Caption = member.IsCollection ? $"목록 · {TypeName(member.ElementType)}" : TypeName(member.Type),
+                    Caption = member.IsCollection ? DataModel.TypeCaption(member.Type) : TypeName(member.Type),
                     Path = Join(here.Path, member.Name),
                     Type = member.Type,
                     Member = member.Info,
@@ -439,7 +439,7 @@ namespace GameSystems.EditorTools.UI
             return new Entry
             {
                 Label = label,
-                Caption = type == null ? "" : folder && FieldPaths.IsCollectionValue(value) ? $"목록 · {FieldPaths.Items(value).Count()}개" : TypeName(type),
+                Caption = type == null ? "" : folder && FieldPaths.IsCollectionValue(value) ? $"{DataModel.TypeCaption(type)} · {FieldPaths.Items(value).Count()}개" : TypeName(type),
                 Preview = folder ? DataModel.Summary(value) : ValueChoices.Display(member, value),
                 Type = type,
                 Value = value,
@@ -605,7 +605,7 @@ namespace GameSystems.EditorTools.UI
             return row;
         }
 
-        // 값 하나를 입력 칸 모양으로: 상자 안 위쪽 이름표, 아래 값(긴 값은 5줄까지, 그 이상은 칸 안에서 스크롤).
+        // 값 하나를 입력 칸 모양으로: 상자 안 위쪽 이름표, 아래 값(긴 값은 10줄까지, 그 이상은 칸 안에서 스크롤).
         VisualElement ValueField(Entry entry)
         {
             var apply = ApplyFor(entry);
@@ -624,7 +624,9 @@ namespace GameSystems.EditorTools.UI
             {
                 IsEmpty = () => entry.Value == null || (entry.Value is string text && text.Length == 0),
             };
-            if (!string.IsNullOrEmpty(entry.Caption)) field.tooltip = entry.Caption;
+            // 마우스를 올리면 형식과 설명([FieldLabel]).
+            var hint = GsPropertyEditor.HintOf(entry.Member);
+            field.tooltip = string.IsNullOrEmpty(hint) ? entry.Caption : $"{entry.Caption}\n{hint}";
             field.SetDisabled(!editable);
 
             if (entry.Remove != null && apply != null)
@@ -705,9 +707,10 @@ namespace GameSystems.EditorTools.UI
                     Selected = Equals(c.Value, entry.Value),
                 }).ToList();
                 var owner = preview.GetFirstAncestorOfType<GsField>();
-                owner?.SetActive(true);
+                owner?.MenuOpened();
                 var menu = GsDropdown.Show(owner?.Box ?? (VisualElement)preview, items, placeholder: "검색");
-                if (menu != null) menu.Closed += () => owner?.SetActive(false);
+                if (menu != null) menu.Closed += () => owner?.MenuClosed();
+                else owner?.MenuClosed();
                 return;
             }
             var host = preview.parent;
@@ -715,7 +718,7 @@ namespace GameSystems.EditorTools.UI
             var field = new TextField { value = entry.Value == null ? "" : Convert.ToString(entry.Value, CultureInfo.InvariantCulture), multiline = type == typeof(string) };
             if (field.multiline)
             {
-                // 긴 글은 칸이 늘어나며 5줄까지, 그 이상은 칸 안에서 스크롤(Enter는 확정).
+                // 긴 글은 칸이 늘어나며 10줄까지, 그 이상은 칸 안에서 스크롤(Enter는 확정).
                 field.style.whiteSpace = WhiteSpace.Normal;
                 field.style.maxHeight = GsField.MaxValueHeight;
                 field.verticalScrollerVisibility = ScrollerVisibility.Auto;
@@ -725,11 +728,11 @@ namespace GameSystems.EditorTools.UI
             preview.style.display = DisplayStyle.None;
             host.Insert(host.IndexOf(preview), field);
             var box = preview.GetFirstAncestorOfType<GsField>();
-            box?.SetActive(true);
+            box?.SetEditing(true);
             void Finish(bool commit)
             {
                 if (field.parent == null) return;
-                box?.SetActive(false);
+                box?.SetEditing(false);
                 field.RemoveFromHierarchy();
                 preview.style.display = DisplayStyle.Flex;
                 if (!commit) return;
@@ -817,8 +820,8 @@ namespace GameSystems.EditorTools.UI
 
         public static string LabelOf(MemberInfo member, string fallback)
         {
-            var custom = member?.GetCustomAttribute<FieldLabelAttribute>();
-            return custom != null ? custom.Text : UnityEditor.ObjectNames.NicifyVariableName(fallback ?? "");
+            // 칸 이름표 = 코드의 변수 이름.
+            return member?.Name ?? fallback ?? "";
         }
 
         // 경로를 사람이 읽는 이름으로: items[].tags → 아이템 › 각 항목 › 태그

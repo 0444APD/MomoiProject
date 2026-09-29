@@ -84,7 +84,7 @@ namespace GameSystems.EditorTools
             help.style.marginLeft = 10;
             titleRow.Add(help);
             titles.Add(titleRow);
-            var caption = Gs.Label("왼쪽에서 필드를 고르고, 오른쪽에서 키워드 그룹을 연결합니다. string 필드는 하나, string 목록 필드는 여러 개를 고릅니다.", "gs-caption");
+            var caption = Gs.Label("왼쪽에서 필드를 고르고, 오른쪽에서 키워드 그룹을 연결합니다. string 필드는 하나, string 배열·리스트 필드는 여러 개를 고릅니다.", "gs-caption");
             caption.style.marginTop = 4;
             titles.Add(caption);
             header.Add(titles);
@@ -225,7 +225,7 @@ namespace GameSystems.EditorTools
                 }
             }
             if (entries.Count == 0)
-                _fields.Add(Gs.Label(_unlinkedOnly ? "연결 안 된 필드가 없습니다." : "키워드를 담을 수 있는 필드(string 또는 string 목록)가 없습니다.", "gs-caption"));
+                _fields.Add(Gs.Label(_unlinkedOnly ? "연결 안 된 필드가 없습니다." : "키워드를 담을 수 있는 필드(string 또는 string 배열·리스트)가 없습니다.", "gs-caption"));
             RebuildSelection();
         }
 

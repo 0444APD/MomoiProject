@@ -8,15 +8,21 @@ namespace GameSystems.EditorTools.UI
     //  · 편집 중: 아래쪽에 포인트 컬러 밑줄.
     //  · 오류: 이름표·밑줄이 빨강, 상자 아래에 오류 문구.
     //  · 비활성: 더 어두운 상자, 옅은 글자.
-    // 긴 값은 칸이 늘어나며 최대 5줄까지 보이고, 그 이상은 칸 안에서 스크롤한다.
+    // 긴 값은 칸이 늘어나며 최대 10줄까지 보이고, 그 이상은 칸 안에서 스크롤한다.
+    //
+    // '편집 중'은 따로 켜고 끄지 않고 실제 상태에서 매번 다시 계산한다(글자 편집 중 · 목록이 열려 있음 · 포커스가 안에 있음).
+    // 어느 경로로 편집이 끝나도(바깥 클릭·다시 그리기·편집기가 안 열린 클릭) 밑줄이 남지 않게, 켜져 있는 동안 주기적으로 다시 확인한다.
     public sealed class GsField : VisualElement
     {
-        // 값 5줄 높이(글자 13px 기준).
-        public const float MaxValueHeight = 92f;
+        // 값 10줄 높이(글자 13px 기준).
+        public const float MaxValueHeight = 180f;
 
         readonly Label _label;
         readonly Label _message;
         bool _active;
+        bool _editing;
+        int _menus;
+        IVisualElementScheduledItem _watch;
 
         public VisualElement Box { get; }
         public VisualElement Body { get; }
@@ -43,16 +49,13 @@ namespace GameSystems.EditorTools.UI
             {
                 if (!ClassListContains("gs-field--empty") || Open == null) return;
                 e.StopPropagation();
-                SetActive(true);
                 Open();
+                RefreshActive();
             });
             // 글자 입력 칸(대화 상자 등)은 포커스로 '편집 중'을 표시한다.
-            RegisterCallback<FocusInEvent>(_ => SetActive(true));
-            RegisterCallback<FocusOutEvent>(_ => schedule.Execute(() =>
-            {
-                var focused = focusController?.focusedElement as VisualElement;
-                if (focused == null || !Contains(focused)) SetActive(false);
-            }).StartingIn(20));
+            RegisterCallback<FocusInEvent>(_ => RefreshActive());
+            RegisterCallback<FocusOutEvent>(_ => schedule.Execute(RefreshActive).StartingIn(20));
+            RegisterCallback<DetachFromPanelEvent>(_ => _watch?.Pause());
         }
 
         public string Label
@@ -63,11 +66,49 @@ namespace GameSystems.EditorTools.UI
 
         public bool Active => _active;
 
-        public void SetActive(bool active)
+        // 값 칸이 글자 편집을 시작·끝낼 때.
+        public void SetEditing(bool editing)
         {
-            _active = active;
-            EnableInClassList("gs-field--active", active);
+            _editing = editing;
+            RefreshActive();
+        }
+
+        // 값 칸이 목록(드롭다운)을 열고 닫을 때.
+        public void MenuOpened()
+        {
+            _menus++;
+            RefreshActive();
+        }
+
+        public void MenuClosed()
+        {
+            _menus = Math.Max(0, _menus - 1);
+            RefreshActive();
+        }
+
+        bool FocusWithin()
+        {
+            var focused = focusController?.focusedElement as VisualElement;
+            return focused != null && (focused == this || Contains(focused));
+        }
+
+        void RefreshActive()
+        {
+            // 편집기가 이미 사라졌으면(다시 그리기 등) 편집 중이 아니다.
+            if (_editing && Body.Q(className: "gs-inline--editing") == null && Body.Q<TextField>() == null) _editing = false;
+            var active = _editing || _menus > 0 || FocusWithin();
+            if (active != _active)
+            {
+                _active = active;
+                EnableInClassList("gs-field--active", active);
+            }
             RefreshEmpty();
+            if (active)
+            {
+                _watch ??= schedule.Execute(RefreshActive).Every(300);
+                _watch.Resume();
+            }
+            else _watch?.Pause();
         }
 
         public void RefreshEmpty() => EnableInClassList("gs-field--empty", !_active && (IsEmpty?.Invoke() ?? false));
