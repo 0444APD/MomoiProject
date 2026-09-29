@@ -70,6 +70,7 @@ namespace GameSystems
         {
             if (evt == null) throw new ArgumentNullException(nameof(evt));
             var entry = _journal.Append(JournalKind.Event, "Events", Describe(evt));
+            entry.Payload = evt;
 
             using (_journal.Cause(entry.Id))
             {

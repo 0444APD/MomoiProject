@@ -90,6 +90,7 @@ namespace GameSystems
 
             action.tick = _clock.Tick;
             var entry = _journal.Append(JournalKind.Action, "Actions", action.Describe());
+            entry.Payload = action;
             var record = new ActionRecord { JournalId = entry.Id, Action = action, Status = ActionStatus.Done };
             var tx = _state.Begin(entry.Id, action.Describe());
             record.TransactionId = tx.Id;

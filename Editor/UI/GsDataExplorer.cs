@@ -9,19 +9,39 @@ using UnityEngine.UIElements;
 
 namespace GameSystems.EditorTools.UI
 {
+    // 탐색기에 넣을 항목 하나. 실제 값이거나, 하위 항목 목록을 가진 가상 폴더(분류)다.
+    public sealed class ExplorerItem
+    {
+        public string Label;
+        public string Caption;
+        public object Value;
+        public Type Type;
+        // 목록 고르기 규칙(ID 참조·enum 등)을 정하는 필드 정보.
+        public MemberInfo Member;
+        // 이 값을 바꾸는 방법(없으면 읽기 전용).
+        public Action<object> Set;
+        // 이 항목 안쪽을 고칠 때 거치는 방법(예: 저장소 Modify, 에셋 Undo 기록). 없으면 위 폴더의 방법을 쓴다.
+        public Action<Action> Apply;
+        // 가상 폴더: 하위 항목(분류 등).
+        public Func<IEnumerable<ExplorerItem>> Children;
+        public Color? Color;
+    }
+
     // 폴더형 데이터 탐색기. 클래스·컬렉션은 폴더, 값은 파일처럼 한 단계씩 들어가며 본다.
     //  · 고르기(Pick): 타입만 보고 필드 경로를 고른다(조건의 "필드" 칸 등).
-    //  · 둘러보기(Browse): 실제 값을 보고, 값 파일을 눌러 바로 고친다(모니터의 인벤토리 등).
-    // 어디서 쓰든 같은 모양이라, 인벤토리 모니터링과 더미 아이템 확인이 같은 화면이 된다.
+    //  · 둘러보기(Browse): 실제 값을 보고, 값 파일을 눌러 바로 고친다. 클래스는 타입별 배치(GsDataView)로 그린다.
+    // 어디서 쓰든 같은 모양이라, 인벤토리 모니터링·도감·더미 아이템 확인이 같은 화면이 된다.
     public sealed class GsDataExplorer : VisualElement
     {
-        // 현재 폴더까지의 발자취. 고르기는 타입만, 둘러보기는 값과 그 값을 담은 부모까지 기억한다.
         sealed class Crumb
         {
             public string Label;
-            public string Path;      // 고르기용 필드 경로(요소는 [] 로)
+            public string Path;
             public Type Type;
-            public object Value;     // 둘러보기용
+            public object Value;
+            public MemberInfo Member;
+            public Action<Action> Apply;
+            public Func<IEnumerable<ExplorerItem>> Children;
         }
 
         internal sealed class Entry
@@ -32,30 +52,30 @@ namespace GameSystems.EditorTools.UI
             public string Path;
             public Type Type;
             public object Value;
+            public MemberInfo Member;
             public bool IsFolder;
             public bool Pickable;
-            // 둘러보기: 값을 고치는 방법(없으면 읽기 전용).
             public Action<object> Set;
+            public Action<Action> Apply;
+            public Func<IEnumerable<ExplorerItem>> Children;
             public Color Color;
+            // 목록 요소 빼기(없으면 뺄 수 없음).
+            public Action Remove;
         }
 
         readonly bool _browse;
         readonly Action<string> _onPick;
-        readonly Action<Action> _apply;
         readonly List<Crumb> _trail = new List<Crumb>();
         readonly VisualElement _breadcrumb;
         readonly VisualElement _list;
         readonly GsButton _pickFolder;
-        readonly Func<Type, string> _typeName;
 
         public event Action Changed;
 
-        GsDataExplorer(bool browse, string rootLabel, Type rootType, object rootValue, Action<string> onPick, Action<Action> apply)
+        GsDataExplorer(bool browse, Crumb root, Action<string> onPick)
         {
             _browse = browse;
             _onPick = onPick;
-            _apply = apply;
-            _typeName = t => t == null ? "" : StorableTypes.Label(t);
             AddToClassList("gs-explorer");
 
             var toolbar = Gs.Row();
@@ -78,33 +98,36 @@ namespace GameSystems.EditorTools.UI
             _list.AddToClassList("gs-explorer__list");
             Add(_list);
 
-            _trail.Add(new Crumb { Label = rootLabel, Path = "", Type = rootType, Value = rootValue });
+            _trail.Add(root);
             Refresh();
         }
+
+        // ── 만들기 ─────────────────────────────────────────────
 
         // 필드 경로 고르기 창. current가 있으면 그 폴더에서 시작한다.
         public static GsModal Pick(VisualElement host, Type rootType, string rootLabel, string current, Action<string> onPick)
         {
             GsModal modal = null;
-            var explorer = new GsDataExplorer(false, rootLabel, rootType, null, path =>
+            var explorer = new GsDataExplorer(false, new Crumb { Label = rootLabel, Path = "", Type = rootType }, path =>
             {
                 modal?.Close();
                 onPick(path);
-            }, null);
+            });
             explorer.OpenPath(current, parentOnly: true);
             modal = GsModal.Show(host, Frame("필드 고르기", "폴더를 열어 들어가고, 값을 누르면 고릅니다.", explorer));
             return modal;
         }
 
-        // 실제 값 둘러보기·고치기. apply: 값을 고치는 동작을 감싸는 방법(예: 저장소 Modify, Undo 기록).
+        // 실제 값 둘러보기·고치기. apply: 값을 고치는 동작을 감싸는 방법(예: 저장소 Modify, Undo 기록). null이면 읽기 전용.
         public static GsDataExplorer Browse(string rootLabel, object root, Action<Action> apply) =>
-            new GsDataExplorer(true, rootLabel, root?.GetType(), root, null, apply);
+            Browse(new ExplorerItem { Label = rootLabel, Value = root, Type = root?.GetType(), Apply = apply });
 
-        public static GsModal BrowseModal(VisualElement host, string title, object root, Action<Action> apply)
-        {
-            var explorer = Browse(title, root, apply);
-            return GsModal.Show(host, Frame(title, apply != null ? "값을 누르면 고칠 수 있습니다." : null, explorer));
-        }
+        // 가상 폴더(분류)나 값 하나를 뿌리로 둘러보기.
+        public static GsDataExplorer Browse(ExplorerItem root) =>
+            new GsDataExplorer(true, new Crumb { Label = root.Label, Type = root.Type ?? root.Value?.GetType(), Value = root.Value, Member = root.Member, Apply = root.Apply, Children = root.Children }, null);
+
+        public static GsModal BrowseModal(VisualElement host, string title, object root, Action<Action> apply) =>
+            GsModal.Show(host, Frame(title, apply != null ? "값을 누르면 고칠 수 있습니다." : "읽기 전용", Browse(title, root, apply)));
 
         static VisualElement Frame(string title, string caption, GsDataExplorer explorer)
         {
@@ -120,6 +143,8 @@ namespace GameSystems.EditorTools.UI
             box.Add(explorer);
             return box;
         }
+
+        // ── 이동 ───────────────────────────────────────────────
 
         // 경로의 폴더를 연다(parentOnly: 마지막 항목은 파일이므로 그 부모까지만).
         public void OpenPath(string path, bool parentOnly)
@@ -149,12 +174,26 @@ namespace GameSystems.EditorTools.UI
             Refresh();
         }
 
-        void Pick(string path)
+        void Enter(Entry entry)
         {
-            _onPick?.Invoke(path);
+            var here = _trail[_trail.Count - 1];
+            _trail.Add(new Crumb
+            {
+                Label = entry.Label,
+                Path = entry.Path,
+                Type = entry.Type,
+                Value = entry.Value,
+                Member = entry.Member,
+                Apply = entry.Apply ?? here.Apply,
+                Children = entry.Children,
+            });
+            Refresh();
         }
 
-        void Refresh()
+        void Pick(string path) => _onPick?.Invoke(path);
+
+        // 값이 바뀌었을 때 현재 폴더를 다시 그린다(위치는 유지).
+        public void Refresh()
         {
             _breadcrumb.Clear();
             for (int i = 0; i < _trail.Count; i++)
@@ -176,10 +215,11 @@ namespace GameSystems.EditorTools.UI
                 _pickFolder.style.display = here.Path.Length > 0 && FieldPaths.ElementTypeOf(here.Type) != null ? DisplayStyle.Flex : DisplayStyle.None;
 
             _list.Clear();
-            // 둘러보기에서 클래스(컬렉션이 아닌 객체)는 타입별 배치로 그린다(상세 패널·더미 생성기와 같은 모양).
-            if (_browse && here.Value != null && !FieldPaths.IsCollectionValue(here.Value) && DataModel.Of(here.Value.GetType()).Kind == DataKind.Object)
+            // 둘러보기에서 클래스(컬렉션이 아닌 객체)는 타입별 배치로 그린다(도감·상세 패널·더미 생성기와 같은 모양).
+            if (_browse && here.Children == null && here.Value != null && !FieldPaths.IsCollectionValue(here.Value) &&
+                DataModel.Of(here.Value.GetType()).Kind == DataKind.Object)
             {
-                _list.Add(new GsDataView(new ExplorerContext(this, here.Value)));
+                _list.Add(new GsDataView(new ExplorerContext(this, here)));
                 return;
             }
             var entries = _browse ? BrowseEntries(here) : PickEntries(here);
@@ -189,6 +229,33 @@ namespace GameSystems.EditorTools.UI
                 return;
             }
             foreach (var entry in entries) _list.Add(Row(entry));
+            AddListTools(here);
+        }
+
+        // 목록 폴더: 맨 아래 '+ 추가'(요소 형식의 기본값으로).
+        void AddListTools(Crumb here)
+        {
+            if (!_browse || here.Apply == null || !(here.Value is IList list) || list.IsFixedSize) return;
+            var elementType = FieldPaths.ElementTypeOf(here.Value.GetType());
+            if (elementType == null) return;
+            var add = new GsButton("+ 추가", () =>
+            {
+                object item;
+                try
+                {
+                    item = elementType == typeof(string) ? "" : elementType.IsAbstract || elementType.IsInterface ? null : DataModel.Create(elementType);
+                }
+                catch (Exception)
+                {
+                    item = null;
+                }
+                here.Apply(() => list.Add(item));
+                Changed?.Invoke();
+                Refresh();
+            }, GsButtonKind.Ghost);
+            add.style.alignSelf = Align.FlexStart;
+            add.style.marginTop = 6;
+            _list.Add(add);
         }
 
         // ── 고르기: 타입의 구조 ─────────────────────────────────
@@ -199,11 +266,10 @@ namespace GameSystems.EditorTools.UI
             var element = FieldPaths.ElementTypeOf(here.Type);
             if (element != null && here.Path.Length > 0 && !here.Path.EndsWith(FieldPaths.Each, StringComparison.Ordinal))
             {
-                // 컬렉션 폴더 안: "각 항목" 폴더(요소마다 검사)
                 list.Add(new Entry
                 {
                     Label = "각 항목",
-                    Caption = _typeName(element),
+                    Caption = TypeName(element),
                     Path = here.Path + FieldPaths.Each,
                     Type = element,
                     IsFolder = FieldPaths.MembersOf(element).Count > 0 || FieldPaths.ElementTypeOf(element) != null,
@@ -218,9 +284,10 @@ namespace GameSystems.EditorTools.UI
                 list.Add(new Entry
                 {
                     Label = LabelOf(member.Info, member.Name),
-                    Caption = member.IsCollection ? $"목록 · {_typeName(member.ElementType)}" : _typeName(member.Type),
+                    Caption = member.IsCollection ? $"목록 · {TypeName(member.ElementType)}" : TypeName(member.Type),
                     Path = Join(here.Path, member.Name),
                     Type = member.Type,
+                    Member = member.Info,
                     IsFolder = nested,
                     Pickable = !nested || member.IsCollection,
                     Color = nested ? Gs.Palette[6] : Gs.Palette[8],
@@ -234,44 +301,56 @@ namespace GameSystems.EditorTools.UI
         List<Entry> BrowseEntries(Crumb here)
         {
             var list = new List<Entry>();
-            var value = here.Value;
-            if (value == null) return list;
-            var info = DataModel.Of(value.GetType());
-            if (FieldPaths.IsCollectionValue(value))
+            if (here.Children != null)
             {
-                int index = 0;
-                if (value is IDictionary map)
+                foreach (var item in here.Children()) list.Add(FromItem(item));
+                return list;
+            }
+            var value = here.Value;
+            if (value == null || !FieldPaths.IsCollectionValue(value)) return list;
+            var elementType = FieldPaths.ElementTypeOf(value.GetType());
+            if (value is IDictionary map)
+            {
+                foreach (DictionaryEntry pair in map)
                 {
-                    foreach (DictionaryEntry pair in map)
-                    {
-                        var key = pair.Key;
-                        list.Add(ValueEntry($"[{pair.Key}]", pair.Value, info.ElementType ?? pair.Value?.GetType(),
-                            v => map[key] = v));
-                    }
-                    return list;
-                }
-                var ilist = value as IList;
-                foreach (var item in FieldPaths.Items(value))
-                {
-                    var at = index++;
-                    Action<object> set = ilist != null ? v => ilist[at] = v : (Action<object>)null;
-                    list.Add(ValueEntry($"[{at}]", item, info.ElementType ?? item?.GetType(), set));
+                    var key = pair.Key;
+                    list.Add(ValueEntry($"[{pair.Key}]", pair.Value, elementType ?? pair.Value?.GetType(), here.Member, v => map[key] = v, null));
                 }
                 return list;
             }
-            foreach (var member in FieldPaths.MembersOf(value.GetType()))
+            var ilist = value as IList;
+            int index = 0;
+            foreach (var item in FieldPaths.Items(value))
             {
-                var target = value;
-                var field = member.Info as FieldInfo;
-                var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
-                Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
-                var entry = ValueEntry(LabelOf(member.Info, member.Name), current, member.Type, set);
+                var at = index++;
+                // 목록 요소의 선택 규칙은 목록 필드의 규칙을 따른다(예: 태그 목록 → 태그 고르기).
+                var entry = ValueEntry($"[{at}]", item, elementType ?? item?.GetType(), here.Member, ilist != null ? v => ilist[at] = v : (Action<object>)null, null);
+                if (ilist != null && !ilist.IsFixedSize) entry.Remove = () => ilist.RemoveAt(at);
                 list.Add(entry);
             }
             return list;
         }
 
-        internal Entry ValueEntry(string label, object value, Type declared, Action<object> set)
+        Entry FromItem(ExplorerItem item)
+        {
+            if (item.Children != null)
+                return new Entry
+                {
+                    Label = item.Label,
+                    Caption = item.Caption,
+                    Preview = "",
+                    IsFolder = true,
+                    Children = item.Children,
+                    Apply = item.Apply,
+                    Color = item.Color ?? Gs.Palette[6],
+                };
+            var entry = ValueEntry(item.Label, item.Value, item.Type ?? item.Value?.GetType(), item.Member, item.Set, item.Apply);
+            if (!string.IsNullOrEmpty(item.Caption)) entry.Caption = item.Caption;
+            if (item.Color.HasValue) entry.Color = item.Color.Value;
+            return entry;
+        }
+
+        internal Entry ValueEntry(string label, object value, Type declared, MemberInfo member, Action<object> set, Action<Action> apply)
         {
             var type = value?.GetType() ?? declared;
             var kind = type == null ? DataKind.Scalar : DataModel.Of(type).Kind;
@@ -279,66 +358,20 @@ namespace GameSystems.EditorTools.UI
             return new Entry
             {
                 Label = label,
-                Caption = type == null ? "" : folder && FieldPaths.IsCollectionValue(value) ? $"목록 · {FieldPaths.Items(value).Count()}개" : _typeName(type),
-                Preview = folder ? DataModel.Summary(value) : StateStore.Format(value),
+                Caption = type == null ? "" : folder && FieldPaths.IsCollectionValue(value) ? $"목록 · {FieldPaths.Items(value).Count()}개" : TypeName(type),
+                Preview = folder ? DataModel.Summary(value) : ValueChoices.Display(member, value),
                 Type = type,
                 Value = value,
+                Member = member,
                 IsFolder = folder,
-                Set = folder || kind == DataKind.Reference ? null : set,
+                Set = folder ? null : set,
+                Apply = apply,
                 Color = folder ? Gs.Palette[6] : Gs.Palette[8],
             };
         }
 
-        // 탐색기 안의 실제 객체를 배치 블록에 넘겨준다. 폴더(클래스·컬렉션) 줄을 누르면 탐색기 안에서 들어간다.
-        sealed class ExplorerContext : DataViewContext
-        {
-            readonly GsDataExplorer _explorer;
-            readonly object _target;
+        Action<Action> ApplyFor(Entry entry) => entry.Apply ?? _trail[_trail.Count - 1].Apply;
 
-            public ExplorerContext(GsDataExplorer explorer, object target)
-            {
-                _explorer = explorer;
-                _target = target;
-            }
-
-            public override Type Type => _target.GetType();
-            public override bool CanEdit => _explorer._apply != null;
-            public override IEnumerable<string> Fields() => FieldPaths.MembersOf(Type).Select(m => m.Name);
-
-            FieldPaths.Member MemberOf(string name) => FieldPaths.MembersOf(Type).FirstOrDefault(m => m.Name == name);
-
-            public override VisualElement FieldRow(string path)
-            {
-                var member = MemberOf(path);
-                if (member == null) return new VisualElement();
-                var field = member.Info as FieldInfo;
-                var target = _target;
-                var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
-                Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
-                var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, set);
-                entry.Path = path;
-                return _explorer.Row(entry);
-            }
-
-            public override VisualElement FieldValue(string path)
-            {
-                var value = FieldPaths.Resolve(_target, path).FirstOrDefault();
-                return Gs.Label(value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object)
-                    ? DataModel.Summary(value)
-                    : StateStore.Format(value), "gs-nowrap");
-            }
-
-            public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(_target, path).FirstOrDefault() as UnityEngine.Object;
-
-            public override void SetObject(string path, UnityEngine.Object value)
-            {
-                var member = MemberOf(path);
-                if (!(member?.Info is FieldInfo field) || _explorer._apply == null) return;
-                _explorer._apply(() => field.SetValue(_target, value));
-                _explorer.Changed?.Invoke();
-                _explorer.Refresh();
-            }
-        }
         // ── 한 줄 ──────────────────────────────────────────────
 
         internal VisualElement Row(Entry entry)
@@ -360,41 +393,72 @@ namespace GameSystems.EditorTools.UI
                 row.Add(pick);
             }
 
+            var apply = ApplyFor(entry);
+            if (_browse && entry.Remove != null && apply != null)
+            {
+                var remove = new GsButton("✕", () =>
+                {
+                    apply(entry.Remove);
+                    Changed?.Invoke();
+                    Refresh();
+                }, GsButtonKind.Ghost);
+                remove.AddToClassList("gs-explorer__pick");
+                remove.tooltip = "목록에서 빼기";
+                row.Add(remove);
+            }
+            var editable = _browse && !entry.IsFolder && entry.Set != null && apply != null;
+            // 에셋 참조(스프라이트·데이터 등): Unity 오브젝트 선택 창을 줄 전체에 덮는다.
+            if (editable && DataModel.Of(entry.Type ?? typeof(object)).Kind == DataKind.Reference)
+            {
+                var picker = new ObjectFieldProxy(entry.Type);
+                picker.SetValue(entry.Value as UnityEngine.Object);
+                picker.Changed += value =>
+                {
+                    apply(() => entry.Set(value));
+                    Changed?.Invoke();
+                    Refresh();
+                };
+                row.Add(picker.Element);
+            }
+
             row.RegisterCallback<ClickEvent>(e =>
             {
                 // 줄 안의 버튼(선택)은 버튼이 처리한다.
                 if (e.target is VisualElement target && (target is GsButton || target.GetFirstAncestorOfType<GsButton>() != null)) return;
-                if (entry.IsFolder)
-                {
-                    _trail.Add(new Crumb { Label = entry.Label, Path = entry.Path, Type = entry.Type, Value = entry.Value });
-                    Refresh();
-                }
+                if (entry.IsFolder) Enter(entry);
                 else if (!_browse && entry.Pickable) Pick(entry.Path);
-                else if (_browse && entry.Set != null && _apply != null) BeginEdit(row, preview, entry);
+                else if (editable) BeginEdit(row, preview, entry, apply);
             });
-            if (_browse && !entry.IsFolder && entry.Set != null && _apply != null) row.tooltip = "클릭해서 고치기";
+            if (editable) row.tooltip = "클릭해서 고치기";
             return row;
         }
 
-        // 값 파일 고치기: 형식에 맞는 입력(참거짓은 바로 뒤집기, enum은 목록).
-        void BeginEdit(VisualElement row, Label preview, Entry entry)
+        // 값 고치기: 목록 고르기 규칙(ID 참조·enum) → 목록, 참거짓 → 뒤집기, 나머지 → 글자 입력.
+        void BeginEdit(VisualElement row, Label preview, Entry entry, Action<Action> apply)
         {
-            var type = Nullable.GetUnderlyingType(entry.Type) ?? entry.Type;
+            var type = Nullable.GetUnderlyingType(entry.Type ?? typeof(string)) ?? entry.Type ?? typeof(string);
             void Commit(object next)
             {
-                _apply(() => entry.Set(next));
+                apply(() => entry.Set(next));
                 Changed?.Invoke();
                 Refresh();
             }
+            if (DataModel.Of(type).Kind == DataKind.Reference) return;
             if (type == typeof(bool))
             {
                 Commit(!(entry.Value is bool b && b));
                 return;
             }
-            if (type != null && type.IsEnum)
+            var choices = ValueChoices.For(entry.Member, type);
+            if (choices != null)
             {
-                var items = Enum.GetNames(type).Select(name => new GsDropdownItem(name, () => Commit(Enum.Parse(type, name))) { Selected = entry.Value?.ToString() == name }).ToList();
-                GsDropdown.Show(preview, items);
+                var items = choices.Select(c => new GsDropdownItem(c.Label, () => Commit(c.Value is Enum || type == typeof(string) ? c.Value : Convert.ChangeType(c.Value, type, CultureInfo.InvariantCulture)))
+                {
+                    Caption = c.Caption,
+                    Group = c.Group,
+                    Selected = Equals(c.Value, entry.Value),
+                }).ToList();
+                GsDropdown.Show(preview, items, placeholder: "검색");
                 return;
             }
             if (row.Q<TextField>() != null) return;
@@ -432,7 +496,62 @@ namespace GameSystems.EditorTools.UI
             });
         }
 
+        // 탐색기 안의 실제 객체를 배치 블록에 넘겨준다. 폴더(클래스·컬렉션) 줄을 누르면 탐색기 안에서 들어간다.
+        sealed class ExplorerContext : DataViewContext
+        {
+            readonly GsDataExplorer _explorer;
+            readonly Crumb _crumb;
+
+            public ExplorerContext(GsDataExplorer explorer, Crumb crumb)
+            {
+                _explorer = explorer;
+                _crumb = crumb;
+            }
+
+            object Target => _crumb.Value;
+            public override Type Type => Target.GetType();
+            public override bool CanEdit => _crumb.Apply != null;
+            public override IEnumerable<string> Fields() => FieldPaths.MembersOf(Type).Select(m => m.Name);
+
+            FieldPaths.Member MemberOf(string name) => FieldPaths.MembersOf(Type).FirstOrDefault(m => m.Name == name);
+
+            public override VisualElement FieldRow(string path)
+            {
+                var member = MemberOf(path);
+                if (member == null) return new VisualElement();
+                var field = member.Info as FieldInfo;
+                var target = Target;
+                var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
+                Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
+                var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, member.Info, set, null);
+                entry.Path = path;
+                return _explorer.Row(entry);
+            }
+
+            public override VisualElement FieldValue(string path)
+            {
+                var value = FieldPaths.Resolve(Target, path).FirstOrDefault();
+                return Gs.Label(value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object)
+                    ? DataModel.Summary(value)
+                    : StateStore.Format(value), "gs-nowrap");
+            }
+
+            public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(Target, path).FirstOrDefault() as UnityEngine.Object;
+
+            public override void SetObject(string path, UnityEngine.Object value)
+            {
+                var member = MemberOf(path);
+                if (!(member?.Info is FieldInfo field) || _crumb.Apply == null) return;
+                var target = Target;
+                _crumb.Apply(() => field.SetValue(target, value));
+                _explorer.Changed?.Invoke();
+                _explorer.Refresh();
+            }
+        }
+
         // ── 이름 ───────────────────────────────────────────────
+
+        static string TypeName(Type type) => type == null ? "" : StorableTypes.Label(type);
 
         public static string LabelOf(MemberInfo member, string fallback)
         {

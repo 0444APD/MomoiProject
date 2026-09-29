@@ -23,7 +23,8 @@ namespace GameSystems.EditorTools
             Commands,
         }
 
-        static readonly string[] TabNames = { "타임라인", "상태", "도전과제", "수치", "이벤트", "행동", "명령" };
+        // 데이터(현재 세션·플레이어의 모든 값)는 탐색기로, 나머지는 기능별 화면.
+        static readonly string[] TabNames = { "타임라인", "데이터", "도전과제", "수치", "이벤트", "행동", "명령" };
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
@@ -32,7 +33,7 @@ namespace GameSystems.EditorTools
         [SerializeField] string _selectedStat;
 
         readonly Dictionary<string, double> _statAmounts = new Dictionary<string, double>();
-        readonly Dictionary<string, Dictionary<string, object>> _eventDrafts = new Dictionary<string, Dictionary<string, object>>();
+        readonly Dictionary<string, object> _eventInstances = new Dictionary<string, object>();
         VisualElement _feedback;
         VisualElement _dock;
 
@@ -206,6 +207,8 @@ namespace GameSystems.EditorTools
             _lastJournalId = last;
             _lastUndoCount = _session.UndoCount;
             if (_tab == Tab.Timeline) RefreshTimeline();
+            // 데이터 탭은 들어가 있는 폴더를 유지한 채 값만 다시 그린다.
+            else if (_tab == Tab.State) _dataExplorer?.Refresh();
             else if (_tab != Tab.Commands) BuildTab();
         }
 
@@ -228,7 +231,7 @@ namespace GameSystems.EditorTools
             switch (_tab)
             {
                 case Tab.Timeline: BuildTimeline(); break;
-                case Tab.State: BuildInspect(_session.State); break;
+                case Tab.State: BuildData(); break;
                 case Tab.Achievements: BuildAchievements(); break;
                 case Tab.Stats: BuildStats(); break;
                 case Tab.Events: BuildEvents(); break;
@@ -274,6 +277,16 @@ namespace GameSystems.EditorTools
             row.Add(Gs.Label("", "gs-grow", "gs-nowrap"));
             row.Add(Gs.Label("", "gs-caption", "gs-nowrap", "gs-log-row__count"));
             row.Add(Gs.Label("", "gs-caption", "gs-nowrap"));
+            // 내용 객체(이벤트·행동·클래스 값)가 있으면 탐색기로 연다.
+            var open = new GsButton("열기", null, GsButtonKind.Ghost);
+            open.AddToClassList("gs-log-row__open");
+            open.AddManipulator(new Clickable(() =>
+            {
+                if (open.userData is JournalEntry entry && entry.Payload != null)
+                    GsDataExplorer.BrowseModal(_root, $"{KindName(entry.Kind)} · {entry.Message}", entry.Payload, null);
+            }));
+            open.tooltip = "담긴 내용을 탐색기로 봅니다(읽기 전용)";
+            row.Add(open);
             return row;
         }
 
@@ -292,6 +305,8 @@ namespace GameSystems.EditorTools
             ((Label)row[3]).text = entry.Message;
             ((Label)row[4]).text = data.Descendants > 0 && !data.Expanded ? data.Summary : "";
             ((Label)row[5]).text = $"#{entry.Id} · 틱 {entry.Tick}";
+            row[6].userData = entry;
+            row[6].style.visibility = entry.Payload != null ? Visibility.Visible : Visibility.Hidden;
             row.EnableInClassList("gs-log-row--root", _grouped && data.Depth == 0);
             row.EnableInClassList("gs-log-row--chain", _selectedEntry != 0 && _chain.Contains(entry.Id));
             row.EnableInClassList("gs-log-row--dim", _selectedEntry != 0 && !_chain.Contains(entry.Id));
@@ -598,6 +613,79 @@ namespace GameSystems.EditorTools
             }
         }
 
+        // ── 데이터: 현재 세션·플레이어의 모든 값(분류별 폴더) ──────────
+        // 판 데이터(세션 구역) · 플레이어 데이터(메타 구역) · 수치 · 도전과제 달성. 클래스·컬렉션은 폴더로 들어가 배치대로 본다.
+        // 고치면 게임 코드와 같은 통로(Set·Modify)를 거쳐 기록되고 Undo할 수 있다.
+
+        GsDataExplorer _dataExplorer;
+
+        void BuildData()
+        {
+            var session = _session;
+            var state = session.State;
+
+            ExplorerItem KeyItem(string key)
+            {
+                var type = state.TypeOf(key);
+                var item = new ExplorerItem
+                {
+                    Label = state.LabelOf(key),
+                    Caption = key,
+                    Value = state.Get(key),
+                    Type = type ?? state.Get(key)?.GetType(),
+                };
+                if (state.IsData(key)) item.Apply = change => state.Modify<object>(key, _ => change());
+                else
+                {
+                    item.Set = value => state.Set(key, value);
+                    item.Apply = change => change();
+                }
+                return item;
+            }
+
+            ExplorerItem Folder(string label, string caption, Func<string, bool> include, Color color) => new ExplorerItem
+            {
+                Label = label,
+                Caption = caption,
+                Color = color,
+                Children = () => state.Keys.Where(include).OrderBy(k => k, StringComparer.Ordinal).Select(KeyItem).ToList(),
+            };
+
+            bool IsSystem(string key) => key.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal) || key.StartsWith(StateKeys.AchievementPrefix, StringComparison.Ordinal);
+
+            var root = new ExplorerItem
+            {
+                Label = "데이터",
+                Children = () => new List<ExplorerItem>
+                {
+                    Folder("판 데이터", "이번 판 내용(세션 구역) · 판 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Session, Gs.Palette[6]),
+                    Folder("플레이어 데이터", "프로필(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Meta, Gs.Palette[4]),
+                    Folder("수치", "수치 탭에서 규칙·이벤트로 다루는 값", k => k.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal), Gs.Palette[2]),
+                    new ExplorerItem
+                    {
+                        Label = "도전과제 달성",
+                        Caption = "달성 여부(참/거짓을 바꾸면 달성·초기화)",
+                        Color = Gs.Palette[3],
+                        Children = () => session.Achievements.Definitions.Select(d => new ExplorerItem
+                        {
+                            Label = d.DisplayName,
+                            Caption = d.Id,
+                            Value = session.Achievements.IsUnlocked(d.Id),
+                            Type = typeof(bool),
+                            Set = value =>
+                            {
+                                if (value is bool on && on) session.Achievements.Unlock(d.Id, "모니터에서 직접 달성");
+                                else session.Achievements.ResetProgress(d.Id);
+                            },
+                            Apply = change => change(),
+                        }).ToList(),
+                    },
+                },
+            };
+            _dataExplorer = GsDataExplorer.Browse(root);
+            _dataExplorer.style.flexGrow = 1;
+            _body.Add(_dataExplorer);
+        }
         // ── 상태·수치 (관찰 계약 트리) ─────────────────────────
 
         void BuildInspect(IInspectable inspectable)
@@ -950,34 +1038,23 @@ namespace GameSystems.EditorTools
             form.style.marginBottom = 4;
             split.Add(form);
 
-            if (!_eventDrafts.TryGetValue(selected.FullName, out var draft))
+            // 이벤트 값은 실제 이벤트 인스턴스 하나를 탐색기로 채운다(중첩 클래스·목록 필드도 같은 화면에서).
+            if (!_eventInstances.TryGetValue(selected.FullName, out var instance))
             {
-                draft = new Dictionary<string, object>();
                 try
                 {
-                    var sample = EventSimulator.CreateDefault(selected);
-                    foreach (var member in EventSimulator.EditableMembers(selected)) draft[member.Name] = EventSimulator.GetValue(member, sample);
+                    instance = EventSimulator.CreateDefault(selected);
                 }
                 catch (Exception e)
                 {
                     body.Add(new GsNotice(e.Message.Replace("[GameSystems] ", ""), GsNoticeKind.Error));
                     return;
                 }
-                _eventDrafts[selected.FullName] = draft;
+                _eventInstances[selected.FullName] = instance;
             }
-
-            var members = EventSimulator.EditableMembers(selected).ToList();
-            if (members.Count == 0) body.Add(Gs.Label("채울 값이 없는 이벤트입니다.", "gs-caption"));
-            foreach (var member in members)
-            {
-                var row = Gs.Box("gs-field-row");
-                var label = Gs.Label($"{member.Name} ({TypeName(EventSimulator.MemberType(member))})", "gs-field-row__label");
-                label.style.width = 180;
-                row.Add(label);
-                row.Add(EventFieldEditor(member, draft));
-                body.Add(row);
-            }
-
+            var editor = GsDataExplorer.Browse(EventBus.DisplayNameOf(selected), instance, change => change());
+            editor.style.minHeight = 160;
+            body.Add(editor);
             // 이 이벤트가 움직이는 수치(반영 규칙)를 보여줘 결과를 예상할 수 있게 한다.
             var affected = _session.Stats.Definitions
                 .SelectMany(d => d.Rules.Where(r => r.eventType == selected.FullName).Select(r => $"{d.DisplayName} ← {(string.IsNullOrEmpty(r.field) ? "횟수" : r.field)}"))
@@ -997,7 +1074,9 @@ namespace GameSystems.EditorTools
                 try
                 {
                     var count = Math.Max(1, Math.Min(1000, (int)Math.Round(repeat.value)));
-                    var events = Enumerable.Range(0, count).Select(_ => EventSimulator.Create(selected, draft)).ToList();
+                    var template = _eventInstances[selected.FullName];
+                    // 발생시킬 때마다 사본을 만들어, 이후 편집이 이미 발생한 이벤트(기록)를 바꾸지 않게 한다.
+                    var events = Enumerable.Range(0, count).Select(_ => CopyEvent(template)).ToList();
                     _session.SimulateEvents(events, "모니터 이벤트 발생기");
                     ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생", GsNoticeKind.Ok);
                 }
@@ -1012,6 +1091,17 @@ namespace GameSystems.EditorTools
             ShowDock(dock);
         }
 
+        static object CopyEvent(object template)
+        {
+            try
+            {
+                return DataModel.Clone(template, null);
+            }
+            catch (Exception)
+            {
+                return template;
+            }
+        }
         // 필드 이름 뒤에 붙이는 친숙한 타입 이름.
         internal static string TypeName(Type type)
         {
@@ -1031,51 +1121,6 @@ namespace GameSystems.EditorTools
                 case TypeCode.String: return "string";
                 default: return type.Name;
             }
-        }
-
-        static VisualElement EventFieldEditor(System.Reflection.MemberInfo member, Dictionary<string, object> draft)
-        {
-            var type = EventSimulator.MemberType(member);
-            draft.TryGetValue(member.Name, out var current);
-            VisualElement editor;
-            if (type == typeof(string))
-            {
-                var field = new TextField { value = current as string ?? "" };
-                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
-                editor = field;
-            }
-            else if (type == typeof(bool))
-            {
-                var field = new Toggle { value = current is bool b && b };
-                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
-                editor = field;
-            }
-            else if (type.IsEnum)
-            {
-                // 디자인 시스템 드롭다운: 평소엔 값 글자, 클릭하면 목록.
-                var box = Gs.Box("gs-inline--editable");
-                var label = Gs.Label(current?.ToString() ?? Enum.GetNames(type).FirstOrDefault() ?? "", "gs-inline__value");
-                box.Add(label);
-                box.RegisterCallback<ClickEvent>(_ =>
-                {
-                    var items = Enum.GetNames(type).Select(name => new GsDropdownItem(name, () =>
-                    {
-                        draft[member.Name] = name;
-                        label.text = name;
-                    }) { Selected = name == label.text }).ToList();
-                    GsDropdown.Show(box, items);
-                });
-                editor = box;
-            }
-            else
-            {
-                var field = new DoubleField { value = current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture) };
-                field.RegisterValueChangedCallback(e => draft[member.Name] = e.newValue);
-                editor = field;
-            }
-            editor.AddToClassList("gs-inline");
-            editor.style.width = 200;
-            return editor;
         }
 
         // ── 작업 줄(본문 아래, 오른쪽 정렬) ─────────────────────
@@ -1186,6 +1231,9 @@ namespace GameSystems.EditorTools
                 var color = status == ActionStatus.Done ? Gs.Success : status == ActionStatus.Undone ? Gs.Palette[1] : Gs.Danger;
                 row.Add(new GsBadge(ActionDispatcher.StatusText(status), color) { style = { width = 70 } });
                 var text = Gs.Label(record.Action.Describe(), "gs-grow");
+                var action = record.Action;
+                row.RegisterCallback<ClickEvent>(_ => GsDataExplorer.BrowseModal(_root, "행동 · " + action.Describe(), action, null));
+                row.tooltip = "클릭해서 행동 내용 보기";
                 if (status == ActionStatus.Undone) text.AddToClassList("gs-text-3");
                 row.Add(text);
                 row.Add(Gs.Label(record.Action.Visibility == ActionVisibility.Public ? "공개" : record.Action.Visibility == ActionVisibility.Private ? "본인만" : "개발자", "gs-caption"));

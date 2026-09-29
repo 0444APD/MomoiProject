@@ -406,10 +406,15 @@ namespace GameSystems
                     break;
                 }
                 var c = changes[i];
-                last = _journal.Append(kind, "State", prefix + DescribeData(slot, c), key, Leaf(c.Old), Leaf(c.New), transactionId).Id;
+                var entry = _journal.Append(kind, "State", prefix + DescribeData(slot, c), key, Leaf(c.Old), Leaf(c.New), transactionId);
+                // 클래스·컬렉션이 통째로 들어오거나 빠진 경우 그 모습(사본)을 남겨 모니터에서 열어 볼 수 있게 한다.
+                if (IsDataObject(c.New) || IsDataObject(c.Old)) entry.Payload = IsDataObject(c.New) ? c.New : c.Old;
+                last = entry.Id;
             }
             if (last != 0) _lastEntry[key] = last;
         }
+
+        static bool IsDataObject(object value) => value != null && IsDataType(value.GetType());
 
         static object Leaf(object value) => value == null || !IsDataType(value.GetType()) ? value : DataModel.Summary(value);
 
