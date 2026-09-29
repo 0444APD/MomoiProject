@@ -461,5 +461,19 @@ namespace GameSystems.Tests
             Console.WriteLine($"장비 500개 인벤토리, 누락 검사 {(detect ? "켬(개발 빌드)" : "끔(출시 빌드)")}: 행동 한 번 평균 {perAction:0.00}ms");
             return perAction;
         }
+        [Test]
+        public void 식별자_규칙()
+        {
+            Assert.IsTrue(IdRules.IsValid("player.inventory", out _));
+            Assert.IsTrue(IdRules.IsValid("kills_total", out _));
+            Assert.IsFalse(IdRules.IsValid("Player", out _), "대문자 불가");
+            Assert.IsFalse(IdRules.IsValid("1st", out _), "숫자로 시작 불가");
+            Assert.IsFalse(IdRules.IsValid("처치", out _), "한글은 표시 이름에");
+            Assert.IsFalse(IdRules.IsValid("a..b", out _));
+            Assert.AreEqual("PlayerInventory", IdRules.ToIdentifier("player.inventory"));
+            Assert.AreEqual("KillsTotal", IdRules.ToIdentifier("kills_total"));
+            Assert.AreEqual("player", IdRules.GroupOf("player.inventory"));
+            Assert.AreEqual("stat", IdRules.GroupOf("stat:kills"));
+        }
     }
 }

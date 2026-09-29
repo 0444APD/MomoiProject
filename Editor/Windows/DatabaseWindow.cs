@@ -418,12 +418,48 @@ namespace GameSystems.EditorTools
         {
             var type = SelectedType;
             if (type == null) return;
-            var created = EditorDatabase.Instance.Create(type);
-            _selectedId = created.Id;
-            _search = "";
-            _searchField.Value = "";
-            RefreshAll();
-            OpenDetail(created);
+            var info = DataTypes.Find(type);
+            var db = EditorDatabase.Instance;
+            // 이름(ID)은 여기서 한 번 짓는다. 이후 모든 곳에서는 목록에서 고른다.
+            GsDialog.Form(_root, $"새 {info.DisplayName}", "ID는 저장 파일·코드(GameIds)·조건이 함께 쓰는 식별자입니다. 나중에 바꿔도 참조가 모두 따라갑니다.",
+                new[]
+                {
+                    new DialogField { Key = "id", Label = "ID", Value = db.NextId(info), Caption = "영문 소문자·숫자·밑줄, 분류는 점(.)으로. 예: player.inventory, kills_total" },
+                    new DialogField { Key = "name", Label = "표시 이름", Value = "", Caption = "화면과 목록에 보이는 이름(한글 가능)" },
+                },
+                "만들기",
+                values => db.CanUseId(values["id"], null, out var error) ? null : error,
+                values =>
+                {
+                    var name = string.IsNullOrWhiteSpace(values["name"]) ? null : values["name"].Trim();
+                    var created = db.Create(type, name, values["id"]);
+                    _selectedId = created.Id;
+                    _search = "";
+                    _searchField.Value = "";
+                    RefreshAll();
+                    OpenDetail(created);
+                });
+        }
+
+        void RenameId(GameData item, GsDetailPanel panel)
+        {
+            var db = EditorDatabase.Instance;
+            var usages = db.FindUsages(item);
+            var message = usages.Count == 0
+                ? "이 ID를 가리키는 곳이 없습니다."
+                : $"이 ID를 가리키는 {usages.Count}곳이 함께 바뀝니다: " + string.Join(", ", usages.Take(5).Select(u => u.Label)) + (usages.Count > 5 ? " …" : "");
+            GsDialog.Form(_root, "ID 바꾸기", message + "\n저장 파일의 예전 ID 값은 새 ID로 이어지고, GameIds 코드도 다시 만들어집니다.",
+                new[] { new DialogField { Key = "id", Label = "새 ID", Value = item.Id } },
+                "바꾸기",
+                values => values["id"] == item.Id ? "지금과 같은 ID입니다." : db.CanUseId(values["id"], item, out var error) ? null : error,
+                values =>
+                {
+                    panel.Close();
+                    var count = db.Rename(item, values["id"]);
+                    _selectedId = item.Id;
+                    QueueRefresh();
+                    Debug.Log($"[GameSystems] ID를 바꿨습니다: {item.DisplayName} → {item.Id} (참조 {count}곳 갱신)");
+                });
         }
 
         // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
@@ -448,13 +484,7 @@ namespace GameSystems.EditorTools
                 },
             };
             options.Actions.Add(("에셋 위치", _ => EditorGUIUtility.PingObject(item)));
-            if (_issues.Any(i => i.Asset == item && i.Message.Contains("중복")))
-                options.Actions.Add(("ID 재발급", panel =>
-                {
-                    EditorDatabase.Instance.AssignNewId(item);
-                    panel.Close();
-                    QueueRefresh();
-                }));
+            options.Actions.Add(("ID 바꾸기", panel => RenameId(item, panel)));
             options.Actions.Add(("삭제", panel => Delete(item, panel)));
             GsDetailPanel.Open(_root, item, options);
         }
@@ -494,6 +524,16 @@ namespace GameSystems.EditorTools
         }
         void Delete(GameData item, GsDetailPanel panel)
         {
+            // 어딘가에서 가리키는 항목은 지우지 못하게 막고 사용처를 보여 준다(지우면 끊긴 참조가 생긴다).
+            var usages = EditorDatabase.Instance.FindUsages(item);
+            if (usages.Count > 0)
+            {
+                GsDialog.Show(_root, "삭제할 수 없습니다",
+                    $"'{item.DisplayName}'을(를) {usages.Count}곳에서 가리키고 있습니다. 먼저 그곳들의 선택을 바꾸세요.\n" +
+                    string.Join("\n", usages.Take(10).Select(u => "· " + u.Label)) + (usages.Count > 10 ? "\n…" : ""),
+                    null, new DialogButton("확인", GsButtonKind.Primary, null));
+                return;
+            }
             GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 에셋은 휴지통으로 이동합니다.", "삭제", () =>
             {
                 panel.Close();

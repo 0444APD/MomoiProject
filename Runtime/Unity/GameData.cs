@@ -5,12 +5,12 @@ using UnityEngine;
 namespace GameSystems.Data
 {
     // 데이터베이스 항목의 공용 베이스. 이 클래스를 상속하면 코드 추가 없이 데이터베이스 창에 나타난다.
-    // 제공 계약: 자동 ID(생성 후 변경 불가), 표시 이름, 태그, 검증 훅.
+    // 제공 계약: ID(데이터베이스 창에서 짓고, 바꾸면 모든 참조·저장·생성 코드가 따라간다), 표시 이름, 태그, 검증 훅.
     public abstract class GameData : ScriptableObject
     {
         [SerializeField, HideInInspector] string id;
         [SerializeField, FieldLabel("이름")] string displayName;
-        [SerializeField, FieldLabel("태그")] List<string> tags = new List<string>();
+        [SerializeField, FieldLabel("태그"), DataRef(typeof(TagData))] List<string> tags = new List<string>();
 
         public string Id => id;
         public string DisplayName => string.IsNullOrEmpty(displayName) ? name : displayName;
@@ -22,7 +22,7 @@ namespace GameSystems.Data
         }
 
 #if UNITY_EDITOR
-        // ID는 에디터 도구만 부여한다(세이브 호환을 위해 이후 변경하지 않는다).
+        // ID는 에디터 도구만 부여·변경한다(변경 시 참조 갱신·저장 호환 별칭은 EditorDatabase.Rename이 처리).
         public void EditorAssignId(string newId) => id = newId;
         public void EditorSetDisplayName(string value) => displayName = value;
 #endif
@@ -42,6 +42,25 @@ namespace GameSystems.Data
         {
             DisplayName = displayName;
         }
+    }
+
+    // 문자열 필드가 어떤 데이터베이스 항목의 ID인지 표시한다. 에디터는 직접 입력 대신 그 타입 항목만 목록으로 보여 주고,
+    // 검증기는 없는 ID를 찾아내며, ID 이름을 바꾸면 이 필드들의 값도 함께 바뀐다. List<string>에도 쓸 수 있다.
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class DataRefAttribute : Attribute
+    {
+        public Type DataType { get; }
+
+        public DataRefAttribute(Type dataType)
+        {
+            DataType = dataType;
+        }
+    }
+
+    // 문자열 필드가 저장소에 담을 값 형식(타입 전체 이름)임을 표시한다. 에디터는 담을 수 있는 형식 목록을 띄운다.
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class DataTypeRefAttribute : Attribute
+    {
     }
 
     // GameData를 상속하지만 데이터베이스 창에 보이지 않아야 할 때.

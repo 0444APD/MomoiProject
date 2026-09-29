@@ -12,6 +12,8 @@ namespace GameSystems
         public int JournalCapacity = 4096;
         // 저장 데이터 버전. 출시 후 데이터 구조를 바꾸면 올리고 GameSession.Migrations에 변환을 등록한다.
         public int SaveVersion = 1;
+        // 저장 버전 변환. 불러오기 전에 등록되도록 옵션에 둔다(GameSystemsRuntime.Configuring에서 등록).
+        public SaveMigrations Migrations = new SaveMigrations();
         // Modify를 거치지 않은 데이터 수정 검사(행동마다·프레임마다 값 전체 비교). 출시 빌드에서는 끈다.
         public bool DetectUntrackedChanges = true;
     }
@@ -30,7 +32,7 @@ namespace GameSystems
         public AchievementSystem Achievements { get; }
         public DebugCommands Debug { get; }
         public SessionOptions Options { get; }
-        public SaveMigrations Migrations { get; } = new SaveMigrations();
+        public SaveMigrations Migrations => Options.Migrations;
 
         // 확정 전 행동별 난수 상태. 무르면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, 무르기 악용 차단).
         readonly Dictionary<long, Dictionary<string, ulong[]>> _randomBefore = new Dictionary<long, Dictionary<string, ulong[]>>();

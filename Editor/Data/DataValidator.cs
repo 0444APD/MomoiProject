@@ -52,13 +52,15 @@ namespace GameSystems.EditorTools
                 foreach (var data in group)
                 {
                     context.Current = data;
-                    context.Error($"ID '{data.Id}'가 {group.Count()}개 항목에서 중복됩니다(복제한 에셋일 수 있음). 'ID 재발급'으로 고치세요.");
+                    context.Error($"ID '{data.Id}'가 {group.Count()}개 항목에서 중복됩니다(복제한 에셋일 수 있음). 'ID 바꾸기'로 고치세요.");
                 }
 
             foreach (var data in all)
             {
                 context.Current = data;
                 if (string.IsNullOrEmpty(data.Id)) context.Error("ID가 없습니다.");
+                else if (!IdRules.IsValid(data.Id, out var idError)) context.Error($"ID '{data.Id}': {idError} 'ID 바꾸기'로 고치세요.");
+                CheckReferences(data, all, context);
                 try
                 {
                     data.ValidateData(context);
@@ -79,6 +81,32 @@ namespace GameSystems.EditorTools
 
             FindCycles(all.OfType<AchievementData>().ToList(), context);
             return context.Issues;
+        }
+
+        // [DataRef] 필드가 없는 항목을 가리키는지(수치·도전과제 참조는 블록 검증이 따로 본다).
+        static void CheckReferences(GameData data, IReadOnlyList<GameData> all, Context context)
+        {
+            try
+            {
+                EditorDatabase.ForEachReference(data, (property, refType) =>
+                {
+                    if (refType == typeof(StatData) || refType == typeof(AchievementData)) return;
+                    var id = property.stringValue;
+                    var kind = DataTypes.Find(refType)?.DisplayName ?? refType.Name;
+                    if (string.IsNullOrEmpty(id))
+                    {
+                        context.Warning($"{property.displayName}: {kind}이(가) 선택되지 않은 칸이 있습니다.");
+                        return;
+                    }
+                    var target = all.FirstOrDefault(d => d != null && d.Id == id);
+                    if (target == null || !refType.IsInstanceOfType(target))
+                        context.Error($"{property.displayName}: 없는 {kind} '{id}'를 가리킵니다. 목록에서 다시 고르거나 {kind}을(를) 먼저 만드세요.");
+                });
+            }
+            catch (Exception e)
+            {
+                context.Error($"참조 검사 중 오류: {e.Message}");
+            }
         }
 
         // A 달성 → B 조건 → A 조건 같은 순환 참조.

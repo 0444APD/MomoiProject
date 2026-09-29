@@ -600,7 +600,7 @@ namespace GameSystems
             var groups = new SortedDictionary<string, InspectNode>(StringComparer.Ordinal);
             foreach (var pair in _slots)
             {
-                var prefix = pair.Key.Contains(":") ? pair.Key.Substring(0, pair.Key.IndexOf(':')) : "기타";
+                var prefix = IdRules.GroupOf(pair.Key);
                 if (!groups.TryGetValue(prefix, out var group))
                 {
                     group = new InspectNode(prefix);

@@ -118,6 +118,104 @@ namespace GameSystems.EditorTools.UI
             Show(host, title, message, changes,
                  new DialogButton("취소", GsButtonKind.Ghost, null),
                  new DialogButton(confirmText, GsButtonKind.Primary, onConfirm));
+
+        // 입력 창. 칸마다 값을 받고, 입력할 때마다 validate로 검사해 오류를 보여 주며 오류가 있으면 확인 버튼을 막는다.
+        // validate: 값들 → 오류 문장(없으면 null). onConfirm: 확인된 값들.
+        public static GsModal Form(VisualElement host, string title, string message, IList<DialogField> fields, string confirmText,
+                                   Func<Dictionary<string, string>, string> validate, Action<Dictionary<string, string>> onConfirm)
+        {
+            var box = Gs.Box("gs-dialog");
+            box.Add(Gs.Label(title, "gs-title"));
+            if (!string.IsNullOrEmpty(message))
+            {
+                var text = Gs.Label(message, "gs-text-2");
+                text.style.marginTop = 8;
+                text.style.whiteSpace = WhiteSpace.Normal;
+                box.Add(text);
+            }
+
+            var values = new Dictionary<string, string>();
+            var inputs = new List<TextField>();
+            var error = Gs.Label("", "gs-caption");
+            error.style.color = Gs.Danger;
+            error.style.marginTop = 10;
+            error.style.whiteSpace = WhiteSpace.Normal;
+            GsButton confirm = null;
+
+            void Check()
+            {
+                var problem = validate?.Invoke(values);
+                error.text = problem ?? "";
+                error.style.display = string.IsNullOrEmpty(problem) ? DisplayStyle.None : DisplayStyle.Flex;
+                confirm?.SetEnabled(string.IsNullOrEmpty(problem));
+            }
+
+            foreach (var field in fields)
+            {
+                var key = field.Key;
+                values[key] = field.Value ?? "";
+                var row = Gs.Col();
+                row.style.marginTop = 14;
+                row.Add(Gs.Label(field.Label, "gs-detail__label"));
+                var input = new TextField { value = values[key] };
+                input.AddToClassList("gs-inline");
+                input.style.marginTop = 6;
+                input.RegisterValueChangedCallback(e =>
+                {
+                    values[key] = e.newValue ?? "";
+                    Check();
+                });
+                row.Add(input);
+                if (!string.IsNullOrEmpty(field.Caption))
+                {
+                    var caption = Gs.Label(field.Caption, "gs-caption");
+                    caption.style.marginTop = 4;
+                    caption.style.whiteSpace = WhiteSpace.Normal;
+                    row.Add(caption);
+                }
+                box.Add(row);
+                inputs.Add(input);
+            }
+            box.Add(error);
+
+            var buttons = Gs.Box("gs-dialog__buttons");
+            box.Add(buttons);
+            var modal = GsModal.Show(host, box);
+            buttons.Add(new GsButton("취소", modal.Close, GsButtonKind.Ghost));
+            void Submit()
+            {
+                if (!string.IsNullOrEmpty(validate?.Invoke(values))) return;
+                modal.Close();
+                onConfirm?.Invoke(new Dictionary<string, string>(values));
+            }
+            confirm = new GsButton(confirmText, Submit, GsButtonKind.Primary);
+            buttons.Add(confirm);
+
+            // Enter로 확인.
+            box.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode != KeyCode.Return && e.keyCode != KeyCode.KeypadEnter) return;
+                e.StopPropagation();
+                Submit();
+            }, TrickleDown.TrickleDown);
+
+            Check();
+            if (inputs.Count > 0)
+                inputs[0].schedule.Execute(() =>
+                {
+                    inputs[0].Focus();
+                    inputs[0].SelectAll();
+                }).StartingIn(40);
+            return modal;
+        }
+    }
+
+    public sealed class DialogField
+    {
+        public string Key;
+        public string Label;
+        public string Value;
+        public string Caption;
     }
 
     // 위 [이전] · V 화살표 · 아래 [현재]

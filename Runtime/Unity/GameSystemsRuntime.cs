@@ -52,7 +52,19 @@ namespace GameSystems
             }
             else
             {
+                foreach (var key in database.All<StateKeyData>())
+                {
+                    try { key.DefineIn(session.State); }
+                    catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[GameSystems] ", "")); }
+                }
                 foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
+                // ID 이름이 바뀐 항목은 예전 이름으로 저장된 값을 이어받는다.
+                foreach (var rename in database.Renames)
+                {
+                    if (rename.dataType == typeof(StatData).FullName) session.State.AddAlias(StateKeys.Stat(rename.oldId), StateKeys.Stat(rename.newId));
+                    else if (rename.dataType == typeof(AchievementData).FullName) session.State.AddAlias(StateKeys.Achievement(rename.oldId), StateKeys.Achievement(rename.newId));
+                    else if (rename.dataType == typeof(StateKeyData).FullName) session.State.AddAlias(rename.oldId, rename.newId);
+                }
                 LoadProfile(session);
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
                 session.Achievements.EvaluateAll();

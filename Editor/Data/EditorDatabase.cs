@@ -67,10 +67,12 @@ namespace GameSystems.EditorTools
 
         // ── 생성과 ID ─────────────────────────────────────────
 
-        public GameData Create(Type type, string displayName = null)
+        // id를 주지 않으면 접두어_0001 형식으로 제안한 ID를 쓴다. 데이터베이스 창은 만들기 전에 이름을 묻는다.
+        public GameData Create(Type type, string displayName = null, string id = null)
         {
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 데이터베이스 타입이 아닙니다.");
-            var id = NextId(info);
+            id = string.IsNullOrEmpty(id) ? NextId(info) : id;
+            if (!CanUseId(id, null, out var error)) throw new ArgumentException("[GameSystems] " + error);
             var folder = $"{DataRoot}/{Sanitize(info.DisplayName)}";
             EnsureFolder(folder);
 
@@ -108,6 +110,101 @@ namespace GameSystems.EditorTools
             EditorUtility.SetDirty(data);
             AssetDatabase.SaveAssetIfDirty(data);
             MarkDirty();
+        }
+
+        // ── ID 규칙·이름 바꾸기·참조 찾기 ─────────────────────────
+
+        // 형식이 맞고 다른 항목이 쓰지 않는 ID인지. self는 이름을 바꾸는 항목 자신(자기 ID는 중복으로 치지 않는다).
+        public bool CanUseId(string id, GameData self, out string error)
+        {
+            if (!IdRules.IsValid(id, out error)) return false;
+            var owner = All.FirstOrDefault(d => d != self && d.Id == id);
+            if (owner == null) return true;
+            error = $"'{id}'는 이미 '{owner.DisplayName}'({DataTypes.Find(owner.GetType())?.DisplayName})이(가) 쓰고 있습니다.";
+            return false;
+        }
+
+        public sealed class IdUsage
+        {
+            public GameData Owner;
+            public string PropertyPath;
+            public string Label;
+        }
+
+        // 이 항목의 ID를 가리키는 모든 곳(조건·보상·태그 칸 등 ID 참조 필드).
+        public List<IdUsage> FindUsages(GameData target)
+        {
+            var result = new List<IdUsage>();
+            if (target == null || string.IsNullOrEmpty(target.Id)) return result;
+            foreach (var data in All)
+            {
+                ForEachReference(data, (property, refType) =>
+                {
+                    if (property.stringValue == target.Id && refType.IsInstanceOfType(target))
+                        result.Add(new IdUsage { Owner = data, PropertyPath = property.propertyPath, Label = $"{data.DisplayName} · {property.displayName}" });
+                });
+            }
+            return result;
+        }
+
+        // ID 참조 필드(수치·도전과제·[DataRef])를 모두 방문한다. 조건·보상 블록 안쪽까지 들어간다.
+        public static void ForEachReference(GameData data, Action<SerializedProperty, Type> visit)
+        {
+            var so = new SerializedObject(data);
+            var it = so.GetIterator();
+            while (it.Next(true))
+            {
+                if (it.propertyType != SerializedPropertyType.String) continue;
+                var refType = RefTypeOf(PropertyUtil.GetField(it, out _));
+                if (refType != null) visit(it, refType);
+            }
+        }
+
+        public static Type RefTypeOf(System.Reflection.FieldInfo field)
+        {
+            if (field == null) return null;
+            if (field.IsDefined(typeof(StatRefAttribute), false)) return typeof(StatData);
+            if (field.IsDefined(typeof(AchievementRefAttribute), false)) return typeof(AchievementData);
+            return ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
+        }
+
+        // ID를 바꾼다. 이 ID를 가리키는 모든 필드, 에셋 파일 이름, 생성 코드(GameIds)가 함께 바뀌고,
+        // 예전 이름으로 저장된 플레이어 데이터는 런타임이 새 이름으로 이어받는다(GameDatabase 변경 이력).
+        public int Rename(GameData data, string newId)
+        {
+            var oldId = data.Id;
+            if (oldId == newId) return 0;
+            if (!CanUseId(newId, data, out var error)) throw new ArgumentException("[GameSystems] " + error);
+
+            var usages = FindUsages(data);
+            Undo.IncrementCurrentGroup();
+            var group = Undo.GetCurrentGroup();
+            foreach (var usage in usages)
+            {
+                var so = new SerializedObject(usage.Owner);
+                var property = so.FindProperty(usage.PropertyPath);
+                if (property == null) continue;
+                property.stringValue = newId;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(usage.Owner);
+            }
+            Undo.RecordObject(data, "ID 바꾸기");
+            data.EditorAssignId(newId);
+            EditorUtility.SetDirty(data);
+            Undo.CollapseUndoOperations(group);
+
+            var path = AssetDatabase.GetAssetPath(data);
+            if (System.IO.Path.GetFileNameWithoutExtension(path) == oldId) AssetDatabase.RenameAsset(path, newId);
+
+            var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
+            if (database != null)
+            {
+                database.EditorAddRename(data.GetType().FullName, oldId, newId);
+                EditorUtility.SetDirty(database);
+            }
+            AssetDatabase.SaveAssets();
+            MarkDirty();
+            return usages.Count;
         }
 
         // ID 없는 항목(Create 메뉴로 만든 것 등)에 ID를 부여하고, 런타임용 GameDatabase 목록을 맞춘다.

@@ -69,6 +69,8 @@ namespace GameSystems.EditorTools.UI
         bool IsAchievementRef => _field != null && _field.IsDefined(typeof(AchievementRefAttribute), false);
         bool IsEventTypeRef => _field != null && _field.IsDefined(typeof(EventTypeRefAttribute), false);
         EventFieldRefAttribute EventFieldRef => _field?.GetCustomAttribute<EventFieldRefAttribute>();
+        Type DataRefType => _field?.GetCustomAttribute<DataRefAttribute>()?.DataType;
+        bool IsDataTypeRef => _field != null && _field.IsDefined(typeof(DataTypeRefAttribute), false);
 
         public void Refresh()
         {
@@ -95,6 +97,20 @@ namespace GameSystems.EditorTools.UI
                     if (string.IsNullOrEmpty(id)) return ("선택 안 됨", true, false);
                     var target = db.FindById(id);
                     return target != null ? (target.DisplayName, false, false) : ($"없는 항목: {id}", false, true);
+                }
+                var dataRef = field?.GetCustomAttribute<DataRefAttribute>();
+                if (dataRef != null)
+                {
+                    var kind = DataTypes.Find(dataRef.DataType)?.DisplayName ?? dataRef.DataType.Name;
+                    if (string.IsNullOrEmpty(id)) return ($"{kind} 선택", true, false);
+                    var target = db.FindById(id);
+                    return target != null && dataRef.DataType.IsInstanceOfType(target) ? (target.DisplayName, false, false) : ($"없는 {kind}: {id}", false, true);
+                }
+                if (field != null && field.IsDefined(typeof(DataTypeRefAttribute), false))
+                {
+                    if (string.IsNullOrEmpty(id)) return ("형식 선택", true, false);
+                    var valueType = TypeResolver.Find(id);
+                    return valueType != null ? (StorableTypes.Label(valueType), false, false) : ($"없는 형식: {id}", false, true);
                 }
                 if (field != null && field.IsDefined(typeof(EventTypeRefAttribute), false))
                 {
@@ -156,6 +172,12 @@ namespace GameSystems.EditorTools.UI
                     return;
                 case SerializedPropertyType.String when EventFieldRef != null:
                     ShowEventFieldMenu();
+                    return;
+                case SerializedPropertyType.String when DataRefType != null:
+                    ShowIdMenu(EditorDatabase.Instance.OfType(DataRefType), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
+                    return;
+                case SerializedPropertyType.String when IsDataTypeRef:
+                    ShowStorableTypeMenu();
                     return;
             }
             BeginEdit();
@@ -225,6 +247,21 @@ namespace GameSystems.EditorTools.UI
             }
             GsDropdown.Show(this, items);
         }
+        void ShowStorableTypeMenu()
+        {
+            var items = StorableTypes.All().Select(type =>
+            {
+                var name = type.FullName;
+                return new GsDropdownItem(StorableTypes.Label(type), () => SetString(name))
+                {
+                    Group = StorableTypes.GroupOf(type),
+                    Caption = type.Namespace,
+                    Selected = _property.stringValue == name,
+                };
+            }).ToList();
+            GsDropdown.Show(this, items, placeholder: "형식 검색");
+        }
+
         void SetString(string value)
         {
             _property.serializedObject.Update();
