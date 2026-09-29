@@ -16,7 +16,7 @@
 
 쓰는 규칙은 두 가지뿐입니다.
 
-1. 키(ID)는 데이터베이스 창 한곳에서만 짓고, 나머지는 목록에서 고르거나 생성된 코드(`GameIds`)로 씁니다.
+1. 키(ID)는 도감 창 한곳에서만 짓고, 나머지는 목록에서 고르거나 생성된 코드(`GameIds`)로 씁니다.
 2. 저장소 안의 값은 반드시 `Set`(통째로 교체) 또는 `Modify`(일부 수정)로 바꿉니다.
 
 ---
@@ -85,9 +85,9 @@ public class Inventory
 }
 ```
 
-### 3.2 데이터베이스 창에서 상태 키 만들기
+### 3.2 도감 창에서 상태 키 만들기
 
-1. 메뉴 `Game Systems > 데이터베이스`를 엽니다.
+1. 메뉴 `Game Systems > 도감`를 엽니다.
 2. 왼쪽의 `식별자 > 상태 키`를 고르고 `+ 추가`를 누릅니다.
 3. 창이 뜨면 ID(예: `player.inventory`)와 표시 이름(예: `인벤토리`)을 입력합니다.
 4. 상세 패널에서 구역(메타)과 값 형식(`Inventory`)을 목록에서 고릅니다.
@@ -338,7 +338,7 @@ GameSystemsRuntime.Configuring += options =>
 
 `GameSystemsRuntime`을 쓰지 않고 세션을 직접 만든다면 `new GameSession(options)` 전에 `options.Migrations`에 등록하거나, `ImportMeta`보다 먼저 `session.Migrations`에 등록하세요.
 
-필드 이름만 바꾼 경우는 변환 없이 `[FormerlySerializedAs("예전이름")]`만 달면 됩니다. 상태 키·수치·도전과제의 ID를 데이터베이스 창에서 바꾼 경우도 변환이 필요 없습니다(11.3 참고).
+필드 이름만 바꾼 경우는 변환 없이 `[FormerlySerializedAs("예전이름")]`만 달면 됩니다. 상태 키·수치·도전과제의 ID를 도감 창에서 바꾼 경우도 변환이 필요 없습니다(11.3 참고).
 
 ---
 
@@ -358,7 +358,7 @@ GameSystemsRuntime.Configuring += options =>
 
 ### 11.1 규칙
 
-- ID는 데이터베이스 창에서 항목을 만들 때 한 번 짓습니다.
+- ID는 도감 창에서 항목을 만들 때 한 번 짓습니다.
 - 형식은 영문 소문자로 시작하고 소문자·숫자·밑줄만 씁니다. 분류는 점(.)으로 나눕니다. 예: `player.inventory`, `kills_total`, `boss`
 - 한글 이름은 표시 이름에 적습니다. 표시 이름은 자유롭게 바꿔도 됩니다.
 - 모든 ID는 프로젝트 전체에서 하나뿐이어야 합니다.
@@ -437,7 +437,7 @@ public class MonsterData : GameData
 
 | 증상 | 원인과 해결 |
 |---|---|
-| "정의되지 않은 상태 키" 오류 | 데이터베이스 창에서 상태 키를 만들지 않았습니다. 코드에는 `GameIds`를 쓰세요. |
+| "정의되지 않은 상태 키" 오류 | 도감 창에서 상태 키를 만들지 않았습니다. 코드에는 `GameIds`를 쓰세요. |
 | "Modify를 거치지 않고 바뀌었습니다" 경고 | `Get`으로 받은 인스턴스를 직접 고쳤습니다. `Modify` 안에서 고치세요. |
 | "담을 수 없는 필드" 오류 | 함수·`object` 필드가 있습니다. `[NonSerialized]`를 붙이거나 데이터로 바꾸세요. |
 | "순환 참조" 오류 | 객체끼리 서로를 가리킵니다. 한쪽은 ID(`[DataRef]` 문자열)로 가리키세요. |
@@ -454,7 +454,7 @@ public class MonsterData : GameData
 | `StateStore` | `Get(key)`, `Get<T>(id)` | 읽기(데이터 값은 실제 인스턴스) |
 | | `Set(key, value)` | 통째로 바꾸기 |
 | | `Modify(key, action)` | 클래스·컬렉션 일부 바꾸기 |
-| | `Define(key, zone, default)` | 코드에서 직접 등록(보통은 데이터베이스 창) |
+| | `Define(key, zone, default)` | 코드에서 직접 등록(보통은 도감 창) |
 | | `Changed`, `DataChanged` | 변경 알림 |
 | | `Identity.IdOf(instance)` | 컬렉션 요소의 내부 ID |
 | | `CheckUntrackedChanges()` | 누락 검사 수동 실행 |

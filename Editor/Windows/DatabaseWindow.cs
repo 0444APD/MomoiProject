@@ -32,11 +32,11 @@ namespace GameSystems.EditorTools
         // 등장 애니메이션은 타입을 바꿀 때만(값 수정 후 재구성 때는 생략).
         bool _animate = true;
 
-        [MenuItem("Game Systems/데이터베이스", priority = 0)]
+        [MenuItem("Game Systems/도감", priority = 0)]
         public static void Open()
         {
             var window = GetWindow<DatabaseWindow>();
-            window.titleContent = new GUIContent("데이터베이스");
+            window.titleContent = new GUIContent("도감");
             window.minSize = new Vector2(980, 560);
         }
 
@@ -240,7 +240,7 @@ namespace GameSystems.EditorTools
             var type = SelectedType;
             if (type == null)
             {
-                _title.text = "데이터베이스";
+                _title.text = "도감";
                 _caption.text = "GameData를 상속한 클래스를 만들면 여기에 자동으로 나타납니다.";
                 return;
             }

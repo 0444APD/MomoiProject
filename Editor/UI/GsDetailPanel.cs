@@ -211,6 +211,7 @@ namespace GameSystems.EditorTools.UI
             _body.Add(_notices);
 
             // 본문은 타입별 배치(그리드 + 블록)로 그린다. 기본 배치: 스프라이트 나열 + 데이터 나열.
+            RememberReferences();
             _body.Add(new GsDataView(new DetailContext(this)));
 
             RefreshState();
@@ -230,7 +231,7 @@ namespace GameSystems.EditorTools.UI
             var field = PropertyUtil.GetField(property, out _);
             var section = Gs.Box("gs-detail__section");
             section.Add(Gs.Label(GsPropertyEditor.LabelOf(property, field).ToUpperInvariant(), "gs-detail__label"));
-            var content = GsPropertyEditor.BuildContent(property, OnValueChanged, OnStructureChanged);
+            var content = UsesExplorer(property, field) ? EmbeddedExplorer(property, field) : GsPropertyEditor.BuildContent(property, OnValueChanged, OnStructureChanged);
             if (content is GsInlineProperty inline)
             {
                 section.Add(ValueWithHistory(path, inline, section, null));
@@ -244,6 +245,66 @@ namespace GameSystems.EditorTools.UI
                 _sections[path] = (section, change, c => change.Set(c.Old, c.New));
             }
             return section;
+        }
+
+        // 클래스·컬렉션 필드는 탐색기로 연다(도감·모니터와 같은 모양). 조건·보상 같은 블록 트리는 문장 편집기를 쓴다.
+        static bool UsesExplorer(SerializedProperty property, System.Reflection.FieldInfo field)
+        {
+            if (field == null) return false;
+            if (property.propertyType == SerializedPropertyType.ManagedReference) return !IsBlockType(field.FieldType);
+            if (property.propertyType != SerializedPropertyType.Generic) return false;
+            var type = field.FieldType;
+            var element = FieldPaths.ElementTypeOf(type);
+            if (element != null)
+                return !PropertyUtil.IsManagedReferenceList(field) && !ContainsBlocks(element, 0) && !typeof(UnityEngine.Object).IsAssignableFrom(element);
+            return property.hasVisibleChildren && !ContainsBlocks(type, 0);
+        }
+
+        static bool IsBlockType(Type type) =>
+            typeof(Condition).IsAssignableFrom(type) || typeof(Reward).IsAssignableFrom(type) || typeof(ValueFilter).IsAssignableFrom(type);
+
+        static bool ContainsBlocks(Type type, int depth)
+        {
+            if (type == null || depth > 4) return false;
+            if (IsBlockType(type)) return true;
+            var element = FieldPaths.ElementTypeOf(type);
+            if (element != null) return ContainsBlocks(element, depth + 1);
+            if (DataModel.Of(type).Kind != DataKind.Object) return false;
+            return FieldPaths.MembersOf(type).Any(m => ContainsBlocks(m.Type, depth + 1));
+        }
+
+        // 사본 객체의 필드 값을 탐색기로 연다. 고치면 사본에 반영되고 변경 표시·저장 흐름을 그대로 탄다.
+        VisualElement EmbeddedExplorer(SerializedProperty property, System.Reflection.FieldInfo field)
+        {
+            var value = field.GetValue(_draft);
+            if (value == null)
+            {
+                if (property.propertyType == SerializedPropertyType.ManagedReference)
+                    return Gs.Label("비어 있습니다 — 위에서 형식을 고르면 만들어집니다.", "gs-caption");
+                try
+                {
+                    value = DataModel.Create(field.FieldType);
+                    field.SetValue(_draft, value);
+                }
+                catch (Exception)
+                {
+                    return Gs.Label("비어 있습니다", "gs-caption");
+                }
+            }
+            var explorer = GsDataExplorer.Browse(new ExplorerItem
+            {
+                Label = GsPropertyEditor.LabelOf(property, field),
+                Value = value,
+                Member = field,
+                Apply = change =>
+                {
+                    change();
+                    _draftObject.Update();
+                    OnValueChanged();
+                },
+            });
+            explorer.AddToClassList("gs-explorer--embedded");
+            return explorer;
         }
 
         // 상세 패널의 데이터(편집 중 사본)를 배치 블록에 넘겨준다.
@@ -330,7 +391,28 @@ namespace GameSystems.EditorTools.UI
             return column;
         }
 
-        void OnValueChanged() => RefreshState();
+        // 관리 참조 필드(템플릿 값 등)가 새 인스턴스로 바뀌면 본문을 다시 그린다(새 값의 탐색기를 보이려고).
+        readonly Dictionary<string, long> _referenceIds = new Dictionary<string, long>();
+
+        void RememberReferences()
+        {
+            _referenceIds.Clear();
+            foreach (var property in PropertyUtil.TopLevel(_draftObject))
+                if (property.propertyType == SerializedPropertyType.ManagedReference) _referenceIds[property.propertyPath] = property.managedReferenceId;
+        }
+
+        void OnValueChanged()
+        {
+            _draftObject.Update();
+            foreach (var property in PropertyUtil.TopLevel(_draftObject))
+            {
+                if (property.propertyType != SerializedPropertyType.ManagedReference) continue;
+                if (_referenceIds.TryGetValue(property.propertyPath, out var id) && id == property.managedReferenceId) continue;
+                OnStructureChanged();
+                return;
+            }
+            RefreshState();
+        }
 
         void OnStructureChanged()
         {

@@ -132,6 +132,12 @@ namespace GameSystems.EditorTools.UI
             {
                 layout.blocks.Add(new BlockPlacement { block = DataListBlock.Id, x = 0, y = 0, w = 12 });
             }
+            int row = 1;
+            foreach (var entry in GsLayoutBlock.Registry.Values)
+            {
+                var block = (GsLayoutBlock)Activator.CreateInstance(entry.type);
+                if (block.AutoInclude(type)) layout.blocks.Add(new BlockPlacement { block = entry.info.Id, x = 0, y = row++, w = 12 });
+            }
             return layout;
         }
 
@@ -188,6 +194,8 @@ namespace GameSystems.EditorTools.UI
         public virtual BlockSettings Settings => BlockSettings.None;
         // 이 블록이 따로 보여 주는 최상위 필드(데이터 나열 블록은 이것들을 빼고 그린다).
         public virtual IEnumerable<string> Claims(BlockPlacement placement) => Array.Empty<string>();
+        // 이 타입의 기본 배치에 자동으로 넣을지(예: 프리팹 항목 → 컴포넌트 블록).
+        public virtual bool AutoInclude(Type type) => false;
         public abstract VisualElement Build(DataViewContext context, BlockPlacement placement, ISet<string> claimed);
 
         static Dictionary<string, (Type type, LayoutBlockAttribute info)> _registry;

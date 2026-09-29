@@ -379,7 +379,23 @@ namespace GameSystems.EditorTools.UI
             var items = StorableTypes.All().Select(type =>
             {
                 var name = type.FullName;
-                return new GsDropdownItem(StorableTypes.Label(type), () => SetString(name))
+                return new GsDropdownItem(StorableTypes.Label(type), () =>
+                {
+                    var instanceField = _field.GetCustomAttribute<DataTypeRefAttribute>()?.InstanceField;
+                    if (string.IsNullOrEmpty(instanceField))
+                    {
+                        SetString(name);
+                        return;
+                    }
+                    // 형식을 고르면 그 형식의 새 인스턴스를 옆 칸에 넣는다(템플릿). 같은 형식이면 기존 값을 둔다.
+                    _property.serializedObject.Update();
+                    var changed = _property.stringValue != name;
+                    _property.stringValue = name;
+                    var instance = _property.serializedObject.FindProperty(FieldPathContext.Sibling(_property.propertyPath, instanceField));
+                    if (instance != null && instance.propertyType == SerializedPropertyType.ManagedReference && (changed || instance.managedReferenceValue == null))
+                        instance.managedReferenceValue = DataModel.Create(type);
+                    Apply();
+                })
                 {
                     Group = StorableTypes.GroupOf(type),
                     Caption = type.Namespace,
