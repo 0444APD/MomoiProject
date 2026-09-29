@@ -7,7 +7,7 @@ using System.Reflection;
 namespace GameSystems
 {
     // 테스트용 이벤트 발생. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 수치 규칙 → 확정 → 도전과제 → 보상)를 탄다.
-    // 행동으로 기록되므로 무르기·확정·인과 추적이 그대로 적용된다.
+    // 행동으로 기록되므로 무르기·인과 추적이 그대로 적용된다.
     [Serializable]
     public sealed class SimulatedEventAction : GameAction
     {

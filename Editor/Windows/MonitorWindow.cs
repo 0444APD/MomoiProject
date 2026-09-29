@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 
 namespace GameSystems.EditorTools
 {
-    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 수치, 행동(확정·무르기), 디버그 명령.
+    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 수치, 행동(무르기), 디버그 명령.
     public sealed class MonitorWindow : EditorWindow
     {
         enum Tab
@@ -27,8 +27,6 @@ namespace GameSystems.EditorTools
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
-        // 테스트 이벤트 직후 확정까지 할지(수동 확정 세션에서만 의미가 있다). 기본은 꺼짐: 무르기를 시험할 수 있게.
-        [SerializeField] bool _autoCommitTests;
         [SerializeField] string _eventTypeName;
         [SerializeField] string _selectedAchievement;
         [SerializeField] string _selectedStat;
@@ -54,7 +52,7 @@ namespace GameSystems.EditorTools
         Label _sessionInfo;
         GameSession _session;
         long _lastJournalId = -1;
-        int _lastUncommitted = -1;
+        int _lastUndoCount = -1;
         bool _paused;
         long _selectedEntry;
         readonly HashSet<long> _chain = new HashSet<long>();
@@ -114,25 +112,12 @@ namespace GameSystems.EditorTools
             header.Add(Gs.Spacer());
             if (_session != null)
             {
-                if (!_session.Options.AutoCommit)
-                {
-                    var toggle = new GsButton(CommitToggleText(), null, GsButtonKind.Ghost);
-                    toggle.tooltip = "켜면 테스트 이벤트를 발생시킨 뒤 곧바로 확정합니다(무르기 불가, 보상 즉시 지급).\n끄면 확정 대기로 남아 무르기를 시험할 수 있습니다.";
-                    toggle.AddManipulator(new Clickable(() =>
-                    {
-                        _autoCommitTests = !_autoCommitTests;
-                        toggle.Text = CommitToggleText();
-                    }));
-                    header.Add(toggle);
-                    header.Add(Gs.HSpace(12));
-                }
-                var commit = new GsButton("확정", CommitAll);
-                commit.tooltip = "확정 대기 중인 행동을 모두 확정하고, 미뤄 둔 도전과제 보상을 지급합니다.";
                 var undo = new GsButton("무르기", UndoLast);
-                undo.tooltip = "확정되지 않은 마지막 행동을 되돌립니다. 값만 돌아가고 달성한 도전과제는 유지됩니다.";
+                undo.tooltip = _session.Options.History == HistoryMode.Snapshots
+                    ? "마지막 스냅샷으로 되감습니다. 행동이 바꾼 값·시간이 돌아가고, 달성한 도전과제와 보상은 유지됩니다."
+                    : "마지막 행동을 되돌립니다(몇 번이든 뒤에서부터). 행동이 바꾼 값이 돌아가고, 달성한 도전과제와 보상은 유지됩니다.";
+                undo.SetEnabled(_session.Options.History != HistoryMode.None);
                 header.Add(undo);
-                header.Add(Gs.HSpace(8));
-                header.Add(commit);
             }
             main.Add(header);
 
@@ -208,9 +193,9 @@ namespace GameSystems.EditorTools
             var focused = _root.focusController?.focusedElement as VisualElement;
             if (focused != null && (_body.Contains(focused) || _dock.Contains(focused))) return;
             var last = _session.Journal.LastId;
-            if (last == _lastJournalId && _session.State.UncommittedCount == _lastUncommitted) return;
+            if (last == _lastJournalId && _session.UndoCount == _lastUndoCount) return;
             _lastJournalId = last;
-            _lastUncommitted = _session.State.UncommittedCount;
+            _lastUndoCount = _session.UndoCount;
             if (_tab == Tab.Timeline) RefreshTimeline();
             else if (_tab != Tab.Commands) BuildTab();
         }
@@ -224,8 +209,7 @@ namespace GameSystems.EditorTools
                 return;
             }
             _sessionInfo.text = $"시드 {_session.Random.MasterSeed}  ·  틱 {_session.Clock.Tick}  ·  {_session.Clock.Time:0.0}초  ·  " +
-                                $"확정 대기 {_session.State.UncommittedCount}  ·  기록 {_session.Journal.Count}/{_session.Journal.Capacity}" +
-                                (_session.Options.AutoCommit ? "  ·  자동 확정" : "  ·  수동 확정");
+                                $"{HistoryText()}  ·  기록 {_session.Journal.Count}/{_session.Journal.Capacity}";
         }
 
         void BuildTab()
@@ -406,7 +390,7 @@ namespace GameSystems.EditorTools
                 case JournalKind.Action: return "행동";
                 case JournalKind.Event: return "이벤트";
                 case JournalKind.State: return "상태";
-                case JournalKind.Commit: return "확정";
+                case JournalKind.Snapshot: return "스냅샷";
                 case JournalKind.Undo: return "무르기";
                 case JournalKind.Achievement: return "도전과제";
                 case JournalKind.Reward: return "보상";
@@ -423,7 +407,7 @@ namespace GameSystems.EditorTools
                 case JournalKind.Action: return Gs.Accent;
                 case JournalKind.Event: return Gs.Palette[6];
                 case JournalKind.State: return Gs.Palette[7];
-                case JournalKind.Commit: return Gs.Palette[4];
+                case JournalKind.Snapshot: return Gs.Palette[4];
                 case JournalKind.Undo: return Gs.Palette[1];
                 case JournalKind.Achievement: return Gs.Palette[2];
                 case JournalKind.Reward: return Gs.Palette[3];
@@ -594,15 +578,15 @@ namespace GameSystems.EditorTools
                 var force = new GsButton("강제 달성", () =>
                 {
                     _session.Achievements.Unlock(selected.Id, "모니터에서 강제 달성");
-                    ShowFeedback($"'{selected.DisplayName}' 강제 달성" + RewardNote(), GsNoticeKind.Ok);
+                    ShowFeedback($"'{selected.DisplayName}' 강제 달성", GsNoticeKind.Ok);
                 });
                 force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다.";
                 buttons.Add(force);
                 buttons.Add(Gs.HSpace(8));
                 var fill = new GsButton("이벤트로 달성", () =>
                 {
-                    if (_session.TrySimulateAchievement(selected.Id, _autoCommitTests, out var error))
-                        ShowFeedback($"'{selected.DisplayName}' 조건을 이벤트로 채웠습니다" + PendingNote() + RewardNote(), GsNoticeKind.Ok);
+                    if (_session.TrySimulateAchievement(selected.Id, out var error))
+                        ShowFeedback($"'{selected.DisplayName}' 조건을 이벤트로 채웠습니다", GsNoticeKind.Ok);
                     else
                         ShowFeedback(error, GsNoticeKind.Warning);
                 }, GsButtonKind.Primary);
@@ -702,8 +686,8 @@ namespace GameSystems.EditorTools
             dock.Add(Gs.HSpace(8));
             var fire = new GsButton(isSum ? "이벤트로 더하기" : "이벤트로 기록", () =>
             {
-                if (_session.TrySimulateStat(selected.Id, amountField.value, _autoCommitTests, out var description, out var error))
-                    ShowFeedback($"{description} 발생" + PendingNote() + RewardNote(), GsNoticeKind.Ok);
+                if (_session.TrySimulateStat(selected.Id, amountField.value, out var description, out var error))
+                    ShowFeedback($"{description} 발생", GsNoticeKind.Ok);
                 else
                     ShowFeedback(error, GsNoticeKind.Warning);
             }, GsButtonKind.Primary);
@@ -818,8 +802,8 @@ namespace GameSystems.EditorTools
                 {
                     var count = Math.Max(1, Math.Min(1000, (int)Math.Round(repeat.value)));
                     var events = Enumerable.Range(0, count).Select(_ => EventSimulator.Create(selected, draft)).ToList();
-                    _session.SimulateEvents(events, "모니터 이벤트 발생기", _autoCommitTests);
-                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생" + PendingNote() + RewardNote(), GsNoticeKind.Ok);
+                    _session.SimulateEvents(events, "모니터 이벤트 발생기");
+                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생", GsNoticeKind.Ok);
                 }
                 catch (Exception e)
                 {
@@ -917,35 +901,25 @@ namespace GameSystems.EditorTools
             if (content != null) _dock.Add(content);
         }
 
-        string CommitToggleText() => _autoCommitTests ? "테스트 후 즉시 확정: 켜짐" : "테스트 후 즉시 확정: 꺼짐";
-
-        string PendingNote() =>
-            _session != null && _session.State.UncommittedCount > 0 ? $"  ·  확정 대기 {_session.State.UncommittedCount} (무르기 가능)" : "";
-
-        string RewardNote() =>
-            _session != null && _session.Achievements.DeferredRewardCount > 0 ? $"  ·  보상 {_session.Achievements.DeferredRewardCount}건은 확정 시 지급" : "";
+        string HistoryText()
+        {
+            switch (_session.Options.History)
+            {
+                case HistoryMode.Actions: return $"무를 수 있는 행동 {_session.UndoCount}";
+                case HistoryMode.Snapshots: return $"되감기 스냅샷 {_session.UndoCount} ({_session.Options.SnapshotInterval:0.##}초 간격)";
+                default: return "되돌리기 없음";
+            }
+        }
 
         void UndoLast()
         {
-            var pending = _session.State.Uncommitted;
-            var label = pending.Count > 0 ? pending[pending.Count - 1].Label : null;
+            var history = _session.State.History;
+            var label = _session.Options.History == HistoryMode.Actions && history.Count > 0 ? history[history.Count - 1].Label : null;
             if (_session.Undo())
-                ShowFeedback($"무름: {label ?? "마지막 행동"}  ·  값은 되돌리고 달성한 도전과제는 유지", GsNoticeKind.Info);
+                ShowFeedback((label != null ? $"무름: {label}" : "되감기") + "  ·  행동이 바꾼 값은 돌아가고 달성한 도전과제·보상은 유지", GsNoticeKind.Info);
             else
-                ShowFeedback(_session.Options.AutoCommit
-                    ? "무를 행동이 없습니다. 자동 확정 세션이라 행동이 곧바로 확정됩니다."
-                    : "무를 행동이 없습니다. 확정된 행동은 무를 수 없습니다.", GsNoticeKind.Warning);
+                ShowFeedback(_session.Options.History == HistoryMode.None ? "이 세션은 되돌리기를 쓰지 않습니다(SessionOptions.History)." : "되돌릴 행동이 없습니다.", GsNoticeKind.Warning);
         }
-
-        void CommitAll()
-        {
-            var count = _session.State.UncommittedCount;
-            var rewards = _session.Achievements.DeferredRewardCount;
-            _session.Commit();
-            if (count == 0 && rewards == 0) ShowFeedback("확정할 행동이 없습니다.", GsNoticeKind.Info);
-            else ShowFeedback($"확정: 행동 {count}개" + (rewards > 0 ? $"  ·  보상 {rewards}건 지급" : ""), GsNoticeKind.Ok);
-        }
-
         void ShowFeedback(string text, GsNoticeKind kind)
         {
             if (_feedback == null) return;
@@ -975,13 +949,13 @@ namespace GameSystems.EditorTools
                 return;
             }
 
-            var panel = Gs.Panel("행동 로그", $"{log.Count}개  ·  확정 대기 {_session.State.UncommittedCount}개", out _, out var body);
+            var panel = Gs.Panel("행동 로그", $"{log.Count}개  ·  {HistoryText()}", out _, out var body);
             for (int i = log.Count - 1; i >= 0; i--)
             {
                 var record = log[i];
                 var row = Gs.Box("gs-sheet__row");
                 var status = record.Status;
-                var color = status == ActionStatus.Committed ? Gs.Success : status == ActionStatus.Pending ? Gs.Palette[2] : status == ActionStatus.Undone ? Gs.Palette[1] : Gs.Danger;
+                var color = status == ActionStatus.Done ? Gs.Success : status == ActionStatus.Undone ? Gs.Palette[1] : Gs.Danger;
                 row.Add(new GsBadge(ActionDispatcher.StatusText(status), color) { style = { width = 70 } });
                 var text = Gs.Label(record.Action.Describe(), "gs-grow");
                 if (status == ActionStatus.Undone) text.AddToClassList("gs-text-3");

@@ -50,7 +50,7 @@ namespace GameSystems
         public List<DataChange> Changes = new List<DataChange>();
     }
 
-    // 행동 하나로 일어난 변화의 묶음. 무르기 단위.
+    // 행동 하나로 일어난 변화의 묶음. 무르기 한 단위.
     public sealed class Transaction
     {
         public long Id;
@@ -62,8 +62,9 @@ namespace GameSystems
 
     // 모든 게임 상태가 사는 곳.
     //
-    // 규칙은 하나: 값은 바꾸는 즉시 반영되고, 확정 전에는 무를 수 있으며, 확정하면 굳는다.
-    // 되돌릴 수 없는 일(보상 지급·저장·외부 전송)만 확정 시점에 일어난다.
+    // 규칙은 하나: 값은 바꾸는 즉시 반영된다. 행동은 실행되면 끝이고, 이력(History)에 쌓여 언제든 뒤에서부터 무를 수 있다.
+    // 이력에 남지 않는 변화: 행동 밖의 변화, Permanent 안의 변화(도전과제 달성·보상처럼 되돌리지 않을 일).
+    // 실시간 게임은 이력을 끄고(RecordHistory = false) 세션이 일정 간격 스냅샷으로 되감는다.
     //
     // 담을 수 있는 값: bool, 숫자(double로 정규화), string, 날짜·시간·Guid, 그리고 임의의 클래스·구조체·
     // 리스트·배열·딕셔너리·집합·큐·스택(필드 깊이 무관). 모든 타입이 같은 문법을 쓴다.
@@ -94,7 +95,7 @@ namespace GameSystems
         readonly Dictionary<string, Slot> _slots = new Dictionary<string, Slot>(StringComparer.Ordinal);
         readonly Dictionary<string, object> _preloaded = new Dictionary<string, object>(StringComparer.Ordinal);
         readonly Dictionary<string, string> _aliases = new Dictionary<string, string>(StringComparer.Ordinal);
-        readonly List<Transaction> _uncommitted = new List<Transaction>();
+        readonly List<Transaction> _history = new List<Transaction>();
         // 키별로 마지막으로 적용된 변화의 기록 id. 그 변화로 일어난 일(조건 충족 등)의 원인으로 쓴다.
         readonly Dictionary<string, long> _lastEntry = new Dictionary<string, long>(StringComparer.Ordinal);
         readonly Journal _journal;
@@ -106,7 +107,8 @@ namespace GameSystems
         // 데이터 값이 바뀌었을 때 바뀐 경로 목록과 함께.
         public event Action<string, IReadOnlyList<DataChange>> DataChanged;
         public event Action<Transaction> TransactionUndone;
-        public event Action<Transaction> TransactionCommitted;
+        // 이력 한도를 넘어 가장 오래된 행동이 무르기 대상에서 빠졌을 때.
+        public event Action<Transaction> TransactionForgotten;
 
         public StateStore(Journal journal)
         {
@@ -114,9 +116,14 @@ namespace GameSystems
         }
 
         public string InspectName => "상태";
-        public int UncommittedCount => _uncommitted.Count;
+        // 무를 수 있는 행동 수와 목록(오래된 것부터).
+        public int HistoryCount => _history.Count;
+        public IReadOnlyList<Transaction> History => _history;
         public bool InTransaction => _active != null;
-        public IReadOnlyList<Transaction> Uncommitted => _uncommitted;
+        // false면 행동을 이력에 남기지 않는다(실시간 게임: 스냅샷으로 되감음, 또는 무르기가 없는 게임).
+        public bool RecordHistory = true;
+        // 이력에 남길 최대 행동 수. 0이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 늘어난다).
+        public int HistoryLimit;
         public IEnumerable<string> Keys => _slots.Keys;
         public DataIdentity Identity { get; } = new DataIdentity();
         // Modify를 거치지 않은 데이터 수정을 찾아 경고한다. 값 전체를 비교하므로 출시 빌드에서는 끈다.
@@ -447,9 +454,17 @@ namespace GameSystems
         public void End()
         {
             if (_active == null) return;
-            // 값이 바뀌지 않은 행동(빗나감 등)도 하나의 무르기 단위로 남긴다(난수 소비도 되돌려야 하므로).
-            _uncommitted.Add(_active);
+            var tx = _active;
             _active = null;
+            if (!RecordHistory) return;
+            // 값이 바뀌지 않은 행동(빗나감 등)도 하나의 무르기 단위로 남긴다(난수 소비도 되돌려야 하므로).
+            _history.Add(tx);
+            if (HistoryLimit > 0 && _history.Count > HistoryLimit)
+            {
+                var oldest = _history[0];
+                _history.RemoveAt(0);
+                TransactionForgotten?.Invoke(oldest);
+            }
         }
 
         // 행동 실행 중 예외가 나면 진행 중이던 변화를 모두 되돌린다(원자성).
@@ -461,28 +476,34 @@ namespace GameSystems
             Revert(tx, "중단");
         }
 
-        // 확정: 무르기 대기 중인 행동을 굳힌다. 확정된 행동은 더 이상 되돌릴 수 없다.
-        public void Commit()
-        {
-            if (_active != null)
-                throw new InvalidOperationException("[GameSystems] 트랜잭션 진행 중에는 확정할 수 없습니다.");
-            if (_uncommitted.Count == 0) return;
+        // 이 안의 변화는 무르기 이력에 넣지 않는다(도전과제 달성·보상처럼 한 번 일어나면 되돌리지 않을 일).
+        // 예: using (state.Permanent()) state.Set("achievement:first", true);
+        public IDisposable Permanent() => new PermanentScope(this);
 
-            var committed = new List<Transaction>(_uncommitted);
-            _uncommitted.Clear();
-            _journal.Append(JournalKind.Commit, "State", $"확정: 행동 {committed.Count}개");
-            foreach (var tx in committed) TransactionCommitted?.Invoke(tx);
+        sealed class PermanentScope : IDisposable
+        {
+            readonly StateStore _store;
+            readonly Transaction _suspended;
+
+            public PermanentScope(StateStore store)
+            {
+                _store = store;
+                _suspended = store._active;
+                store._active = null;
+            }
+
+            public void Dispose() => _store._active = _suspended;
         }
 
-        // 확정되지 않은 마지막 행동을 되돌린다.
+        // 마지막 행동을 되돌린다. 이력에 남은 행동은 언제든(몇 번이든) 뒤에서부터 무를 수 있다.
         public bool UndoLast()
         {
             if (_active != null)
-                throw new InvalidOperationException("[GameSystems] 트랜잭션 진행 중에는 되돌릴 수 없습니다.");
-            if (_uncommitted.Count == 0) return false;
+                throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 무를 수 없습니다.");
+            if (_history.Count == 0) return false;
 
-            var tx = _uncommitted[_uncommitted.Count - 1];
-            _uncommitted.RemoveAt(_uncommitted.Count - 1);
+            var tx = _history[_history.Count - 1];
+            _history.RemoveAt(_history.Count - 1);
 
             var entry = _journal.Append(JournalKind.Undo, "State", $"무르기: {tx.Label}", transactionId: tx.Id);
             using (_journal.Cause(entry.Id)) Revert(tx, "무르기");
@@ -490,6 +511,11 @@ namespace GameSystems
             return true;
         }
 
+        public void ClearHistory()
+        {
+            foreach (var tx in _history) TransactionForgotten?.Invoke(tx);
+            _history.Clear();
+        }
         void Revert(Transaction tx, string reason)
         {
             for (int i = tx.ValueChanges.Count - 1; i >= 0; i--)
@@ -522,7 +548,8 @@ namespace GameSystems
         // ── 저장·불러오기 ───────────────────────────────────────
         // 데이터 값은 저장 트리(필드 이름 기준, enum은 이름, 요소 ID 포함)로 바꿔 내보낸다.
 
-        public Dictionary<string, object> Export(StateZone zone)
+        // report: 참조를 저장할 수 없는 등의 경고를 기록에 남길지(스냅샷처럼 자주 부를 때는 끈다).
+        public Dictionary<string, object> Export(StateZone zone, bool report = true)
         {
             var result = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (var pair in _slots)
@@ -533,11 +560,43 @@ namespace GameSystems
                 result[pair.Key] = slot.DataType == null
                     ? DataModel.ToTree(slot.Value, slot.Value?.GetType() ?? typeof(object), Identity, warnings, slot.Label)
                     : DataModel.ToTree(slot.Value, slot.DataType, Identity, warnings, slot.Label);
-                foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, pair.Key);
+                if (report) foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, pair.Key);
             }
             return result;
         }
 
+        // 스냅샷(Export로 만든 트리)으로 되돌린다. 바뀐 곳은 기록하고 알린다(인스턴스·요소 ID 유지).
+        // 실시간 게임의 되감기가 쓴다. 이 되돌림은 무르기 이력에 남지 않는다.
+        public void Restore(Dictionary<string, object> tree, StateZone zone, string reason)
+        {
+            if (_active != null)
+                throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 되감을 수 없습니다.");
+            foreach (var pair in _slots.ToList())
+            {
+                var key = pair.Key;
+                var slot = pair.Value;
+                if (slot.Zone != zone || !tree.TryGetValue(key, out var saved)) continue;
+                if (slot.DataType != null)
+                {
+                    if (DetectUntrackedChanges) AdoptUntracked(key, slot);
+                    var before = slot.Shadow;
+                    slot.Value = LoadData(key, slot, saved);
+                    slot.Shadow = CloneShadow(slot);
+                    var changes = DataModel.Diff(before, slot.Value, Identity);
+                    if (changes.Count == 0) continue;
+                    LogChanges(key, slot, changes, JournalKind.Undo, $"{reason}: ", 0);
+                    Changed?.Invoke(key);
+                    DataChanged?.Invoke(key, changes);
+                }
+                else if (TryNormalize(ReadScalar(slot, saved), out var value) && !Equals(value, slot.Value))
+                {
+                    var current = slot.Value;
+                    slot.Value = value;
+                    _lastEntry[key] = _journal.Append(JournalKind.Undo, "State", $"{reason}: " + Describe(key, current, value), key, current, value).Id;
+                    Changed?.Invoke(key);
+                }
+            }
+        }
         // 아직 정의되지 않은 키는 보관했다가 Define 시점에 적용한다. 이름이 바뀐 키는 새 이름으로 옮긴다.
         public void Import(Dictionary<string, object> values, StateZone zone)
         {
@@ -613,7 +672,7 @@ namespace GameSystems
                 node.Note = TypeText(slot);
             }
             foreach (var group in groups.Values) root.Children.Add(group);
-            root.Add("무르기 대기 행동", _uncommitted.Count.ToString(CultureInfo.InvariantCulture));
+            root.Add("무를 수 있는 행동", _history.Count.ToString(CultureInfo.InvariantCulture));
         }
 
         // ── 도우미 ─────────────────────────────────────────────

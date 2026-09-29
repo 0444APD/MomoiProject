@@ -8,7 +8,7 @@
 
 게임에서 의미 있는 상태(골드, 체력, 인벤토리, 장비, 턴, 도전과제 등)는 모두 상태 저장소 한곳에 둡니다. 저장소를 거치면 아래 기능이 추가 코드 없이 따라옵니다.
 
-- 무르기: 확정 전 행동을 되돌립니다.
+- 무르기: 이미 한 행동을 언제든 뒤에서부터 되돌립니다(실시간 게임은 스냅샷으로 되감습니다).
 - 기록: 무엇이, 왜 바뀌었는지 모니터 타임라인에 남습니다(예: `인벤토리.items[#12].level 3 → 4`).
 - 도전과제·조건: 값이 바뀌면 그 값을 보는 조건만 다시 검사합니다.
 - 저장·불러오기: 메타 구역을 파일로 저장하고, 버전이 바뀌어도 이어서 읽습니다.
@@ -34,9 +34,9 @@
 
 ### 2.2 값의 규칙은 하나입니다
 
-모든 값은 바꾸는 즉시 반영됩니다. 확정하기 전에는 무를 수 있고, 확정하면 굳어집니다. 되돌릴 수 없는 일(도전과제 보상 지급, 저장, 서버 전송)만 확정 시점에 일어납니다.
+모든 값은 바꾸는 즉시 반영됩니다. 행동은 실행되는 즉시 끝나며, 대기하거나 확정하는 단계가 없습니다. 이미 한 행동은 이력에 쌓여 있어 언제든 뒤에서부터 되돌릴 수 있습니다.
 
-도전과제는 조건을 만족하는 순간 달성되고, 무르기를 해도 달성은 유지됩니다. 값(예: 골드)만 되돌아가므로 무르고 다시 해도 값이 쌓이지 않아 반복 획득을 막습니다.
+도전과제는 조건을 만족하는 순간 달성되고 보상도 그때 지급됩니다. 달성과 보상은 무르기나 되감기로 취소되지 않습니다. 행동이 바꾼 값(예: 주운 골드)만 되돌아가므로, 무르고 다시 해도 값이 쌓이지 않고 보상도 한 번만 나옵니다.
 
 ### 2.3 담을 수 있는 값
 
@@ -168,9 +168,9 @@ inv.gold = 999;   // 잘못된 예: 저장소가 이 변화를 모릅니다
 
 ---
 
-## 5. 행동, 무르기, 확정
+## 5. 행동과 무르기
 
-플레이어의 행동은 데이터 클래스로 만들고 `session.Do`로 실행합니다. 행동 하나가 무르기 한 단위입니다.
+플레이어의 행동은 데이터 클래스로 만들고 `session.Do`로 실행합니다. 행동은 실행되는 즉시 끝나고, 행동 하나가 무르기 한 단위입니다.
 
 ```csharp
 [Serializable]
@@ -186,29 +186,48 @@ GameSystemsRuntime.Started += session =>
         session.State.Modify(GameIds.State.PlayerInventory, inv => inv.items[action.itemIndex].level++));
 };
 
-// 실행
-session.Do(new EquipAction { itemIndex = 0 });
+session.Do(new EquipAction { itemIndex = 0 });   // 실행 = 끝
+session.Do(new EquipAction { itemIndex = 1 });
+session.Undo();                                   // 마지막 행동을 되돌림(값·난수 모두)
+session.Undo();                                   // 그 전 행동도 되돌림 — 언제든, 몇 번이든
 ```
 
-### 5.1 턴제(무르기가 있는 게임)
+무르면 게임 코드가 쥐고 있던 인스턴스가 그대로 제자리로 돌아갑니다. 목록에서 뺐던 장비도 같은 인스턴스, 같은 ID로 돌아옵니다. 행동 중에 예외가 나면 그 행동의 변화는 모두 자동으로 취소됩니다. 무를 수 있는 횟수는 `session.UndoCount`로 확인합니다.
 
-`SessionOptions.AutoCommit = false`로 두면 `Commit()`을 부를 때까지 행동이 무르기 대기 상태로 남습니다.
+### 5.1 되돌리기 방식
+
+게임 코드는 어느 방식이든 `session.Undo()` 하나만 씁니다. 장르에 맞는 방식을 옵션 하나로 고릅니다.
+
+| 방식 | 설정 | 되돌리는 단위 | 어울리는 장르 |
+|---|---|---|---|
+| 행동 단위(기본) | `History = HistoryMode.Actions` | 행동 하나 | 턴제, 퍼즐, 전략, 카드 |
+| 스냅샷 | `History = HistoryMode.Snapshots` | 일정 간격(`SnapshotInterval` 초) | 실시간 액션 |
+| 없음 | `History = HistoryMode.None` | 되돌리지 않음(기록 비용 없음) | 되돌리기가 필요 없는 게임 |
 
 ```csharp
-GameSystemsRuntime.Configuring += options => options.AutoCommit = false;
-
-session.Do(new EquipAction { itemIndex = 0 });
-session.Undo();     // 방금 행동을 되돌림(값·난수 모두)
-session.Do(new EquipAction { itemIndex = 1 });
-session.Commit();   // 턴 종료: 굳히고, 미뤄 둔 도전과제 보상을 지급
+// 실시간 게임: 0.5초마다 스냅샷, 최근 20개(10초)까지 되감기
+GameSystemsRuntime.Configuring += options =>
+{
+    options.History = HistoryMode.Snapshots;
+    options.SnapshotInterval = 0.5;
+    options.SnapshotLimit = 20;
+};
 ```
 
-무르면 게임 코드가 쥐고 있던 인스턴스가 그대로 제자리로 돌아갑니다. 목록에서 뺐던 장비도 같은 인스턴스, 같은 ID로 돌아옵니다. 행동 중에 예외가 나면 그 행동의 변화는 모두 자동으로 취소됩니다.
+행동 단위 방식은 이력 길이가 기본 무제한입니다. 행동마다 바뀐 값의 이전 모습을 보관하므로, 오래 플레이하는 게임에서 메모리를 아끼려면 `HistoryLimit`(예: 200)을 정하세요. 한도를 넘으면 가장 오래된 행동부터 무를 수 없게 됩니다.
 
-### 5.2 실시간(무르기가 없는 게임)
+스냅샷 방식은 행동별 기록을 남기지 않고, 프레임 끝에 간격마다 전체 상태를 찍어 둡니다. `Undo()`를 한 번 부르면 스냅샷 한 칸만큼 되감기며 값, 난수, 게임 시간이 함께 돌아가고, 되감은 구간의 행동은 행동 탭에 "무름"으로 표시됩니다. 중요한 순간(보스 입장 등)에는 `session.CaptureSnapshot()`으로 직접 찍어 둘 수도 있습니다.
 
-기본값 `AutoCommit = true`에서는 행동마다 즉시 확정됩니다. 되돌리기가 필요하면 무르기 대신 주기적으로 저장 트리(`State.Export`)를 스냅샷으로 남겨 두는 방식을 씁니다.
+### 5.2 되돌리지 않는 것
 
+도전과제 달성과 보상은 어느 방식에서도 되돌리지 않습니다. 직접 만든 기능에서도 "한 번 일어나면 되돌리지 않을 변화"가 있다면 `Permanent` 안에서 바꾸세요. 그 변화는 무르기 이력에 들어가지 않습니다.
+
+```csharp
+using (session.State.Permanent())
+    session.State.Set(GameIds.State.TutorialSeen, true);
+```
+
+`Permanent`는 행동 단위 방식의 무르기에서 빠지는 것이고, 스냅샷 되감기는 찍어 둔 시점의 값으로 돌아갑니다(도전과제는 되감은 뒤 자동으로 다시 적용됩니다).
 ---
 
 ## 6. 필드 규칙과 어트리뷰트
@@ -261,7 +280,7 @@ state.DataChanged += (key, changes) =>
 메타 구역만 저장합니다. 단일 게임은 `GameSystemsRuntime`이 종료할 때 자동으로 저장하고 시작할 때 불러옵니다. 직접 할 때는 아래처럼 씁니다.
 
 ```csharp
-string json = session.ExportMeta();   // 확정 안 된 행동이 있으면 먼저 확정합니다
+string json = session.ExportMeta();
 session.ImportMeta(json);
 ```
 
@@ -301,7 +320,7 @@ GameSystemsRuntime.Configuring += options =>
 
 - 상태 탭: 모든 키를 분류(ID의 첫 점 앞)별로 보여 드립니다. 단순 값은 클릭해서 고칠 수 있고, 데이터 값은 요약(`Inventory`, `List<Item> 3개` 등)으로 표시됩니다.
 - 타임라인 탭: 모든 변화와 원인을 봅니다. 한 줄을 고르면 원인 행동까지 거슬러 올라갑니다.
-- 행동 탭: 무르기 대기 중인 행동과 확정된 행동을 봅니다.
+- 행동 탭: 실행한 행동과 무른 행동을 봅니다. 위쪽의 무르기 버튼으로 마지막 행동(스냅샷 방식이면 마지막 스냅샷)을 되돌립니다.
 
 클래스는 카드로, 클래스 목록은 카드 격자로 보여 주는 화면은 다음 작업에서 추가합니다.
 
@@ -396,7 +415,7 @@ public class MonsterData : GameData
 | "순환 참조" 오류 | 객체끼리 서로를 가리킵니다. 한쪽은 ID(`[DataRef]` 문자열)로 가리키세요. |
 | 불러온 값이 기본값으로 나옴 | 필드 이름을 바꿨습니다. `[FormerlySerializedAs("예전이름")]`을 다세요. |
 | 속성(property) 값이 저장되지 않음 | 속성은 담지 않습니다. 필드로 선언하세요. |
-| 무르기를 했는데 값이 안 돌아옴 | 자동 확정 세션이거나 이미 확정했습니다. 또는 직접 수정(4.3)한 값입니다. |
+| 무르기를 했는데 값이 안 돌아옴 | 직접 수정(4.3)했거나 `Permanent` 안에서 바꾼 값입니다. 이력 한도를 넘은 오래된 행동이거나, 되돌리기 방식이 `None`일 수도 있습니다. |
 
 ---
 
@@ -411,9 +430,12 @@ public class MonsterData : GameData
 | | `Changed`, `DataChanged` | 변경 알림 |
 | | `Identity.IdOf(instance)` | 컬렉션 요소의 내부 ID |
 | | `CheckUntrackedChanges()` | 누락 검사 수동 실행 |
+| | `Permanent()` | 이 안의 변화는 무르기 이력에 넣지 않음 |
 | | `AddAlias(old, new)` | 예전 키로 저장된 값 이어받기(ID 바꾸기가 자동 처리) |
-| `GameSession` | `Do(action)`, `Undo()`, `Commit()` | 행동 실행, 무르기, 확정 |
+| `GameSession` | `Do(action)`, `Undo()`, `UndoCount` | 행동 실행, 되돌리기, 되돌릴 수 있는 횟수 |
+| | `CaptureSnapshot()` | 스냅샷 직접 찍기(스냅샷 방식) |
 | | `ExportMeta()`, `ImportMeta(json)` | 저장·불러오기 |
-| `SessionOptions` | `AutoCommit`, `SaveVersion`, `Migrations`, `DetectUntrackedChanges` | 확정 방식, 저장 버전, 버전 변환, 누락 검사 |
+| `SessionOptions` | `History`, `HistoryLimit`, `SnapshotInterval`, `SnapshotLimit` | 되돌리기 방식과 한도 |
+| | `SaveVersion`, `Migrations`, `DetectUntrackedChanges` | 저장 버전, 버전 변환, 누락 검사 |
 | `StateKey<T>` | `GameIds.State.XXX` | 타입이 붙은 키(생성 코드) |
 | 어트리뷰트 | `[DataRef(typeof(T))]` | 다른 데이터베이스 항목을 가리키는 문자열 필드 |

@@ -120,7 +120,6 @@ namespace GameSystems.Tests
         public void 세션은_기본_디버그_명령을_제공한다()
         {
             var session = new GameSession();
-            Assert.IsTrue(session.Debug.All.Any(c => c.Name.Contains("Commit")));
             Assert.IsTrue(session.Debug.All.Any(c => c.Name.Contains("Undo")));
         }
     }

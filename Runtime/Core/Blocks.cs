@@ -85,13 +85,12 @@ namespace GameSystems
         public virtual IEnumerable<Condition> Children => Array.Empty<Condition>();
     }
 
+    // 보상이 어디에 영향을 주는지. 도전과제 보상은 어느 쪽이든 무르기·되감기로 취소되지 않는다(달성과 같다).
     public enum RewardEffect
     {
-        // 게임 상태 안에서만 일어나 되돌릴 수 있다.
+        // 게임 상태(저장소) 안에서만 일어난다.
         Reversible,
-        // 확정 시점까지 미뤄서 실행한다(외부 전송 등).
-        AfterCommit,
-        // 되돌릴 수 없다(결제, 플랫폼 전송).
+        // 게임 밖에 영향을 준다(결제, 플랫폼 전송). 멀티플레이에서는 서버만 실행한다.
         Irreversible,
     }
 

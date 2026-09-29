@@ -62,7 +62,7 @@ namespace GameSystems.Samples
             Achievement("부자", "골드를 1000 모았다.",
                 new StatCompareCondition { stat = gold.Id, op = CompareOp.AtLeast, value = 1000 });
 
-            // 이번 판 수치는 되감기 대상임을 보여주는 용도(확정 전에도 즉시 바뀐다).
+            // 이번 판 수치는 되감기 대상임을 보여주는 용도(무르면 되돌아간다).
             _ = killsRun;
 
             AssetDatabase.SaveAssets();

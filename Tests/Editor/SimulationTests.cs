@@ -13,7 +13,7 @@ namespace GameSystems.Tests
         [SetUp]
         public void SetUp()
         {
-            _session = new GameSession(new SessionOptions { AutoCommit = false, Seed = 5 });
+            _session = new GameSession(new SessionOptions { Seed = 5 });
             _session.Stats.Define(Stat("kills", StatScope.Total, StatAggregate.Sum, nameof(TestKill.Count)));
             _session.Stats.Define(Stat("run_kills", StatScope.Run, StatAggregate.Sum, null));
             _session.Stats.Define(Stat("combo", StatScope.Total, StatAggregate.Max, nameof(TestKill.Combo)));
@@ -30,7 +30,7 @@ namespace GameSystems.Tests
         [Test]
         public void 이벤트로_반영하면_같은_이벤트를_받는_다른_수치도_움직인다()
         {
-            Assert.IsTrue(_session.TrySimulateStat("kills", 3, commit: true, out var description, out var error), error);
+            Assert.IsTrue(_session.TrySimulateStat("kills", 3, out var description, out var error), error);
             Assert.AreEqual(3, _session.Stats.Get("kills"));
             Assert.AreEqual(1, _session.Stats.Get("run_kills"), "처치 이벤트 1회가 발생했으므로 횟수 규칙도 반응한다");
             StringAssert.Contains("Count", description);
@@ -40,7 +40,7 @@ namespace GameSystems.Tests
         [Test]
         public void 횟수_규칙은_이벤트를_그_수만큼_발생시킨다()
         {
-            Assert.IsTrue(_session.TrySimulateStat("run_kills", 4, commit: false, out _, out var error), error);
+            Assert.IsTrue(_session.TrySimulateStat("run_kills", 4, out _, out var error), error);
             Assert.AreEqual(4, _session.Stats.Get("run_kills"));
             Assert.AreEqual(4, _session.Journal.Entries.Count(e => e.Kind == JournalKind.Event));
         }
@@ -48,16 +48,16 @@ namespace GameSystems.Tests
         [Test]
         public void 최고치_수치는_값을_한_번_기록한다()
         {
-            Assert.IsTrue(_session.TrySimulateStat("combo", 7, commit: true, out _, out var error), error);
+            Assert.IsTrue(_session.TrySimulateStat("combo", 7, out _, out var error), error);
             Assert.AreEqual(7, _session.Stats.Get("combo"));
-            _session.TrySimulateStat("combo", 3, commit: true, out _, out _);
+            _session.TrySimulateStat("combo", 3, out _, out _);
             Assert.AreEqual(7, _session.Stats.Get("combo"), "최고치 규칙은 게임과 똑같이 적용된다");
         }
 
         [Test]
         public void 테스트_이벤트도_무를_수_있다()
         {
-            _session.TrySimulateStat("kills", 5, commit: false, out _, out _);
+            _session.TrySimulateStat("kills", 5, out _, out _);
             Assert.AreEqual(5, _session.Stats.Get("kills"));
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(0, _session.Stats.Get("kills"));
@@ -67,7 +67,7 @@ namespace GameSystems.Tests
         [Test]
         public void 규칙이_없는_수치는_이유와_함께_거절한다()
         {
-            Assert.IsFalse(_session.TrySimulateStat("gold", 10, commit: true, out _, out var error));
+            Assert.IsFalse(_session.TrySimulateStat("gold", 10, out _, out var error));
             StringAssert.Contains("반영 규칙이 없어", error);
             Assert.AreEqual(0, _session.Actions.Log.Count, "아무 행동도 실행되지 않는다");
         }
@@ -75,7 +75,7 @@ namespace GameSystems.Tests
         [Test]
         public void 정수_필드에_소수는_거절한다()
         {
-            Assert.IsFalse(_session.TrySimulateStat("kills", 1.5, commit: true, out _, out var error));
+            Assert.IsFalse(_session.TrySimulateStat("kills", 1.5, out _, out var error));
             StringAssert.Contains("정수", error);
         }
 
@@ -97,9 +97,9 @@ namespace GameSystems.Tests
             };
             definition.Rewards.Add(new AddToStatReward { stat = "gold", amount = 100 });
             _session.Achievements.Define(definition);
-            _session.TrySimulateStat("kills", 4, commit: true, out _, out _);
+            _session.TrySimulateStat("kills", 4, out _, out _);
 
-            Assert.IsTrue(_session.TrySimulateAchievement("legend", commit: true, out var error), error);
+            Assert.IsTrue(_session.TrySimulateAchievement("legend", out var error), error);
             Assert.IsTrue(_session.Achievements.IsUnlocked("legend"));
             Assert.AreEqual(100, _session.Stats.Get("gold"));
             Assert.GreaterOrEqual(_session.Stats.Get("kills"), 10);
@@ -112,7 +112,7 @@ namespace GameSystems.Tests
         public void 이미_만족한_조건은_채우지_않는다()
         {
             _session.Achievements.Define(new AchievementDefinition { Id = "a", DisplayName = "a", Condition = new StatCompareCondition { stat = "kills", value = 0 } });
-            Assert.IsFalse(_session.TrySimulateAchievement("a", commit: false, out var error));
+            Assert.IsFalse(_session.TrySimulateAchievement("a", out var error));
             Assert.IsNotNull(error);
         }
 

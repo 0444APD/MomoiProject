@@ -47,22 +47,18 @@ namespace GameSystems.Tests
             hunter.condition = new StatCompareCondition { stat = kills.Id, op = CompareOp.AtLeast, value = 3 };
             hunter.rewards.Add(new AddToStatReward { stat = gold.Id, amount = 100 });
 
-            var session = new GameSession(new SessionOptions { AutoCommit = false, Seed = 9 });
+            var session = new GameSession(new SessionOptions { Seed = 9 });
             session.Stats.Define(kills.ToDefinition());
             session.Stats.Define(gold.ToDefinition());
             session.Achievements.Define(hunter.ToDefinition());
             session.Actions.Register<DataFlowKill>(_ => session.Events.Publish(new TestKill { Count = 1 }));
 
             for (int i = 0; i < 3; i++) session.Do(new DataFlowKill());
-            Assert.IsTrue(session.Achievements.IsUnlocked(hunter.Id), "세 번째 처치 직후 달성(확정 전)");
-            Assert.AreEqual(0, session.Stats.Get(gold.Id), "보상은 확정 전 미지급");
-            session.Commit();
-
             Assert.AreEqual(3, session.Stats.Get(kills.Id));
             Assert.IsTrue(session.Achievements.IsUnlocked(hunter.Id));
             Assert.AreEqual(100, session.Stats.Get(gold.Id));
 
-            // 인과 사슬: 보상 ← 달성 ← 처치 수 변화(확정 대기) ← 적 처치 이벤트 ← 세 번째 처치 행동.
+            // 인과 사슬: 보상 ← 달성 ← 처치 수 변화 ← 적 처치 이벤트 ← 세 번째 처치 행동.
             var reward = session.Journal.Entries.Last(e => e.Kind == JournalKind.Reward);
             var chain = session.Journal.CauseChain(reward.Id);
             CollectionAssert.AreEqual(

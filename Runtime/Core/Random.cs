@@ -171,5 +171,12 @@ namespace GameSystems
             Tick++;
             if (deltaTime > 0) Time += deltaTime;
         }
+
+        // 되감기 전용: 스냅샷 시점으로 시간을 돌린다.
+        public void Rewind(long tick, double time)
+        {
+            Tick = tick;
+            Time = time;
+        }
     }
 }

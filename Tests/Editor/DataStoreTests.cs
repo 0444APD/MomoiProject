@@ -95,7 +95,7 @@ namespace GameSystems.Tests
         [SetUp]
         public void SetUp()
         {
-            _session = new GameSession(new SessionOptions { AutoCommit = false, Seed = 7 });
+            _session = new GameSession(new SessionOptions { Seed = 7 });
             _inventory = _session.State.Define("s:inventory", StateZone.Session, new TestInventory(), "인벤토리");
             _session.Actions.Register<DataAction>(_ => _session.State.Modify("s:inventory", _onAction));
         }
@@ -124,7 +124,6 @@ namespace GameSystems.Tests
         public void 무르면_같은_인스턴스가_제자리로_돌아온다()
         {
             Do(inv => inv.items.Add(Sword()));
-            _session.Commit();
             var sword = _inventory.items[0];
 
             Do(inv =>
@@ -149,7 +148,6 @@ namespace GameSystems.Tests
                 inv.items.Add(Sword());
                 inv.items.Add(new TestItem { name = "방패" });
             });
-            _session.Commit();
             var sword = _inventory.items[0];
             var id = _session.State.Identity.IdOf(sword);
 
@@ -172,7 +170,7 @@ namespace GameSystems.Tests
             });
             Assert.Throws<InvalidOperationException>(() => _session.Do(new FailingAction()));
             Assert.AreEqual(0, _inventory.gold);
-            Assert.AreEqual(0, _session.State.UncommittedCount);
+            Assert.AreEqual(0, _session.State.HistoryCount);
         }
 
         [Test]
@@ -318,7 +316,6 @@ namespace GameSystems.Tests
                 inv.gold = 9;
                 inv.items.Add(Sword());
             });
-            _session.Commit();
             _session.State.ResetZone(StateZone.Session);
             Assert.AreEqual(0, _inventory.gold);
             Assert.AreEqual(0, _inventory.items.Count);
@@ -337,7 +334,7 @@ namespace GameSystems.Tests
         [Test]
         public void 집합_큐_스택_연결리스트_nullable_날짜도_담고_되돌리고_저장한다()
         {
-            var session = new GameSession(new SessionOptions { AutoCommit = false });
+            var session = new GameSession(new SessionOptions());
             session.Actions.Register<DataAction>(_ => session.State.Modify<TestCollections>("m:misc", c =>
             {
                 c.flags.Add("보스");
@@ -368,7 +365,7 @@ namespace GameSystems.Tests
             Assert.AreEqual(TimeSpan.FromSeconds(90), copy.cooldown);
             Assert.AreEqual(new Guid("11111111-2222-3333-4444-555555555555"), copy.guid);
 
-            var undo = new GameSession(new SessionOptions { AutoCommit = false });
+            var undo = new GameSession(new SessionOptions());
             undo.Actions.Register<DataAction>(_ => undo.State.Modify<TestCollections>("s:misc", c =>
             {
                 c.flags.Add("임시");
@@ -408,7 +405,7 @@ namespace GameSystems.Tests
                 _session.State.Modify<TestInventory>("s:inventory", i => i.gold = 2);
                 inv.gold = 3;
             });
-            var tx = _session.State.Uncommitted.Last();
+            var tx = _session.State.History.Last();
             Assert.AreEqual(1, tx.DataChanges.Count);
             Assert.AreEqual(3, tx.DataChanges[0].Changes.Count);
             _session.Undo();
@@ -445,7 +442,7 @@ namespace GameSystems.Tests
 
         static double MeasureAction(bool detect)
         {
-            var session = new GameSession(new SessionOptions { AutoCommit = false, DetectUntrackedChanges = detect });
+            var session = new GameSession(new SessionOptions { DetectUntrackedChanges = detect });
             var inventory = new TestInventory();
             for (int i = 0; i < 500; i++)
                 inventory.items.Add(new TestItem { name = "장비" + i, level = i % 10, tags = { "근접", "희귀" }, effects = { new TestLifesteal(), new TestBurn() } });

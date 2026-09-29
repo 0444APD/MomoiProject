@@ -12,7 +12,7 @@ namespace GameSystems
     {
         public static GameSession Session { get; private set; }
 
-        // 세션 생성 직전: 옵션 조정(자동 확정 여부, 시드 등).
+        // 세션 생성 직전: 옵션 조정(되돌리기 방식, 시드, 저장 버전 변환 등).
         public static event Action<SessionOptions> Configuring;
         // 세션 준비 완료: 행동 처리기·디버그 명령 등록.
         public static event Action<GameSession> Started;

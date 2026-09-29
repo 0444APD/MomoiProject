@@ -155,13 +155,13 @@ namespace GameSystems.Tests
         [Test]
         public void 모니터의_모든_탭이_실행_중인_세션으로_구성된다()
         {
-            var session = new GameSession(new SessionOptions { AutoCommit = false });
+            var session = new GameSession(new SessionOptions());
             var kills = new StatDefinition { Id = "kills", DisplayName = "처치", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             kills.Rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
             session.Stats.Define(kills);
             session.Stats.Define(new StatDefinition { Id = "gold", DisplayName = "골드", Scope = StatScope.Total, Aggregate = StatAggregate.Sum });
             session.Achievements.Define(new AchievementDefinition { Id = "a", DisplayName = "업적", Condition = new StatCompareCondition { stat = "kills", value = 5 } });
-            session.TrySimulateStat("kills", 2, false, out _, out _);
+            session.TrySimulateStat("kills", 2, out _, out _);
 
             var previous = MonitorWindow.SessionSource;
             MonitorWindow.SessionSource = () => session;

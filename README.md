@@ -30,7 +30,7 @@
 | 메뉴 | 용도 |
 |---|---|
 | **Game Systems → 데이터베이스** | `GameData`를 상속한 모든 타입을 시트·카드(세로·가로·바)로 보고 추가·검색·수정. 조건·보상은 블록 편집기. |
-| **Game Systems → 모니터** | 플레이 중 통합 기록(인과 추적), 상태, 도전과제 진행도, 수치, 이벤트 발생기, 행동 로그(확정·무르기), 디버그 명령 |
+| **Game Systems → 모니터** | 플레이 중 통합 기록(인과 추적), 상태, 도전과제 진행도, 수치, 이벤트 발생기, 행동 로그(무르기), 디버그 명령 |
 | **Game Systems → UI 샘플** | 디자인 시스템의 모든 부품. 새 도구는 이 부품을 조립해 만든다. |
 | Game Systems → 샘플 → 샘플 데이터 만들기 | 샘플 수치·도전과제 생성(샘플 심볼 필요) |
 
@@ -39,7 +39,7 @@
 모니터에서 값을 바꾸는 방법은 두 가지다.
 
 - **직접 수정**: 상태 탭의 값 칸, 수치 탭 작업 패널의 '직접 수정', 도전과제 작업 패널의 '강제 달성'. 값만 덮어쓰고 이벤트·수치 규칙은 반응하지 않는다.
-- **이벤트로 반영**: 수치의 '이벤트로 더하기/기록', 도전과제의 '이벤트로 달성', 이벤트 탭의 '이벤트 발생'. 게임에서 그 값을 얻은 것처럼 실제 이벤트를 발생시켜 다른 수치·도전과제·보상까지 연쇄 반응하고, 행동으로 기록되어 무를 수 있다. 수동 확정 게임에서는 '테스트 후 즉시 확정'(기본 꺼짐)으로 바로 확정할지 고른다.
+- **이벤트로 반영**: 수치의 '이벤트로 더하기/기록', 도전과제의 '이벤트로 달성', 이벤트 탭의 '이벤트 발생'. 게임에서 그 값을 얻은 것처럼 실제 이벤트를 발생시켜 다른 수치·도전과제·보상까지 연쇄 반응하고, 행동으로 기록되어 무를 수 있다.
 
 도전과제·수치 탭은 항목을 클릭해 선택하면, 이벤트 탭은 이벤트를 고르면 오른쪽 아래 작업 패널에 조작 버튼이 뜬다.
 
@@ -51,7 +51,7 @@
 
 - **행동은 데이터다.** 모든 플레이어 행동은 `session.Do(행동)`을 거친다. 행동 하나가 무르기 단위다.
 - **모든 게임 상태는 상태 저장소(`State`)에 둔다.** 세션 구역(게임 내용, 되감김)과 메타 구역(도전과제·누적 수치, 되감기지 않음)으로 나뉜다.
-- **값의 규칙은 하나.** 모든 값(숫자든 클래스·컬렉션이든)은 바꾸는 즉시 반영되고, 확정 전에는 무를 수 있고, 확정하면 굳는다. 도전과제는 조건을 만족하는 순간 달성되고 무르기로 취소되지 않으며(값만 되돌아가 반복 획득 불가), 보상은 확정 시 지급된다. 읽기 `Get`, 교체 `Set`, 부분 수정 `Modify` — 모든 타입이 같은 문법.
+- **값의 규칙은 하나.** 행동은 실행되는 즉시 끝나고, 이미 한 행동은 언제든 뒤에서부터 `Undo()`로 되돌린다(확정 단계 없음). 실시간 게임은 행동별 기록 대신 일정 간격 스냅샷으로 같은 `Undo()`가 되감는다. 도전과제 달성과 보상은 되돌리지 않는다(행동이 바꾼 값만 돌아가 반복 획득 불가). 읽기 `Get`, 교체 `Set`, 부분 수정 `Modify` — 모든 타입이 같은 문법.
 - **식별자는 한 곳에서 짓는다.** 상태 키·수치·도전과제·태그의 ID는 데이터베이스 창에서만 짓고, 에디터에서는 목록에서 고르고, 코드에서는 자동 생성되는 `GameIds`(예: `GameIds.State.PlayerInventory` → `StateKey<Inventory>`)로 쓴다. ID를 바꾸면 참조·에셋·생성 코드·저장 파일 호환이 함께 처리된다.
 - 자세한 사용법: `Documentation~/StateStore.md`
 - **모든 변화는 통합 기록(Journal)에 원인과 함께 남는다.** 모니터에서 보상 한 줄을 선택하면 그 원인 행동까지 거슬러 올라간다.
@@ -83,8 +83,8 @@ public sealed class AttackAction : GameAction
 [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
 static void Hook()
 {
-    // 턴제·되감기 게임이면 자동 확정을 끈다(기본은 행동마다 즉시 확정).
-    GameSystemsRuntime.Configuring += options => options.AutoCommit = false;
+    // 되돌리기 방식: 기본은 행동 단위. 실시간 게임은 스냅샷(options.History = HistoryMode.Snapshots).
+    GameSystemsRuntime.Configuring += options => options.History = HistoryMode.Actions;
 
     GameSystemsRuntime.Started += session =>
     {
@@ -100,8 +100,7 @@ static void Hook()
 
 ```csharp
 GameSystemsRuntime.Session.Do(new AttackAction { target = "고블린" });
-GameSystemsRuntime.Session.Commit();   // 턴 종료
-GameSystemsRuntime.Session.Undo();     // 확정 전 무르기
+GameSystemsRuntime.Session.Undo();     // 마지막 행동 무르기(몇 번이든)
 ```
 
 ### 3. 데이터(에디터, 코드 없음)

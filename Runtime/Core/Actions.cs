@@ -27,9 +27,11 @@ namespace GameSystems
 
     public enum ActionStatus
     {
-        Pending,
-        Committed,
+        // 실행됨(행동은 실행되는 즉시 끝난다).
+        Done,
+        // 무르기·되감기로 되돌려짐.
         Undone,
+        // 실행 중 오류로 변경이 모두 취소됨.
         Failed,
     }
 
@@ -65,7 +67,6 @@ namespace GameSystems
             _clock = clock;
             _logCapacity = Math.Max(16, logCapacity);
             _state.TransactionUndone += tx => SetStatus(tx.Id, ActionStatus.Undone);
-            _state.TransactionCommitted += tx => SetStatus(tx.Id, ActionStatus.Committed);
         }
 
         public string InspectName => "행동";
@@ -89,7 +90,7 @@ namespace GameSystems
 
             action.tick = _clock.Tick;
             var entry = _journal.Append(JournalKind.Action, "Actions", action.Describe());
-            var record = new ActionRecord { JournalId = entry.Id, Action = action, Status = ActionStatus.Pending };
+            var record = new ActionRecord { JournalId = entry.Id, Action = action, Status = ActionStatus.Done };
             var tx = _state.Begin(entry.Id, action.Describe());
             record.TransactionId = tx.Id;
             entry.TransactionId = tx.Id;
@@ -127,6 +128,17 @@ namespace GameSystems
             }
         }
 
+        // 되감기: 이 기록 id 이후에 실행된 행동을 되돌려진 것으로 표시한다.
+        public void MarkUndoneAfter(long journalId)
+        {
+            foreach (var record in _log)
+            {
+                if (record.Status != ActionStatus.Done || record.JournalId <= journalId) continue;
+                record.Status = ActionStatus.Undone;
+                StatusChanged?.Invoke(record);
+            }
+        }
+
         void SetStatus(long transactionId, ActionStatus status)
         {
             if (!_byTransaction.TryGetValue(transactionId, out var record)) return;
@@ -149,8 +161,7 @@ namespace GameSystems
         {
             switch (status)
             {
-                case ActionStatus.Pending: return "확정 대기";
-                case ActionStatus.Committed: return "확정";
+                case ActionStatus.Done: return "실행";
                 case ActionStatus.Undone: return "무름";
                 default: return "실패";
             }

@@ -31,7 +31,7 @@ namespace GameSystems.Tests
         [SetUp]
         public void SetUp()
         {
-            _session = new GameSession(new SessionOptions { AutoCommit = false, Seed = 42 });
+            _session = new GameSession(new SessionOptions { Seed = 42 });
             _session.State.Define("s:hp", StateZone.Session, 10, "체력");
             _session.State.Define("m:gold", StateZone.Meta, 0, "골드");
             _session.Actions.Register<TestKillAction>(_ =>
@@ -67,24 +67,12 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 세션과_메타_모두_즉시_반영되고_확정은_굳히기만_한다()
+        public void 행동은_실행되는_즉시_반영된다()
         {
             _session.Do(new TestKillAction());
             Assert.AreEqual(7, _session.State.GetNumber("s:hp"));
             Assert.AreEqual(5, _session.State.GetNumber("m:gold"), "메타도 즉시 반영된다");
-            _session.Commit();
-            Assert.AreEqual(5, _session.State.GetNumber("m:gold"));
-            Assert.IsFalse(_session.Undo(), "확정 후에는 무를 수 없다");
-        }
-
-        [Test]
-        public void 확정_전_변화는_누적되어_보인다()
-        {
-            _session.Do(new TestKillAction());
-            _session.Do(new TestKillAction());
-            Assert.AreEqual(10, _session.State.GetNumber("m:gold"));
-            _session.Commit();
-            Assert.AreEqual(10, _session.State.GetNumber("m:gold"));
+            Assert.AreEqual(1, _session.UndoCount);
         }
 
         [Test]
@@ -99,26 +87,50 @@ namespace GameSystems.Tests
             Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
             Assert.AreEqual(0, _session.State.GetNumber("m:gold"));
             Assert.IsFalse(_session.Undo(), "더 무를 행동이 없다");
-            _session.Commit();
-            Assert.AreEqual(0, _session.State.GetNumber("m:gold"), "무른 행동은 확정되지 않는다");
         }
 
         [Test]
-        public void 확정된_행동은_무를_수_없다()
+        public void 이미_한_행동은_언제든_무를_수_있다()
         {
-            _session.Do(new TestKillAction());
-            _session.Commit();
-            Assert.IsFalse(_session.Undo());
-            Assert.AreEqual(7, _session.State.GetNumber("s:hp"));
+            for (int i = 0; i < 3; i++) _session.Do(new TestKillAction());
+            _session.EndFrame(1);
+            _session.ExportMeta();
+            Assert.AreEqual(3, _session.UndoCount, "저장·시간 경과와 상관없이 이력이 남는다");
+            while (_session.Undo()) { }
+            Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
+            Assert.AreEqual(0, _session.State.GetNumber("m:gold"));
         }
 
+        [Test]
+        public void 이력_한도를_넘으면_오래된_행동부터_무를_수_없게_된다()
+        {
+            var session = new GameSession(new SessionOptions { HistoryLimit = 2 });
+            session.State.Define("s:n", StateZone.Session, 0);
+            session.Actions.Register<TestKillAction>(_ => session.State.Set("s:n", session.State.GetNumber("s:n") + 1));
+            for (int i = 0; i < 5; i++) session.Do(new TestKillAction());
+            Assert.AreEqual(2, session.UndoCount);
+            while (session.Undo()) { }
+            Assert.AreEqual(3, session.State.GetNumber("s:n"));
+        }
+
+        [Test]
+        public void 되돌리기를_끄면_기록하지_않는다()
+        {
+            var session = new GameSession(new SessionOptions { History = HistoryMode.None });
+            session.State.Define("s:n", StateZone.Session, 0);
+            session.Actions.Register<TestKillAction>(_ => session.State.Set("s:n", 1));
+            session.Do(new TestKillAction());
+            Assert.AreEqual(0, session.UndoCount);
+            Assert.IsFalse(session.Undo());
+            Assert.AreEqual(1, session.State.GetNumber("s:n"));
+        }
         [Test]
         public void 행동_실패_시_변경이_모두_취소된다()
         {
             Assert.Throws<InvalidOperationException>(() => _session.Do(new FailingAction()));
             Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
             Assert.AreEqual(ActionStatus.Failed, _session.Actions.Log.Last().Status);
-            Assert.AreEqual(0, _session.State.UncommittedCount);
+            Assert.AreEqual(0, _session.State.HistoryCount);
         }
 
         [Test]
@@ -130,15 +142,14 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 행동_상태는_확정과_무르기를_따라간다()
+        public void 행동_상태는_무르기를_따라간다()
         {
             var first = _session.Do(new TestKillAction());
             var second = _session.Do(new TestKillAction());
-            Assert.AreEqual(ActionStatus.Pending, first.Status);
+            Assert.AreEqual(ActionStatus.Done, first.Status);
             _session.Undo();
             Assert.AreEqual(ActionStatus.Undone, second.Status);
-            _session.Commit();
-            Assert.AreEqual(ActionStatus.Committed, first.Status);
+            Assert.AreEqual(ActionStatus.Done, first.Status);
         }
 
         [Test]
@@ -244,7 +255,7 @@ namespace GameSystems.Tests
         [Test]
         public void 무르면_난수도_되돌아가_같은_행동이_같은_결과를_낸다()
         {
-            var session = new GameSession(new SessionOptions { AutoCommit = false, Seed = 3 });
+            var session = new GameSession(new SessionOptions { Seed = 3 });
             var rolls = new List<ulong>();
             session.Actions.Register<TestKillAction>(_ => rolls.Add(session.Random.Get("combat").NextULong()));
             session.Do(new TestKillAction());
@@ -261,7 +272,7 @@ namespace GameSystems.Tests
         [SetUp]
         public void SetUp()
         {
-            _session = new GameSession(new SessionOptions { AutoCommit = false, Seed = 1 });
+            _session = new GameSession(new SessionOptions { Seed = 1 });
             var kills = new StatDefinition { Id = "kills", DisplayName = "처치 수", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             kills.Rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
             var runKills = new StatDefinition { Id = "run_kills", DisplayName = "이번 판 처치", Scope = StatScope.Run, Aggregate = StatAggregate.Sum };
@@ -306,28 +317,25 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 달성은_행동_직후_보상은_확정_시()
+        public void 달성과_보상은_행동_직후_바로_일어난다()
         {
             Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
             _session.Do(new TestKillAction());
-            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "조건을 만족하는 순간 달성된다(확정 대기 중인 값 포함)");
-            Assert.AreEqual(0, _session.Stats.Get("gold"), "보상은 확정 전에는 지급되지 않는다");
-            Assert.AreEqual(1, _session.Achievements.DeferredRewardCount);
-            _session.Commit();
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"));
             Assert.AreEqual(50, _session.Stats.Get("gold"));
-            Assert.AreEqual(0, _session.Achievements.DeferredRewardCount);
         }
 
         [Test]
-        public void 무르기는_값만_되돌리고_달성은_유지된다()
+        public void 무르기는_행동이_바꾼_값만_되돌리고_달성과_보상은_유지된다()
         {
             Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
             _session.Do(new TestKillAction());
             _session.Undo();
             Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "한 번 달성한 것은 무르기로 취소되지 않는다");
-            Assert.AreEqual(0, _session.Stats.Get("kills"), "값은 되돌아간다");
-            _session.Commit();
-            Assert.AreEqual(50, _session.Stats.Get("gold"), "달성이 유지되므로 보상은 확정 때 지급된다");
+            Assert.AreEqual(0, _session.Stats.Get("kills"), "행동이 바꾼 값은 되돌아간다");
+            Assert.AreEqual(50, _session.Stats.Get("gold"), "보상은 유지된다");
+            _session.Do(new TestKillAction());
+            Assert.AreEqual(50, _session.Stats.Get("gold"), "다시 해도 보상이 또 나오지 않는다");
         }
 
         [Test]
@@ -339,11 +347,43 @@ namespace GameSystems.Tests
                 _session.Do(new TestKillAction());
                 _session.Undo();
             }
-            _session.Commit();
             Assert.AreEqual(0, _session.Stats.Get("kills"));
             Assert.IsFalse(_session.Achievements.IsUnlocked("hunter"), "한 번의 행동으로 닿지 않는 목표는 무르기 반복으로 달성할 수 없다");
         }
 
+        [Test]
+        public void 스냅샷_방식은_같은_Undo로_되감고_달성과_보상은_유지한다()
+        {
+            var session = new GameSession(new SessionOptions { History = HistoryMode.Snapshots, SnapshotInterval = 1, Seed = 1 });
+            var kills = new StatDefinition { Id = "kills", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
+            kills.Rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
+            session.Stats.Define(kills);
+            session.Stats.Define(new StatDefinition { Id = "gold", Scope = StatScope.Total, Aggregate = StatAggregate.Sum });
+            var definition = new AchievementDefinition { Id = "first", DisplayName = "first", Condition = AtLeast("kills", 2) };
+            definition.Rewards.Add(new AddToStatReward { stat = "gold", amount = 50 });
+            session.Achievements.Define(definition);
+            session.Actions.Register<TestKillAction>(_ => session.Events.Publish(new TestKill { Count = 1 }));
+
+            session.EndFrame(0.5);                         // 첫 스냅샷(처치 0)
+            session.Do(new TestKillAction());
+            session.EndFrame(1.0);                         // 스냅샷(처치 1)
+            session.Do(new TestKillAction());               // 처치 2 → 달성, 골드 +50
+            session.Random.Get("loot").NextULong();
+            session.EndFrame(0.2);
+            Assert.AreEqual(0, session.State.HistoryCount, "스냅샷 방식은 행동별 기록을 남기지 않는다");
+            Assert.AreEqual(2, session.UndoCount);
+
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(1, session.Stats.Get("kills"), "행동이 바꾼 값은 스냅샷 시점으로 돌아간다");
+            Assert.AreEqual(1.5, session.Clock.Time, 1e-9, "시간도 되감긴다");
+            Assert.IsTrue(session.Achievements.IsUnlocked("first"), "되감은 구간의 달성은 유지된다");
+            Assert.AreEqual(50, session.Stats.Get("gold"), "보상도 유지된다");
+            Assert.AreEqual(ActionStatus.Undone, session.Actions.Log.Last().Status);
+
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(0, session.Stats.Get("kills"));
+            Assert.IsFalse(session.Undo());
+        }
         [Test]
         public void 관련_조건만_다시_평가한다()
         {
@@ -361,7 +401,6 @@ namespace GameSystems.Tests
             Achievement("b", AtLeast("gold", 100));
             Achievement("c", new AllOfCondition { conditions = { new AchievementUnlockedCondition { achievement = "a" }, new AchievementUnlockedCondition { achievement = "b" } } });
             _session.Do(new TestKillAction());
-            _session.Commit();
             Assert.IsTrue(_session.Achievements.IsUnlocked("a"));
             Assert.IsTrue(_session.Achievements.IsUnlocked("b"));
             Assert.IsTrue(_session.Achievements.IsUnlocked("c"));
@@ -382,7 +421,6 @@ namespace GameSystems.Tests
         {
             Achievement("first", AtLeast("kills", 1));
             _session.Do(new TestKillAction());
-            _session.Commit();
             var json = _session.ExportMeta();
 
             var next = new GameSession();

@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace GameSystems
 {
-    // Run: 이번 판(세션 구역, 되감김). Total: 누적(메타 구역, 확정된 행동만 반영).
+    // Run: 이번 판(세션 구역, 되감김). Total: 누적(메타 구역, 저장됨).
     public enum StatScope
     {
 #if UNITY_2020_1_OR_NEWER

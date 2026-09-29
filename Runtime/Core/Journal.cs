@@ -8,7 +8,7 @@ namespace GameSystems
         Action,
         Event,
         State,
-        Commit,
+        Snapshot,
         Undo,
         Achievement,
         Reward,
