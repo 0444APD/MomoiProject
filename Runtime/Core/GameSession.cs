@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GameSystems
 {
@@ -281,6 +282,77 @@ namespace GameSystems
             Journal.Append(JournalKind.System, "Save", $"메타 상태 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
         }
 
+        // ── 판(런) 저장 ─────────────────────────────────────────
+        // 싱글 게임의 '이어하기'용. 세션 구역(이번 판 내용) + 난수 상태 + 게임 시간을 저장한다.
+        // 프로필(메타)은 ExportMeta로 따로 저장한다(판을 지워도 프로필은 남도록). Undo 이력은 저장하지 않는다.
+
+        public string ExportRun()
+        {
+            if (State.InTransaction) throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 판을 저장할 수 없습니다.");
+            var random = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var pair in Random.ExportStates())
+                random[pair.Key] = pair.Value.Select(v => (object)v.ToString("x16", System.Globalization.CultureInfo.InvariantCulture)).ToList();
+            var root = new Dictionary<string, object>
+            {
+                ["version"] = (double)Options.SaveVersion,
+                ["kind"] = "run",
+                ["seed"] = Random.MasterSeed.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
+                ["tick"] = (double)Clock.Tick,
+                ["time"] = Clock.Time,
+                ["random"] = random,
+                ["state"] = State.Export(StateZone.Session),
+            };
+            return MiniJson.Serialize(root);
+        }
+
+        // 저장한 판을 이어서 진행한다. 아직 등록되지 않은 키의 값은 등록되는 순간 적용된다.
+        public void ImportRun(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return;
+            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[GameSystems] 판 저장 데이터 형식이 올바르지 않습니다.");
+            var version = root.TryGetValue("version", out var v) && v is double number ? (int)number : 1;
+            if (version > Options.SaveVersion)
+                throw new FormatException($"[GameSystems] 판 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}).");
+
+            if (root.TryGetValue("seed", out var seed) && seed is string seedText)
+                Random.Reseed(ulong.Parse(seedText, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture));
+            if (root.TryGetValue("random", out var random) && random is Dictionary<string, object> streams)
+            {
+                var states = new Dictionary<string, ulong[]>(StringComparer.Ordinal);
+                foreach (var pair in streams)
+                    if (pair.Value is List<object> parts && parts.Count == 4)
+                        states[pair.Key] = parts.Select(p => ulong.Parse((string)p, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                Random.ImportStates(states);
+            }
+            var tick = root.TryGetValue("tick", out var t) && t is double tickValue ? (long)tickValue : 0;
+            var time = root.TryGetValue("time", out var s) && s is double timeValue ? timeValue : 0;
+            Clock.Rewind(tick, time);
+
+            if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
+            {
+                if (version < Options.SaveVersion) Migrations.Run(values, version, Options.SaveVersion, Journal);
+                State.Import(values, StateZone.Session);
+            }
+            // 불러온 시점부터 새로 시작한다(이전 판의 Undo 이력·스냅샷은 버린다).
+            ClearUndo();
+            Journal.Append(JournalKind.System, "Save", $"판 불러옴 (틱 {tick}, {time:0.0}초)");
+            Achievements.Flush();
+        }
+
+        // 새 판: 세션 구역을 등록할 때의 값으로 되돌리고 Undo 이력을 비운다(프로필은 그대로).
+        public void NewRun()
+        {
+            State.ResetZone(StateZone.Session);
+            ClearUndo();
+            Journal.Append(JournalKind.System, "Session", "새 판 시작");
+        }
+
+        void ClearUndo()
+        {
+            State.ClearHistory();
+            _snapshots.Clear();
+            _lastSnapshotTime = double.NegativeInfinity;
+        }
         // ── 이름 조회 ───────────────────────────────────────────
 
         public string StatName(string id)

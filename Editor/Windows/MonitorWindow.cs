@@ -116,6 +116,11 @@ namespace GameSystems.EditorTools
             header.Add(Gs.Spacer());
             if (_session != null)
             {
+                if (Application.isPlaying)
+                {
+                    header.Add(TimeControls());
+                    header.Add(Gs.HSpace(16));
+                }
                 var undo = new GsButton("Undo", UndoLast);
                 undo.tooltip = _session.Options.History == HistoryMode.Snapshots
                     ? "마지막 스냅샷으로 되감습니다. 행동이 바꾼 값·시간이 돌아가고, 달성한 도전과제와 보상은 유지됩니다."
@@ -1077,6 +1082,38 @@ namespace GameSystems.EditorTools
             if (content != null) _dock.Add(content);
         }
 
+        // 게임 시간: 일시정지·1프레임 진행(개발용)·배속. 게임 안의 모든 요소(물리·애니메이션·파티클·게임 시계)가 따라간다.
+        static readonly float[] Speeds = { 0.25f, 0.5f, 1f, 2f, 4f };
+
+        VisualElement TimeControls()
+        {
+            var row = Gs.Row();
+            var pause = new GsButton("", () => GameTime.TogglePause("개발 도구"), GsButtonKind.Ghost);
+            var step = new GsButton("1프레임", () => GameTime.StepFrame(), GsButtonKind.Ghost);
+            step.tooltip = "일시정지 중에 한 프레임만 진행합니다(개발용).";
+            var speed = new GsSegmented(Speeds.Select(s => s.ToString("0.##", CultureInfo.InvariantCulture) + "×").ToArray());
+            speed.tooltip = "배속·슬로우. 게임 안의 모든 요소가 함께 빨라지거나 느려집니다.";
+            speed.Changed += index => GameTime.SetSpeed(Speeds[index]);
+            row.Add(pause);
+            row.Add(step);
+            row.Add(Gs.HSpace(8));
+            row.Add(speed);
+
+            void Refresh()
+            {
+                var paused = GameTime.IsPaused;
+                pause.Text = paused ? "재개" : "일시정지";
+                pause.tooltip = paused ? "멈춘 이유: " + string.Join(", ", GameTime.PausedBy) : "게임 시간을 멈춥니다.";
+                step.SetEnabled(paused);
+                var index = Array.FindIndex(Speeds, s => Mathf.Approximately(s, GameTime.Speed));
+                if (index >= 0) speed.Select(index);
+            }
+            Action onChanged = Refresh;
+            row.RegisterCallback<AttachToPanelEvent>(_ => GameTime.Changed += onChanged);
+            row.RegisterCallback<DetachFromPanelEvent>(_ => GameTime.Changed -= onChanged);
+            Refresh();
+            return row;
+        }
         string HistoryText()
         {
             switch (_session.Options.History)

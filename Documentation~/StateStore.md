@@ -288,6 +288,21 @@ session.ImportMeta(json);
 
 불러올 때 저장 파일에 없는 필드는 클래스의 기본값을 쓰고, 지금 클래스에 없는 필드는 무시한 뒤 경고로 알려 드립니다.
 
+### 9.0 판(런) 저장과 이어하기
+
+프로필(메타 구역)과 별도로, 진행 중인 판을 저장해 이어할 수 있습니다. 판 저장에는 세션 구역 전체, 난수 상태, 게임 시간이 들어갑니다. 그래서 이어하면 저장한 순간과 똑같이 이어지고, 다음 난수 결과까지 같습니다. Undo 이력은 저장하지 않으므로, 불러온 시점부터 새로 쌓입니다.
+
+```csharp
+// 타이틀 화면
+if (GameSystemsRuntime.HasSavedRun) GameSystemsRuntime.LoadRun(session);   // 이어하기
+else session.NewRun();                                                     // 새 판
+
+// 판이 끝났을 때
+session.NewRun();                  // 세션 구역을 처음 값으로, Undo 이력 비움(프로필은 그대로)
+GameSystemsRuntime.DeleteRun();    // 판 저장 파일 삭제
+```
+
+`GameSystemsRuntime`은 게임을 끌 때 판을 자동으로 저장합니다(`GameSystemsRuntime.AutoSaveRun`, 기본 켜짐). 불러오기는 자동으로 하지 않습니다. 타이틀의 '이어하기'처럼 게임이 원하는 때에 `LoadRun`을 부르세요. 직접 다룰 때는 `session.ExportRun()` / `session.ImportRun(json)`을 씁니다. 저장 버전과 변환은 프로필과 같은 규칙을 따릅니다.
 ### 9.1 버전과 변환
 
 출시 후 데이터 구조를 바꾸면 `SaveVersion`을 올리고 변환을 등록합니다.
@@ -434,7 +449,8 @@ public class MonsterData : GameData
 | | `AddAlias(old, new)` | 예전 키로 저장된 값 이어받기(ID 바꾸기가 자동 처리) |
 | `GameSession` | `Do(action)`, `Undo()`, `UndoCount` | 행동 실행, 되돌리기, 되돌릴 수 있는 횟수 |
 | | `CaptureSnapshot()` | 스냅샷 직접 찍기(스냅샷 방식) |
-| | `ExportMeta()`, `ImportMeta(json)` | 저장·불러오기 |
+| | `ExportMeta()`, `ImportMeta(json)` | 프로필 저장·불러오기 |
+| | `ExportRun()`, `ImportRun(json)`, `NewRun()` | 판 저장·이어하기·새 판 |
 | `SessionOptions` | `History`, `HistoryLimit`, `SnapshotInterval`, `SnapshotLimit` | 되돌리기 방식과 한도 |
 | | `SaveVersion`, `Migrations`, `DetectUntrackedChanges` | 저장 버전, 버전 변환, 누락 검사 |
 | `StateKey<T>` | `GameIds.State.XXX` | 타입이 붙은 키(생성 코드) |

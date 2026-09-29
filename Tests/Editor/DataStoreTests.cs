@@ -472,5 +472,53 @@ namespace GameSystems.Tests
             Assert.AreEqual("player", IdRules.GroupOf("player.inventory"));
             Assert.AreEqual("stat", IdRules.GroupOf("stat:kills"));
         }
+        [Test]
+        public void 판을_저장하고_이어하면_내용_난수_시간이_이어진다()
+        {
+            GameSession Make()
+            {
+                var s = new GameSession(new SessionOptions { Seed = 11 });
+                s.State.Define("run.hp", StateZone.Session, 10);
+                s.State.Define("run.bag", StateZone.Session, new TestInventory());
+                s.State.Define("meta.gold", StateZone.Meta, 0);
+                return s;
+            }
+
+            var played = Make();
+            played.State.Set("run.hp", 4);
+            played.State.Modify<TestInventory>("run.bag", inv => inv.items.Add(Sword()));
+            played.State.Set("meta.gold", 99);
+            played.Random.Get("loot").NextULong();
+            played.EndFrame(2.5);
+            var json = played.ExportRun();
+            var expectedNext = played.Random.Get("loot").NextULong();
+
+            var resumed = Make();
+            resumed.ImportRun(json);
+            Assert.AreEqual(4, resumed.State.Get<int>("run.hp"));
+            Assert.AreEqual("검", resumed.State.Get<TestInventory>("run.bag").items.Single().name);
+            Assert.AreEqual(0, resumed.State.Get<int>("meta.gold"), "프로필(메타)은 판 저장에 들어가지 않는다");
+            Assert.AreEqual(2.5, resumed.Clock.Time, 1e-9);
+            Assert.AreEqual(expectedNext, resumed.Random.Get("loot").NextULong(), "난수가 저장 시점부터 그대로 이어진다");
+            Assert.AreEqual(0, resumed.UndoCount, "불러온 시점부터 새로 기록한다");
+
+            resumed.NewRun();
+            Assert.AreEqual(10, resumed.State.Get<int>("run.hp"));
+            Assert.AreEqual(0, resumed.State.Get<TestInventory>("run.bag").items.Count);
+        }
+
+        [Test]
+        public void 판_저장은_나중에_등록되는_키에도_적용된다()
+        {
+            var played = new GameSession();
+            played.State.Define("run.turn", StateZone.Session, 1);
+            played.State.Set("run.turn", 7);
+            var json = played.ExportRun();
+
+            var resumed = new GameSession();
+            resumed.ImportRun(json);
+            resumed.State.Define("run.turn", StateZone.Session, 1);
+            Assert.AreEqual(7, resumed.State.Get<int>("run.turn"));
+        }
     }
 }

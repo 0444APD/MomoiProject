@@ -58,6 +58,34 @@ namespace GameSystems.Tests
             Assert.AreEqual(totalBefore, session.State.Get(StateKeys.Stat(KillsTotal(session))), "Undo한 행동은 누적에 남지 않는다");
         }
 
+        [UnityTest]
+        public IEnumerator 일시정지_배속_프레임_넘기기()
+        {
+            yield return null;
+            var clock = GameSystemsRuntime.Session.Clock;
+
+            GameTime.SetSpeed(2f);
+            Assert.AreEqual(2f, UnityEngine.Time.timeScale);
+            GameTime.Pause("테스트");
+            GameTime.Pause("메뉴");
+            Assert.AreEqual(0f, UnityEngine.Time.timeScale);
+            var pausedTime = clock.Time;
+            yield return null;
+            yield return null;
+            Assert.AreEqual(pausedTime, clock.Time, "멈춘 동안 게임 시계도 멈춘다");
+
+            GameTime.StepFrame();
+            yield return null;
+            yield return null;
+            Assert.Greater(clock.Time, pausedTime, "1프레임은 진행한다");
+            Assert.AreEqual(0f, UnityEngine.Time.timeScale, "넘긴 뒤 다시 멈춘다");
+
+            GameTime.Resume("테스트");
+            Assert.IsTrue(GameTime.IsPaused, "다른 이유(메뉴)가 남아 있으면 계속 멈춘다");
+            GameTime.Resume("메뉴");
+            Assert.AreEqual(2f, UnityEngine.Time.timeScale, "재개하면 배속이 돌아온다");
+            GameTime.SetSpeed(1f);
+        }
         static string KillsTotal(GameSession session) =>
             session.Stats.Definitions.First(s => s.DisplayName == "처치 수 (누적)").Id;
     }

@@ -19,6 +19,11 @@ namespace GameSystems
         public static event Action<GameSession> Stopped;
 
         public static string SavePath => Path.Combine(Application.persistentDataPath, "GameSystems", "profile.json");
+        // 진행 중인 판(런) 저장 파일. 이어하기용.
+        public static string RunSavePath => Path.Combine(Application.persistentDataPath, "GameSystems", "run.json");
+        public static bool HasSavedRun => File.Exists(RunSavePath);
+        // 종료할 때 진행 중인 판을 자동으로 저장할지(불러오기는 게임이 LoadRun으로 직접 한다: 타이틀의 '이어하기' 등).
+        public static bool AutoSaveRun = true;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -73,6 +78,14 @@ namespace GameSystems
             session.Journal.Appended += ForwardToConsole;
             session.Debug.Register("저장", "프로필 저장", () => SaveProfile(session));
             session.Debug.Register("저장", "프로필 삭제", DeleteProfile, "저장 파일을 지웁니다. 다음 플레이부터 적용됩니다.");
+            session.Debug.Register("저장", "판 저장", () => SaveRun(session), "진행 중인 판(세션 구역·난수·시간)을 저장합니다.");
+            session.Debug.Register("저장", "판 불러오기", () => LoadRun(session), "저장한 판을 이어서 진행합니다.");
+            session.Debug.Register("저장", "새 판", () => { session.NewRun(); DeleteRun(); }, "이번 판 내용을 처음 값으로 되돌리고 판 저장을 지웁니다.");
+            session.Debug.Register("시간", "일시정지 / 재개", () => GameTime.TogglePause("개발 도구"));
+            session.Debug.Register("시간", "1프레임 진행", () => GameTime.StepFrame(), "일시정지 중에만 동작합니다.");
+            session.Debug.Register("시간", "배속 0.25", () => GameTime.SetSpeed(0.25f));
+            session.Debug.Register("시간", "배속 1", () => GameTime.SetSpeed(1f));
+            session.Debug.Register("시간", "배속 2", () => GameTime.SetSpeed(2f));
 
             Session = session;
             // 숨기지 않는다: 하이어라키의 DontDestroyOnLoad 아래에서 보이는 편이 상태 확인에 낫다.
@@ -88,6 +101,7 @@ namespace GameSystems
         {
             if (Session == null) return;
             SaveProfile(Session);
+            if (AutoSaveRun) SaveRun(Session);
             Stopped?.Invoke(Session);
             Session = null;
         }
@@ -125,6 +139,41 @@ namespace GameSystems
             }
         }
 
+        public static void SaveRun(GameSession session)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(RunSavePath));
+                File.WriteAllText(RunSavePath, session.ExportRun());
+                session.Journal.Append(JournalKind.System, "Save", "판 저장: " + RunSavePath);
+            }
+            catch (Exception e)
+            {
+                session.Journal.Append(JournalKind.Error, "Save", "판 저장 실패: " + e.Message);
+            }
+        }
+
+        // 저장한 판이 있으면 이어서 진행하고 true.
+        public static bool LoadRun(GameSession session)
+        {
+            if (!HasSavedRun) return false;
+            try
+            {
+                session.ImportRun(File.ReadAllText(RunSavePath));
+                return true;
+            }
+            catch (Exception e)
+            {
+                session.Journal.Append(JournalKind.Error, "Save", "판 불러오기 실패: " + e.Message);
+                return false;
+            }
+        }
+
+        public static void DeleteRun()
+        {
+            if (File.Exists(RunSavePath)) File.Delete(RunSavePath);
+        }
+
         static void DeleteProfile()
         {
             if (File.Exists(SavePath)) File.Delete(SavePath);
@@ -134,7 +183,17 @@ namespace GameSystems
     [AddComponentMenu("")]
     sealed class GameSystemsHost : MonoBehaviour
     {
-        void LateUpdate() => GameSystemsRuntime.Session?.EndFrame(Time.deltaTime);
+        void LateUpdate()
+        {
+            var session = GameSystemsRuntime.Session;
+            // 일시정지 중(시간이 흐르지 않음)에는 시계를 멈추고, 조건 평가만 한다.
+            if (session != null)
+            {
+                if (Time.deltaTime > 0f) session.EndFrame(Time.deltaTime);
+                else if (!session.State.InTransaction) session.Achievements.Flush();
+            }
+            GameTime.OnFrameEnd();
+        }
 
         void OnApplicationQuit() => GameSystemsRuntime.Stop();
     }
