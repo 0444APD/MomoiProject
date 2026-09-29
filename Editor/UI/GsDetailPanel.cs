@@ -319,6 +319,7 @@ namespace GameSystems.EditorTools.UI
 
             public override Type Type => _panel._draft.GetType();
             public override bool CanEdit => true;
+            public override UnityEngine.Object Target => _panel._target;
 
             public override IEnumerable<string> Fields() =>
                 PropertyUtil.TopLevel(_panel._draftObject)

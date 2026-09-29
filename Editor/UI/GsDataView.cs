@@ -34,6 +34,8 @@ namespace GameSystems.EditorTools.UI
         public abstract UnityEngine.Object ObjectAt(string path);
         public abstract void SetObject(string path, UnityEngine.Object value);
         public abstract bool CanEdit { get; }
+        // 보고 있는 도감 항목(있으면). 항목에 딸린 블록(선택지 목록 등)이 쓴다.
+        public virtual UnityEngine.Object Target => null;
 
         public string LabelOf(string path)
         {

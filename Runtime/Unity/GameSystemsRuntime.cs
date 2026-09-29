@@ -63,6 +63,9 @@ namespace GameSystems
                     catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[GameSystems] ", "")); }
                 }
                 foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
+                // 필드 규칙의 '필수': 저장소 값에서 비면 경고하고 채워질 때까지 모니터에 남긴다.
+                foreach (var rule in database.All<FieldRuleData>())
+                    if (rule.required && rule.TargetType != null) session.State.Require(rule.TargetType, rule.field);
                 // 저장 호환: 지금 데이터 구조를 저장 파일에 남기고, 개발 중이면 호환되지 않는 저장을 지운다.
                 session.SaveSchema = BuildSchema(database);
                 if (!database.IsReleased) ResetIncompatibleSaves(session);

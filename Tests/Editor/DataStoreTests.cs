@@ -560,5 +560,19 @@ namespace GameSystems.Tests
             StringAssert.Contains("hero", reason);
             Assert.IsTrue(GameSession.IsSaveCompatible("{\"version\":1,\"state\":{}}", renamed, out _), "구조 정보가 없는 예전 파일은 호환으로 본다");
         }
+        [Test]
+        public void 필수_필드가_비면_경고하고_채워지면_알린다()
+        {
+            var session = new GameSession();
+            session.State.Require(typeof(TestItem), nameof(TestItem.name));
+            session.State.Define("s:bag", StateZone.Session, new TestInventory());
+            session.State.Modify<TestInventory>("s:bag", inv => inv.items.Add(new TestItem { level = 1 }));
+            Assert.AreEqual(1, session.State.MissingRequired.Count());
+            Assert.IsTrue(session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.StartsWith("필수 값이 비어 있습니다")));
+
+            session.State.Modify<TestInventory>("s:bag", inv => inv.items[0].name = "검");
+            Assert.AreEqual(0, session.State.MissingRequired.Count());
+            Assert.IsTrue(session.Journal.Entries.Any(e => e.Message.StartsWith("필수 값이 채워졌습니다")));
+        }
     }
 }

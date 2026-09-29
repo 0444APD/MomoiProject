@@ -117,6 +117,27 @@ namespace GameSystems.EditorTools
                 b.AppendLine($"        public static class {className}");
                 b.AppendLine("        {");
                 var used = new HashSet<string>(StringComparer.Ordinal) { className };
+                if (group.Key == typeof(ChoiceData))
+                {
+                    // 선택지는 목록별로: GameIds.Choice.ItemCategory.Weapon
+                    foreach (var byList in group.Cast<ChoiceData>().GroupBy(c => c.list).OrderBy(g => g.Key, StringComparer.Ordinal))
+                    {
+                        var listName = Unique(IdRules.ToIdentifier(string.IsNullOrEmpty(byList.Key) ? "unlisted" : byList.Key), used);
+                        var listData = all.FirstOrDefault(d => d.Id == byList.Key);
+                        b.AppendLine($"            /// <summary>{Escape(listData?.DisplayName ?? byList.Key)}</summary>");
+                        b.AppendLine($"            public static class {listName}");
+                        b.AppendLine("            {");
+                        var inner = new HashSet<string>(StringComparer.Ordinal) { listName };
+                        foreach (var choice in byList.OrderBy(c => c.Id, StringComparer.Ordinal))
+                        {
+                            b.AppendLine($"                /// <summary>{Escape(choice.DisplayName)}</summary>");
+                            b.AppendLine($"                public const string {Unique(IdRules.ToIdentifier(choice.Id), inner)} = \"{choice.Id}\";");
+                        }
+                        b.AppendLine("            }");
+                    }
+                    b.AppendLine("        }");
+                    continue;
+                }
                 foreach (var data in group.OrderBy(d => d.Id, StringComparer.Ordinal))
                 {
                     var name = Unique(IdRules.ToIdentifier(data.Id), used);

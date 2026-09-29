@@ -69,7 +69,8 @@ namespace GameSystems.EditorTools.UI
         bool IsAchievementRef => _field != null && _field.IsDefined(typeof(AchievementRefAttribute), false);
         bool IsEventTypeRef => _field != null && _field.IsDefined(typeof(EventTypeRefAttribute), false);
         EventFieldRefAttribute EventFieldRef => _field?.GetCustomAttribute<EventFieldRefAttribute>();
-        Type DataRefType => _field?.GetCustomAttribute<DataRefAttribute>()?.DataType;
+        // [DataRef] 또는 도감의 필드 규칙으로 정해진 참조 종류.
+        Type DataRefType => EditorDatabase.RefTypeOf(_field);
         bool IsDataTypeRef => _field != null && _field.IsDefined(typeof(DataTypeRefAttribute), false);
         bool Has<T>() where T : Attribute => _field != null && _field.IsDefined(typeof(T), false);
 
@@ -128,13 +129,33 @@ namespace GameSystems.EditorTools.UI
                     var target = db.FindById(id);
                     return target != null ? (target.DisplayName, false, false) : ($"없는 항목: {id}", false, true);
                 }
-                var dataRef = field?.GetCustomAttribute<DataRefAttribute>();
+                var dataRef = EditorDatabase.RefTypeOf(field);
                 if (dataRef != null)
                 {
-                    var kind = DataTypes.Find(dataRef.DataType)?.DisplayName ?? dataRef.DataType.Name;
-                    if (string.IsNullOrEmpty(id)) return ($"{kind} 선택", true, false);
+                    var kind = DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name;
+                    if (string.IsNullOrEmpty(id)) return EditorDatabase.IsRequired(field) ? ($"{kind} 선택 (필수)", true, true) : ($"{kind} 선택", true, false);
                     var target = db.FindById(id);
-                    return target != null && dataRef.DataType.IsInstanceOfType(target) ? (target.DisplayName, false, false) : ($"없는 {kind}: {id}", false, true);
+                    return target != null && dataRef.IsInstanceOfType(target) ? (target.DisplayName, false, false) : ($"없는 {kind}: {id}", false, true);
+                }
+                if (field != null && field.IsDefined(typeof(ClassTypeRefAttribute), false))
+                {
+                    if (string.IsNullOrEmpty(id)) return ("클래스 선택", true, false);
+                    var classType = TypeResolver.Find(id);
+                    return classType != null ? (ClassTypes.Label(classType), false, false) : ($"없는 클래스: {id}", false, true);
+                }
+                if (field != null && field.IsDefined(typeof(GameDataTypeRefAttribute), false))
+                {
+                    if (string.IsNullOrEmpty(id)) return ("도감 종류 선택", true, false);
+                    var dataType = TypeResolver.Find(id);
+                    return dataType != null ? (DataTypes.Find(dataType)?.DisplayName ?? dataType.Name, false, false) : ($"없는 종류: {id}", false, true);
+                }
+                var memberRef = field?.GetCustomAttribute<MemberRefAttribute>();
+                if (memberRef != null)
+                {
+                    if (string.IsNullOrEmpty(id)) return ("필드 선택", true, false);
+                    var owner = TypeResolver.Find(Sibling(property, memberRef.TypeField)?.stringValue);
+                    var member = owner?.GetField(id, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    return member != null ? ($"{GsDataExplorer.LabelOf(member, id)} ({id})", false, false) : ($"없는 필드: {id}", false, owner != null);
                 }
                 if (field != null && field.IsDefined(typeof(DataTypeRefAttribute), false))
                 {
@@ -216,7 +237,16 @@ namespace GameSystems.EditorTools.UI
                     ShowEventFieldMenu();
                     return;
                 case SerializedPropertyType.String when DataRefType != null:
-                    ShowIdMenu(EditorDatabase.Instance.OfType(DataRefType), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
+                    ShowIdMenu(EditorDatabase.Instance.RefCandidates(_field), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
+                    return;
+                case SerializedPropertyType.String when Has<ClassTypeRefAttribute>():
+                    ShowTypeList(ClassTypes.All(), ClassTypes.Label, ClassTypes.GroupOf, "클래스 검색");
+                    return;
+                case SerializedPropertyType.String when Has<GameDataTypeRefAttribute>():
+                    ShowTypeList(DataTypes.All.Select(i => i.Type), t => DataTypes.Find(t)?.DisplayName ?? t.Name, t => DataTypes.Find(t)?.Group, "도감 종류 검색");
+                    return;
+                case SerializedPropertyType.String when Has<MemberRefAttribute>():
+                    ShowMemberMenu();
                     return;
                 case SerializedPropertyType.String when IsDataTypeRef:
                     ShowStorableTypeMenu();
@@ -350,10 +380,10 @@ namespace GameSystems.EditorTools.UI
             var type = path == null ? null : FieldPathContext.LeafType(path, out _);
             if (type != null && (fieldOp == FieldOp.Contains || fieldOp == FieldOp.NotContains)) type = FieldPaths.ElementTypeOf(type) ?? type;
             type = type == null ? null : Nullable.GetUnderlyingType(type) ?? type;
-            var dataRef = LeafDataRef(_property, attr);
+            var dataRef = LeafDataRef(_property, attr, out var leafField);
             if (dataRef != null)
             {
-                ShowIdMenu(EditorDatabase.Instance.OfType(dataRef), DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name);
+                ShowIdMenu(EditorDatabase.Instance.RefCandidates(leafField), DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name);
                 return true;
             }
             if (type != null && type.IsEnum)
@@ -365,13 +395,47 @@ namespace GameSystems.EditorTools.UI
             return false;
         }
 
-        // 경로 끝 필드에 [DataRef]가 붙어 있으면 그 데이터 타입(예: 태그 목록 → 태그).
-        static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr)
+        // 경로 끝 필드가 ID 참조([DataRef]·필드 규칙)면 그 데이터 타입(예: 태그 목록 → 태그).
+        static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr) => LeafDataRef(valueProperty, attr, out _);
+
+        static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr, out FieldInfo leaf)
         {
+            leaf = null;
             var path = valueProperty.serializedObject.FindProperty(FieldPathContext.Sibling(valueProperty.propertyPath, attr.PathField));
             if (path == null) return null;
             FieldPathContext.LeafType(path, out var member);
-            return member?.GetCustomAttribute<DataRefAttribute>()?.DataType;
+            leaf = member as FieldInfo;
+            return EditorDatabase.RefTypeOf(leaf);
+        }
+
+        void ShowTypeList(IEnumerable<Type> types, Func<Type, string> label, Func<Type, string> group, string placeholder)
+        {
+            var items = types.Select(type =>
+            {
+                var name = type.FullName;
+                return new GsDropdownItem(label(type), () => SetString(name)) { Group = group(type), Caption = type.Namespace, Selected = _property.stringValue == name };
+            }).ToList();
+            GsDropdown.Show(this, items, placeholder: placeholder);
+        }
+
+        // 옆 칸의 클래스가 가진 필드 목록(필드 규칙의 '필드' 칸).
+        void ShowMemberMenu()
+        {
+            var attr = _field.GetCustomAttribute<MemberRefAttribute>();
+            var owner = TypeResolver.Find(Sibling(attr.TypeField)?.stringValue);
+            var items = new List<GsDropdownItem>();
+            if (owner == null) items.Add(new GsDropdownItem("클래스를 먼저 고르세요") { Disabled = true });
+            else
+                foreach (var member in ClassTypes.FieldsOf(owner))
+                {
+                    var name = member.Name;
+                    items.Add(new GsDropdownItem(GsDataExplorer.LabelOf(member, name), () => SetString(name))
+                    {
+                        Caption = $"{name} · {DataModel.FriendlyName(member.FieldType)}",
+                        Selected = _property.stringValue == name,
+                    });
+                }
+            GsDropdown.Show(this, items, placeholder: "필드 검색");
         }
 
         void ShowStorableTypeMenu()

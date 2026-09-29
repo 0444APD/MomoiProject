@@ -84,13 +84,29 @@ namespace GameSystems.Samples
             foreach (var (id, name) in new[] { ("boss", "보스"), ("legendary", "전설"), ("melee", "근접"), ("lifesteal", "흡혈"), ("fire_resist", "화염 저항") })
                 if (db.FindById(id) == null) db.Create(typeof(TagData), name, id);
 
+            // 선택지 목록 + 필드 규칙: SampleEquipment.slot은 코드에 어트리뷰트가 없어도 '장비 부위'에서만 고르고, 필수다.
+            var slots = (ChoiceListData)db.Create(typeof(ChoiceListData), "장비 부위", "equipment_slot");
+            foreach (var (id, name) in new[] { ("weapon", "무기"), ("armor", "방어구"), ("accessory", "장신구") })
+            {
+                var choice = (ChoiceData)db.Create(typeof(ChoiceData), name, id);
+                choice.list = slots.Id;
+                EditorUtility.SetDirty(choice);
+            }
+            var rule = (FieldRuleData)db.Create(typeof(FieldRuleData), "장비 부위 규칙", "rule.equipment_slot");
+            rule.targetType = typeof(SampleEquipment).FullName;
+            rule.field = nameof(SampleEquipment.slot);
+            rule.source = FieldRuleSource.Choice;
+            rule.choiceList = slots.Id;
+            rule.required = true;
+            EditorUtility.SetDirty(rule);
+
             var inventory = (StateKeyData)db.Create(typeof(StateKeyData), "인벤토리", "player.inventory");
             inventory.zone = StateZone.Meta;
             inventory.valueType = typeof(SampleInventory).FullName;
             EditorUtility.SetDirty(inventory);
 
-            Template("template.training_sword", "훈련용 검", new SampleEquipment { name = "훈련용 검", grade = 1, tags = { "melee" } });
-            Template("template.dragon_armor", "용의 비늘 갑옷", new SampleEquipment { name = "용의 비늘 갑옷", grade = 5, element = SampleElement.Fire, tags = { "legendary" } });
+            Template("template.training_sword", "훈련용 검", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = 1, tags = { "melee" } });
+            Template("template.dragon_armor", "용의 비늘 갑옷", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = 5, element = SampleElement.Fire, tags = { "legendary" } });
 
             var gold = db.OfType<StatData>().FirstOrDefault(s => s.DisplayName == "골드");
             var bossRule = Rule<EnemyKilled>("");

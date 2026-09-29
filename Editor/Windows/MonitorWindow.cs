@@ -223,7 +223,8 @@ namespace GameSystems.EditorTools
                 return;
             }
             _sessionInfo.text = $"시드 {_session.Random.MasterSeed}  ·  틱 {_session.Clock.Tick}  ·  {_session.Clock.Time:0.0}초  ·  " +
-                                $"{HistoryText()}  ·  기록 {_session.Journal.Count}/{_session.Journal.Capacity}";
+                                $"{HistoryText()}  ·  기록 {_session.Journal.Count}/{_session.Journal.Capacity}" +
+                                (_session.State.MissingRequired.Any() ? $"  ·  필수 값 비어 있음 {_session.State.MissingRequired.Count()}" : "");
         }
 
         void BuildTab()
@@ -690,7 +691,7 @@ namespace GameSystems.EditorTools
             var root = new ExplorerItem
             {
                 Label = "데이터",
-                Children = () => new List<ExplorerItem>
+                Children = () => MissingFolder(state).Concat(new List<ExplorerItem>
                 {
                     Folder("판 데이터", "이번 판 내용(세션 구역) · 판 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Session, Gs.Palette[6]),
                     Folder("플레이어 데이터", "프로필(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Meta, Gs.Palette[4]),
@@ -714,12 +715,32 @@ namespace GameSystems.EditorTools
                             Apply = change => change(),
                         }).ToList(),
                     },
-                },
+                }),
             };
             _dataExplorer = GsDataExplorer.Browse(root);
             _dataExplorer.style.flexGrow = 1;
             _body.Add(_dataExplorer);
         }
+        // 필드 규칙의 '필수' 값이 빈 곳(채워질 때까지 맨 위에 보인다).
+        static IEnumerable<ExplorerItem> MissingFolder(StateStore state)
+        {
+            var missing = state.MissingRequired.ToList();
+            if (missing.Count == 0) yield break;
+            yield return new ExplorerItem
+            {
+                Label = $"필수 값 비어 있음 ({missing.Count})",
+                Caption = "필드 규칙에서 필수로 정한 값",
+                Color = Gs.Danger,
+                Children = () => state.MissingRequired.Select(m => new ExplorerItem
+                {
+                    Label = state.LabelOf(m.key),
+                    Caption = DataModel.NaturalPath(state.TypeOf(m.key), m.where),
+                    Value = "비어 있음",
+                    Type = typeof(string),
+                }).ToList(),
+            };
+        }
+
         // ── 상태·수치 (관찰 계약 트리) ─────────────────────────
 
         void BuildInspect(IInspectable inspectable)

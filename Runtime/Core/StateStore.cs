@@ -203,6 +203,7 @@ namespace GameSystems
             if (TakePreloaded(key, out var loaded)) slot.Value = LoadData(key, slot, loaded);
             slot.Shadow = CloneShadow(slot);
             _slots.Add(key, slot);
+            CheckRequired(key, slot);
         }
 
         static void CheckRedefine(string key, Slot existing, StateZone zone, Type dataType)
@@ -381,6 +382,7 @@ namespace GameSystems
             LogChanges(key, slot, changes, JournalKind.State, null, _active?.Id ?? 0);
             Changed?.Invoke(key);
             DataChanged?.Invoke(key, changes);
+            CheckRequired(key, slot);
         }
 
         object CloneShadow(Slot slot)
@@ -458,9 +460,81 @@ namespace GameSystems
             slot.Shadow = CloneShadow(slot);
             Changed?.Invoke(key);
             DataChanged?.Invoke(key, changes);
+            CheckRequired(key, slot);
             return true;
         }
 
+        // ── 필수 값 ─────────────────────────────────────────────
+        // 필드 규칙의 "필수": 어떤 클래스의 어떤 필드가 비어 있으면(null·빈 글자·빈 목록) 기록에 경고를 남기고,
+        // 채워질 때까지 MissingRequired에 남겨 둔다(모니터가 목록으로 보여 준다).
+
+        sealed class Requirement
+        {
+            public Type Owner;
+            public string Field;
+            public System.Reflection.FieldInfo Info;
+        }
+
+        readonly List<Requirement> _required = new List<Requirement>();
+        readonly Dictionary<string, HashSet<string>> _missing = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        public event Action MissingChanged;
+
+        public void Require(Type owner, string field)
+        {
+            var info = owner?.GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (info == null) return;
+            _required.Add(new Requirement { Owner = owner, Field = field, Info = info });
+            foreach (var pair in _slots) if (pair.Value.DataType != null) CheckRequired(pair.Key, pair.Value);
+        }
+
+        // (상태 키, 사람이 읽는 위치) 목록.
+        public IEnumerable<(string key, string where)> MissingRequired =>
+            _missing.SelectMany(pair => pair.Value.Select(path => (pair.Key, path)));
+
+        void CheckRequired(string key, Slot slot)
+        {
+            if (_required.Count == 0 || slot.DataType == null) return;
+            var found = new HashSet<string>(StringComparer.Ordinal);
+            FindMissing(slot.Value, "", found, 0);
+            _missing.TryGetValue(key, out var before);
+            before = before ?? new HashSet<string>(StringComparer.Ordinal);
+            if (found.SetEquals(before)) return;
+            foreach (var path in found.Where(p => !before.Contains(p)))
+                _journal.Append(JournalKind.Warning, "State", $"필수 값이 비어 있습니다: {slot.Label} › {DataModel.NaturalPath(slot.DataType, path)}", key);
+            foreach (var path in before.Where(p => !found.Contains(p)))
+                _journal.Append(JournalKind.System, "State", $"필수 값이 채워졌습니다: {slot.Label} › {DataModel.NaturalPath(slot.DataType, path)}", key);
+            if (found.Count == 0) _missing.Remove(key);
+            else _missing[key] = found;
+            MissingChanged?.Invoke();
+        }
+
+        void FindMissing(object value, string path, HashSet<string> found, int depth)
+        {
+            if (value == null || depth > 32) return;
+            if (FieldPaths.IsCollectionValue(value))
+            {
+                int index = 0;
+                foreach (var item in FieldPaths.Items(value))
+                {
+                    var at = item != null && Identity.TryGetId(item, out var id) ? $"[#{id}]" : $"[{index}]";
+                    FindMissing(item, path + at, found, depth + 1);
+                    index++;
+                }
+                return;
+            }
+            var info = DataModel.Of(value.GetType());
+            if (info.Kind != DataKind.Object) return;
+            foreach (var requirement in _required)
+            {
+                if (!requirement.Owner.IsInstanceOfType(value)) continue;
+                var current = requirement.Info.GetValue(value);
+                if (current == null || (current is string text && text.Length == 0) || (FieldPaths.IsCollectionValue(current) && !FieldPaths.Items(current).Any()))
+                    found.Add(Join(path, requirement.Field));
+            }
+            foreach (var field in info.Fields) FindMissing(field.Field.GetValue(value), Join(path, field.Name), found, depth + 1);
+        }
+
+        static string Join(string path, string name) => string.IsNullOrEmpty(path) ? name : path + "." + name;
         // ── 트랜잭션 ───────────────────────────────────────────
 
         public Transaction Begin(long journalId, string label)
@@ -562,6 +636,7 @@ namespace GameSystems
                 LogChanges(record.Key, slot, changes, JournalKind.Undo, $"{reason}: ", tx.Id);
                 Changed?.Invoke(record.Key);
                 DataChanged?.Invoke(record.Key, changes);
+                CheckRequired(record.Key, slot);
             }
         }
 
@@ -607,6 +682,7 @@ namespace GameSystems
                     LogChanges(key, slot, changes, JournalKind.Undo, $"{reason}: ", 0);
                     Changed?.Invoke(key);
                     DataChanged?.Invoke(key, changes);
+                    CheckRequired(key, slot);
                 }
                 else if (TryNormalize(ReadScalar(slot, saved), out var value) && !Equals(value, slot.Value))
                 {
@@ -633,6 +709,7 @@ namespace GameSystems
                 {
                     slot.Value = LoadData(key, slot, pair.Value);
                     slot.Shadow = CloneShadow(slot);
+                    CheckRequired(key, slot);
                 }
                 else if (TryNormalize(ReadScalar(slot, pair.Value), out var value))
                 {

@@ -37,6 +37,8 @@ namespace GameSystems.Samples
     {
         [FieldLabel("이름")] public string name = "";
         [FieldLabel("아이콘")] public Sprite icon;
+        // 어트리뷰트 없음: 어떤 값에서 고를지는 도감의 필드 규칙(부위 → 장비 부위 목록, 필수)으로 연결한다.
+        [FieldLabel("부위")] public string slot = "";
         [FieldLabel("등급")] public int grade = 1;
         [FieldLabel("속성")] public SampleElement element;
         [FieldLabel("태그"), DataRef(typeof(TagData))] public List<string> tags = new List<string>();

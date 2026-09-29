@@ -61,6 +61,7 @@ namespace GameSystems.EditorTools
                 if (string.IsNullOrEmpty(data.Id)) context.Error("ID가 없습니다.");
                 else if (!IdRules.IsValid(data.Id, out var idError)) context.Error($"ID '{data.Id}': {idError} 'ID 바꾸기'로 고치세요.");
                 CheckReferences(data, all, context);
+                CheckRequired(data, context);
                 try
                 {
                     data.ValidateData(context);
@@ -103,6 +104,28 @@ namespace GameSystems.EditorTools
             foreach (var child in condition.Children) CheckStateFields(child, all, context);
         }
 
+        // 필드 규칙의 '필수': 비어 있으면(빈 글자·빈 참조·빈 목록) 오류. 템플릿 값 같은 안쪽 클래스까지 본다.
+        static void CheckRequired(GameData data, Context context)
+        {
+            var so = new UnityEditor.SerializedObject(data);
+            var it = so.GetIterator();
+            while (it.Next(true))
+            {
+                var field = PropertyUtil.GetField(it, out _);
+                if (field == null || !EditorDatabase.IsRequired(field)) continue;
+                // 목록의 요소마다가 아니라 목록 칸 자체로 한 번만 본다.
+                if (it.propertyPath.EndsWith("]", StringComparison.Ordinal) || it.propertyPath.EndsWith(".Array.size", StringComparison.Ordinal)) continue;
+                bool empty;
+                switch (it.propertyType)
+                {
+                    case UnityEditor.SerializedPropertyType.String: empty = string.IsNullOrEmpty(it.stringValue); break;
+                    case UnityEditor.SerializedPropertyType.ObjectReference: empty = it.objectReferenceValue == null; break;
+                    case UnityEditor.SerializedPropertyType.ManagedReference: empty = it.managedReferenceValue == null; break;
+                    default: empty = it.isArray && it.propertyType == UnityEditor.SerializedPropertyType.Generic && it.arraySize == 0; break;
+                }
+                if (empty) context.Error($"필수 값 '{it.displayName}'({it.propertyPath})이 비어 있습니다.");
+            }
+        }
         // [DataRef] 필드가 없는 항목을 가리키는지(수치·도전과제 참조는 블록 검증이 따로 본다).
         static void CheckReferences(GameData data, IReadOnlyList<GameData> all, Context context)
         {

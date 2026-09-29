@@ -48,6 +48,7 @@ namespace GameSystems.EditorTools
         public static void MarkDirty()
         {
             if (_instance != null) _instance._all = null;
+            _rules = null;
             Changed?.Invoke();
         }
 
@@ -196,8 +197,51 @@ namespace GameSystems.EditorTools
             if (field == null) return null;
             if (field.IsDefined(typeof(StatRefAttribute), false)) return typeof(StatData);
             if (field.IsDefined(typeof(AchievementRefAttribute), false)) return typeof(AchievementData);
-            return ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
+            var attribute = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
+            if (attribute != null) return attribute;
+            // 필드 규칙(도감에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
+            var rule = RuleFor(field);
+            if (rule == null) return null;
+            switch (rule.source)
+            {
+                case FieldRuleSource.Tag: return typeof(TagData);
+                case FieldRuleSource.Choice: return typeof(ChoiceData);
+                case FieldRuleSource.StateKey: return typeof(StateKeyData);
+                case FieldRuleSource.Data: return TypeResolver.Find(rule.dataType);
+                default: return null;
+            }
         }
+
+        // 이 필드에 걸린 필드 규칙(없으면 null). 필드를 선언한 클래스와 그 부모 클래스 기준.
+        public static FieldRuleData RuleFor(System.Reflection.FieldInfo field)
+        {
+            if (field == null) return null;
+            if (_rules == null)
+            {
+                _rules = new Dictionary<string, FieldRuleData>(StringComparer.Ordinal);
+                foreach (var rule in Instance.OfType<FieldRuleData>())
+                    if (!string.IsNullOrEmpty(rule.targetType) && !string.IsNullOrEmpty(rule.field)) _rules[rule.targetType + "|" + rule.field] = rule;
+            }
+            for (var type = field.ReflectedType; type != null; type = type.BaseType)
+                if (_rules.TryGetValue(type.FullName + "|" + field.Name, out var found)) return found;
+            return null;
+        }
+
+        static Dictionary<string, FieldRuleData> _rules;
+
+        // 이 필드에서 고를 수 있는 항목(타입 + 선택지 목록으로 거른다).
+        public IEnumerable<GameData> RefCandidates(System.Reflection.FieldInfo field)
+        {
+            var type = RefTypeOf(field);
+            if (type == null) return Enumerable.Empty<GameData>();
+            var items = OfType(type);
+            var rule = RuleFor(field);
+            if (type == typeof(ChoiceData) && rule != null && !string.IsNullOrEmpty(rule.choiceList))
+                items = items.Where(d => ((ChoiceData)d).list == rule.choiceList);
+            return items;
+        }
+
+        public static bool IsRequired(System.Reflection.FieldInfo field) => RuleFor(field)?.required ?? false;
 
         // ID를 바꾼다. 이 ID를 가리키는 모든 필드, 에셋 파일 이름, 생성 코드(GameIds)가 함께 바뀐다.
         // 출시 후: 예전 이름으로 저장된 플레이어 데이터를 런타임이 새 이름으로 이어받도록 변경 이력을 남긴다.

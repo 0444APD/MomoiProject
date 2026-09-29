@@ -28,7 +28,8 @@ namespace GameSystems.EditorTools
                 var refType = EditorDatabase.RefTypeOf(member as FieldInfo) ??
                               (member.IsDefined(typeof(StateKeyRefAttribute), false) ? typeof(StateKeyData) : null);
                 if (refType != null)
-                    return db.OfType(refType).OrderBy(d => d.DisplayName).Select(d => new Choice { Label = d.DisplayName, Caption = d.Id, Value = d.Id }).ToList();
+                    return (member is FieldInfo field && EditorDatabase.RefTypeOf(field) != null ? db.RefCandidates(field) : db.OfType(refType))
+                        .OrderBy(d => d.DisplayName).Select(d => new Choice { Label = d.DisplayName, Caption = d.Id, Value = d.Id }).ToList();
                 if (member.IsDefined(typeof(EventTypeRefAttribute), false))
                     return TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf)
                         .Select(t => new Choice { Label = EventBus.DisplayNameOf(t), Caption = t.Name, Value = t.FullName }).ToList();
