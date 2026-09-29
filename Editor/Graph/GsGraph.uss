@@ -1,0 +1,183 @@
+/* 노드 그래프 편집 화면 */
+
+.gs-graph {
+    flex-grow: 1;
+    overflow: hidden;
+    background-color: #111215;
+}
+
+.gs-graph__content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    transform-origin: 0 0;
+}
+
+.gs-graph__edges,
+.gs-graph__nodes {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+}
+
+.gs-graph__toolbar {
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background-color: rgba(22, 23, 26, 0.92);
+    border-width: 1px;
+    border-color: var(--gs-border);
+}
+
+/* 노드 카드 */
+.gs-graph-node {
+    position: absolute;
+    width: 290px;
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    border-radius: 8px;
+}
+
+.gs-graph-node--selected {
+    border-color: var(--gs-accent);
+}
+
+.gs-graph-node__header {
+    padding: 7px 10px;
+    border-top-width: 2px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    background-color: var(--gs-surface-2);
+    cursor: move-arrow;
+}
+
+.gs-graph-node__mark {
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    margin-right: 7px;
+}
+
+.gs-root .gs-graph-node__title {
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.gs-root .gs-graph-node__summary {
+    font-size: 11px;
+    color: var(--gs-text-3);
+    margin-left: 8px;
+    flex-shrink: 1;
+    max-width: 150px;
+}
+
+.gs-root .gs-graph-node__close {
+    font-size: 11px;
+    color: var(--gs-text-3);
+    padding: 0 2px;
+}
+
+.gs-root .gs-graph-node__close:hover {
+    color: var(--gs-text);
+}
+
+.gs-graph-node__ports {
+    padding: 6px 0 4px 0;
+}
+
+.gs-graph-node__body {
+    padding: 4px 12px 12px 12px;
+    border-top-width: 1px;
+    border-top-color: var(--gs-border);
+}
+
+/* 점 */
+.gs-graph-port-row {
+    min-height: 22px;
+}
+
+.gs-graph-port {
+    align-items: center;
+}
+
+.gs-root .gs-graph-port Label {
+    font-size: 11px;
+    color: var(--gs-text-2);
+    max-width: 120px;
+}
+
+.gs-graph-port--in Label {
+    margin-left: 6px;
+}
+
+.gs-graph-port--out Label {
+    margin-right: 6px;
+}
+
+.gs-graph-port__dot {
+    width: 12px;
+    height: 12px;
+    border-width: 2px;
+    background-color: #111215;
+}
+
+.gs-graph-port--in .gs-graph-port__dot {
+    margin-left: -7px;
+}
+
+.gs-graph-port--out .gs-graph-port__dot {
+    margin-right: -7px;
+}
+
+.gs-graph-port__dot--flow {
+    border-radius: 6px;
+    border-color: rgba(242, 242, 243, 0.8);
+}
+
+.gs-graph-port__dot--signal {
+    border-radius: 3px;
+    border-color: var(--gs-accent);
+}
+
+.gs-graph-port__dot--flow.gs-graph-port__dot--linked {
+    background-color: rgba(242, 242, 243, 0.8);
+}
+
+.gs-graph-port__dot--signal.gs-graph-port__dot--linked {
+    background-color: var(--gs-accent);
+}
+
+.gs-graph-port__dot:hover {
+    border-color: #FFFFFF;
+}
+
+/* 그래프 창 사이드바 */
+.gs-graph-window__side {
+    width: 230px;
+    padding: 14px 10px;
+    border-right-width: 1px;
+    border-right-color: var(--gs-border);
+    background-color: var(--gs-surface);
+}
+
+.gs-graph-window__item {
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+}
+
+.gs-graph-window__item:hover {
+    background-color: var(--gs-hover);
+}
+
+.gs-graph-window__item--active {
+    background-color: var(--gs-accent-soft);
+}

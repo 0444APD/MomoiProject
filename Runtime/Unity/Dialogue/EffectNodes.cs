@@ -27,6 +27,7 @@ namespace GameSystems.Dialogue
 
         [FieldLabel("시작 전 기다림(초)"), Min(0)] public float delay;
         [FieldLabel("진행 시간(초)"), Min(0)] public float duration = 0.4f;
+        [FieldLabel("움직임 곡선")] public Ease ease = Ease.OutQuad;
         [FieldLabel("진행 신호 지점")] public List<ProgressMark> marks = new List<ProgressMark>();
         [FieldLabel("다음 대사로 넘어가도 계속(끄면 넘길 때 바로 끝낸다)")] public bool keepAcrossLines;
 
@@ -320,6 +321,46 @@ namespace GameSystems.Dialogue
         public override IEnumerable<PortInfo> Ports
         {
             get { yield return PortInfo.SignalIn(FirePort, "보내기"); }
+        }
+    }
+}
+
+namespace GameSystems.Dialogue
+{
+    // 효과 진행 곡선. 진행 신호(n%)는 시간 기준이고, 화면 움직임만 곡선을 따른다.
+    public enum Ease
+    {
+        [InspectorName("일정하게")] Linear,
+        [InspectorName("천천히 시작")] InQuad,
+        [InspectorName("천천히 끝")] OutQuad,
+        [InspectorName("천천히 시작·끝")] InOutQuad,
+        [InspectorName("살짝 넘쳤다 돌아옴")] OutBack,
+        [InspectorName("튕김")] OutBounce,
+    }
+
+    public static class Easing
+    {
+        public static float Apply(Ease ease, float t)
+        {
+            t = UnityEngine.Mathf.Clamp01(t);
+            switch (ease)
+            {
+                case Ease.InQuad: return t * t;
+                case Ease.OutQuad: return 1 - (1 - t) * (1 - t);
+                case Ease.InOutQuad: return t < 0.5f ? 2 * t * t : 1 - (-2 * t + 2) * (-2 * t + 2) / 2;
+                case Ease.OutBack:
+                    const float c1 = 1.70158f;
+                    const float c3 = c1 + 1;
+                    return 1 + c3 * UnityEngine.Mathf.Pow(t - 1, 3) + c1 * UnityEngine.Mathf.Pow(t - 1, 2);
+                case Ease.OutBounce:
+                    const float n = 7.5625f;
+                    const float d = 2.75f;
+                    if (t < 1 / d) return n * t * t;
+                    if (t < 2 / d) return n * (t -= 1.5f / d) * t + 0.75f;
+                    if (t < 2.5f / d) return n * (t -= 2.25f / d) * t + 0.9375f;
+                    return n * (t -= 2.625f / d) * t + 0.984375f;
+                default: return t;
+            }
         }
     }
 }

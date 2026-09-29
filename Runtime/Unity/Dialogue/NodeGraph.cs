@@ -118,23 +118,23 @@ namespace GameSystems.Dialogue
         [SerializeReference] public List<GraphNode> nodes = new List<GraphNode>();
         public List<GraphEdge> edges = new List<GraphEdge>();
 
-        [NonSerialized] Dictionary<string, GraphNode> _index;
+        // guid → 목록 위치. 편집기가 목록을 다시 읽어 노드 인스턴스가 바뀌어도 항상 현재 목록에서 꺼낸다.
+        [NonSerialized] Dictionary<string, int> _index;
 
         public GraphNode Find(string guid)
         {
             if (string.IsNullOrEmpty(guid)) return null;
-            if (_index == null || _index.Count != nodes.Count) Reindex();
-            if (_index.TryGetValue(guid, out var node) && node != null && node.guid == guid) return node;
+            if (_index != null && _index.TryGetValue(guid, out var at) && at < nodes.Count && nodes[at]?.guid == guid) return nodes[at];
             Reindex();
-            return _index.TryGetValue(guid, out node) ? node : null;
+            return _index.TryGetValue(guid, out at) ? nodes[at] : null;
         }
 
         void Reindex()
         {
-            _index = new Dictionary<string, GraphNode>(StringComparer.Ordinal);
-            foreach (var node in nodes)
-                if (node != null && !string.IsNullOrEmpty(node.guid))
-                    _index[node.guid] = node;
+            _index = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (var i = 0; i < nodes.Count; i++)
+                if (nodes[i] != null && !string.IsNullOrEmpty(nodes[i].guid))
+                    _index[nodes[i].guid] = i;
         }
 
         public IEnumerable<T> OfType<T>() where T : GraphNode => nodes.OfType<T>();

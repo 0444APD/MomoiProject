@@ -496,7 +496,7 @@ namespace GameSystems.Dialogue
             if (run.Node is PresetEffect) return;
             run.Elapsed += deltaTime;
             var t = run.Node.duration <= 0 ? 1f : Mathf.Clamp01(run.Elapsed / run.Node.duration);
-            run.Player?.Evaluate(t);
+            run.Player?.Evaluate(Easing.Apply(run.Node.ease, t));
             FireMarks(run, t);
             if (t >= 1f && !run.Done) Complete(run);
         }
