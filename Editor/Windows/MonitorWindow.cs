@@ -57,7 +57,11 @@ namespace GameSystems.EditorTools
         long _selectedEntry;
         readonly HashSet<long> _chain = new HashSet<long>();
         readonly HashSet<JournalKind> _hiddenKinds = new HashSet<JournalKind>();
-        List<JournalEntry> _entries = new List<JournalEntry>();
+        readonly List<LogRow> _rows = new List<LogRow>();
+        // 펼친 기록 id(묶어 보기). 창을 다시 그려도 유지된다.
+        readonly HashSet<long> _expanded = new HashSet<long>();
+        readonly Dictionary<long, List<JournalEntry>> _children = new Dictionary<long, List<JournalEntry>>();
+        [SerializeField] bool _grouped = true;
         ListView _timeline;
         VisualElement _chainPanel;
 
@@ -229,13 +233,71 @@ namespace GameSystems.EditorTools
         }
 
         // ── 타임라인 ───────────────────────────────────────────
+        // 묶어 보기: 원인이 없는 기록(행동·무르기·되감기·시스템)을 한 줄로 두고, 그 때문에 일어난 기록을 아래에 접어 둔다.
+        // 행동 → 이벤트 → 수치 변화 → 달성 → 보상처럼 여러 단계로 이어지며, 단계마다 접고 펼칠 수 있다.
+        // 시간순: 모든 기록을 최신순으로 평평하게 본다.
+
+        sealed class LogRow
+        {
+            public JournalEntry Entry;
+            public int Depth;
+            public int Descendants;
+            public bool Expanded;
+            public string Summary;
+        }
+
+        VisualElement MakeLogRow()
+        {
+            var row = Gs.Box("gs-log-row");
+            var indent = new VisualElement();
+            indent.style.flexShrink = 0;
+            row.Add(indent);
+            var chevron = Gs.Label("", "gs-log-row__chevron");
+            chevron.RegisterCallback<ClickEvent>(e =>
+            {
+                if (!(chevron.userData is LogRow data) || data.Descendants == 0) return;
+                e.StopPropagation();
+                // Shift+클릭: 아래 단계까지 모두 펼치기/접기.
+                SetExpanded(data.Entry.Id, !data.Expanded, e.shiftKey);
+                RefreshTimeline();
+            });
+            row.Add(chevron);
+            var badge = new GsBadge("", Color.white);
+            badge.style.width = 64;
+            badge.style.flexShrink = 0;
+            row.Add(badge);
+            row.Add(Gs.Label("", "gs-grow", "gs-nowrap"));
+            row.Add(Gs.Label("", "gs-caption", "gs-nowrap", "gs-log-row__count"));
+            row.Add(Gs.Label("", "gs-caption", "gs-nowrap"));
+            return row;
+        }
+
+        void BindLogRow(VisualElement row, int index)
+        {
+            var data = _rows[index];
+            var entry = data.Entry;
+            row[0].style.width = data.Depth * 20;
+            var chevron = (Label)row[1];
+            chevron.userData = data;
+            chevron.text = data.Descendants == 0 ? "" : data.Expanded ? "▾" : "▸";
+            chevron.tooltip = data.Descendants == 0 ? "" : "클릭: 펼치기/접기 · Shift+클릭: 아래 단계까지 모두";
+            var badge = (GsBadge)row[2];
+            badge.Text = KindName(entry.Kind);
+            badge.SetColor(KindColor(entry.Kind));
+            ((Label)row[3]).text = entry.Message;
+            ((Label)row[4]).text = data.Descendants > 0 && !data.Expanded ? data.Summary : "";
+            ((Label)row[5]).text = $"#{entry.Id} · 틱 {entry.Tick}";
+            row.EnableInClassList("gs-log-row--root", _grouped && data.Depth == 0);
+            row.EnableInClassList("gs-log-row--chain", _selectedEntry != 0 && _chain.Contains(entry.Id));
+            row.EnableInClassList("gs-log-row--dim", _selectedEntry != 0 && !_chain.Contains(entry.Id));
+        }
 
         void BuildTimeline()
         {
             var tools = Gs.Row();
             tools.style.marginBottom = 12;
             var search = new GsSearchField("기록 검색");
-            search.style.width = 240;
+            search.style.width = 220;
             search.Value = _search;
             search.Changed += v =>
             {
@@ -260,14 +322,41 @@ namespace GameSystems.EditorTools
                 tools.Add(chip);
             }
             tools.Add(Gs.Spacer());
+            _body.Add(tools);
+
+            var viewTools = Gs.Row();
+            viewTools.style.marginBottom = 10;
+            var mode = new GsSegmented("묶어 보기", "시간순");
+            mode.Select(_grouped ? 0 : 1);
+            mode.Changed += index =>
+            {
+                _grouped = index == 0;
+                RefreshTimeline();
+            };
+            mode.tooltip = "묶어 보기: 행동(또는 무르기·되감기) 한 줄 아래에 그로 인해 일어난 기록을 접어 둡니다.";
+            viewTools.Add(mode);
+            viewTools.Add(Gs.HSpace(12));
+            var expandAll = new GsButton("모두 펼치기", () =>
+            {
+                foreach (var row in _rows) SetExpanded(row.Entry.Id, true, true);
+                RefreshTimeline();
+            }, GsButtonKind.Ghost);
+            var collapseAll = new GsButton("모두 접기", () =>
+            {
+                _expanded.Clear();
+                RefreshTimeline();
+            }, GsButtonKind.Ghost);
+            viewTools.Add(expandAll);
+            viewTools.Add(collapseAll);
+            viewTools.Add(Gs.Spacer());
             var pause = new GsButton(_paused ? "재개" : "일시정지", null, GsButtonKind.Ghost);
             pause.AddManipulator(new Clickable(() =>
             {
                 _paused = !_paused;
                 pause.Text = _paused ? "재개" : "일시정지";
             }));
-            tools.Add(pause);
-            _body.Add(tools);
+            viewTools.Add(pause);
+            _body.Add(viewTools);
 
             var split = Gs.Row("gs-grow");
             split.style.alignItems = Align.Stretch;
@@ -279,14 +368,22 @@ namespace GameSystems.EditorTools
                 selectionType = SelectionType.Single,
                 makeItem = MakeLogRow,
                 bindItem = BindLogRow,
-                itemsSource = _entries,
+                itemsSource = _rows,
             };
             _timeline.style.flexGrow = 1;
             _timeline.selectionChanged += selection =>
             {
-                var entry = selection.OfType<JournalEntry>().FirstOrDefault();
-                _selectedEntry = entry?.Id ?? 0;
+                var row = selection.OfType<LogRow>().FirstOrDefault();
+                _selectedEntry = row?.Entry.Id ?? 0;
                 UpdateChain();
+            };
+            // 두 번 클릭(또는 Enter): 펼치기/접기.
+            _timeline.itemsChosen += items =>
+            {
+                var row = items.OfType<LogRow>().FirstOrDefault();
+                if (row == null || row.Descendants == 0) return;
+                SetExpanded(row.Entry.Id, !row.Expanded, false);
+                RefreshTimeline();
             };
             split.Add(_timeline);
 
@@ -299,39 +396,118 @@ namespace GameSystems.EditorTools
             RefreshTimeline();
         }
 
-        VisualElement MakeLogRow()
+        // deep: 이 기록 아래의 모든 단계에도 적용한다.
+        void SetExpanded(long id, bool expanded, bool deep)
         {
-            var row = Gs.Box("gs-log-row");
-            var badge = new GsBadge("", Color.white);
-            badge.style.width = 64;
-            row.Add(badge);
-            row.Add(Gs.Label("", "gs-grow", "gs-nowrap"));
-            row.Add(Gs.Label("", "gs-caption"));
-            return row;
-        }
-
-        void BindLogRow(VisualElement row, int index)
-        {
-            var entry = _entries[index];
-            var badge = (GsBadge)row[0];
-            badge.Text = KindName(entry.Kind);
-            badge.SetColor(KindColor(entry.Kind));
-            ((Label)row[1]).text = entry.Message;
-            ((Label)row[2]).text = $"#{entry.Id} · 틱 {entry.Tick}";
-            row.EnableInClassList("gs-log-row--chain", _selectedEntry != 0 && _chain.Contains(entry.Id));
-            row.EnableInClassList("gs-log-row--dim", _selectedEntry != 0 && !_chain.Contains(entry.Id));
+            if (expanded) _expanded.Add(id);
+            else _expanded.Remove(id);
+            if (!deep || !_children.TryGetValue(id, out var children)) return;
+            foreach (var child in children) SetExpanded(child.Id, expanded, true);
         }
 
         void RefreshTimeline()
         {
             if (_timeline == null || _session == null) return;
-            _entries.Clear();
-            _entries.AddRange(_session.Journal.Entries.Reverse().Where(e =>
-                !_hiddenKinds.Contains(e.Kind) &&
-                (string.IsNullOrEmpty(_search) || (e.Message ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                 (e.Key ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0)));
+            var journal = _session.Journal;
+            var all = journal.Entries.ToList(); // 오래된 것부터
+            var byId = new Dictionary<long, JournalEntry>();
+            foreach (var entry in all) byId[entry.Id] = entry;
+
+            bool Matches(JournalEntry e) =>
+                string.IsNullOrEmpty(_search) ||
+                (e.Message ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (e.Key ?? "").IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0;
+
+            _rows.Clear();
+            _children.Clear();
+            if (!_grouped)
+            {
+                for (int i = all.Count - 1; i >= 0; i--)
+                    if (!_hiddenKinds.Contains(all[i].Kind) && Matches(all[i])) _rows.Add(new LogRow { Entry = all[i] });
+                _timeline.RefreshItems();
+                UpdateChain();
+                return;
+            }
+
+            // 보이는 기록: 종류 필터 통과 + (검색어가 있으면) 검색에 맞는 기록과 그 원인들(맥락이 보이도록).
+            var visible = new HashSet<long>();
+            var searchOpen = new HashSet<long>();
+            foreach (var entry in all)
+            {
+                if (_hiddenKinds.Contains(entry.Kind) || !Matches(entry)) continue;
+                visible.Add(entry.Id);
+                if (string.IsNullOrEmpty(_search)) continue;
+                for (var cause = entry.CauseId; cause != 0 && byId.TryGetValue(cause, out var parent); cause = parent.CauseId)
+                {
+                    if (_hiddenKinds.Contains(parent.Kind)) continue;
+                    visible.Add(parent.Id);
+                    searchOpen.Add(parent.Id);
+                }
+            }
+
+            // 부모 = 가장 가까운 보이는 원인. 숨긴 종류는 건너뛰고 그 위에 붙인다.
+            var roots = new List<JournalEntry>();
+            foreach (var entry in all)
+            {
+                if (!visible.Contains(entry.Id)) continue;
+                long parentId = 0;
+                for (var cause = entry.CauseId; cause != 0 && byId.TryGetValue(cause, out var parent); cause = parent.CauseId)
+                    if (visible.Contains(cause))
+                    {
+                        parentId = cause;
+                        break;
+                    }
+                if (parentId == 0) roots.Add(entry);
+                else
+                {
+                    if (!_children.TryGetValue(parentId, out var list)) _children[parentId] = list = new List<JournalEntry>();
+                    list.Add(entry);
+                }
+            }
+
+            var counts = new Dictionary<long, int>();
+            int CountOf(long id)
+            {
+                if (counts.TryGetValue(id, out var cached)) return cached;
+                int total = 0;
+                if (_children.TryGetValue(id, out var list))
+                    foreach (var child in list) total += 1 + CountOf(child.Id);
+                counts[id] = total;
+                return total;
+            }
+
+            void Add(JournalEntry entry, int depth)
+            {
+                var expanded = _expanded.Contains(entry.Id) || searchOpen.Contains(entry.Id);
+                var row = new LogRow { Entry = entry, Depth = depth, Descendants = CountOf(entry.Id), Expanded = expanded };
+                if (row.Descendants > 0 && !expanded) row.Summary = SummaryOf(entry.Id, row.Descendants);
+                _rows.Add(row);
+                if (!expanded || !_children.TryGetValue(entry.Id, out var list)) return;
+                foreach (var child in list) Add(child, depth + 1);
+            }
+
+            for (int i = roots.Count - 1; i >= 0; i--) Add(roots[i], 0);
             _timeline.RefreshItems();
             UpdateChain();
+        }
+
+        // 접힌 줄 옆 요약: "하위 12 · 상태 8 · 이벤트 2 · 보상 1"
+        string SummaryOf(long id, int total)
+        {
+            var kinds = new Dictionary<JournalKind, int>();
+            void Walk(long parent)
+            {
+                if (!_children.TryGetValue(parent, out var list)) return;
+                foreach (var child in list)
+                {
+                    kinds.TryGetValue(child.Kind, out var n);
+                    kinds[child.Kind] = n + 1;
+                    Walk(child.Id);
+                }
+            }
+            Walk(id);
+            var parts = kinds.OrderByDescending(k => k.Value).Take(3).Select(k => $"{KindName(k.Key)} {k.Value}");
+            return $"하위 {total}  ·  " + string.Join(" · ", parts);
         }
 
         void UpdateChain()

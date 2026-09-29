@@ -90,6 +90,17 @@ namespace GameSystems.Tests
         }
 
         [Test]
+        public void 무르기는_되돌린_값마다_기록을_남기고_무르기_한_줄_아래로_묶인다()
+        {
+            _session.Do(new TestKillAction());
+            _session.Undo();
+            var undo = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Undo && e.Message.StartsWith("무르기: 테스트"));
+            var rollbacks = _session.Journal.Consequences(undo.Id);
+            Assert.AreEqual(2, rollbacks.Count, "체력·골드 두 값의 롤백이 각각 기록된다");
+            Assert.IsTrue(rollbacks.All(e => e.Kind == JournalKind.Undo && e.CauseId == undo.Id));
+            Assert.IsTrue(rollbacks.Any(e => e.Message.Contains("체력") && e.Message.Contains("7 → 10")));
+        }
+        [Test]
         public void 이미_한_행동은_언제든_무를_수_있다()
         {
             for (int i = 0; i < 3; i++) _session.Do(new TestKillAction());

@@ -369,6 +369,10 @@
 .gs-log-row:hover { background-color: var(--gs-hover); }
 .gs-log-row--chain { background-color: var(--gs-accent-soft); }
 .gs-log-row--dim { opacity: 0.35; }
+.gs-log-row__chevron { width: 18px; flex-shrink: 0; -unity-text-align: middle-center; color: var(--gs-text-2); font-size: 11px; }
+.gs-log-row__chevron:hover { color: var(--gs-accent); }
+.gs-log-row__count { margin-left: 12px; margin-right: 14px; flex-shrink: 0; }
+.gs-log-row--root .gs-badge { opacity: 1; }
 
 /* 스크롤바를 옅게 */
 .gs-root .unity-scroller--vertical { width: 8px; }
