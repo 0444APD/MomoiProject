@@ -242,6 +242,29 @@ namespace GameSystems
         public static string Code(string pathLabel, FieldOp op, string value) =>
             NeedsValue(op) ? $"{pathLabel} {Symbol(op)} {value}" : $"{pathLabel} {Symbol(op)}";
 
+        // 자연어 조각(이어 붙이기용): "등급이 3 이상", "태그에 boss 포함"
+        public static string Clause(string pathLabel, FieldOp op, string value)
+        {
+            switch (op)
+            {
+                case FieldOp.AtLeast: return $"{Josa.IGa(pathLabel)} {value} 이상";
+                case FieldOp.AtMost: return $"{Josa.IGa(pathLabel)} {value} 이하";
+                case FieldOp.Greater: return $"{Josa.IGa(pathLabel)} {value} 초과";
+                case FieldOp.Less: return $"{Josa.IGa(pathLabel)} {value} 미만";
+                case FieldOp.Equal: return $"{Josa.IGa(pathLabel)} {value}";
+                case FieldOp.NotEqual: return $"{Josa.IGa(pathLabel)} {Josa.IGa(value)} 아님";
+                case FieldOp.IsTrue: return $"{Josa.IGa(pathLabel)} 참";
+                case FieldOp.IsFalse: return $"{Josa.IGa(pathLabel)} 거짓";
+                case FieldOp.Contains: return $"{pathLabel}에 {value} 포함";
+                case FieldOp.NotContains: return $"{pathLabel}에 {value} 없음";
+                case FieldOp.CountAtLeast: return $"{pathLabel} 개수 {value} 이상";
+                case FieldOp.CountAtMost: return $"{pathLabel} 개수 {value} 이하";
+                case FieldOp.CountEqual: return $"{pathLabel} 개수 {value}개";
+                case FieldOp.IsEmpty: return $"{Josa.IGa(pathLabel)} 비어 있음";
+                default: return $"{Josa.IGa(pathLabel)} 비어 있지 않음";
+            }
+        }
+
         // 설명 문장: "등급이 3 이상이라면", "태그에 boss를 포함한다면"
         public static string Natural(string pathLabel, FieldOp op, string value)
         {

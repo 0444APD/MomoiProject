@@ -261,8 +261,8 @@ namespace GameSystems.EditorTools.UI
 
         public void Set(string oldText, string newText)
         {
-            _old.text = oldText;
-            _new.text = newText;
+            Gs.SetText(_old, oldText);
+            Gs.SetText(_new, newText);
         }
     }
 }

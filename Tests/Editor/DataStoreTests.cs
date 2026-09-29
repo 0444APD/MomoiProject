@@ -121,8 +121,9 @@ namespace GameSystems.Tests
 
             var id = _session.State.Identity.IdOf(_inventory.items[0]);
             var entry = _session.Journal.Entries.Last(e => e.Kind == JournalKind.State);
-            StringAssert.Contains($"items[#{id}].level", entry.Message);
+            StringAssert.Contains($"items #{id} › level", entry.Message, "기본은 사람이 읽는 경로");
             StringAssert.Contains("1 → 4", entry.Message);
+            StringAssert.Contains($"items[#{id}].level", entry.Code, "코드 형태(Alt)는 실제 경로");
         }
 
         [Test]

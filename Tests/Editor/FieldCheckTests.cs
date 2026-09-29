@@ -125,6 +125,8 @@ namespace GameSystems.Tests
             Assert.IsFalse(filter.Test(bag));
             StringAssert.Contains("&&", filter.Describe());
             StringAssert.Contains("||", filter.Describe());
+            StringAssert.Contains("그리고", filter.Natural());
+            StringAssert.Contains("또는", filter.Natural());
         }
 
         [Test]
@@ -178,7 +180,8 @@ namespace GameSystems.Tests
 
             Assert.AreEqual(1, session.Stats.Get("boss_kills"));
             Assert.AreEqual(2, session.Stats.Get("elite_fire"), "조건은 모두 만족해야 한다");
-            StringAssert.Contains("tags contains boss일 때", bossKills.Rules[0].Describe("보스 처치 수"));
+            StringAssert.Contains("tags에 boss 포함일 때", bossKills.Rules[0].Describe("보스 처치 수"));
+            StringAssert.Contains("where tags contains boss", bossKills.Rules[0].DescribeCode("보스 처치 수"));
         }
 
         [Test]

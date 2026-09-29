@@ -122,7 +122,15 @@ namespace GameSystems.EditorTools
                 case SerializedPropertyType.ObjectReference: return property.objectReferenceValue != null ? property.objectReferenceValue.name : "";
                 case SerializedPropertyType.Color: return "#" + ColorUtility.ToHtmlStringRGBA(property.colorValue);
                 case SerializedPropertyType.ManagedReference:
-                    return property.managedReferenceValue == null ? "" : BlockTypes.DisplayName(property.managedReferenceValue.GetType());
+                    // 조건식은 자연어(기본) / 코드(Alt) 두 가지로.
+                    switch (property.managedReferenceValue)
+                    {
+                        case null: return "";
+                        case Condition condition: return GameSystems.EditorTools.UI.Gs.Dual(condition.Natural(EditorDatabase.Instance), condition.Describe(EditorDatabase.Instance));
+                        case ValueFilter filter: return GameSystems.EditorTools.UI.Gs.Dual(filter.Natural(), filter.Describe());
+                        case Reward reward: return reward.Describe(EditorDatabase.Instance);
+                        default: return BlockTypes.DisplayName(property.managedReferenceValue.GetType());
+                    }
             }
             if (property.isArray && property.propertyType == SerializedPropertyType.Generic) return $"{property.arraySize}개";
             return property.hasVisibleChildren ? "…" : property.type;

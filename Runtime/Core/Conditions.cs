@@ -27,6 +27,9 @@ namespace GameSystems
         public override string Explain(INameResolver names) =>
             CompareOps.Natural(names.StatName(stat), op, value.ToString("0.##", CultureInfo.InvariantCulture));
 
+        public override string Natural(INameResolver names) =>
+            CompareOps.Clause(names.StatName(stat), op, value.ToString("0.##", CultureInfo.InvariantCulture));
+
         public override void Validate(IValidationContext context)
         {
             if (string.IsNullOrEmpty(stat)) context.Error("비교할 수치가 선택되지 않았습니다.");
@@ -65,6 +68,9 @@ namespace GameSystems
         public override string Describe(INameResolver names) =>
             $"{(string.IsNullOrEmpty(key) ? "(상태 없음)" : key)}: {ValueFilter.DescribeOrAll(filter)}";
 
+        public override string Natural(INameResolver names) =>
+            $"{(string.IsNullOrEmpty(key) ? "(상태 없음)" : key)}의 {ValueFilter.NaturalOrAll(filter)}";
+
         public override void Validate(IValidationContext context)
         {
             if (string.IsNullOrEmpty(key)) context.Error("검사할 상태 키가 선택되지 않았습니다.");
@@ -92,6 +98,7 @@ namespace GameSystems
         public override double PollInterval => MinPoll(Children);
 
         public override string Describe(INameResolver names) => Join(Children, names, " && ");
+        public override string Natural(INameResolver names) => JoinNatural(Children, names, " 그리고 ");
         public override string Explain(INameResolver names) => "아래 조건을 모두 만족한다면";
 
         public override void Validate(IValidationContext context)
@@ -112,6 +119,12 @@ namespace GameSystems
         internal static string Join(IEnumerable<Condition> children, INameResolver names, string separator)
         {
             var parts = children.Select(c => c.Children.Any() ? $"({c.Describe(names)})" : c.Describe(names)).ToList();
+            return parts.Count == 0 ? "(조건 없음)" : string.Join(separator, parts);
+        }
+
+        internal static string JoinNatural(IEnumerable<Condition> children, INameResolver names, string separator)
+        {
+            var parts = children.Select(c => c.Children.Any() ? $"({c.Natural(names)})" : c.Natural(names)).ToList();
             return parts.Count == 0 ? "(조건 없음)" : string.Join(separator, parts);
         }
 
@@ -155,6 +168,7 @@ namespace GameSystems
         public override double PollInterval => AllOfCondition.MinPoll(Children);
 
         public override string Describe(INameResolver names) => AllOfCondition.Join(Children, names, " || ");
+        public override string Natural(INameResolver names) => AllOfCondition.JoinNatural(Children, names, " 또는 ");
         public override string Explain(INameResolver names) => "아래 조건 중 하나라도 만족한다면";
 
         public override void Validate(IValidationContext context)
@@ -185,6 +199,7 @@ namespace GameSystems
             condition == null ? "!(true)" : $"!({condition.Describe(names)})";
 
         public override string Explain(INameResolver names) => "아래 조건을 만족하지 않는다면";
+        public override string Natural(INameResolver names) => condition == null ? "아님" : $"({condition.Natural(names)}) 아님";
 
         public override void Validate(IValidationContext context)
         {

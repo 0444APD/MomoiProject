@@ -520,15 +520,16 @@ namespace GameSystems.EditorTools
                     var rewards = achievement.rewards.Where(r => r != null).Select(r => r.Describe(names)).ToList();
                     return new List<(string, string)>
                     {
-                        ("조건", achievement.condition != null ? achievement.condition.Describe(names) : "조건 없음"),
+                        ("조건", achievement.condition != null ? Gs.Dual(achievement.condition.Natural(names), achievement.condition.Describe(names)) : "조건 없음"),
                         ("보상", rewards.Count > 0 ? string.Join(",  ", rewards) : "없음"),
                     };
                 case StatData stat:
                     var rules = stat.rules.Where(r => r != null).Select(r => r.Describe(stat.DisplayName)).ToList();
+                    var rulesCode = stat.rules.Where(r => r != null).Select(r => r.DescribeCode(stat.DisplayName)).ToList();
                     return new List<(string, string)>
                     {
                         ("방식", $"{(stat.scope == StatScope.Run ? "이번 판" : "누적")} · {StatSystem.AggregateText(stat.aggregate)}"),
-                        ("반영", rules.Count > 0 ? string.Join("\n", rules) : "반영 규칙 없음"),
+                        ("반영", rules.Count > 0 ? Gs.Dual(string.Join("\n", rules), string.Join("\n", rulesCode)) : "반영 규칙 없음"),
                     };
             }
             return null;

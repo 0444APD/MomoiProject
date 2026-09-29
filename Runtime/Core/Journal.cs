@@ -32,6 +32,8 @@ namespace GameSystems
         public object New;
         // 이 기록의 내용 객체(이벤트·행동, 바뀐 클래스 값의 사본). 모니터가 탐색기로 연다.
         public object Payload;
+        // 코드 형태의 메시지(모니터에서 Alt를 누르면 보인다). 없으면 Message만.
+        public string Code;
     }
 
     // 모든 시스템이 공유하는 링 버퍼 기록.

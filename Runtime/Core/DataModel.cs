@@ -910,6 +910,42 @@ namespace GameSystems
             return true;
         }
 
+        // 경로를 사람이 읽는 이름으로: items[#12].level → 아이템 #12 › 레벨 (필드 이름은 [FieldLabel]을 쓴다)
+        public static string NaturalPath(Type root, string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            var parts = new List<string>();
+            var type = root;
+            var i = 0;
+            while (i < path.Length)
+            {
+                if (path[i] == '.')
+                {
+                    i++;
+                    continue;
+                }
+                if (path[i] == '[')
+                {
+                    var close = path.IndexOf(']', i);
+                    if (close < 0) break;
+                    var key = path.Substring(i + 1, close - i - 1);
+                    if (parts.Count > 0) parts[parts.Count - 1] += key.StartsWith("#", StringComparison.Ordinal) ? " " + key : $" [{key}]";
+                    else parts.Add(key);
+                    type = type == null ? null : Of(type).ElementType;
+                    i = close + 1;
+                    continue;
+                }
+                var end = i;
+                while (end < path.Length && path[end] != '.' && path[end] != '[') end++;
+                var name = path.Substring(i, end - i);
+                var field = type == null ? null : Of(type).Fields.FirstOrDefault(f => f.Name == name);
+                var label = field?.Field.GetCustomAttributes(typeof(FieldLabelAttribute), true).OfType<FieldLabelAttribute>().FirstOrDefault()?.Text;
+                parts.Add(label ?? name);
+                type = field?.Type;
+                i = end;
+            }
+            return string.Join(" › ", parts);
+        }
         // ── 표시 ───────────────────────────────────────────────
 
         public static string Summary(object value)

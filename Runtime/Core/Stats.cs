@@ -60,10 +60,19 @@ namespace GameSystems
             var typeName = EventDisplayName(eventType);
             var source = string.IsNullOrEmpty(field) ? "횟수" : field;
             var factor = Math.Abs(multiplier - 1) < 1e-9 ? "" : $" × {multiplier.ToString("0.##", CultureInfo.InvariantCulture)}";
-            var when = filter == null ? "" : $" ({filter.Describe()}일 때)";
+            var when = filter == null ? "" : $" ({filter.Natural()}일 때)";
             return $"{typeName} 발생 시{when} {source}{factor}를 {statName}에 반영";
         }
 
+        // 코드 형태(Alt): on 적 처치 where (tags contains boss) : 처치 수 += Count × 2
+        public string DescribeCode(string statName)
+        {
+            var typeName = EventDisplayName(eventType);
+            var source = string.IsNullOrEmpty(field) ? "1" : field;
+            var factor = Math.Abs(multiplier - 1) < 1e-9 ? "" : $" * {multiplier.ToString("0.##", CultureInfo.InvariantCulture)}";
+            var where = filter == null ? "" : $" where {filter.Describe()}";
+            return $"on {typeName}{where}: {statName} += {source}{factor}";
+        }
         public static string EventDisplayName(string typeName)
         {
             var type = TypeResolver.Find(typeName);

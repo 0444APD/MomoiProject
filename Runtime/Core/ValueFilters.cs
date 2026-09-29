@@ -20,6 +20,12 @@ namespace GameSystems
         public abstract string Describe();
         // 마우스를 올렸을 때 보이는 설명 문장.
         public virtual string Explain() => Describe();
+        // 자연어 요약(도감·로그 기본 표시): 등급이 3 이상 그리고 (태그에 boss 포함 또는 …)
+        public abstract string Natural();
+
+        public static string NaturalOrAll(ValueFilter filter) => filter == null ? "항상" : filter.Natural();
+
+        protected static string Wrap(ValueFilter filter) => filter.Children.Any() && !(filter is ElementFilter) ? $"({filter.Natural()})" : filter.Natural();
         public virtual IEnumerable<ValueFilter> Children => Array.Empty<ValueFilter>();
 
         // root 타입 기준 검증. 문제는 errors에 문장으로.
@@ -40,6 +46,7 @@ namespace GameSystems
 
         public override string Describe() => FieldOps.Code(PathLabel(path), op, value);
         public override string Explain() => FieldOps.Natural(PathLabel(path), op, value);
+        public override string Natural() => FieldOps.Clause(PathLabel(path), op, value);
 
         public static string PathLabel(string path) =>
             string.IsNullOrEmpty(path) ? "(필드 없음)" : path.Replace("[]", "의 각 항목").Replace(".", " › ");
@@ -77,6 +84,7 @@ namespace GameSystems
         public override bool Test(object root) => Children.All(f => f.Test(root));
         public override string Describe() => Children.Any() ? "(" + string.Join(" && ", Children.Select(f => f.Describe())) + ")" : "true";
         public override string Explain() => "아래 조건을 모두 만족한다면";
+        public override string Natural() => Children.Any() ? string.Join(" 그리고 ", Children.Select(Wrap)) : "항상";
 
         public override void Validate(Type root, List<string> errors)
         {
@@ -97,6 +105,7 @@ namespace GameSystems
         public override bool Test(object root) => Children.Any(f => f.Test(root));
         public override string Describe() => Children.Any() ? "(" + string.Join(" || ", Children.Select(f => f.Describe())) + ")" : "false";
         public override string Explain() => "아래 조건 중 하나라도 만족한다면";
+        public override string Natural() => Children.Any() ? string.Join(" 또는 ", Children.Select(Wrap)) : "없음";
 
         public override void Validate(Type root, List<string> errors)
         {
@@ -118,6 +127,7 @@ namespace GameSystems
         public override bool Test(object root) => filter == null || !filter.Test(root);
         public override string Describe() => $"!({DescribeOrAll(filter)})";
         public override string Explain() => "아래 조건을 만족하지 않는다면";
+        public override string Natural() => filter == null ? "아님" : $"({filter.Natural()}) 아님";
 
         public override void Validate(Type root, List<string> errors)
         {
@@ -197,6 +207,20 @@ namespace GameSystems
                 case ElementMode.CountAtLeast: return $"count({inner}) >= {count}";
                 case ElementMode.CountAtMost: return $"count({inner}) <= {count}";
                 default: return $"count({inner}) == {count}";
+            }
+        }
+
+        public override string Natural()
+        {
+            var what = $"{FieldFilter.PathLabel(path)} 중 [{NaturalOrAll(filter)}]인 항목이";
+            switch (mode)
+            {
+                case ElementMode.Any: return $"{what} 하나 이상";
+                case ElementMode.All: return $"{FieldFilter.PathLabel(path)}의 모든 항목이 [{NaturalOrAll(filter)}]";
+                case ElementMode.None: return $"{what} 없음";
+                case ElementMode.CountAtLeast: return $"{what} {count}개 이상";
+                case ElementMode.CountAtMost: return $"{what} {count}개 이하";
+                default: return $"{what} {count}개";
             }
         }
 

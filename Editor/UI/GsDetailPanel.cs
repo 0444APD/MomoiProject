@@ -385,7 +385,7 @@ namespace GameSystems.EditorTools.UI
             {
                 // 이전 값은 원본을 값 칸과 같은 규칙으로 표시한다(ID는 이름으로 등).
                 var original = _originalObject.FindProperty(path);
-                oldLabel.text = original != null ? GsInlineProperty.Describe(original).text : "없음";
+                Gs.SetText(oldLabel, original != null ? GsInlineProperty.Describe(original).text : "없음");
                 chevron.style.display = oldBox.style.display;
             });
             return column;

@@ -302,7 +302,7 @@ namespace GameSystems.EditorTools
             var badge = (GsBadge)row[2];
             badge.Text = KindName(entry.Kind);
             badge.SetColor(KindColor(entry.Kind));
-            ((Label)row[3]).text = entry.Message;
+            Gs.SetText((Label)row[3], Gs.Dual(entry.Message, entry.Code));
             ((Label)row[4]).text = data.Descendants > 0 && !data.Expanded ? data.Summary : "";
             ((Label)row[5]).text = $"#{entry.Id} · 틱 {entry.Tick}";
             row[6].userData = entry;
@@ -573,7 +573,7 @@ namespace GameSystems.EditorTools
             marker.style.backgroundColor = selected ? Gs.Accent : KindColor(entry.Kind);
             marker.style.marginRight = 10;
             row.Add(marker);
-            var label = Gs.Label(entry.Message, "gs-grow");
+            var label = Gs.Label(Gs.Dual(entry.Message, entry.Code), "gs-grow");
             if (!selected) label.AddToClassList("gs-text-2");
             row.Add(label);
             return row;
@@ -815,7 +815,7 @@ namespace GameSystems.EditorTools
                 var card = new GsCard(CardLayout.Bar);
                 card.SetImage(null, unlocked ? Gs.Success : Gs.PaletteFor(id));
                 card.Title = definition.DisplayName;
-                card.Subtitle = definition.Condition?.Describe(_session) ?? "(조건 없음)";
+                card.Subtitle = definition.Condition != null ? Gs.Dual(definition.Condition.Natural(_session), definition.Condition.Describe(_session)) : "(조건 없음)";
                 card.AddBadge(unlocked ? "달성" : "진행 중", unlocked ? Gs.Success : Gs.Palette[7]);
 
                 if (!unlocked && _session.Achievements.TryGetProgress(id, out var current, out var target))

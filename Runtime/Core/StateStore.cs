@@ -406,7 +406,8 @@ namespace GameSystems
                     break;
                 }
                 var c = changes[i];
-                var entry = _journal.Append(kind, "State", prefix + DescribeData(slot, c), key, Leaf(c.Old), Leaf(c.New), transactionId);
+                var entry = _journal.Append(kind, "State", prefix + DescribeNatural(slot, c), key, Leaf(c.Old), Leaf(c.New), transactionId);
+                entry.Code = prefix + DescribeData(slot, c);
                 // 클래스·컬렉션이 통째로 들어오거나 빠진 경우 그 모습(사본)을 남겨 모니터에서 열어 볼 수 있게 한다.
                 if (IsDataObject(c.New) || IsDataObject(c.Old)) entry.Payload = IsDataObject(c.New) ? c.New : c.Old;
                 last = entry.Id;
@@ -417,6 +418,20 @@ namespace GameSystems
         static bool IsDataObject(object value) => value != null && IsDataType(value.GetType());
 
         static object Leaf(object value) => value == null || !IsDataType(value.GetType()) ? value : DataModel.Summary(value);
+
+        // 자연어: 인벤토리 › 아이템 #12 › 레벨  3 → 4
+        static string DescribeNatural(Slot slot, DataChange change)
+        {
+            var where = DataModel.NaturalPath(slot.DataType, change.Path);
+            var head = string.IsNullOrEmpty(where) ? slot.Label : $"{slot.Label} › {where}";
+            switch (change.Kind)
+            {
+                case DataChangeKind.Insert: return $"{head} 추가: {DataModel.Summary(change.New)}";
+                case DataChangeKind.Remove: return $"{head} 제거: {DataModel.Summary(change.Old)}";
+                case DataChangeKind.Reorder: return $"{head} 순서 변경";
+                default: return $"{head}  {DataModel.Summary(change.Old)} → {DataModel.Summary(change.New)}";
+            }
+        }
 
         static string DescribeData(Slot slot, DataChange change)
         {

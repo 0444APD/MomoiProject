@@ -42,6 +42,64 @@ namespace GameSystems.EditorTools.UI
             AddSheet(root, "GsTheme");
             AddSheet(root, "GsExperimental");
             root.AddToClassList("gs-root");
+            if (!root.ClassListContains("gs-dual-host"))
+            {
+                // Alt를 누르고 있는 동안 두 가지 표현이 있는 글자(도감 요약·로그)를 코드 형태로 바꿔 보여 준다.
+                root.AddToClassList("gs-dual-host");
+                root.RegisterCallback<KeyDownEvent>(e => SetShowCode(root, e.altKey), TrickleDown.TrickleDown);
+                root.RegisterCallback<KeyUpEvent>(e => SetShowCode(root, e.altKey), TrickleDown.TrickleDown);
+                root.RegisterCallback<PointerMoveEvent>(e => SetShowCode(root, e.altKey), TrickleDown.TrickleDown);
+                root.RegisterCallback<PointerLeaveEvent>(_ => SetShowCode(root, false));
+            }
+        }
+
+        // ── 두 가지 표현(자연어 / 코드) ─────────────────────────
+        // Dual(자연어, 코드)로 만든 글자는 평소 자연어, Alt를 누르고 있으면 코드로 보인다. 마우스를 올리면 다른 쪽이 툴팁으로.
+        public const char DualSeparator = '\u001F';
+        public static bool ShowCode { get; private set; }
+
+        sealed class DualText
+        {
+            public string Natural;
+            public string Code;
+        }
+
+        public static string Dual(string natural, string code) =>
+            string.IsNullOrEmpty(code) || code == natural ? natural : natural + DualSeparator + code;
+
+        public static void SetText(Label label, string text)
+        {
+            var index = text?.IndexOf(DualSeparator) ?? -1;
+            if (index < 0)
+            {
+                label.text = text;
+                if (label.userData is DualText)
+                {
+                    label.userData = null;
+                    label.RemoveFromClassList("gs-dual");
+                }
+                return;
+            }
+            var dual = new DualText { Natural = text.Substring(0, index), Code = text.Substring(index + 1) };
+            label.userData = dual;
+            label.AddToClassList("gs-dual");
+            Show(label, dual);
+        }
+
+        static void Show(Label label, DualText dual)
+        {
+            label.text = ShowCode ? dual.Code : dual.Natural;
+            label.tooltip = ShowCode ? dual.Natural : dual.Code + "\n(Alt를 누르고 있으면 코드 형태)";
+        }
+
+        static void SetShowCode(VisualElement root, bool on)
+        {
+            if (on == ShowCode) return;
+            ShowCode = on;
+            root.Query<Label>(className: "gs-dual").ForEach(label =>
+            {
+                if (label.userData is DualText dual) Show(label, dual);
+            });
         }
 
         static void AddSheet(VisualElement root, string name)
@@ -82,8 +140,9 @@ namespace GameSystems.EditorTools.UI
 
         public static Label Label(string text, params string[] classes)
         {
-            var label = new Label(text);
+            var label = new Label();
             foreach (var c in classes) label.AddToClassList(c);
+            SetText(label, text);
             return label;
         }
 

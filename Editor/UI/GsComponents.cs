@@ -267,7 +267,7 @@ namespace GameSystems.EditorTools.UI
         public string Title
         {
             get => _title.text;
-            set => _title.text = value;
+            set => Gs.SetText(_title, value);
         }
 
         public string Subtitle
@@ -275,7 +275,7 @@ namespace GameSystems.EditorTools.UI
             get => _subtitle.text;
             set
             {
-                _subtitle.text = value;
+                Gs.SetText(_subtitle, value);
                 _subtitle.style.display = string.IsNullOrEmpty(value) ? DisplayStyle.None : DisplayStyle.Flex;
             }
         }

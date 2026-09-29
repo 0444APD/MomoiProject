@@ -72,6 +72,9 @@ namespace GameSystems
         // 마우스를 올렸을 때 보이는 설명 문장(없으면 Describe).
         public virtual string Explain(INameResolver names) => Describe(names);
 
+        // 자연어 요약(도감·로그 기본 표시). Describe는 코드 형태(Alt를 누르면 보임).
+        public virtual string Natural(INameResolver names) => Describe(names);
+
         // 시간 기반 조건만 0보다 크게 선언한다(초 단위 확인 주기).
         public virtual double PollInterval => 0;
 
@@ -108,6 +111,9 @@ namespace GameSystems
 
         // 마우스를 올렸을 때 보이는 설명 문장(없으면 Describe).
         public virtual string Explain(INameResolver names) => Describe(names);
+
+        // 자연어 요약(도감·로그 기본 표시). Describe는 코드 형태(Alt를 누르면 보임).
+        public virtual string Natural(INameResolver names) => Describe(names);
         public abstract RewardEffect Effect { get; }
 
         public virtual void Validate(IValidationContext context)
@@ -166,6 +172,9 @@ namespace GameSystems
                 default: return "==";
             }
         }
+
+        // 자연어 조각: "처치 수가 100 이상"
+        public static string Clause(string left, CompareOp op, string right) => $"{Josa.IGa(left)} {right} {Word(op)}";
 
         // 설명 문장: "처치 수가 100 이상이라면"
         public static string Natural(string left, CompareOp op, string right)

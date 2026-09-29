@@ -78,7 +78,7 @@ namespace GameSystems.EditorTools.UI
             if (_editor != null) return;
             _property.serializedObject.Update();
             var (text, empty, broken) = Display();
-            _value.text = text;
+            Gs.SetText(_value, text);
             _value.EnableInClassList("gs-inline__empty", empty);
             EnableInClassList("gs-inline--broken", broken);
         }
