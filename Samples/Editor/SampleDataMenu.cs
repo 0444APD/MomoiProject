@@ -30,6 +30,16 @@ namespace GameSystems.Samples
         {
             var db = EditorDatabase.Instance;
             db.Sync();
+            var created = CreateBasics(db);
+            created |= CreateEquipmentExample(db);
+            if (!created) return false;
+            AssetDatabase.SaveAssets();
+            EditorDatabase.Instance.Sync();
+            return true;
+        }
+
+        static bool CreateBasics(EditorDatabase db)
+        {
             if (db.OfType<StatData>().Any(s => s.DisplayName == "처치 수 (누적)")) return false;
 
             var killsRun = Stat("처치 수 (이번 판)", StatScope.Run, StatAggregate.Sum, Rule<EnemyKilled>(nameof(EnemyKilled.Count)));
@@ -64,10 +74,66 @@ namespace GameSystems.Samples
 
             // 이번 판 수치는 되감기 대상임을 보여주는 용도(Undo하면 되돌아간다).
             _ = killsRun;
-
-            AssetDatabase.SaveAssets();
-            EditorDatabase.Instance.Sync();
             return true;
+        }
+
+        // 장비·강화 효과·몬스터 태그 예제: 태그, 상태 키, 템플릿, 조건식이 붙은 수치·도전과제.
+        static bool CreateEquipmentExample(EditorDatabase db)
+        {
+            if (db.FindById("player.inventory") != null) return false;
+            foreach (var (id, name) in new[] { ("boss", "보스"), ("legendary", "전설"), ("melee", "근접"), ("lifesteal", "흡혈"), ("fire_resist", "화염 저항") })
+                if (db.FindById(id) == null) db.Create(typeof(TagData), name, id);
+
+            var inventory = (StateKeyData)db.Create(typeof(StateKeyData), "인벤토리", "player.inventory");
+            inventory.zone = StateZone.Meta;
+            inventory.valueType = typeof(SampleInventory).FullName;
+            EditorUtility.SetDirty(inventory);
+
+            Template("template.training_sword", "훈련용 검", new SampleEquipment { name = "훈련용 검", grade = 1, tags = { "melee" } });
+            Template("template.dragon_armor", "용의 비늘 갑옷", new SampleEquipment { name = "용의 비늘 갑옷", grade = 5, element = SampleElement.Fire, tags = { "legendary" } });
+
+            var gold = db.OfType<StatData>().FirstOrDefault(s => s.DisplayName == "골드");
+            var bossRule = Rule<EnemyKilled>("");
+            bossRule.filter = new FieldFilter { path = nameof(EnemyKilled.Tags), op = FieldOp.Contains, value = "boss" };
+            var bossKills = Stat("보스 처치 수", StatScope.Total, StatAggregate.Sum, bossRule);
+
+            Achievement("용 사냥꾼", "보스를 처치했다.",
+                new StatCompareCondition { stat = bossKills.Id, op = CompareOp.AtLeast, value = 1 },
+                gold != null ? new[] { new AddToStatReward { stat = gold.Id, amount = 100 } } : new Reward[0]);
+            Achievement("전설 수집가", "전설 태그 장비를 얻었다.",
+                new StateFieldCondition
+                {
+                    key = inventory.Id,
+                    filter = new ElementFilter { path = "items", mode = ElementMode.Any, filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "legendary" } },
+                });
+            Achievement("강화 장인", "불 속성이 아닌 장비를 3번 이상 강화했다.",
+                new StateFieldCondition
+                {
+                    key = inventory.Id,
+                    filter = new ElementFilter
+                    {
+                        path = "items",
+                        mode = ElementMode.Any,
+                        filter = new AllFilter
+                        {
+                            filters =
+                            {
+                                new FieldFilter { path = "enhancements", op = FieldOp.CountAtLeast, value = "3" },
+                                new NotFilter { filter = new FieldFilter { path = "element", op = FieldOp.Equal, value = "Fire" } },
+                            },
+                        },
+                    },
+                });
+            return true;
+        }
+
+        static void Template(string id, string name, object value)
+        {
+            var template = (TemplateData)EditorDatabase.Instance.Create(typeof(TemplateData), name, id);
+            template.templateType = value.GetType().FullName;
+            template.value = value;
+            EditorUtility.SetDirty(template);
+            AssetDatabase.SaveAssetIfDirty(template);
         }
 
         static StatRule Rule<T>(string field) => new StatRule { eventType = typeof(T).FullName, field = field, multiplier = 1 };
