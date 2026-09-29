@@ -29,8 +29,9 @@
 
 | 메뉴 | 용도 |
 |---|---|
-| **Game Systems → 데이터베이스** | `GameData`를 상속한 모든 타입을 시트·카드(세로·가로·바)로 보고 추가·검색·수정. 조건·보상은 블록 편집기. |
+| **Game Systems → 도감** | 맨 위 **시작하기** 탭이 새 프로젝트의 설정 단계를 순서대로 안내(단계별 설명·현재 상태·바로 하기·완료 표시). 아래로 `GameData`를 상속한 모든 타입을 시트·카드(세로·가로·바)로 보고 추가·검색·수정. 조건·보상은 블록 편집기. |
 | **Game Systems → 모니터** | 플레이 중 통합 기록(인과 추적), 상태, 도전과제 진행도, 수치, 이벤트 발생기, 행동 로그(Undo), 디버그 명령 |
+| **Game Systems → 도움말** | 모든 창·탭·도감 종류·블록의 설명. 각 화면 제목 옆 `?` 버튼이 해당 항목으로 연다. |
 | **Game Systems → UI 샘플** | 디자인 시스템의 모든 부품. 새 도구는 이 부품을 조립해 만든다. |
 | Game Systems → 샘플 → 샘플 데이터 만들기 | 샘플 수치·도전과제 생성(샘플 심볼 필요) |
 
@@ -127,6 +128,8 @@ GameSystemsRuntime.Session.Undo();     // 마지막 행동 Undo(몇 번이든)
 | 새 조건 블록 | `Condition` 상속 + `[Serializable]` + `[BlockInfo("이름", Category = "분류")]`. `Evaluate`, `CollectDependencies`, `Describe` 구현 | "+ 조건 선택" 메뉴, 미리보기, 계약 테스트 |
 | 새 보상 블록 | `Reward` 상속 + 위와 같은 어트리뷰트. `Grant`, `Describe`, `Effect` 구현 | "+ 보상 추가" 메뉴, 계약 테스트 |
 | 새 이벤트 | `[GameEvent("표시 이름")]` 클래스 | 수치 규칙의 이벤트·필드 선택 목록 |
+| 새 화면 배치 블록 | `GsLayoutBlock` 상속 + `[LayoutBlock("id", "이름", Description = "설명")]` | 배치 편집의 블록 목록, 도움말 항목 |
+| 도움말·설정 단계 | `IHelpProvider`(도움말 항목), `ISetupProvider`(시작하기 단계) 구현 클래스 작성 | 도움말 창, `?` 버튼, 시작하기 탭 |
 
 - 필드 이름을 한국어로 보이려면 `[FieldLabel("이름")]`.
 - 다른 항목의 ID를 담는 문자열 필드는 `[StatRef]`, `[AchievementRef]`를 붙인다 → 직접 입력 대신 목록 선택 + 존재 여부 검증.
@@ -140,6 +143,8 @@ GameSystemsRuntime.Session.Undo();     // 마지막 행동 Undo(몇 번이든)
 - 게임 로직에서 `UnityEngine.Random`·`System.Random`·`Time`을 쓰지 않는다 → `session.Random.Get("용도")`, `session.Clock`.
 - 게임 상태를 static 변수나 필드에 두지 않는다 → `session.State` (Undo·되감기·저장·모니터에서 빠지지 않게).
 - 새 시스템은 관찰 계약(`IInspectable`)을 구현한다.
+- **새 기능에는 도움말을 함께 넣는다.** 도감 종류·모니터 탭은 직접 쓴 도움말 항목(`Editor/Help/BuiltInHelp.cs` 또는 기능별 `IHelpProvider`), 블록은 `Description`이 필수다. 사용자가 설정해야 하는 기능이면 시작하기 단계(`ISetupProvider`)도 추가한다. 빠지면 `HelpCoverageTests`가 실패한다.
+- 도움말 문체: 매뉴얼보다 약간 친절하게, 비유 없이. 첫 문장에 핵심, 이어서 사용법·주의점. 빈 줄로 문단, `## `로 소제목, `- `로 목록.
 
 ## 검증
 

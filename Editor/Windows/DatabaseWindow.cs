@@ -32,12 +32,63 @@ namespace GameSystems.EditorTools
         // 등장 애니메이션은 타입을 바꿀 때만(값 수정 후 재구성 때는 생략).
         bool _animate = true;
 
+        // 사이드바 맨 위의 "시작하기" 탭(타입 대신 이 값이 선택된다).
+        const string SetupKey = "$setup";
+        [SerializeField] string _expandedStep;
+        VisualElement _typeTools;
+        VisualElement _helpSlot;
+
         [MenuItem("Game Systems/도감", priority = 0)]
-        public static void Open()
+        public static void Open() => OpenWindow();
+
+        static DatabaseWindow OpenWindow()
         {
             var window = GetWindow<DatabaseWindow>();
             window.titleContent = new GUIContent("도감");
             window.minSize = new Vector2(980, 560);
+            return window;
+        }
+
+        // 다른 창·시작하기 단계에서 특정 종류로 이동한다. create면 새 항목 만들기 창을 바로 연다.
+        public static void ShowType(Type type, bool create = false)
+        {
+            var window = OpenWindow();
+            window._selectedType = type.FullName;
+            window._selectedId = null;
+            window._animate = true;
+            window.RefreshAll();
+            if (create) window.CreateItem();
+        }
+
+        public static void ShowSetup()
+        {
+            var window = OpenWindow();
+            window._selectedType = SetupKey;
+            window.RefreshAll();
+        }
+
+        // 검증 오류가 있는 첫 종류를 열고 오류 항목만 거른다.
+        public static void ShowInvalid()
+        {
+            var window = OpenWindow();
+            var issue = DataValidator.ValidateAll().FirstOrDefault(i => i.Severity == ValidationSeverity.Error && i.Asset != null);
+            if (issue != null) window._selectedType = issue.Asset.GetType().FullName;
+            window._search = "invalid";
+            if (window._searchField != null) window._searchField.Value = "invalid";
+            window.RefreshAll();
+        }
+
+        bool ShowingSetup
+        {
+            get
+            {
+                // 처음 열 때: 필수 단계가 남아 있으면 시작하기부터.
+                if (_selectedType == null)
+                    _selectedType = SetupRegistry.All.Any(s => !s.Optional && SetupRegistry.StateOf(s).state == SetupState.Todo) || DataTypes.All.Count == 0
+                        ? SetupKey
+                        : DataTypes.All[0].Type.FullName;
+                return _selectedType == SetupKey;
+            }
         }
 
         void OnEnable()
@@ -82,10 +133,17 @@ namespace GameSystems.EditorTools
             _title = Gs.Label("", "gs-display");
             _caption = Gs.Label("", "gs-caption");
             _caption.style.marginTop = 4;
-            titles.Add(_title);
+            var titleRow = Gs.Row();
+            titleRow.Add(_title);
+            _helpSlot = Gs.Row();
+            _helpSlot.style.marginLeft = 10;
+            titleRow.Add(_helpSlot);
+            titles.Add(titleRow);
             titles.Add(_caption);
             header.Add(titles);
             header.Add(Gs.Spacer());
+            _typeTools = Gs.Row();
+            header.Add(_typeTools);
 
             _searchField = new GsSearchField("검색   tag:  invalid");
             _searchField.style.width = 230;
@@ -95,8 +153,8 @@ namespace GameSystems.EditorTools
                 _search = value;
                 RebuildContent();
             };
-            header.Add(_searchField);
-            header.Add(Gs.HSpace(12));
+            _typeTools.Add(_searchField);
+            _typeTools.Add(Gs.HSpace(12));
 
             _views = new GsSegmented(ViewNames);
             _views.Changed += index =>
@@ -108,11 +166,11 @@ namespace GameSystems.EditorTools
                 _animate = true;
                 RebuildContent();
             };
-            header.Add(_views);
-            header.Add(Gs.HSpace(8));
-            header.Add(new GsButton("보기 설정", ToggleViewSettings, GsButtonKind.Ghost));
-            header.Add(Gs.HSpace(8));
-            header.Add(new GsButton("+ 새로 만들기", CreateItem, GsButtonKind.Primary));
+            _typeTools.Add(_views);
+            _typeTools.Add(Gs.HSpace(8));
+            _typeTools.Add(new GsButton("보기 설정", ToggleViewSettings, GsButtonKind.Ghost));
+            _typeTools.Add(Gs.HSpace(8));
+            _typeTools.Add(new GsButton("+ 새로 만들기", CreateItem, GsButtonKind.Primary));
             main.Add(header);
 
             var body = new VisualElement();
@@ -139,6 +197,7 @@ namespace GameSystems.EditorTools
         {
             get
             {
+                if (ShowingSetup) return null;
                 var types = DataTypes.All;
                 var info = types.FirstOrDefault(t => t.Type.FullName == _selectedType) ?? types.FirstOrDefault();
                 return info?.Type;
@@ -183,6 +242,21 @@ namespace GameSystems.EditorTools
             logo.Add(Gs.Label("Game Systems", "gs-heading"));
             brand.Add(logo);
             _sidebar.Add(brand);
+
+            var steps = SetupRegistry.All;
+            var finished = steps.Count(s => SetupRegistry.StateOf(s).state != SetupState.Todo);
+            var setup = new GsNavItem("시작하기", Gs.Accent, () =>
+            {
+                _selectedType = SetupKey;
+                _viewSettingsPanel.style.display = DisplayStyle.None;
+                _animate = true;
+                RefreshAll();
+            });
+            setup.SetCount($"{finished}/{steps.Count}");
+            setup.SetActive(ShowingSetup);
+            _sidebar.Add(setup);
+            var help = new GsNavItem("도움말", Gs.PaletteFor("help"), () => HelpWindow.Show(null));
+            _sidebar.Add(help);
 
             var selected = SelectedType;
             foreach (var group in DataTypes.All.GroupBy(t => t.Group))
@@ -237,7 +311,16 @@ namespace GameSystems.EditorTools
         {
             if (_content == null) return;
             _content.Clear();
+            _helpSlot.Clear();
+            _typeTools.style.display = ShowingSetup ? DisplayStyle.None : DisplayStyle.Flex;
+            if (ShowingSetup)
+            {
+                BuildSetup();
+                return;
+            }
             var type = SelectedType;
+            if (type != null) _helpSlot.Add(HelpUI.Button(HelpIds.Data(type)));
+            else _helpSlot.Add(HelpUI.Button("guide:codex"));
             if (type == null)
             {
                 _title.text = "도감";
@@ -297,6 +380,121 @@ namespace GameSystems.EditorTools
 
             if (view.Layout == "Sheet" || ViewSettings.CardLayoutOf(ViewSettings.Get(type)) == null) BuildSheet(items, view);
             else BuildCards(items, view, ViewSettings.CardLayoutOf(ViewSettings.Get(type)).Value);
+        }
+
+        // ── 시작하기 ───────────────────────────────────────────
+        // 새 프로젝트의 설정 단계를 순서대로. 단계마다 설명·현재 상태·바로 하기 버튼·완료 표시.
+
+        void BuildSetup()
+        {
+            var steps = SetupRegistry.All;
+            var states = steps.Select(s => (step: s, status: SetupRegistry.StateOf(s))).ToList();
+            var required = states.Where(s => !s.step.Optional).ToList();
+            _title.text = "시작하기";
+            _caption.text = $"필수 {required.Count(s => s.status.state != SetupState.Todo)}/{required.Count}  ·  전체 {states.Count(s => s.status.state != SetupState.Todo)}/{states.Count} 단계 완료";
+            _helpSlot.Add(HelpUI.Button(HelpIds.Setup));
+
+            var intro = Gs.Label("위에서부터 차례로 진행하세요. 뒤 단계는 앞 단계에서 만든 항목을 목록에서 고릅니다. 각 단계의 '?'로 자세한 도움말을, 왼쪽 '도움말'로 전체 설명을 볼 수 있습니다.", "gs-caption", "gs-setup__intro");
+            _content.Add(intro);
+
+            // 펼친 단계: 사용자가 고른 것, 없으면 첫 할 일.
+            var expanded = states.Any(s => s.step.Id == _expandedStep) ? _expandedStep : states.FirstOrDefault(s => s.status.state == SetupState.Todo).step?.Id;
+            int number = 0;
+            foreach (var (step, status) in states)
+            {
+                number++;
+                var card = Gs.Col("gs-setup__step");
+                card.EnableInClassList("gs-setup__step--done", status.state == SetupState.Done || status.state == SetupState.Skipped);
+                var open = step.Id == expanded;
+
+                var head = Gs.Row("gs-setup__head");
+                var mark = Gs.Label(status.state == SetupState.Done ? "✓" : status.state == SetupState.Skipped ? "–" : number.ToString(), "gs-setup__number");
+                mark.EnableInClassList("gs-setup__number--done", status.state == SetupState.Done);
+                head.Add(mark);
+                var titles = Gs.Col("gs-grow");
+                var titleRow = Gs.Row();
+                titleRow.Add(Gs.Label(step.Title, "gs-heading"));
+                if (step.Optional)
+                {
+                    var optional = new GsBadge("선택", Gs.PaletteFor("optional"));
+                    optional.style.marginLeft = 8;
+                    titleRow.Add(optional);
+                }
+                titles.Add(titleRow);
+                var summary = Gs.Label(step.Summary, "gs-caption");
+                summary.style.marginTop = 2;
+                summary.style.whiteSpace = WhiteSpace.Normal;
+                titles.Add(summary);
+                head.Add(titles);
+                head.Add(StatusBadge(status.state, status.text));
+                if (!string.IsNullOrEmpty(step.HelpTopic)) head.Add(HelpUI.Button(step.HelpTopic));
+                var id = step.Id;
+                head.RegisterCallback<ClickEvent>(e =>
+                {
+                    if (e.target is VisualElement v && v.GetFirstAncestorOfType<GsButton>() == null && !(v is GsButton))
+                    {
+                        _expandedStep = open ? "" : id;
+                        RebuildContent();
+                    }
+                });
+                card.Add(head);
+
+                if (open)
+                {
+                    var detail = Gs.Col("gs-setup__detail");
+                    detail.Add(HelpUI.Body(step.Body));
+                    var actions = Gs.Row("gs-wrap");
+                    foreach (var action in step.Actions)
+                    {
+                        var a = action;
+                        var button = new GsButton(a.Label, () =>
+                        {
+                            a.Run?.Invoke();
+                            QueueRefresh();
+                        }, a.Primary ? GsButtonKind.Primary : GsButtonKind.Default);
+                        button.style.marginRight = 8;
+                        button.style.marginBottom = 6;
+                        actions.Add(button);
+                    }
+                    actions.Add(Gs.Spacer());
+                    // 자동 판정이 없는 단계만 직접 완료 표시. 선택 단계는 건너뛰기 가능.
+                    if (step.Check == null)
+                    {
+                        var marked = SetupRegistry.IsMarkedDone(id);
+                        actions.Add(new GsButton(marked ? "완료 해제" : "완료로 표시", () =>
+                        {
+                            SetupRegistry.Mark(id, marked ? SetupState.Todo : SetupState.Done);
+                            RefreshAll();
+                        }, marked ? GsButtonKind.Ghost : GsButtonKind.Primary));
+                    }
+                    if (step.Optional)
+                    {
+                        var skipped = SetupRegistry.IsSkipped(id);
+                        actions.Add(new GsButton(skipped ? "건너뛰기 취소" : "건너뛰기", () =>
+                        {
+                            SetupRegistry.Mark(id, skipped ? SetupState.Todo : SetupState.Skipped);
+                            RefreshAll();
+                        }, GsButtonKind.Ghost));
+                    }
+                    detail.Add(actions);
+                    card.Add(detail);
+                }
+                _content.Add(card);
+            }
+            if (_animate) GsMotion.Appear(_content.Children().Skip(1));
+            _animate = false;
+        }
+
+        static VisualElement StatusBadge(SetupState state, string text)
+        {
+            var color = state == SetupState.Done ? Gs.Success : state == SetupState.Warning ? Gs.Warning : state == SetupState.Skipped ? Gs.PaletteFor("skipped") : Gs.Accent;
+            var label = state == SetupState.Done ? "완료" : state == SetupState.Skipped ? "건너뜀" : state == SetupState.Warning ? "확인 필요" : "할 일";
+            var row = Gs.Col("gs-setup__status");
+            row.Add(new GsBadge(label, color));
+            var detail = Gs.Label(text ?? "", "gs-caption");
+            detail.style.marginTop = 4;
+            row.Add(detail);
+            return row;
         }
 
         bool Matches(GameData data)
@@ -482,6 +680,7 @@ namespace GameSystems.EditorTools
                 ImagePath = view.Image?.Path,
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
+                HelpTopic = HelpIds.Data(item.GetType()),
                 Summary = draft => DescribeItem((GameData)draft),
                 Validate = draft => ValidateDraft(item, (GameData)draft),
                 Saved = _ =>

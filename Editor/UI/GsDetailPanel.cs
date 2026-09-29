@@ -28,6 +28,8 @@ namespace GameSystems.EditorTools.UI
         public Func<UnityEngine.Object, IList<(string label, string text)>> Summary;
         public List<(string label, Action<GsDetailPanel> action)> Actions = new List<(string, Action<GsDetailPanel>)>();
         public Action<UnityEngine.Object> Saved;
+        // 제목 옆 "?" 버튼이 여는 도움말 항목.
+        public string HelpTopic;
     }
 
     // 모든 카드·시트가 공유하는 상세 보기·편집 패널.
@@ -122,6 +124,7 @@ namespace GameSystems.EditorTools.UI
             titles.Add(_summary);
             top.Add(titles);
 
+            if (!string.IsNullOrEmpty(_options.HelpTopic)) top.Add(HelpUI.Button(_options.HelpTopic));
             var close = new GsButton("✕", RequestClose, GsButtonKind.Ghost);
             close.tooltip = "닫기 (Esc)";
             top.Add(close);

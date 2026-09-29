@@ -42,6 +42,7 @@ namespace GameSystems.EditorTools
         // 테스트에서 런타임 없이 세션을 주입하기 위한 통로.
         internal static Func<GameSession> SessionSource = () => GameSystemsRuntime.Session;
         internal static int TabCount => TabNames.Length;
+        internal static string TabKey(int index) => ((Tab)index).ToString();
 
         internal void ShowTab(int index)
         {
@@ -111,7 +112,12 @@ namespace GameSystems.EditorTools
             var header = Gs.Row();
             header.style.marginBottom = 18;
             var titles = Gs.Col();
-            titles.Add(Gs.Label(TabNames[(int)_tab], "gs-display"));
+            var titleRow = Gs.Row();
+            titleRow.Add(Gs.Label(TabNames[(int)_tab], "gs-display"));
+            var help = HelpUI.Button(HelpIds.Monitor(_tab.ToString()));
+            help.style.marginLeft = 10;
+            titleRow.Add(help);
+            titles.Add(titleRow);
             _sessionInfo = Gs.Label("", "gs-caption");
             _sessionInfo.style.marginTop = 4;
             titles.Add(_sessionInfo);

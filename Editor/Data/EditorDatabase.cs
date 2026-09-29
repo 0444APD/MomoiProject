@@ -127,7 +127,7 @@ namespace GameSystems.EditorTools
 
         public static bool IsReleased => AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath)?.IsReleased ?? false;
 
-        const string ReleasedMenu = "Game Systems/출시됨 (저장 호환 유지)";
+        internal const string ReleasedMenu = "Game Systems/출시됨 (저장 호환 유지)";
 
         [MenuItem(ReleasedMenu, priority = 40)]
         static void ToggleReleased()

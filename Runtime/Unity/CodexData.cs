@@ -16,7 +16,7 @@ namespace GameSystems.Data
 
         // 템플릿의 사본(원본을 건드리지 않는다).
         public object CreateInstance() => value == null ? null : DataModel.Clone(value, null);
-        public T CreateInstance<T>() where T : class => CreateInstance() as T;
+        public new T CreateInstance<T>() where T : class => CreateInstance() as T;
 
         public override void ValidateData(IValidationContext context)
         {

@@ -678,8 +678,8 @@ namespace GameSystems.EditorTools.UI
                 _crumb = crumb;
             }
 
-            object Target => _crumb.Value;
-            public override Type Type => Target.GetType();
+            object Current => _crumb.Value;
+            public override Type Type => Current.GetType();
             public override bool CanEdit => _crumb.Apply != null;
             public override IEnumerable<string> Fields() => FieldPaths.MembersOf(Type).Select(m => m.Name);
 
@@ -690,7 +690,7 @@ namespace GameSystems.EditorTools.UI
                 var member = MemberOf(path);
                 if (member == null) return new VisualElement();
                 var field = member.Info as FieldInfo;
-                var target = Target;
+                var target = Current;
                 var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
                 Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
                 var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, member.Info, set, null);
@@ -700,19 +700,19 @@ namespace GameSystems.EditorTools.UI
 
             public override VisualElement FieldValue(string path)
             {
-                var value = FieldPaths.Resolve(Target, path).FirstOrDefault();
+                var value = FieldPaths.Resolve(Current, path).FirstOrDefault();
                 return Gs.Label(value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object)
                     ? DataModel.Summary(value)
                     : StateStore.Format(value), "gs-nowrap");
             }
 
-            public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(Target, path).FirstOrDefault() as UnityEngine.Object;
+            public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(Current, path).FirstOrDefault() as UnityEngine.Object;
 
             public override void SetObject(string path, UnityEngine.Object value)
             {
                 var member = MemberOf(path);
                 if (!(member?.Info is FieldInfo field) || _crumb.Apply == null) return;
-                var target = Target;
+                var target = Current;
                 _crumb.Apply(() => field.SetValue(target, value));
                 _explorer.Changed?.Invoke();
                 _explorer.Refresh();
