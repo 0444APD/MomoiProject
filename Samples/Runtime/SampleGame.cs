@@ -94,6 +94,8 @@ namespace GameSystems.Samples
         const string ComboKey = "sample:combo";
         // 도감의 플레이어 데이터(샘플 데이터 만들기로 생성). 없으면 장비 명령은 안내만 한다.
         const string InventoryKey = "player.inventory";
+        // 지갑 골드(쓰고 줄어드는 자원 → 플레이어 데이터). 번 골드 총합은 로그(goldEarned)가 이벤트로 센다.
+        const string GoldKey = "player.gold";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         static void Hook()
@@ -169,7 +171,9 @@ namespace GameSystems.Samples
         static void OpenChest(GameSession session)
         {
             var drop = session.Random.Get("drop");
-            session.Events.Publish(new GoldEarned { Amount = drop.Range(10, 60) });
+            var amount = drop.Range(10, 60);
+            if (session.State.TypeOf(GoldKey) != null) session.State.Set(GoldKey, session.State.Get<int>(GoldKey) + amount);
+            session.Events.Publish(new GoldEarned { Amount = amount });
         }
     }
 }

@@ -496,8 +496,6 @@
 
 /* 값 칸과 이전 값 칸은 같은 크기·같은 글자 위치(바뀌어도 원래 자리의 글자가 움직이지 않는다) */
 .gs-detail .gs-inline { margin-left: 0; padding: 6px 10px; min-height: 32px; border-radius: 7px; }
-.gs-detail .gs-change__box { flex-direction: row; align-items: center; min-height: 32px; padding: 6px 10px; border-radius: 7px; }
-.gs-detail__value { flex-direction: column; align-items: stretch; }
 .gs-detail .gs-inline { flex-shrink: 1; min-width: 0; }
 .gs-detail .gs-inline TextField { flex-shrink: 1; min-width: 0; }
 .gs-change-row { padding: 10px 0; border-bottom-width: 1px; border-color: var(--gs-border); }
@@ -899,7 +897,6 @@
     font-size: 13px;
 }
 .gs-field .unity-base-field__label { display: none; }
-.gs-field .gs-change__box { padding: 0; min-height: 20px; background-color: rgba(0, 0, 0, 0); }
 .gs-detail__section--changed .gs-field__label { color: var(--gs-accent); }
 
 /* 좁고 긴 상세 패널 */
@@ -989,3 +986,43 @@
 .gs-field .unity-text-element { margin: 0; padding: 0; font-size: 13px; }
 .gs-field .gs-inline { min-height: 18px; }
 .gs-field .gs-inline__scroll { min-height: 18px; }
+
+/* ── 상세 창: 크롬식 탭 바 + 본문 ─────────────────────────── */
+.gs-tabs { flex-grow: 1; }
+.gs-tabs__bar {
+    flex-direction: row;
+    flex-shrink: 0;
+    align-items: flex-end;
+    padding: 8px 8px 0 8px;
+    background-color: var(--gs-bg);
+    border-bottom-width: 1px;
+    border-color: var(--gs-border);
+    overflow: hidden;
+}
+.gs-tabs__tab {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+    min-width: 60px;
+    max-width: 200px;
+    height: 32px;
+    padding: 0 4px 0 12px;
+    margin-right: 2px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    background-color: rgba(0, 0, 0, 0);
+    cursor: link;
+}
+.gs-tabs__tab:hover { background-color: var(--gs-hover); }
+.gs-tabs__tab--active,
+.gs-tabs__tab--active:hover { background-color: var(--gs-surface); }
+.gs-root .gs-tabs__title { font-size: 12px; color: var(--gs-text-2); flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
+.gs-root .gs-tabs__tab--active .gs-tabs__title { color: var(--gs-text); -unity-font-style: bold; }
+.gs-root .gs-tabs__depth { font-size: 11px; color: var(--gs-accent); margin-right: 4px; }
+.gs-tabs__close { padding: 2px 6px; margin-left: 2px; }
+.gs-tabs__body { flex-grow: 1; min-height: 0; background-color: var(--gs-surface); }
+.gs-tabs__nested { flex-grow: 1; min-height: 0; padding: 16px; }
+.gs-tabs__nested-head { align-items: center; margin-bottom: 12px; }
+
+/* 창에 붙은 상세 패널: 테두리·둥근 모서리 없이 창을 채운다 */
+.gs-detail--docked { flex-grow: 1; border-width: 0; border-radius: 0; }

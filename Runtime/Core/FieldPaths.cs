@@ -143,7 +143,7 @@ namespace GameSystems
         public static bool IsCollectionValue(object value) => value != null && !(value is string) && value is IEnumerable;
     }
 
-    // 필드 형식별 비교. 숫자는 크기, 글자·선택지는 일치, 컬렉션은 포함·개수, 참/거짓은 참·거짓.
+    // 필드 형식별 비교. 숫자는 크기, 글자·enum은 일치, 컬렉션은 포함·개수, 참/거짓은 참·거짓.
     public enum FieldOp
     {
         Equal,

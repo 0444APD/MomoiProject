@@ -181,9 +181,11 @@ namespace GameSystems.EditorTools
             {
                 // 처음 열 때: 필수 단계가 남아 있으면 시작하기부터.
                 if (_selectedType == null)
-                    _selectedType = SetupRegistry.All.Any(s => !s.Optional && SetupRegistry.StateOf(s).state == SetupState.Todo) || DataTypes.All.Count == 0
+                    _selectedType = HelpFeature.Enabled && (SetupRegistry.All.Any(s => !s.Optional && SetupRegistry.StateOf(s).state == SetupState.Todo) || DataTypes.All.Count == 0)
                         ? SetupKey
-                        : DataTypes.All.First(i => !i.Hidden).Type.FullName;
+                        : DataTypes.All.FirstOrDefault(i => !i.Hidden)?.Type.FullName;
+                // 시작하기가 보류 중이면(HelpFeature) 예전에 열어 둔 시작하기 탭 대신 첫 종류를 연다.
+                if (_selectedType == SetupKey && !HelpFeature.Enabled) _selectedType = DataTypes.All.FirstOrDefault(i => !i.Hidden)?.Type.FullName;
                 return _selectedType == SetupKey;
             }
         }
@@ -342,14 +344,17 @@ namespace GameSystems.EditorTools
             brand.Add(logo);
             _sidebar.Add(brand);
 
-            var steps = SetupRegistry.All;
-            var finished = steps.Count(s => SetupRegistry.StateOf(s).state != SetupState.Todo);
-            var setup = new GsNavItem("시작하기", Gs.Accent, () => Navigate(SetupKey));
-            setup.SetCount($"{finished}/{steps.Count}");
-            setup.SetActive(ShowingSetup);
-            _sidebar.Add(setup);
-            var help = new GsNavItem("도움말", Gs.PaletteFor("help"), () => HelpWindow.Show(null));
-            _sidebar.Add(help);
+            if (HelpFeature.Enabled)
+            {
+                var steps = SetupRegistry.All;
+                var finished = steps.Count(s => SetupRegistry.StateOf(s).state != SetupState.Todo);
+                var setup = new GsNavItem("시작하기", Gs.Accent, () => Navigate(SetupKey));
+                setup.SetCount($"{finished}/{steps.Count}");
+                setup.SetActive(ShowingSetup);
+                _sidebar.Add(setup);
+                var help = new GsNavItem("도움말", Gs.PaletteFor("help"), () => HelpWindow.Show(null));
+                _sidebar.Add(help);
+            }
 
             var selected = SelectedType;
             foreach (var group in DataTypes.All.Where(t => !t.Hidden).GroupBy(t => t.Group))
@@ -786,12 +791,22 @@ namespace GameSystems.EditorTools
         // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
         // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 도감 목록에 바로 보이고, Unity 에셋에는 탭을 옮길 때 적용된다.
 
+        // 상세 창(탭)으로 연다. 적용·되돌리기로 작업본이 바뀌면 상세 창이 같은 설정 함수로 다시 연다.
         void OpenDetail(GameData item, string focusPath = null)
         {
-            item = Staging.Work(item);
             _selectedId = item.Id;
+            var first = true;
+            DetailWindow.OpenItem(item, work =>
+            {
+                var options = DetailOptionsFor(work, first ? focusPath : null);
+                first = false;
+                return options;
+            });
+        }
+
+        DetailOptions DetailOptionsFor(GameData item, string focusPath)
+        {
             var info = DataTypes.Find(item.GetType());
-            var view = ViewSettings.Resolve(item.GetType());
             var target = item;
             var options = new DetailOptions
             {
@@ -803,7 +818,9 @@ namespace GameSystems.EditorTools
                 TitleValidate = id => id == target.Id ? null : EditorDatabase.Instance.CanUseId(id, target, out var error) ? null : error,
                 TitleCommit = (panel, id) =>
                 {
+                    var oldId = target.Id;
                     var count = StageRename(target, id);
+                    DetailWindow.Renamed(target, oldId);
                     if (panel.DraftTarget is GameData draft) draft.EditorAssignId(id);
                     _selectedId = id;
                     QueueRefresh();
@@ -832,7 +849,7 @@ namespace GameSystems.EditorTools
             {
                 options.Actions.Add(("삭제", panel => Delete(item, panel)));
             }
-            GsDetailPanel.Open(_root, item, options);
+            return options;
         }
 
         // 편집 중 사본을 원본 자리에 넣고 검증한다(저장 전에 오류를 미리 보여준다).

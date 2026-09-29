@@ -75,8 +75,13 @@ namespace GameSystems.EditorTools
             EditorDatabase.Changed -= QueueRebind;
         }
 
-        void CreateGUI()
+        void CreateGUI() => EnsureRoot();
+
+        // 창의 뿌리(탭 바 + 본문). 창이 그려지기 전에 탭을 열 때도 먼저 만든다.
+        void EnsureRoot()
         {
+            // 이미 만들어 붙였으면 그대로 쓴다(열린 패널의 대화 상자가 이 뿌리를 쓴다).
+            if (_root != null && _root.parent == rootVisualElement) return;
             var host = rootVisualElement;
             host.Clear();
             _root = Gs.Col();
@@ -95,9 +100,11 @@ namespace GameSystems.EditorTools
 
         void BuildItem(Tab tab, GameData item)
         {
-            var options = tab.Options(item);
+            EnsureRoot();
+            var work = EditorDatabase.Staging.Work(item);
+            var options = tab.Options(work);
             options.OpenNested = value => OpenNested(tab, value);
-            var panel = GsDetailPanel.Create(_root ?? rootVisualElement, EditorDatabase.Staging.Work(item), options);
+            var panel = GsDetailPanel.Create(_root, work, options);
             panel.CloseRequested += () => CloseTab(tab, closePanel: false);
             panel.BodyRebuilt += () => CloseChildren(tab);
             tab.Panel = panel;

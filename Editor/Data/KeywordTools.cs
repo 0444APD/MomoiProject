@@ -70,8 +70,6 @@ namespace GameSystems.EditorTools
         public static IEnumerable<(Type type, FieldInfo field)> FieldsLinkedTo(string group) =>
             Fields().Where(f => GroupOf(f.type, f.field) == group);
 
-        public static bool StageByDefault => CodexGroups.StageByDefault;
-
         public static KeywordGroupData CreateGroup(string id, bool? staged = null) =>
             (KeywordGroupData)CodexGroups.Create(typeof(KeywordGroupData), id, null, staged);
 

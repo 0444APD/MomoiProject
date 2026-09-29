@@ -312,7 +312,7 @@ namespace GameSystems.EditorTools.UI
                     Refresh();
                 }, GsButtonKind.Ghost);
                 remove.AddToClassList("gs-explorer__card-remove");
-                remove.tooltip = "목록에서 빼기";
+                remove.tooltip = "빼기";
                 card.Add(remove);
             }
             card.tooltip = "클릭해서 열기";
@@ -554,8 +554,7 @@ namespace GameSystems.EditorTools.UI
             row.Add(icon);
             row.Add(Gs.Label(entry.Label, "gs-explorer__name"));
             row.Add(Gs.Label(entry.Caption ?? "", "gs-caption", "gs-explorer__type"));
-            var preview = Gs.Label(entry.Preview ?? "", "gs-grow", "gs-nowrap", "gs-explorer__value");
-            row.Add(preview);
+            row.Add(Gs.Label(entry.Preview ?? "", "gs-grow", "gs-nowrap", "gs-explorer__value"));
             if (entry.IsFolder) row.Add(Gs.Label("›", "gs-explorer__chevron"));
 
             if (!_browse && entry.Pickable)
@@ -565,6 +564,7 @@ namespace GameSystems.EditorTools.UI
                 row.Add(pick);
             }
 
+            // 배열·리스트 안의 클래스 요소(폴더)는 빼기 버튼을 단다.
             var apply = ApplyFor(entry);
             if (_browse && entry.Remove != null && apply != null)
             {
@@ -575,47 +575,17 @@ namespace GameSystems.EditorTools.UI
                     Refresh();
                 }, GsButtonKind.Ghost);
                 remove.AddToClassList("gs-explorer__pick");
-                remove.tooltip = "목록에서 빼기";
+                remove.tooltip = "빼기";
                 row.Add(remove);
-            }
-            var editable = _browse && !entry.IsFolder && entry.Set != null && apply != null;
-            // 에셋 참조(스프라이트·데이터 등): Unity 오브젝트 선택 창을 줄 전체에 덮는다.
-            if (editable && DataModel.Of(entry.Type ?? typeof(object)).Kind == DataKind.Reference)
-            {
-                var picker = new ObjectFieldProxy(entry.Type);
-                picker.SetValue(entry.Value as UnityEngine.Object);
-                picker.Changed += value =>
-                {
-                    apply(() => entry.Set(value));
-                    Changed?.Invoke();
-                    Refresh();
-                    var rule = SpriteSpecEditor.RuleFor(entry.Member as FieldInfo);
-                    var host = panel?.visualTree.Q(className: "gs-root");
-                    if (rule != null && value is Sprite placed && host != null) GsSpriteFraming.Open(host, placed, rule.spriteGroup, Refresh);
-                };
-                row.Add(picker.Element);
-            }
-            var spriteRule = _browse ? SpriteSpecEditor.RuleFor(entry.Member as FieldInfo) : null;
-            if (spriteRule != null && entry.Value is Sprite framed)
-            {
-                var frame = new GsButton("맞추기", () =>
-                {
-                    var host = panel?.visualTree.Q(className: "gs-root");
-                    if (host != null) GsSpriteFraming.Open(host, framed, spriteRule.spriteGroup, Refresh);
-                }, GsButtonKind.Ghost);
-                frame.AddToClassList("gs-explorer__pick");
-                row.Add(frame);
             }
 
             row.RegisterCallback<ClickEvent>(e =>
             {
-                // 줄 안의 버튼(선택)은 버튼이 처리한다.
+                // 줄 안의 버튼(선택·빼기)은 버튼이 처리한다.
                 if (e.target is VisualElement target && (target is GsButton || target.GetFirstAncestorOfType<GsButton>() != null)) return;
                 if (entry.IsFolder) Enter(entry);
                 else if (!_browse && entry.Pickable) Pick(entry.Path);
-                else if (editable) BeginEdit(row, preview, entry, apply);
             });
-            if (editable) row.tooltip = "클릭해서 고치기";
             return row;
         }
 
@@ -651,7 +621,7 @@ namespace GameSystems.EditorTools.UI
                     Changed?.Invoke();
                     Refresh();
                 }, GsButtonKind.Ghost);
-                remove.tooltip = "목록에서 빼기";
+                remove.tooltip = "빼기";
                 line.Add(remove);
             }
             // 에셋 참조(스프라이트·데이터 등): Unity 오브젝트 선택 창을 칸 전체에 덮는다.

@@ -47,6 +47,17 @@ namespace GameSystems.Tests
         }
 
         [Test]
+        public void 값_더하기_보상은_플레이어_데이터에_더하고_뺀다()
+        {
+            _session.State.DefineOfType("player.gold", StateZone.Meta, typeof(int), 10);
+            new AddToStateReward { key = "player.gold", amount = 50 }.Grant(_session);
+            Assert.AreEqual(60, _session.State.Get("player.gold"));
+            new AddToStateReward { key = "player.gold", amount = -15 }.Grant(_session);
+            Assert.AreEqual(45, _session.State.Get("player.gold"));
+            Assert.AreEqual("player.gold -= 15", new AddToStateReward { key = "player.gold", amount = -15 }.Describe(null));
+        }
+
+        [Test]
         public void 정의되지_않은_키는_조용히_넘어가지_않는다()
         {
             Assert.Throws<InvalidOperationException>(() => _session.State.Set("없는:키", 1));

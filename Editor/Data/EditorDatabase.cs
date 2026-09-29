@@ -131,17 +131,6 @@ namespace GameSystems.EditorTools
             return info.IdPrefix + (max + 1).ToString(CultureInfo.InvariantCulture);
         }
 
-        public void AssignNewId(GameData data)
-        {
-            var info = DataTypes.Find(data.GetType());
-            if (info == null) return;
-            Undo.RecordObject(data, "ID 재발급");
-            data.EditorAssignId(NextId(info));
-            EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssetIfDirty(data);
-            MarkDirty();
-        }
-
         // ── ID 규칙·이름 바꾸기·참조 찾기 ─────────────────────────
 
         // 형식이 맞고 다른 항목이 쓰지 않는 ID인지. self는 이름을 바꾸는 항목 자신(자기 ID는 중복으로 치지 않는다).

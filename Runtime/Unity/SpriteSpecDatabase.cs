@@ -23,8 +23,6 @@ namespace GameSystems.Data
             framings.Add(found);
             return found;
         }
-
-        public void EditorRemove(SpriteFraming framing) => framings.Remove(framing);
 #endif
     }
 }

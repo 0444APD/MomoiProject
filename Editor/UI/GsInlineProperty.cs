@@ -625,13 +625,12 @@ namespace GameSystems.EditorTools.UI
             }, TrickleDown.TrickleDown);
 
             // 텍스트 필드는 내부 입력 요소로 포커스가 옮겨가며 FocusOut이 생길 수 있어, 한 틱 뒤 실제로 벗어났는지 확인한다.
-            if (!(_editor is ObjectField) && !(_editor is ColorField))
-                _editor.RegisterCallback<FocusOutEvent>(_ => schedule.Execute(() =>
-                {
-                    if (_editor != null && !IsFocusWithin(_editor)) EndEdit(true);
-                }).StartingIn(30));
+            _editor.RegisterCallback<FocusOutEvent>(_ => schedule.Execute(() =>
+            {
+                if (_editor != null && !IsFocusWithin(_editor)) EndEdit(true);
+            }).StartingIn(30));
 
-            // 바깥을 클릭하면 편집을 끝낸다(오브젝트·색 선택처럼 포커스가 창 밖으로 나가는 편집기 포함).
+            // 바깥을 클릭하면 편집을 끝낸다.
             var root = panel?.visualTree;
             if (root != null)
             {
@@ -676,25 +675,6 @@ namespace GameSystems.EditorTools.UI
                     return _property.type == "double"
                         ? (VisualElement)new DoubleField { value = _property.doubleValue }
                         : new FloatField { value = _property.floatValue };
-                case SerializedPropertyType.ObjectReference:
-                    var objectField = new ObjectField { objectType = _valueType ?? typeof(UnityEngine.Object), allowSceneObjects = false, value = _property.objectReferenceValue };
-                    objectField.RegisterValueChangedCallback(e =>
-                    {
-                        _property.serializedObject.Update();
-                        _property.objectReferenceValue = e.newValue;
-                        Apply(keepEditing: true);
-                        OpenFramingIfRuled(e.newValue);
-                    });
-                    return objectField;
-                case SerializedPropertyType.Color:
-                    var colorField = new ColorField { value = _property.colorValue };
-                    colorField.RegisterValueChangedCallback(e =>
-                    {
-                        _property.serializedObject.Update();
-                        _property.colorValue = e.newValue;
-                        Apply(keepEditing: true);
-                    });
-                    return colorField;
             }
             return null;
         }

@@ -151,6 +151,12 @@ namespace GameSystems.EditorTools
         static void OnReload() => ClearCache();
     }
 
+    // 도움말·시작하기는 보류(사용자 결정, 가장 마지막에). 켜기 전까지 화면에 보이지 않는다(코드는 그대로 둔다).
+    public static class HelpFeature
+    {
+        public static readonly bool Enabled = false;
+    }
+
     public static class HelpUI
     {
         // 작은 "?" 버튼: 마우스를 올리면 요약, 누르면 도움말 창에서 그 항목을 연다.
@@ -160,6 +166,7 @@ namespace GameSystems.EditorTools
             var button = new GsButton("?", () => HelpWindow.Show(topicId), GsButtonKind.Ghost);
             button.AddToClassList("gs-help-button");
             button.tooltip = topic != null ? $"{topic.Title}\n{topic.Summary}\n\n눌러서 자세히 보기" : "도움말 보기";
+            if (!HelpFeature.Enabled) button.style.display = DisplayStyle.None;
             return button;
         }
 

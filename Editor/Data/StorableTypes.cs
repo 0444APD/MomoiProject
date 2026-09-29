@@ -55,7 +55,7 @@ namespace GameSystems.EditorTools
         }
 
         public static string GroupOf(Type type) =>
-            Basics.Any(b => b.type == type) ? "기본 형식" : type.IsEnum ? "선택지 (enum)" : "데이터 클래스";
+            Basics.Any(b => b.type == type) ? "기본 형식" : type.IsEnum ? "enum" : "데이터 클래스";
 
         [InitializeOnLoadMethod]
         static void ResetOnReload() => _cache = null;

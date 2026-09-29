@@ -36,7 +36,7 @@ namespace GameSystems.EditorTools.UI
         public abstract bool CanEdit { get; }
         // 좁은 곳(상세 패널)에서는 블록을 옆으로 나누지 않고 모두 한 줄씩 위아래로 쌓는다.
         public virtual bool SingleColumn => false;
-        // 보고 있는 도감 항목(있으면). 항목에 딸린 블록(선택지 목록 등)이 쓴다.
+        // 보고 있는 도감 항목(있으면). 항목에 딸린 블록(키워드 그룹의 키워드 등)이 쓴다.
         public virtual UnityEngine.Object Target => null;
 
         public string LabelOf(string path)

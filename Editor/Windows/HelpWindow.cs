@@ -16,7 +16,7 @@ namespace GameSystems.EditorTools
         VisualElement _list;
         VisualElement _page;
 
-        [MenuItem("Game Systems/도움말", priority = 2)]
+        // 메뉴는 도움말 보류 동안 뺀다(HelpFeature).
         public static void Open() => Show(null);
 
         public static void Show(string topicId)

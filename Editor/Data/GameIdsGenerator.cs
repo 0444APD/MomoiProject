@@ -174,7 +174,7 @@ namespace GameSystems.EditorTools
         static string ClassName(Type type)
         {
             var name = type.Name.EndsWith("Data", StringComparison.Ordinal) && type.Name.Length > 4 ? type.Name.Substring(0, type.Name.Length - 4) : type.Name;
-            return name == "State" ? "StateData" : name;
+            return name == "PlayerData" ? "PlayerDataData" : name;
         }
 
         static string Unique(string name, HashSet<string> used)

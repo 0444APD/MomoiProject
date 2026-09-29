@@ -260,4 +260,36 @@ namespace GameSystems
             else if (info.Value.Aggregate != StatAggregate.Sum) context.Error($"'획득'은 합계형 수치에만 쓸 수 있습니다 ('{stat}'은 합계형이 아님).");
         }
     }
+
+    [Serializable]
+    [BlockInfo("값 더하기", Category = "플레이어 데이터", Description = "골드처럼 숫자로 된 플레이어 데이터에 더합니다(음수면 뺍니다).", Sentence = "{key} += {amount}")]
+    public sealed class AddToStateReward : Reward
+    {
+        [StateKeyRef, FieldLabel("플레이어 데이터")] public string key;
+        [FieldLabel("수량")] public double amount = 1;
+
+        public override RewardEffect Effect => RewardEffect.Reversible;
+
+        public override void Grant(GameSession session)
+        {
+            var type = session.State.TypeOf(key) ?? typeof(double);
+            var current = session.State.Get(key);
+            var sum = (current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture)) + amount;
+            var whole = type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte);
+            session.State.Set(key, Convert.ChangeType(whole ? Math.Round(sum) : sum, type, CultureInfo.InvariantCulture));
+        }
+
+        public override string Describe(INameResolver names) =>
+            $"{key} {(amount >= 0 ? "+=" : "-=")} {Math.Abs(amount).ToString("0.##", CultureInfo.InvariantCulture)}";
+
+        public override string Natural(INameResolver names) =>
+            amount >= 0
+                ? $"{key} {amount.ToString("0.##", CultureInfo.InvariantCulture)} 지급"
+                : $"{key} {(-amount).ToString("0.##", CultureInfo.InvariantCulture)} 차감";
+
+        public override void Validate(IValidationContext context)
+        {
+            if (string.IsNullOrEmpty(key)) context.Error("값을 더할 플레이어 데이터가 선택되지 않았습니다.");
+        }
+    }
 }

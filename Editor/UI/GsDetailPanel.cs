@@ -65,8 +65,8 @@ namespace GameSystems.EditorTools.UI
         Label _status;
         GsButton _revert;
         GsButton _save;
-        readonly Dictionary<string, (VisualElement section, VisualElement change, Action<FieldChange> update)> _sections =
-            new Dictionary<string, (VisualElement, VisualElement, Action<FieldChange>)>();
+        // 필드 경로 → 그 필드의 칸(바뀐 칸 표시·찾아가기).
+        readonly Dictionary<string, VisualElement> _sections = new Dictionary<string, VisualElement>();
 
         public UnityEngine.Object Target => _target;
         internal SerializedObject Draft => _draftObject;
@@ -242,7 +242,7 @@ namespace GameSystems.EditorTools.UI
                 var title = new GsInlineProperty(titleProperty);
                 title.Q<Label>().AddToClassList("gs-display");
                 title.Changed += OnValueChanged;
-                _titleSlot.Add(ValueWithHistory(titleProperty.propertyPath, title, _titleSlot, "gs-display"));
+                _titleSlot.Add(Track(titleProperty.propertyPath, title, _titleSlot));
             }
             else if (!string.IsNullOrEmpty(_options.Title))
             {
@@ -279,7 +279,7 @@ namespace GameSystems.EditorTools.UI
             if (content is GsInlineProperty inline)
             {
                 // 값 하나: 입력 칸 모양(상자 안 위쪽 이름표, 아래 값). 바뀐 뒤 값만 보인다.
-                var box = GsField.For(label, inline, ValueWithHistory(path, inline, section, null));
+                var box = GsField.For(label, inline, Track(path, inline, section));
                 box.tooltip = GsPropertyEditor.HintOf(field);
                 section.Add(box);
             }
@@ -292,11 +292,8 @@ namespace GameSystems.EditorTools.UI
                 if (!string.IsNullOrEmpty(caption)) head.Add(Gs.Label(caption, "gs-detail__type"));
                 head.tooltip = GsPropertyEditor.HintOf(field);
                 section.Add(head);
-                var change = new GsChangeView(null, "", "");
-                change.style.marginBottom = 10;
-                section.Add(change);
                 section.Add(content);
-                _sections[path] = (section, change, c => change.Set(c.Old, c.New));
+                _sections[path] = section;
             }
             return section;
         }
@@ -420,34 +417,18 @@ namespace GameSystems.EditorTools.UI
         internal void FocusField(string path)
         {
             if (path == null || !_sections.TryGetValue(path, out var focus)) return;
-            var target = focus.section;
+            var target = focus;
             target.AddToClassList("gs-detail__section--changed");
             if (_body.contentContainer.Contains(target)) _body.ScrollTo(target);
             schedule.Execute(() => RefreshState()).StartingIn(1600);
         }
 
-        // 단순 값: 바뀌지 않았으면 값 칸만. 바뀌면 원래 자리에 같은 크기·같은 글자 위치의 [이전] 칸이 남고,
-        // 그 아래 V 화살표와 현재 값(편집 칸)이 붙는다 → 원래 글자는 움직이지 않는다.
-        VisualElement ValueWithHistory(string path, GsInlineProperty inline, VisualElement owner, string labelClass)
+        // 단순 값 칸을 기록한다(바뀐 칸 표시·찾아가기). 화면에는 바뀐 뒤 값만 보인다.
+        VisualElement Track(string path, GsInlineProperty inline, VisualElement owner)
         {
             inline.Multiline = true;
-            var column = Gs.Col("gs-detail__value");
-            var oldBox = Gs.Box("gs-change__box", "gs-change__old");
-            var oldLabel = labelClass == null ? Gs.Label("") : Gs.Label("", labelClass);
-            oldBox.Add(oldLabel);
-            var chevron = Gs.Box("gs-change__chevron");
-            chevron.style.display = DisplayStyle.None;
-            column.Add(oldBox);
-            column.Add(chevron);
-            column.Add(inline);
-            _sections[path] = (owner, oldBox, _ =>
-            {
-                // 이전 값은 원본을 값 칸과 같은 규칙으로 표시한다(ID는 이름으로 등).
-                var original = _originalObject.FindProperty(path);
-                Gs.SetText(oldLabel, original != null ? GsInlineProperty.Describe(original).text : "없음");
-                chevron.style.display = oldBox.style.display;
-            });
-            return column;
+            _sections[path] = owner;
+            return inline;
         }
 
         // 편집 중인 사본(도감이 ID를 바꿀 때 사본의 ID도 맞춘다).
@@ -590,7 +571,8 @@ namespace GameSystems.EditorTools.UI
             if (_draft == null) return;
             if (_target == null)
             {
-                CloseNow();
+                // 모달은 닫는다. 창에 붙은 패널은 창이 같은 ID로 다시 연다(상세 창의 Rebind).
+                if (_modal != null) CloseNow();
                 return;
             }
             _changes = DraftDiff.Compute(_originalObject, _draftObject);
@@ -599,11 +581,8 @@ namespace GameSystems.EditorTools.UI
             foreach (var pair in _sections)
             {
                 var isChanged = changed.Contains(pair.Key);
-                pair.Value.section.EnableInClassList("gs-detail__section--changed", isChanged);
-                // 이전 값은 보이지 않는다(바뀐 뒤 값만). 바뀐 칸은 이름표 색으로만 알린다.
-                pair.Value.change.style.display = DisplayStyle.None;
-                if (isChanged) pair.Value.update(_changes.First(c => c.Path == pair.Key));
-                else pair.Value.update(new FieldChange());
+                // 바뀐 칸은 이름표 색으로만 알린다(이전 값은 보이지 않는다).
+                pair.Value.EnableInClassList("gs-detail__section--changed", isChanged);
             }
 
             var count = _changes.Count;

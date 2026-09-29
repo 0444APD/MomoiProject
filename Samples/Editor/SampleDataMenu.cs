@@ -64,15 +64,21 @@ namespace GameSystems.Samples
             var killsRun = Stat("killsRun", StatScope.Run, StatAggregate.Sum, Rule<EnemyKilled>(nameof(EnemyKilled.Count)));
             var killsTotal = Stat("killsTotal", StatScope.Total, StatAggregate.Sum, Rule<EnemyKilled>(nameof(EnemyKilled.Count)));
             var bestCombo = Stat("bestCombo", StatScope.Total, StatAggregate.Max, Rule<EnemyKilled>(nameof(EnemyKilled.Combo)));
-            var gold = Stat("gold", StatScope.Total, StatAggregate.Sum, Rule<GoldEarned>(nameof(GoldEarned.Amount)));
+            // 번 골드 총합은 로그(이벤트로 자동 누적), 지갑 골드는 플레이어 데이터(보상으로 지급·사용으로 차감).
+            var goldEarned = Stat("goldEarned", StatScope.Total, StatAggregate.Sum, Rule<GoldEarned>(nameof(GoldEarned.Amount)));
+            var gold = (StateKeyData)db.Create(typeof(StateKeyData), "player.gold");
+            gold.zone = StateZone.Meta;
+            gold.valueType = typeof(int).FullName;
+            gold.defaultValue = "0";
+            EditorUtility.SetDirty(gold);
 
             Achievement("firstHunt", "처음으로 적을 처치했다.",
                 new StatCompareCondition { stat = killsTotal.Id, op = CompareOp.AtLeast, value = 1 },
-                new AddToStatReward { stat = gold.Id, amount = 50 });
+                new AddToStateReward { key = gold.Id, amount = 50 });
 
             var hunter = Achievement("monsterHunter", "적을 25마리 처치했다.",
                 new StatCompareCondition { stat = killsTotal.Id, op = CompareOp.AtLeast, value = 25 },
-                new AddToStatReward { stat = gold.Id, amount = 500 });
+                new AddToStateReward { key = gold.Id, amount = 500 });
 
             var comboMaster = Achievement("comboMaster", "한 번에 8연속 처치했다.",
                 new StatCompareCondition { stat = bestCombo.Id, op = CompareOp.AtLeast, value = 8 });
@@ -86,10 +92,10 @@ namespace GameSystems.Samples
                         new AchievementUnlockedCondition { achievement = comboMaster.Id },
                     },
                 },
-                new AddToStatReward { stat = gold.Id, amount = 2000 });
+                new AddToStateReward { key = gold.Id, amount = 2000 });
 
-            Achievement("rich", "골드를 1000 모았다.",
-                new StatCompareCondition { stat = gold.Id, op = CompareOp.AtLeast, value = 1000 });
+            Achievement("rich", "골드를 총 1000 벌었다.",
+                new StatCompareCondition { stat = goldEarned.Id, op = CompareOp.AtLeast, value = 1000 });
 
             // 이번 판 수치는 되감기 대상임을 보여주는 용도(Undo하면 되돌아간다).
             _ = killsRun;
@@ -137,14 +143,17 @@ namespace GameSystems.Samples
             Template("template.trainingSword", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = "common", tags = { "melee" } });
             Template("template.dragonArmor", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = "legendary", element = SampleElement.Fire, tags = { "pierce" } });
 
-            var gold = db.OfType<StatData>().FirstOrDefault(s => s.Id == "gold");
+            var gold = db.OfType<StateKeyData>().FirstOrDefault(s => s.Id == "player.gold");
             var bossRule = Rule<EnemyKilled>("");
             bossRule.filter = new FieldFilter { path = nameof(EnemyKilled.Tags), op = FieldOp.Contains, value = "boss" };
             var bossKills = Stat("bossKills", StatScope.Total, StatAggregate.Sum, bossRule);
 
             Achievement("dragonSlayer", "보스를 처치했다.",
                 new StatCompareCondition { stat = bossKills.Id, op = CompareOp.AtLeast, value = 1 },
-                gold != null ? new[] { new AddToStatReward { stat = gold.Id, amount = 100 } } : new Reward[0]);
+                // 보상: 골드 지급 + 아이템(용의 비늘 갑옷 템플릿 사본)을 인벤토리 items에 지급.
+                gold != null
+                    ? new Reward[] { new AddToStateReward { key = gold.Id, amount = 100 }, new GrantItemReward { key = inventory.Id, path = "items", template = "template.dragonArmor" } }
+                    : new Reward[] { new GrantItemReward { key = inventory.Id, path = "items", template = "template.dragonArmor" } });
             Achievement("legendCollector", "전설 등급 장비를 얻었다.",
                 new StateFieldCondition
                 {
