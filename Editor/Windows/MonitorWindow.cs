@@ -627,13 +627,28 @@ namespace GameSystems.EditorTools
                 var tag = Gs.Label(node.Tag ?? "", "gs-caption");
                 tag.style.width = 130;
                 row.Add(tag);
-                row.Add(node.StateKey != null ? StateValue(node) : Gs.Label(node.Value ?? "", "gs-grow"));
+                row.Add(node.StateKey != null ? StateValue(node) : node.DataKey != null ? DataValue(node) : Gs.Label(node.Value ?? "", "gs-grow"));
                 if (!string.IsNullOrEmpty(node.Note)) row.Add(Gs.Label(node.Note, "gs-caption", "gs-nowrap"));
                 body.Add(row);
             }
             return panel;
         }
 
+        // 클래스·컬렉션 값: 요약을 누르면 폴더형 탐색기로 열어 보고 고친다(고치면 Modify로 기록되어 Undo 가능).
+        VisualElement DataValue(InspectNode node)
+        {
+            var box = Gs.Box("gs-inline", "gs-inline--editable", "gs-grow");
+            box.Add(Gs.Label((node.Value ?? "") + "  ›", "gs-inline__value"));
+            box.tooltip = "클릭해서 열기";
+            var key = node.DataKey;
+            box.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (_session == null || !_session.State.IsDefined(key)) return;
+                GsDataExplorer.BrowseModal(_root, node.Label, _session.State.Get(key),
+                    change => _session.State.Modify<object>(key, _ => change()));
+            });
+            return box;
+        }
         // 모니터에서 상태 값을 직접 바꾼다(디버그 조작, 트랜잭션 밖에서 바로 적용되며 기록에 남는다).
         VisualElement StateValue(InspectNode node)
         {

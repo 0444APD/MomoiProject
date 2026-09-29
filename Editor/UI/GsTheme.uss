@@ -602,3 +602,29 @@
     margin-top: 12px;
     margin-bottom: 18px;
 }
+/* ── 폴더형 탐색기 ─────────────────────────────────────── */
+.gs-explorer { flex-grow: 1; min-height: 240px; }
+.gs-explorer-dialog { width: 640px; max-width: 90%; }
+.gs-explorer-dialog .gs-explorer__list { max-height: 420px; }
+.gs-explorer__toolbar { align-items: center; margin-bottom: 8px; }
+.gs-explorer__crumbs { flex-wrap: wrap; align-items: center; margin-left: 6px; }
+.gs-explorer__crumb { color: var(--gs-text-2); padding: 2px 6px; border-radius: 6px; }
+.gs-explorer__crumb:hover { background-color: var(--gs-hover); color: var(--gs-text); }
+.gs-explorer__crumb--current { color: var(--gs-text); -unity-font-style: bold; }
+.gs-explorer__sep { color: var(--gs-text-3); margin: 0 2px; }
+.gs-explorer__list { border-top-width: 1px; border-color: var(--gs-border); padding-top: 4px; }
+.gs-explorer__row { flex-direction: row; align-items: center; height: 34px; padding: 0 10px; border-radius: 8px; }
+.gs-explorer__row:hover { background-color: var(--gs-hover); }
+.gs-explorer__folder { width: 14px; height: 11px; border-radius: 3px; border-top-left-radius: 1px; margin-right: 12px; flex-shrink: 0; }
+.gs-explorer__file { width: 10px; height: 12px; border-radius: 2px; margin-right: 14px; margin-left: 2px; flex-shrink: 0; }
+.gs-explorer__name { width: 180px; flex-shrink: 0; overflow: hidden; }
+.gs-explorer__type { width: 150px; flex-shrink: 0; overflow: hidden; }
+.gs-explorer__value { color: var(--gs-text-2); margin-left: 8px; }
+.gs-explorer__chevron { color: var(--gs-text-3); margin-left: 8px; }
+.gs-explorer__pick { opacity: 0; margin-left: 8px; }
+.gs-explorer__row:hover .gs-explorer__pick { opacity: 1; }
+.gs-explorer__empty { padding: 16px 10px; }
+/* ── 조건 묶음 접기 ── */
+.gs-block__chevron { width: 14px; color: var(--gs-text-2); font-size: 11px; }
+.gs-block-group > .gs-block__header:hover .gs-block__chevron { color: var(--gs-accent); }
+.gs-block__summary { margin-left: 12px; flex-shrink: 1; overflow: hidden; }

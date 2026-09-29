@@ -669,6 +669,7 @@ namespace GameSystems
                 // 데이터 값은 글자 한 칸으로 고칠 수 없으므로 편집 키를 넘기지 않는다.
                 var node = group.Add(slot.Label, Format(slot.Value), slot.DataType == null ? pair.Key : null);
                 node.Tag = ZoneName(slot.Zone);
+                if (slot.DataType != null) node.DataKey = pair.Key;
                 node.Note = TypeText(slot);
             }
             foreach (var group in groups.Values) root.Children.Add(group);

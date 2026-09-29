@@ -71,6 +71,7 @@ namespace GameSystems.EditorTools.UI
         EventFieldRefAttribute EventFieldRef => _field?.GetCustomAttribute<EventFieldRefAttribute>();
         Type DataRefType => _field?.GetCustomAttribute<DataRefAttribute>()?.DataType;
         bool IsDataTypeRef => _field != null && _field.IsDefined(typeof(DataTypeRefAttribute), false);
+        bool Has<T>() where T : Attribute => _field != null && _field.IsDefined(typeof(T), false);
 
         public void Refresh()
         {
@@ -89,6 +90,35 @@ namespace GameSystems.EditorTools.UI
         {
             if (field == null) field = PropertyUtil.GetField(property, out _);
             var db = EditorDatabase.Instance;
+            if (field != null && field.IsDefined(typeof(FieldOpRefAttribute), false) && property.propertyType == SerializedPropertyType.Enum)
+                return (FieldOps.Word((FieldOp)property.intValue), false, false);
+            if (field != null && field.IsDefined(typeof(FieldPathAttribute), false) && property.propertyType == SerializedPropertyType.String)
+            {
+                if (string.IsNullOrEmpty(property.stringValue)) return ("필드 선택", true, false);
+                var root = FieldPathContext.RootType(property, out _);
+                var broken = root != null && FieldPaths.TypeAt(root, property.stringValue, out _) == null;
+                return (FieldPathContext.DescribePath(property), false, broken);
+            }
+            var valueRef = field?.GetCustomAttribute<FieldValueRefAttribute>();
+            if (valueRef != null && property.propertyType == SerializedPropertyType.String)
+            {
+                var op = property.serializedObject.FindProperty(FieldPathContext.Sibling(property.propertyPath, valueRef.OpField));
+                if (op != null && !FieldOps.NeedsValue((FieldOp)op.intValue)) return ("—", true, false);
+                if (string.IsNullOrEmpty(property.stringValue)) return ("값 입력", true, false);
+                var leafRef = LeafDataRef(property, valueRef);
+                if (leafRef != null)
+                {
+                    var target = db.FindById(property.stringValue);
+                    return target != null ? (target.DisplayName, false, false) : ($"없는 항목: {property.stringValue}", false, true);
+                }
+                return (property.stringValue, false, false);
+            }
+            if (field != null && field.IsDefined(typeof(StateKeyRefAttribute), false) && property.propertyType == SerializedPropertyType.String)
+            {
+                if (string.IsNullOrEmpty(property.stringValue)) return ("상태 선택", true, false);
+                var key = db.FindById(property.stringValue) as StateKeyData;
+                return key != null ? (key.DisplayName, false, false) : ($"없는 상태 키: {property.stringValue}", false, true);
+            }
             if (property.propertyType == SerializedPropertyType.String)
             {
                 var id = property.stringValue;
@@ -158,9 +188,21 @@ namespace GameSystems.EditorTools.UI
                     _property.boolValue = !_property.boolValue;
                     Apply();
                     return;
+                case SerializedPropertyType.Enum when Has<FieldOpRefAttribute>():
+                    ShowFieldOpMenu();
+                    return;
                 case SerializedPropertyType.Enum:
                     ShowEnumMenu();
                     return;
+                case SerializedPropertyType.String when Has<FieldPathAttribute>():
+                    PickFieldPath();
+                    return;
+                case SerializedPropertyType.String when Has<StateKeyRefAttribute>():
+                    ShowIdMenu(EditorDatabase.Instance.OfType<StateKeyData>().Cast<GameData>(), "상태 키");
+                    return;
+                case SerializedPropertyType.String when Has<FieldValueRefAttribute>():
+                    if (EditFieldValue()) return;
+                    break;
                 case SerializedPropertyType.String when IsStatRef:
                     ShowIdMenu(EditorDatabase.Instance.OfType<StatData>().Cast<GameData>(), "수치");
                     return;
@@ -247,6 +289,91 @@ namespace GameSystems.EditorTools.UI
             }
             GsDropdown.Show(this, items);
         }
+        // ── 필드 검사(경로·비교·값) ───────────────────────────
+
+        void PickFieldPath()
+        {
+            var root = FieldPathContext.RootType(_property, out var rootLabel);
+            var host = GetFirstAncestorOfType<GsModal>()?.parent ?? panel?.visualTree.Q(className: "gs-root") ?? this;
+            if (root == null)
+            {
+                GsDropdown.Show(this, new List<GsDropdownItem> { new GsDropdownItem("이벤트나 상태 키를 먼저 고르세요") { Disabled = true } });
+                return;
+            }
+            GsDataExplorer.Pick(host, root, rootLabel ?? DataModel.FriendlyName(root), _property.stringValue, picked =>
+            {
+                _property.serializedObject.Update();
+                _property.stringValue = picked;
+                // 새 필드 형식에 맞지 않는 비교는 맞는 첫 비교로 바꾸고 값을 비운다.
+                var leaf = FieldPaths.TypeAt(root, picked, out _);
+                foreach (var sibling in new[] { "op" })
+                {
+                    var op = PathSibling(sibling);
+                    if (op == null || op.propertyType != SerializedPropertyType.Enum || leaf == null) continue;
+                    var allowed = FieldOps.For(leaf);
+                    if (allowed.Count == 0 || allowed.Contains((FieldOp)op.intValue)) continue;
+                    op.intValue = (int)allowed[0];
+                    var value = PathSibling("value");
+                    if (value != null && value.propertyType == SerializedPropertyType.String) value.stringValue = "";
+                }
+                Apply();
+            });
+        }
+
+        SerializedProperty PathSibling(string name) => _property.serializedObject.FindProperty(FieldPathContext.Sibling(_property.propertyPath, name));
+
+        void ShowFieldOpMenu()
+        {
+            var attr = _field.GetCustomAttribute<FieldOpRefAttribute>();
+            var path = PathSibling(attr.PathField);
+            var type = path == null ? null : FieldPathContext.LeafType(path, out _);
+            var ops = type == null ? (IReadOnlyList<FieldOp>)Enum.GetValues(typeof(FieldOp)).Cast<FieldOp>().ToList() : FieldOps.For(type);
+            var items = ops.Select(op => new GsDropdownItem(FieldOps.Word(op), () =>
+            {
+                _property.serializedObject.Update();
+                _property.intValue = (int)op;
+                Apply();
+            }) { Selected = _property.intValue == (int)op }).ToList();
+            if (type == null) items.Insert(0, new GsDropdownItem("필드를 먼저 고르면 맞는 비교만 보입니다") { Disabled = true });
+            GsDropdown.Show(this, items);
+        }
+
+        // 값 칸: enum·ID 참조면 목록, 필요 없는 비교면 무시, 나머지는 글자 입력(false 반환).
+        bool EditFieldValue()
+        {
+            var attr = _field.GetCustomAttribute<FieldValueRefAttribute>();
+            var op = PathSibling(attr.OpField);
+            var fieldOp = op == null ? FieldOp.Equal : (FieldOp)op.intValue;
+            if (!FieldOps.NeedsValue(fieldOp)) return true;
+            if (FieldOps.IsCount(fieldOp)) return false;
+            var path = PathSibling(attr.PathField);
+            var type = path == null ? null : FieldPathContext.LeafType(path, out _);
+            if (type != null && (fieldOp == FieldOp.Contains || fieldOp == FieldOp.NotContains)) type = FieldPaths.ElementTypeOf(type) ?? type;
+            type = type == null ? null : Nullable.GetUnderlyingType(type) ?? type;
+            var dataRef = LeafDataRef(_property, attr);
+            if (dataRef != null)
+            {
+                ShowIdMenu(EditorDatabase.Instance.OfType(dataRef), DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name);
+                return true;
+            }
+            if (type != null && type.IsEnum)
+            {
+                var items = Enum.GetNames(type).Select(name => new GsDropdownItem(name, () => SetString(name)) { Selected = _property.stringValue == name }).ToList();
+                GsDropdown.Show(this, items);
+                return true;
+            }
+            return false;
+        }
+
+        // 경로 끝 필드에 [DataRef]가 붙어 있으면 그 데이터 타입(예: 태그 목록 → 태그).
+        static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr)
+        {
+            var path = valueProperty.serializedObject.FindProperty(FieldPathContext.Sibling(valueProperty.propertyPath, attr.PathField));
+            if (path == null) return null;
+            FieldPathContext.LeafType(path, out var member);
+            return member?.GetCustomAttribute<DataRefAttribute>()?.DataType;
+        }
+
         void ShowStorableTypeMenu()
         {
             var items = StorableTypes.All().Select(type =>

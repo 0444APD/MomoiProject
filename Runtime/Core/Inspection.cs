@@ -17,6 +17,8 @@ namespace GameSystems
         public string Value;
         // 상태 저장소 키. 있으면 모니터에서 값을 직접 바꿀 수 있다.
         public string StateKey;
+        // 클래스·컬렉션 값의 상태 키(모니터가 탐색기로 연다).
+        public string DataKey;
         // 작고 옅게 붙는 보조 정보(구역, 분류 등).
         public string Tag;
         public string Note;

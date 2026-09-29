@@ -104,6 +104,7 @@ namespace GameSystems.EditorTools.UI
             {
                 var index = i;
                 var element = list.GetArrayElementAtIndex(i);
+                var count = list.arraySize;
                 container.Add(new BlockEditor(element, elementType, onValue, onStructure, () =>
                 {
                     list.serializedObject.Update();
@@ -112,6 +113,29 @@ namespace GameSystems.EditorTools.UI
                     var size = list.arraySize;
                     list.DeleteArrayElementAtIndex(index);
                     if (list.arraySize == size) list.DeleteArrayElementAtIndex(index);
+                    list.serializedObject.ApplyModifiedProperties();
+                    onStructure?.Invoke();
+                },
+                onMove: delta =>
+                {
+                    var target = index + delta;
+                    if (target < 0 || target >= count) return;
+                    list.serializedObject.Update();
+                    list.MoveArrayElement(index, target);
+                    list.serializedObject.ApplyModifiedProperties();
+                    onStructure?.Invoke();
+                },
+                canMoveUp: index > 0,
+                canMoveDown: index < count - 1,
+                onDuplicate: () =>
+                {
+                    list.serializedObject.Update();
+                    var source = list.GetArrayElementAtIndex(index).managedReferenceValue;
+                    if (source == null) return;
+                    // 같은 객체를 두 번 가리키지 않게 깊은 복사본을 넣는다(하위 조건까지).
+                    var copy = DataModel.Clone(source, null);
+                    list.InsertArrayElementAtIndex(index + 1);
+                    list.GetArrayElementAtIndex(index + 1).managedReferenceValue = copy;
                     list.serializedObject.ApplyModifiedProperties();
                     onStructure?.Invoke();
                 }));
@@ -143,7 +167,22 @@ namespace GameSystems.EditorTools.UI
                 var card = Gs.Box("gs-block");
                 var header = Gs.Box("gs-block__header");
 
-                if (element.propertyType == SerializedPropertyType.Generic && element.hasVisibleChildren)
+                var sentence = elementType != null ? BlockTypes.Sentence(elementType) : null;
+                if (element.propertyType == SerializedPropertyType.Generic && !string.IsNullOrEmpty(sentence) && sentence.Contains("{"))
+                {
+                    // 문장형 항목(필드 검사 등): 겉패널 없이 한 줄.
+                    card.RemoveFromClassList("gs-block");
+                    card.AddToClassList("gs-block-line");
+                    var line = Gs.Box("gs-block-line__row");
+                    var words = Sentence(element, sentence, new HashSet<string>(), onValue);
+                    words.AddToClassList("gs-grow");
+                    line.Add(words);
+                    var remove = RemoveButton(() => Remove(list, index, onStructure));
+                    remove.AddToClassList("gs-block__action");
+                    line.Add(remove);
+                    card.Add(line);
+                }
+                else if (element.propertyType == SerializedPropertyType.Generic && element.hasVisibleChildren)
                 {
                     var preview = Gs.Label(Preview(element), "gs-text-2", "gs-grow");
                     header.Add(preview);
@@ -225,6 +264,7 @@ namespace GameSystems.EditorTools.UI
         public static VisualElement Sentence(SerializedProperty block, string template, HashSet<string> used, Action onValue)
         {
             var row = Gs.Box("gs-sentence");
+            var tokens = new List<GsInlineProperty>();
             int index = 0;
             while (index < template.Length)
             {
@@ -246,7 +286,13 @@ namespace GameSystems.EditorTools.UI
                     token.AddToClassList("gs-token");
                     // 첫 단어는 문장의 주어: 뒤 내용과 간격을 더 둔다.
                     if (used.Count == 1) token.AddToClassList("gs-token--subject");
-                    token.Changed += () => onValue?.Invoke();
+                    // 한 단어가 바뀌면 같은 문장의 다른 단어도 다시 그린다(필드를 바꾸면 비교·값 표시가 달라지므로).
+                    token.Changed += () =>
+                    {
+                        foreach (var other in tokens) if (other != token) other.Refresh();
+                        onValue?.Invoke();
+                    };
+                    tokens.Add(token);
                     var field = PropertyUtil.GetField(child, out _);
                     token.tooltip = LabelOf(child, field);
                     row.Add(token);
@@ -288,7 +334,11 @@ namespace GameSystems.EditorTools.UI
     // 조건·보상 블록 하나. 비어 있으면 "선택" 버튼, 차 있으면 카드 + 내부 필드.
     public sealed class BlockEditor : VisualElement
     {
-        public BlockEditor(SerializedProperty property, Type baseType, Action onValue, Action onStructure, Action onRemove)
+        // 접힌 묶음 블록(에셋·경로별). 창을 다시 그려도 유지된다.
+        static readonly HashSet<string> Collapsed = new HashSet<string>();
+
+        public BlockEditor(SerializedProperty property, Type baseType, Action onValue, Action onStructure, Action onRemove,
+                           Action<int> onMove = null, bool canMoveUp = false, bool canMoveDown = false, Action onDuplicate = null)
         {
             var value = property.managedReferenceValue;
             if (value == null)
@@ -334,6 +384,14 @@ namespace GameSystems.EditorTools.UI
             remove.AddToClassList("gs-block__action");
             remove.tooltip = "삭제";
 
+            // 줄 도구(마우스를 올리면 보임): 위로·아래로·복제·바꾸기·삭제
+            var tools = new List<VisualElement>();
+            if (onMove != null && canMoveUp) tools.Add(Action("↑", "위로", () => onMove(-1)));
+            if (onMove != null && canMoveDown) tools.Add(Action("↓", "아래로", () => onMove(1)));
+            if (onDuplicate != null) tools.Add(Action("복제", "바로 아래에 복사", onDuplicate));
+            tools.Add(swap);
+            tools.Add(remove);
+
             var used = new HashSet<string>();
             var sentence = BlockTypes.Sentence(type);
             if (!string.IsNullOrEmpty(sentence) && sentence.Contains("{"))
@@ -344,19 +402,37 @@ namespace GameSystems.EditorTools.UI
                 var words = GsPropertyEditor.Sentence(property, sentence, used, onValue);
                 words.AddToClassList("gs-grow");
                 line.Add(words);
-                line.Add(swap);
-                line.Add(remove);
+                foreach (var tool in tools) line.Add(tool);
                 Add(line);
             }
             else
             {
-                // 묶음 블록(모두 만족 등): 이름 한 줄 + 들여쓴 하위 문장들.
+                // 묶음 블록(모두 만족 등): 이름 한 줄 + 들여쓴 하위 문장들. 머리줄을 누르면 접고 펼친다.
                 AddToClassList("gs-block-group");
+                var key = property.serializedObject.targetObject.GetHashCode() + ":" + property.propertyPath;
+                var collapsed = Collapsed.Contains(key);
                 var header = Gs.Box("gs-block__header");
-                header.Add(Gs.Label(BlockTypes.DisplayName(type), "gs-caption"));
+                var chevron = Gs.Label(collapsed ? "▸" : "▾", "gs-block__chevron");
+                header.Add(chevron);
+                var children = (value as Condition)?.Children.Count() ?? 0;
+                header.Add(Gs.Label(BlockTypes.DisplayName(type) + (children > 0 ? $"  ·  {children}개" : ""), "gs-caption"));
+                var summary = Gs.Label(collapsed ? Summary(value) : "", "gs-caption", "gs-nowrap", "gs-block__summary");
+                summary.style.display = collapsed ? DisplayStyle.Flex : DisplayStyle.None;
+                header.Add(summary);
                 header.Add(Gs.Spacer());
-                header.Add(swap);
-                header.Add(remove);
+                foreach (var tool in tools) header.Add(tool);
+                header.RegisterCallback<ClickEvent>(e =>
+                {
+                    if (e.target is VisualElement target && (target is GsButton || target.GetFirstAncestorOfType<GsButton>() != null)) return;
+                    var now = !Collapsed.Contains(key);
+                    if (now) Collapsed.Add(key);
+                    else Collapsed.Remove(key);
+                    chevron.text = now ? "▸" : "▾";
+                    summary.text = now ? Summary(property.managedReferenceValue) : "";
+                    summary.style.display = now ? DisplayStyle.Flex : DisplayStyle.None;
+                    foreach (var child in Children().Where(c => c.ClassListContains("gs-block__children"))) child.style.display = now ? DisplayStyle.None : DisplayStyle.Flex;
+                });
+                header.tooltip = "클릭해서 접기·펼치기";
                 Add(header);
             }
 
@@ -368,6 +444,8 @@ namespace GameSystems.EditorTools.UI
                 {
                     var nested = Gs.Box("gs-block__children");
                     nested.Add(GsPropertyEditor.BuildContent(child, onValue, onStructure));
+                    if (ClassListContains("gs-block-group") && Collapsed.Contains(property.serializedObject.targetObject.GetHashCode() + ":" + property.propertyPath))
+                        nested.style.display = DisplayStyle.None;
                     Add(nested);
                 }
                 else
@@ -375,5 +453,16 @@ namespace GameSystems.EditorTools.UI
                     Add(GsPropertyEditor.BuildProperty(child, onValue, onStructure));
                 }
             }
-        }    }
+        }
+
+        static GsButton Action(string text, string tip, Action onClick)
+        {
+            var button = new GsButton(text, onClick, GsButtonKind.Ghost);
+            button.AddToClassList("gs-block__action");
+            button.tooltip = tip;
+            return button;
+        }
+
+        static string Summary(object value) => value is Condition condition ? condition.Describe(EditorDatabase.Instance) : "";
+    }
 }

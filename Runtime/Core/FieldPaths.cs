@@ -311,6 +311,7 @@ namespace GameSystems
 
     // 필드 검사 한 줄(경로 + 비교 + 값). 수치 규칙의 걸러내기 등에 쓴다.
     [Serializable]
+    [BlockInfo("필드 검사", Sentence = "{path} {value} {op}")]
     public sealed class FieldCheck
     {
         [FieldPath, FieldLabel("필드")] public string path = "";
