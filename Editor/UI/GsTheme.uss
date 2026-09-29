@@ -628,3 +628,32 @@
 .gs-block__chevron { width: 14px; color: var(--gs-text-2); font-size: 11px; }
 .gs-block-group > .gs-block__header:hover .gs-block__chevron { color: var(--gs-accent); }
 .gs-block__summary { margin-left: 12px; flex-shrink: 1; overflow: hidden; }
+
+/* ── 데이터 보기(그리드 + 블록) ─────────────────────────── */
+.gs-view { flex-shrink: 0; }
+.gs-view__tools { flex-direction: row; margin-bottom: 4px; }
+.gs-view__tools .gs-button { opacity: 0.55; }
+.gs-view__tools .gs-button:hover { opacity: 1; }
+.gs-view__row { flex-direction: row; align-items: flex-start; margin-bottom: 12px; }
+.gs-view__cell { padding-right: 16px; flex-shrink: 0; }
+.gs-view__image-grid { flex-direction: row; flex-wrap: wrap; }
+.gs-view__image-tile { padding: 0 10px 12px 0; }
+.gs-view__image { height: 104px; border-radius: 12px; border-width: 1px; border-color: var(--gs-border); background-color: var(--gs-surface-2); -unity-background-scale-mode: scale-to-fit; justify-content: center; align-items: center; }
+.gs-view__image--large { height: 220px; }
+.gs-view__image:hover { border-color: var(--gs-accent); }
+.gs-view__image-empty { color: var(--gs-text-3); }
+.gs-view__image-label { margin-top: 6px; }
+.gs-view__data { }
+.gs-view__card { background-color: var(--gs-surface-2); border-width: 1px; border-color: var(--gs-border); border-radius: 12px; padding: 12px 14px; }
+.gs-view__card-title { -unity-font-style: bold; margin-bottom: 8px; }
+.gs-view__card-value { font-size: 16px; margin-top: 4px; }
+.gs-view__card-row { flex-direction: row; align-items: center; min-height: 26px; }
+.gs-view__card-key { width: 96px; flex-shrink: 0; }
+
+/* ── 배치 편집 ── */
+.gs-layout-editor { width: 1000px; max-width: 94%; height: 640px; max-height: 92%; }
+.gs-layout-editor__list { width: 380px; flex-shrink: 0; margin-right: 16px; }
+.gs-layout-editor__preview { flex-grow: 1; border-left-width: 1px; border-color: var(--gs-border); padding-left: 16px; }
+.gs-layout-editor__row { margin-bottom: 10px; }
+.gs-layout-editor__stepper { flex-direction: row; align-items: center; margin-right: 12px; margin-bottom: 6px; }
+.gs-layout-editor__number { min-width: 22px; -unity-text-align: middle-center; }

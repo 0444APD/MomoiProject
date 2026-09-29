@@ -210,32 +210,8 @@ namespace GameSystems.EditorTools.UI
             _notices = Gs.Col();
             _body.Add(_notices);
 
-            foreach (var property in PropertyUtil.TopLevel(_draftObject))
-            {
-                var path = property.propertyPath;
-                if (path == _options.TitlePath || _options.Hidden.Contains(path)) continue;
-
-                var field = PropertyUtil.GetField(property, out _);
-                var section = Gs.Box("gs-detail__section");
-                section.Add(Gs.Label(GsPropertyEditor.LabelOf(property, field).ToUpperInvariant(), "gs-detail__label"));
-                var content = GsPropertyEditor.BuildContent(property, OnValueChanged, OnStructureChanged);
-                var isLeaf = content is GsInlineProperty;
-
-                if (isLeaf)
-                {
-                    section.Add(ValueWithHistory(path, (GsInlineProperty)content, section, null));
-                }
-                else
-                {
-                    // 조건·목록: 위에 문장 단위 이전 / V / 현재, 아래 편집기
-                    var change = new GsChangeView(null, "", "");
-                    change.style.marginBottom = 10;
-                    section.Add(change);
-                    section.Add(content);
-                    _sections[path] = (section, change, c => change.Set(c.Old, c.New));
-                }
-                _body.Add(section);
-            }
+            // 본문은 타입별 배치(그리드 + 블록)로 그린다. 기본 배치: 스프라이트 나열 + 데이터 나열.
+            _body.Add(new GsDataView(new DetailContext(this)));
 
             RefreshState();
 
@@ -247,6 +223,78 @@ namespace GameSystems.EditorTools.UI
             }
         }
 
+        // 필드 한 칸(이름 + 값). 단순 값은 이전/현재 표시가 붙은 인라인 편집, 조건·목록은 문장 변경 표시 + 편집기.
+        VisualElement BuildSection(SerializedProperty property)
+        {
+            var path = property.propertyPath;
+            var field = PropertyUtil.GetField(property, out _);
+            var section = Gs.Box("gs-detail__section");
+            section.Add(Gs.Label(GsPropertyEditor.LabelOf(property, field).ToUpperInvariant(), "gs-detail__label"));
+            var content = GsPropertyEditor.BuildContent(property, OnValueChanged, OnStructureChanged);
+            if (content is GsInlineProperty inline)
+            {
+                section.Add(ValueWithHistory(path, inline, section, null));
+            }
+            else
+            {
+                var change = new GsChangeView(null, "", "");
+                change.style.marginBottom = 10;
+                section.Add(change);
+                section.Add(content);
+                _sections[path] = (section, change, c => change.Set(c.Old, c.New));
+            }
+            return section;
+        }
+
+        // 상세 패널의 데이터(편집 중 사본)를 배치 블록에 넘겨준다.
+        sealed class DetailContext : DataViewContext
+        {
+            readonly GsDetailPanel _panel;
+
+            public DetailContext(GsDetailPanel panel)
+            {
+                _panel = panel;
+            }
+
+            public override Type Type => _panel._draft.GetType();
+            public override bool CanEdit => true;
+
+            public override IEnumerable<string> Fields() =>
+                PropertyUtil.TopLevel(_panel._draftObject)
+                    .Select(p => p.propertyPath)
+                    .Where(p => p != _panel._options.TitlePath && !_panel._options.Hidden.Contains(p))
+                    .ToList();
+
+            public override VisualElement FieldRow(string path)
+            {
+                var property = _panel._draftObject.FindProperty(path);
+                return property == null ? new VisualElement() : _panel.BuildSection(property);
+            }
+
+            public override VisualElement FieldValue(string path)
+            {
+                var property = _panel._draftObject.FindProperty(path);
+                if (property == null) return Gs.Label($"없는 필드: {path}", "gs-caption");
+                var isLeaf = !(property.propertyType == SerializedPropertyType.ManagedReference ||
+                               (property.propertyType == SerializedPropertyType.Generic && (property.isArray || property.hasVisibleChildren)));
+                if (!isLeaf) return Gs.Label(PropertyUtil.Summary(property), "gs-nowrap");
+                var inline = new GsInlineProperty(property);
+                inline.Changed += _panel.OnValueChanged;
+                return inline;
+            }
+
+            public override UnityEngine.Object ObjectAt(string path) => _panel._draftObject.FindProperty(path)?.objectReferenceValue;
+
+            public override void SetObject(string path, UnityEngine.Object value)
+            {
+                _panel._draftObject.Update();
+                var property = _panel._draftObject.FindProperty(path);
+                if (property == null) return;
+                property.objectReferenceValue = value;
+                _panel._draftObject.ApplyModifiedPropertiesWithoutUndo();
+                _panel.OnStructureChanged();
+            }
+        }
         // 필드를 강조하고, 스크롤 영역 안에 있으면 그 위치로 스크롤한다.
         // 제목처럼 헤더에 있는 필드는 항상 보이므로 스크롤하지 않는다(ScrollView 밖 요소로 ScrollTo하면 예외).
         internal void FocusField(string path)

@@ -24,7 +24,7 @@ namespace GameSystems.EditorTools.UI
             public object Value;     // 둘러보기용
         }
 
-        sealed class Entry
+        internal sealed class Entry
         {
             public string Label;
             public string Caption;
@@ -176,6 +176,12 @@ namespace GameSystems.EditorTools.UI
                 _pickFolder.style.display = here.Path.Length > 0 && FieldPaths.ElementTypeOf(here.Type) != null ? DisplayStyle.Flex : DisplayStyle.None;
 
             _list.Clear();
+            // 둘러보기에서 클래스(컬렉션이 아닌 객체)는 타입별 배치로 그린다(상세 패널·더미 생성기와 같은 모양).
+            if (_browse && here.Value != null && !FieldPaths.IsCollectionValue(here.Value) && DataModel.Of(here.Value.GetType()).Kind == DataKind.Object)
+            {
+                _list.Add(new GsDataView(new ExplorerContext(this, here.Value)));
+                return;
+            }
             var entries = _browse ? BrowseEntries(here) : PickEntries(here);
             if (entries.Count == 0)
             {
@@ -265,7 +271,7 @@ namespace GameSystems.EditorTools.UI
             return list;
         }
 
-        Entry ValueEntry(string label, object value, Type declared, Action<object> set)
+        internal Entry ValueEntry(string label, object value, Type declared, Action<object> set)
         {
             var type = value?.GetType() ?? declared;
             var kind = type == null ? DataKind.Scalar : DataModel.Of(type).Kind;
@@ -283,9 +289,59 @@ namespace GameSystems.EditorTools.UI
             };
         }
 
+        // 탐색기 안의 실제 객체를 배치 블록에 넘겨준다. 폴더(클래스·컬렉션) 줄을 누르면 탐색기 안에서 들어간다.
+        sealed class ExplorerContext : DataViewContext
+        {
+            readonly GsDataExplorer _explorer;
+            readonly object _target;
+
+            public ExplorerContext(GsDataExplorer explorer, object target)
+            {
+                _explorer = explorer;
+                _target = target;
+            }
+
+            public override Type Type => _target.GetType();
+            public override bool CanEdit => _explorer._apply != null;
+            public override IEnumerable<string> Fields() => FieldPaths.MembersOf(Type).Select(m => m.Name);
+
+            FieldPaths.Member MemberOf(string name) => FieldPaths.MembersOf(Type).FirstOrDefault(m => m.Name == name);
+
+            public override VisualElement FieldRow(string path)
+            {
+                var member = MemberOf(path);
+                if (member == null) return new VisualElement();
+                var field = member.Info as FieldInfo;
+                var target = _target;
+                var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
+                Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
+                var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, set);
+                entry.Path = path;
+                return _explorer.Row(entry);
+            }
+
+            public override VisualElement FieldValue(string path)
+            {
+                var value = FieldPaths.Resolve(_target, path).FirstOrDefault();
+                return Gs.Label(value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object)
+                    ? DataModel.Summary(value)
+                    : StateStore.Format(value), "gs-nowrap");
+            }
+
+            public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(_target, path).FirstOrDefault() as UnityEngine.Object;
+
+            public override void SetObject(string path, UnityEngine.Object value)
+            {
+                var member = MemberOf(path);
+                if (!(member?.Info is FieldInfo field) || _explorer._apply == null) return;
+                _explorer._apply(() => field.SetValue(_target, value));
+                _explorer.Changed?.Invoke();
+                _explorer.Refresh();
+            }
+        }
         // ── 한 줄 ──────────────────────────────────────────────
 
-        VisualElement Row(Entry entry)
+        internal VisualElement Row(Entry entry)
         {
             var row = Gs.Box("gs-explorer__row");
             var icon = Gs.Box(entry.IsFolder ? "gs-explorer__folder" : "gs-explorer__file");
