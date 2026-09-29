@@ -157,7 +157,8 @@ namespace GameSystems.EditorTools.UI
                 var row = Gs.Col();
                 row.style.marginTop = 14;
                 row.Add(Gs.Label(field.Label, "gs-detail__label"));
-                var input = new TextField { value = values[key] };
+                var input = new TextField { value = values[key], multiline = field.Multiline };
+                if (field.Multiline) input.style.minHeight = 90;
                 input.AddToClassList("gs-inline");
                 input.style.marginTop = 6;
                 input.RegisterValueChangedCallback(e =>
@@ -195,6 +196,7 @@ namespace GameSystems.EditorTools.UI
             box.RegisterCallback<KeyDownEvent>(e =>
             {
                 if (e.keyCode != KeyCode.Return && e.keyCode != KeyCode.KeypadEnter) return;
+                if (e.target is VisualElement target && (target as TextField ?? target.GetFirstAncestorOfType<TextField>()) is TextField text && text.multiline) return;
                 e.StopPropagation();
                 Submit();
             }, TrickleDown.TrickleDown);
@@ -216,6 +218,8 @@ namespace GameSystems.EditorTools.UI
         public string Label;
         public string Value;
         public string Caption;
+        // 여러 줄 입력(Enter는 줄바꿈, 확인은 버튼으로).
+        public bool Multiline;
     }
 
     // 위 [이전] · V 화살표 · 아래 [현재]

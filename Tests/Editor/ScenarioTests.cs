@@ -47,7 +47,7 @@ namespace GameSystems.Tests
     [Serializable] public sealed class ScenarioLoot : GameAction { public string template; public override string Describe() => $"{template} 획득"; }
     [Serializable] public sealed class ScenarioEnhance : GameAction { public string effect; public override string Describe() => $"첫 장비 {effect} 강화"; }
 
-    // 끝까지 검증: 도감에서 정의할 것(수치 규칙·도전과제 조건식·상태 키·템플릿)을 데이터로 만들고,
+    // 끝까지 검증: 도감에서 정의할 것(수치 규칙·도전과제 조건식·플레이어 데이터·템플릿)을 데이터로 만들고,
     // 행동 → 이벤트 → 수치 → 조건식 → 달성·보상 → Undo → 저장·이어하기가 코드 추가 없이 맞물리는지 확인한다.
     public class ScenarioTests
     {
@@ -65,7 +65,7 @@ namespace GameSystems.Tests
         {
             var session = new GameSession(new SessionOptions { Seed = 77 });
 
-            // 상태 키(도감: 상태 키)
+            // 플레이어 데이터(도감: 플레이어 데이터)
             session.State.Define(Inventory, StateZone.Meta, new ScenarioInventory(), "인벤토리");
             session.State.Define(Floor, StateZone.Session, 1, "현재 층");
 

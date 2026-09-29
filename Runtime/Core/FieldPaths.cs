@@ -395,7 +395,7 @@ namespace GameSystems
     {
     }
 
-    // 필드 경로의 뿌리를 정하는 필드. Kind: 이벤트 타입 이름 / 상태 키.
+    // 필드 경로의 뿌리를 정하는 필드. Kind: 이벤트 타입 이름 / 플레이어 데이터.
     public enum FieldPathRootKind
     {
         EventType,
@@ -439,7 +439,7 @@ namespace GameSystems
         }
     }
 
-    // 상태 키 ID. 편집기는 데이터베이스의 상태 키 목록을 띄운다.
+    // 플레이어 데이터 ID. 편집기는 데이터베이스의 플레이어 데이터 목록을 띄운다.
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class StateKeyRefAttribute : Attribute
     {

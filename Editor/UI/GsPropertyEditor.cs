@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using GameSystems.Data;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -156,9 +157,73 @@ namespace GameSystems.EditorTools.UI
             return container;
         }
 
-        // ── 일반 목록(수치 규칙, 태그 등) ─────────────────────────
+        // ── 키워드 목록: 칩으로 보여 주고 여러 개 고른다 ─────────────
+        // 칩을 누르면 빠지고, '+ 추가'로 연결된 그룹의 키워드를 더한다(그룹이 없으면 모든 키워드).
+        static VisualElement KeywordChips(SerializedProperty list, FieldInfo field, Action onStructure)
+        {
+            var db = EditorDatabase.Instance;
+            var row = Gs.Row("gs-wrap");
+            var current = new List<string>();
+            for (int i = 0; i < list.arraySize; i++) current.Add(list.GetArrayElementAtIndex(i).stringValue);
+            for (int i = 0; i < current.Count; i++)
+            {
+                var index = i;
+                var target = db.FindById(current[i]);
+                var chip = new GsBadge((target != null ? target.DisplayName : $"없는 키워드: {current[i]}") + "  ✕", target != null ? Gs.PaletteFor("kw:" + (target as KeywordData)?.group) : Gs.Danger);
+                chip.tooltip = $"{current[i]}\n눌러서 빼기";
+                chip.style.marginRight = 6;
+                chip.style.marginBottom = 6;
+                chip.RegisterCallback<ClickEvent>(_ => Remove(list, index, onStructure));
+                row.Add(chip);
+            }
+
+            void Add(string id)
+            {
+                list.serializedObject.Update();
+                var at = list.arraySize;
+                list.InsertArrayElementAtIndex(at);
+                list.GetArrayElementAtIndex(at).stringValue = id;
+                list.serializedObject.ApplyModifiedProperties();
+                onStructure?.Invoke();
+            }
+
+            GsButton add = null;
+            add = new GsButton("+ 추가", () =>
+            {
+                var items = db.RefCandidates(field).Where(k => !current.Contains(k.Id))
+                    .OrderBy(k => db.GroupLabel(k) ?? "").ThenBy(k => k.DisplayName)
+                    .Select(k =>
+                    {
+                        var id = k.Id;
+                        return new GsDropdownItem(k.DisplayName, () => Add(id)) { Caption = id, Group = db.GroupLabel(k) };
+                    }).ToList();
+                if (items.Count == 0) items.Add(new GsDropdownItem("더 고를 키워드가 없습니다") { Disabled = true });
+                items.AddRange(KeywordMenuExtras(add, field, ids => { foreach (var id in ids) Add(id); }));
+                GsDropdown.Show(add, items, placeholder: "키워드 검색");
+            }, GsButtonKind.Ghost);
+            add.style.marginBottom = 6;
+            row.Add(add);
+            return row;
+        }
+
+        // 키워드 드롭다운 끝에 붙는 항목: 새 키워드 만들기, 키워드 연결 창 열기.
+        public static IEnumerable<GsDropdownItem> KeywordMenuExtras(VisualElement anchor, FieldInfo field, Action<List<string>> created)
+        {
+            var group = EditorDatabase.RuleFor(field)?.keywordGroup;
+            var host = anchor.panel?.visualTree.Q(className: "gs-root") ?? anchor;
+            if (!string.IsNullOrEmpty(group))
+                yield return new GsDropdownItem("+ 새 키워드", () => KeywordDialogs.AddKeywords(host, group, created))
+                    { Group = "관리", Detail = $"'{EditorDatabase.Instance.FindById(group)?.DisplayName ?? group}' 그룹에 추가하고 바로 고릅니다" };
+            if (field != null)
+                yield return new GsDropdownItem("키워드 연결 창 열기", () => KeywordWindow.Open(group, field.DeclaringType, field.Name))
+                    { Group = "관리", Detail = "이 필드가 쓸 키워드 그룹을 바꾸거나 새 그룹을 만듭니다" };
+        }
+
+        // ── 일반 목록(수치 규칙 등) ─────────────────────────────
         static VisualElement PlainList(SerializedProperty list, Type elementType, Action onValue, Action onStructure)
         {
+            var listField = PropertyUtil.GetField(list, out _);
+            if (EditorDatabase.RefTypeOf(listField) == typeof(KeywordData)) return KeywordChips(list, listField, onStructure);
             var container = Gs.Col();
             for (int i = 0; i < list.arraySize; i++)
             {

@@ -53,7 +53,7 @@ namespace GameSystems
         public SessionOptions Options { get; }
         public SaveMigrations Migrations => Options.Migrations;
         // 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식). 불러올 때 호환 여부를 판단하는 데 쓴다.
-        // 런타임이 데이터베이스(상태 키·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
+        // 런타임이 데이터베이스(플레이어 데이터·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
         public Dictionary<string, string> SaveSchema;
 
         // 행동별 실행 전 난수 상태. Undo하면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, Undo 악용 차단).

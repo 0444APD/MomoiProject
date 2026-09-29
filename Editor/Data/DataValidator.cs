@@ -88,13 +88,13 @@ namespace GameSystems.EditorTools
             return context.Issues;
         }
 
-        // 상태 값 검사 블록: 상태 키가 있는지, 그 값 형식 기준으로 경로·비교·값이 맞는지.
+        // 상태 값 검사 블록: 플레이어 데이터가 있는지, 그 값 형식 기준으로 경로·비교·값이 맞는지.
         static void CheckStateFields(Condition condition, IReadOnlyList<GameData> all, Context context)
         {
             if (condition is StateFieldCondition check && !string.IsNullOrEmpty(check.key))
             {
                 var key = all.OfType<StateKeyData>().FirstOrDefault(k => k.Id == check.key);
-                if (key == null) context.Error($"상태 값 검사: 없는 상태 키 '{check.key}'를 가리킵니다.");
+                if (key == null) context.Error($"상태 값 검사: 없는 플레이어 데이터 '{check.key}'를 가리킵니다.");
                 else if (key.ValueType != null && check.filter != null)
                 {
                     var problems = new List<string>();

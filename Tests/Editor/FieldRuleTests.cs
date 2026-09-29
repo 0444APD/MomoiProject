@@ -36,16 +36,33 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 선택지_목록별로_코드가_만들어진다()
+        public void 키워드는_그룹별로_코드가_만들어진다()
         {
-            var list = Make<ChoiceListData>("item_category", "아이템 분류");
-            var weapon = Make<ChoiceData>("weapon", "무기");
-            weapon.list = list.Id;
-            var armor = Make<ChoiceData>("armor", "방어구");
-            armor.list = list.Id;
-            var code = GameIdsGenerator.Build(new List<GameData> { list, weapon, armor }, "GameSystems.Tests.Editor");
-            StringAssert.Contains("public static class ItemCategory", code);
-            StringAssert.Contains("public const string Weapon = \"weapon\";", code);
+            var group = Make<KeywordGroupData>("grade", "등급");
+            var legendary = Make<KeywordData>("legendary", "전설");
+            legendary.group = group.Id;
+            var common = Make<KeywordData>("common", "일반");
+            common.group = group.Id;
+            var code = GameIdsGenerator.Build(new List<GameData> { group, legendary, common }, "GameSystems.Tests.Editor");
+            StringAssert.Contains("public static class Keyword", code);
+            StringAssert.Contains("public static class Grade", code);
+            StringAssert.Contains("public const string Legendary = \"legendary\";", code);
+        }
+
+        [Test]
+        public void 문자열_필드는_하나_문자열_목록은_여러_개()
+        {
+            Assert.IsFalse(KeywordTools.IsMulti(typeof(RuleItem).GetField(nameof(RuleItem.category))));
+            Assert.IsTrue(KeywordTools.IsMulti(typeof(RuleItem).GetField(nameof(RuleItem.tags))));
+            Assert.IsTrue(KeywordTools.CanConnect(typeof(RuleItem).GetField(nameof(RuleItem.category))));
+        }
+
+        [Test]
+        public void 키워드_입력은_줄마다_ID와_이름()
+        {
+            var lines = KeywordTools.ParseLines("legendary 전설\ncommon\n rare  레어 등급 ");
+            CollectionAssert.AreEqual(new[] { "legendary", "common", "rare" }, lines.Select(l => l.id));
+            CollectionAssert.AreEqual(new[] { "전설", "common", "레어 등급" }, lines.Select(l => l.name));
         }
 
         [Test]
@@ -62,7 +79,7 @@ namespace GameSystems.Tests
             var rule = Make<FieldRuleData>("rule.tag_required", "태그 필수");
             rule.targetType = typeof(StatData).FullName;
             rule.field = "tags";
-            rule.source = FieldRuleSource.Tag;
+            rule.source = FieldRuleSource.Keyword;
             rule.required = true;
             Assert.IsEmpty(DataValidator.Validate(new List<GameData> { rule }).Where(i => i.Asset == rule && i.Severity == ValidationSeverity.Error),
                 "규칙 자체는 올바르다");

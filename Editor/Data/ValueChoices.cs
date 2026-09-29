@@ -29,7 +29,7 @@ namespace GameSystems.EditorTools
                               (member.IsDefined(typeof(StateKeyRefAttribute), false) ? typeof(StateKeyData) : null);
                 if (refType != null)
                     return (member is FieldInfo field && EditorDatabase.RefTypeOf(field) != null ? db.RefCandidates(field) : db.OfType(refType))
-                        .OrderBy(d => d.DisplayName).Select(d => new Choice { Label = d.DisplayName, Caption = d.Id, Value = d.Id }).ToList();
+                        .OrderBy(d => db.GroupLabel(d) ?? "").ThenBy(d => d.DisplayName).Select(d => new Choice { Label = d.DisplayName, Caption = d.Id, Group = db.GroupLabel(d), Value = d.Id }).ToList();
                 if (member.IsDefined(typeof(EventTypeRefAttribute), false))
                     return TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf)
                         .Select(t => new Choice { Label = EventBus.DisplayNameOf(t), Caption = t.Name, Value = t.FullName }).ToList();

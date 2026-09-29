@@ -27,7 +27,7 @@ namespace GameSystems
             _steps.Add(new Step { ToVersion = toVersion, Label = label ?? $"버전 {toVersion}", Apply = migrate ?? throw new ArgumentNullException(nameof(migrate)) });
         }
 
-        // 상태 키 이름 변경.
+        // 플레이어 데이터 이름 변경.
         public void RenameKey(int toVersion, string oldKey, string newKey) =>
             Add(toVersion, $"키 이름 변경 {oldKey} → {newKey}", state =>
             {
@@ -36,7 +36,7 @@ namespace GameSystems
                 state[newKey] = value;
             });
 
-        // 상태 키 삭제(더 이상 쓰지 않는 값).
+        // 플레이어 데이터 삭제(더 이상 쓰지 않는 값).
         public void RemoveKey(int toVersion, string key) =>
             Add(toVersion, $"키 삭제 {key}", state => state.Remove(key));
 

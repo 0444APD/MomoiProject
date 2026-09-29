@@ -45,6 +45,10 @@ namespace GameSystems.EditorTools
 
         public GameData FindById(string id) => string.IsNullOrEmpty(id) ? null : All.FirstOrDefault(d => d.Id == id);
 
+        // 드롭다운 묶음 머리글: 키워드는 그룹 이름으로 묶는다.
+        public string GroupLabel(GameData data) =>
+            data is KeywordData keyword ? (FindById(keyword.group)?.DisplayName ?? "(그룹 없음)") : null;
+
         public static void MarkDirty()
         {
             if (_instance != null) _instance._all = null;
@@ -205,8 +209,7 @@ namespace GameSystems.EditorTools
             if (rule == null || (field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) != typeof(string))) return null;
             switch (rule.source)
             {
-                case FieldRuleSource.Tag: return typeof(TagData);
-                case FieldRuleSource.Choice: return typeof(ChoiceData);
+                case FieldRuleSource.Keyword: return typeof(KeywordData);
                 case FieldRuleSource.StateKey: return typeof(StateKeyData);
                 case FieldRuleSource.Data: return TypeResolver.Find(rule.dataType);
                 default: return null;
@@ -230,15 +233,15 @@ namespace GameSystems.EditorTools
 
         static Dictionary<string, FieldRuleData> _rules;
 
-        // 이 필드에서 고를 수 있는 항목(타입 + 선택지 목록으로 거른다).
+        // 이 필드에서 고를 수 있는 항목(타입 + 키워드 그룹으로 거른다. 그룹이 비어 있으면 모든 키워드).
         public IEnumerable<GameData> RefCandidates(System.Reflection.FieldInfo field)
         {
             var type = RefTypeOf(field);
             if (type == null) return Enumerable.Empty<GameData>();
             var items = OfType(type);
             var rule = RuleFor(field);
-            if (type == typeof(ChoiceData) && rule != null && !string.IsNullOrEmpty(rule.choiceList))
-                items = items.Where(d => ((ChoiceData)d).list == rule.choiceList);
+            if (type == typeof(KeywordData) && rule != null && !string.IsNullOrEmpty(rule.keywordGroup))
+                items = items.Where(d => ((KeywordData)d).group == rule.keywordGroup);
             return items;
         }
 

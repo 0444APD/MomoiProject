@@ -37,6 +37,14 @@ namespace GameSystems.EditorTools.UI
             _value = Gs.Label("", "gs-inline__value", "gs-grow");
             Add(_value);
 
+            // 식별용 글자 칸: 오른쪽 클릭으로 키워드 연결 창을 연다(필드와 키워드 그룹을 잇거나 새로 만든다).
+            if (_property.propertyType == SerializedPropertyType.String && KeywordTools.CanConnect(_field))
+            {
+                var field = _field;
+                this.AddManipulator(new ContextualMenuManipulator(e =>
+                    e.menu.AppendAction("키워드 연결…", _ => KeywordWindow.Open(KeywordTools.GroupOf(field.DeclaringType, field), field.DeclaringType, field.Name))));
+            }
+
             if (IsEditable)
             {
                 AddToClassList("gs-inline--editable");
@@ -118,7 +126,7 @@ namespace GameSystems.EditorTools.UI
             {
                 if (string.IsNullOrEmpty(property.stringValue)) return ("상태 선택", true, false);
                 var key = db.FindById(property.stringValue) as StateKeyData;
-                return key != null ? (key.DisplayName, false, false) : ($"없는 상태 키: {property.stringValue}", false, true);
+                return key != null ? (key.DisplayName, false, false) : ($"없는 플레이어 데이터: {property.stringValue}", false, true);
             }
             if (property.propertyType == SerializedPropertyType.String)
             {
@@ -219,7 +227,7 @@ namespace GameSystems.EditorTools.UI
                     PickFieldPath();
                     return;
                 case SerializedPropertyType.String when Has<StateKeyRefAttribute>():
-                    ShowIdMenu(EditorDatabase.Instance.OfType<StateKeyData>().Cast<GameData>(), "상태 키");
+                    ShowIdMenu(EditorDatabase.Instance.OfType<StateKeyData>().Cast<GameData>(), "플레이어 데이터");
                     return;
                 case SerializedPropertyType.String when Has<FieldValueRefAttribute>():
                     if (EditFieldValue()) return;
@@ -276,13 +284,15 @@ namespace GameSystems.EditorTools.UI
 
         void ShowIdMenu(IEnumerable<GameData> data, string kind)
         {
-            var list = data.OrderBy(d => d.DisplayName).ToList();
+            var db = EditorDatabase.Instance;
+            var list = data.OrderBy(d => db.GroupLabel(d) ?? "").ThenBy(d => d.DisplayName).ToList();
             var items = list.Select(d =>
             {
                 var id = d.Id;
-                return new GsDropdownItem(d.DisplayName, () => SetString(id)) { Caption = id, Selected = _property.stringValue == id };
+                return new GsDropdownItem(d.DisplayName, () => SetString(id)) { Caption = id, Group = db.GroupLabel(d), Selected = _property.stringValue == id };
             }).ToList();
-            if (items.Count == 0) items.Add(new GsDropdownItem($"{kind}이(가) 아직 없습니다 — 데이터베이스에서 먼저 만드세요") { Disabled = true });
+            if (items.Count == 0) items.Add(new GsDropdownItem($"{kind}이(가) 아직 없습니다 — 도감에서 먼저 만드세요") { Disabled = true });
+            if (DataRefType == typeof(KeywordData)) items.AddRange(GsPropertyEditor.KeywordMenuExtras(this, _field, ids => { if (ids.Count > 0) SetString(ids[0]); }));
             GsDropdown.Show(this, items, placeholder: $"{kind} 검색");
         }
 
@@ -327,7 +337,7 @@ namespace GameSystems.EditorTools.UI
             var host = GetFirstAncestorOfType<GsModal>()?.parent ?? panel?.visualTree.Q(className: "gs-root") ?? this;
             if (root == null)
             {
-                GsDropdown.Show(this, new List<GsDropdownItem> { new GsDropdownItem("이벤트나 상태 키를 먼저 고르세요") { Disabled = true } });
+                GsDropdown.Show(this, new List<GsDropdownItem> { new GsDropdownItem("이벤트나 플레이어 데이터를 먼저 고르세요") { Disabled = true } });
                 return;
             }
             GsDataExplorer.Pick(host, root, rootLabel ?? DataModel.FriendlyName(root), _property.stringValue, picked =>

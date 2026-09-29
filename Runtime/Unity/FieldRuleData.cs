@@ -3,62 +3,38 @@ using UnityEngine;
 
 namespace GameSystems.Data
 {
-    // 선택지 목록: 아이템 분류·등급·속성처럼 "목록에서 고르는 값"의 묶음. 선택지 하나하나는 ChoiceData 항목이다.
-    // 코드에는 빈 string 필드만 두고, 어떤 목록에서 고를지는 필드 규칙으로 연결한다.
-    [Database("선택지 목록", Group = "식별자", Order = 2, IdPrefix = "choices")]
-    [CreateAssetMenu(menuName = "Game Systems/선택지 목록", fileName = "NewChoiceList")]
-    public sealed class ChoiceListData : GameData
-    {
-        [FieldLabel("설명")] public string description = "";
-    }
-
-    // 선택지 하나. 값으로는 이 항목의 ID가 들어간다(이름을 바꿔도 값이 따라간다).
-    [Database("선택지", Group = "식별자", Order = 3, IdPrefix = "choice")]
-    [CreateAssetMenu(menuName = "Game Systems/선택지", fileName = "NewChoice")]
-    public sealed class ChoiceData : GameData
-    {
-        [FieldLabel("목록"), DataRef(typeof(ChoiceListData))] public string list = "";
-
-        public override void ValidateData(IValidationContext context)
-        {
-            if (string.IsNullOrEmpty(list)) context.Error("어느 선택지 목록에 속하는지 정해지지 않았습니다.");
-        }
-    }
-
     public enum FieldRuleSource
     {
 #if UNITY_2020_1_OR_NEWER
-        [InspectorName("태그")]
+        [InspectorName("키워드")]
 #endif
-        Tag,
-#if UNITY_2020_1_OR_NEWER
-        [InspectorName("선택지 목록")]
-#endif
-        Choice,
+        Keyword = 0,
 #if UNITY_2020_1_OR_NEWER
         [InspectorName("도감 항목")]
 #endif
-        Data,
+        Data = 2,
 #if UNITY_2020_1_OR_NEWER
-        [InspectorName("상태 키")]
+        [InspectorName("플레이어 데이터")]
 #endif
-        StateKey,
+        StateKey = 3,
 #if UNITY_2020_1_OR_NEWER
         [InspectorName("자유 입력")]
 #endif
-        Free,
+        Free = 4,
     }
 
-    // 필드 규칙: "이 클래스의 이 필드는 여기서 고른다(, 필수다)". 코드·어트리뷰트 없이 도감에서 연결한다.
+    // 필드 규칙: "이 클래스의 이 필드는 여기서 고른다(, 필수다)". 코드·어트리뷰트 없이 에디터에서 연결한다.
     // 모든 편집 칸(도감·탐색기·이벤트 발생기·조건식 값)과 ID 바꾸기·검증이 이 규칙을 따른다.
+    // 키워드: string 필드는 그룹에서 하나, string 목록 필드는 여러 개를 고른다. 그룹을 비우면 모든 키워드.
+    // 보통은 '키워드 연결' 창에서 필드와 그룹을 이어 만들고, 이 도감 탭은 확인·유지보수용이다.
     [Database("필드 규칙", Group = "식별자", Order = 4, IdPrefix = "rule")]
     [CreateAssetMenu(menuName = "Game Systems/필드 규칙", fileName = "NewFieldRule")]
     public sealed class FieldRuleData : GameData
     {
         [FieldLabel("클래스"), ClassTypeRef] public string targetType = "";
         [FieldLabel("필드"), MemberRef(nameof(targetType))] public string field = "";
-        [FieldLabel("값 출처")] public FieldRuleSource source = FieldRuleSource.Tag;
-        [FieldLabel("선택지 목록"), DataRef(typeof(ChoiceListData))] public string choiceList = "";
+        [FieldLabel("값 출처")] public FieldRuleSource source = FieldRuleSource.Keyword;
+        [FieldLabel("키워드 그룹"), DataRef(typeof(KeywordGroupData))] public string keywordGroup = "";
         [FieldLabel("도감 종류"), GameDataTypeRef] public string dataType = "";
         [FieldLabel("필수")] public bool required;
         // 스프라이트 필드: 원본을 넣으면 이 묶음의 규격으로 베이크하고, 목록·카드는 미리보기 규격으로 보여 준다.
@@ -66,6 +42,9 @@ namespace GameSystems.Data
         [FieldLabel("미리보기 규격"), DataRef(typeof(SpritePresetData))] public string previewPreset = "";
 
         public Type TargetType => TypeResolver.Find(targetType);
+
+        public System.Reflection.FieldInfo Field =>
+            TargetType?.GetField(field ?? "", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
 
         public override void ValidateData(IValidationContext context)
         {
@@ -76,9 +55,8 @@ namespace GameSystems.Data
                 return;
             }
             if (string.IsNullOrEmpty(field)) context.Error("필드가 선택되지 않았습니다.");
-            else if (type.GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic) == null)
+            else if (Field == null)
                 context.Error($"'{type.Name}'에 '{field}' 필드가 없습니다(이름이 바뀌었는지 확인).");
-            if (source == FieldRuleSource.Choice && string.IsNullOrEmpty(choiceList)) context.Error("선택지 목록을 고르세요.");
             if (source == FieldRuleSource.Data && TypeResolver.Find(dataType) == null) context.Error("도감 종류를 고르세요.");
         }
     }

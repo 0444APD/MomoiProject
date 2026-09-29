@@ -60,6 +60,17 @@ namespace GameSystems.EditorTools
             if (create) window.CreateItem();
         }
 
+        // 항목 하나를 상세 화면으로 연다.
+        public static void ShowItem(GameData item)
+        {
+            if (item == null) return;
+            var window = OpenWindow();
+            window._selectedType = item.GetType().FullName;
+            window._selectedId = item.Id;
+            window.RefreshAll();
+            window.OpenDetail(item);
+        }
+
         public static void ShowSetup()
         {
             var window = OpenWindow();

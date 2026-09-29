@@ -167,61 +167,35 @@ namespace GameSystems.EditorTools
             };
             yield return new SetupStep
             {
-                Id = "tags", Order = 10, Title = "태그 만들기",
-                Summary = "데이터를 분류할 이름(보스·원거리·전설 등)을 만듭니다.",
-                Body = "태그는 여러 데이터에 공통으로 붙이는 분류입니다. 조건식(예: 태그 boss 포함)과 도감 검색(`tag:이름`)에 쓰입니다.\n\n" +
-                       "태그 이름은 여기서만 짓고, 다른 곳에서는 목록에서 고릅니다. 지금 떠오르는 것만 만들고 나중에 추가해도 됩니다.",
-                HelpTopic = HelpIds.Data(typeof(TagData)),
-                Optional = true,
-                Check = () => (Count<TagData>() > 0, $"태그 {Count<TagData>()}개"),
-                Actions = { Create<TagData>(), Open<TagData>() },
-            };
-            yield return new SetupStep
-            {
-                Id = "choices", Order = 20, Title = "선택지 목록 만들기",
-                Summary = "장비 부위·등급·속성처럼 정해진 값 중에서 고르는 칸의 목록을 만듭니다.",
-                Body = "선택지 목록을 만들고, 상세 화면의 '선택지' 블록에서 값을 추가합니다.\n\n" +
-                       "코드의 클래스에는 빈 string 필드만 두고, 다음 단계의 필드 규칙으로 목록과 연결합니다. enum과 달리 값을 추가할 때 코드를 고치지 않아도 됩니다.",
-                HelpTopic = HelpIds.Data(typeof(ChoiceListData)),
-                Optional = true,
-                Check = () =>
-                {
-                    var lists = Count<ChoiceListData>();
-                    var empty = EditorDatabase.Instance.OfType<ChoiceListData>().Count(l => !EditorDatabase.Instance.OfType<ChoiceData>().Any(c => c.list == l.Id));
-                    return (lists > 0 && empty == 0, lists == 0 ? "선택지 목록 없음" : empty > 0 ? $"목록 {lists}개 · 선택지가 없는 목록 {empty}개" : $"목록 {lists}개 · 선택지 {Count<ChoiceData>()}개");
-                },
-                Actions = { Create<ChoiceListData>(), Open<ChoiceListData>() },
-            };
-            yield return new SetupStep
-            {
-                Id = "field-rules", Order = 30, Title = "필드 규칙 연결",
-                Summary = "클래스의 string·Sprite 필드에 값의 출처(태그·선택지·도감 항목·상태 키·스프라이트 규격)를 연결합니다.",
-                Body = "규칙이 걸린 칸은 모든 편집 화면에서 드롭다운이 되고, ID를 바꾸면 값이 함께 바뀌며, 검증도 이 규칙을 따릅니다.\n\n" +
+                Id = "keywords", Order = 10, Title = "키워드 만들고 필드에 연결",
+                Summary = "등급·부위·태그 같은 식별용 string 필드가 어떤 키워드 그룹에서 고를지 정합니다.",
+                Body = "코드의 클래스에는 빈 string(또는 string 목록) 필드만 둡니다. 어떤 값에서 고를지는 여기서 정합니다.\n\n" +
                        "## 방법\n" +
-                       "- 필드 규칙을 만들고 클래스와 필드를 고릅니다.\n" +
-                       "- 값 출처를 고르고, 선택지 목록이나 도감 종류를 지정합니다.\n" +
-                       "- 비면 안 되는 값이면 '필수'를 켭니다.\n\n" +
-                       "아래 상태 줄의 '규칙 없는 string 필드'는 데이터 클래스·이벤트 중 아직 규칙이 없는 식별용 필드 후보입니다. 자유 입력이 맞는 필드라면 그대로 둡니다.",
-                HelpTopic = HelpIds.Data(typeof(FieldRuleData)),
+                       "- '키워드 연결 창'을 엽니다. 왼쪽이 필드, 오른쪽이 키워드 그룹입니다.\n" +
+                       "- 필드를 고르고, 알맞은 그룹의 '이 필드에 연결'을 누릅니다.\n" +
+                       "- 그룹이 없으면 '+ 새 그룹 만들어 연결'로 그룹과 키워드를 한 번에 만듭니다(예: 등급 → 일반·레어·전설).\n\n" +
+                       "string 필드는 하나, string 목록 필드는 여러 개를 고릅니다. 연결하면 필드 규칙이 자동으로 만들어지며, 비면 안 되는 값은 도감의 필드 규칙에서 '필수'를 켭니다.\n\n" +
+                       "아래 상태 줄의 '연결 안 된 필드'는 아직 규칙이 없는 식별용 필드 후보입니다. 자유 입력이 맞는 필드(이름 등)라면 그대로 둡니다.",
+                HelpTopic = "window:keywords",
                 Check = () =>
                 {
-                    var rules = Count<FieldRuleData>();
-                    var candidates = RuleCandidates().Count;
-                    return (rules > 0 && candidates == 0, $"규칙 {rules}개" + (candidates > 0 ? $" · 규칙 없는 string 필드 {candidates}개" : ""));
+                    var groups = Count<KeywordGroupData>();
+                    var unlinked = KeywordTools.Fields().Count(f => KeywordTools.RuleOf(f.type, f.field) == null && EditorDatabase.RefTypeOf(f.field) == null);
+                    return (groups > 0 && unlinked == 0, $"그룹 {groups}개 · 키워드 {Count<KeywordData>()}개" + (unlinked > 0 ? $" · 연결 안 된 필드 {unlinked}개" : ""));
                 },
-                Actions = { Create<FieldRuleData>(), Open<FieldRuleData>(), new SetupAction("후보 필드 보기", ShowCandidates) },
+                Actions = { new SetupAction("키워드 연결 창 열기", () => KeywordWindow.Open(null), true), Open<KeywordGroupData>("키워드 그룹 보기"), Open<FieldRuleData>("필드 규칙 보기") },
             };
             yield return new SetupStep
             {
-                Id = "state-keys", Order = 40, Title = "상태 키 정의",
+                Id = "state-keys", Order = 20, Title = "플레이어 데이터 정의",
                 Summary = "게임 중 바뀌는 값(골드, 인벤토리, 진행도 등)의 이름과 형식을 정합니다.",
-                Body = "상태 키는 저장소에 담을 값 하나입니다. 여기서 만든 키는 게임이 시작될 때 자동으로 등록되고 저장·Undo·모니터에 자동으로 포함됩니다.\n\n" +
+                Body = "플레이어 데이터는 저장소에 담을 값 하나입니다. 여기서 만든 키는 게임이 시작될 때 자동으로 등록되고 저장·Undo·모니터에 자동으로 포함됩니다.\n\n" +
                        "## 정할 것\n" +
-                       "- ID: 코드에서 GameIds.State.XXX로 쓰입니다.\n" +
+                       "- ID: 코드에서 GameIds.PlayerData.XXX로 쓰입니다.\n" +
                        "- 구역: 이번 판(새 판에서 초기화) 또는 프로필(계속 유지).\n" +
                        "- 값 형식: 숫자·글자 같은 단순 값이나 프로젝트의 클래스·리스트·딕셔너리.",
                 HelpTopic = HelpIds.Data(typeof(StateKeyData)),
-                Check = () => (Count<StateKeyData>() > 0, $"상태 키 {Count<StateKeyData>()}개"),
+                Check = () => (Count<StateKeyData>() > 0, $"플레이어 데이터 {Count<StateKeyData>()}개"),
                 Actions = { Create<StateKeyData>(), Open<StateKeyData>() },
             };
             yield return new SetupStep
@@ -282,7 +256,7 @@ namespace GameSystems.EditorTools
             {
                 Id = "game-ids", Order = 90, Title = "식별자 코드 확인",
                 Summary = "도감의 ID가 코드에서 쓸 수 있게 GameIds.cs로 만들어졌는지 확인합니다.",
-                Body = "GameIds.cs는 도감이 바뀔 때마다 자동으로 다시 만들어집니다. 코드에서는 문자열 대신 `GameIds.State.Gold`처럼 씁니다.\n\n" +
+                Body = "GameIds.cs는 도감이 바뀔 때마다 자동으로 다시 만들어집니다. 코드에서는 문자열 대신 `GameIds.PlayerData.Gold`처럼 씁니다.\n\n" +
                        "파일이 없거나 오래됐다면 '다시 만들기'를 누릅니다.",
                 HelpTopic = "guide:ids",
                 Check = () =>
@@ -312,36 +286,13 @@ namespace GameSystems.EditorTools
                 Id = "monitor", Order = 110, Title = "플레이하며 확인",
                 Summary = "플레이 모드에서 모니터 창으로 값과 기록이 제대로 쌓이는지 확인합니다.",
                 Body = "플레이를 시작하고 모니터 창을 엽니다.\n\n" +
-                       "- 데이터 탭에서 상태 키가 모두 보이는지, '빈 필수 값'이 없는지 봅니다.\n" +
+                       "- 데이터 탭에서 플레이어 데이터가 모두 보이는지, '빈 필수 값'이 없는지 봅니다.\n" +
                        "- 게임을 조작하면서 타임라인에 행동과 값 변경이 쌓이는지 봅니다.\n" +
                        "- 이벤트 탭에서 이벤트를 발생시켜 수치와 도전과제가 반응하는지 봅니다.\n\n" +
                        "확인했으면 '완료로 표시'를 누릅니다.",
                 HelpTopic = "window:monitor",
                 Actions = { new SetupAction("모니터 열기", MonitorWindow.Open, true) },
             };
-        }
-
-        // 규칙이 없는 식별용 string 필드 후보(데이터 클래스·이벤트만. 도감 종류의 id·이름 등은 제외).
-        internal static List<(Type type, System.Reflection.FieldInfo field)> RuleCandidates()
-        {
-            var result = new List<(Type, System.Reflection.FieldInfo)>();
-            foreach (var type in ClassTypes.All())
-            {
-                if (typeof(GameData).IsAssignableFrom(type)) continue;
-                foreach (var field in ClassTypes.FieldsOf(type))
-                    if (field.FieldType == typeof(string) && EditorDatabase.RuleFor(field) == null)
-                        result.Add((type, field));
-            }
-            return result;
-        }
-
-        static void ShowCandidates()
-        {
-            var list = RuleCandidates();
-            var text = list.Count == 0
-                ? "규칙이 없는 string 필드가 없습니다."
-                : string.Join("\n", list.Take(40).Select(c => $"{ClassTypes.Label(c.type)} › {c.field.Name}")) + (list.Count > 40 ? $"\n… 외 {list.Count - 40}개" : "");
-            EditorUtility.DisplayDialog("규칙 없는 string 필드", text, "확인");
         }
     }
 }

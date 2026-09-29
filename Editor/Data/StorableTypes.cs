@@ -6,7 +6,7 @@ using UnityEditor.Compilation;
 
 namespace GameSystems.EditorTools
 {
-    // 상태 키의 "값 형식" 목록: 기본 형식 + 프로젝트의 enum + 저장소에 담을 수 있는 데이터 클래스.
+    // 플레이어 데이터의 "값 형식" 목록: 기본 형식 + 프로젝트의 enum + 저장소에 담을 수 있는 데이터 클래스.
     // 클래스는 추가 코드 없이 목록에 나타난다(공개 클래스이고 담을 수 없는 필드가 없으면).
     public static class StorableTypes
     {

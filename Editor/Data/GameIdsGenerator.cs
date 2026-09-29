@@ -13,10 +13,10 @@ namespace GameSystems.EditorTools
     // 데이터베이스의 모든 ID를 C# 상수로 만든다(GameIds.cs). 코드에서도 ID를 글자로 쓰지 않고 자동완성으로 고르게 해
     // 오타를 컴파일 단계에서 막는다. 데이터가 바뀌면 자동으로 다시 만들고, 내용이 같으면 파일을 건드리지 않는다.
     //
-    //   GameIds.State.PlayerInventory   → StateKey<Inventory>("player.inventory")   (상태 키: 값 형식까지 붙는다)
+    //   GameIds.PlayerData.PlayerInventory   → StateKey<Inventory>("player.inventory")   (플레이어 데이터: 값 형식까지 붙는다)
     //   GameIds.Stat.KillsTotal         → "kills_total"                             (그 밖의 항목: ID 문자열)
     //
-    // 파일 위치: 상태 키의 값 형식이 들어 있는 어셈블리(asmdef) 폴더의 Generated/ 아래 — 그래야 그 형식을 참조할 수 있다.
+    // 파일 위치: 플레이어 데이터의 값 형식이 들어 있는 어셈블리(asmdef) 폴더의 Generated/ 아래 — 그래야 그 형식을 참조할 수 있다.
     // 형식이 없거나 Assembly-CSharp에 있으면 Assets/GameSystemsGenerated/. 설정 파일로 직접 지정할 수도 있다.
     public static class GameIdsGenerator
     {
@@ -112,15 +112,15 @@ namespace GameSystems.EditorTools
                 if (!firstGroup) b.AppendLine();
                 firstGroup = false;
                 var info = DataTypes.Find(group.Key);
-                var className = group.Key == typeof(StateKeyData) ? "State" : ClassName(group.Key);
+                var className = group.Key == typeof(StateKeyData) ? "PlayerData" : ClassName(group.Key);
                 b.AppendLine($"        /// <summary>{Escape(info?.DisplayName ?? group.Key.Name)}</summary>");
                 b.AppendLine($"        public static class {className}");
                 b.AppendLine("        {");
                 var used = new HashSet<string>(StringComparer.Ordinal) { className };
-                if (group.Key == typeof(ChoiceData))
+                if (group.Key == typeof(KeywordData))
                 {
-                    // 선택지는 목록별로: GameIds.Choice.ItemCategory.Weapon
-                    foreach (var byList in group.Cast<ChoiceData>().GroupBy(c => c.list).OrderBy(g => g.Key, StringComparer.Ordinal))
+                    // 키워드는 그룹별로: GameIds.Keyword.Grade.Legendary
+                    foreach (var byList in group.Cast<KeywordData>().GroupBy(c => c.group).OrderBy(g => g.Key, StringComparer.Ordinal))
                     {
                         var listName = Unique(IdRules.ToIdentifier(string.IsNullOrEmpty(byList.Key) ? "unlisted" : byList.Key), used);
                         var listData = all.FirstOrDefault(d => d.Id == byList.Key);

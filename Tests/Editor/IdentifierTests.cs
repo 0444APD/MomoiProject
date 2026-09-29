@@ -47,16 +47,18 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 없는_태그를_가리키면_오류_태그를_만들면_통과()
+        public void 없는_키워드를_가리키면_오류_키워드를_만들면_통과()
         {
             var stat = Make<StatData>("kills", "처치");
             SetTags(stat, "boss");
             var issues = DataValidator.Validate(new List<GameData> { stat });
-            Assert.IsTrue(issues.Any(i => i.Asset == stat && i.Severity == ValidationSeverity.Error && i.Message.Contains("없는 태그 'boss'")));
+            Assert.IsTrue(issues.Any(i => i.Asset == stat && i.Severity == ValidationSeverity.Error && i.Message.Contains("없는 키워드 'boss'")));
 
-            var tag = Make<TagData>("boss", "보스");
-            issues = DataValidator.Validate(new List<GameData> { stat, tag });
-            Assert.IsFalse(issues.Any(i => i.Asset == stat && i.Message.Contains("태그")));
+            var group = Make<KeywordGroupData>("monster_tag", "몬스터 태그");
+            var tag = Make<KeywordData>("boss", "보스");
+            tag.group = group.Id;
+            issues = DataValidator.Validate(new List<GameData> { stat, group, tag });
+            Assert.IsFalse(issues.Any(i => i.Asset == stat && i.Message.Contains("키워드")));
         }
 
         [Test]
@@ -67,7 +69,7 @@ namespace GameSystems.Tests
             var found = new List<(string value, System.Type type)>();
             EditorDatabase.ForEachReference(stat, (property, type) => found.Add((property.stringValue, type)));
             CollectionAssert.AreEqual(new[] { "boss", "elite" }, found.Select(f => f.value));
-            Assert.IsTrue(found.All(f => f.type == typeof(TagData)));
+            Assert.IsTrue(found.All(f => f.type == typeof(KeywordData)));
 
             var achievement = Make<AchievementData>("hunter", "사냥꾼");
             achievement.condition = new StatCompareCondition { stat = "kills", value = 3 };

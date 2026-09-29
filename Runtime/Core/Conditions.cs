@@ -73,8 +73,8 @@ namespace GameSystems
 
         public override void Validate(IValidationContext context)
         {
-            if (string.IsNullOrEmpty(key)) context.Error("검사할 상태 키가 선택되지 않았습니다.");
-            if (filter == null) context.Warning("조건식이 비어 있어 상태 키가 있기만 하면 참입니다.");
+            if (string.IsNullOrEmpty(key)) context.Error("검사할 플레이어 데이터가 선택되지 않았습니다.");
+            if (filter == null) context.Warning("조건식이 비어 있어 플레이어 데이터가 있기만 하면 참입니다.");
         }
     }
     [Serializable]

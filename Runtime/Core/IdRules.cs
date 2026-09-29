@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace GameSystems
 {
-    // 식별자(ID·상태 키) 규칙. 이름은 데이터베이스 창 한 곳에서만 짓고, 나머지는 모두 목록에서 고른다.
+    // 식별자(ID·플레이어 데이터) 규칙. 이름은 데이터베이스 창 한 곳에서만 짓고, 나머지는 모두 목록에서 고른다.
     // 형식: 영문 소문자로 시작, 소문자·숫자·밑줄, 점(.)으로 분류를 나눈다. 예: player.inventory, kills_total
     // 이 문자열이 저장 파일·네트워크·코드 생성(GameIds)에서 공통 식별자로 쓰인다.
     public static class IdRules
@@ -22,6 +22,21 @@ namespace GameSystems
             else if (!Pattern.IsMatch(id))
                 error = "ID는 영문 소문자로 시작하고 소문자·숫자·밑줄(_)만 쓸 수 있습니다. 분류는 점(.)으로 나눕니다. 예: player.inventory";
             return error == null;
+        }
+
+        // 코드 이름을 ID 조각으로: SampleEquipment → sample_equipment, effectTags → effect_tags.
+        public static string Normalize(string name)
+        {
+            var b = new System.Text.StringBuilder();
+            foreach (var c in name ?? "")
+            {
+                if (char.IsUpper(c) && b.Length > 0 && b[b.Length - 1] != '_') b.Append('_');
+                if (c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9') b.Append(char.ToLowerInvariant(c));
+                else if (b.Length > 0 && b[b.Length - 1] != '_') b.Append('_');
+            }
+            var result = b.ToString().Trim('_');
+            if (result.Length == 0 || !(result[0] >= 'a' && result[0] <= 'z')) result = "x" + result;
+            return result;
         }
 
         // 분류(첫 점 또는 콜론 앞). 모니터가 이 이름으로 묶어 보여 준다.

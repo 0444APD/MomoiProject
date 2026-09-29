@@ -749,3 +749,38 @@
     border-color: var(--gs-border);
     padding-top: 14px;
 }
+
+/* ── 키워드 연결 창 ─────────────────────────────────────── */
+.gs-kw__pane {
+    background-color: var(--gs-surface);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 20px;
+    min-width: 0;
+}
+.gs-kw__row {
+    padding: 7px 10px;
+    border-radius: 8px;
+    align-items: center;
+}
+.gs-kw__row:hover { background-color: var(--gs-hover); }
+.gs-kw__row--selected { background-color: var(--gs-accent-soft); }
+.gs-kw__row--selected:hover { background-color: var(--gs-accent-soft); }
+.gs-kw__selection {
+    border-top-width: 1px;
+    border-color: var(--gs-border);
+    padding-top: 12px;
+    margin-top: 8px;
+}
+.gs-kw__group {
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+}
+.gs-kw__group--focus { border-color: var(--gs-border-strong); }
+.gs-kw__group--current { border-color: var(--gs-success); }

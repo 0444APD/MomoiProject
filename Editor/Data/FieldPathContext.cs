@@ -8,8 +8,8 @@ using UnityEditor;
 namespace GameSystems.EditorTools
 {
     // 편집 중인 필드 경로 칸의 "뿌리 타입"을 찾는다.
-    // 같은 객체나 위쪽 객체에서 [FieldPathRoot]가 붙은 칸(이벤트 타입·상태 키)을 찾아 그 값으로 타입을 정한다.
-    // 예: 수치 규칙의 조건(filters[i].path) → 규칙의 이벤트 타입 / 상태 값 검사의 path → 고른 상태 키의 값 형식
+    // 같은 객체나 위쪽 객체에서 [FieldPathRoot]가 붙은 칸(이벤트 타입·플레이어 데이터)을 찾아 그 값으로 타입을 정한다.
+    // 예: 수치 규칙의 조건(filters[i].path) → 규칙의 이벤트 타입 / 상태 값 검사의 path → 고른 플레이어 데이터의 값 형식
     public static class FieldPathContext
     {
         public static Type RootType(SerializedProperty property, out string rootLabel)

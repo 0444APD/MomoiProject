@@ -145,7 +145,7 @@ namespace GameSystems
             }
         }
 
-        // 데이터베이스가 정의한 저장 대상(상태 키·수치·도전과제)의 구조.
+        // 데이터베이스가 정의한 저장 대상(플레이어 데이터·수치·도전과제)의 구조.
         static System.Collections.Generic.Dictionary<string, string> BuildSchema(GameDatabase database)
         {
             var schema = new System.Collections.Generic.Dictionary<string, string>(StringComparer.Ordinal);

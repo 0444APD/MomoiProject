@@ -85,20 +85,20 @@ public class Inventory
 }
 ```
 
-### 3.2 도감 창에서 상태 키 만들기
+### 3.2 도감 창에서 플레이어 데이터 만들기
 
 1. 메뉴 `Game Systems > 도감`를 엽니다.
-2. 왼쪽의 `식별자 > 상태 키`를 고르고 `+ 추가`를 누릅니다.
+2. 왼쪽의 `식별자 > 플레이어 데이터`를 고르고 `+ 추가`를 누릅니다.
 3. 창이 뜨면 ID(예: `player.inventory`)와 표시 이름(예: `인벤토리`)을 입력합니다.
 4. 상세 패널에서 구역(메타)과 값 형식(`Inventory`)을 목록에서 고릅니다.
 
 값 형식 목록에는 기본 형식, 프로젝트의 enum, 저장소에 담을 수 있는 공개 데이터 클래스가 자동으로 나타납니다. 숫자·글자 같은 단순 형식은 기본값 칸에 기본값을 적을 수 있고, 클래스는 클래스의 초기값(필드 초기화·생성자)을 씁니다.
 
-상태 키는 게임이 시작될 때 자동으로 저장소에 등록됩니다. 코드에서 따로 등록할 필요가 없습니다.
+플레이어 데이터는 게임이 시작될 때 자동으로 저장소에 등록됩니다. 코드에서 따로 등록할 필요가 없습니다.
 
 ### 3.3 생성된 코드로 쓰기
 
-상태 키를 만들거나 바꾸면 `GameIds.cs`가 자동으로 다시 만들어집니다. 코드에서는 ID를 글자로 쓰지 않고 자동완성으로 고릅니다.
+플레이어 데이터를 만들거나 바꾸면 `GameIds.cs`가 자동으로 다시 만들어집니다. 코드에서는 ID를 글자로 쓰지 않고 자동완성으로 고릅니다.
 
 ```csharp
 using GameSystems;
@@ -107,14 +107,14 @@ using GameSystems.Ids;
 var state = GameSystemsRuntime.Session.State;
 
 // 읽기: 저장소가 관리하는 실제 인스턴스
-Inventory inventory = state.Get(GameIds.State.PlayerInventory);
+Inventory inventory = state.Get(GameIds.PlayerData.PlayerInventory);
 int count = inventory.items.Count;
 
 // 일부 수정
-state.Modify(GameIds.State.PlayerInventory, inv => inv.gold += 100);
+state.Modify(GameIds.PlayerData.PlayerInventory, inv => inv.gold += 100);
 ```
 
-`GameIds.State.PlayerInventory`의 타입은 `StateKey<Inventory>`입니다. `Get`은 `Inventory`를 돌려주고, `Modify`의 람다도 `Inventory`를 받습니다. ID를 잘못 쓰면 컴파일 단계에서 오류가 나므로 오타가 생길 수 없습니다.
+`GameIds.PlayerData.PlayerInventory`의 타입은 `StateKey<Inventory>`입니다. `Get`은 `Inventory`를 돌려주고, `Modify`의 람다도 `Inventory`를 받습니다. ID를 잘못 쓰면 컴파일 단계에서 오류가 나므로 오타가 생길 수 없습니다.
 
 ---
 
@@ -132,8 +132,8 @@ state.Modify(GameIds.State.PlayerInventory, inv => inv.gold += 100);
 ### 4.1 단순 값
 
 ```csharp
-state.Set(GameIds.State.PlayerGold, 150);          // StateKey<int>
-int gold = state.Get(GameIds.State.PlayerGold);   // 150
+state.Set(GameIds.PlayerData.PlayerGold, 150);          // StateKey<int>
+int gold = state.Get(GameIds.PlayerData.PlayerGold);   // 150
 ```
 
 숫자는 내부에서 `double`로 보관하지만, `Get`이 선언한 형식(`int` 등)으로 바꿔서 돌려 드립니다. 선언한 형식과 다른 값(숫자 키에 글자 등)을 넣으면 거부합니다.
@@ -141,7 +141,7 @@ int gold = state.Get(GameIds.State.PlayerGold);   // 150
 ### 4.2 클래스·컬렉션
 
 ```csharp
-state.Modify(GameIds.State.PlayerInventory, inv =>
+state.Modify(GameIds.PlayerData.PlayerInventory, inv =>
 {
     inv.items.Add(new Item { name = "검", level = 1 });
     inv.items[0].tags.Add("근접");
@@ -154,13 +154,13 @@ state.Modify(GameIds.State.PlayerInventory, inv =>
 통째로 바꿀 때는 `Set`을 씁니다. 이때도 게임 코드가 쥐고 있는 인스턴스는 그대로 유지되고 내용만 바뀝니다.
 
 ```csharp
-state.Set(GameIds.State.PlayerInventory, new Inventory { gold = 0 });
+state.Set(GameIds.PlayerData.PlayerInventory, new Inventory { gold = 0 });
 ```
 
 ### 4.3 읽은 인스턴스를 직접 고치면 안 됩니다
 
 ```csharp
-var inv = state.Get(GameIds.State.PlayerInventory);
+var inv = state.Get(GameIds.PlayerData.PlayerInventory);
 inv.gold = 999;   // 잘못된 예: 저장소가 이 변화를 모릅니다
 ```
 
@@ -183,7 +183,7 @@ public class EquipAction : GameAction
 GameSystemsRuntime.Started += session =>
 {
     session.Actions.Register<EquipAction>(action =>
-        session.State.Modify(GameIds.State.PlayerInventory, inv => inv.items[action.itemIndex].level++));
+        session.State.Modify(GameIds.PlayerData.PlayerInventory, inv => inv.items[action.itemIndex].level++));
 };
 
 session.Do(new EquipAction { itemIndex = 0 });   // 실행 = 끝
@@ -224,7 +224,7 @@ GameSystemsRuntime.Configuring += options =>
 
 ```csharp
 using (session.State.Permanent())
-    session.State.Set(GameIds.State.TutorialSeen, true);
+    session.State.Set(GameIds.PlayerData.TutorialSeen, true);
 ```
 
 `Permanent`는 행동 단위 방식의 Undo에서 빠지는 것이고, 스냅샷 되감기는 찍어 둔 시점의 값으로 돌아갑니다(도전과제는 되감은 뒤 자동으로 다시 적용됩니다).
@@ -338,7 +338,7 @@ GameSystemsRuntime.Configuring += options =>
 
 `GameSystemsRuntime`을 쓰지 않고 세션을 직접 만든다면 `new GameSession(options)` 전에 `options.Migrations`에 등록하거나, `ImportMeta`보다 먼저 `session.Migrations`에 등록하세요.
 
-필드 이름만 바꾼 경우는 변환 없이 `[FormerlySerializedAs("예전이름")]`만 달면 됩니다. 상태 키·수치·도전과제의 ID를 도감 창에서 바꾼 경우도 변환이 필요 없습니다(11.3 참고).
+필드 이름만 바꾼 경우는 변환 없이 `[FormerlySerializedAs("예전이름")]`만 달면 됩니다. 플레이어 데이터·수치·도전과제의 ID를 도감 창에서 바꾼 경우도 변환이 필요 없습니다(11.3 참고).
 
 ---
 
@@ -365,12 +365,12 @@ GameSystemsRuntime.Configuring += options =>
 
 ### 11.2 모든 곳에서 목록으로 고릅니다
 
-에디터에서 ID를 가리키는 칸(조건의 수치, 보상, 태그, 상태 키의 값 형식 등)은 직접 입력하는 칸이 없고 목록에서만 고릅니다. 코드에서는 `GameIds`를 씁니다.
+에디터에서 ID를 가리키는 칸(조건의 수치, 보상, 태그, 플레이어 데이터의 값 형식 등)은 직접 입력하는 칸이 없고 목록에서만 고릅니다. 코드에서는 `GameIds`를 씁니다.
 
 ```csharp
 string killsId = GameIds.Stat.KillsTotal;          // "kills_total"
-string bossTag = GameIds.Tag.Boss;                 // "boss"
-StateKey<Inventory> key = GameIds.State.PlayerInventory;
+string bossTag = GameIds.Keyword.MonsterTag.Boss;  // "boss"
+StateKey<Inventory> key = GameIds.PlayerData.PlayerInventory;
 ```
 
 직접 만든 데이터 클래스에서 다른 항목을 가리키는 필드가 있으면 `[DataRef]`를 붙이세요. 그러면 에디터가 그 종류의 목록을 띄우고, 검증기가 없는 ID를 찾아내고, ID 이름을 바꿀 때 이 필드의 값도 함께 바뀝니다.
@@ -379,7 +379,7 @@ StateKey<Inventory> key = GameIds.State.PlayerInventory;
 [Database("몬스터", Group = "전투")]
 public class MonsterData : GameData
 {
-    [DataRef(typeof(TagData))] public List<string> weakTo = new List<string>();
+    public List<string> weakTo = new List<string>();   // 키워드: 키워드 연결 창에서 그룹을 연결
     [DataRef(typeof(ItemData))] public string dropItem;
 }
 ```
@@ -388,7 +388,7 @@ public class MonsterData : GameData
 
 상세 패널의 `ID 바꾸기`에서 새 ID를 입력하면 아래가 한꺼번에 처리됩니다.
 
-- 이 ID를 가리키는 모든 필드(조건·보상·태그·`[DataRef]` 칸)
+- 이 ID를 가리키는 모든 필드(조건·보상·키워드·`[DataRef]` 칸)
 - 에셋 파일 이름
 - `GameIds.cs`(코드에서 쓰던 이름은 컴파일 오류로 알려 드리므로 고칠 곳을 바로 찾을 수 있습니다)
 - 저장 파일: 출시 후라면 예전 ID로 저장된 값을 새 ID로 이어받도록 변경 이력이 남습니다(런타임이 자동 적용). 개발 중이라면 이력을 남기지 않고, 다음 플레이 때 그 저장이 초기화됩니다.
@@ -397,26 +397,33 @@ public class MonsterData : GameData
 
 다른 곳에서 가리키는 항목은 삭제할 수 없습니다. 삭제를 누르면 사용처 목록을 보여 드리니, 그곳들의 선택을 먼저 바꾸세요.
 
-### 11.5 태그
+### 11.5 키워드와 필드 연결
 
-태그도 식별자입니다. `식별자 > 태그`에서 태그를 만들고, 모든 데이터의 태그 칸에서는 목록에서 고릅니다. 없는 태그를 가리키면 검증 오류가 나고 빌드가 막힙니다.
+등급·부위·속성·태그처럼 식별에 쓰는 string 값은 모두 **키워드**입니다. 키워드는 **키워드 그룹** 아래에 둡니다.
 
-### 11.5.1 선택지 목록과 필드 규칙
+| 그룹 | 키워드 | 연결할 필드 | 고르는 개수 |
+|---|---|---|---|
+| 등급 | 일반 · 레어 · 전설 | `SampleEquipment.grade` (`string`) | 하나 |
+| 장비 태그 | 근접 · 원거리 · 도트 | `SampleEquipment.tags` (`List<string>`) | 여러 개 |
 
-분류·등급·속성처럼 목록에서 고르는 값은 `식별자 > 선택지 목록`에 목록(예: 장비 부위)을 만들고, 목록 항목의 "선택지" 블록에서 선택지(무기·방어구…)를 추가합니다. 코드에서는 `GameIds.Choice.EquipmentSlot.Weapon`처럼 씁니다.
+코드에는 어트리뷰트 없이 빈 `string` 또는 `List<string>` 필드만 둡니다. 하나인지 여러 개인지는 필드 형식으로 정해집니다.
 
-어떤 필드가 어디서 고르는지는 `식별자 > 필드 규칙`에서 연결합니다. 코드에는 어트리뷰트 없이 빈 `string` 필드만 두면 됩니다.
+연결은 메뉴 `Game Systems > 키워드 연결`에서 합니다. 왼쪽에서 필드를 고르고 오른쪽에서 그룹의 `이 필드에 연결`을 누르거나, `+ 새 그룹 만들어 연결`로 그룹과 키워드를 한 번에 만들어 연결합니다. 편집 칸에서 오른쪽 클릭 › `키워드 연결…`로도 열 수 있습니다. 코드에서는 `GameIds.Keyword.Grade.Legendary`처럼 씁니다.
+
+연결하면 **필드 규칙**이 자동으로 만들어집니다. `식별자 > 필드 규칙`은 확인과 유지보수용입니다.
 
 | 칸 | 뜻 |
 |---|---|
-| 클래스 · 필드 | 규칙을 걸 필드(데이터 클래스·도감 종류·이벤트의 필드) |
-| 값 출처 | 태그 / 선택지 목록 / 도감 항목(종류 지정) / 상태 키 / 자유 입력 |
+| 클래스 · 필드 | 규칙을 걸 필드(데이터 클래스·도감 종류·이벤트의 필드). 상속받은 필드는 선언한 클래스에 걸린다 |
+| 값 출처 | 키워드 / 도감 항목(종류 지정) / 플레이어 데이터 / 자유 입력 |
+| 키워드 그룹 | 고를 범위. 비우면 모든 키워드 |
 | 필수 | 비어 있으면 도감 검증 오류, 게임 중에는 경고 로그 + 모니터 표시 |
 
-규칙은 `[DataRef]`와 똑같이 취급됩니다. 도감·탐색기·이벤트 발생기·조건식 값 칸이 목록을 띄우고, ID를 바꾸면 값이 따라가며, 없는 값은 검증에서 걸립니다.
+규칙은 `[DataRef]`와 똑같이 취급됩니다. 도감·탐색기·이벤트 발생기·조건식 값 칸이 목록을 띄우고, ID를 바꾸면 값이 따라가며, 없는 값은 검증에서 걸립니다. 도감 항목의 기본 태그 칸은 모든 키워드에서 고릅니다.
+
 ### 11.6 생성 코드의 위치
 
-`GameIds.cs`는 상태 키의 값 형식이 들어 있는 어셈블리(asmdef) 폴더 아래 `Generated/`에 만들어집니다. 그래야 그 형식을 참조해 `StateKey<Inventory>`처럼 타입을 붙일 수 있습니다. 형식이 없거나 asmdef 밖(Assembly-CSharp)에 있으면 `Assets/GameSystemsGenerated/`에 만들어집니다.
+`GameIds.cs`는 플레이어 데이터의 값 형식이 들어 있는 어셈블리(asmdef) 폴더 아래 `Generated/`에 만들어집니다. 그래야 그 형식을 참조해 `StateKey<Inventory>`처럼 타입을 붙일 수 있습니다. 형식이 없거나 asmdef 밖(Assembly-CSharp)에 있으면 `Assets/GameSystemsGenerated/`에 만들어집니다.
 
 위치를 직접 정하려면 `ProjectSettings/GameSystems/Ids.json`의 `folder`에 폴더 경로를 적습니다. 그 위치에서 참조할 수 없는 형식의 키는 타입 없이 ID 문자열로만 만들어집니다. 수동으로 다시 만들려면 메뉴 `Game Systems > 식별자 코드 다시 만들기`를 누릅니다.
 
@@ -450,7 +457,7 @@ public class MonsterData : GameData
 
 | 증상 | 원인과 해결 |
 |---|---|
-| "정의되지 않은 상태 키" 오류 | 도감 창에서 상태 키를 만들지 않았습니다. 코드에는 `GameIds`를 쓰세요. |
+| "정의되지 않은 플레이어 데이터" 오류 | 도감 창에서 플레이어 데이터를 만들지 않았습니다. 코드에는 `GameIds`를 쓰세요. |
 | "Modify를 거치지 않고 바뀌었습니다" 경고 | `Get`으로 받은 인스턴스를 직접 고쳤습니다. `Modify` 안에서 고치세요. |
 | "담을 수 없는 필드" 오류 | 함수·`object` 필드가 있습니다. `[NonSerialized]`를 붙이거나 데이터로 바꾸세요. |
 | "순환 참조" 오류 | 객체끼리 서로를 가리킵니다. 한쪽은 ID(`[DataRef]` 문자열)로 가리키세요. |
@@ -479,5 +486,5 @@ public class MonsterData : GameData
 | | `ExportRun()`, `ImportRun(json)`, `NewRun()` | 판 저장·이어하기·새 판 |
 | `SessionOptions` | `History`, `HistoryLimit`, `SnapshotInterval`, `SnapshotLimit` | 되돌리기 방식과 한도 |
 | | `SaveVersion`, `Migrations`, `DetectUntrackedChanges` | 저장 버전, 버전 변환, 누락 검사 |
-| `StateKey<T>` | `GameIds.State.XXX` | 타입이 붙은 키(생성 코드) |
+| `StateKey<T>` | `GameIds.PlayerData.XXX` | 타입이 붙은 키(생성 코드) |
 | 어트리뷰트 | `[DataRef(typeof(T))]` | 다른 데이터베이스 항목을 가리키는 문자열 필드 |

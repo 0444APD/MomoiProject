@@ -77,28 +77,22 @@ namespace GameSystems.Samples
             return true;
         }
 
-        // 장비·강화 효과·몬스터 태그 예제: 태그, 상태 키, 템플릿, 조건식이 붙은 수치·도전과제.
+        // 장비·강화 효과·몬스터 태그 예제: 키워드, 플레이어 데이터, 템플릿, 조건식이 붙은 수치·도전과제.
         static bool CreateEquipmentExample(EditorDatabase db)
         {
             if (db.FindById("player.inventory") != null) return false;
-            foreach (var (id, name) in new[] { ("boss", "보스"), ("legendary", "전설"), ("melee", "근접"), ("lifesteal", "흡혈"), ("fire_resist", "화염 저항") })
-                if (db.FindById(id) == null) db.Create(typeof(TagData), name, id);
-
-            // 선택지 목록 + 필드 규칙: SampleEquipment.slot은 코드에 어트리뷰트가 없어도 '장비 부위'에서만 고르고, 필수다.
-            var slots = (ChoiceListData)db.Create(typeof(ChoiceListData), "장비 부위", "equipment_slot");
-            foreach (var (id, name) in new[] { ("weapon", "무기"), ("armor", "방어구"), ("accessory", "장신구") })
-            {
-                var choice = (ChoiceData)db.Create(typeof(ChoiceData), name, id);
-                choice.list = slots.Id;
-                EditorUtility.SetDirty(choice);
-            }
-            var rule = (FieldRuleData)db.Create(typeof(FieldRuleData), "장비 부위 규칙", "rule.equipment_slot");
-            rule.targetType = typeof(SampleEquipment).FullName;
-            rule.field = nameof(SampleEquipment.slot);
-            rule.source = FieldRuleSource.Choice;
-            rule.choiceList = slots.Id;
-            rule.required = true;
-            EditorUtility.SetDirty(rule);
+            // 키워드 그룹 + 필드 연결: 코드의 빈 string 필드가 에디터 설정만으로 드롭다운이 된다.
+            // string 필드는 하나, string 목록 필드는 여러 개를 고른다.
+            Keywords("equipment_slot", "장비 부위", ("weapon", "무기"), ("armor", "방어구"), ("accessory", "장신구"));
+            Keywords("grade", "등급", ("common", "일반"), ("rare", "레어"), ("legendary", "전설"));
+            Keywords("equipment_tag", "장비 태그", ("melee", "근접"), ("ranged", "원거리"), ("dot", "도트"), ("pierce", "관통"));
+            Keywords("monster_tag", "몬스터 태그", ("boss", "보스"), ("elite", "정예"));
+            Keywords("enhance_effect", "강화 효과", ("lifesteal", "흡혈"), ("fire_resist", "화염 저항"));
+            Link(typeof(SampleEquipment), nameof(SampleEquipment.slot), "equipment_slot", required: true);
+            Link(typeof(SampleEquipment), nameof(SampleEquipment.grade), "grade");
+            Link(typeof(SampleEquipment), nameof(SampleEquipment.tags), "equipment_tag");
+            Link(typeof(EnemyKilled), nameof(EnemyKilled.Tags), "monster_tag");
+            Link(typeof(SampleEnhancement), nameof(SampleEnhancement.effect), "enhance_effect");
 
             // 스프라이트 규격: 장비 아이콘 필드에 원본을 넣으면 아이콘·카드 규격으로 베이크, 목록은 아이콘 규격으로 보인다.
             var itemImages = (SpritePresetGroupData)db.Create(typeof(SpritePresetGroupData), "아이템 이미지", "item_images");
@@ -122,8 +116,8 @@ namespace GameSystems.Samples
             inventory.valueType = typeof(SampleInventory).FullName;
             EditorUtility.SetDirty(inventory);
 
-            Template("template.training_sword", "훈련용 검", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = 1, tags = { "melee" } });
-            Template("template.dragon_armor", "용의 비늘 갑옷", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = 5, element = SampleElement.Fire, tags = { "legendary" } });
+            Template("template.training_sword", "훈련용 검", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = "common", tags = { "melee" } });
+            Template("template.dragon_armor", "용의 비늘 갑옷", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = "legendary", element = SampleElement.Fire, tags = { "pierce" } });
 
             var gold = db.OfType<StatData>().FirstOrDefault(s => s.DisplayName == "골드");
             var bossRule = Rule<EnemyKilled>("");
@@ -133,11 +127,11 @@ namespace GameSystems.Samples
             Achievement("용 사냥꾼", "보스를 처치했다.",
                 new StatCompareCondition { stat = bossKills.Id, op = CompareOp.AtLeast, value = 1 },
                 gold != null ? new[] { new AddToStatReward { stat = gold.Id, amount = 100 } } : new Reward[0]);
-            Achievement("전설 수집가", "전설 태그 장비를 얻었다.",
+            Achievement("전설 수집가", "전설 등급 장비를 얻었다.",
                 new StateFieldCondition
                 {
                     key = inventory.Id,
-                    filter = new ElementFilter { path = "items", mode = ElementMode.Any, filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "legendary" } },
+                    filter = new ElementFilter { path = "items", mode = ElementMode.Any, filter = new FieldFilter { path = "grade", op = FieldOp.Equal, value = "legendary" } },
                 });
             Achievement("강화 장인", "불 속성이 아닌 장비를 3번 이상 강화했다.",
                 new StateFieldCondition
@@ -158,6 +152,22 @@ namespace GameSystems.Samples
                     },
                 });
             return true;
+        }
+
+        static void Keywords(string group, string name, params (string id, string name)[] keywords)
+        {
+            if (EditorDatabase.Instance.FindById(group) == null) KeywordTools.CreateGroup(group, name);
+            foreach (var (id, label) in keywords)
+                if (EditorDatabase.Instance.FindById(id) == null) KeywordTools.CreateKeyword(group, id, label);
+        }
+
+        static void Link(System.Type type, string field, string group, bool required = false)
+        {
+            var rule = KeywordTools.Connect(type, type.GetField(field), group);
+            if (!required) return;
+            rule.required = true;
+            EditorUtility.SetDirty(rule);
+            AssetDatabase.SaveAssetIfDirty(rule);
         }
 
         static void Template(string id, string name, object value)

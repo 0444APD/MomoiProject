@@ -4,10 +4,10 @@ using UnityEngine;
 
 namespace GameSystems.Data
 {
-    // 상태 키: 저장소에 담을 게임 상태 하나. 데이터베이스 창에서 ID(=키)와 값 형식을 정하면
-    // 런타임이 시작할 때 자동으로 등록하고, 코드에서는 생성된 GameIds.State.XXX로 타입까지 맞춰 쓴다.
-    [Database("상태 키", Group = "식별자", Order = 0, IdPrefix = "state")]
-    [CreateAssetMenu(menuName = "Game Systems/상태 키", fileName = "NewStateKey")]
+    // 플레이어 데이터: 저장소에 담을 게임 상태 하나. 데이터베이스 창에서 ID(=키)와 값 형식을 정하면
+    // 런타임이 시작할 때 자동으로 등록하고, 코드에서는 생성된 GameIds.PlayerData.XXX로 타입까지 맞춰 쓴다.
+    [Database("플레이어 데이터", Group = "식별자", Order = 0, IdPrefix = "state")]
+    [CreateAssetMenu(menuName = "Game Systems/플레이어 데이터", fileName = "NewStateKey")]
     public sealed class StateKeyData : GameData
     {
         [FieldLabel("구역")] public StateZone zone = StateZone.Session;
@@ -20,8 +20,8 @@ namespace GameSystems.Data
         // 저장소에 등록한다(런타임 시작 시 자동 호출).
         public void DefineIn(StateStore store)
         {
-            var type = ValueType ?? throw new InvalidOperationException($"[GameSystems] 상태 키 '{Id}'의 값 형식 '{valueType}'을 찾을 수 없습니다.");
-            if (!TryParseDefault(type, out var value, out var error)) throw new InvalidOperationException($"[GameSystems] 상태 키 '{Id}': {error}");
+            var type = ValueType ?? throw new InvalidOperationException($"[GameSystems] 플레이어 데이터 '{Id}'의 값 형식 '{valueType}'을 찾을 수 없습니다.");
+            if (!TryParseDefault(type, out var value, out var error)) throw new InvalidOperationException($"[GameSystems] 플레이어 데이터 '{Id}': {error}");
             store.DefineOfType(Id, zone, type, value, DisplayName);
         }
 

@@ -14,7 +14,7 @@ namespace GameSystems
         Meta,
     }
 
-    // 타입이 붙은 상태 키. 데이터베이스 창에서 이름을 지은 키는 코드 생성(GameIds)으로 이 형태로 제공된다.
+    // 타입이 붙은 플레이어 데이터 키. 도감 창에서 이름을 지은 키는 코드 생성(GameIds)으로 이 형태로 제공된다.
     // 문자열 키 대신 쓰면 값의 타입이 컴파일 단계에서 맞춰지고 오타가 날 수 없다.
     public readonly struct StateKey<T>
     {
@@ -142,11 +142,11 @@ namespace GameSystems
             return Get<T>(key);
         }
 
-        // 타입을 지정해 등록한다(데이터베이스 창의 상태 키가 이 경로로 등록된다).
+        // 타입을 지정해 등록한다(데이터베이스 창의 플레이어 데이터가 이 경로로 등록된다).
         // 클래스·컬렉션인데 기본값이 없으면 기본 생성자로 만든다.
         public void DefineOfType(string key, StateZone zone, Type type, object defaultValue, string label = null)
         {
-            if (string.IsNullOrEmpty(key)) throw new ArgumentException("[GameSystems] 상태 키가 비어 있습니다.", nameof(key));
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("[GameSystems] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
             if (type != null && IsDataType(type))
             {
                 DefineData(key, zone, defaultValue ?? DataModel.Create(type), label);
@@ -209,9 +209,9 @@ namespace GameSystems
         static void CheckRedefine(string key, Slot existing, StateZone zone, Type dataType)
         {
             if (existing.Zone != zone)
-                throw new InvalidOperationException($"[GameSystems] 상태 키 '{key}'가 이미 {ZoneName(existing.Zone)} 구역으로 정의되어 있습니다.");
+                throw new InvalidOperationException($"[GameSystems] 플레이어 데이터 '{key}'가 이미 {ZoneName(existing.Zone)} 구역으로 정의되어 있습니다.");
             if (existing.DataType != dataType)
-                throw new InvalidOperationException($"[GameSystems] 상태 키 '{key}'는 이미 {TypeText(existing)}(으)로 정의되어 있습니다.");
+                throw new InvalidOperationException($"[GameSystems] 플레이어 데이터 '{key}'는 이미 {TypeText(existing)}(으)로 정의되어 있습니다.");
         }
 
         // 이름이 바뀐 키. 예전 이름으로 저장된 값을 새 이름으로 불러온다(식별자 이름 변경 시 자동 등록).
@@ -487,7 +487,7 @@ namespace GameSystems
             foreach (var pair in _slots) if (pair.Value.DataType != null) CheckRequired(pair.Key, pair.Value);
         }
 
-        // (상태 키, 사람이 읽는 위치) 목록.
+        // (플레이어 데이터, 사람이 읽는 위치) 목록.
         public IEnumerable<(string key, string where)> MissingRequired =>
             _missing.SelectMany(pair => pair.Value.Select(path => (pair.Key, path)));
 
@@ -778,7 +778,7 @@ namespace GameSystems
         Slot GetSlot(string key)
         {
             if (key != null && _slots.TryGetValue(key, out var slot)) return slot;
-            throw new InvalidOperationException($"[GameSystems] 정의되지 않은 상태 키 '{key}'입니다. 데이터베이스 창의 상태 키에 등록하거나 Define으로 먼저 등록하세요.");
+            throw new InvalidOperationException($"[GameSystems] 정의되지 않은 플레이어 데이터 '{key}'입니다. 데이터베이스 창의 플레이어 데이터에 등록하거나 Define으로 먼저 등록하세요.");
         }
 
         static string ZoneName(StateZone zone) => zone == StateZone.Meta ? "메타" : "세션";

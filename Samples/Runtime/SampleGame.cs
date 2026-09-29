@@ -13,7 +13,8 @@ namespace GameSystems.Samples
         public string Enemy;
         public int Count = 1;
         public int Combo;
-        [FieldLabel("태그"), DataRef(typeof(TagData))] public List<string> Tags = new List<string>();
+        // 어트리뷰트 없음: 키워드 연결(몬스터 태그 그룹)은 에디터에서 한다.
+        [FieldLabel("태그")] public List<string> Tags = new List<string>();
     }
 
     // ── 샘플 게임 데이터(개발자가 짜는 클래스) ──────────────────
@@ -28,7 +29,7 @@ namespace GameSystems.Samples
     [Serializable]
     public sealed class SampleEnhancement
     {
-        [FieldLabel("효과"), DataRef(typeof(TagData))] public string effect = "";
+        [FieldLabel("효과")] public string effect = "";
         [FieldLabel("수치")] public int power;
     }
 
@@ -37,11 +38,12 @@ namespace GameSystems.Samples
     {
         [FieldLabel("이름")] public string name = "";
         [FieldLabel("아이콘")] public Sprite icon;
-        // 어트리뷰트 없음: 어떤 값에서 고를지는 도감의 필드 규칙(부위 → 장비 부위 목록, 필수)으로 연결한다.
+        // 식별용 값은 모두 빈 string 필드. 어떤 키워드 그룹에서 고를지는 키워드 연결 창(필드 규칙)에서 정한다.
+        //   부위 → 장비 부위(하나, 필수) · 등급 → 등급(하나) · 태그 → 장비 태그(여러 개)
         [FieldLabel("부위")] public string slot = "";
-        [FieldLabel("등급")] public int grade = 1;
+        [FieldLabel("등급")] public string grade = "";
         [FieldLabel("속성")] public SampleElement element;
-        [FieldLabel("태그"), DataRef(typeof(TagData))] public List<string> tags = new List<string>();
+        [FieldLabel("태그")] public List<string> tags = new List<string>();
         [FieldLabel("강화")] public List<SampleEnhancement> enhancements = new List<SampleEnhancement>();
     }
 
@@ -90,7 +92,7 @@ namespace GameSystems.Samples
     {
         // 게임 상태는 반드시 상태 저장소에 둔다(static 변수에 두면 Undo·되감기에서 빠진다).
         const string ComboKey = "sample:combo";
-        // 도감의 상태 키(샘플 데이터 만들기로 생성). 없으면 장비 명령은 안내만 한다.
+        // 도감의 플레이어 데이터(샘플 데이터 만들기로 생성). 없으면 장비 명령은 안내만 한다.
         const string InventoryKey = "player.inventory";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
@@ -138,7 +140,7 @@ namespace GameSystems.Samples
         {
             if (!session.State.IsDefined(InventoryKey))
             {
-                session.Journal.Append(JournalKind.Warning, "Sample", "인벤토리 상태 키가 없습니다. 메뉴 Game Systems > 샘플 > 샘플 데이터 만들기를 먼저 실행하세요.");
+                session.Journal.Append(JournalKind.Warning, "Sample", "인벤토리 플레이어 데이터가 없습니다. 메뉴 Game Systems > 샘플 > 샘플 데이터 만들기를 먼저 실행하세요.");
                 return;
             }
             session.Do(action);

@@ -10,7 +10,7 @@ namespace GameSystems.Data
     {
         [SerializeField, HideInInspector] string id;
         [SerializeField, FieldLabel("이름")] string displayName;
-        [SerializeField, FieldLabel("태그"), DataRef(typeof(TagData))] List<string> tags = new List<string>();
+        [SerializeField, FieldLabel("태그"), DataRef(typeof(KeywordData))] List<string> tags = new List<string>();
 
         public string Id => id;
         public string DisplayName => string.IsNullOrEmpty(displayName) ? name : displayName;

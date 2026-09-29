@@ -28,7 +28,7 @@ namespace GameSystems.EditorTools
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
-        // 타임라인: 이 값(상태 키)과 관련된 기록만.
+        // 타임라인: 이 값(플레이어 데이터)과 관련된 기록만.
         [SerializeField] string _keyFilter = "";
         [SerializeField] string _eventTypeName;
         [SerializeField] string _selectedAchievement;
@@ -655,7 +655,7 @@ namespace GameSystems.EditorTools
         }
 
         // ── 데이터: 현재 세션·플레이어의 모든 값(분류별 폴더) ──────────
-        // 판 데이터(세션 구역) · 플레이어 데이터(메타 구역) · 수치 · 도전과제 달성. 클래스·컬렉션은 폴더로 들어가 배치대로 본다.
+        // 판 데이터(세션 구역) · 프로필 데이터(메타 구역) · 수치 · 도전과제 달성. 클래스·컬렉션은 폴더로 들어가 배치대로 본다.
         // 고치면 게임 코드와 같은 통로(Set·Modify)를 거쳐 기록되고 Undo할 수 있다.
 
         GsDataExplorer _dataExplorer;
@@ -700,7 +700,7 @@ namespace GameSystems.EditorTools
                 Children = () => MissingFolder(state).Concat(new List<ExplorerItem>
                 {
                     Folder("판 데이터", "이번 판 내용(세션 구역) · 판 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Session, Gs.Palette[6]),
-                    Folder("플레이어 데이터", "프로필(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Meta, Gs.Palette[4]),
+                    Folder("프로필 데이터", "판이 바뀌어도 유지(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Meta, Gs.Palette[4]),
                     Folder("수치", "수치 탭에서 규칙·이벤트로 다루는 값", k => k.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal), Gs.Palette[2]),
                     new ExplorerItem
                     {
