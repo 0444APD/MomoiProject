@@ -193,7 +193,7 @@ namespace GameSystems.EditorTools
             public string Label;
         }
 
-        // 이 항목의 ID를 가리키는 모든 곳(조건·보상·태그 칸 등 ID 참조 필드).
+        // 이 항목의 ID를 가리키는 모든 곳(조건·보상·키워드 칸 등 ID 참조 필드).
         public List<IdUsage> FindUsages(GameData target)
         {
             var result = new List<IdUsage>();

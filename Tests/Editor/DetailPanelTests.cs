@@ -93,7 +93,7 @@ namespace GameSystems.Tests
             try
             {
                 var statPanel = GsDetailPanel.Open(_host, stat);
-                foreach (var path in new[] { "tags", "scope", "aggregate", "rules" })
+                foreach (var path in new[] { "scope", "aggregate", "rules" })
                     Assert.DoesNotThrow(() => statPanel.FocusField(path), path);
                 statPanel.Close();
             }

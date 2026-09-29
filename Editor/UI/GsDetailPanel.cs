@@ -12,8 +12,13 @@ namespace GameSystems.EditorTools.UI
     {
         // 제목으로 쓸 필드(패널 위쪽에 크게, 편집 가능).
         public string TitlePath = "displayName";
-        // TitlePath가 없을 때 보일 고정 제목.
+        // TitlePath가 없을 때 보일 제목. TitleCommit이 있으면 제목을 눌러 고칠 수 있다(도감: ID 바꾸기).
         public string Title;
+        // 새 제목 검사(문제가 있으면 문구, 없으면 null)와 반영.
+        public Func<string, string> TitleValidate;
+        public Action<GsDetailPanel, string> TitleCommit;
+        // 위쪽 왼편 이미지 칸을 보일지(도감 항목은 쓰지 않는다. 이미지 필드는 본문에 나온다).
+        public bool ShowMedia = true;
         public string Subtitle;
         // 이미지로 쓸 필드 경로. 지정하면 이미지를 클릭해 바꿀 수 있고, 그 필드는 정보 영역에 따로 나오지 않는다.
         public string ImagePath;
@@ -113,6 +118,7 @@ namespace GameSystems.EditorTools.UI
             _initial.pickingMode = PickingMode.Ignore;
             _media.Add(_initial);
             top.Add(_media);
+            if (!_options.ShowMedia) _media.style.display = DisplayStyle.None;
             BuildImagePicker();
 
             var titles = Gs.Col("gs-grow");
@@ -129,10 +135,13 @@ namespace GameSystems.EditorTools.UI
             titles.Add(_summary);
             top.Add(titles);
 
-            if (!string.IsNullOrEmpty(_options.HelpTopic)) top.Add(HelpUI.Button(_options.HelpTopic));
+            // 오른쪽 위: 도움말 · 닫기를 나란히.
+            var corner = Gs.Row("gs-detail__corner");
+            if (!string.IsNullOrEmpty(_options.HelpTopic)) corner.Add(HelpUI.Button(_options.HelpTopic));
             var close = new GsButton("✕", RequestClose, GsButtonKind.Ghost);
             close.tooltip = "닫기 (Esc)";
-            top.Add(close);
+            corner.Add(close);
+            top.Add(corner);
 
             _body = new ScrollView(ScrollViewMode.Vertical);
             _body.AddToClassList("gs-detail__body");
@@ -218,7 +227,7 @@ namespace GameSystems.EditorTools.UI
             else if (!string.IsNullOrEmpty(_options.Title))
             {
                 // 고칠 수 없는 제목(도감 항목의 ID. ID는 'ID 바꾸기'로만 바꾼다).
-                _titleSlot.Add(Gs.Label(_options.Title, "gs-display"));
+                _titleSlot.Add(_options.TitleCommit != null ? EditableTitle() : Gs.Label(_options.Title, "gs-display"));
             }
 
             _notices = Gs.Col();
@@ -409,6 +418,100 @@ namespace GameSystems.EditorTools.UI
                 chevron.style.display = oldBox.style.display;
             });
             return column;
+        }
+
+        // 편집 중인 사본(도감이 ID를 바꿀 때 사본의 ID도 맞춘다).
+        public UnityEngine.Object DraftTarget => _draft;
+
+        // 고칠 수 있는 제목: 평소엔 큰 글자, 마우스를 올리면 상자, 누르면 입력 칸. Enter·바깥 클릭으로 확정, Esc로 취소.
+        VisualElement EditableTitle()
+        {
+            var box = Gs.Col("gs-detail__title-edit");
+            var label = Gs.Label(_options.Title, "gs-display");
+            var error = Gs.Label("", "gs-detail__title-error");
+            error.style.display = DisplayStyle.None;
+            box.Add(label);
+            box.tooltip = "눌러서 바꾸기";
+            var wrap = Gs.Col();
+            wrap.Add(box);
+            wrap.Add(error);
+            TextField input = null;
+
+            void ShowError(string message)
+            {
+                error.text = message ?? "";
+                error.style.display = string.IsNullOrEmpty(message) ? DisplayStyle.None : DisplayStyle.Flex;
+                box.EnableInClassList("gs-detail__title-edit--error", !string.IsNullOrEmpty(message));
+            }
+
+            void Finish(bool commit)
+            {
+                if (input == null) return;
+                var value = input.value?.Trim() ?? "";
+                if (commit && value != _options.Title)
+                {
+                    var problem = _options.TitleValidate?.Invoke(value);
+                    if (problem != null)
+                    {
+                        ShowError(problem);
+                        input.schedule.Execute(() => input?.Focus());
+                        return;
+                    }
+                    _options.TitleCommit(this, value);
+                    _options.Title = value;
+                    label.text = value;
+                }
+                ShowError(null);
+                input.RemoveFromHierarchy();
+                input = null;
+                label.style.display = DisplayStyle.Flex;
+                box.RemoveFromClassList("gs-detail__title-edit--editing");
+            }
+
+            box.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (input != null) return;
+                input = new TextField { value = _options.Title };
+                input.AddToClassList("gs-detail__title-input");
+                label.style.display = DisplayStyle.None;
+                box.Insert(0, input);
+                box.AddToClassList("gs-detail__title-edit--editing");
+                input.RegisterCallback<KeyDownEvent>(e =>
+                {
+                    if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+                    {
+                        e.StopPropagation();
+                        Finish(true);
+                    }
+                    else if (e.keyCode == KeyCode.Escape)
+                    {
+                        e.StopPropagation();
+                        ShowError(null);
+                        Finish(false);
+                    }
+                }, TrickleDown.TrickleDown);
+                // 바깥을 누르면 확정. 문제가 있으면 원래 값으로 돌리고 문구만 남긴다.
+                input.RegisterCallback<FocusOutEvent>(_ => input?.schedule.Execute(() =>
+                {
+                    if (input == null) return;
+                    var focused = input.focusController?.focusedElement as VisualElement;
+                    if (focused != null && (focused == input || input.Contains(focused))) return;
+                    var value = input.value?.Trim() ?? "";
+                    var problem = value == _options.Title ? null : _options.TitleValidate?.Invoke(value);
+                    if (problem != null)
+                    {
+                        Finish(false);
+                        ShowError(problem);
+                    }
+                    else Finish(true);
+                }).StartingIn(30));
+                input.schedule.Execute(() =>
+                {
+                    input?.Focus();
+                    input?.SelectAll();
+                });
+            });
+            return wrap;
         }
 
         // 관리 참조 필드(템플릿 값 등)가 새 인스턴스로 바뀌면 본문을 다시 그린다(새 값의 탐색기를 보이려고).

@@ -292,7 +292,7 @@ namespace GameSystems.EditorTools
         static List<FieldEntry> AutoColumns(IReadOnlyList<FieldEntry> fields)
         {
             var list = new List<FieldEntry>();
-            list.AddRange(fields.Where(f => f.Path != "tags" && f.Kind != FieldKind.Image).Take(6));
+            list.AddRange(fields.Where(f => f.Kind != FieldKind.Image).Take(6));
             return list;
         }
 

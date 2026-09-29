@@ -43,7 +43,7 @@ namespace GameSystems.EditorTools
 
         static bool HasFixedPurpose(FieldInfo field)
         {
-            if (field.DeclaringType == typeof(GameData)) return field.Name != "tags";
+            if (field.DeclaringType == typeof(GameData)) return true;
             // 코드에서 이미 용도를 정한 칸(다른 도감 항목·이벤트·클래스·필드 경로 등)은 연결 대상이 아니다.
             return field.GetCustomAttributes(false).Any(a =>
                 !(a is FieldLabelAttribute) && !(a is UnityEngine.SerializeField) && !(a is UnityEngine.TooltipAttribute) &&

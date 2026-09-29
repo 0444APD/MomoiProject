@@ -41,7 +41,7 @@ namespace GameSystems.EditorTools
                        "- 가운데: 선택한 종류의 항목. 시트·세로 카드·가로 카드·바 중에서 보기를 고릅니다.\n" +
                        "- 항목을 클릭(시트는 더블클릭)하면 상세 화면이 열립니다. '반영'하면 목록에 바로 보이고, Unity 에셋에는 탭을 옮길 때 변경 목록을 확인하고 적용합니다.\n\n" +
                        "## 검색\n" +
-                       "ID로 찾습니다. `tag:boss`는 기본 태그 칸의 키워드로, `invalid`는 검증 오류가 있는 항목만 거릅니다.\n\n" +
+                       "ID로 찾습니다. `invalid`를 넣으면 검증 오류가 있는 항목만 거릅니다.\n\n" +
                        "## 새 종류 추가\n" +
                        "코드에서 GameData를 상속한 클래스를 만들면 자동으로 목록에 나타납니다. [Database(\"이름\", Group = \"분류\")]로 표시 이름과 분류를 정합니다.",
                 Related = new[] { "guide:apply", "guide:ids", "guide:layout", "guide:validation" },

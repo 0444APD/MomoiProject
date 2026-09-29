@@ -73,9 +73,9 @@ namespace GameSystems.Tests
         [Test]
         public void 필수_규칙은_검증기가_잡는다()
         {
-            var rule = Make<FieldRuleData>("rule.tagRequired", "태그 필수");
-            rule.targetType = typeof(StatData).FullName;
-            rule.field = "tags";
+            var rule = Make<FieldRuleData>("rule.descriptionRequired", "설명 필수");
+            rule.targetType = typeof(AchievementData).FullName;
+            rule.field = nameof(AchievementData.description);
             rule.source = FieldRuleSource.Keyword;
             rule.required = true;
             Assert.IsEmpty(DataValidator.Validate(new List<GameData> { rule }).Where(i => i.Asset == rule && i.Severity == ValidationSeverity.Error),

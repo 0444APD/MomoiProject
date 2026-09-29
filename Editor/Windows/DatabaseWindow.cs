@@ -242,7 +242,7 @@ namespace GameSystems.EditorTools
             _typeTools = Gs.Row();
             header.Add(_typeTools);
 
-            _searchField = new GsSearchField("검색   tag:  invalid");
+            _searchField = new GsSearchField("ID 검색   invalid");
             _searchField.style.width = 230;
             _searchField.Value = _search;
             _searchField.Changed += value =>
@@ -623,12 +623,7 @@ namespace GameSystems.EditorTools
             if (string.IsNullOrWhiteSpace(_search)) return true;
             foreach (var token in _search.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                if (token.StartsWith("tag:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var tag = token.Substring(4);
-                    if (!data.Tags.Any(t => t.IndexOf(tag, StringComparison.OrdinalIgnoreCase) >= 0)) return false;
-                }
-                else if (token.Equals("invalid", StringComparison.OrdinalIgnoreCase))
+                if (token.Equals("invalid", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!_issues.Any(i => i.Asset == data && i.Severity == ValidationSeverity.Error)) return false;
                 }
@@ -713,8 +708,6 @@ namespace GameSystems.EditorTools
                     var badge = Value(so, view.Badge);
                     if (!string.IsNullOrEmpty(badge)) card.AddBadge(badge, Gs.PaletteFor(view.Badge.Path + ":" + badge));
                 }
-                foreach (var tag in item.Tags.Where(t => !string.IsNullOrEmpty(t)))
-                    card.AddBadge(tag, Gs.PaletteFor("tag:" + tag));
                 if (_issues.Any(i => i.Asset == item && i.Severity == ValidationSeverity.Error))
                     card.AddBadge("오류", Gs.Danger);
                 if (Staging.IsPending(item)) card.AddBadge(Staging.IsAdded(item) ? "새 항목 · 적용 전" : "변경 · 적용 전", Gs.Warning);
@@ -768,29 +761,6 @@ namespace GameSystems.EditorTools
                 });
         }
 
-        void RenameId(GameData item, GsDetailPanel panel)
-        {
-            var db = EditorDatabase.Instance;
-            var usages = db.FindUsages(item);
-            var message = usages.Count == 0
-                ? "이 ID를 가리키는 곳이 없습니다."
-                : $"이 ID를 가리키는 {usages.Count}곳이 함께 바뀝니다: " + string.Join(", ", usages.Take(5).Select(u => u.Label)) + (usages.Count > 5 ? " …" : "");
-            var saveNote = EditorDatabase.IsReleased
-                ? "\n출시 상태: 저장 파일의 예전 ID 값은 새 ID로 이어집니다."
-                : "\n개발 중: 이 ID로 저장된 데이터는 다음 플레이 때 초기화됩니다(변환하지 않음).";
-            GsDialog.Form(_root, "ID 바꾸기", message + saveNote + " GameIds 코드도 다시 만들어집니다.",
-                new[] { new DialogField { Key = "id", Label = "새 ID", Value = item.Id } },
-                "바꾸기",
-                values => values["id"] == item.Id ? "지금과 같은 ID입니다." : db.CanUseId(values["id"], item, out var error) ? null : error,
-                values =>
-                {
-                    panel.Close();
-                    var count = StageRename(item, values["id"]);
-                    _selectedId = values["id"];
-                    QueueRefresh();
-                    Debug.Log($"[GameSystems] ID 바꾸기를 모아 두었습니다: {item.DisplayName} → {values["id"]} (참조 {count}곳, 탭을 옮길 때 적용)");
-                });
-        }
 
         // ID 바꾸기도 모아 둔다: 이 항목과, 이 ID를 가리키는 항목들의 작업본을 함께 고친다(도감이 바로 새 ID로 보인다).
         // 적용하면 내용을 원본에 옮긴 뒤 ID 바꾸기(파일 이름·변경 이력·GameIds)가 실제로 일어난다.
@@ -828,7 +798,17 @@ namespace GameSystems.EditorTools
                 TitlePath = null,
                 Title = item.Id,
                 Subtitle = info?.DisplayName + (Staging.IsAdded(item) ? "  ·  새 항목(적용 전)" : ""),
-                ImagePath = view.Image?.Path,
+                ShowMedia = false,
+                // 제목(ID)을 눌러 바로 고친다. 이 ID를 가리키는 곳도 함께 바뀌고, 적용은 탭을 옮길 때.
+                TitleValidate = id => id == target.Id ? null : EditorDatabase.Instance.CanUseId(id, target, out var error) ? null : error,
+                TitleCommit = (panel, id) =>
+                {
+                    var count = StageRename(target, id);
+                    if (panel.DraftTarget is GameData draft) draft.EditorAssignId(id);
+                    _selectedId = id;
+                    QueueRefresh();
+                    Debug.Log($"[GameSystems] ID를 {id}(으)로 바꿨습니다(참조 {count}곳 함께, 탭을 옮길 때 적용).");
+                },
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
                 HelpTopic = HelpIds.Data(item.GetType()),
@@ -843,7 +823,6 @@ namespace GameSystems.EditorTools
                 if (original != null) EditorGUIUtility.PingObject(original);
                 else Debug.Log("[GameSystems] 아직 적용하지 않은 새 항목이라 에셋이 없습니다.");
             }));
-            options.Actions.Add(("ID 바꾸기", panel => RenameId(target, panel)));
             if (item is PrefabData prefabEntry)
             {
                 // 프리팹은 도감에서 지우지 않는다. 프로젝트 창의 프리팹으로 이동해 거기서 지운다(항목은 자동 정리).

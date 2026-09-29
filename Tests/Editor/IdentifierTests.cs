@@ -21,15 +21,6 @@ namespace GameSystems.Tests
             return data;
         }
 
-        static void SetTags(GameData data, params string[] tags)
-        {
-            var so = new SerializedObject(data);
-            var list = so.FindProperty("tags");
-            list.arraySize = tags.Length;
-            for (int i = 0; i < tags.Length; i++) list.GetArrayElementAtIndex(i).stringValue = tags[i];
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
         [TearDown]
         public void TearDown()
         {
@@ -46,29 +37,27 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 없는_키워드를_가리키면_오류_키워드를_만들면_통과()
+        public void 없는_그룹을_가리키면_오류_그룹을_만들면_통과()
         {
-            var stat = Make<StatData>("kills", "처치");
-            SetTags(stat, "boss");
-            var issues = DataValidator.Validate(new List<GameData> { stat });
-            Assert.IsTrue(issues.Any(i => i.Asset == stat && i.Severity == ValidationSeverity.Error && i.Message.Contains("없는 키워드 'boss'")));
+            var boss = Make<KeywordData>("boss", "보스");
+            boss.group = "monsterTag";
+            var issues = DataValidator.Validate(new List<GameData> { boss });
+            Assert.IsTrue(issues.Any(i => i.Asset == boss && i.Severity == ValidationSeverity.Error && i.Message.Contains("'monsterTag'")));
 
             var group = Make<KeywordGroupData>("monsterTag", "몬스터 태그");
-            var tag = Make<KeywordData>("boss", "보스");
-            tag.group = group.Id;
-            issues = DataValidator.Validate(new List<GameData> { stat, group, tag });
-            Assert.IsFalse(issues.Any(i => i.Asset == stat && i.Message.Contains("키워드")));
+            issues = DataValidator.Validate(new List<GameData> { boss, group });
+            Assert.IsFalse(issues.Any(i => i.Asset == boss && i.Severity == ValidationSeverity.Error));
         }
 
         [Test]
         public void 참조_필드를_모두_찾는다()
         {
-            var stat = Make<StatData>("kills", "처치");
-            SetTags(stat, "boss", "elite");
+            var boss = Make<KeywordData>("boss", "보스");
+            boss.group = "monsterTag";
             var found = new List<(string value, System.Type type)>();
-            EditorDatabase.ForEachReference(stat, (property, type) => found.Add((property.stringValue, type)));
-            CollectionAssert.AreEqual(new[] { "boss", "elite" }, found.Select(f => f.value));
-            Assert.IsTrue(found.All(f => f.type == typeof(KeywordData)));
+            EditorDatabase.ForEachReference(boss, (property, type) => found.Add((property.stringValue, type)));
+            CollectionAssert.AreEqual(new[] { "monsterTag" }, found.Select(f => f.value));
+            Assert.IsTrue(found.All(f => f.type == typeof(KeywordGroupData)));
 
             var achievement = Make<AchievementData>("hunter", "사냥꾼");
             achievement.condition = new StatCompareCondition { stat = "kills", value = 3 };

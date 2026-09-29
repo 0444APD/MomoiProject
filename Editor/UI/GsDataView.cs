@@ -419,6 +419,15 @@ namespace GameSystems.EditorTools.UI
             Rebuild();
         }
 
+        internal DataViewContext Context => _context;
+
+        // 저장하지 않고 다른 배치로 그려 본다(테스트·미리보기용).
+        internal void Preview(TypeLayout layout)
+        {
+            _layout = layout;
+            Rebuild();
+        }
+
         public void Rebuild()
         {
             var layout = _layout ?? DataLayouts.Get(_context.Type, _context);
