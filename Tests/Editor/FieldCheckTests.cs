@@ -83,16 +83,67 @@ namespace GameSystems.Tests
             Assert.IsTrue(FieldOps.Test(bag, "items", FieldOp.IsNotEmpty, ""));
         }
 
+        static List<string> Errors(ValueFilter filter, Type root)
+        {
+            var errors = new List<string>();
+            filter.Validate(root, errors);
+            return errors;
+        }
+
         [Test]
         public void 검증은_경로_비교_값을_타입_기준으로_확인한다()
         {
-            Assert.IsTrue(new FieldCheck { path = "items[].grade", op = FieldOp.AtLeast, value = "2" }.Validate(typeof(TestBag), out _));
-            Assert.IsFalse(new FieldCheck { path = "items[].grade", op = FieldOp.Contains, value = "2" }.Validate(typeof(TestBag), out var wrongOp));
-            StringAssert.Contains("쓸 수 없습니다", wrongOp);
-            Assert.IsFalse(new FieldCheck { path = "equipped.grade", op = FieldOp.AtLeast, value = "많이" }.Validate(typeof(TestBag), out var notNumber));
-            StringAssert.Contains("숫자가 아닙니다", notNumber);
-            Assert.IsFalse(new FieldCheck { path = "element", op = FieldOp.Equal, value = "Water" }.Validate(typeof(TestMonsterKilled), out var noEnum));
-            StringAssert.Contains("없는 값", noEnum);
+            Assert.IsEmpty(Errors(new FieldFilter { path = "items[].grade", op = FieldOp.AtLeast, value = "2" }, typeof(TestBag)));
+            StringAssert.Contains("쓸 수 없습니다", Errors(new FieldFilter { path = "items[].grade", op = FieldOp.Contains, value = "2" }, typeof(TestBag)).Single());
+            StringAssert.Contains("숫자가 아닙니다", Errors(new FieldFilter { path = "equipped.grade", op = FieldOp.AtLeast, value = "많이" }, typeof(TestBag)).Single());
+            StringAssert.Contains("없는 값", Errors(new FieldFilter { path = "element", op = FieldOp.Equal, value = "Water" }, typeof(TestMonsterKilled)).Single());
+            var nested = new ElementFilter { path = "items", filter = new FieldFilter { path = "grade", op = FieldOp.AtLeast, value = "많이" } };
+            StringAssert.Contains("숫자가 아닙니다", Errors(nested, typeof(TestBag)).Single(), "목록 항목 조건은 요소 타입 기준으로 검사한다");
+        }
+
+        [Test]
+        public void 그리고_또는_아님을_중첩한다()
+        {
+            var bag = Bag();
+            var filter = new AllFilter
+            {
+                filters =
+                {
+                    new FieldFilter { path = "equipped.grade", op = FieldOp.AtLeast, value = "3" },
+                    new AnyFilter
+                    {
+                        filters =
+                        {
+                            new FieldFilter { path = "equipped.tags", op = FieldOp.Contains, value = "ranged" },
+                            new NotFilter { filter = new FieldFilter { path = "equipped.name", op = FieldOp.Equal, value = "활" } },
+                        },
+                    },
+                },
+            };
+            Assert.IsTrue(filter.Test(bag), "등급 3 이상 그리고 (원거리 또는 활이 아님)");
+            bag.equipped.name = "활";
+            Assert.IsFalse(filter.Test(bag));
+            StringAssert.Contains("그리고", filter.Describe());
+            StringAssert.Contains("또는", filter.Describe());
+        }
+
+        [Test]
+        public void 목록_항목_검사로_조건에_맞는_항목_개수를_센다()
+        {
+            var bag = Bag();
+            bag.items.Add(new TestLoot { name = "보스 반지", grade = 4, tags = { "boss" } });
+            var bossItems = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "boss" };
+            Assert.IsTrue(new ElementFilter { path = "items", mode = ElementMode.CountAtLeast, count = 2, filter = bossItems }.Test(bag), "boss 태그 아이템 2개");
+            Assert.IsFalse(new ElementFilter { path = "items", mode = ElementMode.CountAtLeast, count = 3, filter = bossItems }.Test(bag));
+            Assert.IsFalse(new ElementFilter { path = "items", mode = ElementMode.All, filter = bossItems }.Test(bag));
+            Assert.IsTrue(new ElementFilter { path = "items", mode = ElementMode.None, filter = new FieldFilter { path = "grade", op = FieldOp.Greater, value = "5" } }.Test(bag));
+            var both = new ElementFilter
+            {
+                path = "items",
+                mode = ElementMode.Any,
+                filter = new AllFilter { filters = { bossItems, new FieldFilter { path = "grade", op = FieldOp.AtLeast, value = "5" } } },
+            };
+            Assert.IsTrue(both.Test(bag), "boss 태그이면서 5등급 이상인 항목(왕관)");
         }
 
         [Test]
@@ -103,16 +154,19 @@ namespace GameSystems.Tests
             bossKills.Rules.Add(new StatRule
             {
                 eventType = typeof(TestMonsterKilled).FullName,
-                filters = { new FieldCheck { path = "tags", op = FieldOp.Contains, value = "boss" } },
+                filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "boss" },
             });
             var eliteFire = new StatDefinition { Id = "elite_fire", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             eliteFire.Rules.Add(new StatRule
             {
                 eventType = typeof(TestMonsterKilled).FullName,
-                filters =
+                filter = new AllFilter
                 {
-                    new FieldCheck { path = "elite", op = FieldOp.IsTrue },
-                    new FieldCheck { path = "element", op = FieldOp.Equal, value = "Fire" },
+                    filters =
+                    {
+                        new FieldFilter { path = "elite", op = FieldOp.IsTrue },
+                        new FieldFilter { path = "element", op = FieldOp.Equal, value = "Fire" },
+                    },
                 },
             });
             session.Stats.Define(bossKills);
@@ -138,7 +192,11 @@ namespace GameSystems.Tests
             {
                 Id = "legend_owner",
                 DisplayName = "전설 보유",
-                Condition = new StateFieldCondition { key = "player.bag", path = "items[].tags", op = FieldOp.Contains, value = "legendary" },
+                Condition = new StateFieldCondition
+                {
+                    key = "player.bag",
+                    filter = new ElementFilter { path = "items", filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "legendary" } },
+                },
             });
 
             Assert.IsFalse(session.Achievements.IsUnlocked("legend_owner"));

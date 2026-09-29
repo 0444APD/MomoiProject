@@ -312,6 +312,7 @@ namespace GameSystems.EditorTools.UI
         {
             if (baseType == typeof(Condition)) return "조건";
             if (baseType == typeof(Reward)) return "보상";
+            if (baseType == typeof(ValueFilter)) return "조건";
             return "항목";
         }
 
@@ -414,7 +415,7 @@ namespace GameSystems.EditorTools.UI
                 var header = Gs.Box("gs-block__header");
                 var chevron = Gs.Label(collapsed ? "▸" : "▾", "gs-block__chevron");
                 header.Add(chevron);
-                var children = (value as Condition)?.Children.Count() ?? 0;
+                var children = (value as Condition)?.Children.Count() ?? (value as ValueFilter)?.Children.Count() ?? 0;
                 header.Add(Gs.Label(BlockTypes.DisplayName(type) + (children > 0 ? $"  ·  {children}개" : ""), "gs-caption"));
                 var summary = Gs.Label(collapsed ? Summary(value) : "", "gs-caption", "gs-nowrap", "gs-block__summary");
                 summary.style.display = collapsed ? DisplayStyle.Flex : DisplayStyle.None;
@@ -463,6 +464,7 @@ namespace GameSystems.EditorTools.UI
             return button;
         }
 
-        static string Summary(object value) => value is Condition condition ? condition.Describe(EditorDatabase.Instance) : "";
+        static string Summary(object value) =>
+            value is Condition condition ? condition.Describe(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Describe() : "";
     }
 }

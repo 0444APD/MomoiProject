@@ -42,17 +42,17 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("상태 값 검사", Category = "상태", Description = "저장소 값(클래스·컬렉션 포함)의 필드를 검사합니다. 예: 인벤토리 › 아이템의 각 항목 › 태그에 legendary 포함",
-               Sentence = "{key} {path} {value} {op}")]
+    [BlockInfo("상태 값 검사", Category = "상태", Description = "저장소 값(클래스·컬렉션 포함)을 조건식으로 검사합니다. 예: 인벤토리 › 아이템 중 [태그 legendary 포함]인 항목이 하나라도 있음")]
     public sealed class StateFieldCondition : Condition
     {
         [StateKeyRef, FieldPathRoot(FieldPathRootKind.StateKey), FieldLabel("상태")] public string key;
-        [FieldPath, FieldLabel("필드")] public string path = "";
-        [FieldOpRef(nameof(path)), FieldLabel("비교")] public FieldOp op = FieldOp.Equal;
-        [FieldValueRef(nameof(path), nameof(op)), FieldLabel("값")] public string value = "";
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.SerializeReference]
+#endif
+        [FieldLabel("조건")] public ValueFilter filter;
 
         public override bool Evaluate(GameSession session) =>
-            !string.IsNullOrEmpty(key) && session.State.IsDefined(key) && FieldOps.Test(session.State.Get(key), path, op, value);
+            !string.IsNullOrEmpty(key) && session.State.IsDefined(key) && (filter == null || filter.Test(session.State.Get(key)));
 
         public override void CollectDependencies(ICollection<string> stateKeys)
         {
@@ -60,11 +60,12 @@ namespace GameSystems
         }
 
         public override string Describe(INameResolver names) =>
-            (string.IsNullOrEmpty(key) ? "(상태 없음)" : key) + (string.IsNullOrEmpty(path) ? " " : " › " + FieldCheck.PathLabel(path) + " ") + FieldOps.Sentence("", op, value).Trim();
+            $"{(string.IsNullOrEmpty(key) ? "(상태 없음)" : key)}: {ValueFilter.DescribeOrAll(filter)}";
 
         public override void Validate(IValidationContext context)
         {
             if (string.IsNullOrEmpty(key)) context.Error("검사할 상태 키가 선택되지 않았습니다.");
+            if (filter == null) context.Warning("조건식이 비어 있어 상태 키가 있기만 하면 참입니다.");
         }
     }
     [Serializable]

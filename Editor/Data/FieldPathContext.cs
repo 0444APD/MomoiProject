@@ -26,6 +26,15 @@ namespace GameSystems.EditorTools
                 foreach (var child in path.Length == 0 ? TopLevel(so) : PropertyUtil.Children(holder))
                 {
                     var field = PropertyUtil.GetField(child, out _);
+                    // 목록 항목 검사 안쪽: 뿌리는 그 목록의 요소 타입.
+                    if (field != null && field.IsDefined(typeof(FieldPathScopeAttribute), false) &&
+                        child.propertyPath != property.propertyPath && child.propertyType == SerializedPropertyType.String)
+                    {
+                        var outer = RootType(child, out rootLabel);
+                        if (outer == null) return null;
+                        rootLabel = GsDataExplorer.PathLabel(outer, child.stringValue) + "의 각 항목";
+                        return ElementFilter.ElementRoot(outer, child.stringValue);
+                    }
                     var root = field?.GetCustomAttribute<FieldPathRootAttribute>();
                     if (root == null || child.propertyType != SerializedPropertyType.String) continue;
                     return Resolve(root.Kind, child.stringValue, out rootLabel);

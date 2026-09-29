@@ -93,8 +93,12 @@ namespace GameSystems.EditorTools
             {
                 var key = all.OfType<StateKeyData>().FirstOrDefault(k => k.Id == check.key);
                 if (key == null) context.Error($"상태 값 검사: 없는 상태 키 '{check.key}'를 가리킵니다.");
-                else if (key.ValueType != null && !new FieldCheck { path = check.path, op = check.op, value = check.value }.Validate(key.ValueType, out var error))
-                    context.Error($"상태 값 검사({key.DisplayName}): {error}");
+                else if (key.ValueType != null && check.filter != null)
+                {
+                    var problems = new List<string>();
+                    check.filter.Validate(key.ValueType, problems);
+                    foreach (var problem in problems) context.Error($"상태 값 검사({key.DisplayName}): {problem}");
+                }
             }
             foreach (var child in condition.Children) CheckStateFields(child, all, context);
         }

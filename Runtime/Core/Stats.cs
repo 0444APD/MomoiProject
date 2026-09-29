@@ -49,15 +49,18 @@ namespace GameSystems
         [EventTypeRef, FieldPathRoot(FieldPathRootKind.EventType), FieldLabel("이벤트")] public string eventType;
         [EventFieldRef(nameof(eventType)), FieldLabel("반영할 값")] public string field;
         [FieldLabel("배수")] public double multiplier = 1;
-        // 이벤트를 걸러 내는 조건(모두 만족할 때만 반영). 예: 태그 boss 포함 → 보스 처치만 센다.
-        [FieldLabel("조건")] public List<FieldCheck> filters = new List<FieldCheck>();
+        // 이벤트를 걸러 내는 조건식(참일 때만 반영). 비어 있으면 모든 이벤트. 예: 태그 boss 포함 → 보스 처치만 센다.
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.SerializeReference]
+#endif
+        [FieldLabel("조건")] public ValueFilter filter;
 
         public string Describe(string statName)
         {
             var typeName = EventDisplayName(eventType);
             var source = string.IsNullOrEmpty(field) ? "횟수" : field;
             var factor = Math.Abs(multiplier - 1) < 1e-9 ? "" : $" × {multiplier.ToString("0.##", CultureInfo.InvariantCulture)}";
-            var when = filters == null || filters.Count == 0 ? "" : $" ({string.Join(", ", filters.Where(c => c != null).Select(c => c.Describe()))}일 때)";
+            var when = filter == null ? "" : $" ({filter.Describe()}일 때)";
             return $"{typeName} 발생 시{when} {source}{factor}를 {statName}에 반영";
         }
 
@@ -158,8 +161,7 @@ namespace GameSystems
             if (!_rulesByEvent.TryGetValue(evt.GetType(), out var rules)) return;
             foreach (var bound in rules)
             {
-                var filters = bound.Rule.filters;
-                if (filters != null && !filters.All(c => c == null || c.Test(evt))) continue;
+                if (bound.Rule.filter != null && !bound.Rule.filter.Test(evt)) continue;
                 Report(bound.Stat.Id, bound.Getter(evt) * bound.Rule.multiplier);
             }
         }

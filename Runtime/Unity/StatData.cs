@@ -43,10 +43,10 @@ namespace GameSystems.Data
                     context.Error($"규칙 {i + 1}: {error}");
                 if (aggregate != StatAggregate.Sum && string.IsNullOrEmpty(rule.field))
                     context.Warning($"규칙 {i + 1}: 횟수 반영은 합계형 수치에서만 의미가 있습니다.");
-                if (rule.filters == null) continue;
-                for (int j = 0; j < rule.filters.Count; j++)
-                    if (rule.filters[j] != null && !rule.filters[j].Validate(type, out var filterError))
-                        context.Error($"규칙 {i + 1} 조건 {j + 1}: {filterError}");
+                if (rule.filter == null) continue;
+                var problems = new List<string>();
+                rule.filter.Validate(type, problems);
+                foreach (var problem in problems) context.Error($"규칙 {i + 1} 조건: {problem}");
             }
         }
     }

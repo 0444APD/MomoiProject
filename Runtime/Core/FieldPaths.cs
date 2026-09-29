@@ -309,45 +309,17 @@ namespace GameSystems
         }
     }
 
-    // 필드 검사 한 줄(경로 + 비교 + 값). 수치 규칙의 걸러내기 등에 쓴다.
-    [Serializable]
-    [BlockInfo("필드 검사", Sentence = "{path} {value} {op}")]
-    public sealed class FieldCheck
-    {
-        [FieldPath, FieldLabel("필드")] public string path = "";
-        [FieldOpRef(nameof(path)), FieldLabel("비교")] public FieldOp op = FieldOp.Equal;
-        [FieldValueRef(nameof(path), nameof(op)), FieldLabel("값")] public string value = "";
-
-        public bool Test(object root) => FieldOps.Test(root, path, op, value);
-
-        public string Describe() => FieldOps.Sentence(string.IsNullOrEmpty(path) ? "(필드 없음)" : PathLabel(path), op, value);
-
-        public static string PathLabel(string path) => string.IsNullOrEmpty(path) ? "(전체)" : path.Replace("[]", "의 각 항목").Replace(".", " › ");
-
-        // root 타입 기준으로 경로·비교·값이 맞는지.
-        public bool Validate(Type root, out string error)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                error = "검사할 필드가 선택되지 않았습니다.";
-                return false;
-            }
-            var type = FieldPaths.TypeAt(root, path, out error);
-            if (type == null) return false;
-            if (!FieldOps.For(type).Contains(op))
-            {
-                error = $"'{PathLabel(path)}'({DataModel.FriendlyName(type)})에는 '{FieldOps.Word(op)}' 비교를 쓸 수 없습니다.";
-                return false;
-            }
-            return FieldOps.TryValidateValue(type, op, value, out error);
-        }
-    }
-
     // ── 편집기 표시용 어트리뷰트 ──────────────────────────────────
 
     // 필드 경로 문자열. 편집기는 폴더형 탐색기로 고르게 한다. 뿌리 타입은 같은 객체(또는 위쪽 객체)의 [FieldPathRoot] 필드로 정해진다.
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class FieldPathAttribute : Attribute
+    {
+    }
+
+    // 이 필드(컬렉션 경로)의 안쪽 조건은 컬렉션 요소를 뿌리로 삼는다(목록 항목 검사).
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class FieldPathScopeAttribute : Attribute
     {
     }
 
