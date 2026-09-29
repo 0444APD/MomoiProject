@@ -656,6 +656,27 @@ namespace GameSystems.EditorTools.UI
                 };
                 field.Box.Add(picker.Element);
             }
+            // 색: 왼쪽 둥근 정사각형 미리보기 + 16진수. 칸을 누르면 색 선택기가 바로 열린다.
+            if (entry.Value is Color || entry.Type == typeof(Color))
+            {
+                var current = entry.Value is Color c ? c : Color.white;
+                var swatch = Gs.Box("gs-inline__swatch");
+                swatch.style.backgroundColor = current;
+                line.Insert(0, swatch);
+                preview.text = "#" + (current.a < 1f ? ColorUtility.ToHtmlStringRGBA(current) : ColorUtility.ToHtmlStringRGB(current));
+                if (editable)
+                {
+                    var picker = new UnityEditor.UIElements.ColorField { value = current, showEyeDropper = false };
+                    picker.AddToClassList("gs-inline__color-picker");
+                    picker.RegisterValueChangedCallback(e =>
+                    {
+                        apply(() => entry.Set(e.newValue));
+                        Changed?.Invoke();
+                        Refresh();
+                    });
+                    field.Box.Add(picker);
+                }
+            }
             var spriteRule = SpriteSpecEditor.RuleFor(entry.Member as FieldInfo);
             if (spriteRule != null && entry.Value is Sprite framed)
             {
@@ -691,7 +712,8 @@ namespace GameSystems.EditorTools.UI
                 Changed?.Invoke();
                 Refresh();
             }
-            if (DataModel.Of(type).Kind == DataKind.Reference) return;
+            // 오브젝트·색은 칸을 덮은 Unity 선택기가 받는다.
+            if (DataModel.Of(type).Kind == DataKind.Reference || type == typeof(Color)) return;
             if (type == typeof(bool))
             {
                 Commit(!(entry.Value is bool b && b));

@@ -947,3 +947,45 @@
 .gs-detail__section-head { flex-direction: row; align-items: center; margin-bottom: 6px; }
 .gs-detail__section-head .gs-detail__label { margin-bottom: 0; font-size: 11px; color: var(--gs-text-2); letter-spacing: 0; }
 .gs-root .gs-detail__type { font-size: 10px; color: var(--gs-text-3); margin-left: 8px; }
+
+/* 색 칸: 왼쪽 둥근 정사각형 미리보기 + 16진수 */
+.gs-inline__swatch {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-right: 8px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+}
+/* 칸 전체를 덮는 투명한 색 선택기(누르면 색 선택 창이 바로 열린다) */
+.gs-inline__color-picker { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; opacity: 0.001; }
+.gs-inline__color-picker .unity-base-field__input,
+.gs-inline__color-picker .unity-color-field__color { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; height: auto; }
+.gs-field .gs-detail__picker { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; opacity: 0.001; }
+
+/* 편집을 시작해도 칸 높이·글자 크기가 바뀌지 않게: 값 글자와 입력 필드를 같은 크기로 맞춘다 */
+.gs-root .gs-field .gs-inline__value,
+.gs-root .gs-field .gs-field__value { font-size: 13px; min-height: 18px; -unity-text-align: upper-left; margin: 0; padding: 0; }
+.gs-field TextField,
+.gs-field LongField,
+.gs-field IntegerField,
+.gs-field FloatField,
+.gs-field DoubleField,
+.gs-field .gs-field__input,
+.gs-field .unity-base-field { margin: 0; padding: 0; min-height: 18px; flex-grow: 1; }
+.gs-field .unity-base-text-field__input,
+.gs-field .unity-base-field__input {
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    min-height: 18px;
+    font-size: 13px;
+    -unity-font-style: normal;
+    -unity-text-align: upper-left;
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--gs-text);
+}
+.gs-field .unity-text-element { margin: 0; padding: 0; font-size: 13px; }
+.gs-field .gs-inline { min-height: 18px; }
+.gs-field .gs-inline__scroll { min-height: 18px; }

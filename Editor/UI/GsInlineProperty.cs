@@ -37,6 +37,17 @@ namespace GameSystems.EditorTools.UI
             _value = Gs.Label("", "gs-inline__value", "gs-grow");
             Add(_value);
 
+            // 색: 왼쪽에 둥근 정사각형 미리보기, 오른쪽에 16진수.
+            if (_property.propertyType == SerializedPropertyType.Color)
+            {
+                _swatch = Gs.Box("gs-inline__swatch");
+                Insert(0, _swatch);
+            }
+            // 오브젝트·색은 칸을 누르면 Unity 선택 창(오브젝트 선택기·색 선택기)이 바로 열린다. 끌어다 놓기도 된다.
+            if (_property.propertyType == SerializedPropertyType.ObjectReference) DirectPicker = ObjectPicker();
+            else if (_property.propertyType == SerializedPropertyType.Color) DirectPicker = ColorPicker();
+            if (DirectPicker != null) Add(DirectPicker);
+
             // 식별용 글자 칸: 오른쪽 클릭으로 키워드 연결 창을 연다(필드와 키워드 그룹을 잇거나 새로 만든다).
             if (_property.propertyType == SerializedPropertyType.String && KeywordTools.CanConnect(_field))
             {
@@ -82,6 +93,38 @@ namespace GameSystems.EditorTools.UI
         bool IsDataTypeRef => _field != null && _field.IsDefined(typeof(DataTypeRefAttribute), false);
         bool Has<T>() where T : Attribute => _field != null && _field.IsDefined(typeof(T), false);
 
+        VisualElement _swatch;
+
+        // 칸 전체를 덮는 투명한 Unity 선택기(오브젝트·색). 입력 칸 안에 있으면 칸 상자 전체로 옮겨 덮는다.
+        public VisualElement DirectPicker { get; private set; }
+
+        VisualElement ObjectPicker()
+        {
+            var picker = new ObjectField { objectType = _valueType ?? typeof(UnityEngine.Object), allowSceneObjects = false, value = _property.objectReferenceValue };
+            picker.AddToClassList("gs-detail__picker");
+            picker.RegisterValueChangedCallback(e =>
+            {
+                _property.serializedObject.Update();
+                _property.objectReferenceValue = e.newValue;
+                Apply();
+                OpenFramingIfRuled(e.newValue);
+            });
+            return picker;
+        }
+
+        VisualElement ColorPicker()
+        {
+            var picker = new ColorField { value = _property.colorValue, showEyeDropper = false };
+            picker.AddToClassList("gs-inline__color-picker");
+            picker.RegisterValueChangedCallback(e =>
+            {
+                _property.serializedObject.Update();
+                _property.colorValue = e.newValue;
+                Apply();
+            });
+            return picker;
+        }
+
         public void Refresh()
         {
             if (_editor != null) return;
@@ -90,6 +133,17 @@ namespace GameSystems.EditorTools.UI
             Gs.SetText(_value, text);
             _value.EnableInClassList("gs-inline__empty", empty);
             EnableInClassList("gs-inline--broken", broken);
+            if (_property.propertyType == SerializedPropertyType.Color)
+            {
+                var color = _property.colorValue;
+                if (_swatch != null) _swatch.style.backgroundColor = color;
+                Gs.SetText(_value, "#" + (color.a < 1f ? ColorUtility.ToHtmlStringRGBA(color) : ColorUtility.ToHtmlStringRGB(color)));
+            }
+            switch (DirectPicker)
+            {
+                case ObjectField objectPicker: objectPicker.SetValueWithoutNotify(_property.objectReferenceValue); break;
+                case ColorField colorPicker: colorPicker.SetValueWithoutNotify(_property.colorValue); break;
+            }
         }
 
         (string text, bool empty, bool broken) Display() => Describe(_property, _field);
@@ -257,7 +311,7 @@ namespace GameSystems.EditorTools.UI
         // 편집 열기(클릭과 같다). 비어 있는 입력 칸을 눌렀을 때도 쓴다.
         public void Open()
         {
-            if (_editor != null || !IsEditable) return;
+            if (_editor != null || !IsEditable || DirectPicker != null) return;
             _property.serializedObject.Update();
 
             switch (_property.propertyType)

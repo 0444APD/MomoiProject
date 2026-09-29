@@ -142,6 +142,8 @@ namespace GameSystems.EditorTools.UI
                 Open = inline.Open,
             };
             inline.CapHeight(MaxValueHeight);
+            // 오브젝트·색 선택기는 칸 상자 전체를 덮는다(어디를 눌러도 Unity 선택 창이 바로 열린다).
+            if (inline.DirectPicker != null) field.Box.Add(inline.DirectPicker);
             inline.Changed += field.RefreshEmpty;
             field.SetDisabled(!inline.Editable);
             field.RefreshEmpty();
