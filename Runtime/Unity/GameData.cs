@@ -37,6 +37,10 @@ namespace GameSystems.Data
         public int Order { get; set; }
         // ID 앞부분. 없으면 클래스 이름에서 만든다(예: ItemData → item).
         public string IdPrefix { get; set; }
+        // 사이드바에 따로 나오지 않는다(다른 종류의 전용 화면에서 함께 다룬다. 예: 키워드 그룹은 키워드 탭에서).
+        public bool Hidden { get; set; }
+        // 시트·카드 대신 쓸 전용 화면의 키(에디터가 같은 키의 화면을 찾는다). 예: "keywords"
+        public string Page { get; set; }
 
         public DatabaseAttribute(string displayName)
         {

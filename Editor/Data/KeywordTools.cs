@@ -12,10 +12,10 @@ namespace GameSystems.EditorTools
     {
         static EditorDatabase Db => EditorDatabase.Instance;
 
-        public static IEnumerable<KeywordGroupData> Groups() => Db.OfType<KeywordGroupData>().OrderBy(g => g.DisplayName);
+        public static IEnumerable<KeywordGroupData> Groups() => Db.OfType<KeywordGroupData>().OrderBy(g => g.order).ThenBy(g => g.DisplayName);
 
         public static IEnumerable<KeywordData> KeywordsOf(string group) =>
-            Db.OfType<KeywordData>().Where(k => k.group == group).OrderBy(k => k.DisplayName);
+            Db.OfType<KeywordData>().Where(k => k.group == group).OrderBy(k => k.order).ThenBy(k => k.DisplayName);
 
         // string 목록 필드면 여러 개, string 필드면 하나.
         public static bool IsMulti(FieldInfo field) => field != null && field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) == typeof(string);
@@ -70,13 +70,41 @@ namespace GameSystems.EditorTools
         public static IEnumerable<(Type type, FieldInfo field)> FieldsLinkedTo(string group) =>
             Fields().Where(f => GroupOf(f.type, f.field) == group);
 
-        public static KeywordGroupData CreateGroup(string id, string name) =>
-            (KeywordGroupData)Db.Create(typeof(KeywordGroupData), string.IsNullOrWhiteSpace(name) ? id : name.Trim(), id);
+        // 도감 창이 열려 있으면 도감 안의 변경으로 모아 둔다(탭을 옮길 때 적용). 아니면 바로 에셋으로 만든다.
+        public static bool StageByDefault => EditorWindow.HasOpenInstances<DatabaseWindow>();
 
-        public static KeywordData CreateKeyword(string group, string id, string name)
+        public static KeywordGroupData CreateGroup(string id, string name, bool? staged = null)
         {
-            var keyword = (KeywordData)Db.Create(typeof(KeywordData), string.IsNullOrWhiteSpace(name) ? id : name.Trim(), id);
+            var label = string.IsNullOrWhiteSpace(name) ? id : name.Trim();
+            var order = Groups().Select(g => g.order).DefaultIfEmpty(0).Max() + 10;
+            if (staged ?? StageByDefault)
+            {
+                var group = (KeywordGroupData)EditorDatabase.Staging.Add(typeof(KeywordGroupData), id, label);
+                group.order = order;
+                return group;
+            }
+            var created = (KeywordGroupData)Db.Create(typeof(KeywordGroupData), label, id);
+            created.order = order;
+            EditorUtility.SetDirty(created);
+            AssetDatabase.SaveAssetIfDirty(created);
+            return created;
+        }
+
+        public static KeywordData CreateKeyword(string group, string id, string name, bool? staged = null)
+        {
+            var label = string.IsNullOrWhiteSpace(name) ? id : name.Trim();
+            var order = KeywordsOf(group).Select(k => k.order).DefaultIfEmpty(0).Max() + 10;
+            if (staged ?? StageByDefault)
+            {
+                var added = (KeywordData)EditorDatabase.Staging.Add(typeof(KeywordData), id, label);
+                added.group = group;
+                added.order = order;
+                EditorDatabase.StagingChanged();
+                return added;
+            }
+            var keyword = (KeywordData)Db.Create(typeof(KeywordData), label, id);
             keyword.group = group;
+            keyword.order = order;
             EditorUtility.SetDirty(keyword);
             AssetDatabase.SaveAssetIfDirty(keyword);
             EditorDatabase.MarkDirty();

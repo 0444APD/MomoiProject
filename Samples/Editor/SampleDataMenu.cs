@@ -156,9 +156,9 @@ namespace GameSystems.Samples
 
         static void Keywords(string group, string name, params (string id, string name)[] keywords)
         {
-            if (EditorDatabase.Instance.FindById(group) == null) KeywordTools.CreateGroup(group, name);
+            if (EditorDatabase.Instance.FindById(group) == null) KeywordTools.CreateGroup(group, name, staged: false);
             foreach (var (id, label) in keywords)
-                if (EditorDatabase.Instance.FindById(id) == null) KeywordTools.CreateKeyword(group, id, label);
+                if (EditorDatabase.Instance.FindById(id) == null) KeywordTools.CreateKeyword(group, id, label, staged: false);
         }
 
         static void Link(System.Type type, string field, string group, bool required = false)

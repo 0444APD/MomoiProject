@@ -16,6 +16,10 @@ namespace GameSystems.EditorTools
         public string Group;
         public int Order;
         public string IdPrefix;
+        // 사이드바에 따로 나오지 않는다(Page가 같은 다른 종류의 탭에서 함께 다룬다).
+        public bool Hidden;
+        // 시트·카드 대신 쓰는 전용 화면 키(없으면 시트·카드).
+        public string Page;
     }
 
     // 데이터베이스 등록 판별: GameData를 상속한 구체 클래스만(명시적 참여).
@@ -57,6 +61,8 @@ namespace GameSystems.EditorTools
                 Group = attr?.Group ?? "데이터",
                 Order = attr?.Order ?? 100,
                 IdPrefix = !string.IsNullOrEmpty(attr?.IdPrefix) ? attr.IdPrefix : DefaultPrefix(type),
+                Hidden = attr?.Hidden ?? false,
+                Page = attr?.Page,
             };
         }
 

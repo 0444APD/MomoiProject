@@ -20,9 +20,17 @@ namespace GameSystems.EditorTools
         public static EditorDatabase Instance => _instance ??= new EditorDatabase();
 
         List<GameData> _all;
+        List<GameData> _view;
         public static event Action Changed;
 
-        public IReadOnlyList<GameData> All
+        // 도감에서 모아 둔(아직 적용하지 않은) 변경. 탭을 옮길 때 적용하거나 되돌린다.
+        public static CodexStaging Staging { get; } = new CodexStaging();
+
+        // 도감이 보는 모습: 실제 에셋 + 적용 대기 중인 변경(추가·수정·삭제). 목록·드롭다운·검증이 이것을 쓴다.
+        public IReadOnlyList<GameData> All => Staging.IsEmpty ? Committed : _view ??= Staging.Overlay(Committed);
+
+        // 실제 에셋만(적용된 것). 생성 코드·런타임 목록 동기화처럼 Unity에 쓰는 쪽이 쓴다.
+        public IReadOnlyList<GameData> Committed
         {
             get
             {
@@ -49,9 +57,21 @@ namespace GameSystems.EditorTools
         public string GroupLabel(GameData data) =>
             data is KeywordData keyword ? (FindById(keyword.group)?.DisplayName ?? "(그룹 없음)") : null;
 
-        public static void MarkDirty()
+        public static void MarkDirty(bool notify = true)
         {
-            if (_instance != null) _instance._all = null;
+            if (_instance != null)
+            {
+                _instance._all = null;
+                _instance._view = null;
+            }
+            _rules = null;
+            if (notify) Changed?.Invoke();
+        }
+
+        // 적용 대기 중인 변경이 바뀌었다(에셋은 그대로, 도감이 보는 모습만 다시 만든다).
+        public static void StagingChanged()
+        {
+            if (_instance != null) _instance._view = null;
             _rules = null;
             Changed?.Invoke();
         }
@@ -78,19 +98,25 @@ namespace GameSystems.EditorTools
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 데이터베이스 타입이 아닙니다.");
             id = string.IsNullOrEmpty(id) ? NextId(info) : id;
             if (!CanUseId(id, null, out var error)) throw new ArgumentException("[GameSystems] " + error);
-            var folder = $"{DataRoot}/{Sanitize(info.DisplayName)}";
-            EnsureFolder(folder);
-
             var data = (GameData)ScriptableObject.CreateInstance(type);
             data.EditorAssignId(id);
             data.EditorSetDisplayName(displayName ?? $"새 {info.DisplayName}");
-            var path = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{id}.asset");
-            AssetDatabase.CreateAsset(data, path);
+            CreateAsset(data);
             AssetDatabase.SaveAssets();
-            Undo.RegisterCreatedObjectUndo(data, $"{info.DisplayName} 추가");
             MarkDirty();
             SyncDatabaseAsset();
             return data;
+        }
+
+        // 메모리의 항목을 에셋으로 저장한다(종류 이름 폴더, 파일 이름 = ID). 도감의 '적용'이 새 항목에 쓴다.
+        public void CreateAsset(GameData data)
+        {
+            var info = DataTypes.Find(data.GetType()) ?? throw new ArgumentException($"{data.GetType().Name}은 데이터베이스 타입이 아닙니다.");
+            var folder = $"{DataRoot}/{Sanitize(info.DisplayName)}";
+            EnsureFolder(folder);
+            var path = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{data.Id}.asset");
+            AssetDatabase.CreateAsset(data, path);
+            Undo.RegisterCreatedObjectUndo(data, $"{info.DisplayName} 추가");
         }
 
         // 형식: 접두어_0001 (자동 연번, 설계 문서 미결 사항 — 확정 시 이 함수만 바꾼다).
@@ -291,7 +317,7 @@ namespace GameSystems.EditorTools
         public int RemoveOrphanPrefabEntries()
         {
             int removed = 0;
-            foreach (var entry in OfType<PrefabData>().ToList())
+            foreach (var entry in Committed.OfType<PrefabData>().ToList())
             {
                 if (entry.prefab != null || string.IsNullOrEmpty(entry.PrefabGuid)) continue;
                 if (!string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(entry.PrefabGuid))) continue;
@@ -307,7 +333,7 @@ namespace GameSystems.EditorTools
         public void Sync()
         {
             _all = null;
-            foreach (var data in All.Where(d => string.IsNullOrEmpty(d.Id)).ToList())
+            foreach (var data in Committed.Where(d => string.IsNullOrEmpty(d.Id)).ToList())
             {
                 var info = DataTypes.Find(data.GetType());
                 data.EditorAssignId(NextId(info));
@@ -321,7 +347,7 @@ namespace GameSystems.EditorTools
 
         public void SyncDatabaseAsset()
         {
-            var entries = All.ToList();
+            var entries = Committed.ToList();
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
             if (database == null)
             {

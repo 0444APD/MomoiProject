@@ -136,7 +136,7 @@ namespace GameSystems.EditorTools
             {
                 _focusGroup = id;
                 QueueRefresh();
-            }), GsButtonKind.Ghost));
+            }, staged: false), GsButtonKind.Ghost));
             right.Add(rightHead);
             var groupSearch = new GsSearchField("그룹·키워드 검색") { Value = _groupSearch };
             groupSearch.Changed += v =>
@@ -252,7 +252,7 @@ namespace GameSystems.EditorTools
                 KeywordTools.Connect(type, field, id);
                 _focusGroup = id;
                 QueueRefresh();
-            }), GsButtonKind.Primary));
+            }, staged: false), GsButtonKind.Primary));
             actions.Add(Gs.HSpace(6));
             if (KeywordTools.GroupOf(type, field) != "")
                 actions.Add(new GsButton("모든 키워드 허용", () =>
@@ -308,6 +308,12 @@ namespace GameSystems.EditorTools
                 names.Add(Gs.Label($"{id}  ·  연결된 필드 {linkedCount}개", "gs-caption"));
                 head.Add(names);
                 if (isCurrent) head.Add(new GsBadge("연결됨", Gs.Success));
+                else if (selected != null && EditorDatabase.Staging.IsAdded(group))
+                {
+                    var pending = new GsBadge("도감에서 적용 대기", Gs.Warning);
+                    pending.tooltip = "도감에서 만든 뒤 아직 적용하지 않은 그룹입니다. 도감에서 탭을 옮겨 적용하면 연결할 수 있습니다.";
+                    head.Add(pending);
+                }
                 else if (selected != null)
                 {
                     var (type, field) = selected.Value;
@@ -330,7 +336,7 @@ namespace GameSystems.EditorTools
                     chip.style.marginBottom = 6;
                     chips.Add(chip);
                 }
-                var add = new GsButton("+ 키워드", () => KeywordDialogs.AddKeywords(_root, id, _ => QueueRefresh()), GsButtonKind.Ghost);
+                var add = new GsButton("+ 키워드", () => KeywordDialogs.AddKeywords(_root, id, _ => QueueRefresh(), staged: false), GsButtonKind.Ghost);
                 chips.Add(add);
                 card.Add(chips);
 

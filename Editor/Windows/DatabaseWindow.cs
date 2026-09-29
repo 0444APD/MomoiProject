@@ -37,6 +37,7 @@ namespace GameSystems.EditorTools
         [SerializeField] string _expandedStep;
         VisualElement _typeTools;
         VisualElement _helpSlot;
+        GsButton _viewSettingsButton;
 
         [MenuItem("Game Systems/도감", priority = 0)]
         public static void Open() => OpenWindow();
@@ -53,11 +54,10 @@ namespace GameSystems.EditorTools
         public static void ShowType(Type type, bool create = false)
         {
             var window = OpenWindow();
-            window._selectedType = type.FullName;
-            window._selectedId = null;
-            window._animate = true;
-            window.RefreshAll();
-            if (create) window.CreateItem();
+            window.Navigate(TabOf(type), () =>
+            {
+                if (create) window.CreateItem();
+            });
         }
 
         // 항목 하나를 상세 화면으로 연다.
@@ -65,17 +65,17 @@ namespace GameSystems.EditorTools
         {
             if (item == null) return;
             var window = OpenWindow();
-            window._selectedType = item.GetType().FullName;
-            window._selectedId = item.Id;
-            window.RefreshAll();
-            window.OpenDetail(item);
+            window.Navigate(TabOf(item.GetType()), () =>
+            {
+                window._selectedId = item.Id;
+                window.OpenDetail(item);
+            });
         }
 
         public static void ShowSetup()
         {
             var window = OpenWindow();
-            window._selectedType = SetupKey;
-            window.RefreshAll();
+            window.Navigate(SetupKey);
         }
 
         // 검증 오류가 있는 첫 종류를 열고 오류 항목만 거른다.
@@ -83,10 +83,95 @@ namespace GameSystems.EditorTools
         {
             var window = OpenWindow();
             var issue = DataValidator.ValidateAll().FirstOrDefault(i => i.Severity == ValidationSeverity.Error && i.Asset != null);
-            if (issue != null) window._selectedType = issue.Asset.GetType().FullName;
-            window._search = "invalid";
-            if (window._searchField != null) window._searchField.Value = "invalid";
-            window.RefreshAll();
+            window.Navigate(issue != null ? TabOf(issue.Asset.GetType()) : window._selectedType, () =>
+            {
+                window._search = "invalid";
+                if (window._searchField != null) window._searchField.Value = "invalid";
+                window.RebuildContent();
+            });
+        }
+
+        // 종류가 보이는 탭: 사이드바에 따로 없는 종류(예: 키워드 그룹)는 같은 전용 화면을 쓰는 종류의 탭.
+        static string TabOfName(string typeName)
+        {
+            var info = DataTypes.All.FirstOrDefault(i => i.Type.FullName == typeName);
+            return info != null ? TabOf(info.Type) : typeName;
+        }
+
+        static string TabOf(Type type)
+        {
+            var info = DataTypes.Find(type);
+            if (info == null || !info.Hidden) return type.FullName;
+            return DataTypes.All.FirstOrDefault(i => !i.Hidden && i.Page == info.Page)?.Type.FullName ?? type.FullName;
+        }
+
+        // ── 탭 이동과 적용 ──────────────────────────────────────
+        // 도감의 변경은 Unity에 바로 쓰지 않고 모아 둔다. 탭을 옮길 때 변경이 있으면 목록을 보여 주고 적용하거나 되돌린다.
+
+        static CodexStaging Staging => EditorDatabase.Staging;
+
+        void Navigate(string tab, Action after = null)
+        {
+            void Go()
+            {
+                if (tab != _selectedType)
+                {
+                    _selectedType = tab;
+                    _selectedId = null;
+                    _animate = true;
+                    if (_viewSettingsPanel != null) _viewSettingsPanel.style.display = DisplayStyle.None;
+                }
+                RefreshAll();
+                after?.Invoke();
+            }
+            if (tab == _selectedType || _root == null || !Staging.HasChanges)
+            {
+                Go();
+                return;
+            }
+            AskPending(Go);
+        }
+
+        // 적용 대기 중인 변경을 항목별로 보여 주고 적용·되돌리기를 고른다. '계속 편집'이면 그대로 머문다.
+        void AskPending(Action then)
+        {
+            var changes = Staging.Changes();
+            var rows = new List<FieldChange>();
+            foreach (var change in changes)
+            {
+                var kind = CodexStaging.KindText(change.Kind);
+                if (change.Kind == PendingKind.Modified)
+                    rows.AddRange(change.Fields.Select(f => new FieldChange
+                    {
+                        Path = f.Path, Label = $"{kind} · {change.Label} › {f.Label}", Old = f.Old, New = f.New, OldObject = f.OldObject, NewObject = f.NewObject,
+                    }));
+                else
+                    rows.Add(new FieldChange
+                    {
+                        Label = $"{kind} · {change.Label}",
+                        Old = change.Kind == PendingKind.Added ? "(없음)" : change.Item.DisplayName,
+                        New = change.Kind == PendingKind.Added ? change.Item.DisplayName : "(삭제)",
+                    });
+            }
+            GsDialog.Show(_root, "적용하지 않은 변경", $"이 탭에서 바꾼 {changes.Count}개 항목을 Unity에 적용하거나 되돌립니다.", rows,
+                new DialogButton("계속 편집", GsButtonKind.Ghost, null),
+                new DialogButton("되돌리기", GsButtonKind.Default, () =>
+                {
+                    Staging.Discard();
+                    then?.Invoke();
+                }),
+                new DialogButton("적용", GsButtonKind.Primary, () =>
+                {
+                    var count = Staging.Commit();
+                    Debug.Log($"[GameSystems] 도감 변경 {count}건을 적용했습니다.");
+                    then?.Invoke();
+                }));
+        }
+
+        void OnDestroy()
+        {
+            // 창을 닫아도 변경은 사라지지 않지만, 잊지 않도록 묻는다('취소'면 다음에 열 때까지 그대로 둔다).
+            CodexStaging.AskBeforeLeaving("도감 창을 닫기 전에");
         }
 
         bool ShowingSetup
@@ -97,7 +182,7 @@ namespace GameSystems.EditorTools
                 if (_selectedType == null)
                     _selectedType = SetupRegistry.All.Any(s => !s.Optional && SetupRegistry.StateOf(s).state == SetupState.Todo) || DataTypes.All.Count == 0
                         ? SetupKey
-                        : DataTypes.All[0].Type.FullName;
+                        : DataTypes.All.First(i => !i.Hidden).Type.FullName;
                 return _selectedType == SetupKey;
             }
         }
@@ -179,7 +264,8 @@ namespace GameSystems.EditorTools
             };
             _typeTools.Add(_views);
             _typeTools.Add(Gs.HSpace(8));
-            _typeTools.Add(new GsButton("보기 설정", ToggleViewSettings, GsButtonKind.Ghost));
+            _viewSettingsButton = new GsButton("보기 설정", ToggleViewSettings, GsButtonKind.Ghost);
+            _typeTools.Add(_viewSettingsButton);
             _typeTools.Add(Gs.HSpace(8));
             _typeTools.Add(new GsButton("+ 새로 만들기", CreateItem, GsButtonKind.Primary));
             main.Add(header);
@@ -210,7 +296,7 @@ namespace GameSystems.EditorTools
             {
                 if (ShowingSetup) return null;
                 var types = DataTypes.All;
-                var info = types.FirstOrDefault(t => t.Type.FullName == _selectedType) ?? types.FirstOrDefault();
+                var info = types.FirstOrDefault(t => t.Type.FullName == TabOfName(_selectedType)) ?? types.FirstOrDefault(t => !t.Hidden);
                 return info?.Type;
             }
         }
@@ -256,13 +342,7 @@ namespace GameSystems.EditorTools
 
             var steps = SetupRegistry.All;
             var finished = steps.Count(s => SetupRegistry.StateOf(s).state != SetupState.Todo);
-            var setup = new GsNavItem("시작하기", Gs.Accent, () =>
-            {
-                _selectedType = SetupKey;
-                _viewSettingsPanel.style.display = DisplayStyle.None;
-                _animate = true;
-                RefreshAll();
-            });
+            var setup = new GsNavItem("시작하기", Gs.Accent, () => Navigate(SetupKey));
             setup.SetCount($"{finished}/{steps.Count}");
             setup.SetActive(ShowingSetup);
             _sidebar.Add(setup);
@@ -270,22 +350,17 @@ namespace GameSystems.EditorTools
             _sidebar.Add(help);
 
             var selected = SelectedType;
-            foreach (var group in DataTypes.All.GroupBy(t => t.Group))
+            foreach (var group in DataTypes.All.Where(t => !t.Hidden).GroupBy(t => t.Group))
             {
                 _sidebar.Add(Gs.Label(group.Key.ToUpperInvariant(), "gs-sidebar__group"));
                 foreach (var info in group)
                 {
                     var type = info.Type;
-                    var item = new GsNavItem(info.DisplayName, Gs.PaletteFor(type.Name), () =>
-                    {
-                        _selectedType = type.FullName;
-                        _selectedId = null;
-                        _animate = true;
-                        _viewSettingsPanel.style.display = DisplayStyle.None;
-                        RefreshAll();
-                    });
-                    var count = EditorDatabase.Instance.OfType(type).Count();
-                    var errors = _issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && i.Asset.GetType() == type);
+                    var item = new GsNavItem(info.DisplayName, Gs.PaletteFor(type.Name), () => Navigate(type.FullName));
+                    // 전용 화면을 함께 쓰는 종류(키워드 + 키워드 그룹)는 한 탭에서 센다.
+                    var types = DataTypes.All.Where(i => i.Type == type || (info.Page != null && i.Page == info.Page)).Select(i => i.Type).ToList();
+                    var count = EditorDatabase.Instance.All.Count(d => types.Contains(d.GetType()));
+                    var errors = _issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && types.Contains(i.Asset.GetType()));
                     item.SetCount(errors > 0 ? $"{count} · 오류 {errors}" : count.ToString());
                     item.SetActive(type == selected);
                     _sidebar.Add(item);
@@ -296,6 +371,14 @@ namespace GameSystems.EditorTools
                 _sidebar.Add(Gs.Label("GameData를 상속한 데이터 타입이 없습니다.", "gs-caption"));
 
             _sidebar.Add(Gs.Spacer());
+
+            if (Staging.HasChanges)
+            {
+                var pending = new GsNotice($"적용 대기 {Staging.Changes().Count}건 · 탭을 옮길 때 적용", GsNoticeKind.Warning);
+                pending.tooltip = "도감의 변경은 탭을 옮길 때 목록을 확인하고 Unity에 적용합니다. 그 전까지는 에셋이 바뀌지 않습니다.";
+                pending.style.marginBottom = 6;
+                _sidebar.Add(pending);
+            }
 
             var errorCount = _issues.Count(i => i.Severity == ValidationSeverity.Error);
             var warningCount = _issues.Count(i => i.Severity == ValidationSeverity.Warning);
@@ -340,6 +423,19 @@ namespace GameSystems.EditorTools
             }
 
             var info = DataTypes.Find(type);
+            // 전용 화면(키워드 등): 시트·카드 대신 그 화면이 그린다.
+            var page = info.Page != null ? CodexPage.Find(info.Page) : null;
+            _views.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
+            _viewSettingsButton.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
+            if (page != null)
+            {
+                _title.text = info.DisplayName;
+                var context = PageContext();
+                _caption.text = page.Caption(context);
+                page.Build(context);
+                _animate = false;
+                return;
+            }
             var all = EditorDatabase.Instance.OfType(type).ToList();
             var items = all.Where(Matches).ToList();
             var typeErrors = _issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && i.Asset.GetType() == type);
@@ -508,6 +604,17 @@ namespace GameSystems.EditorTools
             return row;
         }
 
+        CodexPageContext PageContext() => new CodexPageContext
+        {
+            Host = _root,
+            Content = _content,
+            Search = _search ?? "",
+            Issues = _issues,
+            OpenDetail = item => OpenDetail(item),
+            Refresh = QueueRefresh,
+            Animate = _animate,
+        };
+
         bool Matches(GameData data)
         {
             if (string.IsNullOrWhiteSpace(_search)) return true;
@@ -607,6 +714,7 @@ namespace GameSystems.EditorTools
                     card.AddBadge(tag, Gs.PaletteFor("tag:" + tag));
                 if (_issues.Any(i => i.Asset == item && i.Severity == ValidationSeverity.Error))
                     card.AddBadge("오류", Gs.Danger);
+                if (Staging.IsPending(item)) card.AddBadge(Staging.IsAdded(item) ? "새 항목 · 적용 전" : "변경 · 적용 전", Gs.Warning);
 
                 foreach (var stat in view.Stats)
                 {
@@ -632,6 +740,11 @@ namespace GameSystems.EditorTools
             var type = SelectedType;
             if (type == null) return;
             var info = DataTypes.Find(type);
+            if (info.Page != null && CodexPage.Find(info.Page) is CodexPage page)
+            {
+                page.Create(PageContext());
+                return;
+            }
             var db = EditorDatabase.Instance;
             // 이름(ID)은 여기서 한 번 짓는다. 이후 모든 곳에서는 목록에서 고른다.
             GsDialog.Form(_root, $"새 {info.DisplayName}", "ID는 저장 파일·코드(GameIds)·조건이 함께 쓰는 식별자입니다. 나중에 바꿔도 참조가 모두 따라갑니다.",
@@ -645,7 +758,7 @@ namespace GameSystems.EditorTools
                 values =>
                 {
                     var name = string.IsNullOrWhiteSpace(values["name"]) ? null : values["name"].Trim();
-                    var created = db.Create(type, name, values["id"]);
+                    var created = Staging.Add(type, values["id"], name);
                     _selectedId = created.Id;
                     _search = "";
                     _searchField.Value = "";
@@ -671,37 +784,63 @@ namespace GameSystems.EditorTools
                 values =>
                 {
                     panel.Close();
-                    var count = db.Rename(item, values["id"]);
-                    _selectedId = item.Id;
+                    var count = StageRename(item, values["id"]);
+                    _selectedId = values["id"];
                     QueueRefresh();
-                    Debug.Log($"[GameSystems] ID를 바꿨습니다: {item.DisplayName} → {item.Id} (참조 {count}곳 갱신)");
+                    Debug.Log($"[GameSystems] ID 바꾸기를 모아 두었습니다: {item.DisplayName} → {values["id"]} (참조 {count}곳, 탭을 옮길 때 적용)");
                 });
         }
 
+        // ID 바꾸기도 모아 둔다: 이 항목과, 이 ID를 가리키는 항목들의 작업본을 함께 고친다(도감이 바로 새 ID로 보인다).
+        // 적용하면 내용을 원본에 옮긴 뒤 ID 바꾸기(파일 이름·변경 이력·GameIds)가 실제로 일어난다.
+        static int StageRename(GameData item, string newId)
+        {
+            var db = EditorDatabase.Instance;
+            var work = Staging.Work(item);
+            var usages = db.FindUsages(work);
+            foreach (var usage in usages)
+            {
+                var owner = Staging.Work(usage.Owner);
+                var so = new SerializedObject(owner);
+                var property = so.FindProperty(usage.PropertyPath);
+                if (property == null) continue;
+                property.stringValue = newId;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            work.EditorAssignId(newId);
+            Staging.Touch();
+            return usages.Count;
+        }
+
         // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
+        // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 도감 목록에 바로 보이고, Unity 에셋에는 탭을 옮길 때 적용된다.
 
         void OpenDetail(GameData item, string focusPath = null)
         {
+            item = Staging.Work(item);
             _selectedId = item.Id;
             var info = DataTypes.Find(item.GetType());
             var view = ViewSettings.Resolve(item.GetType());
+            var target = item;
             var options = new DetailOptions
             {
-                Subtitle = $"{info?.DisplayName}  ·  {item.Id}",
+                Subtitle = $"{info?.DisplayName}  ·  {item.Id}" + (Staging.IsAdded(item) ? "  ·  새 항목(적용 전)" : ""),
                 ImagePath = view.Image?.Path,
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
                 HelpTopic = HelpIds.Data(item.GetType()),
+                Staged = true,
                 Summary = draft => DescribeItem((GameData)draft),
-                Validate = draft => ValidateDraft(item, (GameData)draft),
-                Saved = _ =>
-                {
-                    EditorDatabase.MarkDirty();
-                    QueueRefresh();
-                },
+                Validate = draft => ValidateDraft(target, (GameData)draft),
+                Saved = _ => Staging.Touch(),
             };
-            options.Actions.Add(("에셋 위치", _ => EditorGUIUtility.PingObject(item)));
-            options.Actions.Add(("ID 바꾸기", panel => RenameId(item, panel)));
+            options.Actions.Add(("에셋 위치", _ =>
+            {
+                var original = Staging.OriginalOf(target);
+                if (original != null) EditorGUIUtility.PingObject(original);
+                else Debug.Log("[GameSystems] 아직 적용하지 않은 새 항목이라 에셋이 없습니다.");
+            }));
+            options.Actions.Add(("ID 바꾸기", panel => RenameId(target, panel)));
             if (item is PrefabData prefabEntry)
             {
                 // 프리팹은 도감에서 지우지 않는다. 프로젝트 창의 프리팹으로 이동해 거기서 지운다(항목은 자동 정리).
@@ -778,12 +917,11 @@ namespace GameSystems.EditorTools
                     null, new DialogButton("확인", GsButtonKind.Primary, null));
                 return;
             }
-            GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 에셋은 휴지통으로 이동합니다.", "삭제", () =>
+            GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 탭을 옮길 때 적용하면 에셋이 휴지통으로 이동합니다.", "삭제", () =>
             {
                 panel.Close();
-                AssetDatabase.MoveAssetToTrash(AssetDatabase.GetAssetPath(item));
+                Staging.Remove(item);
                 _selectedId = null;
-                EditorDatabase.Instance.Sync();
             });
         }
         // ── 보기 설정 ──────────────────────────────────────────

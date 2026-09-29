@@ -64,7 +64,7 @@ namespace GameSystems.EditorTools
         // 만든(또는 이미 최신인) 파일 경로. 식별자가 하나도 없으면 null.
         public static string Generate(bool force = false)
         {
-            var all = EditorDatabase.Instance.All.Where(d => d != null && !string.IsNullOrEmpty(d.Id)).ToList();
+            var all = EditorDatabase.Instance.Committed.Where(d => d != null && !string.IsNullOrEmpty(d.Id)).ToList();
             if (all.Count == 0) return null;
 
             var settings = LoadSettings();

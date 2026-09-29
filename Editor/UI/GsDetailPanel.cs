@@ -30,6 +30,8 @@ namespace GameSystems.EditorTools.UI
         public Action<UnityEngine.Object> Saved;
         // 제목 옆 "?" 버튼이 여는 도움말 항목.
         public string HelpTopic;
+        // 도감처럼 변경을 모아 두는 곳: 저장 확인 없이 작업본에 바로 반영하고, Unity 적용은 탭을 옮길 때 한다.
+        public bool Staged;
     }
 
     // 모든 카드·시트가 공유하는 상세 보기·편집 패널.
@@ -150,7 +152,8 @@ namespace GameSystems.EditorTools.UI
             _revert = new GsButton("되돌리기", Revert, GsButtonKind.Ghost);
             footer.Add(_revert);
             footer.Add(Gs.HSpace(8));
-            _save = new GsButton("저장", Save, GsButtonKind.Primary);
+            _save = new GsButton(_options.Staged ? "반영" : "저장", Save, GsButtonKind.Primary);
+            if (_options.Staged) _save.tooltip = "도감 목록에 바로 반영합니다. Unity 에셋에는 탭을 옮길 때 변경 목록을 확인하고 적용합니다.";
             footer.Add(_save);
             Add(footer);
 
@@ -491,6 +494,11 @@ namespace GameSystems.EditorTools.UI
         void Save()
         {
             if (_changes.Count == 0) return;
+            if (_options.Staged)
+            {
+                SaveNow();
+                return;
+            }
             GsDialog.Confirm(_host, "변경 사항 저장", $"아래 {_changes.Count}개 항목을 저장합니다.", "저장", () => SaveNow(), _changes);
         }
 
@@ -501,10 +509,10 @@ namespace GameSystems.EditorTools.UI
                 _modal.Close();
                 return;
             }
-            GsDialog.Show(_host, "저장하지 않은 변경", $"변경 {_changes.Count}개가 저장되지 않았습니다.", _changes,
+            GsDialog.Show(_host, _options.Staged ? "반영하지 않은 변경" : "저장하지 않은 변경", $"변경 {_changes.Count}개가 {(_options.Staged ? "반영" : "저장")}되지 않았습니다.", _changes,
                 new DialogButton("계속 편집", GsButtonKind.Ghost, null),
                 new DialogButton("버리고 닫기", GsButtonKind.Default, () => _modal.Close()),
-                new DialogButton("저장하고 닫기", GsButtonKind.Primary, () =>
+                new DialogButton(_options.Staged ? "반영하고 닫기" : "저장하고 닫기", GsButtonKind.Primary, () =>
                 {
                     SaveNow();
                     _modal.Close();

@@ -64,7 +64,7 @@ namespace GameSystems.EditorTools.UI
     {
         const string LinesCaption = "한 줄에 하나씩 'ID 표시이름'. 예: legendary 전설. 표시 이름은 생략할 수 있습니다. ID는 영문 소문자·숫자·밑줄.";
 
-        public static void AddKeywords(VisualElement host, string group, Action<List<string>> done)
+        public static void AddKeywords(VisualElement host, string group, Action<List<string>> done, bool? staged = null)
         {
             var groupName = EditorDatabase.Instance.FindById(group)?.DisplayName ?? group;
             GsDialog.Form(host, $"'{groupName}'에 키워드 추가", "필드에는 키워드의 ID가 저장됩니다. 표시 이름은 나중에 바꿔도 값에 영향이 없습니다.",
@@ -78,13 +78,13 @@ namespace GameSystems.EditorTools.UI
                 values =>
                 {
                     var created = new List<string>();
-                    foreach (var (id, name) in KeywordTools.ParseLines(values["lines"])) created.Add(KeywordTools.CreateKeyword(group, id, name).Id);
+                    foreach (var (id, name) in KeywordTools.ParseLines(values["lines"])) created.Add(KeywordTools.CreateKeyword(group, id, name, staged).Id);
                     done?.Invoke(created);
                 });
         }
 
         // 새 그룹과 그 키워드를 한 번에. 만든 그룹 ID를 돌려준다.
-        public static void NewGroup(VisualElement host, string title, Action<string> done)
+        public static void NewGroup(VisualElement host, string title, Action<string> done, bool? staged = null)
         {
             GsDialog.Form(host, title ?? "새 키워드 그룹", "그룹은 키워드의 부모입니다. 예: 등급(전설·레어·일반), 장비 태그(불속성·얼음·전기).",
                 new[]
@@ -103,8 +103,8 @@ namespace GameSystems.EditorTools.UI
                 },
                 values =>
                 {
-                    var group = KeywordTools.CreateGroup(values["id"], values["name"]);
-                    foreach (var (id, name) in KeywordTools.ParseLines(values["lines"])) KeywordTools.CreateKeyword(group.Id, id, name);
+                    var group = KeywordTools.CreateGroup(values["id"], values["name"], staged);
+                    foreach (var (id, name) in KeywordTools.ParseLines(values["lines"])) KeywordTools.CreateKeyword(group.Id, id, name, staged);
                     done?.Invoke(group.Id);
                 });
         }
