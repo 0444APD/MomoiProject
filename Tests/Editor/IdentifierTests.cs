@@ -83,7 +83,7 @@ namespace GameSystems.Tests
             Assert.AreEqual(5, session.State.Get<int>("player.gold"));
             Assert.AreEqual(StateZone.Meta, session.State.ZoneOf("player.gold"));
             Assert.IsNotNull(session.State.Get<TestInventory>("player.bag"));
-            Assert.AreEqual("골드", session.State.LabelOf("player.gold"));
+            Assert.AreEqual("player.gold", session.State.LabelOf("player.gold"), "도감 항목은 ID로만 식별한다");
         }
 
         [Test]

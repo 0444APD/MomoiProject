@@ -400,7 +400,12 @@ namespace GameSystems.EditorTools.UI
                 return inline;
             }
 
-            public override UnityEngine.Object ObjectAt(string path) => _panel._draftObject.FindProperty(path)?.objectReferenceValue;
+            public override UnityEngine.Object ObjectAt(string path)
+            {
+                // 배치의 스프라이트 블록이 스프라이트가 아닌 필드를 가리킬 수 있다(배치를 바꾼 뒤 필드 형식이 바뀐 경우 등).
+                var property = _panel._draftObject.FindProperty(path);
+                return property != null && property.propertyType == SerializedPropertyType.ObjectReference ? property.objectReferenceValue : null;
+            }
 
             public override void SetObject(string path, UnityEngine.Object value)
             {
@@ -419,7 +424,7 @@ namespace GameSystems.EditorTools.UI
             if (path == null || !_sections.TryGetValue(path, out var focus)) return;
             var target = focus;
             target.AddToClassList("gs-detail__section--changed");
-            if (_body.contentContainer.Contains(target)) _body.ScrollTo(target);
+            if (_body.panel != null && _body.contentContainer.Contains(target)) _body.ScrollTo(target);
             schedule.Execute(() => RefreshState()).StartingIn(1600);
         }
 

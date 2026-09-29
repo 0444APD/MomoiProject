@@ -48,11 +48,7 @@ namespace GameSystems.Tests
             Assert.AreEqual(1, dropdown.Query(className: "gs-dropdown__item--selected").ToList().Count, "현재 값 표시");
             Assert.IsNull(dropdown.Q<GsSearchField>(), "항목이 적으면 검색창이 없다");
 
-            using (var click = ClickEvent.GetPooled())
-            {
-                click.target = rows[1];
-                rows[1].SendEvent(click);
-            }
+            dropdown.PickVisible(1);
             Assert.AreEqual("이하", picked);
         }
 

@@ -171,6 +171,12 @@ namespace GameSystems.EditorTools.UI
             return row;
         }
 
+        // 보이는 줄 하나를 고른다(키보드 Enter와 테스트가 쓴다: 패널에 붙지 않은 요소에는 클릭 이벤트가 전달되지 않는다).
+        internal void PickVisible(int index)
+        {
+            if (index >= 0 && index < _visible.Count) Pick(_visible[index].item);
+        }
+
         void Pick(GsDropdownItem item)
         {
             if (item.Disabled) return;
@@ -185,12 +191,12 @@ namespace GameSystems.EditorTools.UI
             if (_active < 0 || _active >= _visible.Count) return;
             var row = _visible[_active].row;
             row.AddToClassList("gs-dropdown__item--active");
-            if (row.layout.height > 0) _list.ScrollTo(row);
+            if (_list.panel != null && row.layout.height > 0) _list.ScrollTo(row);
         }
 
         void ScrollToSelected()
         {
-            if (_active >= 0 && _active < _visible.Count) _list.ScrollTo(_visible[_active].row);
+            if (_list.panel != null && _active >= 0 && _active < _visible.Count) _list.ScrollTo(_visible[_active].row);
         }
 
         void OnKey(KeyDownEvent e)
