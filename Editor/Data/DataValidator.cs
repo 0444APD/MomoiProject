@@ -70,6 +70,9 @@ namespace GameSystems.EditorTools
                     context.Error($"검증 중 오류: {e.Message}");
                 }
 
+                if (data is AchievementData withState && withState.condition != null)
+                    CheckStateFields(withState.condition, all, context);
+
                 if (data is AchievementData achievement && achievement.condition != null)
                 {
                     var keys = new HashSet<string>();
@@ -81,6 +84,19 @@ namespace GameSystems.EditorTools
 
             FindCycles(all.OfType<AchievementData>().ToList(), context);
             return context.Issues;
+        }
+
+        // 상태 값 검사 블록: 상태 키가 있는지, 그 값 형식 기준으로 경로·비교·값이 맞는지.
+        static void CheckStateFields(Condition condition, IReadOnlyList<GameData> all, Context context)
+        {
+            if (condition is StateFieldCondition check && !string.IsNullOrEmpty(check.key))
+            {
+                var key = all.OfType<StateKeyData>().FirstOrDefault(k => k.Id == check.key);
+                if (key == null) context.Error($"상태 값 검사: 없는 상태 키 '{check.key}'를 가리킵니다.");
+                else if (key.ValueType != null && !new FieldCheck { path = check.path, op = check.op, value = check.value }.Validate(key.ValueType, out var error))
+                    context.Error($"상태 값 검사({key.DisplayName}): {error}");
+            }
+            foreach (var child in condition.Children) CheckStateFields(child, all, context);
         }
 
         // [DataRef] 필드가 없는 항목을 가리키는지(수치·도전과제 참조는 블록 검증이 따로 본다).
