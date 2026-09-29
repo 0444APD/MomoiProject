@@ -46,6 +46,8 @@ namespace GameSystems.EditorTools
 
         public static List<ValidationIssue> Validate(IReadOnlyList<GameData> all)
         {
+            // 사라진 항목(적용·되돌리기로 지워진 작업본 등)은 건너뛴다.
+            all = all.Where(d => d != null).ToList();
             var context = new Context(all);
 
             foreach (var group in all.Where(d => !string.IsNullOrEmpty(d.Id)).GroupBy(d => d.Id).Where(g => g.Count() > 1))

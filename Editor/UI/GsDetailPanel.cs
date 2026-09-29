@@ -443,6 +443,13 @@ namespace GameSystems.EditorTools.UI
 
         internal void RefreshState()
         {
+            // 닫혔거나(사본 삭제) 대상이 사라졌으면(적용·되돌리기로 작업본이 없어짐) 아무것도 하지 않는다. 대상이 사라졌으면 패널도 닫는다.
+            if (_draft == null) return;
+            if (_target == null)
+            {
+                _modal?.Close();
+                return;
+            }
             _changes = DraftDiff.Compute(_originalObject, _draftObject);
             var changed = new HashSet<string>(_changes.Select(c => c.Path));
 
