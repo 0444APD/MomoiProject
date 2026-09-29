@@ -24,7 +24,7 @@ namespace GameSystems.EditorTools
         }
 
         // 데이터(현재 세션·플레이어의 모든 값)는 탐색기로, 나머지는 기능별 화면.
-        static readonly string[] TabNames = { "타임라인", "데이터", "도전과제", "수치", "이벤트", "행동", "명령" };
+        static readonly string[] TabNames = { "타임라인", "데이터", "도전과제", "로그", "이벤트", "행동", "명령" };
 
         [SerializeField] Tab _tab;
         [SerializeField] string _search = "";
@@ -701,7 +701,7 @@ namespace GameSystems.EditorTools
                 {
                     Folder("판 데이터", "이번 판 내용(세션 구역) · 판 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Session, Gs.Palette[6]),
                     Folder("프로필 데이터", "판이 바뀌어도 유지(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Meta, Gs.Palette[4]),
-                    Folder("수치", "수치 탭에서 규칙·이벤트로 다루는 값", k => k.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal), Gs.Palette[2]),
+                    Folder("로그", "로그 탭에서 규칙·이벤트로 다루는 값", k => k.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal), Gs.Palette[2]),
                     new ExplorerItem
                     {
                         Label = "도전과제 달성",
@@ -959,9 +959,9 @@ namespace GameSystems.EditorTools
                 return;
             }
 
-            var panel = Gs.Panel("수치", "행을 클릭하면 오른쪽 아래에서 값을 바꾸거나 이벤트로 기록합니다", out _, out var body);
+            var panel = Gs.Panel("로그", "행을 클릭하면 오른쪽 아래에서 값을 바꾸거나 이벤트로 기록합니다", out _, out var body);
             var header = Gs.Box("gs-sheet__header");
-            foreach (var (title, width) in new[] { ("수치", 240f), ("범위 · 집계", 150f), ("현재 값", 150f), ("", 200f) })
+            foreach (var (title, width) in new[] { ("로그", 240f), ("범위 · 집계", 150f), ("현재 값", 150f), ("", 200f) })
             {
                 var cell = Gs.Label(title);
                 cell.style.width = width;

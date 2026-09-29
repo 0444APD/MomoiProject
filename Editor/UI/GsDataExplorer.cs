@@ -532,6 +532,8 @@ namespace GameSystems.EditorTools.UI
 
         internal VisualElement Row(Entry entry)
         {
+            // 값 하나(폴더가 아닌 줄)는 입력 칸 모양으로. 폴더·고르기 목록은 줄 모양 그대로.
+            if (_browse && !entry.IsFolder) return ValueField(entry);
             var row = Gs.Box("gs-explorer__row");
             var icon = Gs.Box(entry.IsFolder ? "gs-explorer__folder" : "gs-explorer__file");
             icon.style.backgroundColor = Gs.WithAlpha(entry.Color, entry.IsFolder ? 0.85f : 0.35f);
@@ -603,6 +605,80 @@ namespace GameSystems.EditorTools.UI
             return row;
         }
 
+        // 값 하나를 입력 칸 모양으로: 상자 안 위쪽 이름표, 아래 값(긴 값은 5줄까지, 그 이상은 칸 안에서 스크롤).
+        VisualElement ValueField(Entry entry)
+        {
+            var apply = ApplyFor(entry);
+            var editable = entry.Set != null && apply != null;
+            var preview = Gs.Label(entry.Preview ?? "", "gs-field__value");
+            preview.style.whiteSpace = WhiteSpace.Normal;
+            var scroll = new ScrollView(ScrollViewMode.Vertical);
+            scroll.AddToClassList("gs-inline__scroll");
+            scroll.style.maxHeight = GsField.MaxValueHeight;
+            scroll.style.flexGrow = 1;
+            scroll.Add(preview);
+            var line = Gs.Row("gs-field__line");
+            line.Add(scroll);
+
+            var field = new GsField(entry.Label, line)
+            {
+                IsEmpty = () => entry.Value == null || (entry.Value is string text && text.Length == 0),
+            };
+            if (!string.IsNullOrEmpty(entry.Caption)) field.tooltip = entry.Caption;
+            field.SetDisabled(!editable);
+
+            if (entry.Remove != null && apply != null)
+            {
+                var remove = new GsButton("✕", () =>
+                {
+                    apply(entry.Remove);
+                    Changed?.Invoke();
+                    Refresh();
+                }, GsButtonKind.Ghost);
+                remove.tooltip = "목록에서 빼기";
+                line.Add(remove);
+            }
+            // 에셋 참조(스프라이트·데이터 등): Unity 오브젝트 선택 창을 칸 전체에 덮는다.
+            if (editable && DataModel.Of(entry.Type ?? typeof(object)).Kind == DataKind.Reference)
+            {
+                var picker = new ObjectFieldProxy(entry.Type);
+                picker.SetValue(entry.Value as UnityEngine.Object);
+                picker.Changed += value =>
+                {
+                    apply(() => entry.Set(value));
+                    Changed?.Invoke();
+                    Refresh();
+                    var rule = SpriteSpecEditor.RuleFor(entry.Member as FieldInfo);
+                    var host = panel?.visualTree.Q(className: "gs-root");
+                    if (rule != null && value is Sprite placed && host != null) GsSpriteFraming.Open(host, placed, rule.spriteGroup, Refresh);
+                };
+                field.Box.Add(picker.Element);
+            }
+            var spriteRule = SpriteSpecEditor.RuleFor(entry.Member as FieldInfo);
+            if (spriteRule != null && entry.Value is Sprite framed)
+            {
+                line.Add(new GsButton("맞추기", () =>
+                {
+                    var host = panel?.visualTree.Q(className: "gs-root");
+                    if (host != null) GsSpriteFraming.Open(host, framed, spriteRule.spriteGroup, Refresh);
+                }, GsButtonKind.Ghost));
+            }
+
+            if (editable)
+            {
+                field.Open = () => BeginEdit(field, preview, entry, apply);
+                field.Box.RegisterCallback<ClickEvent>(e =>
+                {
+                    // 비어 있을 때는 칸이 이미 열었고, 칸 안의 버튼은 버튼이 처리한다.
+                    if (e.isPropagationStopped) return;
+                    if (e.target is VisualElement target && (target is GsButton || target.GetFirstAncestorOfType<GsButton>() != null)) return;
+                    BeginEdit(field, preview, entry, apply);
+                });
+            }
+            field.RefreshEmpty();
+            return field;
+        }
+
         // 값 고치기: 목록 고르기 규칙(ID 참조·enum) → 목록, 참거짓 → 뒤집기, 나머지 → 글자 입력.
         void BeginEdit(VisualElement row, Label preview, Entry entry, Action<Action> apply)
         {
@@ -628,18 +704,32 @@ namespace GameSystems.EditorTools.UI
                     Group = c.Group,
                     Selected = Equals(c.Value, entry.Value),
                 }).ToList();
-                GsDropdown.Show(preview, items, placeholder: "검색");
+                var owner = preview.GetFirstAncestorOfType<GsField>();
+                owner?.SetActive(true);
+                var menu = GsDropdown.Show(owner?.Box ?? (VisualElement)preview, items, placeholder: "검색");
+                if (menu != null) menu.Closed += () => owner?.SetActive(false);
                 return;
             }
-            if (row.Q<TextField>() != null) return;
-            var field = new TextField { value = entry.Value == null ? "" : Convert.ToString(entry.Value, CultureInfo.InvariantCulture) };
+            var host = preview.parent;
+            if (host.Q<TextField>() != null) return;
+            var field = new TextField { value = entry.Value == null ? "" : Convert.ToString(entry.Value, CultureInfo.InvariantCulture), multiline = type == typeof(string) };
+            if (field.multiline)
+            {
+                // 긴 글은 칸이 늘어나며 5줄까지, 그 이상은 칸 안에서 스크롤(Enter는 확정).
+                field.style.whiteSpace = WhiteSpace.Normal;
+                field.style.maxHeight = GsField.MaxValueHeight;
+                field.verticalScrollerVisibility = ScrollerVisibility.Auto;
+            }
             field.AddToClassList("gs-inline");
             field.style.flexGrow = 1;
             preview.style.display = DisplayStyle.None;
-            row.Insert(row.IndexOf(preview), field);
+            host.Insert(host.IndexOf(preview), field);
+            var box = preview.GetFirstAncestorOfType<GsField>();
+            box?.SetActive(true);
             void Finish(bool commit)
             {
                 if (field.parent == null) return;
+                box?.SetActive(false);
                 field.RemoveFromHierarchy();
                 preview.style.display = DisplayStyle.Flex;
                 if (!commit) return;
@@ -681,6 +771,8 @@ namespace GameSystems.EditorTools.UI
             object Current => _crumb.Value;
             public override Type Type => Current.GetType();
             public override bool CanEdit => _crumb.Apply != null;
+            // 상세 패널 안에 들어간 탐색기는 좁으므로 블록을 한 줄씩 쌓는다.
+            public override bool SingleColumn => _explorer.GetFirstAncestorOfType<GsDetailPanel>() != null;
             public override IEnumerable<string> Fields() => FieldPaths.MembersOf(Type).Select(m => m.Name);
 
             FieldPaths.Member MemberOf(string name) => FieldPaths.MembersOf(Type).FirstOrDefault(m => m.Name == name);

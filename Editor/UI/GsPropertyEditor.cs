@@ -77,13 +77,9 @@ namespace GameSystems.EditorTools.UI
 
         public static VisualElement FieldRow(string label, SerializedProperty property, Action onValue)
         {
-            var row = Gs.Box("gs-field-row");
-            row.Add(Gs.Label(label, "gs-field-row__label"));
-            var inline = new GsInlineProperty(property);
-            inline.AddToClassList("gs-grow");
+            var inline = new GsInlineProperty(property) { Multiline = property.propertyType == SerializedPropertyType.String };
             inline.Changed += () => onValue?.Invoke();
-            row.Add(inline);
-            return row;
+            return GsField.For(label, inline);
         }
 
         static VisualElement Section(string label, VisualElement content)
@@ -191,11 +187,11 @@ namespace GameSystems.EditorTools.UI
             add = new GsButton("+ 추가", () =>
             {
                 var items = db.RefCandidates(field).Where(k => !current.Contains(k.Id))
-                    .OrderBy(k => db.GroupLabel(k) ?? "").ThenBy(k => k.DisplayName)
+                    .OrderBy(k => db.GroupLabel(k) ?? "").ThenBy(k => CodexGroups.OrderOf(k)).ThenBy(k => k.Id)
                     .Select(k =>
                     {
                         var id = k.Id;
-                        return new GsDropdownItem(k.DisplayName, () => Add(id)) { Caption = id, Group = db.GroupLabel(k) };
+                        return new GsDropdownItem(id, () => Add(id)) { Group = db.GroupLabel(k) };
                     }).ToList();
                 if (items.Count == 0) items.Add(new GsDropdownItem("더 고를 키워드가 없습니다") { Disabled = true });
                 items.AddRange(KeywordMenuExtras(add, field, ids => { foreach (var id in ids) Add(id); }));

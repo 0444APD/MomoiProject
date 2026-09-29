@@ -38,7 +38,7 @@ namespace GameSystems.Tests
             var template = ScriptableObject.CreateInstance<TemplateData>();
             try
             {
-                template.EditorAssignId("template_bad");
+                template.EditorAssignId("templateBad");
                 template.templateType = typeof(TestLoot).FullName;
                 template.value = new TestBag();
                 var issues = GameSystems.EditorTools.DataValidator.Validate(new List<GameData> { template });

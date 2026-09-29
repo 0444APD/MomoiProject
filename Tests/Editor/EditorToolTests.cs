@@ -16,7 +16,6 @@ namespace GameSystems.Tests
         {
             var data = ScriptableObject.CreateInstance<T>();
             data.EditorAssignId(id);
-            data.EditorSetDisplayName(name);
             _created.Add(data);
             return data;
         }
@@ -31,8 +30,8 @@ namespace GameSystems.Tests
         [Test]
         public void 중복_ID를_잡는다()
         {
-            var a = Make<StatData>("stat_0001", "A");
-            var b = Make<StatData>("stat_0001", "B");
+            var a = Make<StatData>("stat1", "A");
+            var b = Make<StatData>("stat1", "B");
             var issues = DataValidator.Validate(new List<GameData> { a, b });
             Assert.AreEqual(2, issues.Count(i => i.Message.Contains("중복")));
         }
@@ -40,9 +39,9 @@ namespace GameSystems.Tests
         [Test]
         public void 없는_수치_참조와_빈_조건을_잡는다()
         {
-            var achievement = Make<AchievementData>("achievement_0001", "업적");
+            var achievement = Make<AchievementData>("achievement1", "업적");
             achievement.condition = new StatCompareCondition { stat = "없는수치", value = 1 };
-            var empty = Make<AchievementData>("achievement_0002", "빈 업적");
+            var empty = Make<AchievementData>("achievement2", "빈 업적");
             var issues = DataValidator.Validate(new List<GameData> { achievement, empty });
             Assert.IsTrue(issues.Any(i => i.Asset == achievement && i.Message.Contains("존재하지 않는 수치")));
             Assert.IsTrue(issues.Any(i => i.Asset == empty && i.Message.Contains("조건이 없습니다")));
@@ -51,11 +50,11 @@ namespace GameSystems.Tests
         [Test]
         public void 합계형이_아닌_수치에_더하기_보상은_오류()
         {
-            var stat = Make<StatData>("stat_0001", "최고 콤보");
+            var stat = Make<StatData>("stat1", "최고 콤보");
             stat.aggregate = StatAggregate.Max;
-            var achievement = Make<AchievementData>("achievement_0001", "업적");
-            achievement.condition = new StatCompareCondition { stat = "stat_0001", value = 1 };
-            achievement.rewards.Add(new AddToStatReward { stat = "stat_0001", amount = 1 });
+            var achievement = Make<AchievementData>("achievement1", "업적");
+            achievement.condition = new StatCompareCondition { stat = "stat1", value = 1 };
+            achievement.rewards.Add(new AddToStatReward { stat = "stat1", amount = 1 });
             var issues = DataValidator.Validate(new List<GameData> { stat, achievement });
             Assert.IsTrue(issues.Any(i => i.Message.Contains("합계형")));
         }
@@ -63,10 +62,10 @@ namespace GameSystems.Tests
         [Test]
         public void 순환_참조를_잡는다()
         {
-            var a = Make<AchievementData>("achievement_0001", "A");
-            var b = Make<AchievementData>("achievement_0002", "B");
-            a.condition = new AchievementUnlockedCondition { achievement = "achievement_0002" };
-            b.condition = new AchievementUnlockedCondition { achievement = "achievement_0001" };
+            var a = Make<AchievementData>("achievement1", "A");
+            var b = Make<AchievementData>("achievement2", "B");
+            a.condition = new AchievementUnlockedCondition { achievement = "achievement2" };
+            b.condition = new AchievementUnlockedCondition { achievement = "achievement1" };
             var issues = DataValidator.Validate(new List<GameData> { a, b });
             Assert.IsTrue(issues.Any(i => i.Message.Contains("순환")));
         }
@@ -74,7 +73,7 @@ namespace GameSystems.Tests
         [Test]
         public void 잘못된_이벤트_규칙을_잡는다()
         {
-            var stat = Make<StatData>("stat_0001", "처치");
+            var stat = Make<StatData>("stat1", "처치");
             stat.rules.Add(new StatRule { eventType = "Nope.Missing" });
             stat.rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = "Missing" });
             var issues = DataValidator.Validate(new List<GameData> { stat });
@@ -85,10 +84,10 @@ namespace GameSystems.Tests
         [Test]
         public void 정상_데이터는_통과한다()
         {
-            var stat = Make<StatData>("stat_0001", "처치");
+            var stat = Make<StatData>("stat1", "처치");
             stat.rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
-            var achievement = Make<AchievementData>("achievement_0001", "업적");
-            achievement.condition = new StatCompareCondition { stat = "stat_0001", value = 5 };
+            var achievement = Make<AchievementData>("achievement1", "업적");
+            achievement.condition = new StatCompareCondition { stat = "stat1", value = 5 };
             Assert.IsEmpty(DataValidator.Validate(new List<GameData> { stat, achievement }).Where(i => i.Severity == ValidationSeverity.Error));
         }
     }
@@ -109,7 +108,8 @@ namespace GameSystems.Tests
         {
             var fields = FieldCatalog.For(typeof(AchievementData));
             Assert.AreEqual(FieldKind.Image, fields.First(f => f.Path == "icon").Kind);
-            Assert.AreEqual(FieldKind.Text, fields.First(f => f.Path == "displayName").Kind);
+            Assert.AreEqual(FieldKind.Text, fields.First(f => f.Path == "description").Kind);
+            Assert.IsFalse(fields.Any(f => f.Path == "displayName"), "도감 항목은 ID로만 식별한다(표시 이름 없음)");
             Assert.IsFalse(fields.Any(f => f.Path == "id"), "숨긴 필드(ID)는 목록에 없다");
         }
 
@@ -118,7 +118,7 @@ namespace GameSystems.Tests
         {
             var view = ViewSettings.Resolve(typeof(AchievementData));
             Assert.AreEqual("icon", view.Image?.Path);
-            Assert.AreEqual("displayName", view.Title?.Path);
+            Assert.IsNull(view.Title, "제목을 고르지 않으면 카드 제목은 ID");
             Assert.AreEqual("description", view.Subtitle?.Path);
         }
 

@@ -12,6 +12,8 @@ namespace GameSystems.EditorTools.UI
     {
         // 제목으로 쓸 필드(패널 위쪽에 크게, 편집 가능).
         public string TitlePath = "displayName";
+        // TitlePath가 없을 때 보일 고정 제목.
+        public string Title;
         public string Subtitle;
         // 이미지로 쓸 필드 경로. 지정하면 이미지를 클릭해 바꿀 수 있고, 그 필드는 정보 영역에 따로 나오지 않는다.
         public string ImagePath;
@@ -93,8 +95,9 @@ namespace GameSystems.EditorTools.UI
         // 창 크기에 맞춰 넉넉한 세로 크기.
         void Fit()
         {
-            var width = Mathf.Min(960f, Mathf.Max(700f, _host.layout.width - 64f));
-            var height = Mathf.Clamp(width * 0.8f, 520f, Mathf.Max(520f, _host.layout.height - 48f));
+            // 좁고 긴 패널: 폭은 좁게 고정, 높이는 창에 맞춰 길게(내용은 스크롤).
+            var width = Mathf.Min(480f, Mathf.Max(360f, _host.layout.width - 32f));
+            var height = Mathf.Max(420f, _host.layout.height - 40f);
             style.width = width;
             style.height = height;
         }
@@ -133,9 +136,9 @@ namespace GameSystems.EditorTools.UI
 
             _body = new ScrollView(ScrollViewMode.Vertical);
             _body.AddToClassList("gs-detail__body");
-            _body.contentContainer.style.paddingLeft = 24;
-            _body.contentContainer.style.paddingRight = 24;
-            _body.contentContainer.style.paddingTop = 20;
+            _body.contentContainer.style.paddingLeft = 16;
+            _body.contentContainer.style.paddingRight = 16;
+            _body.contentContainer.style.paddingTop = 16;
             _body.contentContainer.style.paddingBottom = 8;
             Add(_body);
 
@@ -204,13 +207,18 @@ namespace GameSystems.EditorTools.UI
             _titleSlot.Clear();
             _body.Clear();
 
-            var titleProperty = _draftObject.FindProperty(_options.TitlePath);
+            var titleProperty = string.IsNullOrEmpty(_options.TitlePath) ? null : _draftObject.FindProperty(_options.TitlePath);
             if (titleProperty != null)
             {
                 var title = new GsInlineProperty(titleProperty);
                 title.Q<Label>().AddToClassList("gs-display");
                 title.Changed += OnValueChanged;
                 _titleSlot.Add(ValueWithHistory(titleProperty.propertyPath, title, _titleSlot, "gs-display"));
+            }
+            else if (!string.IsNullOrEmpty(_options.Title))
+            {
+                // 고칠 수 없는 제목(도감 항목의 ID. ID는 'ID 바꾸기'로만 바꾼다).
+                _titleSlot.Add(Gs.Label(_options.Title, "gs-display"));
             }
 
             _notices = Gs.Col();
@@ -236,14 +244,16 @@ namespace GameSystems.EditorTools.UI
             var path = property.propertyPath;
             var field = PropertyUtil.GetField(property, out _);
             var section = Gs.Box("gs-detail__section");
-            section.Add(Gs.Label(GsPropertyEditor.LabelOf(property, field).ToUpperInvariant(), "gs-detail__label"));
+            var label = GsPropertyEditor.LabelOf(property, field);
             var content = UsesExplorer(property, field) ? EmbeddedExplorer(property, field) : GsPropertyEditor.BuildContent(property, OnValueChanged, OnStructureChanged);
             if (content is GsInlineProperty inline)
             {
-                section.Add(ValueWithHistory(path, inline, section, null));
+                // 값 하나: 입력 칸 모양(상자 안 위쪽 이름표, 아래 값). 바뀌면 이전 값이 값 위에 함께 보인다.
+                section.Add(GsField.For(label, inline, ValueWithHistory(path, inline, section, null)));
             }
             else
             {
+                section.Add(Gs.Label(label.ToUpperInvariant(), "gs-detail__label"));
                 var change = new GsChangeView(null, "", "");
                 change.style.marginBottom = 10;
                 section.Add(change);
@@ -322,6 +332,9 @@ namespace GameSystems.EditorTools.UI
             {
                 _panel = panel;
             }
+
+            // 좁은 패널: 블록을 옆으로 나누지 않고 한 줄씩 쌓는다.
+            public override bool SingleColumn => true;
 
             public override Type Type => _panel._draft.GetType();
             public override bool CanEdit => true;
@@ -457,8 +470,8 @@ namespace GameSystems.EditorTools.UI
                 _media.style.backgroundImage = StyleKeyword.Null;
                 _media.style.backgroundColor = Gs.Blend(Gs.Surface2, _options.Placeholder, 0.14f);
             }
-            var title = _draftObject.FindProperty(_options.TitlePath);
-            var titleText = title != null && title.propertyType == SerializedPropertyType.String ? title.stringValue : null;
+            var title = string.IsNullOrEmpty(_options.TitlePath) ? null : _draftObject.FindProperty(_options.TitlePath);
+            var titleText = title != null && title.propertyType == SerializedPropertyType.String ? title.stringValue : _options.Title;
             _initial.text = image == null && !string.IsNullOrEmpty(titleText) ? titleText.Substring(0, 1) : "";
 
             _summary.Clear();
@@ -476,9 +489,15 @@ namespace GameSystems.EditorTools.UI
             _summary.style.display = _summary.childCount == 0 ? DisplayStyle.None : DisplayStyle.Flex;
 
             _notices.Clear();
-            if (_options.Validate != null)
-                foreach (var (error, message) in _options.Validate(_draft))
-                    _notices.Add(new GsNotice(message, error ? GsNoticeKind.Error : GsNoticeKind.Warning));
+            var issues = _options.Validate != null ? _options.Validate(_draft) : new List<(bool error, string message)>();
+            foreach (var (error, message) in issues)
+                _notices.Add(new GsNotice(message, error ? GsNoticeKind.Error : GsNoticeKind.Warning));
+            // 오류 문구에 필드 이름이 들어 있으면 그 입력 칸에도 오류로 보인다(빨간 이름표·밑줄, 칸 아래 문구).
+            foreach (var field in _body.Query<GsField>().ToList())
+            {
+                var match = issues.FirstOrDefault(i => i.error && !string.IsNullOrEmpty(field.Label) && i.message.Contains(field.Label));
+                field.SetError(match.message);
+            }
         }
 
         // ── 되돌리기 · 저장 · 닫기 ─────────────────────────────

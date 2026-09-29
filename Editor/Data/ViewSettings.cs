@@ -242,7 +242,8 @@ namespace GameSystems.EditorTools
             }
 
             result.Image = Pick("이미지", ref view.image, Slot.Image, () => AutoImage(fields));
-            result.Title = Pick("제목", ref view.title, Slot.Title, () => fields.FirstOrDefault(f => f.Path == "displayName"));
+            // 제목을 고르지 않으면 카드 제목은 항목 ID.
+            result.Title = Pick("제목", ref view.title, Slot.Title, () => null);
             result.Subtitle = Pick("부제목", ref view.subtitle, Slot.Subtitle, () => fields.FirstOrDefault(f => f.Kind == FieldKind.Text && f.Path.IndexOf("desc", StringComparison.OrdinalIgnoreCase) >= 0));
             result.Badge = Pick("배지", ref view.badge, Slot.Badge, () => fields.FirstOrDefault(f => f.Kind == FieldKind.Enum));
 
@@ -291,9 +292,7 @@ namespace GameSystems.EditorTools
         static List<FieldEntry> AutoColumns(IReadOnlyList<FieldEntry> fields)
         {
             var list = new List<FieldEntry>();
-            var title = fields.FirstOrDefault(f => f.Path == "displayName");
-            if (title != null) list.Add(title);
-            list.AddRange(fields.Where(f => f.Path != "displayName" && f.Path != "tags" && f.Kind != FieldKind.Image).Take(6));
+            list.AddRange(fields.Where(f => f.Path != "tags" && f.Kind != FieldKind.Image).Take(6));
             return list;
         }
 

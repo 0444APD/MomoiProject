@@ -157,7 +157,7 @@ namespace GameSystems.Samples
 
         static void Enhance(GameSession session)
         {
-            var effects = new[] { "lifesteal", "fire_resist" };
+            var effects = new[] { "lifesteal", "fireResist" };
             var roll = session.Random.Get("enhance");
             session.State.Modify<SampleInventory>(InventoryKey, inv =>
             {

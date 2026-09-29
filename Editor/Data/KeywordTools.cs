@@ -12,10 +12,10 @@ namespace GameSystems.EditorTools
     {
         static EditorDatabase Db => EditorDatabase.Instance;
 
-        public static IEnumerable<KeywordGroupData> Groups() => Db.OfType<KeywordGroupData>().OrderBy(g => g.order).ThenBy(g => g.DisplayName);
+        public static IEnumerable<KeywordGroupData> Groups() => CodexGroups.Groups(typeof(KeywordGroupData)).Cast<KeywordGroupData>();
 
         public static IEnumerable<KeywordData> KeywordsOf(string group) =>
-            Db.OfType<KeywordData>().Where(k => k.group == group).OrderBy(k => k.order).ThenBy(k => k.DisplayName);
+            CodexGroups.Items(typeof(KeywordData), group).Cast<KeywordData>();
 
         // string 목록 필드면 여러 개, string 필드면 하나.
         public static bool IsMulti(FieldInfo field) => field != null && field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) == typeof(string);
@@ -70,72 +70,13 @@ namespace GameSystems.EditorTools
         public static IEnumerable<(Type type, FieldInfo field)> FieldsLinkedTo(string group) =>
             Fields().Where(f => GroupOf(f.type, f.field) == group);
 
-        // 도감 창이 열려 있으면 도감 안의 변경으로 모아 둔다(탭을 옮길 때 적용). 아니면 바로 에셋으로 만든다.
-        public static bool StageByDefault => EditorWindow.HasOpenInstances<DatabaseWindow>();
+        public static bool StageByDefault => CodexGroups.StageByDefault;
 
-        public static KeywordGroupData CreateGroup(string id, string name, bool? staged = null)
-        {
-            var label = string.IsNullOrWhiteSpace(name) ? id : name.Trim();
-            var order = Groups().Select(g => g.order).DefaultIfEmpty(0).Max() + 10;
-            if (staged ?? StageByDefault)
-            {
-                var group = (KeywordGroupData)EditorDatabase.Staging.Add(typeof(KeywordGroupData), id, label);
-                group.order = order;
-                return group;
-            }
-            var created = (KeywordGroupData)Db.Create(typeof(KeywordGroupData), label, id);
-            created.order = order;
-            EditorUtility.SetDirty(created);
-            AssetDatabase.SaveAssetIfDirty(created);
-            return created;
-        }
+        public static KeywordGroupData CreateGroup(string id, bool? staged = null) =>
+            (KeywordGroupData)CodexGroups.Create(typeof(KeywordGroupData), id, null, staged);
 
-        public static KeywordData CreateKeyword(string group, string id, string name, bool? staged = null)
-        {
-            var label = string.IsNullOrWhiteSpace(name) ? id : name.Trim();
-            var order = KeywordsOf(group).Select(k => k.order).DefaultIfEmpty(0).Max() + 10;
-            if (staged ?? StageByDefault)
-            {
-                var added = (KeywordData)EditorDatabase.Staging.Add(typeof(KeywordData), id, label);
-                added.group = group;
-                added.order = order;
-                EditorDatabase.StagingChanged();
-                return added;
-            }
-            var keyword = (KeywordData)Db.Create(typeof(KeywordData), label, id);
-            keyword.group = group;
-            keyword.order = order;
-            EditorUtility.SetDirty(keyword);
-            AssetDatabase.SaveAssetIfDirty(keyword);
-            EditorDatabase.MarkDirty();
-            return keyword;
-        }
-
-        // "ID 표시이름" 한 줄에 하나(표시 이름은 생략 가능). 쉼표로 나눠도 된다.
-        public static List<(string id, string name)> ParseLines(string text)
-        {
-            var result = new List<(string, string)>();
-            foreach (var raw in (text ?? "").Replace("\r", "").Split('\n', ','))
-            {
-                var line = raw.Trim();
-                if (line.Length == 0) continue;
-                var space = line.IndexOfAny(new[] { ' ', '\t' });
-                result.Add(space < 0 ? (line, line) : (line.Substring(0, space), line.Substring(space + 1).Trim()));
-            }
-            return result;
-        }
-
-        // 여러 키워드를 만들기 전에 검사: 형식·중복(서로 간, 기존 항목과).
-        public static string CheckNew(IEnumerable<string> ids)
-        {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var id in ids)
-            {
-                if (!seen.Add(id)) return $"'{id}'가 두 번 들어 있습니다.";
-                if (!Db.CanUseId(id, null, out var error)) return $"'{id}': {error}";
-            }
-            return null;
-        }
+        public static KeywordData CreateKeyword(string group, string id, bool? staged = null) =>
+            (KeywordData)CodexGroups.Create(typeof(KeywordData), id, group, staged);
 
         // 필드를 키워드 그룹에 연결한다(규칙이 있으면 고치고, 없으면 만든다). group이 ""이면 모든 키워드.
         public static FieldRuleData Connect(Type type, FieldInfo field, string group)
@@ -146,7 +87,7 @@ namespace GameSystems.EditorTools
             if (rule == null)
             {
                 var id = UniqueRuleId(type, field);
-                rule = (FieldRuleData)Db.Create(typeof(FieldRuleData), $"{ClassTypes.Label(type)} › {FieldLabel(field)}", id);
+                rule = (FieldRuleData)Db.Create(typeof(FieldRuleData), id);
                 rule.targetType = type.FullName;
                 rule.field = field.Name;
             }

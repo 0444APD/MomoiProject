@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace GameSystems.Data
 {
-    [Database("수치", Group = "진행", Order = 10, IdPrefix = "stat")]
+    [Database("로그", Group = "진행", Order = 10, IdPrefix = "stat")]
     [CreateAssetMenu(menuName = "Game Systems/수치", fileName = "NewStat")]
     public sealed class StatData : GameData
     {

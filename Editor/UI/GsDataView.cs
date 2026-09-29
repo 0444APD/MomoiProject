@@ -34,6 +34,8 @@ namespace GameSystems.EditorTools.UI
         public abstract UnityEngine.Object ObjectAt(string path);
         public abstract void SetObject(string path, UnityEngine.Object value);
         public abstract bool CanEdit { get; }
+        // 좁은 곳(상세 패널)에서는 블록을 옆으로 나누지 않고 모두 한 줄씩 위아래로 쌓는다.
+        public virtual bool SingleColumn => false;
         // 보고 있는 도감 항목(있으면). 항목에 딸린 블록(선택지 목록 등)이 쓴다.
         public virtual UnityEngine.Object Target => null;
 
@@ -433,6 +435,20 @@ namespace GameSystems.EditorTools.UI
                     foreach (var path in block.Claims(placement))
                         if (!string.IsNullOrEmpty(path)) claimed.Add(path.Split('.')[0]);
 
+            if (context.SingleColumn)
+            {
+                foreach (var (placement, block) in blocks.OrderBy(b => b.placement.y).ThenBy(b => b.placement.x))
+                {
+                    var cell = Gs.Col("gs-view__cell");
+                    cell.style.width = Length.Percent(100);
+                    cell.Add(BuildBlock(context, placement, block, claimed));
+                    var line = Gs.Row("gs-view__row");
+                    line.Add(cell);
+                    grid.Add(line);
+                }
+                return;
+            }
+
             foreach (var row in blocks.GroupBy(b => b.placement.y).OrderBy(g => g.Key))
             {
                 var line = Gs.Row("gs-view__row");
@@ -454,20 +470,23 @@ namespace GameSystems.EditorTools.UI
                         cell.style.height = placement.h * DataLayouts.RowUnit;
                         cell.style.overflow = Overflow.Hidden;
                     }
-                    VisualElement content;
-                    try
-                    {
-                        content = block != null ? block.Build(context, placement, claimed) : Gs.Label(GsLayoutBlock.NameOf(placement.block), "gs-caption");
-                    }
-                    catch (Exception e)
-                    {
-                        content = new GsNotice($"{GsLayoutBlock.NameOf(placement.block)} 블록 오류: {e.Message}", GsNoticeKind.Error);
-                    }
-                    cell.Add(content);
+                    cell.Add(BuildBlock(context, placement, block, claimed));
                     line.Add(cell);
                     cursor = x + w;
                 }
                 grid.Add(line);
+            }
+        }
+
+        static VisualElement BuildBlock(DataViewContext context, BlockPlacement placement, GsLayoutBlock block, ISet<string> claimed)
+        {
+            try
+            {
+                return block != null ? block.Build(context, placement, claimed) : Gs.Label(GsLayoutBlock.NameOf(placement.block), "gs-caption");
+            }
+            catch (Exception e)
+            {
+                return new GsNotice($"{GsLayoutBlock.NameOf(placement.block)} 블록 오류: {e.Message}", GsNoticeKind.Error);
             }
         }
     }

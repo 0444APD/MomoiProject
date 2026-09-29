@@ -142,11 +142,17 @@ namespace GameSystems.EditorTools.UI
             error.style.whiteSpace = WhiteSpace.Normal;
             GsButton confirm = null;
 
+            var boxes = new List<GsField>();
+            // 처음 열었을 때는 빈 칸 오류를 띄우지 않는다(무언가 입력한 뒤부터). 확인 버튼은 처음부터 막는다.
+            var touched = false;
+
             void Check()
             {
                 var problem = validate?.Invoke(values);
-                error.text = problem ?? "";
-                error.style.display = string.IsNullOrEmpty(problem) ? DisplayStyle.None : DisplayStyle.Flex;
+                var shown = touched ? problem : null;
+                var owned = MarkFields(shown);
+                error.text = owned ? "" : shown ?? "";
+                error.style.display = string.IsNullOrEmpty(shown) || owned ? DisplayStyle.None : DisplayStyle.Flex;
                 confirm?.SetEnabled(string.IsNullOrEmpty(problem));
             }
 
@@ -154,28 +160,47 @@ namespace GameSystems.EditorTools.UI
             {
                 var key = field.Key;
                 values[key] = field.Value ?? "";
-                var row = Gs.Col();
-                row.style.marginTop = 14;
-                row.Add(Gs.Label(field.Label, "gs-detail__label"));
+                // 입력 칸 모양: 상자 안 위쪽 이름표, 아래 입력. 설명은 상자 아래 옅게.
                 var input = new TextField { value = values[key], multiline = field.Multiline };
-                if (field.Multiline) input.style.minHeight = 90;
-                input.AddToClassList("gs-inline");
-                input.style.marginTop = 6;
+                input.AddToClassList("gs-field__input");
+                if (field.Multiline)
+                {
+                    input.style.whiteSpace = WhiteSpace.Normal;
+                    input.style.maxHeight = GsField.MaxValueHeight;
+                    input.verticalScrollerVisibility = ScrollerVisibility.Auto;
+                }
                 input.RegisterValueChangedCallback(e =>
                 {
                     values[key] = e.newValue ?? "";
+                    touched = true;
                     Check();
                 });
-                row.Add(input);
-                if (!string.IsNullOrEmpty(field.Caption))
-                {
-                    var caption = Gs.Label(field.Caption, "gs-caption");
-                    caption.style.marginTop = 4;
-                    caption.style.whiteSpace = WhiteSpace.Normal;
-                    row.Add(caption);
-                }
+                var row = new GsField(field.Label, input) { Open = () => input.Focus() };
+                row.SetHelp(field.Caption);
+                row.style.marginTop = 14;
                 box.Add(row);
+                boxes.Add(row);
                 inputs.Add(input);
+            }
+            // 오류 문구가 칸 이름으로 시작하면(예: "그룹 ID: …") 그 칸에도 표시한다.
+            bool MarkFields(string problem)
+            {
+                var owned = false;
+                for (int i = 0; i < boxes.Count; i++)
+                {
+                    var own = !owned && !string.IsNullOrEmpty(problem) && (problem.StartsWith(fields[i].Label, StringComparison.Ordinal) || boxes.Count == 1);
+                    if (own)
+                    {
+                        boxes[i].SetError(problem);
+                        owned = true;
+                    }
+                    else
+                    {
+                        boxes[i].SetError(null);
+                        boxes[i].SetHelp(fields[i].Caption);
+                    }
+                }
+                return owned;
             }
             box.Add(error);
 

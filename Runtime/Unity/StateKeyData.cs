@@ -6,7 +6,7 @@ namespace GameSystems.Data
 {
     // 플레이어 데이터: 저장소에 담을 게임 상태 하나. 데이터베이스 창에서 ID(=키)와 값 형식을 정하면
     // 런타임이 시작할 때 자동으로 등록하고, 코드에서는 생성된 GameIds.PlayerData.XXX로 타입까지 맞춰 쓴다.
-    [Database("플레이어 데이터", Group = "식별자", Order = 0, IdPrefix = "state")]
+    [Database("플레이어 데이터", Group = "식별자", Order = 0, IdPrefix = "playerData")]
     [CreateAssetMenu(menuName = "Game Systems/플레이어 데이터", fileName = "NewStateKey")]
     public sealed class StateKeyData : GameData
     {

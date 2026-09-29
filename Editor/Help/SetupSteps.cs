@@ -218,7 +218,7 @@ namespace GameSystems.EditorTools
             };
             yield return new SetupStep
             {
-                Id = "stats", Order = 60, Title = "수치 정의",
+                Id = "stats", Order = 60, Title = "로그 정의",
                 Summary = "처치 수·획득 골드처럼 이벤트에서 자동으로 집계할 값을 만듭니다.",
                 Body = "수치는 반영 규칙에 따라 이벤트가 발생할 때 자동으로 올라갑니다. 게임 코드는 이벤트만 발생시키면 됩니다.\n\n" +
                        "## 정할 것\n" +

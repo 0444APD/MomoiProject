@@ -23,7 +23,6 @@ namespace GameSystems.Tests
         {
             var data = ScriptableObject.CreateInstance<T>();
             data.EditorAssignId(id);
-            data.EditorSetDisplayName(name);
             _created.Add(data);
             return data;
         }
@@ -58,11 +57,9 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 키워드_입력은_줄마다_ID와_이름()
+        public void 여러_ID는_줄바꿈_띄어쓰기_쉼표로_나눈다()
         {
-            var lines = KeywordTools.ParseLines("legendary 전설\ncommon\n rare  레어 등급 ");
-            CollectionAssert.AreEqual(new[] { "legendary", "common", "rare" }, lines.Select(l => l.id));
-            CollectionAssert.AreEqual(new[] { "전설", "common", "레어 등급" }, lines.Select(l => l.name));
+            CollectionAssert.AreEqual(new[] { "legendary", "common", "rare", "epic" }, CodexGroups.ParseIds("legendary\ncommon,  rare epic "));
         }
 
         [Test]
@@ -76,7 +73,7 @@ namespace GameSystems.Tests
         [Test]
         public void 필수_규칙은_검증기가_잡는다()
         {
-            var rule = Make<FieldRuleData>("rule.tag_required", "태그 필수");
+            var rule = Make<FieldRuleData>("rule.tagRequired", "태그 필수");
             rule.targetType = typeof(StatData).FullName;
             rule.field = "tags";
             rule.source = FieldRuleSource.Keyword;

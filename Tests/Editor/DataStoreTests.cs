@@ -468,13 +468,16 @@ namespace GameSystems.Tests
         public void 식별자_규칙()
         {
             Assert.IsTrue(IdRules.IsValid("player.inventory", out _));
-            Assert.IsTrue(IdRules.IsValid("kills_total", out _));
-            Assert.IsFalse(IdRules.IsValid("Player", out _), "대문자 불가");
+            Assert.IsTrue(IdRules.IsValid("killsTotal", out _));
+            Assert.IsFalse(IdRules.IsValid("kills_total", out _), "밑줄 불가(lowerCamelCase)");
+            Assert.IsFalse(IdRules.IsValid("Player", out _), "대문자로 시작 불가");
             Assert.IsFalse(IdRules.IsValid("1st", out _), "숫자로 시작 불가");
-            Assert.IsFalse(IdRules.IsValid("처치", out _), "한글은 표시 이름에");
+            Assert.IsFalse(IdRules.IsValid("처치", out _), "영문·숫자만");
             Assert.IsFalse(IdRules.IsValid("a..b", out _));
             Assert.AreEqual("PlayerInventory", IdRules.ToIdentifier("player.inventory"));
-            Assert.AreEqual("KillsTotal", IdRules.ToIdentifier("kills_total"));
+            Assert.AreEqual("KillsTotal", IdRules.ToIdentifier("killsTotal"));
+            Assert.AreEqual("sampleEquipment", IdRules.Normalize("SampleEquipment"));
+            Assert.AreEqual("effectTags", IdRules.Normalize("effect_tags"));
             Assert.AreEqual("player", IdRules.GroupOf("player.inventory"));
             Assert.AreEqual("stat", IdRules.GroupOf("stat:kills"));
         }

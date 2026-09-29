@@ -31,7 +31,8 @@ namespace GameSystems.EditorTools.UI
         public abstract string Key { get; }
         public abstract string Caption(CodexPageContext context);
         public abstract void Build(CodexPageContext context);
-        // 머리글의 '+ 새로 만들기'.
+        // 머리글 만들기 버튼의 글자(예: "+ 새 그룹")와 동작.
+        public virtual string CreateLabel => "+ 새로 만들기";
         public abstract void Create(CodexPageContext context);
 
         static Dictionary<string, CodexPage> _pages;

@@ -80,13 +80,12 @@ namespace GameSystems.EditorTools
             return copy;
         }
 
-        public GameData Add(Type type, string id, string displayName)
+        public GameData Add(Type type, string id)
         {
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 도감 종류가 아닙니다.");
             if (!EditorDatabase.Instance.CanUseId(id, null, out var error)) throw new ArgumentException("[GameSystems] " + error);
             var data = (GameData)ScriptableObject.CreateInstance(type);
             data.EditorAssignId(id);
-            data.EditorSetDisplayName(string.IsNullOrWhiteSpace(displayName) ? $"새 {info.DisplayName}" : displayName.Trim());
             data.name = id;
             data.hideFlags = HideFlags.DontSave;
             _added.Add(data);
@@ -137,7 +136,7 @@ namespace GameSystems.EditorTools
             return result;
         }
 
-        static string Label(GameData item) => $"{DataTypes.Find(item.GetType())?.DisplayName} · {item.DisplayName} ({item.Id})";
+        static string Label(GameData item) => $"{DataTypes.Find(item.GetType())?.DisplayName} · {item.Id}";
 
         static bool Differs(GameData original, GameData copy) => original != null && copy != null && FieldsOf(original, copy).Count > 0;
 

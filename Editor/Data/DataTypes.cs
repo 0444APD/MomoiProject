@@ -69,7 +69,7 @@ namespace GameSystems.EditorTools
         static string DefaultPrefix(Type type)
         {
             var name = Regex.Replace(type.Name, "Data$", "");
-            return Regex.Replace(name, "(?<=[a-z0-9])([A-Z])", "_$1").ToLowerInvariant();
+            return IdRules.Normalize(name);
         }
 
         static HashSet<string> _projectAssemblies;

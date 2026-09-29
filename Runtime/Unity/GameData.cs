@@ -5,15 +5,16 @@ using UnityEngine;
 namespace GameSystems.Data
 {
     // 데이터베이스 항목의 공용 베이스. 이 클래스를 상속하면 코드 추가 없이 데이터베이스 창에 나타난다.
-    // 제공 계약: ID(데이터베이스 창에서 짓고, 바꾸면 모든 참조·저장·생성 코드가 따라간다), 표시 이름, 태그, 검증 훅.
+    // 제공 계약: ID(도감에서 짓고, 바꾸면 모든 참조·저장·생성 코드가 따라간다), 태그, 검증 훅.
+    // 항목은 ID로만 식별한다(따로 표시 이름을 두지 않는다. 플레이어에게 보일 글자는 텍스트 시트·번역에서 ID로 찾는다).
     public abstract class GameData : ScriptableObject
     {
         [SerializeField, HideInInspector] string id;
-        [SerializeField, FieldLabel("이름")] string displayName;
         [SerializeField, FieldLabel("태그"), DataRef(typeof(KeywordData))] List<string> tags = new List<string>();
 
         public string Id => id;
-        public string DisplayName => string.IsNullOrEmpty(displayName) ? name : displayName;
+        // 화면·로그에 쓰는 이름 = ID(ID가 아직 없으면 에셋 이름).
+        public string DisplayName => string.IsNullOrEmpty(id) ? name : id;
         public IReadOnlyList<string> Tags => tags;
 
         // 항목 고유의 검증. 데이터베이스 검증기가 저장·빌드 시점에 호출한다.
@@ -24,7 +25,6 @@ namespace GameSystems.Data
 #if UNITY_EDITOR
         // ID는 에디터 도구만 부여·변경한다(변경 시 참조 갱신·저장 호환 별칭은 EditorDatabase.Rename이 처리).
         public void EditorAssignId(string newId) => id = newId;
-        public void EditorSetDisplayName(string value) => displayName = value;
 #endif
     }
 
@@ -73,5 +73,20 @@ namespace GameSystems.Data
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public sealed class HideInDatabaseAttribute : Attribute
     {
+    }
+}
+
+namespace GameSystems.Data
+{
+    // 도감에서 순서를 끌어 바꾸는 항목(예: 키워드 그룹, 스프라이트 규격 묶음).
+    public interface IOrderedData
+    {
+        int Order { get; set; }
+    }
+
+    // 그룹에 속하는 항목(예: 키워드 → 키워드 그룹, 스프라이트 규격 → 규격 묶음). 도감의 그룹 탭이 끌어 옮긴다.
+    public interface IGroupedData : IOrderedData
+    {
+        string Group { get; set; }
     }
 }

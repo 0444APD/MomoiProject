@@ -17,7 +17,6 @@ namespace GameSystems.Tests
         {
             var data = ScriptableObject.CreateInstance<T>();
             data.EditorAssignId(id);
-            data.EditorSetDisplayName(name);
             _created.Add(data);
             return data;
         }
@@ -54,7 +53,7 @@ namespace GameSystems.Tests
             var issues = DataValidator.Validate(new List<GameData> { stat });
             Assert.IsTrue(issues.Any(i => i.Asset == stat && i.Severity == ValidationSeverity.Error && i.Message.Contains("없는 키워드 'boss'")));
 
-            var group = Make<KeywordGroupData>("monster_tag", "몬스터 태그");
+            var group = Make<KeywordGroupData>("monsterTag", "몬스터 태그");
             var tag = Make<KeywordData>("boss", "보스");
             tag.group = group.Id;
             issues = DataValidator.Validate(new List<GameData> { stat, group, tag });
@@ -118,16 +117,16 @@ namespace GameSystems.Tests
             gold.valueType = typeof(int).FullName;
             var bag = Make<StateKeyData>("player.bag", "가방");
             bag.valueType = typeof(TestInventory).FullName;
-            var kills = Make<StatData>("kills_total", "처치 수");
+            var kills = Make<StatData>("killsTotal", "처치 수");
 
             var code = GameIdsGenerator.Build(new List<GameData> { gold, bag, kills }, "GameSystems.Tests.Editor");
 
-            StringAssert.Contains("public static class State", code);
+            StringAssert.Contains("public static class PlayerData", code);
             StringAssert.Contains("global::GameSystems.StateKey<int> PlayerGold = new global::GameSystems.StateKey<int>(\"player.gold\");", code);
             StringAssert.Contains("global::GameSystems.StateKey<global::GameSystems.Tests.TestInventory> PlayerBag", code);
             StringAssert.Contains("public static class Stat", code);
-            StringAssert.Contains("public const string KillsTotal = \"kills_total\";", code);
-            StringAssert.Contains("/// <summary>처치 수</summary>", code);
+            StringAssert.Contains("public const string KillsTotal = \"killsTotal\";", code);
+            StringAssert.Contains("/// <summary>killsTotal</summary>", code);
         }
 
         [Test]

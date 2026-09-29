@@ -111,11 +111,15 @@ namespace GameSystems.EditorTools.UI
             return anchor.panel?.visualTree;
         }
 
+        // 닫힐 때(고르거나 바깥을 눌러서). 입력 칸이 '편집 중' 표시를 끄는 데 쓴다.
+        public event Action Closed;
+
         public void Close()
         {
             if (_closed) return;
             _closed = true;
             AddToClassList("gs-dropdown--hidden");
+            Closed?.Invoke();
             _layer.schedule.Execute(_layer.RemoveFromHierarchy).StartingIn(120);
         }
 

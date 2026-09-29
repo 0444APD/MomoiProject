@@ -6,12 +6,15 @@ namespace GameSystems.Data
     // 필드에는 이 항목의 ID가 들어간다(표시 이름을 바꿔도 값은 그대로, ID를 바꾸면 참조가 함께 바뀐다).
     [Database("키워드", Group = "식별자", Order = 1, IdPrefix = "keyword", Page = "keywords")]
     [CreateAssetMenu(menuName = "Game Systems/키워드", fileName = "NewKeyword")]
-    public sealed class KeywordData : GameData
+    public sealed class KeywordData : GameData, IGroupedData
     {
         [FieldLabel("그룹"), DataRef(typeof(KeywordGroupData))] public string group = "";
         [FieldLabel("설명")] public string description = "";
         // 그룹 안에서의 순서(끌어서 바꾼다).
         [HideInInspector] public int order;
+
+        int IOrderedData.Order { get => order; set => order = value; }
+        string IGroupedData.Group { get => group; set => group = value; }
 
         public override void ValidateData(IValidationContext context)
         {

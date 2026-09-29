@@ -22,7 +22,6 @@ namespace GameSystems.Tests
         {
             var data = ScriptableObject.CreateInstance<T>();
             data.EditorAssignId(id);
-            data.EditorSetDisplayName(name);
             _created.Add(data);
             return data;
         }
@@ -37,13 +36,13 @@ namespace GameSystems.Tests
         [Test]
         public void 에셋에서_만든_정의로_행동부터_보상까지_이어진다()
         {
-            var kills = Make<StatData>("stat_0001", "처치 수");
+            var kills = Make<StatData>("stat1", "처치 수");
             kills.scope = StatScope.Total;
             kills.aggregate = StatAggregate.Sum;
             kills.rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
-            var gold = Make<StatData>("stat_0002", "골드");
+            var gold = Make<StatData>("stat2", "골드");
 
-            var hunter = Make<AchievementData>("achievement_0001", "사냥꾼");
+            var hunter = Make<AchievementData>("achievement1", "사냥꾼");
             hunter.condition = new StatCompareCondition { stat = kills.Id, op = CompareOp.AtLeast, value = 3 };
             hunter.rewards.Add(new AddToStatReward { stat = gold.Id, amount = 100 });
 

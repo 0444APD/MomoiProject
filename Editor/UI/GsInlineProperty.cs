@@ -209,6 +209,55 @@ namespace GameSystems.EditorTools.UI
         {
             if (_editor != null) return;
             evt.StopPropagation();
+            Open();
+        }
+
+        public bool Editable => IsEditable;
+
+        // 값이 비었는지(입력 칸의 '비어 있음' 모양에 쓴다).
+        public bool IsEmptyValue
+        {
+            get
+            {
+                _property.serializedObject.Update();
+                return Describe(_property, _field).empty;
+            }
+        }
+
+        GsField Field => GetFirstAncestorOfType<GsField>();
+
+        // 목록은 입력 칸 전체 아래에 펼치고, 열려 있는 동안 '편집 중'으로 보인다.
+        GsDropdown OpenMenu(IEnumerable<GsDropdownItem> items, bool? searchable = null, string placeholder = "검색")
+        {
+            var field = Field;
+            field?.SetActive(true);
+            var menu = GsDropdown.Show(field?.Box ?? (VisualElement)this, items, searchable, placeholder);
+            if (menu != null) menu.Closed += () => field?.SetActive(false);
+            else field?.SetActive(false);
+            return menu;
+        }
+
+        ScrollView _valueScroll;
+
+        // 긴 값은 칸이 늘어나며 최대 높이까지 보이고, 그 이상은 칸 안에서 스크롤한다.
+        public void CapHeight(float maxHeight)
+        {
+            if (_valueScroll != null) return;
+            _valueScroll = new ScrollView(ScrollViewMode.Vertical);
+            _valueScroll.AddToClassList("gs-inline__scroll");
+            _valueScroll.style.maxHeight = maxHeight;
+            _valueScroll.style.flexGrow = 1;
+            var index = IndexOf(_value);
+            _value.RemoveFromHierarchy();
+            _value.style.whiteSpace = WhiteSpace.Normal;
+            _valueScroll.Add(_value);
+            Insert(Math.Max(0, index), _valueScroll);
+        }
+
+        // 편집 열기(클릭과 같다). 비어 있는 입력 칸을 눌렀을 때도 쓴다.
+        public void Open()
+        {
+            if (_editor != null || !IsEditable) return;
             _property.serializedObject.Update();
 
             switch (_property.propertyType)
@@ -279,21 +328,21 @@ namespace GameSystems.EditorTools.UI
                     Apply();
                 }) { Selected = _property.enumValueIndex == i });
             }
-            GsDropdown.Show(this, items);
+            OpenMenu(items);
         }
 
         void ShowIdMenu(IEnumerable<GameData> data, string kind)
         {
             var db = EditorDatabase.Instance;
-            var list = data.OrderBy(d => db.GroupLabel(d) ?? "").ThenBy(d => d.DisplayName).ToList();
+            var list = data.OrderBy(d => db.GroupLabel(d) ?? "").ThenBy(d => CodexGroups.OrderOf(d)).ThenBy(d => d.Id).ToList();
             var items = list.Select(d =>
             {
                 var id = d.Id;
-                return new GsDropdownItem(d.DisplayName, () => SetString(id)) { Caption = id, Group = db.GroupLabel(d), Selected = _property.stringValue == id };
+                return new GsDropdownItem(id, () => SetString(id)) { Group = db.GroupLabel(d), Selected = _property.stringValue == id };
             }).ToList();
             if (items.Count == 0) items.Add(new GsDropdownItem($"{kind}이(가) 아직 없습니다 — 도감에서 먼저 만드세요") { Disabled = true });
             if (DataRefType == typeof(KeywordData)) items.AddRange(GsPropertyEditor.KeywordMenuExtras(this, _field, ids => { if (ids.Count > 0) SetString(ids[0]); }));
-            GsDropdown.Show(this, items, placeholder: $"{kind} 검색");
+            OpenMenu(items, placeholder: $"{kind} 검색");
         }
 
         void ShowEventTypeMenu()
@@ -304,7 +353,7 @@ namespace GameSystems.EditorTools.UI
                 return new GsDropdownItem(EventBus.DisplayNameOf(type), () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name };
             }).ToList();
             if (items.Count == 0) items.Add(new GsDropdownItem("[GameEvent]가 붙은 이벤트 타입이 없습니다") { Disabled = true });
-            GsDropdown.Show(this, items, placeholder: "이벤트 검색");
+            OpenMenu(items, placeholder: "이벤트 검색");
         }
 
         void ShowEventFieldMenu()
@@ -327,7 +376,7 @@ namespace GameSystems.EditorTools.UI
                     items.Add(new GsDropdownItem(name, () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name });
                 }
             }
-            GsDropdown.Show(this, items);
+            OpenMenu(items);
         }
         // ── 필드 검사(경로·비교·값) ───────────────────────────
 
@@ -337,7 +386,7 @@ namespace GameSystems.EditorTools.UI
             var host = GetFirstAncestorOfType<GsModal>()?.parent ?? panel?.visualTree.Q(className: "gs-root") ?? this;
             if (root == null)
             {
-                GsDropdown.Show(this, new List<GsDropdownItem> { new GsDropdownItem("이벤트나 플레이어 데이터를 먼저 고르세요") { Disabled = true } });
+                OpenMenu(new List<GsDropdownItem> { new GsDropdownItem("이벤트나 플레이어 데이터를 먼저 고르세요") { Disabled = true } });
                 return;
             }
             GsDataExplorer.Pick(host, root, rootLabel ?? DataModel.FriendlyName(root), _property.stringValue, picked =>
@@ -375,7 +424,7 @@ namespace GameSystems.EditorTools.UI
                 Apply();
             }) { Caption = FieldOps.Word(op), Selected = _property.intValue == (int)op }).ToList();
             if (type == null) items.Insert(0, new GsDropdownItem("필드를 먼저 고르면 맞는 비교만 보입니다") { Disabled = true });
-            GsDropdown.Show(this, items);
+            OpenMenu(items);
         }
 
         // 값 칸: enum·ID 참조면 목록, 필요 없는 비교면 무시, 나머지는 글자 입력(false 반환).
@@ -399,7 +448,7 @@ namespace GameSystems.EditorTools.UI
             if (type != null && type.IsEnum)
             {
                 var items = Enum.GetNames(type).Select(name => new GsDropdownItem(name, () => SetString(name)) { Selected = _property.stringValue == name }).ToList();
-                GsDropdown.Show(this, items);
+                OpenMenu(items);
                 return true;
             }
             return false;
@@ -425,7 +474,7 @@ namespace GameSystems.EditorTools.UI
                 var name = type.FullName;
                 return new GsDropdownItem(label(type), () => SetString(name)) { Group = group(type), Caption = type.Namespace, Selected = _property.stringValue == name };
             }).ToList();
-            GsDropdown.Show(this, items, placeholder: placeholder);
+            OpenMenu(items, placeholder: placeholder);
         }
 
         // 옆 칸의 클래스가 가진 필드 목록(필드 규칙의 '필드' 칸).
@@ -445,7 +494,7 @@ namespace GameSystems.EditorTools.UI
                         Selected = _property.stringValue == name,
                     });
                 }
-            GsDropdown.Show(this, items, placeholder: "필드 검색");
+            OpenMenu(items, placeholder: "필드 검색");
         }
 
         // 스프라이트 규격 묶음이 걸린 필드에 원본을 넣으면 맞춤 창을 띄운다.
@@ -485,7 +534,7 @@ namespace GameSystems.EditorTools.UI
                     Selected = _property.stringValue == name,
                 };
             }).ToList();
-            GsDropdown.Show(this, items, placeholder: "형식 검색");
+            OpenMenu(items, placeholder: "형식 검색");
         }
 
         void SetString(string value)
@@ -503,6 +552,7 @@ namespace GameSystems.EditorTools.UI
             if (_editor == null) return;
 
             AddToClassList("gs-inline--editing");
+            Field?.SetActive(true);
             _value.style.display = DisplayStyle.None;
             Add(_editor);
 
@@ -558,7 +608,13 @@ namespace GameSystems.EditorTools.UI
             {
                 case SerializedPropertyType.String:
                     var text = new TextField { value = _property.stringValue, multiline = Multiline };
-                    if (Multiline) text.style.whiteSpace = WhiteSpace.Normal;
+                    if (Multiline)
+                    {
+                        // 긴 글은 칸이 늘어나며 5줄까지, 그 이상은 칸 안에서 스크롤.
+                        text.style.whiteSpace = WhiteSpace.Normal;
+                        text.style.maxHeight = GsField.MaxValueHeight;
+                        text.verticalScrollerVisibility = ScrollerVisibility.Auto;
+                    }
                     return text;
                 case SerializedPropertyType.Integer:
                     return new LongField { value = _property.longValue };
@@ -615,6 +671,7 @@ namespace GameSystems.EditorTools.UI
 
             editor.RemoveFromHierarchy();
             RemoveFromClassList("gs-inline--editing");
+            Field?.SetActive(false);
             _value.style.display = DisplayStyle.Flex;
             if (commit) Apply();
             else Refresh();

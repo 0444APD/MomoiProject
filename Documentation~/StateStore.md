@@ -89,7 +89,7 @@ public class Inventory
 
 1. 메뉴 `Game Systems > 도감`를 엽니다.
 2. 왼쪽의 `식별자 > 플레이어 데이터`를 고르고 `+ 추가`를 누릅니다.
-3. 창이 뜨면 ID(예: `player.inventory`)와 표시 이름(예: `인벤토리`)을 입력합니다.
+3. 창이 뜨면 ID(예: `player.inventory`)를 입력합니다. 항목은 따로 이름을 두지 않고 ID로만 식별합니다.
 4. 상세 패널에서 구역(메타)과 값 형식(`Inventory`)을 목록에서 고릅니다.
 
 값 형식 목록에는 기본 형식, 프로젝트의 enum, 저장소에 담을 수 있는 공개 데이터 클래스가 자동으로 나타납니다. 숫자·글자 같은 단순 형식은 기본값 칸에 기본값을 적을 수 있고, 클래스는 클래스의 초기값(필드 초기화·생성자)을 씁니다.
@@ -359,8 +359,8 @@ GameSystemsRuntime.Configuring += options =>
 ### 11.1 규칙
 
 - ID는 도감 창에서 항목을 만들 때 한 번 짓습니다.
-- 형식은 영문 소문자로 시작하고 소문자·숫자·밑줄만 씁니다. 분류는 점(.)으로 나눕니다. 예: `player.inventory`, `kills_total`, `boss`
-- 한글 이름은 표시 이름에 적습니다. 표시 이름은 자유롭게 바꿔도 됩니다.
+- 형식은 lowerCamelCase입니다. 영문 소문자로 시작하고, 단어 사이는 대문자로 잇습니다(띄어쓰기·밑줄 없음). 분류는 점(.)으로 나눕니다. 예: `playerGold`, `player.inventory`, `killsTotal`
+- 대소문자만 다른 ID는 같은 ID로 봅니다(Windows 파일 이름이 대소문자를 구분하지 않기 때문). 따로 표시 이름은 없고, 플레이어에게 보일 글자는 이후 텍스트 시트·번역에서 ID로 찾습니다.
 - 모든 ID는 프로젝트 전체에서 하나뿐이어야 합니다.
 
 ### 11.2 모든 곳에서 목록으로 고릅니다
@@ -368,7 +368,7 @@ GameSystemsRuntime.Configuring += options =>
 에디터에서 ID를 가리키는 칸(조건의 수치, 보상, 태그, 플레이어 데이터의 값 형식 등)은 직접 입력하는 칸이 없고 목록에서만 고릅니다. 코드에서는 `GameIds`를 씁니다.
 
 ```csharp
-string killsId = GameIds.Stat.KillsTotal;          // "kills_total"
+string killsId = GameIds.Stat.KillsTotal;          // "killsTotal"
 string bossTag = GameIds.Keyword.MonsterTag.Boss;  // "boss"
 StateKey<Inventory> key = GameIds.PlayerData.PlayerInventory;
 ```

@@ -17,21 +17,21 @@ namespace GameSystems.Tests
         [Test]
         public void 새_항목은_적용_전에는_도감에만_보인다()
         {
-            var added = Staging.Add(typeof(KeywordGroupData), "test_staged_group", "스테이징 그룹");
+            var added = Staging.Add(typeof(KeywordGroupData), "testStagedGroup");
             Assert.IsTrue(EditorDatabase.Instance.All.Contains(added));
             Assert.IsFalse(EditorDatabase.Instance.Committed.Contains(added));
             Assert.IsTrue(Staging.HasChanges);
             Assert.AreEqual(PendingKind.Added, Staging.Changes().Single().Kind);
 
             Staging.Discard();
-            Assert.IsFalse(EditorDatabase.Instance.All.Any(d => d.Id == "test_staged_group"));
+            Assert.IsFalse(EditorDatabase.Instance.All.Any(d => d.Id == "testStagedGroup"));
             Assert.IsFalse(Staging.HasChanges);
         }
 
         [Test]
         public void 새_항목을_지우면_변경에서_빠진다()
         {
-            var added = Staging.Add(typeof(KeywordData), "test_staged_keyword", "키워드");
+            var added = Staging.Add(typeof(KeywordData), "testStagedKeyword");
             Staging.Remove(added);
             Assert.IsFalse(Staging.HasChanges);
         }
@@ -40,7 +40,7 @@ namespace GameSystems.Tests
         public void 작업본을_고치면_필드별_변경이_나온다()
         {
             var original = ScriptableObject.CreateInstance<KeywordData>();
-            original.EditorAssignId("test_original_keyword");
+            original.EditorAssignId("testOriginalKeyword");
             original.group = "a";
             try
             {

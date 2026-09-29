@@ -38,6 +38,7 @@ namespace GameSystems.EditorTools
         VisualElement _typeTools;
         VisualElement _helpSlot;
         GsButton _viewSettingsButton;
+        GsButton _createButton;
 
         [MenuItem("Game Systems/도감", priority = 0)]
         public static void Open() => OpenWindow();
@@ -267,7 +268,8 @@ namespace GameSystems.EditorTools
             _viewSettingsButton = new GsButton("보기 설정", ToggleViewSettings, GsButtonKind.Ghost);
             _typeTools.Add(_viewSettingsButton);
             _typeTools.Add(Gs.HSpace(8));
-            _typeTools.Add(new GsButton("+ 새로 만들기", CreateItem, GsButtonKind.Primary));
+            _createButton = new GsButton("+ 새로 만들기", CreateItem, GsButtonKind.Primary);
+            _typeTools.Add(_createButton);
             main.Add(header);
 
             var body = new VisualElement();
@@ -427,6 +429,7 @@ namespace GameSystems.EditorTools
             var page = info.Page != null ? CodexPage.Find(info.Page) : null;
             _views.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
             _viewSettingsButton.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
+            _createButton.Text = page != null ? page.CreateLabel : "+ 새로 만들기";
             if (page != null)
             {
                 _title.text = info.DisplayName;
@@ -646,8 +649,6 @@ namespace GameSystems.EditorTools
             var sheet = new GsSheet(Gs.Background)
             {
                 Thumbnail = view.Image == null ? null : (Func<UnityEngine.Object, UnityEngine.Object>)(o => new SerializedObject(o).FindProperty(view.Image.Path)?.objectReferenceValue),
-                Trailing = o => ((GameData)o).Id,
-                TrailingWidth = typeView.WidthOf(GsSheet.TrailingKey, 110),
                 HasError = o => _issues.Any(i => i.Asset == o && i.Severity == ValidationSeverity.Error),
             };
             sheet.ColumnResized += (key, width) =>
@@ -655,7 +656,10 @@ namespace GameSystems.EditorTools
                 typeView.SetWidth(key, Mathf.Round(width));
                 ViewSettings.Save();
             };
-            sheet.Build(view.Columns.Select(c => new SheetColumn { Title = c.Label, Width = typeView.WidthOf(c.Path, ColumnWidth(c)), Path = c.Path, Bold = c.Path == "displayName" }).ToList(),
+            // 첫 열은 항목 ID(항목은 ID로만 식별한다).
+            var columns = new List<SheetColumn> { new SheetColumn { Title = "ID", Width = typeView.WidthOf("id", 200), Path = "id", Bold = true } };
+            columns.AddRange(view.Columns.Select(c => new SheetColumn { Title = c.Label, Width = typeView.WidthOf(c.Path, ColumnWidth(c)), Path = c.Path }));
+            sheet.Build(columns,
                         items.Cast<UnityEngine.Object>());
             var selected = items.FirstOrDefault(i => i.Id == _selectedId);
             if (selected != null) sheet.Select(selected, false);
@@ -667,7 +671,6 @@ namespace GameSystems.EditorTools
         }
         static float ColumnWidth(FieldEntry column)
         {
-            if (column.Path == "displayName") return 200;
             // 설명처럼 긴 글은 넓게(ID보다 설명이 길어야 맞다).
             if (column.Kind == FieldKind.Text && column.Path.IndexOf("desc", StringComparison.OrdinalIgnoreCase) >= 0) return 320;
             switch (column.Kind)
@@ -703,7 +706,7 @@ namespace GameSystems.EditorTools
                 else card.HideMedia();
 
                 card.Title = view.Title != null ? Value(so, view.Title) : item.DisplayName;
-                card.Subtitle = view.Subtitle != null ? Value(so, view.Subtitle) : item.Id;
+                card.Subtitle = view.Subtitle != null ? Value(so, view.Subtitle) : "";
 
                 if (view.Badge != null)
                 {
@@ -750,15 +753,13 @@ namespace GameSystems.EditorTools
             GsDialog.Form(_root, $"새 {info.DisplayName}", "ID는 저장 파일·코드(GameIds)·조건이 함께 쓰는 식별자입니다. 나중에 바꿔도 참조가 모두 따라갑니다.",
                 new[]
                 {
-                    new DialogField { Key = "id", Label = "ID", Value = db.NextId(info), Caption = "영문 소문자·숫자·밑줄, 분류는 점(.)으로. 예: player.inventory, kills_total" },
-                    new DialogField { Key = "name", Label = "표시 이름", Value = "", Caption = "화면과 목록에 보이는 이름(한글 가능)" },
+                    new DialogField { Key = "id", Label = "ID", Value = db.NextId(info), Caption = "영문 소문자로 시작, 단어 사이는 대문자(띄어쓰기·밑줄 없음), 분류는 점(.)으로. 예: playerGold, player.inventory" },
                 },
                 "만들기",
                 values => db.CanUseId(values["id"], null, out var error) ? null : error,
                 values =>
                 {
-                    var name = string.IsNullOrWhiteSpace(values["name"]) ? null : values["name"].Trim();
-                    var created = Staging.Add(type, values["id"], name);
+                    var created = Staging.Add(type, values["id"]);
                     _selectedId = created.Id;
                     _search = "";
                     _searchField.Value = "";
@@ -824,7 +825,9 @@ namespace GameSystems.EditorTools
             var target = item;
             var options = new DetailOptions
             {
-                Subtitle = $"{info?.DisplayName}  ·  {item.Id}" + (Staging.IsAdded(item) ? "  ·  새 항목(적용 전)" : ""),
+                TitlePath = null,
+                Title = item.Id,
+                Subtitle = info?.DisplayName + (Staging.IsAdded(item) ? "  ·  새 항목(적용 전)" : ""),
                 ImagePath = view.Image?.Path,
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,

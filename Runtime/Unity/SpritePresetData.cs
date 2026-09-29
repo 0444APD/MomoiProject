@@ -3,13 +3,18 @@ using UnityEngine;
 namespace GameSystems.Data
 {
     // 스프라이트 규격 하나: 출력 크기. 바꾸면 이 규격으로 베이크한 이미지가 모두 다시 베이크된다.
-    [Database("스프라이트 규격", Group = "이미지", Order = 1, IdPrefix = "preset")]
+    [Database("스프라이트 규격", Group = "이미지", Order = 0, IdPrefix = "spritePreset", Page = "sprites")]
     [CreateAssetMenu(menuName = "Game Systems/스프라이트 규격", fileName = "NewSpritePreset")]
-    public sealed class SpritePresetData : GameData
+    public sealed class SpritePresetData : GameData, IGroupedData
     {
         [FieldLabel("묶음"), DataRef(typeof(SpritePresetGroupData))] public string group = "";
         [FieldLabel("가로(px)")] public int width = 256;
         [FieldLabel("세로(px)")] public int height = 256;
+        // 묶음 안에서의 순서(끌어서 바꾼다).
+        [HideInInspector] public int order;
+
+        int IOrderedData.Order { get => order; set => order = value; }
+        string IGroupedData.Group { get => group; set => group = value; }
 
         // 규격이 바뀌었는지 알아내는 값(베이크 기록과 비교).
         public int Revision => width * 73856093 ^ height * 19349663;

@@ -92,15 +92,14 @@ namespace GameSystems.EditorTools
 
         // ── 생성과 ID ─────────────────────────────────────────
 
-        // id를 주지 않으면 접두어_0001 형식으로 제안한 ID를 쓴다. 데이터베이스 창은 만들기 전에 이름을 묻는다.
-        public GameData Create(Type type, string displayName = null, string id = null)
+        // id를 주지 않으면 접두어+연번(예: keyword3)으로 제안한 ID를 쓴다. 도감은 만들기 전에 ID를 묻는다.
+        public GameData Create(Type type, string id = null)
         {
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 데이터베이스 타입이 아닙니다.");
             id = string.IsNullOrEmpty(id) ? NextId(info) : id;
             if (!CanUseId(id, null, out var error)) throw new ArgumentException("[GameSystems] " + error);
             var data = (GameData)ScriptableObject.CreateInstance(type);
             data.EditorAssignId(id);
-            data.EditorSetDisplayName(displayName ?? $"새 {info.DisplayName}");
             CreateAsset(data);
             AssetDatabase.SaveAssets();
             MarkDirty();
@@ -119,17 +118,17 @@ namespace GameSystems.EditorTools
             Undo.RegisterCreatedObjectUndo(data, $"{info.DisplayName} 추가");
         }
 
-        // 형식: 접두어_0001 (자동 연번, 설계 문서 미결 사항 — 확정 시 이 함수만 바꾼다).
+        // 새 항목 ID 제안: 접두어 + 연번(예: keyword3). 만들기 창에서 바로 고쳐 쓰는 자리 표시용.
         public string NextId(DataTypeInfo info)
         {
-            var pattern = new Regex("^" + Regex.Escape(info.IdPrefix) + "_(\\d+)$");
+            var pattern = new Regex("^" + Regex.Escape(info.IdPrefix) + "(\\d+)$");
             var max = 0;
             foreach (var data in All)
             {
                 var match = pattern.Match(data.Id ?? "");
                 if (match.Success) max = Math.Max(max, int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture));
             }
-            return $"{info.IdPrefix}_{(max + 1).ToString("0000", CultureInfo.InvariantCulture)}";
+            return info.IdPrefix + (max + 1).ToString(CultureInfo.InvariantCulture);
         }
 
         public void AssignNewId(GameData data)
@@ -149,7 +148,8 @@ namespace GameSystems.EditorTools
         public bool CanUseId(string id, GameData self, out string error)
         {
             if (!IdRules.IsValid(id, out error)) return false;
-            var owner = All.FirstOrDefault(d => d != self && d.Id == id);
+            // 대소문자만 다른 ID도 막는다(에셋 파일 이름이 겹치고, 읽을 때 헷갈린다).
+            var owner = All.FirstOrDefault(d => d != self && string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
             if (owner == null) return true;
             error = $"'{id}'는 이미 '{owner.DisplayName}'({DataTypes.Find(owner.GetType())?.DisplayName})이(가) 쓰고 있습니다.";
             return false;

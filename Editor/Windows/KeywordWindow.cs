@@ -305,7 +305,7 @@ namespace GameSystems.EditorTools
                 var names = Gs.Col("gs-grow");
                 names.Add(Gs.Label(group.DisplayName, "gs-heading"));
                 var linkedCount = KeywordTools.FieldsLinkedTo(id).Count();
-                names.Add(Gs.Label($"{id}  ·  연결된 필드 {linkedCount}개", "gs-caption"));
+                names.Add(Gs.Label($"연결된 필드 {linkedCount}개", "gs-caption"));
                 head.Add(names);
                 if (isCurrent) head.Add(new GsBadge("연결됨", Gs.Success));
                 else if (selected != null && EditorDatabase.Staging.IsAdded(group))
