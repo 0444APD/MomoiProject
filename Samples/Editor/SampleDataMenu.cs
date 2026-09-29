@@ -100,6 +100,23 @@ namespace GameSystems.Samples
             rule.required = true;
             EditorUtility.SetDirty(rule);
 
+            // 스프라이트 규격: 장비 아이콘 필드에 원본을 넣으면 아이콘·카드 규격으로 베이크, 목록은 아이콘 규격으로 보인다.
+            var itemImages = (SpritePresetGroupData)db.Create(typeof(SpritePresetGroupData), "아이템 이미지", "item_images");
+            foreach (var (id, name, w, h) in new[] { ("item_icon", "아이콘", 128, 128), ("item_card", "카드", 256, 384) })
+            {
+                var preset = (SpritePresetData)db.Create(typeof(SpritePresetData), name, id);
+                preset.group = itemImages.Id;
+                preset.width = w;
+                preset.height = h;
+                EditorUtility.SetDirty(preset);
+            }
+            var iconRule = (FieldRuleData)db.Create(typeof(FieldRuleData), "장비 아이콘 규격", "rule.equipment_icon");
+            iconRule.targetType = typeof(SampleEquipment).FullName;
+            iconRule.field = nameof(SampleEquipment.icon);
+            iconRule.source = FieldRuleSource.Free;
+            iconRule.spriteGroup = itemImages.Id;
+            iconRule.previewPreset = "item_icon";
+            EditorUtility.SetDirty(iconRule);
             var inventory = (StateKeyData)db.Create(typeof(StateKeyData), "인벤토리", "player.inventory");
             inventory.zone = StateZone.Meta;
             inventory.valueType = typeof(SampleInventory).FullName;

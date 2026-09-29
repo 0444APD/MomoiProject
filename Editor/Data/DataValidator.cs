@@ -84,6 +84,7 @@ namespace GameSystems.EditorTools
             }
 
             FindCycles(all.OfType<AchievementData>().ToList(), context);
+            CheckSpriteReviews(all, context);
             return context.Issues;
         }
 
@@ -152,6 +153,19 @@ namespace GameSystems.EditorTools
             }
         }
 
+        // 규격이 바뀌어 다시 확인해야 하는 예외 촬영(규격 항목의 경고로).
+        static void CheckSpriteReviews(IReadOnlyList<GameData> all, Context context)
+        {
+            var registry = UnityEditor.AssetDatabase.LoadAssetAtPath<SpriteSpecDatabase>(SpriteSpecEditor.RegistryPath);
+            if (registry == null) return;
+            foreach (var preset in all.OfType<SpritePresetData>())
+            {
+                var pending = registry.Framings.Where(f => f.OverrideFor(preset.Id)?.needsReview == true).Select(f => f.source != null ? f.source.name : "?").ToList();
+                if (pending.Count == 0) continue;
+                context.Current = preset;
+                context.Warning($"규격이 바뀌어 예외 촬영을 확인해야 합니다: {string.Join(", ", pending)}");
+            }
+        }
         // A 달성 → B 조건 → A 조건 같은 순환 참조.
         static void FindCycles(List<AchievementData> achievements, Context context)
         {

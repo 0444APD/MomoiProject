@@ -666,3 +666,16 @@
 .gs-explorer__card .gs-card__media { height: 150px; }
 .gs-explorer__card-remove { position: absolute; top: 6px; right: 6px; opacity: 0; }
 .gs-explorer__card:hover .gs-explorer__card-remove { opacity: 1; }
+
+/* ── 스프라이트 맞춤 ── */
+.gs-framing { width: 820px; max-width: 94%; }
+.gs-framing__canvas { position: relative; background-color: var(--gs-surface-2); border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+.gs-framing__image { position: absolute; -unity-background-scale-mode: stretch-to-fill; }
+.gs-framing__frame { position: absolute; border-width: 1px; opacity: 0.45; }
+.gs-framing__frame--active { border-width: 2px; opacity: 1; }
+.gs-framing__frame--override { border-width: 2px; }
+.gs-framing__tag { position: absolute; left: 0; top: -1px; font-size: 10px; padding: 1px 5px; color: #111; border-bottom-right-radius: 6px; }
+.gs-framing__side { margin-left: 16px; flex-grow: 1; flex-wrap: wrap; flex-direction: row; }
+.gs-framing__preview { margin: 0 12px 12px 0; }
+.gs-framing__preview-image { background-color: var(--gs-surface-2); border-radius: 6px; margin-bottom: 4px; }
+.gs-framing__mode--active { border-color: var(--gs-accent); color: var(--gs-accent); }

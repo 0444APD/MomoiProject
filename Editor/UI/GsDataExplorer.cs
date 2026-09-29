@@ -274,7 +274,7 @@ namespace GameSystems.EditorTools.UI
                 foreach (var member in FieldPaths.MembersOf(value.GetType()))
                 {
                     var v = FieldPaths.Read(value, member.Name);
-                    if (image == null && v is UnityEngine.Object o && GsDataViewImages.IsImage(o)) image = o;
+                    if (image == null && v is UnityEngine.Object o && GsDataViewImages.IsImage(o)) image = SpriteSpecEditor.Preview(o, member.Info as FieldInfo);
                     else if (stats.Count < 3 && member.ElementType == null && DataModel.Of(member.Type).Kind != DataKind.Object && !(v is UnityEngine.Object))
                         stats.Add((LabelOf(member.Info, member.Name), ValueChoices.Display(member.Info, v)));
                 }
@@ -573,8 +573,22 @@ namespace GameSystems.EditorTools.UI
                     apply(() => entry.Set(value));
                     Changed?.Invoke();
                     Refresh();
+                    var rule = SpriteSpecEditor.RuleFor(entry.Member as FieldInfo);
+                    var host = panel?.visualTree.Q(className: "gs-root");
+                    if (rule != null && value is Sprite placed && host != null) GsSpriteFraming.Open(host, placed, rule.spriteGroup, Refresh);
                 };
                 row.Add(picker.Element);
+            }
+            var spriteRule = _browse ? SpriteSpecEditor.RuleFor(entry.Member as FieldInfo) : null;
+            if (spriteRule != null && entry.Value is Sprite framed)
+            {
+                var frame = new GsButton("맞추기", () =>
+                {
+                    var host = panel?.visualTree.Q(className: "gs-root");
+                    if (host != null) GsSpriteFraming.Open(host, framed, spriteRule.spriteGroup, Refresh);
+                }, GsButtonKind.Ghost);
+                frame.AddToClassList("gs-explorer__pick");
+                row.Add(frame);
             }
 
             row.RegisterCallback<ClickEvent>(e =>

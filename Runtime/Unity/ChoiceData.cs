@@ -61,6 +61,9 @@ namespace GameSystems.Data
         [FieldLabel("선택지 목록"), DataRef(typeof(ChoiceListData))] public string choiceList = "";
         [FieldLabel("도감 종류"), GameDataTypeRef] public string dataType = "";
         [FieldLabel("필수")] public bool required;
+        // 스프라이트 필드: 원본을 넣으면 이 묶음의 규격으로 베이크하고, 목록·카드는 미리보기 규격으로 보여 준다.
+        [FieldLabel("스프라이트 규격 묶음"), DataRef(typeof(SpritePresetGroupData))] public string spriteGroup = "";
+        [FieldLabel("미리보기 규격"), DataRef(typeof(SpritePresetData))] public string previewPreset = "";
 
         public Type TargetType => TypeResolver.Find(targetType);
 

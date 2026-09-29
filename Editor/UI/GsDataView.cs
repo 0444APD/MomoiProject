@@ -239,19 +239,43 @@ namespace GameSystems.EditorTools.UI
             var image = Gs.Box("gs-view__image");
             if (large) image.AddToClassList("gs-view__image--large");
             var current = context.ObjectAt(path);
-            if (current is Sprite sprite) image.style.backgroundImage = new StyleBackground(sprite);
-            else if (current is Texture2D texture) image.style.backgroundImage = new StyleBackground(texture);
+            var field = context.Type == null ? null : GameSystems.EditorTools.ClassTypes.FieldsOf(context.Type).FirstOrDefault(f => f.Name == path);
+            var rule = GameSystems.EditorTools.SpriteSpecEditor.RuleFor(field);
+            // 미리보기 규격이 정해진 필드는 그 규격의 베이크본으로 보여 준다.
+            var shown = GameSystems.EditorTools.SpriteSpecEditor.Preview(current, field);
+            if (shown is Sprite sprite) image.style.backgroundImage = new StyleBackground(sprite);
+            else if (shown is Texture2D texture) image.style.backgroundImage = new StyleBackground(texture);
             else image.Add(Gs.Label("없음", "gs-caption", "gs-view__image-empty"));
             if (context.CanEdit)
             {
                 var picker = new ObjectFieldProxy(context.TypeAt(path) ?? typeof(Sprite));
                 picker.SetValue(current);
-                picker.Changed += value => context.SetObject(path, value);
+                picker.Changed += value =>
+                {
+                    context.SetObject(path, value);
+                    if (rule != null && value is Sprite placed)
+                    {
+                        var host = tile.panel?.visualTree.Q(className: "gs-root");
+                        if (host != null) GsSpriteFraming.Open(host, placed, rule.spriteGroup);
+                    }
+                };
                 image.Add(picker.Element);
                 image.tooltip = "클릭해서 바꾸기 (끌어다 놓기도 됨)";
             }
             tile.Add(image);
-            tile.Add(Gs.Label(context.LabelOf(path), "gs-caption", "gs-nowrap", "gs-view__image-label"));
+            var caption = Gs.Row();
+            caption.Add(Gs.Label(context.LabelOf(path), "gs-caption", "gs-nowrap", "gs-view__image-label", "gs-grow"));
+            if (rule != null && current is Sprite original)
+            {
+                var frame = new GsButton("맞추기", () =>
+                {
+                    var host = tile.panel?.visualTree.Q(className: "gs-root");
+                    if (host != null) GsSpriteFraming.Open(host, original, rule.spriteGroup);
+                }, GsButtonKind.Ghost);
+                frame.tooltip = "규격 틀에 맞춰 중심·배율을 다시 잡고 베이크합니다(규격별 예외 촬영 가능).";
+                caption.Add(frame);
+            }
+            tile.Add(caption);
             return tile;
         }
     }

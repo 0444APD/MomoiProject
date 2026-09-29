@@ -438,6 +438,15 @@ namespace GameSystems.EditorTools.UI
             GsDropdown.Show(this, items, placeholder: "필드 검색");
         }
 
+        // 스프라이트 규격 묶음이 걸린 필드에 원본을 넣으면 맞춤 창을 띄운다.
+        void OpenFramingIfRuled(UnityEngine.Object value)
+        {
+            var rule = SpriteSpecEditor.RuleFor(_field);
+            if (rule == null || !(value is Sprite sprite)) return;
+            var host = panel?.visualTree.Q(className: "gs-root");
+            if (host != null) schedule.Execute(() => GsSpriteFraming.Open(host, sprite, rule.spriteGroup, Refresh)).StartingIn(50);
+        }
+
         void ShowStorableTypeMenu()
         {
             var items = StorableTypes.All().Select(type =>
@@ -554,6 +563,7 @@ namespace GameSystems.EditorTools.UI
                         _property.serializedObject.Update();
                         _property.objectReferenceValue = e.newValue;
                         Apply(keepEditing: true);
+                        OpenFramingIfRuled(e.newValue);
                     });
                     return objectField;
                 case SerializedPropertyType.Color:

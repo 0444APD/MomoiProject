@@ -201,7 +201,8 @@ namespace GameSystems.EditorTools
             if (attribute != null) return attribute;
             // 필드 규칙(도감에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
             var rule = RuleFor(field);
-            if (rule == null) return null;
+            // 규칙의 값 출처는 글자 필드(또는 글자 목록)에만 적용한다(스프라이트 필드의 규칙은 규격 묶음용).
+            if (rule == null || (field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) != typeof(string))) return null;
             switch (rule.source)
             {
                 case FieldRuleSource.Tag: return typeof(TagData);

@@ -378,7 +378,11 @@ namespace GameSystems.EditorTools
                 card.SetSelected(item.Id == _selectedId);
                 card.RegisterCallback<ClickEvent>(_ => OpenDetail(item));
 
-                if (view.Image != null) card.SetImage(so.FindProperty(view.Image.Path)?.objectReferenceValue, placeholder);
+                if (view.Image != null)
+                {
+                    var imageProperty = so.FindProperty(view.Image.Path);
+                    card.SetImage(imageProperty == null ? null : SpriteSpecEditor.Preview(imageProperty.objectReferenceValue, PropertyUtil.GetField(imageProperty, out _)), placeholder);
+                }
                 else if (layout == CardLayout.Bar) card.SetImage(null, placeholder);
                 else card.HideMedia();
 
