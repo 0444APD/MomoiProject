@@ -147,7 +147,7 @@ GameSystemsRuntime.Session.Undo();     // 마지막 행동 Undo(몇 번이든)
 - 게임 로직에서 `UnityEngine.Random`·`System.Random`·`Time`을 쓰지 않는다 → `session.Random.Get("용도")`, `session.Clock`.
 - 게임 상태를 static 변수나 필드에 두지 않는다 → `session.State` (Undo·되감기·저장·모니터에서 빠지지 않게).
 - 새 시스템은 관찰 계약(`IInspectable`)을 구현한다.
-- **새 기능에는 도움말을 함께 넣는다.** 도감 종류·모니터 탭은 직접 쓴 도움말 항목(`Editor/Help/BuiltInHelp.cs` 또는 기능별 `IHelpProvider`), 블록은 `Description`이 필수다. 사용자가 설정해야 하는 기능이면 시작하기 단계(`ISetupProvider`)도 추가한다. 빠지면 `HelpCoverageTests`가 실패한다.
+- (보류 중 — 도움말·시작하기는 가장 마지막에 다시 켠다) **새 기능에는 도움말을 함께 넣는다.** 도감 종류·모니터 탭은 직접 쓴 도움말 항목(`Editor/Help/BuiltInHelp.cs` 또는 기능별 `IHelpProvider`), 블록은 `Description`이 필수다. 사용자가 설정해야 하는 기능이면 시작하기 단계(`ISetupProvider`)도 추가한다. 빠지면 `HelpCoverageTests`가 실패한다.
 - 도움말 문체: 매뉴얼보다 약간 친절하게, 비유 없이. 첫 문장에 핵심, 이어서 사용법·주의점. 빈 줄로 문단, `## `로 소제목, `- `로 목록.
 
 ## 검증
