@@ -73,6 +73,9 @@ namespace GameSystems.EditorTools.UI
 
         public event Action Changed;
 
+        // 폴더(클래스·배열·리스트)를 이 탐색기 안에서 들어가지 않고 따로 연다(상세 창의 새 탭). true를 돌려주면 안에서 들어가지 않는다.
+        public Func<ExplorerItem, bool> OpenInTab;
+
         GsDataExplorer(bool browse, Crumb root, Action<string> onPick)
         {
             _browse = browse;
@@ -185,6 +188,17 @@ namespace GameSystems.EditorTools.UI
         void Enter(Entry entry)
         {
             var here = _trail[_trail.Count - 1];
+            if (_browse && OpenInTab != null && OpenInTab(new ExplorerItem
+            {
+                Label = entry.Label,
+                Caption = entry.Caption,
+                Value = entry.Value,
+                Type = entry.Type,
+                Member = entry.Member,
+                Apply = entry.Apply ?? here.Apply,
+                Children = entry.Children,
+            }))
+                return;
             _trail.Add(new Crumb
             {
                 Label = entry.Label,

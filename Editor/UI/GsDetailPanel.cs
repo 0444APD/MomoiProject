@@ -19,6 +19,8 @@ namespace GameSystems.EditorTools.UI
         public Action<GsDetailPanel, string> TitleCommit;
         // 위쪽 왼편 이미지 칸을 보일지(도감 항목은 쓰지 않는다. 이미지 필드는 본문에 나온다).
         public bool ShowMedia = true;
+        // 클래스·배열·리스트 필드에 들어갈 때 따로 여는 방법(상세 창의 새 탭). true면 패널 안에서 들어가지 않는다.
+        public Func<ExplorerItem, bool> OpenNested;
         public string Subtitle;
         // 이미지로 쓸 필드 경로. 지정하면 이미지를 클릭해 바꿀 수 있고, 그 필드는 정보 영역에 따로 나오지 않는다.
         public string ImagePath;
@@ -83,6 +85,18 @@ namespace GameSystems.EditorTools.UI
             AddToClassList("gs-detail");
             Build();
         }
+
+        // 창 안에 붙여 쓰는 패널(모달 아님). 닫기를 누르면 CloseRequested가 온다.
+        public static GsDetailPanel Create(VisualElement host, UnityEngine.Object target, DetailOptions options = null)
+        {
+            var panel = new GsDetailPanel(host, target, options);
+            panel.AddToClassList("gs-detail--docked");
+            return panel;
+        }
+
+        public event Action CloseRequested;
+        // 본문을 다시 그렸다(안쪽 값 객체가 바뀌었을 수 있다 → 따로 연 안쪽 탭은 닫는다).
+        public event Action BodyRebuilt;
 
         public static GsDetailPanel Open(VisualElement host, UnityEngine.Object target, DetailOptions options = null)
         {
@@ -167,6 +181,12 @@ namespace GameSystems.EditorTools.UI
             _save = new GsButton(_options.Staged ? "반영" : "저장", Save, GsButtonKind.Primary);
             if (_options.Staged) _save.tooltip = "도감 목록에 바로 반영합니다. Unity 에셋에는 탭을 옮길 때 변경 목록을 확인하고 적용합니다.";
             footer.Add(_save);
+            if (_options.Staged)
+            {
+                // 바꾼 값은 바로 반영되므로 되돌리기·반영 버튼이 필요 없다(되돌리기는 도감 탭을 옮길 때 한꺼번에).
+                _revert.style.display = DisplayStyle.None;
+                _save.style.display = DisplayStyle.None;
+            }
             Add(footer);
 
             BuildBody();
@@ -245,6 +265,7 @@ namespace GameSystems.EditorTools.UI
                 _options.FocusPath = null;
                 schedule.Execute(() => FocusField(path)).StartingIn(60);
             }
+            BodyRebuilt?.Invoke();
         }
 
         // 필드 한 칸(이름 + 값). 단순 값은 이전/현재 표시가 붙은 인라인 편집, 조건·목록은 문장 변경 표시 + 편집기.
@@ -337,6 +358,7 @@ namespace GameSystems.EditorTools.UI
                 },
             });
             explorer.AddToClassList("gs-explorer--embedded");
+            explorer.OpenInTab = _options.OpenNested;
             return explorer;
         }
 
@@ -543,6 +565,15 @@ namespace GameSystems.EditorTools.UI
                 return;
             }
             RefreshState();
+            ReflectIfStaged();
+        }
+
+        // 도감(변경 모아 두기): 바꾼 값은 바로 작업본에 반영한다(확인·저장 단계 없음). Unity 적용은 도감 탭을 옮길 때.
+        void ReflectIfStaged()
+        {
+            if (!_options.Staged || _draft == null || _target == null) return;
+            if (_changes == null || _changes.Count == 0) RefreshState();
+            if (_changes != null && _changes.Count > 0) SaveNow();
         }
 
         void OnStructureChanged()
@@ -550,6 +581,7 @@ namespace GameSystems.EditorTools.UI
             var scroll = _body.scrollOffset;
             BuildBody();
             schedule.Execute(() => _body.scrollOffset = scroll);
+            ReflectIfStaged();
         }
 
         internal void RefreshState()
@@ -558,7 +590,7 @@ namespace GameSystems.EditorTools.UI
             if (_draft == null) return;
             if (_target == null)
             {
-                _modal?.Close();
+                CloseNow();
                 return;
             }
             _changes = DraftDiff.Compute(_originalObject, _draftObject);
@@ -575,7 +607,8 @@ namespace GameSystems.EditorTools.UI
             }
 
             var count = _changes.Count;
-            _status.text = count == 0 ? "변경 없음" : $"변경 {count}개 · 저장 전";
+            _status.text = _options.Staged ? "바꾼 값은 바로 반영 · Unity 적용은 도감 탭을 옮길 때"
+                : count == 0 ? "변경 없음" : $"변경 {count}개 · 저장 전";
             _status.EnableInClassList("gs-accent-text", count > 0);
             _revert.SetEnabled(count > 0);
             _save.SetEnabled(count > 0);
@@ -644,16 +677,16 @@ namespace GameSystems.EditorTools.UI
         {
             if (_changes.Count == 0)
             {
-                _modal.Close();
+                CloseNow();
                 return;
             }
             GsDialog.Show(_host, _options.Staged ? "반영하지 않은 변경" : "저장하지 않은 변경", $"변경 {_changes.Count}개가 {(_options.Staged ? "반영" : "저장")}되지 않았습니다.", _changes,
                 new DialogButton("계속 편집", GsButtonKind.Ghost, null),
-                new DialogButton("버리고 닫기", GsButtonKind.Default, () => _modal.Close()),
+                new DialogButton("버리고 닫기", GsButtonKind.Default, () => CloseNow()),
                 new DialogButton(_options.Staged ? "반영하고 닫기" : "저장하고 닫기", GsButtonKind.Primary, () =>
                 {
                     SaveNow();
-                    _modal.Close();
+                    CloseNow();
                 }));
         }
 
@@ -683,7 +716,18 @@ namespace GameSystems.EditorTools.UI
             RefreshState();
         }
 
-        public void Close() => _modal?.Close();
+        public void Close() => CloseNow();
+
+        void CloseNow()
+        {
+            if (_modal != null)
+            {
+                _modal.Close();
+                return;
+            }
+            DestroyDraft();
+            CloseRequested?.Invoke();
+        }
 
         void DestroyDraft()
         {
