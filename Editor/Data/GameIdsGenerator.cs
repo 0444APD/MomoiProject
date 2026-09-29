@@ -231,9 +231,25 @@ namespace GameSystems.EditorTools
             return DefaultFolder;
         }
 
-        static bool IsProjectAssembly(string name) =>
-            CompilationPipeline.GetAssemblies(AssembliesType.PlayerWithoutTestAssemblies).Any(a => a.name == name) &&
-            !name.StartsWith("Unity", StringComparison.Ordinal) && !name.StartsWith("GameSystems.", StringComparison.Ordinal);
+        // 어셈블리 목록은 스크립트를 다시 불러올 때만 바뀐다. 매번 묻지 않는다(GetAssemblies는 느리고, 플러그인 경고를 매번 다시 출력한다).
+        static HashSet<string> _playerAssemblies;
+
+        [UnityEditor.Callbacks.DidReloadScripts]
+        static void ClearAssemblyCache()
+        {
+            _playerAssemblies = null;
+            _editorAssemblies = null;
+        }
+
+        static UnityEditor.Compilation.Assembly[] _editorAssemblies;
+        static UnityEditor.Compilation.Assembly[] EditorAssemblies => _editorAssemblies ??= CompilationPipeline.GetAssemblies(AssembliesType.Editor);
+
+        static bool IsProjectAssembly(string name)
+        {
+            _playerAssemblies ??= new HashSet<string>(CompilationPipeline.GetAssemblies(AssembliesType.PlayerWithoutTestAssemblies).Select(a => a.name), StringComparer.Ordinal);
+            return _playerAssemblies.Contains(name) &&
+                   !name.StartsWith("Unity", StringComparison.Ordinal) && !name.StartsWith("GameSystems.", StringComparison.Ordinal);
+        }
 
         static string AssemblyOf(string scriptPath)
         {
@@ -245,7 +261,7 @@ namespace GameSystems.EditorTools
         static HashSet<string> VisibleAssemblies(string assemblyName)
         {
             var map = new Dictionary<string, UnityEditor.Compilation.Assembly>(StringComparer.Ordinal);
-            foreach (var a in CompilationPipeline.GetAssemblies(AssembliesType.Editor)) map[a.name] = a;
+            foreach (var a in EditorAssemblies) map[a.name] = a;
             var result = new HashSet<string>(StringComparer.Ordinal);
             var stack = new Stack<string>();
             stack.Push(assemblyName);
@@ -267,7 +283,7 @@ namespace GameSystems.EditorTools
 
         // 시스템·엔진 어셈블리(mscorlib 등)는 어디서나 참조된다.
         static bool IsProjectAssemblyOrPackage(string name) =>
-            CompilationPipeline.GetAssemblies(AssembliesType.Editor).Any(a => a.name == name);
+            EditorAssemblies.Any(a => a.name == name);
 
         static Settings LoadSettings()
         {
