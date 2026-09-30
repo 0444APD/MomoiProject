@@ -150,6 +150,9 @@ namespace GameSystems.Dialogue
         // 자동 진행: '클릭' 대사가 다 나오고 막는 효과가 없으면 AutoDelay초 뒤 클릭한 것으로 친다.
         public bool AutoMode;
         public float AutoDelay = 1.2f;
+        // 자동 진행을 붙잡는 조건(예: 목소리가 아직 나오는 중). 참이면 자동 진행의 지연을 다시 잰다.
+        public Func<bool> HoldAuto = () => false;
+        bool _simulating;
         // 대사마다 화자 자동 강조(대사 노드에서 '그대로'로 끌 수 있다).
         public bool AutoHighlightSpeaker = true;
         // 장소·스탠딩 프로필 찾기(FromDatabase가 채운다).
@@ -338,6 +341,7 @@ namespace GameSystems.Dialogue
         {
             var auto = AutoMode;
             var delay = AutoDelay;
+            _simulating = true;
             if (autoClick)
             {
                 AutoMode = true;
@@ -356,6 +360,7 @@ namespace GameSystems.Dialogue
             {
                 AutoMode = auto;
                 AutoDelay = delay;
+                _simulating = false;
             }
         }
 
@@ -677,7 +682,7 @@ namespace GameSystems.Dialogue
             {
                 // 다 나온 뒤: 시간 진행 대사는 머무는 시간 뒤, 자동 모드면 AutoDelay 뒤 넘어간다.
                 // 막는 효과가 도는 동안은 재지 않는다(효과가 끝난 뒤부터 머문다).
-                if (InputBlocked) _shownTimer = 0;
+                if (InputBlocked || (AutoMode && !_simulating && Line.advance == LineAdvance.Click && HoldAuto())) _shownTimer = 0;
                 else
                 {
                     _shownTimer += deltaTime;

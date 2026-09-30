@@ -28,8 +28,7 @@ namespace GameSystems.Dialogue
         [Tooltip("강조가 꺼진 스탠딩의 밝기"), Range(0, 1)] public float dimmedBrightness = 0.7f;
         public int backgroundOrder = -100;
         public int standingOrder;
-        public AudioSource music;
-        public AudioSource sounds;
+        [Tooltip("대화가 브금을 바꿨으면 끝날 때 대화 전의 브금으로 되돌린다")] public bool restoreMusicOnEnd = true;
         [Tooltip("대화가 끝나면 배경·스탠딩을 지우고 카메라를 되돌린다")] public bool clearOnEnd = true;
 
         // 캐릭터 ID → 데이터(대화 재생기가 채운다).
@@ -55,6 +54,8 @@ namespace GameSystems.Dialogue
         Vector2 _offset;
         Vector3 _cameraShake;
         int _visibleTotal;
+        AudioClip _musicBefore;
+        bool _musicTouched;
 
         Camera Cam => stageCamera != null ? stageCamera : Camera.main;
 
@@ -66,6 +67,8 @@ namespace GameSystems.Dialogue
             var cam = Cam;
             if (cam == null) return;
             _captured = true;
+            _musicBefore = GameAudio.CurrentBgm;
+            _musicTouched = false;
             _cameraBase = cam.transform.position;
             _sizeBase = cam.orthographicSize;
             _fovBase = cam.fieldOfView;
@@ -141,15 +144,11 @@ namespace GameSystems.Dialogue
             ui?.SetFlash(Color.clear, 0f);
             _zoom = state.cameraZoom;
             _offset = state.cameraOffset;
-            if (music != null)
+            if (state.musicSet)
             {
-                if (music.clip != state.music)
-                {
-                    music.clip = state.music;
-                    if (state.music != null) music.Play();
-                    else music.Stop();
-                }
-                music.volume = state.musicVolume;
+                _musicTouched = true;
+                if (state.music != null) GameAudio.PlayBgm(state.music, state.musicVolume, 0f);
+                else GameAudio.StopBgm(0f);
             }
             foreach (var id in _standings.Keys.Where(id => state.Standing(id) == null).ToList()) RemoveStanding(id);
             foreach (var s in state.standings)
@@ -325,6 +324,9 @@ namespace GameSystems.Dialogue
         {
             _visibleTotal = DialogueRunner.VisibleLength(text);
             var character = Characters(line.speaker);
+            // 목소리: 대사에 목소리가 있으면 재생(이전 목소리는 짧게 사라진다), 없으면 이전 목소리를 멈춘다.
+            if (line.voice != null) GameAudio.PlayVoice(line.voice);
+            else GameAudio.StopVoice();
             var info = new DialogueLineInfo
             {
                 Line = line,
@@ -383,8 +385,13 @@ namespace GameSystems.Dialogue
             ui?.SetLetterbox(0f);
             ui?.SetFlash(Color.clear, 0f);
             ui?.SetFade(0f);
-            if (music != null) music.Stop();
-            if (effectRoot != null)
+            GameAudio.StopVoice();
+            if (_musicTouched && restoreMusicOnEnd)
+            {
+                if (_musicBefore != null) GameAudio.PlayBgm(_musicBefore);
+                else GameAudio.StopBgm();
+            }
+            _musicTouched = false;            if (effectRoot != null)
                 for (var i = effectRoot.childCount - 1; i >= 0; i--)
                     Destroy(effectRoot.GetChild(i).gameObject);
             Release();
@@ -407,7 +414,7 @@ namespace GameSystems.Dialogue
                 case SpawnEffect spawn:
                     return Spawn(spawn, context);
                 case SoundEffect sound:
-                    if (sounds != null && sound.clip != null) sounds.PlayOneShot(sound.clip, sound.volume);
+                    GameAudio.PlaySfx(sound.clip, sound.volume);
                     return null;
                 case UiMotionEffect uiMotion:
                     return new UiMotionPlayer(ui, uiMotion);
@@ -450,7 +457,15 @@ namespace GameSystems.Dialogue
                 _viaBlack = effect is BackgroundEffect background && background.viaBlack;
                 _hold = _viaBlack && effect.EffectiveDuration > 0 ? Mathf.Clamp(((BackgroundEffect)effect).blackHold / effect.EffectiveDuration, 0f, 0.9f) : 0f;
                 _background = before.background != after.background;
-                _musicChange = before.music != after.music;
+                _musicChange = after.musicSet && (before.music != after.music || !Mathf.Approximately(before.musicVolume, after.musicVolume) || !before.musicSet);
+                // 브금은 오디오 채널이 교차 페이드한다(효과의 진행 시간 = 페이드 시간).
+                if (_musicChange)
+                {
+                    stage._musicTouched = true;
+                    var fade = effect.EffectiveDuration;
+                    if (after.music != null) GameAudio.PlayBgm(after.music, after.musicVolume, fade);
+                    else GameAudio.StopBgm(fade);
+                }
                 if (_background && !_viaBlack)
                 {
                     stage.SetBackground(stage.backgroundBack, before.background, 1f);
@@ -524,24 +539,7 @@ namespace GameSystems.Dialogue
                 if (!Mathf.Approximately(_before.letterbox, _after.letterbox)) s.ui?.SetLetterbox(Mathf.Lerp(_before.letterbox, _after.letterbox, t));
                 if (!Mathf.Approximately(_before.cameraZoom, _after.cameraZoom)) s._zoom = Mathf.LerpUnclamped(_before.cameraZoom, _after.cameraZoom, t);
                 if (_before.cameraOffset != _after.cameraOffset) s._offset = Vector2.LerpUnclamped(_before.cameraOffset, _after.cameraOffset, t);
-                if (s.music != null)
-                {
-                    if (_musicChange)
-                    {
-                        if (t < 0.5f) s.music.volume = _before.musicVolume * (1f - t * 2f);
-                        else
-                        {
-                            if (s.music.clip != _after.music)
-                            {
-                                s.music.clip = _after.music;
-                                if (_after.music != null) s.music.Play();
-                                else s.music.Stop();
-                            }
-                            s.music.volume = _after.musicVolume * (t * 2f - 1f);
-                        }
-                    }
-                    else if (!Mathf.Approximately(_before.musicVolume, _after.musicVolume)) s.music.volume = Mathf.Lerp(_before.musicVolume, _after.musicVolume, t);
-                }
+
                 foreach (var (_, from, to, view) in _standings)
                 {
                     var fromAlpha = from != null ? 1f : 0f;

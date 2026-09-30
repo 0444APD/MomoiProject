@@ -140,6 +140,7 @@ namespace GameSystems.Dialogue
 
         public override void ApplyTo(StageState state, EffectContext context)
         {
+            state.musicSet = true;
             state.music = clip;
             state.musicVolume = volume;
         }

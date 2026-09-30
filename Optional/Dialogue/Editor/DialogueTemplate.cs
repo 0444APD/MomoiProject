@@ -176,13 +176,7 @@ namespace GameSystems.EditorTools.Graph
                 stage.standingRoot = Child(stageObject.transform, "Standings");
                 stage.effectRoot = Child(stageObject.transform, "Effects");
                 stage.imageRoot = Child(stageObject.transform, "Images");
-                var music = Child(stageObject.transform, "Music").gameObject.AddComponent<AudioSource>();
-                music.loop = true;
-                music.playOnAwake = false;
-                stage.music = music;
-                var sounds = Child(stageObject.transform, "Sounds").gameObject.AddComponent<AudioSource>();
-                sounds.playOnAwake = false;
-                stage.sounds = sounds;
+
 
                 player.stage = stage;
                 return PrefabUtility.SaveAsPrefabAsset(root, folder + "/DialogueSystem.prefab");

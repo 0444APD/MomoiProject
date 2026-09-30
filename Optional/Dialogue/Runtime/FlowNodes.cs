@@ -58,6 +58,7 @@ namespace GameSystems.Dialogue
         [FieldLabel("화자 스탠딩 ID(비우면 그대로)"), StandingRef(nameof(speaker))] public string expression = "";
         [FieldLabel("화자 예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite expressionSprite;
         [FieldLabel("대사(원문)"), TextArea(2, 10)] public string text = "";
+        [FieldLabel("목소리(비우면 이전 목소리를 멈춘다)")] public AudioClip voice;
         [FieldLabel("선택지")] public List<ChoiceOption> options = new List<ChoiceOption>();
         [FieldLabel("타이핑 속도(초당 글자, 0이면 기본)"), Min(0)] public float typingSpeed;
         [FieldLabel("넘기는 방식")] public LineAdvance advance = LineAdvance.Click;

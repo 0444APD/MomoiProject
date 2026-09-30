@@ -17,6 +17,8 @@ namespace GameSystems.Dialogue
         [Range(0, 0.5f)] public float letterbox;
         public float cameraZoom = 1f;
         public Vector2 cameraOffset;
+        // 대화가 브금을 정했는지(정하지 않았으면 게임의 브금을 건드리지 않는다).
+        public bool musicSet;
         public AudioClip music;
         [Range(0, 1)] public float musicVolume = 1f;
         public List<StandingState> standings = new List<StandingState>();

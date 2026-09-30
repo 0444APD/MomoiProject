@@ -98,6 +98,7 @@ namespace GameSystems.Dialogue
             }
             _runner.LineEntered += _ => stage?.ui?.ShowStaging();
             _runner.ProgressChanged += SaveProgress;
+            _runner.HoldAuto = () => GameAudio.IsVoicePlaying;
             _runner.Signaled += signal =>
             {
                 Signaled?.Invoke(signal);

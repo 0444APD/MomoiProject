@@ -107,6 +107,38 @@ namespace GameSystems.Tests
         }
 
         [Test]
+        public void 대화_브금은_오디오_채널로_나오고_끝나면_게임_브금으로_돌아간다()
+        {
+            var game = AudioClip.Create("game", 44100 * 10, 1, 44100, false);
+            var scene = AudioClip.Create("scene", 44100 * 10, 1, 44100, false);
+            var voice = AudioClip.Create("voice", 44100 * 2, 1, 44100, false);
+            GameAudio.Shutdown();
+            try
+            {
+                GameAudio.PlayBgm(game, 1f, 0f);
+                var (runner, d, line) = One(new MusicEffect { clip = scene, duration = 0.5f });
+                line.voice = voice;
+                runner.StartAt(d, line.guid);
+                Assert.AreEqual(scene, GameAudio.CurrentBgm, "대화의 브금");
+                Assert.AreEqual(voice, GameAudio.CurrentVoice, "대사의 목소리");
+                runner.Stop();
+                Assert.AreEqual(game, GameAudio.CurrentBgm, "대화 전의 브금으로");
+
+                var (quiet, d2, line2) = One();
+                quiet.StartAt(d2, line2.guid);
+                Assert.AreEqual(game, GameAudio.CurrentBgm, "브금을 정하지 않은 대화는 게임 브금을 건드리지 않는다");
+                quiet.Stop();
+            }
+            finally
+            {
+                GameAudio.Shutdown();
+                Object.DestroyImmediate(game);
+                Object.DestroyImmediate(scene);
+                Object.DestroyImmediate(voice);
+            }
+        }
+
+        [Test]
         public void 검은_화면은_유지_시간_동안_바뀐_배경으로_기다린다()
         {
             var background = new BackgroundEffect { sprite = _a, viaBlack = true, duration = 2f, blackHold = 1f, ease = Ease.Linear };

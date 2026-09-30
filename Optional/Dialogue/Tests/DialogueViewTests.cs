@@ -180,7 +180,6 @@ namespace GameSystems.Tests
                 Assert.IsNotNull(player.stage);
                 Assert.IsNotNull(player.stage.ui);
                 Assert.IsNotNull(player.stage.dim);
-                Assert.IsNotNull(player.stage.music);
                 var document = player.stage.ui.GetComponent<UIDocument>();
                 Assert.IsNotNull(document.panelSettings);
                 Assert.IsNotNull(document.panelSettings.themeStyleSheet, "런타임 테마 연결");
