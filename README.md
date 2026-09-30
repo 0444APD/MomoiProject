@@ -4,6 +4,8 @@
 
 설계와 결정 사항은 [`Documentation~/Architecture.md`](Documentation~/Architecture.md)에 있다. 구현이 문서와 달라지면 문서를 먼저 고친다.
 
+**처음 이어받는 사람은 [`HANDOVER.md`](HANDOVER.md)부터 읽는다**: 모든 기능 설명, 설계 철학, 작업 규칙, 개발 흐름, 진행 중·앞으로의 안건, 미해결·보류 사항.
+
 ---
 
 ## 요구 사항
