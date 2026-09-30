@@ -239,6 +239,17 @@ namespace GameSystems.EditorTools.Graph
             </ui:VisualElement>
             <ui:Label name=""dialogue-text"" class=""dialogue-text"" text="""" enable-rich-text=""true"" />
             <ui:VisualElement name=""dialogue-next"" class=""dialogue-next"" picking-mode=""Ignore"" />
+            <ui:Label name=""dialogue-log-button"" class=""dialogue-log-button"" text=""로그"" />
+        </ui:VisualElement>
+        <!-- 대사 로그: 로그 버튼·글상자 위로 휠을 굴리면 열린다. -->
+        <ui:VisualElement name=""dialogue-log"" class=""dialogue-log"">
+            <ui:VisualElement class=""dialogue-log__panel"">
+                <ui:VisualElement class=""dialogue-log__head"">
+                    <ui:Label class=""dialogue-log__title"" text=""대사 로그"" />
+                    <ui:Label name=""dialogue-log-close"" class=""dialogue-log-close"" text=""✕"" />
+                </ui:VisualElement>
+                <ui:ScrollView name=""dialogue-log-list"" class=""dialogue-log__list"" />
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name=""dialogue-tooltip"" class=""dialogue-tooltip"" picking-mode=""Ignore"">
             <ui:Label name=""dialogue-tooltip-text"" class=""dialogue-tooltip-text"" text="""" />
@@ -435,6 +446,116 @@ namespace GameSystems.EditorTools.Graph
     color: rgb(242, 242, 243);
     -unity-text-align: middle-center;
     white-space: normal;
+}
+
+/* 대사 로그: 위에서 아래로, 내가 고른 선택지는 오른쪽 */
+.dialogue-log-button {
+    position: absolute;
+    right: 24px;
+    top: 14px;
+    font-size: 18px;
+    color: rgba(242, 242, 243, 0.6);
+    padding: 2px 10px;
+    border-radius: 8px;
+}
+
+.dialogue-log-button:hover {
+    color: rgb(255, 255, 255);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dialogue-log {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    align-items: center;
+    justify-content: center;
+}
+
+.dialogue-log__panel {
+    width: 70%;
+    height: 82%;
+    padding: 20px 28px;
+    border-radius: 20px;
+    background-color: rgba(14, 15, 17, 0.92);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.dialogue-log__head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.dialogue-log__title {
+    flex-grow: 1;
+    font-size: 26px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+}
+
+.dialogue-log-close {
+    font-size: 24px;
+    color: rgba(242, 242, 243, 0.6);
+    padding: 2px 10px;
+}
+
+.dialogue-log__list {
+    flex-grow: 1;
+}
+
+.dialogue-log__entry {
+    flex-direction: row;
+    align-items: flex-start;
+    margin: 10px 0;
+}
+
+.dialogue-log__portrait {
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+    margin-right: 16px;
+    border-radius: 12px;
+    background-color: rgba(255, 255, 255, 0.06);
+    -unity-background-scale-mode: scale-and-crop;
+    background-position-y: top;
+}
+
+.dialogue-log__body {
+    flex-shrink: 1;
+    max-width: 80%;
+}
+
+.dialogue-log__name {
+    font-size: 20px;
+    -unity-font-style: bold;
+    color: rgb(253, 93, 131);
+}
+
+.dialogue-log__text {
+    font-size: 24px;
+    color: rgb(242, 242, 243);
+    white-space: normal;
+}
+
+.dialogue-log__entry--choice {
+    flex-direction: row-reverse;
+}
+
+.dialogue-log__entry--choice .dialogue-log__body {
+    padding: 10px 18px;
+    border-radius: 14px;
+    background-color: rgba(253, 93, 131, 0.25);
+}
+
+.dialogue-log__entry--narration .dialogue-log__text,
+.dialogue-log__entry--thought .dialogue-log__text {
+    -unity-font-style: italic;
+    color: rgba(242, 242, 243, 0.8);
 }
 
 /* 용어 툴팁 */

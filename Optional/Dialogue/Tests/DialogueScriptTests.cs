@@ -115,6 +115,50 @@ namespace GameSystems.Tests
         }
 
         [Test]
+        public void 로그는_말하는_이_얼굴_대사와_내_선택을_남긴다()
+        {
+            var texture = Make(new Texture2D(2, 2));
+            var smile = Make(Sprite.Create(texture, new Rect(0, 0, 2, 2), Vector2.zero));
+            var icon = Make(Sprite.Create(texture, new Rect(0, 0, 1, 1), Vector2.zero));
+            var arin = Make(ScriptableObject.CreateInstance<StandingProfileData>());
+            arin.EditorAssignId("arin");
+            arin.expressions[0].id = "smile";
+            arin.expressions[0].sprite = smile;
+            var bob = Make(ScriptableObject.CreateInstance<StandingProfileData>());
+            bob.EditorAssignId("bob");
+            bob.logIcon = icon;
+
+            var d = Make(ScriptableObject.CreateInstance<DialogueData>());
+            d.EditorAssignId("log");
+            var g = d.graph;
+            var start = new StartNode();
+            var a = new LineNode { speaker = "arin", text = "안녕" };
+            var ask = new LineNode { speaker = "bob", text = "어때?", options = { new ChoiceOption { text = "좋아" } } };
+            var n = new LineNode { text = "해설" };
+            foreach (var node in new GraphNode[] { start, a, ask, n }) g.Add(node);
+            g.Connect(start.guid, StartNode.NextPort, a.guid, GraphNode.FlowInPort);
+            g.Connect(a.guid, LineNode.NextPort, ask.guid, GraphNode.FlowInPort);
+            g.Connect(ask.guid, LineNode.OptionPrefix + ask.options[0].id, n.guid, GraphNode.FlowInPort);
+
+            var runner = new DialogueRunner(_ => d, _ => null) { ClickCooldown = 0, Profiles = id => id == "arin" ? arin : id == "bob" ? bob : null };
+            runner.Start(d);
+            runner.FastForward();
+            runner.Advance();
+            runner.FastForward();
+            runner.Choose(0);
+            runner.FastForward();
+            var log = runner.Log;
+            Assert.AreEqual(4, log.Count);
+            Assert.AreEqual("arin", log[0].SpeakerName);
+            Assert.AreEqual(smile, log[0].Portrait, "나와 있지 않으면 기본 스탠딩 그림");
+            Assert.AreEqual(icon, log[1].Portrait, "로그 얼굴이 있으면 그것");
+            Assert.IsTrue(log[2].Choice);
+            Assert.AreEqual("좋아", log[2].Text);
+            Assert.AreEqual("", log[3].SpeakerName, "해설");
+            Assert.IsNull(log[3].Portrait);
+        }
+
+        [Test]
         public void 화자_이름은_다른_이름_프로필_해설_순서()
         {
             var runner = new DialogueRunner(_ => null, _ => null);

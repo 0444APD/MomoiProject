@@ -42,6 +42,10 @@ namespace GameSystems.Dialogue
             public string tooltip = "dialogue-tooltip";
             public string tooltipText = "dialogue-tooltip-text";
             [Tooltip("선택지 템플릿 안에서 글을 넣을 Label")] public string choiceText = "choice-text";
+            [Tooltip("대사 로그 창(열면 보인다)")] public string log = "dialogue-log";
+            [Tooltip("로그 줄을 담는 ScrollView")] public string logList = "dialogue-log-list";
+            public string logButton = "dialogue-log-button";
+            public string logClose = "dialogue-log-close";
 
             public IEnumerable<(string field, string name, bool required)> All()
             {
@@ -58,6 +62,10 @@ namespace GameSystems.Dialogue
                 yield return (nameof(fade), fade, false);
                 yield return (nameof(tooltip), tooltip, false);
                 yield return (nameof(tooltipText), tooltipText, false);
+                yield return (nameof(log), log, false);
+                yield return (nameof(logList), logList, false);
+                yield return (nameof(logButton), logButton, false);
+                yield return (nameof(logClose), logClose, false);
             }
         }
 
@@ -87,6 +95,10 @@ namespace GameSystems.Dialogue
         public ElementNames names = new ElementNames();
         [Tooltip("선택지 하나의 모양(UXML). 비우면 버튼을 만든다.")]
         public VisualTreeAsset choiceTemplate;
+        [Tooltip("로그 한 줄의 모양(UXML: log-portrait · log-name · log-text). 비우면 기본 모양을 만든다.")]
+        public VisualTreeAsset logEntryTemplate;
+        [Tooltip("글상자에서 휠을 위로 굴리면 로그를 연다")]
+        public bool wheelOpensLog = true;
         public List<MotionSlot> motions = new List<MotionSlot>();
         [Tooltip("한글 등 글자가 있는 폰트(TTF). SDF 폰트 에셋을 쓰려면 아래 칸.")]
         public UIFont font;
@@ -98,6 +110,12 @@ namespace GameSystems.Dialogue
 
         public event Action AdvanceRequested;
         public event Action<int> ChoiceRequested;
+        public event Action LogOpened;
+        public event Action LogClosed;
+
+        // 로그 내용(대화 재생기가 실행기의 로그로 채운다).
+        public Func<IReadOnlyList<DialogueLogEntry>> LogSource = () => Array.Empty<DialogueLogEntry>();
+        public bool IsLogOpen { get; private set; }
 
         readonly UiMotionRunner _motions = new UiMotionRunner();
         readonly List<VisualElement> _choiceElements = new List<VisualElement>();
@@ -116,6 +134,8 @@ namespace GameSystems.Dialogue
         VisualElement _fade;
         VisualElement _tooltip;
         Label _tooltipText;
+        VisualElement _log;
+        ScrollView _logList;
         string _fullText = "";
         string _speaker;
         bool _open;
@@ -173,8 +193,24 @@ namespace GameSystems.Dialogue
             _fade = Find<VisualElement>(names.fade, false);
             _tooltip = Find<VisualElement>(names.tooltip, false);
             _tooltipText = Find<Label>(names.tooltipText, false);
-            _extras.Clear();
-            tree.Query<VisualElement>().ForEach(element =>
+            _log = Find<VisualElement>(names.log, false);
+            _logList = Find<ScrollView>(names.logList, false);
+            var logButton = Find<VisualElement>(names.logButton, false);
+            var logClose = Find<VisualElement>(names.logClose, false);
+            logButton?.RegisterCallback<ClickEvent>(e =>
+            {
+                e.StopPropagation();
+                OpenLog();
+            });
+            logClose?.RegisterCallback<ClickEvent>(e =>
+            {
+                e.StopPropagation();
+                CloseLog();
+            });
+            _log?.RegisterCallback<ClickEvent>(e => e.StopPropagation());
+            if (_log != null) _log.style.display = DisplayStyle.None;
+            IsLogOpen = false;
+            _extras.Clear();            tree.Query<VisualElement>().ForEach(element =>
             {
                 if (!string.IsNullOrEmpty(element.name) && element.name.StartsWith(ExtraPrefix, StringComparison.Ordinal))
                     _extras.Add((element.name.Substring(ExtraPrefix.Length), element));
@@ -187,6 +223,14 @@ namespace GameSystems.Dialogue
             _root.focusable = true;
             _root.RegisterCallback<ClickEvent>(OnClick);
             _root.RegisterCallback<KeyDownEvent>(OnKey);
+            _root.RegisterCallback<WheelEvent>(e =>
+            {
+                if (wheelOpensLog && !IsLogOpen && _log != null && e.delta.y < 0)
+                {
+                    OpenLog();
+                    e.StopPropagation();
+                }
+            });
             if (_text != null)
             {
                 _text.enableRichText = true;
@@ -228,6 +272,7 @@ namespace GameSystems.Dialogue
             }
             if (!open)
             {
+                if (IsLogOpen) CloseLog();
                 ClearStateClasses();
                 _choiceData = Array.Empty<DialogueChoice>();
                 ClearChoices();
@@ -414,7 +459,7 @@ namespace GameSystems.Dialogue
 
         void OnClick(ClickEvent e)
         {
-            if (!_open) return;
+            if (!_open || IsLogOpen) return;
             if (_root.ClassListContains("dialogue--choosing")) return;
             AdvanceRequested?.Invoke();
         }
@@ -422,6 +467,12 @@ namespace GameSystems.Dialogue
         void OnKey(KeyDownEvent e)
         {
             if (!_open) return;
+            if (IsLogOpen)
+            {
+                if (e.keyCode == KeyCode.Escape || e.keyCode == KeyCode.Return || e.keyCode == KeyCode.Space) CloseLog();
+                e.StopPropagation();
+                return;
+            }
             if (e.keyCode == KeyCode.Space || e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
             {
                 if (!_root.ClassListContains("dialogue--choosing")) AdvanceRequested?.Invoke();
@@ -432,6 +483,86 @@ namespace GameSystems.Dialogue
                 Pick(e.keyCode - KeyCode.Alpha1);
                 e.StopPropagation();
             }
+        }
+
+        // ── 대사 로그 ────────────────────────────────────────
+        // 위에서 아래로 읽는 목록. 줄마다 말하는 이 · 얼굴(정사각형) · 대사, 내가 고른 선택지는 오른쪽 정렬.
+        // 줄 클래스: dialogue-log__entry · --choice · --narration · --thought · --no-portrait
+
+        public void OpenLog()
+        {
+            if (!Ready() || _log == null || _logList == null || IsLogOpen) return;
+            IsLogOpen = true;
+            _logList.Clear();
+            foreach (var entry in LogSource?.Invoke() ?? Array.Empty<DialogueLogEntry>()) _logList.Add(LogRow(entry));
+            _log.style.display = DisplayStyle.Flex;
+            _root.AddToClassList("dialogue--log-open");
+            // 맨 아래(가장 최근)부터 보인다.
+            _logList.schedule.Execute(() => _logList.scrollOffset = new Vector2(0, float.MaxValue)).StartingIn(16);
+            LogOpened?.Invoke();
+        }
+
+        public void CloseLog()
+        {
+            if (!IsLogOpen) return;
+            IsLogOpen = false;
+            if (_log != null) _log.style.display = DisplayStyle.None;
+            _root.RemoveFromClassList("dialogue--log-open");
+            _root.Focus();
+            LogClosed?.Invoke();
+        }
+
+        VisualElement LogRow(DialogueLogEntry entry)
+        {
+            VisualElement row;
+            VisualElement portrait;
+            Label nameLabel;
+            Label textLabel;
+            if (logEntryTemplate != null)
+            {
+                var instance = logEntryTemplate.Instantiate();
+                row = instance.childCount == 1 ? instance[0] : instance;
+                portrait = row.Q("log-portrait");
+                nameLabel = row.Q<Label>("log-name");
+                textLabel = row.Q<Label>("log-text");
+            }
+            else
+            {
+                row = new VisualElement();
+                portrait = new VisualElement();
+                portrait.AddToClassList("dialogue-log__portrait");
+                var body = new VisualElement();
+                body.AddToClassList("dialogue-log__body");
+                nameLabel = new Label();
+                nameLabel.AddToClassList("dialogue-log__name");
+                textLabel = new Label();
+                textLabel.AddToClassList("dialogue-log__text");
+                body.Add(nameLabel);
+                body.Add(textLabel);
+                row.Add(portrait);
+                row.Add(body);
+            }
+            row.AddToClassList("dialogue-log__entry");
+            row.EnableInClassList("dialogue-log__entry--choice", entry.Choice);
+            row.EnableInClassList("dialogue-log__entry--narration", !entry.Choice && string.IsNullOrEmpty(entry.SpeakerName));
+            row.EnableInClassList("dialogue-log__entry--thought", entry.Thought);
+            row.EnableInClassList("dialogue-log__entry--no-portrait", entry.Portrait == null);
+            if (portrait != null)
+            {
+                portrait.style.backgroundImage = entry.Portrait != null ? new StyleBackground(entry.Portrait) : StyleKeyword.Null;
+                portrait.style.display = entry.Portrait != null ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            if (nameLabel != null)
+            {
+                nameLabel.text = entry.SpeakerName ?? "";
+                nameLabel.style.display = string.IsNullOrEmpty(entry.SpeakerName) ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+            if (textLabel != null)
+            {
+                textLabel.enableRichText = true;
+                textLabel.text = entry.Text ?? "";
+            }
+            return row;
         }
 
         // ── 용어 툴팁 ────────────────────────────────────────

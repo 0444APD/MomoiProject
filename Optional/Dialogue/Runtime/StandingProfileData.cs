@@ -25,6 +25,7 @@ namespace GameSystems.Data
         [FieldLabel("이름 색")] public Color nameColor = Color.white;
         [FieldLabel("스탠딩 프리팹(StandingView가 붙은 프리팹, 스파인 등. 비우면 스탠딩 목록의 스프라이트로 그린다)")] public GameObject standingPrefab;
         [FieldLabel("스탠딩 크기 배율"), Min(0.01f)] public float standingScale = 1f;
+        [FieldLabel("로그 얼굴(정사각형 권장. 비우면 그때의 스탠딩 그림, 스파인이면 꼭 넣는다)")] public Sprite logIcon;
         [FieldLabel("추가 글(소속·직함 등, UI의 dialogue-extra-<키> 요소에 보인다)")] public List<ExtraText> extras = new List<ExtraText>();
 
         public IEnumerable<string> StandingIds => expressions.Select(e => e.id).Where(id => !string.IsNullOrEmpty(id));

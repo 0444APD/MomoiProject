@@ -70,6 +70,19 @@ namespace GameSystems.Dialogue
         public StageState state;
     }
 
+    // 대사 로그 한 줄.
+    public sealed class DialogueLogEntry
+    {
+        public string Speaker;
+        public string SpeakerName;
+        public string Text;
+        // 그때의 화자 얼굴(로그 얼굴 → 그때 스탠딩 그림 → 기본 스탠딩). 없으면 null.
+        public Sprite Portrait;
+        public bool Thought;
+        // 플레이어가 고른 선택지.
+        public bool Choice;
+    }
+
     // 대화 진행 기록(저장용): 어디서 시작했고, 분기·선택지에서 어느 쪽으로 갔고, 대사를 몇 줄 지났는지.
     // 불러올 때는 같은 길을 조용히 다시 밟아(값 바꾸기·신호는 다시 하지 않는다) 그때의 화면을 그대로 만든다.
     [Serializable]
@@ -120,6 +133,7 @@ namespace GameSystems.Dialogue
         readonly HashSet<string> _released = new HashSet<string>();
         readonly List<DialogueChoice> _choices = new List<DialogueChoice>();
         readonly List<DialogueSnapshot> _history = new List<DialogueSnapshot>();
+        readonly List<DialogueLogEntry> _log = new List<DialogueLogEntry>();
         Scope _main;
         int _depth;
         float _visible;
@@ -160,6 +174,8 @@ namespace GameSystems.Dialogue
         public int RunningEffects => _runs.Count;
         // 지나온 줄(그때의 화면 상태 포함). 대사 로그·되감기에 쓴다.
         public IReadOnlyList<DialogueSnapshot> History => _history;
+        // 대사 로그(대사가 나올 때, 선택지를 고를 때 한 줄씩).
+        public IReadOnlyList<DialogueLogEntry> Log => _log;
 
         public event Action<LineNode> LineEntered;
         public event Action<string> Signaled;
@@ -375,6 +391,7 @@ namespace GameSystems.Dialogue
             _cooldown = 0;
             _choices.Clear();
             _history.Clear();
+            _log.Clear();
             State = new StageState();
             Line = null;
             Text = "";
@@ -386,6 +403,17 @@ namespace GameSystems.Dialogue
         {
             Dialogue = dialogue;
             _main = new Scope { Graph = dialogue.graph, Context = NewContext() };
+        }
+
+        // 로그 얼굴: 프로필의 로그 얼굴 → 지금 스탠딩 그림(예외 스프라이트·스탠딩 ID) → 기본 스탠딩.
+        Sprite PortraitOf(string speaker)
+        {
+            var profile = Profiles(speaker);
+            if (profile == null) return null;
+            if (profile.logIcon != null) return profile.logIcon;
+            var standing = State.Standing(speaker);
+            if (standing != null && standing.sprite != null) return standing.sprite;
+            return profile.SpriteOf(standing?.expression ?? profile.defaultExpression);
         }
 
         EffectContext NewContext() => new EffectContext { Locations = id => Locations(id), Profiles = id => Profiles(id) };
@@ -510,7 +538,9 @@ namespace GameSystems.Dialogue
         {
             if (Phase != DialoguePhase.WaitingForText) return;
             Phase = DialoguePhase.Typing;
-            Stage?.ShowLine(Line, SpeakerNameOf(Line), Text);
+            var speakerName = SpeakerNameOf(Line);
+            _log.Add(new DialogueLogEntry { Speaker = Line.speaker, SpeakerName = speakerName, Text = Text, Portrait = PortraitOf(Line.speaker), Thought = Line.thought });
+            Stage?.ShowLine(Line, speakerName, Text);
             Stage?.SetVisibleCharacters(0);
             if (TextLength == 0) Typed();
         }
@@ -600,6 +630,8 @@ namespace GameSystems.Dialogue
         void Pick(string optionId)
         {
             _progress?.decisions.Add(optionId);
+            var picked = _choices.FirstOrDefault(c => c.OptionId == optionId);
+            _log.Add(new DialogueLogEntry { Text = picked.Text ?? "", Choice = true });
             Leave(LineNode.OptionPrefix + optionId);
         }
 

@@ -57,6 +57,9 @@ namespace GameSystems.Dialogue
             {
                 stage.ui.AdvanceRequested += OnAdvance;
                 stage.ui.ChoiceRequested += OnChoice;
+                stage.ui.LogSource = () => Runner.Log;
+                stage.ui.LogOpened += OnLogOpened;
+                stage.ui.LogClosed += OnLogClosed;
             }
         }
 
@@ -66,6 +69,8 @@ namespace GameSystems.Dialogue
             {
                 stage.ui.AdvanceRequested -= OnAdvance;
                 stage.ui.ChoiceRequested -= OnChoice;
+                stage.ui.LogOpened -= OnLogOpened;
+                stage.ui.LogClosed -= OnLogClosed;
             }
             if (IsPlaying) Stop();
         }
@@ -223,6 +228,23 @@ namespace GameSystems.Dialogue
         void OnChoice(int index) => Choose(index);
 
         void OnAdvance() => Advance();
+
+        // 로그를 보는 동안은 대화 시간이 흐르지 않는다(자동 진행도 멈춤).
+        bool _pausedByLog;
+
+        void OnLogOpened()
+        {
+            if (Paused) return;
+            Paused = true;
+            _pausedByLog = true;
+        }
+
+        void OnLogClosed()
+        {
+            if (!_pausedByLog) return;
+            _pausedByLog = false;
+            Paused = false;
+        }
 
         void Update()
         {
