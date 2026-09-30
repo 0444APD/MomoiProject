@@ -6,10 +6,11 @@ using UnityEngine;
 
 namespace GameSystems.Data
 {
-    // 캐릭터 프로필 = 스탠딩 프로필. 스탠딩 목록(ID → 스프라이트)을 두고, 대화 그래프에서는 '프로필 ID + 스탠딩 ID'로 고른다.
+    // 대화용 스탠딩 프로필(대화 시스템 전용, 게임의 캐릭터 데이터와 따로 관리한다). 스탠딩 목록(ID → 스프라이트)을 두고,
+    // 대화 그래프에서는 "프로필 ID + 스탠딩 ID"로 고른다. 대사의 화자도 이 프로필 ID다.
     // 이름은 텍스트 시트의 '<id>.name'. 소속 같은 프로젝트별 글은 '추가 글'에 키로 적는다(UI에 같은 키의 요소를 두면 보인다).
-    [Database("캐릭터 프로필", Group = "대화", Order = 0, IdPrefix = "character")]
-    public sealed class CharacterData : GameData
+    [Database("스탠딩 프로필", Group = "대화", Order = 0, IdPrefix = "profile")]
+    public sealed class StandingProfileData : GameData
     {
         // 스탠딩 하나(표정·의상·포즈 등). 필드 이름 expressions는 저장 호환을 위해 그대로 둔다.
         [Serializable]
@@ -61,7 +62,7 @@ namespace GameSystems.Dialogue
         [FieldLabel("글(문장 틀 문법 가능)"), TextArea(1, 4)] public string text = "";
     }
 
-    // 문자열 칸이 어느 캐릭터 프로필의 스탠딩 ID인지. characterField: 같은 노드에서 캐릭터 ID를 담은 칸 이름(비어 있으면 현재 화자).
+    // 문자열 칸이 어느 스탠딩 프로필의 스탠딩 ID인지. characterField: 같은 노드에서 프로필 ID를 담은 칸 이름(비어 있으면 현재 화자).
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class StandingRefAttribute : Attribute
     {

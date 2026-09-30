@@ -82,7 +82,7 @@ namespace GameSystems.Tests
             made.Add(texture);
             var sprite = Sprite.Create(texture, new Rect(0, 0, 4, 8), new Vector2(0.5f, 0f), 4);
             made.Add(sprite);
-            var arin = ScriptableObject.CreateInstance<CharacterData>();
+            var arin = ScriptableObject.CreateInstance<StandingProfileData>();
             made.Add(arin);
             arin.EditorAssignId("arin");
             arin.expressions[0].sprite = sprite;
@@ -107,7 +107,7 @@ namespace GameSystems.Tests
 
             try
             {
-                var runner = new DialogueRunner(id => dialogue, _ => null) { Stage = stage };
+                var runner = new DialogueRunner(id => dialogue, _ => null) { Stage = stage, ClickCooldown = 0 };
                 runner.Start(dialogue);
                 Assert.AreEqual(1, standings.childCount, "등장하면 스탠딩이 생긴다");
                 runner.Tick(0.25f);

@@ -74,7 +74,7 @@ namespace GameSystems.Tests
         {
             var stage = new RecordingStage();
             var runner = new DialogueRunner(id => id != null && _dialogues.TryGetValue(id, out var d) ? d : null,
-                id => id != null && _presets.TryGetValue(id, out var p) ? p : null) { Stage = stage, DefaultTypingSpeed = 10 };
+                id => id != null && _presets.TryGetValue(id, out var p) ? p : null) { Stage = stage, DefaultTypingSpeed = 10, ClickCooldown = 0 };
             return (runner, stage);
         }
 
@@ -163,8 +163,8 @@ namespace GameSystems.Tests
             var g = d.graph;
             var start = Add(g, new StartNode());
             var line = Add(g, new LineNode { text = "짠" });
-            var bg = Add(g, new BackgroundEffect { duration = 3f });
-            var dim = Add(g, new DimEffect { duration = 3f, amount = 0.4f });
+            var bg = Add(g, new BackgroundEffect { duration = 3f, blockInput = false });
+            var dim = Add(g, new DimEffect { duration = 3f, amount = 0.4f, blockInput = false });
             Link(g, start, StartNode.NextPort, line, GraphNode.FlowInPort);
             Link(g, line, LineNode.EnterPort, bg, EffectNode.PlayPort);
             Link(g, bg, EffectNode.DonePort, dim, EffectNode.PlayPort);
@@ -186,7 +186,7 @@ namespace GameSystems.Tests
             var start = Add(g, new StartNode());
             var a = Add(g, new LineNode { text = "a" });
             var b = Add(g, new LineNode { text = "b" });
-            var shake = Add(g, new ShakeEffect { duration = 5f });
+            var shake = Add(g, new ShakeEffect { duration = 5f, blockInput = false });
             var music = Add(g, new MusicEffect { duration = 5f, keepAcrossLines = true });
             Link(g, start, StartNode.NextPort, a, GraphNode.FlowInPort);
             Link(g, a, LineNode.NextPort, b, GraphNode.FlowInPort);
@@ -353,6 +353,161 @@ namespace GameSystems.Tests
 
             line.options.Add(new ChoiceOption());
             Assert.AreEqual(1, g.Prune(), "선택지가 생겨 '다음' 점이 사라지면 그 선이 정리된다");
+        }
+
+        // ── 클릭·시간 제어 ────────────────────────────────────
+
+        (DialogueData d, LineNode a, LineNode b, LineNode c) Three(LineAdvance bAdvance = LineAdvance.Click)
+        {
+            var d = Dialogue("flow" + System.Guid.NewGuid().ToString("N").Substring(0, 6));
+            var g = d.graph;
+            var start = Add(g, new StartNode());
+            var a = Add(g, new LineNode { text = "하나" });
+            var b = Add(g, new LineNode { text = "둘", advance = bAdvance, holdSeconds = 1f });
+            var c = Add(g, new LineNode { text = "셋", options = { new ChoiceOption { text = "예" } } });
+            Link(g, start, StartNode.NextPort, a, GraphNode.FlowInPort);
+            Link(g, a, LineNode.NextPort, b, GraphNode.FlowInPort);
+            Link(g, b, LineNode.NextPort, c, GraphNode.FlowInPort);
+            return (d, a, b, c);
+        }
+
+        [Test]
+        public void 효과가_진행_중이면_클릭을_막고_끝나면_받는다()
+        {
+            var (d, a, _, _) = Three();
+            var shake = Add(d.graph, new ShakeEffect { duration = 1f });
+            Link(d.graph, a, LineNode.EnterPort, shake, EffectNode.PlayPort);
+            var (runner, _) = Runner();
+            runner.Start(d);
+            Assert.IsTrue(runner.InputBlocked);
+            Assert.IsFalse(runner.Advance(), "효과 시간 보장: 클릭 무시");
+            Assert.AreEqual(DialoguePhase.Typing, runner.Phase);
+            runner.Tick(1f);
+            Assert.IsFalse(runner.InputBlocked);
+            runner.Advance();
+            Assert.IsTrue(runner.Advance());
+            Assert.AreNotEqual(a, runner.Line);
+        }
+
+        [Test]
+        public void 연타는_쿨다운_동안_무시한다()
+        {
+            var (d, a, b, _) = Three();
+            var (runner, _) = Runner();
+            runner.ClickCooldown = 0.2f;
+            runner.Start(d);
+            runner.FastForward();
+            Assert.IsTrue(runner.Advance());
+            Assert.AreEqual(b, runner.Line);
+            runner.FastForward();
+            Assert.IsFalse(runner.Advance(), "방금 클릭함");
+            runner.Tick(0.25f);
+            Assert.IsTrue(runner.Advance());
+        }
+
+        [Test]
+        public void 시간_진행_대사는_클릭을_받지_않고_머문_뒤_넘어간다()
+        {
+            var (d, _, b, c) = Three(LineAdvance.Timed);
+            var (runner, _) = Runner();
+            runner.Start(d);
+            runner.FastForward();
+            runner.Advance();
+            Assert.AreEqual(b, runner.Line);
+            Assert.IsFalse(runner.Advance(), "타이핑 중 클릭 무시");
+            runner.Tick(0.2f);
+            Assert.AreEqual(DialoguePhase.Shown, runner.Phase);
+            Assert.IsFalse(runner.Advance(), "다 나와도 클릭 무시");
+            runner.Tick(0.9f);
+            Assert.AreEqual(b, runner.Line);
+            runner.Tick(0.2f);
+            Assert.AreEqual(c, runner.Line, "머무는 시간 1초 뒤 스스로 넘어감");
+        }
+
+        [Test]
+        public void 자동_진행은_막는_효과가_끝난_뒤_지연_후_넘긴다()
+        {
+            var (d, a, b, _) = Three();
+            var wait = Add(d.graph, new WaitEffect { duration = 2f });
+            Link(d.graph, a, LineNode.EnterPort, wait, EffectNode.PlayPort);
+            var (runner, _) = Runner();
+            runner.AutoMode = true;
+            runner.AutoDelay = 0.5f;
+            runner.Start(d);
+            runner.Tick(1f);
+            runner.Tick(0.9f);
+            Assert.AreEqual(a, runner.Line, "기다리기(막는 효과) 중에는 자동으로도 넘기지 않는다");
+            runner.Tick(0.3f);
+            Assert.AreEqual(a, runner.Line, "효과가 끝나고 0.5초가 아직 안 지남");
+            runner.Tick(0.3f);
+            Assert.AreEqual(b, runner.Line);
+        }
+
+        [Test]
+        public void 스킵은_다음_선택지_직전에서_멈춘다()
+        {
+            var (d, a, _, c) = Three(LineAdvance.Timed);
+            var wait = Add(d.graph, new WaitEffect { duration = 5f });
+            Link(d.graph, a, LineNode.EnterPort, wait, EffectNode.PlayPort);
+            var (runner, stage) = Runner();
+            runner.Start(d);
+            runner.SkipToChoice();
+            Assert.AreEqual(c, runner.Line);
+            Assert.AreEqual(DialoguePhase.Choosing, runner.Phase);
+            Assert.AreEqual(1, stage.Choices.Count);
+            Assert.AreEqual(0, runner.RunningEffects);
+        }
+
+        [Test]
+        public void 노드에서_시작해_중간_시점으로_이동하면_효과가_그_진행도에서_이어진다()
+        {
+            var d = Dialogue("seek");
+            var g = d.graph;
+            var start = Add(g, new StartNode());
+            var line = Add(g, new LineNode { text = "…" });
+            var dim = Add(g, new DimEffect { duration = 3f, amount = 1f, ease = Ease.Linear });
+            var late = Add(g, new LetterboxEffect { delay = 1f, duration = 2f, thickness = 0.2f, ease = Ease.Linear });
+            Link(g, start, StartNode.NextPort, line, GraphNode.FlowInPort);
+            Link(g, line, LineNode.EnterPort, dim, EffectNode.PlayPort);
+            Link(g, line, LineNode.EnterPort, late, EffectNode.PlayPort);
+
+            var seen = new Dictionary<System.Type, float>();
+            var stage = new SeekStage(seen);
+            var runner = new DialogueRunner(_ => d, _ => null) { Stage = stage };
+            Assert.IsTrue(runner.StartAt(d, line.guid));
+            runner.Simulate(1.5f);
+            Assert.AreEqual(1.5f, runner.Time, 1e-3);
+            Assert.AreEqual(0.5f, seen[typeof(DimEffect)], 0.02f, "3초 효과의 1.5초 = 50%");
+            Assert.AreEqual(0.25f, seen[typeof(LetterboxEffect)], 0.02f, "1초 뒤 시작한 2초 효과 = 25%");
+
+            Assert.IsTrue(runner.StartAt(d, dim.guid), "효과 노드 하나만 재생");
+            runner.Simulate(3f);
+            Assert.AreEqual(1f, seen[typeof(DimEffect)], 1e-3);
+        }
+
+        sealed class SeekStage : IDialogueStage
+        {
+            readonly Dictionary<System.Type, float> _seen;
+
+            public SeekStage(Dictionary<System.Type, float> seen)
+            {
+                _seen = seen;
+            }
+
+            sealed class Player : IEffectPlayer
+            {
+                public System.Type Type;
+                public Dictionary<System.Type, float> Seen;
+                public void Evaluate(float t) => Seen[Type] = t;
+                public void Finish() { }
+            }
+
+            public void ApplyState(StageState state) { }
+            public IEffectPlayer Begin(EffectNode effect, EffectContext context, StageState before, StageState after) => new Player { Type = effect.GetType(), Seen = _seen };
+            public void ShowLine(LineNode line, string speakerName, string text) { }
+            public void SetVisibleCharacters(int count) { }
+            public void ShowChoices(IReadOnlyList<DialogueChoice> choices) { }
+            public void Hide() { }
         }
     }
 }

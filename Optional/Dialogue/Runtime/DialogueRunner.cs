@@ -109,11 +109,24 @@ namespace GameSystems.Dialogue
         Scope _main;
         int _depth;
         float _visible;
-        float _autoTimer;
+        float _shownTimer;
+        float _cooldown;
 
         public GameSession Session { get; set; }
         public IDialogueStage Stage { get; set; }
         public float DefaultTypingSpeed = 30f;
+        // 클릭을 받은 뒤 다음 클릭을 무시하는 시간(연타로 두 줄씩 넘어가지 않게).
+        public float ClickCooldown = 0.12f;
+        // 자동 진행: '클릭' 대사가 다 나오고 막는 효과가 없으면 AutoDelay초 뒤 클릭한 것으로 친다.
+        public bool AutoMode;
+        public float AutoDelay = 1.2f;
+        // 시작(StartAt·Start)부터 흐른 시간. 미리보기의 시간 위치.
+        public float Time { get; private set; }
+
+        // 클릭을 막는 효과(효과 시간 보장)가 진행 중인지.
+        public bool InputBlocked => _runs.Any(r => !r.Done && r.Node.blockInput && !(r.Node is PresetEffect));
+        // 대화 진행 중이거나 효과가 돌고 있다.
+        public bool IsActive => (Phase != DialoguePhase.Idle && Phase != DialoguePhase.Ended) || _runs.Count > 0;
 
         public DialogueData Dialogue { get; private set; }
         public LineNode Line { get; private set; }
@@ -185,8 +198,78 @@ namespace GameSystems.Dialogue
 
         public void Stop()
         {
-            if (Phase == DialoguePhase.Idle || Phase == DialoguePhase.Ended) return;
+            if (!IsActive) return;
             End();
+        }
+
+        // 그래프의 아무 노드에서 시작한다(미리보기). 시작·대사·흐름 노드는 그 자리부터 흐름을 따르고, 효과 노드는 그 효과 체인만 재생한다.
+        public bool StartAt(DialogueData dialogue, string nodeGuid)
+        {
+            var node = dialogue?.graph.Find(nodeGuid);
+            if (node == null) return false;
+            Reset();
+            Stage?.ApplyState(State);
+            Enter(dialogue);
+            switch (node)
+            {
+                case StartNode start:
+                    Fire(_main, start, StartNode.StartedPort);
+                    Continue(dialogue.graph.Next(start, StartNode.NextPort));
+                    break;
+                case EffectNode effect:
+                    Play(_main, effect, null);
+                    break;
+                default:
+                    Continue(node);
+                    break;
+            }
+            return true;
+        }
+
+        // 연출 프리셋 하나만 재생한다(프리셋 창 미리보기).
+        public bool StartPreset(string presetId)
+        {
+            if (_presets(presetId) == null) return false;
+            Reset();
+            Stage?.ApplyState(State);
+            Dialogue = null;
+            _main = new Scope { Graph = new NodeGraph(), Context = new EffectContext() };
+            Play(_main, new PresetEffect { preset = presetId }, null);
+            return true;
+        }
+
+        // 지금부터 seconds만큼 클릭 없이 시간을 흘린다(미리보기의 시간 이동: 다시 시작한 뒤 원하는 시점까지 감는다).
+        public void Simulate(float seconds, float step = 1f / 60f)
+        {
+            while (seconds > 1e-5f)
+            {
+                var dt = Mathf.Min(step, seconds);
+                Tick(dt);
+                seconds -= dt;
+            }
+        }
+
+        // 다음 선택지 직전까지(선택지가 뜬 상태, 또는 대화 끝까지) 건너뛴다. 막는 효과도 끝 모습으로 보낸다.
+        public void SkipToChoice()
+        {
+            for (var guard = 0; guard < 10000; guard++)
+            {
+                FinishAll(null);
+                switch (Phase)
+                {
+                    case DialoguePhase.WaitingForText:
+                        BeginTyping();
+                        break;
+                    case DialoguePhase.Typing:
+                        Typed();
+                        break;
+                    case DialoguePhase.Shown:
+                        Leave(LineNode.NextPort);
+                        break;
+                    default:
+                        return;
+                }
+            }
         }
 
         void Reset()
@@ -194,6 +277,8 @@ namespace GameSystems.Dialogue
             foreach (var run in _runs.ToList()) run.Player?.Finish();
             _runs.Clear();
             _released.Clear();
+            Time = 0;
+            _cooldown = 0;
             _choices.Clear();
             _history.Clear();
             State = new StageState();
@@ -288,7 +373,7 @@ namespace GameSystems.Dialogue
             Text = ResolveText(line.lineId, line.text);
             TextLength = VisibleLength(Text);
             _visible = 0;
-            _autoTimer = 0;
+            _shownTimer = 0;
             Phase = DialoguePhase.WaitingForText;
             _history.Add(new DialogueSnapshot { dialogue = Dialogue.Id, node = line.guid, state = State.Clone() });
 
@@ -352,29 +437,44 @@ namespace GameSystems.Dialogue
 
         // ── 입력 ─────────────────────────────────────────────
 
-        // 클릭: 연출 대기 중이면 연출을 끝내고, 타이핑 중이면 글자를 다 보이고, 다 나왔으면 다음으로.
-        public void Advance()
+        // 클릭. 받아들였으면 true.
+        //  · 클릭을 막는 효과가 진행 중이거나(효과 시간 보장), 방금 클릭했으면(연타 방지) 무시한다.
+        //  · 연출 대기 중: 막지 않는 효과를 끝 모습으로 보내고 대사를 시작한다.
+        //  · 타이핑 중: 글자를 다 보인다. / 다 나옴: 다음 대사로.
+        //  · '시간 진행(클릭 무시)' 대사는 클릭을 받지 않는다.
+        public bool Advance()
         {
+            if (_cooldown > 0 || InputBlocked || Line == null) return false;
+            var timedOnly = Line.advance == LineAdvance.Timed;
             switch (Phase)
             {
                 case DialoguePhase.WaitingForText:
+                    if (timedOnly) return false;
                     var line = Line;
                     FinishAll(run => run.Line == line);
                     if (Phase == DialoguePhase.WaitingForText && Line == line) BeginTyping();
                     break;
                 case DialoguePhase.Typing:
+                    if (timedOnly) return false;
                     Typed();
                     break;
                 case DialoguePhase.Shown:
+                    if (timedOnly) return false;
                     Leave(LineNode.NextPort);
                     break;
+                default:
+                    return false;
             }
+            _cooldown = ClickCooldown;
+            return true;
         }
 
-        // 선택지 고르기(Choices의 순서).
+        // 선택지 고르기(Choices의 순서). 클릭을 막는 효과가 진행 중이면 받지 않는다.
         public bool Choose(int choiceIndex)
         {
+            if (_cooldown > 0 || InputBlocked) return false;
             if (Phase != DialoguePhase.Choosing || choiceIndex < 0 || choiceIndex >= _choices.Count || !_choices[choiceIndex].Enabled) return false;
+            _cooldown = ClickCooldown;
             Leave(LineNode.OptionPrefix + _choices[choiceIndex].OptionId);
             return true;
         }
@@ -392,6 +492,8 @@ namespace GameSystems.Dialogue
         public void Tick(float deltaTime)
         {
             if (deltaTime < 0) deltaTime = 0;
+            Time += deltaTime;
+            if (_cooldown > 0) _cooldown -= deltaTime;
             foreach (var run in _runs.ToList())
             {
                 if (run.Done) continue;
@@ -415,10 +517,17 @@ namespace GameSystems.Dialogue
                 if (_visible >= TextLength) Typed();
                 else Stage?.SetVisibleCharacters(VisibleCharacters);
             }
-            else if (Phase == DialoguePhase.Shown && Line != null && Line.autoAdvance >= 0)
+            else if (Phase == DialoguePhase.Shown && Line != null)
             {
-                _autoTimer += deltaTime;
-                if (_autoTimer >= Line.autoAdvance) Leave(LineNode.NextPort);
+                // 다 나온 뒤: 시간 진행 대사는 머무는 시간 뒤, 자동 모드면 AutoDelay 뒤 넘어간다.
+                // 막는 효과가 도는 동안은 재지 않는다(효과가 끝난 뒤부터 머문다).
+                if (InputBlocked) _shownTimer = 0;
+                else
+                {
+                    _shownTimer += deltaTime;
+                    var wait = Line.advance != LineAdvance.Click ? Line.holdSeconds : AutoMode ? AutoDelay : float.PositiveInfinity;
+                    if (_shownTimer >= wait) Leave(LineNode.NextPort);
+                }
             }
         }
 

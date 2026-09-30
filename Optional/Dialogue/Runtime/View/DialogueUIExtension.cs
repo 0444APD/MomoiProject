@@ -10,7 +10,7 @@ namespace GameSystems.Dialogue
         public LineNode Line;
         // 캐릭터 ID(해설이면 빈 값)와 프로필.
         public string Speaker;
-        public CharacterData Character;
+        public StandingProfileData Character;
         public string SpeakerName;
         public string Text;
         public Color NameColor = Color.white;

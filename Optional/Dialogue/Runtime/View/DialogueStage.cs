@@ -31,7 +31,7 @@ namespace GameSystems.Dialogue
         [Tooltip("대화가 끝나면 배경·스탠딩을 지우고 카메라를 되돌린다")] public bool clearOnEnd = true;
 
         // 캐릭터 ID → 데이터(대화 재생기가 채운다).
-        public Func<string, CharacterData> Characters = _ => null;
+        public Func<string, StandingProfileData> Characters = _ => null;
 
         sealed class Standing
         {
@@ -264,9 +264,9 @@ namespace GameSystems.Dialogue
         }
 
         // 추가 글: 대사의 같은 키가 캐릭터 것보다 우선. 번역 표에 '<대사 키>.<키>' 또는 '<캐릭터 ID>.<키>'가 있으면 그것을 쓴다.
-        Dictionary<string, string> ResolveExtras(LineNode line, CharacterData character) => ResolveExtras(line, character, TextArguments?.Invoke());
+        Dictionary<string, string> ResolveExtras(LineNode line, StandingProfileData character) => ResolveExtras(line, character, TextArguments?.Invoke());
 
-        public static Dictionary<string, string> ResolveExtras(LineNode line, CharacterData character, IReadOnlyDictionary<string, object> args)
+        public static Dictionary<string, string> ResolveExtras(LineNode line, StandingProfileData character, IReadOnlyDictionary<string, object> args)
         {
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
             string Resolve(string key, string source) =>
@@ -474,7 +474,8 @@ namespace GameSystems.Dialogue
             public void Evaluate(float t)
             {
                 var amplitude = _strength * _stage.ViewSize.y * (1f - t);
-                var time = Time.unscaledTime * 40f;
+                // 진행도로 흔든다(같은 시점이면 같은 모습: 미리보기 시간 이동·일시정지에서도 맞는다).
+                var time = t * 25f;
                 var offset = new Vector3((Mathf.PerlinNoise(_seed, time) - 0.5f) * 2f, (Mathf.PerlinNoise(time, _seed) - 0.5f) * 2f, 0f) * amplitude;
                 Set(offset);
             }

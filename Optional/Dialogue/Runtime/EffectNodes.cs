@@ -30,6 +30,7 @@ namespace GameSystems.Dialogue
         [FieldLabel("움직임 곡선")] public Ease ease = Ease.OutQuad;
         [FieldLabel("진행 신호 지점")] public List<ProgressMark> marks = new List<ProgressMark>();
         [FieldLabel("다음 대사로 넘어가도 계속(끄면 넘길 때 바로 끝낸다)")] public bool keepAcrossLines;
+        [FieldLabel("진행 중 클릭 막기(효과 시간 보장). 끄면 클릭이 이 효과를 끝 모습으로 건너뛴다")] public bool blockInput = true;
 
         public virtual bool IsState => false;
         public virtual bool HasDuration => true;
@@ -115,6 +116,11 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("배경 음악", Category = "소리", Graphs = GraphKinds.Both)]
     public sealed class MusicEffect : EffectNode
     {
+        public MusicEffect()
+        {
+            blockInput = false;
+        }
+
         [FieldLabel("음악(비우면 멈춤)")] public AudioClip clip;
         [FieldLabel("음량"), Range(0, 1)] public float volume = 1f;
         public override bool IsState => true;
@@ -130,7 +136,7 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("스탠딩 등장", Category = "스탠딩", Graphs = GraphKinds.Both)]
     public sealed class StandingEnterEffect : EffectNode
     {
-        [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
         [FieldLabel("스탠딩 ID(비우면 기본)"), StandingRef(nameof(character))] public string expression = "";
         [FieldLabel("예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite sprite;
         [FieldLabel("자리")] public StandingSlot slot = StandingSlot.Center;
@@ -155,7 +161,7 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("스탠딩 퇴장", Category = "스탠딩", Graphs = GraphKinds.Both)]
     public sealed class StandingExitEffect : EffectNode
     {
-        [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
         public override bool IsState => true;
         public override string Summary => string.IsNullOrEmpty(character) ? "화자" : character;
 
@@ -169,7 +175,7 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("스탠딩 바꾸기", Category = "스탠딩", Graphs = GraphKinds.Both)]
     public sealed class ExpressionEffect : EffectNode
     {
-        [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
         [FieldLabel("스탠딩 ID"), StandingRef(nameof(character))] public string expression = "";
         [FieldLabel("예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite sprite;
         public override bool IsState => true;
@@ -187,7 +193,7 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("스탠딩 이동", Category = "스탠딩", Graphs = GraphKinds.Both)]
     public sealed class StandingMoveEffect : EffectNode
     {
-        [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
         [FieldLabel("자리")] public StandingSlot slot = StandingSlot.Center;
         [FieldLabel("직접 지정 위치(0~1)")] public float x = 0.5f;
         public override bool IsState => true;
@@ -203,7 +209,7 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("강조", Category = "스탠딩", Graphs = GraphKinds.Both)]
     public sealed class HighlightEffect : EffectNode
     {
-        [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
         [FieldLabel("강조")] public bool on = true;
         [FieldLabel("나머지는 강조 끄기")] public bool onlyThis = true;
         public override bool IsState => true;
@@ -226,7 +232,7 @@ namespace GameSystems.Dialogue
     public sealed class ShakeEffect : EffectNode
     {
         [FieldLabel("캐릭터를 흔든다(끄면 화면 전체)")] public bool shakeCharacter;
-        [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
         [FieldLabel("세기(화면 높이 비율)"), Min(0)] public float strength = 0.02f;
         public override string Summary => !shakeCharacter ? "화면" : string.IsNullOrEmpty(character) ? "화자" : character;
 
@@ -246,13 +252,18 @@ namespace GameSystems.Dialogue
     {
         [FieldLabel("프리팹")] public GameObject prefab;
         [FieldLabel("위치(화면 비율 0~1)")] public Vector2 screenPosition = new Vector2(0.5f, 0.5f);
-        [FieldLabel("붙일 캐릭터(비우면 화면 위치)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("붙일 캐릭터(비우면 화면 위치)"), DataRef(typeof(StandingProfileData))] public string character = "";
         public override string Summary => prefab != null ? prefab.name : "없음";
     }
 
     [Serializable, GraphNode("효과음", Category = "소리", Graphs = GraphKinds.Both)]
     public sealed class SoundEffect : EffectNode
     {
+        public SoundEffect()
+        {
+            blockInput = false;
+        }
+
         [FieldLabel("소리")] public AudioClip clip;
         [FieldLabel("음량"), Range(0, 1)] public float volume = 1f;
         public override bool HasDuration => false;
@@ -286,7 +297,7 @@ namespace GameSystems.Dialogue
     public sealed class PresetEffect : EffectNode
     {
         [FieldLabel("프리셋"), DataRef(typeof(EffectPresetData))] public string preset = "";
-        [FieldLabel("대상 캐릭터(프리셋 안에서 캐릭터를 비운 효과가 가리킴, 비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
+        [FieldLabel("대상 캐릭터(프리셋 안에서 캐릭터를 비운 효과가 가리킴, 비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
 
         public const string OutputPrefix = "out:";
 

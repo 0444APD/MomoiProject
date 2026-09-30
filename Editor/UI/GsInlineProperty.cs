@@ -347,8 +347,8 @@ namespace GameSystems.EditorTools.UI
                 case SerializedPropertyType.String when EventFieldRef != null:
                     ShowEventFieldMenu();
                     return;
-                case SerializedPropertyType.String when Has<GameSystems.Dialogue.StandingRefAttribute>():
-                    ShowStandingMenu();
+                case SerializedPropertyType.String when InlineChoices.For(_field) != null:
+                    ShowProviderMenu(InlineChoices.For(_field));
                     return;
                 case SerializedPropertyType.String when DataRefType != null:
                     ShowIdMenu(EditorDatabase.Instance.RefCandidates(_field), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
@@ -388,39 +388,13 @@ namespace GameSystems.EditorTools.UI
             OpenMenu(items);
         }
 
-        // 스탠딩 ID: 같은 노드의 캐릭터 칸이 정한 프로필의 스탠딩 목록(캐릭터가 비어 있으면 = 현재 화자, 모든 프로필을 묶어 보인다).
-        void ShowStandingMenu()
+        // 선택 모듈(대화 등)이 등록한 목록.
+        void ShowProviderMenu(IInlineChoiceProvider provider)
         {
-            var attribute = _field.GetCustomAttribute<GameSystems.Dialogue.StandingRefAttribute>();
-            var path = _property.propertyPath;
-            var dot = path.LastIndexOf('.');
-            var sibling = _property.serializedObject.FindProperty((dot < 0 ? "" : path.Substring(0, dot + 1)) + attribute.CharacterField);
-            var characterId = sibling != null && sibling.propertyType == SerializedPropertyType.String ? sibling.stringValue : "";
-            var profiles = EditorDatabase.Instance.OfType<CharacterData>()
-                .Where(c => string.IsNullOrEmpty(characterId) || c.Id == characterId)
-                .OrderBy(c => c.Id, StringComparer.Ordinal)
-                .ToList();
-            var grouped = profiles.Count > 1;
-            var items = new List<GsDropdownItem>
-            {
-                new GsDropdownItem("(비움)", () => SetString("")) { Detail = "바꾸지 않음 / 기본 스탠딩", Selected = string.IsNullOrEmpty(_property.stringValue) },
-            };
-            foreach (var profile in profiles)
-            foreach (var standing in profile.expressions.Where(e => !string.IsNullOrEmpty(e.id)))
-            {
-                var id = standing.id;
-                items.Add(new GsDropdownItem(id, () => SetString(id))
-                {
-                    Caption = standing.sprite != null ? standing.sprite.name : "스프라이트 없음",
-                    Group = grouped ? profile.Id : null,
-                    Selected = _property.stringValue == id,
-                });
-            }
-            if (items.Count == 1)
-                items.Add(new GsDropdownItem(profiles.Count == 0 ? "캐릭터 프로필이 없습니다 — 도감에서 먼저 만드세요" : "스탠딩 목록이 비었습니다 — 캐릭터 프로필에서 추가하세요") { Disabled = true });
-            OpenMenu(items, placeholder: "스탠딩 검색");
+            var items = provider.Items(_property, _field, SetString).ToList();
+            if (items.Count == 0) items.Add(new GsDropdownItem("고를 항목이 없습니다") { Disabled = true });
+            OpenMenu(items, placeholder: provider.Placeholder);
         }
-
         void ShowIdMenu(IEnumerable<GameData> data, string kind)
         {
             var db = EditorDatabase.Instance;

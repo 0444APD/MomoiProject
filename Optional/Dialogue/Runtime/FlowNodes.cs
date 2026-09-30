@@ -51,13 +51,14 @@ namespace GameSystems.Dialogue
         public const string LeavePort = "leave";
         public const string OptionPrefix = "opt:";
 
-        [FieldLabel("화자(비우면 해설)"), DataRef(typeof(CharacterData))] public string speaker = "";
+        [FieldLabel("화자(비우면 해설)"), DataRef(typeof(StandingProfileData))] public string speaker = "";
         [FieldLabel("화자 스탠딩 ID(비우면 그대로)"), StandingRef(nameof(speaker))] public string expression = "";
         [FieldLabel("화자 예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite expressionSprite;
         [FieldLabel("대사(원문)"), TextArea(2, 10)] public string text = "";
         [FieldLabel("선택지")] public List<ChoiceOption> options = new List<ChoiceOption>();
         [FieldLabel("타이핑 속도(초당 글자, 0이면 기본)"), Min(0)] public float typingSpeed;
-        [FieldLabel("자동 넘김(초, 0 미만이면 클릭 대기)")] public float autoAdvance = -1f;
+        [FieldLabel("넘기는 방식")] public LineAdvance advance = LineAdvance.Click;
+        [FieldLabel("시간 진행: 글이 다 나온 뒤 머무는 시간(초)"), Min(0)] public float holdSeconds = 1.5f;
         [FieldLabel("추가 글(이 줄에서만, 캐릭터의 같은 키보다 우선)")] public List<ExtraText> extras = new List<ExtraText>();
         // 번역 시트 키(자동, 바꾸지 않는다).
         [HideInInspector] public string lineId = DialogueIds.NewLineId();
@@ -79,6 +80,17 @@ namespace GameSystems.Dialogue
                         yield return PortInfo.FlowOut(OptionPrefix + options[i].id, string.IsNullOrEmpty(options[i].text) ? $"선택지 {i + 1}" : options[i].text);
             }
         }
+    }
+
+    // 대사를 넘기는 방식.
+    public enum LineAdvance
+    {
+        // 클릭(자동 모드면 잠시 뒤 클릭한 것으로 친다).
+        [InspectorName("클릭")] Click,
+        // 시간만큼 머문 뒤 스스로 넘어간다. 클릭은 받지 않는다(연출처럼 흘러가는 대사).
+        [InspectorName("시간 진행(클릭 무시)")] Timed,
+        // 시간만큼 머문 뒤 넘어가고, 그 전에 클릭해도 넘어간다.
+        [InspectorName("시간 진행(클릭 가능)")] TimedOrClick,
     }
 
     [Serializable, GraphNode("조건 분기", Category = "흐름")]

@@ -213,7 +213,7 @@ namespace GameSystems.EditorTools.Graph
         <ui:VisualElement name=""dialogue-box"" class=""dialogue-box"">
             <ui:VisualElement name=""dialogue-name-box"" class=""dialogue-name-box"">
                 <ui:Label name=""dialogue-name"" class=""dialogue-name"" text="""" />
-                <!-- 프로젝트별 추가 글 예시: 캐릭터 프로필의 추가 글 키 affiliation(소속). 비어 있으면 숨는다. 필요 없으면 지운다. -->
+                <!-- 프로젝트별 추가 글 예시: 스탠딩 프로필의 추가 글 키 affiliation(소속). 비어 있으면 숨는다. 필요 없으면 지운다. -->
                 <ui:Label name=""dialogue-extra-affiliation"" class=""dialogue-extra dialogue-affiliation"" text="""" />
             </ui:VisualElement>
             <ui:Label name=""dialogue-text"" class=""dialogue-text"" text="""" enable-rich-text=""true"" />

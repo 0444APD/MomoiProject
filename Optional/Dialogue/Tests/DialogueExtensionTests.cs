@@ -56,7 +56,7 @@ namespace GameSystems.Tests
         [Test]
         public void 추가_글은_대사가_캐릭터보다_우선이고_문장_틀을_푼다()
         {
-            var arin = Make(ScriptableObject.CreateInstance<CharacterData>());
+            var arin = Make(ScriptableObject.CreateInstance<StandingProfileData>());
             arin.EditorAssignId("arin");
             arin.extras.Add(new ExtraText { key = "affiliation", text = "왕립 기사단" });
             arin.extras.Add(new ExtraText { key = "title", text = "부단장" });
@@ -74,7 +74,7 @@ namespace GameSystems.Tests
             var texture = Make(new Texture2D(2, 2));
             var normal = Make(Sprite.Create(texture, new Rect(0, 0, 2, 2), Vector2.zero));
             var special = Make(Sprite.Create(texture, new Rect(0, 0, 1, 1), Vector2.zero));
-            var arin = Make(ScriptableObject.CreateInstance<CharacterData>());
+            var arin = Make(ScriptableObject.CreateInstance<StandingProfileData>());
             arin.EditorAssignId("arin");
             arin.expressions[0].id = "smile";
             arin.expressions[0].sprite = normal;

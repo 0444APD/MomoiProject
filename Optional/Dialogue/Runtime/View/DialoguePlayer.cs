@@ -30,7 +30,17 @@ namespace GameSystems.Dialogue
             }
         }
 
-        public bool IsPlaying => _runner != null && _runner.Phase != DialoguePhase.Idle && _runner.Phase != DialoguePhase.Ended;
+        [Tooltip("자동 진행: '클릭' 대사가 다 나오면 잠시 뒤 스스로 넘어간다")] public bool autoMode;
+        [Tooltip("자동 진행에서 넘어가기까지 기다리는 시간(초)")] public float autoDelay = 1.2f;
+
+        public bool IsPlaying => _runner != null && _runner.IsActive;
+        // 일시정지: 시간이 흐르지 않는다(효과·타이핑·자동 넘김 모두 멈춤).
+        public bool Paused { get; set; }
+
+        // 미리보기: 마지막으로 시작한 위치(시간 이동 때 여기서 다시 시작해 감는다).
+        DialogueData _previewDialogue;
+        string _previewNode;
+        string _previewPreset;
 
         public event Action<string> Signaled;
 
@@ -40,7 +50,7 @@ namespace GameSystems.Dialogue
         {
             if (stage != null && stage.ui != null)
             {
-                stage.ui.AdvanceRequested += Advance;
+                stage.ui.AdvanceRequested += OnAdvance;
                 stage.ui.ChoiceRequested += OnChoice;
             }
         }
@@ -49,7 +59,7 @@ namespace GameSystems.Dialogue
         {
             if (stage != null && stage.ui != null)
             {
-                stage.ui.AdvanceRequested -= Advance;
+                stage.ui.AdvanceRequested -= OnAdvance;
                 stage.ui.ChoiceRequested -= OnChoice;
             }
             if (IsPlaying) Stop();
@@ -64,9 +74,9 @@ namespace GameSystems.Dialogue
             _runner.DefaultTypingSpeed = typingSpeed;
             if (stage != null)
             {
-                var characters = database == null ? null : new System.Collections.Generic.Dictionary<string, CharacterData>();
+                var characters = database == null ? null : new System.Collections.Generic.Dictionary<string, StandingProfileData>();
                 if (database != null)
-                    foreach (var character in database.All<CharacterData>())
+                    foreach (var character in database.All<StandingProfileData>())
                         if (character != null && !string.IsNullOrEmpty(character.Id)) characters[character.Id] = character;
                 stage.Characters = id => id != null && characters != null && characters.TryGetValue(id, out var c) ? c : null;
             }
@@ -106,9 +116,47 @@ namespace GameSystems.Dialogue
             return false;
         }
 
-        public void Advance()
+        public bool Advance() => IsPlaying && !Paused && _runner.Advance();
+
+        // 다음 선택지 직전까지 건너뛴다.
+        public void SkipToChoice()
         {
-            if (IsPlaying) _runner.Advance();
+            if (IsPlaying) _runner.SkipToChoice();
+        }
+
+        // ── 미리보기(그래프 창) ──────────────────────────────
+
+        // 그래프의 노드에서 시작해 time초 지점으로 간다(그 사이에 시작된 효과는 모두 그 시점의 모습으로).
+        public bool PlayFrom(DialogueData dialogue, string nodeGuid, float time = 0f)
+        {
+            EnsureRunner();
+            _previewDialogue = dialogue;
+            _previewNode = nodeGuid;
+            _previewPreset = null;
+            return Restart(time);
+        }
+
+        public bool PlayPreset(string presetId, float time = 0f)
+        {
+            EnsureRunner();
+            _previewDialogue = null;
+            _previewNode = null;
+            _previewPreset = presetId;
+            return Restart(time);
+        }
+
+        // 미리보기 시간 이동: 처음부터 다시 시작해 time까지 클릭 없이 감는다.
+        public bool Seek(float time) => (_previewDialogue != null || _previewPreset != null) && Restart(time);
+
+        bool Restart(float time)
+        {
+            _runner.Session = GameSystemsRuntime.Session;
+            _runner.DefaultTypingSpeed = typingSpeed;
+            var started = _previewPreset != null ? _runner.StartPreset(_previewPreset) : _runner.StartAt(_previewDialogue, _previewNode);
+            if (!started) return false;
+            if (time > 0) _runner.Simulate(time);
+            stage?.Sync();
+            return true;
         }
 
         public bool Choose(int index) => IsPlaying && _runner.Choose(index);
@@ -125,9 +173,14 @@ namespace GameSystems.Dialogue
 
         void OnChoice(int index) => Choose(index);
 
+        void OnAdvance() => Advance();
+
         void Update()
         {
-            if (IsPlaying) _runner.Tick(Time.unscaledDeltaTime);
+            if (_runner == null) return;
+            _runner.AutoMode = autoMode;
+            _runner.AutoDelay = autoDelay;
+            if (IsPlaying && !Paused) _runner.Tick(Time.unscaledDeltaTime);
         }
     }
 }

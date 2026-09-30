@@ -10,9 +10,9 @@ namespace GameSystems.Dialogue
     // 캐릭터의 '스탠딩 프리팹'에 이 컴포넌트(또는 상속한 것)를 붙인다. 비워 두면 SpriteStandingView를 만들어 표정 스프라이트로 그린다.
     public abstract class StandingView : MonoBehaviour
     {
-        public CharacterData Character { get; private set; }
+        public StandingProfileData Character { get; private set; }
 
-        public virtual void Bind(CharacterData character) => Character = character;
+        public virtual void Bind(StandingProfileData character) => Character = character;
 
         // 스탠딩 바꾸기 시작(스탠딩 ID, 또는 예외로 꽂은 스프라이트). 이후 SetExpressionBlend(0→1)로 전환이 진행된다(바로 바꾸는 방식이면 무시해도 된다).
         public abstract void BeginExpression(string expression, Sprite sprite = null);
@@ -55,7 +55,7 @@ namespace GameSystems.Dialogue
             return renderer != null ? renderer : child.AddComponent<SpriteRenderer>();
         }
 
-        public override void Bind(CharacterData character)
+        public override void Bind(StandingProfileData character)
         {
             base.Bind(character);
             EnsureRenderers();
@@ -138,7 +138,7 @@ namespace GameSystems.Dialogue
 
         Component _skeleton;
 
-        public override void Bind(CharacterData character)
+        public override void Bind(StandingProfileData character)
         {
             base.Bind(character);
             _skeleton = FindSkeleton();
