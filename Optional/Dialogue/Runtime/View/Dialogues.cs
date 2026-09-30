@@ -27,6 +27,14 @@ namespace GameSystems.Dialogue
             Signaled = null;
         }
 
+        // 판 저장에 대화 진행 칸이 들어가도록 세션이 만들어질 때마다 정의한다(불러오기 전에 있어야 한다).
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        static void HookSessions()
+        {
+            GameSystemsRuntime.Started += DialoguePlayer.DefineProgress;
+            DialoguePlayer.DefineProgress(GameSystemsRuntime.Session);
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
         {
@@ -80,6 +88,13 @@ namespace GameSystems.Dialogue
             if (!player.Play(dialogueId, entryId)) return false;
             Started?.Invoke(dialogueId);
             return true;
+        }
+
+        // 판을 불러온 뒤: 저장된 대화 진행이 있으면 그 대사부터 이어 간다.
+        public static bool ResumeSaved()
+        {
+            var player = Ensure();
+            return player != null && player.ResumeSaved();
         }
 
         public static bool Advance() => _player != null && _player.Advance();

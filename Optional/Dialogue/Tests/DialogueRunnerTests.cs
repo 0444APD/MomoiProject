@@ -512,6 +512,53 @@ namespace GameSystems.Tests
             Assert.IsFalse(runner.AutoMode, "감은 뒤 자동 설정은 원래대로");
         }
 
+        [Test]
+        public void 진행_기록으로_같은_길을_조용히_밟아_이어_간다()
+        {
+            var d = Dialogue("save");
+            var g = d.graph;
+            var start = Add(g, new StartNode());
+            var a = Add(g, new LineNode { text = "하나" });
+            var ask = Add(g, new LineNode { text = "고르기", options = { new ChoiceOption { text = "왼쪽" }, new ChoiceOption { text = "오른쪽" } } });
+            var left = Add(g, new LineNode { text = "왼쪽 길" });
+            var signal = Add(g, new SignalNode { signal = "tookRight" });
+            var branch = Add(g, new BranchNode());
+            var b = Add(g, new LineNode { text = "오른쪽 길" });
+            var dim = Add(g, new DimEffect { amount = 0.6f, duration = 1f });
+            Link(g, start, StartNode.NextPort, a, GraphNode.FlowInPort);
+            Link(g, a, LineNode.NextPort, ask, GraphNode.FlowInPort);
+            Link(g, ask, LineNode.OptionPrefix + ask.options[0].id, left, GraphNode.FlowInPort);
+            Link(g, ask, LineNode.OptionPrefix + ask.options[1].id, signal, GraphNode.FlowInPort);
+            Link(g, signal, SignalNode.NextPort, branch, GraphNode.FlowInPort);
+            Link(g, branch, BranchNode.TruePort, b, GraphNode.FlowInPort);
+            Link(g, a, LineNode.EnterPort, dim, EffectNode.PlayPort);
+
+            var (runner, _) = Runner();
+            var signals = 0;
+            runner.Signaled += _ => signals++;
+            runner.Start(d);
+            runner.FastForward();
+            runner.Advance();
+            runner.FastForward();
+            Assert.IsTrue(runner.Choose(1));
+            Assert.AreEqual(b, runner.Line);
+            Assert.AreEqual(1, signals);
+            var progress = runner.Progress;
+            Assert.AreEqual(3, progress.lines);
+            CollectionAssert.AreEqual(new[] { ask.options[1].id, "true" }, progress.decisions);
+
+            var json = JsonUtility.ToJson(progress);
+            var (other, stage) = Runner();
+            var replayedSignals = 0;
+            other.Signaled += _ => replayedSignals++;
+            Assert.IsTrue(other.Restore(JsonUtility.FromJson<DialogueProgress>(json)));
+            Assert.AreEqual(b, other.Line, "저장한 대사에 들어간다");
+            Assert.AreEqual(0, replayedSignals, "다시 밟을 때 신호는 보내지 않는다");
+            Assert.AreEqual(0.6f, other.State.dim, 1e-4, "지나온 연출의 끝 모습");
+            Assert.AreEqual(3, other.Progress.lines);
+            Assert.AreEqual(0, other.RunningEffects);
+        }
+
         sealed class SeekStage : IDialogueStage
         {
             readonly Dictionary<System.Type, float> _seen;

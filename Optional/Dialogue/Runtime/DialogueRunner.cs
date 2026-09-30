@@ -70,6 +70,20 @@ namespace GameSystems.Dialogue
         public StageState state;
     }
 
+    // 대화 진행 기록(저장용): 어디서 시작했고, 분기·선택지에서 어느 쪽으로 갔고, 대사를 몇 줄 지났는지.
+    // 불러올 때는 같은 길을 조용히 다시 밟아(값 바꾸기·신호는 다시 하지 않는다) 그때의 화면을 그대로 만든다.
+    [Serializable]
+    public sealed class DialogueProgress
+    {
+        public string dialogue;
+        public string entry;
+        // 분기 결과("true"/"false")와 고른 선택지 ID, 일어난 순서대로.
+        public List<string> decisions = new List<string>();
+        public int lines;
+
+        public DialogueProgress Clone() => new DialogueProgress { dialogue = dialogue, entry = entry, decisions = new List<string>(decisions), lines = lines };
+    }
+
     // 대화 실행기. 흐름(대사 → 선택지 → 분기 …)을 따라가며, 신호로 이어진 효과 체인을 시간에 맞춰 재생한다.
     // 게임 쪽은 Tick(프레임 시간), Advance(클릭), Choose(선택)만 부른다. Unity 컴포넌트 없이도 돈다(테스트·미리보기).
     public sealed class DialogueRunner
@@ -111,6 +125,8 @@ namespace GameSystems.Dialogue
         float _visible;
         float _shownTimer;
         float _cooldown;
+        DialogueProgress _progress;
+        Queue<string> _replay;
 
         public GameSession Session { get; set; }
         public IDialogueStage Stage { get; set; }
@@ -149,7 +165,13 @@ namespace GameSystems.Dialogue
         public event Action<string> Signaled;
         public event Action Ended;
         public event Action<EffectNode> EffectStarted;
+        // 진행 기록이 바뀌었다(대사에 들어감·끝남). 저장에 쓴다.
+        public event Action ProgressChanged;
 
+        // 지금까지의 진행 기록(저장용 사본). 대화 중이 아니면 null.
+        public DialogueProgress Progress => IsActive && _progress != null ? _progress.Clone() : null;
+        // 불러오기 위해 길을 다시 밟는 중(값 바꾸기·신호를 하지 않는다).
+        public bool Replaying => _replay != null;
         public DialogueRunner(Func<string, DialogueData> dialogues, Func<string, EffectPresetData> presets)
         {
             _dialogues = dialogues ?? (_ => null);
@@ -182,11 +204,54 @@ namespace GameSystems.Dialogue
                 return false;
             }
             Reset();
+            _progress = new DialogueProgress { dialogue = dialogue.Id, entry = entryId };
             Stage?.ApplyState(State);
             Enter(dialogue);
             Fire(_main, entry, StartNode.StartedPort);
             Continue(dialogue.graph.Next(entry, StartNode.NextPort));
             return true;
+        }
+
+        // 저장한 진행 기록에서 이어 간다: 처음부터 같은 길을 조용히 밟아 저장한 대사에 들어간다.
+        public bool Restore(DialogueProgress progress)
+        {
+            var dialogue = _dialogues(progress?.dialogue);
+            if (dialogue == null) return false;
+            _replay = new Queue<string>(progress.decisions ?? new List<string>());
+            try
+            {
+                if (!Start(dialogue, progress.entry)) return false;
+                for (var guard = 0; guard < 100000 && _progress != null && _progress.lines < progress.lines; guard++)
+                {
+                    FinishAll(null);
+                    switch (Phase)
+                    {
+                        case DialoguePhase.WaitingForText:
+                            BeginTyping();
+                            break;
+                        case DialoguePhase.Typing:
+                            Typed();
+                            break;
+                        case DialoguePhase.Shown:
+                            Leave(LineNode.NextPort);
+                            break;
+                        case DialoguePhase.Choosing:
+                            if (_replay.Count == 0) return IsActive;
+                            var optionId = _replay.Dequeue();
+                            if (_choices.All(c => c.OptionId != optionId)) return IsActive;
+                            Pick(optionId);
+                            break;
+                        default:
+                            return IsActive;
+                    }
+                }
+            }
+            finally
+            {
+                _replay = null;
+            }
+            ProgressChanged?.Invoke();
+            return IsActive;
         }
 
         public bool Start(string dialogueId, string entryId = "start") => Start(_dialogues(dialogueId), entryId);
@@ -219,6 +284,7 @@ namespace GameSystems.Dialogue
             var node = dialogue?.graph.Find(nodeGuid);
             if (node == null) return false;
             Reset();
+            _progress = null;
             Stage?.ApplyState(State);
             Enter(dialogue);
             switch (node)
@@ -242,6 +308,7 @@ namespace GameSystems.Dialogue
         {
             if (_presets(presetId) == null) return false;
             Reset();
+            _progress = null;
             Stage?.ApplyState(State);
             Dialogue = null;
             _main = new Scope { Graph = new NodeGraph(), Context = NewContext() };
@@ -343,6 +410,7 @@ namespace GameSystems.Dialogue
             Phase = DialoguePhase.Ended;
             Stage?.Hide();
             Ended?.Invoke();
+            if (!Replaying) ProgressChanged?.Invoke();
         }
 
         // ── 흐름 ─────────────────────────────────────────────
@@ -361,17 +429,21 @@ namespace GameSystems.Dialogue
                         EnterLine(line);
                         return;
                     case BranchNode branch:
-                        var pass = branch.condition == null || Session == null || branch.condition.Evaluate(Session);
+                        // 불러오기 중이면 저장할 때 간 쪽으로.
+                        var pass = Replaying && _replay.Count > 0
+                            ? _replay.Dequeue() == "true"
+                            : branch.condition == null || Session == null || branch.condition.Evaluate(Session);
+                        _progress?.decisions.Add(pass ? "true" : "false");
                         node = Dialogue.graph.Next(branch, pass ? BranchNode.TruePort : BranchNode.FalsePort);
                         break;
                     case SetNode set:
-                        if (Session != null)
+                        if (Session != null && !Replaying)
                             foreach (var reward in set.rewards)
                                 reward?.Grant(Session);
                         node = Dialogue.graph.Next(set, SetNode.NextPort);
                         break;
                     case SignalNode signal:
-                        Signaled?.Invoke(signal.signal);
+                        if (!Replaying) Signaled?.Invoke(signal.signal);
                         node = Dialogue.graph.Next(signal, SignalNode.NextPort);
                         break;
                     case JumpNode jump:
@@ -417,6 +489,7 @@ namespace GameSystems.Dialogue
             _shownTimer = 0;
             Phase = DialoguePhase.WaitingForText;
             _history.Add(new DialogueSnapshot { dialogue = Dialogue.Id, node = line.guid, state = State.Clone() });
+            if (_progress != null) _progress.lines++;
 
             // 줄에 적은 화자 스탠딩(ID 또는 예외 스프라이트)은 짧은 스탠딩 바꾸기 효과로 바꾼다.
             if ((!string.IsNullOrEmpty(line.expression) || line.expressionSprite != null) && !string.IsNullOrEmpty(line.speaker))
@@ -430,6 +503,7 @@ namespace GameSystems.Dialogue
                 Play(_main, new SpeakerHighlightEffect { speaker = line.speaker }, line);
             var gated = Dialogue.graph.To(line.guid, LineNode.TextStartPort).Any();
             if (!gated || _released.Remove(line.guid)) BeginTyping();
+            if (!Replaying) ProgressChanged?.Invoke();
         }
 
         void BeginTyping()
@@ -519,8 +593,14 @@ namespace GameSystems.Dialogue
             if (_cooldown > 0 || InputBlocked) return false;
             if (Phase != DialoguePhase.Choosing || choiceIndex < 0 || choiceIndex >= _choices.Count || !_choices[choiceIndex].Enabled) return false;
             _cooldown = ClickCooldown;
-            Leave(LineNode.OptionPrefix + _choices[choiceIndex].OptionId);
+            Pick(_choices[choiceIndex].OptionId);
             return true;
+        }
+
+        void Pick(string optionId)
+        {
+            _progress?.decisions.Add(optionId);
+            Leave(LineNode.OptionPrefix + optionId);
         }
 
         // 진행 중인 연출을 모두 끝 모습으로 보내고 글자를 다 보인다(빨리 감기).
@@ -548,10 +628,10 @@ namespace GameSystems.Dialogue
                     var overflow = -run.Wait;
                     Begin(run);
                     if (run.Done || !run.Begun) continue;
-                    Progress(run, overflow);
+                    Step(run, overflow);
                     continue;
                 }
-                Progress(run, deltaTime);
+                Step(run, deltaTime);
             }
 
             if (Phase == DialoguePhase.Typing)
@@ -648,7 +728,7 @@ namespace GameSystems.Dialogue
             if (!run.Done && (!effect.HasDuration || effect.EffectiveDuration <= 0)) Complete(run);
         }
 
-        void Progress(Run run, float deltaTime)
+        void Step(Run run, float deltaTime)
         {
             if (run.Node is PresetEffect) return;
             run.Elapsed += deltaTime;

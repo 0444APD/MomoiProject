@@ -17,7 +17,11 @@ namespace GameSystems.Dialogue
         public UnityEvent onStarted = new UnityEvent();
         [Tooltip("대화 그래프의 '신호 보내기' 노드")] public UnityEvent<string> onSignal = new UnityEvent<string>();
         public UnityEvent onEnded = new UnityEvent();
+        [Tooltip("대화 진행을 판 저장(run.json)에 함께 남긴다. 불러온 뒤 Dialogues.ResumeSaved()로 이어 간다.")]
+        public bool saveProgress = true;
 
+        // 판 저장에 들어가는 진행 기록 키(세션 구역, JSON 글).
+        public const string ProgressKey = "dialogue.progress";
         const string PauseReason = "대화";
         DialogueRunner _runner;
 
@@ -88,6 +92,7 @@ namespace GameSystems.Dialogue
                 stage.Locations = id => _runner.Locations(id);
             }
             _runner.LineEntered += _ => stage?.ui?.ShowStaging();
+            _runner.ProgressChanged += SaveProgress;
             _runner.Signaled += signal =>
             {
                 Signaled?.Invoke(signal);
@@ -123,6 +128,44 @@ namespace GameSystems.Dialogue
         }
 
         public bool Advance() => IsPlaying && !Paused && _runner.Advance();
+
+        // ── 저장 ─────────────────────────────────────────────
+
+        // 저장소에 진행 기록 칸을 만든다(판 저장에 들어간다). 게임이 시작될 때 대화 관리자가 부른다.
+        public static void DefineProgress(GameSession session)
+        {
+            if (session != null && !session.State.IsDefined(ProgressKey)) session.State.Define(ProgressKey, StateZone.Session, "");
+        }
+
+        void SaveProgress()
+        {
+            var session = GameSystemsRuntime.Session;
+            if (!saveProgress || session == null) return;
+            DefineProgress(session);
+            var progress = _runner.Progress;
+            session.State.Set(ProgressKey, progress == null ? "" : JsonUtility.ToJson(progress));
+        }
+
+        // 저장된 진행 기록이 있으면 그 대사부터 이어 간다(판을 불러온 뒤 부른다).
+        public bool ResumeSaved()
+        {
+            var session = GameSystemsRuntime.Session;
+            if (session == null || !session.State.IsDefined(ProgressKey)) return false;
+            var json = session.State.Get<string>(ProgressKey);
+            if (string.IsNullOrEmpty(json)) return false;
+            var progress = JsonUtility.FromJson<DialogueProgress>(json);
+            EnsureRunner();
+            _runner.Session = session;
+            _runner.DefaultTypingSpeed = typingSpeed;
+            if (pauseGame) GameTime.Pause(PauseReason);
+            if (_runner.Restore(progress))
+            {
+                onStarted.Invoke();
+                return true;
+            }
+            if (pauseGame) GameTime.Resume(PauseReason);
+            return false;
+        }
 
         // 다음 선택지 직전까지 건너뛴다.
         public void SkipToChoice()
