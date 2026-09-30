@@ -33,6 +33,8 @@ namespace GameSystems.Dialogue
 
         public virtual bool IsState => false;
         public virtual bool HasDuration => true;
+        // 실제 진행 시간(모션 에셋 길이를 따르는 효과 등은 바꾼다).
+        public virtual float EffectiveDuration => duration;
 
         // 상태 효과: 끝 모습을 state에 적용한다.
         public virtual void ApplyTo(StageState state, EffectContext context)
@@ -246,6 +248,17 @@ namespace GameSystems.Dialogue
         [FieldLabel("음량"), Range(0, 1)] public float volume = 1f;
         public override bool HasDuration => false;
         public override string Summary => clip != null ? clip.name : "없음";
+    }
+
+    // 대화 UI 요소(글상자·이름표 …)에 UI 모션을 재생한다. 요소 이름을 비우면 대화 상자.
+    [Serializable, GraphNode("UI 모션", Category = "화면", Graphs = GraphKinds.Both)]
+    public sealed class UiMotionEffect : EffectNode
+    {
+        [FieldLabel("요소 이름(비우면 대화 상자)")] public string element = "";
+        [FieldLabel("모션")] public UiMotion motion;
+        [FieldLabel("진행 시간을 모션 길이로(반복 모션은 진행 시간 동안)")] public bool useMotionLength = true;
+        public override string Summary => motion != null ? motion.name : "없음";
+        public override float EffectiveDuration => useMotionLength && motion != null && !motion.IsLooping ? motion.duration : duration;
     }
 
     [Serializable, GraphNode("기다리기", Category = "흐름 제어", Graphs = GraphKinds.Both)]

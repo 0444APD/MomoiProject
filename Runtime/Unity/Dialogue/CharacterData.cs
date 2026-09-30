@@ -19,6 +19,8 @@ namespace GameSystems.Data
         [FieldLabel("표정")] public List<Expression> expressions = new List<Expression> { new Expression() };
         [FieldLabel("기본 표정 ID(비우면 첫 표정)")] public string defaultExpression = "";
         [FieldLabel("이름 색")] public Color nameColor = Color.white;
+        [FieldLabel("스탠딩 프리팹(StandingView가 붙은 프리팹, 스파인 등. 비우면 표정 스프라이트로 그린다)")] public GameObject standingPrefab;
+        [FieldLabel("스탠딩 크기 배율"), Min(0.01f)] public float standingScale = 1f;
 
         public Sprite SpriteOf(string expression)
         {

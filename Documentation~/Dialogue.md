@@ -37,4 +37,16 @@ runner.Start("shopIntro");
 
 대사 글자는 대사 키(`line.xxxxxxxxxx`, 자동·고정)로 텍스트 표를 찾고, 없으면 노드의 원문을 쓴다. 원문은 다국어 문장 틀 문법(`{player.gold}`, `{item:을}`, `[[burn]]`)을 그대로 쓴다. 대화 그래프를 시트로 내보내는 규격은 아직 정하지 않았다(대사 키·화자·원문·선택지·순서는 모두 데이터에 있다).
 
-화면 그리기(`IDialogueStage`: 배경·스탠딩·카메라·글상자·선택지)의 기본 구현은 다음 단계에서 만든다.
+## 화면: 템플릿 프리팹
+
+`Game Systems → 대화 UI 템플릿 만들기`는 `Assets/GameSystemsData/DialogueUI/`에 모든 기능이 연결된 한 벌을 만든다: `DialogueSystem.prefab`, `DialogueUI.uxml`·`DialogueUI.uss`(글상자·이름표·선택지·레터박스·번쩍임·검은 화면·툴팁), `DialogueChoice.uxml`(선택지 하나), 패널 설정·런타임 테마, 기본 모션 4개(열림·클릭 대기 깜빡임·선택지 나타남·고름), 흰 스프라이트. 프리팹을 씬에 놓고 `GetComponent<DialoguePlayer>().Play("대화 ID")`로 재생한다. 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI > font`에 한글 TTF를 넣는다.
+
+프리팹 구성: `DialoguePlayer`(실행기·입력·게임 시간 멈춤·신호 이벤트) › `Stage`(`DialogueStage`: 게임 카메라 앞에 배경 두 장·배경 어둡게·스탠딩·이펙트, 음악·효과음, 카메라 확대·이동·흔들기) · `UI`(`UIDocument` + `DialogueUI`).
+
+**모양 바꾸기(프로젝트마다).** UXML·USS를 고친다. 코드는 요소를 **이름**으로만 찾으므로 이름만 지키면 배치·스프라이트·크기·클래스는 자유롭다. 이름이 다르면 `DialogueUI`의 이름 칸을 고친다. 인스펙터 아래 '요소 연결 확인'이 UXML에 이름 규격의 요소가 있는지(필수/선택) 바로 보여 준다. 필수는 `dialogue-root`·`dialogue-name`·`dialogue-text`·`dialogue-choices`이고, 나머지는 없으면 그 기능만 꺼진다. 여러 모양을 두려면 프리팹 변형(Prefab Variant)에서 UXML·모션만 바꾼다.
+
+**애니메이션.** UI Toolkit 요소는 Animator·AnimationClip으로 움직이지 않는다. 대신 두 층을 쓴다. 나타나기·사라지기·색 변화처럼 '상태가 바뀌면 부드럽게'는 USS 전환(`transition`)과 루트의 상태 클래스(`dialogue--open`·`--staging`·`--typing`·`--waiting`·`--choosing`·`--narration`·`--speaker-<ID>`)로 USS 안에서 끝낸다(참조 연결 없음). 키프레임·반복·스프라이트 프레임 애니메이션은 **UI 모션** 에셋(`Create › Game Systems › 대화 › UI 모션`: 투명도·이동·크기·회전·색 곡선, 프레임 목록, 한 번/반복/왕복)을 만들어 `DialogueUI`의 모션 칸(순간 × 요소 이름 × 모션)에 넣는다. 순간은 열림·닫힘·줄 시작·화자 바뀜·클릭 대기·선택지 나타남·선택지 고름이다. 대화 그래프에서도 'UI 모션' 효과 노드로 원하는 순간에 어느 요소든 모션을 재생할 수 있다(체인에 들어간다).
+
+**스탠딩.** 캐릭터의 '스탠딩 프리팹'이 비어 있으면 표정 스프라이트 두 장을 겹쳐 크로스페이드한다(`SpriteStandingView`, 높이는 `standingHeight`). 스파인은 프리팹에 `SpineStandingView`를 붙인다: 스파인 런타임을 직접 참조하지 않고 이름으로 찾아(`SkeletonAnimation`·`SkeletonGraphic`·`SkeletonMecanim`) 표정 ID와 같은 이름의 애니메이션을 재생하고(다르면 짝 목록), 밝기·투명도는 스켈레톤 색으로 준다. 다른 방식(Live2D 등)은 `StandingView`를 상속한다.
+
+**그리기 방식.** 상태 효과는 효과 종류와 상관없이 '앞 모습 → 뒤 모습'에서 바뀐 값만 섞는다(배경 크로스페이드·검은 화면 경유, 어둡기, 레터박스, 카메라, 음악 교차, 스탠딩 등장·퇴장·위치·밝기·표정). 그래서 새 상태 효과를 더해도 화면 코드를 고칠 일이 거의 없다. 큐 효과는 흔들기(화면=카메라, 캐릭터=스탠딩), 번쩍임(UI 덮개), 이펙트(프리팹 생성, 진행 시간이 있으면 끝날 때 지움), 효과음, UI 모션이다.

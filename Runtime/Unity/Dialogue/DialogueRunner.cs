@@ -488,14 +488,15 @@ namespace GameSystems.Dialogue
             if (effect.IsState) effect.ApplyTo(State, run.Scope.Context);
             run.Player = Stage?.Begin(effect, run.Scope.Context, before, State.Clone());
             Fire(run.Scope, effect, EffectNode.StartedPort);
-            if (!run.Done && (!effect.HasDuration || effect.duration <= 0)) Complete(run);
+            if (!run.Done && (!effect.HasDuration || effect.EffectiveDuration <= 0)) Complete(run);
         }
 
         void Progress(Run run, float deltaTime)
         {
             if (run.Node is PresetEffect) return;
             run.Elapsed += deltaTime;
-            var t = run.Node.duration <= 0 ? 1f : Mathf.Clamp01(run.Elapsed / run.Node.duration);
+            var duration = run.Node.EffectiveDuration;
+            var t = duration <= 0 ? 1f : Mathf.Clamp01(run.Elapsed / duration);
             run.Player?.Evaluate(Easing.Apply(run.Node.ease, t));
             FireMarks(run, t);
             if (t >= 1f && !run.Done) Complete(run);
