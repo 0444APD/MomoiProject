@@ -102,6 +102,7 @@ namespace GameSystems.Samples
             db.Sync();
             var created = CreateBasics(db);
             created |= CreateEquipmentExample(db);
+            created |= CreateItemExample(db);
             if (!created) return false;
             AssetDatabase.SaveAssets();
             EditorDatabase.Instance.Sync();
@@ -154,6 +155,29 @@ namespace GameSystems.Samples
         }
 
         // 장비·강화 효과·몬스터 태그 예제: 키워드, 플레이어 데이터, 템플릿, 조건식이 붙은 수치·도전과제.
+        // 기능 조립식 아이템: 공통 칸 + 기능 묶음 목록(장착·사용·겹침·투척).
+        static bool CreateItemExample(EditorDatabase db)
+        {
+            if (db.FindById("item.ironSword") != null) return false;
+            if (db.FindById("grade") != null) Link(typeof(SampleItem), nameof(SampleItem.grade), "grade");
+            if (db.FindById("equipmentSlot") != null) Link(typeof(SampleEquippable), nameof(SampleEquippable.slot), "equipmentSlot");
+            Item("item.ironSword", 120, "common", new SampleEquippable { slot = "weapon", attack = 10 });
+            Item("item.healthPotion", 30, "common", new SampleConsumable { heal = 50 }, new SampleStackable { maxStack = 99 });
+            Item("item.blessedRing", 800, "rare", new SampleEquippable { slot = "accessory", defense = 5 }, new SampleConsumable { heal = 100 });
+            Item("item.bomb", 60, "common", new SampleConsumable { heal = 0 }, new SampleStackable { maxStack = 10 }, new SampleThrowable { damage = 40 });
+            return true;
+
+            void Item(string id, int price, string grade, params SampleItemFeature[] features)
+            {
+                var item = (SampleItem)db.Create(typeof(SampleItem), id);
+                item.price = price;
+                item.grade = grade;
+                item.features.AddRange(features);
+                EditorUtility.SetDirty(item);
+                AssetDatabase.SaveAssetIfDirty(item);
+            }
+        }
+
         static bool CreateEquipmentExample(EditorDatabase db)
         {
             if (db.FindById("player.inventory") != null) return false;
