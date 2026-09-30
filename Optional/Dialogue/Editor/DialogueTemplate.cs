@@ -24,7 +24,7 @@ namespace GameSystems.EditorTools.Graph
         }
 
         // 새 폴더에 템플릿 한 벌을 만들고 프리팹을 돌려준다(이미 있으면 'DialogueUI 1' …).
-        public static GameObject Create(string folder = null)
+        public static GameObject Create(string folder = null, bool registerAsDefault = true)
         {
             folder ??= UniqueFolder(Root);
             EditorDatabase.EnsureFolder(folder);
@@ -84,8 +84,26 @@ namespace GameSystems.EditorTools.Graph
 
             var prefab = BuildPrefab(folder, AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxml), AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(choice),
                 panel, AssetDatabase.LoadAssetAtPath<Sprite>(white), motions);
+            if (registerAsDefault) RegisterDefault(prefab);
             AssetDatabase.SaveAssets();
             return prefab;
+        }
+
+        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/GameSystems/DialogueSettings.asset";
+
+        // 대화 관리자가 쓸 기본 프리팹으로 등록한다(설정이 없거나 프리팹이 비어 있을 때만. 이미 있으면 그대로 둔다).
+        static void RegisterDefault(GameObject prefab)
+        {
+            var settings = AssetDatabase.LoadAssetAtPath<DialogueSettings>(SettingsPath);
+            if (settings == null)
+            {
+                EditorDatabase.EnsureFolder(System.IO.Path.GetDirectoryName(SettingsPath).Replace('\\', '/'));
+                settings = ScriptableObject.CreateInstance<DialogueSettings>();
+                AssetDatabase.CreateAsset(settings, SettingsPath);
+            }
+            if (settings.playerPrefab != null) return;
+            settings.playerPrefab = prefab;
+            EditorUtility.SetDirty(settings);
         }
 
         static string UniqueFolder(string path)

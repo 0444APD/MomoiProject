@@ -173,7 +173,7 @@ namespace GameSystems.Tests
             if (AssetDatabase.IsValidFolder(folder)) AssetDatabase.DeleteAsset(folder);
             try
             {
-                var prefab = DialogueTemplate.Create(folder);
+                var prefab = DialogueTemplate.Create(folder, registerAsDefault: false);
                 Assert.IsNotNull(prefab);
                 var player = prefab.GetComponent<DialoguePlayer>();
                 Assert.IsNotNull(player);

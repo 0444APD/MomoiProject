@@ -80,6 +80,8 @@ namespace GameSystems.EditorTools.Graph
         {
             var player = UnityEngine.Object.FindAnyObjectByType<DialoguePlayer>();
             if (player != null) return player;
+            // 대화 관리자 설정이 있으면 게임에서와 같은 방식으로 만든다.
+            if (DialogueSettings.Load()?.playerPrefab != null && Camera.main != null) return Dialogues.Player;
             var prefab = AssetDatabase.FindAssets("t:Prefab")
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .Select(AssetDatabase.LoadAssetAtPath<GameObject>)
