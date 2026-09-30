@@ -209,6 +209,8 @@ namespace GameSystems.EditorTools.Graph
         <ui:VisualElement name=""dialogue-flash"" class=""dialogue-flash"" picking-mode=""Ignore"" />
         <ui:VisualElement name=""dialogue-letterbox-top"" class=""dialogue-letterbox dialogue-letterbox--top"" picking-mode=""Ignore"" />
         <ui:VisualElement name=""dialogue-letterbox-bottom"" class=""dialogue-letterbox dialogue-letterbox--bottom"" picking-mode=""Ignore"" />
+        <!-- 지금 장소 이름(기본 추가 글 location). 장소가 없으면 숨는다. -->
+        <ui:Label name=""dialogue-extra-location"" class=""dialogue-extra dialogue-location"" text="""" picking-mode=""Ignore"" />
         <ui:VisualElement name=""dialogue-choices"" class=""dialogue-choices"" picking-mode=""Ignore"" />
         <ui:VisualElement name=""dialogue-box"" class=""dialogue-box"">
             <ui:VisualElement name=""dialogue-name-box"" class=""dialogue-name-box"">
@@ -306,17 +308,14 @@ namespace GameSystems.EditorTools.Graph
     padding: 6px 20px;
     border-radius: 12px;
     background-color: rgb(253, 93, 131);
+    flex-direction: row;
+    align-items: center;
 }
 
 .dialogue-name {
     font-size: 26px;
     -unity-font-style: bold;
     color: rgb(255, 255, 255);
-}
-
-.dialogue-name-box {
-    flex-direction: row;
-    align-items: center;
 }
 
 .dialogue-affiliation {
@@ -338,25 +337,25 @@ namespace GameSystems.EditorTools.Graph
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
-.dialogue--narration .dialogue-name-box {
-    flex-direction: row;
-    align-items: center;
-}
-
-.dialogue-affiliation {
-    font-size: 18px;
-    color: rgba(255, 255, 255, 0.85);
-    margin-left: 12px;
-}
-
-/* 추가 글이 비었으면 숨긴다(dialogue-extra-<키> 요소 공통) */
-.dialogue-extra--empty {
-    display: none;
-}
-
-.dialogue-text {
+.dialogue--narration .dialogue-text {
     -unity-font-style: italic;
     color: rgba(242, 242, 243, 0.82);
+}
+
+.dialogue--thought .dialogue-text {
+    -unity-font-style: italic;
+    color: rgba(190, 205, 255, 0.92);
+}
+
+.dialogue-location {
+    position: absolute;
+    left: 40px;
+    top: 32px;
+    padding: 6px 16px;
+    border-radius: 10px;
+    background-color: rgba(14, 15, 17, 0.6);
+    font-size: 20px;
+    color: rgb(242, 242, 243);
 }
 
 .dialogue-next {
