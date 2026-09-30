@@ -32,6 +32,7 @@ namespace GameSystems.Dialogue
 
         [Tooltip("자동 진행: '클릭' 대사가 다 나오면 잠시 뒤 스스로 넘어간다")] public bool autoMode;
         [Tooltip("자동 진행에서 넘어가기까지 기다리는 시간(초)")] public float autoDelay = 1.2f;
+        [Tooltip("미리보기 시간 이동에서 클릭 대기 대사를 넘기기까지의 시간(초). 이동 중에는 클릭 대사도 이만큼 뒤 넘어간 것으로 감는다")] public float previewClickDelay;
 
         public bool IsPlaying => _runner != null && _runner.IsActive;
         // 일시정지: 시간이 흐르지 않는다(효과·타이핑·자동 넘김 모두 멈춤).
@@ -154,7 +155,7 @@ namespace GameSystems.Dialogue
             _runner.DefaultTypingSpeed = typingSpeed;
             var started = _previewPreset != null ? _runner.StartPreset(_previewPreset) : _runner.StartAt(_previewDialogue, _previewNode);
             if (!started) return false;
-            if (time > 0) _runner.Simulate(time);
+            if (time > 0) _runner.Simulate(time, autoClick: true, clickDelay: previewClickDelay);
             stage?.Sync();
             return true;
         }

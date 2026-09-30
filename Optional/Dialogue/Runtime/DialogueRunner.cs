@@ -238,14 +238,30 @@ namespace GameSystems.Dialogue
             return true;
         }
 
-        // 지금부터 seconds만큼 클릭 없이 시간을 흘린다(미리보기의 시간 이동: 다시 시작한 뒤 원하는 시점까지 감는다).
-        public void Simulate(float seconds, float step = 1f / 60f)
+        // 지금부터 seconds만큼 시간을 흘린다(미리보기의 시간 이동: 다시 시작한 뒤 원하는 시점까지 감는다).
+        // autoClick: '클릭' 대사도 글이 다 나오고 막는 효과가 끝나면 clickDelay초 뒤 클릭한 것으로 치고 넘어간다(선택지에서는 멈춘다).
+        public void Simulate(float seconds, float step = 1f / 60f, bool autoClick = false, float clickDelay = 0f)
         {
-            while (seconds > 1e-5f)
+            var auto = AutoMode;
+            var delay = AutoDelay;
+            if (autoClick)
             {
-                var dt = Mathf.Min(step, seconds);
-                Tick(dt);
-                seconds -= dt;
+                AutoMode = true;
+                AutoDelay = clickDelay;
+            }
+            try
+            {
+                while (seconds > 1e-5f)
+                {
+                    var dt = Mathf.Min(step, seconds);
+                    Tick(dt);
+                    seconds -= dt;
+                }
+            }
+            finally
+            {
+                AutoMode = auto;
+                AutoDelay = delay;
             }
         }
 

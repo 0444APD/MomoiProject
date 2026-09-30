@@ -485,6 +485,33 @@ namespace GameSystems.Tests
             Assert.AreEqual(1f, seen[typeof(DimEffect)], 1e-3);
         }
 
+        [Test]
+        public void 시간_이동은_클릭_대기_대사를_넘기며_감고_선택지에서_멈춘다()
+        {
+            var (d, a, b, c) = Three();
+            var dim = Add(d.graph, new DimEffect { duration = 2f, amount = 1f, ease = Ease.Linear });
+            var shake = Add(d.graph, new ShakeEffect { duration = 4f, ease = Ease.Linear });
+            Link(d.graph, a, LineNode.EnterPort, dim, EffectNode.PlayPort);
+            Link(d.graph, b, LineNode.EnterPort, shake, EffectNode.PlayPort);
+
+            var seen = new Dictionary<System.Type, float>();
+            var runner = new DialogueRunner(_ => d, _ => null) { Stage = new SeekStage(seen) };
+            runner.StartAt(d, a.guid);
+            runner.Simulate(5f);
+            Assert.AreEqual(a, runner.Line, "그냥 감으면 클릭 대기 대사에서 머문다");
+
+            runner.StartAt(d, a.guid);
+            runner.Simulate(5f, autoClick: true);
+            Assert.AreEqual(b, runner.Line, "A의 효과(2초)가 끝나자마자 넘어감");
+            Assert.AreEqual(0.75f, seen[typeof(ShakeEffect)], 0.03f, "2초에 시작한 4초 흔들기의 5초 시점 = 75%");
+
+            runner.StartAt(d, a.guid);
+            runner.Simulate(20f, autoClick: true);
+            Assert.AreEqual(c, runner.Line);
+            Assert.AreEqual(DialoguePhase.Choosing, runner.Phase, "선택지에서는 멈춘다");
+            Assert.IsFalse(runner.AutoMode, "감은 뒤 자동 설정은 원래대로");
+        }
+
         sealed class SeekStage : IDialogueStage
         {
             readonly Dictionary<System.Type, float> _seen;
