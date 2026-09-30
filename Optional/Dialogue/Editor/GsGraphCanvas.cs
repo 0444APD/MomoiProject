@@ -110,6 +110,8 @@ namespace GameSystems.EditorTools.Graph
         NodeGraph Graph => _graph();
         Vector2 Center => contentRect.center;
         public float Zoom => _zoom;
+        // 선택한 노드(처음 것). 없으면 null.
+        public string FirstSelected => _selected.FirstOrDefault();
         public Vector2 Pan => _pan;
 
         public void SetView(Vector2 pan, float zoom)

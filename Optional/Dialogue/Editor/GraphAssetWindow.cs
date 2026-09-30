@@ -153,6 +153,8 @@ namespace GameSystems.EditorTools.Graph
             bar.Add(new GsButton("프로젝트에서 보기", () => EditorGUIUtility.PingObject(data), GsButtonKind.Ghost));
             _main.Add(bar);
 
+            _main.Add(PreviewBar());
+
             _canvas = new GsGraphCanvas(data, () => GraphOf(Current), "graph", Kind);
             _canvas.Changed += RefreshIssues;
             _main.Add(_canvas);
@@ -169,6 +171,73 @@ namespace GameSystems.EditorTools.Graph
             var issues = context.Messages.Concat(GraphIssues(GraphOf(data))).ToList();
             _issues.text = issues.Count == 0 ? "" : "⚠ " + string.Join(" · ", issues.Take(3)) + (issues.Count > 3 ? $" 외 {issues.Count - 3}건" : "");
             _issues.tooltip = string.Join("\n", issues);
+        }
+
+        // ── 미리보기 ─────────────────────────────────────────
+
+        // 미리보기 시작(플레이 모드에서). time: 그 시점으로 감아서 시작.
+        protected abstract void StartPreview(GameData data, GsGraphCanvas canvas, float time);
+        protected abstract string PreviewLabel { get; }
+
+        Slider _timeSlider;
+        Label _previewStatus;
+        GsButton _pauseButton;
+        GsButton _autoButton;
+
+        VisualElement PreviewBar()
+        {
+            var bar = Gs.Row();
+            bar.style.paddingLeft = 16;
+            bar.style.paddingRight = 16;
+            bar.style.paddingBottom = 8;
+            bar.Add(new GsButton(PreviewLabel, () => StartPreview(Current, _canvas, 0f), GsButtonKind.Primary));
+            _pauseButton = new GsButton("⏸", () =>
+            {
+                DialoguePreview.Paused = !DialoguePreview.Paused;
+                RefreshPreview();
+            }, GsButtonKind.Ghost) { tooltip = "일시정지 / 계속" };
+            bar.Add(_pauseButton);
+            _timeSlider = new Slider(0f, 10f) { tooltip = "끌면 그 시점으로 이동(일시정지)" };
+            _timeSlider.style.width = 220;
+            _timeSlider.style.marginLeft = 8;
+            _timeSlider.RegisterValueChangedCallback(e =>
+            {
+                if (!Application.isPlaying)
+                {
+                    StartPreview(Current, _canvas, e.newValue);
+                    return;
+                }
+                DialoguePreview.Paused = true;
+                DialoguePreview.Seek(e.newValue);
+                RefreshPreview();
+            });
+            bar.Add(_timeSlider);
+            _previewStatus = Gs.Label("", "gs-caption");
+            _previewStatus.style.marginLeft = 10;
+            _previewStatus.style.minWidth = 190;
+            bar.Add(_previewStatus);
+            bar.Add(new GsButton("다음 ▷", DialoguePreview.Next, GsButtonKind.Ghost) { tooltip = "클릭한 것처럼(막는 효과 중이면 무시)" });
+            _autoButton = new GsButton("자동", () =>
+            {
+                DialoguePreview.Auto = !DialoguePreview.Auto;
+                RefreshPreview();
+            }, GsButtonKind.Ghost);
+            bar.Add(_autoButton);
+            bar.Add(new GsButton("선택지까지 ⏭", DialoguePreview.SkipToChoice, GsButtonKind.Ghost));
+            bar.Add(new GsButton("■", DialoguePreview.Stop, GsButtonKind.Ghost) { tooltip = "정지" });
+            bar.schedule.Execute(RefreshPreview).Every(100);
+            return bar;
+        }
+
+        void RefreshPreview()
+        {
+            if (_timeSlider == null) return;
+            var time = DialoguePreview.Time;
+            if (time > _timeSlider.highValue - 0.5f) _timeSlider.highValue = Mathf.Ceil(time + 5f);
+            _timeSlider.SetValueWithoutNotify(time);
+            _previewStatus.text = $"{time:0.00}초 · {DialoguePreview.Status}";
+            _pauseButton.Text = DialoguePreview.Paused ? "▶" : "⏸";
+            _autoButton.Text = DialoguePreview.Auto ? "자동 ✓" : "자동";
         }
 
         // 그래프 공통 검사(끊긴 흐름 등).
@@ -232,6 +301,17 @@ namespace GameSystems.EditorTools.Graph
             graph.Connect(start.guid, StartNode.NextPort, line.guid, GraphNode.FlowInPort);
         }
 
+        protected override string PreviewLabel => "▶ 선택한 노드부터";
+
+        protected override void StartPreview(GameData data, GsGraphCanvas canvas, float time)
+        {
+            if (!(data is DialogueData dialogue)) return;
+            var node = canvas?.FirstSelected ?? dialogue.graph.OfType<StartNode>().FirstOrDefault()?.guid;
+            if (node == null) return;
+            AssetDatabase.SaveAssetIfDirty(dialogue);
+            DialoguePreview.PlayDialogue(dialogue, node, time);
+        }
+
         protected override IEnumerable<string> GraphIssues(NodeGraph graph)
         {
             if (graph == null) yield break;
@@ -269,6 +349,15 @@ namespace GameSystems.EditorTools.Graph
         protected override NodeGraph GraphOf(GameData data) => (data as EffectPresetData)?.graph;
 
         protected override void Seed(NodeGraph graph) => graph.Add(new PresetEntryNode { position = Vector2.zero });
+
+        protected override string PreviewLabel => "▶ 프리셋 재생";
+
+        protected override void StartPreview(GameData data, GsGraphCanvas canvas, float time)
+        {
+            if (!(data is EffectPresetData preset)) return;
+            AssetDatabase.SaveAssetIfDirty(preset);
+            DialoguePreview.PlayPreset(preset, time);
+        }
 
         protected override IEnumerable<string> GraphIssues(NodeGraph graph)
         {

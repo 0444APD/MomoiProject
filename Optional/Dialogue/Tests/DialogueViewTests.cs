@@ -137,6 +137,36 @@ namespace GameSystems.Tests
         }
 
         [Test]
+        public void 재생기는_노드에서_시작하고_시간을_이동한다()
+        {
+            var dialogue = ScriptableObject.CreateInstance<DialogueData>();
+            dialogue.EditorAssignId("previewTest");
+            var line = new LineNode { text = "미리보기" };
+            var dim = new DimEffect { duration = 3f, amount = 1f, ease = Ease.Linear };
+            dialogue.graph.Add(line);
+            dialogue.graph.Add(dim);
+            dialogue.graph.Connect(line.guid, LineNode.EnterPort, dim.guid, EffectNode.PlayPort);
+            var go = new GameObject("Player");
+            try
+            {
+                var player = go.AddComponent<DialoguePlayer>();
+                Assert.IsTrue(player.PlayFrom(dialogue, line.guid, 1.5f));
+                Assert.AreEqual(1.5f, player.Runner.Time, 1e-3);
+                Assert.AreEqual(1f, player.Runner.State.dim, 1e-4, "상태는 시작할 때 끝 모습");
+                Assert.IsTrue(player.Runner.InputBlocked, "3초 효과가 아직 진행 중");
+                Assert.IsTrue(player.Seek(0.5f));
+                Assert.AreEqual(0.5f, player.Runner.Time, 1e-3, "뒤로도 이동");
+                Assert.IsTrue(player.Seek(3.5f));
+                Assert.IsFalse(player.Runner.InputBlocked);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(dialogue);
+            }
+        }
+
+        [Test]
         public void 템플릿은_이름_규격을_모두_갖춘_프리팹을_만든다()
         {
             const string folder = EditorTools.EditorDatabase.DataRoot + "/__DialogueTemplateTest";
