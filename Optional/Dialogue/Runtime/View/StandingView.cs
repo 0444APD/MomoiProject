@@ -23,9 +23,15 @@ namespace GameSystems.Dialogue
         // 밝기(강조 1, 비강조는 0.7 정도)와 투명도.
         public abstract void SetTint(float brightness, float alpha);
 
-        // 그리기 순서(뒤에 등장한 캐릭터가 앞).
+        // 그리기 순서(뒤에 등장한 캐릭터가 앞). order ~ order+3을 이 스탠딩이 쓴다.
         public virtual void SetSortingOrder(int order)
         {
+        }
+
+        // 창 모드: 창 이미지(테두리)와 창 모양(마스크). frame이 null이면 일반 스탠딩.
+        public virtual void SetFrame(Sprite frame, Sprite mask)
+        {
+            if (frame != null) Debug.LogWarning($"[대화] '{name}' 스탠딩은 창 모드를 지원하지 않습니다.", this);
         }
     }
 
@@ -34,6 +40,9 @@ namespace GameSystems.Dialogue
     {
         [SerializeField] SpriteRenderer current;
         [SerializeField] SpriteRenderer next;
+        SpriteRenderer _frame;
+        SpriteMask _mask;
+        int _order;
         float _brightness = 1f;
         float _alpha = 1f;
         float _blend = 1f;
@@ -104,8 +113,46 @@ namespace GameSystems.Dialogue
         public override void SetSortingOrder(int order)
         {
             EnsureRenderers();
+            _order = order;
             current.sortingOrder = order;
             next.sortingOrder = order + 1;
+            if (_frame != null) _frame.sortingOrder = order + 2;
+            if (_mask != null)
+            {
+                // 이 스탠딩의 그림만 가린다(다른 캐릭터에는 영향 없음).
+                _mask.isCustomRangeActive = true;
+                _mask.backSortingOrder = order - 1;
+                _mask.frontSortingOrder = order + 1;
+            }
+        }
+
+        // 창 모드: 창 모양 안쪽만 보이고 창 이미지를 위에 그린다. 창은 캐릭터 그림의 가운데에 놓인다.
+        public override void SetFrame(Sprite frame, Sprite mask)
+        {
+            EnsureRenderers();
+            var on = frame != null;
+            if (on && _frame == null)
+            {
+                _frame = new GameObject("Frame").AddComponent<SpriteRenderer>();
+                _frame.transform.SetParent(transform, false);
+                _mask = new GameObject("FrameMask").AddComponent<SpriteMask>();
+                _mask.transform.SetParent(transform, false);
+            }
+            if (_frame != null)
+            {
+                _frame.sprite = frame;
+                _frame.gameObject.SetActive(on);
+                _mask.sprite = mask != null ? mask : frame;
+                _mask.gameObject.SetActive(on);
+                var center = current.sprite != null ? current.sprite.bounds.center : Vector3.zero;
+                _frame.transform.localPosition = center + Vector3.back * 0.001f;
+                _mask.transform.localPosition = center;
+            }
+            var interaction = on ? SpriteMaskInteraction.VisibleInsideMask : SpriteMaskInteraction.None;
+            current.maskInteraction = interaction;
+            next.maskInteraction = interaction;
+            SetSortingOrder(_order);
+            Apply();
         }
 
         void Apply()
@@ -113,6 +160,7 @@ namespace GameSystems.Dialogue
             var color = new Color(_brightness, _brightness, _brightness, _alpha);
             current.color = next.sprite == null ? color : new Color(color.r, color.g, color.b, color.a * (1f - _blend * 0.999f));
             next.color = new Color(color.r, color.g, color.b, color.a * _blend);
+            if (_frame != null) _frame.color = color;
         }
     }
 

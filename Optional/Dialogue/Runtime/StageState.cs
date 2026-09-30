@@ -20,6 +20,8 @@ namespace GameSystems.Dialogue
         public AudioClip music;
         [Range(0, 1)] public float musicVolume = 1f;
         public List<StandingState> standings = new List<StandingState>();
+        // 이미지 창(CG 등). 자리(slot)마다 하나.
+        public List<ImageState> images = new List<ImageState>();
         // 프로젝트가 더한 상태 효과의 값(날씨·시간대 등). 스킵·저장·되감기에 함께 따라간다.
         public List<CustomStateValue> custom = new List<CustomStateValue>();
 
@@ -31,11 +33,13 @@ namespace GameSystems.Dialogue
         }
 
         public StandingState Standing(string character) => standings.FirstOrDefault(s => s.character == character);
+        public ImageState Image(string slot) => images.FirstOrDefault(i => i.slot == slot);
 
         public StageState Clone()
         {
             var copy = (StageState)MemberwiseClone();
             copy.standings = standings.Select(s => s.Clone()).ToList();
+            copy.images = images.Select(i => i.Clone()).ToList();
             copy.custom = custom.Select(c => c.Clone()).ToList();
             return copy;
         }
@@ -51,8 +55,24 @@ namespace GameSystems.Dialogue
         // 가로 위치(0 = 왼쪽 끝, 1 = 오른쪽 끝, 밖은 0 미만·1 초과).
         public float x = 0.5f;
         public bool highlighted = true;
+        // 창 모드: 창 이미지(테두리)와 창 모양(마스크). 비우면 일반 스탠딩.
+        public Sprite frame;
+        public Sprite frameMask;
 
         public StandingState Clone() => (StandingState)MemberwiseClone();
+    }
+
+    [Serializable]
+    public sealed class ImageState
+    {
+        public string slot = "cg";
+        public Sprite sprite;
+        // 가운데 위치(화면 비율)와 크기(화면 높이 비율).
+        public float x = 0.5f;
+        public float y = 0.5f;
+        public float size = 0.6f;
+
+        public ImageState Clone() => (ImageState)MemberwiseClone();
     }
 
     [Serializable]

@@ -157,6 +157,7 @@ namespace GameSystems.EditorTools.Graph
                 stage.dim.color = new Color(0, 0, 0, 0);
                 stage.standingRoot = Child(stageObject.transform, "Standings");
                 stage.effectRoot = Child(stageObject.transform, "Effects");
+                stage.imageRoot = Child(stageObject.transform, "Images");
                 var music = Child(stageObject.transform, "Music").gameObject.AddComponent<AudioSource>();
                 music.loop = true;
                 music.playOnAwake = false;

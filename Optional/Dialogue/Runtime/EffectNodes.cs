@@ -154,6 +154,8 @@ namespace GameSystems.Dialogue
         [FieldLabel("자리")] public StandingSlot slot = StandingSlot.Center;
         [FieldLabel("직접 지정 위치(0~1)")] public float x = 0.5f;
         [FieldLabel("강조")] public bool highlighted = true;
+        [FieldLabel("창 모드: 창 이미지(비우면 일반 스탠딩)")] public Sprite frame;
+        [FieldLabel("창 모양(마스크, 비우면 창 이미지 모양)")] public Sprite frameMask;
         public override bool IsState => true;
         public override string Summary => $"{(string.IsNullOrEmpty(character) ? "화자" : character)} · {slot}";
 
@@ -167,6 +169,8 @@ namespace GameSystems.Dialogue
             standing.sprite = sprite;
             standing.x = StandingSlots.X(slot, x);
             standing.highlighted = highlighted;
+            standing.frame = frame;
+            standing.frameMask = frameMask;
         }
     }
 
@@ -236,6 +240,58 @@ namespace GameSystems.Dialogue
                 else if (onlyThis && on) standing.highlighted = false;
             }
         }
+    }
+
+    // 창 모드 켜기·끄기, 창 이미지 바꾸기.
+    [Serializable, GraphNode("창 바꾸기", Category = "스탠딩", Graphs = GraphKinds.Both)]
+    public sealed class StandingFrameEffect : EffectNode
+    {
+        [FieldLabel("스탠딩 프로필(비우면 현재 화자)"), DataRef(typeof(StandingProfileData))] public string character = "";
+        [FieldLabel("창 이미지(비우면 창 모드 끄기)")] public Sprite frame;
+        [FieldLabel("창 모양(마스크, 비우면 창 이미지 모양)")] public Sprite frameMask;
+        public override bool IsState => true;
+        public override string Summary => $"{(string.IsNullOrEmpty(character) ? "화자" : character)} · {(frame != null ? frame.name : "창 끄기")}";
+
+        public override void ApplyTo(StageState state, EffectContext context)
+        {
+            var standing = state.Standing(context.Character(character));
+            if (standing == null) return;
+            standing.frame = frame;
+            standing.frameMask = frameMask;
+        }
+    }
+
+    // 이미지 창(CG·일러스트): 자리마다 하나. 같은 자리에 다시 표시하면 이미지·위치·크기가 바뀐다.
+    [Serializable, GraphNode("이미지 표시", Category = "이미지", Graphs = GraphKinds.Both)]
+    public sealed class ShowImageEffect : EffectNode
+    {
+        [FieldLabel("자리 이름(여러 장을 따로 띄울 때)")] public string slot = "cg";
+        [FieldLabel("이미지")] public Sprite sprite;
+        [FieldLabel("가운데 위치(화면 비율 0~1)")] public Vector2 screenPosition = new Vector2(0.5f, 0.55f);
+        [FieldLabel("크기(화면 높이 비율)"), Min(0.01f)] public float size = 0.6f;
+        public override bool IsState => true;
+        public override string Summary => $"{slot} · {(sprite != null ? sprite.name : "없음")}";
+
+        public override void ApplyTo(StageState state, EffectContext context)
+        {
+            var image = state.Image(slot);
+            if (image == null) state.images.Add(image = new ImageState { slot = slot });
+            image.sprite = sprite;
+            image.x = screenPosition.x;
+            image.y = screenPosition.y;
+            image.size = size;
+        }
+    }
+
+    [Serializable, GraphNode("이미지 지우기", Category = "이미지", Graphs = GraphKinds.Both)]
+    public sealed class HideImageEffect : EffectNode
+    {
+        [FieldLabel("자리 이름(비우면 모든 이미지)")] public string slot = "cg";
+        public override bool IsState => true;
+        public override string Summary => string.IsNullOrEmpty(slot) ? "모두" : slot;
+
+        public override void ApplyTo(StageState state, EffectContext context) =>
+            state.images.RemoveAll(i => string.IsNullOrEmpty(slot) || i.slot == slot);
     }
 
     // 화자 자동 강조: 화자가 나와 있으면 화자만 밝게(나머지 어둡게), 나와 있지 않거나 해설이면 모두 원래대로.

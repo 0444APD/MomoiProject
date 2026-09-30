@@ -620,7 +620,7 @@ namespace GameSystems.EditorTools.Graph
         }
 
         // 노드 종류(이 그래프에서 쓸 수 있는 것). 분류 순서 → Order → 이름.
-        static readonly string[] CategoryOrder = { "흐름", "프리셋", "화면", "스탠딩", "움직임", "소리", "흐름 제어" };
+        static readonly string[] CategoryOrder = { "흐름", "프리셋", "화면", "스탠딩", "이미지", "움직임", "소리", "흐름 제어" };
 
         public static IEnumerable<(Type type, GraphNodeAttribute info)> NodeTypes(GraphKinds kind) =>
             TypeCache.GetTypesDerivedFrom<GraphNode>()

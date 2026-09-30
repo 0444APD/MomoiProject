@@ -21,6 +21,8 @@ namespace GameSystems.Dialogue
         [Tooltip("배경 어둡게(흰 스프라이트, 색은 검정)")] public SpriteRenderer dim;
         public Transform standingRoot;
         public Transform effectRoot;
+        [Tooltip("이미지 창(CG) 부모. 비우면 대화 화면 아래에 만든다")] public Transform imageRoot;
+        [Tooltip("이미지 창 그리기 순서(스탠딩보다 앞)")] public int imageOrder = 500;
         [Tooltip("스탠딩 발 위치(화면 아래 0 ~ 위 1)"), Range(-0.5f, 1f)] public float standingBaseline;
         [Tooltip("스프라이트 스탠딩의 높이(화면 높이 비율)"), Range(0.1f, 2f)] public float standingHeight = 0.95f;
         [Tooltip("강조가 꺼진 스탠딩의 밝기"), Range(0, 1)] public float dimmedBrightness = 0.7f;
@@ -159,7 +161,15 @@ namespace GameSystems.Dialogue
                 standing.Brightness = s.highlighted ? 1f : dimmedBrightness;
                 standing.View.BeginExpression(s.expression, s.sprite);
                 standing.View.SetExpressionBlend(1f);
+                standing.View.SetFrame(s.frame, s.frameMask);
                 standing.View.SetTint(standing.Brightness, 1f);
+            }
+            foreach (var slot in _images.Keys.Where(slot => state.Image(slot) == null).ToList()) RemoveImage(slot);
+            foreach (var image in state.images)
+            {
+                var view = EnsureImage(image.slot);
+                view.Set(image.sprite, 1f);
+                view.Place(this, image.x, image.y, image.size);
             }
             Sync();
         }
@@ -221,7 +231,7 @@ namespace GameSystems.Dialogue
                 }
             }
             var standing = new Standing { View = view, Order = _nextOrder++, Alpha = 0f };
-            view.SetSortingOrder(standingOrder + standing.Order * 2);
+            view.SetSortingOrder(standingOrder + standing.Order * 4);
             view.SetTint(1f, 0f);
             _standings[id] = standing;
             return standing;
@@ -239,6 +249,68 @@ namespace GameSystems.Dialogue
             if (target == null) return;
             if (Application.isPlaying) UnityEngine.Object.Destroy(target);
             else DestroyImmediate(target);
+        }
+
+        // ── 이미지 창 ────────────────────────────────────────
+
+        readonly Dictionary<string, ImageView> _images = new Dictionary<string, ImageView>();
+
+        // 자리 하나의 그림: 두 장을 겹쳐 바꾼다.
+        sealed class ImageView
+        {
+            public SpriteRenderer Current;
+            public SpriteRenderer Next;
+            public float Alpha;
+
+            public void Set(Sprite sprite, float alpha)
+            {
+                Current.sprite = sprite;
+                Next.sprite = null;
+                Alpha = alpha;
+                Current.color = new Color(1, 1, 1, alpha);
+                Next.color = new Color(1, 1, 1, 0);
+            }
+
+            public void Place(DialogueStage stage, float x, float y, float size)
+            {
+                var sprite = Current.sprite != null ? Current.sprite : Next.sprite;
+                var height = sprite != null ? sprite.bounds.size.y : 1f;
+                var scale = size * stage.ViewSize.y / Mathf.Max(0.0001f, height);
+                var root = Current.transform.parent;
+                root.localPosition = stage.Local(x, y) + Vector3.back * 0.5f;
+                root.localScale = new Vector3(scale, scale, 1f);
+            }
+        }
+
+        ImageView EnsureImage(string slot)
+        {
+            if (_images.TryGetValue(slot, out var existing) && existing.Current != null) return existing;
+            if (imageRoot == null)
+            {
+                imageRoot = new GameObject("Images").transform;
+                imageRoot.SetParent(transform, false);
+            }
+            var root = new GameObject(slot).transform;
+            root.SetParent(imageRoot, false);
+            SpriteRenderer Renderer(string rendererName, int order)
+            {
+                var renderer = new GameObject(rendererName).AddComponent<SpriteRenderer>();
+                renderer.transform.SetParent(root, false);
+                renderer.sortingOrder = order;
+                return renderer;
+            }
+            var order = imageOrder + _images.Count * 2;
+            var view = new ImageView { Current = Renderer("Current", order), Next = Renderer("Next", order + 1) };
+            view.Set(null, 0f);
+            _images[slot] = view;
+            return view;
+        }
+
+        void RemoveImage(string slot)
+        {
+            if (!_images.TryGetValue(slot, out var view)) return;
+            _images.Remove(slot);
+            if (view.Current != null) Destroy(view.Current.transform.parent.gameObject);
         }
 
         // ── 대사·선택지 ──────────────────────────────────────
@@ -304,6 +376,7 @@ namespace GameSystems.Dialogue
             ui?.SetOpen(false);
             if (!clearOnEnd) return;
             foreach (var id in _standings.Keys.ToList()) RemoveStanding(id);
+            foreach (var slot in _images.Keys.ToList()) RemoveImage(slot);
             SetBackground(backgroundBack, null, 0f);
             SetBackground(backgroundFront, null, 0f);
             SetDim(0f);
@@ -365,6 +438,8 @@ namespace GameSystems.Dialogue
             readonly bool _background;
             readonly bool _musicChange;
             readonly List<(string id, StandingState from, StandingState to, Standing view)> _standings = new List<(string, StandingState, StandingState, Standing)>();
+            readonly List<(string slot, ImageState from, ImageState to, ImageView view, bool swap)> _images = new List<(string, ImageState, ImageState, ImageView, bool)>();
+            readonly float _hold;
             bool _swapped;
 
             public StateBlend(DialogueStage stage, EffectNode effect, StageState before, StageState after)
@@ -373,6 +448,7 @@ namespace GameSystems.Dialogue
                 _before = before;
                 _after = after;
                 _viaBlack = effect is BackgroundEffect background && background.viaBlack;
+                _hold = _viaBlack && effect.EffectiveDuration > 0 ? Mathf.Clamp(((BackgroundEffect)effect).blackHold / effect.EffectiveDuration, 0f, 0.9f) : 0f;
                 _background = before.background != after.background;
                 _musicChange = before.music != after.music;
                 if (_background && !_viaBlack)
@@ -388,12 +464,24 @@ namespace GameSystems.Dialogue
                     var view = stage.EnsureStanding(id);
                     if (view == null) continue;
                     if (to != null && (from == null || from.expression != to.expression || from.sprite != to.sprite)) view.View.BeginExpression(to.expression, to.sprite);
+                    if (to != null && (from == null || from.frame != to.frame || from.frameMask != to.frameMask)) view.View.SetFrame(to.frame, to.frameMask);
                     _standings.Add((id, from, to, view));
+                }
+                foreach (var slot in before.images.Select(i => i.slot).Union(after.images.Select(i => i.slot)))
+                {
+                    var from = before.Image(slot);
+                    var to = after.Image(slot);
+                    if (from != null && to != null && from.sprite == to.sprite && Mathf.Approximately(from.x, to.x) && Mathf.Approximately(from.y, to.y) && Mathf.Approximately(from.size, to.size)) continue;
+                    var view = stage.EnsureImage(slot);
+                    var swap = from != null && to != null && from.sprite != to.sprite;
+                    if (swap) view.Next.sprite = to.sprite;
+                    else if (from == null && to != null) view.Set(to.sprite, 0f);
+                    _images.Add((slot, from, to, view, swap));
                 }
             }
 
             static bool Same(StandingState a, StandingState b) =>
-                a != null && b != null && a.expression == b.expression && a.sprite == b.sprite && Mathf.Approximately(a.x, b.x) && a.highlighted == b.highlighted;
+                a != null && b != null && a.expression == b.expression && a.sprite == b.sprite && Mathf.Approximately(a.x, b.x) && a.highlighted == b.highlighted && a.frame == b.frame && a.frameMask == b.frameMask;
 
             public void Evaluate(float t)
             {
@@ -402,7 +490,19 @@ namespace GameSystems.Dialogue
                 {
                     if (_viaBlack)
                     {
-                        if (t < 0.5f) s.ui?.SetFade(t * 2f);
+                        // 어두워짐 → (유지) → 밝아짐. 유지 시간은 진행 시간 안에 포함된다.
+                        var fadeOut = (1f - _hold) * 0.5f;
+                        if (t < fadeOut) s.ui?.SetFade(t / Mathf.Max(0.0001f, fadeOut));
+                        else if (t < fadeOut + _hold)
+                        {
+                            s.ui?.SetFade(1f);
+                            if (!_swapped)
+                            {
+                                _swapped = true;
+                                s.SetBackground(s.backgroundBack, _after.background, 1f);
+                                s.SetBackground(s.backgroundFront, null, 0f);
+                            }
+                        }
                         else
                         {
                             if (!_swapped)
@@ -411,7 +511,7 @@ namespace GameSystems.Dialogue
                                 s.SetBackground(s.backgroundBack, _after.background, 1f);
                                 s.SetBackground(s.backgroundFront, null, 0f);
                             }
-                            s.ui?.SetFade((1f - t) * 2f);
+                            s.ui?.SetFade((1f - t) / Mathf.Max(0.0001f, fadeOut));
                         }
                     }
                     else if (s.backgroundFront != null)
@@ -456,6 +556,19 @@ namespace GameSystems.Dialogue
                     if (to != null && (from == null || from.expression != to.expression || from.sprite != to.sprite)) view.View.SetExpressionBlend(t);
                     view.View.SetTint(view.Brightness, view.Alpha);
                 }
+                foreach (var (_, from, to, view, swap) in _images)
+                {
+                    var alpha = Mathf.Lerp(from != null ? 1f : 0f, to != null ? 1f : 0f, t);
+                    if (swap)
+                    {
+                        view.Current.color = new Color(1, 1, 1, 1f - t);
+                        view.Next.color = new Color(1, 1, 1, t);
+                    }
+                    else view.Current.color = new Color(1, 1, 1, alpha);
+                    var a = from ?? to;
+                    var b = to ?? from;
+                    view.Place(s, Mathf.LerpUnclamped(a.x, b.x, t), Mathf.LerpUnclamped(a.y, b.y, t), Mathf.LerpUnclamped(a.size, b.size, t));
+                }
             }
 
             public void Finish()
@@ -470,6 +583,15 @@ namespace GameSystems.Dialogue
                 foreach (var (id, _, to, _) in _standings)
                     if (to == null)
                         s.RemoveStanding(id);
+                foreach (var (slot, _, to, view, _) in _images)
+                {
+                    if (to == null) s.RemoveImage(slot);
+                    else
+                    {
+                        view.Set(to.sprite, 1f);
+                        view.Place(s, to.x, to.y, to.size);
+                    }
+                }
             }
         }
 
