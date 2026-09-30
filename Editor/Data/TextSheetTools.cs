@@ -8,6 +8,22 @@ using UnityEngine;
 
 namespace GameSystems.EditorTools
 {
+    // 텍스트 시트에 행을 더하는 곳(선택 모듈: 대화 대사 등). 원문은 모듈 쪽이 기준이라 가져올 때 원문 칸은 건너뛴다.
+    public interface ITextSheetSource
+    {
+        // sourceText: 원문 표에서 키 찾기(없으면 null). 문맥 열에 이름을 보일 때 쓴다.
+        IEnumerable<TextSheetRow> Rows(Func<string, string> sourceText);
+    }
+
+    public sealed class TextSheetRow
+    {
+        public string Key;
+        public string Source;
+        // 문맥 열 이름 → 값(예: dialogue, location, speaker). 읽기 전용, 가져올 때 무시.
+        public Dictionary<string, string> Context = new Dictionary<string, string>();
+        public string Note;
+    }
+
     // 다국어 설정·텍스트 표 만들기, 시트(CSV) 내보내기·가져오기, 번역 검사.
     public static class TextSheetTools
     {
@@ -80,9 +96,36 @@ namespace GameSystems.EditorTools
         {
             // 원문 언어를 첫 언어 열로.
             var codes = settings.Codes.OrderBy(c => string.Equals(c, settings.sourceLanguage, StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToList();
-            var tables = codes.ToDictionary(c => c, c => (IReadOnlyDictionary<string, string>)(settings.Find(c)?.table?.ToDictionary() ?? new Dictionary<string, string>()));
-            var order = settings.Find(settings.sourceLanguage)?.table?.entries.Select(e => e.key);
-            return TextSheet.Export(codes, tables, order);
+            var tables = codes.ToDictionary(c => c, c => settings.Find(c)?.table?.ToDictionary() ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+            var sourceTable = tables.TryGetValue(settings.sourceLanguage, out var st) ? st : new Dictionary<string, string>();
+            var order = settings.Find(settings.sourceLanguage)?.table?.entries.Select(e => e.key).ToList() ?? new List<string>();
+
+            // 모듈이 더하는 행(대화 대사 등): 원문은 모듈 쪽(그래프)이 기준이다.
+            var rows = SourceRows(sourceTable).ToList();
+            var notes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var context = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+            var columns = new List<string>();
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrEmpty(row.Key)) continue;
+                sourceTable[row.Key] = row.Source ?? "";
+                if (!order.Contains(row.Key)) order.Add(row.Key);
+                if (!string.IsNullOrEmpty(row.Note)) notes[row.Key] = row.Note;
+                context[row.Key] = row.Context;
+                foreach (var column in row.Context.Keys)
+                    if (!columns.Contains(column)) columns.Add(column);
+            }
+            var readOnly = tables.ToDictionary(p => p.Key, p => (IReadOnlyDictionary<string, string>)p.Value);
+            return TextSheet.Export(codes, readOnly, order, notes, columns,
+                (key, column) => context.TryGetValue(key, out var c) && c.TryGetValue(column, out var v) ? v : "");
+        }
+
+        // 모든 ITextSheetSource의 행.
+        public static IEnumerable<TextSheetRow> SourceRows(IReadOnlyDictionary<string, string> sourceTable)
+        {
+            foreach (var type in TypeCache.GetTypesDerivedFrom<ITextSheetSource>().Where(t => !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null))
+            foreach (var row in ((ITextSheetSource)Activator.CreateInstance(type)).Rows(key => sourceTable.TryGetValue(key, out var v) ? v : null))
+                yield return row;
         }
 
         [MenuItem(Menu + "시트 가져오기 (CSV)", priority = 42)]
@@ -105,6 +148,10 @@ namespace GameSystems.EditorTools
         {
             var codes = settings.Codes.Where(c => includeSource || !string.Equals(c, settings.sourceLanguage, StringComparison.OrdinalIgnoreCase)).ToList();
             var result = TextSheet.Import(csv, codes);
+            // 모듈 행(대화 대사 등)의 원문은 그래프가 기준이므로 원문 언어 표에 넣지 않는다.
+            if (result.Tables.TryGetValue(settings.sourceLanguage, out var sourceImport))
+                foreach (var row in SourceRows(new Dictionary<string, string>()))
+                    if (!string.IsNullOrEmpty(row.Key)) sourceImport.Remove(row.Key);
             var lines = new List<string>();
             foreach (var pair in result.Tables)
             {
@@ -134,6 +181,8 @@ namespace GameSystems.EditorTools
         public static IEnumerable<string> Check(LocalizationSettings settings)
         {
             var source = settings.Find(settings.sourceLanguage)?.table?.ToDictionary() ?? new Dictionary<string, string>();
+            foreach (var row in SourceRows(source).ToList())
+                if (!string.IsNullOrEmpty(row.Key)) source[row.Key] = row.Source ?? "";
             foreach (var pair in source)
             {
                 var error = TextFormat.Parse(pair.Value).Error;

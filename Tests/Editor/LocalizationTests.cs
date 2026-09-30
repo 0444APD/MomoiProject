@@ -248,6 +248,26 @@ namespace GameSystems.Tests
         }
 
         [Test]
+        public void SheetContextColumnsAreReadOnly()
+        {
+            var tables = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["ko"] = new Dictionary<string, string> { ["line.1"] = "왔구나" },
+                ["en"] = new Dictionary<string, string>(),
+            };
+            var csv = TextSheet.Export(new[] { "ko", "en" }, tables, null, new Dictionary<string, string> { ["line.1"] = "놀란 말투" },
+                new[] { "location", "speaker" }, (key, column) => column == "location" ? "성" : "아린");
+            var rows = Csv.Read(csv);
+            CollectionAssert.AreEqual(new[] { "key", "location", "speaker", "ko", "en", "note" }, rows[1]);
+            CollectionAssert.AreEqual(new[] { "line.1", "성", "아린", "왔구나", "", "놀란 말투" }, rows[2]);
+
+            var edited = csv.Replace("왔구나,,", "왔구나,You came,");
+            var result = TextSheet.Import(edited, new[] { "en" });
+            Assert.AreEqual("You came", result.Tables["en"]["line.1"]);
+            Assert.AreEqual(1, result.Tables["en"].Count, "문맥 열은 가져오지 않는다");
+        }
+
+        [Test]
         public void TranslationCheck()
         {
             Assert.IsEmpty(TextSheet.Check("{item:을} {count}개", "{count} {item}"));

@@ -245,6 +245,9 @@ namespace GameSystems.Dialogue
 
         // 문장 틀의 값(대화 재생기가 플레이어 데이터로 채운다).
         public Func<IReadOnlyDictionary<string, object>> TextArguments = () => null;
+        // 지금 장소(대화 재생기가 실행기 상태로 채운다)와 장소 찾기.
+        public Func<string> CurrentLocation = () => null;
+        public Func<string, LocationData> Locations = _ => null;
 
         public void ShowLine(LineNode line, string speakerName, string text)
         {
@@ -258,8 +261,21 @@ namespace GameSystems.Dialogue
                 SpeakerName = speakerName,
                 Text = text,
                 NameColor = character != null ? character.nameColor : Color.white,
-                Extras = ResolveExtras(line, character),
+                Thought = line.thought,
+                Location = CurrentLocation?.Invoke() ?? "",
             };
+            var extras = ResolveExtras(line, character);
+            // 장소: 기본 추가 글 'location' = 장소 이름(프로필·대사에 같은 키가 있으면 그것), 장소의 추가 글도 더한다.
+            if (!string.IsNullOrEmpty(info.Location))
+            {
+                var place = Locations(info.Location);
+                if (place != null)
+                    foreach (var extra in place.extras)
+                        if (!string.IsNullOrEmpty(extra.key) && !extras.ContainsKey(extra.key))
+                            extras[extra.key] = Texts.Has(place.Id + "." + extra.key) ? Texts.Get(place.Id + "." + extra.key) : Texts.Catalog.FormatTemplate(extra.text ?? "");
+                if (!extras.ContainsKey("location")) extras["location"] = Texts.NameOf(info.Location);
+            }
+            info.Extras = extras;
             ui?.ShowLine(info);
         }
 

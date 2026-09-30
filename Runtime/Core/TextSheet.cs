@@ -18,22 +18,26 @@ namespace GameSystems
         public const string KeyColumn = "key";
         public const string NoteColumn = "note";
 
+        // contextColumns: 키 다음에 두는 읽기 전용 문맥 열(예: dialogue·location·speaker). 가져올 때는 읽지 않는다.
         public static string Export(IReadOnlyList<string> languages, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> tables,
-            IEnumerable<string> keyOrder = null, IReadOnlyDictionary<string, string> notes = null)
+            IEnumerable<string> keyOrder = null, IReadOnlyDictionary<string, string> notes = null,
+            IReadOnlyList<string> contextColumns = null, Func<string, string, string> context = null)
         {
             var keys = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var key in (keyOrder ?? Enumerable.Empty<string>()).Concat(languages.SelectMany(l => tables.TryGetValue(l, out var t) ? t.Keys : Enumerable.Empty<string>())))
                 if (seen.Add(key)) keys.Add(key);
+            contextColumns ??= Array.Empty<string>();
 
             var rows = new List<IEnumerable<string>>
             {
                 new[] { FormatLine, FormatVersion.ToString() },
-                new[] { KeyColumn }.Concat(languages).Concat(new[] { NoteColumn }),
+                new[] { KeyColumn }.Concat(contextColumns).Concat(languages).Concat(new[] { NoteColumn }),
             };
             foreach (var key in keys)
             {
                 var row = new List<string> { key };
+                foreach (var column in contextColumns) row.Add(context?.Invoke(key, column) ?? "");
                 foreach (var language in languages)
                     row.Add(tables.TryGetValue(language, out var table) && table.TryGetValue(key, out var value) ? value : "");
                 row.Add(notes != null && notes.TryGetValue(key, out var note) ? note : "");

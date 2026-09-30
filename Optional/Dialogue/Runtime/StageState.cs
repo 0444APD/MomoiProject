@@ -10,6 +10,8 @@ namespace GameSystems.Dialogue
     [Serializable]
     public sealed class StageState
     {
+        // 지금 장소(장소 ID)와 그 배경 이미지(예외 이미지면 그것).
+        public string location;
         public Sprite background;
         [Range(0, 1)] public float dim;
         [Range(0, 0.5f)] public float letterbox;

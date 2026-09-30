@@ -62,10 +62,15 @@ namespace GameSystems.Dialogue
     // 효과가 가리키는 대상을 푸는 데 필요한 것(현재 화자 등).
     public sealed class EffectContext
     {
-        // 지금 대사의 화자(캐릭터 ID). 캐릭터 칸을 비운 효과는 화자를 가리킨다.
+        // 지금 대사의 화자(스탠딩 프로필 ID). 프로필 칸을 비운 효과는 화자를 가리킨다.
         public string Speaker;
+        // 장소·프로필 찾기(실행기가 채운다).
+        public Func<string, LocationData> Locations = _ => null;
+        public Func<string, StandingProfileData> Profiles = _ => null;
 
         public string Character(string id) => string.IsNullOrEmpty(id) ? Speaker : id;
+
+        public EffectContext With(string speaker) => new EffectContext { Speaker = speaker, Locations = Locations, Profiles = Profiles };
     }
 
     // ── 상태 효과 ────────────────────────────────────────────
@@ -73,11 +78,18 @@ namespace GameSystems.Dialogue
     [Serializable, GraphNode("배경", Category = "화면", Graphs = GraphKinds.Both)]
     public sealed class BackgroundEffect : EffectNode
     {
-        [FieldLabel("배경 이미지(비우면 배경 없음)")] public Sprite sprite;
+        [FieldLabel("장소(배경 이미지 = 장소의 배경)"), DataRef(typeof(LocationData))] public string location = "";
+        [FieldLabel("예외 배경 이미지(있으면 장소 이미지 대신)")] public Sprite sprite;
         [FieldLabel("검은 화면을 거쳐 바꾼다")] public bool viaBlack;
+        [FieldLabel("검은 화면 유지 시간(초, 진행 시간에 포함)"), Min(0)] public float blackHold;
         public override bool IsState => true;
-        public override string Summary => sprite != null ? sprite.name : "없음";
-        public override void ApplyTo(StageState state, EffectContext context) => state.background = sprite;
+        public override string Summary => !string.IsNullOrEmpty(location) ? location : sprite != null ? sprite.name : "없음";
+
+        public override void ApplyTo(StageState state, EffectContext context)
+        {
+            state.location = location;
+            state.background = sprite != null ? sprite : context.Locations(location)?.background;
+        }
     }
 
     [Serializable, GraphNode("배경 어둡게", Category = "화면", Graphs = GraphKinds.Both)]
@@ -223,6 +235,36 @@ namespace GameSystems.Dialogue
                 if (standing.character == id) standing.highlighted = on;
                 else if (onlyThis && on) standing.highlighted = false;
             }
+        }
+    }
+
+    // 화자 자동 강조: 화자가 나와 있으면 화자만 밝게(나머지 어둡게), 나와 있지 않거나 해설이면 모두 원래대로.
+    // 실행기가 대사마다 만든다(메뉴에는 없다).
+    [Serializable]
+    public sealed class SpeakerHighlightEffect : EffectNode
+    {
+        public string speaker;
+
+        public SpeakerHighlightEffect()
+        {
+            duration = 0.2f;
+            blockInput = false;
+        }
+
+        public override bool IsState => true;
+
+        public static bool Changes(StageState state, string speaker)
+        {
+            var present = !string.IsNullOrEmpty(speaker) && state.Standing(speaker) != null;
+            foreach (var s in state.standings)
+                if (s.highlighted != (!present || s.character == speaker)) return true;
+            return false;
+        }
+
+        public override void ApplyTo(StageState state, EffectContext context)
+        {
+            var present = !string.IsNullOrEmpty(speaker) && state.Standing(speaker) != null;
+            foreach (var s in state.standings) s.highlighted = !present || s.character == speaker;
         }
     }
 

@@ -81,7 +81,12 @@ namespace GameSystems.Dialogue
                         if (character != null && !string.IsNullOrEmpty(character.Id)) characters[character.Id] = character;
                 stage.Characters = id => id != null && characters != null && characters.TryGetValue(id, out var c) ? c : null;
             }
-            if (stage != null) stage.TextArguments = () => _runner.TextArguments();
+            if (stage != null)
+            {
+                stage.TextArguments = () => _runner.TextArguments();
+                stage.CurrentLocation = () => _runner.State.location;
+                stage.Locations = id => _runner.Locations(id);
+            }
             _runner.LineEntered += _ => stage?.ui?.ShowStaging();
             _runner.Signaled += signal =>
             {

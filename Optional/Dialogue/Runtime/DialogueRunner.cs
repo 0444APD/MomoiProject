@@ -120,6 +120,11 @@ namespace GameSystems.Dialogue
         // 자동 진행: '클릭' 대사가 다 나오고 막는 효과가 없으면 AutoDelay초 뒤 클릭한 것으로 친다.
         public bool AutoMode;
         public float AutoDelay = 1.2f;
+        // 대사마다 화자 자동 강조(대사 노드에서 '그대로'로 끌 수 있다).
+        public bool AutoHighlightSpeaker = true;
+        // 장소·스탠딩 프로필 찾기(FromDatabase가 채운다).
+        public Func<string, LocationData> Locations = _ => null;
+        public Func<string, StandingProfileData> Profiles = _ => null;
         // 시작(StartAt·Start)부터 흐른 시간. 미리보기의 시간 위치.
         public float Time { get; private set; }
 
@@ -156,8 +161,14 @@ namespace GameSystems.Dialogue
         {
             var dialogues = database == null ? new Dictionary<string, DialogueData>() : database.All<DialogueData>().Where(d => d != null).ToDictionary(d => d.Id);
             var presets = database == null ? new Dictionary<string, EffectPresetData>() : database.All<EffectPresetData>().Where(p => p != null).ToDictionary(p => p.Id);
+            var locations = database == null ? new Dictionary<string, LocationData>() : database.All<LocationData>().Where(l => l != null).ToDictionary(l => l.Id);
+            var profiles = database == null ? new Dictionary<string, StandingProfileData>() : database.All<StandingProfileData>().Where(p => p != null).ToDictionary(p => p.Id);
             return new DialogueRunner(id => id != null && dialogues.TryGetValue(id, out var d) ? d : null,
-                id => id != null && presets.TryGetValue(id, out var p) ? p : null);
+                id => id != null && presets.TryGetValue(id, out var p) ? p : null)
+            {
+                Locations = id => id != null && locations.TryGetValue(id, out var l) ? l : null,
+                Profiles = id => id != null && profiles.TryGetValue(id, out var p) ? p : null,
+            };
         }
 
         // ── 시작·끝 ───────────────────────────────────────────
@@ -233,7 +244,7 @@ namespace GameSystems.Dialogue
             Reset();
             Stage?.ApplyState(State);
             Dialogue = null;
-            _main = new Scope { Graph = new NodeGraph(), Context = new EffectContext() };
+            _main = new Scope { Graph = new NodeGraph(), Context = NewContext() };
             Play(_main, new PresetEffect { preset = presetId }, null);
             return true;
         }
@@ -307,7 +318,21 @@ namespace GameSystems.Dialogue
         void Enter(DialogueData dialogue)
         {
             Dialogue = dialogue;
-            _main = new Scope { Graph = dialogue.graph, Context = new EffectContext() };
+            _main = new Scope { Graph = dialogue.graph, Context = NewContext() };
+        }
+
+        EffectContext NewContext() => new EffectContext { Locations = id => Locations(id), Profiles = id => Profiles(id) };
+
+        // 화면에 보일 화자 이름: 다른 이름(번역 키 '<대사 키>.speaker') → 프로필 이름('<프로필 ID>.name') → 해설이면 빈 값.
+        public string SpeakerNameOf(LineNode line)
+        {
+            if (line == null) return "";
+            if (!string.IsNullOrEmpty(line.speakerName))
+            {
+                var key = line.lineId + ".speaker";
+                return Texts.Has(key) ? Texts.Get(key, TextArguments()) : Texts.Catalog.FormatTemplate(line.speakerName, TextArguments());
+            }
+            return string.IsNullOrEmpty(line.speaker) ? "" : Texts.NameOf(line.speaker);
         }
 
         void End()
@@ -400,6 +425,9 @@ namespace GameSystems.Dialogue
             LineEntered?.Invoke(line);
             Fire(_main, line, LineNode.EnterPort);
             if (Line != line) return;
+            // 화자 자동 강조(진입 신호로 등장한 캐릭터까지 본 뒤).
+            if (AutoHighlightSpeaker && line.highlight == SpeakerHighlight.Auto && SpeakerHighlightEffect.Changes(State, line.speaker))
+                Play(_main, new SpeakerHighlightEffect { speaker = line.speaker }, line);
             var gated = Dialogue.graph.To(line.guid, LineNode.TextStartPort).Any();
             if (!gated || _released.Remove(line.guid)) BeginTyping();
         }
@@ -408,7 +436,7 @@ namespace GameSystems.Dialogue
         {
             if (Phase != DialoguePhase.WaitingForText) return;
             Phase = DialoguePhase.Typing;
-            Stage?.ShowLine(Line, string.IsNullOrEmpty(Line.speaker) ? "" : Texts.NameOf(Line.speaker), Text);
+            Stage?.ShowLine(Line, SpeakerNameOf(Line), Text);
             Stage?.SetVisibleCharacters(0);
             if (TextLength == 0) Typed();
         }
@@ -601,7 +629,7 @@ namespace GameSystems.Dialogue
             if (effect is PresetEffect presetEffect)
             {
                 var preset = _presets(presetEffect.preset);
-                var context = new EffectContext { Speaker = run.Scope.Context.Character(presetEffect.character) };
+                var context = run.Scope.Context.With(run.Scope.Context.Character(presetEffect.character));
                 run.Child = new Scope { Graph = preset?.graph ?? new NodeGraph(), Context = context, Parent = run.Scope, OwnerRun = run };
                 Fire(run.Scope, effect, EffectNode.StartedPort);
                 // 안의 효과가 모두 끝나야 완료. 아무것도 시작하지 않으면 바로 완료.

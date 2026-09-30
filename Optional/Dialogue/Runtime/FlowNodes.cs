@@ -51,7 +51,10 @@ namespace GameSystems.Dialogue
         public const string LeavePort = "leave";
         public const string OptionPrefix = "opt:";
 
-        [FieldLabel("화자(비우면 해설)"), DataRef(typeof(StandingProfileData))] public string speaker = "";
+        [FieldLabel("화자(스탠딩 프로필. 비우면 해설)"), DataRef(typeof(StandingProfileData))] public string speaker = "";
+        [FieldLabel("다른 이름(비우면 프로필 이름. 예: ???, 병사 A — 프로필 없이 이름만 둘 때도)")] public string speakerName = "";
+        [FieldLabel("생각(속마음)")] public bool thought;
+        [FieldLabel("화자 강조(화자가 나와 있으면 화자만 밝게, 아니면 모두 원래대로)")] public SpeakerHighlight highlight = SpeakerHighlight.Auto;
         [FieldLabel("화자 스탠딩 ID(비우면 그대로)"), StandingRef(nameof(speaker))] public string expression = "";
         [FieldLabel("화자 예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite expressionSprite;
         [FieldLabel("대사(원문)"), TextArea(2, 10)] public string text = "";
@@ -60,10 +63,11 @@ namespace GameSystems.Dialogue
         [FieldLabel("넘기는 방식")] public LineAdvance advance = LineAdvance.Click;
         [FieldLabel("시간 진행: 글이 다 나온 뒤 머무는 시간(초)"), Min(0)] public float holdSeconds = 1.5f;
         [FieldLabel("추가 글(이 줄에서만, 캐릭터의 같은 키보다 우선)")] public List<ExtraText> extras = new List<ExtraText>();
+        [FieldLabel("메모(번역 시트의 메모 칸으로 나간다)"), TextArea(1, 4)] public string comment = "";
         // 번역 시트 키(자동, 바꾸지 않는다).
         [HideInInspector] public string lineId = DialogueIds.NewLineId();
 
-        public override string Summary => string.IsNullOrEmpty(speaker) ? "해설" : speaker;
+        public override string Summary => (!string.IsNullOrEmpty(speakerName) ? speakerName : string.IsNullOrEmpty(speaker) ? "해설" : speaker) + (thought ? " (생각)" : "");
 
         public override IEnumerable<PortInfo> Ports
         {
@@ -80,6 +84,14 @@ namespace GameSystems.Dialogue
                         yield return PortInfo.FlowOut(OptionPrefix + options[i].id, string.IsNullOrEmpty(options[i].text) ? $"선택지 {i + 1}" : options[i].text);
             }
         }
+    }
+
+    public enum SpeakerHighlight
+    {
+        // 실행기 설정(AutoHighlightSpeaker)을 따른다.
+        [InspectorName("자동")] Auto,
+        // 이 줄에서는 강조를 건드리지 않는다.
+        [InspectorName("그대로")] Keep,
     }
 
     // 대사를 넘기는 방식.

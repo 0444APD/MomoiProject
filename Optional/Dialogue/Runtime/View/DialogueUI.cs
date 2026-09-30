@@ -275,9 +275,11 @@ namespace GameSystems.Dialogue
             var changed = speaker != _speaker;
             if (!string.IsNullOrEmpty(_speaker)) _root.RemoveFromClassList("dialogue--speaker-" + _speaker);
             _speaker = speaker;
-            var narration = string.IsNullOrEmpty(speaker);
+            // 해설 = 보일 이름이 없음(프로필 없이 '다른 이름'만 있는 화자도 이름표가 보인다).
+            var narration = string.IsNullOrEmpty(speakerName);
             _root.EnableInClassList("dialogue--narration", narration);
-            if (!narration) _root.AddToClassList("dialogue--speaker-" + speaker);
+            _root.EnableInClassList("dialogue--thought", info.Thought);
+            if (!string.IsNullOrEmpty(speaker)) _root.AddToClassList("dialogue--speaker-" + speaker);
             if (_name != null)
             {
                 _name.text = speakerName ?? "";

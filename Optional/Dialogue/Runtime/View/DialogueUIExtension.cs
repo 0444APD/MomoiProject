@@ -13,6 +13,10 @@ namespace GameSystems.Dialogue
         public StandingProfileData Character;
         public string SpeakerName;
         public string Text;
+        // 속마음(생각) 대사인지.
+        public bool Thought;
+        // 지금 장소 ID(없으면 빈 값).
+        public string Location;
         public Color NameColor = Color.white;
         // 추가 글(키 → 글). 캐릭터의 추가 글 + 대사의 추가 글(대사가 우선), 번역이 있으면 번역.
         public IReadOnlyDictionary<string, string> Extras = new Dictionary<string, string>();
