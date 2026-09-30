@@ -14,8 +14,8 @@ namespace GameSystems.Dialogue
 
         public virtual void Bind(CharacterData character) => Character = character;
 
-        // 표정 바꾸기 시작. 이후 SetExpressionBlend(0→1)로 전환이 진행된다(바로 바꾸는 방식이면 무시해도 된다).
-        public abstract void BeginExpression(string expression);
+        // 스탠딩 바꾸기 시작(스탠딩 ID, 또는 예외로 꽂은 스프라이트). 이후 SetExpressionBlend(0→1)로 전환이 진행된다(바로 바꾸는 방식이면 무시해도 된다).
+        public abstract void BeginExpression(string expression, Sprite sprite = null);
         public virtual void SetExpressionBlend(float t)
         {
         }
@@ -65,10 +65,10 @@ namespace GameSystems.Dialogue
             Apply();
         }
 
-        public override void BeginExpression(string expression)
+        public override void BeginExpression(string expression, Sprite overrideSprite = null)
         {
             EnsureRenderers();
-            var sprite = Character != null ? Character.SpriteOf(expression) : null;
+            var sprite = overrideSprite != null ? overrideSprite : Character != null ? Character.SpriteOf(expression) : null;
             if (sprite == current.sprite)
             {
                 next.sprite = null;
@@ -157,8 +157,9 @@ namespace GameSystems.Dialogue
             return null;
         }
 
-        public override void BeginExpression(string expression)
+        public override void BeginExpression(string expression, Sprite sprite = null)
         {
+            if (sprite != null) Debug.LogWarning($"[대화] 스파인 스탠딩 '{name}'에는 예외 스프라이트를 꽂을 수 없습니다(스탠딩 ID로 애니메이션을 고르세요).", this);
             if (_skeleton == null || string.IsNullOrEmpty(expression)) return;
             var animation = expression;
             var loop = true;

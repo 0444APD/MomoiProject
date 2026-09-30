@@ -24,7 +24,7 @@ namespace GameSystems.Tests
                 return null;
             }
 
-            public void ShowLine(string speaker, string speakerName, string text) => Line = text;
+            public void ShowLine(LineNode line, string speakerName, string text) => Line = text;
             public void SetVisibleCharacters(int count) => Visible = count;
             public void ShowChoices(IReadOnlyList<DialogueChoice> choices) => Choices = choices.ToList();
             public void Hide() => Log.Add("hide");

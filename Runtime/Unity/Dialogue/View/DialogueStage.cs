@@ -157,7 +157,7 @@ namespace GameSystems.Dialogue
                 standing.X = s.x;
                 standing.Alpha = 1f;
                 standing.Brightness = s.highlighted ? 1f : dimmedBrightness;
-                standing.View.BeginExpression(s.expression);
+                standing.View.BeginExpression(s.expression, s.sprite);
                 standing.View.SetExpressionBlend(1f);
                 standing.View.SetTint(standing.Brightness, 1f);
             }
@@ -243,11 +243,40 @@ namespace GameSystems.Dialogue
 
         // ── 대사·선택지 ──────────────────────────────────────
 
-        public void ShowLine(string speaker, string speakerName, string text)
+        // 문장 틀의 값(대화 재생기가 플레이어 데이터로 채운다).
+        public Func<IReadOnlyDictionary<string, object>> TextArguments = () => null;
+
+        public void ShowLine(LineNode line, string speakerName, string text)
         {
             _visibleTotal = DialogueRunner.VisibleLength(text);
-            var color = Characters(speaker)?.nameColor ?? Color.white;
-            ui?.ShowLine(speaker, speakerName, text, color);
+            var character = Characters(line.speaker);
+            var info = new DialogueLineInfo
+            {
+                Line = line,
+                Speaker = line.speaker,
+                Character = character,
+                SpeakerName = speakerName,
+                Text = text,
+                NameColor = character != null ? character.nameColor : Color.white,
+                Extras = ResolveExtras(line, character),
+            };
+            ui?.ShowLine(info);
+        }
+
+        // 추가 글: 대사의 같은 키가 캐릭터 것보다 우선. 번역 표에 '<대사 키>.<키>' 또는 '<캐릭터 ID>.<키>'가 있으면 그것을 쓴다.
+        Dictionary<string, string> ResolveExtras(LineNode line, CharacterData character) => ResolveExtras(line, character, TextArguments?.Invoke());
+
+        public static Dictionary<string, string> ResolveExtras(LineNode line, CharacterData character, IReadOnlyDictionary<string, object> args)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            string Resolve(string key, string source) =>
+                Texts.Has(key) ? Texts.Get(key, args) : Texts.Catalog.FormatTemplate(source ?? "", args);
+            if (character != null)
+                foreach (var extra in character.extras)
+                    if (!string.IsNullOrEmpty(extra.key)) result[extra.key] = Resolve(character.Id + "." + extra.key, extra.text);
+            foreach (var extra in line.extras)
+                if (!string.IsNullOrEmpty(extra.key)) result[extra.key] = Resolve(line.lineId + "." + extra.key, extra.text);
+            return result;
         }
 
         public void SetVisibleCharacters(int count) => ui?.SetVisibleCharacters(count, _visibleTotal);
@@ -277,6 +306,8 @@ namespace GameSystems.Dialogue
         public IEffectPlayer Begin(EffectNode effect, EffectContext context, StageState before, StageState after)
         {
             Capture();
+            var custom = effect.CreatePlayer(this, context, before, after);
+            if (custom != null) return custom;
             if (effect.IsState) return new StateBlend(this, effect, before, after);
             switch (effect)
             {
@@ -340,13 +371,13 @@ namespace GameSystems.Dialogue
                     if (Same(from, to)) continue;
                     var view = stage.EnsureStanding(id);
                     if (view == null) continue;
-                    if (to != null && (from == null || from.expression != to.expression)) view.View.BeginExpression(to.expression);
+                    if (to != null && (from == null || from.expression != to.expression || from.sprite != to.sprite)) view.View.BeginExpression(to.expression, to.sprite);
                     _standings.Add((id, from, to, view));
                 }
             }
 
             static bool Same(StandingState a, StandingState b) =>
-                a != null && b != null && a.expression == b.expression && Mathf.Approximately(a.x, b.x) && a.highlighted == b.highlighted;
+                a != null && b != null && a.expression == b.expression && a.sprite == b.sprite && Mathf.Approximately(a.x, b.x) && a.highlighted == b.highlighted;
 
             public void Evaluate(float t)
             {
@@ -406,7 +437,7 @@ namespace GameSystems.Dialogue
                     var fromB = from == null ? (to != null && to.highlighted ? 1f : s.dimmedBrightness) : from.highlighted ? 1f : s.dimmedBrightness;
                     var toB = to == null ? fromB : to.highlighted ? 1f : s.dimmedBrightness;
                     view.Brightness = Mathf.Lerp(fromB, toB, t);
-                    if (to != null && (from == null || from.expression != to.expression)) view.View.SetExpressionBlend(t);
+                    if (to != null && (from == null || from.expression != to.expression || from.sprite != to.sprite)) view.View.SetExpressionBlend(t);
                     view.View.SetTint(view.Brightness, view.Alpha);
                 }
             }

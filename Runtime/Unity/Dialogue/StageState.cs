@@ -18,6 +18,15 @@ namespace GameSystems.Dialogue
         public AudioClip music;
         [Range(0, 1)] public float musicVolume = 1f;
         public List<StandingState> standings = new List<StandingState>();
+        // 프로젝트가 더한 상태 효과의 값(날씨·시간대 등). 스킵·저장·되감기에 함께 따라간다.
+        public List<CustomStateValue> custom = new List<CustomStateValue>();
+
+        public CustomStateValue Custom(string key, bool create = false)
+        {
+            var found = custom.FirstOrDefault(c => c.key == key);
+            if (found == null && create) custom.Add(found = new CustomStateValue { key = key });
+            return found;
+        }
 
         public StandingState Standing(string character) => standings.FirstOrDefault(s => s.character == character);
 
@@ -25,6 +34,7 @@ namespace GameSystems.Dialogue
         {
             var copy = (StageState)MemberwiseClone();
             copy.standings = standings.Select(s => s.Clone()).ToList();
+            copy.custom = custom.Select(c => c.Clone()).ToList();
             return copy;
         }
     }
@@ -34,11 +44,24 @@ namespace GameSystems.Dialogue
     {
         public string character;
         public string expression;
+        // 스탠딩 ID 대신 직접 꽂은 스프라이트(예외).
+        public Sprite sprite;
         // 가로 위치(0 = 왼쪽 끝, 1 = 오른쪽 끝, 밖은 0 미만·1 초과).
         public float x = 0.5f;
         public bool highlighted = true;
 
         public StandingState Clone() => (StandingState)MemberwiseClone();
+    }
+
+    [Serializable]
+    public sealed class CustomStateValue
+    {
+        public string key;
+        public string text;
+        public float number;
+        public UnityEngine.Object asset;
+
+        public CustomStateValue Clone() => (CustomStateValue)MemberwiseClone();
     }
 
     // 스탠딩 자리. 사용자 지정은 가로 위치 값을 직접 쓴다.

@@ -213,6 +213,8 @@ namespace GameSystems.EditorTools.Graph
         <ui:VisualElement name=""dialogue-box"" class=""dialogue-box"">
             <ui:VisualElement name=""dialogue-name-box"" class=""dialogue-name-box"">
                 <ui:Label name=""dialogue-name"" class=""dialogue-name"" text="""" />
+                <!-- 프로젝트별 추가 글 예시: 캐릭터 프로필의 추가 글 키 affiliation(소속). 비어 있으면 숨는다. 필요 없으면 지운다. -->
+                <ui:Label name=""dialogue-extra-affiliation"" class=""dialogue-extra dialogue-affiliation"" text="""" />
             </ui:VisualElement>
             <ui:Label name=""dialogue-text"" class=""dialogue-text"" text="""" enable-rich-text=""true"" />
             <ui:VisualElement name=""dialogue-next"" class=""dialogue-next"" picking-mode=""Ignore"" />
@@ -312,6 +314,22 @@ namespace GameSystems.EditorTools.Graph
     color: rgb(255, 255, 255);
 }
 
+.dialogue-name-box {
+    flex-direction: row;
+    align-items: center;
+}
+
+.dialogue-affiliation {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.85);
+    margin-left: 12px;
+}
+
+/* 추가 글이 비었으면 숨긴다(dialogue-extra-<키> 요소 공통) */
+.dialogue-extra--empty {
+    display: none;
+}
+
 .dialogue-text {
     font-size: 30px;
     color: rgb(242, 242, 243);
@@ -320,7 +338,23 @@ namespace GameSystems.EditorTools.Graph
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
-.dialogue--narration .dialogue-text {
+.dialogue--narration .dialogue-name-box {
+    flex-direction: row;
+    align-items: center;
+}
+
+.dialogue-affiliation {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.85);
+    margin-left: 12px;
+}
+
+/* 추가 글이 비었으면 숨긴다(dialogue-extra-<키> 요소 공통) */
+.dialogue-extra--empty {
+    display: none;
+}
+
+.dialogue-text {
     -unity-font-style: italic;
     color: rgba(242, 242, 243, 0.82);
 }

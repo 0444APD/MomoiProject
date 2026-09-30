@@ -15,6 +15,11 @@ namespace GameSystems.Dialogue
     // 상태 클래스(루트): dialogue--open · dialogue--staging(연출 대기) · dialogue--typing · dialogue--waiting(클릭 대기)
     //                    · dialogue--choosing · dialogue--narration(화자 없음) · dialogue--speaker-<캐릭터 ID>
     // 선택지 클래스: dialogue-choice · dialogue-choice--locked · dialogue-choice--picked
+    //
+    // 프로젝트별 추가:
+    //  · 글(소속·직함 등): 캐릭터·대사의 '추가 글'에 키를 적고 UXML에 name="dialogue-extra-<키>" 요소를 둔다(Label이면 글이 들어가고,
+    //    비었으면 그 요소에 dialogue-extra--empty, 루트에 dialogue--has-<키> 클래스가 붙는다). 코드 없음.
+    //  · 동작하는 UI: IDialogueUIExtension(또는 DialogueUIExtension) 컴포넌트를 이 오브젝트나 자식에 붙인다.
     [RequireComponent(typeof(UIDocument))]
     [AddComponentMenu("Game Systems/대화 UI")]
     public sealed class DialogueUI : MonoBehaviour
@@ -77,6 +82,8 @@ namespace GameSystems.Dialogue
             public UiMotion motion;
         }
 
+        public const string ExtraPrefix = "dialogue-extra-";
+
         public ElementNames names = new ElementNames();
         [Tooltip("선택지 하나의 모양(UXML). 비우면 버튼을 만든다.")]
         public VisualTreeAsset choiceTemplate;
@@ -94,6 +101,8 @@ namespace GameSystems.Dialogue
 
         readonly UiMotionRunner _motions = new UiMotionRunner();
         readonly List<VisualElement> _choiceElements = new List<VisualElement>();
+        readonly List<(string key, VisualElement element)> _extras = new List<(string, VisualElement)>();
+        IDialogueUIExtension[] _extensions = Array.Empty<IDialogueUIExtension>();
         VisualElement _root;
         VisualElement _box;
         VisualElement _nameBox;
@@ -164,6 +173,13 @@ namespace GameSystems.Dialogue
             _fade = Find<VisualElement>(names.fade, false);
             _tooltip = Find<VisualElement>(names.tooltip, false);
             _tooltipText = Find<Label>(names.tooltipText, false);
+            _extras.Clear();
+            tree.Query<VisualElement>().ForEach(element =>
+            {
+                if (!string.IsNullOrEmpty(element.name) && element.name.StartsWith(ExtraPrefix, StringComparison.Ordinal))
+                    _extras.Add((element.name.Substring(ExtraPrefix.Length), element));
+            });
+            _extensions = GetComponentsInChildren<IDialogueUIExtension>(true);
 
             if (font != null) tree.style.unityFontDefinition = FontDefinition.FromFont(font);
             else if (fontAsset != null) tree.style.unityFontDefinition = FontDefinition.FromSDFFont(fontAsset);
@@ -218,6 +234,9 @@ namespace GameSystems.Dialogue
                 HideTooltip();
             }
             if (!instant) PlayMoment(open ? Moment.Open : Moment.Close);
+            foreach (var extension in _extensions)
+                if (open) extension.OnOpened(this);
+                else extension.OnClosed(this);
             if (open) _root.Focus();
         }
 
@@ -244,9 +263,13 @@ namespace GameSystems.Dialogue
             SetState("dialogue--staging");
         }
 
-        public void ShowLine(string speaker, string speakerName, string text, Color nameColor)
+        public void ShowLine(DialogueLineInfo info)
         {
             if (!Ready()) return;
+            var speaker = info.Speaker;
+            var speakerName = info.SpeakerName;
+            var text = info.Text;
+            var nameColor = info.NameColor;
             if (_root == null) return;
             SetOpen(true);
             var changed = speaker != _speaker;
@@ -266,8 +289,17 @@ namespace GameSystems.Dialogue
             SetState("dialogue--typing");
             if (_next != null) _motions.Stop(_next);
             StopLoopingMotions();
+            foreach (var (key, element) in _extras)
+            {
+                var value = info.Extras != null && info.Extras.TryGetValue(key, out var found) ? found : "";
+                if (element is Label label) label.text = value;
+                var empty = string.IsNullOrEmpty(value);
+                element.EnableInClassList("dialogue-extra--empty", empty);
+                _root.EnableInClassList("dialogue--has-" + key, !empty);
+            }
             if (changed) PlayMoment(Moment.SpeakerChanged);
             PlayMoment(Moment.LineStart);
+            foreach (var extension in _extensions) extension.OnLine(this, info);
         }
 
         public void SetVisibleCharacters(int count, int total)
@@ -309,6 +341,7 @@ namespace GameSystems.Dialogue
                 _choiceElements.Add(element);
             }
             PlayMoment(Moment.ChoicesShown);
+            foreach (var extension in _extensions) extension.OnChoices(this, _choiceData);
         }
 
         VisualElement MakeChoice(string text)

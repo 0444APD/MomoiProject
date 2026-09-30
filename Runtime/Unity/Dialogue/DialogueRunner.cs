@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameSystems.Data;
@@ -6,27 +6,27 @@ using UnityEngine;
 
 namespace GameSystems.Dialogue
 {
-    // ????붾㈃???ㅼ젣濡?洹몃━??履?UI쨌?ㅽ깲?㈑룹뭅硫붾씪 ??. ?ㅽ뻾湲곕뒗 '?몄젣 臾댁뾿??留??뺥븯怨?洹몃━湲곕뒗 ?ш린??留↔릿??
+    // 대화 화면을 실제로 그리는 쪽(UI·스탠딩·카메라 …). 실행기는 '언제 무엇을'만 정하고 그리기는 여기에 맡긴다.
     public interface IDialogueStage
     {
-        // ?곹깭瑜??꾪솚 ?놁씠 諛붾줈 ?곸슜?쒕떎(?쒖옉쨌遺덈윭?ㅺ린쨌?섍컧湲?.
+        // 상태를 전환 없이 바로 적용한다(시작·불러오기·되감기).
         void ApplyState(StageState state);
 
-        // ?④낵 ?섎굹瑜??쒖옉?쒕떎. before ??after???곹깭 ?④낵???욌뮘 紐⑥뒿(???④낵??媛숇떎). ?ъ깮湲곌? ?놁쑝硫?null(?쒓컙留??먮Ⅸ??.
+        // 효과 하나를 시작한다. before → after는 상태 효과의 앞뒤 모습(큐 효과는 같다). 재생기가 없으면 null(시간만 흐른다).
         IEffectPlayer Begin(EffectNode effect, EffectContext context, StageState before, StageState after);
 
-        // ???以꾩쓣 ?꾩슫??湲?먮뒗 SetVisibleCharacters留뚰겮 蹂댁씤??. speaker??罹먮┃??ID(?댁꽕?대㈃ 鍮?媛?.
-        void ShowLine(string speaker, string speakerName, string text);
+        // 대사 줄을 띄운다(글자는 SetVisibleCharacters만큼 보인다). line.speaker는 캐릭터 ID(해설이면 빈 값).
+        void ShowLine(LineNode line, string speakerName, string text);
         void SetVisibleCharacters(int count);
 
-        // ?좏깮吏瑜??꾩슫??鍮?紐⑸줉?대㈃ ?④릿??.
+        // 선택지를 띄운다(빈 목록이면 숨긴다).
         void ShowChoices(IReadOnlyList<DialogueChoice> choices);
 
-        // ??붽? ?앸궗??
+        // 대화가 끝났다.
         void Hide();
     }
 
-    // ?④낵 ?섎굹??吏꾪뻾??洹몃┛?? t??0~1. ?ㅽ궢?섎㈃ 諛붾줈 Evaluate(1) ??Finish媛 遺덈┛??
+    // 효과 하나의 진행을 그린다. t는 0~1(효과의 움직임 곡선을 이미 적용한 값). 스킵하면 바로 Evaluate(1) 뒤 Finish가 불린다.
     public interface IEffectPlayer
     {
         void Evaluate(float t);
@@ -52,16 +52,16 @@ namespace GameSystems.Dialogue
     public enum DialoguePhase
     {
         Idle,
-        // 以꾩뿉 ?ㅼ뼱?붿?留?'????쒖옉' ?좏샇瑜?湲곕떎由곕떎(?곗텧 以?.
+        // 줄에 들어왔지만 '대사 시작' 신호를 기다린다(연출 중).
         WaitingForText,
         Typing,
-        // ???섏솕怨??대┃(?먮뒗 ?먮룞 ?섍?)??湲곕떎由곕떎.
+        // 다 나왔고 클릭(또는 자동 넘김)을 기다린다.
         Shown,
         Choosing,
         Ended,
     }
 
-    // 以묎컙 ??Β룸릺媛먭린?? ?대뒓 ??붿쓽 ?대뒓 以? 洹몃븣???붾㈃ ?곹깭.
+    // 중간 저장·되감기용: 어느 대화의 어느 줄, 그때의 화면 상태.
     [Serializable]
     public sealed class DialogueSnapshot
     {
@@ -70,8 +70,8 @@ namespace GameSystems.Dialogue
         public StageState state;
     }
 
-    // ????ㅽ뻾湲? ?먮쫫(??????좏깮吏 ??遺꾧린 ?????곕씪媛硫? ?좏샇濡??댁뼱吏??④낵 泥댁씤???쒓컙??留욎떠 ?ъ깮?쒕떎.
-    // 寃뚯엫 履쎌? Tick(?꾨젅???쒓컙), Advance(?대┃), Choose(?좏깮)留?遺瑜몃떎. Unity 而댄룷?뚰듃 ?놁씠???덈떎(?뚯뒪?맞룸?由щ낫湲?.
+    // 대화 실행기. 흐름(대사 → 선택지 → 분기 …)을 따라가며, 신호로 이어진 효과 체인을 시간에 맞춰 재생한다.
+    // 게임 쪽은 Tick(프레임 시간), Advance(클릭), Choose(선택)만 부른다. Unity 컴포넌트 없이도 돈다(테스트·미리보기).
     public sealed class DialogueRunner
     {
         const int MaxSignalDepth = 64;
@@ -124,7 +124,7 @@ namespace GameSystems.Dialogue
         public int VisibleCharacters => Mathf.Min(TextLength, Mathf.FloorToInt(_visible));
         public IReadOnlyList<DialogueChoice> Choices => _choices;
         public int RunningEffects => _runs.Count;
-        // 吏?섏삩 以?洹몃븣???붾㈃ ?곹깭 ?ы븿). ???濡쒓렇쨌?섍컧湲곗뿉 ?대떎.
+        // 지나온 줄(그때의 화면 상태 포함). 대사 로그·되감기에 쓴다.
         public IReadOnlyList<DialogueSnapshot> History => _history;
 
         public event Action<LineNode> LineEntered;
@@ -138,7 +138,7 @@ namespace GameSystems.Dialogue
             _presets = presets ?? (_ => null);
         }
 
-        // 寃뚯엫 ?곗씠?곕쿋?댁뒪?먯꽌 ??붋룻봽由ъ뀑??李얜뒗 ?ㅽ뻾湲?
+        // 게임 데이터베이스에서 대화·프리셋을 찾는 실행기.
         public static DialogueRunner FromDatabase(GameDatabase database)
         {
             var dialogues = database == null ? new Dictionary<string, DialogueData>() : database.All<DialogueData>().Where(d => d != null).ToDictionary(d => d.Id);
@@ -147,14 +147,14 @@ namespace GameSystems.Dialogue
                 id => id != null && presets.TryGetValue(id, out var p) ? p : null);
         }
 
-        // ?? ?쒖옉쨌?????????????????????????????????????????????
+        // ── 시작·끝 ───────────────────────────────────────────
 
         public bool Start(DialogueData dialogue, string entryId = "start")
         {
             var entry = dialogue?.Entry(entryId);
             if (entry == null)
             {
-                Debug.LogWarning($"[??? '{dialogue?.Id}'???쒖옉 ID '{entryId}'媛 ?놁뒿?덈떎.");
+                Debug.LogWarning($"[대화] '{dialogue?.Id}'에 시작 ID '{entryId}'가 없습니다.");
                 return false;
             }
             Reset();
@@ -167,7 +167,7 @@ namespace GameSystems.Dialogue
 
         public bool Start(string dialogueId, string entryId = "start") => Start(_dialogues(dialogueId), entryId);
 
-        // ??ν빐 ??以꾩뿉???ㅼ떆 ?쒖옉?쒕떎(?붾㈃ ?곹깭瑜?諛붾줈 ?곸슜).
+        // 저장해 둔 줄에서 다시 시작한다(화면 상태를 바로 적용).
         public bool Resume(DialogueSnapshot snapshot)
         {
             var dialogue = _dialogues(snapshot?.dialogue);
@@ -219,7 +219,7 @@ namespace GameSystems.Dialogue
             Ended?.Invoke();
         }
 
-        // ?? ?먮쫫 ?????????????????????????????????????????????
+        // ── 흐름 ─────────────────────────────────────────────
 
         void Continue(GraphNode node)
         {
@@ -253,7 +253,7 @@ namespace GameSystems.Dialogue
                         var entry = target?.Entry(jump.entryId);
                         if (entry == null)
                         {
-                            Debug.LogWarning($"[??? ?대룞??怨녹씠 ?놁뒿?덈떎: {jump.dialogue} 쨌 {jump.entryId}");
+                            Debug.LogWarning($"[대화] 이동할 곳이 없습니다: {jump.dialogue} · {jump.entryId}");
                             End();
                             return;
                         }
@@ -265,13 +265,17 @@ namespace GameSystems.Dialogue
                         Fire(_main, entry, StartNode.StartedPort);
                         node = target.graph.Next(entry, StartNode.NextPort);
                         break;
+                    case CustomFlowNode custom:
+                        var port = custom.Run(this);
+                        node = port == null ? null : Dialogue.graph.Next(custom, port);
+                        break;
                     default:
-                        Debug.LogWarning($"[??? ?먮쫫?먯꽌 泥섎━?????녿뒗 ?몃뱶: {node.GetType().Name}");
+                        Debug.LogWarning($"[대화] 흐름에서 처리할 수 없는 노드: {node.GetType().Name}");
                         End();
                         return;
                 }
             }
-            Debug.LogWarning("[??? ?먮쫫???덈Т 湲멸쾶 ?댁뼱吏묐땲??????놁씠 ?꾨뒗 怨좊━媛 ?덈뒗吏 ?뺤씤?섏꽭??.");
+            Debug.LogWarning("[대화] 흐름이 너무 길게 이어집니다(대사 없이 도는 고리가 있는지 확인하세요).");
             End();
         }
 
@@ -288,9 +292,9 @@ namespace GameSystems.Dialogue
             Phase = DialoguePhase.WaitingForText;
             _history.Add(new DialogueSnapshot { dialogue = Dialogue.Id, node = line.guid, state = State.Clone() });
 
-            // ?붿옄 ?쒖젙: 以꾩뿉 ?곸? ?쒖젙? 吏㏃? ?쒖젙 ?④낵濡?諛붽씔??
-            if (!string.IsNullOrEmpty(line.expression) && !string.IsNullOrEmpty(line.speaker))
-                Play(_main, new ExpressionEffect { character = line.speaker, expression = line.expression, duration = 0.15f }, null);
+            // 줄에 적은 화자 스탠딩(ID 또는 예외 스프라이트)은 짧은 스탠딩 바꾸기 효과로 바꾼다.
+            if ((!string.IsNullOrEmpty(line.expression) || line.expressionSprite != null) && !string.IsNullOrEmpty(line.speaker))
+                Play(_main, new ExpressionEffect { character = line.speaker, expression = line.expression, sprite = line.expressionSprite, duration = 0.15f }, null);
 
             LineEntered?.Invoke(line);
             Fire(_main, line, LineNode.EnterPort);
@@ -303,7 +307,7 @@ namespace GameSystems.Dialogue
         {
             if (Phase != DialoguePhase.WaitingForText) return;
             Phase = DialoguePhase.Typing;
-            Stage?.ShowLine(Line.speaker, string.IsNullOrEmpty(Line.speaker) ? "" : Texts.NameOf(Line.speaker), Text);
+            Stage?.ShowLine(Line, string.IsNullOrEmpty(Line.speaker) ? "" : Texts.NameOf(Line.speaker), Text);
             Stage?.SetVisibleCharacters(0);
             if (TextLength == 0) Typed();
         }
@@ -339,16 +343,16 @@ namespace GameSystems.Dialogue
         {
             var line = Line;
             Fire(_main, line, LineNode.LeavePort);
-            // ??以꾩뿉???쒖옉???④낵??(怨꾩냽 ?ㅼ젙???꾨땲硫? ??紐⑥뒿?쇰줈 留덈Т由ы븳??
+            // 이 줄에서 시작한 효과는 (계속 설정이 아니면) 끝 모습으로 마무리한다.
             FinishAll(run => run.Line == line && !run.Node.keepAcrossLines);
             _choices.Clear();
             Stage?.ShowChoices(_choices);
             if (Line == line) Continue(Dialogue.graph.Next(line, port));
         }
 
-        // ?? ?낅젰 ?????????????????????????????????????????????
+        // ── 입력 ─────────────────────────────────────────────
 
-        // ?대┃: ?곗텧 ?湲?以묒씠硫??곗텧???앸궡怨? ??댄븨 以묒씠硫?湲?먮? ??蹂댁씠怨? ???섏솕?쇰㈃ ?ㅼ쓬?쇰줈.
+        // 클릭: 연출 대기 중이면 연출을 끝내고, 타이핑 중이면 글자를 다 보이고, 다 나왔으면 다음으로.
         public void Advance()
         {
             switch (Phase)
@@ -367,7 +371,7 @@ namespace GameSystems.Dialogue
             }
         }
 
-        // ?좏깮吏 怨좊Ⅴ湲?Choices???쒖꽌).
+        // 선택지 고르기(Choices의 순서).
         public bool Choose(int choiceIndex)
         {
             if (Phase != DialoguePhase.Choosing || choiceIndex < 0 || choiceIndex >= _choices.Count || !_choices[choiceIndex].Enabled) return false;
@@ -375,7 +379,7 @@ namespace GameSystems.Dialogue
             return true;
         }
 
-        // 吏꾪뻾 以묒씤 ?곗텧??紐⑤몢 ??紐⑥뒿?쇰줈 蹂대궡怨?湲?먮? ??蹂댁씤??鍮⑤━ 媛먭린).
+        // 진행 중인 연출을 모두 끝 모습으로 보내고 글자를 다 보인다(빨리 감기).
         public void FastForward()
         {
             FinishAll(null);
@@ -383,7 +387,7 @@ namespace GameSystems.Dialogue
             if (Phase == DialoguePhase.Typing) Typed();
         }
 
-        // ?? ?쒓컙 ?????????????????????????????????????????????
+        // ── 시간 ─────────────────────────────────────────────
 
         public void Tick(float deltaTime)
         {
@@ -418,14 +422,14 @@ namespace GameSystems.Dialogue
             }
         }
 
-        // ?? ?좏샇? ?④낵 ???????????????????????????????????????
+        // ── 신호와 효과 ───────────────────────────────────────
 
         void Fire(Scope scope, GraphNode from, string port)
         {
             if (from == null || scope == null) return;
             if (_depth >= MaxSignalDepth)
             {
-                Debug.LogWarning("[??? ?좏샇媛 ?덈Т 源딄쾶 ?댁뼱吏묐땲???쒓컙 0???④낵?쇰━ 怨좊━媛 ?덈뒗吏 ?뺤씤?섏꽭??.");
+                Debug.LogWarning("[대화] 신호가 너무 깊게 이어집니다(시간 0인 효과끼리 고리가 있는지 확인하세요).");
                 return;
             }
             _depth++;
@@ -475,7 +479,7 @@ namespace GameSystems.Dialogue
                 var context = new EffectContext { Speaker = run.Scope.Context.Character(presetEffect.character) };
                 run.Child = new Scope { Graph = preset?.graph ?? new NodeGraph(), Context = context, Parent = run.Scope, OwnerRun = run };
                 Fire(run.Scope, effect, EffectNode.StartedPort);
-                // ?덉쓽 ?④낵媛 紐⑤몢 ?앸굹???꾨즺. ?꾨Т寃껊룄 ?쒖옉?섏? ?딆쑝硫?諛붾줈 ?꾨즺.
+                // 안의 효과가 모두 끝나야 완료. 아무것도 시작하지 않으면 바로 완료.
                 run.Child.Active++;
                 foreach (var entry in run.Child.Graph.OfType<PresetEntryNode>().ToList())
                     Fire(run.Child, entry, PresetEntryNode.StartPort);
@@ -519,7 +523,7 @@ namespace GameSystems.Dialogue
             if (run.Done) return;
             if (run.Child != null && run.Child.Active > 0)
             {
-                // ?꾨━?? ?덉쓽 ?④낵瑜?紐⑤몢 ?앸궦??媛??④낵 ?꾨즺媛 李⑤?濡????ㅽ뻾???꾨즺?쒗궓??.
+                // 프리셋: 안의 효과를 모두 끝낸다(각 효과 완료가 차례로 이 실행을 완료시킨다).
                 FinishAll(r => IsInside(r.Scope, run.Child));
                 if (run.Done) return;
             }
@@ -550,7 +554,7 @@ namespace GameSystems.Dialogue
             return false;
         }
 
-        // 議곌굔??留욌뒗 ?ㅽ뻾 以??④낵瑜???紐⑥뒿?쇰줈 蹂대궦?? ?앸굹硫??댁뼱吏??④낵??媛숈? 議곌굔?대㈃) 李⑤?濡??앸궦??
+        // 조건에 맞는 실행 중 효과를 끝 모습으로 보낸다. 끝나며 이어진 효과도(같은 조건이면) 차례로 끝낸다.
         void FinishAll(Func<Run, bool> filter)
         {
             for (var guard = 0; guard < 10000; guard++)
@@ -562,7 +566,7 @@ namespace GameSystems.Dialogue
             }
         }
 
-        // ?? 湲???????????????????????????????????????????????
+        // ── 글자 ─────────────────────────────────────────────
 
         string ResolveText(string key, string source)
         {
@@ -571,8 +575,8 @@ namespace GameSystems.Dialogue
             return Texts.Catalog.FormatTemplate(source ?? "", args);
         }
 
-        // 臾몄옣 ???{媛?: ?뚮젅?댁뼱 ?곗씠???? {player.gold}).
-        IReadOnlyDictionary<string, object> TextArguments()
+        // 문장 틀의 {값}: 플레이어 데이터(예: {player.gold}).
+        public IReadOnlyDictionary<string, object> TextArguments()
         {
             var args = new Dictionary<string, object>(StringComparer.Ordinal);
             if (Session != null)
@@ -584,13 +588,13 @@ namespace GameSystems.Dialogue
                     }
                     catch (Exception)
                     {
-                        // ?쎌쓣 ???녿뒗 媛믪? 嫄대꼫?대떎.
+                        // 읽을 수 없는 값은 건너뛴다.
                     }
                 }
             return args;
         }
 
-        // ?쒓렇(<??)瑜?類 湲????TextMeshPro??maxVisibleCharacters? 媛숈? 湲곗?).
+        // 태그(<…>)를 뺀 글자 수(TextMeshPro의 maxVisibleCharacters와 같은 기준).
         public static int VisibleLength(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;

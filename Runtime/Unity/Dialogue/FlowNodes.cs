@@ -52,11 +52,13 @@ namespace GameSystems.Dialogue
         public const string OptionPrefix = "opt:";
 
         [FieldLabel("화자(비우면 해설)"), DataRef(typeof(CharacterData))] public string speaker = "";
-        [FieldLabel("화자 표정(비우면 그대로)")] public string expression = "";
+        [FieldLabel("화자 스탠딩 ID(비우면 그대로)"), StandingRef(nameof(speaker))] public string expression = "";
+        [FieldLabel("화자 예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite expressionSprite;
         [FieldLabel("대사(원문)"), TextArea(2, 10)] public string text = "";
         [FieldLabel("선택지")] public List<ChoiceOption> options = new List<ChoiceOption>();
         [FieldLabel("타이핑 속도(초당 글자, 0이면 기본)"), Min(0)] public float typingSpeed;
         [FieldLabel("자동 넘김(초, 0 미만이면 클릭 대기)")] public float autoAdvance = -1f;
+        [FieldLabel("추가 글(이 줄에서만, 캐릭터의 같은 키보다 우선)")] public List<ExtraText> extras = new List<ExtraText>();
         // 번역 시트 키(자동, 바꾸지 않는다).
         [HideInInspector] public string lineId = DialogueIds.NewLineId();
 
@@ -156,6 +158,25 @@ namespace GameSystems.Dialogue
         public override IEnumerable<PortInfo> Ports
         {
             get { yield return PortInfo.FlowIn(); }
+        }
+    }
+
+    // 프로젝트 전용 흐름 노드의 바탕. Run이 돌려준 점(포트 ID)으로 흐름이 이어진다(null이면 대화 끝).
+    // 예: 퀘스트 상태로 세 갈래 나누기, 미니게임 결과 기다리기 없이 즉시 판정 등. [GraphNode]를 붙이면 메뉴에 나온다.
+    [Serializable]
+    public abstract class CustomFlowNode : GraphNode
+    {
+        public const string NextPort = "next";
+
+        public abstract string Run(DialogueRunner runner);
+
+        public override IEnumerable<PortInfo> Ports
+        {
+            get
+            {
+                yield return PortInfo.FlowIn();
+                yield return PortInfo.FlowOut(NextPort, "다음");
+            }
         }
     }
 

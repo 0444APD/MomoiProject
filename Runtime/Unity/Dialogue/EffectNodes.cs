@@ -36,6 +36,10 @@ namespace GameSystems.Dialogue
         // 실제 진행 시간(모션 에셋 길이를 따르는 효과 등은 바꾼다).
         public virtual float EffectiveDuration => duration;
 
+        // 프로젝트 전용 효과: 화면 그리기를 직접 만든다(null이면 대화 화면의 기본 그리기). 새 효과는 EffectNode를 상속하고
+        // [GraphNode]를 붙이면 우클릭 메뉴에 나오고, 여기서 stage.ui.Element("요소 이름") 등으로 원하는 것을 움직인다.
+        public virtual IEffectPlayer CreatePlayer(DialogueStage stage, EffectContext context, StageState before, StageState after) => null;
+
         // 상태 효과: 끝 모습을 state에 적용한다.
         public virtual void ApplyTo(StageState state, EffectContext context)
         {
@@ -127,7 +131,8 @@ namespace GameSystems.Dialogue
     public sealed class StandingEnterEffect : EffectNode
     {
         [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
-        [FieldLabel("표정(비우면 기본)")] public string expression = "";
+        [FieldLabel("스탠딩 ID(비우면 기본)"), StandingRef(nameof(character))] public string expression = "";
+        [FieldLabel("예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite sprite;
         [FieldLabel("자리")] public StandingSlot slot = StandingSlot.Center;
         [FieldLabel("직접 지정 위치(0~1)")] public float x = 0.5f;
         [FieldLabel("강조")] public bool highlighted = true;
@@ -141,6 +146,7 @@ namespace GameSystems.Dialogue
             var standing = state.Standing(id);
             if (standing == null) state.standings.Add(standing = new StandingState { character = id });
             standing.expression = expression;
+            standing.sprite = sprite;
             standing.x = StandingSlots.X(slot, x);
             standing.highlighted = highlighted;
         }
@@ -160,18 +166,21 @@ namespace GameSystems.Dialogue
         }
     }
 
-    [Serializable, GraphNode("표정", Category = "스탠딩", Graphs = GraphKinds.Both)]
+    [Serializable, GraphNode("스탠딩 바꾸기", Category = "스탠딩", Graphs = GraphKinds.Both)]
     public sealed class ExpressionEffect : EffectNode
     {
         [FieldLabel("캐릭터(비우면 현재 화자)"), DataRef(typeof(CharacterData))] public string character = "";
-        [FieldLabel("표정")] public string expression = "";
+        [FieldLabel("스탠딩 ID"), StandingRef(nameof(character))] public string expression = "";
+        [FieldLabel("예외 스프라이트(있으면 스탠딩 ID 대신)")] public Sprite sprite;
         public override bool IsState => true;
         public override string Summary => $"{(string.IsNullOrEmpty(character) ? "화자" : character)} · {expression}";
 
         public override void ApplyTo(StageState state, EffectContext context)
         {
             var standing = state.Standing(context.Character(character));
-            if (standing != null) standing.expression = expression;
+            if (standing == null) return;
+            standing.expression = expression;
+            standing.sprite = sprite;
         }
     }
 
