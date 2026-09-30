@@ -1066,7 +1066,7 @@ namespace GameSystems.EditorTools
             split.style.alignItems = Align.Stretch;
             _body.Add(split);
 
-            var types = TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf).ToList();
+            var types = ProjectCode.Events().OrderBy(EventBus.DisplayNameOf).ToList();
             var list = new ScrollView();
             list.style.width = 240;
             list.style.flexShrink = 0;

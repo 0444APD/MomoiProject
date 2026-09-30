@@ -40,6 +40,7 @@
 | **Game Systems → 대화 그래프** | (선택 모듈 `Optional/Dialogue`) 격자 배경에서 우클릭으로 노드를 만들고 점을 끌어 잇는다. 대사 한 줄 = 노드 하나. 흐름(흰 선)과 신호(분홍 선: 효과의 시작·n%·완료로 다음 효과를 잇는 체인). 자세히: `Documentation~/Dialogue.md` |
 | **Game Systems → 연출 프리셋** | 효과 노드로 연출 묶음을 만든다. 대화 그래프에서는 노드 하나로 쓰고, 프리셋이 내보낸 신호가 그 노드의 점이 된다. |
 | **Game Systems → 대화 UI 템플릿 만들기** | 모든 기능이 연결된 대화 화면 한 벌(프리팹·UXML·USS·모션·패널 설정). UI Toolkit, 요소는 이름 규격으로 연결(인스펙터에서 확인), 애니메이션은 USS 상태 클래스 + UI 모션 에셋. 스탠딩은 스프라이트·스파인. |
+| Game Systems → 내 코드 범위 | 클래스를 고르는 목록(값 형식·템플릿·필드 규칙·키워드 연결·이벤트)에 들어갈 스크립트 확인. 기본: 이 프로젝트에서 만든 데이터 클래스만(Unity·패키지·라이브러리·Plugins·기능 스크립트 제외). 필요할 때만 폴더·네임스페이스를 더한다(ProjectSettings/GameSystems/ProjectCode.json). |
 | **Game Systems → 오디오** | 채널(전체·브금·목소리·효과음·UI) 음량, 클립 미리 듣기(채널별 방식 그대로), 지금 나는 소리, 오디오 설정. 오디오 클립 우클릭 › Game Systems › 오디오 재생. 코드: `GameAudio.PlayBgm/PlayVoice/PlaySfx/PlayUi`. 자세히: `Documentation~/Audio.md` |
 | **Game Systems → 다국어** | 설정 열기(지원 언어·대체 순서·언어별 표), 시트 내보내기·가져오기(CSV, 머리줄 이름으로 읽음), 번역 검사(문법·누락·값·용어·태그 차이), 도감 이름 키 채우기. 자세히: `Documentation~/Localization.md` |
 | Game Systems → 샘플 → 샘플 텍스트 만들기 | 한국어·영어 표와 조사·복수형·용어 예시 문장 |

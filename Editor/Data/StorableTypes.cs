@@ -27,18 +27,13 @@ namespace GameSystems.EditorTools
         public static IReadOnlyList<Type> All()
         {
             if (_cache != null) return _cache;
-            var assemblies = new HashSet<string>(CompilationPipeline.GetAssemblies(AssembliesType.PlayerWithoutTestAssemblies)
-                .Select(a => a.name)
-                .Where(name => !name.StartsWith("Unity", StringComparison.Ordinal) &&
-                               !name.StartsWith("GameSystems.", StringComparison.Ordinal)));
-
+            // 내 코드만(ProjectCode): 플러그인·패키지·라이브러리 형식은 보이지 않는다.
             var enums = TypeCache.GetTypesDerivedFrom<Enum>()
-                .Where(t => t.IsVisible && assemblies.Contains(t.Assembly.GetName().Name))
+                .Where(t => t.IsVisible && ProjectCode.IsProjectType(t))
                 .OrderBy(t => t.Name);
             var classes = TypeCache.GetTypesWithAttribute<SerializableAttribute>()
-                .Where(t => t.IsVisible && !t.IsEnum && !t.IsAbstract && !t.IsGenericTypeDefinition && !t.IsInterface &&
-                            assemblies.Contains(t.Assembly.GetName().Name) &&
-                            !typeof(UnityEngine.Object).IsAssignableFrom(t) && !typeof(Attribute).IsAssignableFrom(t) &&
+                .Where(t => !t.IsEnum && !t.IsAbstract && ProjectCode.IsDataClass(t) &&
+                            !typeof(UnityEngine.Object).IsAssignableFrom(t) &&
                             !typeof(GameAction).IsAssignableFrom(t) &&
                             DataModel.Of(t).Kind == DataKind.Object && DataModel.Validate(t).Count == 0)
                 .OrderBy(t => t.Name);
@@ -58,6 +53,10 @@ namespace GameSystems.EditorTools
             Basics.Any(b => b.type == type) ? "기본 형식" : type.IsEnum ? "enum" : "데이터 클래스";
 
         [InitializeOnLoadMethod]
-        static void ResetOnReload() => _cache = null;
+        static void ResetOnReload()
+        {
+            _cache = null;
+            ProjectCode.Changed += () => _cache = null;
+        }
     }
 }

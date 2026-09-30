@@ -8,12 +8,13 @@ using UnityEngine;
 namespace GameSystems.EditorTools
 {
     // 필드 규칙을 걸 수 있는 클래스: 데이터 클래스(저장소·템플릿에 담는 것), 도감 종류, 이벤트.
+    // 내 코드만 보인다(ProjectCode: 플러그인·패키지·이 라이브러리의 기본 도감 종류는 빠진다). 이벤트는 [GameEvent]를 붙인 것만.
     public static class ClassTypes
     {
         public static IEnumerable<Type> All() =>
             StorableTypes.All().Where(t => !t.IsEnum && StorableTypes.GroupOf(t) == "데이터 클래스")
-                .Concat(DataTypes.All.Select(i => i.Type))
-                .Concat(TypeResolver.GameEventTypes())
+                .Concat(DataTypes.All.Select(i => i.Type).Where(ProjectCode.IsDataClass))
+                .Concat(ProjectCode.Events())
                 .Distinct()
                 .OrderBy(GroupOf).ThenBy(t => t.Name);
 

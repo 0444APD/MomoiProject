@@ -411,7 +411,7 @@ namespace GameSystems.EditorTools.UI
 
         void ShowEventTypeMenu()
         {
-            var items = TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf).Select(type =>
+            var items = ProjectCode.Events().OrderBy(EventBus.DisplayNameOf).Select(type =>
             {
                 var name = type.FullName;
                 return new GsDropdownItem(EventBus.DisplayNameOf(type), () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name };

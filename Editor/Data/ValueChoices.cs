@@ -31,7 +31,7 @@ namespace GameSystems.EditorTools
                     return (member is FieldInfo field && EditorDatabase.RefTypeOf(field) != null ? db.RefCandidates(field) : db.OfType(refType))
                         .OrderBy(d => db.GroupLabel(d) ?? "").ThenBy(d => d.Id).Select(d => new Choice { Label = d.Id, Group = db.GroupLabel(d), Value = d.Id }).ToList();
                 if (member.IsDefined(typeof(EventTypeRefAttribute), false))
-                    return TypeResolver.GameEventTypes().OrderBy(EventBus.DisplayNameOf)
+                    return ProjectCode.Events().OrderBy(EventBus.DisplayNameOf)
                         .Select(t => new Choice { Label = EventBus.DisplayNameOf(t), Caption = t.Name, Value = t.FullName }).ToList();
                 if (member.IsDefined(typeof(DataTypeRefAttribute), false))
                     return StorableTypes.All().Select(t => new Choice { Label = StorableTypes.Label(t), Caption = t.Namespace, Group = StorableTypes.GroupOf(t), Value = t.FullName }).ToList();
