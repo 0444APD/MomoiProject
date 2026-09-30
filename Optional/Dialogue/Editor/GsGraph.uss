@@ -181,3 +181,55 @@
 .gs-graph-window__item--active {
     background-color: var(--gs-accent-soft);
 }
+
+/* 범위 선택 */
+.gs-graph__marquee {
+    position: absolute;
+    border-width: 1px;
+    border-color: rgba(253, 93, 131, 0.8);
+    background-color: rgba(253, 93, 131, 0.08);
+}
+
+/* 묶음 상자 */
+.gs-graph-group {
+    position: absolute;
+    border-width: 1px;
+    border-radius: 12px;
+}
+
+.gs-graph-group.gs-graph-node--selected {
+    border-width: 2px;
+}
+
+.gs-graph-group__head {
+    padding: 8px 14px;
+    cursor: move-arrow;
+}
+
+.gs-root .gs-graph-group__title {
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+
+.gs-graph-group__resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-color: rgba(242, 242, 243, 0.35);
+    border-bottom-right-radius: 12px;
+    cursor: resize-up-left;
+}
+
+/* 메모 */
+.gs-graph-node--note {
+    background-color: rgba(232, 214, 107, 0.12);
+    border-color: rgba(232, 214, 107, 0.5);
+}
+
+.gs-graph-node--note .gs-graph-node__ports {
+    display: none;
+}

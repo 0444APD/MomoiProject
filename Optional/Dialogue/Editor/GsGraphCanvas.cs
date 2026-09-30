@@ -26,6 +26,8 @@ namespace GameSystems.EditorTools.Graph
             Pan,
             Move,
             Connect,
+            Box,
+            Resize,
         }
 
         readonly Object _owner;
@@ -35,8 +37,10 @@ namespace GameSystems.EditorTools.Graph
         readonly VisualElement _content;
         readonly VisualElement _edges;
         readonly VisualElement _nodes;
+        readonly VisualElement _groups;
+        readonly VisualElement _marquee;
         readonly Label _zoomLabel;
-        readonly Dictionary<string, NodeView> _views = new Dictionary<string, NodeView>();
+        readonly Dictionary<string, ItemView> _views = new Dictionary<string, ItemView>();
         readonly Dictionary<(string node, string port), VisualElement> _dots = new Dictionary<(string, string), VisualElement>();
         readonly HashSet<string> _selected = new HashSet<string>();
         SerializedObject _so;
@@ -50,6 +54,11 @@ namespace GameSystems.EditorTools.Graph
         bool _moveRecorded;
         (string node, string port, PortSide side, PortKind kind) _from;
         Vector2 _connectEnd;
+        Vector2 _boxStart;
+        Vector2 _lastLocal;
+        bool _spaceHeld;
+        string _resizing;
+        readonly HashSet<string> _moving = new HashSet<string>();
 
         // 접힌 노드(편집 세션 동안만).
         public readonly HashSet<string> Collapsed = new HashSet<string>();
@@ -74,6 +83,9 @@ namespace GameSystems.EditorTools.Graph
             _edges = new VisualElement { pickingMode = PickingMode.Ignore };
             _edges.AddToClassList("gs-graph__edges");
             _edges.generateVisualContent += DrawEdges;
+            _groups = new VisualElement { pickingMode = PickingMode.Ignore };
+            _groups.AddToClassList("gs-graph__nodes");
+            _content.Add(_groups);
             _content.Add(_edges);
             _nodes = new VisualElement { pickingMode = PickingMode.Ignore };
             _nodes.AddToClassList("gs-graph__nodes");
@@ -88,7 +100,7 @@ namespace GameSystems.EditorTools.Graph
             tools.Add(_zoomLabel);
             tools.Add(new GsButton("＋", () => ZoomBy(1.2f, Center), GsButtonKind.Ghost));
             tools.Add(new GsButton("전체 보기", FrameAll, GsButtonKind.Ghost));
-            var hint = Gs.Label("우클릭: 노드 만들기 · 점 끌기: 잇기 · 빈 곳 끌기: 이동 · 휠: 확대", "gs-caption");
+            var hint = Gs.Label("우클릭: 노드 만들기 · 점 끌기: 잇기 · 빈 곳 끌기: 범위 선택 · 가운데 버튼·Alt·Space 끌기: 화면 이동 · 휠: 확대 · Ctrl+C/V/D · Ctrl+F: 노드 찾기", "gs-caption");
             hint.style.marginLeft = 12;
             tools.Add(hint);
             Add(tools);
@@ -99,6 +111,16 @@ namespace GameSystems.EditorTools.Graph
             RegisterCallback<PointerCaptureOutEvent>(_ => EndDrag());
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKey);
+            RegisterCallback<KeyUpEvent>(e =>
+            {
+                if (e.keyCode == KeyCode.Space) _spaceHeld = false;
+            });
+            RegisterCallback<PointerMoveEvent>(e => _lastLocal = this.WorldToLocal(e.position), TrickleDown.TrickleDown);
+
+            _marquee = new VisualElement { pickingMode = PickingMode.Ignore };
+            _marquee.AddToClassList("gs-graph__marquee");
+            _marquee.style.display = DisplayStyle.None;
+            Add(_marquee);
             RegisterCallback<GeometryChangedEvent>(_ => MarkDirtyRepaint());
             RegisterCallback<AttachToPanelEvent>(_ => Undo.undoRedoPerformed += OnUndoRedo);
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
@@ -112,6 +134,17 @@ namespace GameSystems.EditorTools.Graph
         public float Zoom => _zoom;
         // 선택한 노드(처음 것). 없으면 null.
         public string FirstSelected => _selected.FirstOrDefault();
+        public IReadOnlyCollection<string> Selection => _selected;
+
+        public void SelectOnly(IEnumerable<string> guids)
+        {
+            ClearNodeSelection();
+            foreach (var guid in guids) SelectNode(guid, true);
+        }
+
+        public void CopySelection() => GraphClipboard.Copy(Graph, _selected);
+        public void PasteAt(Vector2 graphPoint) => Paste(GraphClipboard.Nodes, GraphClipboard.Edges, graphPoint - GraphClipboard.Origin);
+        public void DuplicateSelection() => Duplicate(_selected.ToList());
         public Vector2 Pan => _pan;
 
         public void SetView(Vector2 pan, float zoom)
@@ -132,6 +165,7 @@ namespace GameSystems.EditorTools.Graph
         public void Rebuild()
         {
             _nodes.Clear();
+            _groups.Clear();
             _views.Clear();
             _dots.Clear();
             if (_owner == null || Graph == null) return;
@@ -141,6 +175,13 @@ namespace GameSystems.EditorTools.Graph
             {
                 var node = Graph.nodes[i];
                 if (node == null) continue;
+                if (node is GroupNode)
+                {
+                    var group = new GroupView(this, node.guid);
+                    _views[node.guid] = group;
+                    _groups.Add(group);
+                    continue;
+                }
                 var view = new NodeView(this, node.guid, list.GetArrayElementAtIndex(i));
                 _views[node.guid] = view;
                 _nodes.Add(view);
@@ -371,9 +412,53 @@ namespace GameSystems.EditorTools.Graph
                 if (!e.shiftKey) ClearNodeSelection();
                 _selectedEdge = null;
                 RepaintEdges();
+                if (e.altKey || _spaceHeld) BeginDrag(DragMode.Pan, e.pointerId);
+                else
+                {
+                    _boxStart = local;
+                    UpdateMarquee(local);
+                    _marquee.style.display = DisplayStyle.Flex;
+                    BeginDrag(DragMode.Box, e.pointerId);
+                }
             }
-            if (e.button == 0 || e.button == 2) BeginDrag(DragMode.Pan, e.pointerId);
+            if (e.button == 2) BeginDrag(DragMode.Pan, e.pointerId);
             e.StopPropagation();
+        }
+
+        void UpdateMarquee(Vector2 local)
+        {
+            var min = Vector2.Min(_boxStart, local);
+            var max = Vector2.Max(_boxStart, local);
+            _marquee.style.left = min.x;
+            _marquee.style.top = min.y;
+            _marquee.style.width = max.x - min.x;
+            _marquee.style.height = max.y - min.y;
+        }
+
+        // 옮길 노드: 고른 노드 + 고른 묶음 상자 안에 든 노드(끌기 시작할 때 정한다).
+        void CollectMoving()
+        {
+            _moving.Clear();
+            foreach (var id in _selected)
+            {
+                _moving.Add(id);
+                if (Graph.Find(id) is GroupNode group)
+                    foreach (var inside in Inside(group))
+                        _moving.Add(inside);
+            }
+        }
+
+        IEnumerable<string> Inside(GroupNode group)
+        {
+            var rect = new Rect(group.position, group.size);
+            foreach (var pair in _views)
+            {
+                if (pair.Key == group.guid) continue;
+                var node = Graph.Find(pair.Key);
+                if (node == null) continue;
+                var size = new Vector2(Mathf.Max(pair.Value.layout.width, 1), Mathf.Max(pair.Value.layout.height, 1));
+                if (rect.Contains(node.position + size * 0.5f)) yield return pair.Key;
+            }
         }
 
         void BeginDrag(DragMode mode, int pointerId)
@@ -381,6 +466,7 @@ namespace GameSystems.EditorTools.Graph
             _drag = mode;
             _pointer = pointerId;
             _moveRecorded = false;
+            if (mode == DragMode.Move) CollectMoving();
             this.CapturePointer(pointerId);
         }
 
@@ -400,7 +486,7 @@ namespace GameSystems.EditorTools.Graph
                         Record("노드 옮기기");
                         _moveRecorded = true;
                     }
-                    foreach (var id in _selected)
+                    foreach (var id in _moving)
                     {
                         var node = Graph.Find(id);
                         if (node == null || !_views.TryGetValue(id, out var view)) continue;
@@ -408,6 +494,19 @@ namespace GameSystems.EditorTools.Graph
                         view.Place(node.position);
                     }
                     RepaintEdges();
+                    break;
+                case DragMode.Box:
+                    UpdateMarquee(this.WorldToLocal(e.position));
+                    break;
+                case DragMode.Resize:
+                    if (!(Graph.Find(_resizing) is GroupNode resized) || !_views.TryGetValue(_resizing, out var resizedView)) break;
+                    if (!_moveRecorded)
+                    {
+                        Record("묶음 상자 크기");
+                        _moveRecorded = true;
+                    }
+                    resized.size = Vector2.Max(new Vector2(200, 120), resized.size + delta / _zoom);
+                    ((GroupView)resizedView).Resize(resized.size);
                     break;
                 case DragMode.Connect:
                     _connectEnd = ToGraph(this.WorldToLocal(e.position));
@@ -425,7 +524,7 @@ namespace GameSystems.EditorTools.Graph
             if (mode == DragMode.Move && _moveRecorded)
             {
                 // 격자에 맞춘다.
-                foreach (var id in _selected)
+                foreach (var id in _moving)
                 {
                     var node = Graph.Find(id);
                     if (node == null) continue;
@@ -433,6 +532,21 @@ namespace GameSystems.EditorTools.Graph
                     if (_views.TryGetValue(id, out var view)) view.Place(node.position);
                 }
                 Touched(false);
+            }
+            if (mode == DragMode.Resize && _moveRecorded) Touched(false);
+            if (mode == DragMode.Box)
+            {
+                _marquee.style.display = DisplayStyle.None;
+                var box = _marquee.worldBound;
+                foreach (var pair in _views)
+                {
+                    var bound = pair.Value.worldBound;
+                    // 노드는 겹치면, 묶음 상자는 다 들어오면 고른다.
+                    var hit = pair.Value is GroupView ? box.Contains(bound.min) && box.Contains(bound.max) : box.Overlaps(bound);
+                    if (!hit) continue;
+                    _selected.Add(pair.Key);
+                    pair.Value.SetSelected(true);
+                }
             }
             if (mode == DragMode.Connect)
             {
@@ -501,6 +615,21 @@ namespace GameSystems.EditorTools.Graph
                     Duplicate(_selected.ToList());
                     e.StopPropagation();
                     break;
+                case KeyCode.C when e.actionKey:
+                    GraphClipboard.Copy(Graph, _selected);
+                    e.StopPropagation();
+                    break;
+                case KeyCode.V when e.actionKey:
+                    Paste(GraphClipboard.Nodes, GraphClipboard.Edges, ToGraph(_lastLocal) - GraphClipboard.Origin);
+                    e.StopPropagation();
+                    break;
+                case KeyCode.F when e.actionKey:
+                    SearchMenu();
+                    e.StopPropagation();
+                    break;
+                case KeyCode.Space:
+                    _spaceHeld = true;
+                    break;
                 case KeyCode.F:
                     FrameAll();
                     e.StopPropagation();
@@ -565,25 +694,58 @@ namespace GameSystems.EditorTools.Graph
             Touched(true);
         }
 
+        // 복제: 고른 노드와 그 사이의 선을 함께(클립보드는 건드리지 않는다).
         void Duplicate(List<string> guids)
         {
-            if (guids.Count == 0) return;
-            Record("노드 복제");
-            var copies = new List<string>();
-            foreach (var guid in guids)
+            var nodes = guids.Select(g => Graph.Find(g)).Where(n => n != null).ToList();
+            var ids = new HashSet<string>(nodes.Select(n => n.guid));
+            Paste(nodes, Graph.edges.Where(e => ids.Contains(e.fromNode) && ids.Contains(e.toNode)).ToList(), new Vector2(30, 30));
+        }
+
+        // 노드들을 새 ID로 복사해 넣는다(선은 복사한 노드끼리만 다시 잇는다). 이 그래프에 못 쓰는 노드는 건너뛴다.
+        void Paste(IReadOnlyList<GraphNode> nodes, IReadOnlyList<GraphEdge> edges, Vector2 offset)
+        {
+            if (nodes == null || nodes.Count == 0) return;
+            Record("노드 붙여넣기");
+            var map = new Dictionary<string, string>();
+            var skipped = 0;
+            foreach (var node in nodes)
             {
-                var node = Graph.Find(guid);
-                if (node == null) continue;
+                var info = node.GetType().GetCustomAttribute<GraphNodeAttribute>(false);
+                if (info == null || (info.Graphs & _kind) == 0)
+                {
+                    skipped++;
+                    continue;
+                }
                 var copy = NodeClipboard.Clone(node);
                 copy.guid = GraphNode.NewId();
-                copy.position = node.position + new Vector2(30, 30);
+                copy.position = new Vector2(Mathf.Round((node.position.x + offset.x) / 10) * 10, Mathf.Round((node.position.y + offset.y) / 10) * 10);
                 FreshKeys(copy);
                 Graph.Add(copy);
-                copies.Add(copy.guid);
+                map[node.guid] = copy.guid;
             }
+            foreach (var edge in edges ?? Array.Empty<GraphEdge>())
+                if (map.TryGetValue(edge.fromNode, out var from) && map.TryGetValue(edge.toNode, out var to))
+                    Graph.Connect(from, edge.fromPort, to, edge.toPort);
+            if (skipped > 0) Debug.Log($"[대화 그래프] 이 그래프에서 쓸 수 없는 노드 {skipped}개는 붙여 넣지 않았습니다.");
             _selected.Clear();
-            foreach (var id in copies) _selected.Add(id);
+            foreach (var id in map.Values) _selected.Add(id);
             Touched(true);
+        }
+
+        // 노드 찾기: 종류·요약·대사 글로 검색해 그 노드로 간다.
+        void SearchMenu()
+        {
+            var items = new List<GsDropdownItem>();
+            foreach (var node in Graph.nodes.Where(n => n != null))
+            {
+                var info = node.GetType().GetCustomAttribute<GraphNodeAttribute>(false);
+                var detail = node is LineNode line ? line.text : node is NoteNode note ? note.text : null;
+                if (detail != null && detail.Length > 40) detail = detail.Substring(0, 40) + "…";
+                var guid = node.guid;
+                items.Add(new GsDropdownItem(info?.Name ?? node.GetType().Name, () => Select(guid)) { Caption = node.Summary, Detail = detail, Group = info?.Category });
+            }
+            ShowMenu(new Vector2(contentRect.width * 0.5f - 150, 60), items, true);
         }
 
         // 복제한 노드는 번역 키를 새로 받는다(같은 키가 둘이면 한 줄의 번역이 두 곳에 쓰인다).
@@ -620,7 +782,7 @@ namespace GameSystems.EditorTools.Graph
         }
 
         // 노드 종류(이 그래프에서 쓸 수 있는 것). 분류 순서 → Order → 이름.
-        static readonly string[] CategoryOrder = { "흐름", "프리셋", "화면", "스탠딩", "이미지", "움직임", "소리", "흐름 제어" };
+        static readonly string[] CategoryOrder = { "흐름", "프리셋", "화면", "스탠딩", "이미지", "움직임", "소리", "흐름 제어", "정리" };
 
         public static IEnumerable<(Type type, GraphNodeAttribute info)> NodeTypes(GraphKinds kind) =>
             TypeCache.GetTypesDerivedFrom<GraphNode>()
@@ -715,7 +877,7 @@ namespace GameSystems.EditorTools.Graph
         void ToggleCollapsed(string guid)
         {
             if (!Collapsed.Remove(guid)) Collapsed.Add(guid);
-            if (_views.TryGetValue(guid, out var view)) view.BuildBody();
+            if (_views.TryGetValue(guid, out var view) && view is NodeView nodeView) nodeView.BuildBody();
             RepaintEdges();
         }
 
@@ -740,7 +902,115 @@ namespace GameSystems.EditorTools.Graph
             public PortKind Kind;
         }
 
-        sealed class NodeView : VisualElement
+        // 캔버스 위의 항목(노드·묶음 상자) 공통.
+        abstract class ItemView : VisualElement
+        {
+            public readonly string Guid;
+
+            protected ItemView(string guid)
+            {
+                Guid = guid;
+            }
+
+            public void Place(Vector2 position)
+            {
+                style.left = position.x;
+                style.top = position.y;
+            }
+
+            public virtual void SetSelected(bool selected) => EnableInClassList("gs-graph-node--selected", selected);
+        }
+
+        // 묶음 상자: 노드 뒤에 깔리는 제목 달린 영역. 머리를 끌면 안에 든 노드도 함께 움직이고, 오른쪽 아래를 끌면 크기가 바뀐다.
+        sealed class GroupView : ItemView
+        {
+            readonly GsGraphCanvas _canvas;
+            readonly Label _title;
+
+            public GroupView(GsGraphCanvas canvas, string guid) : base(guid)
+            {
+                _canvas = canvas;
+                AddToClassList("gs-graph-group");
+                var group = (GroupNode)canvas.Graph.Find(guid);
+                var head = Gs.Row("gs-graph-group__head");
+                _title = Gs.Label(group.title, "gs-graph-group__title");
+                head.Add(_title);
+                head.RegisterCallback<PointerDownEvent>(e =>
+                {
+                    if (e.button == 1)
+                    {
+                        Menu(canvas.WorldToLocal(e.position));
+                        e.StopPropagation();
+                        return;
+                    }
+                    if (e.button != 0) return;
+                    canvas.SelectNode(Guid, e.shiftKey);
+                    canvas.BeginDrag(DragMode.Move, e.pointerId);
+                    e.StopPropagation();
+                });
+                Add(head);
+                var handle = new VisualElement();
+                handle.AddToClassList("gs-graph-group__resize");
+                handle.RegisterCallback<PointerDownEvent>(e =>
+                {
+                    if (e.button != 0) return;
+                    canvas._resizing = Guid;
+                    canvas.BeginDrag(DragMode.Resize, e.pointerId);
+                    e.StopPropagation();
+                });
+                Add(handle);
+                Place(group.position);
+                Resize(group.size);
+                Paint(group.color);
+            }
+
+            public void Resize(Vector2 size)
+            {
+                style.width = size.x;
+                style.height = size.y;
+            }
+
+            void Paint(Color color)
+            {
+                style.backgroundColor = Gs.WithAlpha(color, 0.07f);
+                style.borderTopColor = style.borderBottomColor = style.borderLeftColor = style.borderRightColor = Gs.WithAlpha(color, 0.45f);
+                _title.style.color = color;
+            }
+
+            void Menu(Vector2 local)
+            {
+                var items = new List<GsDropdownItem>
+                {
+                    new GsDropdownItem("제목 바꾸기", () =>
+                    {
+                        var group = (GroupNode)_canvas.Graph.Find(Guid);
+                        GsDialog.Form(_canvas, "묶음 상자 제목", null, new List<DialogField> { new DialogField { Key = "title", Label = "title", Value = group.title } }, "바꾸기",
+                            values => string.IsNullOrWhiteSpace(values["title"]) ? "제목을 적으세요." : null,
+                            values =>
+                            {
+                                _canvas.Record("묶음 상자 제목");
+                                ((GroupNode)_canvas.Graph.Find(Guid)).title = values["title"].Trim();
+                                _canvas.Touched(true);
+                            });
+                    }),
+                };
+                for (var i = 0; i < Gs.Palette.Length; i++)
+                {
+                    var color = Gs.Palette[i];
+                    items.Add(new GsDropdownItem(Gs.PaletteNames[i], () =>
+                    {
+                        _canvas.Record("묶음 상자 색");
+                        ((GroupNode)_canvas.Graph.Find(Guid)).color = color;
+                        Paint(color);
+                        _canvas.Touched(false);
+                    }) { Group = "색" });
+                }
+                items.Add(new GsDropdownItem("상자만 지우기(안의 노드는 남긴다)", () => _canvas.DeleteNode(Guid)));
+                _canvas.ShowMenu(local, items, false);
+            }
+        }
+
+        sealed class NodeView : ItemView
         {
             readonly GsGraphCanvas _canvas;
             readonly SerializedProperty _property;
@@ -749,14 +1019,12 @@ namespace GameSystems.EditorTools.Graph
             readonly VisualElement _body;
             string _portSignature;
 
-            public readonly string Guid;
-
-            public NodeView(GsGraphCanvas canvas, string guid, SerializedProperty property)
+            public NodeView(GsGraphCanvas canvas, string guid, SerializedProperty property) : base(guid)
             {
                 _canvas = canvas;
-                Guid = guid;
                 _property = property;
                 AddToClassList("gs-graph-node");
+                EnableInClassList("gs-graph-node--note", canvas.Graph.Find(guid) is NoteNode);
                 var node = Node;
                 var info = node.GetType().GetCustomAttribute<GraphNodeAttribute>(false);
                 var category = info?.Category ?? "";
@@ -801,14 +1069,6 @@ namespace GameSystems.EditorTools.Graph
             }
 
             GraphNode Node => _canvas.Graph.Find(Guid);
-
-            public void Place(Vector2 position)
-            {
-                style.left = position.x;
-                style.top = position.y;
-            }
-
-            public void SetSelected(bool selected) => EnableInClassList("gs-graph-node--selected", selected);
 
             void OnHeaderDown(PointerDownEvent e)
             {
