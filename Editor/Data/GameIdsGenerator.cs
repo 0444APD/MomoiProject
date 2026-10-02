@@ -117,27 +117,6 @@ namespace GBible.EditorTools
                 b.AppendLine($"        public static class {className}");
                 b.AppendLine("        {");
                 var used = new HashSet<string>(StringComparer.Ordinal) { className };
-                if (group.Key == typeof(KeywordData))
-                {
-                    // 키워드는 그룹별로: GameIds.Keyword.Grade.Legendary
-                    foreach (var byList in group.Cast<KeywordData>().GroupBy(c => c.group).OrderBy(g => g.Key, StringComparer.Ordinal))
-                    {
-                        var listName = Unique(IdRules.ToIdentifier(string.IsNullOrEmpty(byList.Key) ? "unlisted" : byList.Key), used);
-                        var listData = all.FirstOrDefault(d => d.Id == byList.Key);
-                        b.AppendLine($"            /// <summary>{Escape(listData?.DisplayName ?? byList.Key)}</summary>");
-                        b.AppendLine($"            public static class {listName}");
-                        b.AppendLine("            {");
-                        var inner = new HashSet<string>(StringComparer.Ordinal) { listName };
-                        foreach (var choice in byList.OrderBy(c => c.Id, StringComparer.Ordinal))
-                        {
-                            b.AppendLine($"                /// <summary>{Escape(choice.DisplayName)}</summary>");
-                            b.AppendLine($"                public const string {Unique(IdRules.ToIdentifier(choice.Id), inner)} = \"{choice.Id}\";");
-                        }
-                        b.AppendLine("            }");
-                    }
-                    b.AppendLine("        }");
-                    continue;
-                }
                 foreach (var data in group.OrderBy(d => d.Id, StringComparer.Ordinal))
                 {
                     var name = Unique(IdRules.ToIdentifier(data.Id), used);

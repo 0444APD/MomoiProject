@@ -53,9 +53,8 @@ namespace GBible.EditorTools
 
         public GameData FindById(string id) => string.IsNullOrEmpty(id) ? null : All.FirstOrDefault(d => d.Id == id);
 
-        // 드롭다운 그룹 머리글: 키워드는 그룹 이름으로 묶는다.
-        public string GroupLabel(GameData data) =>
-            data is KeywordData keyword ? (FindById(keyword.group)?.DisplayName ?? "(그룹 없음)") : null;
+        // 드롭다운 그룹 머리글(지금은 없음).
+        public string GroupLabel(GameData data) => null;
 
         public static void MarkDirty(bool notify = true)
         {
@@ -224,7 +223,6 @@ namespace GBible.EditorTools
             if (rule == null || (field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) != typeof(string))) return null;
             switch (rule.source)
             {
-                case FieldRuleSource.Keyword: return typeof(KeywordData);
                 case FieldRuleSource.PlayerDataKey: return typeof(PlayerDataEntry);
                 case FieldRuleSource.Data: return TypeResolver.Find(rule.dataType);
                 default: return null;
@@ -254,9 +252,6 @@ namespace GBible.EditorTools
             var type = RefTypeOf(field);
             if (type == null) return Enumerable.Empty<GameData>();
             var items = OfType(type);
-            var rule = RuleFor(field);
-            if (type == typeof(KeywordData) && rule != null && !string.IsNullOrEmpty(rule.keywordGroup))
-                items = items.Where(d => ((KeywordData)d).group == rule.keywordGroup);
             return items;
         }
 

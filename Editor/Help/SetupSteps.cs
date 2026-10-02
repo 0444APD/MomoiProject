@@ -180,11 +180,11 @@ namespace GBible.EditorTools
                 HelpTopic = "window:keywords",
                 Check = () =>
                 {
-                    var groups = Count<KeywordGroupData>();
-                    var unlinked = KeywordTools.Fields().Count(f => KeywordTools.RuleOf(f.type, f.field) == null && EditorDatabase.RefTypeOf(f.field) == null);
-                    return (groups > 0 && unlinked == 0, $"그룹 {groups}개 · 키워드 {Count<KeywordData>()}개" + (unlinked > 0 ? $" · 연결 안 된 필드 {unlinked}개" : ""));
+                    var groups = KeywordTools.Groups().Count;
+                    var unlinked = KeywordTools.Fields().Count(f => KeywordTools.GroupOf(f.field) == null && KeywordTools.RuleOf(f.type, f.field) == null && EditorDatabase.RefTypeOf(f.field) == null);
+                    return (groups > 0 && unlinked == 0, $"그룹 {groups}개 · 키워드 {KeywordTools.AllKeywords().Count()}개" + (unlinked > 0 ? $" · 연결 안 된 필드 {unlinked}개" : ""));
                 },
-                Actions = { new SetupAction("클래스 탭 열기", () => DatabaseWindow.ShowPage(ClassesPage.PageKey), true), Open<KeywordData>("키워드 탭 열기") },
+                Actions = { new SetupAction("클래스 탭 열기", () => DatabaseWindow.ShowPage(ClassesPage.PageKey), true), new SetupAction("키워드 탭 열기", () => DatabaseWindow.ShowPage(KeywordsPage.PageKey), true) },
             };
             yield return new SetupStep
             {

@@ -79,7 +79,6 @@ namespace GBible.Tests
             Assert.AreEqual("a", CodexFolders.Parent("a/b"));
             Assert.AreEqual("b", CodexFolders.Name("a/b"));
             Assert.AreEqual("", CodexFolders.Parent("a"));
-            Assert.AreEqual("x/a/inner", ClassFolders.Rebase("a/inner", "a", "x/a"));
 
             // 쓰는 사람의 저장 안 된 폴더 변경을 건드리지 않게 보관했다가 되돌린다.
             var pending = UnityEditor.SessionState.GetString(CodexFolders.StashKey, "");

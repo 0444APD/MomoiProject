@@ -14,7 +14,7 @@ namespace GBible.Samples
         public int Count = 1;
         public int Combo;
         // 어트리뷰트 없음: 키워드 연결(몬스터 태그 그룹)은 에디터에서 한다.
-        [FieldLabel("태그")] public List<string> Tags = new List<string>();
+        [FieldLabel("태그"), Keyword(typeof(SampleMonsterTag))] public List<string> Tags = new List<string>();
     }
 
     // ── 샘플 게임 데이터(개발자가 짜는 클래스) ──────────────────
@@ -29,7 +29,7 @@ namespace GBible.Samples
     [Serializable, PlayerData]
     public sealed class SampleEnhancement
     {
-        [FieldLabel("효과")] public string effect = "";
+        [FieldLabel("효과"), Keyword(typeof(SampleEnhanceEffect))] public string effect = "";
         [FieldLabel("수치")] public int power;
     }
 
@@ -40,10 +40,10 @@ namespace GBible.Samples
         [FieldLabel("아이콘")] public Sprite icon;
         // 식별용 값은 모두 빈 string 필드. 어떤 키워드 그룹에서 고를지는 키워드 연결 창(필드 규칙)에서 정한다.
         //   부위 → 장비 부위(하나, 필수) · 등급 → 등급(하나) · 태그 → 장비 태그(여러 개)
-        [FieldLabel("부위")] public string slot = "";
-        [FieldLabel("등급")] public string grade = "";
+        [FieldLabel("부위"), Keyword(typeof(SampleEquipmentSlot))] public string slot = "";
+        [FieldLabel("등급"), Keyword(typeof(SampleGrade))] public string grade = "";
         [FieldLabel("속성")] public SampleElement element;
-        [FieldLabel("태그")] public List<string> tags = new List<string>();
+        [FieldLabel("태그"), Keyword(typeof(SampleEquipmentTag))] public List<string> tags = new List<string>();
         [FieldLabel("강화")] public List<SampleEnhancement> enhancements = new List<SampleEnhancement>();
     }
 
@@ -88,6 +88,46 @@ namespace GBible.Samples
     }
 
     // 샘플 연결: 세션이 시작되면 행동 처리기와 디버그 명령을 등록한다.
+    // 샘플 키워드 그룹(코드가 원본, 도감 › 키워드 탭에 보인다).
+    [KeywordGroup("장비 부위")]
+    public static class SampleEquipmentSlot
+    {
+        public const string Weapon = "weapon";
+        public const string Armor = "armor";
+        public const string Accessory = "accessory";
+    }
+
+    [KeywordGroup("등급")]
+    public static class SampleGrade
+    {
+        public const string Common = "common";
+        public const string Rare = "rare";
+        public const string Legendary = "legendary";
+    }
+
+    [KeywordGroup("장비 태그")]
+    public static class SampleEquipmentTag
+    {
+        public const string Melee = "melee";
+        public const string Ranged = "ranged";
+        public const string Dot = "dot";
+        public const string Pierce = "pierce";
+    }
+
+    [KeywordGroup("몬스터 태그")]
+    public static class SampleMonsterTag
+    {
+        public const string Boss = "boss";
+        public const string Elite = "elite";
+    }
+
+    [KeywordGroup("강화 효과")]
+    public static class SampleEnhanceEffect
+    {
+        public const string Lifesteal = "lifesteal";
+        public const string FireResist = "fireResist";
+    }
+
     public static class SampleGame
     {
         // 게임 중 바뀌는 값은 반드시 플레이어 데이터 저장소에 둔다(static 변수에 두면 Undo·되감기에서 빠진다).

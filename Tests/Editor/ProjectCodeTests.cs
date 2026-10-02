@@ -24,7 +24,7 @@ namespace GBible.Tests
         [Test]
         public void 기능_스크립트와_라이브러리_형식은_데이터_클래스가_아니다()
         {
-            Assert.IsFalse(ProjectCode.IsDataClass(typeof(KeywordData)), "라이브러리 기본 도감 종류");
+            Assert.IsFalse(ProjectCode.IsDataClass(typeof(SpritePresetData)), "라이브러리 기본 도감 종류");
             Assert.IsFalse(ProjectCode.IsDataClass(typeof(GameAudio)), "라이브러리 정적 클래스");
             Assert.IsFalse(ProjectCode.IsDataClass(typeof(Vector3)), "Unity");
             var dg = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("DG.Tweening.Tween")).FirstOrDefault(t => t != null);

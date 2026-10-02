@@ -23,6 +23,18 @@ namespace GBible
             public TextTable table;
         }
 
+        // 문장 속 용어([[키워드 ID]])의 모양: TextMeshPro 스타일 시트의 스타일 이름(색·굵기 등)과 스프라이트 애셋의 아이콘 이름.
+        [Serializable]
+        public sealed class TermStyle
+        {
+            public string id = "";
+            public string style = "";
+            public string icon = "";
+        }
+
+        [Tooltip("문장 속 용어([[키워드 ID]])의 스타일·아이콘")]
+        public List<TermStyle> termStyles = new List<TermStyle>();
+
         [Tooltip("작가가 쓰는 원문 언어. 모든 언어의 마지막 대체 언어.")]
         public string sourceLanguage = "ko";
         public List<Language> languages = new List<Language> { new Language() };

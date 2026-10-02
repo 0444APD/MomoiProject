@@ -39,12 +39,12 @@ namespace GBible.Tests
         [Test]
         public void 없는_그룹을_가리키면_오류_그룹을_만들면_통과()
         {
-            var boss = Make<KeywordData>("boss", "보스");
+            var boss = Make<SpritePresetData>("boss", "보스");
             boss.group = "monsterTag";
             var issues = DataValidator.Validate(new List<GameData> { boss });
             Assert.IsTrue(issues.Any(i => i.Asset == boss && i.Severity == ValidationSeverity.Error && i.Message.Contains("'monsterTag'")));
 
-            var group = Make<KeywordGroupData>("monsterTag", "몬스터 태그");
+            var group = Make<SpritePresetGroupData>("monsterTag", "몬스터 태그");
             issues = DataValidator.Validate(new List<GameData> { boss, group });
             Assert.IsFalse(issues.Any(i => i.Asset == boss && i.Severity == ValidationSeverity.Error));
         }
@@ -52,12 +52,12 @@ namespace GBible.Tests
         [Test]
         public void 참조_필드를_모두_찾는다()
         {
-            var boss = Make<KeywordData>("boss", "보스");
+            var boss = Make<SpritePresetData>("boss", "보스");
             boss.group = "monsterTag";
             var found = new List<(string value, System.Type type)>();
             EditorDatabase.ForEachReference(boss, (property, type) => found.Add((property.stringValue, type)));
             CollectionAssert.AreEqual(new[] { "monsterTag" }, found.Select(f => f.value));
-            Assert.IsTrue(found.All(f => f.type == typeof(KeywordGroupData)));
+            Assert.IsTrue(found.All(f => f.type == typeof(SpritePresetGroupData)));
 
             var achievement = Make<AchievementData>("hunter", "사냥꾼");
             achievement.condition = new StatCompareCondition { stat = "kills", value = 3 };

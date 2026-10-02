@@ -356,6 +356,9 @@ namespace GBible.EditorTools.UI
                 case SerializedPropertyType.String when InlineChoices.For(_field) != null:
                     ShowProviderMenu(InlineChoices.For(_field));
                     return;
+                case SerializedPropertyType.String when KeywordTools.GroupOf(_field) != null:
+                    ShowKeywordMenu();
+                    break;
                 case SerializedPropertyType.String when DataRefType != null:
                     ShowIdMenu(EditorDatabase.Instance.RefCandidates(_field), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
                     return;
@@ -411,8 +414,22 @@ namespace GBible.EditorTools.UI
                 return new GsDropdownItem(id, () => SetString(id)) { Group = db.GroupLabel(d), Selected = _property.stringValue == id };
             }).ToList();
             if (items.Count == 0) items.Add(new GsDropdownItem($"도감 › {kind} 탭에 아직 항목이 없습니다 — 먼저 만드세요") { Disabled = true });
-            if (DataRefType == typeof(KeywordData)) items.AddRange(GsPropertyEditor.KeywordMenuExtras(this, _field, ids => { if (ids.Count > 0) SetString(ids[0]); }));
             OpenMenu(items, placeholder: $"{kind} 검색");
+        }
+
+        // 키워드 필드([Keyword(typeof(그룹))]): 그 그룹의 키워드에서 고른다.
+        void ShowKeywordMenu()
+        {
+            var group = KeywordTools.GroupOf(_field);
+            var items = KeywordTools.KeywordsOf(group).Select(k =>
+            {
+                var id = k.Id;
+                return new GsDropdownItem(id, () => SetString(id)) { Caption = k.Name, Selected = _property.stringValue == id };
+            }).ToList();
+            items.Insert(0, new GsDropdownItem("(비움)", () => SetString("")) { Selected = string.IsNullOrEmpty(_property.stringValue) });
+            if (items.Count == 1) items.Add(new GsDropdownItem("이 그룹에 아직 키워드가 없습니다") { Disabled = true });
+            items.AddRange(GsPropertyEditor.KeywordMenuExtras(this, _field, ids => { if (ids.Count > 0) SetString(ids[0]); }));
+            OpenMenu(items, placeholder: "키워드 검색");
         }
 
         void ShowEventTypeMenu()

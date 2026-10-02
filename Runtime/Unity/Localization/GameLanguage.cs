@@ -13,7 +13,7 @@ namespace GBible
         const string PrefsKey = "GBible.Language";
 
         static LocalizationSettings _settings;
-        static Dictionary<string, KeywordData> _keywords;
+        static Dictionary<string, LocalizationSettings.TermStyle> _terms;
         static bool _ready;
 
         // 언어가 바뀌었거나 표를 다시 읽은 뒤(화면 글자 새로 고침 신호).
@@ -53,7 +53,7 @@ namespace GBible
         {
             _ready = false;
             _settings = null;
-            _keywords = null;
+            _terms = null;
             Changed = null;
             Texts.Catalog = new TextCatalog();
         }
@@ -83,7 +83,7 @@ namespace GBible
         {
             var language = _ready ? Texts.Language : null;
             _ready = false;
-            _keywords = null;
+            _terms = null;
             Texts.Catalog = new TextCatalog();
             EnsureReady();
             if (language != null) Texts.Language = language;
@@ -155,24 +155,24 @@ namespace GBible
         // <link="term:id">는 툴팁을 띄울 때 TMP_TextUtilities.FindIntersectingLink로 찾는다.
         static string DecorateTerm(string id, string text)
         {
-            var keyword = Keyword(id);
-            if (keyword == null || (string.IsNullOrEmpty(keyword.textStyle) && string.IsNullOrEmpty(keyword.textIcon))) return text;
-            var body = string.IsNullOrEmpty(keyword.textStyle) ? text : $"<style=\"{keyword.textStyle}\">{text}</style>";
-            if (!string.IsNullOrEmpty(keyword.textIcon)) body = $"<sprite name=\"{keyword.textIcon}\">{body}";
+            var term = Term(id);
+            if (term == null || (string.IsNullOrEmpty(term.style) && string.IsNullOrEmpty(term.icon))) return text;
+            var body = string.IsNullOrEmpty(term.style) ? text : $"<style=\"{term.style}\">{text}</style>";
+            if (!string.IsNullOrEmpty(term.icon)) body = $"<sprite name=\"{term.icon}\">{body}";
             return $"<link=\"term:{id}\">{body}</link>";
         }
 
-        static KeywordData Keyword(string id)
+        static LocalizationSettings.TermStyle Term(string id)
         {
-            if (_keywords == null)
+            if (_terms == null)
             {
-                _keywords = new Dictionary<string, KeywordData>(StringComparer.Ordinal);
-                var database = GameDatabase.Load();
-                if (database != null)
-                    foreach (var keyword in database.All<KeywordData>())
-                        if (keyword != null && !string.IsNullOrEmpty(keyword.Id)) _keywords[keyword.Id] = keyword;
+                _terms = new Dictionary<string, LocalizationSettings.TermStyle>(StringComparer.Ordinal);
+                var settings = LocalizationSettings.Load();
+                if (settings != null)
+                    foreach (var term in settings.termStyles)
+                        if (term != null && !string.IsNullOrEmpty(term.id)) _terms[term.id] = term;
             }
-            return _keywords.TryGetValue(id, out var found) ? found : null;
+            return _terms.TryGetValue(id, out var found) ? found : null;
         }
 
         // 링크 ID("term:burn")에서 용어 ID를 꺼낸다. 용어 링크가 아니면 null.

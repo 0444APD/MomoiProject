@@ -140,16 +140,8 @@ namespace GBible.Samples
             if (db.FindById("player.inventory") != null) return false;
             // 키워드 그룹 + 필드 연결: 코드의 빈 string 필드가 에디터 설정만으로 드롭다운이 된다.
             // string 필드는 하나, string 배열·리스트 필드는 여러 개를 고른다.
-            Keywords("equipmentSlot", "weapon", "armor", "accessory");
-            Keywords("grade", "common", "rare", "legendary");
-            Keywords("equipmentTag", "melee", "ranged", "dot", "pierce");
-            Keywords("monsterTag", "boss", "elite");
-            Keywords("enhanceEffect", "lifesteal", "fireResist");
-            Link(typeof(SampleEquipment), nameof(SampleEquipment.slot), "equipmentSlot", required: true);
-            Link(typeof(SampleEquipment), nameof(SampleEquipment.grade), "grade");
-            Link(typeof(SampleEquipment), nameof(SampleEquipment.tags), "equipmentTag");
-            Link(typeof(EnemyKilled), nameof(EnemyKilled.Tags), "monsterTag");
-            Link(typeof(SampleEnhancement), nameof(SampleEnhancement.effect), "enhanceEffect");
+            // 키워드 그룹과 필드 연결은 샘플 코드(SampleGame.cs의 [KeywordGroup]·[Keyword])에 있다. 여기서는 필수만.
+            Required(typeof(SampleEquipment), nameof(SampleEquipment.slot));
 
             // 스프라이트 규격: 장비 아이콘 필드에 원본을 넣으면 아이콘·카드 규격으로 베이크, 목록은 아이콘 규격으로 보인다.
             var itemImages = CodexGroups.Create(typeof(SpritePresetGroupData), "itemImages", staged: false);
@@ -213,21 +205,7 @@ namespace GBible.Samples
             return true;
         }
 
-        static void Keywords(string group, params string[] keywords)
-        {
-            if (EditorDatabase.Instance.FindById(group) == null) KeywordTools.CreateGroup(group, staged: false);
-            foreach (var id in keywords)
-                if (EditorDatabase.Instance.FindById(id) == null) KeywordTools.CreateKeyword(group, id, staged: false);
-        }
-
-        static void Link(System.Type type, string field, string group, bool required = false)
-        {
-            var rule = KeywordTools.Connect(type, type.GetField(field), group, staged: false);
-            if (!required) return;
-            rule.required = true;
-            EditorUtility.SetDirty(rule);
-            AssetDatabase.SaveAssetIfDirty(rule);
-        }
+        static void Required(System.Type type, string field) => KeywordTools.SetRequired(type, type.GetField(field), true, staged: false);
 
         static void Template(string id, object value)
         {

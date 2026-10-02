@@ -63,6 +63,7 @@ namespace GBible.EditorTools
                 if (string.IsNullOrEmpty(data.Id)) context.Error("ID가 없습니다.");
                 else if (!IdRules.IsValid(data.Id, out var idError)) context.Error($"ID '{data.Id}': {idError} 'ID 바꾸기'로 고치세요.");
                 CheckReferences(data, all, context);
+                CheckKeywords(data, context);
                 CheckRequired(data, context);
                 try
                 {
@@ -194,6 +195,23 @@ namespace GBible.EditorTools
                 if (empty) context.Error($"필수 값 '{it.displayName}'({it.propertyPath})이 비어 있습니다.");
             }
         }
+        // [Keyword(typeof(그룹))] 필드의 값이 그 그룹의 키워드인지(저장 전 변경 포함). 비어 있는 값은 필수 검사가 본다.
+        static void CheckKeywords(GameData data, Context context)
+        {
+            var so = new UnityEditor.SerializedObject(data);
+            var it = so.GetIterator();
+            while (it.Next(true))
+            {
+                if (it.propertyType != UnityEditor.SerializedPropertyType.String || string.IsNullOrEmpty(it.stringValue)) continue;
+                var field = PropertyUtil.GetField(it, out _);
+                var group = KeywordTools.GroupOf(field);
+                if (group == null) continue;
+                if (KeywordTools.KeywordsOf(group).Any(k => k.Id == it.stringValue)) continue;
+                var name = KeywordTools.FindGroup(group)?.DisplayName ?? group;
+                context.Error($"{field.Name}: {it.stringValue}은(는) 키워드 그룹 {name}에 없는 키워드입니다. 목록에서 다시 고르거나 키워드 탭에서 더하세요.");
+            }
+        }
+
         // [DataRef] 필드가 없는 항목을 가리키는지(수치·도전과제 참조는 블록 검증이 따로 본다).
         static void CheckReferences(GameData data, IReadOnlyList<GameData> all, Context context)
         {

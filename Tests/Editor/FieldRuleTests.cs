@@ -12,6 +12,20 @@ namespace GBible.Tests
     {
         public string category = "";
         public List<string> tags = new List<string>();
+        [Keyword(typeof(TestRarity))] public string grade = "";
+    }
+
+    [KeywordGroup("등급")]
+    public static class TestRarity
+    {
+        public const string Common = "common";
+        public const string Legendary = "legendary";
+
+        [KeywordGroup]
+        public static class Special
+        {
+            public const string Event = "eventOnly";
+        }
     }
 
     // 필드 규칙: 코드·어트리뷰트 없이 "이 필드는 여기서 고른다(, 필수)"를 연결한다.
@@ -35,17 +49,17 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 키워드는_그룹별로_코드가_만들어진다()
+        public void 키워드는_코드에서_모인다()
         {
-            var group = Make<KeywordGroupData>("grade", "등급");
-            var legendary = Make<KeywordData>("legendary", "전설");
-            legendary.group = group.Id;
-            var common = Make<KeywordData>("common", "일반");
-            common.group = group.Id;
-            var code = GameIdsGenerator.Build(new List<GameData> { group, legendary, common }, "GBible.Tests.Editor");
-            StringAssert.Contains("public static class Keyword", code);
-            StringAssert.Contains("public static class Grade", code);
-            StringAssert.Contains("public const string Legendary = \"legendary\";", code);
+            Keywords.Reset();
+            var group = Keywords.GroupOf(typeof(TestRarity));
+            Assert.IsNotNull(group, "[KeywordGroup] static class");
+            Assert.AreEqual("등급", group.DisplayName);
+            CollectionAssert.AreEqual(new[] { "common", "legendary" }, group.Keywords.Select(k => k.Id));
+            Assert.AreEqual("Legendary", Keywords.Find("legendary").Name);
+            Assert.AreSame(group, Keywords.GroupOf(typeof(TestRarity.Special)).Parent, "안쪽 클래스 = 하위 그룹");
+            Assert.AreEqual(group.Id, KeywordTools.GroupOf(typeof(RuleItem).GetField(nameof(RuleItem.grade))), "[Keyword(typeof(그룹))]");
+            Assert.IsNull(KeywordTools.GroupOf(typeof(RuleItem).GetField(nameof(RuleItem.category))));
         }
 
         [Test]
@@ -74,9 +88,9 @@ namespace GBible.Tests
         public void 필수_규칙은_검증기가_잡는다()
         {
             var rule = Make<FieldRuleData>("rule.textStyleRequired", "용어 스타일 필수");
-            rule.targetType = typeof(KeywordData).FullName;
-            rule.field = nameof(KeywordData.textStyle);
-            rule.source = FieldRuleSource.Keyword;
+            rule.targetType = typeof(RuleItem).FullName;
+            rule.field = nameof(RuleItem.category);
+            rule.source = FieldRuleSource.Free;
             rule.required = true;
             Assert.IsEmpty(DataValidator.Validate(new List<GameData> { rule }).Where(i => i.Asset == rule && i.Severity == ValidationSeverity.Error),
                 "규칙 자체는 올바르다");

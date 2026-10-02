@@ -182,15 +182,16 @@ namespace GBible.EditorTools.UI
         // 칩을 누르면 빠지고, '+ 추가'로 연결된 그룹의 키워드를 더한다(그룹이 없으면 모든 키워드).
         static VisualElement KeywordChips(SerializedProperty list, FieldInfo field, Action onStructure)
         {
-            var db = EditorDatabase.Instance;
+            var group = KeywordTools.GroupOf(field);
+            var keywords = KeywordTools.KeywordsOf(group).ToList();
             var row = Gs.Row("gs-wrap");
             var current = new List<string>();
             for (int i = 0; i < list.arraySize; i++) current.Add(list.GetArrayElementAtIndex(i).stringValue);
             for (int i = 0; i < current.Count; i++)
             {
                 var index = i;
-                var target = db.FindById(current[i]);
-                var chip = new GsBadge((target != null ? target.DisplayName : $"없는 키워드: {current[i]}") + "  ✕", target != null ? Gs.PaletteFor("kw:" + (target as KeywordData)?.group) : Gs.Danger);
+                var known = keywords.Any(k => k.Id == current[i]);
+                var chip = new GsBadge((known ? current[i] : $"없는 키워드: {current[i]}") + "  ✕", known ? Gs.PaletteFor("kw:" + group) : Gs.Danger);
                 chip.tooltip = $"{current[i]}\n눌러서 빼기";
                 chip.style.marginRight = 6;
                 chip.style.marginBottom = 6;
@@ -211,12 +212,11 @@ namespace GBible.EditorTools.UI
             GsButton add = null;
             add = new GsButton("+ 추가", () =>
             {
-                var items = db.RefCandidates(field).Where(k => !current.Contains(k.Id))
-                    .OrderBy(k => db.GroupLabel(k) ?? "").ThenBy(k => CodexGroups.OrderOf(k)).ThenBy(k => k.Id)
+                var items = keywords.Where(k => !current.Contains(k.Id))
                     .Select(k =>
                     {
                         var id = k.Id;
-                        return new GsDropdownItem(id, () => Add(id)) { Group = db.GroupLabel(k) };
+                        return new GsDropdownItem(id, () => Add(id)) { Caption = k.Name };
                     }).ToList();
                 if (items.Count == 0) items.Add(new GsDropdownItem("더 고를 키워드가 없습니다") { Disabled = true });
                 items.AddRange(KeywordMenuExtras(add, field, ids => { foreach (var id in ids) Add(id); }));
@@ -230,11 +230,11 @@ namespace GBible.EditorTools.UI
         // 키워드 드롭다운 끝에 붙는 항목: 새 키워드 만들기, 클래스 상세에서 연결 바꾸기.
         public static IEnumerable<GsDropdownItem> KeywordMenuExtras(VisualElement anchor, FieldInfo field, Action<List<string>> created)
         {
-            var group = EditorDatabase.RuleFor(field)?.keywordGroup;
+            var group = KeywordTools.GroupOf(field);
             var host = anchor.panel?.visualTree.Q(className: "gs-root") ?? anchor;
             if (!string.IsNullOrEmpty(group))
-                yield return new GsDropdownItem("+ 새 키워드", () => KeywordDialogs.AddKeywords(host, group, created))
-                    { Group = "관리", Detail = $"'{EditorDatabase.Instance.FindById(group)?.DisplayName ?? group}' 그룹에 추가하고 바로 고릅니다" };
+                yield return new GsDropdownItem("+ 새 키워드", () => KeywordsPage.AddKeywords(host, group, created))
+                    { Group = "관리", Detail = $"'{KeywordTools.FindGroup(group)?.DisplayName ?? group}' 그룹에 추가하고 바로 고릅니다(저장할 때 코드에 씁니다)" };
             if (field != null)
                 yield return new GsDropdownItem("연결 바꾸기(클래스 상세)", () => ClassDetail.Open(field.DeclaringType, field.Name))
                     { Group = "관리", Detail = "이 필드가 쓸 키워드 그룹을 바꾸거나 새 그룹을 만듭니다" };
@@ -244,7 +244,7 @@ namespace GBible.EditorTools.UI
         static VisualElement PlainList(SerializedProperty list, Type elementType, Action onValue, Action onStructure)
         {
             var listField = PropertyUtil.GetField(list, out _);
-            if (EditorDatabase.RefTypeOf(listField) == typeof(KeywordData)) return KeywordChips(list, listField, onStructure);
+            if (KeywordTools.GroupOf(listField) != null) return KeywordChips(list, listField, onStructure);
             var container = Gs.Col();
             for (int i = 0; i < list.arraySize; i++)
             {

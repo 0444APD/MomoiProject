@@ -17,7 +17,7 @@ namespace GBible.Tests
         [Test]
         public void 새_항목은_적용_전에는_도감에만_보인다()
         {
-            var added = Staging.Add(typeof(KeywordGroupData), "testStagedGroup");
+            var added = Staging.Add(typeof(SpritePresetGroupData), "testStagedGroup");
             Assert.IsTrue(EditorDatabase.Instance.All.Contains(added));
             Assert.IsFalse(EditorDatabase.Instance.Committed.Contains(added));
             Assert.IsTrue(Staging.HasChanges);
@@ -31,7 +31,7 @@ namespace GBible.Tests
         [Test]
         public void 새_항목을_지우면_변경에서_빠진다()
         {
-            var added = Staging.Add(typeof(KeywordData), "testStagedKeyword");
+            var added = Staging.Add(typeof(SpritePresetData), "testStagedKeyword");
             Staging.Remove(added);
             Assert.IsFalse(Staging.HasChanges);
         }
@@ -39,12 +39,12 @@ namespace GBible.Tests
         [Test]
         public void 작업본을_고치면_필드별_변경이_나온다()
         {
-            var original = ScriptableObject.CreateInstance<KeywordData>();
+            var original = ScriptableObject.CreateInstance<SpritePresetData>();
             original.EditorAssignId("testOriginalKeyword");
             original.group = "a";
             try
             {
-                var work = (KeywordData)Staging.Work(original);
+                var work = (SpritePresetData)Staging.Work(original);
                 Assert.AreNotSame(original, work);
                 Assert.AreSame(work, Staging.Work(work), "작업본을 다시 고쳐도 같은 작업본");
                 Assert.IsFalse(Staging.IsPending(work), "열기만 하고 고치지 않으면 변경이 아니다");

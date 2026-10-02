@@ -114,7 +114,7 @@ namespace GBible.Tests
         {
             var fields = FieldCatalog.For(typeof(AchievementData));
             Assert.AreEqual(FieldKind.Image, fields.First(f => f.Path == "icon").Kind);
-            Assert.AreEqual(FieldKind.Text, FieldCatalog.For(typeof(KeywordData)).First(f => f.Path == "textStyle").Kind);
+            Assert.AreEqual(FieldKind.Text, FieldCatalog.For(typeof(FieldRuleData)).First(f => f.Path == "field").Kind);
             Assert.IsFalse(fields.Any(f => f.Path == "displayName"), "도감 항목은 ID로만 식별한다(표시 이름 없음)");
             Assert.IsFalse(fields.Any(f => f.Path == "id"), "숨긴 필드(ID)는 목록에 없다");
         }

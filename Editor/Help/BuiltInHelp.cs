@@ -193,30 +193,21 @@ namespace GBible.EditorTools
                 "## 코드에서\n" +
                 "`Game.Data().Gold`처럼 이름으로 읽고 씁니다(식별자 코드를 만들면 생깁니다). 낮은 단계로는 `session.Data.Get(GameIds.PlayerData.Gold)`·`Set`·`Modify`를 씁니다.",
                 "guide:store", "guide:ids");
-            yield return Data<KeywordData>("키워드",
-                "식별용 string 값(등급·부위·태그 등)을 그룹별로 만들고, 끌어서 정리하는 탭입니다. 그룹 안에 그룹을 둘 수 있습니다.",
-                "키워드는 반드시 하나의 그룹에 속합니다. 이 탭 한 화면에서 그룹과 키워드를 함께 다룹니다.\n\n" +
-                "## 만들기\n" +
-                "- '+ 새 그룹': 그룹 ID와 키워드 ID를 한 번에 입력합니다. 키워드는 줄바꿈·띄어쓰기·쉼표로 나눕니다(예: common rare legendary).\n" +
-                "- 그룹 줄의 '+ 키워드': 그 그룹에 키워드를 추가합니다. '+ 하위 그룹': 그 그룹 안에 그룹을 만듭니다.\n\n" +
-                "## 정리(끌어 놓기)\n" +
-                "- 키워드를 끌어 다른 그룹 위에 놓으면 그 그룹으로 옮깁니다. 그룹을 끌어 다른 그룹 위에 놓으면 그 안의 하위 그룹이 됩니다(맨 위 줄에 놓으면 맨 위로).\n" +
-                "- 놓을 그룹은 분홍으로 밝아집니다. 순서는 따로 두지 않고 이름순입니다(그룹 먼저, 그다음 키워드).\n" +
-                "- 필드 연결은 그룹마다 따로입니다. 하위 그룹의 키워드는 부모 그룹에 연결된 필드에서 고를 수 없습니다.\n\n" +
-                "## 편집\n" +
-                "키워드 줄을 누르거나 그룹 줄의 ⋯ › 그룹 편집으로 상세 화면을 엽니다. 설명, ID 바꾸기, 삭제를 여기서 합니다. 필드에는 ID가 저장되며, ID를 바꾸면 쓰던 곳이 함께 바뀝니다.\n\n" +
-                "## 필드에 연결\n" +
-                "string 필드는 하나, string 배열·리스트 필드는 여러 개를 고릅니다. 연결은 '필드에 연결…'(키워드 연결 창)에서 합니다. 코드에서는 `GameIds.Keyword.그룹.키워드` 형태로 씁니다.\n\n" +
-                "이 탭의 변경도 저장(Ctrl+S)할 때 Unity에 적용합니다.",
-                "window:keywords", "guide:apply", "data:" + typeof(KeywordGroupData).FullName);
-            yield return Data<KeywordGroupData>("키워드 그룹",
-                "키워드의 부모입니다. 필드에 그룹을 연결하면 그 필드는 그룹의 키워드에서 고릅니다.",
-                "그룹은 도감의 키워드 탭에서 키워드와 함께 만들고 정리합니다.\n\n" +
-                "## 예\n" +
-                "- 등급: 일반·레어·전설 → 장비의 등급(string) 필드에 연결하면 하나만 고릅니다.\n" +
-                "- 장비 태그: 근접·원거리·도트 → 장비의 태그(string 배열·리스트) 필드에 연결하면 여러 개를 고릅니다.\n\n" +
-                "그룹의 상세 화면에서는 속한 키워드와, 이 그룹을 쓰는 필드를 확인할 수 있습니다. 키워드가 남아 있는 그룹은 지울 수 없습니다(키워드를 먼저 옮기거나 지우세요).",
-                "data:" + typeof(KeywordData).FullName, "window:keywords");
+            yield return new HelpTopic
+            {
+                Id = "page:keywords", Category = "도감", Order = 0, Title = "키워드",
+                Summary = "고르는 값(등급·부위·태그 등)을 그룹별로 코드에 정의합니다. 도감의 키워드 탭은 그 코드를 읽고 고칩니다.",
+                Body = "키워드 그룹은 코드의 static class이고, 키워드는 그 안의 const string입니다. 필드 값에는 키워드 ID(글자)가 저장됩니다.\n\n" +
+                       "```\n[KeywordGroup(\"등급\")]\npublic static class Rarity\n{\n    public const string Common = \"common\";\n    public const string Rare = \"rare\";\n}\n```\n\n" +
+                       "## 필드에 연결\n" +
+                       "`[Keyword(typeof(Rarity))] public string rarity;` — string 필드는 하나, string 배열·리스트는 여러 개를 고릅니다. 클래스 상세에서 연결해도 이 어트리뷰트가 코드에 쓰입니다. 게임 코드는 상수로 씁니다: `if (item.rarity == Rarity.Rare)`.\n\n" +
+                       "## 키워드 탭에서\n" +
+                       "- '+ 새 그룹': 그룹 이름(코드, 대문자로 시작)·표시 이름·키워드 ID를 한 번에. Assets/Code/Keywords/그룹이름.cs로 만들어집니다.\n" +
+                       "- 그룹 줄의 '+ 키워드'·'+ 하위 그룹'(안쪽 클래스)·'cs 열기'·⋯ › 그룹 지우기. 키워드 줄을 누르면 코드의 상수 이름을 바꿉니다(저장되는 ID는 그대로).\n" +
+                       "- 모든 변경은 저장(Ctrl+S)할 때 코드에 쓰이고 다시 컴파일됩니다. 코드에서 직접 고친 것도 컴파일되면 그대로 보입니다.\n\n" +
+                       "키워드 ID는 모든 그룹에서 하나뿐입니다. 문장 속 용어([[id]])의 스타일·아이콘은 다국어 설정의 용어 모양에서 정합니다.",
+                Related = new[] { "guide:apply" },
+            };
             yield return new HelpTopic
             {
                 Id = "guide:apply", Category = "안내", Order = 2, Title = "변경 적용과 되돌리기",
@@ -249,7 +240,7 @@ namespace GBible.EditorTools
                        "- '모든 키워드 허용'은 그룹을 정하지 않고 모든 키워드에서 고르게 합니다.\n" +
                        "- '연결 안 된 것만'을 켜면 아직 규칙이 없는 필드만 보입니다.\n" +
                        "- 편집 칸에서 오른쪽 클릭 › '키워드 연결…'로도 이 창을 열 수 있습니다. 키워드 드롭다운 끝의 '+ 새 키워드'는 연결된 그룹에 바로 추가합니다.",
-                Related = new[] { "data:" + typeof(KeywordGroupData).FullName, "data:" + typeof(KeywordData).FullName, "data:" + typeof(FieldRuleData).FullName },
+                Related = new[] { "page:keywords", "data:" + typeof(FieldRuleData).FullName },
             };
             yield return Data<FieldRuleData>("필드 규칙",
                 "'A 클래스의 a 필드는 B에서 고른다'를 코드 없이 연결합니다. 키워드 연결 창이 자동으로 만듭니다.",
