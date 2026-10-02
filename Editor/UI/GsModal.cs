@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 창 위에 뜨는 패널. 바깥 클릭·Esc는 닫기 요청으로 전달한다(저장 안 된 변경 확인 등은 요청 처리 쪽 몫).
     public sealed class GsModal : VisualElement

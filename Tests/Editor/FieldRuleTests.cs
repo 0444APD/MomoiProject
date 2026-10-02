@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     [System.Serializable]
     public sealed class RuleItem
@@ -42,7 +42,7 @@ namespace GameSystems.Tests
             legendary.group = group.Id;
             var common = Make<KeywordData>("common", "일반");
             common.group = group.Id;
-            var code = GameIdsGenerator.Build(new List<GameData> { group, legendary, common }, "GameSystems.Tests.Editor");
+            var code = GameIdsGenerator.Build(new List<GameData> { group, legendary, common }, "GBible.Tests.Editor");
             StringAssert.Contains("public static class Keyword", code);
             StringAssert.Contains("public static class Grade", code);
             StringAssert.Contains("public const string Legendary = \"legendary\";", code);
@@ -73,9 +73,9 @@ namespace GameSystems.Tests
         [Test]
         public void 필수_규칙은_검증기가_잡는다()
         {
-            var rule = Make<FieldRuleData>("rule.descriptionRequired", "설명 필수");
-            rule.targetType = typeof(AchievementData).FullName;
-            rule.field = nameof(AchievementData.description);
+            var rule = Make<FieldRuleData>("rule.textStyleRequired", "용어 스타일 필수");
+            rule.targetType = typeof(KeywordData).FullName;
+            rule.field = nameof(KeywordData.textStyle);
             rule.source = FieldRuleSource.Keyword;
             rule.required = true;
             Assert.IsEmpty(DataValidator.Validate(new List<GameData> { rule }).Where(i => i.Asset == rule && i.Severity == ValidationSeverity.Error),

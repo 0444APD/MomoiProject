@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Dialogue;
+using GBible.Dialogue;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
-    // 대화용 스탠딩 프로필(대화 시스템 전용, 게임의 캐릭터 데이터와 따로 관리한다). 스탠딩 목록(ID → 스프라이트)을 두고,
-    // 대화 그래프에서는 "프로필 ID + 스탠딩 ID"로 고른다. 대사의 화자도 이 프로필 ID다.
+    // 다이얼로그용 스탠딩 프로필(다이얼로그 시스템 전용, 게임의 캐릭터 데이터와 따로 관리한다). 스탠딩 목록(ID → 스프라이트)을 두고,
+    // 다이얼로그 그래프에서는 "프로필 ID + 스탠딩 ID"로 고른다. 대사의 화자도 이 프로필 ID다.
     // 이름은 텍스트 시트의 '<id>.name'. 소속 같은 프로젝트별 글은 '추가 글'에 키로 적는다(UI에 같은 키의 요소를 두면 보인다).
-    [Database("스탠딩 프로필", Group = "대화", Order = 0, IdPrefix = "profile")]
+    [Database("스탠딩 프로필", Group = "다이얼로그 시스템", Order = 0, IdPrefix = "profile")]
     public sealed class StandingProfileData : GameData
     {
         // 스탠딩 하나(표정·의상·포즈 등). 필드 이름 expressions는 저장 호환을 위해 그대로 둔다.
@@ -52,7 +52,7 @@ namespace GameSystems.Data
     }
 }
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
     // 프로젝트마다 더하는 글(소속·직함·장소 등). 키가 같은 UI 요소(dialogue-extra-<키>)에 보인다.
     // 번역: 캐릭터 글은 '<캐릭터 ID>.<키>', 대사 글은 '<대사 키>.<키>' 텍스트가 있으면 그것을 쓴다.

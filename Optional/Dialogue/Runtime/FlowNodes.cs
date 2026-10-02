@@ -1,19 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 대화에 들어오는 곳. 코드·다른 대화가 이 ID로 시작한다.
+    // 다이얼로그에 들어오는 곳. 코드·다른 다이얼로그가 이 ID로 시작한다.
     [Serializable, GraphNode("시작", Category = "흐름", Order = -10)]
     public sealed class StartNode : GraphNode
     {
         public const string NextPort = "next";
         public const string StartedPort = "started";
 
-        [FieldLabel("시작 ID(한 대화 안에서 겹치지 않게)")] public string entryId = "start";
+        [FieldLabel("시작 ID(한 다이얼로그 안에서 겹치지 않게)")] public string entryId = "start";
 
         public override string Summary => entryId;
 
@@ -125,7 +125,7 @@ namespace GameSystems.Dialogue
         }
     }
 
-    // 플레이어 데이터를 바꾼다(골드 지급, 아이템 지급 …). 도전과제 보상과 같은 블록을 쓴다.
+    // 플레이어 데이터를 바꾼다(골드 더하기, 인벤토리에 아이템 넣기 …). 도전과제 보상과 같은 블록을 쓴다.
     [Serializable, GraphNode("값 바꾸기", Category = "흐름")]
     public sealed class SetNode : GraphNode
     {
@@ -163,13 +163,13 @@ namespace GameSystems.Dialogue
         }
     }
 
-    [Serializable, GraphNode("다른 대화로", Category = "흐름")]
+    [Serializable, GraphNode("다른 다이얼로그로", Category = "흐름")]
     public sealed class JumpNode : GraphNode
     {
-        [FieldLabel("대화(비우면 이 대화)"), DataRef(typeof(DialogueData))] public string dialogue = "";
+        [FieldLabel("다이얼로그(비우면 이 다이얼로그)"), DataRef(typeof(DialogueData))] public string dialogue = "";
         [FieldLabel("시작 ID")] public string entryId = "start";
 
-        public override string Summary => $"{(string.IsNullOrEmpty(dialogue) ? "이 대화" : dialogue)} · {entryId}";
+        public override string Summary => $"{(string.IsNullOrEmpty(dialogue) ? "이 다이얼로그" : dialogue)} · {entryId}";
 
         public override IEnumerable<PortInfo> Ports
         {
@@ -186,7 +186,7 @@ namespace GameSystems.Dialogue
         }
     }
 
-    // 프로젝트 전용 흐름 노드의 바탕. Run이 돌려준 점(포트 ID)으로 흐름이 이어진다(null이면 대화 끝).
+    // 프로젝트 전용 흐름 노드의 바탕. Run이 돌려준 점(포트 ID)으로 흐름이 이어진다(null이면 다이얼로그 끝).
     // 예: 퀘스트 상태로 세 갈래 나누기, 미니게임 결과 기다리기 없이 즉시 판정 등. [GraphNode]를 붙이면 메뉴에 나온다.
     [Serializable]
     public abstract class CustomFlowNode : GraphNode
@@ -207,7 +207,7 @@ namespace GameSystems.Dialogue
 
     public static class DialogueIds
     {
-        // 번역 시트 키. 구조 의미가 없는 고정 ID(대화·노드를 옮기거나 이름을 바꿔도 그대로).
+        // 번역 시트 키. 구조 의미가 없는 고정 ID(다이얼로그·노드를 옮기거나 이름을 바꿔도 그대로).
         public static string NewLineId() => "line." + Guid.NewGuid().ToString("N").Substring(0, 10);
     }
 }

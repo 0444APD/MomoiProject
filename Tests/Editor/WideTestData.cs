@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public enum WideMood
     {

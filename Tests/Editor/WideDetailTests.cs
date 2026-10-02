@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.EditorTools;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 필드 종류·개수가 많은 데이터로 상세 패널을 띄워 입력 칸·스크롤·배치 편집이 모두 동작하는지 본다.
     // 배치 블록이나 입력 칸 모양을 바꿀 때마다 이 테스트가 함께 돌아 회귀를 잡는다.

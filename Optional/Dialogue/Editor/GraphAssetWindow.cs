@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.Dialogue;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
-    // 그래프 에셋(대화·연출 프리셋)을 왼쪽 목록에서 고르고 오른쪽 그래프에서 편집하는 창의 공통 부분.
+    // 그래프 에셋(다이얼로그·연출 프리셋)을 왼쪽 목록에서 고르고 오른쪽 그래프에서 편집하는 창의 공통 부분.
     // 편집은 에셋에 바로 저장한다(도감의 모아 두기 적용과 별개, Undo 가능).
     public abstract class GraphAssetWindow : EditorWindow
     {
@@ -63,13 +63,8 @@ namespace GameSystems.EditorTools.Graph
             _root.style.alignItems = Align.Stretch;
             host.Add(_root);
 
+            // 왼쪽 목록: 도감의 모든 탭과 같은 모양(CodexTree). 폴더는 정리용이고, 끌어서 다른 폴더로 옮긴다.
             var side = Gs.Col("gs-graph-window__side");
-            var head = Gs.Row();
-            head.Add(Gs.Label(Noun, "gs-heading"));
-            head.Add(Gs.Spacer());
-            head.Add(new GsButton("+ 새로", NewAsset, GsButtonKind.Ghost));
-            side.Add(head);
-            side.Add(Gs.Space(8));
             _list = Gs.Col();
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
@@ -99,27 +94,96 @@ namespace GameSystems.EditorTools.Graph
             });
         }
 
+        // 이 창의 편집은 에셋에 바로 저장하므로, 폴더 옮기기·만들기도 바로 적용한다(도감의 Ctrl+S를 기다리지 않는다).
         void RefreshList()
         {
             if (_list == null) return;
             _list.Clear();
-            var any = false;
-            foreach (var data in Assets)
+            var items = Assets.ToList();
+            var tab = AssetType.FullName;
+            var tree = new CodexTree { Key = "graph:" + tab, ItemNoun = Noun };
+            tree.Folders.Add(new CodexTree.Folder
             {
-                any = true;
-                var item = Gs.Row("gs-graph-window__item");
-                item.EnableInClassList("gs-graph-window__item--active", data.Id == _selected);
-                item.Add(Gs.Label(data.Id, "gs-nowrap"));
-                var id = data.Id;
-                item.AddManipulator(new Clickable(() =>
+                Path = "", Parent = null, Name = Noun, Draggable = false,
+                Hint = $"아직 {Noun}가 없습니다. '+ 새로'로 만드세요.",
+                Tools = tools =>
                 {
-                    _selected = id;
-                    RefreshList();
-                    OpenCanvas();
-                }));
-                _list.Add(item);
+                    tools.Add(new GsButton("+ 새로", () => NewAsset(""), GsButtonKind.Ghost));
+                    tools.Add(new GsButton("+ 폴더", () => NewFolder(""), GsButtonKind.Ghost));
+                },
+            });
+            foreach (var folder in CodexFolders.All(tab, items))
+            {
+                var path = folder;
+                tree.Folders.Add(new CodexTree.Folder
+                {
+                    Path = path, Parent = CodexFolders.Parent(path), Name = CodexFolders.Name(path),
+                    Tools = tools =>
+                    {
+                        tools.Add(new GsButton("+ 새로", () => NewAsset(path), GsButtonKind.Ghost));
+                        tools.Add(new GsButton("+ 폴더", () => NewFolder(path), GsButtonKind.Ghost));
+                    },
+                });
             }
-            if (!any) _list.Add(Gs.Label($"아직 {Noun}가 없습니다.\n'+ 새로'로 만드세요.", "gs-caption"));
+            foreach (var data in items)
+            {
+                var d = data;
+                tree.Items.Add(new CodexTree.Item
+                {
+                    Key = d.Id, Folder = d.Folder, Name = d.Id, Payload = d,
+                    Build = () =>
+                    {
+                        var row = GsGroupSection.Row(d.Id);
+                        row.EnableInClassList("gs-group__row--active", d.Id == _selected);
+                        return row;
+                    },
+                    Open = () =>
+                    {
+                        _selected = d.Id;
+                        RefreshList();
+                        OpenCanvas();
+                    },
+                });
+            }
+            tree.MoveItem = (item, folder) =>
+            {
+                SetFolder((GameData)item.Payload, folder.Path);
+                RefreshList();
+            };
+            tree.MoveFolder = (folder, target) =>
+            {
+                var to = CodexFolders.Join(target.Path, CodexFolders.Name(folder.Path));
+                if (CodexFolders.All(tab, items).Contains(to)) return;
+                CodexFolders.Move(tab, folder.Path, to);
+                CodexFolders.CommitTab(tab);
+                foreach (var data in items.Where(i => CodexFolders.IsUnder(i.Folder, folder.Path)))
+                    SetFolder(data, CodexFolders.Rebase(data.Folder, folder.Path, to));
+                RefreshList();
+            };
+            tree.Build(_list, _root);
+        }
+
+        static void SetFolder(GameData data, string folder)
+        {
+            Undo.RecordObject(data, "폴더 옮기기");
+            data.EditorAssignFolder(folder);
+            EditorUtility.SetDirty(data);
+            AssetDatabase.SaveAssetIfDirty(data);
+            EditorDatabase.MarkDirty();
+        }
+
+        void NewFolder(string parent)
+        {
+            var tab = AssetType.FullName;
+            GsDialog.Form(_root, parent == "" ? "새 폴더" : $"'{parent}' 안에 폴더", "정리용 폴더입니다(게임 동작과 상관없음).",
+                new List<DialogField> { new DialogField { Key = "name", Label = "폴더 이름", Value = "" } }, "만들기",
+                values => CodexFolders.CanCreate(tab, Assets, parent, values["name"], out var error) ? null : error,
+                values =>
+                {
+                    CodexFolders.Create(tab, CodexFolders.Join(parent, values["name"].Trim()));
+                    CodexFolders.CommitTab(tab);
+                    RefreshList();
+                });
         }
 
         void OpenCanvas()
@@ -243,7 +307,7 @@ namespace GameSystems.EditorTools.Graph
         // 그래프 공통 검사(끊긴 흐름 등).
         protected virtual IEnumerable<string> GraphIssues(NodeGraph graph) => Enumerable.Empty<string>();
 
-        void NewAsset()
+        void NewAsset(string folder)
         {
             var info = DataTypes.Find(AssetType);
             var suggested = EditorDatabase.Instance.NextId(info);
@@ -253,6 +317,7 @@ namespace GameSystems.EditorTools.Graph
                 values =>
                 {
                     var data = EditorDatabase.Instance.Create(AssetType, values["id"]);
+                    data.EditorAssignFolder(folder ?? "");
                     Seed(GraphOf(data));
                     EditorUtility.SetDirty(data);
                     AssetDatabase.SaveAssetIfDirty(data);
@@ -272,16 +337,16 @@ namespace GameSystems.EditorTools.Graph
         }
     }
 
-    // 대화 그래프 창.
+    // 다이얼로그 그래프 창.
     public sealed class DialogueGraphWindow : GraphAssetWindow
     {
-        [MenuItem("Game Systems/대화 그래프", priority = 5)]
+        [MenuItem("MomoiProject/다이얼로그 시스템/그래프", priority = 5)]
         public static void Open() => OpenWith(null);
 
         public static DialogueGraphWindow OpenWith(string id)
         {
-            var window = GetWindow<DialogueGraphWindow>();
-            window.titleContent = new GUIContent("대화 그래프");
+            var window = GBible.EditorTools.GsWindows.Get<DialogueGraphWindow>();
+            window.titleContent = new GUIContent("다이얼로그 그래프");
             window.minSize = new Vector2(900, 520);
             if (id != null) window.ShowAsset(id);
             return window;
@@ -289,7 +354,7 @@ namespace GameSystems.EditorTools.Graph
 
         protected override Type AssetType => typeof(DialogueData);
         protected override GraphKinds Kind => GraphKinds.Dialogue;
-        protected override string Noun => "대화";
+        protected override string Noun => "다이얼로그";
         protected override NodeGraph GraphOf(GameData data) => (data as DialogueData)?.graph;
 
         protected override void Seed(NodeGraph graph)
@@ -328,15 +393,15 @@ namespace GameSystems.EditorTools.Graph
         }
     }
 
-    // 연출 프리셋 창: 효과 노드로 프리셋을 만든다. 대화 그래프에서는 '연출 프리셋' 노드 하나로 쓴다.
+    // 연출 프리셋 창: 효과 노드로 프리셋을 만든다. 다이얼로그 그래프에서는 '연출 프리셋' 노드 하나로 쓴다.
     public sealed class EffectPresetWindow : GraphAssetWindow
     {
-        [MenuItem("Game Systems/연출 프리셋", priority = 6)]
+        [MenuItem("MomoiProject/다이얼로그 시스템/연출 프리셋", priority = 6)]
         public static void Open() => OpenWith(null);
 
         public static EffectPresetWindow OpenWith(string id)
         {
-            var window = GetWindow<EffectPresetWindow>();
+            var window = GBible.EditorTools.GsWindows.Get<EffectPresetWindow>();
             window.titleContent = new GUIContent("연출 프리셋");
             window.minSize = new Vector2(900, 520);
             if (id != null) window.ShowAsset(id);
@@ -369,7 +434,7 @@ namespace GameSystems.EditorTools.Graph
         }
     }
 
-    // 대화 그래프의 프리셋 노드에 프리셋이 내보내는 신호 점을 만든다.
+    // 다이얼로그 그래프의 프리셋 노드에 프리셋이 내보내는 신호 점을 만든다.
     static class PresetOutputs
     {
         [InitializeOnLoadMethod]

@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 
-namespace GameSystems
+namespace GBible
 {
     // 이벤트 타입(class·struct)에 붙인다. 데이터베이스 창의 이벤트 선택 목록에 표시된다.
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]

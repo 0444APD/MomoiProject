@@ -1,0 +1,23 @@
+{
+    "name": "GBible.Samples.Editor",
+    "rootNamespace": "GBible.Samples",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity",
+        "GBible.Editor",
+        "GBible.Samples"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "GBIBLE_SAMPLES"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

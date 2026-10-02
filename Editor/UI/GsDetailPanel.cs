@@ -6,7 +6,7 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     public sealed class DetailOptions
     {
@@ -39,7 +39,7 @@ namespace GameSystems.EditorTools.UI
         public Action<UnityEngine.Object> Saved;
         // 제목 옆 "?" 버튼이 여는 도움말 항목.
         public string HelpTopic;
-        // 도감처럼 변경을 모아 두는 곳: 저장 확인 없이 작업본에 바로 반영하고, Unity 적용은 탭을 옮길 때 한다.
+        // 도감처럼 변경을 모아 두는 곳: 저장 확인 없이 작업본에 바로 반영하고, Unity 적용은 저장(Ctrl+S)할 때 한다.
         public bool Staged;
     }
 
@@ -179,11 +179,11 @@ namespace GameSystems.EditorTools.UI
             footer.Add(_revert);
             footer.Add(Gs.HSpace(8));
             _save = new GsButton(_options.Staged ? "반영" : "저장", Save, GsButtonKind.Primary);
-            if (_options.Staged) _save.tooltip = "도감 목록에 바로 반영합니다. Unity 에셋에는 탭을 옮길 때 변경 목록을 확인하고 적용합니다.";
+            if (_options.Staged) _save.tooltip = "도감 목록에 바로 반영합니다. Unity 에셋에는 저장(Ctrl+S)할 때 적용합니다.";
             footer.Add(_save);
             if (_options.Staged)
             {
-                // 바꾼 값은 바로 반영되므로 되돌리기·반영 버튼이 필요 없다(되돌리기는 도감 탭을 옮길 때 한꺼번에).
+                // 바꾼 값은 바로 반영되므로 되돌리기·반영 버튼이 필요 없다(되돌리기는 저장(Ctrl+S)할 때 한꺼번에).
                 _revert.style.display = DisplayStyle.None;
                 _save.style.display = DisplayStyle.None;
             }
@@ -285,7 +285,7 @@ namespace GameSystems.EditorTools.UI
             }
             else
             {
-                // 클래스·배열·리스트: 변수 이름 + 형식(예: nestedList · SampleFieldNested 리스트).
+                // 클래스·배열·리스트: 변수 이름 + 형식(예: nestedList · WideNested 리스트).
                 var head = Gs.Row("gs-detail__section-head");
                 head.Add(Gs.Label(label, "gs-detail__label"));
                 var caption = field != null ? DataModel.TypeCaption(field.FieldType) : "";
@@ -312,7 +312,9 @@ namespace GameSystems.EditorTools.UI
         }
 
         static bool IsBlockType(Type type) =>
-            typeof(Condition).IsAssignableFrom(type) || typeof(Reward).IsAssignableFrom(type) || typeof(ValueFilter).IsAssignableFrom(type);
+            typeof(Condition).IsAssignableFrom(type) || typeof(Reward).IsAssignableFrom(type) || typeof(ValueFilter).IsAssignableFrom(type) ||
+            typeof(Effect).IsAssignableFrom(type) || typeof(TargetSelector).IsAssignableFrom(type) ||
+            typeof(Trigger).IsAssignableFrom(type) || typeof(Outcome).IsAssignableFrom(type);
 
         static bool ContainsBlocks(Type type, int depth)
         {
@@ -554,7 +556,7 @@ namespace GameSystems.EditorTools.UI
             ReflectIfStaged();
         }
 
-        // 도감(변경 모아 두기): 바꾼 값은 바로 작업본에 반영한다(확인·저장 단계 없음). Unity 적용은 도감 탭을 옮길 때.
+        // 도감(변경 모아 두기): 바꾼 값은 바로 작업본에 반영한다(확인·저장 단계 없음). Unity 적용은 저장(Ctrl+S)할 때.
         void ReflectIfStaged()
         {
             if (!_options.Staged || _draft == null || _target == null) return;
@@ -591,7 +593,7 @@ namespace GameSystems.EditorTools.UI
             }
 
             var count = _changes.Count;
-            _status.text = _options.Staged ? "바꾼 값은 바로 반영 · Unity 적용은 도감 탭을 옮길 때"
+            _status.text = _options.Staged ? "바꾼 값은 바로 반영 · Unity 적용은 저장(Ctrl+S)할 때"
                 : count == 0 ? "변경 없음" : $"변경 {count}개 · 저장 전";
             _status.EnableInClassList("gs-accent-text", count > 0);
             _revert.SetEnabled(count > 0);

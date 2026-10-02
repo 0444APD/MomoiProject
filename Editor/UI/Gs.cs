@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 디자인 시스템 진입점: 스타일시트 적용, 분류 팔레트, 요소 생성 도우미.
     public static class Gs
@@ -42,6 +42,8 @@ namespace GameSystems.EditorTools.UI
             AddSheet(root, "GsTheme");
             AddSheet(root, "GsExperimental");
             root.AddToClassList("gs-root");
+            // 툴팁은 글 양에 맞춰 커지는 창 안의 상자로(기본 툴팁은 긴 글이 잘린다).
+            GsTooltip.Attach(root);
             if (!root.ClassListContains("gs-dual-host"))
             {
                 // Alt를 누르고 있는 동안 두 가지 표현이 있는 글자(도감 요약·로그)를 코드 형태로 바꿔 보여 준다.

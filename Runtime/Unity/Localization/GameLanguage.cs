@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
     // 게임의 현재 언어. 시작할 때 저장된 언어 → 기기 언어 → 원문 언어 순으로 정하고, 바꾸면 저장한다.
     // 글자는 어디서든 Texts.Get(...)으로 만든다. 이 클래스는 설정·표·용어 모양을 Texts에 연결한다.
     public static class GameLanguage
     {
-        const string PrefsKey = "GameSystems.Language";
+        const string PrefsKey = "GBible.Language";
 
         static LocalizationSettings _settings;
         static Dictionary<string, KeywordData> _keywords;

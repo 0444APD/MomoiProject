@@ -1,13 +1,13 @@
 using UnityEngine;
 using UnityEngine.Audio;
 
-namespace GameSystems
+namespace GBible
 {
-    // 오디오 설정(선택, Resources/GameSystems/GameAudioSettings). 없으면 기본값으로 동작한다.
-    [CreateAssetMenu(menuName = "Game Systems/오디오 설정", fileName = "GameAudioSettings")]
+    // 오디오 설정(선택, Resources/MomoiProject/GameAudioSettings). 없으면 기본값으로 동작한다.
+    [CreateAssetMenu(menuName = "MomoiProject/오디오 설정", fileName = "GameAudioSettings")]
     public sealed class GameAudioSettings : ScriptableObject
     {
-        public const string ResourcesPath = "GameSystems/GameAudioSettings";
+        public const string ResourcesPath = "MomoiProject/GameAudioSettings";
 
         [Header("기본 음량(플레이어가 바꾼 값이 저장돼 있으면 그것)")]
         [Range(0, 1)] public float master = 1f;

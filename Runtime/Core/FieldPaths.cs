@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-namespace GameSystems
+namespace GBible
 {
     // 필드 경로: 클래스·컬렉션을 따라 내려가는 주소.
     //   "level"            필드 하나
@@ -387,6 +387,8 @@ namespace GameSystems
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class FieldPathAttribute : Attribute
     {
+        // 비어 있을 때의 뜻(예: "값 전체"). 없으면 비어 있는 칸은 '필드 선택'으로 보인다.
+        public string EmptyLabel { get; set; }
     }
 
     // 이 필드(컬렉션 경로)의 안쪽 조건은 컬렉션 요소를 뿌리로 삼는다(목록 항목 검사).
@@ -399,7 +401,7 @@ namespace GameSystems
     public enum FieldPathRootKind
     {
         EventType,
-        StateKey,
+        PlayerDataKey,
     }
 
     [AttributeUsage(AttributeTargets.Field)]
@@ -441,7 +443,7 @@ namespace GameSystems
 
     // 플레이어 데이터 ID. 편집기는 데이터베이스의 플레이어 데이터 목록을 띄운다.
     [AttributeUsage(AttributeTargets.Field)]
-    public sealed class StateKeyRefAttribute : Attribute
+    public sealed class PlayerDataRefAttribute : Attribute
     {
     }
 }

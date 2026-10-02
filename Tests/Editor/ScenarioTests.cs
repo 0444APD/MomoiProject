@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // ── 예제 게임 데이터(개발자가 짜는 부분: 클래스만) ───────────────
     public enum ScenarioElement
@@ -66,18 +66,17 @@ namespace GameSystems.Tests
             var session = new GameSession(new SessionOptions { Seed = 77 });
 
             // 플레이어 데이터(도감: 플레이어 데이터)
-            session.State.Define(Inventory, StateZone.Meta, new ScenarioInventory(), "인벤토리");
-            session.State.Define(Floor, StateZone.Session, 1, "현재 층");
+            session.Data.Define(Inventory, DataZone.Meta, new ScenarioInventory(), "인벤토리");
+            session.Data.Define(Floor, DataZone.Session, 1, "현재 층");
 
             // 수치(도감: 수치) — 보스 처치 수는 이벤트 조건식으로 거른다.
             var kills = new StatDefinition { Id = "kills", DisplayName = "처치 수", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             kills.Rules.Add(new StatRule { eventType = typeof(ScenarioKilled).FullName });
             var bossKills = new StatDefinition { Id = "boss_kills", DisplayName = "보스 처치 수", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             bossKills.Rules.Add(new StatRule { eventType = typeof(ScenarioKilled).FullName, filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "boss" } });
-            var gold = new StatDefinition { Id = "gold", DisplayName = "골드", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
+            session.Data.Define("gold", DataZone.Meta, 0.0, "골드");
             session.Stats.Define(kills);
             session.Stats.Define(bossKills);
-            session.Stats.Define(gold);
 
             // 도전과제(도감: 도전과제) — 조건식 트리
             var dragonSlayer = new AchievementDefinition
@@ -86,13 +85,13 @@ namespace GameSystems.Tests
                 DisplayName = "용 사냥꾼",
                 Condition = new StatCompareCondition { stat = "boss_kills", op = CompareOp.AtLeast, value = 1 },
             };
-            dragonSlayer.Rewards.Add(new AddToStatReward { stat = "gold", amount = 100 });
+            dragonSlayer.Rewards.Add(new PlayerDataReward { key = "gold", amount = 100 });
             session.Achievements.Define(dragonSlayer);
             session.Achievements.Define(new AchievementDefinition
             {
                 Id = "legend_collector",
                 DisplayName = "전설 수집가",
-                Condition = new StateFieldCondition
+                Condition = new PlayerDataCondition
                 {
                     key = Inventory,
                     filter = new ElementFilter { path = "items", mode = ElementMode.Any, filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "legendary" } },
@@ -103,7 +102,7 @@ namespace GameSystems.Tests
             {
                 Id = "enhance_master",
                 DisplayName = "강화 장인",
-                Condition = new StateFieldCondition
+                Condition = new PlayerDataCondition
                 {
                     key = Inventory,
                     filter = new ElementFilter
@@ -124,8 +123,8 @@ namespace GameSystems.Tests
 
             // 행동(프로그래머가 짜는 부분: 게임 로직 한 줄씩)
             session.Actions.Register<ScenarioAttack>(a => session.Events.Publish(new ScenarioKilled { monster = a.monster, tags = a.tags.ToList() }));
-            session.Actions.Register<ScenarioLoot>(a => session.State.Modify<ScenarioInventory>(Inventory, inv => inv.items.Add((ScenarioEquipment)DataModel.Clone(Templates[a.template], null))));
-            session.Actions.Register<ScenarioEnhance>(a => session.State.Modify<ScenarioInventory>(Inventory, inv =>
+            session.Actions.Register<ScenarioLoot>(a => session.Data.Modify<ScenarioInventory>(Inventory, inv => inv.items.Add((ScenarioEquipment)DataModel.Clone(Templates[a.template], null))));
+            session.Actions.Register<ScenarioEnhance>(a => session.Data.Modify<ScenarioInventory>(Inventory, inv =>
                 inv.items[0].enhancements.Add(new ScenarioEnhancement { effect = a.effect, power = session.Random.Get("enhance").Range(1, 10) })));
             return session;
         }
@@ -141,13 +140,13 @@ namespace GameSystems.Tests
             Assert.AreEqual(2, session.Stats.Get("kills"));
             Assert.AreEqual(1, session.Stats.Get("boss_kills"));
             Assert.IsTrue(session.Achievements.IsUnlocked("dragon_slayer"));
-            Assert.AreEqual(100, session.Stats.Get("gold"));
+            Assert.AreEqual(100, session.Data.GetNumber("gold"));
 
             // 2) 템플릿 사본 획득 → 저장소 조건식(목록 항목 검사) 달성 → Undo해도 달성은 유지, 아이템만 빠진다
             session.Do(new ScenarioLoot { template = "dragon_armor" });
             Assert.IsTrue(session.Achievements.IsUnlocked("legend_collector"));
             session.Undo();
-            Assert.AreEqual(0, session.State.Get<ScenarioInventory>(Inventory).items.Count);
+            Assert.AreEqual(0, session.Data.Get<ScenarioInventory>(Inventory).items.Count);
             Assert.IsTrue(session.Achievements.IsUnlocked("legend_collector"));
             Assert.AreEqual(0, Templates["dragon_armor"].enhancements.Count, "템플릿 원본은 그대로");
 
@@ -155,18 +154,18 @@ namespace GameSystems.Tests
             session.Do(new ScenarioLoot { template = "dragon_armor" });
             for (int i = 0; i < 3; i++) session.Do(new ScenarioEnhance { effect = "lifesteal" });
             Assert.IsFalse(session.Achievements.IsUnlocked("enhance_master"), "불 속성은 제외");
-            session.State.Modify<ScenarioInventory>(Inventory, inv => inv.items.Insert(0, (ScenarioEquipment)DataModel.Clone(Templates["training_sword"], null)));
+            session.Data.Modify<ScenarioInventory>(Inventory, inv => inv.items.Insert(0, (ScenarioEquipment)DataModel.Clone(Templates["training_sword"], null)));
             for (int i = 0; i < 3; i++) session.Do(new ScenarioEnhance { effect = "fire_resist" });
             Assert.IsTrue(session.Achievements.IsUnlocked("enhance_master"));
 
             // 4) 기록: 강화 한 번이 사람이 읽는 경로와 코드 경로로 남는다
-            var change = session.Journal.Entries.Last(e => e.Kind == JournalKind.State && e.Key == Inventory);
+            var change = session.Journal.Entries.Last(e => e.Kind == JournalKind.Data && e.Key == Inventory);
             StringAssert.Contains("인벤토리 › 장비 #", change.Message);
             StringAssert.Contains("› 강화", change.Message);
             StringAssert.Contains("items[#", change.Code);
 
             // 5) 저장·이어하기: 프로필(인벤토리·수치·달성)과 판(층·난수)이 따로 저장되고 그대로 이어진다
-            session.State.Set(Floor, 4);
+            session.Data.Set(Floor, 4);
             var profile = session.ExportMeta();
             var run = session.ExportRun();
             var nextRoll = session.Random.Get("enhance").Range(1, 10);
@@ -174,12 +173,12 @@ namespace GameSystems.Tests
             var resumed = NewSession();
             resumed.ImportMeta(profile);
             resumed.ImportRun(run);
-            var items = resumed.State.Get<ScenarioInventory>(Inventory).items;
+            var items = resumed.Data.Get<ScenarioInventory>(Inventory).items;
             CollectionAssert.AreEqual(new[] { "훈련용 검", "용의 비늘 갑옷" }, items.Select(i => i.name).ToArray());
             Assert.AreEqual(3, items[0].enhancements.Count);
             Assert.AreEqual(ScenarioElement.Fire, items[1].element);
-            Assert.AreEqual(4, resumed.State.Get<int>(Floor));
-            Assert.AreEqual(100, resumed.Stats.Get("gold"), "보상 골드 유지");
+            Assert.AreEqual(4, resumed.Data.Get<int>(Floor));
+            Assert.AreEqual(100, resumed.Data.GetNumber("gold"), "보상 골드 유지");
             resumed.Achievements.EvaluateAll();
             Assert.IsTrue(resumed.Achievements.IsUnlocked("dragon_slayer"));
             Assert.IsTrue(resumed.Achievements.IsUnlocked("enhance_master"));

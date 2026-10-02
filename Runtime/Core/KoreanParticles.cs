@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GameSystems
+namespace GBible
 {
     // 한국어 조사: 앞 단어의 받침(읽는 소리 기준)에 맞춰 을/를, 이/가, (으)로 … 를 고른다.
     //  · 한글: 마지막 글자의 받침. (으)로는 ㄹ 받침이면 '로'.

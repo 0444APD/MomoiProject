@@ -1,0 +1,27 @@
+{
+    "name": "GBible.Inventory.Tests",
+    "rootNamespace": "GBible.Tests",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity",
+        "GBible.Inventory",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "GBIBLE_INVENTORY"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

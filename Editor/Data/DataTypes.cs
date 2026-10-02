@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     public sealed class DataTypeInfo
     {
@@ -81,15 +81,19 @@ namespace GameSystems.EditorTools
                     .Where(a => a.sourceFiles.Any(f => f.StartsWith("Assets/", StringComparison.Ordinal)))
                     .Select(a => a.name));
 
-        // GameData를 상속하지 않은 데이터용 ScriptableObject(놓침 방지 알림용).
-        public static IEnumerable<Type> UnregisteredScriptableObjects()
+        // GameData를 상속하지 않은 데이터용 ScriptableObject(놓침 방지 알림용). 형식 목록은 다시 컴파일할 때만 바뀌므로 한 번만 찾는다.
+        static List<Type> _unregistered;
+
+        public static IReadOnlyList<Type> UnregisteredScriptableObjects() => _unregistered ??= FindUnregistered().ToList();
+
+        static IEnumerable<Type> FindUnregistered()
         {
             foreach (var type in TypeCache.GetTypesDerivedFrom<ScriptableObject>())
             {
                 if (type.IsAbstract || type.IsGenericTypeDefinition || typeof(GameData).IsAssignableFrom(type)) continue;
                 if (typeof(EditorWindow).IsAssignableFrom(type) || typeof(UnityEditor.Editor).IsAssignableFrom(type)) continue;
                 var assembly = type.Assembly.GetName().Name;
-                if (assembly.StartsWith("GameSystems", StringComparison.Ordinal) || !ProjectAssemblies.Contains(assembly)) continue;
+                if (assembly.StartsWith("GBible", StringComparison.Ordinal) || !ProjectAssemblies.Contains(assembly)) continue;
                 if (type.IsDefined(typeof(HideInDatabaseAttribute), false)) continue;
                 yield return type;
             }
@@ -100,6 +104,7 @@ namespace GameSystems.EditorTools
         {
             _cache = null;
             _projectAssemblies = null;
+            _unregistered = null;
         }
     }
 }

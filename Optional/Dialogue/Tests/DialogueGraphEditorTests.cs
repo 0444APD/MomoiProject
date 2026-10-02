@@ -1,12 +1,12 @@
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
-using GameSystems.EditorTools.Graph;
+using GBible.Data;
+using GBible.Dialogue;
+using GBible.EditorTools.Graph;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public sealed class DialogueGraphEditorTests
     {
@@ -46,7 +46,7 @@ namespace GameSystems.Tests
                 GsGraphCanvas canvas = null;
                 Assert.DoesNotThrow(() => canvas = new GsGraphCanvas(data, () => data.graph, "graph", GraphKinds.Both));
                 Assert.AreEqual(data.graph.nodes.Count(n => !(n is GroupNode)), canvas.Query(className: "gs-graph-node").ToList().Count);
-                Assert.AreEqual(1, canvas.Query(className: "gs-graph-group").ToList().Count, "묶음 상자는 따로 그린다");
+                Assert.AreEqual(1, canvas.Query(className: "gs-graph-group").ToList().Count, "그룹 상자는 따로 그린다");
                 Assert.AreEqual(data.graph.nodes.Sum(n => n.Ports.Count()), canvas.Query(className: "gs-graph-port__dot").ToList().Count, "점마다 하나씩");
                 Assert.DoesNotThrow(() => canvas.FrameAll());
             }

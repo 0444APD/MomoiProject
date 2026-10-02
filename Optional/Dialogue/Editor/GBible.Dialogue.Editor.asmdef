@@ -1,0 +1,23 @@
+{
+    "name": "GBible.Dialogue.Editor",
+    "rootNamespace": "GBible.EditorTools.Graph",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity",
+        "GBible.Editor",
+        "GBible.Dialogue"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GBIBLE_DIALOGUE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

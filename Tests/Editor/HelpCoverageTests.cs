@@ -1,21 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 계약 테스트: 기능을 추가하면 도움말과 설정 단계도 함께 있어야 한다.
     // 여기서 실패하면 BuiltInHelp(또는 그 기능의 IHelpProvider)·BuiltInSetup에 항목을 추가하세요.
     [Ignore("도움말·시작하기 보류 중(HelpFeature.Enabled = false)")]
     public class HelpCoverageTests
     {
-        static bool IsLibrary(Type type) => type.Assembly.GetName().Name.StartsWith("GameSystems.", StringComparison.Ordinal) &&
-                                            !type.Assembly.GetName().Name.StartsWith("GameSystems.Samples", StringComparison.Ordinal) &&
-                                            !type.Assembly.GetName().Name.StartsWith("GameSystems.Tests", StringComparison.Ordinal);
+        static bool IsLibrary(Type type) => type.Assembly.GetName().Name.StartsWith("GBible.", StringComparison.Ordinal) &&
+                                            !type.Assembly.GetName().Name.StartsWith("GBible.Samples", StringComparison.Ordinal) &&
+                                            !type.Assembly.GetName().Name.StartsWith("GBible.Tests", StringComparison.Ordinal);
 
         [Test]
         public void 기본_도감_종류는_직접_쓴_도움말이_있다()

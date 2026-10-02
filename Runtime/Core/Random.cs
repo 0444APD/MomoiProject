@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GameSystems
+namespace GBible
 {
     // 기기·플랫폼과 무관하게 같은 시드면 같은 순서를 내는 난수(xoshiro256**, 정수 연산만 사용).
     // UnityEngine.Random·System.Random은 버전·플랫폼에 따라 결과가 달라질 수 있어 게임 로직에서 쓰지 않는다.
@@ -46,7 +46,7 @@ namespace GameSystems
         public int Range(int minInclusive, int maxExclusive)
         {
             if (maxExclusive <= minInclusive)
-                throw new ArgumentException($"[GameSystems] 난수 범위가 잘못되었습니다: [{minInclusive}, {maxExclusive})");
+                throw new ArgumentException($"[MomoiProject] 난수 범위가 잘못되었습니다: [{minInclusive}, {maxExclusive})");
             ulong range = (ulong)((long)maxExclusive - minInclusive);
             ulong limit = ulong.MaxValue - (ulong.MaxValue % range + 1) % range;
             ulong value;

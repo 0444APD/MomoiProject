@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
 
-namespace GameSystems
+namespace GBible
 {
     // Run: 이번 판(세션 구역, 되감김). Total: 누적(메타 구역, 저장됨).
     public enum StatScope
@@ -42,7 +42,8 @@ namespace GameSystems
         Last,
     }
 
-    // "이벤트가 발생하면 필드 값을 수치에 반영한다" 규칙. field가 비어 있으면 1(횟수)을 반영한다.
+    // "이벤트가 발생하면 필드 값을 로그에 반영한다"의 짧은 형태(예전 저장 형식·코드용). field가 비어 있으면 1(횟수)을 반영한다.
+    // 실행할 때는 트리거·결과 규칙(이벤트 발생 → 로그에 기록)으로 바뀌어 다른 기능과 같은 길로 돈다(ToTriggerRule).
     [Serializable]
     public class StatRule
     {
@@ -73,6 +74,12 @@ namespace GameSystems
             var where = filter == null ? "" : $" where {filter.Describe()}";
             return $"on {typeName}{where}: {statName} += {source}{factor}";
         }
+        public TriggerRule ToTriggerRule() => new TriggerRule
+        {
+            when = new EventTrigger { eventType = eventType, filter = filter },
+            then = { new RecordOutcome { field = field ?? "", multiplier = multiplier } },
+        };
+
         public static string EventDisplayName(string typeName)
         {
             var type = TypeResolver.Find(typeName);
@@ -88,10 +95,26 @@ namespace GameSystems
         public StatScope Scope;
         public StatAggregate Aggregate;
         public double? Initial;
+        // 반영 규칙: 트리거(이벤트 발생) → 결과(로그에 기록). 짧은 형태 Rules도 같은 규칙으로 바뀌어 돈다.
+        public readonly List<TriggerRule> Triggers = new List<TriggerRule>();
         public readonly List<StatRule> Rules = new List<StatRule>();
+
+        public IEnumerable<TriggerRule> AllRules() => Rules.Where(r => r != null).Select(r => r.ToTriggerRule()).Concat(Triggers.Where(r => r != null));
+
+        // "이벤트 하나 발생 → 이 로그에 기록" 꼴로 읽을 수 있는 규칙(시뮬레이션이 거꾸로 따라가 이벤트를 만들 때). 그 밖의 트리거는 뺀다.
+        public IEnumerable<StatRule> SimpleRules()
+        {
+            foreach (var rule in Rules.Where(r => r != null)) yield return rule;
+            foreach (var rule in Triggers.Where(r => r?.when is EventTrigger))
+            {
+                var when = (EventTrigger)rule.when;
+                foreach (var record in rule.then.OfType<RecordOutcome>().Where(o => string.IsNullOrEmpty(o.stat) || o.stat == Id))
+                    yield return new StatRule { eventType = when.eventType, filter = when.filter, field = record.field, multiplier = record.multiplier };
+            }
+        }
     }
 
-    public static class StateKeys
+    public static class PlayerDataKeys
     {
         public const string StatPrefix = "stat:";
         public const string AchievementPrefix = "achievement:";
@@ -100,92 +123,61 @@ namespace GameSystems
         public static string Achievement(string id) => AchievementPrefix + id;
     }
 
+    // 로그: 값의 기록. 반영 규칙은 공용 트리거 감시(TriggerSystem)에 등록해 다른 기능과 같은 길로 돈다.
     public sealed class StatSystem : IInspectable
     {
-        sealed class BoundRule
-        {
-            public StatDefinition Stat;
-            public StatRule Rule;
-            public Func<object, double> Getter;
-        }
-
         readonly Dictionary<string, StatDefinition> _definitions = new Dictionary<string, StatDefinition>(StringComparer.Ordinal);
-        readonly Dictionary<Type, List<BoundRule>> _rulesByEvent = new Dictionary<Type, List<BoundRule>>();
-        readonly StateStore _state;
+        readonly PlayerDataStore _state;
         readonly Journal _journal;
+        readonly TriggerSystem _triggers;
 
-        public StatSystem(StateStore state, EventBus events, Journal journal)
+        public StatSystem(PlayerDataStore state, TriggerSystem triggers, Journal journal)
         {
             _state = state;
             _journal = journal;
-            events.SubscribeAll(OnEvent);
+            _triggers = triggers;
         }
 
-        public string InspectName => "수치";
+        public string InspectName => "로그";
         public IEnumerable<StatDefinition> Definitions => _definitions.Values;
 
         public void Define(StatDefinition definition)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
-            if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[GameSystems] 수치 ID가 비어 있습니다.");
+            if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[MomoiProject] 수치 ID가 비어 있습니다.");
 
             _definitions[definition.Id] = definition;
-            var zone = definition.Scope == StatScope.Run ? StateZone.Session : StateZone.Meta;
-            _state.Define(StateKeys.Stat(definition.Id), zone, DefaultValue(definition), definition.DisplayName ?? definition.Id);
+            var zone = definition.Scope == StatScope.Run ? DataZone.Session : DataZone.Meta;
+            _state.Define(PlayerDataKeys.Stat(definition.Id), zone, DefaultValue(definition), definition.DisplayName ?? definition.Id);
 
-            foreach (var rule in definition.Rules) Bind(definition, rule);
+            _triggers.Unregister(definition.Id);
+            foreach (var rule in definition.AllRules()) Bind(definition, rule);
         }
 
-        void Bind(StatDefinition stat, StatRule rule)
+        void Bind(StatDefinition stat, TriggerRule rule)
         {
-            var type = TypeResolver.Find(rule.eventType);
-            if (type == null)
+            if (rule.when == null)
             {
-                _journal.Append(JournalKind.Warning, "Stats", $"수치 '{stat.DisplayName}' 규칙의 이벤트 타입을 찾을 수 없습니다: {rule.eventType}");
+                _journal.Append(JournalKind.Warning, "Stats", $"로그 '{stat.DisplayName}'의 규칙에 트리거가 없습니다.");
                 return;
             }
-
-            Func<object, double> getter;
-            if (string.IsNullOrEmpty(rule.field))
-            {
-                getter = _ => 1;
-            }
-            else
-            {
-                getter = TypeResolver.NumberGetter(type, rule.field, out var error);
-                if (getter == null)
-                {
-                    _journal.Append(JournalKind.Warning, "Stats", $"수치 '{stat.DisplayName}' 규칙 오류: {error}");
-                    return;
-                }
-            }
-
-            if (!_rulesByEvent.TryGetValue(type, out var list))
-                _rulesByEvent[type] = list = new List<BoundRule>();
-            list.Add(new BoundRule { Stat = stat, Rule = rule, Getter = getter });
-        }
-
-        void OnEvent(object evt)
-        {
-            if (!_rulesByEvent.TryGetValue(evt.GetType(), out var rules)) return;
-            foreach (var bound in rules)
-            {
-                if (bound.Rule.filter != null && !bound.Rule.filter.Test(evt)) continue;
-                Report(bound.Stat.Id, bound.Getter(evt) * bound.Rule.multiplier);
-            }
+            foreach (var missing in rule.when.Leaves().OfType<EventTrigger>().Where(e => TypeResolver.Find(e.eventType) == null))
+                _journal.Append(JournalKind.Warning, "Stats", $"로그 '{stat.DisplayName}' 규칙의 이벤트 타입을 찾을 수 없습니다: {missing.eventType}");
+            var outcomes = rule.then;
+            _triggers.Register(stat.Id, rule.when, repeat: true, fire: moment => _triggers.RunOutcomes(outcomes, moment, "Stats"));
         }
 
         public bool IsDefined(string id) => id != null && _definitions.ContainsKey(id);
 
         public StatDefinition Find(string id) => id != null && _definitions.TryGetValue(id, out var d) ? d : null;
 
-        public double Get(string id) => _state.GetNumber(StateKeys.Stat(RequireDefined(id).Id));
+        public double Get(string id) => _state.GetNumber(PlayerDataKeys.Stat(RequireDefined(id).Id));
 
         // 수치의 집계 방식에 따라 값을 반영한다(Sum: 더함, Max/Min: 기록 갱신, Last: 덮어씀).
         public void Report(string id, double value)
         {
             var definition = RequireDefined(id);
-            var key = StateKeys.Stat(id);
+            var key = PlayerDataKeys.Stat(id);
             var current = _state.GetNumber(key);
             double next;
             switch (definition.Aggregate)
@@ -206,20 +198,20 @@ namespace GameSystems
             _state.Set(key, next);
         }
 
-        public void Set(string id, double value) => _state.Set(StateKeys.Stat(RequireDefined(id).Id), value);
+        public void Set(string id, double value) => _state.Set(PlayerDataKeys.Stat(RequireDefined(id).Id), value);
 
         // 이번 판(Run) 수치를 초기값으로 되돌린다.
         public void ResetRun()
         {
             foreach (var definition in _definitions.Values)
                 if (definition.Scope == StatScope.Run)
-                    _state.Set(StateKeys.Stat(definition.Id), DefaultValue(definition));
+                    _state.Set(PlayerDataKeys.Stat(definition.Id), DefaultValue(definition));
         }
 
         StatDefinition RequireDefined(string id)
         {
             if (id != null && _definitions.TryGetValue(id, out var definition)) return definition;
-            throw new InvalidOperationException($"[GameSystems] 정의되지 않은 수치 '{id}'입니다.");
+            throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 수치 '{id}'입니다.");
         }
 
         static object DefaultValue(StatDefinition definition)
@@ -234,8 +226,8 @@ namespace GameSystems
             foreach (var definition in _definitions.Values)
             {
                 var node = root.Add(definition.DisplayName ?? definition.Id,
-                                    StateStore.Format(_state.Get(StateKeys.Stat(definition.Id))),
-                                    StateKeys.Stat(definition.Id));
+                                    PlayerDataStore.Format(_state.Get(PlayerDataKeys.Stat(definition.Id))),
+                                    PlayerDataKeys.Stat(definition.Id));
                 node.Tag = (definition.Scope == StatScope.Run ? "이번 판" : "누적") + " · " + AggregateText(definition.Aggregate);
             }
         }

@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 오디오 채널: 브금·목소리는 하나씩(교차 페이드), 효과음·UI는 동시에. 재생 여부는 오디오 시계로 판단하므로 오디오 장치 없이도 검사된다.
     public sealed class GameAudioTests

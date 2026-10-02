@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 대화 화면을 실제로 그리는 쪽(UI·스탠딩·카메라 …). 실행기는 '언제 무엇을'만 정하고 그리기는 여기에 맡긴다.
+    // 다이얼로그 화면을 실제로 그리는 쪽(UI·스탠딩·카메라 …). 실행기는 '언제 무엇을'만 정하고 그리기는 여기에 맡긴다.
     public interface IDialogueStage
     {
         // 상태를 전환 없이 바로 적용한다(시작·불러오기·되감기).
@@ -22,7 +22,7 @@ namespace GameSystems.Dialogue
         // 선택지를 띄운다(빈 목록이면 숨긴다).
         void ShowChoices(IReadOnlyList<DialogueChoice> choices);
 
-        // 대화가 끝났다.
+        // 다이얼로그가 끝났다.
         void Hide();
     }
 
@@ -61,7 +61,7 @@ namespace GameSystems.Dialogue
         Ended,
     }
 
-    // 중간 저장·되감기용: 어느 대화의 어느 줄, 그때의 화면 상태.
+    // 중간 저장·되감기용: 어느 다이얼로그의 어느 줄, 그때의 화면 상태.
     [Serializable]
     public sealed class DialogueSnapshot
     {
@@ -83,7 +83,7 @@ namespace GameSystems.Dialogue
         public bool Choice;
     }
 
-    // 대화 진행 기록(저장용): 어디서 시작했고, 분기·선택지에서 어느 쪽으로 갔고, 대사를 몇 줄 지났는지.
+    // 다이얼로그 진행 기록(저장용): 어디서 시작했고, 분기·선택지에서 어느 쪽으로 갔고, 대사를 몇 줄 지났는지.
     // 불러올 때는 같은 길을 조용히 다시 밟아(값 바꾸기·신호는 다시 하지 않는다) 그때의 화면을 그대로 만든다.
     [Serializable]
     public sealed class DialogueProgress
@@ -97,7 +97,7 @@ namespace GameSystems.Dialogue
         public DialogueProgress Clone() => new DialogueProgress { dialogue = dialogue, entry = entry, decisions = new List<string>(decisions), lines = lines };
     }
 
-    // 대화 실행기. 흐름(대사 → 선택지 → 분기 …)을 따라가며, 신호로 이어진 효과 체인을 시간에 맞춰 재생한다.
+    // 다이얼로그 실행기. 흐름(대사 → 선택지 → 분기 …)을 따라가며, 신호로 이어진 효과 체인을 시간에 맞춰 재생한다.
     // 게임 쪽은 Tick(프레임 시간), Advance(클릭), Choose(선택)만 부른다. Unity 컴포넌트 없이도 돈다(테스트·미리보기).
     public sealed class DialogueRunner
     {
@@ -163,7 +163,7 @@ namespace GameSystems.Dialogue
 
         // 클릭을 막는 효과(효과 시간 보장)가 진행 중인지.
         public bool InputBlocked => _runs.Any(r => !r.Done && r.Node.blockInput && !(r.Node is PresetEffect));
-        // 대화 진행 중이거나 효과가 돌고 있다.
+        // 다이얼로그 진행 중이거나 효과가 돌고 있다.
         public bool IsActive => (Phase != DialoguePhase.Idle && Phase != DialoguePhase.Ended) || _runs.Count > 0;
 
         public DialogueData Dialogue { get; private set; }
@@ -187,7 +187,7 @@ namespace GameSystems.Dialogue
         // 진행 기록이 바뀌었다(대사에 들어감·끝남). 저장에 쓴다.
         public event Action ProgressChanged;
 
-        // 지금까지의 진행 기록(저장용 사본). 대화 중이 아니면 null.
+        // 지금까지의 진행 기록(저장용 사본). 다이얼로그 중이 아니면 null.
         public DialogueProgress Progress => IsActive && _progress != null ? _progress.Clone() : null;
         // 불러오기 위해 길을 다시 밟는 중(값 바꾸기·신호를 하지 않는다).
         public bool Replaying => _replay != null;
@@ -197,7 +197,7 @@ namespace GameSystems.Dialogue
             _presets = presets ?? (_ => null);
         }
 
-        // 게임 데이터베이스에서 대화·프리셋을 찾는 실행기.
+        // 게임 데이터베이스에서 다이얼로그·프리셋을 찾는 실행기.
         public static DialogueRunner FromDatabase(GameDatabase database)
         {
             var dialogues = database == null ? new Dictionary<string, DialogueData>() : database.All<DialogueData>().Where(d => d != null).ToDictionary(d => d.Id);
@@ -219,7 +219,7 @@ namespace GameSystems.Dialogue
             var entry = dialogue?.Entry(entryId);
             if (entry == null)
             {
-                Debug.LogWarning($"[대화] '{dialogue?.Id}'에 시작 ID '{entryId}'가 없습니다.");
+                Debug.LogWarning($"[다이얼로그] '{dialogue?.Id}'에 시작 ID '{entryId}'가 없습니다.");
                 return false;
             }
             Reset();
@@ -364,7 +364,7 @@ namespace GameSystems.Dialogue
             }
         }
 
-        // 다음 선택지 직전까지(선택지가 뜬 상태, 또는 대화 끝까지) 건너뛴다. 막는 효과도 끝 모습으로 보낸다.
+        // 다음 선택지 직전까지(선택지가 뜬 상태, 또는 다이얼로그 끝까지) 건너뛴다. 막는 효과도 끝 모습으로 보낸다.
         public void SkipToChoice()
         {
             for (var guard = 0; guard < 10000; guard++)
@@ -484,7 +484,7 @@ namespace GameSystems.Dialogue
                         var entry = target?.Entry(jump.entryId);
                         if (entry == null)
                         {
-                            Debug.LogWarning($"[대화] 이동할 곳이 없습니다: {jump.dialogue} · {jump.entryId}");
+                            Debug.LogWarning($"[다이얼로그] 이동할 곳이 없습니다: {jump.dialogue} · {jump.entryId}");
                             End();
                             return;
                         }
@@ -501,12 +501,12 @@ namespace GameSystems.Dialogue
                         node = port == null ? null : Dialogue.graph.Next(custom, port);
                         break;
                     default:
-                        Debug.LogWarning($"[대화] 흐름에서 처리할 수 없는 노드: {node.GetType().Name}");
+                        Debug.LogWarning($"[다이얼로그] 흐름에서 처리할 수 없는 노드: {node.GetType().Name}");
                         End();
                         return;
                 }
             }
-            Debug.LogWarning("[대화] 흐름이 너무 길게 이어집니다(대사 없이 도는 고리가 있는지 확인하세요).");
+            Debug.LogWarning("[다이얼로그] 흐름이 너무 길게 이어집니다(대사 없이 도는 고리가 있는지 확인하세요).");
             End();
         }
 
@@ -699,7 +699,7 @@ namespace GameSystems.Dialogue
             if (from == null || scope == null) return;
             if (_depth >= MaxSignalDepth)
             {
-                Debug.LogWarning("[대화] 신호가 너무 깊게 이어집니다(시간 0인 효과끼리 고리가 있는지 확인하세요).");
+                Debug.LogWarning("[다이얼로그] 신호가 너무 깊게 이어집니다(시간 0인 효과끼리 고리가 있는지 확인하세요).");
                 return;
             }
             _depth++;
@@ -850,11 +850,11 @@ namespace GameSystems.Dialogue
         {
             var args = new Dictionary<string, object>(StringComparer.Ordinal);
             if (Session != null)
-                foreach (var key in Session.State.Keys)
+                foreach (var key in Session.Data.Keys)
                 {
                     try
                     {
-                        args[key] = Session.State.Get(key);
+                        args[key] = Session.Data.Get(key);
                     }
                     catch (Exception)
                     {

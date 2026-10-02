@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
-    // 스프라이트 규격 베이크: 원본 일러 + 맞춤(중심·배율) → 묶음의 규격마다 잘라 PNG 스프라이트로 저장한다.
+    // 스프라이트 규격 베이크: 원본 일러 + 맞춤(중심·배율) → 그룹의 규격마다 잘라 PNG 스프라이트로 저장한다.
     // 잘라 내기는 GPU로 하므로 원본 텍스처에 읽기 권한(Read/Write)이 없어도 된다.
     // 규격이 바뀌면 그 규격의 베이크를 다시 만들고, 예외 촬영이 걸린 것은 '확인 필요'로 표시한다.
     public static class SpriteSpecEditor
     {
-        public const string RegistryPath = EditorDatabase.DataRoot + "/Resources/GameSystems/SpriteSpecs.asset";
+        public const string RegistryPath = EditorDatabase.DataRoot + "/Resources/MomoiProject/SpriteSpecs.asset";
         public const string OutputRoot = EditorDatabase.DataRoot + "/Sprites";
 
         // ── 맞춤 기록 저장소 ───────────────────────────────────
@@ -35,7 +35,7 @@ namespace GameSystems.EditorTools
         public static IEnumerable<SpritePresetData> PresetsOf(string group) =>
             EditorDatabase.Instance.OfType<SpritePresetData>().Where(p => p.group == group).OrderBy(p => p.Id, StringComparer.Ordinal);
 
-        // 스프라이트 필드의 규칙(규격 묶음·미리보기 규격).
+        // 스프라이트 필드의 규칙(규격 그룹·미리보기 규격).
         public static FieldRuleData RuleFor(FieldInfo field)
         {
             var rule = EditorDatabase.RuleFor(field);
@@ -110,7 +110,7 @@ namespace GameSystems.EditorTools
 
         // ── 베이크 ─────────────────────────────────────────────
 
-        // 맞춤을 저장하고 묶음의 모든 규격을 베이크한다. 돌려주는 값: 만든 스프라이트 수.
+        // 맞춤을 저장하고 그룹의 모든 규격을 베이크한다. 돌려주는 값: 만든 스프라이트 수.
         public static int Apply(Sprite source, string group, Vector2 center, float zoom, IDictionary<string, (Vector2 center, float zoom)> overrides)
         {
             var registry = Registry;
@@ -160,7 +160,7 @@ namespace GameSystems.EditorTools
             return sprite != null;
         }
 
-        // 규격 크기가 바뀌었거나 묶음에 규격이 추가된 경우 다시 베이크한다. 예외 촬영이 걸린 것은 '확인 필요'로 표시.
+        // 규격 크기가 바뀌었거나 그룹에 규격이 추가된 경우 다시 베이크한다. 예외 촬영이 걸린 것은 '확인 필요'로 표시.
         // 돌려주는 값: (다시 베이크한 수, 확인이 필요한 예외 목록)
         public static (int rebaked, List<string> review) RebakeStale()
         {
@@ -214,13 +214,13 @@ namespace GameSystems.EditorTools
                 // 도감에 적용 대기 중인 규격 변경은 적용된 뒤에 베이크한다.
                 if (EditorDatabase.Staging.HasChanges) return;
                 var (rebaked, review) = RebakeStale();
-                if (rebaked > 0) Debug.Log($"[GameSystems] 바뀐 스프라이트 규격으로 {rebaked}개를 다시 베이크했습니다.");
+                if (rebaked > 0) Debug.Log($"[MomoiProject] 바뀐 스프라이트 규격으로 {rebaked}개를 다시 베이크했습니다.");
                 if (review.Count > 0)
-                    Debug.LogWarning("[GameSystems] 규격이 바뀌어 예외 촬영을 확인해야 합니다(도감 › 스프라이트 규격에서 표시):\n  " + string.Join("\n  ", review));
+                    Debug.LogWarning("[MomoiProject] 규격이 바뀌어 예외 촬영을 확인해야 합니다(도감 › 스프라이트 규격에서 표시):\n  " + string.Join("\n  ", review));
             };
         }
 
-        [MenuItem("Game Systems/스프라이트 규격 다시 베이크", priority = 31)]
+        [MenuItem("MomoiProject/스프라이트 규격 다시 베이크", priority = 31)]
         static void RebakeAllMenu()
         {
             var registry = AssetDatabase.LoadAssetAtPath<SpriteSpecDatabase>(RegistryPath);
@@ -228,7 +228,7 @@ namespace GameSystems.EditorTools
             foreach (var framing in registry.Framings)
                 foreach (var bake in framing.baked) bake.revision = 0;
             var (rebaked, _) = RebakeStale();
-            Debug.Log($"[GameSystems] 스프라이트 {rebaked}개를 다시 베이크했습니다.");
+            Debug.Log($"[MomoiProject] 스프라이트 {rebaked}개를 다시 베이크했습니다.");
         }
 
         static string Safe(string name) => string.Concat((name ?? "").Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));

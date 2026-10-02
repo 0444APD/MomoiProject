@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     [GameEvent("테스트 몬스터 처치")]
     public sealed class TestMonsterKilled
@@ -185,17 +185,17 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 상태_값_검사_조건은_컬렉션_안까지_보고_바뀔_때만_평가한다()
+        public void 플레이어_데이터_검사_조건은_컬렉션_안까지_보고_바뀔_때만_평가한다()
         {
             var session = new GameSession();
-            session.State.Define("player.bag", StateZone.Meta, new TestBag());
-            session.Actions.Register<LootAction>(_ => session.State.Modify<TestBag>("player.bag",
+            session.Data.Define("player.bag", DataZone.Meta, new TestBag());
+            session.Actions.Register<LootAction>(_ => session.Data.Modify<TestBag>("player.bag",
                 bag => bag.items.Add(new TestLoot { name = "왕관", grade = 5, tags = { "legendary" } })));
             session.Achievements.Define(new AchievementDefinition
             {
                 Id = "legend_owner",
                 DisplayName = "전설 보유",
-                Condition = new StateFieldCondition
+                Condition = new PlayerDataCondition
                 {
                     key = "player.bag",
                     filter = new ElementFilter { path = "items", filter = new FieldFilter { path = "tags", op = FieldOp.Contains, value = "legendary" } },

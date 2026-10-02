@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // USS 문법 오류는 컴파일 오류가 아니라 임포트 경고로만 나오므로 따로 잡는다.
     public class StyleSheetTests

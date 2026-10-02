@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
+using GBible.Data;
+using GBible.Dialogue;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
-    // 텍스트 시트에 대화 대본을 더한다: 대화마다 재생 순서대로 대사·선택지, 문맥 열은 대화 · 장소 · 화자.
+    // 텍스트 시트에 다이얼로그 대본을 더한다: 다이얼로그마다 재생 순서대로 대사·선택지, 문맥 열은 다이얼로그 · 장소 · 화자.
     // 그 밖의 연출 정보는 시트에 내보내지 않는다(필요하면 대사 노드의 '메모'가 메모 칸으로 나간다).
     sealed class DialogueSheetRows : ITextSheetSource
     {

@@ -1,14 +1,14 @@
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using UnityEditor;
 
-namespace GameSystems.Samples
+namespace GBible.Samples
 {
     // 샘플 수치·도전과제 에셋을 만든다. 이미 있으면 건너뛴다.
     public static class SampleDataMenu
     {
-        [MenuItem("Game Systems/샘플/샘플 데이터 만들기", priority = 40)]
+        [MenuItem("Tests/샘플/샘플 데이터 만들기", priority = 40)]
         public static void Create()
         {
             if (!CreateData())
@@ -19,27 +19,8 @@ namespace GameSystems.Samples
             DatabaseWindow.Open();
         }
 
-        // 상세 패널 점검용 항목: 필드 종류·개수가 많고, 긴 글(10줄 넘음)과 빈 칸이 들어 있다. 만들고 바로 상세 패널을 연다.
-        [MenuItem("Game Systems/샘플/필드 시험 항목 만들기", priority = 41)]
-        public static void CreateFieldTest()
-        {
-            var db = EditorDatabase.Instance;
-            db.Sync();
-            var item = (SampleFieldTestData)db.Create(typeof(SampleFieldTestData), db.NextId(DataTypes.Find(typeof(SampleFieldTestData))));
-            item.longText = string.Join("\n", Enumerable.Range(1, 16).Select(i => $"{i}번째 줄: 긴 글은 칸이 늘어나다가 10줄을 넘으면 칸 안에서 스크롤됩니다."));
-            item.stat = db.OfType<StatData>().FirstOrDefault()?.Id ?? "";
-            item.achievement = db.OfType<AchievementData>().FirstOrDefault()?.Id ?? "";
-            item.condition = new AllOfCondition();
-            EditorUtility.SetDirty(item);
-            AssetDatabase.SaveAssetIfDirty(item);
-            // 샘플 키워드가 있으면 키워드 칸(하나·여러 개)도 드롭다운으로 확인할 수 있게 연결한다.
-            if (db.FindById("grade") != null) KeywordTools.Connect(typeof(SampleFieldTestData), typeof(SampleFieldTestData).GetField(nameof(SampleFieldTestData.keyword)), "grade");
-            if (db.FindById("equipmentTag") != null) KeywordTools.Connect(typeof(SampleFieldTestData), typeof(SampleFieldTestData).GetField(nameof(SampleFieldTestData.keywords)), "equipmentTag");
-            DatabaseWindow.ShowItem(item);
-        }
-
         // 다국어 예시: 한국어(원문)·영어 표와 문장 몇 개. 있는 키는 건드리지 않는다.
-        [MenuItem("Game Systems/샘플/샘플 텍스트 만들기", priority = 42)]
+        [MenuItem("Tests/샘플/샘플 텍스트 만들기", priority = 42)]
         public static void CreateTexts()
         {
             var settings = TextSheetTools.EnsureSettings();
@@ -89,11 +70,11 @@ namespace GameSystems.Samples
             EditorUtility.SetDirty(table);
         }
 
-        // 배치모드용: Unity.exe -batchmode -quit -executeMethod GameSystems.Samples.SampleDataMenu.CreateDataBatch
+        // 배치모드용: Unity.exe -batchmode -quit -executeMethod GBible.Samples.SampleDataMenu.CreateDataBatch
         public static void CreateDataBatch()
         {
             var created = CreateData();
-            UnityEngine.Debug.Log(created ? "[GameSystems] 샘플 데이터를 만들었습니다." : "[GameSystems] 샘플 데이터가 이미 있습니다.");
+            UnityEngine.Debug.Log(created ? "[MomoiProject] 샘플 데이터를 만들었습니다." : "[MomoiProject] 샘플 데이터가 이미 있습니다.");
         }
 
         public static bool CreateData()
@@ -102,7 +83,6 @@ namespace GameSystems.Samples
             db.Sync();
             var created = CreateBasics(db);
             created |= CreateEquipmentExample(db);
-            created |= CreateItemExample(db);
             if (!created) return false;
             AssetDatabase.SaveAssets();
             EditorDatabase.Instance.Sync();
@@ -118,24 +98,24 @@ namespace GameSystems.Samples
             var bestCombo = Stat("bestCombo", StatScope.Total, StatAggregate.Max, Rule<EnemyKilled>(nameof(EnemyKilled.Combo)));
             // 번 골드 총합은 로그(이벤트로 자동 누적), 지갑 골드는 플레이어 데이터(보상으로 지급·사용으로 차감).
             var goldEarned = Stat("goldEarned", StatScope.Total, StatAggregate.Sum, Rule<GoldEarned>(nameof(GoldEarned.Amount)));
-            var gold = (StateKeyData)db.Create(typeof(StateKeyData), "player.gold");
-            gold.zone = StateZone.Meta;
+            var gold = (PlayerDataEntry)db.Create(typeof(PlayerDataEntry), "player.gold");
+            gold.zone = DataZone.Meta;
             gold.valueType = typeof(int).FullName;
             gold.defaultValue = "0";
             EditorUtility.SetDirty(gold);
 
-            Achievement("firstHunt", "처음으로 적을 처치했다.",
+            Achievement("firstHunt",
                 new StatCompareCondition { stat = killsTotal.Id, op = CompareOp.AtLeast, value = 1 },
-                new AddToStateReward { key = gold.Id, amount = 50 });
+                Pay(gold.Id, 50));
 
-            var hunter = Achievement("monsterHunter", "적을 25마리 처치했다.",
+            var hunter = Achievement("monsterHunter",
                 new StatCompareCondition { stat = killsTotal.Id, op = CompareOp.AtLeast, value = 25 },
-                new AddToStateReward { key = gold.Id, amount = 500 });
+                Pay(gold.Id, 500));
 
-            var comboMaster = Achievement("comboMaster", "한 번에 8연속 처치했다.",
+            var comboMaster = Achievement("comboMaster",
                 new StatCompareCondition { stat = bestCombo.Id, op = CompareOp.AtLeast, value = 8 });
 
-            Achievement("legendaryWarrior", "몬스터 사냥꾼과 연속 공격의 달인을 모두 달성했다.",
+            Achievement("legendaryWarrior",
                 new AllOfCondition
                 {
                     conditions =
@@ -144,9 +124,9 @@ namespace GameSystems.Samples
                         new AchievementUnlockedCondition { achievement = comboMaster.Id },
                     },
                 },
-                new AddToStateReward { key = gold.Id, amount = 2000 });
+                Pay(gold.Id, 2000));
 
-            Achievement("rich", "골드를 총 1000 벌었다.",
+            Achievement("rich",
                 new StatCompareCondition { stat = goldEarned.Id, op = CompareOp.AtLeast, value = 1000 });
 
             // 이번 판 수치는 되감기 대상임을 보여주는 용도(Undo하면 되돌아간다).
@@ -155,29 +135,6 @@ namespace GameSystems.Samples
         }
 
         // 장비·강화 효과·몬스터 태그 예제: 키워드, 플레이어 데이터, 템플릿, 조건식이 붙은 수치·도전과제.
-        // 기능 조립식 아이템: 공통 칸 + 기능 묶음 목록(장착·사용·겹침·투척).
-        static bool CreateItemExample(EditorDatabase db)
-        {
-            if (db.FindById("item.ironSword") != null) return false;
-            if (db.FindById("grade") != null) Link(typeof(SampleItem), nameof(SampleItem.grade), "grade");
-            if (db.FindById("equipmentSlot") != null) Link(typeof(SampleEquippable), nameof(SampleEquippable.slot), "equipmentSlot");
-            Item("item.ironSword", 120, "common", new SampleEquippable { slot = "weapon", attack = 10 });
-            Item("item.healthPotion", 30, "common", new SampleConsumable { heal = 50 }, new SampleStackable { maxStack = 99 });
-            Item("item.blessedRing", 800, "rare", new SampleEquippable { slot = "accessory", defense = 5 }, new SampleConsumable { heal = 100 });
-            Item("item.bomb", 60, "common", new SampleConsumable { heal = 0 }, new SampleStackable { maxStack = 10 }, new SampleThrowable { damage = 40 });
-            return true;
-
-            void Item(string id, int price, string grade, params SampleItemFeature[] features)
-            {
-                var item = (SampleItem)db.Create(typeof(SampleItem), id);
-                item.price = price;
-                item.grade = grade;
-                item.features.AddRange(features);
-                EditorUtility.SetDirty(item);
-                AssetDatabase.SaveAssetIfDirty(item);
-            }
-        }
-
         static bool CreateEquipmentExample(EditorDatabase db)
         {
             if (db.FindById("player.inventory") != null) return false;
@@ -210,33 +167,33 @@ namespace GameSystems.Samples
             iconRule.spriteGroup = itemImages.Id;
             iconRule.previewPreset = "itemIcon";
             EditorUtility.SetDirty(iconRule);
-            var inventory = (StateKeyData)db.Create(typeof(StateKeyData), "player.inventory");
-            inventory.zone = StateZone.Meta;
+            var inventory = (PlayerDataEntry)db.Create(typeof(PlayerDataEntry), "player.inventory");
+            inventory.zone = DataZone.Meta;
             inventory.valueType = typeof(SampleInventory).FullName;
             EditorUtility.SetDirty(inventory);
 
             Template("template.trainingSword", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = "common", tags = { "melee" } });
             Template("template.dragonArmor", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = "legendary", element = SampleElement.Fire, tags = { "pierce" } });
 
-            var gold = db.OfType<StateKeyData>().FirstOrDefault(s => s.Id == "player.gold");
+            var gold = db.OfType<PlayerDataEntry>().FirstOrDefault(s => s.Id == "player.gold");
             var bossRule = Rule<EnemyKilled>("");
             bossRule.filter = new FieldFilter { path = nameof(EnemyKilled.Tags), op = FieldOp.Contains, value = "boss" };
             var bossKills = Stat("bossKills", StatScope.Total, StatAggregate.Sum, bossRule);
 
-            Achievement("dragonSlayer", "보스를 처치했다.",
+            Achievement("dragonSlayer",
                 new StatCompareCondition { stat = bossKills.Id, op = CompareOp.AtLeast, value = 1 },
                 // 보상: 골드 지급 + 아이템(용의 비늘 갑옷 템플릿 사본)을 인벤토리 items에 지급.
                 gold != null
-                    ? new Reward[] { new AddToStateReward { key = gold.Id, amount = 100 }, new GrantItemReward { key = inventory.Id, path = "items", template = "template.dragonArmor" } }
-                    : new Reward[] { new GrantItemReward { key = inventory.Id, path = "items", template = "template.dragonArmor" } });
-            Achievement("legendCollector", "전설 등급 장비를 얻었다.",
-                new StateFieldCondition
+                    ? new Reward[] { Pay(gold.Id, 100), Give(inventory.Id, "items", "template.dragonArmor") }
+                    : new Reward[] { Give(inventory.Id, "items", "template.dragonArmor") });
+            Achievement("legendCollector",
+                new PlayerDataCondition
                 {
                     key = inventory.Id,
                     filter = new ElementFilter { path = "items", mode = ElementMode.Any, filter = new FieldFilter { path = "grade", op = FieldOp.Equal, value = "legendary" } },
                 });
-            Achievement("enhanceMaster", "불 속성이 아닌 장비를 3번 이상 강화했다.",
-                new StateFieldCondition
+            Achievement("enhanceMaster",
+                new PlayerDataCondition
                 {
                     key = inventory.Id,
                     filter = new ElementFilter
@@ -265,7 +222,7 @@ namespace GameSystems.Samples
 
         static void Link(System.Type type, string field, string group, bool required = false)
         {
-            var rule = KeywordTools.Connect(type, type.GetField(field), group);
+            var rule = KeywordTools.Connect(type, type.GetField(field), group, staged: false);
             if (!required) return;
             rule.required = true;
             EditorUtility.SetDirty(rule);
@@ -281,6 +238,13 @@ namespace GameSystems.Samples
             AssetDatabase.SaveAssetIfDirty(template);
         }
 
+        // 보상: 숫자 플레이어 데이터 증감 / 리스트에 템플릿(사본) 넣기.
+        static PlayerDataReward Pay(string key, int amount) =>
+            new PlayerDataReward { key = key, amount = amount };
+
+        static PlayerDataReward Give(string key, string path, string template) =>
+            new PlayerDataReward { key = key, path = path, items = { template } };
+
         static StatRule Rule<T>(string field) => new StatRule { eventType = typeof(T).FullName, field = field, multiplier = 1 };
 
         static StatData Stat(string id, StatScope scope, StatAggregate aggregate, StatRule rule)
@@ -288,17 +252,16 @@ namespace GameSystems.Samples
             var stat = (StatData)EditorDatabase.Instance.Create(typeof(StatData), id);
             stat.scope = scope;
             stat.aggregate = aggregate;
-            stat.rules.Add(rule);
+            stat.triggers.Add(rule.ToTriggerRule());
             EditorUtility.SetDirty(stat);
             return stat;
         }
 
-        static AchievementData Achievement(string id, string description, Condition condition, params Reward[] rewards)
+        static AchievementData Achievement(string id, Condition condition, params Reward[] rewards)
         {
             var achievement = (AchievementData)EditorDatabase.Instance.Create(typeof(AchievementData), id);
-            achievement.description = description;
-            achievement.condition = condition;
-            achievement.rewards.AddRange(rewards);
+            achievement.trigger = new ConditionTrigger { condition = condition };
+            achievement.outcomes.AddRange(rewards);
             EditorUtility.SetDirty(achievement);
             AssetDatabase.SaveAssetIfDirty(achievement);
             EditorDatabase.MarkDirty();

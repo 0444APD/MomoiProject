@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
     // 게임 오디오: 어디서든 부른다. 게임이 시작되면 오디오 오브젝트가 자동으로 만들어져 씬이 바뀌어도 계속 돈다.
     //   GameAudio.PlayBgm(clip);            // 브금: 바뀌면 이전 곡이 페이드 아웃, 새 곡이 페이드 인
@@ -19,7 +19,7 @@ namespace GameSystems
         static readonly bool[] Muted = new bool[5];
         static bool _volumesLoaded;
 
-        const string PrefsPrefix = "GameSystems.Audio.";
+        const string PrefsPrefix = "GBible.Audio.";
 
         // 음량이 바뀌었을 때(설정 화면 갱신용).
         public static event Action<AudioChannel> VolumeChanged;

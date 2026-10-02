@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 식별자: 한 곳(데이터베이스)에서 짓고, 나머지는 목록 선택·생성 코드로만 쓴다.
     public class IdentifierTests
@@ -67,31 +67,31 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 상태_키_데이터가_저장소에_등록된다()
+        public void 플레이어_데이터_항목이_저장소에_등록된다()
         {
-            var gold = Make<StateKeyData>("player.gold", "골드");
-            gold.zone = StateZone.Meta;
+            var gold = Make<PlayerDataEntry>("player.gold", "골드");
+            gold.zone = DataZone.Meta;
             gold.valueType = typeof(int).FullName;
             gold.defaultValue = "5";
-            var bag = Make<StateKeyData>("player.bag", "가방");
+            var bag = Make<PlayerDataEntry>("player.bag", "가방");
             bag.valueType = typeof(TestInventory).FullName;
 
             var session = new GameSession();
-            gold.DefineIn(session.State);
-            bag.DefineIn(session.State);
+            gold.DefineIn(session.Data);
+            bag.DefineIn(session.Data);
 
-            Assert.AreEqual(5, session.State.Get<int>("player.gold"));
-            Assert.AreEqual(StateZone.Meta, session.State.ZoneOf("player.gold"));
-            Assert.IsNotNull(session.State.Get<TestInventory>("player.bag"));
-            Assert.AreEqual("player.gold", session.State.LabelOf("player.gold"), "도감 항목은 ID로만 식별한다");
+            Assert.AreEqual(5, session.Data.Get<int>("player.gold"));
+            Assert.AreEqual(DataZone.Meta, session.Data.ZoneOf("player.gold"));
+            Assert.IsNotNull(session.Data.Get<TestInventory>("player.bag"));
+            Assert.AreEqual("player.gold", session.Data.LabelOf("player.gold"), "도감 항목은 ID로만 식별한다");
         }
 
         [Test]
-        public void 상태_키의_잘못된_형식과_기본값을_잡는다()
+        public void 플레이어_데이터_항목의_잘못된_형식과_기본값을_잡는다()
         {
-            var missing = Make<StateKeyData>("a.missing", "없는 형식");
+            var missing = Make<PlayerDataEntry>("a.missing", "없는 형식");
             missing.valueType = "Nope.Type";
-            var badDefault = Make<StateKeyData>("a.bad", "잘못된 기본값");
+            var badDefault = Make<PlayerDataEntry>("a.bad", "잘못된 기본값");
             badDefault.valueType = typeof(int).FullName;
             badDefault.defaultValue = "많이";
             var issues = DataValidator.Validate(new List<GameData> { missing, badDefault });
@@ -102,26 +102,30 @@ namespace GameSystems.Tests
         [Test]
         public void 식별자_코드를_타입까지_붙여_만든다()
         {
-            var gold = Make<StateKeyData>("player.gold", "골드");
+            var gold = Make<PlayerDataEntry>("player.gold", "골드");
             gold.valueType = typeof(int).FullName;
-            var bag = Make<StateKeyData>("player.bag", "가방");
+            var bag = Make<PlayerDataEntry>("player.bag", "가방");
             bag.valueType = typeof(TestInventory).FullName;
             var kills = Make<StatData>("killsTotal", "처치 수");
 
-            var code = GameIdsGenerator.Build(new List<GameData> { gold, bag, kills }, "GameSystems.Tests.Editor");
+            var code = GameIdsGenerator.Build(new List<GameData> { gold, bag, kills }, "GBible.Tests.Editor");
 
             StringAssert.Contains("public static class PlayerData", code);
-            StringAssert.Contains("global::GameSystems.StateKey<int> PlayerGold = new global::GameSystems.StateKey<int>(\"player.gold\");", code);
-            StringAssert.Contains("global::GameSystems.StateKey<global::GameSystems.Tests.TestInventory> PlayerBag", code);
+            StringAssert.Contains("global::GBible.PlayerDataKey<int> PlayerGold = new global::GBible.PlayerDataKey<int>(\"player.gold\");", code);
+            StringAssert.Contains("global::GBible.PlayerDataKey<global::GBible.Tests.TestInventory> PlayerBag", code);
             StringAssert.Contains("public static class Stat", code);
             StringAssert.Contains("public const string KillsTotal = \"killsTotal\";", code);
             StringAssert.Contains("/// <summary>killsTotal</summary>", code);
+            // 이름으로 읽고 쓰는 창구: 단순 값은 읽고 쓰기, 클래스 값은 읽기(안쪽을 고친다).
+            StringAssert.Contains("public int PlayerGold { get => _game.Session.Data.Get<int>(\"player.gold\"); set => _game.Session.Data.Set(\"player.gold\", value); }", code);
+            StringAssert.Contains("public global::GBible.Tests.TestInventory PlayerBag => _game.Session.Data.Get<global::GBible.Tests.TestInventory>(\"player.bag\");", code);
+            StringAssert.Contains("public static PlayerDataView Data(this global::GBible.GameApi game)", code);
         }
 
         [Test]
         public void 참조할_수_없는_위치면_ID_문자열만_만든다()
         {
-            var bag = Make<StateKeyData>("player.bag", "가방");
+            var bag = Make<PlayerDataEntry>("player.bag", "가방");
             bag.valueType = typeof(TestInventory).FullName;
             var code = GameIdsGenerator.Build(new List<GameData> { bag }, "없는어셈블리");
             StringAssert.Contains("public const string PlayerBag = \"player.bag\";", code);

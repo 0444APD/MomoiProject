@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-namespace GameSystems
+namespace GBible
 {
     // 테스트용 이벤트 발생. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 수치 규칙 → 확정 → 도전과제 → 보상)를 탄다.
     // 행동으로 기록되므로 Undo·인과 추적이 그대로 적용된다.
@@ -61,7 +61,7 @@ namespace GameSystems
         {
             if (type.IsValueType) return Activator.CreateInstance(type);
             if (type.GetConstructor(Type.EmptyTypes) == null)
-                throw new InvalidOperationException($"[GameSystems] 이벤트 '{type.Name}'에 매개변수 없는 생성자가 없어 테스트로 만들 수 없습니다.");
+                throw new InvalidOperationException($"[MomoiProject] 이벤트 '{type.Name}'에 매개변수 없는 생성자가 없어 테스트로 만들 수 없습니다.");
             return Activator.CreateInstance(type);
         }
 
@@ -74,7 +74,7 @@ namespace GameSystems
             {
                 var member = (MemberInfo)type.GetField(pair.Key, BindingFlags.Public | BindingFlags.Instance)
                              ?? type.GetProperty(pair.Key, BindingFlags.Public | BindingFlags.Instance);
-                if (member == null) throw new ArgumentException($"[GameSystems] '{type.Name}'에 '{pair.Key}' 멤버가 없습니다.");
+                if (member == null) throw new ArgumentException($"[MomoiProject] '{type.Name}'에 '{pair.Key}' 멤버가 없습니다.");
                 var converted = Convert(pair.Value, MemberType(member), pair.Key);
                 if (member is FieldInfo field) field.SetValue(instance, converted);
                 else ((PropertyInfo)member).SetValue(instance, converted);
@@ -90,7 +90,7 @@ namespace GameSystems
             if (target == typeof(bool) && value is double d) return d != 0;
             var number = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
             if (IsInteger(target) && Math.Abs(number - Math.Round(number)) > 1e-9)
-                throw new ArgumentException($"[GameSystems] '{name}'은 정수 필드라 {number.ToString(CultureInfo.InvariantCulture)}을 넣을 수 없습니다.");
+                throw new ArgumentException($"[MomoiProject] '{name}'은 정수 필드라 {number.ToString(CultureInfo.InvariantCulture)}을 넣을 수 없습니다.");
             return System.Convert.ChangeType(IsInteger(target) ? Math.Round(number) : number, target, CultureInfo.InvariantCulture);
         }
 
@@ -125,14 +125,14 @@ namespace GameSystems
                 error = $"정의되지 않은 수치 '{statId}'입니다.";
                 return false;
             }
-            if (definition.Rules.Count == 0)
+            if (!definition.SimpleRules().Any())
             {
                 error = $"'{definition.DisplayName}'에는 반영 규칙이 없어 이벤트로 바꿀 수 없습니다. 직접 수정을 쓰세요.";
                 return false;
             }
 
             var reasons = new List<string>();
-            foreach (var rule in definition.Rules)
+            foreach (var rule in definition.SimpleRules())
             {
                 var type = TypeResolver.Find(rule.eventType);
                 if (type == null)
@@ -181,7 +181,7 @@ namespace GameSystems
                 }
                 catch (Exception e)
                 {
-                    reasons.Add($"{name}: {e.Message.Replace("[GameSystems] ", "")}");
+                    reasons.Add($"{name}: {e.Message.Replace("[MomoiProject] ", "")}");
                 }
             }
 
@@ -191,22 +191,140 @@ namespace GameSystems
 
         // ── 도전과제 조건 채우기 ─────────────────────────────────
 
-        // 조건 트리를 따라가 아직 부족한 수치 차이를 계산한다. (수치 id, 반영할 값) 목록.
-        public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out string error)
+        // 트리거를 따라가 테스트로 발동시키는 계획: 먼저 조건을 채울 로그 차이(로그 id, 반영할 값), 그다음 발생시킬 이벤트(값 조건을 맞춘 것).
+        // 게임과 같은 경로라 조건이 맞은 상태에서 이벤트가 발생해 트리거가 스스로 발동한다.
+        //   조건 충족 → 부족한 로그를 이벤트로 채운다 / 이벤트 발생 → 그 이벤트를 만들고 값 조건(같음·이상·포함 …)에 맞춰 채운다 /
+        //   AND → 모두 / OR → 계획이 서는 첫 갈래 / NOT·사용 → 자동으로 만들 수 없다(강제 달성을 쓴다).
+        public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out List<object> events, out string error)
         {
             steps = new List<(string, double)>();
+            events = new List<object>();
             var problems = new List<string>();
             var definition = session.Achievements.Find(achievementId);
-            if (definition?.Condition == null)
+            if (definition?.When == null)
             {
-                error = "조건이 없는 도전과제입니다.";
+                error = "트리거가 없는 도전과제입니다.";
                 return false;
             }
-            Collect(session, definition.Condition, steps, problems, new HashSet<string> { achievementId });
-            // 같은 수치를 여러 조건이 보면 가장 큰 요구치 하나로 합친다.
+            PlanTrigger(session, definition.When, steps, events, problems, new HashSet<string> { achievementId });
+            // 같은 로그를 여러 조건이 보면 가장 큰 요구치 하나로 합친다.
             steps = steps.GroupBy(s => s.stat).Select(g => (g.Key, g.Max(s => s.amount))).ToList();
             error = problems.Count > 0 ? string.Join(" / ", problems) : null;
-            return problems.Count == 0 && steps.Count > 0;
+            return problems.Count == 0 && (steps.Count > 0 || events.Count > 0);
+        }
+
+        // 예전 형태(조건만): 로그 차이만.
+        public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out string error) =>
+            TryPlanForAchievement(session, achievementId, out steps, out _, out error);
+
+        static void PlanTrigger(GameSession session, Trigger trigger, List<(string stat, double amount)> steps, List<object> events, List<string> problems, HashSet<string> visiting)
+        {
+            switch (trigger)
+            {
+                case ConditionTrigger single:
+                    if (single.condition != null) Collect(session, single.condition, steps, problems, visiting);
+                    return;
+                case EventTrigger fired:
+                    var type = TypeResolver.Find(fired.eventType);
+                    if (type == null)
+                    {
+                        problems.Add($"이벤트 '{fired.eventType}'을(를) 찾을 수 없음");
+                        return;
+                    }
+                    object evt;
+                    try { evt = CreateDefault(type); }
+                    catch (InvalidOperationException e)
+                    {
+                        problems.Add(e.Message.Replace("[MomoiProject] ", ""));
+                        return;
+                    }
+                    if (fired.filter != null)
+                    {
+                        Satisfy(evt, fired.filter);
+                        if (!fired.filter.Test(evt))
+                        {
+                            problems.Add($"{EventBus.DisplayNameOf(type)}의 값 조건 '{fired.filter.Natural()}'을 자동으로 맞출 수 없음(이벤트 탭에서 값을 채워 직접 발생시키세요)");
+                            return;
+                        }
+                    }
+                    events.Add(evt);
+                    return;
+                case AllTrigger all:
+                    if (all.Children.Count(c => c is EventTrigger) > 1) problems.Add("서로 다른 이벤트를 AND로 묶어 같은 순간을 만들 수 없음");
+                    foreach (var child in all.Children) PlanTrigger(session, child, steps, events, problems, visiting);
+                    return;
+                case AnyTrigger any:
+                    // 계획이 서는 첫 갈래.
+                    foreach (var child in any.Children)
+                    {
+                        var s = new List<(string, double)>();
+                        var e = new List<object>();
+                        var p = new List<string>();
+                        PlanTrigger(session, child, s, e, p, new HashSet<string>(visiting));
+                        if (p.Count > 0) continue;
+                        steps.AddRange(s);
+                        events.AddRange(e);
+                        return;
+                    }
+                    problems.Add("OR의 어느 갈래도 자동으로 채울 수 없음");
+                    return;
+                case UseTrigger _:
+                    problems.Add("'사용'은 테스트 이벤트로 재현할 수 없음(게임 코드의 Game.Use)");
+                    return;
+                default:
+                    problems.Add($"'{trigger.Natural(session)}'은 자동으로 채울 수 없는 트리거");
+                    return;
+            }
+        }
+
+        // 이벤트 값을 값 조건에 맞게 채운다(필드 하나짜리 비교: 같음·이상·초과·이하·미만·참·거짓·포함, AND는 모두, OR는 첫 갈래).
+        static void Satisfy(object evt, ValueFilter filter)
+        {
+            switch (filter)
+            {
+                case AllFilter all:
+                    foreach (var child in all.Children) Satisfy(evt, child);
+                    return;
+                case AnyFilter any:
+                    var first = any.Children.FirstOrDefault();
+                    if (first != null) Satisfy(evt, first);
+                    return;
+                case FieldFilter field when !string.IsNullOrEmpty(field.path) && !field.path.Contains('.'):
+                    var member = (MemberInfo)evt.GetType().GetField(field.path, BindingFlags.Public | BindingFlags.Instance)
+                                 ?? evt.GetType().GetProperty(field.path, BindingFlags.Public | BindingFlags.Instance);
+                    if (member == null) return;
+                    var type = MemberType(member);
+                    object value = null;
+                    switch (field.op)
+                    {
+                        case FieldOp.Equal:
+                        case FieldOp.AtLeast:
+                        case FieldOp.AtMost:
+                            PlayerDataGrants.TryParse(type, field.value, out value, out _);
+                            break;
+                        case FieldOp.Greater:
+                        case FieldOp.Less:
+                            if (TypeResolver.IsNumeric(type) && double.TryParse(field.value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+                                value = PlayerDataGrants.ToNumber(field.op == FieldOp.Greater ? number + 1 : number - 1, type);
+                            break;
+                        case FieldOp.IsTrue:
+                            if (type == typeof(bool)) value = true;
+                            break;
+                        case FieldOp.IsFalse:
+                            if (type == typeof(bool)) value = false;
+                            break;
+                        case FieldOp.Contains:
+                            if (type == typeof(string)) value = field.value;
+                            else if (GetValue(member, evt) is System.Collections.IList list && FieldPaths.ElementTypeOf(type) is Type element &&
+                                     PlayerDataGrants.TryParse(element, field.value, out var item, out _))
+                                list.Add(item);
+                            break;
+                    }
+                    if (value == null) return;
+                    if (member is FieldInfo f) f.SetValue(evt, value);
+                    else if (member is PropertyInfo p && p.CanWrite) p.SetValue(evt, value);
+                    return;
+            }
         }
 
         static void Collect(GameSession session, Condition condition, List<(string stat, double amount)> steps, List<string> problems, HashSet<string> visiting)
@@ -239,8 +357,8 @@ namespace GameSystems
                         return;
                     }
                     var other = session.Achievements.Find(unlocked.achievement);
-                    if (other?.Condition == null) problems.Add($"'{session.AchievementName(unlocked.achievement)}'의 조건이 없음");
-                    else Collect(session, other.Condition, steps, problems, visiting);
+                    if (other?.When == null) problems.Add($"'{session.AchievementName(unlocked.achievement)}'의 트리거가 없음");
+                    else PlanTrigger(session, other.When, steps, new List<object>(), problems, visiting);
                     return;
 
                 case AllOfCondition all:

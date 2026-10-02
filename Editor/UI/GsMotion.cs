@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 모션 토큰과 애니메이션 도우미. DOTween 없이 USS 트랜지션 + 자체 스프링으로 만든다.
     public static class GsMotion

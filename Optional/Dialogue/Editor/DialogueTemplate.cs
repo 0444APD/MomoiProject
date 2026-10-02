@@ -1,26 +1,26 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using GameSystems.Dialogue;
+using GBible.Dialogue;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
-    // 대화 UI 템플릿: 모든 기능이 연결된 기본 프리팹과 UXML·USS·모션·패널 설정을 한 폴더에 만든다.
+    // 다이얼로그 UI 템플릿: 모든 기능이 연결된 기본 프리팹과 UXML·USS·모션·패널 설정을 한 폴더에 만든다.
     // 프로젝트마다 모양을 바꿀 때는 이 폴더의 UXML·USS를 고치거나(요소 이름만 지키면 된다), 프리팹 변형을 만든다.
     public static class DialogueTemplate
     {
         const string Root = EditorDatabase.DataRoot + "/DialogueUI";
 
-        [MenuItem("Game Systems/대화 UI 템플릿 만들기", priority = 7)]
+        [MenuItem("MomoiProject/다이얼로그 시스템/UI 템플릿 만들기", priority = 7)]
         static void CreateMenu()
         {
             var prefab = Create();
             Selection.activeObject = prefab;
             EditorGUIUtility.PingObject(prefab);
-            Debug.Log($"[대화 UI] 템플릿을 만들었습니다: {AssetDatabase.GetAssetPath(prefab)}\n씬에 끌어 놓고 DialoguePlayer.Play(\"대화 ID\")로 재생합니다. 한글이 네모로 보이면 UI 오브젝트의 DialogueUI > font에 한글 폰트(TTF)를 넣으세요.");
+            Debug.Log($"[다이얼로그 UI] 템플릿을 만들었습니다: {AssetDatabase.GetAssetPath(prefab)}\n씬에 끌어 놓고 DialoguePlayer.Play(\"다이얼로그 ID\")로 재생합니다. 한글이 네모로 보이면 UI 오브젝트의 DialogueUI > font에 한글 폰트(TTF)를 넣으세요.");
         }
 
         // 새 폴더에 템플릿 한 벌을 만들고 프리팹을 돌려준다(이미 있으면 'DialogueUI 1' …).
@@ -89,9 +89,9 @@ namespace GameSystems.EditorTools.Graph
             return prefab;
         }
 
-        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/GameSystems/DialogueSettings.asset";
+        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/MomoiProject/DialogueSettings.asset";
 
-        // 대화 관리자가 쓸 기본 프리팹으로 등록한다(설정이 없거나 프리팹이 비어 있을 때만. 이미 있으면 그대로 둔다).
+        // 다이얼로그 관리자가 쓸 기본 프리팹으로 등록한다(설정이 없거나 프리팹이 비어 있을 때만. 이미 있으면 그대로 둔다).
         static void RegisterDefault(GameObject prefab)
         {
             var settings = AssetDatabase.LoadAssetAtPath<DialogueSettings>(SettingsPath);
@@ -259,7 +259,7 @@ namespace GameSystems.EditorTools.Graph
 </ui:UXML>
 ";
 
-        const string Uss = @"/* 대화 UI 기본 모양. 상태 클래스: dialogue--open · dialogue--staging · dialogue--typing · dialogue--waiting
+        const string Uss = @"/* 다이얼로그 UI 기본 모양. 상태 클래스: dialogue--open · dialogue--staging · dialogue--typing · dialogue--waiting
    · dialogue--choosing · dialogue--narration · dialogue--speaker-<캐릭터 ID> (루트에 붙는다) */
 
 .dialogue-root {
@@ -571,7 +571,7 @@ namespace GameSystems.EditorTools.Graph
 ";
     }
 
-    // 대화 UI 인스펙터: UXML에 이름 규격의 요소가 모두 있는지 보여 준다.
+    // 다이얼로그 UI 인스펙터: UXML에 이름 규격의 요소가 모두 있는지 보여 준다.
     [CustomEditor(typeof(DialogueUI))]
     sealed class DialogueUIInspector : Editor
     {

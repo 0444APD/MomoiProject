@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public class DropdownTests
     {

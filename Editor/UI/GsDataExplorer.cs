@@ -7,7 +7,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 탐색기에 넣을 항목 하나. 실제 값이거나, 하위 항목 목록을 가진 가상 폴더(분류)다.
     public sealed class ExplorerItem
@@ -713,10 +713,8 @@ namespace GameSystems.EditorTools.UI
                     Selected = Equals(c.Value, entry.Value),
                 }).ToList();
                 var owner = preview.GetFirstAncestorOfType<GsField>();
-                owner?.MenuOpened();
                 var menu = GsDropdown.Show(owner?.Box ?? (VisualElement)preview, items, placeholder: "검색");
-                if (menu != null) menu.Closed += () => owner?.MenuClosed();
-                else owner?.MenuClosed();
+                owner?.TrackMenu(menu);
                 return;
             }
             var host = preview.parent;
@@ -804,7 +802,7 @@ namespace GameSystems.EditorTools.UI
                 var value = FieldPaths.Resolve(Current, path).FirstOrDefault();
                 return Gs.Label(value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object)
                     ? DataModel.Summary(value)
-                    : StateStore.Format(value), "gs-nowrap");
+                    : PlayerDataStore.Format(value), "gs-nowrap");
             }
 
             public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(Current, path).FirstOrDefault() as UnityEngine.Object;

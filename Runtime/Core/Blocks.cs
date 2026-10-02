@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
     // 블록 타입의 표시 정보. 에디터의 "+ 추가" 메뉴에 이 이름·분류로 나타난다. (계약: 모든 블록 타입 필수)
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -12,7 +13,7 @@ namespace GameSystems
         public string Description { get; set; }
         // 편집 화면의 한 줄 문장. {필드이름}은 클릭해 바꾸는 단어, 나머지는 고정 글자. 예: "{stat} {value} {op}"
         public string Sentence { get; set; }
-        // 묶음 블록의 코드식 표시(AND·OR·NOT).
+        // 그룹 블록의 코드식 표시(AND·OR·NOT).
         public string Keyword { get; set; }
 
         public BlockInfoAttribute(string displayName)
@@ -91,34 +92,43 @@ namespace GameSystems
         }
 
         public virtual IEnumerable<Condition> Children => Array.Empty<Condition>();
+
+        // 무엇을 보는지 선언하지 않고, 평가할 때 읽은 값을 시스템이 기록해 감시하는 조건(SimpleCondition과 그것을 품은 조건).
+        public virtual bool AutoDependencies => Children.Any(c => c != null && c.AutoDependencies);
     }
 
     // 보상이 어디에 영향을 주는지. 도전과제 보상은 어느 쪽이든 Undo·되감기로 취소되지 않는다(달성과 같다).
     public enum RewardEffect
     {
-        // 게임 상태(저장소) 안에서만 일어난다.
+        // 플레이어 데이터(저장소) 안에서만 일어난다.
         Reversible,
         // 게임 밖에 영향을 준다(결제, 플랫폼 전송). 멀티플레이에서는 서버만 실행한다.
         Irreversible,
     }
 
-    // ── 보상 블록 계약 ───────────────────────────────────────────
+    // ── 코딩한 결과 Block 계약(보상) ─────────────────────────────
+    // 결과(Outcome)의 한 종류: 대상 없이 게임에 무언가를 한다(플레이어 데이터에 주기, 다이얼로그 재생 …).
+    // 프로그래머가 결과를 코딩할 때 이것을 상속한다. Grant 안에서 Context로 트리거의 이벤트·사용자·대상을 볼 수 있다.
     [Serializable]
-    public abstract class Reward
+    public abstract class Reward : Outcome
     {
+        [NonSerialized] TriggerContext _context;
+
+        // 지금 실행 중인 트리거 순간(이벤트·사용자·대상). 트리거 밖에서 직접 Grant하면 null.
+        protected TriggerContext Context => _context;
+
         public abstract void Grant(GameSession session);
-        public abstract string Describe(INameResolver names);
 
-        // 마우스를 올렸을 때 보이는 설명 문장(없으면 Describe).
-        public virtual string Explain(INameResolver names) => Describe(names);
+        public override OutcomeKinds Kind => OutcomeKinds.Coded;
 
-        // 자연어 요약(도감·로그 기본 표시). Describe는 코드 형태(Alt를 누르면 보임).
-        public virtual string Natural(INameResolver names) => Describe(names);
-        public abstract RewardEffect Effect { get; }
-
-        public virtual void Validate(IValidationContext context)
+        public override void Run(TriggerContext context)
         {
+            _context = context;
+            try { Grant(context.Session); }
+            finally { _context = null; }
         }
+
+        public abstract RewardEffect Effect { get; }
     }
 
     public enum CompareOp

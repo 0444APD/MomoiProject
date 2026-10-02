@@ -1,13 +1,13 @@
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public class DetailPanelTests
     {

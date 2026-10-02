@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
     // 오디오 오브젝트(GameAudio가 만든다). 채널마다 소리 자리(AudioSource)를 두고 페이드·음량을 매 프레임 맞춘다.
     [AddComponentMenu("")]

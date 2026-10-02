@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
     // 되돌리기 방식.
     public enum HistoryMode
@@ -28,7 +28,7 @@ namespace GameSystems
         public int SnapshotLimit = 30;
         // 저장 데이터 버전. 출시 후 데이터 구조를 바꾸면 올리고 Migrations에 변환을 등록한다.
         public int SaveVersion = 1;
-        // 저장 버전 변환. 불러오기 전에 등록되도록 옵션에 둔다(GameSystemsRuntime.Configuring에서 등록).
+        // 저장 버전 변환. 불러오기 전에 등록되도록 옵션에 둔다(GBibleRuntime.Configuring에서 등록).
         public SaveMigrations Migrations = new SaveMigrations();
         // Modify를 거치지 않은 데이터 수정 검사(행동마다·프레임마다 값 전체 비교). 출시 빌드에서는 끈다.
         public bool DetectUntrackedChanges = true;
@@ -42,19 +42,35 @@ namespace GameSystems
     public sealed class GameSession : INameResolver
     {
         public Journal Journal { get; }
-        public StateStore State { get; }
+        public PlayerDataStore Data { get; }
         public EventBus Events { get; }
         public GameClock Clock { get; }
         public RandomStreams Random { get; }
         public ActionDispatcher Actions { get; }
+        // 트리거 감시(로그·도전과제·능력 … 공용): 이벤트 발생·조건 충족·사용을 검사해 발동한다.
+        public TriggerSystem Triggers { get; }
         public StatSystem Stats { get; }
         public AchievementSystem Achievements { get; }
+        // 능력(도감 › 능력): 아이템 사용 효과·스킬 등. Game.Use로 쓴다.
+        public AbilitySystem Abilities { get; }
+        // 게임 코드의 창구(All·Find·Random·Do·Use). Block 안에서는 Game 속성으로 쓴다.
+        public GameApi Game { get; }
         public DebugCommands Debug { get; }
         public SessionOptions Options { get; }
         public SaveMigrations Migrations => Options.Migrations;
         // 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식). 불러올 때 호환 여부를 판단하는 데 쓴다.
         // 런타임이 데이터베이스(플레이어 데이터·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
         public Dictionary<string, string> SaveSchema;
+
+        // 템플릿(도감 › 템플릿에서 만든 인스턴스: 아이템 A, 버프 B …)의 원본을 ID로 찾는다. 런타임이 데이터베이스로 채운다.
+        // 보상 등은 원본이 아니라 CreateFromTemplate의 사본을 넣는다.
+        public Func<string, object> Templates;
+
+        public object CreateFromTemplate(string id)
+        {
+            var source = string.IsNullOrEmpty(id) ? null : Templates?.Invoke(id);
+            return source == null ? null : DataModel.Clone(source, null);
+        }
 
         // 행동별 실행 전 난수 상태. Undo하면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, Undo 악용 차단).
         readonly Dictionary<long, Dictionary<string, ulong[]>> _randomBefore = new Dictionary<long, Dictionary<string, ulong[]>>();
@@ -78,7 +94,7 @@ namespace GameSystems
             Options = options ?? new SessionOptions();
             Clock = new GameClock();
             Journal = new Journal(Options.JournalCapacity) { TickSource = () => Clock.Tick };
-            State = new StateStore(Journal)
+            Data = new PlayerDataStore(Journal)
             {
                 DetectUntrackedChanges = Options.DetectUntrackedChanges,
                 RecordHistory = Options.History == HistoryMode.Actions,
@@ -86,10 +102,15 @@ namespace GameSystems
             };
             Events = new EventBus(Journal);
             Random = new RandomStreams(Options.Seed);
-            Actions = new ActionDispatcher(Journal, State, Clock);
-            Stats = new StatSystem(State, Events, Journal);
+            Actions = new ActionDispatcher(Journal, Data, Clock);
+            Triggers = new TriggerSystem(this);
+            Stats = new StatSystem(Data, Triggers, Journal);
             Achievements = new AchievementSystem(this);
             Debug = new DebugCommands();
+            Abilities = new AbilitySystem();
+            Game = new GameApi(this);
+            // 처리를 클래스 안에 쓴 행동(GameAction<T>·SimpleAction·UseAbility)은 등록 없이 실행한다.
+            Actions.SelfRun = action => ((ISelfRunningAction)action).Run(Game);
 
             // 테스트 이벤트는 게임 행동과 같은 경로로 처리된다(Undo·기록 동일).
             Actions.Register<SimulatedEventAction>(action =>
@@ -99,8 +120,8 @@ namespace GameSystems
 
             Actions.TransactionStarted += id => _randomBefore[id] = Random.ExportStates();
             Actions.TransactionAborted += RestoreRandom;
-            State.TransactionUndone += tx => RestoreRandom(tx.Id);
-            State.TransactionForgotten += tx => _randomBefore.Remove(tx.Id);
+            Data.TransactionUndone += tx => RestoreRandom(tx.Id);
+            Data.TransactionForgotten += tx => _randomBefore.Remove(tx.Id);
             // 이력에 남지 않는 행동(스냅샷·없음 방식)의 난수 상태는 바로 버린다.
             Actions.Executed += record =>
             {
@@ -118,7 +139,7 @@ namespace GameSystems
                 yield return Stats;
                 yield return Achievements;
                 yield return Actions;
-                yield return State;
+                yield return Data;
                 yield return Random;
             }
         }
@@ -127,14 +148,14 @@ namespace GameSystems
         public ActionRecord Do(GameAction action)
         {
             var record = Actions.Execute(action);
-            if (State.DetectUntrackedChanges) State.CheckUntrackedChanges();
+            if (Data.DetectUntrackedChanges) Data.CheckUntrackedChanges();
             Achievements.Flush();
             return record;
         }
 
         // 되돌릴 수 있는 횟수(행동 방식: 이력의 행동 수, 스냅샷 방식: 보관된 스냅샷 수).
         public int UndoCount =>
-            Options.History == HistoryMode.Actions ? State.HistoryCount :
+            Options.History == HistoryMode.Actions ? Data.HistoryCount :
             Options.History == HistoryMode.Snapshots ? _snapshots.Count : 0;
 
         // 마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌린다. 되돌릴 것이 없으면 false.
@@ -143,7 +164,7 @@ namespace GameSystems
             switch (Options.History)
             {
                 case HistoryMode.Actions:
-                    var undone = State.UndoLast();
+                    var undone = Data.UndoLast();
                     if (undone) Achievements.Flush();
                     return undone;
                 case HistoryMode.Snapshots:
@@ -158,14 +179,14 @@ namespace GameSystems
         // 지금 상태를 스냅샷으로 남긴다. 스냅샷 방식이면 EndFrame이 간격마다 자동으로 부른다(중요한 순간에 직접 불러도 된다).
         public void CaptureSnapshot()
         {
-            if (State.InTransaction) throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 스냅샷을 남길 수 없습니다.");
+            if (Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 스냅샷을 남길 수 없습니다.");
             _snapshots.Add(new Snapshot
             {
                 JournalId = Journal.LastId,
                 Tick = Clock.Tick,
                 Time = Clock.Time,
-                Session = State.Export(StateZone.Session, report: false),
-                Meta = State.Export(StateZone.Meta, report: false),
+                Session = Data.Export(DataZone.Session, report: false),
+                Meta = Data.Export(DataZone.Meta, report: false),
                 Random = Random.ExportStates(),
             });
             _lastSnapshotTime = Clock.Time;
@@ -188,8 +209,8 @@ namespace GameSystems
             var entry = Journal.Append(JournalKind.Undo, "Session", $"되감기: 틱 {snapshot.Tick} ({Clock.Time - snapshot.Time:0.0}초 전)");
             using (Journal.Cause(entry.Id))
             {
-                State.Restore(snapshot.Session, StateZone.Session, "되감기");
-                State.Restore(snapshot.Meta, StateZone.Meta, "되감기");
+                Data.Restore(snapshot.Session, DataZone.Session, "되감기");
+                Data.Restore(snapshot.Meta, DataZone.Meta, "되감기");
                 Random.Restore(snapshot.Random);
                 Clock.Rewind(snapshot.Tick, snapshot.Time);
                 Actions.MarkUndoneAfter(snapshot.JournalId);
@@ -208,7 +229,7 @@ namespace GameSystems
         {
             var action = new SimulatedEventAction { reason = reason };
             action.Events.AddRange(events);
-            if (action.Events.Count == 0) throw new ArgumentException("[GameSystems] 발생시킬 이벤트가 없습니다.");
+            if (action.Events.Count == 0) throw new ArgumentException("[MomoiProject] 발생시킬 이벤트가 없습니다.");
             return Do(action);
         }
 
@@ -221,10 +242,11 @@ namespace GameSystems
             return true;
         }
 
-        // 도전과제 조건을 이벤트로 채운다. 필요한 이벤트 전체가 하나의 행동(Undo 단위)이 된다.
+        // 도전과제를 게임과 같은 경로로 발동시킨다: 부족한 로그를 이벤트로 채워 조건을 맞추고, 트리거의 이벤트(값 조건을 맞춘 것)를 발생시킨다.
+        // 필요한 이벤트 전체가 하나의 행동(Undo 단위)이 된다. 자동으로 못 만드는 트리거(사용·NOT 등)는 모니터의 강제 달성을 쓴다.
         public bool TrySimulateAchievement(string achievementId, out string error)
         {
-            if (!EventSimulator.TryPlanForAchievement(this, achievementId, out var steps, out error))
+            if (!EventSimulator.TryPlanForAchievement(this, achievementId, out var steps, out var triggerEvents, out error))
             {
                 if (error == null) error = "이미 조건을 만족합니다.";
                 return false;
@@ -235,7 +257,9 @@ namespace GameSystems
                 if (!EventSimulator.TryPlanForStat(Stats, stat, amount, out var plan, out error)) return false;
                 events.AddRange(plan.Events);
             }
-            SimulateEvents(events, $"'{AchievementName(achievementId)}' 조건 채우기");
+            // 조건이 맞은 뒤에 트리거의 이벤트가 발생해야 AND가 같은 순간에 참이 된다.
+            events.AddRange(triggerEvents);
+            SimulateEvents(events, $"'{AchievementName(achievementId)}' 트리거 발동");
             return true;
         }
 
@@ -251,8 +275,8 @@ namespace GameSystems
         {
             Clock.Advance(deltaTime);
             Achievements.Poll(Clock.Time);
-            if (State.InTransaction) return;
-            if (State.DetectUntrackedChanges) State.CheckUntrackedChanges();
+            if (Data.InTransaction) return;
+            if (Data.DetectUntrackedChanges) Data.CheckUntrackedChanges();
             Achievements.Flush();
             if (Options.History == HistoryMode.Snapshots && Clock.Time - _lastSnapshotTime >= Options.SnapshotInterval)
                 CaptureSnapshot();
@@ -265,7 +289,7 @@ namespace GameSystems
             var root = new Dictionary<string, object>
             {
                 ["version"] = (double)Options.SaveVersion,
-                ["state"] = State.Export(StateZone.Meta),
+                ["state"] = Data.Export(DataZone.Meta),
             };
             AddSchema(root);
             return MiniJson.Serialize(root);
@@ -274,16 +298,16 @@ namespace GameSystems
         public void ImportMeta(string json)
         {
             if (string.IsNullOrEmpty(json)) return;
-            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[GameSystems] 저장 데이터 형식이 올바르지 않습니다.");
+            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[MomoiProject] 저장 데이터 형식이 올바르지 않습니다.");
             var version = root.TryGetValue("version", out var v) && v is double number ? (int)number : 1;
             if (version > Options.SaveVersion)
-                throw new FormatException($"[GameSystems] 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}). 게임을 업데이트하세요.");
+                throw new FormatException($"[MomoiProject] 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}). 게임을 업데이트하세요.");
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
             {
                 if (version < Options.SaveVersion) Migrations.Run(values, version, Options.SaveVersion, Journal);
-                State.Import(values, StateZone.Meta);
+                Data.Import(values, DataZone.Meta);
             }
-            Journal.Append(JournalKind.System, "Save", $"메타 상태 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
+            Journal.Append(JournalKind.System, "Save", $"프로필 데이터 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
         }
 
         // ── 판(런) 저장 ─────────────────────────────────────────
@@ -292,7 +316,7 @@ namespace GameSystems
 
         public string ExportRun()
         {
-            if (State.InTransaction) throw new InvalidOperationException("[GameSystems] 행동 실행 중에는 판을 저장할 수 없습니다.");
+            if (Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 판을 저장할 수 없습니다.");
             var random = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (var pair in Random.ExportStates())
                 random[pair.Key] = pair.Value.Select(v => (object)v.ToString("x16", System.Globalization.CultureInfo.InvariantCulture)).ToList();
@@ -304,7 +328,7 @@ namespace GameSystems
                 ["tick"] = (double)Clock.Tick,
                 ["time"] = Clock.Time,
                 ["random"] = random,
-                ["state"] = State.Export(StateZone.Session),
+                ["state"] = Data.Export(DataZone.Session),
             };
             AddSchema(root);
             return MiniJson.Serialize(root);
@@ -314,10 +338,10 @@ namespace GameSystems
         public void ImportRun(string json)
         {
             if (string.IsNullOrEmpty(json)) return;
-            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[GameSystems] 판 저장 데이터 형식이 올바르지 않습니다.");
+            if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[MomoiProject] 판 저장 데이터 형식이 올바르지 않습니다.");
             var version = root.TryGetValue("version", out var v) && v is double number ? (int)number : 1;
             if (version > Options.SaveVersion)
-                throw new FormatException($"[GameSystems] 판 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}).");
+                throw new FormatException($"[MomoiProject] 판 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}).");
 
             if (root.TryGetValue("seed", out var seed) && seed is string seedText)
                 Random.Reseed(ulong.Parse(seedText, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture));
@@ -336,7 +360,7 @@ namespace GameSystems
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
             {
                 if (version < Options.SaveVersion) Migrations.Run(values, version, Options.SaveVersion, Journal);
-                State.Import(values, StateZone.Session);
+                Data.Import(values, DataZone.Session);
             }
             // 불러온 시점부터 새로 시작한다(이전 판의 Undo 이력·스냅샷은 버린다).
             ClearUndo();
@@ -347,7 +371,7 @@ namespace GameSystems
         // 새 판: 세션 구역을 등록할 때의 값으로 되돌리고 Undo 이력을 비운다(프로필은 그대로).
         public void NewRun()
         {
-            State.ResetZone(StateZone.Session);
+            Data.ResetZone(DataZone.Session);
             ClearUndo();
             Journal.Append(JournalKind.System, "Session", "새 판 시작");
         }
@@ -361,7 +385,7 @@ namespace GameSystems
         }
 
         // 저장 파일(프로필·판)이 지금 데이터 구조와 호환되는지. 구조 정보가 없는 파일은 호환으로 본다.
-        // 개발 중에는 호환되지 않는 저장을 변환하지 않고 지운다(GameSystemsRuntime).
+        // 개발 중에는 호환되지 않는 저장을 변환하지 않고 지운다(GBibleRuntime).
         public static bool IsSaveCompatible(string json, IDictionary<string, string> current, out string reason)
         {
             reason = null;
@@ -379,7 +403,7 @@ namespace GameSystems
 
         void ClearUndo()
         {
-            State.ClearHistory();
+            Data.ClearHistory();
             _snapshots.Clear();
             _lastSnapshotTime = double.NegativeInfinity;
         }

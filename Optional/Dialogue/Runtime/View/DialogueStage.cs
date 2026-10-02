@@ -1,37 +1,37 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 대화 화면(IDialogueStage의 기본 구현).
+    // 다이얼로그 화면(IDialogueStage의 기본 구현).
     //  · 게임 카메라 앞(월드): 배경, 배경 어둡게, 스탠딩(스프라이트·스파인), 이펙트 프리팹, 카메라 확대·이동·흔들기
     //  · UI Toolkit(DialogueUI): 글상자, 이름, 선택지, 레터박스, 번쩍임, 검은 화면
     // 상태 효과는 모두 '앞 모습 → 뒤 모습'을 섞는 한 가지 방식으로 그린다(바뀐 값만 움직인다).
-    [AddComponentMenu("Game Systems/대화 화면")]
+    [AddComponentMenu("MomoiProject/다이얼로그 화면")]
     public sealed class DialogueStage : MonoBehaviour, IDialogueStage
     {
         public DialogueUI ui;
         [Tooltip("비우면 Camera.main")] public Camera stageCamera;
-        [Tooltip("카메라에서 대화 화면까지의 거리")] public float distance = 10f;
+        [Tooltip("카메라에서 다이얼로그 화면까지의 거리")] public float distance = 10f;
         public SpriteRenderer backgroundBack;
         public SpriteRenderer backgroundFront;
         [Tooltip("배경 어둡게(흰 스프라이트, 색은 검정)")] public SpriteRenderer dim;
         public Transform standingRoot;
         public Transform effectRoot;
-        [Tooltip("이미지 창(CG) 부모. 비우면 대화 화면 아래에 만든다")] public Transform imageRoot;
+        [Tooltip("이미지 창(CG) 부모. 비우면 다이얼로그 화면 아래에 만든다")] public Transform imageRoot;
         [Tooltip("이미지 창 그리기 순서(스탠딩보다 앞)")] public int imageOrder = 500;
         [Tooltip("스탠딩 발 위치(화면 아래 0 ~ 위 1)"), Range(-0.5f, 1f)] public float standingBaseline;
         [Tooltip("스프라이트 스탠딩의 높이(화면 높이 비율)"), Range(0.1f, 2f)] public float standingHeight = 0.95f;
         [Tooltip("강조가 꺼진 스탠딩의 밝기"), Range(0, 1)] public float dimmedBrightness = 0.7f;
         public int backgroundOrder = -100;
         public int standingOrder;
-        [Tooltip("대화가 브금을 바꿨으면 끝날 때 대화 전의 브금으로 되돌린다")] public bool restoreMusicOnEnd = true;
-        [Tooltip("대화가 끝나면 배경·스탠딩을 지우고 카메라를 되돌린다")] public bool clearOnEnd = true;
+        [Tooltip("다이얼로그가 브금을 바꿨으면 끝날 때 다이얼로그 전의 브금으로 되돌린다")] public bool restoreMusicOnEnd = true;
+        [Tooltip("다이얼로그가 끝나면 배경·스탠딩을 지우고 카메라를 되돌린다")] public bool clearOnEnd = true;
 
-        // 캐릭터 ID → 데이터(대화 재생기가 채운다).
+        // 캐릭터 ID → 데이터(다이얼로그 재생기가 채운다).
         public Func<string, StandingProfileData> Characters = _ => null;
 
         sealed class Standing
@@ -105,7 +105,7 @@ namespace GameSystems.Dialogue
             }
         }
 
-        // 화면 비율 좌표(0~1) → 대화 화면 안 좌표.
+        // 화면 비율 좌표(0~1) → 다이얼로그 화면 안 좌표.
         public Vector3 Local(float x, float y)
         {
             var size = ViewSize;
@@ -314,9 +314,9 @@ namespace GameSystems.Dialogue
 
         // ── 대사·선택지 ──────────────────────────────────────
 
-        // 문장 틀의 값(대화 재생기가 플레이어 데이터로 채운다).
+        // 문장 틀의 값(다이얼로그 재생기가 플레이어 데이터로 채운다).
         public Func<IReadOnlyDictionary<string, object>> TextArguments = () => null;
-        // 지금 장소(대화 재생기가 실행기 상태로 채운다)와 장소 찾기.
+        // 지금 장소(다이얼로그 재생기가 실행기 상태로 채운다)와 장소 찾기.
         public Func<string> CurrentLocation = () => null;
         public Func<string, LocationData> Locations = _ => null;
 

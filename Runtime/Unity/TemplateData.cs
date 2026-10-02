@@ -1,12 +1,12 @@
 using System;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     // 템플릿: 개발자가 만든 클래스의 미리 채운 인스턴스(더미 아이템·테스트 몬스터 설정 등).
     // 도감에서 형식을 고르면 빈 인스턴스가 만들어지고, 탐색기로 값을 채운다. 게임·테스트에서는 CreateInstance로 사본을 받는다.
     [Database("템플릿", Group = "도감", Order = 50, IdPrefix = "template")]
-    [CreateAssetMenu(menuName = "Game Systems/템플릿", fileName = "NewTemplate")]
+    [CreateAssetMenu(menuName = "MomoiProject/템플릿", fileName = "NewTemplate")]
     public sealed class TemplateData : GameData
     {
         [FieldLabel("형식"), DataTypeRef(InstanceField = nameof(value))] public string templateType = "";

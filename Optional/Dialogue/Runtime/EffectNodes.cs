@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
     // 효과 하나가 진행 중 내는 신호 지점(예: 50%).
     [Serializable]
@@ -37,7 +37,7 @@ namespace GameSystems.Dialogue
         // 실제 진행 시간(모션 에셋 길이를 따르는 효과 등은 바꾼다).
         public virtual float EffectiveDuration => duration;
 
-        // 프로젝트 전용 효과: 화면 그리기를 직접 만든다(null이면 대화 화면의 기본 그리기). 새 효과는 EffectNode를 상속하고
+        // 프로젝트 전용 효과: 화면 그리기를 직접 만든다(null이면 다이얼로그 화면의 기본 그리기). 새 효과는 EffectNode를 상속하고
         // [GraphNode]를 붙이면 우클릭 메뉴에 나오고, 여기서 stage.ui.Element("요소 이름") 등으로 원하는 것을 움직인다.
         public virtual IEffectPlayer CreatePlayer(DialogueStage stage, EffectContext context, StageState before, StageState after) => null;
 
@@ -369,11 +369,11 @@ namespace GameSystems.Dialogue
         public override string Summary => clip != null ? clip.name : "없음";
     }
 
-    // 대화 UI 요소(글상자·이름표 …)에 UI 모션을 재생한다. 요소 이름을 비우면 대화 상자.
+    // 다이얼로그 UI 요소(글상자·이름표 …)에 UI 모션을 재생한다. 요소 이름을 비우면 다이얼로그 상자.
     [Serializable, GraphNode("UI 모션", Category = "화면", Graphs = GraphKinds.Both)]
     public sealed class UiMotionEffect : EffectNode
     {
-        [FieldLabel("요소 이름(비우면 대화 상자)")] public string element = "";
+        [FieldLabel("요소 이름(비우면 다이얼로그 상자)")] public string element = "";
         [FieldLabel("모션")] public UiMotion motion;
         [FieldLabel("진행 시간을 모션 길이로(반복 모션은 진행 시간 동안)")] public bool useMotionLength = true;
         public override string Summary => motion != null ? motion.name : "없음";
@@ -441,7 +441,7 @@ namespace GameSystems.Dialogue
         }
     }
 
-    // 프리셋 밖으로 내보내는 신호. 대화 그래프의 프리셋 노드에 같은 이름의 점이 생긴다.
+    // 프리셋 밖으로 내보내는 신호. 다이얼로그 그래프의 프리셋 노드에 같은 이름의 점이 생긴다.
     [Serializable, GraphNode("신호 내보내기", Category = "프리셋", Graphs = GraphKinds.Preset, Order = -1)]
     public sealed class PresetOutputNode : GraphNode
     {
@@ -457,7 +457,7 @@ namespace GameSystems.Dialogue
     }
 }
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
     // 효과 진행 곡선. 진행 신호(n%)는 시간 기준이고, 화면 움직임만 곡선을 따른다.
     public enum Ease

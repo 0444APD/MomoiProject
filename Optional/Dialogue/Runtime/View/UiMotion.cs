@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
     // UI Toolkit 요소용 애니메이션 에셋. Animator·AnimationClip은 UI Toolkit 요소를 움직이지 못하므로 이것을 쓴다.
     // 채널마다 곡선(가로 = 0~1 진행, 세로 = 값)을 그리면 키프레임 애니메이션이 된다. 스프라이트 프레임 애니메이션도 된다.
     // 간단한 나타나기·사라지기는 USS 전환(transition) + 상태 클래스로 충분하고, 반복·키프레임·프레임 애니메이션에 이 에셋을 쓴다.
-    [CreateAssetMenu(menuName = "Game Systems/대화/UI 모션", fileName = "NewUiMotion")]
+    [CreateAssetMenu(menuName = "MomoiProject/다이얼로그 시스템/UI 모션", fileName = "NewUiMotion")]
     public sealed class UiMotion : ScriptableObject
     {
         public enum LoopMode

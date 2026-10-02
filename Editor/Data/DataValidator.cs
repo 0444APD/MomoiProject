@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     public sealed class ValidationIssue
     {
@@ -73,16 +73,7 @@ namespace GameSystems.EditorTools
                     context.Error($"검증 중 오류: {e.Message}");
                 }
 
-                if (data is AchievementData withState && withState.condition != null)
-                    CheckStateFields(withState.condition, all, context);
-
-                if (data is AchievementData achievement && achievement.condition != null)
-                {
-                    var keys = new HashSet<string>();
-                    achievement.condition.CollectDependencies(keys);
-                    if (keys.Count == 0 && achievement.condition.PollInterval <= 0)
-                        context.Error("조건이 아무 값도 관찰하지 않아 달성될 수 없습니다(블록 계약 위반).");
-                }
+                CheckSlots(data, all, context);
             }
 
             FindCycles(all.OfType<AchievementData>().ToList(), context);
@@ -90,21 +81,95 @@ namespace GameSystems.EditorTools
             return context.Issues;
         }
 
-        // 상태 값 검사 블록: 플레이어 데이터가 있는지, 그 값 형식 기준으로 경로·비교·값이 맞는지.
-        static void CheckStateFields(Condition condition, IReadOnlyList<GameData> all, Context context)
+        // 트리거·결과 칸(모든 기능 공용): 칸의 잠금(고를 수 있는 종류·고정), 조건이 값을 관찰하는지, 플레이어 데이터 검사·주기의 형식.
+        static void CheckSlots(GameData data, IReadOnlyList<GameData> all, Context context)
         {
-            if (condition is StateFieldCondition check && !string.IsNullOrEmpty(check.key))
+            var slots = TriggerSlots.Of(data).ToList();
+            foreach (var slot in slots)
             {
-                var key = all.OfType<StateKeyData>().FirstOrDefault(k => k.Id == check.key);
-                if (key == null) context.Error($"상태 값 검사: 없는 플레이어 데이터 '{check.key}'를 가리킵니다.");
+                var where = string.IsNullOrEmpty(slot.Label) ? "" : slot.Label + ": ";
+                if (slot.Trigger != null)
+                {
+                    foreach (var leaf in slot.Trigger.Leaves())
+                        if ((leaf.Kind & slot.TriggerAllowed) == 0)
+                            context.Error($"{where}이 칸에서는 '{BlockTypes.DisplayName(leaf.GetType())}' 트리거를 쓸 수 없습니다(쓸 수 있는 것: {TriggerSlots.Text(slot.TriggerAllowed)}).");
+                    foreach (var condition in slot.Trigger.Conditions())
+                    {
+                        CheckPlayerDataFields(condition, all, context);
+                        var keys = new HashSet<string>();
+                        condition.CollectDependencies(keys);
+                        if (keys.Count == 0 && condition.PollInterval <= 0 && !condition.AutoDependencies)
+                            context.Error($"{where}조건이 아무 값도 관찰하지 않아 발동할 수 없습니다(블록 계약 위반).");
+                    }
+                }
+                if (slot.Outcomes != null)
+                {
+                    foreach (var outcome in slot.Outcomes.Where(o => o != null))
+                    {
+                        if ((outcome.Kind & slot.OutcomeAllowed) == 0)
+                            context.Error($"{where}이 칸에서는 '{BlockTypes.DisplayName(outcome.GetType())}' 결과를 쓸 수 없습니다(쓸 수 있는 것: {TriggerSlots.Text(slot.OutcomeAllowed)}).");
+                        if (outcome is PlayerDataReward change) CheckPlayerDataReward(change, all, context);
+                        if (outcome is RecordOutcome record) CheckRecord(record, slot.Trigger ?? slots.FirstOrDefault(s => s.Owner == slot.Owner && s.Trigger != null)?.Trigger, where, context);
+                    }
+                    if (slot.OutcomeFixed && slot.Outcomes.Count(o => o != null) != 1)
+                        context.Error($"{where}결과가 '{TriggerSlots.Text(slot.OutcomeAllowed)}' 하나로 고정된 칸인데 {slot.Outcomes.Count(o => o != null)}개입니다.");
+                }
+            }
+        }
+
+        // 로그에 기록: '반영할 값'은 같은 칸 짝의 트리거가 보는 이벤트에서 읽는다. 이벤트가 없거나, 여러 이벤트 중 그 숫자 필드가 없는 것이 있으면 오류.
+        static void CheckRecord(RecordOutcome record, Trigger when, string where, Context context)
+        {
+            if (string.IsNullOrEmpty(record.field)) return;
+            var events = when?.EventTypes().ToList() ?? new List<Type>();
+            if (events.Count == 0)
+            {
+                context.Error($"{where}로그에 기록의 반영할 값 '{record.field}'을 읽을 이벤트가 트리거에 없습니다(비우면 횟수 1).");
+                return;
+            }
+            foreach (var type in events)
+                if (TypeResolver.NumberGetter(type, record.field, out var error) == null)
+                    context.Error($"{where}{EventBus.DisplayNameOf(type)}: {error}");
+        }
+
+        // 플레이어 데이터 검사 블록: 플레이어 데이터가 있는지, 그 값 형식 기준으로 경로·비교·값이 맞는지.
+        static void CheckPlayerDataFields(Condition condition, IReadOnlyList<GameData> all, Context context)
+        {
+            if (condition is PlayerDataCondition check && !string.IsNullOrEmpty(check.key))
+            {
+                var key = all.OfType<PlayerDataEntry>().FirstOrDefault(k => k.Id == check.key);
+                if (key == null) context.Error($"플레이어 데이터 검사: 없는 플레이어 데이터 '{check.key}'를 가리킵니다.");
                 else if (key.ValueType != null && check.filter != null)
                 {
                     var problems = new List<string>();
                     check.filter.Validate(key.ValueType, problems);
-                    foreach (var problem in problems) context.Error($"상태 값 검사({key.DisplayName}): {problem}");
+                    foreach (var problem in problems) context.Error($"플레이어 데이터 검사({key.DisplayName}): {problem}");
                 }
             }
-            foreach (var child in condition.Children) CheckStateFields(child, all, context);
+            foreach (var child in condition.Children) CheckPlayerDataFields(child, all, context);
+        }
+
+        // 플레이어 데이터에 주기 보상: 플레이어 데이터가 있는지, 필드 형식 기준으로 값이 맞는지, 고른 템플릿이 있고 형식이 맞는지.
+        static void CheckPlayerDataReward(PlayerDataReward change, IReadOnlyList<GameData> all, Context context)
+        {
+            if (string.IsNullOrEmpty(change.key)) return;
+            var key = all.OfType<PlayerDataEntry>().FirstOrDefault(k => k.Id == change.key);
+            if (key == null)
+            {
+                context.Error($"플레이어 데이터에 주기: 없는 플레이어 데이터 '{change.key}'를 가리킵니다.");
+                return;
+            }
+            var label = $"플레이어 데이터에 주기({PlayerDataGrants.PathLabel(key.DisplayName, change.path)})";
+            var problems = new List<string>();
+            change.Validate(key.ValueType, problems);
+            foreach (var problem in problems) context.Error($"{label}: {problem}");
+            foreach (var (id, type) in change.TemplateRefs(key.ValueType))
+            {
+                var template = all.OfType<TemplateData>().FirstOrDefault(t => t.Id == id);
+                if (template == null) context.Error($"{label}: 없는 템플릿 '{id}'를 가리킵니다.");
+                else if (template.value != null && !type.IsInstanceOfType(template.value))
+                    context.Error($"{label}: 템플릿 '{id}'({template.value.GetType().Name})는 {DataModel.FriendlyName(type)}이(가) 아닙니다.");
+            }
         }
 
         // 필드 규칙의 '필수': 비어 있으면(빈 글자·빈 참조·빈 목록) 오류. 템플릿 값 같은 안쪽 클래스까지 본다.
@@ -141,6 +206,8 @@ namespace GameSystems.EditorTools
                     var kind = DataTypes.Find(refType)?.DisplayName ?? refType.Name;
                     if (string.IsNullOrEmpty(id))
                     {
+                        // 상위 그룹은 비어 있으면 맨 위(정상).
+                        if (data is INestedData && property.propertyPath == "parent") return;
                         context.Warning($"{property.displayName}: {kind}이(가) 선택되지 않은 칸이 있습니다.");
                         return;
                     }
@@ -174,11 +241,12 @@ namespace GameSystems.EditorTools
             var edges = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             foreach (var a in achievements)
             {
-                if (string.IsNullOrEmpty(a.Id) || a.condition == null) continue;
+                var when = a.EffectiveTrigger;
+                if (string.IsNullOrEmpty(a.Id) || when == null) continue;
                 var keys = new HashSet<string>();
-                a.condition.CollectDependencies(keys);
-                edges[a.Id] = keys.Where(k => k.StartsWith(StateKeys.AchievementPrefix, StringComparison.Ordinal))
-                                  .Select(k => k.Substring(StateKeys.AchievementPrefix.Length)).ToList();
+                foreach (var condition in when.Conditions()) condition.CollectDependencies(keys);
+                edges[a.Id] = keys.Where(k => k.StartsWith(PlayerDataKeys.AchievementPrefix, StringComparison.Ordinal))
+                                  .Select(k => k.Substring(PlayerDataKeys.AchievementPrefix.Length)).ToList();
             }
 
             var state = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -219,7 +287,7 @@ namespace GameSystems.EditorTools
             var errors = DataValidator.ValidateAll().Where(i => i.Severity == ValidationSeverity.Error).ToList();
             if (errors.Count == 0) return;
             var lines = errors.Take(20).Select(e => $"- {(e.Asset != null ? e.Asset.DisplayName : "?")}: {e.Message}");
-            throw new BuildFailedException($"[GameSystems] 데이터 검증 오류 {errors.Count}건으로 빌드를 중단합니다. 데이터베이스 창에서 확인하세요.\n" + string.Join("\n", lines));
+            throw new BuildFailedException($"[MomoiProject] 데이터 검증 오류 {errors.Count}건으로 빌드를 중단합니다. 데이터베이스 창에서 확인하세요.\n" + string.Join("\n", lines));
         }
     }
 }

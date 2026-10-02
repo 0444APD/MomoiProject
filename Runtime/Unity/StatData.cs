@@ -1,15 +1,23 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
-    [Database("로그", Group = "진행", Order = 10, IdPrefix = "stat")]
-    [CreateAssetMenu(menuName = "Game Systems/수치", fileName = "NewStat")]
-    public sealed class StatData : GameData
+    // 로그: 값의 기록. 반영 규칙 = 트리거(이벤트 발생만, AND·OR 가능) → 결과(로그에 기록으로 고정, 세부 칸만 고친다).
+    // 다른 기능(도전과제·능력·아이템 …)과 같은 트리거·결과 편집 화면을 쓰고, 잠금만 다르다.
+    [Database("로그", Group = "선언", Order = 2, IdPrefix = "stat")]
+    [CreateAssetMenu(menuName = "MomoiProject/수치", fileName = "NewStat")]
+    public sealed class StatData : GameData, ILegacyData
     {
         [FieldLabel("범위")] public StatScope scope = StatScope.Total;
         [FieldLabel("집계 방식")] public StatAggregate aggregate = StatAggregate.Sum;
-        [FieldLabel("반영 규칙")] public List<StatRule> rules = new List<StatRule>();
+        [FieldLabel("반영 규칙"), TriggerSlot(TriggerKinds.Event), OutcomeSlot(OutcomeKinds.Record, Fixed = true)]
+        public List<TriggerRule> triggers = new List<TriggerRule>();
+        // 예전 저장 형식(이벤트·값·배수·조건 한 줄). 도감을 열면 위의 규칙으로 옮겨진다. 코드에서 넣어도 같은 길로 돈다.
+        [HideInInspector, TriggerSlot(TriggerKinds.Event), OutcomeSlot(OutcomeKinds.Record)] public List<StatRule> rules = new List<StatRule>();
+
+        public IEnumerable<TriggerRule> AllRules() => rules.Where(r => r != null).Select(r => r.ToTriggerRule()).Concat(triggers.Where(r => r != null));
 
         public StatDefinition ToDefinition()
         {
@@ -22,31 +30,36 @@ namespace GameSystems.Data
             };
             foreach (var rule in rules)
                 if (rule != null) definition.Rules.Add(rule);
+            foreach (var rule in triggers)
+                if (rule != null) definition.Triggers.Add(rule);
             return definition;
+        }
+
+        public bool MigrateLegacy()
+        {
+            if (rules.Count == 0) return false;
+            triggers.AddRange(rules.Where(r => r != null).Select(r => r.ToTriggerRule()));
+            rules.Clear();
+            return true;
         }
 
         public override void ValidateData(IValidationContext context)
         {
-            for (int i = 0; i < rules.Count; i++)
+            var i = 0;
+            foreach (var rule in AllRules())
             {
-                var rule = rules[i];
-                if (rule == null) continue;
-                var type = TypeResolver.Find(rule.eventType);
-                if (type == null)
+                i++;
+                if (rule.when == null)
                 {
-                    context.Error(string.IsNullOrEmpty(rule.eventType)
-                        ? $"규칙 {i + 1}: 이벤트가 선택되지 않았습니다."
-                        : $"규칙 {i + 1}: 이벤트 타입 '{rule.eventType}'을 찾을 수 없습니다(이름이 바뀌었는지 확인).");
+                    context.Error($"규칙 {i}: 트리거가 없습니다.");
                     continue;
                 }
-                if (!string.IsNullOrEmpty(rule.field) && TypeResolver.NumberGetter(type, rule.field, out var error) == null)
-                    context.Error($"규칙 {i + 1}: {error}");
-                if (aggregate != StatAggregate.Sum && string.IsNullOrEmpty(rule.field))
-                    context.Warning($"규칙 {i + 1}: 횟수 반영은 합계형 수치에서만 의미가 있습니다.");
-                if (rule.filter == null) continue;
-                var problems = new List<string>();
-                rule.filter.Validate(type, problems);
-                foreach (var problem in problems) context.Error($"규칙 {i + 1} 조건: {problem}");
+                var scoped = new PrefixedContext(context, $"규칙 {i}: ");
+                rule.when.Validate(scoped);
+                foreach (var outcome in rule.then.Where(o => o != null)) outcome.Validate(scoped);
+                // 반영할 값이 트리거의 이벤트에 있는지는 도감 검증기가 모든 기능에 같은 규칙으로 본다(DataValidator.CheckRecord).
+                if (aggregate != StatAggregate.Sum && rule.then.OfType<RecordOutcome>().Any(r => string.IsNullOrEmpty(r.field)))
+                    context.Warning($"규칙 {i}: 횟수 반영은 합계형 로그에서만 의미가 있습니다.");
             }
         }
     }

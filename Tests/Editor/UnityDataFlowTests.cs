@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     [Serializable]
     public sealed class DataFlowKill : GameAction
@@ -40,28 +40,29 @@ namespace GameSystems.Tests
             kills.scope = StatScope.Total;
             kills.aggregate = StatAggregate.Sum;
             kills.rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
-            var gold = Make<StatData>("stat2", "골드");
+            var gold = Make<PlayerDataEntry>("playerData1", "골드");
+            gold.zone = DataZone.Meta;
 
             var hunter = Make<AchievementData>("achievement1", "사냥꾼");
             hunter.condition = new StatCompareCondition { stat = kills.Id, op = CompareOp.AtLeast, value = 3 };
-            hunter.rewards.Add(new AddToStatReward { stat = gold.Id, amount = 100 });
+            hunter.rewards.Add(new PlayerDataReward { key = gold.Id, amount = 100 });
 
             var session = new GameSession(new SessionOptions { Seed = 9 });
             session.Stats.Define(kills.ToDefinition());
-            session.Stats.Define(gold.ToDefinition());
+            gold.DefineIn(session.Data);
             session.Achievements.Define(hunter.ToDefinition());
             session.Actions.Register<DataFlowKill>(_ => session.Events.Publish(new TestKill { Count = 1 }));
 
             for (int i = 0; i < 3; i++) session.Do(new DataFlowKill());
             Assert.AreEqual(3, session.Stats.Get(kills.Id));
             Assert.IsTrue(session.Achievements.IsUnlocked(hunter.Id));
-            Assert.AreEqual(100, session.Stats.Get(gold.Id));
+            Assert.AreEqual(100, session.Data.GetNumber(gold.Id));
 
             // 인과 사슬: 보상 ← 달성 ← 처치 수 변화 ← 적 처치 이벤트 ← 세 번째 처치 행동.
             var reward = session.Journal.Entries.Last(e => e.Kind == JournalKind.Reward);
             var chain = session.Journal.CauseChain(reward.Id);
             CollectionAssert.AreEqual(
-                new[] { JournalKind.Action, JournalKind.Event, JournalKind.State, JournalKind.Achievement, JournalKind.Reward },
+                new[] { JournalKind.Action, JournalKind.Event, JournalKind.Data, JournalKind.Achievement, JournalKind.Reward },
                 chain.Select(e => e.Kind).ToArray(),
                 string.Join(" → ", chain.Select(e => e.Message)));
         }

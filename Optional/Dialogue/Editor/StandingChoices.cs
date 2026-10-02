@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
-using GameSystems.Dialogue;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.Dialogue;
+using GBible.EditorTools.UI;
 using UnityEditor;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
     // '스탠딩 ID' 칸의 목록: 같은 노드의 프로필 칸이 정한 스탠딩 프로필의 스탠딩들(프로필이 비어 있으면 = 현재 화자, 모든 프로필을 묶어 보인다).
     sealed class StandingChoices : IInlineChoiceProvider

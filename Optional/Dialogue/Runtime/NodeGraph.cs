@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 선 종류. 흐름(대화가 어디로 가는가)과 신호(연출이 언제 시작하는가)는 서로 잇지 않는다.
+    // 선 종류. 흐름(다이얼로그가 어디로 가는가)과 신호(연출이 언제 시작하는가)는 서로 잇지 않는다.
     public enum PortKind
     {
         Flow,
@@ -111,7 +111,7 @@ namespace GameSystems.Dialogue
             other != null && fromNode == other.fromNode && fromPort == other.fromPort && toNode == other.toNode && toPort == other.toPort;
     }
 
-    // 노드와 선. 대화와 연출 프리셋이 같은 구조를 쓴다.
+    // 노드와 선. 다이얼로그와 연출 프리셋이 같은 구조를 쓴다.
     [Serializable]
     public sealed class NodeGraph
     {

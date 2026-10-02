@@ -7,9 +7,9 @@ using UnityEngine.UIElements;
 using UIFont = UnityEngine.Font;
 using SdfFontAsset = UnityEngine.TextCore.Text.FontAsset;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 대화 UI(UI Toolkit). UXML의 요소를 '이름'으로 찾아 쓴다: 이름 규격만 지키면 모양·배치·스프라이트는 프로젝트마다 자유롭게 바꾼다.
+    // 다이얼로그 UI(UI Toolkit). UXML의 요소를 '이름'으로 찾아 쓴다: 이름 규격만 지키면 모양·배치·스프라이트는 프로젝트마다 자유롭게 바꾼다.
     // 모양 변화는 루트에 붙는 상태 클래스(USS)로, 키프레임·반복·프레임 애니메이션은 모션 칸(UiMotion 에셋)으로 건다.
     //
     // 상태 클래스(루트): dialogue--open · dialogue--staging(연출 대기) · dialogue--typing · dialogue--waiting(클릭 대기)
@@ -21,14 +21,14 @@ namespace GameSystems.Dialogue
     //    비었으면 그 요소에 dialogue-extra--empty, 루트에 dialogue--has-<키> 클래스가 붙는다). 코드 없음.
     //  · 동작하는 UI: IDialogueUIExtension(또는 DialogueUIExtension) 컴포넌트를 이 오브젝트나 자식에 붙인다.
     [RequireComponent(typeof(UIDocument))]
-    [AddComponentMenu("Game Systems/대화 UI")]
+    [AddComponentMenu("MomoiProject/다이얼로그 UI")]
     public sealed class DialogueUI : MonoBehaviour
     {
         // 요소 이름 규격. 바꾼 UXML에서 이름이 다르면 여기서 맞춘다.
         [Serializable]
         public sealed class ElementNames
         {
-            [Tooltip("대화 UI 전체(여기를 누르면 다음으로)")] public string root = "dialogue-root";
+            [Tooltip("다이얼로그 UI 전체(여기를 누르면 다음으로)")] public string root = "dialogue-root";
             public string box = "dialogue-box";
             public string nameBox = "dialogue-name-box";
             public string name = "dialogue-name";
@@ -85,7 +85,7 @@ namespace GameSystems.Dialogue
         public sealed class MotionSlot
         {
             public Moment moment;
-            [Tooltip("요소 이름(비우면 대화 상자). 선택지 순간에는 선택지 각각에 건다.")]
+            [Tooltip("요소 이름(비우면 다이얼로그 상자). 선택지 순간에는 선택지 각각에 건다.")]
             public string element = "";
             public UiMotion motion;
         }
@@ -113,7 +113,7 @@ namespace GameSystems.Dialogue
         public event Action LogOpened;
         public event Action LogClosed;
 
-        // 로그 내용(대화 재생기가 실행기의 로그로 채운다).
+        // 로그 내용(다이얼로그 재생기가 실행기의 로그로 채운다).
         public Func<IReadOnlyList<DialogueLogEntry>> LogSource = () => Array.Empty<DialogueLogEntry>();
         public bool IsLogOpen { get; private set; }
 
@@ -240,7 +240,7 @@ namespace GameSystems.Dialogue
             HideTooltip();
             SetOpen(false, instant: true);
             _missing = missing;
-            if (missing.Count > 0) Debug.LogWarning("[대화 UI] UXML에 필요한 요소가 없습니다: " + string.Join(", ", missing), this);
+            if (missing.Count > 0) Debug.LogWarning("[다이얼로그 UI] UXML에 필요한 요소가 없습니다: " + string.Join(", ", missing), this);
             return new List<string>(missing);
         }
 

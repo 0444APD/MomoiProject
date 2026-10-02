@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace GameSystems
+namespace GBible
 {
     // 식별자(ID) 규칙. ID는 도감에서 한 번 짓고, 나머지는 모두 목록에서 고른다.
     // 형식: lowerCamelCase(영문 소문자로 시작, 단어 사이는 대문자, 영문·숫자만), 점(.)으로 분류를 나눈다. 예: playerGold, player.inventory

@@ -1,12 +1,13 @@
+using GBible.EditorTools.UI;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     public enum SetupState
     {
@@ -59,7 +60,7 @@ namespace GameSystems.EditorTools
 
     public static class SetupRegistry
     {
-        const string ProgressPath = "ProjectSettings/GameSystems/Setup.json";
+        const string ProgressPath = "ProjectSettings/MomoiProject/Setup.json";
 
         [Serializable]
         sealed class Progress
@@ -160,7 +161,7 @@ namespace GameSystems.EditorTools
                 Summary = "지금이 개발 중인지 출시 후인지 정합니다. 저장 호환 방식이 달라집니다.",
                 Body = "개발 중에는 ID나 데이터 구조가 바뀌어 기존 저장과 맞지 않으면 저장을 지우고 새 프로필로 시작합니다. 변환 코드를 작성할 필요가 없습니다.\n\n" +
                        "출시 후에는 ID 변경 이력을 기록해 예전 저장을 이어받습니다. 구조 변경에는 변환 단계(SessionOptions.Migrations)가 필요합니다.\n\n" +
-                       "처음에는 '개발 중' 그대로 두면 됩니다. 출시 직전에 메뉴 Game Systems › 출시됨을 켭니다.",
+                       "처음에는 '개발 중' 그대로 두면 됩니다. 출시 직전에 메뉴 MomoiProject › 출시됨을 켭니다.",
                 HelpTopic = "guide:saves",
                 Check = () => (true, EditorDatabase.IsReleased ? "출시됨: 저장을 이어받습니다" : "개발 중: 호환되지 않는 저장은 지웁니다"),
                 Actions = { new SetupAction("출시 상태 바꾸기", () => EditorApplication.ExecuteMenuItem(EditorDatabase.ReleasedMenu)) },
@@ -171,7 +172,7 @@ namespace GameSystems.EditorTools
                 Summary = "등급·부위·태그 같은 식별용 string 필드가 어떤 키워드 그룹에서 고를지 정합니다.",
                 Body = "코드의 클래스에는 빈 string(또는 string 배열·리스트) 필드만 둡니다. 어떤 값에서 고를지는 여기서 정합니다.\n\n" +
                        "## 방법\n" +
-                       "- 도감의 키워드 탭에서 그룹과 키워드를 만듭니다(예: 등급 → 일반·레어·전설). 끌어서 순서를 바꾸거나 다른 그룹으로 옮길 수 있습니다.\n" +
+                       "- 도감의 키워드 탭에서 그룹과 키워드를 만듭니다(예: 등급 → 일반·레어·전설). 끌어서 다른 그룹으로 옮기거나 그룹 안에 그룹을 둘 수 있습니다(이름순).\n" +
                        "- '키워드 연결 창'을 엽니다. 왼쪽이 필드, 오른쪽이 키워드 그룹입니다.\n" +
                        "- 필드를 고르고, 알맞은 그룹의 '이 필드에 연결'을 누릅니다. 그룹이 없으면 '+ 새 그룹 만들어 연결'로 바로 만들 수도 있습니다.\n\n" +
                        "string 필드는 하나, string 배열·리스트 필드는 여러 개를 고릅니다. 연결하면 필드 규칙이 자동으로 만들어지며, 비면 안 되는 값은 도감의 필드 규칙에서 '필수'를 켭니다.\n\n" +
@@ -183,7 +184,7 @@ namespace GameSystems.EditorTools
                     var unlinked = KeywordTools.Fields().Count(f => KeywordTools.RuleOf(f.type, f.field) == null && EditorDatabase.RefTypeOf(f.field) == null);
                     return (groups > 0 && unlinked == 0, $"그룹 {groups}개 · 키워드 {Count<KeywordData>()}개" + (unlinked > 0 ? $" · 연결 안 된 필드 {unlinked}개" : ""));
                 },
-                Actions = { new SetupAction("키워드 연결 창 열기", () => KeywordWindow.Open(null), true), Open<KeywordData>("키워드 탭 열기"), Open<FieldRuleData>("필드 규칙 보기") },
+                Actions = { new SetupAction("클래스 탭 열기", () => DatabaseWindow.ShowPage(ClassesPage.PageKey), true), Open<KeywordData>("키워드 탭 열기") },
             };
             yield return new SetupStep
             {
@@ -194,16 +195,16 @@ namespace GameSystems.EditorTools
                        "- ID: 코드에서 GameIds.PlayerData.XXX로 쓰입니다.\n" +
                        "- 구역: 이번 판(새 판에서 초기화) 또는 프로필(계속 유지).\n" +
                        "- 값 형식: 숫자·글자 같은 단순 값이나 프로젝트의 클래스·리스트·딕셔너리.",
-                HelpTopic = HelpIds.Data(typeof(StateKeyData)),
-                Check = () => (Count<StateKeyData>() > 0, $"플레이어 데이터 {Count<StateKeyData>()}개"),
-                Actions = { Create<StateKeyData>(), Open<StateKeyData>() },
+                HelpTopic = HelpIds.Data(typeof(PlayerDataEntry)),
+                Check = () => (Count<PlayerDataEntry>() > 0, $"플레이어 데이터 {Count<PlayerDataEntry>()}개"),
+                Actions = { Create<PlayerDataEntry>(), Open<PlayerDataEntry>() },
             };
             yield return new SetupStep
             {
                 Id = "sprites", Order = 50, Title = "스프라이트 규격",
                 Summary = "원본 일러에서 잘라 낼 크기(스탠딩·아이콘 등)를 프로젝트 단위로 정합니다.",
-                Body = "규격 묶음을 만들고, 묶음 안에 규격(가로·세로 픽셀)을 추가합니다. 그다음 필드 규칙에서 스프라이트 필드에 묶음과 미리보기 규격을 연결합니다.\n\n" +
-                       "이후 그 필드에 원본을 넣으면 맞춤 창이 열리고, 중심과 배율을 한 번 정하면 묶음의 모든 규격이 만들어집니다. 규격 크기를 바꾸면 자동으로 다시 만들어집니다.\n\n" +
+                Body = "규격 그룹을 만들고, 그룹 안에 규격(가로·세로 픽셀)을 추가합니다. 그다음 필드 규칙에서 스프라이트 필드에 그룹과 미리보기 규격을 연결합니다.\n\n" +
+                       "이후 그 필드에 원본을 넣으면 맞춤 창이 열리고, 중심과 배율을 한 번 정하면 그룹의 모든 규격이 만들어집니다. 규격 크기를 바꾸면 자동으로 다시 만들어집니다.\n\n" +
                        "이미지 크기 관리가 필요 없는 프로젝트라면 건너뛰어도 됩니다.",
                 HelpTopic = HelpIds.Data(typeof(SpritePresetGroupData)),
                 Optional = true,
@@ -212,7 +213,7 @@ namespace GameSystems.EditorTools
                     var groups = Count<SpritePresetGroupData>();
                     var presets = Count<SpritePresetData>();
                     var linked = EditorDatabase.Instance.OfType<FieldRuleData>().Count(r => !string.IsNullOrEmpty(r.spriteGroup));
-                    return (groups > 0 && presets > 0 && linked > 0, $"묶음 {groups}개 · 규격 {presets}개 · 연결된 필드 {linked}개");
+                    return (groups > 0 && presets > 0 && linked > 0, $"그룹 {groups}개 · 규격 {presets}개 · 연결된 필드 {linked}개");
                 },
                 Actions = { Create<SpritePresetGroupData>(), Open<SpritePresetData>("규격 열기") },
             };
@@ -234,7 +235,7 @@ namespace GameSystems.EditorTools
             {
                 Id = "achievements", Order = 70, Title = "도전과제 정의",
                 Summary = "조건과 보상을 조립합니다. 조건을 만족하는 순간 달성됩니다.",
-                Body = "조건은 블록으로 조립합니다. AND·OR·NOT 블록 안에 다른 블록을 넣어 원하는 식을 만듭니다. 수치 비교, 상태 값 검사, 다른 도전과제 달성 여부를 조건으로 쓸 수 있습니다.\n\n" +
+                Body = "조건은 블록으로 조립합니다. AND·OR·NOT 블록 안에 다른 블록을 넣어 원하는 식을 만듭니다. 비교(로그 값), 플레이어 데이터 검사, 다른 도전과제 달성 여부를 조건으로 쓸 수 있습니다.\n\n" +
                        "달성과 보상은 즉시 적용되며 Undo로 되돌리지 않습니다.",
                 HelpTopic = HelpIds.Data(typeof(AchievementData)),
                 Optional = true,
@@ -264,7 +265,7 @@ namespace GameSystems.EditorTools
                     var found = AssetDatabase.FindAssets("GameIds t:MonoScript").Select(AssetDatabase.GUIDToAssetPath).FirstOrDefault(p => Path.GetFileName(p) == GameIdsGenerator.FileName);
                     return (found != null, found != null ? found : "아직 만들어지지 않았습니다");
                 },
-                Actions = { new SetupAction("다시 만들기", () => EditorApplication.ExecuteMenuItem("Game Systems/식별자 코드 다시 만들기"), true) },
+                Actions = { new SetupAction("다시 만들기", () => EditorApplication.ExecuteMenuItem("MomoiProject/식별자 코드 다시 만들기"), true) },
             };
             yield return new SetupStep
             {

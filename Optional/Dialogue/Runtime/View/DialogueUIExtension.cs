@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
     // 지금 보이는 대사 한 줄의 정보(프로젝트 확장이 쓴다).
     public sealed class DialogueLineInfo
@@ -22,7 +22,7 @@ namespace GameSystems.Dialogue
         public IReadOnlyDictionary<string, string> Extras = new Dictionary<string, string>();
     }
 
-    // 프로젝트마다 다른 UI를 코드로 더할 때: 대화 UI 오브젝트(또는 자식)에 이 인터페이스를 구현한 컴포넌트를 붙이면 순간마다 불린다.
+    // 프로젝트마다 다른 UI를 코드로 더할 때: 다이얼로그 UI 오브젝트(또는 자식)에 이 인터페이스를 구현한 컴포넌트를 붙이면 순간마다 불린다.
     // 예: 화자 얼굴 아이콘, 음성 재생 표시, 호감도 게이지. 요소는 ui.Element("이름")으로 UXML에서 찾는다.
     // 단순히 글만 더하는 것(소속·직함)은 코드 없이 추가 글 + UXML의 dialogue-extra-<키> 요소로 된다.
     public interface IDialogueUIExtension

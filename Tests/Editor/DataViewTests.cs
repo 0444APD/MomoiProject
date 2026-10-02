@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     [Serializable]
     public sealed class ViewStats

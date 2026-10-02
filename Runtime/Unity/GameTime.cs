@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
     // 게임 시간 조절: 일시정지, 배속·슬로우, 프레임 단위 넘기기(개발용).
     // Unity의 Time.timeScale을 바꾸므로 게임 안의 모든 요소가 함께 영향을 받는다:
@@ -12,7 +12,7 @@ namespace GameSystems
     // 영향을 받지 않는 것(일부러 그렇게 만든 것): Time.unscaledDeltaTime을 쓰는 코드, 애니메이터 Unscaled Time 모드,
     // WaitForSecondsRealtime, 오디오(피치), UI 연출. 메뉴·일시정지 화면처럼 멈추면 안 되는 것만 이쪽을 쓴다.
     //
-    // 일시정지는 이유별로 겹칠 수 있다(예: 메뉴와 대화창이 동시에 멈춤 → 둘 다 풀려야 재개).
+    // 일시정지는 이유별로 겹칠 수 있다(예: 메뉴와 다이얼로그 창이 동시에 멈춤 → 둘 다 풀려야 재개).
     public static class GameTime
     {
         public const float MinSpeed = 0.05f;

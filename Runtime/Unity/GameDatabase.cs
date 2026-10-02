@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     // 런타임이 읽는 데이터 목록. 에디터가 GameData 에셋 변화를 감지해 자동으로 갱신한다(직접 편집하지 않음).
     [HideInDatabase]
     public sealed class GameDatabase : ScriptableObject
     {
-        public const string ResourcesPath = "GameSystems/GameDatabase";
+        public const string ResourcesPath = "MomoiProject/GameDatabase";
 
         [SerializeField] List<GameData> entries = new List<GameData>();
         // ID 이름 변경 이력. 예전 이름으로 저장된 값을 새 이름으로 불러오는 데 쓴다(런타임이 자동 적용).

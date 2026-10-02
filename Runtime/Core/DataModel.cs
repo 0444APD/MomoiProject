@@ -7,9 +7,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
-namespace GameSystems
+namespace GBible
 {
-    // 상태 저장소에 담을 수 있는 임의의 데이터(클래스·구조체·리스트·배열·딕셔너리)를 다루는 도구.
+    // 플레이어 데이터 저장소에 담을 수 있는 임의의 데이터(클래스·구조체·리스트·배열·딕셔너리)를 다루는 도구.
     // 타입마다 한 번만 분석해 캐시하고, 복제·비교·제자리 복원·저장 변환을 리플렉션으로 자동 처리한다.
     // 담을 수 있는 것: 데이터 필드(public 또는 [SerializeField]). 담지 않는 것: 함수(델리게이트), 순환 참조.
     // 에셋 참조(UnityEngine.Object)는 복제하지 않고 참조 그대로 둔다(저장은 DataModel.ReferenceToId 연결 시).
@@ -372,11 +372,11 @@ namespace GameSystems
                 case DataKind.Reference:
                     return value;
                 case DataKind.Unsupported:
-                    throw new InvalidOperationException($"[GameSystems] '{path}'에 담을 수 없는 값입니다: {info.Problem}.");
+                    throw new InvalidOperationException($"[MomoiProject] '{path}'에 담을 수 없는 값입니다: {info.Problem}.");
             }
-            if (depth > MaxDepth) throw new InvalidOperationException($"[GameSystems] '{path}'가 너무 깊습니다(순환 참조일 수 있습니다).");
+            if (depth > MaxDepth) throw new InvalidOperationException($"[MomoiProject] '{path}'가 너무 깊습니다(순환 참조일 수 있습니다).");
             if (!info.Type.IsValueType && !state.Visiting.Add(value))
-                throw new InvalidOperationException($"[GameSystems] '{path}'에 순환 참조가 있습니다. 서로를 가리키는 대신 ID로 참조하세요.");
+                throw new InvalidOperationException($"[MomoiProject] '{path}'에 순환 참조가 있습니다. 서로를 가리키는 대신 ID로 참조하세요.");
             try
             {
                 switch (info.Kind)

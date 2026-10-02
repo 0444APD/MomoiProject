@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public sealed class ProjectCodeTests
     {
@@ -13,9 +13,9 @@ namespace GameSystems.Tests
         public void 라이브러리_유니티_플러그인은_빠지고_샘플은_내_코드다()
         {
             var assemblies = ProjectCode.Assemblies;
-            Assert.IsFalse(assemblies["GameSystems.Core"].included);
-            Assert.IsFalse(assemblies["GameSystems.Unity"].included);
-            if (assemblies.TryGetValue("GameSystems.Samples", out var samples)) Assert.IsTrue(samples.included, "샘플은 사용자 코드의 예시");
+            Assert.IsFalse(assemblies["GBible.Core"].included);
+            Assert.IsFalse(assemblies["GBible.Unity"].included);
+            if (assemblies.TryGetValue("GBible.Samples", out var samples)) Assert.IsTrue(samples.included, "샘플은 사용자 코드의 예시");
             foreach (var pair in assemblies.Where(p => p.Key.StartsWith("Unity", StringComparison.Ordinal) || p.Key.EndsWith("-firstpass", StringComparison.Ordinal)))
                 Assert.IsFalse(pair.Value.included, pair.Key);
             Debug.Log("[내 코드 범위] " + string.Join(", ", assemblies.Select(p => $"{p.Key}={(p.Value.included ? "O" : "X:" + p.Value.reason)}")));
@@ -36,8 +36,9 @@ namespace GameSystems.Tests
         {
             var basics = new[] { typeof(double), typeof(int), typeof(long), typeof(float), typeof(bool), typeof(string), typeof(DateTime), typeof(TimeSpan) };
             var storable = StorableTypes.All().Where(t => !basics.Contains(t)).ToList();
-            foreach (var type in storable) Assert.IsTrue(ProjectCode.IsProjectType(type), type.FullName);
-            foreach (var type in ClassTypes.All().Where(t => ClassTypes.GroupOf(t) != "이벤트"))
+            foreach (var type in storable.Where(t => GameFeatures.Of(t) == null)) Assert.IsTrue(ProjectCode.IsProjectType(type), type.FullName);
+            // 켜 둔 선택 기능의 클래스(라이브러리)는 기능 그룹으로 따로 들어온다.
+            foreach (var type in ClassTypes.All().Where(t => ClassTypes.GroupOf(t) != "이벤트" && GameFeatures.Of(t) == null))
             {
                 Assert.IsTrue(ProjectCode.IsDataClass(type), type.FullName);
                 Assert.IsFalse(typeof(MonoBehaviour).IsAssignableFrom(type), type.FullName);

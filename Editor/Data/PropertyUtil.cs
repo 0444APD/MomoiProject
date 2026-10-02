@@ -6,7 +6,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // SerializedProperty ↔ 실제 C# 필드 정보 연결.
     public static class PropertyUtil
@@ -126,8 +126,8 @@ namespace GameSystems.EditorTools
                     switch (property.managedReferenceValue)
                     {
                         case null: return "";
-                        case Condition condition: return GameSystems.EditorTools.UI.Gs.Dual(condition.Natural(EditorDatabase.Instance), condition.Describe(EditorDatabase.Instance));
-                        case ValueFilter filter: return GameSystems.EditorTools.UI.Gs.Dual(filter.Natural(), filter.Describe());
+                        case Condition condition: return GBible.EditorTools.UI.Gs.Dual(condition.Natural(EditorDatabase.Instance), condition.Describe(EditorDatabase.Instance));
+                        case ValueFilter filter: return GBible.EditorTools.UI.Gs.Dual(filter.Natural(), filter.Describe());
                         case Reward reward: return reward.Describe(EditorDatabase.Instance);
                         default: return BlockTypes.DisplayName(property.managedReferenceValue.GetType());
                     }

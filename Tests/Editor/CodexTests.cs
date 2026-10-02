@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools.UI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 도감: 템플릿·프리팹 항목.
     public class CodexTests
@@ -41,7 +41,7 @@ namespace GameSystems.Tests
                 template.EditorAssignId("templateBad");
                 template.templateType = typeof(TestLoot).FullName;
                 template.value = new TestBag();
-                var issues = GameSystems.EditorTools.DataValidator.Validate(new List<GameData> { template });
+                var issues = GBible.EditorTools.DataValidator.Validate(new List<GameData> { template });
                 Assert.IsTrue(issues.Any(i => i.Message.Contains("형식")));
             }
             finally

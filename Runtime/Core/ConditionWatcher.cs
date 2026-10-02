@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameSystems
+namespace GBible
 {
     // 조건 평가기. 폴링하지 않는다.
     // 관찰 대상 키 → 그 키를 보는 조건(역색인)을 두고, 바뀐 키에 연결된 조건만 Flush 때 한 번씩 평가한다.
@@ -13,9 +13,11 @@ namespace GameSystems
             public Condition Condition;
             public Action OnSatisfied;
             public readonly List<string> Keys = new List<string>();
+            // 조건이 CollectDependencies로 선언한 키(평가 때 읽은 키는 매번 다시 모은다).
+            public readonly HashSet<string> Declared = new HashSet<string>(StringComparer.Ordinal);
             public double PollInterval;
             public double NextPoll;
-            // 이 조건을 다시 평가하게 만든 상태 변화의 기록 id(인과 추적용).
+            // 이 조건을 다시 평가하게 만든 값 변화의 기록 id(인과 추적용).
             public long Cause;
         }
 
@@ -30,7 +32,7 @@ namespace GameSystems
         {
             _session = session;
             // 값이 바뀌는 즉시 반응한다(달성은 조건을 만족하는 순간 일어난다).
-            session.State.Changed += OnStateChanged;
+            session.Data.Changed += OnDataChanged;
         }
 
         public int EvaluationCount { get; private set; }
@@ -44,19 +46,43 @@ namespace GameSystems
             var watch = new Entry { Owner = owner, Condition = condition, OnSatisfied = onSatisfied };
             var keys = new HashSet<string>(StringComparer.Ordinal);
             condition.CollectDependencies(keys);
-            watch.Keys.AddRange(keys);
+            // 선언하지 않은 것도: 한 번 평가해 보며 실제로 읽은 키를 모은다(결과는 쓰지 않는다. 달성은 값이 바뀔 때·EvaluateAll 때).
+            watch.Declared.UnionWith(keys);
+            Probe(condition, keys);
             watch.PollInterval = condition.PollInterval;
 
             _watches[owner] = watch;
-            foreach (var key in watch.Keys)
-            {
-                if (!_index.TryGetValue(key, out var list)) _index[key] = list = new List<Entry>();
-                list.Add(watch);
-            }
+            Index(watch, keys);
             if (watch.PollInterval > 0)
             {
                 watch.NextPoll = _session.Clock.Time + watch.PollInterval;
                 _polling.Add(watch);
+            }
+        }
+
+        void Probe(Condition condition, HashSet<string> keys)
+        {
+            try
+            {
+                using (_session.Data.RecordReads(keys)) condition.Evaluate(_session);
+            }
+            catch (Exception)
+            {
+                // 아직 정의되지 않은 값을 보는 조건 등: 선언한 키만으로 감시하고, 처음 평가될 때 다시 모은다.
+            }
+        }
+
+        // 감시 키를 바꾼다(역색인 갱신).
+        void Index(Entry watch, HashSet<string> keys)
+        {
+            foreach (var key in watch.Keys)
+                if (_index.TryGetValue(key, out var old)) old.Remove(watch);
+            watch.Keys.Clear();
+            watch.Keys.AddRange(keys);
+            foreach (var key in watch.Keys)
+            {
+                if (!_index.TryGetValue(key, out var list)) _index[key] = list = new List<Entry>();
+                list.Add(watch);
             }
         }
 
@@ -75,10 +101,10 @@ namespace GameSystems
         public IEnumerable<string> KeysOf(string owner) =>
             _watches.TryGetValue(owner, out var watch) ? watch.Keys : (IEnumerable<string>)Array.Empty<string>();
 
-        void OnStateChanged(string key)
+        void OnDataChanged(string key)
         {
             if (!_index.TryGetValue(key, out var list)) return;
-            var cause = _session.State.LastEntryId(key);
+            var cause = _session.Data.LastEntryId(key);
             foreach (var watch in list)
             {
                 watch.Cause = cause;
@@ -126,9 +152,11 @@ namespace GameSystems
                     if (!_watches.TryGetValue(watch.Owner, out var current) || current != watch) continue;
                     EvaluationCount++;
                     bool satisfied;
+                    var read = new HashSet<string>(watch.Declared, StringComparer.Ordinal);
                     try
                     {
-                        satisfied = watch.Condition.Evaluate(_session);
+                        using (_session.Data.RecordReads(read)) satisfied = watch.Condition.Evaluate(_session);
+                        if (!read.SetEquals(watch.Keys)) Index(watch, read);
                     }
                     catch (Exception e)
                     {

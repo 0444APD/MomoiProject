@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 스프라이트 규격 항목의 "사용 현황" 블록: 이 규격으로 베이크된 이미지 수와 예외 촬영 목록.
     // 규격이 바뀌어 확인이 필요한 예외는 표시되고, 바로 맞춤 창을 열어 다시 잡을 수 있다.

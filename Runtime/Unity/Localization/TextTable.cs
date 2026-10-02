@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
     // 한 언어의 텍스트 표(키 → 문장 틀). 시트(CSV)에서 가져오거나 직접 고친다.
-    [CreateAssetMenu(menuName = "Game Systems/다국어/텍스트 표", fileName = "Texts_ko")]
+    [CreateAssetMenu(menuName = "MomoiProject/다국어/텍스트 표", fileName = "Texts_ko")]
     public sealed class TextTable : ScriptableObject
     {
         [Serializable]

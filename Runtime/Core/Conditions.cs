@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
     [Serializable]
-    [BlockInfo("수치 비교", Category = "수치", Description = "수치 값을 기준값과 비교합니다.", Sentence = "{stat} {op} {value}")]
+    [BlockInfo("비교", Category = "로그", Description = "로그 값을 기준값과 비교합니다.", Sentence = "{stat} {op} {value}")]
     public sealed class StatCompareCondition : Condition
     {
-        [StatRef, FieldLabel("수치")] public string stat;
+        [StatRef, FieldLabel("로그")] public string stat;
         [FieldLabel("비교")] public CompareOp op = CompareOp.AtLeast;
         [FieldLabel("기준값")] public double value;
 
@@ -18,7 +18,7 @@ namespace GameSystems
 
         public override void CollectDependencies(ICollection<string> stateKeys)
         {
-            if (!string.IsNullOrEmpty(stat)) stateKeys.Add(StateKeys.Stat(stat));
+            if (!string.IsNullOrEmpty(stat)) stateKeys.Add(PlayerDataKeys.Stat(stat));
         }
 
         public override string Describe(INameResolver names) =>
@@ -32,8 +32,8 @@ namespace GameSystems
 
         public override void Validate(IValidationContext context)
         {
-            if (string.IsNullOrEmpty(stat)) context.Error("비교할 수치가 선택되지 않았습니다.");
-            else if (!context.StatExists(stat)) context.Error($"존재하지 않는 수치 '{stat}'을 참조합니다.");
+            if (string.IsNullOrEmpty(stat)) context.Error("비교할 로그가 선택되지 않았습니다.");
+            else if (!context.StatExists(stat)) context.Error($"존재하지 않는 로그 '{stat}'을 참조합니다.");
         }
 
         public override bool TryGetProgress(GameSession session, out double current, out double target)
@@ -48,17 +48,17 @@ namespace GameSystems
     }
 
     [Serializable]
-    [BlockInfo("상태 값 검사", Category = "상태", Description = "저장소 값(클래스·컬렉션 포함)을 조건식으로 검사합니다. 예: 인벤토리 › 아이템 중 [태그 legendary 포함]인 항목이 하나라도 있음")]
-    public sealed class StateFieldCondition : Condition
+    [BlockInfo("플레이어 데이터 검사", Category = "플레이어 데이터", Description = "저장소 값(클래스·컬렉션 포함)을 조건식으로 검사합니다. 예: 인벤토리 › 아이템 중 [태그 legendary 포함]인 항목이 하나라도 있음")]
+    public sealed class PlayerDataCondition : Condition
     {
-        [StateKeyRef, FieldPathRoot(FieldPathRootKind.StateKey), FieldLabel("상태")] public string key;
+        [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key;
 #if UNITY_2020_1_OR_NEWER
         [UnityEngine.SerializeReference]
 #endif
         [FieldLabel("조건")] public ValueFilter filter;
 
         public override bool Evaluate(GameSession session) =>
-            !string.IsNullOrEmpty(key) && session.State.IsDefined(key) && (filter == null || filter.Test(session.State.Get(key)));
+            !string.IsNullOrEmpty(key) && session.Data.IsDefined(key) && (filter == null || filter.Test(session.Data.Get(key)));
 
         public override void CollectDependencies(ICollection<string> stateKeys)
         {
@@ -66,10 +66,10 @@ namespace GameSystems
         }
 
         public override string Describe(INameResolver names) =>
-            $"{(string.IsNullOrEmpty(key) ? "(상태 없음)" : key)}: {ValueFilter.DescribeOrAll(filter)}";
+            $"{(string.IsNullOrEmpty(key) ? "(플레이어 데이터 없음)" : key)}: {ValueFilter.DescribeOrAll(filter)}";
 
         public override string Natural(INameResolver names) =>
-            $"{(string.IsNullOrEmpty(key) ? "(상태 없음)" : key)}의 {ValueFilter.NaturalOrAll(filter)}";
+            $"{(string.IsNullOrEmpty(key) ? "(플레이어 데이터 없음)" : key)}의 {ValueFilter.NaturalOrAll(filter)}";
 
         public override void Validate(IValidationContext context)
         {
@@ -219,7 +219,7 @@ namespace GameSystems
 
         public override void CollectDependencies(ICollection<string> stateKeys)
         {
-            if (!string.IsNullOrEmpty(achievement)) stateKeys.Add(StateKeys.Achievement(achievement));
+            if (!string.IsNullOrEmpty(achievement)) stateKeys.Add(PlayerDataKeys.Achievement(achievement));
         }
 
         public override string Describe(INameResolver names) => $"{names.AchievementName(achievement)} 달성";
@@ -229,67 +229,6 @@ namespace GameSystems
         {
             if (string.IsNullOrEmpty(achievement)) context.Error("확인할 도전과제가 선택되지 않았습니다.");
             else if (!context.AchievementExists(achievement)) context.Error($"존재하지 않는 도전과제 '{achievement}'를 참조합니다.");
-        }
-    }
-
-    [Serializable]
-    [BlockInfo("획득", Category = "수치", Description = "골드·경험치 같은 합계형 수치를 얻습니다(음수면 차감).", Sentence = "{stat} {amount} 획득")]
-    public sealed class AddToStatReward : Reward
-    {
-        [StatRef, FieldLabel("수치")] public string stat;
-        [FieldLabel("수량")] public double amount = 1;
-
-        public override RewardEffect Effect => RewardEffect.Reversible;
-
-        public override void Grant(GameSession session) => session.Stats.Report(stat, amount);
-
-        public override string Describe(INameResolver names) =>
-            amount >= 0
-                ? $"{names.StatName(stat)} {amount.ToString("0.##", CultureInfo.InvariantCulture)} 획득"
-                : $"{names.StatName(stat)} {(-amount).ToString("0.##", CultureInfo.InvariantCulture)} 차감";
-
-        public override void Validate(IValidationContext context)
-        {
-            if (string.IsNullOrEmpty(stat))
-            {
-                context.Error("보상 대상 수치가 선택되지 않았습니다.");
-                return;
-            }
-            var info = context.FindStat(stat);
-            if (info == null) context.Error($"존재하지 않는 수치 '{stat}'을 참조합니다.");
-            else if (info.Value.Aggregate != StatAggregate.Sum) context.Error($"'획득'은 합계형 수치에만 쓸 수 있습니다 ('{stat}'은 합계형이 아님).");
-        }
-    }
-
-    [Serializable]
-    [BlockInfo("값 더하기", Category = "플레이어 데이터", Description = "골드처럼 숫자로 된 플레이어 데이터에 더합니다(음수면 뺍니다).", Sentence = "{key} += {amount}")]
-    public sealed class AddToStateReward : Reward
-    {
-        [StateKeyRef, FieldLabel("플레이어 데이터")] public string key;
-        [FieldLabel("수량")] public double amount = 1;
-
-        public override RewardEffect Effect => RewardEffect.Reversible;
-
-        public override void Grant(GameSession session)
-        {
-            var type = session.State.TypeOf(key) ?? typeof(double);
-            var current = session.State.Get(key);
-            var sum = (current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture)) + amount;
-            var whole = type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte);
-            session.State.Set(key, Convert.ChangeType(whole ? Math.Round(sum) : sum, type, CultureInfo.InvariantCulture));
-        }
-
-        public override string Describe(INameResolver names) =>
-            $"{key} {(amount >= 0 ? "+=" : "-=")} {Math.Abs(amount).ToString("0.##", CultureInfo.InvariantCulture)}";
-
-        public override string Natural(INameResolver names) =>
-            amount >= 0
-                ? $"{key} {amount.ToString("0.##", CultureInfo.InvariantCulture)} 지급"
-                : $"{key} {(-amount).ToString("0.##", CultureInfo.InvariantCulture)} 차감";
-
-        public override void Validate(IValidationContext context)
-        {
-            if (string.IsNullOrEmpty(key)) context.Error("값을 더할 플레이어 데이터가 선택되지 않았습니다.");
         }
     }
 }

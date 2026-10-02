@@ -1,0 +1,28 @@
+{
+    "name": "Unity.GBible.CodeGen",
+    "rootNamespace": "GBible.CodeGen",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Mono.Cecil.dll",
+        "Mono.Cecil.Rocks.dll",
+        "Mono.Cecil.Pdb.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "GBIBLE_CECIL"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.nuget.mono-cecil",
+            "expression": "0.0.0",
+            "define": "GBIBLE_CECIL"
+        }
+    ],
+    "noEngineReferences": true
+}

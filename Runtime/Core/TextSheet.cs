@@ -2,18 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
     // 텍스트 시트(CSV) 주고받기. 규칙은 최소한만 둔다(세부 규칙은 대사 시스템과 함께 정한다).
     //
-    //   #gamesystems-text,1          ← 첫 칸이 '#'인 줄은 설명·형식 버전(읽을 때 건너뛴다)
+    //   #gbible-text,1          ← 첫 칸이 '#'인 줄은 설명·형식 버전(읽을 때 건너뛴다)
     //   key,ko,en,ja,note            ← 머리줄. 'key' 열과 언어 코드 열을 '이름'으로 찾는다(열 순서·다른 열은 상관없음)
     //   ui.start,시작하기,Start,スタート,
     //
     // 읽을 때는 이름이 맞는 언어 열만 가져온다. 빈 칸은 '번역 없음'으로 보고 건너뛴다(기존 값을 지우지 않는다).
     public static class TextSheet
     {
-        public const string FormatLine = "#gamesystems-text";
+        public const string FormatLine = "#gbible-text";
         public const int FormatVersion = 1;
         public const string KeyColumn = "key";
         public const string NoteColumn = "note";

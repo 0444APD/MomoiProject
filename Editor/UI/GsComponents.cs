@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     public enum GsButtonKind
     {
@@ -314,5 +314,28 @@ namespace GameSystems.EditorTools.UI
         public void AddToStats(VisualElement element) => _stats.Add(element);
 
         public void SetSelected(bool selected) => EnableInClassList("gs-card--selected", selected);
+    }
+
+    // 켜짐·꺼짐을 보여 주는 작은 스위치(보이기만 한다. 누르는 동작은 이것을 담은 줄이 맡는다).
+    public sealed class GsSwitch : VisualElement
+    {
+        public GsSwitch(bool on)
+        {
+            AddToClassList("gs-switch");
+            pickingMode = PickingMode.Ignore;
+            var knob = new VisualElement();
+            knob.AddToClassList("gs-switch__knob");
+            knob.pickingMode = PickingMode.Ignore;
+            Add(knob);
+            Set(on);
+        }
+
+        public bool On { get; private set; }
+
+        public void Set(bool on)
+        {
+            On = on;
+            EnableInClassList("gs-switch--on", on);
+        }
     }
 }

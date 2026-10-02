@@ -1,7 +1,7 @@
-using GameSystems.Dialogue;
+using GBible.Dialogue;
 using UnityEngine;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
     // 노드 깊은 복사용 그릇. Unity 직렬화로 복사하므로 [SerializeReference] 안쪽(조건·보상 블록)까지 새 인스턴스가 된다.
     public sealed class NodeClipboard : ScriptableObject

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 모니터의 "이벤트로 반영"이 값을 덮어쓰지 않고 게임과 같은 경로를 타는지.
     public class SimulationTests
@@ -18,6 +18,7 @@ namespace GameSystems.Tests
             _session.Stats.Define(Stat("run_kills", StatScope.Run, StatAggregate.Sum, null));
             _session.Stats.Define(Stat("combo", StatScope.Total, StatAggregate.Max, nameof(TestKill.Combo)));
             _session.Stats.Define(new StatDefinition { Id = "gold", DisplayName = "골드", Scope = StatScope.Total, Aggregate = StatAggregate.Sum });
+            _session.Data.Define("player.gold", DataZone.Meta, 0.0, "골드");
         }
 
         static StatDefinition Stat(string id, StatScope scope, StatAggregate aggregate, string field)
@@ -95,13 +96,13 @@ namespace GameSystems.Tests
                     },
                 },
             };
-            definition.Rewards.Add(new AddToStatReward { stat = "gold", amount = 100 });
+            definition.Rewards.Add(new PlayerDataReward { key = "player.gold", amount = 100 });
             _session.Achievements.Define(definition);
             _session.TrySimulateStat("kills", 4, out _, out _);
 
             Assert.IsTrue(_session.TrySimulateAchievement("legend", out var error), error);
             Assert.IsTrue(_session.Achievements.IsUnlocked("legend"));
-            Assert.AreEqual(100, _session.Stats.Get("gold"));
+            Assert.AreEqual(100, _session.Data.GetNumber("player.gold"));
             Assert.GreaterOrEqual(_session.Stats.Get("kills"), 10);
 
             var reward = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Reward);

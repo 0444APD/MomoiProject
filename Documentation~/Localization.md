@@ -11,7 +11,7 @@ GameLanguage.Set("en");                                             // 바꾸고
 
 ## 구성
 
-`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/GameSystems), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `Game Systems → 다국어`(설정 열기, 시트 내보내기·가져오기, 번역 검사, 도감 이름 키 채우기)다.
+`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/MomoiProject), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject → 다국어`(설정 열기, 시트 내보내기·가져오기, 번역 검사, 도감 이름 키 채우기)다.
 
 ## 문장 틀 문법
 
@@ -33,7 +33,7 @@ GameLanguage.Set("en");                                             // 바꾸고
 
 ## 시트
 
-`시트 내보내기`는 `#gamesystems-text,1` 형식 줄, 머리줄 `key,ko,en,…,note`, 그리고 원문 표 순서의 행을 UTF-8 CSV로 쓴다. `시트 가져오기`는 머리줄의 **이름**으로 열을 찾으므로 열 순서를 바꾸거나 메모 열을 더해도 된다. 기본은 번역 언어 열만 가져오고(원문은 에디터가 기준), 빈 칸은 기존 값을 지우지 않는다. `번역 검사`는 원문 문법 오류, 번역 누락 수, 원문에 없는 키, 원문과 다른 값·용어·태그를 콘솔에 나열한다. 문맥 열(장면·화자·감정·이전 대사·글자 수 제한 등)과 대사 줄 ID 규칙은 대사 시스템과 함께 정한다.
+`시트 내보내기`는 `#gbible-text,1` 형식 줄, 머리줄 `key,ko,en,…,note`, 그리고 원문 표 순서의 행을 UTF-8 CSV로 쓴다. `시트 가져오기`는 머리줄의 **이름**으로 열을 찾으므로 열 순서를 바꾸거나 메모 열을 더해도 된다. 기본은 번역 언어 열만 가져오고(원문은 에디터가 기준), 빈 칸은 기존 값을 지우지 않는다. `번역 검사`는 원문 문법 오류, 번역 누락 수, 원문에 없는 키, 원문과 다른 값·용어·태그를 콘솔에 나열한다. 문맥 열(장면·화자·감정·이전 대사·글자 수 제한 등)과 대사 줄 ID 규칙은 대사 시스템과 함께 정한다.
 
 ## 화면에 넣기
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 다국어 설정·표 애셋이 카탈로그에 제대로 옮겨지는지(애셋 파일 없이 메모리에서).
     public sealed class UnityLocalizationTests

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public sealed class LocalizationTests
     {
@@ -237,7 +237,7 @@ namespace GameSystems.Tests
             StringAssert.Contains("\"끝내기, 정말?\"", csv);
 
             // 번역가가 열 순서를 바꾸고 메모 열을 더해도 이름으로 읽는다.
-            var edited = "#gamesystems-text,1\nmemo,EN,key,ko\nhi,Quit,ui.quit,바뀐 원문\n,,ui.start,\n";
+            var edited = "#gbible-text,1\nmemo,EN,key,ko\nhi,Quit,ui.quit,바뀐 원문\n,,ui.start,\n";
             var result = TextSheet.Import(edited, new[] { "en" });
             Assert.IsEmpty(result.Warnings);
             Assert.AreEqual("Quit", result.Tables["en"]["ui.quit"]);

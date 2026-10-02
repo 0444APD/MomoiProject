@@ -1,11 +1,11 @@
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     // 프리팹: 도감에 등록한 프리팹. 도감에서 컴포넌트 필드를 탐색기로 보고 고친다(프리팹 에셋에 바로 저장, Undo 가능).
     // 도감에서는 지우지 않는다. 프로젝트 창에서 프리팹 에셋을 지우면 이 항목도 자동으로 정리된다.
     [Database("프리팹", Group = "도감", Order = 51, IdPrefix = "prefab")]
-    [CreateAssetMenu(menuName = "Game Systems/프리팹", fileName = "NewPrefab")]
+    [CreateAssetMenu(menuName = "MomoiProject/프리팹", fileName = "NewPrefab")]
     public sealed class PrefabData : GameData
     {
         [FieldLabel("프리팹")] public GameObject prefab;

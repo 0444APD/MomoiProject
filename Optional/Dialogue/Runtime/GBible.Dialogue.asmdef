@@ -1,0 +1,19 @@
+{
+    "name": "GBible.Dialogue",
+    "rootNamespace": "GBible.Dialogue",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GBIBLE_DIALOGUE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

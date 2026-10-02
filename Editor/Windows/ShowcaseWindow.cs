@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 살아 있는 스타일 가이드: 디자인 토큰, 분류 팔레트, 카드 A·B·C, 시트, 상세 패널, 부품, 모션, 필터 실험.
     public sealed class ShowcaseWindow : EditorWindow
@@ -16,10 +16,10 @@ namespace GameSystems.EditorTools
         VisualElement _cardsBody;
         GsSheet _sheet;
 
-        [MenuItem("Game Systems/UI 샘플", priority = 20)]
+        [MenuItem("Tests/UI 샘플", priority = 0)]
         public static void Open()
         {
-            var window = GetWindow<ShowcaseWindow>();
+            var window = GsWindows.Get<ShowcaseWindow>();
             window.titleContent = new GUIContent("UI 샘플");
             window.minSize = new Vector2(900, 600);
         }
@@ -51,7 +51,7 @@ namespace GameSystems.EditorTools
             page.style.paddingBottom = 60;
 
             page.Add(Gs.Label("UI 샘플", "gs-display"));
-            var intro = Gs.Label("Game Systems 디자인 시스템의 모든 부품. 새 도구는 이 부품(패널 단위)을 조립해서 만든다.", "gs-caption");
+            var intro = Gs.Label("MomoiProject 디자인 시스템의 모든 부품. 새 도구는 이 부품(패널 단위)을 조립해서 만든다.", "gs-caption");
             intro.style.marginTop = 6;
             page.Add(intro);
             page.Add(Gs.Space(28));

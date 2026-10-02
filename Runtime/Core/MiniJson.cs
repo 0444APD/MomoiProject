@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace GameSystems
+namespace GBible
 {
     // 외부 의존 없는 최소 JSON. 저장 데이터와 서버용 내보내기에 쓴다.
     // 지원: null, bool, 숫자(double), string, 배열(List<object>), 객체(Dictionary<string, object>).
@@ -67,7 +67,7 @@ namespace GameSystems
                     b.Append(']');
                     return;
             }
-            throw new ArgumentException($"[GameSystems] JSON으로 쓸 수 없는 값 형식입니다: {value.GetType().Name}");
+            throw new ArgumentException($"[MomoiProject] JSON으로 쓸 수 없는 값 형식입니다: {value.GetType().Name}");
         }
 
         static void WriteString(StringBuilder b, string text)
@@ -109,7 +109,7 @@ namespace GameSystems
 
             public bool AtEnd => _pos >= _text.Length;
 
-            public FormatException Fail(string message) => new FormatException($"[GameSystems] JSON 오류 ({_pos}번째 문자): {message}");
+            public FormatException Fail(string message) => new FormatException($"[MomoiProject] JSON 오류 ({_pos}번째 문자): {message}");
 
             public void SkipWhitespace()
             {

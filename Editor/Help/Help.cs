@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 도움말 항목 하나. Body는 빈 줄로 문단을 나누고, "## "로 시작하는 줄은 소제목, "- "로 시작하는 줄은 목록이 된다.
     public sealed class HelpTopic
@@ -94,7 +94,7 @@ namespace GameSystems.EditorTools
         static IEnumerable<HelpTopic> Generated(List<HelpTopic> written)
         {
             var ids = new HashSet<string>(written.Select(t => t.Id));
-            foreach (var baseType in new[] { typeof(Condition), typeof(Reward), typeof(ValueFilter) })
+            foreach (var baseType in new[] { typeof(Condition), typeof(Outcome), typeof(ValueFilter), typeof(Trigger) })
                 foreach (var type in BlockTypes.ConcreteTypes(baseType))
                 {
                     var id = HelpIds.Block(type);
@@ -104,7 +104,7 @@ namespace GameSystems.EditorTools
                     {
                         Id = id,
                         Title = BlockTypes.DisplayName(type),
-                        Category = baseType == typeof(Reward) ? "보상 블록" : baseType == typeof(Condition) ? "조건 블록" : "필드 조건 블록",
+                        Category = baseType == typeof(Outcome) ? "결과 블록" : baseType == typeof(Trigger) ? "트리거 블록" : baseType == typeof(Condition) ? "조건 블록" : "필드 조건 블록",
                         Summary = BlockTypes.Description(type) ?? "",
                         Body = (BlockTypes.Description(type) ?? "") +
                                (sentence != null ? $"\n\n## 표시 형식\n편집 칸에는 `{sentence}` 형태로 보입니다. 각 칸을 클릭해 값을 고릅니다." : "") +

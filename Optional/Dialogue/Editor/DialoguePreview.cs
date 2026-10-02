@@ -1,20 +1,20 @@
 using System;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
+using GBible.Data;
+using GBible.Dialogue;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
     // 그래프 창의 미리보기. 실제 화면(UI Toolkit·스탠딩·카메라)으로 보여 주려고 플레이 모드에서 씬의 DialoguePlayer로 재생한다.
-    // 씬에 없으면 대화 UI 템플릿 프리팹을 잠시 꺼내 쓴다(플레이 모드가 끝나면 사라진다).
+    // 씬에 없으면 다이얼로그 UI 템플릿 프리팹을 잠시 꺼내 쓴다(플레이 모드가 끝나면 사라진다).
     // 시간 이동은 처음부터 다시 시작해 그 시점까지 클릭 없이 감는다: 그 사이 시작된 효과는 모두 그 시점의 진행도에서 이어진다.
     // (트윈으로 그리는 효과는 정확히 맞고, 스파인 애니메이션·파티클은 자기 시간으로 흐르므로 처음부터 다시 돈다.)
     [InitializeOnLoad]
     public static class DialoguePreview
     {
-        const string PendingKey = "GameSystems.DialoguePreview.Pending";
+        static readonly string PendingKey = LegacyNames.Session("GBible.DialoguePreview.Pending");
 
         [Serializable]
         sealed class Request
@@ -68,19 +68,19 @@ namespace GameSystems.EditorTools.Graph
             player.Paused = false;
             if (!string.IsNullOrEmpty(request.preset))
             {
-                if (!player.PlayPreset(request.preset, request.time)) Debug.LogWarning($"[대화 미리보기] 프리셋 '{request.preset}'을(를) 재생하지 못했습니다(게임 데이터베이스에 있는지 확인하세요).");
+                if (!player.PlayPreset(request.preset, request.time)) Debug.LogWarning($"[다이얼로그 미리보기] 프리셋 '{request.preset}'을(를) 재생하지 못했습니다(게임 데이터베이스에 있는지 확인하세요).");
                 return;
             }
             var dialogue = EditorDatabase.Instance.Committed.OfType<DialogueData>().FirstOrDefault(d => d.Id == request.dialogue);
             if (dialogue == null || !player.PlayFrom(dialogue, request.node, request.time))
-                Debug.LogWarning($"[대화 미리보기] '{request.dialogue}'을(를) 재생하지 못했습니다.");
+                Debug.LogWarning($"[다이얼로그 미리보기] '{request.dialogue}'을(를) 재생하지 못했습니다.");
         }
 
         static DialoguePlayer FindPlayer()
         {
             var player = UnityEngine.Object.FindAnyObjectByType<DialoguePlayer>();
             if (player != null) return player;
-            // 대화 관리자 설정이 있으면 게임에서와 같은 방식으로 만든다.
+            // 다이얼로그 관리자 설정이 있으면 게임에서와 같은 방식으로 만든다.
             if (DialogueSettings.Load()?.playerPrefab != null && Camera.main != null) return Dialogues.Player;
             var prefab = AssetDatabase.FindAssets("t:Prefab")
                 .Select(AssetDatabase.GUIDToAssetPath)
@@ -88,7 +88,7 @@ namespace GameSystems.EditorTools.Graph
                 .FirstOrDefault(p => p != null && p.GetComponent<DialoguePlayer>() != null);
             if (prefab == null)
             {
-                Debug.LogWarning("[대화 미리보기] 씬에 DialoguePlayer가 없고 대화 UI 프리팹도 없습니다. 'Game Systems › 대화 UI 템플릿 만들기'를 먼저 하세요.");
+                Debug.LogWarning("[다이얼로그 미리보기] 씬에 DialoguePlayer가 없고 다이얼로그 UI 프리팹도 없습니다. 'MomoiProject › 다이얼로그 시스템 › UI 템플릿 만들기'를 먼저 하세요.");
                 return null;
             }
             if (Camera.main == null)

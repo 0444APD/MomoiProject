@@ -1,8 +1,8 @@
-﻿using GameSystems.EditorTools;
+﻿using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 스프라이트 규격: 잘라 낼 영역 계산(베이크는 GPU라 여기서는 계산만).
     public class SpriteSpecTests

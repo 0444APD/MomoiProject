@@ -1,12 +1,12 @@
 using System.Collections;
-using GameSystems.Dialogue;
+using GBible.Dialogue;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
-    // 대화 관리자: 설정의 프리팹으로 재생기를 만들어 씬이 바뀌어도 남겨 둔다.
+    // 다이얼로그 관리자: 설정의 프리팹으로 재생기를 만들어 씬이 바뀌어도 남겨 둔다.
     public sealed class DialogueManagerTests
     {
         [UnityTest]

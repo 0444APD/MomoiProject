@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
     // 소리 채널. 음량은 채널마다 따로, 실제 음량 = 전체 × 채널 × 소리 하나의 음량.
     //  · 브금·목소리: 한 번에 하나(직렬). 바뀌면 이전 소리가 페이드 아웃, 새 소리가 페이드 인.

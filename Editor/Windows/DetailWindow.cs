@@ -1,19 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 상세 창: 도감 항목의 상세 속성을 따로 띄우는 창(도킹 가능). 위쪽에 탭이 쌓인다(크롬처럼).
     //  · 도감에서 항목을 열면 항목 탭. 이미 열린 항목이면 그 탭으로 간다.
     //  · 항목 안의 클래스·배열·리스트를 누르면 그 값의 탭이 바로 오른쪽에 열린다(안쪽으로 계속 들어갈 수 있다).
     //  · 탭을 닫으면 그 안쪽 탭도 함께 닫힌다.
-    // 값은 바로 반영되고(도감의 적용 대기 목록), Unity 적용은 도감에서 탭을 옮길 때 한다.
+    // 값은 바로 반영되고(도감의 적용 대기 목록), Unity 적용은 저장(Ctrl+S)할 때 한다.
     public sealed class DetailWindow : EditorWindow
     {
         sealed class Tab
@@ -29,6 +29,9 @@ namespace GameSystems.EditorTools
             public Func<GameData, DetailOptions> Options;
             // 안쪽 탭: 같은 값이면 새로 열지 않고 그 탭으로 간다.
             public object Value;
+            // 직접 그리는 탭(클래스 상세 등): 같은 키면 그 탭으로 가고, 도감이 바뀌면 다시 그린다.
+            public string CustomKey;
+            public Func<VisualElement, VisualElement> Build;
         }
 
         readonly List<Tab> _tabs = new List<Tab>();
@@ -38,12 +41,9 @@ namespace GameSystems.EditorTools
         VisualElement _body;
         bool _rebindQueued;
 
-        [MenuItem("Game Systems/상세", priority = 1)]
-        public static void OpenWindow() => Get();
-
         static DetailWindow Get()
         {
-            var window = GetWindow<DetailWindow>();
+            var window = GsWindows.Get<DetailWindow>();
             window.titleContent = new GUIContent("상세");
             window.minSize = new Vector2(360, 420);
             return window;
@@ -53,7 +53,7 @@ namespace GameSystems.EditorTools
         public static void OpenItem(GameData item, Func<GameData, DetailOptions> options)
         {
             var window = Get();
-            var existing = window._tabs.FirstOrDefault(t => t.Parent == null && t.ItemType == item.GetType() && t.ItemId == item.Id);
+            var existing = window._tabs.FirstOrDefault(t => t.Parent == null && t.Build == null && t.ItemType == item.GetType() && t.ItemId == item.Id);
             if (existing != null)
             {
                 window.Activate(existing);
@@ -65,14 +65,46 @@ namespace GameSystems.EditorTools
             window.Activate(tab);
         }
 
+        // 직접 그리는 탭을 연다(도감 항목이 아닌 것: 클래스 상세 등). build는 창의 뿌리(확인 창을 띄울 곳)를 받아 내용을 만든다.
+        // 같은 키의 탭이 있으면 다시 그려서 그 탭으로 간다.
+        public static void OpenCustom(string key, string title, string caption, Func<VisualElement, VisualElement> build)
+        {
+            var window = Get();
+            window.EnsureRoot();
+            var tab = window._tabs.FirstOrDefault(t => t.CustomKey == key);
+            if (tab == null)
+            {
+                tab = new Tab { CustomKey = key };
+                window._tabs.Add(tab);
+            }
+            tab.Title = title;
+            tab.Caption = caption;
+            tab.Build = build;
+            tab.Content = build(window._root);
+            window.Activate(tab);
+        }
+
+        // 직접 그리는 탭을 닫는다(지운 클래스 등).
+        public static void CloseCustom(string key)
+        {
+            if (!HasOpenInstances<DetailWindow>()) return;
+            var window = GsWindows.Get<DetailWindow>(focus: false);
+            var tab = window._tabs.FirstOrDefault(t => t.CustomKey == key);
+            if (tab != null) window.CloseTab(tab, closePanel: false);
+        }
+
         void OnEnable()
         {
             EditorDatabase.Changed += QueueRebind;
+            ClassStaging.Changed += QueueRebind;
+            ClassRegistry.Changed += QueueRebind;
         }
 
         void OnDisable()
         {
             EditorDatabase.Changed -= QueueRebind;
+            ClassStaging.Changed -= QueueRebind;
+            ClassRegistry.Changed -= QueueRebind;
         }
 
         void CreateGUI() => EnsureRoot();
@@ -80,12 +112,19 @@ namespace GameSystems.EditorTools
         // 창의 뿌리(탭 바 + 본문). 창이 그려지기 전에 탭을 열 때도 먼저 만든다.
         void EnsureRoot()
         {
-            // 이미 만들어 붙였으면 그대로 쓴다(열린 패널의 대화 상자가 이 뿌리를 쓴다).
+            // 이미 만들어 붙였으면 그대로 쓴다(열린 패널의 확인 창가 이 뿌리를 쓴다).
             if (_root != null && _root.parent == rootVisualElement) return;
             var host = rootVisualElement;
             host.Clear();
             _root = Gs.Col();
             Gs.Apply(_root);
+            // Ctrl+S: 도감에 모아 둔 변경을 저장한다.
+            _root.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode != KeyCode.S || !e.actionKey || e.shiftKey || e.altKey) return;
+                e.StopPropagation();
+                CodexChanges.Save();
+            }, TrickleDown.TrickleDown);
             _root.AddToClassList("gs-tabs");
             host.Add(_root);
             _bar = Gs.Row("gs-tabs__bar");
@@ -258,17 +297,32 @@ namespace GameSystems.EditorTools
         {
             if (_rebindQueued || _root == null) return;
             _rebindQueued = true;
-            _root.schedule.Execute(() =>
+            _root.schedule.Execute(Run);
+
+            void Run()
             {
+                // 에셋을 가져오는 중에는 끝날 때까지 미룬다(도감 창과 같은 규칙).
+                if (EditorApplication.isUpdating)
+                {
+                    _root.schedule.Execute(Run).StartingIn(100);
+                    return;
+                }
                 _rebindQueued = false;
                 Rebind();
-            });
+            }
         }
 
         void Rebind()
         {
             var changed = false;
-            foreach (var tab in _tabs.Where(t => t.Parent == null).ToList())
+            // 직접 그리는 탭은 내용을 다시 만든다(연결·적용 전 변경이 바뀌었을 수 있다). 지금 보이는 탭이 그것일 때만 화면을 바꾼다
+            // (항목 탭을 보고 있는데 다시 붙이면 편집 중인 칸이 포커스를 잃는다).
+            foreach (var tab in _tabs.Where(t => t.Build != null))
+            {
+                tab.Content = tab.Build(_root);
+                if (tab == _active) changed = true;
+            }
+            foreach (var tab in _tabs.Where(t => t.Parent == null && t.Build == null).ToList())
             {
                 if (tab.Panel != null && tab.Panel.Target != null) continue;
                 var item = EditorDatabase.Instance.All.FirstOrDefault(d => d.GetType() == tab.ItemType && d.Id == tab.ItemId);
@@ -295,7 +349,7 @@ namespace GameSystems.EditorTools
         internal static void Renamed(GameData item, string oldId)
         {
             if (!HasOpenInstances<DetailWindow>()) return;
-            var window = GetWindow<DetailWindow>(false, null, false);
+            var window = GsWindows.Get<DetailWindow>(focus: false);
             foreach (var tab in window._tabs.Where(t => t.Parent == null && t.ItemType == item.GetType() && t.ItemId == oldId))
             {
                 tab.ItemId = item.Id;

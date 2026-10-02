@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using GameSystems.Data;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools.UI;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 기본 기능의 도움말. 기능을 추가하거나 동작을 바꾸면 이 파일(또는 그 기능의 IHelpProvider)도 함께 고친다.
     // 문체: 매뉴얼보다 약간 친절하게, 비유 없이. 첫 문단에 핵심, 이어서 사용법·주의점.
@@ -27,7 +27,7 @@ namespace GameSystems.EditorTools
             yield return new HelpTopic
             {
                 Id = "window:help", Category = "안내", Order = 1, Title = "도움말 창",
-                Summary = "모든 기능의 설명을 모아 둔 창입니다. 메뉴 Game Systems › 도움말.",
+                Summary = "모든 기능의 설명을 모아 둔 창입니다. 메뉴 MomoiProject › 도움말.",
                 Body = "모든 창·탭·블록의 설명을 한곳에서 찾아볼 수 있습니다. 왼쪽 목록에서 고르거나 위의 검색 칸에 이름을 입력합니다.\n\n" +
                        "각 화면의 '?' 버튼을 누르면 해당 항목이 이 창에서 열립니다. 버튼에 마우스를 올리면 요약만 볼 수 있습니다.",
             };
@@ -35,11 +35,13 @@ namespace GameSystems.EditorTools
             {
                 Id = "guide:codex", Category = "안내", Order = 2, Title = "도감",
                 Summary = "플레이어 데이터·키워드·필드 규칙·수치·도전과제·템플릿·프리팹 등 게임의 정의 데이터를 만들고 고치는 곳입니다.",
-                Body = "도감은 게임이 시작되기 전부터 정해져 있는 데이터를 관리합니다. 메뉴 Game Systems › 도감으로 엽니다.\n\n" +
+                Body = "도감은 게임이 시작되기 전부터 정해져 있는 데이터를 관리합니다. 메뉴 MomoiProject › 도감으로 엽니다.\n\n" +
                        "## 화면 구성\n" +
                        "- 왼쪽: 도감 종류 목록. 종류 옆 숫자는 항목 수, '오류'는 검증 오류 수입니다.\n" +
-                       "- 가운데: 선택한 종류의 항목. 시트·세로 카드·가로 카드·바 중에서 보기를 고릅니다.\n" +
-                       "- 항목을 클릭(시트는 더블클릭)하면 상세 화면이 열립니다. '반영'하면 목록에 바로 보이고, Unity 에셋에는 탭을 옮길 때 변경 목록을 확인하고 적용합니다.\n\n" +
+                       "- 가운데: 선택한 종류의 항목. 모든 탭이 클래스 탭과 같은 목록입니다: 폴더(중첩) 안에 항목이 이름순으로, 폴더 먼저 그다음 항목.\n" +
+                       "- 항목 줄을 누르면 상세 화면이 열리고, 폴더 줄을 누르면 접고 펼칩니다. 폴더의 버튼(+ 만들기·+ 하위 폴더·↗ 새 창·⋯)은 마우스를 올린 줄에 보입니다.\n" +
+                       "- 항목·폴더를 끌어 다른 폴더 위에 놓으면 그 안으로 옮깁니다. 폴더는 정리용입니다(게임 동작과 상관없음, 클래스·이벤트 탭만 Assets/Code 아래 실제 폴더).\n" +
+                       "- 상세 화면에서 '반영'하면 목록에 바로 보이고, Unity 에셋에는 저장(Ctrl+S)할 때 적용합니다.\n\n" +
                        "## 검색\n" +
                        "ID로 찾습니다. `invalid`를 넣으면 검증 오류가 있는 항목만 거릅니다.\n\n" +
                        "## 새 종류 추가\n" +
@@ -57,15 +59,15 @@ namespace GameSystems.EditorTools
                        "## ID 바꾸기\n" +
                        "상세 화면의 'ID 바꾸기'를 쓰면 그 ID를 가리키는 모든 곳이 함께 바뀝니다. 바꾸기 전에 영향받는 곳의 목록을 보여 줍니다.\n\n" +
                        "## GameIds\n" +
-                       "도감이 바뀌면 `GameIds.cs`가 자동으로 다시 만들어집니다. 코드에서는 문자열 대신 `GameIds.PlayerData.Gold`, `GameIds.Keyword.MonsterTag.Boss`처럼 씁니다. 플레이어 데이터는 `StateKey<int>`처럼 값 형식까지 붙어 나오므로 잘못된 형식으로 읽으면 컴파일 오류가 납니다.\n\n" +
-                       "수동으로 다시 만들려면 메뉴 Game Systems › 식별자 코드 다시 만들기.",
+                       "도감이 바뀌면 `GameIds.cs`가 자동으로 다시 만들어집니다. 코드에서는 문자열 대신 `GameIds.PlayerData.Gold`, `GameIds.Keyword.MonsterTag.Boss`처럼 씁니다. 플레이어 데이터는 `PlayerDataKey<int>`처럼 값 형식까지 붙어 나오므로 잘못된 형식으로 읽으면 컴파일 오류가 납니다.\n\n" +
+                       "수동으로 다시 만들려면 메뉴 MomoiProject › 식별자 코드 다시 만들기.",
                 Related = new[] { "guide:saves" },
             };
             yield return new HelpTopic
             {
-                Id = "guide:store", Category = "안내", Order = 4, Title = "저장소(상태)",
+                Id = "guide:store", Category = "안내", Order = 4, Title = "저장소(플레이어 데이터)",
                 Summary = "게임 중 바뀌는 모든 의미 있는 값을 담는 곳입니다. 값은 Set·Modify로만 바꿉니다.",
-                Body = "저장소(StateStore)는 플레이어 데이터, 판 진행 상태, 누적 기록 등 게임 중 바뀌는 값을 모두 담습니다. 지역 변수 같은 일시적인 값만 예외입니다.\n\n" +
+                Body = "저장소(PlayerDataStore)는 플레이어 데이터, 판 진행, 누적 기록 등 게임 중 바뀌는 값을 모두 담습니다. 지역 변수 같은 일시적인 값만 예외입니다.\n\n" +
                        "## 규칙\n" +
                        "- 값을 바꿀 때는 반드시 `Set`(통째로 교체) 또는 `Modify`(안쪽을 고침)를 씁니다.\n" +
                        "- 그래야 변경 기록, Undo, 저장, 모니터 표시, 도전과제 검사가 모두 자동으로 따라옵니다.\n" +
@@ -73,8 +75,8 @@ namespace GameSystems.EditorTools
                        "## 구역\n" +
                        "- 이번 판(Session): 새 판을 시작하면 초기화됩니다.\n" +
                        "- 프로필(Meta): 판이 바뀌어도 유지됩니다(해금, 누적 기록 등).\n\n" +
-                       "자세한 코드 예제는 Documentation~/StateStore.md를 참고하세요.",
-                Related = new[] { "data:" + typeof(StateKeyData).FullName, "guide:actions" },
+                       "자세한 코드 예제는 Documentation~/PlayerDataStore.md를 참고하세요.",
+                Related = new[] { "data:" + typeof(PlayerDataEntry).FullName, "guide:actions" },
             };
             yield return new HelpTopic
             {
@@ -96,13 +98,13 @@ namespace GameSystems.EditorTools
                        "## 개발 중\n" +
                        "ID 이름이나 데이터 구조가 바뀌어 기존 저장과 맞지 않으면, 변환하지 않고 저장을 지운 뒤 새 프로필로 시작합니다. 개발 중에는 변환 코드를 작성할 필요가 없습니다.\n\n" +
                        "## 출시 후\n" +
-                       "메뉴 Game Systems › 출시됨을 켜면, 이후의 ID 변경 이력이 기록되어 예전 저장이 새 ID로 이어집니다. 구조를 바꿀 때는 SessionOptions.Migrations에 변환 단계를 추가합니다.",
+                       "메뉴 MomoiProject › 출시됨을 켜면, 이후의 ID 변경 이력이 기록되어 예전 저장이 새 ID로 이어집니다. 구조를 바꿀 때는 SessionOptions.Migrations에 변환 단계를 추가합니다.",
                 Related = new[] { "guide:ids" },
             };
             yield return new HelpTopic
             {
                 Id = "guide:conditions", Category = "안내", Order = 7, Title = "조건식",
-                Summary = "도전과제 조건, 수치 반영 조건, 상태 값 검사에 쓰는 조건을 블록으로 조립합니다.",
+                Summary = "도전과제 조건, 수치 반영 조건, 플레이어 데이터 검사에 쓰는 조건을 블록으로 조립합니다.",
                 Body = "조건식은 블록을 쌓아 만듭니다. '&& AND', '|| OR', '! NOT' 블록 안에 다른 블록을 넣을 수 있고, 몇 단계든 중첩할 수 있습니다. 괄호가 필요한 식도 중첩으로 표현합니다.\n\n" +
                        "## 표시\n" +
                        "편집 칸은 `[변수] [>=] [값]`처럼 코드 형태로 보입니다. 칸을 클릭해 값을 고르고, 마우스를 올리면 자연어 설명이 나옵니다.\n\n" +
@@ -137,7 +139,7 @@ namespace GameSystems.EditorTools
                        "## 블록\n" +
                        "- 스프라이트 나열, 데이터 나열, 특정 스프라이트, 필드 카드, 클래스 카드 등이 있습니다.\n" +
                        "- 다른 블록이 따로 보여 주는 필드는 '데이터 나열'에서 빠집니다.\n\n" +
-                       "배치는 ProjectSettings/GameSystems/Layouts.json에 저장되어 팀 전체가 공유합니다.\n\n" +
+                       "배치는 ProjectSettings/MomoiProject/Layouts.json에 저장되어 팀 전체가 공유합니다.\n\n" +
                        "## 새 블록 만들기(프로그래머)\n" +
                        "GsLayoutBlock을 상속하고 [LayoutBlock(\"id\", \"이름\", Description = \"설명\")]을 붙이면 목록에 나타납니다. Description은 필수입니다.",
             };
@@ -167,8 +169,8 @@ namespace GameSystems.EditorTools
             yield return new HelpTopic
             {
                 Id = "window:monitor", Category = "안내", Order = 13, Title = "모니터 창",
-                Summary = "플레이 중 게임 상태를 보고, 값을 고치고, 이벤트·명령을 실행하는 창입니다.",
-                Body = "메뉴 Game Systems › 모니터로 엽니다. 플레이 모드에서 세션이 시작되면 내용이 채워집니다.\n\n" +
+                Summary = "플레이 중 플레이어 데이터를 보고, 값을 고치고, 이벤트·명령을 실행하는 창입니다.",
+                Body = "메뉴 MomoiProject › 모니터로 엽니다. 플레이 모드에서 세션이 시작되면 내용이 채워집니다.\n\n" +
                        "## 탭\n" +
                        "- 타임라인: 일어난 일의 기록\n" +
                        "- 데이터: 현재 저장소의 모든 값\n" +
@@ -181,7 +183,7 @@ namespace GameSystems.EditorTools
             };
 
             // ── 도감 종류 ───────────────────────────────────────
-            yield return Data<StateKeyData>("플레이어 데이터",
+            yield return Data<PlayerDataEntry>("플레이어 데이터",
                 "저장소에 담을 값 하나를 정의합니다. ID가 곧 키이고, 값 형식과 구역을 정합니다.",
                 "플레이어 데이터는 게임 중 바뀌는 값의 이름표입니다. 여기서 만든 키는 게임이 시작될 때 저장소에 자동으로 등록됩니다.\n\n" +
                 "## 필드\n" +
@@ -189,23 +191,23 @@ namespace GameSystems.EditorTools
                 "- 값 형식: 숫자·글자·참거짓·enum 같은 단순 값, 또는 프로젝트의 클래스·리스트·딕셔너리.\n" +
                 "- 기본값: 단순 값일 때만 입력합니다. 클래스는 그 클래스의 초기값을 씁니다.\n\n" +
                 "## 코드에서\n" +
-                "`State.Get(GameIds.PlayerData.Gold)`로 읽고, `State.Set(...)`이나 `State.Modify(...)`로 바꿉니다.",
+                "`Game.Data().Gold`처럼 이름으로 읽고 씁니다(식별자 코드를 만들면 생깁니다). 낮은 단계로는 `session.Data.Get(GameIds.PlayerData.Gold)`·`Set`·`Modify`를 씁니다.",
                 "guide:store", "guide:ids");
             yield return Data<KeywordData>("키워드",
-                "식별용 string 값(등급·부위·태그 등)을 그룹별로 만들고, 끌어서 정리하는 탭입니다.",
+                "식별용 string 값(등급·부위·태그 등)을 그룹별로 만들고, 끌어서 정리하는 탭입니다. 그룹 안에 그룹을 둘 수 있습니다.",
                 "키워드는 반드시 하나의 그룹에 속합니다. 이 탭 한 화면에서 그룹과 키워드를 함께 다룹니다.\n\n" +
                 "## 만들기\n" +
                 "- '+ 새 그룹': 그룹 ID와 키워드 ID를 한 번에 입력합니다. 키워드는 줄바꿈·띄어쓰기·쉼표로 나눕니다(예: common rare legendary).\n" +
-                "- 그룹 카드의 '+ 키워드': 그 그룹에 키워드를 추가합니다.\n\n" +
+                "- 그룹 줄의 '+ 키워드': 그 그룹에 키워드를 추가합니다. '+ 하위 그룹': 그 그룹 안에 그룹을 만듭니다.\n\n" +
                 "## 정리(끌어 놓기)\n" +
-                "- 그룹 카드 왼쪽의 옅은 세로선을 끌어 그룹 순서를 바꿉니다.\n" +
-                "- 키워드 칩을 끌어 같은 그룹 안에서 순서를 바꾸거나, 다른 그룹 카드에 놓아 옮깁니다. 분홍 막대가 놓일 자리입니다.\n" +
-                "- 순서는 드롭다운에 보이는 순서가 됩니다.\n\n" +
+                "- 키워드를 끌어 다른 그룹 위에 놓으면 그 그룹으로 옮깁니다. 그룹을 끌어 다른 그룹 위에 놓으면 그 안의 하위 그룹이 됩니다(맨 위 줄에 놓으면 맨 위로).\n" +
+                "- 놓을 그룹은 분홍으로 밝아집니다. 순서는 따로 두지 않고 이름순입니다(그룹 먼저, 그다음 키워드).\n" +
+                "- 필드 연결은 그룹마다 따로입니다. 하위 그룹의 키워드는 부모 그룹에 연결된 필드에서 고를 수 없습니다.\n\n" +
                 "## 편집\n" +
-                "그룹 ID나 키워드 칩을 누르면 상세 화면이 열립니다. 설명, ID 바꾸기, 삭제를 여기서 합니다. 필드에는 ID가 저장되며, ID를 바꾸면 쓰던 곳이 함께 바뀝니다.\n\n" +
+                "키워드 줄을 누르거나 그룹 줄의 ⋯ › 그룹 편집으로 상세 화면을 엽니다. 설명, ID 바꾸기, 삭제를 여기서 합니다. 필드에는 ID가 저장되며, ID를 바꾸면 쓰던 곳이 함께 바뀝니다.\n\n" +
                 "## 필드에 연결\n" +
                 "string 필드는 하나, string 배열·리스트 필드는 여러 개를 고릅니다. 연결은 '필드에 연결…'(키워드 연결 창)에서 합니다. 코드에서는 `GameIds.Keyword.그룹.키워드` 형태로 씁니다.\n\n" +
-                "이 탭의 변경도 탭을 옮길 때 목록을 확인하고 Unity에 적용합니다.",
+                "이 탭의 변경도 저장(Ctrl+S)할 때 Unity에 적용합니다.",
                 "window:keywords", "guide:apply", "data:" + typeof(KeywordGroupData).FullName);
             yield return Data<KeywordGroupData>("키워드 그룹",
                 "키워드의 부모입니다. 필드에 그룹을 연결하면 그 필드는 그룹의 키워드에서 고릅니다.",
@@ -218,16 +220,16 @@ namespace GameSystems.EditorTools
             yield return new HelpTopic
             {
                 Id = "guide:apply", Category = "안내", Order = 2, Title = "변경 적용과 되돌리기",
-                Summary = "도감의 변경은 바로 Unity에 쓰지 않고 모아 두었다가, 탭을 옮길 때 목록을 확인하고 적용합니다.",
+                Summary = "도감의 변경은 바로 Unity에 쓰지 않고 모아 두었다가, 저장(Ctrl+S)할 때 Unity에 적용합니다.",
                 Body = "도감에서 항목을 만들고, 고치고, 지우고, ID를 바꾸고, 순서를 옮긴 것은 모두 먼저 '적용 대기'로 모입니다. 도감 화면과 드롭다운·검증은 적용 전 상태를 그대로 보여 주지만, Unity 에셋은 아직 바뀌지 않습니다.\n\n" +
-                       "## 탭을 옮길 때\n" +
+                       "## 저장(Ctrl+S)할 때\n" +
                        "변경이 있으면 이 탭에서 바뀐 항목과 필드가 전후 값으로 나열됩니다.\n" +
                        "- 적용: Unity 에셋에 씁니다. 새 항목은 에셋이 되고, 지운 항목은 휴지통으로, ID 바꾸기는 파일 이름·참조·GameIds까지 함께 바뀝니다.\n" +
                        "- 되돌리기: 모아 둔 변경을 모두 버립니다.\n" +
                        "- 계속 편집: 탭을 옮기지 않고 그대로 머뭅니다.\n\n" +
                        "## 알아 둘 점\n" +
-                       "- 상세 화면의 '반영'은 목록에 반영하는 것이고, Unity 적용은 탭을 옮길 때입니다.\n" +
-                       "- 적용 대기 건수는 사이드바 아래에, 바뀐 카드에는 '적용 전' 배지가 보입니다.\n" +
+                       "- 상세 화면의 '반영'은 목록에 반영하는 것이고, Unity 적용은 저장(Ctrl+S)할 때입니다.\n" +
+                       "- 적용 대기 건수는 사이드바 아래에, 바뀐 줄에는 '적용 전' 배지가 보입니다.\n" +
                        "- 플레이 시작, 도감 창 닫기, Unity 종료 때도 적용 여부를 묻습니다. 스크립트가 다시 컴파일되어도 모아 둔 변경은 유지됩니다.\n" +
                        "- 예외: 프리팹 컴포넌트 필드 수정과 스프라이트 맞춤(베이크)은 에셋에 바로 저장됩니다(Undo 가능).",
                 Related = new[] { "guide:codex" },
@@ -235,7 +237,7 @@ namespace GameSystems.EditorTools
             yield return new HelpTopic
             {
                 Id = "window:keywords", Category = "안내", Order = 3, Title = "키워드 연결 창",
-                Summary = "필드와 키워드 그룹을 두 창에서 함께 보며 연결합니다. 메뉴 Game Systems › 키워드 연결.",
+                Summary = "필드와 키워드 그룹을 두 창에서 함께 보며 연결합니다. 메뉴 MomoiProject › 키워드 연결.",
                 Body = "왼쪽에는 키워드를 담을 수 있는 필드(string, string 배열·리스트)가 클래스별로, 오른쪽에는 키워드 그룹이 나옵니다.\n\n" +
                        "## 기본 흐름\n" +
                        "- 왼쪽에서 필드를 고릅니다.\n" +
@@ -259,21 +261,21 @@ namespace GameSystems.EditorTools
                 "- 키워드 그룹 / 도감 종류: 출처에 따라 고를 범위. 키워드 그룹을 비우면 모든 키워드에서 고릅니다.\n" +
                 "- 필수: 켜면 값이 비었을 때 검증 오류가 납니다. 모니터의 데이터 탭에도 '빈 필수 값'으로 표시됩니다.\n\n" +
                 "## 스프라이트 필드\n" +
-                "Sprite 필드에는 '스프라이트 규격 묶음'과 '미리보기 규격'을 연결합니다. 원본을 넣으면 맞춤 창이 열리고, 묶음의 모든 규격으로 잘라 저장됩니다.",
+                "Sprite 필드에는 '스프라이트 규격 그룹'과 '미리보기 규격'을 연결합니다. 원본을 넣으면 맞춤 창이 열리고, 그룹의 모든 규격으로 잘라 저장됩니다.",
                 "window:keywords", "data:" + typeof(SpritePresetGroupData).FullName);
-            yield return Data<SpritePresetGroupData>("스프라이트 규격 묶음",
+            yield return Data<SpritePresetGroupData>("스프라이트 규격 그룹",
                 "한 용도의 스프라이트 규격들을 묶습니다(예: 캐릭터 일러 = 스탠딩A·스탠딩B·아이콘).",
-                "규격 묶음은 원본 이미지 하나에서 잘라 낼 크기들의 모음입니다. 필드 규칙으로 스프라이트 필드에 묶음을 연결하면, 그 필드에 원본을 넣을 때 묶음의 모든 규격이 한 번에 만들어집니다.\n\n" +
+                "규격 그룹은 원본 이미지 하나에서 잘라 낼 크기들의 모음입니다. 필드 규칙으로 스프라이트 필드에 그룹을 연결하면, 그 필드에 원본을 넣을 때 그룹의 모든 규격이 한 번에 만들어집니다.\n\n" +
                 "## 흐름\n" +
-                "- 도감의 스프라이트 규격 탭에서 '+ 새 묶음'으로 묶음과 규격을 한 번에 만듭니다(한 줄에 'ID 가로x세로', 예: icon 128x128). 카드의 '+ 규격'으로 더합니다.\n" +
-                "- 묶음 카드 왼쪽 세로선을 끌어 묶음 순서를, 규격 칩을 끌어 순서를 바꾸거나 다른 묶음으로 옮깁니다.\n" +
-                "- 필드 규칙에서 스프라이트 필드에 이 묶음을 연결합니다.\n" +
+                "- 도감의 스프라이트 규격 탭에서 '+ 새 그룹'으로 그룹과 규격을 한 번에 만듭니다(한 줄에 'ID 가로x세로', 예: icon 128x128). 그룹 줄의 '+ 규격'으로 더합니다.\n" +
+                "- 규격·그룹을 끌어 다른 그룹 위에 놓아 옮깁니다(그룹 안에 그룹을 둘 수 있습니다). 순서는 이름순입니다.\n" +
+                "- 필드 규칙에서 스프라이트 필드에 이 그룹을 연결합니다.\n" +
                 "- 탐색기에서 그 필드에 원본을 넣으면 맞춤 창이 열립니다. 클릭으로 중심, 휠로 배율을 정하고 '적용'을 누릅니다.\n\n" +
-                "결과는 Assets/GameSystemsData/Sprites 아래에 PNG로 저장됩니다. 게임 코드에서는 `SpriteSpecs.Get(원본, 규격 ID)`로 가져옵니다.",
+                "결과는 Assets/MomoiProjectData/Sprites 아래에 PNG로 저장됩니다. 게임 코드에서는 `SpriteSpecs.Get(원본, 규격 ID)`로 가져옵니다.",
                 "data:" + typeof(SpritePresetData).FullName, "data:" + typeof(FieldRuleData).FullName);
             yield return Data<SpritePresetData>("스프라이트 규격",
                 "출력 크기 하나입니다. 크기를 바꾸면 이 규격으로 만든 이미지가 모두 다시 만들어집니다.",
-                "규격은 묶음과 가로·세로 픽셀 크기로 정의합니다. 도감의 스프라이트 규격 탭에서 묶음과 함께 만들고, 칩을 누르면 크기를 고치는 상세 화면이 열립니다.\n\n" +
+                "규격은 그룹과 가로·세로 픽셀 크기로 정의합니다. 도감의 스프라이트 규격 탭에서 그룹과 함께 만들고, 칩을 누르면 크기를 고치는 상세 화면이 열립니다.\n\n" +
                 "## 예외 촬영\n" +
                 "맞춤 창에서 특정 규격만 따로 위치를 잡을 수 있습니다. 이 기록은 영구 보관됩니다. 나중에 규격 크기가 바뀌면 해당 예외에 '확인 필요'가 표시되므로 다시 잡아 주세요.\n\n" +
                 "상세 화면의 '규격 사용 현황'에서 이 규격으로 만든 이미지 수와 예외 목록을 확인하고 바로 다시 맞출 수 있습니다.",
@@ -289,7 +291,7 @@ namespace GameSystems.EditorTools
                 "data:" + typeof(AchievementData).FullName, "monitor:Stats");
             yield return Data<AchievementData>("도전과제",
                 "조건을 만족하면 즉시 달성되고 보상이 지급됩니다. 달성은 Undo로 되돌리지 않습니다.",
-                "도전과제는 달성 조건과 보상으로 이루어집니다. 조건은 수치·상태 값이 바뀔 때마다 검사되며, 만족하는 순간 달성됩니다.\n\n" +
+                "도전과제는 달성 조건과 보상으로 이루어집니다. 조건은 로그·플레이어 데이터 값이 바뀔 때마다 검사되며, 만족하는 순간 달성됩니다.\n\n" +
                 "## 필드\n" +
                 "- 달성 조건: 조건식 블록으로 조립합니다. 중첩한 AND/OR/NOT을 쓸 수 있습니다.\n" +
                 "- 보상: 달성 시 지급할 항목. 수치 획득 등이 있습니다.\n\n" +
@@ -317,7 +319,7 @@ namespace GameSystems.EditorTools
                 "- 플레이어 데이터로 거르면 그 값과 관련된 기록만 남습니다.\n" +
                 "- 검색 칸은 자연어와 코드 형태 모두로 찾습니다.\n\n" +
                 "Undo를 하면 'Undo' 기록 아래에 되돌린 값들이 묶여 남습니다.");
-            yield return Monitor("State", "데이터", 1,
+            yield return Monitor("Data", "데이터", 1,
                 "현재 세션과 프로필의 모든 값을 탐색기로 보고 고칩니다.",
                 "저장소의 값이 폴더로 나뉘어 표시됩니다.\n\n" +
                 "- 빈 필수 값: 필드 규칙에서 필수로 정했지만 비어 있는 값\n" +
@@ -328,7 +330,7 @@ namespace GameSystems.EditorTools
             yield return Monitor("Achievements", "도전과제", 2,
                 "도전과제별 달성 여부와 진행도를 보고, 테스트용으로 달성 처리합니다.",
                 "카드마다 조건 문장과 현재 진행도(현재 값 / 목표)가 표시됩니다. 카드를 선택하면 오른쪽 아래에서 다음을 실행할 수 있습니다.\n\n" +
-                "- 이벤트로 달성: 부족한 수치만큼 실제 이벤트를 발생시킵니다(게임과 같은 경로). Undo하면 수치는 돌아가고 달성은 유지됩니다.\n" +
+                "- 트리거로 달성: 조건이 맞도록 부족한 로그만큼 이벤트를 발생시키고, 트리거의 이벤트(값 조건을 맞춘 것)를 발생시켜 스스로 달성되게 합니다(게임과 같은 경로). 사용·NOT처럼 자동으로 못 만드는 트리거는 '강제 달성'. Undo하면 로그는 돌아가고 달성은 유지됩니다.\n" +
                 "- 강제 달성: 조건·이벤트 없이 달성 처리만 합니다.\n" +
                 "- 초기화: 달성 표시만 지웁니다. 수치는 그대로입니다.",
                 "data:" + typeof(AchievementData).FullName);

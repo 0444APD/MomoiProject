@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 프리팹 컴포넌트 블록: 도감의 프리팹 항목에서, 프리팹(자식 포함)의 스크립트 컴포넌트 필드를 탐색기로 보고 고친다.
     // 프리팹 에셋에 바로 저장하며 Undo(Ctrl+Z)로 되돌릴 수 있다.

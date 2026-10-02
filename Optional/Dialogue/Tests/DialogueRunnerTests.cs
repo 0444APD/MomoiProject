@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
+using GBible.Data;
+using GBible.Dialogue;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public sealed class DialogueRunnerTests
     {

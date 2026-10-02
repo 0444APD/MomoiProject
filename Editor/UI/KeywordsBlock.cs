@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 키워드 그룹 항목의 "키워드" 블록: 이 그룹의 키워드와 연결된 필드를 보여 주고, 키워드를 바로 추가한다.
     [LayoutBlock(Id, "키워드", Description = "이 키워드 그룹에 속한 키워드와, 그룹이 연결된 필드를 보여 줍니다. 키워드를 여러 개 한 번에 추가할 수 있습니다.")]
@@ -38,19 +38,23 @@ namespace GameSystems.EditorTools.UI
                 });
             }, GsButtonKind.Ghost);
             tools.Add(add);
-            tools.Add(new GsButton("키워드 연결 창", () => KeywordWindow.Open(group.Id), GsButtonKind.Ghost));
             box.Add(tools);
 
             var fields = KeywordTools.FieldsLinkedTo(group.Id).ToList();
             var linked = Gs.Col();
             linked.style.marginTop = 12;
             linked.Add(Gs.Label("연결된 필드", "gs-detail__label"));
-            if (fields.Count == 0) linked.Add(Gs.Label("아직 이 그룹을 쓰는 필드가 없습니다.", "gs-caption"));
+            if (fields.Count == 0) linked.Add(Gs.Label("아직 이 그룹을 쓰는 필드가 없습니다. 도감 › 클래스에서 클래스를 눌러 필드에 이 그룹을 연결하세요.", "gs-caption"));
             foreach (var (type, field) in fields)
             {
                 var row = Gs.Row("gs-sheet__row");
-                row.Add(Gs.Label($"{ClassTypes.Label(type)} › {KeywordTools.FieldLabel(field)}", "gs-grow"));
+                row.Add(Gs.Label($"{ClassTypes.Label(type)} › {field.Name}", "gs-grow"));
                 row.Add(Gs.Label(KeywordTools.IsMulti(field) ? "여러 개" : "하나", "gs-caption"));
+                // 누르면 그 클래스의 상세(연결 설정)로 간다.
+                var linkType = type;
+                var linkField = field.Name;
+                row.tooltip = "눌러서 클래스 상세 열기";
+                row.RegisterCallback<ClickEvent>(_ => ClassDetail.Open(linkType, linkField));
                 linked.Add(row);
             }
             box.Add(linked);
@@ -58,7 +62,7 @@ namespace GameSystems.EditorTools.UI
         }
     }
 
-    // 키워드 만들기 대화 상자(도감 키워드 탭·그룹 블록·연결 창·드롭다운 공용). 항목은 ID로만 식별한다.
+    // 키워드 만들기 확인 창(도감 키워드 탭·그룹 블록·클래스 상세·드롭다운 공용). 항목은 ID로만 식별한다.
     public static class KeywordDialogs
     {
         const string IdsCaption = "여러 개는 줄바꿈·띄어쓰기·쉼표로 나눕니다. 예: common rare legendary";

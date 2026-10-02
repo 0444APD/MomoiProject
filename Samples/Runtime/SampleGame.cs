@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Samples
+namespace GBible.Samples
 {
     // ── 샘플 이벤트 ─────────────────────────────────────────────
     [GameEvent("적 처치")]
@@ -26,14 +26,14 @@ namespace GameSystems.Samples
         Poison,
     }
 
-    [Serializable]
+    [Serializable, PlayerData]
     public sealed class SampleEnhancement
     {
         [FieldLabel("효과")] public string effect = "";
         [FieldLabel("수치")] public int power;
     }
 
-    [Serializable]
+    [Serializable, PlayerData]
     public sealed class SampleEquipment
     {
         [FieldLabel("이름")] public string name = "";
@@ -43,14 +43,14 @@ namespace GameSystems.Samples
         [FieldLabel("부위")] public string slot = "";
         [FieldLabel("등급")] public string grade = "";
         [FieldLabel("속성")] public SampleElement element;
-        [FieldLabel("태그")] public List<string> tags = new List<string>();
-        [FieldLabel("강화")] public List<SampleEnhancement> enhancements = new List<SampleEnhancement>();
+        [FieldLabel("태그")] public GameList<string> tags = new GameList<string>();
+        [FieldLabel("강화")] public GameList<SampleEnhancement> enhancements = new GameList<SampleEnhancement>();
     }
 
-    [Serializable]
+    [Serializable, PlayerData]
     public sealed class SampleInventory
     {
-        [FieldLabel("장비")] public List<SampleEquipment> items = new List<SampleEquipment>();
+        [FieldLabel("장비")] public GameList<SampleEquipment> items = new GameList<SampleEquipment>();
     }
 
     [GameEvent("골드 획득")]
@@ -90,7 +90,7 @@ namespace GameSystems.Samples
     // 샘플 연결: 세션이 시작되면 행동 처리기와 디버그 명령을 등록한다.
     public static class SampleGame
     {
-        // 게임 상태는 반드시 상태 저장소에 둔다(static 변수에 두면 Undo·되감기에서 빠진다).
+        // 게임 중 바뀌는 값은 반드시 플레이어 데이터 저장소에 둔다(static 변수에 두면 Undo·되감기에서 빠진다).
         const string ComboKey = "sample:combo";
         // 도감의 플레이어 데이터(샘플 데이터 만들기로 생성). 없으면 장비 명령은 안내만 한다.
         const string InventoryKey = "player.inventory";
@@ -100,12 +100,12 @@ namespace GameSystems.Samples
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         static void Hook()
         {
-            GameSystemsRuntime.Started += Register;
+            GBibleRuntime.Started += Register;
         }
 
         static void Register(GameSession session)
         {
-            session.State.Define(ComboKey, StateZone.Session, 0, "현재 콤보");
+            session.Data.Define(ComboKey, DataZone.Session, 0, "현재 콤보");
             session.Actions.Register<AttackAction>(action => Attack(session, action));
             session.Actions.Register<OpenChestAction>(_ => OpenChest(session));
             session.Actions.Register<LootAction>(_ => Loot(session));
@@ -128,21 +128,21 @@ namespace GameSystems.Samples
             var combat = session.Random.Get("combat");
             if (!combat.Chance(0.7))
             {
-                session.State.Set(ComboKey, 0);
+                session.Data.Set(ComboKey, 0);
                 session.Journal.Append(JournalKind.System, "Sample", $"{action.target} 공격 빗나감");
                 return;
             }
-            var combo = (int)session.State.GetNumber(ComboKey) + 1;
-            session.State.Set(ComboKey, combo);
+            var combo = (int)session.Data.GetNumber(ComboKey) + 1;
+            session.Data.Set(ComboKey, combo);
             var tags = action.target == "드래곤" ? new List<string> { "boss" } : new List<string>();
             session.Events.Publish(new EnemyKilled { Enemy = action.target, Count = 1, Combo = combo, Tags = tags });
         }
 
         static void Guarded(GameSession session, GameAction action)
         {
-            if (!session.State.IsDefined(InventoryKey))
+            if (!session.Data.IsDefined(InventoryKey))
             {
-                session.Journal.Append(JournalKind.Warning, "Sample", "인벤토리 플레이어 데이터가 없습니다. 메뉴 Game Systems > 샘플 > 샘플 데이터 만들기를 먼저 실행하세요.");
+                session.Journal.Append(JournalKind.Warning, "Sample", "인벤토리 플레이어 데이터가 없습니다. 메뉴 Tests › 샘플 › 샘플 데이터 만들기를 먼저 실행하세요.");
                 return;
             }
             session.Do(action);
@@ -154,14 +154,14 @@ namespace GameSystems.Samples
             var templates = GameDatabase.Load()?.All<TemplateData>().Where(t => t.value is SampleEquipment).ToList();
             if (templates == null || templates.Count == 0) throw new InvalidOperationException("장비 템플릿이 없습니다(샘플 데이터 만들기).");
             var pick = templates[session.Random.Get("drop").Range(0, templates.Count)];
-            session.State.Modify<SampleInventory>(InventoryKey, inv => inv.items.Add(pick.CreateInstance<SampleEquipment>()));
+            session.Data.Modify<SampleInventory>(InventoryKey, inv => inv.items.Add(pick.CreateInstance<SampleEquipment>()));
         }
 
         static void Enhance(GameSession session)
         {
             var effects = new[] { "lifesteal", "fireResist" };
             var roll = session.Random.Get("enhance");
-            session.State.Modify<SampleInventory>(InventoryKey, inv =>
+            session.Data.Modify<SampleInventory>(InventoryKey, inv =>
             {
                 if (inv.items.Count == 0) throw new InvalidOperationException("강화할 장비가 없습니다.");
                 inv.items[0].enhancements.Add(new SampleEnhancement { effect = effects[roll.Range(0, effects.Length)], power = roll.Range(1, 10) });
@@ -172,7 +172,7 @@ namespace GameSystems.Samples
         {
             var drop = session.Random.Get("drop");
             var amount = drop.Range(10, 60);
-            if (session.State.TypeOf(GoldKey) != null) session.State.Set(GoldKey, session.State.Get<int>(GoldKey) + amount);
+            if (session.Data.TypeOf(GoldKey) != null) session.Data.Set(GoldKey, session.Data.Get<int>(GoldKey) + amount);
             session.Events.Publish(new GoldEarned { Amount = amount });
         }
     }

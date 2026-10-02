@@ -1,28 +1,28 @@
 using System;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 using UnityEngine.Events;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 씬에 두는 대화 재생기: 실행기(DialogueRunner) + 대화 화면(DialogueStage) + 입력 연결.
+    // 씬에 두는 다이얼로그 재생기: 실행기(DialogueRunner) + 다이얼로그 화면(DialogueStage) + 입력 연결.
     //   GetComponent<DialoguePlayer>().Play("shopIntro");
-    // 클릭·Space·Enter는 대화 UI가 받는다. 다른 입력(게임패드 등)은 Advance/Choose를 직접 부른다.
-    [AddComponentMenu("Game Systems/대화 재생기")]
+    // 클릭·Space·Enter는 다이얼로그 UI가 받는다. 다른 입력(게임패드 등)은 Advance/Choose를 직접 부른다.
+    [AddComponentMenu("MomoiProject/다이얼로그 재생기")]
     public sealed class DialoguePlayer : MonoBehaviour
     {
         public DialogueStage stage;
         [Tooltip("초당 글자 수(대사 노드에 따로 정하지 않았을 때)")] public float typingSpeed = 30f;
-        [Tooltip("대화 중 게임 시간을 멈춘다(GameTime.Pause, 대화 연출은 멈추지 않는 시간으로 돈다)")] public bool pauseGame = true;
+        [Tooltip("다이얼로그 중 게임 시간을 멈춘다(GameTime.Pause, 다이얼로그 연출은 멈추지 않는 시간으로 돈다)")] public bool pauseGame = true;
         public UnityEvent onStarted = new UnityEvent();
-        [Tooltip("대화 그래프의 '신호 보내기' 노드")] public UnityEvent<string> onSignal = new UnityEvent<string>();
+        [Tooltip("다이얼로그 그래프의 '신호 보내기' 노드")] public UnityEvent<string> onSignal = new UnityEvent<string>();
         public UnityEvent onEnded = new UnityEvent();
-        [Tooltip("대화 진행을 판 저장(run.json)에 함께 남긴다. 불러온 뒤 Dialogues.ResumeSaved()로 이어 간다.")]
+        [Tooltip("다이얼로그 진행을 판 저장(run.json)에 함께 남긴다. 불러온 뒤 Dialogues.ResumeSaved()로 이어 간다.")]
         public bool saveProgress = true;
 
         // 판 저장에 들어가는 진행 기록 키(세션 구역, JSON 글).
         public const string ProgressKey = "dialogue.progress";
-        const string PauseReason = "대화";
+        const string PauseReason = "다이얼로그";
         DialogueRunner _runner;
 
         public DialogueRunner Runner
@@ -114,7 +114,7 @@ namespace GameSystems.Dialogue
         public bool Play(string dialogueId, string entryId = "start")
         {
             EnsureRunner();
-            _runner.Session = GameSystemsRuntime.Session;
+            _runner.Session = GBibleRuntime.Session;
             _runner.DefaultTypingSpeed = typingSpeed;
             if (pauseGame) GameTime.Pause(PauseReason);
             onStarted.Invoke();
@@ -126,7 +126,7 @@ namespace GameSystems.Dialogue
         public bool Resume(DialogueSnapshot snapshot)
         {
             EnsureRunner();
-            _runner.Session = GameSystemsRuntime.Session;
+            _runner.Session = GBibleRuntime.Session;
             if (pauseGame) GameTime.Pause(PauseReason);
             if (_runner.Resume(snapshot)) return true;
             if (pauseGame) GameTime.Resume(PauseReason);
@@ -137,27 +137,27 @@ namespace GameSystems.Dialogue
 
         // ── 저장 ─────────────────────────────────────────────
 
-        // 저장소에 진행 기록 칸을 만든다(판 저장에 들어간다). 게임이 시작될 때 대화 관리자가 부른다.
+        // 저장소에 진행 기록 칸을 만든다(판 저장에 들어간다). 게임이 시작될 때 다이얼로그 관리자가 부른다.
         public static void DefineProgress(GameSession session)
         {
-            if (session != null && !session.State.IsDefined(ProgressKey)) session.State.Define(ProgressKey, StateZone.Session, "");
+            if (session != null && !session.Data.IsDefined(ProgressKey)) session.Data.Define(ProgressKey, DataZone.Session, "");
         }
 
         void SaveProgress()
         {
-            var session = GameSystemsRuntime.Session;
+            var session = GBibleRuntime.Session;
             if (!saveProgress || session == null) return;
             DefineProgress(session);
             var progress = _runner.Progress;
-            session.State.Set(ProgressKey, progress == null ? "" : JsonUtility.ToJson(progress));
+            session.Data.Set(ProgressKey, progress == null ? "" : JsonUtility.ToJson(progress));
         }
 
         // 저장된 진행 기록이 있으면 그 대사부터 이어 간다(판을 불러온 뒤 부른다).
         public bool ResumeSaved()
         {
-            var session = GameSystemsRuntime.Session;
-            if (session == null || !session.State.IsDefined(ProgressKey)) return false;
-            var json = session.State.Get<string>(ProgressKey);
+            var session = GBibleRuntime.Session;
+            if (session == null || !session.Data.IsDefined(ProgressKey)) return false;
+            var json = session.Data.Get<string>(ProgressKey);
             if (string.IsNullOrEmpty(json)) return false;
             var progress = JsonUtility.FromJson<DialogueProgress>(json);
             EnsureRunner();
@@ -205,7 +205,7 @@ namespace GameSystems.Dialogue
 
         bool Restart(float time)
         {
-            _runner.Session = GameSystemsRuntime.Session;
+            _runner.Session = GBibleRuntime.Session;
             _runner.DefaultTypingSpeed = typingSpeed;
             var started = _previewPreset != null ? _runner.StartPreset(_previewPreset) : _runner.StartAt(_previewDialogue, _previewNode);
             if (!started) return false;
@@ -230,7 +230,7 @@ namespace GameSystems.Dialogue
 
         void OnAdvance() => Advance();
 
-        // 로그를 보는 동안은 대화 시간이 흐르지 않는다(자동 진행도 멈춤).
+        // 로그를 보는 동안은 다이얼로그 시간이 흐르지 않는다(자동 진행도 멈춤).
         bool _pausedByLog;
 
         void OnLogOpened()

@@ -1,0 +1,29 @@
+{
+    "name": "GBible.Dialogue.Tests",
+    "rootNamespace": "GBible.Tests",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity",
+        "GBible.Editor",
+        "GBible.Dialogue",
+        "GBible.Dialogue.Editor",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "GBIBLE_DIALOGUE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

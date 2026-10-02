@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 
-namespace GameSystems
+namespace GBible
 {
     // 문장 틀 해석기: ICU MessageFormat의 주요 부분 + 우리 확장 두 가지.
     //

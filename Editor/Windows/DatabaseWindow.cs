@@ -1,17 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 공용 데이터베이스 창: GameData를 상속한 모든 타입을 시트·카드로 보고, 검색·추가·수정한다.
     public sealed class DatabaseWindow : EditorWindow
     {
+        // 예전 목록(시트·카드 보기와 보기 설정). 지우지 않고 숨겨 두었다: true면 전용 화면이 없는 종류가 다시 시트·카드로 보인다.
+        // 기본은 모든 탭이 클래스 탭과 같은 목록(DataListPage·CodexTree).
+        public static bool LegacyViews = false;
+
         static readonly string[] ViewNames = { "시트", "세로 카드", "가로 카드", "바" };
         static readonly string[] ViewKeys = { "Sheet", "Vertical", "Horizontal", "Bar" };
 
@@ -29,23 +33,102 @@ namespace GameSystems.EditorTools
         GsSearchField _searchField;
         List<ValidationIssue> _issues = new List<ValidationIssue>();
         bool _refreshQueued;
-        // 등장 애니메이션은 타입을 바꿀 때만(값 수정 후 재구성 때는 생략).
-        bool _animate = true;
+        // 사이드바의 탭 버튼(탭 키 → 버튼). 탭을 옮길 때는 사이드바를 다시 짓지 않고 선택 표시만 바꾼다.
+        readonly Dictionary<string, GsNavItem> _navItems = new Dictionary<string, GsNavItem>();
 
         // 사이드바 맨 위의 "시작하기" 탭(타입 대신 이 값이 선택된다).
         const string SetupKey = "$setup";
+        // 도감 종류에 딸리지 않은 독립 탭(클래스·이벤트)의 키 앞머리.
+        const string PagePrefix = "$page:";
+
+        // 사이드바의 탭 하나: 도감 종류(Type) 또는 독립 화면(Page). 꺼진 기능의 탭은 흐리게만 보인다(DisabledReason).
+        sealed class TabEntry
+        {
+            public string Key;
+            public string Label;
+            public string Group;
+            public int Order;
+            public Type Type;
+            public CodexPage Page;
+            public string DisabledReason;
+        }
+
+        // 사이드바 그룹 순서: 선언(키워드·클래스·로그·이벤트·플레이어 데이터)이 맨 위, 선택 기능은 아래쪽.
+        static int GroupRank(string group)
+        {
+            switch (group)
+            {
+                case ClassesPage.DeclareGroup: return 0;
+                case "진행": return 10;
+                case "도감": return 20;
+                case "이미지": return 30;
+                case "샘플": return 90;
+            }
+            for (int i = 0; i < GameFeatures.All.Count; i++)
+                if (GameFeatures.All[i].Name == group) return 60 + i;
+            return 40;
+        }
+
+        static List<TabEntry> Tabs()
+        {
+            var tabs = new List<TabEntry>();
+            foreach (var info in DataTypes.All.Where(i => !i.Hidden))
+            {
+                // 막 끈 기능의 종류는 다시 컴파일되기 전이라도 바로 뺀다(아래에서 흐린 탭으로 보인다).
+                if (GameFeatures.Of(info.Type) is GameFeature owner && !GameFeatures.IsEnabled(owner)) continue;
+                tabs.Add(new TabEntry { Key = info.Type.FullName, Label = info.DisplayName, Group = info.Group, Order = info.Order, Type = info.Type });
+            }
+            foreach (var page in CodexPage.All.Where(p => p.TabLabel != null))
+                tabs.Add(new TabEntry { Key = PagePrefix + page.Key, Label = page.TabLabel, Group = page.TabGroup, Order = page.TabOrder, Page = page });
+            foreach (var feature in GameFeatures.All.Where(f => !GameFeatures.IsActive(f)))
+                for (int i = 0; i < feature.TabNames.Length; i++)
+                    tabs.Add(new TabEntry
+                    {
+                        Key = $"$off:{feature.Id}:{i}", Label = feature.TabNames[i], Group = feature.Name, Order = i,
+                        DisabledReason = $"'{feature.Name}' 기능이 꺼져 있습니다. 위의 '기능 활성화'를 눌러 켜면 열립니다.",
+                    });
+            return tabs.OrderBy(t => GroupRank(t.Group)).ThenBy(t => t.Group, StringComparer.Ordinal).ThenBy(t => t.Order).ThenBy(t => t.Label, StringComparer.Ordinal).ToList();
+        }
+
+        static string FirstTabKey() => Tabs().FirstOrDefault(t => t.DisabledReason == null)?.Key;
+
+        // 지금 고른 탭이 독립 화면이면 그 화면.
+        CodexPage CurrentPage =>
+            _selectedType != null && _selectedType.StartsWith(PagePrefix, StringComparison.Ordinal) ? CodexPage.Find(_selectedType.Substring(PagePrefix.Length)) : null;
         [SerializeField] string _expandedStep;
         VisualElement _typeTools;
         VisualElement _helpSlot;
         GsButton _viewSettingsButton;
         GsButton _createButton;
+        GsButton _linkButton;
 
-        [MenuItem("Game Systems/도감", priority = 0)]
+        [MenuItem("MomoiProject/도감", priority = 0)]
         public static void Open() => OpenWindow();
+
+        // 탭마다 옮기는 데 걸린 시간(본문 그리기까지)을 콘솔에 남긴다. 느린 탭을 찾을 때 쓴다.
+        [MenuItem("Tests/도감 탭 전환 시간 재기", priority = 60)]
+        static void MeasureTabs()
+        {
+            var window = OpenWindow();
+            var back = window._selectedType;
+            var lines = new List<string>();
+            var watch = new System.Diagnostics.Stopwatch();
+            watch.Restart();
+            window.RefreshAll();
+            lines.Add($"전체 새로 그리기(검증·사이드바·본문): {watch.Elapsed.TotalMilliseconds:0.0}ms");
+            foreach (var tab in Tabs().Where(t => t.DisabledReason == null))
+            {
+                watch.Restart();
+                window.Navigate(tab.Key);
+                lines.Add($"{tab.Group} › {tab.Label}: {watch.Elapsed.TotalMilliseconds:0.0}ms");
+            }
+            window.Navigate(back);
+            Debug.Log("[MomoiProject] 도감 탭 전환 시간\n" + string.Join("\n", lines));
+        }
 
         static DatabaseWindow OpenWindow()
         {
-            var window = GetWindow<DatabaseWindow>();
+            var window = GsWindows.Get<DatabaseWindow>();
             window.titleContent = new GUIContent("도감");
             window.minSize = new Vector2(980, 560);
             return window;
@@ -79,6 +162,13 @@ namespace GameSystems.EditorTools
             window.Navigate(SetupKey);
         }
 
+        // 독립 탭(클래스·이벤트)으로 이동한다. key: CodexPage.Key
+        public static void ShowPage(string key)
+        {
+            var window = OpenWindow();
+            window.Navigate(PagePrefix + key);
+        }
+
         // 검증 오류가 있는 첫 종류를 열고 오류 항목만 거른다.
         public static void ShowInvalid()
         {
@@ -102,71 +192,56 @@ namespace GameSystems.EditorTools
         static string TabOf(Type type)
         {
             var info = DataTypes.Find(type);
-            if (info == null || !info.Hidden) return type.FullName;
+            if (info == null || !info.Hidden || info.Page == null) return type.FullName;
             return DataTypes.All.FirstOrDefault(i => !i.Hidden && i.Page == info.Page)?.Type.FullName ?? type.FullName;
         }
 
-        // ── 탭 이동과 적용 ──────────────────────────────────────
-        // 도감의 변경은 Unity에 바로 쓰지 않고 모아 둔다. 탭을 옮길 때 변경이 있으면 목록을 보여 주고 적용하거나 되돌린다.
+        // ── 탭 이동과 저장 ──────────────────────────────────────
+        // 도감의 변경은 Unity에 바로 쓰지 않고 모아 둔다. 탭을 옮겨도 그대로 남고,
+        // Ctrl+S 또는 사이드바의 저장 버튼으로 한 번에 저장한다(CodexChanges). 창을 닫거나 플레이·종료하기 전에는 묻는다.
 
         static CodexStaging Staging => EditorDatabase.Staging;
 
         void Navigate(string tab, Action after = null)
         {
-            void Go()
+            if (tab != _selectedType)
             {
-                if (tab != _selectedType)
-                {
-                    _selectedType = tab;
-                    _selectedId = null;
-                    _animate = true;
-                    if (_viewSettingsPanel != null) _viewSettingsPanel.style.display = DisplayStyle.None;
-                }
-                RefreshAll();
-                after?.Invoke();
+                _selectedType = tab;
+                _selectedId = null;
+                if (_viewSettingsPanel != null) _viewSettingsPanel.style.display = DisplayStyle.None;
             }
-            if (tab == _selectedType || _root == null || !Staging.HasChanges)
-            {
-                Go();
-                return;
-            }
-            AskPending(Go);
+            // 탭만 옮길 때는 검증·사이드바를 다시 하지 않는다(데이터가 바뀌지 않았다). 선택 표시만 옮기고 본문만 새로 그린다.
+            if (!MarkActiveTab()) RefreshAll();
+            else RebuildContent();
+            after?.Invoke();
         }
 
-        // 적용 대기 중인 변경을 항목별로 보여 주고 적용·되돌리기를 고른다. '계속 편집'이면 그대로 머문다.
-        void AskPending(Action then)
+        // 사이드바의 선택 표시를 지금 탭으로 옮긴다. 사이드바가 아직 없거나 지금 탭의 버튼이 없으면 false.
+        bool MarkActiveTab()
         {
-            var changes = Staging.Changes();
-            var rows = new List<FieldChange>();
-            foreach (var change in changes)
-            {
-                var kind = CodexStaging.KindText(change.Kind);
-                if (change.Kind == PendingKind.Modified)
-                    rows.AddRange(change.Fields.Select(f => new FieldChange
-                    {
-                        Path = f.Path, Label = $"{kind} · {change.Label} › {f.Label}", Old = f.Old, New = f.New, OldObject = f.OldObject, NewObject = f.NewObject,
-                    }));
-                else
-                    rows.Add(new FieldChange
-                    {
-                        Label = $"{kind} · {change.Label}",
-                        Old = change.Kind == PendingKind.Added ? "(없음)" : change.Item.DisplayName,
-                        New = change.Kind == PendingKind.Added ? change.Item.DisplayName : "(삭제)",
-                    });
-            }
-            GsDialog.Show(_root, "적용하지 않은 변경", $"이 탭에서 바꾼 {changes.Count}개 항목을 Unity에 적용하거나 되돌립니다.", rows,
-                new DialogButton("계속 편집", GsButtonKind.Ghost, null),
-                new DialogButton("되돌리기", GsButtonKind.Default, () =>
-                {
-                    Staging.Discard();
-                    then?.Invoke();
-                }),
-                new DialogButton("적용", GsButtonKind.Primary, () =>
-                {
-                    var count = Staging.Commit();
-                    Debug.Log($"[GameSystems] 도감 변경 {count}건을 적용했습니다.");
-                    then?.Invoke();
-                }));
+            if (_root == null || _navItems.Count == 0) return false;
+            var showingSetup = ShowingSetup;
+            var active = showingSetup ? SetupKey : CurrentPage != null ? _selectedType : SelectedType?.FullName;
+            if (active == null || !_navItems.ContainsKey(active)) return false;
+            foreach (var pair in _navItems) pair.Value.SetActive(pair.Key == active);
+            return true;
+        }
+
+        // 저장 안 된 변경을 한 줄씩 보여 준다(사이드바의 '저장 안 된 변경'을 눌렀을 때). 여기서 저장하거나 되돌릴 수 있다.
+        void ShowChanges()
+        {
+            var rows = CodexChanges.Rows();
+            var code = ClassStaging.HasChanges ? " 클래스 코드 변경을 저장하면 스크립트 파일에 쓰고 Unity가 다시 컴파일합니다." : "";
+            GsDialog.Show(_root, "저장 안 된 변경", $"변경 {rows.Count}건. 저장(Ctrl+S)하기 전까지 에셋도 스크립트 파일도 바뀌지 않습니다.{code}", rows,
+                new DialogButton("닫기", GsButtonKind.Ghost, null),
+                new DialogButton("되돌리기", GsButtonKind.Default, ConfirmDiscard),
+                new DialogButton("저장", GsButtonKind.Primary, () => CodexChanges.Save()));
+        }
+
+        void ConfirmDiscard()
+        {
+            var count = CodexChanges.Count;
+            GsDialog.Confirm(_root, "변경 되돌리기", $"저장 안 된 변경 {count}건을 모두 버리고 마지막으로 저장한 상태로 돌아갑니다.", "되돌리기", CodexChanges.Discard);
         }
 
         void OnDestroy()
@@ -183,9 +258,11 @@ namespace GameSystems.EditorTools
                 if (_selectedType == null)
                     _selectedType = HelpFeature.Enabled && (SetupRegistry.All.Any(s => !s.Optional && SetupRegistry.StateOf(s).state == SetupState.Todo) || DataTypes.All.Count == 0)
                         ? SetupKey
-                        : DataTypes.All.FirstOrDefault(i => !i.Hidden)?.Type.FullName;
-                // 시작하기가 보류 중이면(HelpFeature) 예전에 열어 둔 시작하기 탭 대신 첫 종류를 연다.
-                if (_selectedType == SetupKey && !HelpFeature.Enabled) _selectedType = DataTypes.All.FirstOrDefault(i => !i.Hidden)?.Type.FullName;
+                        : FirstTabKey();
+                // 시작하기가 보류 중이면(HelpFeature) 예전에 열어 둔 시작하기 탭 대신 첫 탭을 연다.
+                if (_selectedType == SetupKey && !HelpFeature.Enabled) _selectedType = FirstTabKey();
+                // 없어진 탭(지운 종류·꺼진 기능의 탭)을 열어 두었으면 첫 탭으로.
+                else if (_selectedType != SetupKey && _selectedType != null && !Tabs().Any(t => t.Key == TabOfName(_selectedType) && t.DisabledReason == null)) _selectedType = FirstTabKey();
                 return _selectedType == SetupKey;
             }
         }
@@ -193,12 +270,20 @@ namespace GameSystems.EditorTools
         void OnEnable()
         {
             EditorDatabase.Changed += QueueRefresh;
+            ClassStaging.Changed += QueueRefresh;
+            ClassRegistry.Changed += QueueRefresh;
+            CodexFolders.Changed += QueueRefresh;
+            GameFeatures.Changed += QueueRefresh;
             Undo.undoRedoPerformed += QueueRefresh;
         }
 
         void OnDisable()
         {
             EditorDatabase.Changed -= QueueRefresh;
+            ClassStaging.Changed -= QueueRefresh;
+            ClassRegistry.Changed -= QueueRefresh;
+            CodexFolders.Changed -= QueueRefresh;
+            GameFeatures.Changed -= QueueRefresh;
             Undo.undoRedoPerformed -= QueueRefresh;
         }
 
@@ -213,6 +298,13 @@ namespace GameSystems.EditorTools
             host.Clear();
             _root = Gs.Row();
             Gs.Apply(_root);
+            // Ctrl+S: 모아 둔 변경을 저장한다(단축키 등록이 먹지 않는 경우를 대비해 창에서도 받는다. 두 번 불려도 두 번째는 할 일이 없다).
+            _root.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode != KeyCode.S || !e.actionKey || e.shiftKey || e.altKey) return;
+                e.StopPropagation();
+                CodexChanges.Save();
+            }, TrickleDown.TrickleDown);
             _root.style.alignItems = Align.Stretch;
             host.Add(_root);
 
@@ -262,13 +354,20 @@ namespace GameSystems.EditorTools
                 if (type == null) return;
                 ViewSettings.Get(type).layout = ViewKeys[index];
                 ViewSettings.Save();
-                _animate = true;
                 RebuildContent();
             };
             _typeTools.Add(_views);
             _typeTools.Add(Gs.HSpace(8));
             _viewSettingsButton = new GsButton("보기 설정", ToggleViewSettings, GsButtonKind.Ghost);
             _typeTools.Add(_viewSettingsButton);
+            _typeTools.Add(Gs.HSpace(8));
+            // 이 종류의 필드마다 키워드 그룹·스프라이트 규격 그룹·필수를 정한다(클래스 탭의 클래스 상세와 같은 화면).
+            _linkButton = new GsButton("필드 연결", () =>
+            {
+                if (SelectedType != null) ClassDetail.Open(SelectedType);
+            }, GsButtonKind.Ghost);
+            _linkButton.tooltip = "이 종류의 필드에 키워드 그룹·스프라이트 규격 그룹을 연결하고 필수 여부를 정합니다(상세 창에 열림).";
+            _typeTools.Add(_linkButton);
             _typeTools.Add(Gs.HSpace(8));
             _createButton = new GsButton("+ 새로 만들기", CreateItem, GsButtonKind.Primary);
             _typeTools.Add(_createButton);
@@ -298,7 +397,7 @@ namespace GameSystems.EditorTools
         {
             get
             {
-                if (ShowingSetup) return null;
+                if (ShowingSetup || CurrentPage != null) return null;
                 var types = DataTypes.All;
                 var info = types.FirstOrDefault(t => t.Type.FullName == TabOfName(_selectedType)) ?? types.FirstOrDefault(t => !t.Hidden);
                 return info?.Type;
@@ -309,11 +408,19 @@ namespace GameSystems.EditorTools
         {
             if (_refreshQueued || _root == null) return;
             _refreshQueued = true;
-            _root.schedule.Execute(() =>
+            _root.schedule.Execute(Run);
+
+            void Run()
             {
+                // 에셋을 가져오는 중(저장 직후 스크립트 다시 가져오기 등)에는 다시 그리지 않고 끝날 때까지 미룬다.
+                if (EditorApplication.isUpdating)
+                {
+                    _root.schedule.Execute(Run).StartingIn(100);
+                    return;
+                }
                 _refreshQueued = false;
                 RefreshAll();
-            });
+            }
         }
 
         void RefreshAll()
@@ -329,6 +436,7 @@ namespace GameSystems.EditorTools
         void RebuildSidebar()
         {
             _sidebar.Clear();
+            _navItems.Clear();
             var brand = Gs.Col();
             brand.style.marginLeft = 12;
             brand.style.marginBottom = 8;
@@ -340,7 +448,7 @@ namespace GameSystems.EditorTools
             mark.style.backgroundColor = Gs.Accent;
             mark.style.marginRight = 10;
             logo.Add(mark);
-            logo.Add(Gs.Label("Game Systems", "gs-heading"));
+            logo.Add(Gs.Label("MomoiProject", "gs-heading"));
             brand.Add(logo);
             _sidebar.Add(brand);
 
@@ -351,19 +459,44 @@ namespace GameSystems.EditorTools
                 var setup = new GsNavItem("시작하기", Gs.Accent, () => Navigate(SetupKey));
                 setup.SetCount($"{finished}/{steps.Count}");
                 setup.SetActive(ShowingSetup);
+                _navItems[SetupKey] = setup;
                 _sidebar.Add(setup);
                 var help = new GsNavItem("도움말", Gs.PaletteFor("help"), () => HelpWindow.Show(null));
                 _sidebar.Add(help);
             }
 
             var selected = SelectedType;
-            foreach (var group in DataTypes.All.Where(t => !t.Hidden).GroupBy(t => t.Group))
+            var currentPage = CurrentPage;
+            var shownGroups = new HashSet<string>();
+            foreach (var group in Tabs().GroupBy(t => t.Group))
             {
                 _sidebar.Add(Gs.Label(group.Key.ToUpperInvariant(), "gs-sidebar__group"));
-                foreach (var info in group)
+                shownGroups.Add(group.Key);
+                // 선택 기능의 그룹: 맨 위에 켜고 끄는 버튼(오른쪽 끝에 켜짐 여부).
+                if (GameFeatures.All.FirstOrDefault(f => f.Name == group.Key) is GameFeature groupFeature) _sidebar.Add(FeatureToggle(groupFeature));
+                foreach (var tab in group)
                 {
-                    var type = info.Type;
-                    var item = new GsNavItem(info.DisplayName, Gs.PaletteFor(type.Name), () => Navigate(type.FullName));
+                    var key = tab.Key;
+                    if (tab.DisabledReason != null)
+                    {
+                        // 꺼진 기능의 탭: 보이기만 하고 들어갈 수 없다.
+                        var off = new GsNavItem(tab.Label, Gs.WithAlpha(Gs.Text, 0.25f), null);
+                        off.SetEnabled(false);
+                        off.tooltip = tab.DisabledReason;
+                        _sidebar.Add(off);
+                        continue;
+                    }
+                    var item = new GsNavItem(tab.Label, Gs.PaletteFor(tab.Type != null ? tab.Type.Name : key), () => Navigate(key));
+                    _navItems[key] = item;
+                    if (tab.Page != null)
+                    {
+                        item.SetCount(tab.Page.TabCount ?? "");
+                        item.SetActive(tab.Page == currentPage);
+                        _sidebar.Add(item);
+                        continue;
+                    }
+                    var type = tab.Type;
+                    var info = DataTypes.Find(type);
                     // 전용 화면을 함께 쓰는 종류(키워드 + 키워드 그룹)는 한 탭에서 센다.
                     var types = DataTypes.All.Where(i => i.Type == type || (info.Page != null && i.Page == info.Page)).Select(i => i.Type).ToList();
                     var count = EditorDatabase.Instance.All.Count(d => types.Contains(d.GetType()));
@@ -374,17 +507,34 @@ namespace GameSystems.EditorTools
                 }
             }
 
+            // 탭이 하나도 없는 선택 기능도 켜고 끌 수 있게 그룹을 보인다.
+            foreach (var feature in GameFeatures.All.Where(f => !shownGroups.Contains(f.Name)))
+            {
+                _sidebar.Add(Gs.Label(feature.Name.ToUpperInvariant(), "gs-sidebar__group"));
+                _sidebar.Add(FeatureToggle(feature));
+            }
+
             if (DataTypes.All.Count == 0)
                 _sidebar.Add(Gs.Label("GameData를 상속한 데이터 타입이 없습니다.", "gs-caption"));
 
             _sidebar.Add(Gs.Spacer());
 
-            if (Staging.HasChanges)
+            if (CodexChanges.HasChanges)
             {
-                var pending = new GsNotice($"적용 대기 {Staging.Changes().Count}건 · 탭을 옮길 때 적용", GsNoticeKind.Warning);
-                pending.tooltip = "도감의 변경은 탭을 옮길 때 목록을 확인하고 Unity에 적용합니다. 그 전까지는 에셋이 바뀌지 않습니다.";
-                pending.style.marginBottom = 6;
+                // 저장 안 된 변경: 누르면 목록, 아래 버튼으로 저장·되돌리기. Ctrl+S로도 저장한다.
+                var pending = new GsNotice($"저장 안 된 변경 {CodexChanges.Count}건", GsNoticeKind.Warning);
+                pending.tooltip = "눌러서 변경 목록 보기. 저장(Ctrl+S)하기 전까지 에셋도 스크립트 파일도 바뀌지 않습니다.";
+                pending.style.marginBottom = 4;
+                pending.RegisterCallback<ClickEvent>(_ => ShowChanges());
                 _sidebar.Add(pending);
+                var buttons = Gs.Row();
+                buttons.style.marginBottom = 8;
+                var save = new GsButton("저장  Ctrl+S", () => CodexChanges.Save(), GsButtonKind.Primary);
+                save.style.flexGrow = 1;
+                save.style.marginRight = 6;
+                buttons.Add(save);
+                buttons.Add(new GsButton("되돌리기", ConfirmDiscard, GsButtonKind.Ghost));
+                _sidebar.Add(buttons);
             }
 
             var errorCount = _issues.Count(i => i.Severity == ValidationSeverity.Error);
@@ -406,6 +556,46 @@ namespace GameSystems.EditorTools
             }
         }
 
+        // ── 선택 기능 켜고 끄기 ─────────────────────────────────
+        // 사이드바의 '기능 활성화' 버튼: 탭이 아니라 누르면 바로 켜고 끈다(확인 뒤). 오른쪽 끝의 스위치가 지금 상태다.
+
+        VisualElement FeatureToggle(GameFeature feature)
+        {
+            var enabled = GameFeatures.IsEnabled(feature);
+            var active = GameFeatures.IsActive(feature);
+            var item = new GsNavItem("기능 활성화", enabled ? Gs.Success : Gs.WithAlpha(Gs.Text, 0.25f), () => ConfirmFeature(feature));
+            item.AddToClassList("gs-nav-item--toggle");
+            item.Add(new GsSwitch(enabled));
+            item.tooltip = !feature.Installed
+                ? $"이 프로젝트에 '{feature.Name}'의 코드 폴더가 없어 켤 수 없습니다."
+                : enabled
+                    ? (active ? "켜짐" : "켜는 중(다시 컴파일이 끝나면 탭이 열립니다)") + $" · 눌러서 끄기\n{feature.Description}"
+                    : $"꺼짐 · 눌러서 켜기\n{feature.Description}";
+            if (!feature.Installed && !enabled) item.SetEnabled(false);
+            return item;
+        }
+
+        void ConfirmFeature(GameFeature feature)
+        {
+            var enable = !GameFeatures.IsEnabled(feature);
+            string message;
+            if (enable)
+                message = $"'{feature.Name}'을(를) 켭니다. Unity가 다시 컴파일한 뒤 이 기능의 탭·메뉴가 열리고, 기능의 클래스가 도감 › 클래스의 '{feature.Name}' 그룹에 자동으로 들어옵니다.\n\n{feature.Description}";
+            else
+            {
+                var types = GameFeatures.ClassTypes(feature).ToList();
+                var items = EditorDatabase.Instance.All.Count(d => types.Contains(d.GetType()));
+                message = $"'{feature.Name}'을(를) 끕니다. 이 기능의 탭·메뉴·클래스가 모두 빠지고 빌드에도 들어가지 않습니다.\n" +
+                          $"만들어 둔 데이터 {items}개는 지워지지 않고 남으며, 다시 켜면 돌아옵니다. 이 기능을 쓰는 게임 코드가 있으면 컴파일 오류가 납니다.";
+            }
+            GsDialog.Confirm(_root, enable ? "기능 켜기" : "기능 끄기", message, enable ? "켜기" : "끄기", () =>
+            {
+                GameFeatures.SetEnabled(feature, enable);
+                Debug.Log($"[MomoiProject] '{feature.Name}'을(를) {(enable ? "켰습니다" : "껐습니다")}. 다시 컴파일합니다.");
+                QueueRefresh();
+            });
+        }
+
         // ── 목록(시트·카드) ─────────────────────────────────────
 
         void RebuildContent()
@@ -419,6 +609,22 @@ namespace GameSystems.EditorTools
                 BuildSetup();
                 return;
             }
+            // 독립 화면(클래스·이벤트): 그 화면이 그린다.
+            var standalone = CurrentPage;
+            if (standalone != null)
+            {
+                _views.style.display = DisplayStyle.None;
+                _viewSettingsButton.style.display = DisplayStyle.None;
+                _linkButton.style.display = DisplayStyle.None;
+                _createButton.style.display = standalone.CreateLabel != null ? DisplayStyle.Flex : DisplayStyle.None;
+                _createButton.Text = standalone.CreateLabel ?? "";
+                _title.text = standalone.TabGroup == ClassesPage.DeclareGroup ? standalone.TabLabel : $"{standalone.TabGroup} · {standalone.TabLabel}";
+                var pageContext = PageContext();
+                _caption.text = standalone.Caption(pageContext);
+                standalone.Build(pageContext);
+                return;
+            }
+            _createButton.style.display = DisplayStyle.Flex;
             var type = SelectedType;
             if (type != null) _helpSlot.Add(HelpUI.Button(HelpIds.Data(type)));
             else _helpSlot.Add(HelpUI.Button("guide:codex"));
@@ -430,10 +636,11 @@ namespace GameSystems.EditorTools
             }
 
             var info = DataTypes.Find(type);
-            // 전용 화면(키워드 등): 시트·카드 대신 그 화면이 그린다.
-            var page = info.Page != null ? CodexPage.Find(info.Page) : null;
+            // 전용 화면(키워드 등)이 있으면 그 화면이, 없으면 공용 목록(클래스 탭 모양, DataListPage)이 그린다. 예전 시트·카드는 LegacyViews.
+            var page = info.Page != null ? CodexPage.Find(info.Page) : LegacyViews ? null : new DataListPage(type);
             _views.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
             _viewSettingsButton.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
+            _linkButton.style.display = HasLinkableFields(type) ? DisplayStyle.Flex : DisplayStyle.None;
             _createButton.Text = page != null ? page.CreateLabel : "+ 새로 만들기";
             if (page != null)
             {
@@ -441,7 +648,6 @@ namespace GameSystems.EditorTools
                 var context = PageContext();
                 _caption.text = page.Caption(context);
                 page.Build(context);
-                _animate = false;
                 return;
             }
             var all = EditorDatabase.Instance.OfType(type).ToList();
@@ -496,6 +702,10 @@ namespace GameSystems.EditorTools
             if (view.Layout == "Sheet" || ViewSettings.CardLayoutOf(ViewSettings.Get(type)) == null) BuildSheet(items, view);
             else BuildCards(items, view, ViewSettings.CardLayoutOf(ViewSettings.Get(type)).Value);
         }
+
+        // 연결을 정할 필드가 있는 종류인지(GameData 공통 칸 id 등만 있으면 없음).
+        static bool HasLinkableFields(Type type) =>
+            ClassTypes.FieldsOf(type).Any(f => f.DeclaringType != typeof(GameData) && (KeywordTools.CanConnect(f) || KeywordTools.IsSpriteField(f)));
 
         // ── 시작하기 ───────────────────────────────────────────
         // 새 프로젝트의 설정 단계를 순서대로. 단계마다 설명·현재 상태·바로 하기 버튼·완료 표시.
@@ -596,8 +806,6 @@ namespace GameSystems.EditorTools
                 }
                 _content.Add(card);
             }
-            if (_animate) GsMotion.Appear(_content.Children().Skip(1));
-            _animate = false;
         }
 
         static VisualElement StatusBadge(SetupState state, string text)
@@ -620,7 +828,6 @@ namespace GameSystems.EditorTools
             Issues = _issues,
             OpenDetail = item => OpenDetail(item),
             Refresh = QueueRefresh,
-            Animate = _animate,
         };
 
         bool Matches(GameData data)
@@ -666,8 +873,6 @@ namespace GameSystems.EditorTools
             sheet.Selected += o => _selectedId = ((GameData)o).Id;
             sheet.OpenRequested += (o, path) => OpenDetail((GameData)o, path);
             _content.Add(sheet);
-            if (_animate) GsMotion.Appear(sheet.Children().Skip(1));
-            _animate = false;
         }
         static float ColumnWidth(FieldEntry column)
         {
@@ -726,8 +931,6 @@ namespace GameSystems.EditorTools
                 grid.Add(card);
             }
             _content.Add(grid);
-            if (_animate) GsMotion.Appear(grid);
-            _animate = false;
         }
 
         static string Value(SerializedObject so, FieldEntry entry)
@@ -738,12 +941,22 @@ namespace GameSystems.EditorTools
 
         void CreateItem()
         {
+            if (CurrentPage is CodexPage standalone)
+            {
+                standalone.Create(PageContext());
+                return;
+            }
             var type = SelectedType;
             if (type == null) return;
             var info = DataTypes.Find(type);
             if (info.Page != null && CodexPage.Find(info.Page) is CodexPage page)
             {
                 page.Create(PageContext());
+                return;
+            }
+            if (!LegacyViews)
+            {
+                new DataListPage(type).Create(PageContext());
                 return;
             }
             var db = EditorDatabase.Instance;
@@ -789,7 +1002,7 @@ namespace GameSystems.EditorTools
         }
 
         // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
-        // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 도감 목록에 바로 보이고, Unity 에셋에는 탭을 옮길 때 적용된다.
+        // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 도감 목록에 바로 보이고, Unity 에셋에는 저장(Ctrl+S)할 때 적용된다.
 
         // 상세 창(탭)으로 연다. 적용·되돌리기로 작업본이 바뀌면 상세 창이 같은 설정 함수로 다시 연다.
         void OpenDetail(GameData item, string focusPath = null)
@@ -814,7 +1027,7 @@ namespace GameSystems.EditorTools
                 Title = item.Id,
                 Subtitle = info?.DisplayName + (Staging.IsAdded(item) ? "  ·  새 항목(적용 전)" : ""),
                 ShowMedia = false,
-                // 제목(ID)을 눌러 바로 고친다. 이 ID를 가리키는 곳도 함께 바뀌고, 적용은 탭을 옮길 때.
+                // 제목(ID)을 눌러 바로 고친다. 이 ID를 가리키는 곳도 함께 바뀌고, 적용은 저장(Ctrl+S)할 때.
                 TitleValidate = id => id == target.Id ? null : EditorDatabase.Instance.CanUseId(id, target, out var error) ? null : error,
                 TitleCommit = (panel, id) =>
                 {
@@ -824,7 +1037,7 @@ namespace GameSystems.EditorTools
                     if (panel.DraftTarget is GameData draft) draft.EditorAssignId(id);
                     _selectedId = id;
                     QueueRefresh();
-                    Debug.Log($"[GameSystems] ID를 {id}(으)로 바꿨습니다(참조 {count}곳 함께, 탭을 옮길 때 적용).");
+                    Debug.Log($"[MomoiProject] ID를 {id}(으)로 바꿨습니다(참조 {count}곳 함께, 저장(Ctrl+S)할 때 적용).");
                 },
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
@@ -838,7 +1051,7 @@ namespace GameSystems.EditorTools
             {
                 var original = Staging.OriginalOf(target);
                 if (original != null) EditorGUIUtility.PingObject(original);
-                else Debug.Log("[GameSystems] 아직 적용하지 않은 새 항목이라 에셋이 없습니다.");
+                else Debug.Log("[MomoiProject] 아직 적용하지 않은 새 항목이라 에셋이 없습니다.");
             }));
             if (item is PrefabData prefabEntry)
             {
@@ -869,15 +1082,23 @@ namespace GameSystems.EditorTools
             switch (item)
             {
                 case AchievementData achievement:
-                    var rewards = achievement.rewards.Where(r => r != null).Select(r => r.Describe(names)).ToList();
+                    var when = achievement.EffectiveTrigger;
+                    var outcomes = achievement.EffectiveOutcomes.Select(o => o.Natural(names)).ToList();
                     return new List<(string, string)>
                     {
-                        ("조건", achievement.condition != null ? Gs.Dual(achievement.condition.Natural(names), achievement.condition.Describe(names)) : "조건 없음"),
-                        ("보상", rewards.Count > 0 ? string.Join(",  ", rewards) : "없음"),
+                        ("트리거", when != null ? Gs.Dual(when.Natural(names), when.Describe(names)) : "트리거 없음"),
+                        ("결과", outcomes.Count > 0 ? string.Join(",  ", outcomes) : "없음"),
+                    };
+                case AbilityData ability:
+                    var abilityOutcomes = ability.ToDefinition().Outcomes.Select(o => o.Natural(names)).ToList();
+                    return new List<(string, string)>
+                    {
+                        ("트리거", ability.trigger != null ? Gs.Dual(ability.trigger.Natural(names), ability.trigger.Describe(names)) : "사용할 때"),
+                        ("결과", abilityOutcomes.Count > 0 ? string.Join(",  ", abilityOutcomes) : "없음"),
                     };
                 case StatData stat:
-                    var rules = stat.rules.Where(r => r != null).Select(r => r.Describe(stat.DisplayName)).ToList();
-                    var rulesCode = stat.rules.Where(r => r != null).Select(r => r.DescribeCode(stat.DisplayName)).ToList();
+                    var rules = stat.AllRules().Select(r => r.Natural(names)).ToList();
+                    var rulesCode = stat.AllRules().Select(r => r.Describe(names)).ToList();
                     return new List<(string, string)>
                     {
                         ("방식", $"{(stat.scope == StatScope.Run ? "이번 판" : "누적")} · {StatSystem.AggregateText(stat.aggregate)}"),
@@ -890,7 +1111,7 @@ namespace GameSystems.EditorTools
         {
             if (asset == null)
             {
-                Debug.LogWarning("[GameSystems] 연결된 프리팹이 없습니다.");
+                Debug.LogWarning("[MomoiProject] 연결된 프리팹이 없습니다.");
                 return;
             }
             EditorUtility.FocusProjectWindow();
@@ -916,7 +1137,7 @@ namespace GameSystems.EditorTools
                     null, new DialogButton("확인", GsButtonKind.Primary, null));
                 return;
             }
-            GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 탭을 옮길 때 적용하면 에셋이 휴지통으로 이동합니다.", "삭제", () =>
+            GsDialog.Confirm(_root, "항목 삭제", $"'{item.DisplayName}'을(를) 삭제합니다. 저장(Ctrl+S)하면 에셋이 휴지통으로 이동합니다.", "삭제", () =>
             {
                 panel.Close();
                 Staging.Remove(item);

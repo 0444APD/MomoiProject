@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     // 데이터베이스 항목의 공용 베이스. 이 클래스를 상속하면 코드 추가 없이 데이터베이스 창에 나타난다.
     // 제공 계약: ID(도감에서 짓고, 바꾸면 모든 참조·저장·생성 코드가 따라간다), 검증 훅. 분류가 필요하면 종류마다 필드를 두고 키워드 그룹을 연결한다.
@@ -10,8 +10,11 @@ namespace GameSystems.Data
     public abstract class GameData : ScriptableObject
     {
         [SerializeField, HideInInspector] string id;
+        // 도감 목록에서 넣어 둔 폴더(예: "전투/보스"). 정리용일 뿐 게임 동작에는 쓰지 않는다. 비어 있으면 맨 위.
+        [SerializeField, HideInInspector] string folder = "";
 
         public string Id => id;
+        public string Folder => folder ?? "";
         // 화면·로그에 쓰는 이름 = ID(ID가 아직 없으면 에셋 이름).
         public string DisplayName => string.IsNullOrEmpty(id) ? name : id;
 
@@ -23,6 +26,7 @@ namespace GameSystems.Data
 #if UNITY_EDITOR
         // ID는 에디터 도구만 부여·변경한다(변경 시 참조 갱신·저장 호환 별칭은 EditorDatabase.Rename이 처리).
         public void EditorAssignId(string newId) => id = newId;
+        public void EditorAssignFolder(string path) => folder = path ?? "";
 #endif
     }
 
@@ -74,17 +78,39 @@ namespace GameSystems.Data
     }
 }
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
-    // 도감에서 순서를 끌어 바꾸는 항목(예: 키워드 그룹, 스프라이트 규격 묶음).
+    // 도감에서 순서를 끌어 바꾸는 항목(예: 키워드 그룹, 스프라이트 규격 그룹).
     public interface IOrderedData
     {
         int Order { get; set; }
     }
 
-    // 그룹에 속하는 항목(예: 키워드 → 키워드 그룹, 스프라이트 규격 → 규격 묶음). 도감의 그룹 탭이 끌어 옮긴다.
+    // 그룹에 속하는 항목(예: 키워드 → 키워드 그룹, 스프라이트 규격 → 규격 그룹). 도감의 그룹 탭이 끌어 옮긴다.
     public interface IGroupedData : IOrderedData
     {
         string Group { get; set; }
+    }
+
+    // 같은 종류 안에서 부모를 두는 그룹(예: 키워드 그룹 안의 하위 그룹). Parent는 부모 그룹의 ID(비어 있으면 맨 위).
+    public interface INestedData
+    {
+        string Parent { get; set; }
+    }
+}
+
+namespace GBible.Data
+{
+    // 예전 저장 형식을 지금 형식으로 옮기는 항목(도감이 열릴 때 한 번, 바뀌었으면 에셋을 저장한다).
+    public interface ILegacyData
+    {
+        bool MigrateLegacy();
+    }
+
+    // Game.Use(ID, 사용자, 대상들)로 쓸 수 있는 항목(능력, 사용 기능이 붙은 아이템 …). 런타임이 세션에 등록한다.
+    public interface IUsableData
+    {
+        // 쓸 수 없는 항목이면 null.
+        AbilityDefinition ToUsable();
     }
 }

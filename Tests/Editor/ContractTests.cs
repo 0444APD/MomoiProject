@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 계약 테스트: 규칙을 어긴 블록·시스템은 추가되는 순간 여기서 걸린다.
     public class BlockContractTests
@@ -33,8 +33,52 @@ namespace GameSystems.Tests
             FillSample(instance);
             var keys = new HashSet<string>();
             instance.CollectDependencies(keys);
-            Assert.IsTrue(keys.Count > 0 || instance.PollInterval > 0,
+            Assert.IsTrue(keys.Count > 0 || instance.PollInterval > 0 || instance.AutoDependencies,
                 $"{type.Name}: 의존 대상도 확인 주기도 없습니다 — 조용히 동작하지 않는 조건입니다");
+        }
+
+        static IEnumerable<Type> AbilityBlockTypes() =>
+            BlockTypes.ConcreteTypes(typeof(Effect)).Concat(BlockTypes.ConcreteTypes(typeof(TargetSelector)));
+
+        // 능력 Block(효과·대상): 에디터 메뉴에 나오고, 세션마다 복사되므로 직렬화돼야 한다.
+        [TestCaseSource(nameof(AbilityBlockTypes))]
+        public void 능력_블록_계약(Type type)
+        {
+            Assert.IsTrue(type.IsDefined(typeof(SerializableAttribute), false), $"{type.Name}: [Serializable]이 필요합니다");
+            Assert.IsNotNull(type.GetCustomAttribute<BlockInfoAttribute>(), $"{type.Name}: [BlockInfo]가 필요합니다(메뉴 이름)");
+            var instance = Activator.CreateInstance(type);
+            Assert.IsNotNull(DataModel.Clone(instance, null), $"{type.Name}: 복사할 수 없습니다");
+        }
+
+        static IEnumerable<Type> TriggerAndOutcomeTypes() =>
+            BlockTypes.ConcreteTypes(typeof(Trigger)).Concat(BlockTypes.ConcreteTypes(typeof(Outcome)));
+
+        // 트리거·결과 Block: 메뉴 이름·설명이 있고, 문장이 나오고, 종류를 선언하고, 세션마다 복사되므로 직렬화돼야 한다.
+        [TestCaseSource(nameof(TriggerAndOutcomeTypes))]
+        public void 트리거_결과_블록_계약(Type type)
+        {
+            Assert.IsTrue(type.IsDefined(typeof(SerializableAttribute), false), $"{type.Name}: [Serializable]이 필요합니다");
+            Assert.IsNotNull(type.GetCustomAttribute<BlockInfoAttribute>(), $"{type.Name}: [BlockInfo]가 필요합니다(메뉴 이름)");
+            var instance = Activator.CreateInstance(type);
+            Assert.IsNotNull(DataModel.Clone(instance, null), $"{type.Name}: 복사할 수 없습니다");
+            if (instance is Outcome outcome)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(outcome.Describe(new FakeNames())), $"{type.Name}: Describe가 비어 있습니다");
+                Assert.AreNotEqual(OutcomeKinds.None, outcome.Kind, $"{type.Name}: 결과 종류(Kind)를 선언해야 합니다(칸 잠금에 쓰인다)");
+            }
+            else Assert.IsNotNull(((Trigger)instance).Describe(new FakeNames()), $"{type.Name}: Describe가 null입니다");
+        }
+
+        // 트리거·결과 칸이 있는 도감 종류는 모두 같은 표시([TriggerSlot]·[OutcomeSlot])로 잠금을 정한다.
+        [Test]
+        public void 트리거_결과_칸은_잠금_표시를_가진다()
+        {
+            foreach (var type in new[] { typeof(StatData), typeof(AchievementData), typeof(AbilityData) })
+            {
+                var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public).Where(f => !f.IsDefined(typeof(HideInInspector), false)).ToList();
+                Assert.IsTrue(fields.Any(f => f.IsDefined(typeof(TriggerSlotAttribute), false)), $"{type.Name}: 트리거 칸");
+                Assert.IsTrue(fields.Any(f => f.IsDefined(typeof(OutcomeSlotAttribute), false)), $"{type.Name}: 결과 칸");
+            }
         }
 
         [TestCaseSource(nameof(RewardTypes))]
@@ -61,7 +105,7 @@ namespace GameSystems.Tests
                         new NotCondition { condition = new AchievementUnlockedCondition { achievement = "x" } },
                     },
                 };
-                data.rewards.Add(new AddToStatReward { stat = "gold", amount = 3 });
+                data.rewards.Add(new PlayerDataReward { key = "bag", path = "items", items = { "template.sword", "template.potion" } });
                 var names = new FakeNames();
                 var before = data.condition.Describe(names) + data.rewards[0].Describe(names);
 
@@ -112,7 +156,7 @@ namespace GameSystems.Tests
                 var root = new InspectNode(inspectable.InspectName);
                 inspectable.Inspect(root);
                 Assert.IsFalse(string.IsNullOrEmpty(inspectable.InspectName));
-                Assert.IsNotEmpty(root.Children, $"{inspectable.InspectName}: 상태 트리가 비어 있습니다");
+                Assert.IsNotEmpty(root.Children, $"{inspectable.InspectName}: 값 트리가 비어 있습니다");
             }
         }
 

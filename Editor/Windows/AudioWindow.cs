@@ -1,11 +1,11 @@
 using System;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 오디오 창: 채널 음량, 클립 미리 듣기(채널을 골라 게임과 같은 방식으로: 브금·목소리는 교차 페이드, 효과음·UI는 동시에), 지금 나는 소리.
     // 플레이 중이 아니어도 GameAudio를 그대로 쓴다(에디터가 시간을 흘려 준다).
@@ -16,10 +16,10 @@ namespace GameSystems.EditorTools
 
         Label _status;
 
-        [MenuItem("Game Systems/오디오", priority = 8)]
+        [MenuItem("MomoiProject/오디오", priority = 8)]
         public static void Open()
         {
-            var window = GetWindow<AudioWindow>();
+            var window = GsWindows.Get<AudioWindow>();
             window.titleContent = new GUIContent("오디오");
             window.minSize = new Vector2(420, 420);
         }
@@ -134,7 +134,7 @@ namespace GameSystems.EditorTools
             GameAudio.Play(clip, channel == AudioChannel.Master ? AudioChannel.Sfx : channel);
         }
 
-        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/GameSystems/GameAudioSettings.asset";
+        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/MomoiProject/GameAudioSettings.asset";
 
         public static GameAudioSettings EnsureSettings()
         {
@@ -147,16 +147,16 @@ namespace GameSystems.EditorTools
             return settings;
         }
 
-        [MenuItem("Assets/Game Systems/오디오 재생", false, 2000)]
+        [MenuItem("Assets/MomoiProject/오디오 재생", false, 2000)]
         static void PlaySelected()
         {
             foreach (var clip in Selection.GetFiltered<AudioClip>(SelectionMode.Assets)) GameAudio.PlaySfx(clip);
         }
 
-        [MenuItem("Assets/Game Systems/오디오 재생", true)]
+        [MenuItem("Assets/MomoiProject/오디오 재생", true)]
         static bool CanPlaySelected() => Selection.GetFiltered<AudioClip>(SelectionMode.Assets).Length > 0;
 
-        [MenuItem("Assets/Game Systems/오디오 정지", false, 2001)]
+        [MenuItem("Assets/MomoiProject/오디오 정지", false, 2001)]
         static void StopAll() => GameAudio.StopAll();
     }
 }

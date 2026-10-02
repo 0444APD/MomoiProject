@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-namespace GameSystems
+namespace GBible
 {
     // 언어별 텍스트 표(키 → 문장 틀)와 현재 언어. 틀을 찾아 TextFormat으로 채워 최종 글자를 만든다.
     //
@@ -233,7 +233,7 @@ namespace GameSystems
         }
     }
 
-    // 값 묶음 만들기 도우미.
+    // 값 인자 만들기 도우미.
     public static class TextArgs
     {
         public static IReadOnlyDictionary<string, object> From(params (string name, object value)[] args)

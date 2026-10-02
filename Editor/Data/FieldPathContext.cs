@@ -1,15 +1,15 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
-using GameSystems.EditorTools.UI;
+using GBible.Data;
+using GBible.EditorTools.UI;
 using UnityEditor;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 편집 중인 필드 경로 칸의 "뿌리 타입"을 찾는다.
     // 같은 객체나 위쪽 객체에서 [FieldPathRoot]가 붙은 칸(이벤트 타입·플레이어 데이터)을 찾아 그 값으로 타입을 정한다.
-    // 예: 수치 규칙의 조건(filters[i].path) → 규칙의 이벤트 타입 / 상태 값 검사의 path → 고른 플레이어 데이터의 값 형식
+    // 예: 수치 규칙의 조건(filters[i].path) → 규칙의 이벤트 타입 / 플레이어 데이터 검사의 path → 고른 플레이어 데이터의 값 형식
     public static class FieldPathContext
     {
         public static Type RootType(SerializedProperty property, out string rootLabel)
@@ -35,6 +35,15 @@ namespace GameSystems.EditorTools
                         rootLabel = GsDataExplorer.PathLabel(outer, child.stringValue) + "의 각 항목";
                         return ElementFilter.ElementRoot(outer, child.stringValue);
                     }
+                    // 트리거·결과 규칙: 결과 칸(로그에 기록의 '반영할 값' 등)의 뿌리는 같은 규칙의 트리거가 보는 이벤트.
+                    if (child.propertyType == SerializedPropertyType.ManagedReference && child.managedReferenceValue is Trigger trigger &&
+                        !property.propertyPath.StartsWith(child.propertyPath + ".", StringComparison.Ordinal))
+                    {
+                        var events = trigger.EventTypes().ToList();
+                        if (events.Count == 0) continue;
+                        rootLabel = string.Join(" · ", events.Select(EventBus.DisplayNameOf));
+                        return events[0];
+                    }
                     var root = field?.GetCustomAttribute<FieldPathRootAttribute>();
                     if (root == null || child.propertyType != SerializedPropertyType.String) continue;
                     return Resolve(root.Kind, child.stringValue, out rootLabel);
@@ -52,7 +61,7 @@ namespace GameSystems.EditorTools
                 label = type != null ? EventBus.DisplayNameOf(type) : value;
                 return type;
             }
-            var key = EditorDatabase.Instance.FindById(value) as StateKeyData;
+            var key = EditorDatabase.Instance.FindById(value) as PlayerDataEntry;
             label = key?.DisplayName ?? value;
             return key?.ValueType;
         }

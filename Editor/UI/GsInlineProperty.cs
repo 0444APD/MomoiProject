@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 정보 우선 원칙의 핵심 부품.
     // 평소: 값이 일반 글자로 보인다. 마우스를 올리면 옅게 강조. 클릭하면 편집 UI로 바뀐다.
@@ -48,12 +48,12 @@ namespace GameSystems.EditorTools.UI
             else if (_property.propertyType == SerializedPropertyType.Color) DirectPicker = ColorPicker();
             if (DirectPicker != null) Add(DirectPicker);
 
-            // 식별용 글자 칸: 오른쪽 클릭으로 키워드 연결 창을 연다(필드와 키워드 그룹을 잇거나 새로 만든다).
+            // 식별용 글자 칸: 오른쪽 클릭으로 클래스 상세를 연다(필드와 키워드 그룹을 잇거나 새로 만든다).
             if (_property.propertyType == SerializedPropertyType.String && KeywordTools.CanConnect(_field))
             {
                 var field = _field;
                 this.AddManipulator(new ContextualMenuManipulator(e =>
-                    e.menu.AppendAction("키워드 연결…", _ => KeywordWindow.Open(KeywordTools.GroupOf(field.DeclaringType, field), field.DeclaringType, field.Name))));
+                    e.menu.AppendAction("키워드 연결…", _ => ClassDetail.Open(field.DeclaringType, field.Name))));
             }
 
             if (IsEditable)
@@ -157,7 +157,8 @@ namespace GameSystems.EditorTools.UI
                 return (FieldOps.Symbol((FieldOp)property.intValue), false, false);
             if (field != null && field.IsDefined(typeof(FieldPathAttribute), false) && property.propertyType == SerializedPropertyType.String)
             {
-                if (string.IsNullOrEmpty(property.stringValue)) return ("필드 선택", true, false);
+                var emptyLabel = field.GetCustomAttribute<FieldPathAttribute>().EmptyLabel;
+                if (string.IsNullOrEmpty(property.stringValue)) return emptyLabel != null ? (emptyLabel, false, false) : ("필드 선택", true, false);
                 var root = FieldPathContext.RootType(property, out _);
                 var broken = root != null && FieldPaths.TypeAt(root, property.stringValue, out _) == null;
                 return (FieldPathContext.DescribePath(property), false, broken);
@@ -176,10 +177,10 @@ namespace GameSystems.EditorTools.UI
                 }
                 return (property.stringValue, false, false);
             }
-            if (field != null && field.IsDefined(typeof(StateKeyRefAttribute), false) && property.propertyType == SerializedPropertyType.String)
+            if (field != null && field.IsDefined(typeof(PlayerDataRefAttribute), false) && property.propertyType == SerializedPropertyType.String)
             {
-                if (string.IsNullOrEmpty(property.stringValue)) return ("상태 선택", true, false);
-                var key = db.FindById(property.stringValue) as StateKeyData;
+                if (string.IsNullOrEmpty(property.stringValue)) return ("플레이어 데이터 선택", true, false);
+                var key = db.FindById(property.stringValue) as PlayerDataEntry;
                 return key != null ? (key.DisplayName, false, false) : ($"없는 플레이어 데이터: {property.stringValue}", false, true);
             }
             if (property.propertyType == SerializedPropertyType.String)
@@ -235,7 +236,7 @@ namespace GameSystems.EditorTools.UI
                 if (fieldRef != null)
                 {
                     if (string.IsNullOrEmpty(id)) return ("횟수 (필드 없음)", true, false);
-                    var eventType = TypeResolver.Find(Sibling(property, fieldRef.EventTypeField)?.stringValue);
+                    var eventType = EventTypeFor(property, fieldRef);
                     if (eventType != null && TypeResolver.NumberGetter(eventType, id, out _) == null) return ($"없는 필드: {id}", false, true);
                     return (id, false, false);
                 }
@@ -248,6 +249,12 @@ namespace GameSystems.EditorTools.UI
             var summary = PropertyUtil.Summary(property);
             return (summary, string.IsNullOrEmpty(summary), false);
         }
+
+        // 이벤트 필드 칸이 보는 이벤트: 형제 칸(이벤트 이름)이 있으면 그것, 없으면 같은 규칙의 트리거가 보는 이벤트.
+        static Type EventTypeFor(SerializedProperty property, EventFieldRefAttribute reference) =>
+            string.IsNullOrEmpty(reference.EventTypeField)
+                ? FieldPathContext.RootType(property, out _)
+                : TypeResolver.Find(Sibling(property, reference.EventTypeField)?.stringValue);
 
         SerializedProperty Sibling(string name) => Sibling(_property, name);
 
@@ -273,7 +280,8 @@ namespace GameSystems.EditorTools.UI
         {
             get
             {
-                _property.serializedObject.Update();
+                // 적용하지 않은 값이 있으면 다시 읽지 않는다(Update가 그 값을 버린다).
+                if (!_property.serializedObject.hasModifiedProperties) _property.serializedObject.Update();
                 return Describe(_property, _field).empty;
             }
         }
@@ -284,10 +292,8 @@ namespace GameSystems.EditorTools.UI
         GsDropdown OpenMenu(IEnumerable<GsDropdownItem> items, bool? searchable = null, string placeholder = "검색")
         {
             var field = Field;
-            field?.MenuOpened();
             var menu = GsDropdown.Show(field?.Box ?? (VisualElement)this, items, searchable, placeholder);
-            if (menu != null) menu.Closed += () => field?.MenuClosed();
-            else field?.MenuClosed();
+            field?.TrackMenu(menu);
             return menu;
         }
 
@@ -329,14 +335,14 @@ namespace GameSystems.EditorTools.UI
                 case SerializedPropertyType.String when Has<FieldPathAttribute>():
                     PickFieldPath();
                     return;
-                case SerializedPropertyType.String when Has<StateKeyRefAttribute>():
-                    ShowIdMenu(EditorDatabase.Instance.OfType<StateKeyData>().Cast<GameData>(), "플레이어 데이터");
+                case SerializedPropertyType.String when Has<PlayerDataRefAttribute>():
+                    ShowIdMenu(EditorDatabase.Instance.OfType<PlayerDataEntry>().Cast<GameData>(), "플레이어 데이터");
                     return;
                 case SerializedPropertyType.String when Has<FieldValueRefAttribute>():
                     if (EditFieldValue()) return;
                     break;
                 case SerializedPropertyType.String when IsStatRef:
-                    ShowIdMenu(EditorDatabase.Instance.OfType<StatData>().Cast<GameData>(), "수치");
+                    ShowIdMenu(EditorDatabase.Instance.OfType<StatData>().Cast<GameData>(), "로그");
                     return;
                 case SerializedPropertyType.String when IsAchievementRef:
                     ShowIdMenu(EditorDatabase.Instance.OfType<AchievementData>().Cast<GameData>(), "도전과제");
@@ -388,7 +394,7 @@ namespace GameSystems.EditorTools.UI
             OpenMenu(items);
         }
 
-        // 선택 모듈(대화 등)이 등록한 목록.
+        // 선택 모듈(다이얼로그 시스템 등)이 등록한 목록.
         void ShowProviderMenu(IInlineChoiceProvider provider)
         {
             var items = provider.Items(_property, _field, SetString).ToList();
@@ -404,7 +410,7 @@ namespace GameSystems.EditorTools.UI
                 var id = d.Id;
                 return new GsDropdownItem(id, () => SetString(id)) { Group = db.GroupLabel(d), Selected = _property.stringValue == id };
             }).ToList();
-            if (items.Count == 0) items.Add(new GsDropdownItem($"{kind}이(가) 아직 없습니다 — 도감에서 먼저 만드세요") { Disabled = true });
+            if (items.Count == 0) items.Add(new GsDropdownItem($"도감 › {kind} 탭에 아직 항목이 없습니다 — 먼저 만드세요") { Disabled = true });
             if (DataRefType == typeof(KeywordData)) items.AddRange(GsPropertyEditor.KeywordMenuExtras(this, _field, ids => { if (ids.Count > 0) SetString(ids[0]); }));
             OpenMenu(items, placeholder: $"{kind} 검색");
         }
@@ -426,7 +432,7 @@ namespace GameSystems.EditorTools.UI
             {
                 new GsDropdownItem("횟수 (필드 없음)", () => SetString("")) { Detail = "이벤트가 한 번 발생할 때마다 1", Selected = string.IsNullOrEmpty(_property.stringValue) },
             };
-            var eventType = TypeResolver.Find(Sibling(EventFieldRef.EventTypeField)?.stringValue);
+            var eventType = EventTypeFor(_property, EventFieldRef);
             if (eventType == null)
             {
                 items.Add(new GsDropdownItem("이벤트를 먼저 선택하세요") { Disabled = true });
@@ -521,10 +527,13 @@ namespace GameSystems.EditorTools.UI
         // 경로 끝 필드가 ID 참조([DataRef]·필드 규칙)면 그 데이터 타입(예: 태그 목록 → 태그).
         static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr) => LeafDataRef(valueProperty, attr, out _);
 
-        static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr, out FieldInfo leaf)
+        static Type LeafDataRef(SerializedProperty valueProperty, FieldValueRefAttribute attr, out FieldInfo leaf) =>
+            LeafDataRef(valueProperty, attr.PathField, out leaf);
+
+        static Type LeafDataRef(SerializedProperty valueProperty, string pathField, out FieldInfo leaf)
         {
             leaf = null;
-            var path = valueProperty.serializedObject.FindProperty(FieldPathContext.Sibling(valueProperty.propertyPath, attr.PathField));
+            var path = valueProperty.serializedObject.FindProperty(FieldPathContext.Sibling(valueProperty.propertyPath, pathField));
             if (path == null) return null;
             FieldPathContext.LeafType(path, out var member);
             leaf = member as FieldInfo;
@@ -561,7 +570,7 @@ namespace GameSystems.EditorTools.UI
             OpenMenu(items, placeholder: "필드 검색");
         }
 
-        // 스프라이트 규격 묶음이 걸린 필드에 원본을 넣으면 맞춤 창을 띄운다.
+        // 스프라이트 규격 그룹이 걸린 필드에 원본을 넣으면 맞춤 창을 띄운다.
         void OpenFramingIfRuled(UnityEngine.Object value)
         {
             var rule = SpriteSpecEditor.RuleFor(_field);
@@ -715,10 +724,11 @@ namespace GameSystems.EditorTools.UI
 
             editor.RemoveFromHierarchy();
             RemoveFromClassList("gs-inline--editing");
-            Field?.SetEditing(false);
             _value.style.display = DisplayStyle.Flex;
+            // 값을 먼저 적용한 뒤에 칸에 알린다: 칸이 빈 값인지 다시 읽을 때(serializedObject.Update) 아직 적용하지 않은 값이 버려지지 않게.
             if (commit) Apply();
             else Refresh();
+            Field?.SetEditing(false);
         }
 
         void Apply(bool keepEditing = false)

@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 대화 그래프를 '대본'으로 펼친다: 재생 순서대로(분기·선택지는 차례로 모두) 대사·선택지 한 줄씩, 그때의 장소·등장 캐릭터와 함께.
+    // 다이얼로그 그래프를 '대본'으로 펼친다: 재생 순서대로(분기·선택지는 차례로 모두) 대사·선택지 한 줄씩, 그때의 장소·등장 캐릭터와 함께.
     // 시트 내보내기·검사에 쓴다. 시간은 보지 않고 효과의 끝 모습만 적용한다.
     public static class DialogueScript
     {
@@ -82,7 +82,7 @@ namespace GameSystems.Dialogue
                             node = outs.Count > 0 ? graph.Next(custom, outs[0].Id) : null;
                             continue;
                         default:
-                            // 끝·다른 대화로 이동.
+                            // 끝·다른 다이얼로그로 이동.
                             return;
                     }
                 }

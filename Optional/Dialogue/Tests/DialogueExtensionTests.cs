@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using GameSystems.Data;
-using GameSystems.Dialogue;
+using GBible.Data;
+using GBible.Dialogue;
 using NUnit.Framework;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 프로젝트 전용 흐름 노드 예시: 흐름이 지나가면 표시만 하고 다음으로.
     [Serializable]

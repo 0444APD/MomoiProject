@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
-    // 스프라이트 맞춤 창: 원본 위에 묶음의 규격 틀을 겹쳐 보이고, 클릭으로 중심·휠로 배율을 맞춘다.
+    // 스프라이트 맞춤 창: 원본 위에 그룹의 규격 틀을 겹쳐 보이고, 클릭으로 중심·휠로 배율을 맞춘다.
     //  · 공통: 모든 규격이 같은 중심·배율을 쓴다.
     //  · 규격 하나 선택: 그 규격만 따로 잡는다(예외 촬영, 영구 기록).
-    // 적용하면 묶음의 규격이 모두 베이크된다.
+    // 적용하면 그룹의 규격이 모두 베이크된다.
     public static class GsSpriteFraming
     {
         const float CanvasSize = 440f;
@@ -25,7 +25,7 @@ namespace GameSystems.EditorTools.UI
             box.Add(Gs.Label($"스프라이트 맞춤 · {source.name}", "gs-title"));
             if (presets.Count == 0)
             {
-                box.Add(Gs.Label($"'{groupData?.DisplayName ?? group}' 묶음에 규격이 없습니다. 도감 › 스프라이트 규격에서 먼저 만드세요.", "gs-caption"));
+                box.Add(Gs.Label($"'{groupData?.DisplayName ?? group}' 그룹에 규격이 없습니다. 도감 › 스프라이트 규격에서 먼저 만드세요.", "gs-caption"));
                 var close = Gs.Box("gs-dialog__buttons");
                 box.Add(close);
                 var m = GsModal.Show(host, box);
@@ -47,7 +47,7 @@ namespace GameSystems.EditorTools.UI
                 }
             string target = null; // null = 공통
 
-            var caption = Gs.Label($"{groupData?.DisplayName ?? group} 묶음 · 규격 {presets.Count}개. 클릭: 중심 · 휠: 배율", "gs-caption");
+            var caption = Gs.Label($"{groupData?.DisplayName ?? group} 그룹 · 규격 {presets.Count}개. 클릭: 중심 · 휠: 배율", "gs-caption");
             caption.style.marginTop = 4;
             box.Add(caption);
 
@@ -221,7 +221,7 @@ namespace GameSystems.EditorTools.UI
             {
                 var count = SpriteSpecEditor.Apply(source, group, center, zoom, overrides);
                 modal.Close();
-                Debug.Log($"[GameSystems] '{source.name}'을(를) 규격 {count}개로 베이크했습니다.");
+                Debug.Log($"[MomoiProject] '{source.name}'을(를) 규격 {count}개로 베이크했습니다.");
                 applied?.Invoke();
             }, GsButtonKind.Primary));
             SelectMode(null);

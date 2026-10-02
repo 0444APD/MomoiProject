@@ -2,10 +2,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     public sealed class FieldChange
     {
@@ -55,7 +55,8 @@ namespace GameSystems.EditorTools
                     {
                         case null: return "(없음)";
                         case Condition condition: return condition.Describe(EditorDatabase.Instance);
-                        case Reward reward: return reward.Describe(EditorDatabase.Instance);
+                        case Outcome outcome: return outcome.Natural(EditorDatabase.Instance);
+                        case Trigger trigger: return trigger.Natural(EditorDatabase.Instance);
                         default: return BlockTypes.DisplayName(property.managedReferenceValue.GetType());
                     }
             }
@@ -71,7 +72,8 @@ namespace GameSystems.EditorTools
 
             if (property.propertyType == SerializedPropertyType.Generic && property.hasVisibleChildren)
             {
-                if (PropertyUtil.GetBoxed(property) is StatRule rule) return rule.Describe("이 수치");
+                if (PropertyUtil.GetBoxed(property) is StatRule rule) return rule.Describe("이 로그");
+                if (PropertyUtil.GetBoxed(property) is TriggerRule triggerRule) return triggerRule.Natural(EditorDatabase.Instance);
                 return string.Join(" · ", PropertyUtil.Children(property).Select(Text).Where(t => !string.IsNullOrEmpty(t)));
             }
 

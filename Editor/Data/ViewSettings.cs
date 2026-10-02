@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     public enum FieldKind
     {
@@ -163,10 +163,10 @@ namespace GameSystems.EditorTools
         public List<(string slot, string path, FieldEntry suggestion)> Broken = new List<(string, string, FieldEntry)>();
     }
 
-    // 프로젝트 공용 저장: ProjectSettings/GameSystems/DatabaseViews.json (Assets를 어지럽히지 않고 팀과 공유된다).
+    // 프로젝트 공용 저장: ProjectSettings/MomoiProject/DatabaseViews.json (Assets를 어지럽히지 않고 팀과 공유된다).
     public static class ViewSettings
     {
-        const string FilePath = "ProjectSettings/GameSystems/DatabaseViews.json";
+        const string FilePath = "ProjectSettings/MomoiProject/DatabaseViews.json";
 
         [Serializable]
         sealed class FileData

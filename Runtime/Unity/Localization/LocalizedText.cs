@@ -4,11 +4,11 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.Events;
 
-namespace GameSystems
+namespace GBible
 {
     // 텍스트 키 하나를 현재 언어 글자로 바꿔 같은 오브젝트의 글자 컴포넌트(TextMeshPro, UI Text 등 'text' 속성이 있는 것)에 넣는다.
     // 언어가 바뀌면 다시 넣는다. 값은 인스펙터 또는 SetArg로 넘긴다.
-    [AddComponentMenu("Game Systems/다국어 텍스트")]
+    [AddComponentMenu("MomoiProject/다국어 텍스트")]
     [ExecuteAlways]
     public sealed class LocalizedText : MonoBehaviour
     {

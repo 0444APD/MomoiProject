@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public class ValidatorTests
     {
@@ -43,20 +43,26 @@ namespace GameSystems.Tests
             achievement.condition = new StatCompareCondition { stat = "없는수치", value = 1 };
             var empty = Make<AchievementData>("achievement2", "빈 업적");
             var issues = DataValidator.Validate(new List<GameData> { achievement, empty });
-            Assert.IsTrue(issues.Any(i => i.Asset == achievement && i.Message.Contains("존재하지 않는 수치")));
-            Assert.IsTrue(issues.Any(i => i.Asset == empty && i.Message.Contains("조건이 없습니다")));
+            Assert.IsTrue(issues.Any(i => i.Asset == achievement && i.Message.Contains("존재하지 않는 로그")));
+            Assert.IsTrue(issues.Any(i => i.Asset == empty && i.Message.Contains("트리거가 없습니다")));
         }
 
         [Test]
-        public void 합계형이_아닌_수치에_더하기_보상은_오류()
+        public void 플레이어_데이터에_주기_보상을_값_형식과_템플릿으로_검사한다()
         {
-            var stat = Make<StatData>("stat1", "최고 콤보");
-            stat.aggregate = StatAggregate.Max;
+            var bag = Make<PlayerDataEntry>("playerData1", "가방");
+            bag.valueType = typeof(TestInventory).FullName;
             var achievement = Make<AchievementData>("achievement1", "업적");
             achievement.condition = new StatCompareCondition { stat = "stat1", value = 1 };
-            achievement.rewards.Add(new AddToStatReward { stat = "stat1", amount = 1 });
-            var issues = DataValidator.Validate(new List<GameData> { stat, achievement });
-            Assert.IsTrue(issues.Any(i => i.Message.Contains("합계형")));
+            achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "items", amount = 1 });
+            achievement.rewards.Add(new PlayerDataReward { key = "없는키", amount = 1 });
+            achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "gold", amount = 5 });
+            achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "items", items = { "template.none" } });
+            var issues = DataValidator.Validate(new List<GameData> { bag, achievement }).Where(i => i.Message.StartsWith("플레이어 데이터에 주기")).ToList();
+            Assert.AreEqual(3, issues.Count, string.Join("\n", issues.Select(i => i.Message)));
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("넣을 요소가 없습니다")));
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("없는 플레이어 데이터")));
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("없는 템플릿 'template.none'")));
         }
 
         [Test]
@@ -108,7 +114,7 @@ namespace GameSystems.Tests
         {
             var fields = FieldCatalog.For(typeof(AchievementData));
             Assert.AreEqual(FieldKind.Image, fields.First(f => f.Path == "icon").Kind);
-            Assert.AreEqual(FieldKind.Text, fields.First(f => f.Path == "description").Kind);
+            Assert.AreEqual(FieldKind.Text, FieldCatalog.For(typeof(KeywordData)).First(f => f.Path == "textStyle").Kind);
             Assert.IsFalse(fields.Any(f => f.Path == "displayName"), "도감 항목은 ID로만 식별한다(표시 이름 없음)");
             Assert.IsFalse(fields.Any(f => f.Path == "id"), "숨긴 필드(ID)는 목록에 없다");
         }
@@ -119,7 +125,7 @@ namespace GameSystems.Tests
             var view = ViewSettings.Resolve(typeof(AchievementData));
             Assert.AreEqual("icon", view.Image?.Path);
             Assert.IsNull(view.Title, "제목을 고르지 않으면 카드 제목은 ID");
-            Assert.AreEqual("description", view.Subtitle?.Path);
+            Assert.IsNull(view.Subtitle, "부제목으로 쓸 글자 필드가 없다");
         }
 
         [Test]

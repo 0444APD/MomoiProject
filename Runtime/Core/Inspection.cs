@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameSystems
+namespace GBible
 {
-    // 관찰 계약: 모든 시스템은 현재 상태 전체를 트리로 내보낼 수 있어야 한다.
+    // 관찰 계약: 모든 시스템은 현재 값 전체를 트리로 내보낼 수 있어야 한다.
     // 변경 기록은 Journal이, 테스트 조작은 DebugCommands가 담당한다.
     public interface IInspectable
     {
@@ -15,8 +15,8 @@ namespace GameSystems
     {
         public string Label;
         public string Value;
-        // 상태 저장소 키. 있으면 모니터에서 값을 직접 바꿀 수 있다.
-        public string StateKey;
+        // 플레이어 데이터 저장소 키. 있으면 모니터에서 값을 직접 바꿀 수 있다.
+        public string PlayerDataKey;
         // 클래스·컬렉션 값의 저장소 키(모니터가 탐색기로 연다).
         public string DataKey;
         // 작고 옅게 붙는 보조 정보(구역, 분류 등).
@@ -28,7 +28,7 @@ namespace GameSystems
         {
             Label = label;
             Value = value;
-            StateKey = stateKey;
+            PlayerDataKey = stateKey;
         }
 
         public InspectNode Add(string label, string value = null, string stateKey = null)
@@ -97,6 +97,24 @@ namespace GameSystems
             Scope = scope;
             Aggregate = aggregate;
         }
+    }
+
+    // 문구 앞에 위치를 붙여 넘긴다(예: "규칙 2: ").
+    public sealed class PrefixedContext : IValidationContext
+    {
+        readonly IValidationContext _inner;
+        readonly string _prefix;
+
+        public PrefixedContext(IValidationContext inner, string prefix)
+        {
+            _inner = inner;
+            _prefix = prefix;
+        }
+
+        public bool StatExists(string id) => _inner.StatExists(id);
+        public bool AchievementExists(string id) => _inner.AchievementExists(id);
+        public StatDefinitionInfo? FindStat(string id) => _inner.FindStat(id);
+        public void Report(ValidationSeverity severity, string message) => _inner.Report(severity, _prefix + message);
     }
 
     public static class ValidationExtensions

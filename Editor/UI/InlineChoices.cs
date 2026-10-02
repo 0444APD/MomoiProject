@@ -4,10 +4,10 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
-    // 값 칸의 목록을 선택 모듈(대화 등)이 채우는 입구. 코어는 모듈을 모르고, 모듈이 이 인터페이스를 구현하면 자동으로 쓰인다.
-    // 예: 대화 모듈의 '스탠딩 ID' 칸은 같은 노드의 프로필 칸을 읽어 그 프로필의 스탠딩 목록을 보여 준다.
+    // 값 칸의 목록을 선택 모듈(다이얼로그 시스템 등)이 채우는 입구. 코어는 모듈을 모르고, 모듈이 이 인터페이스를 구현하면 자동으로 쓰인다.
+    // 예: 다이얼로그 시스템의 '스탠딩 ID' 칸은 같은 노드의 프로필 칸을 읽어 그 프로필의 스탠딩 목록을 보여 준다.
     public interface IInlineChoiceProvider
     {
         // 이 필드의 목록을 맡는지(보통 필드의 어트리뷰트로 판단).

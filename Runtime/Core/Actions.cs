@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameSystems
+namespace GBible
 {
     public enum ActionVisibility
     {
@@ -50,17 +50,17 @@ namespace GameSystems
         readonly List<ActionRecord> _log = new List<ActionRecord>();
         readonly Dictionary<long, ActionRecord> _byTransaction = new Dictionary<long, ActionRecord>();
         readonly Journal _journal;
-        readonly StateStore _state;
+        readonly PlayerDataStore _state;
         readonly GameClock _clock;
         readonly int _logCapacity;
 
         public event Action<ActionRecord> Executed;
-        // 행동의 트랜잭션이 시작·중단될 때(난수 상태 보존 등 상태 저장소 밖 자원의 되돌리기용).
+        // 행동의 트랜잭션이 시작·중단될 때(난수 상태 보존 등 플레이어 데이터 저장소 밖 자원의 되돌리기용).
         public event Action<long> TransactionStarted;
         public event Action<long> TransactionAborted;
         public event Action<ActionRecord> StatusChanged;
 
-        public ActionDispatcher(Journal journal, StateStore state, GameClock clock, int logCapacity = 1024)
+        public ActionDispatcher(Journal journal, PlayerDataStore state, GameClock clock, int logCapacity = 1024)
         {
             _journal = journal;
             _state = state;
@@ -76,17 +76,24 @@ namespace GameSystems
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
             if (_handlers.ContainsKey(typeof(T)))
-                throw new InvalidOperationException($"[GameSystems] 행동 '{typeof(T).Name}'의 처리기가 이미 등록되어 있습니다.");
+                throw new InvalidOperationException($"[MomoiProject] 행동 '{typeof(T).Name}'의 처리기가 이미 등록되어 있습니다.");
             _handlers[typeof(T)] = a => handler((T)a);
         }
 
         public bool IsRegistered(Type actionType) => _handlers.ContainsKey(actionType);
 
+        // 처리를 클래스 안에 쓴 행동의 실행 방법(세션이 정한다).
+        public Action<GameAction> SelfRun;
+
         public ActionRecord Execute(GameAction action)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
             if (!_handlers.TryGetValue(action.GetType(), out var handler))
-                throw new InvalidOperationException($"[GameSystems] 행동 '{action.GetType().Name}'의 처리기가 없습니다. Actions.Register로 등록하세요.");
+            {
+                // 처리를 클래스 안에 쓴 행동(GameAction<T>·SimpleAction)은 등록 없이 실행한다.
+                if (action is ISelfRunningAction && SelfRun != null) handler = SelfRun;
+                else throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'의 처리기가 없습니다. Actions.Register로 등록하거나 GameAction<T>·SimpleAction을 상속해 Run을 쓰세요.");
+            }
 
             action.tick = _clock.Tick;
             var entry = _journal.Append(JournalKind.Action, "Actions", action.Describe());
@@ -99,7 +106,8 @@ namespace GameSystems
 
             try
             {
-                using (_journal.Cause(entry.Id)) handler(action);
+                // 처리 중에 꺼낸 데이터 값은 직접 고쳐도 기록된다(PlayerDataStore.Track).
+                using (_journal.Cause(entry.Id)) _state.Track(() => handler(action));
                 _state.End();
             }
             catch (Exception e)

@@ -1,0 +1,19 @@
+{
+    "name": "GBible.Editor",
+    "rootNamespace": "GBible.EditorTools",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

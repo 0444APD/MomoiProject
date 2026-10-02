@@ -2,20 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
-    // 런타임 모니터: 통합 기록(인과 추적), 상태, 도전과제, 수치, 행동(Undo), 디버그 명령.
+    // 런타임 모니터: 통합 기록(인과 추적), 데이터, 도전과제, 수치, 행동(Undo), 디버그 명령.
     public sealed class MonitorWindow : EditorWindow
     {
         enum Tab
         {
             Timeline,
-            State,
+            Data,
             Achievements,
             Stats,
             Events,
@@ -40,7 +40,7 @@ namespace GameSystems.EditorTools
         VisualElement _dock;
 
         // 테스트에서 런타임 없이 세션을 주입하기 위한 통로.
-        internal static Func<GameSession> SessionSource = () => GameSystemsRuntime.Session;
+        internal static Func<GameSession> SessionSource = () => GBibleRuntime.Session;
         internal static int TabCount => TabNames.Length;
         internal static string TabKey(int index) => ((Tab)index).ToString();
 
@@ -69,10 +69,10 @@ namespace GameSystems.EditorTools
         ListView _timeline;
         VisualElement _chainPanel;
 
-        [MenuItem("Game Systems/모니터", priority = 1)]
+        [MenuItem("MomoiProject/모니터", priority = 1)]
         public static void Open()
         {
-            var window = GetWindow<MonitorWindow>();
+            var window = GsWindows.Get<MonitorWindow>();
             window.titleContent = new GUIContent("모니터");
             window.minSize = new Vector2(900, 480);
         }
@@ -155,11 +155,11 @@ namespace GameSystems.EditorTools
             if (_session == null)
             {
                 var empty = Gs.Box("gs-empty");
-                empty.Add(Gs.Label(EditorApplication.isPlaying ? "세션이 없습니다" : "플레이 모드에서 실시간 상태가 표시됩니다", "gs-title"));
+                empty.Add(Gs.Label(EditorApplication.isPlaying ? "세션이 없습니다" : "플레이 모드에서 실시간 값이 표시됩니다", "gs-title"));
                 empty.Add(Gs.Space(8));
                 empty.Add(Gs.Label(EditorApplication.isPlaying
-                    ? "GameSystemsRuntime이 시작되지 않았습니다."
-                    : "플레이를 시작하면 모든 시스템의 상태, 기록, 행동을 여기서 확인하고 조작할 수 있습니다.", "gs-caption"));
+                    ? "GBibleRuntime이 시작되지 않았습니다."
+                    : "플레이를 시작하면 모든 시스템의 값, 기록, 행동을 여기서 확인하고 조작할 수 있습니다.", "gs-caption"));
                 _body.Add(empty);
                 UpdateInfo();
                 return;
@@ -216,7 +216,7 @@ namespace GameSystems.EditorTools
             _lastUndoCount = _session.UndoCount;
             if (_tab == Tab.Timeline) RefreshTimeline();
             // 데이터 탭은 들어가 있는 폴더를 유지한 채 값만 다시 그린다.
-            else if (_tab == Tab.State) _dataExplorer?.Refresh();
+            else if (_tab == Tab.Data) _dataExplorer?.Refresh();
             else if (_tab != Tab.Commands) BuildTab();
         }
 
@@ -230,7 +230,7 @@ namespace GameSystems.EditorTools
             }
             _sessionInfo.text = $"시드 {_session.Random.MasterSeed}  ·  틱 {_session.Clock.Tick}  ·  {_session.Clock.Time:0.0}초  ·  " +
                                 $"{HistoryText()}  ·  기록 {_session.Journal.Count}/{_session.Journal.Capacity}" +
-                                (_session.State.MissingRequired.Any() ? $"  ·  필수 값 비어 있음 {_session.State.MissingRequired.Count()}" : "");
+                                (_session.Data.MissingRequired.Any() ? $"  ·  필수 값 비어 있음 {_session.Data.MissingRequired.Count()}" : "");
         }
 
         void BuildTab()
@@ -240,7 +240,7 @@ namespace GameSystems.EditorTools
             switch (_tab)
             {
                 case Tab.Timeline: BuildTimeline(); break;
-                case Tab.State: BuildData(); break;
+                case Tab.Data: BuildData(); break;
                 case Tab.Achievements: BuildAchievements(); break;
                 case Tab.Stats: BuildStats(); break;
                 case Tab.Events: BuildEvents(); break;
@@ -339,7 +339,7 @@ namespace GameSystems.EditorTools
             GsButton keyFilter = null;
             keyFilter = new GsButton(KeyFilterText(), () =>
             {
-                var state = _session.State;
+                var state = _session.Data;
                 var used = new HashSet<string>(_session.Journal.Entries.Where(e => !string.IsNullOrEmpty(e.Key)).Select(e => e.Key));
                 var items = new List<GsDropdownItem>
                 {
@@ -452,7 +452,7 @@ namespace GameSystems.EditorTools
         }
 
         string KeyFilterText() =>
-            string.IsNullOrEmpty(_keyFilter) || _session == null ? "모든 값 ▾" : (_session.State.IsDefined(_keyFilter) ? _session.State.LabelOf(_keyFilter) : _keyFilter) + " ▾";
+            string.IsNullOrEmpty(_keyFilter) || _session == null ? "모든 값 ▾" : (_session.Data.IsDefined(_keyFilter) ? _session.Data.LabelOf(_keyFilter) : _keyFilter) + " ▾";
 
         // deep: 이 기록 아래의 모든 단계에도 적용한다.
         void SetExpanded(long id, bool expanded, bool deep)
@@ -552,7 +552,7 @@ namespace GameSystems.EditorTools
             UpdateChain();
         }
 
-        // 접힌 줄 옆 요약: "하위 12 · 상태 8 · 이벤트 2 · 보상 1"
+        // 접힌 줄 옆 요약: "하위 12 · 데이터 8 · 이벤트 2 · 보상 1"
         string SummaryOf(long id, int total)
         {
             var kinds = new Dictionary<JournalKind, int>();
@@ -626,7 +626,7 @@ namespace GameSystems.EditorTools
             {
                 case JournalKind.Action: return "행동";
                 case JournalKind.Event: return "이벤트";
-                case JournalKind.State: return "상태";
+                case JournalKind.Data: return "데이터";
                 case JournalKind.Snapshot: return "스냅샷";
                 case JournalKind.Undo: return "Undo";
                 case JournalKind.Achievement: return "도전과제";
@@ -643,7 +643,7 @@ namespace GameSystems.EditorTools
             {
                 case JournalKind.Action: return Gs.Accent;
                 case JournalKind.Event: return Gs.Palette[6];
-                case JournalKind.State: return Gs.Palette[7];
+                case JournalKind.Data: return Gs.Palette[7];
                 case JournalKind.Snapshot: return Gs.Palette[4];
                 case JournalKind.Undo: return Gs.Palette[1];
                 case JournalKind.Achievement: return Gs.Palette[2];
@@ -663,7 +663,7 @@ namespace GameSystems.EditorTools
         void BuildData()
         {
             var session = _session;
-            var state = session.State;
+            var state = session.Data;
 
             ExplorerItem KeyItem(string key)
             {
@@ -692,16 +692,16 @@ namespace GameSystems.EditorTools
                 Children = () => state.Keys.Where(include).OrderBy(k => k, StringComparer.Ordinal).Select(KeyItem).ToList(),
             };
 
-            bool IsSystem(string key) => key.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal) || key.StartsWith(StateKeys.AchievementPrefix, StringComparison.Ordinal);
+            bool IsSystem(string key) => key.StartsWith(PlayerDataKeys.StatPrefix, StringComparison.Ordinal) || key.StartsWith(PlayerDataKeys.AchievementPrefix, StringComparison.Ordinal);
 
             var root = new ExplorerItem
             {
                 Label = "데이터",
                 Children = () => MissingFolder(state).Concat(new List<ExplorerItem>
                 {
-                    Folder("판 데이터", "이번 판 내용(세션 구역) · 판 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Session, Gs.Palette[6]),
-                    Folder("프로필 데이터", "판이 바뀌어도 유지(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == StateZone.Meta, Gs.Palette[4]),
-                    Folder("로그", "로그 탭에서 규칙·이벤트로 다루는 값", k => k.StartsWith(StateKeys.StatPrefix, StringComparison.Ordinal), Gs.Palette[2]),
+                    Folder("판 데이터", "이번 판 내용(세션 구역) · 판 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == DataZone.Session, Gs.Palette[6]),
+                    Folder("프로필 데이터", "판이 바뀌어도 유지(메타 구역) · 프로필 저장에 들어감", k => !IsSystem(k) && state.ZoneOf(k) == DataZone.Meta, Gs.Palette[4]),
+                    Folder("로그", "로그 탭에서 규칙·이벤트로 다루는 값", k => k.StartsWith(PlayerDataKeys.StatPrefix, StringComparison.Ordinal), Gs.Palette[2]),
                     new ExplorerItem
                     {
                         Label = "도전과제 달성",
@@ -728,7 +728,7 @@ namespace GameSystems.EditorTools
             _body.Add(_dataExplorer);
         }
         // 필드 규칙의 '필수' 값이 빈 곳(채워질 때까지 맨 위에 보인다).
-        static IEnumerable<ExplorerItem> MissingFolder(StateStore state)
+        static IEnumerable<ExplorerItem> MissingFolder(PlayerDataStore state)
         {
             var missing = state.MissingRequired.ToList();
             if (missing.Count == 0) yield break;
@@ -747,7 +747,7 @@ namespace GameSystems.EditorTools
             };
         }
 
-        // ── 상태·수치 (관찰 계약 트리) ─────────────────────────
+        // ── 데이터·로그 (관찰 계약 트리) ─────────────────────────
 
         void BuildInspect(IInspectable inspectable)
         {
@@ -776,7 +776,7 @@ namespace GameSystems.EditorTools
                 var tag = Gs.Label(node.Tag ?? "", "gs-caption");
                 tag.style.width = 130;
                 row.Add(tag);
-                row.Add(node.StateKey != null ? StateValue(node) : node.DataKey != null ? DataValue(node) : Gs.Label(node.Value ?? "", "gs-grow"));
+                row.Add(node.PlayerDataKey != null ? StateValue(node) : node.DataKey != null ? DataValue(node) : Gs.Label(node.Value ?? "", "gs-grow"));
                 if (!string.IsNullOrEmpty(node.Note)) row.Add(Gs.Label(node.Note, "gs-caption", "gs-nowrap"));
                 body.Add(row);
             }
@@ -792,13 +792,13 @@ namespace GameSystems.EditorTools
             var key = node.DataKey;
             box.RegisterCallback<ClickEvent>(_ =>
             {
-                if (_session == null || !_session.State.IsDefined(key)) return;
-                GsDataExplorer.BrowseModal(_root, node.Label, _session.State.Get(key),
-                    change => _session.State.Modify<object>(key, _ => change()));
+                if (_session == null || !_session.Data.IsDefined(key)) return;
+                GsDataExplorer.BrowseModal(_root, node.Label, _session.Data.Get(key),
+                    change => _session.Data.Modify<object>(key, _ => change()));
             });
             return box;
         }
-        // 모니터에서 상태 값을 직접 바꾼다(디버그 조작, 트랜잭션 밖에서 바로 적용되며 기록에 남는다).
+        // 모니터에서 플레이어 데이터 값을 직접 바꾼다(디버그 조작, 트랜잭션 밖에서 바로 적용되며 기록에 남는다).
         VisualElement StateValue(InspectNode node)
         {
             var box = Gs.Box("gs-inline", "gs-inline--editable", "gs-grow");
@@ -808,10 +808,10 @@ namespace GameSystems.EditorTools
             box.RegisterCallback<ClickEvent>(_ =>
             {
                 if (box.childCount > 1) return;
-                var current = _session.State.Get(node.StateKey);
+                var current = _session.Data.Get(node.PlayerDataKey);
                 if (current is bool b)
                 {
-                    _session.State.Set(node.StateKey, !b);
+                    _session.Data.Set(node.PlayerDataKey, !b);
                     return;
                 }
                 var field = new TextField { value = current is double d ? d.ToString(CultureInfo.InvariantCulture) : current?.ToString() ?? "" };
@@ -828,8 +828,8 @@ namespace GameSystems.EditorTools
                         object value = field.value;
                         if (current is double || current == null)
                             if (double.TryParse(field.value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) value = number;
-                        try { _session.State.Set(node.StateKey, value); }
-                        catch (Exception e) { Debug.LogWarning($"[GameSystems] 값을 바꿀 수 없습니다: {e.Message}"); }
+                        try { _session.Data.Set(node.PlayerDataKey, value); }
+                        catch (Exception e) { Debug.LogWarning($"[MomoiProject] 값을 바꿀 수 없습니다: {e.Message}"); }
                     }
                     field.RemoveFromHierarchy();
                     label.style.display = DisplayStyle.Flex;
@@ -876,7 +876,7 @@ namespace GameSystems.EditorTools
                 var card = new GsCard(CardLayout.Bar);
                 card.SetImage(null, unlocked ? Gs.Success : Gs.PaletteFor(id));
                 card.Title = definition.DisplayName;
-                card.Subtitle = definition.Condition != null ? Gs.Dual(definition.Condition.Natural(_session), definition.Condition.Describe(_session)) : "(조건 없음)";
+                card.Subtitle = definition.When != null ? Gs.Dual(definition.When.Natural(_session), definition.When.Describe(_session)) : "(트리거 없음)";
                 card.AddBadge(unlocked ? "달성" : "진행 중", unlocked ? Gs.Success : Gs.Palette[7]);
 
                 if (!unlocked && _session.Achievements.TryGetProgress(id, out var current, out var target))
@@ -928,7 +928,7 @@ namespace GameSystems.EditorTools
                 force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다.";
                 buttons.Add(force);
                 buttons.Add(Gs.HSpace(8));
-                var fill = new GsButton("이벤트로 달성", () =>
+                var fill = new GsButton("트리거로 달성", () =>
                 {
                     if (_session.TrySimulateAchievement(selected.Id, out var error))
                         ShowFeedback($"'{selected.DisplayName}' 조건을 이벤트로 채웠습니다", GsNoticeKind.Ok);
@@ -972,7 +972,7 @@ namespace GameSystems.EditorTools
             foreach (var definition in definitions)
             {
                 var id = definition.Id;
-                var key = StateKeys.Stat(id);
+                var key = PlayerDataKeys.Stat(id);
                 var row = Gs.Box("gs-sheet__row");
                 row.EnableInClassList("gs-sheet__row--selected", id == _selectedStat);
                 row.RegisterCallback<ClickEvent>(_ =>
@@ -987,7 +987,7 @@ namespace GameSystems.EditorTools
                 var tag = Gs.Label(ScopeText(definition), "gs-caption");
                 tag.style.width = 150;
                 row.Add(tag);
-                var value = Gs.Label(StateStore.Format(_session.State.Get(key)));
+                var value = Gs.Label(PlayerDataStore.Format(_session.Data.Get(key)));
                 value.style.width = 150;
                 row.Add(value);
                 body.Add(row);
@@ -1001,7 +1001,7 @@ namespace GameSystems.EditorTools
                 return;
             }
 
-            var statKey = StateKeys.Stat(selected.Id);
+            var statKey = PlayerDataKeys.Stat(selected.Id);
             var dock = Gs.Row();
             var isSum = selected.Aggregate == StatAggregate.Sum;
             var now = _session.Stats.Get(selected.Id);
@@ -1015,8 +1015,8 @@ namespace GameSystems.EditorTools
             dock.Add(Gs.HSpace(8));
             var apply = new GsButton("직접 수정", () =>
             {
-                _session.State.Set(statKey, direct.value);
-                ShowFeedback($"{selected.DisplayName} = {StateStore.Format(direct.value)} (직접 수정)", GsNoticeKind.Info);
+                _session.Data.Set(statKey, direct.value);
+                ShowFeedback($"{selected.DisplayName} = {PlayerDataStore.Format(direct.value)} (직접 수정)", GsNoticeKind.Info);
             });
             apply.tooltip = "값만 덮어씁니다. 이벤트·다른 수치·반영 규칙은 움직이지 않습니다.";
             dock.Add(apply);
@@ -1108,7 +1108,7 @@ namespace GameSystems.EditorTools
                 }
                 catch (Exception e)
                 {
-                    body.Add(new GsNotice(e.Message.Replace("[GameSystems] ", ""), GsNoticeKind.Error));
+                    body.Add(new GsNotice(e.Message.Replace("[MomoiProject] ", ""), GsNoticeKind.Error));
                     return;
                 }
                 _eventInstances[selected.FullName] = instance;
@@ -1118,10 +1118,10 @@ namespace GameSystems.EditorTools
             body.Add(editor);
             // 이 이벤트가 움직이는 수치(반영 규칙)를 보여줘 결과를 예상할 수 있게 한다.
             var affected = _session.Stats.Definitions
-                .SelectMany(d => d.Rules.Where(r => r.eventType == selected.FullName).Select(r => $"{d.DisplayName} ← {(string.IsNullOrEmpty(r.field) ? "횟수" : r.field)}"))
+                .SelectMany(d => d.SimpleRules().Where(r => r.eventType == selected.FullName).Select(r => $"{d.DisplayName} ← {(string.IsNullOrEmpty(r.field) ? "횟수" : r.field)}"))
                 .ToList();
             body.Add(Gs.Space(14));
-            body.Add(Gs.Label(affected.Count > 0 ? "반응하는 수치:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 수치가 없습니다.", "gs-caption"));
+            body.Add(Gs.Label(affected.Count > 0 ? "반응하는 로그:  " + string.Join("   ·   ", affected) : "이 이벤트를 반영하는 로그가 없습니다.", "gs-caption"));
 
             var dock = Gs.Row();
             var actions = Gs.Row();
@@ -1143,7 +1143,7 @@ namespace GameSystems.EditorTools
                 }
                 catch (Exception e)
                 {
-                    ShowFeedback(e.Message.Replace("[GameSystems] ", ""), GsNoticeKind.Error);
+                    ShowFeedback(e.Message.Replace("[MomoiProject] ", ""), GsNoticeKind.Error);
                 }
             }, GsButtonKind.Primary);
             GsMotion.AddPressSpring(fire);
@@ -1247,7 +1247,7 @@ namespace GameSystems.EditorTools
 
         void UndoLast()
         {
-            var history = _session.State.History;
+            var history = _session.Data.History;
             var label = _session.Options.History == HistoryMode.Actions && history.Count > 0 ? history[history.Count - 1].Label : null;
             if (_session.Undo())
                 ShowFeedback((label != null ? $"Undo됨: {label}" : "되감기") + "  ·  행동이 바꾼 값은 돌아가고 달성한 도전과제·보상은 유지", GsNoticeKind.Info);

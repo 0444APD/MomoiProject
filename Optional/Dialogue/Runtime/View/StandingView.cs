@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 스탠딩 하나를 그리는 컴포넌트. 대화 화면이 위치·밝기·투명도·표정을 알려 주고, 그리는 방식은 종류마다 다르다.
+    // 스탠딩 하나를 그리는 컴포넌트. 다이얼로그 화면이 위치·밝기·투명도·표정을 알려 주고, 그리는 방식은 종류마다 다르다.
     // 캐릭터의 '스탠딩 프리팹'에 이 컴포넌트(또는 상속한 것)를 붙인다. 비워 두면 SpriteStandingView를 만들어 표정 스프라이트로 그린다.
     public abstract class StandingView : MonoBehaviour
     {
@@ -31,7 +31,7 @@ namespace GameSystems.Dialogue
         // 창 모드: 창 이미지(테두리)와 창 모양(마스크). frame이 null이면 일반 스탠딩.
         public virtual void SetFrame(Sprite frame, Sprite mask)
         {
-            if (frame != null) Debug.LogWarning($"[대화] '{name}' 스탠딩은 창 모드를 지원하지 않습니다.", this);
+            if (frame != null) Debug.LogWarning($"[다이얼로그] '{name}' 스탠딩은 창 모드를 지원하지 않습니다.", this);
         }
     }
 
@@ -181,7 +181,7 @@ namespace GameSystems.Dialogue
         public List<ExpressionAnimation> animations = new List<ExpressionAnimation>();
         [Tooltip("표정 애니메이션을 재생할 트랙")]
         public int track;
-        [Tooltip("MeshRenderer의 정렬 순서를 대화 화면이 정하게 한다")]
+        [Tooltip("MeshRenderer의 정렬 순서를 다이얼로그 화면이 정하게 한다")]
         public bool controlSorting = true;
 
         Component _skeleton;
@@ -190,7 +190,7 @@ namespace GameSystems.Dialogue
         {
             base.Bind(character);
             _skeleton = FindSkeleton();
-            if (_skeleton == null) Debug.LogWarning($"[대화] '{name}'에서 스파인 컴포넌트(SkeletonAnimation 등)를 찾지 못했습니다.", this);
+            if (_skeleton == null) Debug.LogWarning($"[다이얼로그] '{name}'에서 스파인 컴포넌트(SkeletonAnimation 등)를 찾지 못했습니다.", this);
             if (character != null && !string.IsNullOrEmpty(character.defaultExpression)) BeginExpression(character.defaultExpression);
         }
 
@@ -207,7 +207,7 @@ namespace GameSystems.Dialogue
 
         public override void BeginExpression(string expression, Sprite sprite = null)
         {
-            if (sprite != null) Debug.LogWarning($"[대화] 스파인 스탠딩 '{name}'에는 예외 스프라이트를 꽂을 수 없습니다(스탠딩 ID로 애니메이션을 고르세요).", this);
+            if (sprite != null) Debug.LogWarning($"[다이얼로그] 스파인 스탠딩 '{name}'에는 예외 스프라이트를 꽂을 수 없습니다(스탠딩 ID로 애니메이션을 고르세요).", this);
             if (_skeleton == null || string.IsNullOrEmpty(expression)) return;
             var animation = expression;
             var loop = true;
@@ -226,7 +226,7 @@ namespace GameSystems.Dialogue
             }
             catch (TargetInvocationException e)
             {
-                Debug.LogWarning($"[대화] 스파인 애니메이션 '{animation}'을(를) 재생하지 못했습니다: {e.InnerException?.Message}", this);
+                Debug.LogWarning($"[다이얼로그] 스파인 애니메이션 '{animation}'을(를) 재생하지 못했습니다: {e.InnerException?.Message}", this);
             }
         }
 

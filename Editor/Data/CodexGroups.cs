@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
-    // 그룹과 그 아래 항목(키워드 그룹·키워드, 규격 묶음·스프라이트 규격)을 순서대로 읽고 만든다.
+    // 그룹과 그 아래 항목(키워드 그룹·키워드, 규격 그룹·스프라이트 규격)을 순서대로 읽고 만든다.
     // 순서는 IOrderedData.Order(10 간격), 소속은 IGroupedData.Group.
     public static class CodexGroups
     {
@@ -14,7 +14,7 @@ namespace GameSystems.EditorTools
 
         static EditorDatabase Db => EditorDatabase.Instance;
 
-        // 도감 창이 열려 있으면 도감 안의 변경으로 모아 둔다(탭을 옮길 때 적용). 아니면 바로 에셋으로 만든다.
+        // 도감 창이 열려 있으면 도감 안의 변경으로 모아 둔다(저장(Ctrl+S)할 때 적용). 아니면 바로 에셋으로 만든다.
         public static bool StageByDefault => EditorWindow.HasOpenInstances<DatabaseWindow>();
 
         public static int OrderOf(GameData data) => (data as IOrderedData)?.Order ?? 0;

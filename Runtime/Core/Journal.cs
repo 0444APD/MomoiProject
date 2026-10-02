@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameSystems
+namespace GBible
 {
     public enum JournalKind
     {
         Action,
         Event,
-        State,
+        Data,
         Snapshot,
         Undo,
         Achievement,

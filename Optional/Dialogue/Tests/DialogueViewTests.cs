@@ -1,14 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
-using GameSystems.EditorTools.Graph;
+using GBible.Data;
+using GBible.Dialogue;
+using GBible.EditorTools.Graph;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public sealed class DialogueViewTests
     {

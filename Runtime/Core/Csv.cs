@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace GameSystems
+namespace GBible
 {
     // CSV 읽기·쓰기(RFC 4180): 쉼표 구분, 큰따옴표로 감싼 칸 안의 쉼표·줄바꿈·"" 허용.
     // 구글 시트·엑셀에서 내려받은 CSV를 그대로 읽는다(맨 앞 BOM 무시, \r\n·\n 모두 허용).

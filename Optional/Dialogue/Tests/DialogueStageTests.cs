@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.Dialogue;
+using GBible.Data;
+using GBible.Dialogue;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     public sealed class DialogueStageTests
     {
@@ -107,7 +107,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 대화_브금은_오디오_채널로_나오고_끝나면_게임_브금으로_돌아간다()
+        public void 다이얼로그_브금은_오디오_채널로_나오고_끝나면_게임_브금으로_돌아간다()
         {
             var game = AudioClip.Create("game", 44100 * 10, 1, 44100, false);
             var scene = AudioClip.Create("scene", 44100 * 10, 1, 44100, false);
@@ -119,14 +119,14 @@ namespace GameSystems.Tests
                 var (runner, d, line) = One(new MusicEffect { clip = scene, duration = 0.5f });
                 line.voice = voice;
                 runner.StartAt(d, line.guid);
-                Assert.AreEqual(scene, GameAudio.CurrentBgm, "대화의 브금");
+                Assert.AreEqual(scene, GameAudio.CurrentBgm, "다이얼로그의 브금");
                 Assert.AreEqual(voice, GameAudio.CurrentVoice, "대사의 목소리");
                 runner.Stop();
-                Assert.AreEqual(game, GameAudio.CurrentBgm, "대화 전의 브금으로");
+                Assert.AreEqual(game, GameAudio.CurrentBgm, "다이얼로그 전의 브금으로");
 
                 var (quiet, d2, line2) = One();
                 quiet.StartAt(d2, line2.guid);
-                Assert.AreEqual(game, GameAudio.CurrentBgm, "브금을 정하지 않은 대화는 게임 브금을 건드리지 않는다");
+                Assert.AreEqual(game, GameAudio.CurrentBgm, "브금을 정하지 않은 다이얼로그는 게임 브금을 건드리지 않는다");
                 quiet.Stop();
             }
             finally

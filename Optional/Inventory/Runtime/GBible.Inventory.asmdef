@@ -1,0 +1,19 @@
+{
+    "name": "GBible.Inventory",
+    "rootNamespace": "GBible.InventorySystem",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GBIBLE_INVENTORY"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

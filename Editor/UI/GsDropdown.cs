@@ -5,7 +5,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     public sealed class GsDropdownItem
     {
@@ -113,6 +113,7 @@ namespace GameSystems.EditorTools.UI
 
         // 닫힐 때(고르거나 바깥을 눌러서). 입력 칸이 '편집 중' 표시를 끄는 데 쓴다.
         public event Action Closed;
+        public bool IsClosed => _closed;
 
         public void Close()
         {

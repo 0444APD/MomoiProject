@@ -1,16 +1,16 @@
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     // 스프라이트 규격 하나: 출력 크기. 바꾸면 이 규격으로 베이크한 이미지가 모두 다시 베이크된다.
     [Database("스프라이트 규격", Group = "이미지", Order = 0, IdPrefix = "spritePreset", Page = "sprites")]
-    [CreateAssetMenu(menuName = "Game Systems/스프라이트 규격", fileName = "NewSpritePreset")]
+    [CreateAssetMenu(menuName = "MomoiProject/스프라이트 규격", fileName = "NewSpritePreset")]
     public sealed class SpritePresetData : GameData, IGroupedData
     {
-        [FieldLabel("묶음"), DataRef(typeof(SpritePresetGroupData))] public string group = "";
+        [FieldLabel("그룹"), DataRef(typeof(SpritePresetGroupData))] public string group = "";
         [FieldLabel("가로(px)")] public int width = 256;
         [FieldLabel("세로(px)")] public int height = 256;
-        // 묶음 안에서의 순서(끌어서 바꾼다).
+        // 그룹 안에서의 순서(끌어서 바꾼다).
         [HideInInspector] public int order;
 
         int IOrderedData.Order { get => order; set => order = value; }
@@ -21,7 +21,7 @@ namespace GameSystems.Data
 
         public override void ValidateData(IValidationContext context)
         {
-            if (string.IsNullOrEmpty(group)) context.Error("묶음이 정해지지 않았습니다.");
+            if (string.IsNullOrEmpty(group)) context.Error("그룹이 정해지지 않았습니다.");
             if (width < 8 || height < 8 || width > 8192 || height > 8192) context.Error("크기는 8~8192px 사이여야 합니다.");
         }
     }

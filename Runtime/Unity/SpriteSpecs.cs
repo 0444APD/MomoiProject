@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     // 원본 일러 하나의 맞춤 기록과 베이크 결과. 맞춤은 원본 기준이라 같은 일러를 여러 곳에서 써도 한 번만 맞춘다.
     [Serializable]
@@ -10,7 +10,7 @@ namespace GameSystems.Data
     {
         public Sprite source;
         public string sourceGuid = "";
-        // 이 원본을 베이크하는 규격 묶음(묶음에 규격이 추가되면 그것도 베이크한다).
+        // 이 원본을 베이크하는 규격 그룹(그룹에 규격이 추가되면 그것도 베이크한다).
         public string group = "";
         // 중심(원본 안의 0~1 좌표, 왼쪽 아래 기준)과 배율(1 = 규격 비율로 원본에 꽉 차게, 클수록 확대).
         public Vector2 center = new Vector2(0.5f, 0.5f);

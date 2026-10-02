@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
     // 저장 데이터 버전 올리기. 출시 후 데이터 구조가 바뀌면 SessionOptions.SaveVersion을 올리고 변환을 등록한다.
     // 변환은 저장 트리(키 → 값, 데이터 값은 필드 이름 → 값 딕셔너리)를 직접 고친다.
@@ -23,7 +23,7 @@ namespace GameSystems
         // toVersion - 1 → toVersion 으로 올리는 변환.
         public void Add(int toVersion, string label, Action<Dictionary<string, object>> migrate)
         {
-            if (toVersion < 2) throw new ArgumentOutOfRangeException(nameof(toVersion), "[GameSystems] 변환은 버전 2부터 등록합니다(버전 1이 처음).");
+            if (toVersion < 2) throw new ArgumentOutOfRangeException(nameof(toVersion), "[MomoiProject] 변환은 버전 2부터 등록합니다(버전 1이 처음).");
             _steps.Add(new Step { ToVersion = toVersion, Label = label ?? $"버전 {toVersion}", Apply = migrate ?? throw new ArgumentNullException(nameof(migrate)) });
         }
 
@@ -55,7 +55,7 @@ namespace GameSystems
                     Dictionary<string, object> holder;
                     if (TryRelative(fromPath, target, out var relative)) holder = EnsurePath(map, relative);
                     else if (root is Dictionary<string, object> top && !target.Contains("[]")) holder = EnsurePath(top, target);
-                    else throw new InvalidOperationException($"[GameSystems] 저장 변환: '{fromPath}' → '{toPath}'는 옮길 수 없는 경로입니다. Add로 직접 변환하세요.");
+                    else throw new InvalidOperationException($"[MomoiProject] 저장 변환: '{fromPath}' → '{toPath}'는 옮길 수 없는 경로입니다. Add로 직접 변환하세요.");
                     holder[targetName] = value;
                 }
             });

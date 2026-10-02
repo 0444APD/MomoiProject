@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 도움말 창: 모든 기능의 설명을 분류별로 모아 보여 준다. 각 화면의 "?" 버튼이 해당 항목으로 연다.
     public sealed class HelpWindow : EditorWindow
@@ -21,7 +21,7 @@ namespace GameSystems.EditorTools
 
         public static void Show(string topicId)
         {
-            var window = GetWindow<HelpWindow>();
+            var window = GsWindows.Get<HelpWindow>();
             window.titleContent = new GUIContent("도움말");
             window.minSize = new Vector2(760, 480);
             if (!string.IsNullOrEmpty(topicId)) window._topic = topicId;

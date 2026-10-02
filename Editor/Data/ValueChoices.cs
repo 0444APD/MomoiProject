@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
+using GBible.Data;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 값 칸의 "목록에서 고르기" 규칙 한 곳. 데이터베이스 편집 칸·탐색기·이벤트 발생기가 같은 규칙을 쓴다.
-    // ID 참조([DataRef]·[StatRef]·[AchievementRef]·[StateKeyRef]), 이벤트 타입, 저장 형식, enum이면 목록을 돌려주고,
+    // ID 참조([DataRef]·[StatRef]·[AchievementRef]·[PlayerDataRef]), 이벤트 타입, 저장 형식, enum이면 목록을 돌려주고,
     // 자유 입력 칸이면 null.
     public static class ValueChoices
     {
@@ -26,7 +26,7 @@ namespace GameSystems.EditorTools
             if (member != null)
             {
                 var refType = EditorDatabase.RefTypeOf(member as FieldInfo) ??
-                              (member.IsDefined(typeof(StateKeyRefAttribute), false) ? typeof(StateKeyData) : null);
+                              (member.IsDefined(typeof(PlayerDataRefAttribute), false) ? typeof(PlayerDataEntry) : null);
                 if (refType != null)
                     return (member is FieldInfo field && EditorDatabase.RefTypeOf(field) != null ? db.RefCandidates(field) : db.OfType(refType))
                         .OrderBy(d => db.GroupLabel(d) ?? "").ThenBy(d => d.Id).Select(d => new Choice { Label = d.Id, Group = db.GroupLabel(d), Value = d.Id }).ToList();
@@ -46,7 +46,7 @@ namespace GameSystems.EditorTools
         {
             if (value is string id && !string.IsNullOrEmpty(id) && member is FieldInfo field)
             {
-                var refType = EditorDatabase.RefTypeOf(field) ?? (field.IsDefined(typeof(StateKeyRefAttribute), false) ? typeof(StateKeyData) : null);
+                var refType = EditorDatabase.RefTypeOf(field) ?? (field.IsDefined(typeof(PlayerDataRefAttribute), false) ? typeof(PlayerDataEntry) : null);
                 if (refType != null)
                 {
                     var target = EditorDatabase.Instance.FindById(id);
@@ -58,7 +58,7 @@ namespace GameSystems.EditorTools
                     return type != null ? EventBus.DisplayNameOf(type) : $"없는 이벤트: {id}";
                 }
             }
-            return StateStore.Format(value);
+            return PlayerDataStore.Format(value);
         }
     }
 }

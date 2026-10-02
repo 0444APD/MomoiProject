@@ -4,17 +4,17 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 에디터에서 GameData 에셋 전체를 다루는 창구: 조회, 생성, ID 부여, 이름 조회, GameDatabase 동기화.
     public sealed class EditorDatabase : INameResolver
     {
-        public const string DataRoot = "Assets/GameSystemsData";
-        public const string DatabaseAssetPath = DataRoot + "/Resources/GameSystems/GameDatabase.asset";
+        public const string DataRoot = "Assets/MomoiProjectData";
+        public const string DatabaseAssetPath = DataRoot + "/Resources/MomoiProject/GameDatabase.asset";
 
         static EditorDatabase _instance;
         public static EditorDatabase Instance => _instance ??= new EditorDatabase();
@@ -23,7 +23,7 @@ namespace GameSystems.EditorTools
         List<GameData> _view;
         public static event Action Changed;
 
-        // 도감에서 모아 둔(아직 적용하지 않은) 변경. 탭을 옮길 때 적용하거나 되돌린다.
+        // 도감에서 모아 둔(아직 적용하지 않은) 변경. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
         public static CodexStaging Staging { get; } = new CodexStaging();
 
         // 도감이 보는 모습: 실제 에셋 + 적용 대기 중인 변경(추가·수정·삭제). 목록·드롭다운·검증이 이것을 쓴다.
@@ -53,7 +53,7 @@ namespace GameSystems.EditorTools
 
         public GameData FindById(string id) => string.IsNullOrEmpty(id) ? null : All.FirstOrDefault(d => d.Id == id);
 
-        // 드롭다운 묶음 머리글: 키워드는 그룹 이름으로 묶는다.
+        // 드롭다운 그룹 머리글: 키워드는 그룹 이름으로 묶는다.
         public string GroupLabel(GameData data) =>
             data is KeywordData keyword ? (FindById(keyword.group)?.DisplayName ?? "(그룹 없음)") : null;
 
@@ -97,7 +97,7 @@ namespace GameSystems.EditorTools
         {
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 데이터베이스 타입이 아닙니다.");
             id = string.IsNullOrEmpty(id) ? NextId(info) : id;
-            if (!CanUseId(id, null, out var error)) throw new ArgumentException("[GameSystems] " + error);
+            if (!CanUseId(id, null, out var error)) throw new ArgumentException("[MomoiProject] " + error);
             var data = (GameData)ScriptableObject.CreateInstance(type);
             data.EditorAssignId(id);
             CreateAsset(data);
@@ -146,7 +146,7 @@ namespace GameSystems.EditorTools
 
         public static bool IsReleased => AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath)?.IsReleased ?? false;
 
-        internal const string ReleasedMenu = "Game Systems/출시됨 (저장 호환 유지)";
+        internal const string ReleasedMenu = "MomoiProject/출시됨 (저장 호환 유지)";
 
         [MenuItem(ReleasedMenu, priority = 40)]
         static void ToggleReleased()
@@ -154,7 +154,7 @@ namespace GameSystems.EditorTools
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
             if (database == null)
             {
-                Debug.LogWarning("[GameSystems] GameDatabase가 아직 없습니다. 데이터베이스 창을 한 번 여세요.");
+                Debug.LogWarning("[MomoiProject] GameDatabase가 아직 없습니다. 데이터베이스 창을 한 번 여세요.");
                 return;
             }
             var next = !database.IsReleased;
@@ -220,12 +220,12 @@ namespace GameSystems.EditorTools
             if (attribute != null) return attribute;
             // 필드 규칙(도감에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
             var rule = RuleFor(field);
-            // 규칙의 값 출처는 글자 필드(또는 string 리스트)에만 적용한다(스프라이트 필드의 규칙은 규격 묶음용).
+            // 규칙의 값 출처는 글자 필드(또는 string 리스트)에만 적용한다(스프라이트 필드의 규칙은 규격 그룹용).
             if (rule == null || (field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) != typeof(string))) return null;
             switch (rule.source)
             {
                 case FieldRuleSource.Keyword: return typeof(KeywordData);
-                case FieldRuleSource.StateKey: return typeof(StateKeyData);
+                case FieldRuleSource.PlayerDataKey: return typeof(PlayerDataEntry);
                 case FieldRuleSource.Data: return TypeResolver.Find(rule.dataType);
                 default: return null;
             }
@@ -269,7 +269,7 @@ namespace GameSystems.EditorTools
         {
             var oldId = data.Id;
             if (oldId == newId) return 0;
-            if (!CanUseId(newId, data, out var error)) throw new ArgumentException("[GameSystems] " + error);
+            if (!CanUseId(newId, data, out var error)) throw new ArgumentException("[MomoiProject] " + error);
 
             var usages = FindUsages(data);
             Undo.IncrementCurrentGroup();
@@ -311,7 +311,7 @@ namespace GameSystems.EditorTools
                 if (entry.prefab != null || string.IsNullOrEmpty(entry.PrefabGuid)) continue;
                 if (!string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(entry.PrefabGuid))) continue;
                 AssetDatabase.MoveAssetToTrash(AssetDatabase.GetAssetPath(entry));
-                Debug.Log($"[GameSystems] 프리팹이 지워져 도감 항목 '{entry.DisplayName}'을(를) 정리했습니다.");
+                Debug.Log($"[MomoiProject] 프리팹이 지워져 도감 항목 '{entry.DisplayName}'을(를) 정리했습니다.");
                 removed++;
             }
             if (removed > 0) MarkDirty();
@@ -330,6 +330,19 @@ namespace GameSystems.EditorTools
                 AssetDatabase.SaveAssetIfDirty(data);
                 _all = null;
             }
+            // 예전 저장 형식(로그의 반영 규칙 한 줄, 도전과제의 조건·보상, 능력의 대상·효과)을 트리거·결과로 옮긴다.
+            foreach (var data in Committed.OfType<ILegacyData>().ToList())
+            {
+                if (!data.MigrateLegacy()) continue;
+                var asset = (GameData)data;
+                EditorUtility.SetDirty(asset);
+                AssetDatabase.SaveAssetIfDirty(asset);
+                Debug.Log($"[MomoiProject] '{asset.DisplayName}'을(를) 트리거·결과 형식으로 옮겼습니다.");
+                _all = null;
+            }
+            // 저장 전 작업본(옮기기 전에 만든 것)도 같은 형식으로(저장하면 원본에 그대로 들어간다).
+            foreach (var data in All.OfType<ILegacyData>().Where(d => Staging.IsWorking((GameData)d)).ToList())
+                data.MigrateLegacy();
             SyncDatabaseAsset();
             MarkDirty();
         }

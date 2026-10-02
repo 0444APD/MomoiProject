@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Compilation;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 플레이어 데이터의 "값 형식" 목록: 기본 형식 + 프로젝트의 enum + 저장소에 담을 수 있는 데이터 클래스.
     // 클래스는 추가 코드 없이 목록에 나타난다(공개 클래스이고 담을 수 없는 필드가 없으면).
@@ -31,8 +31,10 @@ namespace GameSystems.EditorTools
             var enums = TypeCache.GetTypesDerivedFrom<Enum>()
                 .Where(t => t.IsVisible && ProjectCode.IsProjectType(t))
                 .OrderBy(t => t.Name);
+            // 켜 둔 선택 기능이 내놓는 데이터 클래스(인벤토리 등)도 값 형식으로 고를 수 있다.
+            var featureData = new HashSet<Type>(GameFeatures.DataClassTypes());
             var classes = TypeCache.GetTypesWithAttribute<SerializableAttribute>()
-                .Where(t => !t.IsEnum && !t.IsAbstract && ProjectCode.IsDataClass(t) &&
+                .Where(t => !t.IsEnum && !t.IsAbstract && (ProjectCode.IsDataClass(t) || featureData.Contains(t)) &&
                             !typeof(UnityEngine.Object).IsAssignableFrom(t) &&
                             !typeof(GameAction).IsAssignableFrom(t) &&
                             DataModel.Of(t).Kind == DataKind.Object && DataModel.Validate(t).Count == 0)

@@ -3,12 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // 상세 패널용 필드 편집기. 단순 값은 인라인, 조건·보상은 블록 편집기, 목록은 카드 목록으로 그린다.
     // onValue: 값만 바뀜(미리보기 갱신) / onStructure: 블록 추가·삭제(패널 재구성).
@@ -18,6 +18,10 @@ namespace GameSystems.EditorTools.UI
         {
             var field = PropertyUtil.GetField(property, out var valueType);
             var label = LabelOf(property, field);
+
+            // 조건식(조건·값 조건): 블럭 · 논리 연산자 · 괄호로 한 줄 식을 만든다.
+            if (property.propertyType == SerializedPropertyType.ManagedReference && GsExpressionEditor.Handles(field?.FieldType))
+                return Section(label, new GsExpressionEditor(property, field.FieldType, onValue, onStructure));
 
             if (property.propertyType == SerializedPropertyType.ManagedReference)
                 return Section(label, new BlockEditor(property, field?.FieldType ?? typeof(object), onValue, onStructure, null));
@@ -45,6 +49,8 @@ namespace GameSystems.EditorTools.UI
         public static VisualElement BuildContent(SerializedProperty property, Action onValue, Action onStructure)
         {
             var field = PropertyUtil.GetField(property, out _);
+            if (property.propertyType == SerializedPropertyType.ManagedReference && GsExpressionEditor.Handles(field?.FieldType))
+                return new GsExpressionEditor(property, field.FieldType, onValue, onStructure);
             if (property.propertyType == SerializedPropertyType.ManagedReference)
                 return new BlockEditor(property, field?.FieldType ?? typeof(object), onValue, onStructure, null);
 
@@ -113,6 +119,8 @@ namespace GameSystems.EditorTools.UI
         // ── 관리 참조 목록(보상, 복합 조건의 하위 조건) ─────────────
         public static VisualElement BlockList(SerializedProperty list, Type elementType, Action onValue, Action onStructure)
         {
+            // 보상 목록: '+ 보상 추가' → 플레이어 데이터 필드 고르기 → 필드 형식에 맞는 값 칸(주는 구문 공통 규칙).
+            if (elementType == typeof(Reward) || elementType == typeof(Outcome)) return RewardListEditor.Build(list, elementType, onValue, onStructure);
             var container = Gs.Col();
             for (int i = 0; i < list.arraySize; i++)
             {
@@ -219,7 +227,7 @@ namespace GameSystems.EditorTools.UI
             return row;
         }
 
-        // 키워드 드롭다운 끝에 붙는 항목: 새 키워드 만들기, 키워드 연결 창 열기.
+        // 키워드 드롭다운 끝에 붙는 항목: 새 키워드 만들기, 클래스 상세에서 연결 바꾸기.
         public static IEnumerable<GsDropdownItem> KeywordMenuExtras(VisualElement anchor, FieldInfo field, Action<List<string>> created)
         {
             var group = EditorDatabase.RuleFor(field)?.keywordGroup;
@@ -228,7 +236,7 @@ namespace GameSystems.EditorTools.UI
                 yield return new GsDropdownItem("+ 새 키워드", () => KeywordDialogs.AddKeywords(host, group, created))
                     { Group = "관리", Detail = $"'{EditorDatabase.Instance.FindById(group)?.DisplayName ?? group}' 그룹에 추가하고 바로 고릅니다" };
             if (field != null)
-                yield return new GsDropdownItem("키워드 연결 창 열기", () => KeywordWindow.Open(group, field.DeclaringType, field.Name))
+                yield return new GsDropdownItem("연결 바꾸기(클래스 상세)", () => ClassDetail.Open(field.DeclaringType, field.Name))
                     { Group = "관리", Detail = "이 필드가 쓸 키워드 그룹을 바꾸거나 새 그룹을 만듭니다" };
         }
 
@@ -332,7 +340,8 @@ namespace GameSystems.EditorTools.UI
             var value = PropertyUtil.GetBoxed(element);
             switch (value)
             {
-                case StatRule rule: return rule.Describe("이 수치");
+                case StatRule rule: return rule.Describe("이 로그");
+                case TriggerRule rule: return rule.Natural(EditorDatabase.Instance);
                 case null: return "";
             }
             return string.Join("  ·  ", PropertyUtil.Children(element).Select(PropertyUtil.Summary).Where(s => !string.IsNullOrEmpty(s)));
@@ -390,13 +399,21 @@ namespace GameSystems.EditorTools.UI
         {
             if (baseType == typeof(Condition)) return "조건";
             if (baseType == typeof(Reward)) return "보상";
+            if (baseType == typeof(Outcome)) return "결과";
+            if (baseType == typeof(Trigger)) return "트리거";
             if (baseType == typeof(ValueFilter)) return "조건";
+            if (baseType == typeof(Effect)) return "효과";
+            if (baseType == typeof(TargetSelector)) return "대상";
             return "항목";
         }
 
-        public static void ShowTypeMenu(VisualElement anchor, Type baseType, Action<Type> onPick)
+        // property: 고르는 칸. 결과 칸이면 그 칸의 잠금([OutcomeSlot])에 없는 종류는 빼고 보인다.
+        public static void ShowTypeMenu(VisualElement anchor, Type baseType, Action<Type> onPick, SerializedProperty property = null)
         {
-            var items = BlockTypes.ConcreteTypes(baseType).Select(type =>
+            var allowed = property != null && typeof(Outcome).IsAssignableFrom(baseType) ? TriggerSlots.OutcomeSlotOf(property)?.Allowed : null;
+            var items = BlockTypes.ConcreteTypes(baseType)
+                .Where(type => allowed == null || (((Outcome)Activator.CreateInstance(type)).Kind & allowed.Value) != 0)
+                .Select(type =>
             {
                 var picked = type;
                 return new GsDropdownItem(BlockTypes.DisplayName(type), () => onPick(picked))
@@ -413,7 +430,7 @@ namespace GameSystems.EditorTools.UI
     // 조건·보상 블록 하나. 비어 있으면 "선택" 버튼, 차 있으면 카드 + 내부 필드.
     public sealed class BlockEditor : VisualElement
     {
-        // 접힌 묶음 블록(에셋·경로별). 창을 다시 그려도 유지된다.
+        // 접힌 그룹 블록(에셋·경로별). 창을 다시 그려도 유지된다.
         static readonly HashSet<string> Collapsed = new HashSet<string>();
 
         public BlockEditor(SerializedProperty property, Type baseType, Action onValue, Action onStructure, Action onRemove,
@@ -445,7 +462,7 @@ namespace GameSystems.EditorTools.UI
                 property.managedReferenceValue = Activator.CreateInstance(newType);
                 property.serializedObject.ApplyModifiedProperties();
                 onStructure?.Invoke();
-            }), GsButtonKind.Ghost);
+            }, property), GsButtonKind.Ghost);
             swap.AddToClassList("gs-block__action");
 
             var remove = new GsButton("✕", () =>
@@ -471,6 +488,14 @@ namespace GameSystems.EditorTools.UI
             tools.Add(swap);
             tools.Add(remove);
 
+            // 플레이어 데이터에 주기: 보상 목록과 같은 한 줄(왼쪽 필드, 오른쪽 형식에 맞는 값 칸).
+            if (value is PlayerDataReward)
+            {
+                AddToClassList("gs-block-line");
+                Add(RewardListEditor.Row(property, onValue, onStructure, tools));
+                return;
+            }
+
             var used = new HashSet<string>();
             var sentence = BlockTypes.Sentence(type);
             if (!string.IsNullOrEmpty(sentence) && sentence.Contains("{"))
@@ -488,7 +513,7 @@ namespace GameSystems.EditorTools.UI
             }
             else
             {
-                // 묶음 블록(모두 만족 등): 이름 한 줄 + 들여쓴 하위 문장들. 머리줄을 누르면 접고 펼친다.
+                // 그룹 블록(모두 만족 등): 이름 한 줄 + 들여쓴 하위 문장들. 머리줄을 누르면 접고 펼친다.
                 AddToClassList("gs-block-group");
                 var key = property.serializedObject.targetObject.GetHashCode() + ":" + property.propertyPath;
                 var collapsed = Collapsed.Contains(key);
@@ -552,9 +577,11 @@ namespace GameSystems.EditorTools.UI
         }
 
         static string Explain(object value) =>
-            value is Condition condition ? condition.Explain(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Explain() : "";
+            value is Condition condition ? condition.Explain(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Explain()
+            : value is Outcome outcome ? outcome.Explain(EditorDatabase.Instance) : value is Trigger trigger ? trigger.Explain(EditorDatabase.Instance) : "";
 
         static string Summary(object value) =>
-            value is Condition condition ? condition.Describe(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Describe() : "";
+            value is Condition condition ? condition.Describe(EditorDatabase.Instance) : value is ValueFilter filter ? filter.Describe()
+            : value is Outcome outcome ? outcome.Describe(EditorDatabase.Instance) : value is Trigger trigger ? trigger.Describe(EditorDatabase.Instance) : "";
     }
 }

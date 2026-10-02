@@ -6,9 +6,9 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
-    // 텍스트 시트에 행을 더하는 곳(선택 모듈: 대화 대사 등). 원문은 모듈 쪽이 기준이라 가져올 때 원문 칸은 건너뛴다.
+    // 텍스트 시트에 행을 더하는 곳(선택 모듈: 다이얼로그 시스템의 대사 등). 원문은 모듈 쪽이 기준이라 가져올 때 원문 칸은 건너뛴다.
     public interface ITextSheetSource
     {
         // sourceText: 원문 표에서 키 찾기(없으면 null). 문맥 열에 이름을 보일 때 쓴다.
@@ -27,9 +27,9 @@ namespace GameSystems.EditorTools
     // 다국어 설정·텍스트 표 만들기, 시트(CSV) 내보내기·가져오기, 번역 검사.
     public static class TextSheetTools
     {
-        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/GameSystems/LocalizationSettings.asset";
+        public const string SettingsPath = EditorDatabase.DataRoot + "/Resources/MomoiProject/LocalizationSettings.asset";
         public const string TableFolder = EditorDatabase.DataRoot + "/Texts";
-        const string Menu = "Game Systems/다국어/";
+        const string Menu = "MomoiProject/다국어/";
 
         // 설정이 없으면 원문 언어 표와 함께 만든다.
         public static LocalizationSettings EnsureSettings()
@@ -100,7 +100,7 @@ namespace GameSystems.EditorTools
             var sourceTable = tables.TryGetValue(settings.sourceLanguage, out var st) ? st : new Dictionary<string, string>();
             var order = settings.Find(settings.sourceLanguage)?.table?.entries.Select(e => e.key).ToList() ?? new List<string>();
 
-            // 모듈이 더하는 행(대화 대사 등): 원문은 모듈 쪽(그래프)이 기준이다.
+            // 모듈이 더하는 행(다이얼로그 시스템의 대사 등): 원문은 모듈 쪽(그래프)이 기준이다.
             var rows = SourceRows(sourceTable).ToList();
             var notes = new Dictionary<string, string>(StringComparer.Ordinal);
             var context = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
@@ -148,7 +148,7 @@ namespace GameSystems.EditorTools
         {
             var codes = settings.Codes.Where(c => includeSource || !string.Equals(c, settings.sourceLanguage, StringComparison.OrdinalIgnoreCase)).ToList();
             var result = TextSheet.Import(csv, codes);
-            // 모듈 행(대화 대사 등)의 원문은 그래프가 기준이므로 원문 언어 표에 넣지 않는다.
+            // 모듈 행(다이얼로그 시스템의 대사 등)의 원문은 그래프가 기준이므로 원문 언어 표에 넣지 않는다.
             if (result.Tables.TryGetValue(settings.sourceLanguage, out var sourceImport))
                 foreach (var row in SourceRows(new Dictionary<string, string>()))
                     if (!string.IsNullOrEmpty(row.Key)) sourceImport.Remove(row.Key);

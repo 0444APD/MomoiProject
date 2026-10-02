@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace GameSystems
+namespace GBible
 {
-    // 지원 언어와 언어별 텍스트 표. Resources/GameSystems/LocalizationSettings 에 둔다.
-    [CreateAssetMenu(menuName = "Game Systems/다국어/다국어 설정", fileName = "LocalizationSettings")]
+    // 지원 언어와 언어별 텍스트 표. Resources/MomoiProject/LocalizationSettings 에 둔다.
+    [CreateAssetMenu(menuName = "MomoiProject/다국어/다국어 설정", fileName = "LocalizationSettings")]
     public sealed class LocalizationSettings : ScriptableObject
     {
-        public const string ResourcesPath = "GameSystems/LocalizationSettings";
+        public const string ResourcesPath = "MomoiProject/LocalizationSettings";
 
         [Serializable]
         public sealed class Language

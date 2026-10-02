@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GameSystems.Data
+namespace GBible.Data
 {
     public enum FieldRuleSource
     {
@@ -16,7 +16,7 @@ namespace GameSystems.Data
 #if UNITY_2020_1_OR_NEWER
         [InspectorName("플레이어 데이터")]
 #endif
-        StateKey = 3,
+        PlayerDataKey = 3,
 #if UNITY_2020_1_OR_NEWER
         [InspectorName("자유 입력")]
 #endif
@@ -27,8 +27,8 @@ namespace GameSystems.Data
     // 모든 편집 칸(도감·탐색기·이벤트 발생기·조건식 값)과 ID 바꾸기·검증이 이 규칙을 따른다.
     // 키워드: string 필드는 그룹에서 하나, string 배열·리스트 필드는 여러 개를 고른다. 그룹을 비우면 모든 키워드.
     // 보통은 '키워드 연결' 창에서 필드와 그룹을 이어 만들고, 이 도감 탭은 확인·유지보수용이다.
-    [Database("필드 규칙", Group = "식별자", Order = 4, IdPrefix = "rule")]
-    [CreateAssetMenu(menuName = "Game Systems/필드 규칙", fileName = "NewFieldRule")]
+    [Database("필드 규칙", Group = "선언", Order = 9, IdPrefix = "rule", Hidden = true)]
+    [CreateAssetMenu(menuName = "MomoiProject/필드 규칙", fileName = "NewFieldRule")]
     public sealed class FieldRuleData : GameData
     {
         [FieldLabel("클래스"), ClassTypeRef] public string targetType = "";
@@ -37,8 +37,8 @@ namespace GameSystems.Data
         [FieldLabel("키워드 그룹"), DataRef(typeof(KeywordGroupData))] public string keywordGroup = "";
         [FieldLabel("도감 종류"), GameDataTypeRef] public string dataType = "";
         [FieldLabel("필수")] public bool required;
-        // 스프라이트 필드: 원본을 넣으면 이 묶음의 규격으로 베이크하고, 목록·카드는 미리보기 규격으로 보여 준다.
-        [FieldLabel("스프라이트 규격 묶음"), DataRef(typeof(SpritePresetGroupData))] public string spriteGroup = "";
+        // 스프라이트 필드: 원본을 넣으면 이 그룹의 규격으로 베이크하고, 목록·카드는 미리보기 규격으로 보여 준다.
+        [FieldLabel("스프라이트 규격 그룹"), DataRef(typeof(SpritePresetGroupData))] public string spriteGroup = "";
         [FieldLabel("미리보기 규격"), DataRef(typeof(SpritePresetData))] public string previewPreset = "";
 
         public Type TargetType => TypeResolver.Find(targetType);

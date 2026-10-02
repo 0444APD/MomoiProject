@@ -7,7 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools.UI
+namespace GBible.EditorTools.UI
 {
     // ── 데이터 보기: 그리드 위에 블록을 끼워 맞춰 한 객체를 그린다 ─────────────
     //
@@ -82,12 +82,12 @@ namespace GameSystems.EditorTools.UI
         public List<BlockPlacement> blocks = new List<BlockPlacement>();
     }
 
-    // 타입별 배치 저장(프로젝트 공유: ProjectSettings/GameSystems/Layouts.json).
+    // 타입별 배치 저장(프로젝트 공유: ProjectSettings/MomoiProject/Layouts.json).
     public static class DataLayouts
     {
         public const int Columns = 12;
         public const float RowUnit = 40f;
-        const string FilePath = "ProjectSettings/GameSystems/Layouts.json";
+        const string FilePath = "ProjectSettings/MomoiProject/Layouts.json";
 
         [Serializable]
         sealed class FileData
@@ -241,10 +241,10 @@ namespace GameSystems.EditorTools.UI
             var image = Gs.Box("gs-view__image");
             if (large) image.AddToClassList("gs-view__image--large");
             var current = context.ObjectAt(path);
-            var field = context.Type == null ? null : GameSystems.EditorTools.ClassTypes.FieldsOf(context.Type).FirstOrDefault(f => f.Name == path);
-            var rule = GameSystems.EditorTools.SpriteSpecEditor.RuleFor(field);
+            var field = context.Type == null ? null : GBible.EditorTools.ClassTypes.FieldsOf(context.Type).FirstOrDefault(f => f.Name == path);
+            var rule = GBible.EditorTools.SpriteSpecEditor.RuleFor(field);
             // 미리보기 규격이 정해진 필드는 그 규격의 베이크본으로 보여 준다.
-            var shown = GameSystems.EditorTools.SpriteSpecEditor.Preview(current, field);
+            var shown = GBible.EditorTools.SpriteSpecEditor.Preview(current, field);
             if (shown is Sprite sprite) image.style.backgroundImage = new StyleBackground(sprite);
             else if (shown is Texture2D texture) image.style.backgroundImage = new StyleBackground(texture);
             else image.Add(Gs.Label("없음", "gs-caption", "gs-view__image-empty"));

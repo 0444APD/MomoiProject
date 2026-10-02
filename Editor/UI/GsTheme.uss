@@ -1,5 +1,5 @@
 /* ───────────────────────────────────────────────────────────
-   Game Systems 디자인 시스템
+   MomoiProject 디자인 시스템
    다크 테마 · 포인트 컬러 1개 · 보일 듯 말 듯한 외곽선 · 넉넉한 여백
    ─────────────────────────────────────────────────────────── */
 
@@ -364,6 +364,21 @@
 }
 .gs-appear--hidden { opacity: 0; translate: 0 10px; }
 
+/* ── 툴팁(GsTooltip): 글 양에 맞춰 커진다. 가로는 최대 폭에서 줄바꿈 ── */
+.gs-tooltip {
+    padding: 7px 10px;
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    border-radius: 8px;
+}
+.gs-root .gs-tooltip__text {
+    white-space: normal;
+    font-size: 11px;
+    color: var(--gs-text);
+    -unity-text-align: upper-left;
+}
+
 /* ── 타임라인(모니터) ─────────────────────────────────── */
 .gs-log-row { flex-direction: row; align-items: center; height: 34px; padding: 0 12px; border-radius: 8px; }
 .gs-log-row:hover { background-color: var(--gs-hover); }
@@ -541,7 +556,24 @@
 .gs-block-group > .gs-block__children { margin-top: 0; }
 .gs-block__action { opacity: 0; transition-property: opacity; transition-duration: 0.12s; }
 .gs-block-line:hover > .gs-block-line__row > .gs-block__action,
-.gs-block-group:hover > .gs-block__header > .gs-block__action { opacity: 1; }
+.gs-block-group:hover > .gs-block__header > .gs-block__action,
+.gs-reward:hover > .gs-block__action,
+.gs-block-line:hover > .gs-reward > .gs-block__action { opacity: 1; }
+
+/* 보상 한 줄: 왼쪽 필드 이름, 오른쪽 필드 형식에 맞는 값 칸 */
+.gs-reward {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    background-color: var(--gs-surface-2);
+}
+.gs-reward__field { width: 190px; flex-shrink: 0; padding-top: 4px; margin-right: 12px; }
+.gs-root .gs-reward__name { -unity-font-style: bold; white-space: normal; }
+.gs-reward__value { min-width: 0; }
+.gs-reward__input { min-width: 140px; }
+.gs-reward__item { flex-direction: row; align-items: center; margin-bottom: 4px; }
 
 /* ── 상세 패널 요약: [머리말] 내용 ──────────────────── */
 .gs-summary { margin-top: 16px; }
@@ -622,7 +654,7 @@
 .gs-explorer__pick { opacity: 0; margin-left: 8px; }
 .gs-explorer__row:hover .gs-explorer__pick { opacity: 1; }
 .gs-explorer__empty { padding: 16px 10px; }
-/* ── 조건 묶음 접기 ── */
+/* ── 조건 그룹 접기 ── */
 .gs-block__chevron { width: 14px; color: var(--gs-text-2); font-size: 11px; }
 .gs-block-group > .gs-block__header:hover .gs-block__chevron { color: var(--gs-accent); }
 .gs-block__summary { margin-left: 12px; flex-shrink: 1; overflow: hidden; }
@@ -784,55 +816,146 @@
 .gs-kw__group--current { border-color: var(--gs-success); }
 
 
-/* ── 도감 그룹 탭(키워드·스프라이트 규격): 그룹 카드 + 항목 칩, 끌어 놓기 ── */
+/* ── 도감 그룹(키워드·스프라이트 규격·클래스·이벤트): 그룹 제목 줄 + 그 아래로 요소가 한 줄씩. 제목 왼쪽 화살표로 접고 펼친다 ── */
 .gs-grouped__toolbar { margin-bottom: 12px; }
 .gs-grouped__list { max-width: 1100px; }
-.gs-grouped__group {
-    background-color: var(--gs-surface);
-    border-width: 1px;
-    border-color: var(--gs-border);
-    border-radius: 12px;
-    padding: 12px 14px 8px 0;
-    margin-bottom: 10px;
-    align-items: stretch;
-}
-/* 왼쪽 손잡이: 옅은 회색의 얇은 세로선 */
-.gs-grouped__handle {
+.gs-group { margin-bottom: 18px; }
+.gs-group__head { align-items: center; min-height: 30px; }
+.gs-root .gs-group__arrow {
     width: 22px;
+    height: 24px;
+    font-size: 12px;
+    color: var(--gs-text-3);
+    -unity-text-align: middle-center;
+    border-radius: 6px;
+    cursor: link;
+}
+.gs-root .gs-group__arrow:hover { color: var(--gs-text); background-color: var(--gs-hover); }
+.gs-group__titles { align-items: center; min-width: 0; }
+.gs-root .gs-group__title { margin-left: 2px; }
+.gs-group__title--link { cursor: link; }
+.gs-root .gs-group__title--link:hover { color: var(--gs-accent); }
+.gs-root .gs-group__info { margin-left: 12px; }
+.gs-group__tools { align-items: center; flex-shrink: 0; }
+.gs-group__tools > * { margin-left: 6px; }
+/* 요소는 제목보다 들여 쓰고, 왼쪽에 옅은 세로선으로 그룹에 속함을 보인다 */
+.gs-group__content {
+    margin: 4px 0 0 10px;
+    padding-left: 13px;
+    border-left-width: 1px;
+    border-left-color: var(--gs-border);
+}
+.gs-group__row {
     align-items: center;
-    justify-content: center;
-    cursor: move-arrow;
+    min-height: 30px;
+    padding: 4px 10px;
+    margin-bottom: 2px;
+    border-radius: 8px;
+    cursor: link;
 }
-.gs-grouped__handle-line {
-    width: 2px;
-    flex-grow: 1;
-    margin: 4px 0 10px 0;
-    border-radius: 1px;
-    background-color: var(--gs-text-3);
+.gs-group__row:hover { background-color: var(--gs-hover); }
+.gs-group__row--active { background-color: var(--gs-accent-soft); }
+.gs-root .gs-group__row-text { font-size: 13px; flex-shrink: 1; }
+.gs-root .gs-group__row-caption { margin-left: 12px; flex-grow: 1; }
+.gs-group__row .gs-badge { margin-left: 8px; }
+.gs-root .gs-group__row--error .gs-group__row-text { color: var(--gs-danger); }
+.gs-root .gs-group__hint { padding: 6px 10px; }
+.gs-group__footer { padding: 2px 10px 0 10px; }
+.gs-group--folded { margin-bottom: 6px; }
+/* 제목 줄 전체로 접고 펼치는 그룹(클래스·이벤트 탭): 마우스를 올린 줄만 밝아지고 도구가 보인다 */
+.gs-group__head--toggle {
+    padding: 2px 6px 2px 0;
+    border-radius: 8px;
+    transition-property: background-color;
+    transition-duration: 0.12s;
 }
-.gs-grouped__handle:hover .gs-grouped__handle-line { background-color: var(--gs-text-2); }
-.gs-grouped__head { align-items: center; margin-bottom: 8px; }
-.gs-grouped__title { cursor: link; }
-.gs-grouped__title:hover { color: var(--gs-accent); }
-.gs-grouped__chips {
-    flex-wrap: wrap;
-    align-items: center;
-    min-height: 34px;
-}
-.gs-grouped__chip {
-    padding: 5px 11px;
-    margin: 0 6px 6px 0;
-    border-radius: 14px;
-    background-color: var(--gs-surface-2);
-    border-width: 1px;
-    border-color: var(--gs-border);
-    cursor: move-arrow;
-}
-.gs-grouped__chip:hover { border-color: var(--gs-border-strong); }
-.gs-grouped__chip--error { border-color: var(--gs-danger); }
-.gs-grouped__chip-text { font-size: 12px; }
-.gs-grouped__hint { margin-bottom: 6px; }
+.gs-group__head--toggle:hover { background-color: var(--gs-hover); }
+.gs-group__head--toggle > .gs-group__tools { opacity: 0; transition-property: opacity; transition-duration: 0.12s; }
+.gs-group__head--toggle:hover > .gs-group__tools { opacity: 1; }
 .gs-grouped--dragging { opacity: 0.35; }
+/* 도감 공용 목록(CodexTree): 하위 폴더는 촘촘히, 끌어 놓을 폴더는 제목 줄과 안쪽을 강조 */
+.gs-tree__folder--nested { margin-bottom: 2px; }
+.gs-tree__folder--nested.gs-group--folded { margin-bottom: 2px; }
+.gs-tree__folder--drop > .gs-group__head { background-color: var(--gs-accent-soft); }
+.gs-tree__folder--drop > .gs-group__content { border-left-color: var(--gs-accent); }
+
+/* ── 조건식 편집기: 한 줄 식 = 조건 블럭 · 논리 연산자 · 괄호 ── */
+.gs-expr-editor { margin-bottom: 6px; }
+.gs-expr { flex-wrap: wrap; align-items: center; min-height: 34px; }
+.gs-root .gs-expr__empty { margin: 4px 0; }
+.gs-expr__term { align-items: center; margin: 0 2px 6px 0; }
+/* 조건 블럭: 옅은 상자 하나 */
+.gs-expr__block {
+    padding: 5px 8px 5px 10px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+    background-color: var(--gs-surface-2);
+}
+.gs-expr__block .gs-inline.gs-token { margin-bottom: 0; }
+.gs-expr__nested { margin-top: 6px; padding: 6px 0 0 10px; border-left-width: 1px; border-left-color: var(--gs-border-strong); }
+/* 논리 연산자: 포인트 컬러 글자, 누르면 바뀐다 */
+.gs-root .gs-expr__op {
+    padding: 3px 9px;
+    margin: 0 4px 6px 2px;
+    border-radius: 9px;
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: var(--gs-accent);
+    cursor: link;
+}
+.gs-root .gs-expr__op:hover { background-color: var(--gs-accent-soft); }
+.gs-root .gs-expr__not { margin: 0 4px 0 0; color: var(--gs-warning); }
+/* 괄호: 크고 옅은 글자 */
+.gs-root .gs-expr__paren { font-size: 20px; color: var(--gs-text-2); margin: 0 3px; }
+.gs-expr__group { flex-wrap: wrap; align-items: center; flex-shrink: 1; }
+.gs-expr__group > .gs-expr__term { margin-bottom: 0; }
+.gs-root .gs-expr__group > .gs-expr__op { margin-bottom: 0; }
+.gs-expr__slot { border-width: 1px; border-color: var(--gs-border-strong); border-radius: 10px; }
+.gs-expr__add { margin-left: 2px; }
+/* 항 메뉴(⋯)는 마우스를 올린 항에만 보인다 */
+.gs-expr__tool { opacity: 0; margin-left: 2px; }
+.gs-expr__term:hover > .gs-expr__tool { opacity: 1; }
+/* 끌어 놓기: 항 왼쪽의 손잡이, 놓일 자리 표시, 끌려가는 그림자 */
+.gs-root .gs-expr__grip {
+    width: 14px;
+    font-size: 12px;
+    color: var(--gs-text-3);
+    -unity-text-align: middle-center;
+    margin-right: 2px;
+    cursor: move-arrow;
+}
+.gs-root .gs-expr__grip:hover { color: var(--gs-text); }
+.gs-expr__term--dragging { opacity: 0.35; }
+.gs-expr__marker { background-color: var(--gs-accent); border-radius: 1px; }
+.gs-expr__ghost {
+    padding: 4px 10px;
+    border-radius: 10px;
+    background-color: var(--gs-accent);
+    opacity: 0.92;
+}
+.gs-root .gs-expr__ghost Label { color: #FFFFFF; -unity-font-style: bold; }
+.gs-expr__group { min-width: 24px; min-height: 26px; }
+.gs-root .gs-expr__drop-hint { margin: 0 6px; }
+.gs-expr__bar { margin-top: 2px; }
+.gs-expr__bar > * { margin-right: 6px; }
+.gs-root .gs-expr__formula { margin-top: 6px; white-space: normal; }
+
+/* ── 스위치(켜짐·꺼짐 표시) ── */
+.gs-switch {
+    width: 26px;
+    height: 14px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    background-color: var(--gs-border-strong);
+    flex-direction: row;
+    align-items: center;
+    padding: 0 2px;
+    justify-content: flex-start;
+}
+.gs-switch__knob { width: 10px; height: 10px; border-radius: 5px; background-color: var(--gs-text-2); }
+.gs-switch--on { background-color: var(--gs-accent); justify-content: flex-end; }
+.gs-switch--on .gs-switch__knob { background-color: #FFFFFF; }
 .gs-grouped__ghost {
     padding: 5px 11px;
     border-radius: 14px;
@@ -855,7 +978,8 @@
     min-height: 54px;
     justify-content: center;
     cursor: link;
-    transition-property: background-color, border-color;
+    /* 밑줄(border-color)은 전환 없이 바로 켜지고 꺼진다: 에디터 창은 쉬는 동안 다시 그리지 않아 전환 중간 색이 남을 수 있다. */
+    transition-property: background-color;
     transition-duration: 0.12s;
 }
 .gs-field__box:hover { background-color: #232429; }

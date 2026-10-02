@@ -8,13 +8,14 @@ using System.Reflection;
 // 조회 결과는 이름별로 캐시하고, 에디터에서는 스크립트 리로드 때 ClearCache가 호출된다.
 #pragma warning disable UAC0005
 
-namespace GameSystems
+namespace GBible
 {
     // 데이터에 문자열로 저장된 타입 이름·필드 경로를 실제 코드로 연결한다.
     // 이 연결은 에디터 검증기가 저장·빌드 시점에 확인한다(이름이 바뀌면 빨간 글씨로 표시).
     public static class TypeResolver
     {
         static readonly Dictionary<string, Type> Cache = new Dictionary<string, Type>(StringComparer.Ordinal);
+        const string LegacyNamespace = "GameSystems.";
 
         public static Type Find(string fullName)
         {
@@ -27,6 +28,12 @@ namespace GameSystems
                 {
                     found = assembly.GetType(fullName, false);
                     if (found != null) break;
+                }
+                // 옛 이름(GameSystems)으로 저장된 형식 이름도 찾는다(이름을 바꾸기 전에 만든 데이터·저장 파일).
+                if (found == null && fullName.StartsWith(LegacyNamespace, StringComparison.Ordinal))
+                {
+                    Cache[fullName] = null;
+                    found = Find("GBible." + fullName.Substring(LegacyNamespace.Length));
                 }
                 Cache[fullName] = found;
                 return found;

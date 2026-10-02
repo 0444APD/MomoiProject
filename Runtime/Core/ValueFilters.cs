@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
     // 값 조건식: 어떤 객체(이벤트, 저장소 값, 컬렉션의 한 항목)를 뿌리로 두고 참·거짓을 판정하는 트리.
     // 필드 검사 · 모두 만족 · 하나라도 만족 · 아님 · 목록 항목 검사를 자유롭게 중첩해 어떤 식이든 만든다.
@@ -11,7 +11,7 @@ namespace GameSystems
     //         └ 하나라도 만족
     //              ├ 태그 boss 포함
     //              └ 목록 항목 검사: 드롭 중 [희귀도 5 이상]인 항목이 2개 이상
-    // 쓰는 곳: 수치 반영 규칙의 조건(뿌리 = 이벤트), 조건 블록 "상태 값 검사"(뿌리 = 상태 값).
+    // 쓰는 곳: 수치 반영 규칙의 조건(뿌리 = 이벤트), 조건 블록 "플레이어 데이터 검사"(뿌리 = 플레이어 데이터 값).
     [Serializable]
     public abstract class ValueFilter
     {

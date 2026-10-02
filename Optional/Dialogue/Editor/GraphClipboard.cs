@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Dialogue;
+using GBible.Dialogue;
 using UnityEngine;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
-    // 그래프 노드 복사·붙여넣기(창·대화·프리셋 사이에서도). 복사할 때 깊은 사본을 떠 두므로 원본을 고쳐도 영향이 없다.
+    // 그래프 노드 복사·붙여넣기(창·다이얼로그·프리셋 사이에서도). 복사할 때 깊은 사본을 떠 두므로 원본을 고쳐도 영향이 없다.
     static class GraphClipboard
     {
         public static List<GraphNode> Nodes { get; private set; } = new List<GraphNode>();

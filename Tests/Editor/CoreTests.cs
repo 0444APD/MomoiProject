@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     [GameEvent("테스트 처치")]
     public sealed class TestKill
@@ -24,7 +24,7 @@ namespace GameSystems.Tests
         public override string Describe() => "실패하는 행동";
     }
 
-    public class StateStoreTests
+    public class PlayerDataStoreTests
     {
         GameSession _session;
 
@@ -32,57 +32,143 @@ namespace GameSystems.Tests
         public void SetUp()
         {
             _session = new GameSession(new SessionOptions { Seed = 42 });
-            _session.State.Define("s:hp", StateZone.Session, 10, "체력");
-            _session.State.Define("m:gold", StateZone.Meta, 0, "골드");
+            _session.Data.Define("s:hp", DataZone.Session, 10, "체력");
+            _session.Data.Define("m:gold", DataZone.Meta, 0, "골드");
             _session.Actions.Register<TestKillAction>(_ =>
             {
-                _session.State.Set("s:hp", _session.State.GetNumber("s:hp") - 3);
-                _session.State.Set("m:gold", _session.State.GetNumber("m:gold") + 5);
+                _session.Data.Set("s:hp", _session.Data.GetNumber("s:hp") - 3);
+                _session.Data.Set("m:gold", _session.Data.GetNumber("m:gold") + 5);
             });
             _session.Actions.Register<FailingAction>(_ =>
             {
-                _session.State.Set("s:hp", 1);
+                _session.Data.Set("s:hp", 1);
                 throw new InvalidOperationException("의도된 실패");
             });
         }
 
         [Test]
-        public void 값_더하기_보상은_플레이어_데이터에_더하고_뺀다()
+        public void 주기_보상은_숫자_플레이어_데이터를_증감한다()
         {
-            _session.State.DefineOfType("player.gold", StateZone.Meta, typeof(int), 10);
-            new AddToStateReward { key = "player.gold", amount = 50 }.Grant(_session);
-            Assert.AreEqual(60, _session.State.Get("player.gold"));
-            new AddToStateReward { key = "player.gold", amount = -15 }.Grant(_session);
-            Assert.AreEqual(45, _session.State.Get("player.gold"));
-            Assert.AreEqual("player.gold -= 15", new AddToStateReward { key = "player.gold", amount = -15 }.Describe(null));
+            _session.Data.DefineOfType("player.gold", DataZone.Meta, typeof(int), 10);
+            new PlayerDataReward { key = "player.gold", amount = 50 }.Grant(_session);
+            Assert.AreEqual(60, _session.Data.Get("player.gold"));
+            new PlayerDataReward { key = "player.gold", amount = -15.4 }.Grant(_session);
+            Assert.AreEqual(45, _session.Data.Get("player.gold"), "정수형은 반올림");
+            Assert.AreEqual("player.gold -= 15", new PlayerDataReward { key = "player.gold", amount = -15 }.Describe(null));
+            Assert.AreEqual("player.gold 15 감소", new PlayerDataReward { key = "player.gold", amount = -15 }.Natural(null));
+        }
+
+        [Test]
+        public void 주기_보상은_템플릿_사본과_값과_요소를_넣는다()
+        {
+            var templates = new Dictionary<string, object>
+            {
+                ["template.sword"] = new TestItem { name = "sword", level = 3, tags = { "melee" } },
+                ["template.potion"] = new TestItem { name = "potion", level = 1 },
+            };
+            _session.Templates = id => templates.TryGetValue(id, out var value) ? value : null;
+            var inventory = _session.Data.Define("s:bag", DataZone.Session, new TestInventory(), "가방");
+            new PlayerDataReward { key = "s:bag", path = "gold", amount = 30 }.Grant(_session);
+            Assert.AreEqual(30, inventory.gold);
+
+            // 컬렉션: 요소마다 템플릿의 사본이 들어간다(원본·서로와 다른 인스턴스).
+            new PlayerDataReward { key = "s:bag", path = "items", items = { "template.sword", "template.potion", "template.sword" } }.Grant(_session);
+            CollectionAssert.AreEqual(new[] { "sword", "potion", "sword" }, inventory.items.Select(i => i.name).ToArray());
+            Assert.AreEqual(3, inventory.items[0].level);
+            Assert.IsFalse(ReferenceEquals(templates["template.sword"], inventory.items[0]));
+            Assert.IsFalse(ReferenceEquals(inventory.items[0], inventory.items[2]));
+            Assert.AreEqual("s:bag › items에 template.sword, template.potion, template.sword 넣기",
+                new PlayerDataReward { key = "s:bag", path = "items", items = { "template.sword", "template.potion", "template.sword" } }.Natural(null));
+
+            // 없는 템플릿은 넣지 않고 경고만 남긴다.
+            new PlayerDataReward { key = "s:bag", path = "items", items = { "template.none" } }.Grant(_session);
+            Assert.AreEqual(3, inventory.items.Count);
+
+            // 클래스 필드: 템플릿으로 통째로 / 글자 필드: 값 / 글자 리스트: 요소.
+            var hero = _session.Data.Define("s:hero", DataZone.Session, new TestItem(), "영웅");
+            new PlayerDataReward { key = "s:hero", path = "name", value = "Ari" }.Grant(_session);
+            new PlayerDataReward { key = "s:hero", path = "tags", items = { "brave", "fast" } }.Grant(_session);
+            Assert.AreEqual("Ari", hero.name);
+            CollectionAssert.AreEqual(new[] { "brave", "fast" }, hero.tags);
+            new PlayerDataReward { key = "s:hero", value = "template.potion" }.Grant(_session);
+            Assert.AreEqual("potion", _session.Data.Get<TestItem>("s:hero").name, "값 전체를 템플릿 사본으로");
+
+            // 배열: 크기가 고정이라 늘린 새 배열로 바꾼다(값 전체·안쪽 필드 모두).
+            _session.Data.Define("s:scores", DataZone.Session, new[] { 1, 2 }, "점수");
+            new PlayerDataReward { key = "s:scores", items = { "3", "4" } }.Grant(_session);
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4 }, _session.Data.Get<int[]>("s:scores"));
+            var quiver = _session.Data.Define("s:quiver", DataZone.Session, new TestQuiver(), "화살통");
+            new PlayerDataReward { key = "s:quiver", path = "arrows", items = { "template.sword" } }.Grant(_session);
+            Assert.AreEqual(1, _session.Data.Get<TestQuiver>("s:quiver").arrows.Length);
+            Assert.AreEqual("sword", _session.Data.Get<TestQuiver>("s:quiver").arrows[0].name);
+        }
+
+        [Serializable]
+        public sealed class TestQuiver
+        {
+            public TestItem[] arrows = new TestItem[0];
+        }
+
+        [Test]
+        public void 주기_보상은_필드_형식으로_주는_방법이_정해진다()
+        {
+            Assert.AreEqual(GrantKind.Number, PlayerDataGrants.KindOf(typeof(int)));
+            Assert.AreEqual(GrantKind.Value, PlayerDataGrants.KindOf(typeof(string)));
+            Assert.AreEqual(GrantKind.Value, PlayerDataGrants.KindOf(typeof(bool)));
+            Assert.AreEqual(GrantKind.Template, PlayerDataGrants.KindOf(typeof(TestItem)));
+            Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(List<TestItem>)));
+            Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(List<int>)));
+            Assert.AreEqual(GrantKind.Dictionary, PlayerDataGrants.KindOf(typeof(Dictionary<string, int>)), "딕셔너리는 키 + 값");
+            Assert.AreEqual(GrantKind.None, PlayerDataGrants.KindOf(typeof(Dictionary<string, List<int>>)), "값이 또 컬렉션이면 주지 않는다");
+            Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(int[])), "배열도 요소 넣기");
+            Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(TestItem[])));
+            Assert.AreEqual(GrantKind.Template, PlayerDataGrants.ElementKind(typeof(List<TestItem>)));
+            // 고를 수 있는 필드: 값 전체·gold·items·딕셔너리 counts(리스트 안쪽은 없다).
+            CollectionAssert.AreEqual(new[] { "", "gold", "items", "counts" }, PlayerDataGrants.Paths(typeof(TestInventory)).ToArray());
+
+            var errors = new List<string>();
+            new PlayerDataReward { key = "s:bag", path = "items" }.Validate(typeof(TestInventory), errors);
+            Assert.AreEqual(1, errors.Count, "넣을 요소가 없다");
+            errors.Clear();
+            new PlayerDataReward { key = "s:bag", path = "items", items = { "" } }.Validate(typeof(TestInventory), errors);
+            Assert.AreEqual(1, errors.Count, "요소의 템플릿이 비어 있다");
+            errors.Clear();
+            new PlayerDataReward { key = "s:bag", path = "gold" }.Validate(typeof(TestInventory), errors);
+            Assert.AreEqual(1, errors.Count, "증감이 0");
+            errors.Clear();
+            new PlayerDataReward { key = "s:bag", path = "counts", amount = 1 }.Validate(typeof(TestInventory), errors);
+            Assert.AreEqual(1, errors.Count, "줄 수 없는 형식");
+            errors.Clear();
+            new PlayerDataReward { key = "s:bag", path = "items", items = { "template.sword" } }.Validate(typeof(TestInventory), errors);
+            Assert.AreEqual(0, errors.Count);
         }
 
         [Test]
         public void 정의되지_않은_키는_조용히_넘어가지_않는다()
         {
-            Assert.Throws<InvalidOperationException>(() => _session.State.Set("없는:키", 1));
-            Assert.Throws<InvalidOperationException>(() => _session.State.Get("없는:키"));
+            Assert.Throws<InvalidOperationException>(() => _session.Data.Set("없는:키", 1));
+            Assert.Throws<InvalidOperationException>(() => _session.Data.Get("없는:키"));
         }
 
         [Test]
         public void 저장할_수_없는_값_형식은_거부한다()
         {
-            Assert.Throws<ArgumentException>(() => _session.State.Set("s:hp", new List<int>()));
+            Assert.Throws<ArgumentException>(() => _session.Data.Set("s:hp", new List<int>()));
         }
 
         [Test]
         public void 숫자는_double로_정규화된다()
         {
-            _session.State.Set("s:hp", 7);
-            Assert.AreEqual(7.0, _session.State.Get("s:hp"));
+            _session.Data.Set("s:hp", 7);
+            Assert.AreEqual(7.0, _session.Data.Get("s:hp"));
         }
 
         [Test]
         public void 행동은_실행되는_즉시_반영된다()
         {
             _session.Do(new TestKillAction());
-            Assert.AreEqual(7, _session.State.GetNumber("s:hp"));
-            Assert.AreEqual(5, _session.State.GetNumber("m:gold"), "메타도 즉시 반영된다");
+            Assert.AreEqual(7, _session.Data.GetNumber("s:hp"));
+            Assert.AreEqual(5, _session.Data.GetNumber("m:gold"), "메타도 즉시 반영된다");
             Assert.AreEqual(1, _session.UndoCount);
         }
 
@@ -92,11 +178,11 @@ namespace GameSystems.Tests
             _session.Do(new TestKillAction());
             _session.Do(new TestKillAction());
             Assert.IsTrue(_session.Undo());
-            Assert.AreEqual(7, _session.State.GetNumber("s:hp"));
-            Assert.AreEqual(5, _session.State.GetNumber("m:gold"));
+            Assert.AreEqual(7, _session.Data.GetNumber("s:hp"));
+            Assert.AreEqual(5, _session.Data.GetNumber("m:gold"));
             Assert.IsTrue(_session.Undo());
-            Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
-            Assert.AreEqual(0, _session.State.GetNumber("m:gold"));
+            Assert.AreEqual(10, _session.Data.GetNumber("s:hp"));
+            Assert.AreEqual(0, _session.Data.GetNumber("m:gold"));
             Assert.IsFalse(_session.Undo(), "더 Undo할 행동이 없다");
         }
 
@@ -119,40 +205,40 @@ namespace GameSystems.Tests
             _session.ExportMeta();
             Assert.AreEqual(3, _session.UndoCount, "저장·시간 경과와 상관없이 이력이 남는다");
             while (_session.Undo()) { }
-            Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
-            Assert.AreEqual(0, _session.State.GetNumber("m:gold"));
+            Assert.AreEqual(10, _session.Data.GetNumber("s:hp"));
+            Assert.AreEqual(0, _session.Data.GetNumber("m:gold"));
         }
 
         [Test]
         public void 이력_한도를_넘으면_오래된_행동부터_Undo할_수_없게_된다()
         {
             var session = new GameSession(new SessionOptions { HistoryLimit = 2 });
-            session.State.Define("s:n", StateZone.Session, 0);
-            session.Actions.Register<TestKillAction>(_ => session.State.Set("s:n", session.State.GetNumber("s:n") + 1));
+            session.Data.Define("s:n", DataZone.Session, 0);
+            session.Actions.Register<TestKillAction>(_ => session.Data.Set("s:n", session.Data.GetNumber("s:n") + 1));
             for (int i = 0; i < 5; i++) session.Do(new TestKillAction());
             Assert.AreEqual(2, session.UndoCount);
             while (session.Undo()) { }
-            Assert.AreEqual(3, session.State.GetNumber("s:n"));
+            Assert.AreEqual(3, session.Data.GetNumber("s:n"));
         }
 
         [Test]
         public void 되돌리기를_끄면_기록하지_않는다()
         {
             var session = new GameSession(new SessionOptions { History = HistoryMode.None });
-            session.State.Define("s:n", StateZone.Session, 0);
-            session.Actions.Register<TestKillAction>(_ => session.State.Set("s:n", 1));
+            session.Data.Define("s:n", DataZone.Session, 0);
+            session.Actions.Register<TestKillAction>(_ => session.Data.Set("s:n", 1));
             session.Do(new TestKillAction());
             Assert.AreEqual(0, session.UndoCount);
             Assert.IsFalse(session.Undo());
-            Assert.AreEqual(1, session.State.GetNumber("s:n"));
+            Assert.AreEqual(1, session.Data.GetNumber("s:n"));
         }
         [Test]
         public void 행동_실패_시_변경이_모두_취소된다()
         {
             Assert.Throws<InvalidOperationException>(() => _session.Do(new FailingAction()));
-            Assert.AreEqual(10, _session.State.GetNumber("s:hp"));
+            Assert.AreEqual(10, _session.Data.GetNumber("s:hp"));
             Assert.AreEqual(ActionStatus.Failed, _session.Actions.Log.Last().Status);
-            Assert.AreEqual(0, _session.State.HistoryCount);
+            Assert.AreEqual(0, _session.Data.HistoryCount);
         }
 
         [Test]
@@ -182,8 +268,8 @@ namespace GameSystems.Tests
 
             var loaded = new GameSession();
             loaded.ImportMeta(json);
-            loaded.State.Define("m:gold", StateZone.Meta, 0);
-            Assert.AreEqual(5, loaded.State.GetNumber("m:gold"), "정의보다 먼저 불러온 값도 정의 시점에 적용된다");
+            loaded.Data.Define("m:gold", DataZone.Meta, 0);
+            Assert.AreEqual(5, loaded.Data.GetNumber("m:gold"), "정의보다 먼저 불러온 값도 정의 시점에 적용된다");
         }
     }
 
@@ -199,7 +285,7 @@ namespace GameSystems.Tests
             using (journal.Cause(root.Id))
             {
                 child = journal.Append(JournalKind.Event, "t", "이벤트");
-                using (journal.Cause(child.Id)) grandChild = journal.Append(JournalKind.State, "t", "상태");
+                using (journal.Cause(child.Id)) grandChild = journal.Append(JournalKind.Data, "t", "데이터");
             }
             var after = journal.Append(JournalKind.System, "t", "무관");
 
@@ -264,7 +350,7 @@ namespace GameSystems.Tests
         }
 
         [Test]
-        public void 상태_저장과_복원()
+        public void 난수_저장과_복원()
         {
             var stream = new RandomStreams(5).Get("t");
             stream.NextULong();
@@ -306,8 +392,16 @@ namespace GameSystems.Tests
             _session.Stats.Define(runKills);
             _session.Stats.Define(combo);
             _session.Stats.Define(gold);
+            _session.Data.Define("player.gold", DataZone.Meta, 0.0, "골드");
             _session.Actions.Register<TestKillAction>(_ => _session.Events.Publish(new TestKill { Count = 1, Combo = 3 }));
         }
+
+        // 보상은 로그가 아니라 플레이어 데이터를 바꾼다.
+        static PlayerDataReward Gold(double amount) =>
+            new PlayerDataReward { key = "player.gold", amount = amount };
+
+        static PlayerDataCondition GoldAtLeast(double value) =>
+            new PlayerDataCondition { key = "player.gold", filter = new FieldFilter { op = FieldOp.AtLeast, value = value.ToString(System.Globalization.CultureInfo.InvariantCulture) } };
 
         AchievementDefinition Achievement(string id, Condition condition, params Reward[] rewards)
         {
@@ -341,23 +435,23 @@ namespace GameSystems.Tests
         [Test]
         public void 달성과_보상은_행동_직후_바로_일어난다()
         {
-            Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
+            Achievement("first", AtLeast("kills", 1), Gold(50));
             _session.Do(new TestKillAction());
             Assert.IsTrue(_session.Achievements.IsUnlocked("first"));
-            Assert.AreEqual(50, _session.Stats.Get("gold"));
+            Assert.AreEqual(50, _session.Data.GetNumber("player.gold"));
         }
 
         [Test]
         public void Undo는_행동이_바꾼_값만_되돌리고_달성과_보상은_유지된다()
         {
-            Achievement("first", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 50 });
+            Achievement("first", AtLeast("kills", 1), Gold(50));
             _session.Do(new TestKillAction());
             _session.Undo();
             Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "한 번 달성한 것은 Undo로 취소되지 않는다");
             Assert.AreEqual(0, _session.Stats.Get("kills"), "행동이 바꾼 값은 되돌아간다");
-            Assert.AreEqual(50, _session.Stats.Get("gold"), "보상은 유지된다");
+            Assert.AreEqual(50, _session.Data.GetNumber("player.gold"), "보상은 유지된다");
             _session.Do(new TestKillAction());
-            Assert.AreEqual(50, _session.Stats.Get("gold"), "다시 해도 보상이 또 나오지 않는다");
+            Assert.AreEqual(50, _session.Data.GetNumber("player.gold"), "다시 해도 보상이 또 나오지 않는다");
         }
 
         [Test]
@@ -380,9 +474,9 @@ namespace GameSystems.Tests
             var kills = new StatDefinition { Id = "kills", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             kills.Rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
             session.Stats.Define(kills);
-            session.Stats.Define(new StatDefinition { Id = "gold", Scope = StatScope.Total, Aggregate = StatAggregate.Sum });
+            session.Data.Define("player.gold", DataZone.Meta, 0.0, "골드");
             var definition = new AchievementDefinition { Id = "first", DisplayName = "first", Condition = AtLeast("kills", 2) };
-            definition.Rewards.Add(new AddToStatReward { stat = "gold", amount = 50 });
+            definition.Rewards.Add(Gold(50));
             session.Achievements.Define(definition);
             session.Actions.Register<TestKillAction>(_ => session.Events.Publish(new TestKill { Count = 1 }));
 
@@ -392,14 +486,14 @@ namespace GameSystems.Tests
             session.Do(new TestKillAction());               // 처치 2 → 달성, 골드 +50
             session.Random.Get("loot").NextULong();
             session.EndFrame(0.2);
-            Assert.AreEqual(0, session.State.HistoryCount, "스냅샷 방식은 행동별 기록을 남기지 않는다");
+            Assert.AreEqual(0, session.Data.HistoryCount, "스냅샷 방식은 행동별 기록을 남기지 않는다");
             Assert.AreEqual(2, session.UndoCount);
 
             Assert.IsTrue(session.Undo());
             Assert.AreEqual(1, session.Stats.Get("kills"), "행동이 바꾼 값은 스냅샷 시점으로 돌아간다");
             Assert.AreEqual(1.5, session.Clock.Time, 1e-9, "시간도 되감긴다");
             Assert.IsTrue(session.Achievements.IsUnlocked("first"), "되감은 구간의 달성은 유지된다");
-            Assert.AreEqual(50, session.Stats.Get("gold"), "보상도 유지된다");
+            Assert.AreEqual(50, session.Data.GetNumber("player.gold"), "보상도 유지된다");
             Assert.AreEqual(ActionStatus.Undone, session.Actions.Log.Last().Status);
 
             Assert.IsTrue(session.Undo());
@@ -419,8 +513,8 @@ namespace GameSystems.Tests
         [Test]
         public void 연쇄_달성()
         {
-            Achievement("a", AtLeast("kills", 1), new AddToStatReward { stat = "gold", amount = 100 });
-            Achievement("b", AtLeast("gold", 100));
+            Achievement("a", AtLeast("kills", 1), Gold(100));
+            Achievement("b", GoldAtLeast(100));
             Achievement("c", new AllOfCondition { conditions = { new AchievementUnlockedCondition { achievement = "a" }, new AchievementUnlockedCondition { achievement = "b" } } });
             _session.Do(new TestKillAction());
             Assert.IsTrue(_session.Achievements.IsUnlocked("a"));
@@ -450,7 +544,7 @@ namespace GameSystems.Tests
             next.Stats.Define(new StatDefinition { Id = "kills", Scope = StatScope.Total, Aggregate = StatAggregate.Sum });
             next.Achievements.Define(new AchievementDefinition { Id = "first", DisplayName = "first", Condition = AtLeast("kills", 1) });
             Assert.IsTrue(next.Achievements.IsUnlocked("first"));
-            Assert.IsFalse(next.Achievements.Watcher.IsWatching("first"), "달성한 항목은 감시하지 않는다");
+            Assert.IsFalse(next.Triggers.IsRegistered("first"), "달성한 항목은 감시하지 않는다");
         }
 
         [Test]

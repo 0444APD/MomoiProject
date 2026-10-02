@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameSystems
+namespace GBible
 {
-    // 기능 조립: 종류별로 상속하지 않고, 한 클래스에 기능 묶음 목록을 붙인다.
+    // 기능 조립: 종류별로 상속하지 않고, 한 클래스에 기능 리스트을 붙인다.
     //   [SerializeReference] public List<ItemFeature> features = new List<ItemFeature>();
     // 한 아이템에 여러 기능을 함께 붙일 수 있고(장착 + 사용), 동작은 각 기능 클래스가 가진다.
     // 코드는 종류를 묻지 않고 기능이 있는지만 묻는다: item.features.GetFeature<Consumable>()

@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.EditorTools.UI;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     // 내 코드 범위: 클래스를 고르는 목록에 어떤 스크립트가 들어가는지 보고 고친다.
     // 기본 규칙만으로 충분하면 손댈 필요 없다(폴더 지정 불필요).
@@ -14,10 +14,10 @@ namespace GameSystems.EditorTools
     {
         VisualElement _root;
 
-        [MenuItem("Game Systems/내 코드 범위", priority = 32)]
+        [MenuItem("MomoiProject/내 코드 범위", priority = 32)]
         public static void Open()
         {
-            var window = GetWindow<ProjectCodeWindow>();
+            var window = GsWindows.Get<ProjectCodeWindow>();
             window.titleContent = new GUIContent("내 코드 범위");
             window.minSize = new Vector2(560, 520);
         }

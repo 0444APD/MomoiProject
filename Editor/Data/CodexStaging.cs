@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameSystems.Data;
+using GBible.Data;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace GameSystems.EditorTools
+namespace GBible.EditorTools
 {
     public enum PendingKind
     {
@@ -24,7 +24,7 @@ namespace GameSystems.EditorTools
         public List<FieldChange> Fields = new List<FieldChange>();
     }
 
-    // 도감의 변경을 Unity 에셋에 바로 쓰지 않고 모아 두는 곳. 탭을 옮길 때 적용하거나 되돌린다.
+    // 도감의 변경을 Unity 에셋에 바로 쓰지 않고 모아 두는 곳. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
     //  · 수정: 원본의 작업본(메모리 사본)을 고친다. 적용하면 원본에 복사하고, ID가 바뀌었으면 ID 바꾸기(참조 갱신)를 한다.
     //  · 추가: 메모리에만 있는 새 항목. 적용하면 에셋으로 만든다.
     //  · 삭제: 목록에서만 뺀다. 적용하면 휴지통으로.
@@ -83,7 +83,7 @@ namespace GameSystems.EditorTools
         public GameData Add(Type type, string id)
         {
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 도감 종류가 아닙니다.");
-            if (!EditorDatabase.Instance.CanUseId(id, null, out var error)) throw new ArgumentException("[GameSystems] " + error);
+            if (!EditorDatabase.Instance.CanUseId(id, null, out var error)) throw new ArgumentException("[MomoiProject] " + error);
             var data = (GameData)ScriptableObject.CreateInstance(type);
             data.EditorAssignId(id);
             data.name = id;
@@ -149,7 +149,14 @@ namespace GameSystems.EditorTools
             var orderAfter = new SerializedObject(copy).FindProperty("order");
             if (orderBefore != null && orderAfter != null && orderBefore.intValue != orderAfter.intValue)
                 fields.Add(new FieldChange { Path = "order", Label = "순서", Old = orderBefore.intValue.ToString(), New = orderAfter.intValue.ToString() });
+            // 도감 목록의 폴더·상위 그룹(숨은 칸이라 위의 비교에 들지 않는다).
+            if (original.Folder != copy.Folder)
+                fields.Add(new FieldChange { Path = "folder", Label = "폴더", Old = Place(original.Folder), New = Place(copy.Folder) });
+            if (original is INestedData nestedBefore && copy is INestedData nestedAfter && (nestedBefore.Parent ?? "") != (nestedAfter.Parent ?? ""))
+                fields.Add(new FieldChange { Path = "parent", Label = "상위 그룹", Old = Place(nestedBefore.Parent), New = Place(nestedAfter.Parent) });
             return fields;
+
+            static string Place(string path) => string.IsNullOrEmpty(path) ? "(맨 위)" : path;
         }
 
         // ── 적용·되돌리기 ──────────────────────────────────────
@@ -208,7 +215,7 @@ namespace GameSystems.EditorTools
             // ID 바꾸기는 내용을 모두 옮긴 뒤에(다른 항목의 참조까지 실제 에셋에서 함께 바뀐다).
             foreach (var (item, id) in renames)
                 if (db.CanUseId(id, item, out _)) db.Rename(item, id);
-                else Debug.LogWarning($"[GameSystems] '{item.DisplayName}'의 ID를 '{id}'(으)로 바꾸지 못했습니다(이미 쓰는 ID).");
+                else Debug.LogWarning($"[MomoiProject] '{item.DisplayName}'의 ID를 '{id}'(으)로 바꾸지 못했습니다(이미 쓰는 ID).");
 
             db.SyncDatabaseAsset();
             EditorDatabase.MarkDirty();
@@ -229,7 +236,7 @@ namespace GameSystems.EditorTools
         // ── 스크립트 다시 불러오기·플레이 전후 ─────────────────────
         // 스크립트가 다시 컴파일되면 메모리 사본이 사라지므로 JSON으로 잠시 보관했다가 되살린다.
 
-        const string StashKey = "GameSystems.CodexStaging";
+        static readonly string StashKey = LegacyNames.Session("GBible.CodexStaging");
 
         [Serializable]
         sealed class Stash
@@ -325,22 +332,22 @@ namespace GameSystems.EditorTools
             Cancel,
         }
 
-        // 창 밖(플레이·종료·창 닫기)에서 묻는 간단한 확인 창. 도감 창 안에서는 변경 목록 대화 상자를 쓴다.
+        // 창 밖(플레이·종료·창 닫기)에서 묻는 간단한 확인 창. 도감 창 안에서는 변경 목록 확인 창를 쓴다.
         public static AskResult AskBeforeLeaving(string when)
         {
-            var staging = EditorDatabase.Staging;
-            if (!staging.HasChanges) return AskResult.Nothing;
-            var changes = staging.Changes();
-            var lines = string.Join("\n", changes.Take(12).Select(c => $"· {KindText(c.Kind)}  {c.Label}")) + (changes.Count > 12 ? $"\n… 외 {changes.Count - 12}건" : "");
-            var choice = EditorUtility.DisplayDialogComplex("도감에 적용하지 않은 변경",
-                $"{when} 도감의 변경 {changes.Count}건을 Unity에 적용할지 정하세요.\n\n{lines}", "적용", "취소", "되돌리기");
+            if (!CodexChanges.HasChanges) return AskResult.Nothing;
+            // 도감 항목·필드 연결·클래스 코드·클래스 그룹을 함께 묻는다.
+            var all = CodexChanges.Rows().Select(c => string.IsNullOrEmpty(c.New) ? $"· {c.Label}" : $"· {c.Label}  {c.New}").ToList();
+            var lines = string.Join("\n", all.Take(12)) + (all.Count > 12 ? $"\n… 외 {all.Count - 12}건" : "");
+            var choice = EditorUtility.DisplayDialogComplex("도감에 저장 안 된 변경",
+                $"{when} 도감의 변경 {all.Count}건을 저장할지 정하세요.\n\n{lines}", "저장", "취소", "되돌리기");
             switch (choice)
             {
                 case 0:
-                    staging.Commit();
+                    CodexChanges.Save();
                     return AskResult.Applied;
                 case 2:
-                    staging.Discard();
+                    CodexChanges.Discard();
                     return AskResult.Reverted;
                 default:
                     return AskResult.Cancel;

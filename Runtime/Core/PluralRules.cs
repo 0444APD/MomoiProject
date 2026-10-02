@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace GameSystems
+namespace GBible
 {
     // 언어별 복수 구분(유니코드 CLDR 규칙의 주요 언어). 결과: zero · one · two · few · many · other
     // 규칙이 없는 언어는 영어처럼(1 = one, 나머지 = other) 다룬다.

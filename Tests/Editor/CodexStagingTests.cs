@@ -1,10 +1,10 @@
 using System.Linq;
-using GameSystems.Data;
-using GameSystems.EditorTools;
+using GBible.Data;
+using GBible.EditorTools;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GameSystems.Tests
+namespace GBible.Tests
 {
     // 도감의 변경 모아 두기: 적용 전에는 에셋이 그대로이고, 도감이 보는 모습(All)에만 나타난다.
     public class CodexStagingTests

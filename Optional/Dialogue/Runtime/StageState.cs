@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace GameSystems.Dialogue
+namespace GBible.Dialogue
 {
-    // 대화 화면의 '유지되는 모습'. 상태 효과(배경·스탠딩·카메라 …)는 이 값을 바꾸고, 화면은 앞뒤 값을 이어 전환을 그린다.
+    // 다이얼로그 화면의 '유지되는 모습'. 상태 효과(배경·스탠딩·카메라 …)는 이 값을 바꾸고, 화면은 앞뒤 값을 이어 전환을 그린다.
     // 스킵·되감기·중간 저장은 이 값만 있으면 그 순간의 화면을 그대로 만든다.
     [Serializable]
     public sealed class StageState
@@ -17,7 +17,7 @@ namespace GameSystems.Dialogue
         [Range(0, 0.5f)] public float letterbox;
         public float cameraZoom = 1f;
         public Vector2 cameraOffset;
-        // 대화가 브금을 정했는지(정하지 않았으면 게임의 브금을 건드리지 않는다).
+        // 다이얼로그가 브금을 정했는지(정하지 않았으면 게임의 브금을 건드리지 않는다).
         public bool musicSet;
         public AudioClip music;
         [Range(0, 1)] public float musicVolume = 1f;

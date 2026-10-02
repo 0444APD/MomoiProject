@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using GameSystems.Dialogue;
-using GameSystems.EditorTools.UI;
+using GBible.Dialogue;
+using GBible.EditorTools.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
-namespace GameSystems.EditorTools.Graph
+namespace GBible.EditorTools.Graph
 {
     // 노드 그래프 편집 화면: 격자 배경, 끌어서 이동(빈 곳), 휠 확대·축소, 우클릭으로 노드 만들기,
     // 점을 끌어 잇기(빈 곳에 놓으면 노드를 만들어 바로 잇기), 선 클릭 선택, Delete 지우기, Ctrl+D 복제, F 전체 보기.
@@ -435,7 +435,7 @@ namespace GameSystems.EditorTools.Graph
             _marquee.style.height = max.y - min.y;
         }
 
-        // 옮길 노드: 고른 노드 + 고른 묶음 상자 안에 든 노드(끌기 시작할 때 정한다).
+        // 옮길 노드: 고른 노드 + 고른 그룹 상자 안에 든 노드(끌기 시작할 때 정한다).
         void CollectMoving()
         {
             _moving.Clear();
@@ -502,7 +502,7 @@ namespace GameSystems.EditorTools.Graph
                     if (!(Graph.Find(_resizing) is GroupNode resized) || !_views.TryGetValue(_resizing, out var resizedView)) break;
                     if (!_moveRecorded)
                     {
-                        Record("묶음 상자 크기");
+                        Record("그룹 상자 크기");
                         _moveRecorded = true;
                     }
                     resized.size = Vector2.Max(new Vector2(200, 120), resized.size + delta / _zoom);
@@ -541,7 +541,7 @@ namespace GameSystems.EditorTools.Graph
                 foreach (var pair in _views)
                 {
                     var bound = pair.Value.worldBound;
-                    // 노드는 겹치면, 묶음 상자는 다 들어오면 고른다.
+                    // 노드는 겹치면, 그룹 상자는 다 들어오면 고른다.
                     var hit = pair.Value is GroupView ? box.Contains(bound.min) && box.Contains(bound.max) : box.Overlaps(bound);
                     if (!hit) continue;
                     _selected.Add(pair.Key);
@@ -585,7 +585,7 @@ namespace GameSystems.EditorTools.Graph
             var (from, to) = a.side == PortSide.Out ? (a, b) : (b, a);
             if (!Graph.CanConnect(from.node, from.port, to.node, to.port, out var reason))
             {
-                if (a.node != b.node || a.port != b.port) Debug.Log("[대화 그래프] " + reason);
+                if (a.node != b.node || a.port != b.port) Debug.Log("[다이얼로그 그래프] " + reason);
                 return;
             }
             Record("선 잇기");
@@ -727,7 +727,7 @@ namespace GameSystems.EditorTools.Graph
             foreach (var edge in edges ?? Array.Empty<GraphEdge>())
                 if (map.TryGetValue(edge.fromNode, out var from) && map.TryGetValue(edge.toNode, out var to))
                     Graph.Connect(from, edge.fromPort, to, edge.toPort);
-            if (skipped > 0) Debug.Log($"[대화 그래프] 이 그래프에서 쓸 수 없는 노드 {skipped}개는 붙여 넣지 않았습니다.");
+            if (skipped > 0) Debug.Log($"[다이얼로그 그래프] 이 그래프에서 쓸 수 없는 노드 {skipped}개는 붙여 넣지 않았습니다.");
             _selected.Clear();
             foreach (var id in map.Values) _selected.Add(id);
             Touched(true);
@@ -902,7 +902,7 @@ namespace GameSystems.EditorTools.Graph
             public PortKind Kind;
         }
 
-        // 캔버스 위의 항목(노드·묶음 상자) 공통.
+        // 캔버스 위의 항목(노드·그룹 상자) 공통.
         abstract class ItemView : VisualElement
         {
             public readonly string Guid;
@@ -921,7 +921,7 @@ namespace GameSystems.EditorTools.Graph
             public virtual void SetSelected(bool selected) => EnableInClassList("gs-graph-node--selected", selected);
         }
 
-        // 묶음 상자: 노드 뒤에 깔리는 제목 달린 영역. 머리를 끌면 안에 든 노드도 함께 움직이고, 오른쪽 아래를 끌면 크기가 바뀐다.
+        // 그룹 상자: 노드 뒤에 깔리는 제목 달린 영역. 머리를 끌면 안에 든 노드도 함께 움직이고, 오른쪽 아래를 끌면 크기가 바뀐다.
         sealed class GroupView : ItemView
         {
             readonly GsGraphCanvas _canvas;
@@ -984,11 +984,11 @@ namespace GameSystems.EditorTools.Graph
                     new GsDropdownItem("제목 바꾸기", () =>
                     {
                         var group = (GroupNode)_canvas.Graph.Find(Guid);
-                        GsDialog.Form(_canvas, "묶음 상자 제목", null, new List<DialogField> { new DialogField { Key = "title", Label = "title", Value = group.title } }, "바꾸기",
+                        GsDialog.Form(_canvas, "그룹 상자 제목", null, new List<DialogField> { new DialogField { Key = "title", Label = "title", Value = group.title } }, "바꾸기",
                             values => string.IsNullOrWhiteSpace(values["title"]) ? "제목을 적으세요." : null,
                             values =>
                             {
-                                _canvas.Record("묶음 상자 제목");
+                                _canvas.Record("그룹 상자 제목");
                                 ((GroupNode)_canvas.Graph.Find(Guid)).title = values["title"].Trim();
                                 _canvas.Touched(true);
                             });
@@ -999,7 +999,7 @@ namespace GameSystems.EditorTools.Graph
                     var color = Gs.Palette[i];
                     items.Add(new GsDropdownItem(Gs.PaletteNames[i], () =>
                     {
-                        _canvas.Record("묶음 상자 색");
+                        _canvas.Record("그룹 상자 색");
                         ((GroupNode)_canvas.Graph.Find(Guid)).color = color;
                         Paint(color);
                         _canvas.Touched(false);
