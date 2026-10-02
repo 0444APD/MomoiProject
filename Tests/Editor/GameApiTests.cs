@@ -9,6 +9,14 @@ namespace GBible.Tests
     [Serializable] public class TbUnit { public string id; public string team; public int x, y; public int hp = 30; }
     [Serializable] public class TbBoard { public List<TbUnit> units = new List<TbUnit>(); public int turn; }
 
+    public static class TbBoundUse
+    {
+        public static object User;
+
+        [BindTo("fn.use")]
+        static void Use(TriggerContext c) => User = c.User;
+    }
+
     public static class TbRules
     {
         public static int Distance(TbUnit a, TbUnit b) => Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
@@ -130,7 +138,16 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 함수로_연결한_결과가_사용_결과가_된다()
+        {
+            _session.Abilities.Define(new AbilityDefinition { Id = "fn.use" });
+            Game.Use("fn.use", "hero");
+            Assert.AreSame(Game.Find("hero"), TbBoundUse.User, "컨텍스트의 사용자");
+        }
+
+        [Test]
         public void 사용자_자신에게_부여한다()
+
         {
             var heal = new AbilityDefinition { Id = "self" };
             heal.Targets.Add(new SelfTarget());

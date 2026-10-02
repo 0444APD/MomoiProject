@@ -105,8 +105,59 @@ namespace GBible.Tests
         public override string Describe(INameResolver names) => "5씩 기록";
     }
 
+    // [BindTo] 함수: 매개변수 형식으로 받을 이벤트를 정한다.
+    public sealed class MtOtherEvent
+    {
+    }
+
+    public static class MtBoundFunctions
+    {
+        public static int Calls;
+        public static int LastCount;
+        public static string LastOwner;
+        public static int Wrong;
+
+        [BindTo("fn.achievement")]
+        static void OnKill(TestKill e, TriggerContext c)
+        {
+            Calls++;
+            LastCount = e.Count;
+            LastOwner = c.Owner;
+        }
+
+        [BindTo("fn.wrong")]
+        static void OnOther(MtOtherEvent e) => Wrong++;
+    }
+
+    public class MtBadBind
+    {
+        [BindTo("fn.bad")]
+        public void NotStatic()
+        {
+        }
+    }
+
     public class BindToTests
     {
+        [Test]
+        public void 함수로_연결하면_이벤트를_형식_그대로_받는다()
+        {
+            var session = new GameSession();
+            MtBoundFunctions.Calls = 0;
+            MtBoundFunctions.Wrong = 0;
+            session.Achievements.Define(new AchievementDefinition { Id = "fn.achievement", When = new EventTrigger { eventType = typeof(TestKill).FullName } });
+            session.Achievements.Define(new AchievementDefinition { Id = "fn.wrong", When = new EventTrigger { eventType = typeof(TestKill).FullName } });
+
+            session.Events.Publish(new TestKill { Count = 7 });
+            Assert.AreEqual(1, MtBoundFunctions.Calls);
+            Assert.AreEqual(7, MtBoundFunctions.LastCount, "이벤트 필드를 형 변환 없이");
+            Assert.AreEqual("fn.achievement", MtBoundFunctions.LastOwner);
+            Assert.AreEqual(0, MtBoundFunctions.Wrong, "받는 이벤트 형식이 다르면 부르지 않는다");
+            Assert.IsTrue(session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("MtOtherEvent")), "대신 경고");
+            Assert.IsTrue(BoundOutcomes.Problems.Any(p => p.Contains("NotStatic")), "static이 아닌 함수는 연결하지 않고 알린다");
+            Assert.IsFalse(BoundOutcomes.Has("fn.bad"));
+        }
+
         [Test]
         public void 연결된_코드_결과가_도전과제와_로그의_결과가_된다()
         {

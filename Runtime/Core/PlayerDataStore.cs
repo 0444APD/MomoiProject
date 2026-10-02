@@ -60,6 +60,8 @@ namespace GBible
         public readonly List<DataRecord> DataChanges = new List<DataRecord>();
         // Mirror로 비교하는 플레이어 데이터의 변경(Sync 순서). Undo는 거꾸로 되돌린다.
         public readonly List<ChangeSet> Mirrored = new List<ChangeSet>();
+        // 이 행동이 끝난 뒤 행동 밖에서 바뀐 곳("키:경로", 변경 목록을 만들 때만). Undo가 덮어쓰면 경고한다.
+        internal HashSet<string> OutsideAfter;
     }
 
     // 모든 플레이어 데이터가 사는 곳.
@@ -584,9 +586,47 @@ namespace GBible
             Changed?.Invoke(key);
             DataChanged?.Invoke(key, changes.Changes);
             if (_holding) _held.Add(changes);
-            else Synced?.Invoke(changes);
+            else
+            {
+                if (kind == JournalKind.Data) NoteOutside(key, changes);
+                Synced?.Invoke(changes);
+            }
             CheckRequired(key, slot);
             return changes;
+        }
+
+        // 행동 밖 변경을 마지막 행동에 적어 둔다(그 행동을 되돌릴 때 덮어쓰는지 보려고).
+        void NoteOutside(string key, ChangeSet changes)
+        {
+            if (!RecordHistory || _history.Count == 0 || changes.Changes.Count == 0) return;
+            var last = _history[_history.Count - 1];
+            last.OutsideAfter ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var change in changes.Changes) last.OutsideAfter.Add(key + ":" + change.Path);
+        }
+
+        // 되돌리는 행동이 바꾼 곳 중 그 뒤 행동 밖에서 다시 바뀐 곳("키:경로").
+        static List<string> Overwritten(Transaction tx)
+        {
+            var found = new List<string>();
+            if (tx.OutsideAfter == null) return found;
+            foreach (var changes in tx.Mirrored)
+            foreach (var change in changes.Changes)
+            {
+                var mine = changes.Key + ":" + change.Path;
+                foreach (var outside in tx.OutsideAfter)
+                    if (Overlaps(mine, outside) && !found.Contains(outside)) found.Add(outside);
+            }
+            return found;
+        }
+
+        // 같은 곳이거나 한쪽이 다른 쪽을 품는다(예: units[#3] 와 units[#3].hp).
+        static bool Overlaps(string a, string b)
+        {
+            if (a.Length > b.Length) (a, b) = (b, a);
+            if (!b.StartsWith(a, StringComparison.Ordinal)) return false;
+            if (b.Length == a.Length || a.EndsWith(":", StringComparison.Ordinal)) return true;
+            var next = b[a.Length];
+            return next == '.' || next == '[';
         }
 
         // 마지막 Sync 이후의 변경을 버리고 사본 모습으로 되돌린다(기록 없이). 예외로 중단된 변경에 쓴다.
@@ -850,7 +890,22 @@ namespace GBible
             _history.RemoveAt(_history.Count - 1);
 
             var entry = _journal.Append(JournalKind.Undo, "Data", $"Undo: {tx.Label}", transactionId: tx.Id);
-            using (_journal.Cause(entry.Id)) Revert(tx, "Undo");
+            using (_journal.Cause(entry.Id))
+            {
+                var overwritten = Overwritten(tx);
+                Revert(tx, "Undo");
+                if (overwritten.Count > 0)
+                    _journal.Append(JournalKind.Warning, "Data",
+                        $"Undo '{tx.Label}'가 행동 밖에서 바뀐 값을 덮었습니다: {string.Join(", ", overwritten.Take(5).Select(p => p.Replace(":", ".")))}" +
+                        (overwritten.Count > 5 ? $" 외 {overwritten.Count - 5}곳" : "") + ". 되돌릴 수 있어야 하는 변경은 행동 안에서 하세요.");
+            }
+            // 이 행동 뒤의 행동 밖 변경은 그 앞 행동 뒤의 것이기도 하다.
+            if (tx.OutsideAfter != null && _history.Count > 0)
+            {
+                var previous = _history[_history.Count - 1];
+                previous.OutsideAfter ??= new HashSet<string>(StringComparer.Ordinal);
+                previous.OutsideAfter.UnionWith(tx.OutsideAfter);
+            }
             TransactionUndone?.Invoke(tx);
             return true;
         }

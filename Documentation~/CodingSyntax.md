@@ -236,6 +236,28 @@ public class GrantTitle : Reward
 - `RewardEffect.Reversible`: 플레이어 데이터 안에서만 일어남 / `Irreversible`: 게임 밖에 영향(결제·플랫폼). 멀티플레이에서는 서버만 실행.
 - 보상 지급은 Undo 대상이 아니다(한 번 받은 보상은 유지).
 
+### 항목 하나의 결과를 함수로 쓰기 `[BindTo(id)]`
+특정 도전과제·로그·사용 기능이 붙은 인스턴스의 결과를 코드로 정한다. 연결된 항목의 결과 칸은 에디터에서 잠기고(보기·cs 열기), 이 함수가 결과가 된다.
+```csharp
+public static class CombatLogic
+{
+    // 받을 이벤트 = 첫 매개변수의 형식. 트리거가 받은 이벤트가 그 형식일 때만 불린다.
+    [BindTo(GameIds.Achievement.FirstBlood)]
+    static void FirstBlood(UnitKilled e, TriggerContext c)
+    {
+        c.Game.Find<Unit>(e.killerId).gold += 100;
+    }
+
+    // 사용 기능(Game.Use)은 이벤트 없이 컨텍스트만: c.User = 사용자, c.Picked = 고른 대상들.
+    [BindTo(GameIds.Instance.Potion)]
+    static void Potion(TriggerContext c) => ((Unit)c.User).hp += 30;
+}
+```
+- 매개변수: 없음 / `(이벤트)` / `(TriggerContext)` / `(이벤트, TriggerContext)`. static, 반환 void.
+- 트리거가 받은 이벤트가 다른 형식이면 부르지 않고 경고(모니터)를 남긴다. 모양이 맞지 않는 함수는 게임이 켜질 때 콘솔에 알린다.
+- 한 함수에 `[BindTo]`를 여러 개 붙여 여러 항목에 쓸 수 있다. 설정값이 필요하면 함수 대신 `Reward` 클래스에 붙여도 된다.
+- 함수는 게임이 켜질 때 대리자로 한 번 만들어 둔다(실행 중 리플렉션 없음).
+
 ---
 
 ## 6. Block·필드에 붙이는 어트리뷰트

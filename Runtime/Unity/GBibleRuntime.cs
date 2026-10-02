@@ -67,6 +67,8 @@ namespace GBible
             Mirror.Warning -= LogMirrorWarning;
             Mirror.Warning += LogMirrorWarning;
             Mirror.Initialize();
+            // [BindTo] 코드 결과도 여기서 한 번 모은다(형식이 맞지 않는 함수는 알린다).
+            foreach (var problem in BoundOutcomes.Problems) Debug.LogWarning("[MomoiProject] " + problem);
 
             // 예전 방식 데이터의 Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
             var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };

@@ -271,6 +271,24 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 되돌리기가_행동_밖_변경을_덮으면_경고한다()
+        {
+            Create(false);
+            _session.Do(new GsShuffle());
+            _party.units[0].hp = 1;
+            _session.EndFrame(0.016);
+            Assert.IsTrue(_session.Undo());
+            Assert.IsFalse(HasWarning, "행동이 건드리지 않은 곳(hp)은 덮지 않는다");
+
+            _session.Do(new GsShuffle());
+            _party.gold = 5;
+            _session.EndFrame(0.016);
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(0, _party.gold, "되돌리기는 행동 전 값으로");
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("gold")), "덮었다고 알린다");
+        }
+
+        [Test]
         public void 행동_중간의_Sync는_행동이_끝날_때_한꺼번에_알린다()
         {
             Create(false);

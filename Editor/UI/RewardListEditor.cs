@@ -24,22 +24,30 @@ namespace GBible.EditorTools.UI
     {
         public static VisualElement Build(SerializedProperty list, Action onValue, Action onStructure) => Build(list, typeof(Reward), onValue, onStructure);
 
-        // [BindTo]로 연결된 코드 결과: 보기만(클래스 이름·설명, cs 열기).
+        // [BindTo]로 연결된 코드 결과: 보기만(클래스·함수 이름, 받는 이벤트, cs 열기).
         static VisualElement BoundView(string id)
         {
             var box = Gs.Col();
             var notice = new GsNotice("코드로 쓴 결과가 이 항목에 연결되어 있습니다([BindTo]). 결과는 코드에서 고칩니다.", GsNoticeKind.Info);
             box.Add(notice);
-            foreach (var type in BoundOutcomes.For(id))
+            foreach (var code in BoundOutcomes.For(id))
             {
                 var row = Gs.Row("gs-sheet__row");
                 row.style.marginTop = 4;
                 var name = Gs.Col("gs-grow");
-                name.Add(Gs.Label(BlockTypes.DisplayName(type) ?? type.Name, "gs-heading"));
-                name.Add(Gs.Label(type.FullName + (BlockTypes.Description(type) is string d && d.Length > 0 ? "  ·  " + d : ""), "gs-caption"));
+                var type = code.Type;
+                if (code.Method == null)
+                {
+                    name.Add(Gs.Label(BlockTypes.DisplayName(type) ?? type.Name, "gs-heading"));
+                    name.Add(Gs.Label(type.FullName + (BlockTypes.Description(type) is string d && d.Length > 0 ? "  ·  " + d : ""), "gs-caption"));
+                }
+                else
+                {
+                    name.Add(Gs.Label(code.Name, "gs-heading"));
+                    name.Add(Gs.Label(code.EventType == null ? "이벤트를 받지 않는 함수" : "받는 이벤트: " + code.EventType.Name, "gs-caption"));
+                }
                 row.Add(name);
-                var t = type;
-                row.Add(new GsButton("cs 열기", () => OpenScript(t), GsButtonKind.Ghost));
+                row.Add(new GsButton("cs 열기", () => OpenScript(type), GsButtonKind.Ghost));
                 box.Add(row);
             }
             return box;
@@ -47,11 +55,12 @@ namespace GBible.EditorTools.UI
 
         static void OpenScript(Type type)
         {
+            while (type.DeclaringType != null) type = type.DeclaringType;
             foreach (var guid in AssetDatabase.FindAssets(type.Name + " t:MonoScript"))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var text = System.IO.File.ReadAllText(path);
-                if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"classs+" + type.Name + @"")) continue;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"\b(class|struct)\s+" + type.Name + @"\b")) continue;
                 AssetDatabase.OpenAsset(AssetDatabase.LoadAssetAtPath<MonoScript>(path));
                 return;
             }
