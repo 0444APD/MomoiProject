@@ -65,7 +65,7 @@ namespace GBible
         }
     }
 
-    // 트리거를 검사하는 한 순간과, 발동했을 때 결과에 넘기는 맥락.
+    // 트리거를 검사하는 한 순간과, 발동했을 때 결과에 넘기는 컨텍스트.
     public sealed class TriggerContext
     {
         public GameSession Session;

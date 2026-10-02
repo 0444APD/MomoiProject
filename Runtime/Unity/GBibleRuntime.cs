@@ -262,11 +262,15 @@ namespace GBible
         void LateUpdate()
         {
             var session = GBibleRuntime.Session;
-            // 일시정지 중(시간이 흐르지 않음)에는 시계를 멈추고, 조건 평가만 한다.
+            // 일시정지 중(시간이 흐르지 않음)에는 시계를 멈추고, Sync와 조건 평가만 한다.
             if (session != null)
             {
                 if (Time.deltaTime > 0f) session.EndFrame(Time.deltaTime);
-                else if (!session.Data.InTransaction) session.Achievements.Flush();
+                else if (!session.Data.InTransaction)
+                {
+                    session.Data.Sync();
+                    session.Achievements.Flush();
+                }
             }
             GameTime.OnFrameEnd();
         }
