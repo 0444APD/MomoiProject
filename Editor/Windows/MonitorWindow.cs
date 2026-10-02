@@ -1058,7 +1058,7 @@ namespace GBible.EditorTools
         static string ScopeText(StatDefinition definition) =>
             (definition.Scope == StatScope.Run ? "이번 판" : "누적") + " · " + StatSystem.AggregateText(definition.Aggregate);
 
-        // ── 이벤트 쏘기 ───────────────────────────────────────
+        // ── 이벤트 호출 ───────────────────────────────────────
 
         void BuildEvents()
         {
@@ -1138,7 +1138,7 @@ namespace GBible.EditorTools
                     var template = _eventInstances[selected.FullName];
                     // 쏠 때마다 사본을 만들어, 이후 편집이 이미 쏜 이벤트(기록)를 바꾸지 않게 한다.
                     var events = Enumerable.Range(0, count).Select(_ => CopyEvent(template)).ToList();
-                    _session.SimulateEvents(events, "모니터 이벤트 쏘기");
+                    _session.SimulateEvents(events, "모니터 이벤트 호출");
                     ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 쐈습니다", GsNoticeKind.Ok);
                 }
                 catch (Exception e)
