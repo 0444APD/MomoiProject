@@ -11,18 +11,20 @@ using Unity.CompilationPipeline.Common.ILPostProcessing;
 
 namespace GBible.CodeGen
 {
-    // Unity가 스크립트를 컴파일할 때마다 부르는 위빙 단계. GBible.Core를 참조하는 어셈블리만 처리한다.
-    // 실제 위빙은 PlayerDataWeaver(코어 테스트 도구와 공용). 이 파일은 Unity의 ILPostProcessor 연결만 맡는다.
+    // Unity가 스크립트를 컴파일할 때마다 부르는 단계. GBible.Core와 그것을 참조하는 어셈블리만 처리한다.
+    // 실제 생성은 MirrorWeaver(코어 테스트 도구와 공용): [Serializable] 형식마다 Mirror 비교 코드를 만든다.
+    // 이 파일은 Unity의 ILPostProcessor 연결만 맡는다.
     // 참고: ILPostProcessor는 공식 문서가 없는 Unity API라 Unity 버전을 올리면 동작을 확인한다(Netcode·Entities가 같은 방식).
-    sealed class PlayerDataILPostProcessor : ILPostProcessor
+    sealed class MirrorILPostProcessor : ILPostProcessor
     {
         public override ILPostProcessor GetInstance() => this;
 
         public override bool WillProcess(ICompiledAssembly compiledAssembly)
         {
-            if (compiledAssembly.Name == PlayerDataWeaver.CoreAssembly || compiledAssembly.Name.EndsWith(".CodeGen", StringComparison.Ordinal)) return false;
+            if (compiledAssembly.Name.EndsWith(".CodeGen", StringComparison.Ordinal)) return false;
             if (compiledAssembly.InMemoryAssembly.PeData == null || compiledAssembly.InMemoryAssembly.PdbData == null) return false;
-            return compiledAssembly.References.Any(r => Path.GetFileNameWithoutExtension(r) == PlayerDataWeaver.CoreAssembly);
+            return compiledAssembly.Name == MirrorWeaver.CoreAssembly ||
+                   compiledAssembly.References.Any(r => Path.GetFileNameWithoutExtension(r) == MirrorWeaver.CoreAssembly);
         }
 
         public override ILPostProcessResult Process(ICompiledAssembly compiledAssembly)
@@ -42,14 +44,14 @@ namespace GBible.CodeGen
             bool changed;
             try
             {
-                changed = PlayerDataWeaver.Weave(assembly.MainModule, warnings);
+                changed = MirrorWeaver.Weave(assembly.MainModule, warnings);
             }
             catch (Exception e)
             {
                 diagnostics.Add(new DiagnosticMessage
                 {
                     DiagnosticType = DiagnosticType.Error,
-                    MessageData = $"[MomoiProject] 플레이어 데이터 위빙 실패({compiledAssembly.Name}): {e.Message}",
+                    MessageData = $"[MomoiProject] Mirror 비교 코드 생성 실패({compiledAssembly.Name}): {e}",
                 });
                 return new ILPostProcessResult(null, diagnostics);
             }

@@ -17,17 +17,16 @@ C# 기본 문법은 빼고, 이 시스템(GBible)의 형식·메서드·어트�
 
 ---
 
-## 0-1. 플레이어 데이터 클래스 `[PlayerData]` · `GameList<T>` · `GameDictionary<K,V>`
+## 0-1. 플레이어 데이터 클래스 — 평범한 `[Serializable]` 클래스
 
 ```csharp
-[Serializable, PlayerData]
-public class Unit { public string id; public int hp; public GameList<string> buffs = new GameList<string>(); }
+[Serializable]
+public class Unit { public string id; public int hp; public List<string> buffs = new List<string>(); }
 ```
-- **하는 일**: 이 클래스의 필드에 `=`·`+=`·`++`로 쓰는 순간 기록된다(Undo·Journal·조건 알림·저장). `GameList`·`GameDictionary`는 넣기·빼기·바꾸기가 그 순간 기록된다. 컴파일할 때 위빙(`GBible.CodeGen`)이 필드 쓰기를 기록 호출로 바꿔 넣는다.
-- **언제**: 플레이어 데이터에 들어가는 모든 클래스(유닛·인벤토리·아이템 사본·버프). 클래스 탭이 만드는 데이터 클래스에는 자동으로 붙고 리스트 필드도 `GameList`로 생긴다. 예전 클래스는 클래스 상세의 '플레이어 데이터 클래스로 바꾸기'.
-- **조건**: class(구조체 아님), 인자 없는 생성자, 리스트·딕셔너리는 `GameList`·`GameDictionary`(일반 `List`가 섞이면 그 플레이어 데이터는 예전처럼 행동이 끝날 때 비교 — 도감 검증이 경고).
-- **기록되지 않는 것**: 지역 변수, 구조체 필드를 제자리에서 고치기(`u.pos.x = 3` → `u.pos = new Pos(3, y)`), 리플렉션, 미리 컴파일된 DLL 안의 코드.
-- `GameList<T>`는 `List<T>`와 같이 쓴다: `Add`·`Insert`·`Remove`·`RemoveAt`·`RemoveAll`·`Clear`·`[i]`·`Count`·`Contains`·`IndexOf`·`Find`·`foreach`. `GameDictionary<K,V>`도 `Dictionary`와 같이(`[key]`·`Add`·`Remove`·`TryGetValue`·`ContainsKey`).
+- **하는 일**: 특별한 문법이 없다. 필드를 그냥 고치고(`u.hp -= 3`), `List`·`Dictionary`·배열·구조체를 그대로 쓴다. private 필드는 `[SerializeField]`(Unity와 같은 규칙).
+- **기록되는 방식(Mirror)**: 시스템이 플레이어 데이터의 사본(Mirror)을 들고 있다가 행동이 끝날 때·Modify가 끝날 때·프레임이 끝날 때 Sync해서, 바뀐 곳만 경로로 기록한다(`units[#3].hp 30 → 20`). 행동 안의 변경은 그 행동의 Undo 단위(ChangeSet)가 되고, 같은 ChangeSet을 다른 쪽에 보내면 그대로 같아진다(멀티플레이).
+- **조건**: 클래스·구조체에 `[Serializable]`(컴파일할 때 `GBible.CodeGen`이 그 형식 안에 비교 코드를 만든다). 없으면 예전 방식(리플렉션 비교)으로 동작하고 기록에 경고가 남는다.
+- **다루지 않는 것**: 중첩 컬렉션(`List<List<int>>`) — 그 데이터는 예전 방식. 델리게이트 필드는 데이터가 아니라 빠진다. 같은 객체를 두 곳에서 가리키면 두 곳 모두 비교되지만, 받는 쪽·되돌린 뒤에는 각자 다른 객체가 될 수 있다(오래 들고 있을 것은 id로).
 
 ### `Game.Data()` — 플레이어 데이터를 이름으로
 ```csharp

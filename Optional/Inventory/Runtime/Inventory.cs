@@ -19,7 +19,7 @@ namespace GBible.InventorySystem
     public sealed class Inventory
     {
         [FieldLabel("칸 수(0이면 제한 없음)")] public int capacity;
-        [FieldLabel("칸")] public GameList<InventorySlot> slots = new GameList<InventorySlot>();
+        [FieldLabel("칸")] public List<InventorySlot> slots = new List<InventorySlot>();
 
         // 가진 개수(모든 칸의 합).
         public int CountOf(string itemId)

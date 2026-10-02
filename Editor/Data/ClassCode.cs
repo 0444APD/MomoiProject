@@ -91,7 +91,7 @@ namespace GBible.EditorTools
                     b.AppendLine($"{indent}public sealed class {name}");
                     break;
                 default:
-                    // 플레이어 데이터 클래스: 필드에 쓰는 순간 기록된다(위빙). 리스트 필드는 GameList로 만든다.
+                    // 데이터 클래스: [Serializable]이면 Mirror 비교 코드가 생긴다(Undo·저장·동기화).
                     b.AppendLine($"{indent}[Serializable, PlayerData]");
                     b.AppendLine($"{indent}public class {name}");
                     break;
@@ -390,8 +390,7 @@ namespace GBible.EditorTools
         // ── 선언 만들기 ────────────────────────────────────────
 
         // 형식 글자(예: int, List<string>, Game.Data.Item)와 이름으로 선언 한 줄을 만든다. 글자·컬렉션은 빈 값으로 시작한다.
-        // 데이터 클래스를 플레이어 데이터 클래스로 바꾼다: 선언 앞에 [PlayerData]를 붙이고, 필드 구역의 List·배열 필드를 GameList로.
-        // 구역 밖에 직접 쓴 필드는 건드리지 않는다(그런 필드가 List면 그 값은 예전처럼 행동이 끝날 때 비교된다).
+        // 데이터 클래스에 [PlayerData] 표시를 붙인다(예전 기능. 지금은 [Serializable]만 있으면 같다).
         public static bool TryUpgradeToPlayerData(ref string text, string className, out string error)
         {
             error = null;
@@ -422,14 +421,6 @@ namespace GBible.EditorTools
             if (!Regex.IsMatch(attributes, @"\bPlayerData\b"))
                 text = text.Insert(lineStart, IndentOf(text, lineStart) + "[PlayerData]" + newline);
 
-            if (TryFindRegion(text, className, out var regionStart, out var regionEnd))
-            {
-                var region = text.Substring(regionStart, regionEnd - regionStart);
-                var upgraded = Regex.Replace(region, @"(?<![\w.])List<", "GameList<");
-                upgraded = Regex.Replace(upgraded, @"public\s+(?<type>[\w.<>, ]+?)\[\]\s+(?<name>[A-Za-z_]\w*)\s*(?:=\s*new\s+[\w.<>, ]+\[\s*\d*\s*\]\s*)?;",
-                    m => $"public GameList<{m.Groups["type"].Value.Trim()}> {m.Groups["name"].Value} = new GameList<{m.Groups["type"].Value.Trim()}>();");
-                text = text.Substring(0, regionStart) + upgraded + text.Substring(regionEnd);
-            }
             EnsureUsing(ref text, "GBible");
             return true;
         }
@@ -438,7 +429,7 @@ namespace GBible.EditorTools
         {
             var initializer = "";
             if (typeCode == "string") initializer = " = \"\"";
-            else if (typeCode.StartsWith("List<", StringComparison.Ordinal) || typeCode.StartsWith("GameList<", StringComparison.Ordinal) || typeCode.StartsWith("GameDictionary<", StringComparison.Ordinal))
+            else if (typeCode.StartsWith("List<", StringComparison.Ordinal) || typeCode.StartsWith("Dictionary<", StringComparison.Ordinal))
                 initializer = $" = new {typeCode}()";
             else if (typeCode.EndsWith("[]", StringComparison.Ordinal)) initializer = $" = new {typeCode.Substring(0, typeCode.Length - 2)}[0]";
             var prefix = string.IsNullOrEmpty(attributes) ? "" : attributes.Trim() + " ";

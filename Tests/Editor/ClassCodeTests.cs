@@ -57,15 +57,15 @@ namespace GBible.Tests
 
 
         [Test]
-        public void 데이터_클래스를_플레이어_데이터_클래스로_바꾼다()
+        public void 데이터_클래스에_플레이어_데이터_표시를_붙인다()
         {
             var text = ClassCode.NewClass("Game.Data", "Bag", ClassKind.Data, null).Replace("[Serializable, PlayerData]", "[Serializable]");
             Assert.IsTrue(ClassCode.TryAddField(ref text, "Bag", "public List<int> counts = new List<int>();", out var error), error);
             Assert.IsTrue(ClassCode.TryAddField(ref text, "Bag", "public string[] names = new string[0];", out error), error);
             Assert.IsTrue(ClassCode.TryUpgradeToPlayerData(ref text, "Bag", out error), error);
             StringAssert.Contains("[PlayerData]", text);
-            StringAssert.Contains("public GameList<int> counts = new GameList<int>();", text);
-            StringAssert.Contains("public GameList<string> names = new GameList<string>();", text);
+            StringAssert.Contains("public List<int> counts = new List<int>();", text);
+            StringAssert.Contains("public string[] names = new string[0];", text);
             CollectionAssert.AreEqual(new[] { "counts", "names" }, ClassCode.RegionFields(text, "Bag"));
             // 두 번 해도 그대로.
             var again = text;

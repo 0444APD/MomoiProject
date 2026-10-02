@@ -4,24 +4,31 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
-    // [PlayerData] 클래스: 필드에 쓰는 순간 기록된다(위빙). 이 테스트 어셈블리도 Unity와 같은 위빙을 거친다.
-    [Serializable, PlayerData] public class GsWeapon { public int power = 5; }
+    // 플레이어 데이터 클래스: 평범한 [Serializable] 클래스(List·Dictionary 그대로). Mirror가 Sync할 때 바뀐 곳을 기록한다.
+    // 이 테스트 어셈블리도 Unity와 같은 Mirror 비교 코드 생성을 거친다.
+    [Serializable] public class GsWeapon { public int power = 5; }
 
-    [Serializable, PlayerData]
+    [Serializable]
     public class GsUnit
     {
         public string id;
         public int hp = 30;
         public GsWeapon weapon = new GsWeapon();
-        public GameList<string> tags = new GameList<string>();
+        public System.Collections.Generic.List<string> tags = new System.Collections.Generic.List<string>();
     }
 
-    [Serializable, PlayerData]
+    [Serializable]
     public class GsParty
     {
         public int gold;
-        public GameList<GsUnit> units = new GameList<GsUnit>();
-        public GameDictionary<string, int> counts = new GameDictionary<string, int>();
+        public System.Collections.Generic.List<GsUnit> units = new System.Collections.Generic.List<GsUnit>();
+        public System.Collections.Generic.Dictionary<string, int> counts = new System.Collections.Generic.Dictionary<string, int>();
+    }
+
+    // [Serializable]이 없는 클래스: 비교 코드가 없어 예전 방식(리플렉션 비교)으로 다룬다.
+    public class GsLoose
+    {
+        public int x;
     }
 
     [Serializable]
@@ -78,24 +85,24 @@ namespace GBible.Tests
         bool HasWarning => _session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning);
 
         [Test]
-        public void 플레이어_데이터_클래스만_쓰는_순간_기록한다()
+        public void Serializable_클래스는_Mirror로_비교한다()
         {
-            Assert.IsTrue(PlayerDataStore.IsTrackedType(typeof(GsParty)));
-            Assert.IsFalse(PlayerDataStore.IsTrackedType(typeof(TestInventory)), "일반 List·[PlayerData] 없는 클래스는 예전처럼 비교");
+            Assert.IsTrue(PlayerDataStore.IsMirrored(typeof(GsParty)), "List·Dictionary를 그대로 쓴 클래스");
+            Assert.IsFalse(PlayerDataStore.IsMirrored(typeof(GsLoose)), "[Serializable]이 없으면 예전 방식");
         }
 
         [TestCase(true)]
         [TestCase(false)]
-        public void 필드에_쓰면_그_순간_기록되고_Undo된다(bool detect)
+        public void 필드를_고치면_행동이_끝날_때_기록되고_Undo된다(bool detect)
         {
             Create(detect);
             _session.Do(new GsHit { target = "hero", damage = 7 });
             Assert.AreEqual(23, Hero.hp);
             Assert.AreEqual(6, Hero.weapon.power, "깊은 필드도");
             var entries = _session.Journal.Entries.Where(e => e.Kind == JournalKind.Data && e.Key == "party").ToList();
-            Assert.IsTrue(entries.Any(e => e.Code != null && e.Code.Contains("hp")), string.Join("\n", entries.Select(e => e.Code)));
+            Assert.IsTrue(entries.Any(e => e.Code != null && e.Code.Contains("units[#") && e.Code.Contains("].hp")), string.Join("\n", entries.Select(e => e.Code)));
             Assert.IsTrue(entries.Any(e => e.Code != null && e.Code.Contains("weapon.power")));
-            Assert.IsFalse(HasWarning, "기록된 쓰기는 누락 경고가 없다");
+            Assert.IsFalse(HasWarning, "Mirror 데이터는 누락 경고가 없다");
 
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(30, Hero.hp);
@@ -107,6 +114,7 @@ namespace GBible.Tests
         public void 리스트_딕셔너리_객체_교체도_기록되고_Undo된다(bool detect)
         {
             Create(detect);
+            var hero = Hero;
             var oldWeapon = Hero.weapon;
             _session.Do(new GsShuffle());
             Assert.AreEqual(2, _party.units.Count);
@@ -116,30 +124,35 @@ namespace GBible.Tests
             Assert.AreEqual(1, Hero.weapon.power);
             Assert.IsFalse(HasWarning);
 
-            // 갈아 끼운 새 무기도 이어서 기록되고, 빠진 옛 무기의 쓰기는 무시된다.
+            // 갈아 끼운 새 무기도 이어서 기록되고, 빠진 옛 무기를 고친 것은 데이터가 아니라 무시된다.
             _session.Do(new GsHit { target = "hero", damage = 0 });
             Assert.AreEqual(2, Hero.weapon.power);
             oldWeapon.power = 99;
+            _session.EndFrame(0.016);
             Assert.IsFalse(_session.Journal.Entries.Any(e => e.Message.Contains("99")));
 
             Assert.IsTrue(_session.Undo());
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(1, _party.units.Count);
+            Assert.AreSame(hero, Hero, "리스트에 남은 유닛은 같은 인스턴스");
             CollectionAssert.AreEqual(new[] { "brave", "fast" }, Hero.tags);
             Assert.IsFalse(_party.counts.ContainsKey("kills"));
             Assert.AreEqual(0, _party.gold);
-            Assert.AreSame(oldWeapon, Hero.weapon, "같은 무기 인스턴스로 돌아온다");
+            Assert.AreEqual(5, Hero.weapon.power, "옛 무기 값으로 돌아온다");
         }
 
         [Test]
-        public void 행동_밖에서_써도_기록된다()
+        public void 행동_밖에서_고친_것은_다음_Sync에_행동_밖_변경으로_남는다()
         {
             Create(true);
             Hero.hp = 12;
+            _session.EndFrame(0.016);
             Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Data && e.Code != null && e.Code.Contains("hp")));
             _session.Do(new GsHit { target = "hero", damage = 2 });
-            Assert.IsFalse(HasWarning, "기록된 쓰기는 누락이 아니다");
+            Assert.IsFalse(HasWarning);
             Assert.AreEqual(10, Hero.hp);
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(12, Hero.hp, "행동 밖 변경은 그 행동의 Undo에 섞이지 않는다");
         }
 
         [Test]
@@ -150,6 +163,7 @@ namespace GBible.Tests
             var loose = new GsUnit { id = "x" };
             loose.hp = 1;
             loose.tags.Add("a");
+            _session.EndFrame(0.016);
             Assert.AreEqual(before, _session.Journal.Entries.Count());
         }
 
@@ -175,10 +189,9 @@ namespace GBible.Tests
 
         [TestCase(true)]
         [TestCase(false)]
-        public void Modify_안의_리플렉션_쓰기도_비교로_기록된다(bool detect)
+        public void Modify_안의_리플렉션_쓰기도_기록된다(bool detect)
         {
             Create(detect);
-            var field = typeof(GsUnit).GetField("hp");
             _session.Do(new GsReflect());
             Assert.AreEqual(1, Hero.hp);
             Assert.IsFalse(HasWarning);
@@ -187,12 +200,21 @@ namespace GBible.Tests
             // 보상 블록도 같은 길(Modify + 리플렉션)로 쓴다.
             new PlayerDataReward { key = "party", path = "gold", amount = 7 }.Grant(_session);
             Assert.AreEqual(7, _party.gold);
-            Assert.IsNotNull(field);
+        }
+
+        [Test]
+        public void 예전_방식_데이터도_그대로_동작한다()
+        {
+            _session = new GameSession(new SessionOptions { Seed = 3 });
+            var loose = _session.Data.Define("loose", DataZone.Session, new GsLoose(), "느슨한 값");
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("예전 방식")));
+            _session.Data.Modify<GsLoose>("loose", v => v.x = 4);
+            Assert.AreEqual(4, loose.x);
         }
 
         [TestCase(true)]
         [TestCase(false)]
-        public void 큰_데이터에서도_쓴_만큼만_일한다(bool detect)
+        public void 큰_데이터에서도_가볍다(bool detect)
         {
             _session = new GameSession(new SessionOptions { Seed = 3, DetectUntrackedChanges = detect });
             var party = new GsParty();
@@ -202,21 +224,39 @@ namespace GBible.Tests
             const int runs = 200;
             for (int i = 0; i < runs; i++) _session.Do(new GsHit { target = "u" + (i % 500), damage = 1 });
             var ms = watch.Elapsed.TotalMilliseconds / runs;
-            Console.WriteLine($"플레이어 데이터 클래스 유닛 500개, 누락 검사 {(detect ? "켬" : "끔")}: 행동 한 번 평균 {ms:0.00}ms");
+            Console.WriteLine($"Mirror 유닛 500개, 누락 검사 {(detect ? "켬" : "끔")}: 행동 한 번 평균 {ms:0.00}ms");
             Assert.IsTrue(_session.Undo());
         }
 
         [Test]
-        public void 조건은_쓰기로_다시_평가된다()
+        public void 조건은_Sync로_다시_평가된다()
         {
             Create(false);
             _session.Achievements.Define(new AchievementDefinition { Id = "rich", DisplayName = "부자", Condition = new GsRich() });
             _session.Do(new GsShuffle());
             Assert.IsTrue(_session.Achievements.IsUnlocked("rich"));
         }
+
+        [Test]
+        public void ChangeSet을_받는_쪽에_적용하면_같아진다()
+        {
+            Create(false);
+            var copy = Mirror.Clone(_party);
+            ChangeSet last = null;
+            _session.Data.Synced += c => last = c;
+            _session.Do(new GsShuffle());
+            Assert.IsNotNull(last);
+            Mirror.Apply(copy, last);
+            var a = new MirrorWriter();
+            var b = new MirrorWriter();
+            Mirror.Write(a, _party);
+            Mirror.Write(b, copy);
+            Assert.IsTrue(a.SameAs(b), "앞으로 기록만 보내도 같아진다");
+            Assert.IsTrue(last.Forward.Length < 200, "변경분만 보낸다: " + last.Forward.Length);
+        }
     }
 
-    // 위빙이 닿지 않는 쓰기(리플렉션)를 Modify 안에서.
+    // 생성 코드가 닿지 않는 쓰기(리플렉션)를 Modify 안에서.
     [Serializable]
     public class GsReflect : SimpleAction
     {

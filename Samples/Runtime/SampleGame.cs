@@ -43,14 +43,14 @@ namespace GBible.Samples
         [FieldLabel("부위")] public string slot = "";
         [FieldLabel("등급")] public string grade = "";
         [FieldLabel("속성")] public SampleElement element;
-        [FieldLabel("태그")] public GameList<string> tags = new GameList<string>();
-        [FieldLabel("강화")] public GameList<SampleEnhancement> enhancements = new GameList<SampleEnhancement>();
+        [FieldLabel("태그")] public List<string> tags = new List<string>();
+        [FieldLabel("강화")] public List<SampleEnhancement> enhancements = new List<SampleEnhancement>();
     }
 
     [Serializable, PlayerData]
     public sealed class SampleInventory
     {
-        [FieldLabel("장비")] public GameList<SampleEquipment> items = new GameList<SampleEquipment>();
+        [FieldLabel("장비")] public List<SampleEquipment> items = new List<SampleEquipment>();
     }
 
     [GameEvent("골드 획득")]

@@ -66,7 +66,7 @@ namespace GBible
             var result = new List<T>();
             foreach (var key in DataKeys())
                 if (CanContain(Session.Data.TypeOf(key), typeof(T)))
-                    Collect(Session.Data.Get(key), result, 0);
+                    CollectFrom(key, result);
             return result;
         }
 
@@ -74,15 +74,34 @@ namespace GBible
         public List<T> All<T>(string key) where T : class
         {
             var result = new List<T>();
-            Collect(Session.Data.Get(key), result, 0);
+            CollectFrom(key, result);
             return result;
+        }
+
+        // Mirror 데이터는 사본 나무에서(리플렉션 없음), 예전 방식 데이터는 필드를 훑어서.
+        void CollectFrom<T>(string key, List<T> into) where T : class
+        {
+            var mirror = Session.Data.SyncedMirror(key);
+            Session.Data.Get(key);
+            if (mirror != null) Mirror.Collect(mirror, into);
+            else Collect(Session.Data.Get(key), into, 0);
         }
 
         public T Find<T>(string id) where T : class
         {
             if (string.IsNullOrEmpty(id)) return null;
             RequireId(typeof(T));
-            return All<T>().FirstOrDefault(item => IdOf(item) == id);
+            foreach (var key in DataKeys())
+            {
+                if (!CanContain(Session.Data.TypeOf(key), typeof(T))) continue;
+                var mirror = Session.Data.SyncedMirror(key);
+                Session.Data.Get(key);
+                var found = mirror != null
+                    ? Mirror.FindById<T>(mirror, id)
+                    : All<T>(key).FirstOrDefault(item => IdOf(item) == id);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         // 형식을 모를 때: id 필드가 있는 모든 객체에서 찾는다.
@@ -108,8 +127,20 @@ namespace GBible
             return prefix + (long)next;
         }
 
-        IEnumerable<string> DataKeys() =>
-            Session.Data.Keys.Where(Session.Data.IsData).OrderBy(k => k, StringComparer.Ordinal).ToList();
+        // 데이터 키 목록(이름순). 정의가 늘 때만 다시 만든다.
+        List<string> _dataKeys;
+        int _dataKeyCount = -1;
+
+        List<string> DataKeys()
+        {
+            var count = Session.Data.KeyCount;
+            if (_dataKeys == null || count != _dataKeyCount)
+            {
+                _dataKeys = Session.Data.Keys.Where(Session.Data.IsData).OrderBy(k => k, StringComparer.Ordinal).ToList();
+                _dataKeyCount = count;
+            }
+            return _dataKeys;
+        }
 
         // ── id ────────────────────────────────────────────────
         // 개체로 찾으려면 클래스에 string id 필드(또는 속성)가 있어야 한다.

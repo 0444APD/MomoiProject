@@ -47,6 +47,18 @@ namespace GBible.Tests
         public Dictionary<string, int> counts = new Dictionary<string, int>();
     }
 
+    // [Serializable]이 없는 클래스: 예전 방식(리플렉션 비교).
+    public sealed class TestPlainItem
+    {
+        public int level;
+    }
+
+    public sealed class TestPlainBag
+    {
+        public int gold;
+        public List<TestPlainItem> items = new List<TestPlainItem>();
+    }
+
     [Serializable]
     public sealed class TestBadData
     {
@@ -191,22 +203,24 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void Modify를_거치지_않은_수정은_경고하고_받아들인다()
+        public void 직접_고친_값은_다음_Sync에_기록된다()
         {
             _inventory.gold = 77;
-            Assert.AreEqual(1, _session.Data.CheckUntrackedChanges());
-            var warning = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Warning);
-            StringAssert.Contains("Modify를 거치지 않고", warning.Message);
-            StringAssert.Contains("gold", warning.Message);
-            Assert.AreEqual(0, _session.Data.CheckUntrackedChanges(), "한 번 받아들인 뒤에는 다시 경고하지 않는다");
+            Assert.AreEqual(1, _session.Data.Sync());
+            var entry = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Data);
+            StringAssert.Contains("gold", entry.Code);
+            Assert.AreEqual(0, _session.Data.Sync(), "한 번 기록한 뒤에는 다시 기록하지 않는다");
+            Assert.IsFalse(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning), "직접 고쳐도 경고하지 않는다");
         }
 
         [Test]
-        public void 행동_안의_직접_수정도_행동_직후_잡아낸다()
+        public void 행동_안의_직접_수정도_그_행동의_Undo에_들어간다()
         {
             _session.Actions.Register<TestKillAction>(_ => _inventory.gold = 5);
             _session.Do(new TestKillAction());
-            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("gold")));
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Data && e.Code != null && e.Code.Contains("gold")));
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(0, _inventory.gold);
         }
 
         [Test]
@@ -412,20 +426,20 @@ namespace GBible.Tests
                 inv.gold = 3;
             });
             var tx = _session.Data.History.Last();
-            Assert.AreEqual(1, tx.DataChanges.Count);
-            Assert.AreEqual(3, tx.DataChanges[0].Changes.Count);
+            Assert.AreEqual(1, tx.Mirrored.Count);
+            Assert.AreEqual(3, tx.Mirrored[0].Count);
             _session.Undo();
             Assert.AreEqual(0, _inventory.gold);
         }
 
         [Test]
-        public void 너무_큰_값은_한_번_경고한다()
+        public void 예전_방식의_너무_큰_값은_한_번_경고한다()
         {
             var session = new GameSession();
-            var big = new TestInventory();
-            for (int i = 0; i < PlayerDataStore.LargeValueNodes; i++) big.items.Add(new TestItem());
+            var big = new TestPlainBag();
+            for (int i = 0; i < PlayerDataStore.LargeValueNodes; i++) big.items.Add(new TestPlainItem());
             session.Data.Define("s:big", DataZone.Session, big);
-            session.Data.Modify<TestInventory>("s:big", inv => inv.gold = 1);
+            session.Data.Modify<TestPlainBag>("s:big", inv => inv.gold = 1);
             Assert.AreEqual(1, session.Journal.Entries.Count(e => e.Kind == JournalKind.Warning && e.Message.Contains("값이 큽니다")));
         }
 

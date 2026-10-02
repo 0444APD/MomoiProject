@@ -369,19 +369,12 @@ namespace GBible.EditorTools
         public static string CodeName(Type type) => "global::" + type.FullName.Replace('+', '.');
 
         // 고른 형식과 개수(0 하나 · 1 리스트 · 2 배열)로 선언 줄과 화면용 이름을 만든다.
-        // playerDataClass: 플레이어 데이터 클래스의 필드면 리스트·배열 대신 GameList(쓰는 순간 기록되는 리스트).
         public static (string declaration, string typeLabel, List<string> usings) Declare(TypeChoice choice, int many, string fieldName, bool playerDataClass = false)
         {
             var code = choice.Code;
             var label = choice.Attributes != null ? choice.Label : Regex.Replace(choice.Code, @"^global::(?:.*\.)?", "");
             var usings = new List<string>(choice.Usings);
-            if (playerDataClass && many != 0)
-            {
-                code = $"GameList<{code}>";
-                label = $"GameList<{label}>";
-                usings.Add("GBible");
-            }
-            else if (many == 1)
+            if (many == 1)
             {
                 code = $"List<{code}>";
                 label = $"List<{label}>";

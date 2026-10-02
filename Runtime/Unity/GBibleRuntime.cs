@@ -40,11 +40,18 @@ namespace GBible
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void AutoStart() => Start();
 
+        static void LogMirrorWarning(string message) => Debug.LogWarning("[MomoiProject] " + message);
+
         public static GameSession Start()
         {
             if (Session != null) return Session;
 
-            // Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
+            // Mirror 비교 코드를 모은다(리플렉션은 게임이 켜질 때 여기서 한 번만).
+            Mirror.Warning -= LogMirrorWarning;
+            Mirror.Warning += LogMirrorWarning;
+            Mirror.Initialize();
+
+            // 예전 방식 데이터의 Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
             var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };
             Configuring?.Invoke(options);
             var session = new GameSession(options);

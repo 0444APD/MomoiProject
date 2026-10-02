@@ -162,12 +162,14 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 행동_밖에서_고친_값은_경고한다()
+        public void 행동_밖에서_고친_값은_행동_밖_변경으로_기록된다()
         {
             var held = Game.Find<TbUnit>("hero");
             held.hp = 1;
             Game.Do(new TbEndTurn());
-            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("Modify를 거치지 않고")));
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Data && e.TransactionId == 0 && e.Code != null && e.Code.Contains("hp")));
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(1, Hp("hero"), "행동 밖 변경은 행동의 Undo로 되돌리지 않는다");
         }
 
         [Test]

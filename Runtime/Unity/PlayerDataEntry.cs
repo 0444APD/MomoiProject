@@ -66,9 +66,8 @@ namespace GBible.Data
             var kind = DataModel.Of(type).Kind;
             if (kind != DataKind.Scalar && kind != DataKind.Enum && !string.IsNullOrEmpty(defaultValue))
                 context.Warning("클래스·컬렉션 형식은 기본값 글자를 쓰지 않습니다(클래스의 초기값을 씁니다).");
-            if (kind != DataKind.Scalar && kind != DataKind.Enum && kind != DataKind.Reference && !PlayerDataStore.IsTrackedType(type))
-                context.Warning("값 형식이 플레이어 데이터 클래스가 아니라서, 필드 쓰기가 그 순간이 아니라 행동이 끝날 때 비교로 기록됩니다(더 느림). " +
-                                "도감 › 클래스에서 그 클래스를 열어 '플레이어 데이터 클래스로 바꾸기'를 누르세요([PlayerData] + 리스트는 GameList).");
+            if (kind == DataKind.Object && !type.IsValueType && !Mirror.Supports(type, out var reason))
+                context.Warning("비교 코드로 다룰 수 없어 예전 방식(리플렉션, 더 느림)으로 비교합니다: " + reason);
         }
     }
 }

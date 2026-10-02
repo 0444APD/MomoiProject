@@ -9,8 +9,8 @@
 |---|---|
 | `Session` (`GameSession`) | 게임 한 판의 실행 전체. Data·Events·Random·Journal·Actions·Abilities를 들고 있다. |
 | `Data` (`session.Data`) | 값 저장소(PlayerDataStore). 플레이어 데이터(도감 › 플레이어 데이터)가 여기 등록된다. 플레이어 데이터는 전부 여기에 둔다. |
-| 플레이어 데이터 클래스 | `[PlayerData]`가 붙은 클래스(클래스 탭이 만드는 데이터 클래스는 자동). 필드에 쓰는 순간 기록된다(위빙). |
-| `GameList<T>` · `GameDictionary<K,V>` | 플레이어 데이터 클래스 안의 리스트·딕셔너리. 넣기·빼기도 그 순간 기록된다. |
+| 플레이어 데이터 클래스 | 플레이어 데이터에 담는 평범한 `[Serializable]` 클래스. 필드·`List`·`Dictionary`를 그냥 고친다. |
+| Mirror · Sync · ChangeSet | 시스템이 플레이어 데이터의 사본(Mirror)을 들고 있다가 Sync할 때 바뀐 곳만 기록한다. 그 기록이 ChangeSet(앞으로 = 새 값, 뒤로 = 옛 값)이다. |
 | `GameApi` | 게임 코드의 창구. Block 안에서는 `Game` 속성, 씬 코드에서는 `GBibleRuntime.Game`. |
 | `GameAction` | 플레이어 입력 하나(이동·사용·구매). 데이터라서 서버 전송·리플레이가 되고, 실행 한 번이 Undo 한 단위. |
 | `Block` | 에디터에서 골라 조립하는 로직 단위: `Condition`(조건), `Reward`(보상), `Effect`(효과), `TargetSelector`(대상). |
@@ -19,9 +19,9 @@
 ## 예제 (턴제)
 
 ```csharp
-// 데이터: 도감 › 클래스에서 만든다([PlayerData]·GameList가 자동으로 붙는다).
-[Serializable, PlayerData]
-public class Unit { public string id; public string team; public int x, y, hp; public GameList<string> buffs = new GameList<string>(); }
+// 데이터: 평범한 [Serializable] 클래스.
+[Serializable]
+public class Unit { public string id; public string team; public int x, y, hp; public List<string> buffs = new List<string>(); }
 
 // 판 규칙: 그냥 정적 함수. 장르마다 다른 조회는 GameApi 확장 메서드로.
 public static class Board
@@ -82,24 +82,24 @@ public class RunManager : MonoBehaviour
 
 ## 규칙
 
-1. **플레이어 데이터는 플레이어 데이터에, 클래스는 플레이어 데이터 클래스로.** 유닛·판·턴처럼 바뀌는 값은 클래스 탭에서 만든 클래스로 플레이어 데이터에 둔다. MonoBehaviour 필드에 두면 Undo·저장·동기화에서 빠진다. 리스트·딕셔너리 필드는 `GameList`·`GameDictionary`.
+1. **플레이어 데이터는 플레이어 데이터에, 클래스는 플레이어 데이터 클래스로.** 유닛·판·턴처럼 바뀌는 값은 `[Serializable]` 클래스로 플레이어 데이터에 둔다. MonoBehaviour 필드에 두면 Undo·저장·동기화에서 빠진다.
 2. **플레이어 입력은 행동으로.** 이동·사용·구매는 `GameAction<T>`·`SimpleAction`으로 만들어 `Game.Do`/`Game.Use`로 실행한다(Undo 한 단위, 서버 전송·리플레이). 행동·효과 안에서는 객체 필드를 그냥 고친다.
 3. **로직은 한 번에 끝낸다.** 행동·효과 안에서 기다리지 않는다(코루틴·await). 연출은 끝난 결과(이벤트·Journal)를 보고 따로 재생한다.
 
 그 밖: 난수는 `Game.Random`, 오래 들고 있을 것은 id(`Game.Find`로 다시 찾기), 개체로 찾을 클래스에는 `public string id;`.
 
-## 쓰기가 기록되는 방식
+## 쓰기가 기록되는 방식 (Mirror)
 
-- **플레이어 데이터 클래스**(권장): 필드에 `=`·`+=`·`++`로 쓰는 순간, `GameList`·`GameDictionary`에 넣고 빼는 순간 기록된다. 어디서 쓰든(행동·효과·씬 코드) 기록되고, 행동 안이면 Undo 단위에 들어간다. 비용은 쓴 만큼(유닛 500개에서 행동 한 번 약 0.3ms).
-- **플레이어 데이터 클래스가 아닌 데이터 클래스**(예전 방식): 행동·효과가 꺼낸 값을 끝날 때 통째로 비교해 찾는다. 비용은 데이터 크기만큼(장비 500개에서 행동 한 번 약 5ms). 행동 밖에서 고치면 다음 행동 때 경고. 클래스 상세의 '플레이어 데이터 클래스로 바꾸기'로 옮긴다.
+- 게임 코드는 어디서든(행동·효과·씬 코드) 필드·리스트·딕셔너리를 그냥 고친다. 시스템이 행동 시작·끝, Modify 끝, 프레임 끝에 Sync해서 바뀐 곳을 기록한다. 행동 안의 변경은 그 행동의 Undo 단위, 행동 밖의 변경은 행동 밖 변경으로 남는다(그 행동의 Undo에 섞이지 않는다).
+- 비용은 데이터 크기에 비례하지만 생성 코드라 가볍다: 객체 2,500개(유닛 500)에서 Sync 한 번 약 0.02ms(Unity 에디터 Mono 약 0.06ms), 바뀐 것이 없으면 할당 0. 객체 10만 개에서 약 0.9ms(에디터 2.5ms) — 실시간 게임은 프레임마다 또는 서버 틱마다.
+- 되돌리기는 뒤로 기록을 거꾸로 적용한다. 리스트에서 빠졌던 객체·갈아 끼워진 객체는 원래 인스턴스로 돌아온다(게임 코드가 쥔 참조가 이어진다).
+- `[Serializable]`이 없는 클래스는 예전 방식(리플렉션으로 통째로 비교, 데이터가 크면 느림)이고 기록에 경고가 남는다.
 
-## 기록되지 않는 것(위빙의 한계)
+## 기록되지 않는 것
 
-- 지역 변수(`var hp = u.hp; hp = 3;`), MonoBehaviour·일반 클래스 필드: 플레이어 데이터가 아니다.
-- 일반 `List<T>`의 Add·Remove: 메서드 호출이라 위빙으로 못 잡는다 → `GameList<T>`.
-- 구조체 필드를 제자리에서 고치기(`u.pos.x = 3`): C# 구조체는 복사본이다 → `u.pos = new Pos(3, y)`.
-- 리플렉션 쓰기, 미리 컴파일된 DLL 안의 코드: 위빙이 닿지 않는다. 개발 빌드는 이런 변경을 다음 행동 때 경고한다.
+- 지역 변수, MonoBehaviour·플레이어 데이터 밖의 객체 필드.
+- 구조체는 값이라 `u.pos.x = 3`처럼 고쳐도 되지만(필드가 바뀌면 잡힌다), 지역 변수로 꺼낸 복사본을 고치면 원본은 그대로다(C# 규칙).
 
-## 위빙
+## Mirror 비교 코드
 
-`GBible.CodeGen`(Unity ILPostProcessor)이 컴파일할 때마다 GBible.Core를 참조하는 어셈블리의 `[PlayerData]` 필드 쓰기를 기록 호출로 바꾼다. 필요한 패키지: `com.unity.nuget.mono-cecil`(Burst·Collections가 함께 가져온다). Unity 버전을 올리면 위빙이 도는지(코어 테스트 `PlayerDataTests`) 확인한다.
+`GBible.CodeGen`(Unity ILPostProcessor)이 컴파일할 때마다 GBible.Core와 그것을 참조하는 어셈블리의 `[Serializable]` 클래스·구조체 안에 비교·쓰기·읽기·적용 메서드(`__gb_*`)를 만든다. 게임 코드의 필드 쓰기는 고치지 않는다. 게임이 켜질 때 `Mirror.Initialize`가 한 번 모은다(리플렉션은 여기서만). 필요한 패키지: `com.unity.nuget.mono-cecil`(Burst·Collections가 함께 가져온다). Unity 버전을 올리면 코어 테스트 `MirrorTests`(생성 메서드 전체 JIT 검사 포함)로 확인한다.

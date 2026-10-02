@@ -58,22 +58,8 @@ namespace GBible
         public string Label;
         public readonly List<PlayerDataChange> ValueChanges = new List<PlayerDataChange>();
         public readonly List<DataRecord> DataChanges = new List<DataRecord>();
-        // 플레이어 데이터 클래스·시스템 컬렉션에 쓴 기록(쓴 순서). Undo는 거꾸로 되돌린다.
-        public readonly List<WriteRecord> Writes = new List<WriteRecord>();
-    }
-
-    // 플레이어 데이터 클래스의 필드 하나·시스템 컬렉션 요소 하나에 쓴 기록.
-    public sealed class WriteRecord
-    {
-        public string Key;
-        public DataWriteKind Kind;
-        // 쓴 객체(필드의 주인 또는 컬렉션)와 필드 이름 / 요소 위치·키.
-        public object Target;
-        public string Member;
-        public int Index;
-        public object ItemKey;
-        public object Old;
-        public object New;
+        // Mirror로 비교하는 플레이어 데이터의 변경(Sync 순서). Undo는 거꾸로 되돌린다.
+        public readonly List<ChangeSet> Mirrored = new List<ChangeSet>();
     }
 
     // 모든 플레이어 데이터가 사는 곳.
@@ -83,12 +69,12 @@ namespace GBible
     // 실시간 게임은 이력을 끄고(RecordHistory = false) 세션이 일정 간격 스냅샷으로 되감는다.
     //
     // 담을 수 있는 값: bool, 숫자(double로 정규화), string, 날짜·시간·Guid, 그리고 임의의 클래스·구조체·
-    // 리스트·배열·딕셔너리·집합·큐·스택(필드 깊이 무관). 모든 타입이 같은 문법을 쓴다.
+    // 리스트·배열·딕셔너리(필드 깊이 무관). 게임 코드는 평범한 C#으로 값을 고친다.
     //   등록  Define(키, 구역, 기본값)          읽기  Get<T>(키)
-    //   교체  Set(키, 값)                       부분 수정  Modify<T>(키, 값 => ...)   ← 클래스·컬렉션
-    // 데이터 값의 변화는 경로 단위로 기록되고(예: 인벤토리.items[#12].level 3 → 4), Undo하면 게임 코드가 쥔
-    // 인스턴스를 그대로 둔 채 제자리로 돌아간다. 컬렉션 요소에는 내부 ID가 자동으로 붙는다.
-    // Modify를 거치지 않은 직접 수정은 DetectUntrackedChanges가 켜져 있으면 찾아내 경고한다.
+    //   교체  Set(키, 값)                       부분 수정  Modify<T>(키, 값 => ...) 또는 꺼낸 객체를 그냥 고치기
+    // 데이터 값(클래스)은 Mirror가 사본을 들고 있다가 Sync할 때(행동 끝·Modify 끝·프레임 끝) 바뀐 곳을 경로로 기록한다
+    // (예: units[3].hp 30 → 20). 행동 안이면 그 변경(ChangeSet)이 Undo 단위에 들어가고, Synced로 알려 네트워크가 보낼 수 있다.
+    // 비교 코드가 없는 형식([Serializable]이 없는 클래스 등)은 예전 방식(리플렉션 비교)으로 다룬다.
     public sealed class PlayerDataStore : IInspectable
     {
         sealed class Slot
@@ -97,15 +83,13 @@ namespace GBible
             public object Value;
             public object Default;
             public string Label;
-            // 단순 값: 선언 타입(없으면 제한 없음). 데이터 값: DataType과 마지막 기록 시점의 스냅샷.
+            // 단순 값: 선언 타입(없으면 제한 없음). 데이터 값: DataType과 비교용 사본.
             public Type ValueType;
             public Type DataType;
+            // Mirror 사본(비교 코드가 있는 형식). 없으면 Shadow(예전 방식: 마지막 기록 시점의 복제본).
+            public MirrorNode Mirror;
             public object Shadow;
             public bool SizeWarned;
-            // 플레이어 데이터 클래스·시스템 컬렉션으로만 이루어진 값: 쓰는 순간 기록된다(비교 없음). 아니면 행동이 끝날 때 비교한다.
-            public bool Tracked;
-            // 마지막 누락 검사 이후 기록된 쓰기가 있었는지(개발 빌드).
-            public bool Written;
         }
 
         const int MaxLoggedChanges = 12;
@@ -122,8 +106,14 @@ namespace GBible
         Transaction _active;
         long _nextTransactionId = 1;
 
+        // Sync가 쓰는 작업용 기록.
+        readonly ChangeSet _work = new ChangeSet();
+        Func<object, long> _elementId;
+
         // 값이 바뀌었을 때(Undo로 돌아갈 때 포함).
         public event Action<string> Changed;
+        // Mirror로 비교하는 플레이어 데이터가 Sync로 바뀌었을 때 그 변경(앞으로 기록을 다른 쪽에 보내면 같아진다).
+        public event Action<ChangeSet> Synced;
         // 데이터 값이 바뀌었을 때 바뀐 경로 목록과 함께.
         public event Action<string, IReadOnlyList<DataChange>> DataChanged;
         public event Action<Transaction> TransactionUndone;
@@ -145,9 +135,14 @@ namespace GBible
         // 이력에 남길 최대 행동 수. 0이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 늘어난다).
         public int HistoryLimit;
         public IEnumerable<string> Keys => _slots.Keys;
+        public int KeyCount => _slots.Count;
         public DataIdentity Identity { get; } = new DataIdentity();
-        // Modify를 거치지 않은 데이터 수정을 찾아 경고한다. 값 전체를 비교하므로 출시 빌드에서는 끈다.
+        // 예전 방식(리플렉션 비교) 데이터에서 Modify를 거치지 않은 수정을 찾아 경고한다. 값 전체를 비교하므로 출시 빌드에서는 끈다.
         public bool DetectUntrackedChanges = true;
+        // false면 모든 데이터를 예전 방식으로 비교한다(비교 코드 문제를 가를 때).
+        public bool UseMirror = true;
+        // 바뀐 곳마다 사람이 읽는 기록(경로·옛 값·새 값)을 만든다. 끄면 기록·DataChanged의 목록이 비지만 Sync가 가벼워진다.
+        public bool DescribeChanges = true;
 
         // ── 정의 ───────────────────────────────────────────────
 
@@ -202,6 +197,7 @@ namespace GBible
                 else _journal.Append(JournalKind.Warning, "Data", $"저장된 '{slot.Label}' 값의 형식이 맞지 않아 기본값을 씁니다.", key);
             }
             _slots.Add(key, slot);
+            _keys = null;
         }
 
         void DefineData(string key, DataZone zone, object value, string label)
@@ -219,12 +215,26 @@ namespace GBible
                 return;
             }
 
-            var slot = new Slot { Zone = zone, Label = label ?? key, DataType = type, Default = DataModel.Clone(value, null), Value = value, Tracked = IsTrackedType(type) };
+            var slot = new Slot { Zone = zone, Label = label ?? key, DataType = type, Default = DataModel.Clone(value, null), Value = value };
             if (TakePreloaded(key, out var loaded)) slot.Value = LoadData(key, slot, loaded);
+            ChooseMirror(key, slot);
             RefreshShadow(slot);
             _slots.Add(key, slot);
-            Reattach(key, slot);
+            _keys = null;
             CheckRequired(key, slot);
+        }
+
+        // 비교 코드가 있는 형식이면 Mirror 사본을 만든다. 없으면 예전 방식(리플렉션 비교)이고, 이유를 한 번 남긴다.
+        void ChooseMirror(string key, Slot slot)
+        {
+            slot.Mirror = null;
+            if (!UseMirror || slot.Value == null) return;
+            if (Mirror.Supports(slot.Value.GetType(), out var reason))
+            {
+                slot.Mirror = Mirror.Make(slot.Value);
+                return;
+            }
+            _journal.Append(JournalKind.Warning, "Data", $"'{slot.Label}'은(는) 예전 방식(리플렉션)으로 비교합니다: {reason}", key);
         }
 
         static void CheckRedefine(string key, Slot existing, DataZone zone, Type dataType)
@@ -254,48 +264,11 @@ namespace GBible
             return true;
         }
 
-        // 쓰는 순간 기록할 수 있는 형식인지: 클래스는 모두 [PlayerData], 리스트·딕셔너리는 GameList·GameDictionary.
-        // 하나라도 아니면(일반 List·배열·[PlayerData] 없는 클래스) 그 플레이어 데이터는 예전처럼 행동이 끝날 때 비교한다.
-        public static bool IsTrackedType(Type type) => IsTrackedType(type, new HashSet<Type>());
+        // 이 형식을 Mirror(생성 코드 비교)로 다루는지. 아니면 예전 방식(리플렉션 비교).
+        public static bool IsMirrored(Type type) => type != null && Mirror.Supports(type, out _);
 
-        static bool IsTrackedType(Type type, HashSet<Type> seen)
-        {
-            if (type == null) return false;
-            var info = DataModel.Of(type);
-            switch (info.Kind)
-            {
-                case DataKind.Scalar:
-                case DataKind.Enum:
-                case DataKind.Reference:
-                    return true;
-                case DataKind.List:
-                    return typeof(IGameCollection).IsAssignableFrom(type) && IsTrackedType(info.ElementType, seen);
-                case DataKind.Dictionary:
-                    return typeof(IGameCollection).IsAssignableFrom(type) && IsTrackedType(info.ElementType, seen);
-                case DataKind.Object:
-                    if (type.IsValueType) return true; // 구조체는 필드에 통째로 쓸 때 기록된다
-                    if (!type.IsDefined(typeof(PlayerDataAttribute), true)) return false;
-                    if (!seen.Add(type)) return true;
-                    // 위빙이 안 된 경우(Mono.Cecil 패키지가 없어 위빙 도구가 빠짐 등): 쓰기를 못 잡으므로 예전처럼 비교한다.
-                    if (info.Fields.Any(f => !IsWoven(f.Field))) return false;
-                    return info.Fields.All(f => IsTrackedType(f.Type, seen));
-            }
-            return false;
-        }
-
-        // 그 필드를 선언한 클래스가 위빙되었는지(위빙 도구가 [PlayerDataWoven]을 붙인다).
-        static bool IsWoven(System.Reflection.FieldInfo field) =>
-            field.DeclaringType != null && field.DeclaringType.IsDefined(typeof(PlayerDataWovenAttribute), false);
-
-        // Tracked 값은 개발 빌드(누락 검사)에서만 비교용 사본을 둔다.
-        void RefreshShadow(Slot slot) => slot.Shadow = slot.Tracked && !DetectUntrackedChanges ? null : CloneShadow(slot);
-
-        // 값 전체가 바뀐 뒤(정의·불러오기·되돌리기) 안쪽 객체를 다시 이 키에 붙인다.
-        void Reattach(string key, Slot slot)
-        {
-            if (!slot.Tracked) return;
-            PlayerDataTracker.Attach(slot.Value, this, key, null, null);
-        }
+        // 예전 방식 데이터만 비교용 복제본을 둔다(Mirror 데이터는 Mirror 사본이 대신한다).
+        void RefreshShadow(Slot slot) => slot.Shadow = slot.Mirror != null ? null : CloneShadow(slot);
 
         static bool IsDataType(Type type)
         {
@@ -376,15 +349,6 @@ namespace GBible
                 if (value != null && !slot.DataType.IsInstanceOfType(value))
                     throw new ArgumentException($"[MomoiProject] 플레이어 데이터 '{key}'에는 {DataModel.FriendlyName(slot.DataType)}만 넣을 수 있습니다({value.GetType().Name}).");
                 var copy = DataModel.Clone(value, Identity);
-                if (slot.Tracked)
-                {
-                    // 값 전체 교체는 한 번에: 이전 모습을 사본으로 남기고, 바꾸는 동안의 개별 쓰기는 기록하지 않는다.
-                    var before = DataModel.Clone(slot.Value, Identity);
-                    using (PlayerDataTracker.Silent()) slot.Value = DataModel.ApplyInPlace(slot.Value, copy, Identity);
-                    Reattach(key, slot);
-                    Commit(key, slot, before);
-                    return;
-                }
                 ModifyCore(key, slot, live => DataModel.ApplyInPlace(live, copy, Identity));
                 return;
             }
@@ -432,25 +396,21 @@ namespace GBible
 
         void ModifyCore(string key, Slot slot, Func<object, object> change)
         {
-            // 쓰는 순간 기록되는 값이라도 Modify는 비교로 기록한다: 안에서 리플렉션 등 위빙이 닿지 않는 방법으로 고칠 수 있다
-            // (모니터 창의 값 편집, 보상 블록). 그동안의 개별 쓰기 기록은 끄고, 끝나면 이전 모습과 비교해 한 번에 남긴다.
-            if (slot.Tracked)
+            if (slot.Mirror != null)
             {
-                var snapshot = DataModel.Clone(slot.Value, Identity);
-                using (PlayerDataTracker.Silent())
+                // 행동 밖이면 그 전에 바뀐 것(들고 있던 객체를 직접 고친 것)을 따로 기록해 이번 변경과 섞지 않는다.
+                // 행동 안이면 어차피 같은 행동의 변경이라 한 번에 비교한다.
+                if (_active == null) SyncSlot(key, slot);
+                try
                 {
-                    try
-                    {
-                        slot.Value = change(slot.Value);
-                    }
-                    catch
-                    {
-                        slot.Value = DataModel.ApplyInPlace(slot.Value, snapshot, Identity);
-                        throw;
-                    }
+                    slot.Value = change(slot.Value);
                 }
-                Reattach(key, slot);
-                Commit(key, slot, snapshot);
+                catch
+                {
+                    RevertToMirror(slot);
+                    throw;
+                }
+                SyncSlot(key, slot);
                 return;
             }
             // 추적 범위에서 이미 꺼낸 값은 직접 고친 부분이 있어도 경고하지 않는다(이번 변경과 함께 기록된다).
@@ -551,28 +511,88 @@ namespace GBible
             return string.IsNullOrEmpty(change.Path) ? $"{slot.Label}{text}" : $"{slot.Label}.{text}";
         }
 
-        // 마지막 기록 이후 Modify 없이 바뀐 곳이 있으면 받아들이고 경고를 남긴다(Undo·원인 기록에서는 빠진다).
-        public int CheckUntrackedChanges()
+        // ── Sync ───────────────────────────────────────────────
+        // Mirror 데이터를 사본과 비교해 바뀐 곳을 기록한다(행동 안이면 그 행동의 Undo 단위, 밖이면 행동 밖 변경).
+        // 시스템이 행동 시작·끝, Modify, 프레임 끝에 부른다. 게임 코드가 직접 부를 일은 없다.
+        // 예전 방식 데이터는 DetectUntrackedChanges가 켜져 있으면 Modify 없이 바뀐 곳을 찾아 경고한다.
+        // 바뀐 플레이어 데이터 수를 돌려준다.
+        public int Sync()
         {
-            int count = 0;
-            foreach (var pair in _slots.ToList())
+            var count = 0;
+            foreach (var key in SlotKeys())
             {
-                var slot = pair.Value;
-                if (slot.DataType == null) continue;
-                if (slot.Tracked)
+                var slot = _slots[key];
+                if (slot.Mirror != null)
                 {
-                    // 쓰는 순간 기록되는 값: 기록된 쓰기가 있었으면 사본만 새로 뜨고, 없는데 바뀌었으면 위빙이 빠진 코드가 고친 것.
-                    if (slot.Shadow == null) continue;
-                    if (slot.Written)
-                    {
-                        slot.Written = false;
-                        RefreshShadow(slot);
-                        continue;
-                    }
+                    if (SyncSlot(key, slot) != null) count++;
                 }
-                if (AdoptUntracked(pair.Key, slot)) count++;
+                else if (slot.DataType != null && DetectUntrackedChanges && AdoptUntracked(key, slot)) count++;
             }
             return count;
+        }
+
+        // 키 목록(정의가 바뀔 때만 새로 만든다). 알림을 받은 쪽이 새 키를 정의해도 훑는 중인 목록은 그대로다.
+        string[] _keys;
+
+        string[] SlotKeys() => _keys ??= _slots.Keys.ToArray();
+
+        // 예전 이름. Sync와 같다.
+        public int CheckUntrackedChanges() => Sync();
+
+        // Mirror 데이터의 사본(지금 값과 맞춘 뒤). 예전 방식 데이터면 null. Game.Find·All이 리플렉션 없이 찾는 데 쓴다.
+        internal MirrorNode SyncedMirror(string key)
+        {
+            if (!_slots.TryGetValue(key, out var slot) || slot.Mirror == null) return null;
+            SyncSlot(key, slot);
+            return slot.Mirror;
+        }
+
+        // Mirror 데이터 하나를 Sync한다. 바뀐 것이 없으면 null.
+        ChangeSet SyncSlot(string key, Slot slot, JournalKind kind = JournalKind.Data, string prefix = null, long transactionId = -1)
+        {
+            if (slot.Value == null || slot.Value.GetType() != slot.Mirror.Type.Type)
+            {
+                // 값이 통째로 다른 형식으로 바뀐 경우(드묾): 사본을 새로 만든다.
+                ChooseMirror(key, slot);
+                RefreshShadow(slot);
+                if (slot.Mirror == null) return null;
+            }
+            _work.Clear();
+            _work.Key = key;
+            _work.Describe = DescribeChanges;
+            _work.ElementId = _elementId ??= Identity.IdOf;
+            Mirror.Sync(slot.Value, slot.Mirror, _work);
+            if (_work.IsEmpty) return null;
+            var changes = _work.Detach();
+            if (kind == JournalKind.Data && _active != null)
+            {
+                // 한 행동 안에서 같은 데이터를 잇달아 Sync하면 Undo 기록 하나로 합친다.
+                var history = _active.Mirrored;
+                var last = history.Count > 0 ? history[history.Count - 1] : null;
+                if (last == null || last.Key != key)
+                {
+                    last = new ChangeSet { Key = key };
+                    history.Add(last);
+                }
+                last.Append(changes);
+            }
+            LogChanges(key, slot, changes.Changes, kind, prefix, transactionId >= 0 ? transactionId : _active?.Id ?? 0);
+            Changed?.Invoke(key);
+            DataChanged?.Invoke(key, changes.Changes);
+            Synced?.Invoke(changes);
+            CheckRequired(key, slot);
+            return changes;
+        }
+
+        // 마지막 Sync 이후의 변경을 버리고 사본 모습으로 되돌린다(기록 없이). 예외로 중단된 변경에 쓴다.
+        void RevertToMirror(Slot slot)
+        {
+            _work.Clear();
+            Mirror.Sync(slot.Value, slot.Mirror, _work);
+            if (_work.IsEmpty) return;
+            var changes = _work.Detach();
+            Mirror.Undo(slot.Value, changes);
+            Mirror.Sync(slot.Value, slot.Mirror, null);
         }
 
         bool AdoptUntracked(string key, Slot slot)
@@ -580,9 +600,7 @@ namespace GBible
             var changes = DataModel.Diff(slot.Shadow, slot.Value, Identity);
             if (changes.Count == 0) return false;
             var where = changes[0].Path + (changes.Count > 1 ? $" 외 {changes.Count - 1}곳" : "");
-            var message = slot.Tracked
-                ? $"'{slot.Label}'이(가) 기록되지 않고 바뀌었습니다({where}). 위빙이 적용되지 않은 코드(미리 컴파일된 DLL·리플렉션)나 [PlayerData]가 없는 클래스에서 고쳤을 수 있습니다. Undo와 원인 기록에서 빠집니다."
-                : $"'{slot.Label}'이(가) Modify를 거치지 않고 바뀌었습니다({where}). Undo와 원인 기록에서 빠집니다. 행동 안에서 고치거나 state.Modify(\"{key}\", …)로 바꾸세요.";
+            var message = $"'{slot.Label}'이(가) Modify를 거치지 않고 바뀌었습니다({where}). Undo와 원인 기록에서 빠집니다. 행동 안에서 고치거나 state.Modify(\"{key}\", …)로 바꾸세요.";
             _lastEntry[key] = _journal.Append(JournalKind.Warning, "Data", message, key).Id;
             RefreshShadow(slot);
             Changed?.Invoke(key);
@@ -619,8 +637,10 @@ namespace GBible
                 foreach (var key in touched)
                 {
                     var slot = _slots[key];
-                    using (PlayerDataTracker.Silent()) slot.Value = DataModel.ApplyInPlace(slot.Value, slot.Shadow, Identity);
+                    slot.Value = DataModel.ApplyInPlace(slot.Value, slot.Shadow, Identity);
                 }
+                foreach (var key in SlotKeys())
+                    if (_slots[key].Mirror != null) RevertToMirror(_slots[key]);
                 throw;
             }
             _touched = null;
@@ -628,6 +648,12 @@ namespace GBible
             {
                 var slot = _slots[key];
                 Commit(key, slot, slot.Shadow);
+            }
+            // Mirror 데이터는 꺼냈는지와 상관없이 모두 비교한다(들고 있던 객체를 고쳐도 잡힌다).
+            foreach (var key in SlotKeys())
+            {
+                var slot = _slots[key];
+                if (slot.Mirror != null) SyncSlot(key, slot);
             }
         }
 
@@ -652,148 +678,9 @@ namespace GBible
         void Note(string key, Slot slot)
         {
             _reads?.Add(key);
-            if (_touched == null || slot.DataType == null || slot.Tracked || !_touched.Add(key)) return;
+            if (_touched == null || slot.DataType == null || slot.Mirror != null || !_touched.Add(key)) return;
             // 추적을 시작하기 전에 직접 바뀐 곳은 이번 변경과 섞지 않고 따로 경고한다(들고 있던 객체를 행동 밖에서 고친 경우).
             if (DetectUntrackedChanges) AdoptUntracked(key, slot);
-        }
-
-        // ── 쓰는 순간 기록(플레이어 데이터 클래스·시스템 컬렉션) ─────────
-        // 위빙된 필드 쓰기와 GameList·GameDictionary가 부른다. 이전 값·새 값을 Undo 단위(행동 안이면)와 Journal에 남기고 알린다.
-
-        internal void OnFieldWrite(PlayerDataTracker.Node node, object owner, string field, object old, object value)
-        {
-            if (!_slots.TryGetValue(node.Key, out var slot)) return;
-            // 객체를 갈아 끼우면 새 객체를 이 자리에 붙이고, 빠진 객체는 뗀다.
-            PlayerDataTracker.Detach(old);
-            PlayerDataTracker.Attach(value, this, node.Key, owner, field);
-            Record(node.Key, slot, new WriteRecord { Key = node.Key, Kind = DataWriteKind.Field, Target = owner, Member = field, Old = old, New = value },
-                Join(PathOf(owner), field));
-        }
-
-        internal void OnCollectionWrite(PlayerDataTracker.Node node, object collection, DataWriteKind kind, int index, object itemKey, object old, object value)
-        {
-            if (!_slots.TryGetValue(node.Key, out var slot)) return;
-            if (kind == DataWriteKind.Clear)
-            {
-                foreach (var item in (System.Collections.IList)old) PlayerDataTracker.Detach(ElementValue(item));
-            }
-            else
-            {
-                PlayerDataTracker.Detach(old);
-                PlayerDataTracker.Attach(value, this, node.Key, collection, null);
-            }
-            var where = PathOf(collection) + (itemKey != null ? $"[\"{itemKey}\"]" : index >= 0 ? $"[{index}]" : "");
-            Record(node.Key, slot, new WriteRecord { Key = node.Key, Kind = kind, Target = collection, Index = index, ItemKey = itemKey, Old = old, New = value }, where);
-        }
-
-        void Record(string key, Slot slot, WriteRecord record, string path)
-        {
-            slot.Written = true;
-            _active?.Writes.Add(record);
-            var change = new DataChange
-            {
-                Kind = record.Kind == DataWriteKind.Insert ? DataChangeKind.Insert : record.Kind == DataWriteKind.Remove || record.Kind == DataWriteKind.Clear ? DataChangeKind.Remove : DataChangeKind.Set,
-                Path = path,
-                Old = record.Kind == DataWriteKind.Clear ? $"{((System.Collections.IList)record.Old).Count}개 전부" : record.Old,
-                New = record.New,
-            };
-            LogChanges(key, slot, new List<DataChange> { change }, JournalKind.Data, null, _active?.Id ?? 0);
-            Changed?.Invoke(key);
-            DataChanged?.Invoke(key, new[] { change });
-            CheckRequired(key, slot);
-        }
-
-        // 객체가 플레이어 데이터 안 어디에 있는지(부모 연결을 거슬러 올라간 경로). 예: units[#3].hp
-        string PathOf(object target)
-        {
-            var parts = new List<string>();
-            for (var current = target; current != null && PlayerDataTracker.TryGetNode(current, out var node); current = node.Parent)
-            {
-                if (node.Parent == null) break;
-                if (node.Member != null) parts.Add(node.Member);
-                else parts.Add(ElementLabel(node.Parent, current));
-            }
-            parts.Reverse();
-            var builder = new System.Text.StringBuilder();
-            foreach (var part in parts)
-            {
-                if (builder.Length > 0 && !part.StartsWith("[", StringComparison.Ordinal)) builder.Append('.');
-                builder.Append(part);
-            }
-            return builder.ToString();
-        }
-
-        // 딕셔너리 비우기 기록의 요소(KeyValuePair)에서 값을 꺼낸다.
-        static object ElementValue(object item)
-        {
-            if (item == null) return null;
-            var type = item.GetType();
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)) return type.GetProperty("Value").GetValue(item);
-            return item;
-        }
-
-        string ElementLabel(object collection, object element)
-        {
-            if (DataModel.Of(element.GetType()).HasIdentity) return $"[#{Identity.IdOf(element)}]";
-            if (collection is System.Collections.IList list) return $"[{list.IndexOf(element)}]";
-            return "[]";
-        }
-
-        // 쓴 기록을 거꾸로 되돌린다(기록 없이). 되돌린 키를 돌려준다.
-        HashSet<string> RevertWrites(Transaction tx, string reason)
-        {
-            var keys = new HashSet<string>(StringComparer.Ordinal);
-            using (PlayerDataTracker.Silent())
-            {
-                for (int i = tx.Writes.Count - 1; i >= 0; i--)
-                {
-                    var write = tx.Writes[i];
-                    switch (write.Kind)
-                    {
-                        case DataWriteKind.Field:
-                            FieldOf(write.Target.GetType(), write.Member)?.SetValue(write.Target, write.Old);
-                            break;
-                        case DataWriteKind.Insert:
-                            ((IGameCollection)write.Target).RawRemove(write.Index, write.ItemKey);
-                            break;
-                        case DataWriteKind.Remove:
-                            ((IGameCollection)write.Target).RawInsert(write.Index, write.ItemKey, write.Old);
-                            break;
-                        case DataWriteKind.SetItem:
-                            ((IGameCollection)write.Target).RawSet(write.Index, write.ItemKey, write.Old);
-                            break;
-                        case DataWriteKind.Clear:
-                            ((IGameCollection)write.Target).RawRestore((System.Collections.IList)write.Old);
-                            break;
-                    }
-                    keys.Add(write.Key);
-                    _lastEntry[write.Key] = _journal.Append(JournalKind.Undo, "Data",
-                        $"{reason}: {LabelOf(write.Key)} {(write.Member ?? "")} {DataModel.Summary(write.New)} → {DataModel.Summary(write.Old)}".Replace("  ", " "), write.Key, null, null, tx.Id).Id;
-                }
-            }
-            // 되돌린 객체들을 다시 제자리에 붙이고 알린다.
-            foreach (var key in keys)
-            {
-                var slot = _slots[key];
-                Reattach(key, slot);
-                slot.Written = true;
-                Changed?.Invoke(key);
-                CheckRequired(key, slot);
-            }
-            return keys;
-        }
-
-        static readonly Dictionary<(Type, string), System.Reflection.FieldInfo> FieldCache = new Dictionary<(Type, string), System.Reflection.FieldInfo>();
-
-        static System.Reflection.FieldInfo FieldOf(Type type, string name)
-        {
-            lock (FieldCache)
-            {
-                if (FieldCache.TryGetValue((type, name), out var cached)) return cached;
-                var found = DataModel.Of(type).Fields.FirstOrDefault(f => f.Name == name)?.Field;
-                FieldCache[(type, name)] = found;
-                return found;
-            }
         }
 
         // ── 필수 값 ─────────────────────────────────────────────
@@ -873,6 +760,8 @@ namespace GBible
         {
             if (_active != null)
                 throw new InvalidOperationException($"[MomoiProject] 트랜잭션 '{_active.Label}'이 진행 중입니다. 행동 안에서 다른 행동을 실행할 수 없습니다.");
+            // 행동 밖에서 바뀐 것은 먼저 행동 밖 변경으로 남긴다(이 행동의 Undo에 섞이지 않게).
+            Sync();
             _active = new Transaction { Id = _nextTransactionId++, JournalId = journalId, Label = label };
             return _active;
         }
@@ -880,6 +769,7 @@ namespace GBible
         public void End()
         {
             if (_active == null) return;
+            Sync();
             var tx = _active;
             _active = null;
             if (!RecordHistory) return;
@@ -897,6 +787,7 @@ namespace GBible
         public void Abort()
         {
             if (_active == null) return;
+            Sync();
             var tx = _active;
             _active = null;
             Revert(tx, "중단");
@@ -911,14 +802,20 @@ namespace GBible
             readonly PlayerDataStore _store;
             readonly Transaction _suspended;
 
+            // 들어가기 전 변경은 진행 중인 행동의 것으로, 안의 변경은 이력 밖으로 Sync한다.
             public PermanentScope(PlayerDataStore store)
             {
                 _store = store;
+                store.Sync();
                 _suspended = store._active;
                 store._active = null;
             }
 
-            public void Dispose() => _store._active = _suspended;
+            public void Dispose()
+            {
+                _store.Sync();
+                _store._active = _suspended;
+            }
         }
 
         // 마지막 행동을 되돌린다. 이력에 남은 행동은 언제든(몇 번이든) 뒤에서부터 Undo할 수 있다.
@@ -927,6 +824,7 @@ namespace GBible
             if (_active != null)
                 throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 Undo할 수 없습니다.");
             if (_history.Count == 0) return false;
+            Sync();
 
             var tx = _history[_history.Count - 1];
             _history.RemoveAt(_history.Count - 1);
@@ -944,8 +842,19 @@ namespace GBible
         }
         void Revert(Transaction tx, string reason)
         {
-            // 쓰는 순간 기록된 쓰기부터 거꾸로.
-            if (tx.Writes.Count > 0) RevertWrites(tx, reason);
+            // Mirror 데이터: 뒤로 기록을 거꾸로 적용하고, 다시 Sync해 되돌린 내용을 기록·전파한다.
+            if (tx.Mirrored.Count > 0)
+            {
+                var keys = new List<string>();
+                for (int i = tx.Mirrored.Count - 1; i >= 0; i--)
+                {
+                    var changes = tx.Mirrored[i];
+                    if (!_slots.TryGetValue(changes.Key, out var mirrored) || mirrored.Mirror == null) continue;
+                    Mirror.Undo(mirrored.Value, changes);
+                    if (!keys.Contains(changes.Key)) keys.Add(changes.Key);
+                }
+                foreach (var key in keys) SyncSlot(key, _slots[key], JournalKind.Undo, $"{reason}: ", tx.Id);
+            }
             for (int i = tx.ValueChanges.Count - 1; i >= 0; i--)
             {
                 var change = tx.ValueChanges[i];
@@ -961,10 +870,9 @@ namespace GBible
             {
                 var record = tx.DataChanges[i];
                 var slot = _slots[record.Key];
-                if (DetectUntrackedChanges && !slot.Tracked) AdoptUntracked(record.Key, slot);
+                if (DetectUntrackedChanges) AdoptUntracked(record.Key, slot);
                 var before = slot.Shadow ?? DataModel.Clone(slot.Value, Identity);
-                using (PlayerDataTracker.Silent()) slot.Value = DataModel.ApplyInPlace(slot.Value, record.Before, Identity);
-                Reattach(record.Key, slot);
+                slot.Value = DataModel.ApplyInPlace(slot.Value, record.Before, Identity);
                 RefreshShadow(slot);
                 var changes = DataModel.Diff(before, slot.Value, Identity);
                 if (changes.Count == 0) continue;
@@ -1006,9 +914,15 @@ namespace GBible
                 var key = pair.Key;
                 var slot = pair.Value;
                 if (slot.Zone != zone || !tree.TryGetValue(key, out var saved)) continue;
-                if (slot.DataType != null)
+                if (slot.DataType != null && slot.Mirror != null)
                 {
-                    if (DetectUntrackedChanges && !slot.Tracked) AdoptUntracked(key, slot);
+                    SyncSlot(key, slot);
+                    slot.Value = LoadData(key, slot, saved);
+                    SyncSlot(key, slot, JournalKind.Undo, $"{reason}: ", 0);
+                }
+                else if (slot.DataType != null)
+                {
+                    if (DetectUntrackedChanges) AdoptUntracked(key, slot);
                     var before = slot.Shadow ?? DataModel.Clone(slot.Value, Identity);
                     slot.Value = LoadData(key, slot, saved);
                     RefreshShadow(slot);
@@ -1043,6 +957,8 @@ namespace GBible
                 if (slot.DataType != null)
                 {
                     slot.Value = LoadData(key, slot, pair.Value);
+                    // 불러온 값이 새 출발점: 기록 없이 사본을 다시 만든다.
+                    ChooseMirror(key, slot);
                     RefreshShadow(slot);
                     CheckRequired(key, slot);
                 }
@@ -1071,10 +987,7 @@ namespace GBible
             var warnings = new List<string>();
             var loaded = DataModel.FromTree(tree, slot.DataType, Identity, warnings, slot.Label);
             foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, key);
-            object result;
-            using (PlayerDataTracker.Silent()) result = DataModel.ApplyInPlace(slot.Value, loaded, Identity);
-            if (slot.Tracked) PlayerDataTracker.Attach(result, this, key, null, null);
-            return result;
+            return DataModel.ApplyInPlace(slot.Value, loaded, Identity);
         }
 
         public void ResetZone(DataZone zone)

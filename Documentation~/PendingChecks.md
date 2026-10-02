@@ -4,8 +4,8 @@
 
 ## 1. 컴파일·기본 동작 (먼저)
 - 이름 변경(GBible / MomoiProject) 뒤 Unity가 다시 컴파일하고 오류가 없는지. 상단 메뉴가 `MomoiProject`로 보이는지. 다이얼로그 기능이 켜진 채인지(옛 심볼 `GAME_SYSTEMS_*`가 `GBIBLE_*`로 바뀌어야 함, Player Settings › Scripting Define Symbols). 도감의 에셋(도전과제·대화 등)에 "형식을 찾을 수 없음"·빈 블록이 없는지. Addressables 그룹 이름 `MomoiProject Default`. 열려 있던 도감·상세 창이 이상하면 닫고 다시 열기.
-- Unity에서 다시 컴파일했을 때 콘솔 오류가 없는지. 특히 위빙 어셈블리 `Unity.GBible.CodeGen`(asmdef 이름을 바꿈)의 CS0246 오류가 사라졌는지.
-- 위빙이 실제로 도는지: `[PlayerData]` 클래스의 필드를 게임 코드에서 바꿨을 때 모니터의 기록에 남는지.
+- Unity에서 다시 컴파일했을 때 콘솔 오류가 없는지. 특히 `Unity.GBible.CodeGen`(Mirror 비교 코드 생성, ILPostProcessor)이 오류·경고 없이 도는지(콘솔에 "Mirror 비교 코드 생성 실패"가 없어야 함).
+- Mirror가 실제로 도는지: 플레이 중 플레이어 데이터(클래스)의 필드를 게임 코드에서 바꾸면 모니터의 기록에 `경로  옛 값 → 새 값`으로 남는지, 행동 Undo로 돌아가는지. 기록에 "예전 방식(리플렉션)으로 비교합니다" 경고가 뜨는 플레이어 데이터가 있으면 그 클래스에 [Serializable]이 빠진 것.
 - 저장 후 멈춤("Hold on") 재현 여부: 클래스를 만들고 필드 2개를 더한 뒤 저장.
 - EditMode 테스트(Test Runner): 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`. PlayMode 샘플 테스트 3개는 `샘플 › 샘플 데이터 만들기` 후.
 

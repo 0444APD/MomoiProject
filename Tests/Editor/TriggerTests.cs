@@ -259,8 +259,8 @@ namespace GBible.Tests
         [Serializable, PlayerData]
         public class TgBag
         {
-            public GameDictionary<string, int> counts = new GameDictionary<string, int>();
-            public GameDictionary<string, string> names = new GameDictionary<string, string>();
+            public Dictionary<string, int> counts = new Dictionary<string, int>();
+            public Dictionary<string, string> names = new Dictionary<string, string>();
         }
 
         [Test]
@@ -274,7 +274,7 @@ namespace GBible.Tests
             Assert.AreEqual(1, bag.counts["elixir"], "없던 키는 0에서");
             Assert.AreEqual("new", bag.names["a"], "숫자가 아니면 덮어쓴다");
             Assert.AreEqual("fresh", bag.names["b"]);
-            Assert.AreEqual(GrantKind.Dictionary, PlayerDataGrants.KindOf(typeof(GameDictionary<string, int>)));
+            Assert.AreEqual(GrantKind.Dictionary, PlayerDataGrants.KindOf(typeof(Dictionary<string, int>)));
 
             var problems = new List<string>();
             new PlayerDataReward { key = "bag", path = "counts", keys = { "x", "x" }, items = { "1", "abc" } }.Validate(typeof(TgBag), problems);

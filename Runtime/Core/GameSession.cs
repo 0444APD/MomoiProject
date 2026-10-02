@@ -148,7 +148,7 @@ namespace GBible
         public ActionRecord Do(GameAction action)
         {
             var record = Actions.Execute(action);
-            if (Data.DetectUntrackedChanges) Data.CheckUntrackedChanges();
+            Data.Sync();
             Achievements.Flush();
             return record;
         }
@@ -276,7 +276,7 @@ namespace GBible
             Clock.Advance(deltaTime);
             Achievements.Poll(Clock.Time);
             if (Data.InTransaction) return;
-            if (Data.DetectUntrackedChanges) Data.CheckUntrackedChanges();
+            Data.Sync();
             Achievements.Flush();
             if (Options.History == HistoryMode.Snapshots && Clock.Time - _lastSnapshotTime >= Options.SnapshotInterval)
                 CaptureSnapshot();
