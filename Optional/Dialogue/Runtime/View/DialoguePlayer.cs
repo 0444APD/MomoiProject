@@ -152,6 +152,9 @@ namespace GBible.Dialogue
             session.Data.Set(ProgressKey, progress == null ? "" : JsonUtility.ToJson(progress));
         }
 
+        // 진행 중인 다이얼로그 ID(없으면 null).
+        public string CurrentDialogue => _runner?.Progress?.dialogue;
+
         // 저장된 진행 기록이 있으면 그 대사부터 이어 간다(판을 불러온 뒤 부른다).
         public bool ResumeSaved()
         {

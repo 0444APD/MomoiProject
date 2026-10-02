@@ -360,6 +360,14 @@ namespace GBible.EditorTools.UI
             explorer.OpenInTab = _options.OpenNested;
             // 도감 항목(인스턴스 등)의 값: [Hide]·[ShowIf]·기능 필드 규칙대로.
             explorer.InstanceEditing = true;
+            // 값 안의 트리거·결과(예: 사용 기능)는 도감과 같은 편집기로. [BindTo]가 연결된 항목이면 결과 칸은 잠긴 보기.
+            var basePath = property.propertyPath;
+            explorer.BlockEditor = relative =>
+            {
+                _draftObject.Update();
+                var nested = _draftObject.FindProperty(basePath + "." + relative);
+                return nested == null ? null : GsPropertyEditor.BuildContent(nested, OnValueChanged, OnStructureChanged);
+            };
             return explorer;
         }
 

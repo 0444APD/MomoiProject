@@ -24,7 +24,7 @@ GameAudio.PlaySfx(clip);                 // 음량·피치
 GameAudio.PlaySfxAt(clip, position);     // 3D
 GameAudio.PlayUi(clip);
 GameAudio.Play(clip, AudioChannel.Sfx);  // 채널을 값으로
-var handle = GameAudio.PlaySfx(loopClip); handle.Stop(0.3f);
+var handle = GameAudio.PlaySfx(clip); handle.Stop(0.3f);   // 효과음은 한 번 재생(반복 재생은 지원하지 않는다 — 반복음은 배경음 채널로)
 GameAudio.Stop(AudioChannel.Sfx);  GameAudio.StopAll();
 GameAudio.SetVolume(AudioChannel.Master, 0.8f);  GameAudio.SetMuted(AudioChannel.Bgm, true);
 GameAudio.CurrentBgm; GameAudio.IsVoicePlaying; GameAudio.Playing(AudioChannel.Sfx);

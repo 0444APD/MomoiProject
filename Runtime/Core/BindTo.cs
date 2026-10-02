@@ -10,7 +10,7 @@ namespace GBible
     //
     // 함수 하나(static, 반환 void). 매개변수로 받고 싶은 것만 적는다:
     //   [BindTo(GameIds.Achievement.FirstBlood)]
-    //   static void FirstBlood(UnitKilled e, TriggerContext c) { c.Game.Data<Party>().gold += e.Reward; }
+    //   static void FirstBlood(UnitKilled e, TriggerContext c) { c.Game.Find<Unit>(e.killerId).gold += 100; }
     //   매개변수 = 없음 / (이벤트) / (TriggerContext) / (이벤트, TriggerContext).
     //   이벤트 매개변수의 형식이 받을 이벤트 형식이다: 트리거가 받은 이벤트가 그 형식일 때만 불린다(아니면 경고를 남기고 건너뜀).
     //   TriggerContext: Owner = 연결된 항목 ID, Event = 받은 이벤트, User·Picked = 사용한 순간의 사용자·대상, Game = GameApi.

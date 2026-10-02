@@ -171,10 +171,25 @@ namespace GBible
 
         public override TriggerKinds Kind => TriggerKinds.Event;
 
+        // 지금 형식 이름(옛 이름 GameSystems.… 으로 저장된 것도 지금 이름으로). 처음 한 번 찾아 둔다.
+        [NonSerialized] string _resolvedFrom;
+        [NonSerialized] string _resolved;
+
+        public string ResolvedType
+        {
+            get
+            {
+                if (_resolved != null && ReferenceEquals(_resolvedFrom, eventType)) return _resolved;
+                _resolvedFrom = eventType;
+                _resolved = string.IsNullOrEmpty(eventType) ? "" : TypeResolver.Find(eventType)?.FullName ?? eventType;
+                return _resolved;
+            }
+        }
+
         public override bool Test(TriggerContext moment)
         {
             var evt = moment?.Event;
-            if (evt == null || string.IsNullOrEmpty(eventType) || evt.GetType().FullName != eventType) return false;
+            if (evt == null || string.IsNullOrEmpty(eventType) || evt.GetType().FullName != ResolvedType) return false;
             return filter == null || filter.Test(evt);
         }
 
@@ -348,6 +363,12 @@ namespace GBible
         public override void Run(TriggerContext context)
         {
             var target = string.IsNullOrEmpty(stat) ? context.Owner : stat;
+            if (!context.Session.Stats.IsDefined(target))
+            {
+                context.Session.Journal.Append(JournalKind.Warning, "Outcomes",
+                    string.IsNullOrEmpty(stat) ? $"로그에 기록: 기록할 로그를 고르지 않았습니다({target}은(는) 로그가 아님)." : $"로그에 기록: 없는 로그 '{target}'입니다.");
+                return;
+            }
             var value = ValueOf(context.Event, out var error);
             if (error != null)
             {
@@ -498,7 +519,7 @@ namespace GBible
             if (when == null) return;
             var entry = new Entry { Owner = owner, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds() };
             _entries.Add(entry);
-            foreach (var type in when.Leaves().OfType<EventTrigger>().Select(e => e.eventType).Where(t => !string.IsNullOrEmpty(t)).Distinct())
+            foreach (var type in when.Leaves().OfType<EventTrigger>().Select(e => e.ResolvedType).Where(t => !string.IsNullOrEmpty(t)).Distinct())
             {
                 if (!_byEvent.TryGetValue(type, out var list)) _byEvent[type] = list = new List<Entry>();
                 list.Add(entry);

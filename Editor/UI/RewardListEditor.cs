@@ -56,11 +56,13 @@ namespace GBible.EditorTools.UI
         static void OpenScript(Type type)
         {
             while (type.DeclaringType != null) type = type.DeclaringType;
-            foreach (var guid in AssetDatabase.FindAssets(type.Name + " t:MonoScript"))
+            var pattern = new System.Text.RegularExpressions.Regex(@"\b(class|struct)\s+" + type.Name + @"\b");
+            // 파일 이름이 클래스 이름과 같은 것부터, 없으면 모든 스크립트에서 찾는다(파일 하나에 여러 클래스가 있을 때).
+            var named = AssetDatabase.FindAssets(type.Name + " t:MonoScript");
+            foreach (var guid in named.Concat(AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" }).Except(named)))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
-                var text = System.IO.File.ReadAllText(path);
-                if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"\b(class|struct)\s+" + type.Name + @"\b")) continue;
+                if (!path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || !pattern.IsMatch(System.IO.File.ReadAllText(path))) continue;
                 AssetDatabase.OpenAsset(AssetDatabase.LoadAssetAtPath<MonoScript>(path));
                 return;
             }

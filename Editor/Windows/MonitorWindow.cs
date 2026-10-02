@@ -656,7 +656,7 @@ namespace GBible.EditorTools
 
         // ── 데이터: 현재 세션·플레이어의 모든 값(분류별 폴더) ──────────
         // 판 데이터(세션 구역) · 프로필 데이터(메타 구역) · 수치 · 도전과제 달성. 클래스·컬렉션은 폴더로 들어가 배치대로 본다.
-        // 고치면 게임 코드와 같은 통로(Set·Modify)를 거쳐 기록되고 Undo할 수 있다.
+        // 고치면 행동 하나(DeveloperEditAction)로 Set·Modify를 거쳐 기록되고 Undo 버튼으로 되돌릴 수 있다.
 
         GsDataExplorer _dataExplorer;
 
@@ -675,11 +675,17 @@ namespace GBible.EditorTools
                     Value = state.Get(key),
                     Type = type ?? state.Get(key)?.GetType(),
                 };
-                if (state.IsData(key)) item.Apply = change => state.Modify<object>(key, _ => change());
+                // 고치는 일은 행동 하나로(Undo 버튼으로 되돌린다). 행동 중이면(드묾) 그 자리에서.
+                void AsAction(Action edit)
+                {
+                    if (state.InTransaction) edit();
+                    else session.Do(new DeveloperEditAction { label = $"모니터에서 {state.LabelOf(key)} 고침", Edit = edit });
+                }
+                if (state.IsData(key)) item.Apply = change => AsAction(() => state.Modify<object>(key, _ => change()));
                 else
                 {
-                    item.Set = value => state.Set(key, value);
-                    item.Apply = change => change();
+                    item.Set = value => AsAction(() => state.Set(key, value));
+                    item.Apply = change => AsAction(change);
                 }
                 return item;
             }
@@ -1088,7 +1094,7 @@ namespace GBible.EditorTools
                     _eventTypeName = t.FullName;
                     BuildTab();
                 });
-                item.SetCount(_session.Events.SubscriberCount(type) > 0 ? $"구독 {_session.Events.SubscriberCount(type)}" : "");
+                item.SetCount(_session.Events.SubscriberCount(type) > 0 ? $"받는 곳 {_session.Events.SubscriberCount(type)}" : "");
                 item.SetActive(type == selected);
                 item.tooltip = type.FullName;
                 list.Add(item);
@@ -1130,7 +1136,7 @@ namespace GBible.EditorTools
             repeat.AddToClassList("gs-inline");
             actions.Add(repeat);
             actions.Add(DockUnit("회"));
-            var fire = new GsButton("이벤트 받기", () =>
+            var fire = new GsButton("이벤트 호출", () =>
             {
                 try
                 {

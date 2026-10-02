@@ -698,8 +698,10 @@ namespace GBible
                 node.Walk = walk;
                 if (node.Origin is T found)
                 {
+                    // id 필드(사본의 값), 없으면 id 속성(생성 코드로 읽기).
                     var field = node.Type.FindIdField();
-                    if (field >= 0 && string.Equals((string)node.R[field], id)) return found;
+                    var nodeId = field >= 0 ? (string)node.R[field] : (FieldAccess.Read(found, "id") ?? FieldAccess.Read(found, "Id")) as string;
+                    if (string.Equals(nodeId, id)) return found;
                 }
                 var start = stack.Count;
                 PushChildren(node, stack);

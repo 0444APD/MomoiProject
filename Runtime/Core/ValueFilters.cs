@@ -124,7 +124,7 @@ namespace GBible
         [FieldLabel("조건")] public ValueFilter filter;
 
         public override IEnumerable<ValueFilter> Children => filter == null ? Array.Empty<ValueFilter>() : new[] { filter };
-        public override bool Test(object root) => filter == null || !filter.Test(root);
+        public override bool Test(object root) => filter != null && !filter.Test(root);
         public override string Describe() => $"!({DescribeOrAll(filter)})";
         public override string Explain() => "아래 조건을 만족하지 않는다면";
         public override string Natural() => filter == null ? "아님" : $"({filter.Natural()}) 아님";

@@ -1083,14 +1083,16 @@ namespace GBible.EditorTools
             {
                 case AchievementData achievement:
                     var when = achievement.EffectiveTrigger;
-                    var outcomes = achievement.EffectiveOutcomes.Select(o => o.Natural(names)).ToList();
+                    var outcomes = BoundOutcomes.Has(achievement.Id) ? BoundOutcomes.For(achievement.Id).Select(c => "코드: " + c.Name).ToList()
+                                 : achievement.EffectiveOutcomes.Select(o => o.Natural(names)).ToList();
                     return new List<(string, string)>
                     {
                         ("트리거", when != null ? Gs.Dual(when.Natural(names), when.Describe(names)) : "트리거 없음"),
                         ("결과", outcomes.Count > 0 ? string.Join(",  ", outcomes) : "없음"),
                     };
                 case AbilityData ability:
-                    var abilityOutcomes = ability.ToDefinition().Outcomes.Select(o => o.Natural(names)).ToList();
+                    var abilityOutcomes = BoundOutcomes.Has(ability.Id) ? BoundOutcomes.For(ability.Id).Select(c => "코드: " + c.Name).ToList()
+                                        : ability.ToDefinition().Outcomes.Select(o => o.Natural(names)).ToList();
                     return new List<(string, string)>
                     {
                         ("트리거", ability.trigger != null ? Gs.Dual(ability.trigger.Natural(names), ability.trigger.Describe(names)) : "사용할 때"),
@@ -1099,11 +1101,13 @@ namespace GBible.EditorTools
                 case StatData stat:
                     var rules = stat.AllRules().Select(r => r.Natural(names)).ToList();
                     var rulesCode = stat.AllRules().Select(r => r.Describe(names)).ToList();
-                    return new List<(string, string)>
+                    var statLines = new List<(string, string)>
                     {
                         ("방식", $"{(stat.scope == StatScope.Run ? "이번 판" : "누적")} · {StatSystem.AggregateText(stat.aggregate)}"),
                         ("반영", rules.Count > 0 ? Gs.Dual(string.Join("\n", rules), string.Join("\n", rulesCode)) : "반영 규칙 없음"),
                     };
+                    if (BoundOutcomes.Has(stat.Id)) statLines.Add(("결과", string.Join(",  ", BoundOutcomes.For(stat.Id).Select(c => "코드: " + c.Name)) + " (로그에 기록 대신)"));
+                    return statLines;
             }
             return null;
         }

@@ -73,6 +73,8 @@ namespace GBible
         {
             public string Name;
             public bool Plural;
+            // selectordinal: 순서 수(1st·2nd·3rd …) 규칙.
+            public bool Ordinal;
             public double Offset;
             public readonly List<(string key, Node[] body)> Cases = new List<(string, Node[])>();
         }
@@ -239,7 +241,7 @@ namespace GBible
             {
                 if (i >= s.Length || s[i] != ',') throw Error(s, i, $"'{type}' 뒤에 ','와 경우들이 와야 합니다");
                 i++;
-                var choice = new ChoiceNode { Name = name, Plural = type != "select" };
+                var choice = new ChoiceNode { Name = name, Plural = type != "select", Ordinal = type == "selectordinal" };
                 while (true)
                 {
                     SkipSpace(s, ref i);
@@ -422,7 +424,7 @@ namespace GBible
                     }
                 if (body == null)
                 {
-                    var category = PluralRules.Category(ctx.Language, pound.Value);
+                    var category = choice.Ordinal ? PluralRules.Ordinal(ctx.Language, pound.Value) : PluralRules.Category(ctx.Language, pound.Value);
                     body = choice.Cases.FirstOrDefault(c => c.key == category).body;
                 }
             }

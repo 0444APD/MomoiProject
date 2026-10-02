@@ -83,6 +83,26 @@ namespace GBible
         }
 
         // "zh-Hant-TW" → "zh", "pt-BR" → "pt"
+        // 순서 수 구분(selectordinal): 영어 1st·2nd·3rd·4th(one·two·few·other), 프랑스어 1er(one). 그 밖의 언어는 other.
+        public static string Ordinal(string language, double n)
+        {
+            var i = (long)Math.Floor(Math.Abs(n));
+            var i10 = i % 10;
+            var i100 = i % 100;
+            switch (BaseLanguage(language))
+            {
+                case "en":
+                    if (i10 == 1 && i100 != 11) return "one";
+                    if (i10 == 2 && i100 != 12) return "two";
+                    if (i10 == 3 && i100 != 13) return "few";
+                    return "other";
+                case "fr":
+                    return i == 1 ? "one" : "other";
+                default:
+                    return "other";
+            }
+        }
+
         public static string BaseLanguage(string language)
         {
             if (string.IsNullOrEmpty(language)) return "";

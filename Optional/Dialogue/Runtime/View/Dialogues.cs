@@ -94,7 +94,9 @@ namespace GBible.Dialogue
         public static bool ResumeSaved()
         {
             var player = Ensure();
-            return player != null && player.ResumeSaved();
+            if (player == null || !player.ResumeSaved()) return false;
+            Started?.Invoke(player.CurrentDialogue);
+            return true;
         }
 
         public static bool Advance() => _player != null && _player.Advance();

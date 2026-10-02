@@ -108,9 +108,21 @@ namespace GBible
         public object Find(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
-            var all = new List<object>();
-            foreach (var key in DataKeys()) Collect(Session.Data.Get(key), all, 0);
-            return all.FirstOrDefault(item => IdMember(item.GetType()) != null && IdOf(item) == id);
+            foreach (var key in DataKeys())
+            {
+                // Mirror 데이터는 사본 나무에서(리플렉션 없음), 예전 방식 데이터는 필드를 훑어서.
+                var mirror = Session.Data.SyncedMirror(key);
+                if (mirror != null)
+                {
+                    if (Mirror.FindById<object>(mirror, id) is { } hit) return hit;
+                    continue;
+                }
+                var all = new List<object>();
+                Collect(Session.Data.Get(key), all, 0);
+                var found = all.FirstOrDefault(item => IdMember(item.GetType()) != null && IdOf(item) == id);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         // 단순 값(숫자·글자 등) 플레이어 데이터.

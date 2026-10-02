@@ -189,6 +189,18 @@ namespace GBible.Dialogue
 
         // 지금까지의 진행 기록(저장용 사본). 다이얼로그 중이 아니면 null.
         public DialogueProgress Progress => IsActive && _progress != null ? _progress.Clone() : null;
+
+        // '값 바꾸기' 노드: 행동 하나로 실행한다(Undo 한 단위·변경 한 묶음). 이미 행동 안이면(도전과제 보상이 연 다이얼로그 등) 그 자리에서.
+        void GrantAsAction(SetNode set)
+        {
+            if (Session.Data.InTransaction)
+            {
+                foreach (var reward in set.rewards)
+                    reward?.Grant(Session);
+                return;
+            }
+            else Session.Do(new DialogueSetAction { dialogue = Dialogue?.Id, node = set.guid, Rewards = set.rewards });
+        }
         // 불러오기 위해 길을 다시 밟는 중(값 바꾸기·신호를 하지 않는다).
         public bool Replaying => _replay != null;
         public DialogueRunner(Func<string, DialogueData> dialogues, Func<string, EffectPresetData> presets)
@@ -470,9 +482,7 @@ namespace GBible.Dialogue
                         node = Dialogue.graph.Next(branch, pass ? BranchNode.TruePort : BranchNode.FalsePort);
                         break;
                     case SetNode set:
-                        if (Session != null && !Replaying)
-                            foreach (var reward in set.rewards)
-                                reward?.Grant(Session);
+                        if (Session != null && !Replaying) GrantAsAction(set);
                         node = Dialogue.graph.Next(set, SetNode.NextPort);
                         break;
                     case SignalNode signal:
@@ -877,6 +887,23 @@ namespace GBible.Dialogue
                 else if (!inTag) count++;
             }
             return count;
+        }
+    }
+    // 다이얼로그의 '값 바꾸기' 노드 실행 = 행동 하나(Undo 한 단위). 바꿀 값(보상 블록)은 노드의 것을 그대로 쓴다.
+    [Serializable]
+    public sealed class DialogueSetAction : GameAction, ISelfRunningAction
+    {
+        public string dialogue;
+        public string node;
+        [NonSerialized] public List<Reward> Rewards;
+
+        public override string Describe() => $"다이얼로그 값 바꾸기 ({dialogue})";
+
+        void ISelfRunningAction.Run(GameApi game)
+        {
+            if (Rewards == null) return;
+            foreach (var reward in Rewards)
+                reward?.Grant(game.Session);
         }
     }
 }

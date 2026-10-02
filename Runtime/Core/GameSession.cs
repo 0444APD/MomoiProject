@@ -186,8 +186,8 @@ namespace GBible
                 JournalId = Journal.LastId,
                 Tick = Clock.Tick,
                 Time = Clock.Time,
-                Session = Data.Export(DataZone.Session, report: false),
-                Meta = Data.Export(DataZone.Meta, report: false),
+                Session = Data.Export(DataZone.Session, report: false, keepReferences: true),
+                Meta = Data.Export(DataZone.Meta, report: false, keepReferences: true),
                 Random = Random.ExportStates(),
             });
             _lastSnapshotTime = Clock.Time;

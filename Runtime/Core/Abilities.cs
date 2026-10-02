@@ -136,8 +136,9 @@ namespace GBible
             // 코드로 쓴 결과가 연결되어 있으면([BindTo]) 그것이 이 능력의 결과다(에디터에서 고른 결과 대신).
             if (BoundOutcomes.Has(definition.Id)) copy.Outcomes.AddRange(BoundOutcomes.Create(definition.Id));
             else copy.Outcomes.AddRange(definition.Outcomes.Where(o => o != null).Select(o => (Outcome)DataModel.Clone(o, null)));
-            copy.Targets.AddRange(definition.Targets.Where(t => t != null).Select(t => (TargetSelector)DataModel.Clone(t, null)));
-            copy.Effects.AddRange(definition.Effects.Where(e => e != null).Select(e => (Effect)DataModel.Clone(e, null)));
+            // 연결된 코드가 결과 전체다: 예전 짧은 형식(대상·효과)도 쓰지 않는다.
+            if (!BoundOutcomes.Has(definition.Id)) copy.Targets.AddRange(definition.Targets.Where(t => t != null).Select(t => (TargetSelector)DataModel.Clone(t, null)));
+            if (!BoundOutcomes.Has(definition.Id)) copy.Effects.AddRange(definition.Effects.Where(e => e != null).Select(e => (Effect)DataModel.Clone(e, null)));
             _definitions[copy.Id] = copy;
         }
 

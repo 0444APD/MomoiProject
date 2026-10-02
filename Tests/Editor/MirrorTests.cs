@@ -118,6 +118,14 @@ namespace GBible.Tests
     }
 
     [Serializable]
+    public class MtOptional
+    {
+        public int? maybe;
+        public MtMood? mood;
+        public List<float?> many = new List<float?>();
+    }
+
+    [Serializable]
     public class MtLoop
     {
         public string name;
@@ -416,6 +424,30 @@ namespace GBible.Tests
 
             var copy = Mirror.Clone(w);
             Assert.AreSame(copy.items[0], copy.byName["first"], "복사본도 공유를 지킨다");
+        }
+
+        [Test]
+        public void 비어_있을_수_있는_값_int_물음표()
+        {
+            Mirror.Initialize();
+            Assert.IsTrue(Mirror.Supports(typeof(MtOptional), out var reason), reason);
+            var live = new MtOptional();
+            var node = Mirror.Make(live);
+            var receiver = new MirrorReceiver();
+            var client = (MtOptional)receiver.Load(Mirror.Snapshot(node));
+            live.maybe = 3;
+            live.mood = MtMood.Angry;
+            live.many.Add(null);
+            live.many.Add(1.5f);
+            var changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            receiver.Apply(client, changes);
+            Assert.AreEqual(3, client.maybe);
+            Assert.AreEqual(MtMood.Angry, client.mood);
+            CollectionAssert.AreEqual(new float?[] { null, 1.5f }, client.many);
+            Mirror.Undo(live, changes);
+            Assert.IsNull(live.maybe);
+            Assert.AreEqual(0, live.many.Count);
         }
 
         [Test]

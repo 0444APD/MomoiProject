@@ -112,6 +112,10 @@ namespace GBible
                 foreach (var instance in database.All<InstanceData>())
                     if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
+                // [BindTo] ID가 어느 항목(도전과제·로그·능력·사용 기능 인스턴스)에도 없으면 알린다(오타·지운 항목).
+                foreach (var id in BoundOutcomes.Ids)
+                    if (!session.Achievements.IsDefined(id) && !session.Stats.IsDefined(id) && session.Abilities.Get(id) == null)
+                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 도전과제·로그·능력·사용 기능 인스턴스가 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
                 session.Achievements.EvaluateAll();
             }
 

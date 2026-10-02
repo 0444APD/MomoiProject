@@ -36,7 +36,7 @@ public static class Board
 public class MoveUnit : GameAction<Unit>
 {
     public int x, y;
-    protected override void Run(Unit u) { u.x = x; u.y = y; }      // 그냥 대입 → 쓰는 순간 기록
+    protected override void Run(Unit u) { u.x = x; u.y = y; }      // 그냥 대입 → 행동 끝 Sync에서 기록
 }
 
 // 효과 Block: 도감 › 능력에서 조립하고 수치를 정한다.

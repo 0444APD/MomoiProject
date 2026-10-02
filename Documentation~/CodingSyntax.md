@@ -26,7 +26,8 @@ public class Unit { public string id; public int hp; public List<string> buffs =
 - **하는 일**: 특별한 문법이 없다. 필드를 그냥 고치고(`u.hp -= 3`), `List`·`Dictionary`·배열·구조체를 그대로 쓴다. private 필드는 `[SerializeField]`(Unity와 같은 규칙).
 - **기록되는 방식(Mirror)**: 시스템이 플레이어 데이터의 사본(Mirror)을 들고 있다가 행동이 끝날 때·Modify가 끝날 때·프레임이 끝날 때 Sync해서, 바뀐 곳만 경로로 기록한다(`units[#3].hp 30 → 20`). 행동 안의 변경은 그 행동의 Undo 단위(ChangeSet)가 되고, 같은 ChangeSet을 다른 쪽에 보내면 그대로 같아진다(멀티플레이).
 - **조건**: 클래스·구조체에 `[Serializable]`(컴파일할 때 `GBible.CodeGen`이 그 형식 안에 비교 코드를 만든다). 없으면 예전 방식(리플렉션 비교)으로 동작하고 기록에 경고가 남는다.
-- **다루지 않는 것**: 중첩 컬렉션(`List<List<int>>`) — 그 데이터는 예전 방식. 델리게이트 필드는 데이터가 아니라 빠진다. 같은 객체를 두 곳에서 가리키면 두 곳 모두 비교되지만, 받는 쪽·되돌린 뒤에는 각자 다른 객체가 될 수 있다(오래 들고 있을 것은 id로).
+- **다루지 않는 것**: 중첩 컬렉션(`List<List<int>>`) — 그 데이터는 예전 방식. 델리게이트·`object` 필드가 있으면 Define에서 오류(데이터가 아님 / 형식을 알 수 없음).
+- **같은 객체를 두 곳에서**: 가리켜도 된다(서로 가리키는 객체 포함). 변경은 한 번만 기록되고, 받는 쪽(MirrorReceiver)·되돌린 뒤에도 같은 인스턴스다.
 
 ### `Game.Data()` — 플레이어 데이터를 이름으로
 ```csharp
@@ -57,7 +58,7 @@ Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 �
   - 이름은 ID를 파스칼 표기로 바꾼 것(`player.gold` → `PlayerGold`, `ability.splash` → `AbilitySplash`)
   - `GameIds.PlayerData.PlayerGold` → `PlayerDataKey<int>` (형식이 붙은 플레이어 데이터 키, `.Id`가 ID 문자열)
   - `GameIds.Ability.AbilitySplash`, `GameIds.Achievement.FirstHunt` … → ID 문자열
-  - 키워드는 그룹별: `GameIds.Keyword.Grade.Legendary`
+  - 키워드는 코드 자체가 상수다: `Rarity.Legendary`([KeywordGroup] 클래스의 const)
 - 문자열을 직접 쓰면 오타가 런타임에야 드러나므로 이걸 쓴다.
 
 ### `Game.Get<T>(key)` / `Game.Set(key, value)`
@@ -94,7 +95,7 @@ Game.Do(new MoveUnit { target = unit.id, x = 3, y = 4 });
 
 ### `Game.Do(action)` 안에서 시스템이 하는 일
 1. 행동을 Journal에 남긴다.
-2. `Run` 안의 쓰기를 이 행동의 Undo 단위로 묶는다. 플레이어 데이터 클래스는 쓰는 순간 기록되고, 아닌 클래스는 꺼낸 값을 끝날 때 비교해 기록한다. → **Modify 같은 감싸기가 필요 없는 이유**.
+2. `Run` 안의 쓰기를 이 행동의 Undo 단위로 묶는다. 플레이어 데이터는 행동이 끝날 때 Sync가 사본과 비교해 바뀐 곳을 기록한다(Mirror). → **Modify 같은 감싸기가 필요 없는 이유**.
 3. 예외가 나면 그 행동이 바꾼 것을 전부 되돌리고 예외를 다시 던진다.
 4. 끝난 뒤 관련 조건(도전과제)을 다시 평가한다.
 
@@ -122,7 +123,7 @@ Game.Do(new MoveUnit { target = unit.id, x = 3, y = 4 });
 | 로그(`StatData.triggers`) | 이벤트 받기 | 로그에 기록 하나로 고정(세부 칸만) |
 | 도전과제(`AchievementData`) | 이벤트 받기 · 조건 충족 | 전부 |
 | 능력(`AbilityData`) | 사용 · 조건 충족(기본 `사용`, AND로 사용 조건) | 대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과 |
-| 아이템의 `사용` 기능(`UsableFeature`) | 능력과 같음 | 능력과 같음 |
+| 인스턴스의 사용 기능(`Usable` 필드) | 능력과 같음 | 능력과 같음 |
 
 - **AND**: 이벤트를 받은 그 순간에 조건도 참이어야 발동한다(예: "보스 처치 받기 AND 골드 100 이상"). 서로 다른 이벤트 둘을 AND로 묶으면 같은 순간에 오지 않으니 검증이 경고한다.
 - **OR**: 어느 쪽이든 먼저 참이 되는 순간에 발동한다.
@@ -276,7 +277,7 @@ Block 클래스에는 `[Serializable]`도 필수. 둘 다 계약 테스트가 �
 | 어트리뷰트 | 칸이 하는 일 |
 |---|---|
 | `[FieldLabel("설명")]` | 마우스를 올리면 보이는 설명 |
-| `[DataRef(typeof(AbilityData))]` (string 필드) | 그 도감 종류의 항목 목록에서 고르기. 키워드는 `typeof(KeywordData)` 또는 클래스 상세에서 그룹 연결 |
+| `[DataRef(typeof(AbilityData))]` (string 필드) | 그 도감 종류의 항목 목록에서 고르기. 키워드는 필드에 `[Keyword(typeof(그룹))]`(클래스 상세에서도 연결) |
 | `[PlayerDataRef]` (string) | 플레이어 데이터 목록에서 고르기 |
 | `[StatRef]` (string) | 로그 목록에서 고르기 |
 | `[AchievementRef]` (string) | 도전과제 목록에서 고르기 |
@@ -308,7 +309,7 @@ sub.Dispose();                                                              // �
 |---|---|
 | `Game.Random("이름").Range(min, max)` | 정수 `min` 이상 `max` 미만. 이름별로 따로 흐르는 결정론적 난수(같은 시드·같은 행동 → 같은 결과, Undo하면 되돌아감). 이름은 용도별로("damage", "loot") 나누면 한 곳의 소비가 다른 곳 결과를 흔들지 않는다. |
 | `Game.NewId("unit")` | "unit1", "unit2" … 소환처럼 개체를 새로 만들 때. 번호가 플레이어 데이터에 있어서 Undo·저장·멀티플레이에서도 같다. |
-| `Game.Session.CopyInstance("template.sword")` | 도감 › 인스턴스의 원본 사본(원본은 안 바뀜). 예: 행동 안에서 `bag.items.Add((Item)Game.Session.CopyInstance(id));` |
+| `Game.Session.CopyInstance("instance.sword")` | 도감 › 인스턴스의 원본 사본(원본은 안 바뀜). 예: 행동 안에서 `bag.items.Add((Item)Game.Session.CopyInstance(id));` |
 
 `UnityEngine.Random`·`System.Random`은 게임 로직에 쓰지 않는다(연출용 흔들림 정도만).
 

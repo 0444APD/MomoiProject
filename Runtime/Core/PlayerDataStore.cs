@@ -1034,15 +1034,21 @@ namespace GBible
                 }
                 foreach (var key in keys) SyncSlot(key, _slots[key], JournalKind.Undo, $"{reason}: ", tx.Id);
             }
+            // 단순 값: 행동이 남긴 값과 지금 값이 다르면 행동 밖에서 바뀐 것(되돌리면 덮인다).
+            var lastSeen = new HashSet<string>(StringComparer.Ordinal);
+            var overwritten = new List<string>();
             for (int i = tx.ValueChanges.Count - 1; i >= 0; i--)
             {
                 var change = tx.ValueChanges[i];
                 var slot = _slots[change.Key];
                 var current = slot.Value;
+                if (reason == "Undo" && lastSeen.Add(change.Key) && !Equals(current, change.New)) overwritten.Add(change.Key);
                 slot.Value = change.Old;
                 _lastEntry[change.Key] = _journal.Append(JournalKind.Undo, "Data", $"{reason}: " + Describe(change.Key, current, change.Old), change.Key, current, change.Old, tx.Id).Id;
                 Changed?.Invoke(change.Key);
             }
+            if (overwritten.Count > 0)
+                _journal.Append(JournalKind.Warning, "Data", $"Undo '{tx.Label}'가 행동 밖에서 바뀐 값을 덮었습니다: {string.Join(", ", overwritten)}. 되돌릴 수 있어야 하는 변경은 행동 안에서 하세요.");
 
             // 데이터 값: 행동 전 스냅샷으로 제자리 복원(인스턴스·요소 ID 유지).
             for (int i = tx.DataChanges.Count - 1; i >= 0; i--)
@@ -1066,18 +1072,28 @@ namespace GBible
         // 데이터 값은 저장 트리(필드 이름 기준, enum은 이름, 요소 ID 포함)로 바꿔 내보낸다.
 
         // report: 참조를 저장할 수 없는 등의 경고를 기록에 남길지(스냅샷처럼 자주 부를 때는 끈다).
-        public Dictionary<string, object> Export(DataZone zone, bool report = true)
+        // keepReferences: 메모리 안에서만 쓸 트리(되감기 스냅샷) — 에셋 참조를 ID 대신 그대로 둔다.
+        public Dictionary<string, object> Export(DataZone zone, bool report = true, bool keepReferences = false)
         {
             var result = new Dictionary<string, object>(StringComparer.Ordinal);
-            foreach (var pair in _slots)
+            var previous = DataModel.KeepReferences;
+            DataModel.KeepReferences = keepReferences;
+            try
             {
-                var slot = pair.Value;
-                if (slot.Zone != zone) continue;
-                var warnings = new List<string>();
-                result[pair.Key] = slot.DataType == null
-                    ? DataModel.ToTree(slot.Value, slot.Value?.GetType() ?? typeof(object), Identity, warnings, slot.Label)
-                    : DataModel.ToTree(slot.Value, slot.DataType, Identity, warnings, slot.Label);
-                if (report) foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, pair.Key);
+                foreach (var pair in _slots)
+                {
+                    var slot = pair.Value;
+                    if (slot.Zone != zone) continue;
+                    var warnings = new List<string>();
+                    result[pair.Key] = slot.DataType == null
+                        ? DataModel.ToTree(slot.Value, slot.Value?.GetType() ?? typeof(object), Identity, warnings, slot.Label)
+                        : DataModel.ToTree(slot.Value, slot.DataType, Identity, warnings, slot.Label);
+                    if (report) foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, pair.Key);
+                }
+            }
+            finally
+            {
+                DataModel.KeepReferences = previous;
             }
             return result;
         }

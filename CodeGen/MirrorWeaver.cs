@@ -304,6 +304,13 @@ namespace GBible.CodeGen
             {
                 var own = Own(type).ToList();
                 var all = Layout(type);
+                var rawParent = type.IsValueType || type.BaseType == null ? null : TryResolve(type.BaseType);
+                if (rawParent != null && rawParent.FullName != "System.Object" && BaseOf(type) == null && !IsTarget(rawParent))
+                {
+                    var lost = rawParent.Fields.Where(IsField).Select(f => f.Name).ToList();
+                    if (lost.Count > 0)
+                        Warn($"{type.FullName}: 부모 {rawParent.FullName}에 [Serializable]이 없어 그 필드({string.Join(", ", lost)})는 기록·비교하지 않습니다(Unity도 저장하지 않음). 부모에 [Serializable]을 붙이세요.");
+                }
                 foreach (var plan in own.Where(p => p.Kind == KNone))
                     Warn($"{type.FullName}.{plan.Field.Name}: 중첩 컬렉션·이 형식은 비교 코드로 다루지 않습니다(이 형식을 담은 플레이어 데이터는 예전 비교 방식).");
                 if (type.IsValueType) GenerateStruct(type, own);
@@ -469,6 +476,7 @@ namespace GBible.CodeGen
                 EmitDelegate(il, create, "MirrorNewFn`1", type);
                 EmitDelegate(il, apply, "MirrorApplyFn`1", type);
                 il.Emit(OpCodes.Call, Code("RegisterClass", type));
+                EmitNullables(il, all);
                 EmitAccessRegister(il, type, access);
                 il.Emit(OpCodes.Ret);
             }
@@ -654,6 +662,16 @@ namespace GBible.CodeGen
                 }
                 il.Append(done);
                 return access;
+            }
+
+            // int? 같은 Nullable<T> 필드·요소가 있으면 그 값 연산을 등록한다(MirrorCode.RegisterNullable<T>).
+            void EmitNullables(ILProcessor il, List<FieldPlan> plans)
+            {
+                var seen = new HashSet<string>();
+                foreach (var plan in plans)
+                    foreach (var type in new[] { plan.Field.FieldType, plan.A, plan.B })
+                        if (type is GenericInstanceType g && g.ElementType.FullName == "System.Nullable`1" && seen.Add(g.GenericArguments[0].FullName))
+                            il.Emit(OpCodes.Call, Code("RegisterNullable", g.GenericArguments[0]));
             }
 
             // FieldAccess에 이 형식의 멤버 이름·종류·읽기·쓰기를 등록한다.
@@ -936,6 +954,7 @@ namespace GBible.CodeGen
                 EmitDelegate(il, write, "MirrorWriteFn`1", type);
                 EmitDelegate(il, read, "MirrorValueReadFn`1", type);
                 il.Emit(OpCodes.Call, Code("RegisterStruct", type));
+                EmitNullables(il, own);
                 EmitAccessRegister(il, type, access);
                 il.Emit(OpCodes.Ret);
             }

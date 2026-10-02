@@ -149,7 +149,7 @@ state.Modify(GameIds.PlayerData.PlayerInventory, inv =>
 });
 ```
 
-람다 안에서는 무엇을 해도 됩니다. 여러 필드를 바꾸든, 추가·삭제·정렬을 하든 저장소가 전후를 비교해 바뀐 곳을 모두 찾습니다. 람다 안에서 오류가 나면 바꾸기 전으로 자동 복원됩니다.
+`Modify`는 한 번에 여러 곳을 고치고 끝에 바로 기록하고 싶을 때 쓰는 편의 기능입니다(꺼낸 객체를 그냥 고쳐도 됩니다 — 4.3). 람다 안에서 오류가 나면 바꾸기 전으로 자동 복원됩니다.
 
 통째로 바꿀 때는 `Set`을 씁니다. 이때도 게임 코드가 쥐고 있는 인스턴스는 그대로 유지되고 내용만 바뀝니다.
 
@@ -157,14 +157,14 @@ state.Modify(GameIds.PlayerData.PlayerInventory, inv =>
 state.Set(GameIds.PlayerData.PlayerInventory, new Inventory { gold = 0 });
 ```
 
-### 4.3 읽은 인스턴스를 직접 고치면 안 됩니다
+### 4.3 읽은 인스턴스를 직접 고쳐도 됩니다
 
 ```csharp
 var inv = state.Get(GameIds.PlayerData.PlayerInventory);
-inv.gold = 999;   // 잘못된 예: 저장소가 이 변화를 모릅니다
+inv.gold = 999;   // 됩니다: 행동이 끝날 때(또는 프레임 끝에) Sync가 바뀐 곳을 찾아 기록합니다
 ```
 
-값은 바뀌지만 Undo·기록·도전과제가 이 순간을 놓칩니다. 개발 빌드에서는 행동이 끝날 때와 프레임 끝에 이런 변경을 찾아 "Modify를 거치지 않고 바뀌었습니다" 경고를 남기고 받아들입니다. 이 변경은 Undo로 되돌아가지 않습니다.
+`[Serializable]` 데이터 클래스는 시스템이 사본(Mirror)을 들고 있다가 Sync할 때 바뀐 곳만 기록합니다. 그래서 `Modify` 없이 꺼낸 객체를 그냥 고쳐도 Undo·기록·도전과제가 모두 따라옵니다. 다만 **행동 밖**에서 고친 것은 "행동 밖 변경"으로 기록되고 Undo 단위에는 들어가지 않습니다(되돌릴 수 있어야 하는 변경은 행동 안에서). `[Serializable]`이 없는 클래스(예전 방식)만 `Modify`를 거쳐야 하며, 개발 빌드에서 "Modify를 거치지 않고 바뀌었습니다" 경고가 남습니다. 자세한 것은 `Manual/01-PlayerData.md`, `Manual/02-Actions-Undo.md`.
 
 ---
 
@@ -399,18 +399,27 @@ public class MonsterData : GameData
 
 ### 11.5 키워드와 필드 연결
 
-등급·부위·속성·태그처럼 식별에 쓰는 string 값은 모두 **키워드**입니다. 키워드는 **키워드 그룹** 아래에 둡니다. 도감의 **키워드** 탭 한 화면에서 그룹과 키워드를 만들고, 끌어서 순서를 바꾸거나 다른 그룹으로 옮깁니다.
+등급·부위·속성·태그처럼 식별에 쓰는 string 값은 모두 **키워드**입니다. 키워드는 코드입니다: `[KeywordGroup("표시 이름")]`을 붙인 static 클래스의 `const string`이 키워드이고, 안쪽 static 클래스가 하위 그룹입니다. 도감의 **키워드** 탭에서 만들고 고쳐도 같은 코드가 써집니다(Ctrl+S로 저장).
 
-| 그룹 | 키워드 | 연결할 필드 | 고르는 개수 |
-|---|---|---|---|
-| 등급 | 일반 · 레어 · 전설 | `SampleEquipment.grade` (`string`) | 하나 |
-| 장비 태그 | 근접 · 원거리 · 도트 | `SampleEquipment.tags` (`List<string>`) | 여러 개 |
+```csharp
+[KeywordGroup("등급")]
+public static class Rarity
+{
+    public const string Common = "common";
+    public const string Legendary = "legendary";
+}
 
-코드에는 어트리뷰트 없이 빈 `string` 또는 `List<string>` 필드만 둡니다. 하나인지 여러 개인지는 필드 형식으로 정해집니다.
+[Serializable]
+public class SampleEquipment
+{
+    [Keyword(typeof(Rarity))] public string grade;              // 하나
+    [Keyword(typeof(EquipTags))] public List<string> tags;      // 여러 개
+}
+```
 
-연결은 도감의 **클래스** 탭에서 합니다. 클래스를 눌러 클래스 상세를 열고, 필드의 `키워드 그룹` 값을 눌러 그룹을 고르거나 `+ 새 그룹 만들어 연결`로 그룹과 키워드를 한 번에 만들어 연결합니다. 편집 칸에서 오른쪽 클릭 › `키워드 연결…`로도 그 클래스의 상세가 열립니다. 키워드 탭의 그룹 카드에는 그 그룹에 연결된 필드가 나열되고, 누르면 그 클래스의 상세로 갑니다. 코드에서는 `GameIds.Keyword.Grade.Legendary`처럼 씁니다.
+필드 연결은 필드의 `[Keyword(typeof(그룹))]`입니다. 도감의 **클래스** 탭(클래스 상세의 '키워드 연결')에서 골라도 같은 어트리뷰트가 코드에 붙습니다. 하나인지 여러 개인지는 필드 형식으로 정해집니다. 비면 안 되는 값은 필드 규칙의 '필수'로 정합니다. 자세한 것은 `Manual/05-Keywords.md`.
 
-연결하면 **필드 규칙**이 자동으로 만들어집니다(따로 탭은 없고, 클래스 상세에서 보고 고칩니다).
+**필드 규칙**(값 출처·필수)은 클래스 상세에서 보고 고칩니다.
 
 | 칸 | 뜻 |
 |---|---|
@@ -449,7 +458,7 @@ public class MonsterData : GameData
 
 ## 13. 멀티플레이(방향, 아직 구현 전)
 
-게임 코드의 문법은 싱글과 같습니다. 유형 A(턴제 경쟁, 서버 권한)는 서버가 매치 세션을 가지고, 바뀐 경로 목록을 클라이언트에 보냅니다. 클라이언트는 행동만 보낼 수 있습니다. 유형 B(친구 방, 방장 권한)는 방장이 방의 세션을 가지고 같은 방식으로 전달합니다. Undo용으로 만든 경로 단위 변경 기록을 그대로 네트워크 동기화에 씁니다.
+게임 코드의 문법은 싱글과 같습니다. 유형 A(턴제 경쟁, 서버 권한)는 서버가 매치 세션을 가지고, 바뀐 경로 목록을 클라이언트에 보냅니다. 클라이언트는 행동만 보낼 수 있습니다. 유형 B(친구 방, 방장 권한)는 방장이 방의 세션을 가지고 같은 방식으로 전달합니다. Undo용으로 만든 변경 기록(ChangeSet의 앞으로 기록)을 그대로 네트워크 동기화에 씁니다. 처음 들어온 쪽은 `session.Data.Snapshot(key)`를 받고, 이후 `Synced`로 오는 변경을 `MirrorReceiver.Apply`로 적용합니다(두 곳에서 가리키는 객체도 같은 인스턴스). 통신 부분은 아직 없습니다.
 
 ---
 

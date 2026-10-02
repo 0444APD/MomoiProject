@@ -37,6 +37,8 @@ namespace GBible.EditorTools.UI
         {
             public string Label;
             public string Path;
+            // SerializedProperty 경로(뿌리 기준, 모르면 null): 블록 편집기를 붙일 때 쓴다.
+            public string Serialized;
             public Type Type;
             public object Value;
             public MemberInfo Member;
@@ -50,6 +52,7 @@ namespace GBible.EditorTools.UI
             public string Caption;
             public string Preview;
             public string Path;
+            public string Serialized;
             public Type Type;
             public object Value;
             public MemberInfo Member;
@@ -79,6 +82,9 @@ namespace GBible.EditorTools.UI
         // 인스턴스 편집(도감 상세): [Hide] 필드는 감추고 [ShowIf]는 조건대로, 기능 필드(비어 있을 수 있는 [SerializeReference])는
         // 붙어 있으면 '빼기', 비어 있으면 '+ 기능'으로 붙인다. 모니터처럼 실제 값을 살피는 곳에서는 끈다(모든 필드를 보인다).
         public bool InstanceEditing;
+
+        // 블록 필드(트리거·결과 …)의 편집기를 만든다(인자 = 뿌리 기준 SerializedProperty 경로). 상세 패널이 넘겨준다.
+        public Func<string, VisualElement> BlockEditor;
 
         GsDataExplorer(bool browse, Crumb root, Action<string> onPick)
         {
@@ -139,7 +145,7 @@ namespace GBible.EditorTools.UI
 
         // 가상 폴더(분류)나 값 하나를 뿌리로 둘러보기.
         public static GsDataExplorer Browse(ExplorerItem root) =>
-            new GsDataExplorer(true, new Crumb { Label = root.Label, Type = root.Type ?? root.Value?.GetType(), Value = root.Value, Member = root.Member, Apply = root.Apply, Children = root.Children }, null);
+            new GsDataExplorer(true, new Crumb { Label = root.Label, Serialized = "", Type = root.Type ?? root.Value?.GetType(), Value = root.Value, Member = root.Member, Apply = root.Apply, Children = root.Children }, null);
 
         public static GsModal BrowseModal(VisualElement host, string title, object root, Action<Action> apply) =>
             GsModal.Show(host, Frame(title, apply != null ? "값을 누르면 고칠 수 있습니다." : "읽기 전용", Browse(title, root, apply)));
@@ -207,6 +213,7 @@ namespace GBible.EditorTools.UI
             {
                 Label = entry.Label,
                 Path = entry.Path,
+                Serialized = entry.Serialized,
                 Type = entry.Type,
                 Value = entry.Value,
                 Member = entry.Member,
@@ -425,6 +432,7 @@ namespace GBible.EditorTools.UI
                 var at = index++;
                 // 목록 요소의 선택 규칙은 목록 필드의 규칙을 따른다(예: 태그 목록 → 태그 고르기).
                 var entry = ValueEntry($"[{at}]", item, elementType ?? item?.GetType(), here.Member, ilist != null ? v => ilist[at] = v : (Action<object>)null, null);
+                if (ilist != null && here.Serialized != null) entry.Serialized = $"{here.Serialized}.Array.data[{at}]";
                 if (ilist != null && !ilist.IsFixedSize) entry.Remove = () => ilist.RemoveAt(at);
                 list.Add(entry);
             }
@@ -796,16 +804,35 @@ namespace GBible.EditorTools.UI
                 if (member == null) return new VisualElement();
                 var field = member.Info as FieldInfo;
                 var target = Current;
+                var serialized = _crumb.Serialized == null || field == null ? null : Join(_crumb.Serialized, field.Name);
+                // 트리거·결과 같은 블록 필드는 도감과 같은 편집기로(상세 패널이 넘겨준 BlockEditor).
+                if (serialized != null && _explorer.BlockEditor != null && IsBlockField(field) && _explorer.BlockEditor(serialized) is { } editor)
+                {
+                    var section = Gs.Col("gs-explorer__block");
+                    section.style.marginTop = 6;
+                    section.Add(Gs.Label(GsDataExplorer.LabelOf(member.Info, member.Name), "gs-detail__label"));
+                    section.Add(editor);
+                    return section;
+                }
                 var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
                 Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
                 var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, member.Info, set, null);
                 entry.Path = path;
+                entry.Serialized = serialized;
                 if (_explorer.InstanceEditing && current != null && field != null && InstanceFields.IsFeature(field) && _crumb.Apply != null)
                 {
                     var apply = _crumb.Apply;
                     entry.Remove = () => apply(() => field.SetValue(target, null));
                 }
                 return _explorer.Row(entry);
+            }
+
+            // 트리거·결과·조건 같은 블록(또는 그 목록) 필드인지.
+            static bool IsBlockField(FieldInfo field)
+            {
+                var type = FieldPaths.ElementTypeOf(field.FieldType) ?? field.FieldType;
+                return typeof(Trigger).IsAssignableFrom(type) || typeof(Outcome).IsAssignableFrom(type) || typeof(Condition).IsAssignableFrom(type) ||
+                       typeof(ValueFilter).IsAssignableFrom(type) || typeof(Effect).IsAssignableFrom(type) || typeof(TargetSelector).IsAssignableFrom(type);
             }
 
             public override VisualElement FieldValue(string path)

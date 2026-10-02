@@ -164,6 +164,8 @@ namespace GBible
         // 에셋 참조 저장 연결(Unity 층에서 GameData ID 등으로 연결한다). 없으면 참조는 저장되지 않는다.
         public static Func<object, string> ReferenceToId;
         public static Func<string, Type, object> IdToReference;
+        // 참이면 ToTree가 에셋 참조를 ID 대신 참조 그대로 넣는다(메모리 안에서만 쓰는 트리: 되감기 스냅샷).
+        [ThreadStatic] internal static bool KeepReferences;
 
         // ── 타입 분석 ───────────────────────────────────────────
 
@@ -260,7 +262,8 @@ namespace GBible
                 {
                     if (field.IsInitOnly) continue;
                     if (field.IsDefined(typeof(NonSerializedAttribute), false)) continue;
-                    if (field.Name.Contains("<")) continue; // 자동 속성의 숨은 필드
+                    // 자동 속성의 숨은 필드는 [field: SerializeField]일 때만(Unity·Mirror와 같다).
+                    if (field.Name.Contains("<") && !HasAttribute(field, "SerializeField")) continue;
                     if (!field.IsPublic && !HasAttribute(field, "SerializeField") && !HasAttribute(field, "SerializeReference")) continue;
                     fields.Add(new DataField
                     {
@@ -727,6 +730,8 @@ namespace GBible
                     return value.ToString();
                 case DataKind.Reference:
                 {
+                    // 메모리 안 스냅샷(되감기)은 참조를 그대로 둔다(스프라이트처럼 데이터베이스에 없는 에셋도 이어진다).
+                    if (KeepReferences) return value;
                     var id = ReferenceToId?.Invoke(value);
                     if (id == null) warnings?.Add($"{path}: 저장할 수 없는 참조입니다({value.GetType().Name}). 데이터베이스에 등록된 데이터만 저장됩니다.");
                     return id;
@@ -792,7 +797,7 @@ namespace GBible
                         warnings?.Add($"{path}: '{tree}'은(는) {type.Name}에 없는 값입니다. 기본값으로 읽습니다.");
                         return Activator.CreateInstance(type);
                     case DataKind.Reference:
-                        return tree is string refId ? IdToReference?.Invoke(refId, type) : null;
+                        return tree is string refId ? IdToReference?.Invoke(refId, type) : tree != null && type.IsInstanceOfType(tree) ? tree : null;
                     case DataKind.Array:
                     {
                         var items = tree as List<object> ?? new List<object>();

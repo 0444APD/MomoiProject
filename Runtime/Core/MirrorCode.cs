@@ -33,6 +33,23 @@ namespace GBible
             Mirror.Add(type);
         }
 
+        // Nullable<T> 값(int? 등)의 비교·쓰기·읽기. 생성 코드가 그런 필드를 가진 형식의 등록에서 부른다(IL2CPP가 형식을 미리 알게).
+        public static void RegisterNullable<T>() where T : struct
+        {
+            if (ValueOps<T?>.Supported) return;
+            ValueOps<T?>.Register(EqualNullable<T>, WriteNullable<T>, ReadNullable<T>);
+        }
+
+        static bool EqualNullable<T>(T? a, T? b) where T : struct => a.HasValue ? b.HasValue && ValueOps<T>.Equal(a.Value, b.Value) : !b.HasValue;
+
+        static void WriteNullable<T>(MirrorWriter w, T? v) where T : struct
+        {
+            w.Bool(v.HasValue);
+            if (v.HasValue) ValueOps<T>.Write(w, v.Value);
+        }
+
+        static T? ReadNullable<T>(MirrorReader r) where T : struct => r.Bool() ? ValueOps<T>.Read(r) : (T?)null;
+
         // 멤버 읽기·쓰기(필드 경로·저장·이벤트 값). kinds: 0 = 저장 필드, 1 = readonly 필드, 2 = 속성.
         public static void RegisterAccess(RuntimeTypeHandle type, string[] names, byte[] kinds, MirrorGetFn get, MirrorSetFn set) =>
             FieldAccess.Register(Type.GetTypeFromHandle(type), names, kinds, get, set);
