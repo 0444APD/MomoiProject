@@ -56,6 +56,21 @@ namespace GBible.Tests
         }
     }
 
+    // 행동 중간에 Game.All(Sync가 일어남)을 끼운 행동.
+    [Serializable]
+    public class GsFindBetween : SimpleAction
+    {
+        protected override void Run()
+        {
+            var party = Game.All<GsParty>()[0];
+            party.gold = 3;
+            party.units.Add(new GsUnit { id = "mid" });
+            party = Game.All<GsParty>()[0];
+            party.gold = 0;
+            party.units.RemoveAt(0);
+        }
+    }
+
     [Serializable]
     public class GsBroken : SimpleAction
     {
@@ -253,6 +268,29 @@ namespace GBible.Tests
             Mirror.Write(b, copy);
             Assert.IsTrue(a.SameAs(b), "앞으로 기록만 보내도 같아진다");
             Assert.IsTrue(last.Forward.Length < 200, "변경분만 보낸다: " + last.Forward.Length);
+        }
+
+        [Test]
+        public void 행동_중간의_Sync는_행동이_끝날_때_한꺼번에_알린다()
+        {
+            Create(false);
+            var copy = Mirror.Clone(_party);
+            var received = new System.Collections.Generic.List<ChangeSet>();
+            var midAction = 0;
+            _session.Data.Synced += c =>
+            {
+                if (_session.Data.InTransaction) midAction++;
+                received.Add(c);
+            };
+            _session.Do(new GsFindBetween());
+            Assert.AreEqual(0, midAction, "행동 중에는 알리지 않는다");
+            Assert.IsTrue(received.Count > 0);
+            foreach (var changes in received) Mirror.Apply(copy, changes);
+            var a = new MirrorWriter();
+            var b = new MirrorWriter();
+            Mirror.Write(a, _party);
+            Mirror.Write(b, copy);
+            Assert.IsTrue(a.SameAs(b), "모아 둔 변경을 차례대로 적용하면 같아진다");
         }
     }
 

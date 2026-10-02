@@ -109,10 +109,14 @@ namespace GBible
         // Sync가 쓰는 작업용 기록.
         readonly ChangeSet _work = new ChangeSet();
         Func<object, long> _elementId;
+        // 행동 중에 Sync한 변경(Synced로 알릴 차례대로). Permanent로 잠시 행동 밖에 나가도 이어서 담는다.
+        readonly List<ChangeSet> _held = new List<ChangeSet>();
+        bool _holding;
 
         // 값이 바뀌었을 때(Undo로 돌아갈 때 포함).
         public event Action<string> Changed;
         // Mirror로 비교하는 플레이어 데이터가 Sync로 바뀌었을 때 그 변경(앞으로 기록을 다른 쪽에 보내면 같아진다).
+        // 행동 안의 변경은 행동이 끝날 때(또는 중단될 때) 순서대로 한꺼번에 알린다: 행동 중간 모습은 밖으로 나가지 않는다.
         public event Action<ChangeSet> Synced;
         // 데이터 값이 바뀌었을 때 바뀐 경로 목록과 함께.
         public event Action<string, IReadOnlyList<DataChange>> DataChanged;
@@ -579,7 +583,8 @@ namespace GBible
             LogChanges(key, slot, changes.Changes, kind, prefix, transactionId >= 0 ? transactionId : _active?.Id ?? 0);
             Changed?.Invoke(key);
             DataChanged?.Invoke(key, changes.Changes);
-            Synced?.Invoke(changes);
+            if (_holding) _held.Add(changes);
+            else Synced?.Invoke(changes);
             CheckRequired(key, slot);
             return changes;
         }
@@ -763,7 +768,19 @@ namespace GBible
             // 행동 밖에서 바뀐 것은 먼저 행동 밖 변경으로 남긴다(이 행동의 Undo에 섞이지 않게).
             Sync();
             _active = new Transaction { Id = _nextTransactionId++, JournalId = journalId, Label = label };
+            _holding = true;
             return _active;
+        }
+
+        // 행동 중에 모아 둔 변경을 차례대로 알린다(한 행동 = 한 묶음).
+        void Release()
+        {
+            _holding = false;
+            if (_held.Count == 0) return;
+            var held = _held.ToArray();
+            _held.Clear();
+            if (Synced == null) return;
+            foreach (var changes in held) Synced(changes);
         }
 
         public void End()
@@ -772,6 +789,7 @@ namespace GBible
             Sync();
             var tx = _active;
             _active = null;
+            Release();
             if (!RecordHistory) return;
             // 값이 바뀌지 않은 행동(빗나감 등)도 하나의 Undo 단위로 남긴다(난수 소비도 되돌려야 하므로).
             _history.Add(tx);
@@ -790,7 +808,9 @@ namespace GBible
             Sync();
             var tx = _active;
             _active = null;
+            // 중단은 진행분과 되돌림을 함께 알린다: 받는 쪽은 한 묶음으로 적용해 같은 결과(Permanent 변경만 남음)가 된다.
             Revert(tx, "중단");
+            Release();
         }
 
         // 이 안의 변화는 Undo 이력에 넣지 않는다(도전과제 달성·보상처럼 한 번 일어나면 되돌리지 않을 일).
