@@ -49,7 +49,7 @@
 
 도감 검증은 값 형식을 찾을 수 없거나, 담을 수 없는 필드가 있거나, 기본값을 읽을 수 없으면 오류를 띄운다. 클래스가 비교 코드로 다뤄지지 않으면 "비교 코드로 다룰 수 없어 예전 방식(리플렉션, 더 느림)으로 비교합니다" 경고를 띄운다.
 
-플레이 중에는 **MomoiProject › 모니터**의 **데이터** 탭에서 **판 데이터**(세션 구역)와 **프로필 데이터**(메타 구역)를 탐색기로 보고 고칠 수 있다.
+플레이 중에는 **MomoiProject › 모니터**의 **데이터** 탭에서 **판 데이터**(세션 구역)와 **프로필 데이터**(메타 구역)를 탐색기로 보고 고칠 수 있다(모니터 자세히는 [22-Monitor-Debug.md](22-Monitor-Debug.md)).
 
 ---
 
@@ -66,7 +66,8 @@ public class Item
 {
     public string id;
     public string name;
-    public int level;
+    public int price;
+    public int level = 1;
     public List<string> tags = new List<string>();
 }
 
@@ -254,7 +255,7 @@ public class Hero
     public int level;                                    // 기록됨
     [SerializeField] int exp;                            // 기록됨(private이지만 [SerializeField])
     [SerializeReference] public StatusEffect effect;     // 기록됨
-    [field: SerializeField] public int Mana { get; set; } // 기록됨(자동 속성의 숨은 필드) — 아래 주의 참고
+    [field: SerializeField] public int Mana { get; set; } // 기록·저장됨(자동 속성의 숨은 필드)
 
     int cache;                                           // 기록 안 됨(private, 어트리뷰트 없음)
     [NonSerialized] public float power;                  // 기록 안 됨
@@ -272,7 +273,7 @@ public class Hero
 | `public` 필드 | 된다 |
 | `[SerializeField]` private 필드 | 된다 |
 | `[SerializeReference]` 필드 | 된다 |
-| `[field: SerializeField]` 자동 속성 | 된다(저장은 아래 주의) |
+| `[field: SerializeField]` 자동 속성 | 된다 |
 | 어트리뷰트 없는 private·protected 필드 | 안 된다 |
 | `[NonSerialized]` · `readonly` · `static` · `const` | 안 된다 |
 | 속성(property) | 안 된다 |
@@ -293,6 +294,7 @@ public class Hero
 |---|---|
 | 숫자 | `int` `long` `float` `double` `byte` `sbyte` `short` `ushort` `uint` `ulong` `decimal` |
 | 그 밖의 단순 값 | `bool` `char` `string` enum `DateTime` `TimeSpan` `DateTimeOffset` `Guid` |
+| 비어 있을 수 있는 값 | `int?` `float?` `MyEnum?` 같은 `Nullable<T>`(필드·리스트 요소) |
 | 구조체 | `[Serializable]` 구조체(필드 규칙은 클래스와 같다) |
 | Unity 구조체 | `Vector2` `Vector3` `Vector4` `Vector2Int` `Vector3Int` `Quaternion` `Color` `Color32` `Rect` `RectInt` `Bounds` |
 | 클래스 | `[Serializable]` 클래스. 다른 클래스를 필드로 품어도 된다(깊이 제한 없음). `null`도 된다 |
@@ -334,7 +336,6 @@ public class Unit
 
 - `[Serializable]`이 없는 클래스
 - `HashSet<T>` `SortedSet<T>` `Queue<T>` `Stack<T>` `LinkedList<T>` 같은 그 밖의 컬렉션
-- nullable 값(`int?` 등)
 - 중첩 컬렉션(`List<List<int>>`, 값이 리스트인 딕셔너리 등). 컴파일할 때 "중첩 컬렉션·이 형식은 비교 코드로 다루지 않습니다" 경고가 난다
 - `float`·`double` 키 딕셔너리
 - 뿌리 값이 컬렉션 그 자체
@@ -376,6 +377,7 @@ public class Unit
 4. **조건 검사는 Sync 뒤에 한다.** 도전과제·트리거 조건은 Sync가 찾아낸 바뀐 키를 보는 것만 다시 평가한다. 행동 밖 변경도 그 프레임 끝에 반영된다.
 5. **매 프레임 바뀌는 값을 넣으면 매 프레임 기록이 쌓인다.** 위치·속도 같은 값은 MonoBehaviour 쪽에 둔다.
 6. **저장소에 넣지 않은 객체는 기록되지 않는다.** `new Unit()`을 만들어 필드를 고쳐도, 플레이어 데이터 안에 넣기 전까지는 아무 기록이 없다. 리스트에서 빠진 객체를 고쳐도 무시된다.
+7. **같은 객체를 두 곳에 넣어도 된다.** `slots[0] = items[3]`처럼 한 객체를 여러 곳에서 가리키거나 서로 가리켜도 된다. 그 객체의 변경은 한 번만(먼저 만난 자리의 경로로) 기록되고, Undo·받는 쪽(`MirrorReceiver`)에서도 같은 인스턴스로 이어진다.
 
 ---
 
@@ -403,27 +405,13 @@ public class Unit
 | `player.gold` | Meta | 정수 (int) | `100` |
 | `player.inventory` | Meta | `Inventory` | (클래스 초기값) |
 
+`Item`·`Inventory`는 2.1의 클래스다.
+
 ```csharp
 using System;
-using System.Collections.Generic;
 using GBible;
 using GBible.Ids;
 using UnityEngine;
-
-[Serializable]
-public class Item
-{
-    public string id;
-    public string name;
-    public int price;
-    public int level = 1;
-}
-
-[Serializable]
-public class Inventory
-{
-    public List<Item> items = new List<Item>();
-}
 
 // 구매는 플레이어 입력이므로 행동으로 만든다(Undo 한 단위).
 [Serializable]
@@ -615,6 +603,5 @@ session.Undo();                                                 // hp 12 (행동
 | "Modify를 거치지 않고 바뀌었습니다" 경고 | 예전 방식 데이터를 행동·`Modify` 밖에서 고쳤다(6장). |
 | "담을 수 없는 필드" 오류 | 함수·`object`·다차원 배열 필드가 있다. 데이터가 아니면 `[NonSerialized]`를 붙인다. |
 | 모니터 타임라인에 기록이 매 프레임 쌓임 | 매 프레임 바뀌는 값을 플레이어 데이터에 넣었다. MonoBehaviour 쪽으로 옮긴다. |
-| `[field: SerializeField]` 자동 속성 값이 저장 후 사라짐 | Undo·Sync는 이 필드를 다루지만, 지금 저장(`ExportMeta`·`ExportRun`)과 데이터 값 `Set`의 내용 복사는 자동 속성의 숨은 필드를 건너뛴다. 저장할 값은 일반 필드(`public` 또는 `[SerializeField]`)로 선언한다. |
-| 스프라이트 같은 에셋 참조가 불러온 뒤 비어 있음 | 저장 파일에는 `GameData`(도감 항목) 참조만 ID로 저장된다. 그 밖의 에셋 참조는 저장되지 않고 "저장할 수 없는 참조입니다" 경고가 난다. 에셋은 도감 ID나 인스턴스 쪽에 두고 플레이어 데이터에는 ID를 둔다. |
+| 스프라이트 같은 에셋 참조가 불러온 뒤 비어 있음 | 저장 파일에는 `GameData`(도감 항목) 참조만 ID로 담긴다(되감기 스냅샷은 메모리 안이라 참조를 그대로 둔다). 그 밖의 에셋 참조는 저장 파일에 담기지 않고, 저장할 때 "저장할 수 없는 참조입니다" 경고가 난다. 에셋은 도감 ID나 인스턴스 쪽에 두고 플레이어 데이터에는 ID를 둔다. |
 | 오래 쥔 객체가 Undo·불러오기 뒤 엉뚱함 | Undo는 빠졌던 객체를 원래 인스턴스로 되돌리지만, 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 오래 들고 있을 것은 id로 들고 `Game.Find`로 다시 찾는다. |

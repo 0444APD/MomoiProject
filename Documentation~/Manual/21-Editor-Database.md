@@ -1,4 +1,4 @@
-# 도감 (데이터베이스 창)
+# 21. 도감 (데이터베이스 창)
 
 `MomoiProject → 도감`은 게임 데이터를 만들고 고치는 창이다. 플레이어 데이터·로그·도전과제·능력·인스턴스 같은 데이터 에셋과, 코드로 정의한 클래스·이벤트·키워드를 한 창에서 본다. 기획자는 여기서 이름(ID)·수치·연결을 정하고, 프로그래머는 클래스와 로직만 코드로 쓴다.
 
@@ -47,6 +47,8 @@
 
 숨겨진 종류: 필드 규칙(`FieldRuleData`, 클래스 상세에서 정한다, `27-Field-Rules-Sprites.md`), 다이얼로그·연출 프리셋(그래프 창에서 편집, `24-Dialogue.md`).
 
+이 문서는 창의 조작을 다룬다. 각 기능 자체는 `01-PlayerData.md`(플레이어 데이터), `04-Instances.md`(인스턴스), `05-Keywords.md`(키워드), `11-Triggers-Conditions.md`·`12-Outcomes.md`(트리거·결과), `14-Achievements.md`(도전과제), `15-Stats-Logs.md`(로그), `16-Abilities-Usable.md`(능력·사용 기능)에서 다룬다.
+
 ### 코드로 쓰는 법 — 도감 종류 만들기
 
 **`GameData` 상속** — 이것만으로 "데이터" 그룹에 탭이 생긴다. 필드만 쓰면 된다.
@@ -91,13 +93,22 @@ public sealed class StageData : GameData
 **`ValidateData(IValidationContext)`** — 항목 고유의 검증. `context.Error(...)`는 빌드를 막고, `context.Warning(...)`은 표시만 한다.
 
 ```csharp
-public override void ValidateData(GBible.IValidationContext context)
+using GBible;
+using GBible.Data;
+
+[Database("몬스터", Group = "전투")]
+public sealed class MonsterData : GameData
 {
-    if (hp <= 0) GBible.ValidationExtensions.Error(context, "hp는 1 이상이어야 합니다.");
+    public int hp = 100;
+    [DataRef(typeof(InstanceData))] public string dropItem = "";
+
+    public override void ValidateData(IValidationContext context)
+    {
+        if (hp <= 0) context.Error("hp는 1 이상이어야 합니다.");
+        if (string.IsNullOrEmpty(dropItem)) context.Warning("드롭 아이템이 없습니다.");
+    }
 }
 ```
-
-(`using GBible;`을 쓰면 `context.Error("...")`로 짧게 쓸 수 있다.)
 
 ### 주의할 점
 
@@ -190,7 +201,7 @@ ID 규칙(`IdRules`): 영문 소문자로 시작, 영문·숫자만, 단어 사�
 ### 에디터에서
 
 - **탭**: 항목이 탭으로 쌓인다. 이미 열린 항목은 그 탭으로 간다. 항목 안의 클래스·배열·리스트 값을 누르면 바로 오른쪽에 안쪽 탭이 열리고(탭 앞에 › 표시), 탭을 닫으면(✕ 또는 가운데 버튼) 안쪽 탭도 함께 닫힌다.
-- **머리**: 제목 = ID(눌러서 바꾸기), 부제 = 종류 이름(새 항목이면 "새 항목(적용 전)"). 도전과제·능력·로그는 제목 아래에 요약 줄이 붙는다(도전과제·능력: "트리거"·"결과", 로그: "방식"·"반영").
+- **머리**: 제목 = ID(눌러서 바꾸기), 부제 = 종류 이름(새 항목이면 "새 항목(적용 전)"). 도전과제·능력·로그는 제목 아래에 요약 줄이 붙는다(도전과제·능력: "트리거"·"결과", 로그: "방식"·"반영"). `[BindTo]`로 코드 결과가 연결된 항목은 결과가 "코드: 클래스·함수 이름"으로 보이고, 로그는 "결과" 줄이 더해진다("… (로그에 기록 대신)"). 자세히는 `13-BindTo.md`.
 - **본문**: 칸마다 이름표(변수 이름) + 값. 검증 문제는 위에 알림으로, 문구에 필드 이름이 들어 있으면 그 칸도 빨간 이름표·밑줄로 보인다.
 - **아래 줄**: 상태 글, **에셋 위치**(프로젝트 창에서 원본 에셋을 깜빡임), **삭제**(프리팹은 **프로젝트에서 보기**).
 - 트리거·조건 칸은 한 줄 식 편집기(`+ 블럭` · `+ 논리 연산자` · `+ 괄호`), 결과 칸은 `+ 결과 추가`로 고친다. 문장은 자연어로 보이고 **Alt**를 누르고 있으면 코드식으로 보인다.

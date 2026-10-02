@@ -37,7 +37,7 @@
 
 로그는 반영 규칙마다의 결과 칸이 모두 이 모습이 된다. 능력도 같다.
 
-사용 기능이 붙은 인스턴스는 다르다. 인스턴스의 값은 탐색기로 그려지므로 이 잠긴 보기가 나오지 않는다(사용 기능 안의 `then`이 탐색기의 리스트로 보인다). 연결은 런타임에서 그대로 적용된다. 그 인스턴스의 결과가 코드라는 것은 코드 쪽에서 확인한다.
+사용 기능이 붙은 인스턴스도 같다: 인스턴스 값 안의 사용 기능(`then`) 자리에 이 잠긴 보기가 나온다.
 
 연결하기 전에 에디터에서 골라 둔 결과는 지워지지 않고 숨겨질 뿐이다. `[BindTo]`를 빼면 다시 보이고 다시 쓰인다.
 
@@ -77,7 +77,7 @@ public static class AchievementLogic
 ```
 
 - `GameIds`(`MomoiProject → 식별자 코드 다시 만들기`로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·능력·인스턴스 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`.
-- 글자를 직접 쓰면 오타나 ID 이름 바꾸기가 **아무 경고 없이** 연결을 끊는다. 상수를 쓰면 컴파일 오류로 드러난다.
+- 글자를 직접 쓰면 오타나 ID 이름 바꾸기가 연결을 끊는다(게임이 켜질 때 콘솔에 "이 ID의 도전과제·로그·능력·사용 기능 인스턴스가 없어 연결되지 않았습니다" 경고). 상수를 쓰면 컴파일 오류로 먼저 드러난다.
 
 ### 2-3. 함수의 모양
 
@@ -167,7 +167,7 @@ public class DragonSlayerReward : Reward
 
 ### 2-8. 연결 실패 알림
 
-게임이 켜질 때(`GBibleRuntime.Start`) 모든 `[BindTo]`를 한 번 모으고, 모양이 맞지 않는 것은 연결하지 않고 콘솔에 경고로 알린다.
+게임이 켜질 때(`GBibleRuntime.Start`) 모든 `[BindTo]`를 한 번 모으고, 모양이 맞지 않는 것은 연결하지 않고 콘솔에 경고를 남긴다.
 
 | 경고 | 원인 |
 |---|---|
@@ -176,7 +176,7 @@ public class DragonSlayerReward : Reward
 | `… 매개변수는 없음 / (이벤트) / (TriggerContext) / (이벤트, TriggerContext) 중 하나여야 합니다.` | 매개변수 모양 |
 | `[MomoiProject] [BindTo] '형식': 클래스에 붙일 때는 Reward(Outcome)를 상속하고 매개변수 없는 생성자가 있어야 합니다.` | 클래스 조건 |
 
-서버·테스트처럼 `GBibleRuntime` 없이 세션을 만들면, 처음 연결을 찾을 때(첫 `Define`) 모은다. 알림은 `BoundOutcomes.Problems`(글자 리스트)를 직접 읽어 출력한다.
+서버·테스트처럼 `GBibleRuntime` 없이 세션을 만들면, 처음 연결을 찾을 때(첫 `Define`) 모은다. 문제 목록은 `BoundOutcomes.Problems`(글자 리스트)를 직접 읽어 출력한다.
 
 ### 2-9. `BoundOutcomes` — 연결 목록 API
 

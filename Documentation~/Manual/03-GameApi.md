@@ -132,7 +132,7 @@ Game.Use("ability.fireball", "hero", "orc1");         // id로
 Game.Use("ability.selfHeal", hero);                   // 대상 없이
 ```
 
-도감 › 능력의 능력, 또는 사용 기능(`Usable`)이 붙은 인스턴스를 ID로 쓴다. `user`·`targets`는 객체 또는 id 문자열이다(객체를 넘기면 그 객체의 `id` 필드를 읽어 id로 바꾼다). 내부적으로 행동 하나(`UseAbility`)라서 Undo 한 번에 통째로 되돌아간다. 행동 안에서는 부를 수 없다. 자세히는 [15-Abilities-Usable.md](15-Abilities-Usable.md).
+도감 › 능력의 능력, 또는 사용 기능(`Usable`)이 붙은 인스턴스를 ID로 쓴다. `user`·`targets`는 객체 또는 id 문자열이다(객체를 넘기면 그 객체의 `id` 필드를 읽어 id로 바꾼다). 내부적으로 행동 하나(`UseAbility`)라서 Undo 한 번에 통째로 되돌아간다. 행동 안에서는 부를 수 없다. 자세히는 [16-Abilities-Usable.md](16-Abilities-Usable.md).
 
 ### 2.10 `Game.CanUse(...)` — 지금 쓸 수 있는가
 
@@ -168,7 +168,7 @@ IDisposable sub = Game.Events.Subscribe<EnemyKilled>(e => PlayHitEffect(e.enemy)
 sub.Dispose();                                                            // 그만 받는다
 ```
 
-`session.Events`(`EventBus`)와 같다. 이벤트를 받는 코드에서 플레이어 데이터를 바꾸면 행동 밖 변경이 되므로, 받는 쪽은 연출·UI만 한다.
+`session.Events`(`EventBus`)와 같다. 이벤트를 받는 코드에서 플레이어 데이터를 바꾸면 행동 밖 변경이 되므로, 받는 쪽은 연출·UI만 한다. 이벤트 정의(`[GameEvent]`)와 쏘기·받기는 [10-Events.md](10-Events.md).
 
 ### 2.14 `GameApi.IdOf(item)`
 
@@ -180,7 +180,7 @@ string id = GameApi.IdOf(hero);   // hero.id
 
 ### 2.15 확장 메서드로 장르 규칙 더하기
 
-`GameApi`는 `sealed`지만 확장 메서드를 붙일 수 있다. 장르마다 자주 쓰는 조회는 여기에 모은다.
+`GameApi`는 `sealed`지만 확장 메서드를 붙일 수 있다. 장르마다 자주 쓰는 조회는 여기에 모은다(`Unit`은 4.0의 클래스).
 
 ```csharp
 using System;
@@ -224,11 +224,26 @@ Game.Find<Unit>("orc1")
 - 예전 방식 데이터([01-PlayerData.md](01-PlayerData.md)의 6장)는 사본이 없어서 리플렉션으로 필드를 훑는다.
 - 찾는 비용은 데이터 크기에 비례한다. 매 프레임 많은 객체를 그릴 때는 `All`을 한 번 불러 리스트를 재사용하고, 객체마다 `Find`를 반복하지 않는다.
 
-`id`는 **필드**여야 한다. `public string Id { get; set; }` 같은 속성은 `Find<T>`의 형식 검사는 통과하지만, 사본에는 속성이 없으므로 클래스 데이터에서는 찾지 못한다. `public string id;`로 선언한다.
+`id`는 필드(`public string id;`)든 속성(`public string Id { get; set; }`)이든 된다. 필드면 사본의 값으로, 속성이면 생성된 읽기 코드로 읽는다(둘 다 리플렉션 없음). 형식은 `string`이어야 한다.
 
 ---
 
 ## 4. 상황별 예제
+
+### 4.0 예제에서 함께 쓰는 클래스
+
+```csharp
+using System;
+
+[Serializable]
+public class Unit
+{
+    public string id;
+    public string team;
+    public int x, y;
+    public int hp = 30;
+}
+```
 
 ### 4.1 씬 코드: 유닛 그리기와 선택
 
@@ -264,15 +279,6 @@ public class UnitBoardView : MonoBehaviour
 using System;
 using System.Linq;
 using GBible;
-
-[Serializable]
-public class Unit
-{
-    public string id;
-    public string team;
-    public int x, y;
-    public int hp = 30;
-}
 
 [Serializable]
 public class Shockwave : GameAction<Unit>
@@ -396,7 +402,7 @@ session.Undo();                        // 다시 30
 
 | 증상 | 원인과 해결 |
 |---|---|
-| `Find<T>`가 늘 `null` | id가 필드가 아니라 속성이다. `public string id;` 필드로 선언한다. 또는 그 객체가 아직 플레이어 데이터 안에 들어가지 않았다. |
+| `Find<T>`가 늘 `null` | 그 객체가 아직 플레이어 데이터 안에 들어가지 않았거나, id 필드·속성의 형식이 `string`이 아니다. |
 | "id 필드가 없어 Find로 찾을 수 없습니다" | `T`에 `string id`(또는 `Id`) 필드가 없다. |
 | 씬 코드에서 고친 값이 Undo되지 않음 | `Find`·`All`로 꺼낸 객체를 행동 밖에서 고쳤다. 씬 코드는 읽기·그리기만 하고, 바꾸는 일은 `Game.Do`로 한다. |
 | `All<T>()`가 원하지 않는 객체까지 줌 | 같은 형식이 여러 플레이어 데이터에 있다. `All<T>("키")`로 한 곳만 본다. |

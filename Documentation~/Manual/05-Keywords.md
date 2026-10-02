@@ -113,6 +113,8 @@ public static class Rarity
 ### 2.2 하위 그룹: 안쪽 static class
 
 ```csharp
+using GBible;
+
 [KeywordGroup("몬스터 태그")]
 public static class MonsterTag
 {

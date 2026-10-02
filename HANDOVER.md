@@ -4,7 +4,7 @@
 
 이 문서는 이 라이브러리를 이어서 개발하는 사람(또는 AI 협업자)이 처음부터 끝까지 읽고 바로 작업을 이어받을 수 있도록, 기능·철학·규칙·개발 흐름·진행 중인 안건·앞으로의 안건·미해결/보류 사항을 한곳에 모은 것이다. 기준 시점은 2026-09-30, 기준 커밋은 이 문서를 올린 `rebuild` 브랜치의 최신 커밋(= 원격 `master`)이다.
 
-세부 사용법은 기능별 문서에 있다: `README.md`(개요·메뉴), `Documentation~/Architecture.md`(설계 결정 기록), `Documentation~/PlayerDataStore.md`(플레이어 데이터 저장소), `Documentation~/Localization.md`(다국어), `Documentation~/Dialogue.md`(다이얼로그), `Documentation~/Audio.md`(오디오). 이 문서와 그 문서들이 어긋나면 **가장 최근 결정**(이 문서의 5·6장, Architecture.md 끝부분)이 우선한다.
+세부 사용법은 기능별 문서에 있다: `Documentation~/Manual/`(기능별 매뉴얼·코드 예제, 00-Index.md부터), `README.md`(개요·메뉴), `Documentation~/Architecture.md`(설계 결정 기록), `Documentation~/PlayerDataStore.md`(플레이어 데이터 저장소), `Documentation~/Localization.md`(다국어), `Documentation~/Dialogue.md`(다이얼로그), `Documentation~/Audio.md`(오디오). 이 문서와 그 문서들이 어긋나면 **가장 최근 결정**(이 문서의 5·6장, Architecture.md 끝부분)이 우선한다.
 
 ---
 

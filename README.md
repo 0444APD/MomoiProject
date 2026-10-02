@@ -2,7 +2,7 @@
 
 팀 공용 게임 시스템 라이브러리. 어느 Unity 프로젝트에 넣어도 독립적으로 동작하고, 요소 추가·조건·보상은 전용 에디터에서 메뉴 선택과 숫자 입력만으로 만든다.
 
-설계와 결정 사항은 [`Documentation~/Architecture.md`](Documentation~/Architecture.md)에 있다. 구현이 문서와 달라지면 문서를 먼저 고친다.
+**기능별 사용법과 코드 예제는 [`Documentation~/Manual/00-Index.md`](Documentation~/Manual/00-Index.md)(매뉴얼)부터 본다.** 설계와 결정 사항은 [`Documentation~/Architecture.md`](Documentation~/Architecture.md)에 있다. 구현이 문서와 달라지면 문서를 먼저 고친다.
 
 **처음 이어받는 사람은 [`HANDOVER.md`](HANDOVER.md)부터 읽는다**: 모든 기능 설명, 설계 철학, 작업 규칙, 개발 흐름, 진행 중·앞으로의 안건, 미해결·보류 사항.
 
@@ -77,7 +77,7 @@
 
 - **행동은 데이터다.** 모든 플레이어 행동은 `session.Do(행동)`을 거친다. 행동 하나가 Undo 단위다.
 - **모든 플레이어 데이터는 플레이어 데이터 저장소(`session.Data`)에 둔다.** 세션 구역(게임 내용, 되감김)과 메타 구역(도전과제·누적 수치, 되감기지 않음)으로 나뉜다.
-- **값의 규칙은 하나.** 행동은 실행되는 즉시 끝나고, 이미 한 행동은 언제든 뒤에서부터 `Undo()`로 되돌린다(확정 단계 없음). 실시간 게임은 행동별 기록 대신 일정 간격 스냅샷으로 같은 `Undo()`가 되감는다. 도전과제 달성과 보상은 되돌리지 않는다(행동이 바꾼 값만 돌아가 반복 획득 불가). 게임 코드는 `GameApi`(`Game.All`·`Find`·`Do`·`Use`·`Data()`)로 객체를 꺼내 필드를 그냥 고친다(플레이어 데이터 클래스는 쓰는 순간 기록 — `Documentation~/Coding.md`). 저수준 API: 읽기 `Get`, 교체 `Set`, 부분 수정 `Modify`.
+- **값의 규칙은 하나.** 행동은 실행되는 즉시 끝나고, 이미 한 행동은 언제든 뒤에서부터 `Undo()`로 되돌린다(확정 단계 없음). 실시간 게임은 행동별 기록 대신 일정 간격 스냅샷으로 같은 `Undo()`가 되감는다. 도전과제 달성과 보상은 되돌리지 않는다(행동이 바꾼 값만 돌아가 반복 획득 불가). 게임 코드는 `GameApi`(`Game.All`·`Find`·`Do`·`Use`·`Data()`)로 객체를 꺼내 필드를 그냥 고친다(행동 끝·프레임 끝 Sync가 바뀐 곳을 기록 — `Documentation~/Coding.md`). 저수준 API: 읽기 `Get`, 교체 `Set`, 부분 수정 `Modify`.
 - **식별자는 한 곳에서 짓는다.** 플레이어 데이터·키워드·수치·도전과제의 ID는 도감 창에서만 짓고, 에디터에서는 목록에서 고르고, 코드에서는 자동 생성되는 `GameIds`(예: `GameIds.PlayerData.PlayerInventory` → `PlayerDataKey<Inventory>`)로 쓴다. ID를 바꾸면 참조·에셋·생성 코드·저장 파일 호환이 함께 처리된다.
 - **저장은 두 가지.** 프로필(메타 구역: 도전과제·누적 수치 등)은 `profile.json`, 진행 중인 판(세션 구역·난수·시간)은 `run.json`. 종료 시 자동 저장, 판 이어하기는 `GBibleRuntime.LoadRun`.
 - **게임 시간 조절.** `GameTime.Pause/Resume`(이유별로 겹침), `GameTime.SetSpeed`(슬로우·배속), `GameTime.StepFrame`(개발용 1프레임 진행). `Time.timeScale`을 바꾸므로 물리·애니메이션·파티클·게임 시계가 모두 따라간다. 멈추면 안 되는 UI 연출만 unscaled 시간을 쓴다. 모니터 상단에서도 조절할 수 있다.

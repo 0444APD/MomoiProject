@@ -89,6 +89,9 @@ public class Monster
 ### 2.3 `[ShowIf(필드)]` — 다른 필드가 "있을 때"만 보임
 
 ```csharp
+using System;
+using GBible;
+
 [Serializable]
 public class Gear
 {
@@ -166,7 +169,7 @@ public class Item
 게임 코드에서는 `is` 패턴으로 확인하고 꺼낸다.
 
 ```csharp
-if (item.equip is { } e) Equip(e.slot, e.attack);
+if (item.equip is { } e) WearInSlot(e.slot, e.attack);   // WearInSlot은 게임 코드의 함수
 if (item.consumable is { } c) hero.hp += c.heal;
 ```
 
@@ -175,6 +178,10 @@ if (item.consumable is { } c) hero.hp += c.heal;
 ### 2.6 사용 기능 `Usable`
 
 ```csharp
+using System;
+using GBible;
+using UnityEngine;
+
 [Serializable]
 public class Potion
 {
@@ -183,7 +190,7 @@ public class Potion
 }
 ```
 
-코어가 제공하는 기능 클래스다. 인스턴스에서 **+ 기능**으로 붙이면 트리거(사용 + 조건)·결과 칸을 에디터에서 조립한다. 게임이 켜질 때 사용 기능이 붙은 인스턴스를 찾아 **인스턴스 ID**로 능력처럼 등록하므로 `Game.Use("potion", hero)`로 쓴다. 개수 줄이기 같은 뒤처리는 게임 코드가 한다. 자세히는 [15-Abilities-Usable.md](15-Abilities-Usable.md).
+코어가 제공하는 기능 클래스다. 인스턴스에서 **+ 기능**으로 붙이면 트리거(사용 + 조건)·결과 칸을 에디터에서 조립한다. 게임이 켜질 때 사용 기능이 붙은 인스턴스를 찾아 **인스턴스 ID**로 능력처럼 등록하므로 `Game.Use("potion", hero)`로 쓴다. 개수 줄이기 같은 뒤처리는 게임 코드가 한다. 자세히는 [16-Abilities-Usable.md](16-Abilities-Usable.md).
 
 ### 2.7 원본 찾기: `session.Instances`
 

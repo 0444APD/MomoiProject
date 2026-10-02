@@ -1,4 +1,4 @@
-# 시작하기
+# 20. 시작하기
 
 Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이 어떻게 준비되는지, 그 준비 과정에 게임 코드를 어떻게 끼워 넣는지를 설명한다. 코드 안의 이름(네임스페이스·어셈블리·클래스)은 `GBible`이고, 메뉴·창에 보이는 이름은 `MomoiProject`다.
 
@@ -57,7 +57,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 2. `[BindTo]` 코드 결과를 모으고, 모양이 맞지 않는 함수는 콘솔에 경고한다.
 3. `SessionOptions`를 만들고 `Configuring` 이벤트를 쏜다(3절).
 4. `new GameSession(options)`.
-5. `GameDatabase.Load()`로 도감 데이터를 읽어 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제를 세션에 등록한다.
+5. `GameDatabase.Load()`로 도감 데이터를 읽어 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제를 세션에 등록한다. `[BindTo("ID")]`의 ID가 어느 도전과제·로그·능력·사용 기능 인스턴스에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 … 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
 6. 저장 호환 검사(개발 중이면 호환되지 않는 저장을 지운다), ID 이름 바꾸기 이력 적용, 프로필(`profile.json`) 불러오기.
 7. 기본 디버그 명령(저장·시간)을 등록하고, 경고·오류 기록을 콘솔로 보낸다.
 8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`).
@@ -98,6 +98,8 @@ public sealed class HudView : MonoBehaviour
 **`GBibleRuntime.DeleteRun()`** — 판 저장 파일을 지운다.
 
 **`GBibleRuntime.AutoSaveRun`** — 끝낼 때 판을 자동 저장할지(기본 `true`). static 필드라 값을 그냥 바꾼다.
+
+저장 파일의 내용·구역·호환 규칙은 `06-SaveLoad.md`에서 자세히 다룬다.
 
 ### 상황별 예제
 
@@ -512,10 +514,10 @@ public static class Cutscenes
 }
 ```
 
-**에디터 코드: `GameFeatures`** (`GBible.EditorTools`, 에디터 전용) — `Find("dialogue")`, `IsEnabled(feature)`, `IsActive(feature)`(켜져 있고 컴파일까지 끝남), `SetEnabled(feature, bool)`, `Changed` 이벤트.
+**에디터 코드: `GameFeatures`** (`GBible.EditorTools`, 어셈블리 `GBible.Editor`, 에디터 전용) — `Find("dialogue")`, `IsEnabled(feature)`, `IsActive(feature)`(켜져 있고 컴파일까지 끝남), `SetEnabled(feature, bool)`, `Changed` 이벤트. `Editor` 폴더 안의 스크립트(또는 `GBible.Editor`를 참조하는 에디터 asmdef)에서 쓴다.
 
 ```csharp
-#if UNITY_EDITOR
+// Assets/Code/Editor/FeatureCheck.cs
 using GBible.EditorTools;
 
 static class FeatureCheck
@@ -527,7 +529,6 @@ static class FeatureCheck
         UnityEngine.Debug.Log(GameFeatures.IsActive(dialogue) ? "켜짐" : "꺼짐 또는 컴파일 중");
     }
 }
-#endif
 ```
 
 ### 상황별 예제
