@@ -6,7 +6,7 @@ using System.Linq;
 namespace GBible
 {
     // 트리거·결과: 로그·도전과제·퀘스트·능력·사용 아이템이 모두 같은 두 칸으로 이루어진다.
-    //   트리거(언제) — 이벤트 발생 · 조건 충족 · 사용, 그리고 AND·OR·NOT으로 중첩.
+    //   트리거(언제) — 이벤트 받기 · 조건 충족 · 사용, 그리고 AND·OR·NOT으로 중첩.
     //   결과(무엇을) — 로그에 기록 · 플레이어 데이터에 주기 · 코딩한 결과 Block · 대상에게 효과.
     // 두 칸의 화면과 동작은 모든 기능이 같이 쓴다. 기능마다 다른 것은 칸에서 고를 수 있는 범위(잠금)뿐이다:
     //   [TriggerSlot(TriggerKinds.Event)] Trigger when;   [OutcomeSlot(OutcomeKinds.Record, Fixed = true)] List<Outcome> then;
@@ -16,7 +16,7 @@ namespace GBible
     public enum TriggerKinds
     {
         None = 0,
-        // 이벤트가 발생한 순간(이벤트의 값으로 거를 수 있다).
+        // 이벤트를 받은 순간(이벤트의 값으로 거를 수 있다).
         Event = 1,
         // 플레이어 데이터 조건이 참인 동안(참이 되는 순간 발동).
         Condition = 2,
@@ -31,7 +31,7 @@ namespace GBible
         None = 0,
         // 로그에 기록(이벤트의 값 × 배수).
         Record = 1,
-        // 플레이어 데이터 필드에 주기(숫자 증감·값·템플릿·요소 넣기).
+        // 플레이어 데이터 필드에 주기(숫자 증감·값·인스턴스·요소 넣기).
         PlayerData = 2,
         // 프로그래머가 코딩한 결과 Block(Reward를 상속).
         Coded = 4,
@@ -71,7 +71,7 @@ namespace GBible
         public GameSession Session;
         // 이 트리거를 가진 항목의 ID(로그·도전과제·능력 …).
         public string Owner;
-        // 이벤트가 발생한 순간이면 그 이벤트.
+        // 이벤트를 받은 순간이면 그 이벤트.
         public object Event;
         // 사용하는 순간이면 true, 사용자와 플레이어가 고른 대상.
         public bool IsUse;
@@ -111,7 +111,7 @@ namespace GBible
         // 이 트리거 안에 있는 종류들.
         public TriggerKinds Kinds() => Leaves().Aggregate(TriggerKinds.None, (all, leaf) => all | leaf.Kind);
 
-        // 이벤트 발생 잎들이 보는 이벤트 형식(결과의 "이벤트 값"이 어느 이벤트의 필드인지 정할 때).
+        // 이벤트 받기 잎들이 보는 이벤트 형식(결과의 "이벤트 값"이 어느 이벤트의 필드인지 정할 때).
         public IEnumerable<Type> EventTypes() =>
             Leaves().OfType<EventTrigger>().Select(e => TypeResolver.Find(e.eventType)).Where(t => t != null).Distinct();
 
@@ -159,8 +159,8 @@ namespace GBible
     }
 
     [Serializable]
-    [BlockInfo("이벤트 발생", Category = "트리거", Description = "이벤트가 발생한 순간입니다. 이벤트의 값으로 거를 수 있습니다(예: 태그 boss 포함인 처치만).",
-               Sentence = "{eventType} 발생")]
+    [BlockInfo("이벤트 받기", Category = "트리거", Description = "이벤트를 받은 순간입니다. 이벤트의 값으로 거를 수 있습니다(예: 태그 boss 포함인 처치만).",
+               Sentence = "{eventType} 받기")]
     public sealed class EventTrigger : Trigger
     {
         [EventTypeRef, FieldPathRoot(FieldPathRootKind.EventType), FieldLabel("이벤트")] public string eventType;
@@ -182,20 +182,20 @@ namespace GBible
             $"on {StatRule.EventDisplayName(eventType)}" + (filter == null ? "" : $" where {filter.Describe()}");
 
         public override string Natural(INameResolver names) =>
-            $"{StatRule.EventDisplayName(eventType)} 발생" + (filter == null ? "" : $"({filter.Natural()}일 때)");
+            $"{StatRule.EventDisplayName(eventType)} 받기" + (filter == null ? "" : $"({filter.Natural()}일 때)");
 
         public override void Validate(IValidationContext context)
         {
             var type = TypeResolver.Find(eventType);
             if (type == null)
             {
-                context.Error(string.IsNullOrEmpty(eventType) ? "이벤트 발생: 이벤트가 선택되지 않았습니다." : $"이벤트 발생: 이벤트 '{eventType}'을 찾을 수 없습니다(이름이 바뀌었는지 확인).");
+                context.Error(string.IsNullOrEmpty(eventType) ? "이벤트 받기: 이벤트가 선택되지 않았습니다." : $"이벤트 받기: 이벤트 '{eventType}'을 찾을 수 없습니다(이름이 바뀌었는지 확인).");
                 return;
             }
             if (filter == null) return;
             var problems = new List<string>();
             filter.Validate(type, problems);
-            foreach (var problem in problems) context.Error($"이벤트 발생({EventBus.DisplayNameOf(type)}) 조건: {problem}");
+            foreach (var problem in problems) context.Error($"이벤트 받기({EventBus.DisplayNameOf(type)}) 조건: {problem}");
         }
     }
 
@@ -251,9 +251,9 @@ namespace GBible
         public override void Validate(IValidationContext context)
         {
             if (!Children.Any()) context.Error("'&& AND'이 비어 있습니다.");
-            // 서로 다른 이벤트가 같은 순간에 함께 발생하지는 않는다.
+            // 서로 다른 이벤트가 같은 순간에 함께 오지는 않는다.
             if (Children.Count(t => t is EventTrigger) > 1)
-                context.Warning("이벤트 발생 둘을 AND로 묶었습니다. 이벤트는 한 순간에 하나씩 발생하므로 같은 이벤트가 아니면 만족하지 않습니다(OR를 뜻했는지 확인).");
+                context.Warning("이벤트 받기 둘을 AND로 묶었습니다. 이벤트는 한 순간에 하나씩 받으므로 같은 이벤트가 아니면 만족하지 않습니다(OR를 뜻했는지 확인).");
             foreach (var child in Children) child.Validate(context);
         }
 
@@ -305,7 +305,7 @@ namespace GBible
             {
                 // 이벤트·사용은 "그 순간"이라 뒤집으면 "그 순간이 아닌 모든 때"가 된다: 혼자면 발동하지 않고, 조건과 AND면 조건만으로 발동한다.
                 if ((trigger.Kinds() & (TriggerKinds.Event | TriggerKinds.Use)) != 0)
-                    context.Warning("'! NOT' 안에 이벤트 발생·사용이 있습니다. 순간을 뒤집으면 뜻이 흐려집니다(혼자면 발동하지 않음). 이벤트의 값을 거르려면 이벤트 발생의 조건 칸을 쓰세요.");
+                    context.Warning("'! NOT' 안에 이벤트 받기·사용이 있습니다. 순간을 뒤집으면 뜻이 흐려집니다(혼자면 발동하지 않음). 이벤트의 값을 거르려면 이벤트 받기의 조건 칸을 쓰세요.");
                 trigger.Validate(context);
             }
         }
@@ -363,7 +363,7 @@ namespace GBible
             if (string.IsNullOrEmpty(field)) return 1;
             if (evt == null)
             {
-                error = $"'{field}' 값을 읽을 이벤트가 없습니다(트리거가 이벤트 발생이 아님).";
+                error = $"'{field}' 값을 읽을 이벤트가 없습니다(트리거가 이벤트 받기가 아님).";
                 return 0;
             }
             var type = evt.GetType();
@@ -456,7 +456,7 @@ namespace GBible
     }
 
     // ── 트리거 감시 ──────────────────────────────────────────────
-    // 이벤트 발생 잎은 이벤트가 발생할 때, 조건 충족 잎은 그 조건이 읽는 값이 바뀔 때(ConditionWatcher), 사용 잎은 Game.Use 때 검사한다.
+    // 이벤트 받기 잎은 이벤트를 받을 때, 조건 충족 잎은 그 조건이 읽는 값이 바뀔 때(ConditionWatcher), 사용 잎은 Game.Use 때 검사한다.
     // 검사 결과가 참이면 발동한다. 이벤트·사용은 그 순간마다, 조건만으로 된 트리거는 참이 되는 순간에(반복이면 다시 거짓이 된 뒤 또).
     public sealed class TriggerSystem
     {
@@ -474,7 +474,7 @@ namespace GBible
         readonly List<Entry> _entries = new List<Entry>();
         readonly Dictionary<string, List<Entry>> _byEvent = new Dictionary<string, List<Entry>>(StringComparer.Ordinal);
         int _watchSerial;
-        // 결과가 이벤트를 발생시켜 트리거가 다시 발동하는 사슬의 깊이. 한도를 넘으면 끊는다(같은 트리거가 자기를 부르는 무한 반복 방지).
+        // 결과가 이벤트를 쏴서 트리거가 다시 발동하는 사슬의 깊이. 한도를 넘으면 끊는다(같은 트리거가 자기를 부르는 무한 반복 방지).
         int _depth;
         public const int MaxDepth = 16;
 
@@ -538,14 +538,14 @@ namespace GBible
         TriggerContext Moment(string owner) => new TriggerContext { Session = _session, Owner = owner };
 
         // 한 이벤트에 걸린 트리거의 순서: 조건이 없는 것(로그 기록 등)을 먼저, 조건이 있는 것(도전과제 등)을 나중에.
-        // 그래야 "처치 발생 AND 처치 수 ≥ 10"이 같은 이벤트로 막 오른 처치 수를 본다.
+        // 그래야 "처치 받기 AND 처치 수 ≥ 10"이 같은 이벤트로 막 오른 처치 수를 본다.
         void OnEvent(object evt)
         {
             if (!_byEvent.TryGetValue(evt.GetType().FullName, out var list)) return;
             if (_depth >= MaxDepth)
             {
                 _session.Journal.Append(JournalKind.Warning, "Triggers",
-                    $"트리거 사슬이 {MaxDepth}단계를 넘어 끊었습니다({EventBus.DisplayNameOf(evt.GetType())}). 결과가 자기 트리거의 이벤트를 다시 발생시키는지 확인하세요.");
+                    $"트리거 사슬이 {MaxDepth}단계를 넘어 끊었습니다({EventBus.DisplayNameOf(evt.GetType())}). 결과가 자기 트리거의 이벤트를 다시 쏘는지 확인하세요.");
                 return;
             }
             _depth++;

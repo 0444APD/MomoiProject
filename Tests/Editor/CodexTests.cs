@@ -9,16 +9,16 @@ using UnityEngine.UIElements;
 
 namespace GBible.Tests
 {
-    // 도감: 템플릿·프리팹 항목.
+    // 도감: 인스턴스·프리팹 항목.
     public class CodexTests
     {
         [Test]
-        public void 템플릿은_사본을_만들어_준다()
+        public void 인스턴스는_사본을_만들어_준다()
         {
-            var template = ScriptableObject.CreateInstance<TemplateData>();
+            var template = ScriptableObject.CreateInstance<InstanceData>();
             try
             {
-                template.templateType = typeof(TestLoot).FullName;
+                template.instanceType = typeof(TestLoot).FullName;
                 template.value = new TestLoot { name = "훈련용 검", grade = 2, tags = { "dummy" } };
                 var copy = template.CreateInstance<TestLoot>();
                 Assert.AreEqual("훈련용 검", copy.name);
@@ -33,13 +33,13 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 템플릿_형식과_값이_다르면_검증_오류()
+        public void 인스턴스_형식과_값이_다르면_검증_오류()
         {
-            var template = ScriptableObject.CreateInstance<TemplateData>();
+            var template = ScriptableObject.CreateInstance<InstanceData>();
             try
             {
                 template.EditorAssignId("templateBad");
-                template.templateType = typeof(TestLoot).FullName;
+                template.instanceType = typeof(TestLoot).FullName;
                 template.value = new TestBag();
                 var issues = GBible.EditorTools.DataValidator.Validate(new List<GameData> { template });
                 Assert.IsTrue(issues.Any(i => i.Message.Contains("형식")));

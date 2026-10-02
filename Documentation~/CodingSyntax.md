@@ -114,17 +114,17 @@ Game.Do(new MoveUnit { target = unit.id, x = 3, y = 4 });
 
 | 칸 | 고르는 것 |
 |---|---|
-| **트리거**(언제) | `이벤트 발생`(이벤트 + 그 값의 조건) · `조건 충족`(조건 Block) · `사용`(`Game.Use`) — `AND`·`OR`·`NOT`·괄호로 중첩 |
+| **트리거**(언제) | `이벤트 받기`(이벤트 + 그 값의 조건) · `조건 충족`(조건 Block) · `사용`(`Game.Use`) — `AND`·`OR`·`NOT`·괄호로 중첩 |
 | **결과**(무엇을) | `로그에 기록`(이벤트 값 × 배수) · `플레이어 데이터에 주기` · `대상에게 효과`(대상 Block + 효과 Block) · 코딩한 결과(`Reward` 상속) |
 
 | 기능 | 트리거 잠금 | 결과 잠금 |
 |---|---|---|
-| 로그(`StatData.triggers`) | 이벤트 발생 | 로그에 기록 하나로 고정(세부 칸만) |
-| 도전과제(`AchievementData`) | 이벤트 발생 · 조건 충족 | 전부 |
+| 로그(`StatData.triggers`) | 이벤트 받기 | 로그에 기록 하나로 고정(세부 칸만) |
+| 도전과제(`AchievementData`) | 이벤트 받기 · 조건 충족 | 전부 |
 | 능력(`AbilityData`) | 사용 · 조건 충족(기본 `사용`, AND로 사용 조건) | 대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과 |
 | 아이템의 `사용` 기능(`UsableFeature`) | 능력과 같음 | 능력과 같음 |
 
-- **AND**: 이벤트가 발생한 그 순간에 조건도 참이어야 발동한다(예: "보스 처치 발생 AND 골드 100 이상"). 서로 다른 이벤트 둘을 AND로 묶으면 같은 순간에 발생하지 않으니 검증이 경고한다.
+- **AND**: 이벤트를 받은 그 순간에 조건도 참이어야 발동한다(예: "보스 처치 받기 AND 골드 100 이상"). 서로 다른 이벤트 둘을 AND로 묶으면 같은 순간에 오지 않으니 검증이 경고한다.
 - **OR**: 어느 쪽이든 먼저 참이 되는 순간에 발동한다.
 - 조건만으로 된 트리거는 참이 되는 순간 발동한다(반복하는 기능이면 다시 거짓이 된 뒤에 또).
 
@@ -140,9 +140,9 @@ public class QuestData : GameData
 //              fire: moment => session.Triggers.RunOutcomes(quest.outcomes, moment, "Quests"));
 ```
 - 규칙 여러 줄(트리거 + 결과)이 필요하면 `List<TriggerRule>` 필드에 두 표시를 붙인다(로그처럼).
-- 한 이벤트에 걸린 트리거는 조건이 없는 것(로그 기록 등)이 먼저, 조건이 있는 것(도전과제 등)이 나중에 검사된다: "처치 발생 AND 처치 수 ≥ 10"은 막 오른 처치 수를 본다.
-- 결과가 자기 트리거의 이벤트를 다시 발생시키는 사슬은 16단계에서 끊기고 경고가 남는다.
-- 플레이어 데이터에 주기: 숫자는 증감, 글자·enum·참거짓은 값, 클래스는 템플릿, 리스트·배열은 요소 넣기, **딕셔너리는 키 + 값 넣기**(숫자 값은 있던 값에 더함·없던 키는 0에서, 그 밖의 값·템플릿은 덮어쓰기).
+- 한 이벤트에 걸린 트리거는 조건이 없는 것(로그 기록 등)이 먼저, 조건이 있는 것(도전과제 등)이 나중에 검사된다: "처치 받기 AND 처치 수 ≥ 10"은 막 오른 처치 수를 본다.
+- 결과가 자기 트리거의 이벤트를 다시 쏘는 사슬은 16단계에서 끊기고 경고가 남는다.
+- 플레이어 데이터에 주기: 숫자는 증감, 글자·enum·참거짓은 값, 클래스는 인스턴스, 리스트·배열은 요소 넣기, **딕셔너리는 키 + 값 넣기**(숫자 값은 있던 값에 더함·없던 키는 0에서, 그 밖의 값·인스턴스는 덮어쓰기).
 - 결과를 코딩할 때: `Reward`를 상속하고 `Grant` 안에서 `Context`(트리거 순간: `Context.Event`·`Context.User`·`Context.Picked`)를 본다.
 - 조건 Block(`SimpleCondition`) 안에서도 `Context`로 트리거 순간을 본다(예: 능력의 사용 조건에서 `Context?.User as Unit`).
 
@@ -280,13 +280,13 @@ sub.Dispose();                                                              // �
 
 ---
 
-## 8. 난수·새 id·템플릿
+## 8. 난수·새 id·인스턴스
 
 | 형태 | 뜻 |
 |---|---|
 | `Game.Random("이름").Range(min, max)` | 정수 `min` 이상 `max` 미만. 이름별로 따로 흐르는 결정론적 난수(같은 시드·같은 행동 → 같은 결과, Undo하면 되돌아감). 이름은 용도별로("damage", "loot") 나누면 한 곳의 소비가 다른 곳 결과를 흔들지 않는다. |
 | `Game.NewId("unit")` | "unit1", "unit2" … 소환처럼 개체를 새로 만들 때. 번호가 플레이어 데이터에 있어서 Undo·저장·멀티플레이에서도 같다. |
-| `Game.Session.CreateFromTemplate("template.sword")` | 도감 › 템플릿의 원본 사본(원본은 안 바뀜). 예: 행동 안에서 `bag.items.Add((Item)Game.Session.CreateFromTemplate(id));` |
+| `Game.Session.CopyInstance("template.sword")` | 도감 › 인스턴스의 원본 사본(원본은 안 바뀜). 예: 행동 안에서 `bag.items.Add((Item)Game.Session.CopyInstance(id));` |
 
 `UnityEngine.Random`·`System.Random`은 게임 로직에 쓰지 않는다(연출용 흔들림 정도만).
 
@@ -311,7 +311,7 @@ public override void ValidateData(IValidationContext context) { … } // 도감 
 
 | 형태 | 뜻 |
 |---|---|
-| `GBibleRuntime.Start()` | 세션을 만들고 도감 데이터(플레이어 데이터·로그·도전과제·능력·템플릿)를 등록. 이미 있으면 그것을 준다. |
+| `GBibleRuntime.Start()` | 세션을 만들고 도감 데이터(플레이어 데이터·로그·도전과제·능력·인스턴스)를 등록. 이미 있으면 그것을 준다. |
 | `GBibleRuntime.Session` / `.Game` | 지금 세션 / 그 `GameApi` |
 | `session.ExportMeta()` / `ImportMeta(json)` | 프로필(메타 구역: 계정 단위로 남는 것) 저장·불러오기 |
 | `session.ExportRun()` / `ImportRun(json)` / `NewRun()` | 이번 판(세션 구역) 저장·불러오기·새 판 |

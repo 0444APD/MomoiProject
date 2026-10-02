@@ -25,7 +25,7 @@ namespace GBible.Data
 
     // 필드 규칙: 에디터에서 정하는 필드 설정 — 값 출처(도감 항목·플레이어 데이터), 필수, 스프라이트 규격 그룹.
     // 키워드 그룹 연결은 코드의 [Keyword(typeof(그룹))]로 한다(예전 Keyword 출처는 이전 도구가 옮긴다).
-    // 모든 편집 칸(도감·탐색기·이벤트 발생기·조건식 값)과 ID 바꾸기·검증이 이 규칙을 따른다.
+    // 모든 편집 칸(도감·탐색기·이벤트 쏘기·조건식 값)과 ID 바꾸기·검증이 이 규칙을 따른다.
     [Database("필드 규칙", Group = "선언", Order = 9, IdPrefix = "rule", Hidden = true)]
     [CreateAssetMenu(menuName = "MomoiProject/필드 규칙", fileName = "NewFieldRule")]
     public sealed class FieldRuleData : GameData

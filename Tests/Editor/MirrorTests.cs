@@ -80,6 +80,54 @@ namespace GBible.Tests
         [NonSerialized] public int notData;
     }
 
+    // [BindTo]: 코드로 쓴 결과를 도감 항목에 연결한다(그 항목의 결과 칸 대신).
+    [BindTo("bound.achievement")]
+    public sealed class MtBoundReward : Reward
+    {
+        public static int Granted;
+        public static string Owner;
+
+        public override void Grant(GameSession session)
+        {
+            Granted++;
+            Owner = Context?.Owner;
+        }
+
+        public override RewardEffect Effect => RewardEffect.Reversible;
+        public override string Describe(INameResolver names) => "테스트 코드 결과";
+    }
+
+    [BindTo("bound.stat")]
+    public sealed class MtBoundRecord : Reward
+    {
+        public override void Grant(GameSession session) => session.Stats.Report(Context.Owner, 5);
+        public override RewardEffect Effect => RewardEffect.Reversible;
+        public override string Describe(INameResolver names) => "5씩 기록";
+    }
+
+    public class BindToTests
+    {
+        [Test]
+        public void 연결된_코드_결과가_도전과제와_로그의_결과가_된다()
+        {
+            var session = new GameSession();
+            MtBoundReward.Granted = 0;
+            var definition = new AchievementDefinition { Id = "bound.achievement", When = new EventTrigger { eventType = typeof(TestKill).FullName } };
+            definition.Outcomes.Add(new PlayerDataReward { key = "never", amount = 1 });
+            session.Achievements.Define(definition);
+            var stat = new StatDefinition { Id = "bound.stat" };
+            stat.Rules.Add(new StatRule { eventType = typeof(TestKill).FullName, field = nameof(TestKill.Count) });
+            session.Stats.Define(stat);
+
+            session.Events.Publish(new TestKill { Count = 1 });
+            Assert.AreEqual(1, MtBoundReward.Granted, "에디터에서 고른 결과 대신 코드 결과");
+            Assert.AreEqual("bound.achievement", MtBoundReward.Owner, "Context.Owner = 연결된 항목");
+            Assert.AreEqual(5, session.Stats.Get("bound.stat"), "로그에 기록 대신 코드 결과");
+            Assert.IsTrue(BoundOutcomes.Has("bound.stat"));
+            Assert.IsFalse(BoundOutcomes.Has("nothing"));
+        }
+    }
+
     // Mirror: 생성 코드(사본·비교·쓰기·읽기·적용)를 여러 형식으로 확인한다.
     public class MirrorTests
     {
@@ -246,6 +294,27 @@ namespace GBible.Tests
             Assert.AreSame(removed, w.items[1]);
             Assert.AreEqual(1, removed.level, "값은 기록대로");
             Assert.AreSame(oldShape, w.shape);
+        }
+
+        // 비교 코드가 없는 객체(에셋 참조처럼)는 참조 그대로: 복사·되돌리기에서 같은 인스턴스를 잇는다.
+        public sealed class MtAssetLike
+        {
+        }
+
+        [Test]
+        public void 에셋_같은_참조는_복사와_되돌리기에서_그대로다()
+        {
+            var w = World();
+            var asset = new MtAssetLike();
+            w.anything = asset;
+            Assert.AreSame(asset, Mirror.Clone(w).anything, "복사본도 같은 참조");
+
+            var node = Mirror.Make(w);
+            w.anything = new MtAssetLike();
+            var changes = new ChangeSet();
+            Mirror.Sync(w, node, changes);
+            Mirror.Undo(w, changes);
+            Assert.AreSame(asset, w.anything, "되돌리면 원래 참조");
         }
 
         [Test]

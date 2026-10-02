@@ -42,8 +42,8 @@ namespace GBible
         Last,
     }
 
-    // "이벤트가 발생하면 필드 값을 로그에 반영한다"의 짧은 형태(예전 저장 형식·코드용). field가 비어 있으면 1(횟수)을 반영한다.
-    // 실행할 때는 트리거·결과 규칙(이벤트 발생 → 로그에 기록)으로 바뀌어 다른 기능과 같은 길로 돈다(ToTriggerRule).
+    // "이벤트를 받으면 필드 값을 로그에 반영한다"의 짧은 형태(예전 저장 형식·코드용). field가 비어 있으면 1(횟수)을 반영한다.
+    // 실행할 때는 트리거·결과 규칙(이벤트 받기 → 로그에 기록)으로 바뀌어 다른 기능과 같은 길로 돈다(ToTriggerRule).
     [Serializable]
     public class StatRule
     {
@@ -62,7 +62,7 @@ namespace GBible
             var source = string.IsNullOrEmpty(field) ? "횟수" : field;
             var factor = Math.Abs(multiplier - 1) < 1e-9 ? "" : $" × {multiplier.ToString("0.##", CultureInfo.InvariantCulture)}";
             var when = filter == null ? "" : $" ({filter.Natural()}일 때)";
-            return $"{typeName} 발생 시{when} {source}{factor}를 {statName}에 반영";
+            return $"{typeName} 받기 시{when} {source}{factor}를 {statName}에 반영";
         }
 
         // 코드 형태(Alt): on 적 처치 where (tags contains boss) : 처치 수 += Count × 2
@@ -95,13 +95,13 @@ namespace GBible
         public StatScope Scope;
         public StatAggregate Aggregate;
         public double? Initial;
-        // 반영 규칙: 트리거(이벤트 발생) → 결과(로그에 기록). 짧은 형태 Rules도 같은 규칙으로 바뀌어 돈다.
+        // 반영 규칙: 트리거(이벤트 받기) → 결과(로그에 기록). 짧은 형태 Rules도 같은 규칙으로 바뀌어 돈다.
         public readonly List<TriggerRule> Triggers = new List<TriggerRule>();
         public readonly List<StatRule> Rules = new List<StatRule>();
 
         public IEnumerable<TriggerRule> AllRules() => Rules.Where(r => r != null).Select(r => r.ToTriggerRule()).Concat(Triggers.Where(r => r != null));
 
-        // "이벤트 하나 발생 → 이 로그에 기록" 꼴로 읽을 수 있는 규칙(시뮬레이션이 거꾸로 따라가 이벤트를 만들 때). 그 밖의 트리거는 뺀다.
+        // "이벤트 하나 받기 → 이 로그에 기록" 꼴로 읽을 수 있는 규칙(시뮬레이션이 거꾸로 따라가 이벤트를 만들 때). 그 밖의 트리거는 뺀다.
         public IEnumerable<StatRule> SimpleRules()
         {
             foreach (var rule in Rules.Where(r => r != null)) yield return rule;
@@ -163,7 +163,8 @@ namespace GBible
             }
             foreach (var missing in rule.when.Leaves().OfType<EventTrigger>().Where(e => TypeResolver.Find(e.eventType) == null))
                 _journal.Append(JournalKind.Warning, "Stats", $"로그 '{stat.DisplayName}' 규칙의 이벤트 타입을 찾을 수 없습니다: {missing.eventType}");
-            var outcomes = rule.then;
+            // 코드로 쓴 결과가 이 로그에 연결되어 있으면([BindTo]) '로그에 기록' 대신 그것이 돈다.
+            IEnumerable<Outcome> outcomes = BoundOutcomes.Has(stat.Id) ? BoundOutcomes.Create(stat.Id) : rule.then;
             _triggers.Register(stat.Id, rule.when, repeat: true, fire: moment => _triggers.RunOutcomes(outcomes, moment, "Stats"));
         }
 

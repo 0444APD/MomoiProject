@@ -42,6 +42,23 @@ namespace GBible
 
         static void LogMirrorWarning(string message) => Debug.LogWarning("[MomoiProject] " + message);
 
+        // 인스턴스 값의 사용 기능(Usable 필드, 붙어 있을 때). 게임이 켜질 때만 부른다(필드 목록은 형식마다 한 번 찾아 둔다).
+        static readonly System.Collections.Generic.Dictionary<Type, System.Reflection.FieldInfo> UsableFields = new System.Collections.Generic.Dictionary<Type, System.Reflection.FieldInfo>();
+
+        static Usable UsableOf(object value)
+        {
+            if (value == null) return null;
+            var type = value.GetType();
+            if (!UsableFields.TryGetValue(type, out var field))
+            {
+                for (var t = type; t != null && field == null; t = t.BaseType)
+                    field = t.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
+                        .FirstOrDefault(f => f.FieldType == typeof(Usable));
+                UsableFields[type] = field;
+            }
+            return field?.GetValue(value) as Usable;
+        }
+
         public static GameSession Start()
         {
             if (Session != null) return Session;
@@ -72,7 +89,7 @@ namespace GBible
                     catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[MomoiProject] ", "")); }
                 }
                 foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
-                session.Templates = id => database.All<TemplateData>().FirstOrDefault(t => t.Id == id)?.value;
+                session.Instances = id => database.All<InstanceData>().FirstOrDefault(t => t.Id == id)?.value;
                 // 필드 규칙의 '필수': 저장소 값에서 비면 경고하고 채워질 때까지 모니터에 남긴다.
                 foreach (var rule in database.All<FieldRuleData>())
                     if (rule.required && rule.TargetType != null) session.Data.Require(rule.TargetType, rule.field);
@@ -87,9 +104,11 @@ namespace GBible
                     else if (rename.dataType == typeof(PlayerDataEntry).FullName) session.Data.AddAlias(rename.oldId, rename.newId);
                 }
                 LoadProfile(session);
-                // Game.Use로 쓰는 것: 능력과, 사용 기능이 붙은 아이템 등(IUsableData).
+                // Game.Use로 쓰는 것: 능력(IUsableData)과, 사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
                 foreach (var usable in database.Entries.OfType<IUsableData>())
                     if (usable.ToUsable() is AbilityDefinition definition) session.Abilities.Define(definition);
+                foreach (var instance in database.All<InstanceData>())
+                    if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
                 session.Achievements.EvaluateAll();
             }

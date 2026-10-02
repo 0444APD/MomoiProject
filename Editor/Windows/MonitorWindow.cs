@@ -935,7 +935,7 @@ namespace GBible.EditorTools
                     else
                         ShowFeedback(error, GsNoticeKind.Warning);
                 }, GsButtonKind.Primary);
-                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 발생시킵니다.\nUndo하면 수치는 돌아가고 달성은 유지됩니다.";
+                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 쏩니다.\nUndo하면 수치는 돌아가고 달성은 유지됩니다.";
                 GsMotion.AddPressSpring(fill);
                 buttons.Add(fill);
             }
@@ -1022,7 +1022,7 @@ namespace GBible.EditorTools
             dock.Add(apply);
             dock.Add(Gs.HSpace(28));
 
-            // 이벤트로: 반영 규칙을 거꾸로 따라가 실제 이벤트를 발생시킨다(게임과 같은 경로).
+            // 이벤트로: 반영 규칙을 거꾸로 따라가 실제 이벤트를 쏜다(게임과 같은 경로).
             if (!_statAmounts.TryGetValue(selected.Id, out var amount)) amount = isSum ? 1 : Math.Max(0, now);
             var amountField = new DoubleField { value = amount };
             amountField.AddToClassList("gs-inline");
@@ -1032,18 +1032,18 @@ namespace GBible.EditorTools
             var fire = new GsButton(isSum ? "이벤트로 더하기" : "이벤트로 기록", () =>
             {
                 if (_session.TrySimulateStat(selected.Id, amountField.value, out var description, out var error))
-                    ShowFeedback($"{description} 발생", GsNoticeKind.Ok);
+                    ShowFeedback($"{description} 받기", GsNoticeKind.Ok);
                 else
                     ShowFeedback(error, GsNoticeKind.Warning);
             }, GsButtonKind.Primary);
             GsMotion.AddPressSpring(fire);
             dock.Add(fire);
 
-            // 발생할 이벤트는 버튼 설명으로 보여 준다.
+            // 쏠 이벤트는 버튼 설명으로 보여 준다.
             void UpdatePlan()
             {
                 fire.tooltip = EventSimulator.TryPlanForStat(_session.Stats, selected.Id, amountField.value, out var p, out var error)
-                    ? "발생할 이벤트: " + p.Description + "\n같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, Undo할 수 있습니다."
+                    ? "쏠 이벤트: " + p.Description + "\n같은 이벤트를 받는 다른 수치와 도전과제도 함께 반응하고, Undo할 수 있습니다."
                     : error;
             }
             amountField.RegisterValueChangedCallback(e =>
@@ -1058,7 +1058,7 @@ namespace GBible.EditorTools
         static string ScopeText(StatDefinition definition) =>
             (definition.Scope == StatScope.Run ? "이번 판" : "누적") + " · " + StatSystem.AggregateText(definition.Aggregate);
 
-        // ── 이벤트 발생기 ───────────────────────────────────────
+        // ── 이벤트 쏘기 ───────────────────────────────────────
 
         void BuildEvents()
         {
@@ -1130,16 +1130,16 @@ namespace GBible.EditorTools
             repeat.AddToClassList("gs-inline");
             actions.Add(repeat);
             actions.Add(DockUnit("회"));
-            var fire = new GsButton("이벤트 발생", () =>
+            var fire = new GsButton("이벤트 받기", () =>
             {
                 try
                 {
                     var count = Math.Max(1, Math.Min(1000, (int)Math.Round(repeat.value)));
                     var template = _eventInstances[selected.FullName];
-                    // 발생시킬 때마다 사본을 만들어, 이후 편집이 이미 발생한 이벤트(기록)를 바꾸지 않게 한다.
+                    // 쏠 때마다 사본을 만들어, 이후 편집이 이미 쏜 이벤트(기록)를 바꾸지 않게 한다.
                     var events = Enumerable.Range(0, count).Select(_ => CopyEvent(template)).ToList();
-                    _session.SimulateEvents(events, "모니터 이벤트 발생기");
-                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 발생", GsNoticeKind.Ok);
+                    _session.SimulateEvents(events, "모니터 이벤트 쏘기");
+                    ShowFeedback($"{EventBus.DisplayNameOf(selected)} ×{count} 쐈습니다", GsNoticeKind.Ok);
                 }
                 catch (Exception e)
                 {

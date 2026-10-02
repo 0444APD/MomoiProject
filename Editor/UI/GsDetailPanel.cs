@@ -358,6 +358,8 @@ namespace GBible.EditorTools.UI
             });
             explorer.AddToClassList("gs-explorer--embedded");
             explorer.OpenInTab = _options.OpenNested;
+            // 도감 항목(인스턴스 등)의 값: [Hide]·[ShowIf]·기능 필드 규칙대로.
+            explorer.InstanceEditing = true;
             return explorer;
         }
 
@@ -532,7 +534,7 @@ namespace GBible.EditorTools.UI
             return wrap;
         }
 
-        // 관리 참조 필드(템플릿 값 등)가 새 인스턴스로 바뀌면 본문을 다시 그린다(새 값의 탐색기를 보이려고).
+        // 관리 참조 필드(인스턴스 값 등)가 새 인스턴스로 바뀌면 본문을 다시 그린다(새 값의 탐색기를 보이려고).
         readonly Dictionary<string, long> _referenceIds = new Dictionary<string, long>();
 
         void RememberReferences()

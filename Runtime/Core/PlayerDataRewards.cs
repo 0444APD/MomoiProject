@@ -13,9 +13,9 @@ namespace GBible
         None,     // 줄 수 없는 형식(에셋 참조, 요소가 또 컬렉션인 컬렉션 등)
         Number,   // 숫자: 증감만(다시 정하기는 하지 않는다)
         Value,    // 글자·참거짓·enum: 값 정하기(키워드가 연결된 글자는 목록에서)
-        Template, // 클래스: 템플릿 중 하나(사본이 들어간다). 여기서 새로 만들지 않는다.
-        List,     // 리스트·배열·컬렉션: 요소 넣기. 요소마다 다시 숫자·값·템플릿 규칙.
-        Dictionary, // 딕셔너리: 키 + 값 넣기. 키는 글자·숫자·enum·참거짓, 값은 숫자(증감: 없던 키는 0에서)·값·템플릿(있던 키는 덮어쓴다).
+        Instance, // 클래스: 인스턴스 중 하나(사본이 들어간다). 여기서 새로 만들지 않는다.
+        List,     // 리스트·배열·컬렉션: 요소 넣기. 요소마다 다시 숫자·값·인스턴스 규칙.
+        Dictionary, // 딕셔너리: 키 + 값 넣기. 키는 글자·숫자·enum·참거짓, 값은 숫자(증감: 없던 키는 0에서)·값·인스턴스(있던 키는 덮어쓴다).
     }
 
     public static class PlayerDataGrants
@@ -40,7 +40,7 @@ namespace GBible
                 var keyOk = keyKind == GrantKind.Value || keyKind == GrantKind.Number;
                 return keyOk && valueKind != GrantKind.None && valueKind != GrantKind.List && valueKind != GrantKind.Dictionary ? GrantKind.Dictionary : GrantKind.None;
             }
-            if (info.Kind == DataKind.Object && !type.IsValueType) return GrantKind.Template;
+            if (info.Kind == DataKind.Object && !type.IsValueType) return GrantKind.Instance;
             return GrantKind.None;
         }
 
@@ -133,19 +133,19 @@ namespace GBible
     }
 
     // 보상: 플레이어 데이터 필드 하나에 준다. 필드 형식에 따라
-    //   숫자 → amount만큼 증감 / 글자·참거짓·enum → value로 정하기 / 클래스 → value(템플릿 ID)의 사본으로 정하기 /
-    //   컬렉션 → items의 요소마다(숫자·값·템플릿 ID) 넣기 / 딕셔너리 → keys[i]에 items[i](숫자면 증감, 아니면 값·템플릿으로 덮어쓰기).
-    // 템플릿은 도감 › 템플릿에서 만든 인스턴스만 고른다(보상 안에서 새로 만들거나 고치지 않는다). 런타임은 session.Templates로 찾는다.
+    //   숫자 → amount만큼 증감 / 글자·참거짓·enum → value로 정하기 / 클래스 → value(인스턴스 ID)의 사본으로 정하기 /
+    //   컬렉션 → items의 요소마다(숫자·값·인스턴스 ID) 넣기 / 딕셔너리 → keys[i]에 items[i](숫자면 증감, 아니면 값·인스턴스로 덮어쓰기).
+    // 인스턴스는 도감 › 인스턴스에서 만든 인스턴스만 고른다(보상 안에서 새로 만들거나 고치지 않는다). 런타임은 session.Instances로 찾는다.
     [Serializable]
     [BlockInfo("플레이어 데이터에 주기", Category = "플레이어 데이터",
-        Description = "플레이어 데이터 필드 하나에 줍니다. 숫자는 증감, 글자·enum은 값, 클래스는 템플릿, 리스트는 요소(숫자·값·템플릿)를 넣습니다.")]
+        Description = "플레이어 데이터 필드 하나에 줍니다. 숫자는 증감, 글자·enum은 값, 클래스는 인스턴스, 리스트는 요소(숫자·값·인스턴스)를 넣습니다.")]
     public sealed class PlayerDataReward : Reward
     {
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key;
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(비우면 값 전체)")] public string path = "";
         [FieldLabel("증감")] public double amount;
-        [FieldLabel("값(클래스면 템플릿 ID)")] public string value = "";
-        [FieldLabel("넣을 요소(숫자·값·템플릿 ID)")] public List<string> items = new List<string>();
+        [FieldLabel("값(클래스면 인스턴스 ID)")] public string value = "";
+        [FieldLabel("넣을 요소(숫자·값·인스턴스 ID)")] public List<string> items = new List<string>();
         // 딕셔너리: items[i]를 넣을 키(같은 순서).
         [FieldLabel("딕셔너리 키")] public List<string> keys = new List<string>();
 
@@ -178,8 +178,8 @@ namespace GBible
                     case GrantKind.Dictionary:
                         store.Modify<object>(key, root => AddEntries(session, root, target));
                         return;
-                    case GrantKind.Template:
-                        var made = Make(session, target, value, GrantKind.Template);
+                    case GrantKind.Instance:
+                        var made = Make(session, target, value, GrantKind.Instance);
                         if (made != null) store.Set(key, made);
                         return;
                     default:
@@ -218,9 +218,9 @@ namespace GBible
                         var grown = AddItems(session, current, target);
                         if (!ReferenceEquals(grown, FieldPaths.Read(parent, member))) Write(parent, member, grown);
                     }
-                    else if (kind == GrantKind.Template)
+                    else if (kind == GrantKind.Instance)
                     {
-                        var made = Make(session, target, value, GrantKind.Template);
+                        var made = Make(session, target, value, GrantKind.Instance);
                         if (made != null) Write(parent, member, made);
                     }
                     else
@@ -243,20 +243,20 @@ namespace GBible
             return Make(session, type, value, kind);
         }
 
-        // 넣을 값 하나: 숫자·값은 글자를 읽고, 템플릿은 원본의 사본(여러 번 줘도 서로 다른 인스턴스).
+        // 넣을 값 하나: 숫자·값은 글자를 읽고, 인스턴스는 원본의 사본(여러 번 줘도 서로 다른 인스턴스).
         static object Make(GameSession session, Type type, string text, GrantKind kind)
         {
-            if (kind == GrantKind.Template)
+            if (kind == GrantKind.Instance)
             {
-                var made = session.CreateFromTemplate(text);
+                var made = session.CopyInstance(text);
                 if (made == null)
                 {
-                    WarnStatic(session, string.IsNullOrEmpty(text) ? "템플릿이 선택되지 않았습니다" : $"템플릿 '{text}'을(를) 찾을 수 없습니다");
+                    WarnStatic(session, string.IsNullOrEmpty(text) ? "인스턴스가 선택되지 않았습니다" : $"인스턴스 '{text}'을(를) 찾을 수 없습니다");
                     return null;
                 }
                 if (!type.IsInstanceOfType(made))
                 {
-                    WarnStatic(session, $"템플릿 '{text}'의 형식({made.GetType().Name})이 {DataModel.FriendlyName(type)}과(와) 다릅니다");
+                    WarnStatic(session, $"인스턴스 '{text}'의 형식({made.GetType().Name})이 {DataModel.FriendlyName(type)}과(와) 다릅니다");
                     return null;
                 }
                 return made;
@@ -295,7 +295,7 @@ namespace GBible
             return collection;
         }
 
-        // 딕셔너리에 키 + 값을 넣는다. 숫자 값은 있던 값에 더하고(없던 키는 0에서), 그 밖의 값·템플릿은 덮어쓴다.
+        // 딕셔너리에 키 + 값을 넣는다. 숫자 값은 있던 값에 더하고(없던 키는 0에서), 그 밖의 값·인스턴스는 덮어쓴다.
         void AddEntries(GameSession session, object collection, Type type)
         {
             if (!(collection is IDictionary map)) return;
@@ -373,7 +373,7 @@ namespace GBible
             if (string.IsNullOrEmpty(key)) context.Error("보상을 줄 플레이어 데이터가 선택되지 않았습니다.");
         }
 
-        // 플레이어 데이터의 값 형식을 알 때의 검사(도감 검증기가 부른다). 템플릿이 있는지는 도감 검증기가 따로 본다.
+        // 플레이어 데이터의 값 형식을 알 때의 검사(도감 검증기가 부른다). 인스턴스가 있는지는 도감 검증기가 따로 본다.
         public void Validate(Type root, List<string> errors)
         {
             if (root == null) return;
@@ -394,8 +394,8 @@ namespace GBible
                 case GrantKind.Value:
                     if (!PlayerDataGrants.TryParse(target, value, out _, out var parseError)) errors.Add(parseError);
                     return;
-                case GrantKind.Template:
-                    if (string.IsNullOrEmpty(value)) errors.Add("템플릿이 선택되지 않았습니다.");
+                case GrantKind.Instance:
+                    if (string.IsNullOrEmpty(value)) errors.Add("인스턴스가 선택되지 않았습니다.");
                     return;
                 case GrantKind.List:
                     if (items.Count == 0) errors.Add("넣을 요소가 없습니다. '+'로 요소를 더하세요.");
@@ -403,9 +403,9 @@ namespace GBible
                     var kind = PlayerDataGrants.ElementKind(target);
                     for (int i = 0; i < items.Count; i++)
                     {
-                        if (kind == GrantKind.Template)
+                        if (kind == GrantKind.Instance)
                         {
-                            if (string.IsNullOrEmpty(items[i])) errors.Add($"{i + 1}번째 요소의 템플릿이 선택되지 않았습니다.");
+                            if (string.IsNullOrEmpty(items[i])) errors.Add($"{i + 1}번째 요소의 인스턴스가 선택되지 않았습니다.");
                         }
                         else if (!PlayerDataGrants.TryParse(element, items[i], out _, out var itemError)) errors.Add($"{i + 1}번째 요소: {itemError}");
                     }
@@ -421,9 +421,9 @@ namespace GBible
                         if (!PlayerDataGrants.TryParse(keyType, keys[i], out _, out var keyError)) errors.Add($"{i + 1}번째 키: {keyError}");
                         else if (!seen.Add(keys[i])) errors.Add($"키 '{keys[i]}'가 두 번 들어 있습니다.");
                         var text = i < items.Count ? items[i] : "";
-                        if (valueKind == GrantKind.Template)
+                        if (valueKind == GrantKind.Instance)
                         {
-                            if (string.IsNullOrEmpty(text)) errors.Add($"{i + 1}번째 값의 템플릿이 선택되지 않았습니다.");
+                            if (string.IsNullOrEmpty(text)) errors.Add($"{i + 1}번째 값의 인스턴스가 선택되지 않았습니다.");
                         }
                         else if (!PlayerDataGrants.TryParse(valueKind == GrantKind.Number ? typeof(double) : valueType, text, out _, out var valueError))
                             errors.Add($"{i + 1}번째 값: {valueError}");
@@ -432,14 +432,14 @@ namespace GBible
             }
         }
 
-        // 템플릿 ID를 쓰는 칸들(검증기가 템플릿이 있는지·형식이 맞는지 본다).
-        public IEnumerable<(string id, Type type)> TemplateRefs(Type root)
+        // 인스턴스 ID를 쓰는 칸들(검증기가 인스턴스가 있는지·형식이 맞는지 본다).
+        public IEnumerable<(string id, Type type)> InstanceRefs(Type root)
         {
             var target = root == null ? null : FieldPaths.TypeAt(root, path, out _);
             if (target == null) yield break;
             var kind = PlayerDataGrants.KindOf(target);
-            if (kind == GrantKind.Template && !string.IsNullOrEmpty(value)) yield return (value, target);
-            if ((kind == GrantKind.List || kind == GrantKind.Dictionary) && PlayerDataGrants.ElementKind(target) == GrantKind.Template)
+            if (kind == GrantKind.Instance && !string.IsNullOrEmpty(value)) yield return (value, target);
+            if ((kind == GrantKind.List || kind == GrantKind.Dictionary) && PlayerDataGrants.ElementKind(target) == GrantKind.Instance)
                 foreach (var id in items.Where(i => !string.IsNullOrEmpty(i))) yield return (id, FieldPaths.ElementTypeOf(target));
         }
     }

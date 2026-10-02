@@ -134,7 +134,7 @@ namespace GBible.Samples
             return true;
         }
 
-        // 장비·강화 효과·몬스터 태그 예제: 키워드, 플레이어 데이터, 템플릿, 조건식이 붙은 수치·도전과제.
+        // 장비·강화 효과·몬스터 태그 예제: 키워드, 플레이어 데이터, 인스턴스, 조건식이 붙은 수치·도전과제.
         static bool CreateEquipmentExample(EditorDatabase db)
         {
             if (db.FindById("player.inventory") != null) return false;
@@ -164,8 +164,8 @@ namespace GBible.Samples
             inventory.valueType = typeof(SampleInventory).FullName;
             EditorUtility.SetDirty(inventory);
 
-            Template("template.trainingSword", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = "common", tags = { "melee" } });
-            Template("template.dragonArmor", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = "legendary", element = SampleElement.Fire, tags = { "pierce" } });
+            Template("instance.trainingSword", new SampleEquipment { name = "훈련용 검", slot = "weapon", grade = "common", tags = { "melee" } });
+            Template("instance.dragonArmor", new SampleEquipment { name = "용의 비늘 갑옷", slot = "armor", grade = "legendary", element = SampleElement.Fire, tags = { "pierce" } });
 
             var gold = db.OfType<PlayerDataEntry>().FirstOrDefault(s => s.Id == "player.gold");
             var bossRule = Rule<EnemyKilled>("");
@@ -174,10 +174,10 @@ namespace GBible.Samples
 
             Achievement("dragonSlayer",
                 new StatCompareCondition { stat = bossKills.Id, op = CompareOp.AtLeast, value = 1 },
-                // 보상: 골드 지급 + 아이템(용의 비늘 갑옷 템플릿 사본)을 인벤토리 items에 지급.
+                // 보상: 골드 지급 + 아이템(용의 비늘 갑옷 인스턴스 사본)을 인벤토리 items에 지급.
                 gold != null
-                    ? new Reward[] { Pay(gold.Id, 100), Give(inventory.Id, "items", "template.dragonArmor") }
-                    : new Reward[] { Give(inventory.Id, "items", "template.dragonArmor") });
+                    ? new Reward[] { Pay(gold.Id, 100), Give(inventory.Id, "items", "instance.dragonArmor") }
+                    : new Reward[] { Give(inventory.Id, "items", "instance.dragonArmor") });
             Achievement("legendCollector",
                 new PlayerDataCondition
                 {
@@ -209,14 +209,14 @@ namespace GBible.Samples
 
         static void Template(string id, object value)
         {
-            var template = (TemplateData)EditorDatabase.Instance.Create(typeof(TemplateData), id);
-            template.templateType = value.GetType().FullName;
+            var template = (InstanceData)EditorDatabase.Instance.Create(typeof(InstanceData), id);
+            template.instanceType = value.GetType().FullName;
             template.value = value;
             EditorUtility.SetDirty(template);
             AssetDatabase.SaveAssetIfDirty(template);
         }
 
-        // 보상: 숫자 플레이어 데이터 증감 / 리스트에 템플릿(사본) 넣기.
+        // 보상: 숫자 플레이어 데이터 증감 / 리스트에 인스턴스(사본) 넣기.
         static PlayerDataReward Pay(string key, int amount) =>
             new PlayerDataReward { key = key, amount = amount };
 

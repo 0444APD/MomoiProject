@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GBible.Data
 {
-    // 로그: 값의 기록. 반영 규칙 = 트리거(이벤트 발생만, AND·OR 가능) → 결과(로그에 기록으로 고정, 세부 칸만 고친다).
+    // 로그: 값의 기록. 반영 규칙 = 트리거(이벤트 받기만, AND·OR 가능) → 결과(로그에 기록으로 고정, 세부 칸만 고친다).
     // 다른 기능(도전과제·능력·아이템 …)과 같은 트리거·결과 편집 화면을 쓰고, 잠금만 다르다.
     [Database("로그", Group = "선언", Order = 2, IdPrefix = "stat")]
     [CreateAssetMenu(menuName = "MomoiProject/수치", fileName = "NewStat")]

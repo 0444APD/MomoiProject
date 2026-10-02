@@ -59,19 +59,19 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 주기_보상은_템플릿_사본과_값과_요소를_넣는다()
+        public void 주기_보상은_인스턴스_사본과_값과_요소를_넣는다()
         {
             var templates = new Dictionary<string, object>
             {
                 ["template.sword"] = new TestItem { name = "sword", level = 3, tags = { "melee" } },
                 ["template.potion"] = new TestItem { name = "potion", level = 1 },
             };
-            _session.Templates = id => templates.TryGetValue(id, out var value) ? value : null;
+            _session.Instances = id => templates.TryGetValue(id, out var value) ? value : null;
             var inventory = _session.Data.Define("s:bag", DataZone.Session, new TestInventory(), "가방");
             new PlayerDataReward { key = "s:bag", path = "gold", amount = 30 }.Grant(_session);
             Assert.AreEqual(30, inventory.gold);
 
-            // 컬렉션: 요소마다 템플릿의 사본이 들어간다(원본·서로와 다른 인스턴스).
+            // 컬렉션: 요소마다 인스턴스의 사본이 들어간다(원본·서로와 다른 인스턴스).
             new PlayerDataReward { key = "s:bag", path = "items", items = { "template.sword", "template.potion", "template.sword" } }.Grant(_session);
             CollectionAssert.AreEqual(new[] { "sword", "potion", "sword" }, inventory.items.Select(i => i.name).ToArray());
             Assert.AreEqual(3, inventory.items[0].level);
@@ -80,18 +80,18 @@ namespace GBible.Tests
             Assert.AreEqual("s:bag › items에 template.sword, template.potion, template.sword 넣기",
                 new PlayerDataReward { key = "s:bag", path = "items", items = { "template.sword", "template.potion", "template.sword" } }.Natural(null));
 
-            // 없는 템플릿은 넣지 않고 경고만 남긴다.
-            new PlayerDataReward { key = "s:bag", path = "items", items = { "template.none" } }.Grant(_session);
+            // 없는 인스턴스는 넣지 않고 경고만 남긴다.
+            new PlayerDataReward { key = "s:bag", path = "items", items = { "instance.none" } }.Grant(_session);
             Assert.AreEqual(3, inventory.items.Count);
 
-            // 클래스 필드: 템플릿으로 통째로 / 글자 필드: 값 / 글자 리스트: 요소.
+            // 클래스 필드: 인스턴스로 통째로 / 글자 필드: 값 / 글자 리스트: 요소.
             var hero = _session.Data.Define("s:hero", DataZone.Session, new TestItem(), "영웅");
             new PlayerDataReward { key = "s:hero", path = "name", value = "Ari" }.Grant(_session);
             new PlayerDataReward { key = "s:hero", path = "tags", items = { "brave", "fast" } }.Grant(_session);
             Assert.AreEqual("Ari", hero.name);
             CollectionAssert.AreEqual(new[] { "brave", "fast" }, hero.tags);
             new PlayerDataReward { key = "s:hero", value = "template.potion" }.Grant(_session);
-            Assert.AreEqual("potion", _session.Data.Get<TestItem>("s:hero").name, "값 전체를 템플릿 사본으로");
+            Assert.AreEqual("potion", _session.Data.Get<TestItem>("s:hero").name, "값 전체를 인스턴스 사본으로");
 
             // 배열: 크기가 고정이라 늘린 새 배열로 바꾼다(값 전체·안쪽 필드 모두).
             _session.Data.Define("s:scores", DataZone.Session, new[] { 1, 2 }, "점수");
@@ -115,14 +115,14 @@ namespace GBible.Tests
             Assert.AreEqual(GrantKind.Number, PlayerDataGrants.KindOf(typeof(int)));
             Assert.AreEqual(GrantKind.Value, PlayerDataGrants.KindOf(typeof(string)));
             Assert.AreEqual(GrantKind.Value, PlayerDataGrants.KindOf(typeof(bool)));
-            Assert.AreEqual(GrantKind.Template, PlayerDataGrants.KindOf(typeof(TestItem)));
+            Assert.AreEqual(GrantKind.Instance, PlayerDataGrants.KindOf(typeof(TestItem)));
             Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(List<TestItem>)));
             Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(List<int>)));
             Assert.AreEqual(GrantKind.Dictionary, PlayerDataGrants.KindOf(typeof(Dictionary<string, int>)), "딕셔너리는 키 + 값");
             Assert.AreEqual(GrantKind.None, PlayerDataGrants.KindOf(typeof(Dictionary<string, List<int>>)), "값이 또 컬렉션이면 주지 않는다");
             Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(int[])), "배열도 요소 넣기");
             Assert.AreEqual(GrantKind.List, PlayerDataGrants.KindOf(typeof(TestItem[])));
-            Assert.AreEqual(GrantKind.Template, PlayerDataGrants.ElementKind(typeof(List<TestItem>)));
+            Assert.AreEqual(GrantKind.Instance, PlayerDataGrants.ElementKind(typeof(List<TestItem>)));
             // 고를 수 있는 필드: 값 전체·gold·items·딕셔너리 counts(리스트 안쪽은 없다).
             CollectionAssert.AreEqual(new[] { "", "gold", "items", "counts" }, PlayerDataGrants.Paths(typeof(TestInventory)).ToArray());
 
@@ -131,7 +131,7 @@ namespace GBible.Tests
             Assert.AreEqual(1, errors.Count, "넣을 요소가 없다");
             errors.Clear();
             new PlayerDataReward { key = "s:bag", path = "items", items = { "" } }.Validate(typeof(TestInventory), errors);
-            Assert.AreEqual(1, errors.Count, "요소의 템플릿이 비어 있다");
+            Assert.AreEqual(1, errors.Count, "요소의 인스턴스가 비어 있다");
             errors.Clear();
             new PlayerDataReward { key = "s:bag", path = "gold" }.Validate(typeof(TestInventory), errors);
             Assert.AreEqual(1, errors.Count, "증감이 0");

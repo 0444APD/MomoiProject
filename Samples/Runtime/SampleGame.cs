@@ -151,14 +151,14 @@ namespace GBible.Samples
             session.Actions.Register<LootAction>(_ => Loot(session));
             session.Actions.Register<EnhanceAction>(_ => Enhance(session));
 
-            session.Debug.Register("샘플", "고블린 공격", () => session.Do(new AttackAction()), "명중하면 적 처치 이벤트가 발생합니다(전투 난수 스트림).");
+            session.Debug.Register("샘플", "고블린 공격", () => session.Do(new AttackAction()), "명중하면 적 처치 이벤트를 쏩니다(전투 난수 스트림).");
             session.Debug.Register("샘플", "오크 공격 ×10", () =>
             {
                 for (int i = 0; i < 10; i++) session.Do(new AttackAction { target = "오크" });
             });
             session.Debug.Register("샘플", "상자 열기", () => session.Do(new OpenChestAction()), "드롭 난수 스트림으로 골드를 얻습니다.");
             session.Debug.Register("샘플", "드래곤(보스) 공격", () => session.Do(new AttackAction { target = "드래곤" }), "보스 태그가 붙은 처치 이벤트 → 보스 처치 수·용 사냥꾼");
-            session.Debug.Register("샘플", "장비 획득(템플릿)", () => Guarded(session, new LootAction()), "도감의 장비 템플릿 중 하나의 사본을 인벤토리에 넣습니다.");
+            session.Debug.Register("샘플", "장비 획득(인스턴스)", () => Guarded(session, new LootAction()), "도감의 장비 인스턴스 중 하나의 사본을 인벤토리에 넣습니다.");
             session.Debug.Register("샘플", "첫 장비 강화", () => Guarded(session, new EnhanceAction()), "첫 장비에 강화 효과를 하나 붙입니다(강화 장인 조건).");
             session.Debug.Register("샘플", "Undo", () => session.Undo(), "마지막 행동을 되돌립니다(몇 번이든 뒤에서부터).");
         }
@@ -188,11 +188,11 @@ namespace GBible.Samples
             session.Do(action);
         }
 
-        // 도감의 장비 템플릿 중 하나(드롭 난수)의 사본을 넣는다.
+        // 도감의 장비 인스턴스 중 하나(드롭 난수)의 사본을 넣는다.
         static void Loot(GameSession session)
         {
-            var templates = GameDatabase.Load()?.All<TemplateData>().Where(t => t.value is SampleEquipment).ToList();
-            if (templates == null || templates.Count == 0) throw new InvalidOperationException("장비 템플릿이 없습니다(샘플 데이터 만들기).");
+            var templates = GameDatabase.Load()?.All<InstanceData>().Where(t => t.value is SampleEquipment).ToList();
+            if (templates == null || templates.Count == 0) throw new InvalidOperationException("장비 인스턴스가 없습니다(샘플 데이터 만들기).");
             var pick = templates[session.Random.Get("drop").Range(0, templates.Count)];
             session.Data.Modify<SampleInventory>(InventoryKey, inv => inv.items.Add(pick.CreateInstance<SampleEquipment>()));
         }

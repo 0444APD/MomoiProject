@@ -208,7 +208,9 @@ namespace GBible
 
         // ── 쓰기·읽기 ───────────────────────────────────────────
         // 객체 표시: 0 = null, 1 = 생성 코드가 있는 객체(형식 번호 + 필드), 2 = 에셋 참조(ID 글자),
-        //           3 = 원래 객체(뒤로 기록 전용: 원래 객체 번호 + 형식 번호 + 필드 — 되돌릴 때 그 인스턴스에 다시 채운다).
+        //           3 = 원래 객체(뒤로 기록 전용: 원래 객체 번호 + 형식 번호 + 필드 — 되돌릴 때 그 인스턴스에 다시 채운다),
+        //           4 = 같은 프로세스 안의 참조(번호 — 복사·되돌리기에서 스프라이트 같은 에셋 참조를 그대로 잇는다. 네트워크로는 보내지 않는다).
+        [ThreadStatic] static List<object> _writeRefs;
 
         public static void Write(MirrorWriter writer, object value)
         {
@@ -223,6 +225,13 @@ namespace GBible
                 writer.Byte(1);
                 writer.UVar((ulong)type.Id);
                 type.Write(writer, value);
+                return;
+            }
+            if (_writeRefs != null)
+            {
+                writer.Byte(4);
+                writer.UVar((ulong)_writeRefs.Count);
+                _writeRefs.Add(value);
                 return;
             }
             writer.Byte(2);
@@ -247,6 +256,9 @@ namespace GBible
                     if (reused == null || reused.GetType() != kind.Type) reused = kind.New();
                     kind.Read(reused, reader);
                     return reused;
+                case 4:
+                    var index = (int)reader.UVar() + _undoOffset;
+                    return _undoOriginals != null && index < _undoOriginals.Count ? _undoOriginals[index] : null;
                 default:
                     var id = reader.Str();
                     return id == null ? null : DataModel.IdToReference?.Invoke(id, declared ?? typeof(object));
@@ -272,6 +284,13 @@ namespace GBible
                 else writer.Byte(1);
                 writer.UVar((ulong)node.Type.Id);
                 WriteNode(writer, node, originals);
+                return;
+            }
+            if (originals != null)
+            {
+                writer.Byte(4);
+                writer.UVar((ulong)originals.Count);
+                originals.Add(shadow);
                 return;
             }
             writer.Byte(2);
@@ -319,13 +338,30 @@ namespace GBible
             return Read(new MirrorReader(w.Data, 0, w.Length), declared);
         }
 
-        // 생성 코드로 깊은 복사(쓰고 다시 읽기). 인스턴스의 사본을 만들 때 쓴다.
+        // 생성 코드로 깊은 복사(쓰고 다시 읽기). 인스턴스의 사본을 만들 때 쓴다. 에셋 참조(스프라이트 등)는 같은 참조 그대로.
         public static T Clone<T>(T value) where T : class
         {
             if (value == null) return null;
-            var w = new MirrorWriter();
-            Write(w, value);
-            return (T)Read(new MirrorReader(w.Data, 0, w.Length), typeof(T));
+            var refs = new List<object>();
+            var previousWrite = _writeRefs;
+            var previousRead = _undoOriginals;
+            var previousOffset = _undoOffset;
+            try
+            {
+                _writeRefs = refs;
+                var w = new MirrorWriter();
+                Write(w, value);
+                _writeRefs = previousWrite;
+                _undoOriginals = refs;
+                _undoOffset = 0;
+                return (T)Read(new MirrorReader(w.Data, 0, w.Length), typeof(T));
+            }
+            finally
+            {
+                _writeRefs = previousWrite;
+                _undoOriginals = previousRead;
+                _undoOffset = previousOffset;
+            }
         }
 
         // ── 찾기 ───────────────────────────────────────────────

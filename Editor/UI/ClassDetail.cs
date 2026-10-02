@@ -156,6 +156,21 @@ namespace GBible.EditorTools.UI
             }
             if (links.childCount > 0) row.Add(links);
 
+            // 인스턴스 편집에서 보이기: [Hide](여기서 바꾸면 저장할 때 코드에 쓴다)·[ShowIf](코드에서 정한 조건, 보기만).
+            if (entry.Kind == ClassKind.Data && !entry.Locked && info.DeclaringType == entry.Type)
+            {
+                var hidden = new Toggle("인스턴스에서 숨김  [Hide]") { value = InstanceFields.IsHidden(info) };
+                hidden.style.marginTop = 6;
+                hidden.tooltip = "도감 › 인스턴스에서 이 필드를 보이지 않습니다(값은 그대로 저장·복사). 저장(Ctrl+S)할 때 코드에 [Hide]를 붙이거나 뗍니다.";
+                hidden.RegisterValueChangedCallback(e => ClassStaging.SetFieldAttribute(entry.FullName, info.Name, InstanceFields.Hide, e.newValue));
+                row.Add(hidden);
+                var showIf = info.GetCustomAttribute<ShowIfAttribute>(true);
+                if (showIf != null)
+                    row.Add(Caption(showIf.Value == null ? $"'{showIf.Field}'이(가) 있거나 참일 때만 보임  [ShowIf]" : $"'{showIf.Field}'이(가) '{showIf.Value}'일 때만 보임  [ShowIf]"));
+                if (InstanceFields.IsFeature(info))
+                    row.Add(Caption("기능 필드: 비어 있으면 그 기능이 없습니다. 인스턴스에서 '+ 기능'으로 붙입니다."));
+            }
+
             if (KeywordTools.CanConnect(info))
             {
                 var group = KeywordTools.GroupOf(info);

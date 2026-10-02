@@ -67,7 +67,7 @@ namespace GBible.Tests
         void Kill(string boss, int damage) => _session.Events.Publish(new TgBossKilled { Boss = boss, Damage = damage });
 
         [Test]
-        public void 로그는_이벤트_발생_트리거와_로그에_기록_결과로_돈다()
+        public void 로그는_이벤트_받기_트리거와_로그에_기록_결과로_돈다()
         {
             var log = new StatDefinition { Id = "bossDamage", Aggregate = StatAggregate.Sum };
             log.Triggers.Add(new TriggerRule { when = Boss("dragon"), then = { new RecordOutcome { field = nameof(TgBossKilled.Damage), multiplier = 2 } } });
@@ -90,7 +90,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void AND는_이벤트가_발생한_순간_조건도_참이어야_발동한다()
+        public void AND는_이벤트를_받은_순간_조건도_참이어야_발동한다()
         {
             var achievement = new AchievementDefinition { Id = "richSlayer", When = new AllTrigger { triggers = { Boss("dragon"), GoldAtLeast(100) } } };
             achievement.Outcomes.Add(new TgGoldFromEvent());
@@ -170,7 +170,7 @@ namespace GBible.Tests
             Assert.IsTrue(_session.Achievements.IsUnlocked("third"), "세 번째 처치 순간에 처치 수가 이미 3");
         }
 
-        // 결과가 자기 트리거의 이벤트를 다시 발생시킨다(잘못 만든 데이터).
+        // 결과가 자기 트리거의 이벤트를 다시 쏜다(잘못 만든 데이터).
         [Serializable, BlockInfo("보스 처치 다시 알리기")]
         public sealed class TgEcho : Reward
         {
@@ -236,7 +236,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 트리거로_달성은_조건을_채우고_값을_맞춘_이벤트를_발생시킨다()
+        public void 트리거로_달성은_조건을_채우고_값을_맞춘_이벤트를_쏜다()
         {
             var log = new StatDefinition { Id = "kills", Aggregate = StatAggregate.Sum };
             log.Triggers.Add(new TriggerRule { when = Boss(), then = { new RecordOutcome() } });
@@ -287,7 +287,7 @@ namespace GBible.Tests
         {
             var rule = new TriggerRule { when = new AllTrigger { triggers = { Boss("dragon"), GoldAtLeast(5) } }, then = { new RecordOutcome { field = "Damage" } } };
             var text = rule.Natural(_session);
-            StringAssert.Contains("보스 처치 발생", text);
+            StringAssert.Contains("보스 처치 받기", text);
             StringAssert.Contains("그리고", text);
             StringAssert.Contains("Damage", text);
             Assert.AreEqual(TriggerKinds.Event | TriggerKinds.Condition, rule.when.Kinds());

@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace GBible.EditorTools
 {
-    // 필드 규칙을 걸 수 있는 클래스: 데이터 클래스(저장소·템플릿에 담는 것), 도감 종류, 이벤트.
+    // 필드 규칙을 걸 수 있는 클래스: 데이터 클래스(저장소·인스턴스에 담는 것), 도감 종류, 이벤트.
     // 내 코드만 보인다(ProjectCode: 플러그인·패키지·이 라이브러리의 기본 도감 종류는 빠진다). 이벤트는 [GameEvent]를 붙인 것만.
     public static class ClassTypes
     {

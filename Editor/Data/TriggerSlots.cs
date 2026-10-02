@@ -104,7 +104,7 @@ namespace GBible.EditorTools
         public static string Text(TriggerKinds kinds)
         {
             var parts = new List<string>();
-            if ((kinds & TriggerKinds.Event) != 0) parts.Add("이벤트 발생");
+            if ((kinds & TriggerKinds.Event) != 0) parts.Add("이벤트 받기");
             if ((kinds & TriggerKinds.Condition) != 0) parts.Add("조건 충족");
             if ((kinds & TriggerKinds.Use) != 0) parts.Add("사용");
             return parts.Count == 0 ? "없음" : string.Join(" · ", parts);

@@ -33,13 +33,13 @@ namespace GBible.Tests
         {
             Assert.IsTrue(_session.TrySimulateStat("kills", 3, out var description, out var error), error);
             Assert.AreEqual(3, _session.Stats.Get("kills"));
-            Assert.AreEqual(1, _session.Stats.Get("run_kills"), "처치 이벤트 1회가 발생했으므로 횟수 규칙도 반응한다");
+            Assert.AreEqual(1, _session.Stats.Get("run_kills"), "처치 이벤트를 1회 받았으므로 횟수 규칙도 반응한다");
             StringAssert.Contains("Count", description);
             Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Event), "실제 이벤트가 기록된다");
         }
 
         [Test]
-        public void 횟수_규칙은_이벤트를_그_수만큼_발생시킨다()
+        public void 횟수_규칙은_이벤트를_그_수만큼_쏜다()
         {
             Assert.IsTrue(_session.TrySimulateStat("run_kills", 4, out _, out var error), error);
             Assert.AreEqual(4, _session.Stats.Get("run_kills"));

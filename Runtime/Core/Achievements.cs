@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace GBible
 {
-    // 도전과제 = 트리거(조건 충족·이벤트 발생, AND·OR) + 결과. 다른 기능과 같은 두 칸(Triggers.cs).
+    // 도전과제 = 트리거(조건 충족·이벤트 받기, AND·OR) + 결과. 다른 기능과 같은 두 칸(Triggers.cs).
     public sealed class AchievementDefinition
     {
         public string Id;
@@ -59,6 +59,13 @@ namespace GBible
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[MomoiProject] 도전과제 ID가 비어 있습니다.");
 
+            // 코드로 쓴 결과가 연결되어 있으면([BindTo]) 그것이 이 도전과제의 결과다(에디터에서 고른 결과 대신).
+            if (BoundOutcomes.Has(definition.Id))
+            {
+                definition.Outcomes.Clear();
+                definition.Rewards.Clear();
+                definition.Outcomes.AddRange(BoundOutcomes.Create(definition.Id));
+            }
             _definitions[definition.Id] = definition;
             _session.Data.Define(PlayerDataKeys.Achievement(definition.Id), DataZone.Meta, false, definition.DisplayName ?? definition.Id);
             if (!IsUnlocked(definition.Id)) WatchCondition(definition);
@@ -73,7 +80,7 @@ namespace GBible
             }
             var id = definition.Id;
             _session.Triggers.Unregister(id);
-            _session.Triggers.Register(id, definition.When, repeat: false, fire: moment => Unlock(id, moment.Event != null ? EventBus.DisplayNameOf(moment.Event.GetType()) + " 발생" : "조건 충족", moment));
+            _session.Triggers.Register(id, definition.When, repeat: false, fire: moment => Unlock(id, moment.Event != null ? EventBus.DisplayNameOf(moment.Event.GetType()) + " 받음" : "조건 충족", moment));
         }
 
         public bool IsDefined(string id) => id != null && _definitions.ContainsKey(id);

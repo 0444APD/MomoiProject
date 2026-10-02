@@ -447,7 +447,7 @@ namespace GBible.EditorTools.UI
         {
             var items = new List<GsDropdownItem>
             {
-                new GsDropdownItem("횟수 (필드 없음)", () => SetString("")) { Detail = "이벤트가 한 번 발생할 때마다 1", Selected = string.IsNullOrEmpty(_property.stringValue) },
+                new GsDropdownItem("횟수 (필드 없음)", () => SetString("")) { Detail = "이벤트가 한 번 받을 때마다 1", Selected = string.IsNullOrEmpty(_property.stringValue) },
             };
             var eventType = EventTypeFor(_property, EventFieldRef);
             if (eventType == null)
@@ -609,7 +609,7 @@ namespace GBible.EditorTools.UI
                         SetString(name);
                         return;
                     }
-                    // 형식을 고르면 그 형식의 새 인스턴스를 옆 칸에 넣는다(템플릿). 같은 형식이면 기존 값을 둔다.
+                    // 형식을 고르면 그 형식의 새 인스턴스를 옆 칸에 넣는다(인스턴스). 같은 형식이면 기존 값을 둔다.
                     _property.serializedObject.Update();
                     var changed = _property.stringValue != name;
                     _property.stringValue = name;

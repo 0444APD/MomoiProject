@@ -48,7 +48,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 플레이어_데이터에_주기_보상을_값_형식과_템플릿으로_검사한다()
+        public void 플레이어_데이터에_주기_보상을_값_형식과_인스턴스로_검사한다()
         {
             var bag = Make<PlayerDataEntry>("playerData1", "가방");
             bag.valueType = typeof(TestInventory).FullName;
@@ -57,12 +57,12 @@ namespace GBible.Tests
             achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "items", amount = 1 });
             achievement.rewards.Add(new PlayerDataReward { key = "없는키", amount = 1 });
             achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "gold", amount = 5 });
-            achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "items", items = { "template.none" } });
+            achievement.rewards.Add(new PlayerDataReward { key = "playerData1", path = "items", items = { "instance.none" } });
             var issues = DataValidator.Validate(new List<GameData> { bag, achievement }).Where(i => i.Message.StartsWith("플레이어 데이터에 주기")).ToList();
             Assert.AreEqual(3, issues.Count, string.Join("\n", issues.Select(i => i.Message)));
             Assert.IsTrue(issues.Any(i => i.Message.Contains("넣을 요소가 없습니다")));
             Assert.IsTrue(issues.Any(i => i.Message.Contains("없는 플레이어 데이터")));
-            Assert.IsTrue(issues.Any(i => i.Message.Contains("없는 템플릿 'template.none'")));
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("없는 인스턴스 'instance.none'")));
         }
 
         [Test]

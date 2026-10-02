@@ -76,6 +76,10 @@ namespace GBible.EditorTools.UI
         // 폴더(클래스·배열·리스트)를 이 탐색기 안에서 들어가지 않고 따로 연다(상세 창의 새 탭). true를 돌려주면 안에서 들어가지 않는다.
         public Func<ExplorerItem, bool> OpenInTab;
 
+        // 인스턴스 편집(도감 상세): [Hide] 필드는 감추고 [ShowIf]는 조건대로, 기능 필드(비어 있을 수 있는 [SerializeReference])는
+        // 붙어 있으면 '빼기', 비어 있으면 '+ 기능'으로 붙인다. 모니터처럼 실제 값을 살피는 곳에서는 끈다(모든 필드를 보인다).
+        public bool InstanceEditing;
+
         GsDataExplorer(bool browse, Crumb root, Action<string> onPick)
         {
             _browse = browse;
@@ -244,6 +248,7 @@ namespace GBible.EditorTools.UI
                 DataModel.Of(here.Value.GetType()).Kind == DataKind.Object)
             {
                 _list.Add(new GsDataView(new ExplorerContext(this, here)));
+                if (InstanceEditing && here.Apply != null) AddFeatureTools(here);
                 return;
             }
             var entries = _browse ? BrowseEntries(here) : PickEntries(here);
@@ -780,7 +785,8 @@ namespace GBible.EditorTools.UI
             public override bool CanEdit => _crumb.Apply != null;
             // 상세 패널 안에 들어간 탐색기는 좁으므로 블록을 한 줄씩 쌓는다.
             public override bool SingleColumn => _explorer.GetFirstAncestorOfType<GsDetailPanel>() != null;
-            public override IEnumerable<string> Fields() => FieldPaths.MembersOf(Type).Select(m => m.Name);
+            public override IEnumerable<string> Fields() =>
+                FieldPaths.MembersOf(Type).Where(m => !_explorer.InstanceEditing || InstanceFields.Visible(Current, m.Info as FieldInfo)).Select(m => m.Name);
 
             FieldPaths.Member MemberOf(string name) => FieldPaths.MembersOf(Type).FirstOrDefault(m => m.Name == name);
 
@@ -794,6 +800,11 @@ namespace GBible.EditorTools.UI
                 Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
                 var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, member.Info, set, null);
                 entry.Path = path;
+                if (_explorer.InstanceEditing && current != null && field != null && InstanceFields.IsFeature(field) && _crumb.Apply != null)
+                {
+                    var apply = _crumb.Apply;
+                    entry.Remove = () => apply(() => field.SetValue(target, null));
+                }
                 return _explorer.Row(entry);
             }
 
@@ -816,6 +827,41 @@ namespace GBible.EditorTools.UI
                 _explorer.Changed?.Invoke();
                 _explorer.Refresh();
             }
+        }
+
+        // 비어 있는 기능 필드를 붙이는 '+ 기능'(인스턴스 편집).
+        void AddFeatureTools(Crumb here)
+        {
+            var target = here.Value;
+            var empty = InstanceFields.Features(target.GetType()).Where(f => f.GetValue(target) == null).ToList();
+            if (empty.Count == 0) return;
+            var row = Gs.Row("gs-wrap");
+            row.style.marginTop = 8;
+            GsButton add = null;
+            add = new GsButton("+ 기능", () =>
+            {
+                var items = new List<GsDropdownItem>();
+                foreach (var field in empty)
+                    foreach (var type in InstanceFields.Choices(field.FieldType))
+                    {
+                        var f = field;
+                        var t = type;
+                        items.Add(new GsDropdownItem(f.Name, () =>
+                        {
+                            here.Apply(() => f.SetValue(target, Activator.CreateInstance(t)));
+                            Changed?.Invoke();
+                            Refresh();
+                        })
+                        {
+                            Caption = t == f.FieldType ? TypeName(t) : $"{TypeName(f.FieldType)} › {TypeName(t)}",
+                            Detail = BlockTypes.Description(t),
+                        });
+                    }
+                GsDropdown.Show(add, items, placeholder: "기능 검색");
+            }, GsButtonKind.Ghost);
+            add.tooltip = "비어 있는 기능 필드를 붙입니다(붙으면 그 기능의 칸이 보입니다)";
+            row.Add(add);
+            _list.Add(row);
         }
 
         // ── 이름 ───────────────────────────────────────────────

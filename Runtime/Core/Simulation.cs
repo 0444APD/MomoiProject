@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace GBible
 {
-    // 테스트용 이벤트 발생. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 수치 규칙 → 확정 → 도전과제 → 보상)를 탄다.
+    // 테스트용 이벤트 받기. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 수치 규칙 → 확정 → 도전과제 → 보상)를 탄다.
     // 행동으로 기록되므로 Undo·인과 추적이 그대로 적용된다.
     [Serializable]
     public sealed class SimulatedEventAction : GameAction
@@ -191,9 +191,9 @@ namespace GBible
 
         // ── 도전과제 조건 채우기 ─────────────────────────────────
 
-        // 트리거를 따라가 테스트로 발동시키는 계획: 먼저 조건을 채울 로그 차이(로그 id, 반영할 값), 그다음 발생시킬 이벤트(값 조건을 맞춘 것).
-        // 게임과 같은 경로라 조건이 맞은 상태에서 이벤트가 발생해 트리거가 스스로 발동한다.
-        //   조건 충족 → 부족한 로그를 이벤트로 채운다 / 이벤트 발생 → 그 이벤트를 만들고 값 조건(같음·이상·포함 …)에 맞춰 채운다 /
+        // 트리거를 따라가 테스트로 발동시키는 계획: 먼저 조건을 채울 로그 차이(로그 id, 반영할 값), 그다음 쏠 이벤트(값 조건을 맞춘 것).
+        // 게임과 같은 경로라 조건이 맞은 상태에서 이벤트를 받아 트리거가 스스로 발동한다.
+        //   조건 충족 → 부족한 로그를 이벤트로 채운다 / 이벤트 받기 → 그 이벤트를 만들고 값 조건(같음·이상·포함 …)에 맞춰 채운다 /
         //   AND → 모두 / OR → 계획이 서는 첫 갈래 / NOT·사용 → 자동으로 만들 수 없다(강제 달성을 쓴다).
         public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out List<object> events, out string error)
         {
@@ -243,7 +243,7 @@ namespace GBible
                         Satisfy(evt, fired.filter);
                         if (!fired.filter.Test(evt))
                         {
-                            problems.Add($"{EventBus.DisplayNameOf(type)}의 값 조건 '{fired.filter.Natural()}'을 자동으로 맞출 수 없음(이벤트 탭에서 값을 채워 직접 발생시키세요)");
+                            problems.Add($"{EventBus.DisplayNameOf(type)}의 값 조건 '{fired.filter.Natural()}'을 자동으로 맞출 수 없음(이벤트 탭에서 값을 채워 직접 쏘세요)");
                             return;
                         }
                     }

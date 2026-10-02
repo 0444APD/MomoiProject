@@ -31,7 +31,7 @@ namespace GBible.EditorTools.UI
         {
             new Logic { Base = typeof(Condition), And = typeof(AllOfCondition), Or = typeof(AnyOfCondition), Not = typeof(NotCondition), List = "conditions", Child = "condition" },
             new Logic { Base = typeof(ValueFilter), And = typeof(AllFilter), Or = typeof(AnyFilter), Not = typeof(NotFilter), List = "filters", Child = "filter" },
-            // 트리거 칸: 블럭은 이벤트 발생 · 조건 블럭(조건 충족으로 감싸 넣는다) · 사용. 칸의 잠금([TriggerSlot])에 없는 종류는 목록에 나오지 않는다.
+            // 트리거 칸: 블럭은 이벤트 받기 · 조건 블럭(조건 충족으로 감싸 넣는다) · 사용. 칸의 잠금([TriggerSlot])에 없는 종류는 목록에 나오지 않는다.
             new Logic { Base = typeof(Trigger), And = typeof(AllTrigger), Or = typeof(AnyTrigger), Not = typeof(NotTrigger), List = "triggers", Child = "trigger" },
         };
 

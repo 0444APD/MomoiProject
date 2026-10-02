@@ -4,18 +4,18 @@ using GBible.Data;
 
 namespace GBible.InventorySystem
 {
-    // 인벤토리 한 칸: 어떤 아이템이 몇 개.
-    [Serializable, PlayerData]
+    // 인벤토리 한 칸: 어떤 아이템(인스턴스 ID)이 몇 개. 아이템은 프로젝트가 코드로 정의한 클래스의 인스턴스(도감 › 인스턴스)다.
+    [Serializable]
     public sealed class InventorySlot
     {
-        [FieldLabel("아이템"), DataRef(typeof(ItemData))] public string item = "";
+        [FieldLabel("아이템"), DataRef(typeof(InstanceData))] public string item = "";
         [FieldLabel("개수")] public int count;
     }
 
     // 인벤토리: 칸의 리스트. 플레이어 데이터의 값 형식으로 쓴다(도감 › 플레이어 데이터에서 값 형식으로 고른다).
-    // 플레이어 데이터 클래스라서 꺼내 그냥 고치면 된다(쓰는 순간 기록: 되돌리기·기록·저장·조건 검사).
-    //   Game.All<Inventory>(GameIds.PlayerData.PlayerInventory.Id)[0].Add(potion, 3);
-    [Serializable, PlayerData]
+    // 꺼내 그냥 고치면 된다(Sync가 기록: 되돌리기·기록·저장·조건 검사).
+    //   inventory.Add("instance.potion", 3, maxStack: 10);
+    [Serializable]
     public sealed class Inventory
     {
         [FieldLabel("칸 수(0이면 제한 없음)")] public int capacity;
@@ -33,8 +33,6 @@ namespace GBible.InventorySystem
         public bool Has(string itemId, int count = 1) => CountOf(itemId) >= count;
 
         // 넣는다: 같은 아이템의 덜 찬 칸부터 채우고, 남으면 새 칸을 만든다. 돌려주는 값: 들어가지 못하고 남은 개수(칸이 모자랄 때).
-        public int Add(ItemData item, int count = 1) => item == null ? count : Add(item.Id, count, item.maxStack);
-
         public int Add(string itemId, int count, int maxStack)
         {
             if (string.IsNullOrEmpty(itemId) || count <= 0) return Math.Max(0, count);

@@ -47,7 +47,7 @@ namespace GBible
         public GameClock Clock { get; }
         public RandomStreams Random { get; }
         public ActionDispatcher Actions { get; }
-        // 트리거 감시(로그·도전과제·능력 … 공용): 이벤트 발생·조건 충족·사용을 검사해 발동한다.
+        // 트리거 감시(로그·도전과제·능력 … 공용): 이벤트 받기·조건 충족·사용을 검사해 발동한다.
         public TriggerSystem Triggers { get; }
         public StatSystem Stats { get; }
         public AchievementSystem Achievements { get; }
@@ -62,14 +62,15 @@ namespace GBible
         // 런타임이 데이터베이스(플레이어 데이터·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
         public Dictionary<string, string> SaveSchema;
 
-        // 템플릿(도감 › 템플릿에서 만든 인스턴스: 아이템 A, 버프 B …)의 원본을 ID로 찾는다. 런타임이 데이터베이스로 채운다.
-        // 보상 등은 원본이 아니라 CreateFromTemplate의 사본을 넣는다.
-        public Func<string, object> Templates;
+        // 인스턴스(도감 › 인스턴스에서 만든 인스턴스: 아이템 A, 버프 B …)의 원본을 ID로 찾는다. 런타임이 데이터베이스로 채운다.
+        // 보상 등은 원본이 아니라 CopyInstance의 깊은 사본을 넣는다(비교 코드가 있으면 생성 코드로, 리플렉션 없음).
+        public Func<string, object> Instances;
 
-        public object CreateFromTemplate(string id)
+        public object CopyInstance(string id)
         {
-            var source = string.IsNullOrEmpty(id) ? null : Templates?.Invoke(id);
-            return source == null ? null : DataModel.Clone(source, null);
+            var source = string.IsNullOrEmpty(id) ? null : Instances?.Invoke(id);
+            if (source == null) return null;
+            return Mirror.Find(source.GetType()) != null && Mirror.Supports(source.GetType(), out _) ? Mirror.Clone(source) : DataModel.Clone(source, null);
         }
 
         // 행동별 실행 전 난수 상태. Undo하면 난수도 되돌려 같은 행동이 같은 결과를 낸다(결정론, Undo 악용 차단).
@@ -223,13 +224,13 @@ namespace GBible
         }
 
         // ── 테스트 이벤트 ──────────────────────────────────────
-        // 값을 덮어쓰지 않고 실제 이벤트를 발생시켜 게임과 같은 연쇄 반응을 일으킨다. 하나의 행동으로 기록된다.
+        // 값을 덮어쓰지 않고 실제 이벤트를 쏴서 게임과 같은 연쇄 반응을 일으킨다. 하나의 행동으로 기록된다.
 
         public ActionRecord SimulateEvents(IEnumerable<object> events, string reason = null)
         {
             var action = new SimulatedEventAction { reason = reason };
             action.Events.AddRange(events);
-            if (action.Events.Count == 0) throw new ArgumentException("[MomoiProject] 발생시킬 이벤트가 없습니다.");
+            if (action.Events.Count == 0) throw new ArgumentException("[MomoiProject] 쏠 이벤트가 없습니다.");
             return Do(action);
         }
 
@@ -242,7 +243,7 @@ namespace GBible
             return true;
         }
 
-        // 도전과제를 게임과 같은 경로로 발동시킨다: 부족한 로그를 이벤트로 채워 조건을 맞추고, 트리거의 이벤트(값 조건을 맞춘 것)를 발생시킨다.
+        // 도전과제를 게임과 같은 경로로 발동시킨다: 부족한 로그를 이벤트로 채워 조건을 맞추고, 트리거의 이벤트(값 조건을 맞춘 것)를 쏜다.
         // 필요한 이벤트 전체가 하나의 행동(Undo 단위)이 된다. 자동으로 못 만드는 트리거(사용·NOT 등)는 모니터의 강제 달성을 쓴다.
         public bool TrySimulateAchievement(string achievementId, out string error)
         {
@@ -257,7 +258,7 @@ namespace GBible
                 if (!EventSimulator.TryPlanForStat(Stats, stat, amount, out var plan, out error)) return false;
                 events.AddRange(plan.Events);
             }
-            // 조건이 맞은 뒤에 트리거의 이벤트가 발생해야 AND가 같은 순간에 참이 된다.
+            // 조건이 맞은 뒤에 트리거의 이벤트를 받아야 AND가 같은 순간에 참이 된다.
             events.AddRange(triggerEvents);
             SimulateEvents(events, $"'{AchievementName(achievementId)}' 트리거 발동");
             return true;

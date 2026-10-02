@@ -6,7 +6,7 @@ using GBible.Data;
 
 namespace GBible.EditorTools
 {
-    // 값 칸의 "목록에서 고르기" 규칙 한 곳. 데이터베이스 편집 칸·탐색기·이벤트 발생기가 같은 규칙을 쓴다.
+    // 값 칸의 "목록에서 고르기" 규칙 한 곳. 데이터베이스 편집 칸·탐색기·이벤트 쏘기가 같은 규칙을 쓴다.
     // ID 참조([DataRef]·[StatRef]·[AchievementRef]·[PlayerDataRef]), 이벤트 타입, 저장 형식, enum이면 목록을 돌려주고,
     // 자유 입력 칸이면 null.
     public static class ValueChoices

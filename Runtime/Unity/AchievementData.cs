@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GBible.Data
 {
-    // 도전과제 = 트리거(조건 충족·이벤트 발생, AND·OR) + 결과(무엇이든). 트리거가 처음 참이 되는 순간 달성되고 결과가 실행된다.
+    // 도전과제 = 트리거(조건 충족·이벤트 받기, AND·OR) + 결과(무엇이든). 트리거가 처음 참이 되는 순간 달성되고 결과가 실행된다.
     // 다른 기능(로그·능력·아이템 …)과 같은 트리거·결과 편집 화면을 쓰고, 잠금만 다르다.
     [Database("도전과제", Group = "진행", Order = 20, IdPrefix = "achievement")]
     [CreateAssetMenu(menuName = "MomoiProject/도전과제", fileName = "NewAchievement")]

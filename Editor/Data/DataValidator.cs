@@ -150,7 +150,7 @@ namespace GBible.EditorTools
             foreach (var child in condition.Children) CheckPlayerDataFields(child, all, context);
         }
 
-        // 플레이어 데이터에 주기 보상: 플레이어 데이터가 있는지, 필드 형식 기준으로 값이 맞는지, 고른 템플릿이 있고 형식이 맞는지.
+        // 플레이어 데이터에 주기 보상: 플레이어 데이터가 있는지, 필드 형식 기준으로 값이 맞는지, 고른 인스턴스가 있고 형식이 맞는지.
         static void CheckPlayerDataReward(PlayerDataReward change, IReadOnlyList<GameData> all, Context context)
         {
             if (string.IsNullOrEmpty(change.key)) return;
@@ -164,16 +164,16 @@ namespace GBible.EditorTools
             var problems = new List<string>();
             change.Validate(key.ValueType, problems);
             foreach (var problem in problems) context.Error($"{label}: {problem}");
-            foreach (var (id, type) in change.TemplateRefs(key.ValueType))
+            foreach (var (id, type) in change.InstanceRefs(key.ValueType))
             {
-                var template = all.OfType<TemplateData>().FirstOrDefault(t => t.Id == id);
-                if (template == null) context.Error($"{label}: 없는 템플릿 '{id}'를 가리킵니다.");
+                var template = all.OfType<InstanceData>().FirstOrDefault(t => t.Id == id);
+                if (template == null) context.Error($"{label}: 없는 인스턴스 '{id}'를 가리킵니다.");
                 else if (template.value != null && !type.IsInstanceOfType(template.value))
-                    context.Error($"{label}: 템플릿 '{id}'({template.value.GetType().Name})는 {DataModel.FriendlyName(type)}이(가) 아닙니다.");
+                    context.Error($"{label}: 인스턴스 '{id}'({template.value.GetType().Name})는 {DataModel.FriendlyName(type)}이(가) 아닙니다.");
             }
         }
 
-        // 필드 규칙의 '필수': 비어 있으면(빈 글자·빈 참조·빈 목록) 오류. 템플릿 값 같은 안쪽 클래스까지 본다.
+        // 필드 규칙의 '필수': 비어 있으면(빈 글자·빈 참조·빈 목록) 오류. 인스턴스 값 같은 안쪽 클래스까지 본다.
         static void CheckRequired(GameData data, Context context)
         {
             var so = new UnityEditor.SerializedObject(data);

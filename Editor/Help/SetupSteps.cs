@@ -221,7 +221,7 @@ namespace GBible.EditorTools
             {
                 Id = "stats", Order = 60, Title = "로그 정의",
                 Summary = "처치 수·획득 골드처럼 이벤트에서 자동으로 집계할 값을 만듭니다.",
-                Body = "수치는 반영 규칙에 따라 이벤트가 발생할 때 자동으로 올라갑니다. 게임 코드는 이벤트만 발생시키면 됩니다.\n\n" +
+                Body = "수치는 반영 규칙에 따라 이벤트를 받을 때 자동으로 올라갑니다. 게임 코드는 이벤트만 쏘면 됩니다.\n\n" +
                        "## 정할 것\n" +
                        "- 범위: 이번 판 또는 누적.\n" +
                        "- 집계 방식: 합계·최고치·최저치·마지막 값.\n" +
@@ -244,14 +244,14 @@ namespace GBible.EditorTools
             };
             yield return new SetupStep
             {
-                Id = "codex", Order = 80, Title = "템플릿·프리팹 등록",
-                Summary = "테스트용 인스턴스(템플릿)와 조립에 쓸 프리팹을 도감에 등록합니다.",
-                Body = "템플릿은 프로젝트 클래스에 값을 미리 채운 인스턴스입니다. 더미 아이템이나 테스트 몬스터 설정을 만들어 두고 코드에서 사본을 받아 씁니다.\n\n" +
+                Id = "codex", Order = 80, Title = "인스턴스·프리팹 등록",
+                Summary = "테스트용 인스턴스(인스턴스)와 조립에 쓸 프리팹을 도감에 등록합니다.",
+                Body = "인스턴스는 프로젝트 클래스에 값을 미리 채운 인스턴스입니다. 더미 아이템이나 테스트 몬스터 설정을 만들어 두고 코드에서 사본을 받아 씁니다.\n\n" +
                        "프리팹을 등록하면 도감에서 컴포넌트 필드를 탐색기로 보고 고칠 수 있습니다. 프리팹 항목은 도감에서 지우지 않고, 프로젝트 창에서 에셋을 지우면 자동으로 정리됩니다.",
-                HelpTopic = HelpIds.Data(typeof(TemplateData)),
+                HelpTopic = HelpIds.Data(typeof(InstanceData)),
                 Optional = true,
-                Check = () => (Count<TemplateData>() + Count<PrefabData>() > 0, $"템플릿 {Count<TemplateData>()}개 · 프리팹 {Count<PrefabData>()}개"),
-                Actions = { Create<TemplateData>(), Open<PrefabData>("프리팹 열기") },
+                Check = () => (Count<InstanceData>() + Count<PrefabData>() > 0, $"인스턴스 {Count<InstanceData>()}개 · 프리팹 {Count<PrefabData>()}개"),
+                Actions = { Create<InstanceData>(), Open<PrefabData>("프리팹 열기") },
             };
             yield return new SetupStep
             {
@@ -289,7 +289,7 @@ namespace GBible.EditorTools
                 Body = "플레이를 시작하고 모니터 창을 엽니다.\n\n" +
                        "- 데이터 탭에서 플레이어 데이터가 모두 보이는지, '빈 필수 값'이 없는지 봅니다.\n" +
                        "- 게임을 조작하면서 타임라인에 행동과 값 변경이 쌓이는지 봅니다.\n" +
-                       "- 이벤트 탭에서 이벤트를 발생시켜 수치와 도전과제가 반응하는지 봅니다.\n\n" +
+                       "- 이벤트 탭에서 이벤트를 쏴서 수치와 도전과제가 반응하는지 봅니다.\n\n" +
                        "확인했으면 '완료로 표시'를 누릅니다.",
                 HelpTopic = "window:monitor",
                 Actions = { new SetupAction("모니터 열기", MonitorWindow.Open, true) },

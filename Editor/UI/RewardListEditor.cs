@@ -14,8 +14,8 @@ namespace GBible.EditorTools.UI
     //   한 줄 = 왼쪽: 고른 필드 / 오른쪽: 그 필드 형식에 맞는 값 칸. 그 아래에 다시 '+ 보상 추가'.
     //   이미 고른 필드는 목록에 다시 나오지 않는다(중복 방지).
     // 값 칸 규칙(PlayerDataGrants.KindOf):
-    //   숫자 → 증감만 / 글자·참거짓·enum → 값(키워드가 연결된 글자는 목록) / 클래스 → 템플릿 중 하나(여기서 새로 만들지 않는다) /
-    //   컬렉션 → '+'로 요소를 더하고, 요소마다 다시 숫자·값·템플릿 규칙.
+    //   숫자 → 증감만 / 글자·참거짓·enum → 값(키워드가 연결된 글자는 목록) / 클래스 → 인스턴스 중 하나(여기서 새로 만들지 않는다) /
+    //   컬렉션 → '+'로 요소를 더하고, 요소마다 다시 숫자·값·인스턴스 규칙.
     // 플레이어 데이터가 아닌 보상(다이얼로그 재생 등)은 같은 목록의 '다른 보상'에서 고르고 블록 편집기로 그린다.
     // 결과 칸(모든 기능 공용: 로그·도전과제·능력·아이템 사용 …). 위의 보상 규칙에 더해:
     //   '+ 결과 추가' 목록 = 플레이어 데이터 필드(플레이어 데이터에 주기) · 로그에 기록 · 대상에게 효과 · 코딩한 결과.
@@ -24,9 +24,49 @@ namespace GBible.EditorTools.UI
     {
         public static VisualElement Build(SerializedProperty list, Action onValue, Action onStructure) => Build(list, typeof(Reward), onValue, onStructure);
 
+        // [BindTo]로 연결된 코드 결과: 보기만(클래스 이름·설명, cs 열기).
+        static VisualElement BoundView(string id)
+        {
+            var box = Gs.Col();
+            var notice = new GsNotice("코드로 쓴 결과가 이 항목에 연결되어 있습니다([BindTo]). 결과는 코드에서 고칩니다.", GsNoticeKind.Info);
+            box.Add(notice);
+            foreach (var type in BoundOutcomes.For(id))
+            {
+                var row = Gs.Row("gs-sheet__row");
+                row.style.marginTop = 4;
+                var name = Gs.Col("gs-grow");
+                name.Add(Gs.Label(BlockTypes.DisplayName(type) ?? type.Name, "gs-heading"));
+                name.Add(Gs.Label(type.FullName + (BlockTypes.Description(type) is string d && d.Length > 0 ? "  ·  " + d : ""), "gs-caption"));
+                row.Add(name);
+                var t = type;
+                row.Add(new GsButton("cs 열기", () => OpenScript(t), GsButtonKind.Ghost));
+                box.Add(row);
+            }
+            return box;
+        }
+
+        static void OpenScript(Type type)
+        {
+            foreach (var guid in AssetDatabase.FindAssets(type.Name + " t:MonoScript"))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var text = System.IO.File.ReadAllText(path);
+                if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"classs+" + type.Name + @"")) continue;
+                AssetDatabase.OpenAsset(AssetDatabase.LoadAssetAtPath<MonoScript>(path));
+                return;
+            }
+            Debug.LogWarning($"[MomoiProject] '{type.FullName}'의 스크립트 파일을 찾지 못했습니다.");
+        }
+
         public static VisualElement Build(SerializedProperty list, Type elementType, Action onValue, Action onStructure)
         {
             var container = Gs.Col("gs-rewards");
+            // 코드로 쓴 결과가 이 항목에 연결되어 있으면([BindTo]) 고를 수 없다: 연결된 클래스를 보이고 cs를 연다.
+            if (list.serializedObject.targetObject is GBible.Data.GameData owner && BoundOutcomes.Has(owner.Id))
+            {
+                container.Add(BoundView(owner.Id));
+                return container;
+            }
             var slot = TriggerSlots.OutcomeSlotOf(list);
             var allowed = slot?.Allowed ?? OutcomeKinds.All;
             // 보상(Reward) 목록에는 Reward만 들어간다.
@@ -181,7 +221,7 @@ namespace GBible.EditorTools.UI
             {
                 case GrantKind.Number: return "숫자 · 증감";
                 case GrantKind.Value: return DataModel.FriendlyName(type) + " · 값";
-                case GrantKind.Template: return DataModel.FriendlyName(type) + " · 템플릿";
+                case GrantKind.Instance: return DataModel.FriendlyName(type) + " · 인스턴스";
                 case GrantKind.List: return DataModel.FriendlyName(type) + " · 요소 넣기";
                 case GrantKind.Dictionary: return DataModel.FriendlyName(type) + " · 키와 값 넣기";
                 default: return "";
@@ -231,8 +271,8 @@ namespace GBible.EditorTools.UI
                     case GrantKind.Value:
                         right.Add(ValueSlot(value, target, leaf as FieldInfo, onValue, onStructure));
                         break;
-                    case GrantKind.Template:
-                        right.Add(TemplateSlot(value, target, onStructure));
+                    case GrantKind.Instance:
+                        right.Add(InstanceSlot(value, target, onStructure));
                         break;
                     case GrantKind.List:
                         right.Add(ListSlots(items, target, leaf as FieldInfo, onValue, onStructure));
@@ -284,7 +324,7 @@ namespace GBible.EditorTools.UI
             return inline;
         }
 
-        // 누르면 목록이 열리는 값 칸(템플릿·키워드·enum·참거짓).
+        // 누르면 목록이 열리는 값 칸(인스턴스·키워드·enum·참거짓).
         static VisualElement Pill(string text, bool empty, bool broken, Action<VisualElement> open)
         {
             var box = Gs.Box("gs-inline", "gs-inline--editable", "gs-reward__input");
@@ -308,17 +348,17 @@ namespace GBible.EditorTools.UI
             onStructure?.Invoke();
         }
 
-        // 클래스: 도감 › 템플릿에서 만든 그 형식의 인스턴스 중 하나.
-        static VisualElement TemplateSlot(SerializedProperty property, Type type, Action onStructure)
+        // 클래스: 도감 › 인스턴스에서 만든 그 형식의 인스턴스 중 하나.
+        static VisualElement InstanceSlot(SerializedProperty property, Type type, Action onStructure)
         {
             var db = EditorDatabase.Instance;
             var id = property.stringValue;
-            var template = string.IsNullOrEmpty(id) ? null : db.OfType<TemplateData>().FirstOrDefault(t => t.Id == id);
+            var template = string.IsNullOrEmpty(id) ? null : db.OfType<InstanceData>().FirstOrDefault(t => t.Id == id);
             var broken = !string.IsNullOrEmpty(id) && (template == null || (template.value != null && !type.IsInstanceOfType(template.value)));
-            var text = string.IsNullOrEmpty(id) ? "템플릿 선택" : template == null ? $"없는 템플릿: {id}" : id;
+            var text = string.IsNullOrEmpty(id) ? "인스턴스 선택" : template == null ? $"없는 인스턴스: {id}" : id;
             var pill = Pill(text, string.IsNullOrEmpty(id), broken, anchor =>
             {
-                var items = db.OfType<TemplateData>()
+                var items = db.OfType<InstanceData>()
                     .Where(t => t.value != null && type.IsInstanceOfType(t.value))
                     .OrderBy(t => db.GroupLabel(t) ?? "").ThenBy(t => t.Id)
                     .Select(t =>
@@ -332,10 +372,10 @@ namespace GBible.EditorTools.UI
                         };
                     }).ToList();
                 if (items.Count == 0)
-                    items.Add(new GsDropdownItem($"{DataModel.FriendlyName(type)} 템플릿이 없습니다 — 도감 › 템플릿에서 먼저 만드세요") { Disabled = true });
-                GsDropdown.Show(anchor, items, placeholder: "템플릿 검색");
+                    items.Add(new GsDropdownItem($"{DataModel.FriendlyName(type)} 인스턴스가 없습니다 — 도감 › 인스턴스에서 먼저 만드세요") { Disabled = true });
+                GsDropdown.Show(anchor, items, placeholder: "인스턴스 검색");
             });
-            pill.tooltip = template != null ? DataModel.Summary(template.value) + "\n고치려면 도감 › 템플릿에서 고칩니다." : $"{DataModel.FriendlyName(type)} 템플릿 중 하나를 고릅니다.";
+            pill.tooltip = template != null ? DataModel.Summary(template.value) + "\n고치려면 도감 › 인스턴스에서 고칩니다." : $"{DataModel.FriendlyName(type)} 인스턴스 중 하나를 고릅니다.";
             return pill;
         }
 
@@ -377,7 +417,7 @@ namespace GBible.EditorTools.UI
             return Inline(property, onValue);
         }
 
-        // 딕셔너리: [키] → [값] 줄들 + '+'. 키는 값 규칙(키워드가 연결된 글자·enum은 목록), 값은 숫자(증감, 없던 키는 0에서)·값·템플릿(있던 키는 덮어쓴다).
+        // 딕셔너리: [키] → [값] 줄들 + '+'. 키는 값 규칙(키워드가 연결된 글자·enum은 목록), 값은 숫자(증감, 없던 키는 0에서)·값·인스턴스(있던 키는 덮어쓴다).
         static VisualElement DictionarySlots(SerializedProperty keys, SerializedProperty items, Type dictionary, FieldInfo leaf, Action onValue, Action onStructure)
         {
             var keyType = PlayerDataGrants.KeyTypeOf(dictionary);
@@ -404,7 +444,7 @@ namespace GBible.EditorTools.UI
                 arrow.style.marginLeft = arrow.style.marginRight = 6;
                 line.Add(arrow);
                 var value = items.GetArrayElementAtIndex(i);
-                if (kind == GrantKind.Template) line.Add(TemplateSlot(value, valueType, onStructure));
+                if (kind == GrantKind.Instance) line.Add(InstanceSlot(value, valueType, onStructure));
                 else if (kind == GrantKind.Number) line.Add(Labeled("증감", Inline(value, onValue), null));
                 else line.Add(ValueSlot(value, valueType, null, onValue, onStructure));
                 var remove = new GsButton("✕", () =>
@@ -438,7 +478,7 @@ namespace GBible.EditorTools.UI
             return col;
         }
 
-        // 컬렉션: 요소 칸들 + '+'(요소 더하기). 요소마다 숫자·값·템플릿 규칙.
+        // 컬렉션: 요소 칸들 + '+'(요소 더하기). 요소마다 숫자·값·인스턴스 규칙.
         static VisualElement ListSlots(SerializedProperty items, Type collection, FieldInfo leaf, Action onValue, Action onStructure)
         {
             var element = FieldPaths.ElementTypeOf(collection);
@@ -449,7 +489,7 @@ namespace GBible.EditorTools.UI
                 var index = i;
                 var slot = items.GetArrayElementAtIndex(i);
                 var line = Gs.Row("gs-reward__item");
-                line.Add(kind == GrantKind.Template ? TemplateSlot(slot, element, onStructure) : ValueSlot(slot, element, leaf, onValue, onStructure));
+                line.Add(kind == GrantKind.Instance ? InstanceSlot(slot, element, onStructure) : ValueSlot(slot, element, leaf, onValue, onStructure));
                 var remove = new GsButton("✕", () =>
                 {
                     items.serializedObject.Update();

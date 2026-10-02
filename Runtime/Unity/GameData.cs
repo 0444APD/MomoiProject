@@ -64,7 +64,7 @@ namespace GBible.Data
     }
 
     // 문자열 필드가 저장소에 담을 값 형식(타입 전체 이름)임을 표시한다. 에디터는 담을 수 있는 형식 목록을 띄운다.
-    // InstanceField: 형식을 고르면 그 형식의 새 인스턴스를 넣을 [SerializeReference] 필드 이름(템플릿 등).
+    // InstanceField: 형식을 고르면 그 형식의 새 인스턴스를 넣을 [SerializeReference] 필드 이름(인스턴스 등).
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class DataTypeRefAttribute : Attribute
     {

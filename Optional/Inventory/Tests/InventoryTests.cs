@@ -63,7 +63,6 @@ namespace GBible.Tests
             var inventory = new Inventory();
             Assert.AreEqual(0, inventory.Add("potion", 0, 10));
             Assert.AreEqual(3, inventory.Add("", 3, 10));
-            Assert.AreEqual(3, inventory.Add((ItemData)null, 3));
             Assert.AreEqual(0, inventory.Remove("potion", 5));
             Assert.AreEqual(0, inventory.slots.Count);
         }
