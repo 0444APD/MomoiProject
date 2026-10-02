@@ -256,12 +256,13 @@ namespace GBible.Tests
         public void ChangeSet을_받는_쪽에_적용하면_같아진다()
         {
             Create(false);
-            var copy = Mirror.Clone(_party);
+            var receiver = new MirrorReceiver();
+            var copy = (GsParty)receiver.Load(_session.Data.Snapshot("party"));
             ChangeSet last = null;
             _session.Data.Synced += c => last = c;
             _session.Do(new GsShuffle());
             Assert.IsNotNull(last);
-            Mirror.Apply(copy, last);
+            receiver.Apply(copy, last);
             var a = new MirrorWriter();
             var b = new MirrorWriter();
             Mirror.Write(a, _party);
@@ -292,7 +293,8 @@ namespace GBible.Tests
         public void 행동_중간의_Sync는_행동이_끝날_때_한꺼번에_알린다()
         {
             Create(false);
-            var copy = Mirror.Clone(_party);
+            var receiver = new MirrorReceiver();
+            var copy = (GsParty)receiver.Load(_session.Data.Snapshot("party"));
             var received = new System.Collections.Generic.List<ChangeSet>();
             var midAction = 0;
             _session.Data.Synced += c =>
@@ -303,7 +305,7 @@ namespace GBible.Tests
             _session.Do(new GsFindBetween());
             Assert.AreEqual(0, midAction, "행동 중에는 알리지 않는다");
             Assert.IsTrue(received.Count > 0);
-            foreach (var changes in received) Mirror.Apply(copy, changes);
+            foreach (var changes in received) receiver.Apply(copy, changes);
             var a = new MirrorWriter();
             var b = new MirrorWriter();
             Mirror.Write(a, _party);

@@ -62,8 +62,32 @@ namespace GBible
             return null;
         }
 
-        // 경로 끝의 타입과 멤버(경로가 틀리면 null과 오류 문장).
+        static readonly Dictionary<(Type, string), (Type type, MemberInfo member, string error)> TypeCache =
+            new Dictionary<(Type, string), (Type, MemberInfo, string)>();
+
+        // 경로 끝의 타입과 멤버(경로가 틀리면 null과 오류 문장). 형식·경로마다 처음 한 번만 찾는다.
         public static Type TypeAt(Type root, string path, out MemberInfo member, out string error)
+        {
+            if (root == null)
+            {
+                member = null;
+                error = null;
+                return null;
+            }
+            var key = (root, path ?? "");
+            lock (TypeCache)
+                if (TypeCache.TryGetValue(key, out var cached))
+                {
+                    member = cached.member;
+                    error = cached.error;
+                    return cached.type;
+                }
+            var found = FindType(root, path, out member, out error);
+            lock (TypeCache) TypeCache[key] = (found, member, error);
+            return found;
+        }
+
+        static Type FindType(Type root, string path, out MemberInfo member, out string error)
         {
             member = null;
             error = null;
@@ -100,33 +124,71 @@ namespace GBible
 
         public static Type TypeAt(Type root, string path, out string error) => TypeAt(root, path, out _, out error);
 
+        // 경로 한 마디(이름 + 요소마다 펼치기). 경로 글자는 처음 쓸 때 한 번 나눠 둔다.
+        struct Step
+        {
+            public string Name;
+            public bool Many;
+        }
+
+        static readonly Dictionary<string, Step[]> Parsed = new Dictionary<string, Step[]>(StringComparer.Ordinal);
+
+        static Step[] Parse(string path)
+        {
+            lock (Parsed)
+            {
+                if (Parsed.TryGetValue(path, out var steps)) return steps;
+                var parts = path.Split('.');
+                steps = new Step[parts.Length];
+                for (var i = 0; i < parts.Length; i++)
+                {
+                    var many = parts[i].EndsWith(Each, StringComparison.Ordinal);
+                    steps[i] = new Step { Name = many ? parts[i].Substring(0, parts[i].Length - Each.Length) : parts[i], Many = many };
+                }
+                Parsed[path] = steps;
+                return steps;
+            }
+        }
+
         // 경로의 값들. [] 가 있으면 요소마다 펼친다. 중간에 null이 있으면 그 갈래는 비어 있다.
+        // 멤버는 생성 코드(FieldAccess)로 읽는다(리플렉션 없음).
         public static IEnumerable<object> Resolve(object root, string path)
         {
-            IEnumerable<object> current = new[] { root };
+            var current = new List<object> { root };
             if (string.IsNullOrEmpty(path)) return current;
-            foreach (var raw in path.Split('.'))
+            var next = new List<object>();
+            foreach (var step in Parse(path))
             {
-                var many = raw.EndsWith(Each, StringComparison.Ordinal);
-                var name = many ? raw.Substring(0, raw.Length - Each.Length) : raw;
-                current = current.SelectMany(node =>
+                next.Clear();
+                foreach (var node in current)
                 {
-                    var value = name.Length == 0 ? node : Read(node, name);
-                    if (value == null) return Enumerable.Empty<object>();
-                    return many ? Items(value) : new[] { value };
-                }).ToList();
+                    var value = step.Name.Length == 0 ? node : Read(node, step.Name);
+                    if (value == null) continue;
+                    if (!step.Many) next.Add(value);
+                    else AddItems(value, next);
+                }
+                (current, next) = (next, current);
             }
             return current;
         }
 
-        public static object Read(object target, string name)
+        public static object Read(object target, string name) => FieldAccess.Read(target, name);
+
+        static void AddItems(object collection, List<object> into)
         {
-            if (target == null) return null;
-            var type = target.GetType();
-            var field = DataModel.Of(type).Fields.FirstOrDefault(f => f.Name == name);
-            if (field != null) return field.Field.GetValue(target);
-            var property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
-            return property != null && property.CanRead && property.GetIndexParameters().Length == 0 ? property.GetValue(target) : null;
+            switch (collection)
+            {
+                case string _:
+                    into.Add(collection);
+                    return;
+                case IDictionary map:
+                    foreach (var value in map.Values) into.Add(value);
+                    return;
+                case IEnumerable list:
+                    foreach (var item in list) into.Add(item);
+                    return;
+            }
+            into.Add(collection);
         }
 
         public static IEnumerable<object> Items(object collection)

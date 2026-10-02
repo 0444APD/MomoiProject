@@ -164,11 +164,9 @@ namespace GBible
         public static string IdOf(object item)
         {
             if (item == null) return null;
-            switch (IdMember(item.GetType()))
-            {
-                case FieldInfo field: return field.GetValue(item) as string;
-                case PropertyInfo property: return property.GetValue(item) as string;
-            }
+            var type = item.GetType();
+            var member = IdMember(type);
+            if (member != null) return FieldAccess.Find(type, member.Name)?.Get(item) as string;
             throw new InvalidOperationException($"[MomoiProject] {item.GetType().Name}에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다. 'public string id;'를 더하세요.");
         }
 
@@ -227,7 +225,7 @@ namespace GBible
                     foreach (var item in FieldPaths.Items(value)) Collect(item, into, depth + 1);
                     return;
                 case DataKind.Object:
-                    foreach (var field in info.Fields) Collect(field.Field.GetValue(value), into, depth + 1);
+                    foreach (var field in info.Fields) Collect(FieldAccess.Find(value.GetType(), field.Name)?.Get(value), into, depth + 1);
                     return;
             }
         }
@@ -318,6 +316,18 @@ namespace GBible
 
     static class BlockNames
     {
-        public static string Of(Type type) => type.GetCustomAttribute<BlockInfoAttribute>()?.DisplayName ?? type.Name;
+        static readonly Dictionary<Type, string> Names = new Dictionary<Type, string>();
+
+        // [BlockInfo]의 이름(형식마다 처음 한 번 찾아 둔다).
+        public static string Of(Type type)
+        {
+            lock (Names)
+            {
+                if (Names.TryGetValue(type, out var name)) return name;
+                name = type.GetCustomAttribute<BlockInfoAttribute>()?.DisplayName ?? type.Name;
+                Names[type] = name;
+                return name;
+            }
+        }
     }
 }

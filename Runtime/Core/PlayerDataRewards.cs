@@ -326,18 +326,8 @@ namespace GBible
             }
         }
 
-        static void Write(object parent, string member, object value)
-        {
-            var type = parent.GetType();
-            var field = DataModel.Of(type).Fields.FirstOrDefault(f => f.Name == member);
-            if (field != null)
-            {
-                field.Field.SetValue(parent, value);
-                return;
-            }
-            var property = type.GetProperty(member, BindingFlags.Instance | BindingFlags.Public);
-            if (property != null && property.CanWrite) property.SetValue(parent, value);
-        }
+        // 생성 코드(FieldAccess)로 쓴다(리플렉션 없음).
+        static void Write(object parent, string member, object value) => FieldAccess.Find(parent.GetType(), member)?.Set(parent, value);
 
         void Warn(GameSession session, string problem) =>
             session.Journal.Append(JournalKind.Warning, "Reward", $"플레이어 데이터에 주기({PlayerDataGrants.PathLabel(key, path)}): {problem}");

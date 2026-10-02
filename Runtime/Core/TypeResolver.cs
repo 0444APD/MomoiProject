@@ -91,6 +91,7 @@ namespace GBible
         }
 
         // "Amount" 또는 "Info.Amount" 같은 경로를 숫자 읽기 함수로 만든다. 실패하면 null과 이유를 돌려준다.
+        // 형식 확인은 처음 한 번(리플렉션), 읽기는 생성 코드(FieldAccess)로.
         public static Func<object, double> NumberGetter(Type type, string path, out string error)
         {
             error = null;
@@ -107,14 +108,14 @@ namespace GBible
                 var field = current.GetField(part, BindingFlags.Public | BindingFlags.Instance);
                 if (field != null)
                 {
-                    chain.Add(field.GetValue);
+                    chain.Add(FieldAccess.Find(current, part) is { } fieldAccess ? fieldAccess.Get : (Func<object, object>)field.GetValue);
                     current = field.FieldType;
                     continue;
                 }
                 var property = current.GetProperty(part, BindingFlags.Public | BindingFlags.Instance);
                 if (property != null && property.CanRead)
                 {
-                    chain.Add(property.GetValue);
+                    chain.Add(FieldAccess.Find(current, part) is { } propertyAccess ? propertyAccess.Get : (Func<object, object>)property.GetValue);
                     current = property.PropertyType;
                     continue;
                 }

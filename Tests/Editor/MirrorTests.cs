@@ -80,6 +80,18 @@ namespace GBible.Tests
         [NonSerialized] public int notData;
     }
 
+    [GameEvent("테스트 피격")]
+    public sealed class MtHit
+    {
+        public readonly int Damage;
+        public int Double => Damage * 2;
+
+        public MtHit(int damage)
+        {
+            Damage = damage;
+        }
+    }
+
     // [BindTo]: 코드로 쓴 결과를 도감 항목에 연결한다(그 항목의 결과 칸 대신).
     [BindTo("bound.achievement")]
     public sealed class MtBoundReward : Reward
@@ -103,6 +115,13 @@ namespace GBible.Tests
         public override void Grant(GameSession session) => session.Stats.Report(Context.Owner, 5);
         public override RewardEffect Effect => RewardEffect.Reversible;
         public override string Describe(INameResolver names) => "5씩 기록";
+    }
+
+    [Serializable]
+    public class MtLoop
+    {
+        public string name;
+        public MtLoop next;
     }
 
     // [BindTo] 함수: 매개변수 형식으로 받을 이벤트를 정한다.
@@ -200,23 +219,25 @@ namespace GBible.Tests
             return w.ToArray();
         }
 
-        // 바뀐 것 → 받는 쪽에 적용 → 같다 / 되돌리기 → 처음과 같다 / 사본도 맞다.
+        // 바뀐 것 → 받는 쪽에 적용 → 같다(두 곳에서 가리키는 객체도 같은 인스턴스) / 되돌리기 → 처음과 같다 / 사본도 맞다.
         static void Check(MtWorld live, Action<MtWorld> change)
         {
             var node = Mirror.Make(live);
-            var client = Mirror.Clone(live);
+            var receiver = new MirrorReceiver();
+            var client = (MtWorld)receiver.Load(Mirror.Snapshot(node));
             var before = Bytes(live);
+            CollectionAssert.AreEqual(before, Bytes(client), "처음 모습");
             change(live);
             var changes = new ChangeSet { Describe = true };
             Mirror.Sync(live, node, changes);
-            Mirror.Apply(client, changes);
+            receiver.Apply(client, changes);
             CollectionAssert.AreEqual(Bytes(live), Bytes(client), "받는 쪽이 같아진다");
             var after = Bytes(live);
             Mirror.Undo(live, changes);
             CollectionAssert.AreEqual(before, Bytes(live), "되돌리면 처음과 같다");
             var redo = new ChangeSet();
             Mirror.Sync(live, node, redo);
-            Mirror.Apply(client, redo);
+            receiver.Apply(client, redo);
             CollectionAssert.AreEqual(before, Bytes(client), "되돌린 것도 받는 쪽에 전해진다");
             Assert.AreNotEqual(Convert.ToBase64String(before), Convert.ToBase64String(after), "실제로 바뀌었다");
         }
@@ -243,6 +264,44 @@ namespace GBible.Tests
             Assert.IsTrue(count > 50, "생성된 메서드 " + count);
             Assert.IsNotNull(Mirror.Find(typeof(MtWorld)));
             Assert.IsTrue(Mirror.Supports(typeof(MtWorld), out var reason), reason);
+        }
+
+        [Test]
+        public void 생성된_읽기_쓰기_코드로_멤버를_다룬다()
+        {
+            Mirror.Initialize();
+            var item = new MtItem { id = "a", level = 3 };
+            item.Secret = 9;
+            var level = FieldAccess.Find(typeof(MtItem), "level");
+            Assert.IsTrue(level.Generated, "부모 클래스 필드도 생성 코드");
+            Assert.AreEqual(typeof(MtBase), level.Owner);
+            Assert.AreEqual(3, level.Get(item));
+            Assert.AreEqual(9, FieldAccess.Read(item, "_secret"), "private [SerializeField]");
+            Assert.AreEqual(9, FieldAccess.Read(item, "Secret"), "공개 속성");
+            FieldAccess.Find(typeof(MtItem), "mood").Set(item, MtMood.Angry);
+            Assert.AreEqual(MtMood.Angry, item.mood);
+            FieldAccess.Find(typeof(MtItem), "path").Set(item, null);
+            Assert.IsNull(item.path);
+
+            object point = new MtPoint { x = 1 };
+            FieldAccess.Find(typeof(MtPoint), "x").Set(point, 5);
+            Assert.AreEqual(5, ((MtPoint)point).x, "구조체(상자 안)");
+
+            var name = FieldAccess.Find(typeof(MtCircle), "name");
+            Assert.IsTrue(name.Generated, "추상 부모도 생성 코드");
+            Assert.AreEqual("c", name.Get(new MtCircle { name = "c" }));
+
+            var hit = FieldAccess.Find(typeof(MtHit), "Damage");
+            Assert.IsTrue(hit.Generated, "[GameEvent]는 [Serializable]이 없어도 생성 코드");
+            Assert.IsFalse(hit.CanWrite, "readonly");
+            Assert.AreEqual(7, hit.Get(new MtHit(7)));
+            Assert.AreEqual(14, FieldAccess.Read(new MtHit(7), "Double"), "계산 속성");
+
+            var world = new MtWorld();
+            world.items.Add(new MtItem { level = 2 });
+            world.items.Add(new MtItem { level = 5 });
+            CollectionAssert.AreEqual(new object[] { 2, 5 }, FieldPaths.Resolve(world, "items[].level").ToList());
+            Assert.IsTrue(FieldOps.Test(world, "items[].level", FieldOp.AtLeast, "5"));
         }
 
         [Test]
@@ -325,8 +384,59 @@ namespace GBible.Tests
             w.byName["first"].id = "renamed";
             var changes = new ChangeSet { Describe = true };
             Mirror.Sync(w, node, changes);
-            CollectionAssert.Contains(changes.Changes.Select(c => c.Path).ToList(), "items[3].level");
-            CollectionAssert.Contains(changes.Changes.Select(c => c.Path).ToList(), "byName[first].id");
+            var paths = changes.Changes.Select(c => c.Path).ToList();
+            CollectionAssert.Contains(paths, "items[3].level");
+            // byName["first"]은 items[0]과 같은 객체: 한 번만(먼저 만난 자리에서) 기록한다.
+            CollectionAssert.Contains(paths, "items[0].id");
+            Assert.AreEqual(1, paths.Count(p => p.EndsWith(".id")), "같은 객체의 변경은 한 번");
+        }
+
+        [Test]
+        public void 두_곳에서_가리키는_객체는_받는_쪽에서도_같은_인스턴스다()
+        {
+            var w = World();
+            var node = Mirror.Make(w);
+            var receiver = new MirrorReceiver();
+            var client = (MtWorld)receiver.Load(Mirror.Snapshot(node));
+            Assert.AreSame(client.items[1], client.slots[1], "처음 모습에서");
+            Assert.AreSame(client.items[0], client.byName["first"]);
+
+            w.slots[2] = w.items[4];
+            var moved = w.items[2];
+            w.items.RemoveAt(2);
+            w.byName["moved"] = moved;
+            w.items[4 - 1].level = 77;
+            var changes = new ChangeSet();
+            Mirror.Sync(w, node, changes);
+            receiver.Apply(client, changes);
+            Assert.AreSame(client.items[3], client.slots[2], "새로 가리킨 곳");
+            Assert.AreEqual(77, client.slots[2].level);
+            Assert.AreEqual("i2", client.byName["moved"].id, "리스트에서 빠져 딕셔너리로 옮긴 객체");
+            CollectionAssert.AreEqual(Bytes(w), Bytes(client));
+
+            var copy = Mirror.Clone(w);
+            Assert.AreSame(copy.items[0], copy.byName["first"], "복사본도 공유를 지킨다");
+        }
+
+        [Test]
+        public void 서로_가리키는_객체도_비교하고_복사한다()
+        {
+            var a = new MtLoop { name = "a" };
+            var b = new MtLoop { name = "b", next = a };
+            a.next = b;
+            var node = Mirror.Make(a);
+            b.name = "B";
+            var changes = new ChangeSet { Describe = true };
+            Mirror.Sync(a, node, changes);
+            Assert.AreEqual(1, changes.Changes.Count);
+            var copy = Mirror.Clone(a);
+            Assert.AreSame(copy, copy.next.next, "순환도 그대로");
+            var receiver = new MirrorReceiver();
+            var client = (MtLoop)receiver.Load(Mirror.Snapshot(node));
+            Assert.AreSame(client, client.next.next);
+            var found = new List<MtLoop>();
+            Mirror.Collect(node, found);
+            Assert.AreEqual(2, found.Count, "찾기는 한 번씩");
         }
 
         [Test]

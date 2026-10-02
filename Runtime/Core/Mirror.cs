@@ -164,36 +164,137 @@ namespace GBible
 
         // ── 사본 ───────────────────────────────────────────────
 
-        // 뿌리 값(클래스 객체)의 사본을 만든다.
+        // ── 사본 나무 ───────────────────────────────────────────
+        // 사본 나무 하나(플레이어 데이터 하나)에서 객체 하나는 사본도 하나다: 두 곳에서 가리키면 두 곳이 같은 사본을 가리킨다.
+        //   · Sync는 한 회차에 사본 하나를 한 번만 비교한다(같은 변경을 두 번 기록하지 않고, 서로 가리키는 객체도 끝난다).
+        //   · 사본마다 객체 번호(NetId)가 있어, 받는 쪽(MirrorReceiver)이 같은 객체를 같은 인스턴스로 잇는다.
+        //   · 가리키는 곳 수(Refs)가 0이 되면 나무에서 뺀다.
+
+        [ThreadStatic] static MirrorTree _tree;
+        [ThreadStatic] static bool _building;
+        static long _nextNetId;
+
+        internal static long NextNetId() => System.Threading.Interlocked.Increment(ref _nextNetId);
+
+        // 뿌리 값(클래스 객체)의 사본을 만든다. 처음 나무의 객체는 받는 쪽이 처음 모습(Snapshot)으로 이미 가진 것으로 본다.
         public static MirrorNode Make(object live)
         {
             if (live == null) throw new ArgumentNullException(nameof(live));
             var type = Find(live.GetType()) ?? throw new InvalidOperationException($"[MomoiProject] {live.GetType().Name}에 비교 코드가 없습니다.");
-            var node = new MirrorNode(type, live);
-            type.Sync(live, node, null);
+            var tree = new MirrorTree();
+            var node = new MirrorNode(type, live) { NetId = NextNetId(), Refs = 1, Sent = true, Tree = tree };
+            tree.Nodes[live] = node;
+            var previousTree = _tree;
+            var previousBuilding = _building;
+            _tree = tree;
+            _building = true;
+            try
+            {
+                node.Pass = tree.Pass;
+                type.Sync(live, node, null);
+            }
+            finally
+            {
+                _tree = previousTree;
+                _building = previousBuilding;
+            }
             return node;
         }
 
         // 실제 값과 사본을 비교해 바뀐 곳을 changes에 쓰고 사본을 맞춘다(changes가 null이면 기록 없이 맞추기만).
         public static void Sync(object live, MirrorNode root, ChangeSet changes)
         {
-            root.Origin = live;
-            root.Type.Sync(live, root, changes);
+            var tree = root.Tree;
+            if (tree == null)
+            {
+                tree = root.Tree = new MirrorTree();
+                if (root.Origin != null) tree.Nodes[root.Origin] = root;
+                root.Refs = 1;
+            }
+            if (!ReferenceEquals(root.Origin, live))
+            {
+                if (root.Origin != null && tree.Nodes.TryGetValue(root.Origin, out var was) && was == root) tree.Nodes.Remove(root.Origin);
+                root.Origin = live;
+                if (live != null) tree.Nodes[live] = root;
+            }
+            var previousTree = _tree;
+            var previousBuilding = _building;
+            _tree = tree;
+            _building = false;
+            try
+            {
+                tree.Pass++;
+                root.Pass = tree.Pass;
+                root.Type.Sync(live, root, changes);
+            }
+            finally
+            {
+                _tree = previousTree;
+                _building = previousBuilding;
+            }
         }
 
         // 객체 하나(또는 null·에셋 참조)의 사본. 생성 코드가 없는 객체는 참조 그대로(바뀐 내용은 따라가지 못한다).
+        // 같은 나무에 이미 사본이 있으면 그 사본을 함께 가리킨다(가리키는 곳 수 +1). 이번 회차에 아직 비교하지 않은
+        // 사본일 수 있으니 부른 쪽이 Enter로 확인해 비교한다.
         internal static object MakeAny(object live)
         {
             if (live == null) return null;
+            var tree = _tree;
+            if (tree != null && tree.Nodes.TryGetValue(live, out var existing))
+            {
+                existing.Refs++;
+                return existing;
+            }
             var type = Find(live.GetType());
             if (type == null)
             {
                 WarnOpaque(live.GetType());
                 return live;
             }
-            var node = new MirrorNode(type, live);
+            var node = new MirrorNode(type, live) { NetId = NextNetId(), Refs = 1, Sent = _building || tree == null, Tree = tree };
+            if (tree != null)
+            {
+                tree.Nodes[live] = node;
+                node.Pass = tree.Pass;
+            }
             type.Sync(live, node, null);
             return node;
+        }
+
+        // 이번 회차에 이 사본을 처음 비교하는지(처음이면 표시하고 true). 나무 밖(Sync 중이 아님)이면 언제나 true.
+        internal static bool Enter(MirrorNode node)
+        {
+            var tree = node.Tree;
+            if (tree == null) return true;
+            if (node.Pass == tree.Pass) return false;
+            node.Pass = tree.Pass;
+            return true;
+        }
+
+        // 한 곳이 사본을 더 가리키지 않는다(가리키는 곳이 없어지면 나무에서 빼고 안쪽도 같이).
+        internal static void Release(object shadow)
+        {
+            if (shadow == null) return;
+            if (shadow is MirrorNode node)
+            {
+                var tree = node.Tree;
+                if (tree == null) return;
+                if (--node.Refs > 0) return;
+                if (node.Origin != null && tree.Nodes.TryGetValue(node.Origin, out var found) && found == node) tree.Nodes.Remove(node.Origin);
+                for (var i = 0; i < node.Type.FieldCount; i++)
+                {
+                    var child = node.R[i];
+                    if (child is MirrorNode || child is IMirrorShadow) Release(child);
+                }
+                return;
+            }
+            if (shadow is IMirrorShadow collection)
+            {
+                var nodes = new List<MirrorNode>();
+                collection.AddNodes(nodes);
+                foreach (var item in nodes) Release(item);
+            }
         }
 
         static void WarnOpaque(Type type)
@@ -204,13 +305,66 @@ namespace GBible
             Warning?.Invoke($"{DataModel.FriendlyName(type)}에 비교 코드가 없어 안쪽 변경을 따라가지 못합니다. 클래스에 [Serializable]을 붙이세요.");
         }
 
+        // 같은 문장은 한 번만 알린다(생성 코드가 없는 형식을 실행 중에 만났을 때 등).
+        internal static void Warn(string message)
+        {
+            lock (Warned)
+                if (!WarnedText.Add(message)) return;
+            Warning?.Invoke(message);
+        }
+
+        static readonly HashSet<string> WarnedText = new HashSet<string>();
+
         internal static object OriginOf(object shadow) => shadow is MirrorNode node ? node.Origin : shadow;
 
         // ── 쓰기·읽기 ───────────────────────────────────────────
         // 객체 표시: 0 = null, 1 = 생성 코드가 있는 객체(형식 번호 + 필드), 2 = 에셋 참조(ID 글자),
         //           3 = 원래 객체(뒤로 기록 전용: 원래 객체 번호 + 형식 번호 + 필드 — 되돌릴 때 그 인스턴스에 다시 채운다),
-        //           4 = 같은 프로세스 안의 참조(번호 — 복사·되돌리기에서 스프라이트 같은 에셋 참조를 그대로 잇는다. 네트워크로는 보내지 않는다).
+        //           4 = 같은 프로세스 안의 참조(번호 — 복사·되돌리기에서 스프라이트 같은 에셋 참조를 그대로 잇는다. 네트워크로는 보내지 않는다),
+        //           5 = 받는 쪽이 이미 가진 객체(객체 번호), 6 = 객체 번호가 붙은 새 객체(객체 번호 + 형식 번호 + 필드) — 네트워크(앞으로 기록·처음 모습),
+        //           7 = 같은 값 안에서 앞서 쓴 객체(번호) — 한 값 안에서 두 곳이 같은 객체를 가리키면 받는 쪽도 같은 인스턴스.
+        // 값 하나(가장 바깥 Write·WriteShadow 한 번)가 한 범위다: 1·3으로 쓴 객체에 차례로 번호를 매기고, 다시 나오면 7로 가리킨다.
         [ThreadStatic] static List<object> _writeRefs;
+        [ThreadStatic] static int _writeDepth;
+        [ThreadStatic] static Dictionary<object, int> _written;
+        [ThreadStatic] static int _readDepth;
+        [ThreadStatic] static List<object> _read;
+        // 네트워크로 쓰는 중(사본 → 5·6). _snapshot이 있으면 처음 모습(한 번 쓴 사본은 5로), 없으면 앞으로 기록(Sent로 판단).
+        [ThreadStatic] static bool _net;
+        [ThreadStatic] static HashSet<MirrorNode> _snapshot;
+        // 받는 쪽(5·6을 읽을 때 객체 번호 → 인스턴스).
+        [ThreadStatic] static MirrorReceiver _receiver;
+
+        // 이 범위에서 처음 쓰는 객체면 번호를 매기고 true, 이미 썼으면 7 + 번호를 쓰고 false.
+        static bool First(MirrorWriter writer, object value)
+        {
+            var written = _written ??= new Dictionary<object, int>(RefEq.Instance);
+            if (written.TryGetValue(value, out var index))
+            {
+                writer.Byte(7);
+                writer.UVar((ulong)index);
+                return false;
+            }
+            written.Add(value, written.Count);
+            return true;
+        }
+
+        static void OpenScope(bool write)
+        {
+            if (write)
+            {
+                if (_writeDepth++ == 0) _written?.Clear();
+            }
+            else if (_readDepth++ == 0) _read?.Clear();
+        }
+
+        static void CloseScope(bool write)
+        {
+            if (write) _writeDepth--;
+            else _readDepth--;
+        }
+
+        static void Remember(object value) => (_read ??= new List<object>()).Add(value);
 
         public static void Write(MirrorWriter writer, object value)
         {
@@ -222,9 +376,18 @@ namespace GBible
             var type = Find(value.GetType());
             if (type != null)
             {
-                writer.Byte(1);
-                writer.UVar((ulong)type.Id);
-                type.Write(writer, value);
+                OpenScope(true);
+                try
+                {
+                    if (!First(writer, value)) return;
+                    writer.Byte(1);
+                    writer.UVar((ulong)type.Id);
+                    type.Write(writer, value);
+                }
+                finally
+                {
+                    CloseScope(true);
+                }
                 return;
             }
             if (_writeRefs != null)
@@ -240,28 +403,67 @@ namespace GBible
 
         public static object Read(MirrorReader reader, Type declared)
         {
-            switch (reader.Byte())
+            OpenScope(false);
+            try
             {
-                case 0:
-                    return null;
-                case 1:
-                    var type = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
-                    var value = type.New();
-                    type.Read(value, reader);
-                    return value;
-                case 3:
-                    var original = (int)reader.UVar();
-                    var kind = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
-                    var reused = _undoOriginals != null && original + _undoOffset < _undoOriginals.Count ? _undoOriginals[original + _undoOffset] : null;
-                    if (reused == null || reused.GetType() != kind.Type) reused = kind.New();
-                    kind.Read(reused, reader);
-                    return reused;
-                case 4:
-                    var index = (int)reader.UVar() + _undoOffset;
-                    return _undoOriginals != null && index < _undoOriginals.Count ? _undoOriginals[index] : null;
-                default:
-                    var id = reader.Str();
-                    return id == null ? null : DataModel.IdToReference?.Invoke(id, declared ?? typeof(object));
+                switch (reader.Byte())
+                {
+                    case 0:
+                        return null;
+                    case 1:
+                    {
+                        var type = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+                        var value = type.New();
+                        Remember(value);
+                        type.Read(value, reader);
+                        return value;
+                    }
+                    case 3:
+                    {
+                        var original = (int)reader.UVar();
+                        var kind = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+                        var reused = _undoOriginals != null && original + _undoOffset < _undoOriginals.Count ? _undoOriginals[original + _undoOffset] : null;
+                        if (reused == null || reused.GetType() != kind.Type) reused = kind.New();
+                        Remember(reused);
+                        kind.Read(reused, reader);
+                        return reused;
+                    }
+                    case 4:
+                    {
+                        var index = (int)reader.UVar() + _undoOffset;
+                        return _undoOriginals != null && index < _undoOriginals.Count ? _undoOriginals[index] : null;
+                    }
+                    case 5:
+                    {
+                        var id = (long)reader.UVar();
+                        return _receiver?.Find(id) ?? throw new InvalidOperationException(
+                            $"[MomoiProject] 받는 쪽에 없는 객체 번호({id})입니다. 처음 모습(Mirror.Snapshot)부터 MirrorReceiver로 받으세요.");
+                    }
+                    case 6:
+                    {
+                        var id = (long)reader.UVar();
+                        var kind = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+                        var value = _receiver?.Find(id);
+                        if (value == null || value.GetType() != kind.Type) value = kind.New();
+                        _receiver?.Register(id, value);
+                        kind.Read(value, reader);
+                        return value;
+                    }
+                    case 7:
+                    {
+                        var index = (int)reader.UVar();
+                        return _read != null && index < _read.Count ? _read[index] : throw new InvalidOperationException("[MomoiProject] 변경 기록의 객체 번호가 맞지 않습니다.");
+                    }
+                    default:
+                    {
+                        var id = reader.Str();
+                        return id == null ? null : DataModel.IdToReference?.Invoke(id, declared ?? typeof(object));
+                    }
+                }
+            }
+            finally
+            {
+                CloseScope(false);
             }
         }
 
@@ -275,15 +477,29 @@ namespace GBible
             }
             if (shadow is MirrorNode node)
             {
-                if (originals != null && node.Origin != null)
+                if (_net)
                 {
-                    writer.Byte(3);
-                    writer.UVar((ulong)originals.Count);
-                    originals.Add(node.Origin);
+                    WriteNet(writer, node);
+                    return;
                 }
-                else writer.Byte(1);
-                writer.UVar((ulong)node.Type.Id);
-                WriteNode(writer, node, originals);
+                OpenScope(true);
+                try
+                {
+                    if (!First(writer, node)) return;
+                    if (originals != null && node.Origin != null)
+                    {
+                        writer.Byte(3);
+                        writer.UVar((ulong)originals.Count);
+                        originals.Add(node.Origin);
+                    }
+                    else writer.Byte(1);
+                    writer.UVar((ulong)node.Type.Id);
+                    WriteNode(writer, node, originals);
+                }
+                finally
+                {
+                    CloseScope(true);
+                }
                 return;
             }
             if (originals != null)
@@ -295,6 +511,88 @@ namespace GBible
             }
             writer.Byte(2);
             writer.Str(DataModel.ReferenceToId?.Invoke(shadow));
+        }
+
+        // 네트워크용: 받는 쪽이 가진 객체면 번호만(5), 아니면 번호 + 내용(6).
+        static void WriteNet(MirrorWriter writer, MirrorNode node)
+        {
+            OpenScope(true);
+            try
+            {
+                var known = _snapshot != null ? !_snapshot.Add(node) : node.Sent;
+                if (known)
+                {
+                    writer.Byte(5);
+                    writer.UVar((ulong)node.NetId);
+                    return;
+                }
+                if (_snapshot == null) node.Sent = true;
+                writer.Byte(6);
+                writer.UVar((ulong)node.NetId);
+                writer.UVar((ulong)node.Type.Id);
+                WriteNode(writer, node, null);
+            }
+            finally
+            {
+                CloseScope(true);
+            }
+        }
+
+        // 앞으로 기록에 사본(객체·null·에셋)을 네트워크 형식으로 쓴다.
+        internal static void WriteForward(MirrorWriter writer, object shadow)
+        {
+            var previous = _net;
+            _net = true;
+            try { WriteShadow(writer, shadow); }
+            finally { _net = previous; }
+        }
+
+        // 앞으로 기록에 컬렉션 사본을 네트워크 형식으로 쓴다(null이면 0).
+        internal static void WriteForwardCollection(MirrorWriter writer, IMirrorShadow shadow)
+        {
+            if (shadow == null)
+            {
+                writer.UVar(0);
+                return;
+            }
+            var previous = _net;
+            _net = true;
+            try { shadow.WriteShadow(writer, null); }
+            finally { _net = previous; }
+        }
+
+        // 처음 모습: 받는 쪽이 처음 받을 뿌리 전체(객체 번호 포함). 받는 쪽은 MirrorReceiver.Load로 읽는다.
+        // 사본이 지금 값과 같아야 하니 Sync한 뒤에 부른다(PlayerDataStore.Snapshot이 그렇게 한다).
+        public static byte[] Snapshot(MirrorNode root)
+        {
+            var writer = new MirrorWriter();
+            var previousNet = _net;
+            var previousSnapshot = _snapshot;
+            _net = true;
+            _snapshot = new HashSet<MirrorNode>();
+            try { WriteNet(writer, root); }
+            finally
+            {
+                _net = previousNet;
+                _snapshot = previousSnapshot;
+            }
+            return writer.ToArray();
+        }
+
+        internal static object ReadWith(MirrorReceiver receiver, MirrorReader reader, Type declared)
+        {
+            var previous = _receiver;
+            _receiver = receiver;
+            try { return Read(reader, declared); }
+            finally { _receiver = previous; }
+        }
+
+        internal static void ApplyWith(MirrorReceiver receiver, object root, byte[] data, int start, int end)
+        {
+            var previous = _receiver;
+            _receiver = receiver;
+            try { Apply(root, data, start, end); }
+            finally { _receiver = previous; }
         }
 
         internal static void WriteNode(MirrorWriter writer, MirrorNode node, List<object> originals = null)
@@ -367,14 +665,19 @@ namespace GBible
         // ── 찾기 ───────────────────────────────────────────────
         // 사본 나무를 따라가며 객체를 찾는다(리플렉션 없음). 사본은 마지막 Sync 때의 모습이라, 부르기 전에 Sync한다.
 
-        // root 안의 T를 들어 있는 순서로(필드 순서 → 리스트 순서) into에 더한다.
+        static int _walk;
+
+        // root 안의 T를 들어 있는 순서로(필드 순서 → 리스트 순서) into에 더한다. 두 곳에서 가리키는 객체는 한 번만.
         public static void Collect<T>(MirrorNode root, List<T> into) where T : class
         {
+            var walk = System.Threading.Interlocked.Increment(ref _walk);
             var stack = new List<MirrorNode> { root };
             while (stack.Count > 0)
             {
                 var node = stack[stack.Count - 1];
                 stack.RemoveAt(stack.Count - 1);
+                if (node.Walk == walk) continue;
+                node.Walk = walk;
                 if (node.Origin is T found) into.Add(found);
                 var start = stack.Count;
                 PushChildren(node, stack);
@@ -385,11 +688,14 @@ namespace GBible
         // root 안에서 id가 같은 T 하나.
         public static T FindById<T>(MirrorNode root, string id) where T : class
         {
+            var walk = System.Threading.Interlocked.Increment(ref _walk);
             var stack = new List<MirrorNode> { root };
             while (stack.Count > 0)
             {
                 var node = stack[stack.Count - 1];
                 stack.RemoveAt(stack.Count - 1);
+                if (node.Walk == walk) continue;
+                node.Walk = walk;
                 if (node.Origin is T found)
                 {
                     var field = node.Type.FindIdField();
@@ -535,6 +841,17 @@ namespace GBible
         public object Origin;
         public readonly long[] L;
         public readonly object[] R;
+        // 객체 번호(보내는 쪽에서 매김). 받는 쪽이 같은 객체를 같은 인스턴스로 잇는다.
+        public long NetId { get; internal set; }
+        // 이 나무에서 이 사본을 가리키는 곳 수.
+        internal int Refs;
+        // 마지막으로 비교한 Sync 회차·찾기 회차.
+        internal int Pass;
+        internal int Walk;
+        // 받는 쪽이 이미 가진 객체인지(처음 나무에 있었거나 앞으로 기록으로 통째로 보냈음).
+        internal bool Sent;
+        // 이 사본이 속한 나무(객체 → 사본, Sync 회차).
+        internal MirrorTree Tree;
 
         public MirrorNode(MirrorType type, object origin)
         {
@@ -542,6 +859,52 @@ namespace GBible
             Origin = origin;
             L = new long[type.FieldCount];
             R = new object[type.FieldCount];
+        }
+    }
+
+    // 사본 나무 하나의 객체 → 사본(객체 하나에 사본 하나).
+    sealed class MirrorTree
+    {
+        public readonly Dictionary<object, MirrorNode> Nodes = new Dictionary<object, MirrorNode>(RefEq.Instance);
+        public int Pass;
+    }
+
+    // 받는 쪽: 보내는 쪽의 객체 번호 → 이쪽 인스턴스. 같은 객체를 두 곳에서 가리키면 이쪽도 같은 인스턴스를 가리킨다.
+    //   var receiver = new MirrorReceiver();
+    //   var party = (Party)receiver.Load(snapshot);       // 처음 모습(Mirror.Snapshot·PlayerDataStore.Snapshot)
+    //   receiver.Apply(party, changes);                    // 이후 앞으로 기록(PlayerDataStore.Synced)마다
+    // 인스턴스는 약하게 붙잡는다(데이터에서 빠져 버려진 객체는 사라져도 된다: 보내는 쪽은 나무에 있는 객체만 번호로 가리킨다).
+    public sealed class MirrorReceiver
+    {
+        readonly Dictionary<long, WeakReference> _objects = new Dictionary<long, WeakReference>();
+        int _sincePrune;
+
+        public int Count => _objects.Count;
+
+        public object Load(byte[] snapshot) => Load(snapshot, 0, snapshot.Length);
+
+        public object Load(byte[] data, int start, int end) => Mirror.ReadWith(this, new MirrorReader(data, start, end), typeof(object));
+
+        public void Apply(object root, ChangeSet changes) => Apply(root, changes.Forward.Data, 0, changes.Forward.Length);
+
+        public void Apply(object root, byte[] data, int start, int end) => Mirror.ApplyWith(this, root, data, start, end);
+
+        public object Find(long id) => _objects.TryGetValue(id, out var weak) ? weak.Target : null;
+
+        internal void Register(long id, object value)
+        {
+            if (_objects.TryGetValue(id, out var weak))
+            {
+                weak.Target = value;
+                return;
+            }
+            _objects[id] = new WeakReference(value);
+            if (++_sincePrune < 1024) return;
+            _sincePrune = 0;
+            var dead = new List<long>();
+            foreach (var pair in _objects)
+                if (!pair.Value.IsAlive) dead.Add(pair.Key);
+            foreach (var id2 in dead) _objects.Remove(id2);
         }
     }
 
@@ -678,6 +1041,9 @@ namespace GBible
     public delegate void MirrorApplyFn<T>(T target, int field, int depth, MirrorReader reader, MirrorOp op);
     public delegate bool MirrorEqualFn<T>(T a, T b);
     public delegate T MirrorValueReadFn<T>(MirrorReader reader);
+    // 멤버 번호로 읽기·쓰기(FieldAccess). 번호 = 그 형식에 선언된 순서.
+    public delegate object MirrorGetFn(object target, int member);
+    public delegate void MirrorSetFn(object target, int member, object value);
 
     sealed class RefEq : IEqualityComparer<object>
     {

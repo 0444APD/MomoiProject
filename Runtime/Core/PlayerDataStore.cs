@@ -553,15 +553,26 @@ namespace GBible
             return slot.Mirror;
         }
 
+        // 받는 쪽(다른 플레이어)이 처음 받을 모습: 지금 값 전체 + 객체 번호. 받는 쪽은 MirrorReceiver.Load로 읽고,
+        // 이후 Synced로 오는 변경을 MirrorReceiver.Apply로 적용한다. 예전 방식 데이터(Mirror가 아님)면 null.
+        public byte[] Snapshot(string key)
+        {
+            var mirror = SyncedMirror(key);
+            return mirror == null ? null : Mirror.Snapshot(mirror);
+        }
+
         // Mirror 데이터 하나를 Sync한다. 바뀐 것이 없으면 null.
         ChangeSet SyncSlot(string key, Slot slot, JournalKind kind = JournalKind.Data, string prefix = null, long transactionId = -1)
         {
             if (slot.Value == null || slot.Value.GetType() != slot.Mirror.Type.Type)
             {
-                // 값이 통째로 다른 형식으로 바뀐 경우(드묾): 사본을 새로 만든다.
+                // 값이 통째로 다른 형식으로 바뀐 경우(드묾): 사본을 새로 만들고, 받는 쪽에는 처음 모습을 통째로 보낸다.
                 ChooseMirror(key, slot);
                 RefreshShadow(slot);
                 if (slot.Mirror == null) return null;
+                var reset = new ChangeSet { Key = key, Snapshot = Mirror.Snapshot(slot.Mirror) };
+                if (_holding) _held.Add(reset);
+                else Synced?.Invoke(reset);
             }
             _work.Clear();
             _work.Key = key;
@@ -736,7 +747,6 @@ namespace GBible
         {
             public Type Owner;
             public string Field;
-            public System.Reflection.FieldInfo Info;
         }
 
         readonly List<Requirement> _required = new List<Requirement>();
@@ -745,9 +755,10 @@ namespace GBible
 
         public void Require(Type owner, string field)
         {
-            var info = owner?.GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            if (info == null) return;
-            _required.Add(new Requirement { Owner = owner, Field = field, Info = info });
+            if (owner == null || FieldAccess.Find(owner, field) == null) return;
+            _required.Add(new Requirement { Owner = owner, Field = field });
+            _checks.Clear();
+            _mayContain.Clear();
             foreach (var pair in _slots) if (pair.Value.DataType != null) CheckRequired(pair.Key, pair.Value);
         }
 
@@ -758,8 +769,11 @@ namespace GBible
         void CheckRequired(string key, Slot slot)
         {
             if (_required.Count == 0 || slot.DataType == null) return;
+            // 필수 규칙의 클래스가 들어 있을 수 없는 데이터는 훑지 않는다(형식마다 한 번 판단).
+            if (!MayContain(slot.DataType)) return;
             var found = new HashSet<string>(StringComparer.Ordinal);
-            FindMissing(slot.Value, "", found, 0);
+            _trail.Clear();
+            FindMissing(slot.Value, found, 0);
             _missing.TryGetValue(key, out var before);
             before = before ?? new HashSet<string>(StringComparer.Ordinal);
             if (found.SetEquals(before)) return;
@@ -772,30 +786,120 @@ namespace GBible
             MissingChanged?.Invoke();
         }
 
-        void FindMissing(object value, string path, HashSet<string> found, int depth)
+        // 형식별: 확인할 필수 필드와, 안쪽으로 내려갈 멤버(객체·컬렉션만 — 숫자·글자는 읽지 않는다).
+        sealed class TypeCheck
+        {
+            public (string name, MemberAccess access)[] Required;
+            public (string name, MemberAccess access)[] Children;
+        }
+
+        readonly Dictionary<Type, TypeCheck> _checks = new Dictionary<Type, TypeCheck>();
+        readonly Dictionary<Type, bool> _mayContain = new Dictionary<Type, bool>();
+
+        // 지금 훑는 위치(필드 이름 또는 요소 표시). 빈 값을 찾았을 때만 글자로 만든다.
+        readonly List<(string name, string element)> _trail = new List<(string, string)>();
+
+        TypeCheck CheckOf(Type type)
+        {
+            if (_checks.TryGetValue(type, out var check)) return check;
+            var required = _required.Where(r => r.Owner.IsAssignableFrom(type))
+                                    .Select(r => (r.Field, FieldAccess.Find(type, r.Field))).Where(p => p.Item2 != null).ToArray();
+            var children = new List<(string, MemberAccess)>();
+            var mirror = Mirror.Find(type);
+            if (mirror != null)
+            {
+                for (var i = 0; i < mirror.FieldCount; i++)
+                {
+                    var kind = mirror.Kinds[i];
+                    if (kind != MirrorKind.Object && kind != MirrorKind.List && kind != MirrorKind.Array && kind != MirrorKind.Dictionary) continue;
+                    if (!MayContain(mirror.FieldTypes[i])) continue;
+                    var access = FieldAccess.Find(type, mirror.Names[i]);
+                    if (access != null) children.Add((mirror.Names[i], access));
+                }
+            }
+            else if (DataModel.Of(type).Kind == DataKind.Object)
+            {
+                foreach (var field in DataModel.Of(type).Fields)
+                    if (!field.Type.IsPrimitive && field.Type != typeof(string) && FieldAccess.Find(type, field.Name) is { } access)
+                        children.Add((field.Name, access));
+            }
+            check = new TypeCheck { Required = required, Children = children.ToArray() };
+            _checks[type] = check;
+            return check;
+        }
+
+        // 이 형식(또는 그 안쪽)에 필수 규칙의 클래스가 올 수 있는지.
+        bool MayContain(Type type)
+        {
+            if (type == null) return false;
+            if (_mayContain.TryGetValue(type, out var known)) return known;
+            var result = Reaches(type, new HashSet<Type>());
+            _mayContain[type] = result;
+            return result;
+        }
+
+        bool Reaches(Type type, HashSet<Type> seen)
+        {
+            if (type == null || type.IsPrimitive || type.IsEnum || type == typeof(string) || !seen.Add(type)) return false;
+            if (type == typeof(object) || type.IsInterface || type.IsAbstract) return true;
+            foreach (var requirement in _required)
+                if (requirement.Owner.IsAssignableFrom(type) || type.IsAssignableFrom(requirement.Owner)) return true;
+            var element = FieldPaths.ElementTypeOf(type);
+            if (element != null) return Reaches(element, seen);
+            var mirror = Mirror.Find(type);
+            if (mirror == null) return !type.IsValueType;
+            for (var i = 0; i < mirror.FieldCount; i++)
+                if (Reaches(mirror.FieldTypes[i], seen)) return true;
+            return false;
+        }
+
+        void FindMissing(object value, HashSet<string> found, int depth)
         {
             if (value == null || depth > 32) return;
             if (FieldPaths.IsCollectionValue(value))
             {
-                int index = 0;
+                var index = 0;
                 foreach (var item in FieldPaths.Items(value))
                 {
-                    var at = item != null && Identity.TryGetId(item, out var id) ? $"[#{id}]" : $"[{index}]";
-                    FindMissing(item, path + at, found, depth + 1);
+                    if (item != null && !(item is string) && !item.GetType().IsPrimitive)
+                    {
+                        _trail.Add((null, Identity.TryGetId(item, out var id) ? "#" + id : index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                        FindMissing(item, found, depth + 1);
+                        _trail.RemoveAt(_trail.Count - 1);
+                    }
                     index++;
                 }
                 return;
             }
-            var info = DataModel.Of(value.GetType());
-            if (info.Kind != DataKind.Object) return;
-            foreach (var requirement in _required)
+            var check = CheckOf(value.GetType());
+            foreach (var (name, access) in check.Required)
             {
-                if (!requirement.Owner.IsInstanceOfType(value)) continue;
-                var current = requirement.Info.GetValue(value);
+                var current = access.Get(value);
                 if (current == null || (current is string text && text.Length == 0) || (FieldPaths.IsCollectionValue(current) && !FieldPaths.Items(current).Any()))
-                    found.Add(Join(path, requirement.Field));
+                    found.Add(Join(Trail(), name));
             }
-            foreach (var field in info.Fields) FindMissing(field.Field.GetValue(value), Join(path, field.Name), found, depth + 1);
+            foreach (var (name, access) in check.Children)
+            {
+                _trail.Add((name, null));
+                FindMissing(access.Get(value), found, depth + 1);
+                _trail.RemoveAt(_trail.Count - 1);
+            }
+        }
+
+        // 지금 위치의 경로 글자(예: units[#3].weapon).
+        string Trail()
+        {
+            var builder = new System.Text.StringBuilder();
+            foreach (var (name, element) in _trail)
+            {
+                if (name != null)
+                {
+                    if (builder.Length > 0) builder.Append('.');
+                    builder.Append(name);
+                }
+                else builder.Append('[').Append(element).Append(']');
+            }
+            return builder.ToString();
         }
 
         static string Join(string path, string name) => string.IsNullOrEmpty(path) ? name : path + "." + name;

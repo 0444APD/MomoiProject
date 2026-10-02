@@ -93,6 +93,7 @@ public class RunManager : MonoBehaviour
 - 게임 코드는 어디서든(행동·효과·씬 코드) 필드·리스트·딕셔너리를 그냥 고친다. 시스템이 행동 시작·끝, Modify 끝, 프레임 끝에 Sync해서 바뀐 곳을 기록한다. 행동 안의 변경은 그 행동의 Undo 단위, 행동 밖의 변경은 행동 밖 변경으로 남는다(그 행동의 Undo에 섞이지 않는다).
 - 비용은 데이터 크기에 비례하지만 생성 코드라 가볍다: 객체 2,500개(유닛 500)에서 Sync 한 번 약 0.02ms(Unity 에디터 Mono 약 0.06ms), 바뀐 것이 없으면 할당 0. 객체 10만 개에서 약 0.9ms(에디터 2.5ms) — 실시간 게임은 프레임마다 또는 서버 틱마다.
 - 되돌리기는 뒤로 기록을 거꾸로 적용한다. 리스트에서 빠졌던 객체·갈아 끼워진 객체는 원래 인스턴스로 돌아온다(게임 코드가 쥔 참조가 이어진다).
+- 같은 객체를 두 곳에서 가리켜도 된다(`slots[0] = items[3]`, 서로 가리키는 객체 포함). 사본도 하나라 변경은 한 번만(먼저 만난 자리의 경로로) 기록되고, 받는 쪽도 같은 인스턴스를 가리킨다(아래 받는 쪽).
 - `[Serializable]`이 없는 클래스는 예전 방식(리플렉션으로 통째로 비교, 데이터가 크면 느림)이고 기록에 경고가 남는다.
 
 ## 기록되지 않는 것
@@ -102,4 +103,14 @@ public class RunManager : MonoBehaviour
 
 ## Mirror 비교 코드
 
-`GBible.CodeGen`(Unity ILPostProcessor)이 컴파일할 때마다 GBible.Core와 그것을 참조하는 어셈블리의 `[Serializable]` 클래스·구조체 안에 비교·쓰기·읽기·적용 메서드(`__gb_*`)를 만든다. 게임 코드의 필드 쓰기는 고치지 않는다. 게임이 켜질 때 `Mirror.Initialize`가 한 번 모은다(리플렉션은 여기서만). 필요한 패키지: `com.unity.nuget.mono-cecil`(Burst·Collections가 함께 가져온다). Unity 버전을 올리면 코어 테스트 `MirrorTests`(생성 메서드 전체 JIT 검사 포함)로 확인한다.
+`GBible.CodeGen`(Unity ILPostProcessor)이 컴파일할 때마다 GBible.Core와 그것을 참조하는 어셈블리의 `[Serializable]`·`[PlayerData]`·`[GameEvent]` 클래스·구조체 안에 비교·쓰기·읽기·적용 메서드(`__gb_*`)와 멤버 읽기·쓰기(`__gb_get`·`__gb_set`)를 만든다. 게임 코드의 필드 쓰기는 고치지 않는다. 게임이 켜질 때 `Mirror.Initialize`가 한 번 모은다(리플렉션은 여기서만). 필요한 패키지: `com.unity.nuget.mono-cecil`(Burst·Collections가 함께 가져온다). Unity 버전을 올리면 코어 테스트 `MirrorTests`(생성 메서드 전체 JIT 검사 포함)로 확인한다.
+
+- 멤버 읽기·쓰기(`FieldAccess`): 조건·필터의 필드 경로, '플레이어 데이터에 주기', '로그에 기록'의 이벤트 값, 이벤트 기록 문장, 필수 값 검사, 저장·불러오기(`DataModel`)가 이것으로 읽고 쓴다(실행 중 리플렉션 없음). 생성 코드가 없는 형식은 리플렉션으로 읽고 한 번 경고한다(`[Serializable]`, 이벤트면 `[GameEvent]`를 붙이면 사라진다).
+- 남은 리플렉션(일부러 둠): 게임이 켜질 때(코드 모으기·형식 정보), 개발 도구(모니터의 이벤트 호출), 선택 패키지 연결(TextMeshPro 글자·Spine 색), 익명 객체로 넘긴 텍스트 인자(`Texts.Get(key, new { … })` — 리플렉션 없이 쓰려면 `("이름", 값)` 형태).
+
+## 받는 쪽 (네트워크)
+
+- 보내는 쪽: 받는 쪽이 처음 들어올 때 `session.Data.Snapshot(key)`(지금 값 전체 + 객체 번호), 이후 `session.Data.Synced`로 오는 ChangeSet의 앞으로 기록(Forward). 행동 안의 변경은 행동이 끝날 때 한 묶음으로 온다.
+- 받는 쪽: `var receiver = new MirrorReceiver(); var party = (Party)receiver.Load(snapshot);` 이후 `receiver.Apply(party, changes)`. `changes.Snapshot`이 있으면(뿌리 값의 형식이 바뀜) `receiver.Load(changes.Snapshot)`으로 통째로 바꾼다.
+- 객체 번호: 사본마다 번호가 있어, 앞으로 기록은 받는 쪽이 이미 가진 객체를 번호로만 가리킨다. 그래서 두 곳에서 가리키는 객체가 받는 쪽에서도 같은 인스턴스다. 받는 쪽은 인스턴스를 약하게 붙잡는다(데이터에서 빠진 객체는 사라져도 된다).
+- 처음 모습 없이 `Mirror.Apply`로 적용하면 새 객체는 만들어지지만, 이미 있던 객체를 새 자리에서 가리키는 기록은 읽지 못한다(오류로 알린다).

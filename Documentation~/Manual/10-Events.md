@@ -1,0 +1,337 @@
+# 10. 이벤트
+
+**한 줄 요약**: 이벤트는 "게임에서 방금 일어난 일"(유닛 처치, 골드 획득, 능력 사용 …)을 값과 함께 담은 평범한 C# 클래스다. 게임 코드가 이벤트를 **쏘고**, 로그·도전과제·퀘스트의 Trigger와 씬 코드가 이벤트를 **받는다**.
+
+**언제 쓰는가**
+
+- 로그(통계)를 셀 때: "유닛 처치를 받을 때마다 처치 수 +1".
+- 도전과제·퀘스트가 "그 순간"에 반응해야 할 때: "보스 처치를 받는 순간 달성".
+- 씬 코드가 연출·UI를 틀 때: "처치를 받으면 피격 이펙트 재생".
+
+이 문서에서 쓰는 용어:
+
+| 용어 | 뜻 |
+|---|---|
+| 쏜다 | 게임 코드(또는 모니터 도구)가 이벤트 인스턴스를 만들어 세션의 이벤트 버스(`EventBus`)에 넘긴다(`Publish`). |
+| 받는다 | Trigger·로그 규칙·`Subscribe`로 등록한 함수가 쏜 이벤트를 넘겨받는다. |
+| Trigger | "언제"를 정하는 칸. 이벤트 받기·조건 충족·사용을 AND·OR·NOT으로 조립한다(→ `11-Triggers-Conditions.md`). |
+| Journal | 세션의 통합 기록. 쏜 이벤트와 그 뒤에 일어난 변화가 원인과 함께 남는다(모니터의 타임라인). |
+
+---
+
+## 1. 에디터에서 보는 법
+
+이벤트는 **코드에서만 만든다**. 에디터는 만든 이벤트를 보고, 고르고, 시험으로 쏘는 곳이다.
+
+### 1-1. 도감 › 이벤트 탭
+
+1. 메뉴 `MomoiProject → 도감`을 연다.
+2. 사이드바에서 **이벤트** 탭을 고른다. `[GameEvent]`가 붙은 클래스가 폴더(실제 디스크 폴더)별로 보인다. 읽기 전용이다(만들기·옮기기 없음).
+3. 항목을 누르면 클래스 상세가 열린다: 필드의 이름·형식, 다른 클래스 형식이면 그 클래스로 이동, `cs 열기`.
+
+목록에 나오는 이벤트는 "내 코드"의 `[GameEvent]` 클래스와 라이브러리 기본 이벤트(`도전과제 달성`, `능력 사용`)다. 플러그인·패키지 폴더에 둔 이벤트는 빠진다. 보이지 않으면 `MomoiProject → 내 코드 범위`에서 그 폴더·네임스페이스를 더한다.
+
+### 1-2. 이벤트를 고르는 칸
+
+Trigger의 **이벤트 받기** 블럭(문장 `{eventType} 받기`)에서 이벤트 칸을 누르면 같은 이벤트 목록이 뜬다. 고른 뒤에는 그 이벤트의 필드로 값 조건(`filter`)을 걸고, 로그의 **반영할 값**에서 숫자 필드를 고른다. 이벤트의 필드가 그대로 고르는 목록이 되므로, 조건·기록에 쓸 값은 이벤트 필드로 둔다.
+
+### 1-3. 모니터 › 이벤트 탭 ("이벤트 호출")
+
+플레이 중 `MomoiProject → 모니터` 창의 **이벤트** 탭에서 이벤트를 직접 쏴 볼 수 있다. 이 도구를 "이벤트 호출"이라 부른다.
+
+1. 왼쪽 목록에서 이벤트를 고른다(표시 이름. 마우스를 올리면 전체 형식 이름. `Subscribe`로 받는 곳이 있으면 그 수가 옆에 보인다).
+2. 오른쪽 탐색기에서 이벤트의 값을 채운다(중첩 클래스·리스트 필드도 같은 화면에서).
+3. 아래에 **반응하는 로그**(`처치 수 ← 횟수` 같은 줄)가 보인다. 없으면 "이 이벤트를 반영하는 로그가 없습니다."
+4. 아래 작업 패널에 횟수(`회`)를 적고 **이벤트 받기** 버튼을 누른다. 적은 횟수만큼 사본을 만들어 쏜다(이후에 값을 고쳐도 이미 쏜 기록은 바뀌지 않는다).
+
+호출한 이벤트는 게임과 같은 길로 간다: 행동(`GameAction`) 하나("모니터 이벤트 호출")로 기록되고, 로그·도전과제·트리거가 실제로 반응하며, **Undo**(마지막 행동 되돌리기)로 되돌릴 수 있다. 도전과제 달성과 보상은 Undo해도 남는다(→ `14-Achievements.md`).
+
+이벤트를 모니터에서 쏘려면 이벤트 클래스에 **매개변수 없는 생성자**가 있어야 한다(구조체는 늘 된다). 없으면 탭에 오류가 뜬다.
+
+### 1-4. 모니터 › 타임라인
+
+쏜 이벤트는 Journal에 "이벤트" 종류로 남는다. 그 줄을 펼치면 이 이벤트가 원인이 된 변화(로그 증가 → 도전과제 달성 → 보상)가 단계별로 이어진다. 줄의 글자는 이벤트가 정한다(아래 2-6).
+
+---
+
+## 2. 코드로 쓰는 법 — 문법 요소를 하나씩
+
+### 2-1. `[GameEvent("표시 이름")]` — 이벤트 클래스 표시
+
+```csharp
+using System.Collections.Generic;
+using GBible;
+
+[GameEvent("유닛 처치")]
+public class UnitKilled
+{
+}
+```
+
+- `class`와 `struct` 모두에 붙는다. 붙인 형식이 이벤트 목록(도감 › 이벤트, Trigger의 이벤트 칸, 모니터)에 나온다.
+- 인자는 화면에 보일 이름이다. 생략하면(`[GameEvent]`) 클래스 이름이 표시 이름이 된다.
+- 기반 클래스를 상속하거나 인터페이스를 구현할 필요가 없다. 평범한 C# 클래스다.
+
+### 2-2. 필드 — 이벤트가 실어 나르는 값
+
+```csharp
+[GameEvent("유닛 처치")]
+public class UnitKilled
+{
+    public string killerId;                              // 처치한 유닛 id
+    public string victimId;                              // 처치된 유닛 id
+    public int exp;                                      // 줄 경험치
+    public int combo;                                    // 연속 처치 수
+    public List<string> tags = new List<string>();       // "boss", "elite" …
+}
+```
+
+- 에디터와 조건이 읽는 것은 **public 필드**와 **읽을 수 있는 public 속성**(인덱서 제외)이다. private 필드는 보이지 않는다.
+- 필드 형식은 숫자·글자·참거짓·enum·리스트·배열·딕셔너리·다른 클래스 무엇이든 된다. 조건은 형식에 맞는 비교만 보여 준다(숫자는 이상·이하, 리스트는 포함·개수 …).
+- 객체를 통째로 넣기보다 **id**(`killerId`)를 넣는다. 이벤트는 기록에 남고 모니터에서 다시 만들어지므로, 값으로 다시 찾을 수 있는 것이 좋다.
+
+### 2-3. 읽기 전용 속성 — 계산한 값도 조건에 쓴다
+
+```csharp
+[GameEvent("유닛 처치")]
+public class UnitKilled
+{
+    public List<string> tags = new List<string>();
+    public bool IsBoss => tags.Contains("boss");         // 이벤트 받기의 조건에서 'IsBoss 참'으로 고를 수 있다
+    public int TagCount => tags.Count;                   // 로그의 '반영할 값'으로도 고를 수 있다(숫자)
+}
+```
+
+- 이벤트 받기의 값 조건(필드 경로)과 로그에 기록의 반영할 값은 속성도 따라간다.
+- 단, Journal의 기본 문장(2-6)에는 public **필드**만 나온다.
+
+### 2-4. `session.Events.Publish(이벤트)` — 쏘기
+
+```csharp
+using System;
+using GBible;
+
+[Serializable]
+public class Unit { public string id; public int hp = 30; }   // 플레이어 데이터 클래스
+
+[Serializable]
+public class KillAction : GameAction<Unit>
+{
+    public string killer;
+    protected override void Run(Unit victim)
+    {
+        victim.hp = 0;
+        Game.Events.Publish(new UnitKilled { killerId = killer, victimId = victim.id, exp = 10 });
+    }
+}
+```
+
+- 이벤트 버스는 세션에 하나 있다: `session.Events`, 또는 Block·행동 안에서 `Game.Events`(`GameApi.Events`), 씬 코드에서 `GBibleRuntime.Game.Events`.
+- `Publish<T>(T evt)`는 그 자리에서 바로 받는 쪽을 모두 부른 뒤 돌아온다(대기열 없음). 그래서 다음 줄에서는 로그가 이미 올라가 있다.
+- **행동 안에서 쏘는 것을 기본으로 한다.** 행동 안에서 쏜 이벤트로 바뀐 값(로그 증가, 결과가 고친 값)은 그 행동의 Undo 단위에 들어간다. 행동 밖에서 쏘면 그 변화는 "행동 밖 변경"으로 기록되어 Undo로 되돌릴 수 없다.
+- `null`을 쏘면 `ArgumentNullException`.
+
+### 2-5. `PublishObject(object)` — 형식을 실행 중에만 알 때
+
+```csharp
+object evt = Activator.CreateInstance(eventType);   // 형식을 데이터로 받은 경우 등
+session.Events.PublishObject(evt);
+```
+
+- `Publish<T>`도 내부에서 이것을 부른다. 받는 쪽이 고르는 기준은 **실제 형식**(`evt.GetType()`)이다.
+- 모니터의 이벤트 호출도 이 길로 쏜다.
+
+### 2-6. `IDescribable` — Journal에 남는 문장 정하기
+
+```csharp
+[GameEvent("유닛 처치")]
+public class UnitKilled : IDescribable
+{
+    public string killerId, victimId;
+    public string Describe() => $"{killerId}이(가) {victimId} 처치";
+}
+```
+
+- 구현하지 않으면 기본 문장은 `표시 이름 (필드=값, 필드=값 …)`이다. 예: `유닛 처치 (killerId=hero, victimId=orc1, exp=10, …)`.
+- 필드가 많거나 리스트가 있어 기본 문장이 읽기 어려울 때 구현한다.
+
+### 2-7. `Subscribe<T>(Action<T>)` — 씬 코드에서 받기
+
+```csharp
+using System;
+using GBible;
+using UnityEngine;
+
+public class KillEffects : MonoBehaviour
+{
+    IDisposable _onKill;
+
+    void OnEnable()  => _onKill = GBibleRuntime.Game.Events.Subscribe<UnitKilled>(e => PlayHitEffect(e.victimId));
+    void OnDisable() => _onKill?.Dispose();          // 그만 받기
+
+    void PlayHitEffect(string unitId) { /* 연출 */ }
+}
+```
+
+- 돌려받는 `IDisposable`을 `Dispose()`하면 그만 받는다. 씬 오브젝트는 `OnDisable`·`OnDestroy`에서 꼭 Dispose한다(세션은 씬보다 오래 산다).
+- `T`와 **정확히 같은 형식**의 이벤트만 받는다. `UnitKilled`를 상속한 `BossKilled`를 쏘면 `Subscribe<UnitKilled>`는 받지 않는다.
+- 받는 함수에서 예외가 나도 다른 받는 쪽은 계속 불린다. 예외는 삼키지 않고 Journal에 오류(출처 `Events`)로 남는다.
+- **받는 쪽(씬 코드)에서는 플레이어 데이터를 바꾸지 않는다.** 연출·UI만 한다. 값을 바꾸는 일은 행동·결과(Outcome)에서 한다(그래야 Undo·저장·멀티플레이가 맞는다).
+
+### 2-8. `SubscribeAll(Action<object>)` — 모든 이벤트 받기
+
+```csharp
+var all = session.Events.SubscribeAll(evt => Debug.Log(EventBus.Describe(evt)));
+// …
+all.Dispose();
+```
+
+- 형식과 상관없이 모든 이벤트를 받는다. 디버그 출력, 네트워크 중계, 리플레이 녹화처럼 이벤트 전체를 다루는 코드용이다.
+- 트리거 감시(`session.Triggers`)도 이것으로 이벤트를 받는다.
+
+### 2-9. 그 밖의 멤버
+
+| 멤버 | 뜻 |
+|---|---|
+| `event Action<object> Published` | 모든 받는 쪽을 부른 **뒤**에 한 번 불린다. |
+| `int SubscriberCount(Type)` | 그 형식을 `Subscribe`로 받는 곳의 수(`SubscribeAll`은 세지 않는다). |
+| `static string EventBus.DisplayNameOf(Type)` | `[GameEvent]`의 표시 이름(없으면 클래스 이름). |
+| `static string EventBus.Describe(object)` | Journal에 쓰는 문장(2-6 규칙). |
+
+### 2-10. 기본 제공 이벤트
+
+| 형식 | 표시 이름 | 필드 | 쏘는 곳 |
+|---|---|---|---|
+| `AchievementUnlocked` | 도전과제 달성 | `Id`, `DisplayName` | 도전과제가 달성된 순간(보상 실행 뒤) |
+| `AbilityUsed` | 능력 사용 | `Ability`, `User`, `Targets`(id 리스트), `TargetCount`(속성) | `Game.Use`가 끝날 때 |
+
+---
+
+## 3. 상황별 예제
+
+### 3-1. 처치 이벤트를 정의하고 공격 행동에서 쏘기
+
+```csharp
+using System;
+using System.Collections.Generic;
+using GBible;
+
+[Serializable]
+public class Unit { public string id; public string team; public int hp = 30; public int exp; }
+
+[GameEvent("유닛 처치")]
+public class UnitKilled
+{
+    public string killerId;
+    public string victimId;
+    public int exp;
+    public int combo;
+    public List<string> tags = new List<string>();
+    public bool IsBoss => tags.Contains("boss");
+}
+
+[Serializable]
+public class Attack : GameAction<Unit>
+{
+    public string attacker;
+    public int damage;
+
+    protected override void Run(Unit target)
+    {
+        target.hp -= damage;
+        if (target.hp > 0) return;
+        Game.Events.Publish(new UnitKilled { killerId = attacker, victimId = target.id, exp = 10 });
+    }
+}
+
+// 씬 코드: GBibleRuntime.Game.Do(new Attack { target = "orc1", attacker = "hero", damage = 12 });
+```
+
+이 이벤트 하나로 로그("처치 수", "보스 처치 수")·도전과제("첫 처치")·퀘스트가 동시에 반응한다. 공격 행동은 그 기능들을 몰라도 된다.
+
+### 3-2. 콤보 값을 함께 실어 "10연속 처치" 도전과제가 읽게 하기
+
+```csharp
+// 연속 처치 수는 플레이어 데이터에 둔다(행동 안에서 고치므로 Undo된다).
+[Serializable]
+public class Battle { public List<Unit> units = new List<Unit>(); public int combo; }
+
+[Serializable]
+public class FinishingBlow : GameAction<Unit>
+{
+    public string attacker;
+    protected override void Run(Unit target)
+    {
+        target.hp = 0;
+        var battle = Game.All<Battle>()[0];
+        battle.combo++;
+        Game.Events.Publish(new UnitKilled { killerId = attacker, victimId = target.id, combo = battle.combo });
+    }
+}
+```
+
+도감 › 도전과제의 트리거를 `유닛 처치 받기`로 하고 조건을 `combo 10 이상`으로 걸면 된다(→ `14-Achievements.md` 3-3).
+
+### 3-3. 구조체 이벤트
+
+```csharp
+[GameEvent("골드 획득")]
+public struct GoldEarned
+{
+    public int amount;
+    public string source;   // "chest", "quest" …
+}
+
+// 쏘기
+session.Events.Publish(new GoldEarned { amount = 50, source = "chest" });
+```
+
+자주 쏘는 작은 이벤트는 구조체로 둬도 된다. 받는 쪽·Trigger·로그 모두 같은 방식으로 다룬다.
+
+### 3-4. 도전과제 달성 연출(기본 이벤트 받기)
+
+```csharp
+public class AchievementToast : MonoBehaviour
+{
+    IDisposable _sub;
+    void OnEnable()  => _sub = GBibleRuntime.Game.Events.Subscribe<AchievementUnlocked>(e => Show(e.DisplayName));
+    void OnDisable() => _sub?.Dispose();
+    void Show(string title) { /* 토스트 UI */ }
+}
+```
+
+### 3-5. 모든 이벤트를 서버 로그로 보내기
+
+```csharp
+public static class EventRelay
+{
+    public static IDisposable Attach(GameSession session, Action<string> send) =>
+        session.Events.SubscribeAll(evt => send(EventBus.DisplayNameOf(evt.GetType()) + ": " + EventBus.Describe(evt)));
+}
+```
+
+### 3-6. 형식 이름으로 이벤트를 만들어 쏘기(도구·콘솔 명령)
+
+```csharp
+public static void FireByName(GameSession session, string fullName)
+{
+    var type = TypeResolver.Find(fullName);                       // 예: "MyGame.UnitKilled"
+    if (type == null) return;
+    session.SimulateEvents(new[] { Activator.CreateInstance(type) }, "콘솔 명령");   // 행동 하나로 쏜다(Undo 가능)
+}
+```
+
+`session.SimulateEvents(이벤트들, 이유)`는 모니터의 이벤트 호출과 같은 길이다: 이벤트들을 행동 하나 안에서 차례로 쏜다.
+
+---
+
+## 4. 주의할 점 / 자주 하는 실수
+
+- **이벤트 클래스 이름·네임스페이스를 바꾸면** 이미 만든 Trigger·로그 규칙이 그 이벤트를 찾지 못한다. 데이터에는 형식의 전체 이름(`네임스페이스.클래스`)이 저장되기 때문이다. 도감 검증이 "이벤트 받기: 이벤트 '…'을 찾을 수 없습니다(이름이 바뀌었는지 확인)" 오류를 띄우므로, 바꾼 뒤 그 칸에서 이벤트를 다시 고른다.
+- **필드 이름을 바꾸면** 그 필드를 쓰던 값 조건·반영할 값이 깨진다(도감 검증 오류로 보인다).
+- **상속한 이벤트는 따로 받는다.** `Subscribe<T>`와 Trigger의 이벤트 받기는 형식이 정확히 같을 때만 받는다. 종류를 나누려면 상속 대신 필드(`tags`, `kind`)를 두고 값 조건으로 거른다.
+- **받는 쪽에서 값을 바꾸지 않는다.** `Subscribe` 함수 안에서 플레이어 데이터를 고치면 Undo 단위·서버 전송에서 빠진다. 값을 바꿔야 하면 그 일을 Trigger의 결과(Outcome)로 두거나, 이벤트를 쏜 행동 안에서 한다.
+- **Dispose를 잊지 않는다.** 씬이 바뀌어도 세션은 남아 있어, Dispose하지 않은 함수가 사라진 오브젝트를 계속 부른다.
+- **결과가 같은 이벤트를 다시 쏘면** 사슬이 16단계에서 끊기고 경고가 남는다("트리거 사슬이 16단계를 넘어 끊었습니다"). 결과에서 이벤트를 쏠 때는 다른 이벤트를 쓴다.
+- **모니터에서 쏘려면 매개변수 없는 생성자.** 생성자에 인자가 필요한 이벤트는 이벤트 호출·트리거로 달성이 만들지 못한다.
+- **Journal 문장에 속성은 나오지 않는다.** 속성 값을 기록에 보이고 싶으면 `IDescribable`을 구현한다.

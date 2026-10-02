@@ -254,11 +254,30 @@ namespace GBible
                 case IDictionary<string, object> dict: return new Dictionary<string, object>(dict, StringComparer.Ordinal);
             }
             var map = new Dictionary<string, object>(StringComparer.Ordinal);
-            foreach (var property in args.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-                if (property.GetIndexParameters().Length == 0) map[property.Name] = property.GetValue(args);
-            foreach (var field in args.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
-                map[field.Name] = field.GetValue(args);
+            var type = args.GetType();
+            // 생성 코드가 있는 형식([Serializable]·[GameEvent] 객체)은 생성 코드로 읽는다.
+            if (FieldAccess.IsGenerated(type))
+            {
+                foreach (var name in FieldAccess.NamesOf(type)) map[name] = FieldAccess.Find(type, name)?.Get(args);
+                return map;
+            }
+            // 익명 객체(new { item = …, count = 3 })는 리플렉션으로 읽는다(형식마다 멤버 목록은 한 번만 찾는다).
+            // 리플렉션 없이 쓰려면 ("item", …), ("count", 3) 형태를 쓴다.
+            foreach (var property in AnonymousMembers(type)) map[property.Name] = property.GetValue(args);
             return map;
+        }
+
+        static readonly Dictionary<Type, PropertyInfo[]> Anonymous = new Dictionary<Type, PropertyInfo[]>();
+
+        static PropertyInfo[] AnonymousMembers(Type type)
+        {
+            lock (Anonymous)
+            {
+                if (Anonymous.TryGetValue(type, out var members)) return members;
+                members = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.GetIndexParameters().Length == 0).ToArray();
+                Anonymous[type] = members;
+                return members;
+            }
         }
     }
 

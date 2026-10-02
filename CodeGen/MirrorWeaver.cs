@@ -17,6 +17,10 @@ namespace GBible.CodeGen
     //     static void __gb_apply(T t, int field, int depth, MirrorReader r, MirrorOp op)  기록 한 줄을 필드 하나에
     //     static void __gb_register()                                 위 메서드를 Mirror에 등록(게임 시작 때 한 번)
     //   구조체 T: __gb_eq(T a, T b) · __gb_write · __gb_read(r) → T · __gb_register
+    //   모두(추상 클래스 포함): __gb_get(object o, int i) → object · __gb_set(object o, int i, object v)
+    //     이 형식에 선언된 읽을 수 있는 멤버(저장 필드 + readonly 공개 필드 + 공개 읽기 속성)를 번호로 읽고 쓴다(필드 경로·저장·이벤트 값 읽기).
+    //     부모 형식의 멤버는 부모의 것으로(FieldAccess가 부모를 따라 올라간다). 쓰기는 readonly가 아닌 필드만.
+    // 대상: [Serializable]·[PlayerData]·[GameEvent] 형식.
     //
     // 필드 = Unity가 저장하는 필드(public 또는 [SerializeField]·[SerializeReference], static·readonly·const·[NonSerialized] 제외).
     // 필드 번호는 부모 클래스의 필드가 먼저다(부모도 생성 대상이면 부모의 메서드를 먼저 부른다).
@@ -64,7 +68,7 @@ namespace GBible.CodeGen
             for (var outer = type.DeclaringType; outer != null; outer = outer.DeclaringType)
                 if (outer.HasGenericParameters) return false;
             if (type.IsAbstract && type.IsSealed) return false; // static class
-            if (!type.IsSerializable && !type.CustomAttributes.Any(a => a.AttributeType.FullName == "GBible.PlayerDataAttribute")) return false;
+            if (!type.IsSerializable && !type.CustomAttributes.Any(a => a.AttributeType.FullName == "GBible.PlayerDataAttribute" || a.AttributeType.FullName == "GBible.GameEventAttribute")) return false;
             for (var current = type.BaseType; current != null;)
             {
                 var name = current.FullName;
@@ -431,7 +435,15 @@ namespace GBible.CodeGen
                 }
                 _generated[type] = generated;
 
-                if (type.IsAbstract) return;
+                var access = GenerateAccess(type);
+                if (type.IsAbstract)
+                {
+                    var registerAccess = NewMethod(type, "register", _module.TypeSystem.Void);
+                    il = registerAccess.Body.GetILProcessor();
+                    EmitAccessRegister(il, type, access);
+                    il.Emit(OpCodes.Ret);
+                    return;
+                }
 
                 // new
                 var create = NewMethod(type, "new", type);
@@ -457,6 +469,7 @@ namespace GBible.CodeGen
                 EmitDelegate(il, create, "MirrorNewFn`1", type);
                 EmitDelegate(il, apply, "MirrorApplyFn`1", type);
                 il.Emit(OpCodes.Call, Code("RegisterClass", type));
+                EmitAccessRegister(il, type, access);
                 il.Emit(OpCodes.Ret);
             }
 
@@ -505,6 +518,177 @@ namespace GBible.CodeGen
                 var generic = new GenericInstanceType(_module.ImportReference(definition));
                 generic.GenericArguments.Add(argument);
                 var constructor = new MethodReference(".ctor", _module.TypeSystem.Void, generic) { HasThis = true };
+                constructor.Parameters.Add(new ParameterDefinition(_module.TypeSystem.Object));
+                constructor.Parameters.Add(new ParameterDefinition(_module.TypeSystem.IntPtr));
+                il.Emit(OpCodes.Ldnull);
+                il.Emit(OpCodes.Ldftn, target);
+                il.Emit(OpCodes.Newobj, _module.ImportReference(constructor));
+            }
+
+            // ── 멤버 읽기·쓰기(__gb_get·__gb_set) ──
+
+            sealed class Member
+            {
+                public string Name;
+                public FieldDefinition Field;
+                public PropertyDefinition Property;
+                public TypeReference Type;
+                public bool Settable;
+            }
+
+            sealed class Access
+            {
+                public List<Member> Members;
+                public MethodDefinition Get, Set;
+            }
+
+            static bool Readable(TypeReference type)
+            {
+                switch (type.MetadataType)
+                {
+                    case MetadataType.Pointer:
+                    case MetadataType.ByReference:
+                    case MetadataType.FunctionPointer:
+                    case MetadataType.TypedByReference:
+                    case MetadataType.Var:
+                    case MetadataType.MVar:
+                    case MetadataType.RequiredModifier:
+                    case MetadataType.OptionalModifier:
+                    case MetadataType.Pinned:
+                        return false;
+                }
+                return true;
+            }
+
+            static bool IsValueType(TypeReference type)
+            {
+                if (type is GenericInstanceType g) return TryResolve(g.ElementType)?.IsValueType ?? type.IsValueType;
+                return TryResolve(type)?.IsValueType ?? type.IsValueType;
+            }
+
+            // 이 형식에 선언된 읽을 수 있는 멤버: 필드(공개 또는 [SerializeField]·[SerializeReference], readonly 포함, static·const 제외) + 공개 읽기 속성.
+            static List<Member> MembersOf(TypeDefinition type)
+            {
+                var members = new List<Member>();
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var field in type.Fields)
+                {
+                    if (field.IsStatic || field.IsLiteral || !Readable(field.FieldType)) continue;
+                    var serialized = field.CustomAttributes.Any(a => a.AttributeType.Name is "SerializeField" or "SerializeReference" or "SerializeFieldAttribute" or "SerializeReferenceAttribute");
+                    if (!field.IsPublic && !serialized) continue;
+                    if (!names.Add(field.Name)) continue;
+                    members.Add(new Member { Name = field.Name, Field = field, Type = field.FieldType, Settable = !field.IsInitOnly });
+                }
+                foreach (var property in type.Properties)
+                {
+                    var getter = property.GetMethod;
+                    if (getter == null || getter.IsStatic || !getter.IsPublic || getter.Parameters.Count > 0 || property.HasParameters) continue;
+                    if (!Readable(property.PropertyType) || getter.HasGenericParameters || !names.Add(property.Name)) continue;
+                    members.Add(new Member { Name = property.Name, Property = property, Type = property.PropertyType });
+                }
+                return members;
+            }
+
+            Access GenerateAccess(TypeDefinition type)
+            {
+                var access = new Access { Members = MembersOf(type) };
+                var members = access.Members;
+                var self = ImportType(type);
+
+                // get
+                var get = access.Get = NewMethod(type, "get", _module.TypeSystem.Object);
+                Param(get, "o", _module.TypeSystem.Object);
+                Param(get, "i", _module.TypeSystem.Int32);
+                var il = get.Body.GetILProcessor();
+                if (members.Count > 0)
+                {
+                    var labels = members.Select(_ => Instruction.Create(OpCodes.Nop)).ToArray();
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Switch, labels);
+                    il.Emit(OpCodes.Ldnull);
+                    il.Emit(OpCodes.Ret);
+                    for (var i = 0; i < members.Count; i++)
+                    {
+                        var member = members[i];
+                        il.Append(labels[i]);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, self);
+                        if (member.Field != null) il.Emit(OpCodes.Ldfld, member.Field);
+                        else il.Emit(type.IsValueType || !member.Property.GetMethod.IsVirtual ? OpCodes.Call : OpCodes.Callvirt, member.Property.GetMethod);
+                        if (IsValueType(member.Type)) il.Emit(OpCodes.Box, member.Type);
+                        il.Emit(OpCodes.Ret);
+                    }
+                }
+                else
+                {
+                    il.Emit(OpCodes.Ldnull);
+                    il.Emit(OpCodes.Ret);
+                }
+
+                // set
+                var set = access.Set = NewMethod(type, "set", _module.TypeSystem.Void);
+                Param(set, "o", _module.TypeSystem.Object);
+                Param(set, "i", _module.TypeSystem.Int32);
+                Param(set, "v", _module.TypeSystem.Object);
+                il = set.Body.GetILProcessor();
+                var done = Instruction.Create(OpCodes.Ret);
+                if (members.Count > 0)
+                {
+                    var labels = members.Select(m => m.Settable ? Instruction.Create(OpCodes.Nop) : done).ToArray();
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Switch, labels);
+                    il.Emit(OpCodes.Br, done);
+                    for (var i = 0; i < members.Count; i++)
+                    {
+                        var member = members[i];
+                        if (!member.Settable) continue;
+                        il.Append(labels[i]);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, self);
+                        il.Emit(OpCodes.Ldarg_2);
+                        if (IsValueType(member.Type)) il.Emit(OpCodes.Unbox_Any, member.Type);
+                        else if (member.Type.MetadataType != MetadataType.Object) il.Emit(OpCodes.Castclass, member.Type);
+                        il.Emit(OpCodes.Stfld, member.Field);
+                        il.Emit(OpCodes.Ret);
+                    }
+                }
+                il.Append(done);
+                return access;
+            }
+
+            // FieldAccess에 이 형식의 멤버 이름·종류·읽기·쓰기를 등록한다.
+            void EmitAccessRegister(ILProcessor il, TypeDefinition type, Access access)
+            {
+                var members = access.Members;
+                il.Emit(OpCodes.Ldtoken, ImportType(type));
+                il.Emit(OpCodes.Ldc_I4, members.Count);
+                il.Emit(OpCodes.Newarr, _module.TypeSystem.String);
+                for (var i = 0; i < members.Count; i++)
+                {
+                    il.Emit(OpCodes.Dup);
+                    il.Emit(OpCodes.Ldc_I4, i);
+                    il.Emit(OpCodes.Ldstr, members[i].Name);
+                    il.Emit(OpCodes.Stelem_Ref);
+                }
+                // 0 = 저장 필드, 1 = readonly 필드, 2 = 속성
+                il.Emit(OpCodes.Ldc_I4, members.Count);
+                il.Emit(OpCodes.Newarr, _module.TypeSystem.Byte);
+                for (var i = 0; i < members.Count; i++)
+                {
+                    il.Emit(OpCodes.Dup);
+                    il.Emit(OpCodes.Ldc_I4, i);
+                    il.Emit(OpCodes.Ldc_I4, members[i].Property != null ? 2 : members[i].Settable ? 0 : 1);
+                    il.Emit(OpCodes.Stelem_I1);
+                }
+                EmitPlainDelegate(il, access.Get, "MirrorGetFn");
+                EmitPlainDelegate(il, access.Set, "MirrorSetFn");
+                il.Emit(OpCodes.Call, Code("RegisterAccess"));
+            }
+
+            void EmitPlainDelegate(ILProcessor il, MethodDefinition target, string delegateName)
+            {
+                var definition = _module.ImportReference(_core.GetType("GBible." + delegateName));
+                var constructor = new MethodReference(".ctor", _module.TypeSystem.Void, definition) { HasThis = true };
                 constructor.Parameters.Add(new ParameterDefinition(_module.TypeSystem.Object));
                 constructor.Parameters.Add(new ParameterDefinition(_module.TypeSystem.IntPtr));
                 il.Emit(OpCodes.Ldnull);
@@ -678,6 +862,7 @@ namespace GBible.CodeGen
 
             void GenerateStruct(TypeDefinition type, List<FieldPlan> own)
             {
+                var access = GenerateAccess(type);
                 // eq
                 var eq = NewMethod(type, "eq", _module.TypeSystem.Boolean);
                 Param(eq, "a", type);
@@ -751,6 +936,7 @@ namespace GBible.CodeGen
                 EmitDelegate(il, write, "MirrorWriteFn`1", type);
                 EmitDelegate(il, read, "MirrorValueReadFn`1", type);
                 il.Emit(OpCodes.Call, Code("RegisterStruct", type));
+                EmitAccessRegister(il, type, access);
                 il.Emit(OpCodes.Ret);
             }
         }

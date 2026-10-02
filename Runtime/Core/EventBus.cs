@@ -77,21 +77,21 @@ namespace GBible
                 if (_handlers.TryGetValue(evt.GetType(), out var list))
                 {
                     foreach (var handler in list.ToArray())
-                        Invoke(() => handler.Invoke(evt), handler.Original);
+                        Invoke(handler.Invoke, evt, handler.Original);
                 }
                 foreach (var listener in _listeners.ToArray())
-                    Invoke(() => listener(evt), listener);
+                    Invoke(listener, evt, listener);
             }
             Published?.Invoke(evt);
         }
 
         public int SubscriberCount(Type eventType) => _handlers.TryGetValue(eventType, out var list) ? list.Count : 0;
 
-        void Invoke(Action call, Delegate target)
+        void Invoke(Action<object> call, object evt, Delegate target)
         {
             try
             {
-                call();
+                call(evt);
             }
             catch (Exception e)
             {
@@ -100,27 +100,37 @@ namespace GBible
             }
         }
 
+        static readonly Dictionary<Type, string> DisplayNames = new Dictionary<Type, string>();
+
+        // [GameEvent]의 표시 이름(형식마다 처음 한 번 찾아 둔다).
         public static string DisplayNameOf(Type type)
         {
-            var attr = type.GetCustomAttribute<GameEventAttribute>();
-            return !string.IsNullOrEmpty(attr?.DisplayName) ? attr.DisplayName : type.Name;
+            lock (DisplayNames)
+            {
+                if (DisplayNames.TryGetValue(type, out var name)) return name;
+                var attr = type.GetCustomAttribute<GameEventAttribute>();
+                name = !string.IsNullOrEmpty(attr?.DisplayName) ? attr.DisplayName : type.Name;
+                DisplayNames[type] = name;
+                return name;
+            }
         }
 
+        // 기록 문장: "표시 이름 (필드=값, …)". 값은 생성 코드(FieldAccess)로 읽는다.
         public static string Describe(object evt)
         {
             if (evt is IDescribable describable) return describable.Describe();
 
             var type = evt.GetType();
             var builder = new StringBuilder(DisplayNameOf(type));
-            var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-            if (fields.Length == 0) return builder.ToString();
+            var names = FieldAccess.NamesOf(type);
+            if (names.Count == 0) return builder.ToString();
 
             builder.Append(" (");
-            for (int i = 0; i < fields.Length; i++)
+            for (int i = 0; i < names.Count; i++)
             {
                 if (i > 0) builder.Append(", ");
-                var value = fields[i].GetValue(evt);
-                builder.Append(fields[i].Name).Append('=')
+                var value = FieldAccess.Find(type, names[i])?.Get(evt);
+                builder.Append(names[i]).Append('=')
                        .Append(value is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : value?.ToString() ?? "없음");
             }
             return builder.Append(')').ToString();

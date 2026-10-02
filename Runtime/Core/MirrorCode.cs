@@ -33,6 +33,10 @@ namespace GBible
             Mirror.Add(type);
         }
 
+        // 멤버 읽기·쓰기(필드 경로·저장·이벤트 값). kinds: 0 = 저장 필드, 1 = readonly 필드, 2 = 속성.
+        public static void RegisterAccess(RuntimeTypeHandle type, string[] names, byte[] kinds, MirrorGetFn get, MirrorSetFn set) =>
+            FieldAccess.Register(Type.GetTypeFromHandle(type), names, kinds, get, set);
+
         public static void RegisterStruct<T>(MirrorEqualFn<T> equal, MirrorWriteFn<T> write, MirrorValueReadFn<T> read) where T : struct =>
             ValueOps<T>.Register(equal, write, read);
 
@@ -160,6 +164,7 @@ namespace GBible
             {
                 if (ReferenceEquals(child.Origin, now))
                 {
+                    if (!Mirror.Enter(child)) return;
                     cs?.PushField(i, n.Type.Names[i]);
                     child.Type.Sync(now, child, cs);
                     cs?.Pop();
@@ -168,16 +173,24 @@ namespace GBible
             }
             else if (ReferenceEquals(old, now)) return;
             var made = Mirror.MakeAny(now);
+            cs?.PushField(i, n.Type.Names[i]);
             if (cs != null)
             {
-                cs.PushField(i, n.Type.Names[i]);
                 cs.Begin(MirrorOp.Set, MirrorOp.Set);
-                Mirror.Write(cs.Forward, now);
+                Mirror.WriteForward(cs.Forward, made);
                 Mirror.WriteShadow(cs.Backward, old, cs.Originals);
                 if (cs.Describe) cs.Note(DataChangeKind.Set, Mirror.Rebuild(old, typeof(T)), now);
-                cs.Pop();
             }
             n.R[i] = made;
+            Mirror.Release(old);
+            Visit(made, now, cs);
+            cs?.Pop();
+        }
+
+        // 다른 곳에서도 가리키는 사본을 새로 가리키게 됐을 때: 이번 회차에 아직 비교하지 않았으면 지금 자리(경로)에서 비교한다.
+        static void Visit(object shadow, object live, ChangeSet cs)
+        {
+            if (shadow is MirrorNode node && Mirror.Enter(node)) node.Type.Sync(live, node, cs);
         }
 
         public static void SyncList<T>(List<T> now, MirrorNode n, int i, ChangeSet cs)
@@ -243,35 +256,53 @@ namespace GBible
         // 컬렉션이 통째로 생기거나(null → 값) 사라질(값 → null) 때. 람다 없이 따로 둔다(자주 불리는 Sync가 할당하지 않게).
         static void ReplaceList<T>(List<T> now, ListShadow<T> old, MirrorNode n, int i, ChangeSet cs)
         {
+            var made = now == null ? null : ListShadow<T>.Make(now);
             if (cs != null)
             {
                 BeginReplace(n, i, cs);
-                WriteList(cs.Forward, now);
+                Mirror.WriteForwardCollection(cs.Forward, made);
                 EndReplace(cs, old, now);
             }
-            n.R[i] = now == null ? null : ListShadow<T>.Make(now);
+            n.R[i] = made;
+            Mirror.Release(old);
+            if (made?.Items == null) return;
+            cs?.PushField(i, n.Type.Names[i]);
+            SyncObjects(now, made.Items, cs);
+            cs?.Pop();
         }
 
         static void ReplaceArray<T>(T[] now, ArrayShadow<T> old, MirrorNode n, int i, ChangeSet cs)
         {
+            var made = now == null ? null : ArrayShadow<T>.Make(now);
             if (cs != null)
             {
                 BeginReplace(n, i, cs);
-                WriteArray(cs.Forward, now);
+                Mirror.WriteForwardCollection(cs.Forward, made);
                 EndReplace(cs, old, now);
             }
-            n.R[i] = now == null ? null : ArrayShadow<T>.Make(now);
+            n.R[i] = made;
+            Mirror.Release(old);
+            if (made?.Items == null) return;
+            cs?.PushField(i, n.Type.Names[i]);
+            for (var k = 0; k < now.Length; k++) SyncElement(now[k], made.Items, k, cs);
+            cs?.Pop();
         }
 
         static void ReplaceDict<TKey, TValue>(Dictionary<TKey, TValue> now, DictShadow<TKey, TValue> old, MirrorNode n, int i, ChangeSet cs)
         {
+            var made = now == null ? null : DictShadow<TKey, TValue>.Make(now);
             if (cs != null)
             {
                 BeginReplace(n, i, cs);
-                WriteDict(cs.Forward, now);
+                Mirror.WriteForwardCollection(cs.Forward, made);
                 EndReplace(cs, old, now);
             }
-            n.R[i] = now == null ? null : DictShadow<TKey, TValue>.Make(now);
+            n.R[i] = made;
+            Mirror.Release(old);
+            if (made?.Items == null) return;
+            cs?.PushField(i, n.Type.Names[i]);
+            SyncObjectDict(now, made.Items, cs);
+            cs?.Pop();
         }
 
         static void BeginReplace(MirrorNode n, int i, ChangeSet cs)
@@ -352,7 +383,7 @@ namespace GBible
             if (!same) Relayout(a, b, cs);
             for (var k = 0; k < a.Count; k++)
             {
-                if (!(b[k] is MirrorNode node)) continue;
+                if (!(b[k] is MirrorNode node) || !Mirror.Enter(node)) continue;
                 cs?.PushIndex(k, a[k]);
                 node.Type.Sync(a[k], node, cs);
                 cs?.Pop();
@@ -367,6 +398,7 @@ namespace GBible
             {
                 if (ReferenceEquals(node.Origin, now))
                 {
+                    if (!Mirror.Enter(node)) return;
                     cs?.PushIndex(k, now);
                     node.Type.Sync(now, node, cs);
                     cs?.Pop();
@@ -374,16 +406,19 @@ namespace GBible
                 }
             }
             else if (ReferenceEquals(old, now)) return;
+            var made = Mirror.MakeAny(now);
+            cs?.PushIndex(k, now);
             if (cs != null)
             {
-                cs.PushIndex(k, now);
                 cs.Begin(MirrorOp.Set, MirrorOp.Set);
-                Mirror.Write(cs.Forward, now);
+                Mirror.WriteForward(cs.Forward, made);
                 Mirror.WriteShadow(cs.Backward, old, cs.Originals);
                 if (cs.Describe) cs.Note(DataChangeKind.Set, Mirror.Rebuild(old, typeof(T)), now);
-                cs.Pop();
             }
-            items[k] = Mirror.MakeAny(now);
+            items[k] = made;
+            Mirror.Release(old);
+            Visit(made, now, cs);
+            cs?.Pop();
         }
 
         static void Relayout<T>(List<T> a, List<object> b, ChangeSet cs)
@@ -407,10 +442,13 @@ namespace GBible
                 }
                 else src[i] = -1;
             }
+            // 새 자리의 사본(남은 요소는 옛 사본, 새 요소는 새로 — 다른 곳에 이미 있는 객체면 그 사본을 함께 가리킨다).
+            var next = new List<object>(a.Count);
+            for (var i = 0; i < a.Count; i++) next.Add(src[i] >= 0 ? b[src[i]] : Mirror.MakeAny(a[i]));
             if (cs != null)
             {
                 cs.Begin(MirrorOp.Layout, MirrorOp.Layout);
-                WriteRuns(cs.Forward, src, a.Count, k => Mirror.Write(cs.Forward, a[k]));
+                WriteRuns(cs.Forward, src, a.Count, k => Mirror.WriteForward(cs.Forward, next[k]));
                 WriteRuns(cs.Backward, dst, b.Count, k => Mirror.WriteShadow(cs.Backward, b[k], cs.Originals));
                 if (cs.Describe)
                 {
@@ -429,8 +467,8 @@ namespace GBible
                     if (moved) cs.Note(DataChangeKind.Reorder, null, null);
                 }
             }
-            var next = new List<object>(a.Count);
-            for (var i = 0; i < a.Count; i++) next.Add(src[i] >= 0 ? b[src[i]] : Mirror.MakeAny(a[i]));
+            for (var j = 0; j < b.Count; j++)
+                if (dst[j] < 0) Mirror.Release(b[j]);
             b.Clear();
             b.AddRange(next);
         }
@@ -519,33 +557,41 @@ namespace GBible
                 {
                     if (old is MirrorNode node && ReferenceEquals(node.Origin, now))
                     {
+                        if (!Mirror.Enter(node)) continue;
                         cs?.PushKey(pair.Key, KeyOps<TKey>.WriteBoxed);
                         node.Type.Sync(now, node, cs);
                         cs?.Pop();
                         continue;
                     }
                     if (!(old is MirrorNode) && ReferenceEquals(old, now)) continue;
+                    var replaced = Mirror.MakeAny(now);
+                    cs?.PushKey(pair.Key, KeyOps<TKey>.WriteBoxed);
                     if (cs != null)
                     {
-                        cs.PushKey(pair.Key, KeyOps<TKey>.WriteBoxed);
                         cs.Begin(MirrorOp.Set, MirrorOp.Set);
-                        Mirror.Write(cs.Forward, now);
+                        Mirror.WriteForward(cs.Forward, replaced);
                         Mirror.WriteShadow(cs.Backward, old, cs.Originals);
                         if (cs.Describe) cs.Note(DataChangeKind.Set, Mirror.Rebuild(old, typeof(TValue)), now);
-                        cs.Pop();
                     }
-                    b[pair.Key] = Mirror.MakeAny(now);
+                    b[pair.Key] = replaced;
+                    Mirror.Release(old);
+                    Visit(replaced, now, cs);
+                    cs?.Pop();
                     continue;
                 }
+                var made = Mirror.MakeAny(now);
                 if (cs != null)
                 {
                     cs.Begin(MirrorOp.DictSet, MirrorOp.DictRemove);
                     ValueOps<TKey>.Write(cs.Forward, pair.Key);
-                    Mirror.Write(cs.Forward, now);
+                    Mirror.WriteForward(cs.Forward, made);
                     ValueOps<TKey>.Write(cs.Backward, pair.Key);
                     if (cs.Describe) cs.Note(DataChangeKind.Insert, null, now, KeyText(pair.Key));
                 }
-                b.Add(pair.Key, Mirror.MakeAny(now));
+                b.Add(pair.Key, made);
+                cs?.PushKey(pair.Key, KeyOps<TKey>.WriteBoxed);
+                Visit(made, now, cs);
+                cs?.Pop();
             }
             if (b.Count == a.Count) return;
             foreach (var key in Missing(a, b.Keys))
@@ -558,6 +604,7 @@ namespace GBible
                     Mirror.WriteShadow(cs.Backward, b[key], cs.Originals);
                     if (cs.Describe) cs.Note(DataChangeKind.Remove, Mirror.Rebuild(b[key], typeof(TValue)), null, KeyText(key));
                 }
+                Mirror.Release(b[key]);
                 b.Remove(key);
             }
         }

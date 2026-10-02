@@ -34,6 +34,37 @@ namespace GBible
         public Type Type;
         // [FormerlySerializedAs]로 남긴 예전 이름. 저장 데이터를 읽을 때 따라간다.
         public string[] FormerNames = Array.Empty<string>();
+
+        // 읽기·쓰기: 생성 코드(FieldAccess)가 있으면 그것으로(저장·불러오기·비교에 리플렉션 없음), 없으면 리플렉션.
+        MemberAccess _access;
+        bool _resolved;
+
+        MemberAccess Access
+        {
+            get
+            {
+                if (_resolved) return _access;
+                _access = FieldAccess.Find(Field.DeclaringType, Name);
+                if (_access != null && !_access.Generated) _access = null;
+                _resolved = true;
+                return _access;
+            }
+        }
+
+        public object Get(object target) => Access is { } access ? access.Get(target) : Field.GetValue(target);
+
+        public void Set(object target, object value)
+        {
+            var access = Access;
+            if (access == null)
+            {
+                Field.SetValue(target, value);
+                return;
+            }
+            // 생성 코드는 정확한 형식만 받는다: 값 형식 필드의 null은 기본값으로.
+            if (value == null && Type.IsValueType && Nullable.GetUnderlyingType(Type) == null) value = DataModel.Create(Type);
+            access.Set(target, value);
+        }
     }
 
     public sealed class DataType
@@ -418,7 +449,7 @@ namespace GBible
                     {
                         var copy = Create(info.Type);
                         foreach (var field in info.Fields)
-                            field.Field.SetValue(copy, Clone(field.Field.GetValue(value), state, Join(path, field.Name), depth + 1));
+                            field.Set(copy, Clone(field.Get(value), state, Join(path, field.Name), depth + 1));
                         return copy;
                     }
                 }
@@ -440,6 +471,8 @@ namespace GBible
         public static object Create(Type type)
         {
             if (type.IsValueType) return Activator.CreateInstance(type);
+            // 생성 코드가 있으면 그것으로(인자 없는 생성자, 없으면 생성자 없이).
+            if (Mirror.Find(type) is { } mirror && mirror.New != null) return mirror.New();
             var constructor = type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (constructor != null) return constructor.Invoke(null);
             return FormatterServices.GetUninitializedObject(type);
@@ -477,7 +510,7 @@ namespace GBible
                     return;
                 case DataKind.Object:
                     foreach (var field in info.Fields)
-                        Diff(field.Field.GetValue(before), field.Field.GetValue(after), Join(path, field.Name), identity, changes, depth + 1);
+                        Diff(field.Get(before), field.Get(after), Join(path, field.Name), identity, changes, depth + 1);
                     return;
                 case DataKind.Dictionary:
                 {
@@ -587,9 +620,9 @@ namespace GBible
                 case DataKind.Object:
                     foreach (var field in info.Fields)
                     {
-                        var current = field.Field.GetValue(target);
-                        var next = ApplyInPlace(current, field.Field.GetValue(source), identity);
-                        if (!ReferenceEquals(current, next) || field.Type.IsValueType) field.Field.SetValue(target, next);
+                        var current = field.Get(target);
+                        var next = ApplyInPlace(current, field.Get(source), identity);
+                        if (!ReferenceEquals(current, next) || field.Type.IsValueType) field.Set(target, next);
                     }
                     return target;
                 case DataKind.Dictionary:
@@ -720,7 +753,7 @@ namespace GBible
                     if (value.GetType() != declared) map["$type"] = value.GetType().FullName;
                     if (identity != null && info.HasIdentity && identity.TryGetId(value, out var id)) map["$id"] = (double)id;
                     foreach (var field in info.Fields)
-                        map[field.Name] = ToTree(field.Field.GetValue(value), field.Type, identity, warnings, Join(path, field.Name));
+                        map[field.Name] = ToTree(field.Get(value), field.Type, identity, warnings, Join(path, field.Name));
                     return map;
                 }
             }
@@ -805,7 +838,7 @@ namespace GBible
                             var key = map.ContainsKey(field.Name) ? field.Name : field.FormerNames.FirstOrDefault(map.ContainsKey);
                             if (key == null) continue;
                             used.Add(key);
-                            field.Field.SetValue(instance, FromTree(map[key], field.Type, identity, warnings, Join(path, field.Name)));
+                            field.Set(instance, FromTree(map[key], field.Type, identity, warnings, Join(path, field.Name)));
                         }
                         foreach (var key in map.Keys)
                             if (!used.Contains(key)) warnings?.Add($"{Join(path, key)}: 지금 {type.Name}에 없는 필드라 무시합니다.");
@@ -971,7 +1004,7 @@ namespace GBible
             var label = info.Fields.FirstOrDefault(f => f.Type == typeof(string) &&
                 (f.Name.Equals("name", StringComparison.OrdinalIgnoreCase) || f.Name.Equals("displayName", StringComparison.OrdinalIgnoreCase) ||
                  f.Name.Equals("id", StringComparison.OrdinalIgnoreCase)));
-            var text = label?.Field.GetValue(value) as string;
+            var text = label?.Get(value) as string;
             return string.IsNullOrEmpty(text) ? FriendlyName(value.GetType()) : $"{FriendlyName(value.GetType())} '{text}'";
         }
 

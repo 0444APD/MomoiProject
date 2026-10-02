@@ -45,6 +45,8 @@ namespace GBible
         public MirrorWriter Backward = new MirrorWriter();
         public readonly List<int> BackwardStarts = new List<int>();
         public int Count;
+        // 받는 쪽이 값을 통째로 새로 받아야 할 때(뿌리 값의 형식이 바뀜): MirrorReceiver.Load로 읽어 그 데이터를 바꾼다. 이때 앞으로 기록은 비어 있다.
+        public byte[] Snapshot;
         public bool Describe;
         public readonly List<DataChange> Changes = new List<DataChange>();
         // 사람이 읽는 경로에서 리스트 요소(객체)를 번호 대신 내부 ID로 보일 때(예: items[#12].level). 저장소가 채운다.
