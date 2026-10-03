@@ -29,6 +29,11 @@ namespace GBible.Data
         [SerializeField] string runEndEvent = "";
         // 프로필도 바깥 행동이 끝날 때마다 저장할지(수집형·방치형처럼 진행이 프로필에 있는 게임. 끄면 끌 때·판 끝에만).
         [SerializeField] bool saveProfileEachAction;
+        // 선택: 이 이벤트를 받은 행동이 끝나면 Undo 기록을 비운다(예: 턴 끝 — 지난 턴으로는 되돌릴 수 없다).
+        [SerializeField] string undoBoundaryEvent = "";
+        // 선택: 게임이 켜질 때 저장된 판이 있으면 이어 하고, 없으면 새 판 행동을 실행한다(타이틀 화면이 없는 게임).
+        [SerializeField] bool continueOnStart;
+        [SerializeField] string newRunAction = "";
         // 고급: 기록(Journal) 보관 줄 수, 개발 빌드의 Modify 누락 검사(예전 방식 데이터).
         [SerializeField] int journalCapacity = 4096;
         [SerializeField] bool detectUntrackedChanges = true;
@@ -54,6 +59,9 @@ namespace GBible.Data
         public RunSaveMode RunSave => runSave;
         public string RunEndEvent => runEndEvent;
         public bool SaveProfileEachAction => saveProfileEachAction;
+        public string UndoBoundaryEvent => undoBoundaryEvent;
+        public bool ContinueOnStart => continueOnStart;
+        public string NewRunAction => newRunAction;
         public int JournalCapacity => journalCapacity;
         public bool DetectUntrackedChanges => detectUntrackedChanges;
 
@@ -79,6 +87,13 @@ namespace GBible.Data
             runSave = mode;
             runEndEvent = endEvent ?? "";
             saveProfileEachAction = profileEachAction;
+        }
+
+        public void EditorSetFlowOptions(string undoBoundary, bool continueAtStart, string newRun)
+        {
+            undoBoundaryEvent = undoBoundary ?? "";
+            continueOnStart = continueAtStart;
+            newRunAction = newRun ?? "";
         }
 
         public void EditorSetAdvanced(int journalCapacity, bool detectUntrackedChanges)

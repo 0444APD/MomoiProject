@@ -564,7 +564,7 @@ public static class DuelFlow
     public static void EndTurn(GameApi game)
     {
         game.Do(new PassTurn());
-        game.Session.Data.ClearHistory();   // 이 시점 이전은 Undo할 수 없다
+        game.Session.ClearUndo();   // 이 시점 이전은 Undo할 수 없다(이벤트로 정해지면 DB › Bootstrap의 Undo 끊는 이벤트로 코드 없이)
     }
 }
 ```

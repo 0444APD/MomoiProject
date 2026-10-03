@@ -144,9 +144,9 @@ namespace GBible
 
             // 판 저장(DB › 시작 파일 › Bootstrap): 행동마다 저장·판 끝 이벤트.
             _runSaveMode = database?.RunSave ?? RunSaveMode.OnQuit;
-            var endEvent = string.IsNullOrEmpty(database?.RunEndEvent) ? null : TypeResolver.Find(database.RunEndEvent);
-            if (database != null && !string.IsNullOrEmpty(database.RunEndEvent) && endEvent == null)
-                session.Journal.Append(JournalKind.Warning, "Save", $"판 끝 이벤트 '{database.RunEndEvent}'를 찾을 수 없습니다(이벤트 클래스 이름이 바뀌었는지 확인).");
+            var endEvent = FindEvent(session, database?.RunEndEvent, "판 끝 이벤트");
+            var undoBoundary = FindEvent(session, database?.UndoBoundaryEvent, "Undo 끊는 이벤트");
+            if (undoBoundary != null) UndoBoundary.Watch(session, undoBoundary);
             _runSaver = new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false);
 
             session.Journal.Appended += ForwardToConsole;
@@ -168,15 +168,42 @@ namespace GBible
             host.AddComponent<GBibleHost>();
 
             Started?.Invoke(session);
+            if (database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
             return session;
         }
 
-        // 앱이 백그라운드로 갈 때(모바일은 종료 알림이 오지 않을 수 있다): 끌 때와 같이 프로필과(설정대로) 판을 저장한다.
-        internal static void SaveForBackground()
+        // DB 설정의 이벤트 형식 이름 → 형식(없으면 기록에 경고).
+        static Type FindEvent(GameSession session, string typeName, string label)
         {
-            if (Session == null || Session.Data.InTransaction) return;
-            SaveProfile(Session);
-            if (AutoSaveRun && !(_runSaver?.Ended ?? false)) SaveRun(Session);
+            if (string.IsNullOrEmpty(typeName)) return null;
+            var type = TypeResolver.Find(typeName);
+            if (type == null) session.Journal.Append(JournalKind.Warning, "Runtime", $"{label} '{typeName}'를 찾을 수 없습니다(이벤트 클래스 이름이 바뀌었는지 확인).");
+            return type;
+        }
+
+        // DB › Bootstrap의 '시작할 때 이어 하기': 저장된 판이 있으면 이어 하고, 없으면 새 판 행동을 실행한다.
+        // 형식 이름 → 객체 만들기는 게임이 켜질 때 한 번뿐이다(실행 중 리플렉션 아님).
+        static void ContinueOrStartRun(GameSession session, GameDatabase database)
+        {
+            if (LoadRun(session))
+            {
+                session.Journal.Append(JournalKind.System, "Runtime", "시작할 때 이어 하기: 저장된 판을 불러왔습니다.");
+                return;
+            }
+            var type = string.IsNullOrEmpty(database.NewRunAction) ? null : TypeResolver.Find(database.NewRunAction);
+            if (type == null || type.IsAbstract || !typeof(GameAction).IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null)
+            {
+                session.Journal.Append(JournalKind.Warning, "Runtime", $"시작할 때 이어 하기: 새 판 행동 '{database.NewRunAction}'을(를) 만들 수 없습니다(매개변수 없는 생성자가 있는 행동 클래스를 고르세요).");
+                return;
+            }
+            try
+            {
+                session.Do((GameAction)Activator.CreateInstance(type));
+            }
+            catch (Exception e)
+            {
+                session.Journal.Append(JournalKind.Error, "Runtime", $"시작할 때 이어 하기: 새 판 행동이 실패했습니다 — {e.Message}");
+            }
         }
 
         internal static void Stop()
@@ -338,10 +365,5 @@ namespace GBible
         }
 
         void OnApplicationQuit() => GBibleRuntime.Stop();
-
-        void OnApplicationPause(bool paused)
-        {
-            if (paused) GBibleRuntime.SaveForBackground();
-        }
     }
 }

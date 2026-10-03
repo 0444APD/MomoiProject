@@ -64,6 +64,20 @@ namespace GBible.EditorTools.UI
                 return;
             }
 
+            var events = TypeCache.GetTypesWithAttribute<GameEventAttribute>()
+                .Where(t => !t.IsAbstract && ClassCatalog.IsDeveloperClass(t))
+                .OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+            var undoBoundary = database.UndoBoundaryEvent ?? "";
+            var continueAtStart = database.ContinueOnStart;
+            var newRun = database.NewRunAction ?? "";
+            void SaveFlow()
+            {
+                Undo.RecordObject(database, "시작 흐름 설정 변경");
+                database.EditorSetFlowOptions(undoBoundary, continueAtStart, newRun);
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            }
+
             var history = database.History;
             var historyLimit = database.HistoryLimit;
             var interval = database.SnapshotInterval;
@@ -108,6 +122,9 @@ namespace GBible.EditorTools.UI
             }
             mode.RegisterValueChangedCallback(_ => { history = (HistoryMode)mode.index; ShowModeFields(); Save(); });
             ShowModeFields();
+            var boundaryField = TypePicker("Undo 끊는 이벤트(선택)", events, t => $"{EventBus.DisplayNameOf(t)} ({t.Name})", undoBoundary, value => { undoBoundary = value; SaveFlow(); });
+            boundaryField.tooltip = "이 이벤트를 쏜 행동이 끝나면 Undo 기록을 비운다. 예: 턴 끝 이벤트 → 이번 턴 안에서만 되돌릴 수 있다. 비우면 끝없이(보관 수까지) 되돌린다.";
+            root.Add(boundaryField);
 
             Heading(root, "시드", "같은 시드에 같은 행동이면 Game.Random의 결과가 같아 버그를 같은 순서로 재현할 수 있다. 에디터 플레이는 개발 빌드로 친다. 출시 빌드는 늘 지금 시각을 시드로 쓴다.");
             var fixToggle = new Toggle("개발 빌드에서 시드 고정") { value = fixSeed };
@@ -130,35 +147,31 @@ namespace GBible.EditorTools.UI
                 AssetDatabase.SaveAssetIfDirty(database);
             }
 
-            Heading(root, "판 저장", "진행 중인 판(이어 하기)을 언제 저장할지. 프로필은 이 설정과 상관없이 끌 때(모바일은 백그라운드로 갈 때도) 늘 저장된다.");
+            Heading(root, "판 저장", "진행 중인 판(이어 하기)을 언제 저장할지. 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.");
             var saveMode = new DropdownField(RunSaveNames.ToList(), (int)runSave);
             saveMode.RegisterValueChangedCallback(_ => { runSave = (RunSaveMode)saveMode.index; SaveRunOptions(); });
             root.Add(saveMode);
 
-            var events = TypeCache.GetTypesWithAttribute<GameEventAttribute>()
-                .Where(t => !t.IsAbstract && ClassCatalog.IsDeveloperClass(t))
-                .OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
-            var eventChoices = new[] { "(없음)" }.Concat(events.Select(t => $"{EventBus.DisplayNameOf(t)} ({t.Name})")).ToList();
-            var current = events.FindIndex(t => t.FullName == endEvent);
-            if (current < 0 && !string.IsNullOrEmpty(endEvent))
-            {
-                eventChoices.Add($"찾을 수 없음: {endEvent}");
-                current = eventChoices.Count - 2;
-            }
-            var endField = new DropdownField("판 끝 이벤트", eventChoices, current + 1);
+            var endField = TypePicker("판 끝 이벤트", events, t => $"{EventBus.DisplayNameOf(t)} ({t.Name})", endEvent, value => { endEvent = value; SaveRunOptions(); });
             endField.tooltip = "이 이벤트를 받으면 그 행동이 끝난 뒤 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤 다른 행동이 판 데이터를 바꾸면(새 판) 다시 저장한다.";
-            endField.RegisterValueChangedCallback(_ =>
-            {
-                var index = endField.index - 1;
-                if (index >= events.Count) return;
-                endEvent = index < 0 ? "" : events[index].FullName;
-                SaveRunOptions();
-            });
             root.Add(endField);
             var profileField = new Toggle("프로필도 행동마다 저장") { value = profileEach };
-            profileField.tooltip = "끄면 프로필은 끌 때(모바일은 백그라운드로 갈 때도)와 판 끝 이벤트 때만 저장된다. 진행이 거의 프로필에 있는 게임(수집형·방치형)은 켠다.";
+            profileField.tooltip = "끄면 프로필은 끌 때와 판 끝 이벤트 때만 저장된다. 진행이 거의 프로필에 있는 게임(수집형·방치형)은 켠다.";
             profileField.RegisterValueChangedCallback(e => { profileEach = e.newValue; SaveRunOptions(); });
             root.Add(profileField);
+
+            // ── 시작할 때 이어 하기(선택) ──
+            Heading(root, "시작할 때 이어 하기(선택)", "타이틀 화면 없이 바로 판으로 들어가는 게임용. 게임이 켜질 때 저장된 판이 있으면 이어 하고, 없으면 새 판 행동을 실행한다. 타이틀 화면이 있는 게임은 끄고, 이어 하기 버튼에서 직접 부른다.");
+            var actions = TypeCache.GetTypesDerivedFrom<GameAction>()
+                .Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && t.GetConstructor(Type.EmptyTypes) != null && ClassCatalog.IsDeveloperClass(t))
+                .OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+            var continueField = new Toggle("시작할 때 이어 하기") { value = continueAtStart };
+            root.Add(continueField);
+            var newRunField = TypePicker("새 판 행동", actions, t => t.Name, newRun, value => { newRun = value; SaveFlow(); });
+            newRunField.tooltip = "저장된 판이 없을 때 실행할 행동(매개변수 없는 생성자가 있는 행동 클래스). 판 끝 이벤트도 정해 두면 끝난 판은 지워져 있으므로 이어 하지 않는다.";
+            newRunField.SetEnabled(continueAtStart);
+            root.Add(newRunField);
+            continueField.RegisterValueChangedCallback(e => { continueAtStart = e.newValue; newRunField.SetEnabled(continueAtStart); SaveFlow(); });
 
             // ── 고급(보통 그대로) ──
             var advanced = new Foldout { text = "고급", value = false };
@@ -188,6 +201,26 @@ namespace GBible.EditorTools.UI
                                 "위 값을 조건에 따라 바꿔야 하면 Bootstrap의 Configure에서 options를 고친다. 그때 바뀐 값은 플레이 중 모니터 타임라인에 \"코드(Configuring)가 … 바꿨습니다\"로 남는다.", "gs-text-2");
             note.style.whiteSpace = WhiteSpace.Normal;
             root.Add(note);
+        }
+
+        // 형식 고르기: "(없음)" + 목록. 저장된 이름이 목록에 없으면 "찾을 수 없음: …"을 보인다.
+        static DropdownField TypePicker(string label, System.Collections.Generic.List<Type> types, Func<Type, string> name, string current, Action<string> set)
+        {
+            var choices = new[] { "(없음)" }.Concat(types.Select(name)).ToList();
+            var index = types.FindIndex(t => t.FullName == current);
+            if (index < 0 && !string.IsNullOrEmpty(current))
+            {
+                choices.Add($"찾을 수 없음: {current}");
+                index = choices.Count - 2;
+            }
+            var field = new DropdownField(label, choices, index + 1);
+            field.RegisterValueChangedCallback(_ =>
+            {
+                var picked = field.index - 1;
+                if (picked >= types.Count) return;
+                set(picked < 0 ? "" : types[picked].FullName);
+            });
+            return field;
         }
 
         static readonly string[] RunSaveNames = { "끌 때 저장", "행동마다 저장(턴제)", "저장하지 않음(이어 하기 없음)" };

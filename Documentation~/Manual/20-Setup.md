@@ -181,6 +181,8 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | Undo 보관 수(행동 단위일 때) | `HistoryLimit` | 0(제한 없음) |
 | 스냅샷 간격(초)·스냅샷 보관 수(스냅샷일 때) | `SnapshotInterval`·`SnapshotLimit` | 1초·30개 |
 | 개발 빌드에서 시드 고정 + 시드 | 개발 빌드에서만 `Seed` | 끔(지금 시각) |
+| Undo 끊는 이벤트(선택) | 그 이벤트를 쏜 바깥 행동이 끝나면 `session.ClearUndo()` | 없음 |
+| 시작할 때 이어 하기 + 새 판 행동(선택) | `Started` 뒤 `LoadRun`, 없으면 `session.Do(new 새 판 행동())` | 끔 |
 
 게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 

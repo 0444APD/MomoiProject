@@ -266,7 +266,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 > - 판을 불러온 뒤에도 같은 식(`Rules.InBattle`)으로 맞는 씬을 고른다.
 
 > [!note]- 다른 장르라면: 턴을 넘기면 Undo 못 하게
-> 턴 넘기기 행동을 실행한 다음 `Game.Session.Data.ClearHistory();`로 Undo 이력을 비운다. 카드 던전은 판 전체에서 Undo를 허락하고, 상한은 DB › 시작 파일 › Bootstrap의 Undo 보관 수(200)로 둔다.
+> DB › 시작 파일 › Bootstrap의 **Undo 끊는 이벤트**로 턴 끝 이벤트를 고른다([07장](07-GenreRecipes.md) 2절). 카드 던전은 판 전체에서 Undo를 허락하고, 상한은 DB › 시작 파일 › Bootstrap의 Undo 보관 수(200)로 둔다.
 
 ## 10. 체크리스트
 

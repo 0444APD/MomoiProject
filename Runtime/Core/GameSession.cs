@@ -409,7 +409,8 @@ namespace GBible
             return DataModel.IsCompatible(savedSchema, current, out reason);
         }
 
-        void ClearUndo()
+        // Undo 기록(행동 이력·스냅샷)을 비운다. 이 시점 이전으로는 되돌릴 수 없다.
+        public void ClearUndo()
         {
             Data.ClearHistory();
             _snapshots.Clear();

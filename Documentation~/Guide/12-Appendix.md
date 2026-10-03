@@ -332,7 +332,7 @@ static void Started(GameSession session)
 ### 07. 장르별 설정
 
 - [ ] Bootstrap 화면에서 Undo 방식과 보관 수(또는 스냅샷 간격·보관 수)를 골랐다.
-- [ ] 되돌릴 수 있는 범위(턴 안 / 무제한 / 없음)를 정하고, 필요하면 `ClearHistory`를 부르는 자리를 정했다.
+- [ ] 되돌릴 수 있는 범위(턴 안 / 무제한 / 없음)를 정하고, 필요하면 Undo 끊는 이벤트를 골랐다.
 - [ ] 판이 끝나면 버릴 값은 `run`, 남길 값은 `profile`에 있다.
 - [ ] 규칙의 무작위는 모두 `Game.Random(이름)`이고, 용도마다 흐름 이름이 다르다.
 - [ ] 개발 빌드는 시드를 고정한다.
@@ -595,7 +595,8 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 행동 안의 행동(`Game.Do`·`Game.Use` 중첩) | 02 · 22 | 02 §4, 03 §5 |
 | `session.Undo()` | 02 | 01 §5(모니터), 03 §3 |
 | `UndoCount` | 02 | 12 §3-7 |
-| `Data.ClearHistory()` | 02 | 03 §9(다른 장르라면), 07 §2 |
+| Undo 끊는 이벤트(Bootstrap), `session.ClearUndo()` | 02 · 20 | 03 §9(다른 장르라면), 07 §2 |
+| 시작할 때 이어 하기 + 새 판 행동(Bootstrap) | 06 · 20 | 01 §4, 03 §3, 10 §3 |
 | 지연 효과(나중에 `Game.Do`) | 02 | 03 §8 |
 | `actorId`·`Visibility` | 02 | 11 §4 |
 | `DeveloperEditAction` | 22 | 01 §4, 08 §2 |
@@ -642,7 +643,6 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `SaveRun`·`SaveProfile`·`DeleteRun`·`HasSavedRun` | 06 · 20 | 03 §3(언급), 07 §6, 10 §2·§3 |
 | 판 저장 설정(끌 때 / 행동마다 / 저장하지 않음), `AutoSaveRun`(코드로 덮어쓰기) | 06 · 20 | 01 §4, 10 §2 |
 | 판 끝 이벤트(받으면 판 저장 지우기·프로필 바로 저장) | 06 · 20 | 01 §4, 02 §3, 10 §2 |
-| 앱이 백그라운드로 갈 때 저장 | 06 · 20 | 10 §2 |
 | `session.NewRun()` | 06 | 03 §3(언급), 07 §3, 10 §3 |
 | `ExportMeta`·`ImportMeta`·`ExportRun`·`ImportRun` | 06 | 10 §3(다른 장르라면), 11 §4 |
 | `SavePath`·`RunSavePath` | 06 | 08 §1, 10 §5 |
