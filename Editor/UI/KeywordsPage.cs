@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // 도감의 키워드 탭: 코드에 정의된 키워드 그룹([KeywordGroup] static class)과 키워드(const string)를 보고 고친다.
+    // DB의 키워드 탭: 코드에 정의된 키워드 그룹([KeywordGroup] static class)과 키워드(const string)를 보고 고친다.
     // 코드가 원본이다. 여기서 한 변경(그룹·키워드 만들기, 이름 바꾸기, 지우기)은 저장(Ctrl+S)할 때 그룹 코드 파일에 쓰이고,
     // 프로그래머가 코드에서 고친 것도 다시 컴파일되면 그대로 보인다. 새 그룹은 Assets/Code/Keywords/그룹이름.cs.
     // 그룹 = 폴더(하위 그룹은 안쪽 클래스), 키워드 = 항목. 그룹 아래에는 이 그룹을 쓰는 필드([Keyword(typeof(그룹))])가 보인다.
@@ -167,7 +167,7 @@ namespace GBible.EditorTools.UI
                 new[]
                 {
                     new DialogField { Key = "name", Label = "그룹 이름(코드)", Value = "", Caption = "대문자로 시작하는 영문(예: Rarity, ItemTag). 코드에서 Rarity.Rare처럼 씁니다." },
-                    new DialogField { Key = "label", Label = "표시 이름 (선택)", Value = "", Caption = "도감에 보일 이름(예: 등급)" },
+                    new DialogField { Key = "label", Label = "표시 이름 (선택)", Value = "", Caption = "DB에 보일 이름(예: 등급)" },
                     new DialogField { Key = "ids", Label = "키워드 ID (선택)", Value = "", Caption = IdsCaption, Multiline = true },
                 },
                 "만들기",

@@ -83,7 +83,7 @@ namespace GBible.Tests
             Assert.AreEqual(5, session.Data.Get<int>("player.gold"));
             Assert.AreEqual(DataZone.Meta, session.Data.ZoneOf("player.gold"));
             Assert.IsNotNull(session.Data.Get<TestInventory>("player.bag"));
-            Assert.AreEqual("player.gold", session.Data.LabelOf("player.gold"), "도감 항목은 ID로만 식별한다");
+            Assert.AreEqual("player.gold", session.Data.LabelOf("player.gold"), "DB 항목은 ID로만 식별한다");
         }
 
         [Test]

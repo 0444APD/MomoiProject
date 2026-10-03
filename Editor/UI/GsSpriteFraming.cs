@@ -25,7 +25,7 @@ namespace GBible.EditorTools.UI
             box.Add(Gs.Label($"스프라이트 맞춤 · {source.name}", "gs-title"));
             if (presets.Count == 0)
             {
-                box.Add(Gs.Label($"'{groupData?.DisplayName ?? group}' 그룹에 규격이 없습니다. 도감 › 스프라이트 규격에서 먼저 만드세요.", "gs-caption"));
+                box.Add(Gs.Label($"'{groupData?.DisplayName ?? group}' 그룹에 규격이 없습니다. DB › 스프라이트 규격에서 먼저 만드세요.", "gs-caption"));
                 var close = Gs.Box("gs-dialog__buttons");
                 box.Add(close);
                 var m = GsModal.Show(host, box);

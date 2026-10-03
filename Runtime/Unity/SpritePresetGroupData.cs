@@ -8,7 +8,7 @@ namespace GBible.Data
     [CreateAssetMenu(menuName = "MomoiProject/스프라이트 규격 그룹", fileName = "NewSpritePresetGroup")]
     public sealed class SpritePresetGroupData : GameData, IOrderedData, INestedData
     {
-        // 상위 그룹(도감 규격 탭에서 그룹을 다른 그룹 위로 끌어 넣는다). 비어 있으면 맨 위.
+        // 상위 그룹(DB 규격 탭에서 그룹을 다른 그룹 위로 끌어 넣는다). 비어 있으면 맨 위.
         [HideInInspector, DataRef(typeof(SpritePresetGroupData))] public string parent = "";
         // 규격 탭에서의 순서(끌어서 바꾼다).
         [HideInInspector] public int order;

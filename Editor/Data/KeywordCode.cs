@@ -8,9 +8,9 @@ using UnityEditor;
 
 namespace GBible.EditorTools
 {
-    // 키워드 코드 고치기: 도감 › 키워드 탭에서 한 변경을 키워드 그룹 코드(static class + const string)에 쓴다.
+    // 키워드 코드 고치기: DB › 키워드 탭에서 한 변경을 키워드 그룹 코드(static class + const string)에 쓴다.
     // 새 그룹은 Assets/Code/Keywords/그룹이름.cs 파일로 만든다. 프로그래머가 다른 파일에 쓴 그룹도 찾아서 고친다.
-    // 글자만 고치고, 파일 쓰기·다시 컴파일은 ClassStaging(도감 저장)이 한 번에 한다.
+    // 글자만 고치고, 파일 쓰기·다시 컴파일은 ClassStaging(DB 저장)이 한 번에 한다.
     public static class KeywordCode
     {
         public const string Folder = "Assets/Code/Keywords";
@@ -58,7 +58,7 @@ namespace GBible.EditorTools
         public static string NewGroupFile(string ns, string className, string label)
         {
             var b = new StringBuilder();
-            b.AppendLine("// 키워드 그룹. 도감 › 키워드 탭에서 고친 내용이 이 파일에 쓰입니다. 코드에서 직접 고쳐도 됩니다.");
+            b.AppendLine("// 키워드 그룹. DB › 키워드 탭에서 고친 내용이 이 파일에 쓰입니다. 코드에서 직접 고쳐도 됩니다.");
             b.AppendLine("// 필드 값에는 키워드 ID(글자)가 저장됩니다. 연결: [Keyword(typeof(" + className + "))] public string 필드;");
             b.AppendLine("using GBible;");
             b.AppendLine();

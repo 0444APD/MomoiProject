@@ -14,7 +14,7 @@ namespace GBible.Data
         [FieldLabel("집계 방식")] public StatAggregate aggregate = StatAggregate.Sum;
         [FieldLabel("반영 규칙"), TriggerSlot(TriggerKinds.Event), OutcomeSlot(OutcomeKinds.Record, Fixed = true)]
         public List<TriggerRule> triggers = new List<TriggerRule>();
-        // 예전 저장 형식(이벤트·값·배수·조건 한 줄). 도감을 열면 위의 규칙으로 옮겨진다. 코드에서 넣어도 같은 길로 돈다.
+        // 예전 저장 형식(이벤트·값·배수·조건 한 줄). DB를 열면 위의 규칙으로 옮겨진다. 코드에서 넣어도 같은 길로 돈다.
         [HideInInspector, TriggerSlot(TriggerKinds.Event), OutcomeSlot(OutcomeKinds.Record)] public List<StatRule> rules = new List<StatRule>();
 
         public IEnumerable<TriggerRule> AllRules() => rules.Where(r => r != null).Select(r => r.ToTriggerRule()).Concat(triggers.Where(r => r != null));
@@ -57,7 +57,7 @@ namespace GBible.Data
                 var scoped = new PrefixedContext(context, $"규칙 {i}: ");
                 rule.when.Validate(scoped);
                 foreach (var outcome in rule.then.Where(o => o != null)) outcome.Validate(scoped);
-                // 반영할 값이 트리거의 이벤트에 있는지는 도감 검증기가 모든 기능에 같은 규칙으로 본다(DataValidator.CheckRecord).
+                // 반영할 값이 트리거의 이벤트에 있는지는 DB 검증기가 모든 기능에 같은 규칙으로 본다(DataValidator.CheckRecord).
                 if (aggregate != StatAggregate.Sum && rule.then.OfType<RecordOutcome>().Any(r => string.IsNullOrEmpty(r.field)))
                     context.Warning($"규칙 {i}: 횟수 반영은 합계형 로그에서만 의미가 있습니다.");
             }

@@ -72,16 +72,20 @@ namespace GBible
 
             // 예전 방식 데이터의 Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
             var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };
+            // DB › 시작 파일 › Bootstrap에서 정한 옵션이 먼저 들어가고, 코드(Configuring)가 바꾸면 그 값이 우선한다.
+            var database = GameDatabase.Load();
+            database?.ApplyTo(options, Debug.isDebugBuild);
+            var fromDatabase = (options.History, options.HistoryLimit, options.SnapshotInterval, options.SnapshotLimit, options.Seed);
             Configuring?.Invoke(options);
             var session = new GameSession(options);
+            if (database != null) NoteCodeOverrides(session, database, fromDatabase, options);
 
-            var database = GameDatabase.Load();
             // 데이터 값 안의 에셋 참조는 데이터베이스 ID로 저장·복원한다.
             DataModel.ReferenceToId = value => value is GameData data && !string.IsNullOrEmpty(data.Id) ? data.Id : null;
             DataModel.IdToReference = (id, type) => database == null ? null : database.Entries.FirstOrDefault(e => e != null && e.Id == id && type.IsInstanceOfType(e));
             if (database == null)
             {
-                session.Journal.Append(JournalKind.Warning, "Runtime", "GameDatabase를 찾을 수 없습니다. 에디터에서 데이터베이스 창을 한 번 열면 자동으로 만들어집니다.");
+                session.Journal.Append(JournalKind.Warning, "Runtime", "GameDatabase를 찾을 수 없습니다. 에디터에서 DB 창을 한 번 열면 자동으로 만들어집니다.");
             }
             else
             {
@@ -116,11 +120,11 @@ namespace GBible
                 foreach (var instance in database.All<InstanceData>())
                     if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
-                // [BindTo] ID가 도감의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
+                // [BindTo] ID가 DB의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
                 var entryIds = new System.Collections.Generic.HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
                 foreach (var id in BoundOutcomes.Ids)
                     if (!entryIds.Contains(id))
-                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 도감 항목이 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
+                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
                 session.Achievements.EvaluateAll();
             }
 
@@ -153,6 +157,19 @@ namespace GBible
             if (AutoSaveRun) SaveRun(Session);
             Stopped?.Invoke(Session);
             Session = null;
+        }
+
+        // 코드(Configuring)가 DB의 세션 옵션을 바꿨으면 기록에 남긴다(에디터 값이 왜 안 먹는지 바로 보이게).
+        static void NoteCodeOverrides(GameSession session, GameDatabase database, (HistoryMode history, int limit, double interval, int snapshots, ulong seed) before, SessionOptions after)
+        {
+            var changed = new System.Collections.Generic.List<string>();
+            if (before.history != after.History) changed.Add($"Undo 방식 {before.history} → {after.History}");
+            if (before.limit != after.HistoryLimit) changed.Add($"Undo 보관 수 {before.limit} → {after.HistoryLimit}");
+            if (before.interval != after.SnapshotInterval) changed.Add($"스냅샷 간격 {before.interval} → {after.SnapshotInterval}");
+            if (before.snapshots != after.SnapshotLimit) changed.Add($"스냅샷 보관 수 {before.snapshots} → {after.SnapshotLimit}");
+            if (database.FixSeedInDevelopment && Debug.isDebugBuild && before.seed != after.Seed) changed.Add($"시드 {before.seed} → {after.Seed}");
+            if (changed.Count > 0)
+                session.Journal.Append(JournalKind.System, "Runtime", "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: " + string.Join(", ", changed));
         }
 
         static void ForwardToConsole(JournalEntry entry)

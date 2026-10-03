@@ -19,15 +19,15 @@
 | 고른 대상 | 플레이어가 고른 대상들(`targets`, 컨텍스트에서는 `Picked`). |
 | 행동 (`GameAction`) | 플레이어 입력 하나. 데이터라서 서버 전송·리플레이가 되고, 실행 한 번이 Undo 한 단위다. |
 | TriggerContext (컨텍스트) | 사용하는 순간의 정보(`IsUse = true`, `User`, `Picked`, `Owner` = 능력 ID). |
-| 인스턴스 | 도감 › 인스턴스에서 만든 클래스 객체 원본(아이템 A …). |
+| 인스턴스 | DB › 인스턴스에서 만든 클래스 객체 원본(아이템 A …). |
 
 ---
 
 ## 1. 에디터에서 쓰는 법
 
-### 1-1. 능력 만들기(도감 › 능력)
+### 1-1. 능력 만들기(DB › 능력)
 
-1. `MomoiProject → 도감` → 사이드바 **도감** 그룹의 **능력** 탭 → 목록 줄의 **`+ 능력`**. 제목(= ID)을 짓는다(예: `fireball`).
+1. `MomoiProject → DB` → 사이드바 **DB** 그룹의 **능력** 탭 → 목록 줄의 **`+ 능력`**. 제목(= ID)을 짓는다(예: `fireball`).
 2. `trigger`(툴팁 "트리거"): 기본으로 `사용` 하나가 들어 있다(요약 "사용할 때").
    - 사용 조건을 붙이려면 `+ 블럭` → **조건 충족** 그룹의 조건 Block(예: 프로젝트가 만든 `사용자 체력 있음`)을 더한다. `사용`과 `AND`로 이어진다.
    - 이 칸에서 고를 수 있는 것은 `사용`과 조건 충족뿐이다.
@@ -39,16 +39,16 @@
 
 결과를 코드로 쓰려면 `[BindTo("fireball")]`(→ `13-BindTo.md`). 연결되면 결과 칸이 잠긴다.
 
-### 1-2. 인스턴스에 사용 기능 붙이기(도감 › 인스턴스)
+### 1-2. 인스턴스에 사용 기능 붙이기(DB › 인스턴스)
 
 먼저 코드에서 아이템 클래스에 사용 기능 필드를 둔다(2-7).
 
-1. `MomoiProject → 도감` → **인스턴스** 탭 → **`+ 인스턴스`** → 제목(= 인스턴스 ID, 예: `potion`)을 짓는다.
+1. `MomoiProject → DB` → **인스턴스** 탭 → **`+ 인스턴스`** → 제목(= 인스턴스 ID, 예: `potion`)을 짓는다.
 2. `instanceType`(툴팁 "형식")에서 아이템 클래스(`Item`)를 고른다. 값(`value`)이 새로 만들어진다.
 3. 값 탐색기 아래 **`+ 기능`**을 누르고 목록에서 `usable`(오른쪽 작은 글씨: 형식 이름)을 고른다. 사용 기능이 붙고 그 칸이 보인다. 줄의 빼기로 다시 뗀다.
 4. 사용 기능의 트리거(`when`)는 기본 `사용`이다.
 
-> 인스턴스 값 안의 사용 기능(`when`·`then`)은 능력 탭과 같은 트리거·결과 편집기로 그려진다. 결과를 코드로 쓰려면 `[BindTo(인스턴스 ID)]`를 붙인다(그러면 결과 칸은 잠기고 연결된 함수 이름·cs 열기가 보인다). 여러 아이템이 같은 효과를 나눠 쓰면 아이템이 **능력 ID를 가리키게** 하고 그 능력을 도감 › 능력에서 조립해도 된다(3-5, 3-6).
+> 인스턴스 값 안의 사용 기능(`when`·`then`)은 능력 탭과 같은 트리거·결과 편집기로 그려진다. 결과를 코드로 쓰려면 `[BindTo(인스턴스 ID)]`를 붙인다(그러면 결과 칸은 잠기고 연결된 함수 이름·cs 열기가 보인다). 여러 아이템이 같은 효과를 나눠 쓰면 아이템이 **능력 ID를 가리키게** 하고 그 능력을 DB › 능력에서 조립해도 된다(3-5, 3-6).
 
 ### 1-3. 모니터에서 확인하기
 
@@ -186,7 +186,7 @@ session.Abilities.Define(fireball);
 | `Define(definition)` | 등록. 정의를 **복사**해 둔다(Block 인스턴스가 세션마다 따로라 여러 세션이 섞이지 않는다). 등록한 뒤 원본을 고쳐도 반영되지 않는다. 그 ID에 `[BindTo]`가 있으면 결과가 그 코드로 바뀐다 |
 | `Get(id)` / `All` | 찾기 / 전체 |
 
-게임에서는 런타임이 시작할 때 도감의 능력 전부와, 사용 기능이 붙은 인스턴스 전부를 등록한다.
+게임에서는 런타임이 시작할 때 DB의 능력 전부와, 사용 기능이 붙은 인스턴스 전부를 등록한다.
 
 ### 2-7. `Usable` — 클래스에 붙이는 사용 기능
 
@@ -212,7 +212,7 @@ public class Item
 4. `Usable`의 칸:
    - `when`(`Trigger`, 기본 `new UseTrigger()`, 잠금 `사용 · 조건 충족`)
    - `then`(`List<Outcome>`, 잠금 `대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과`)
-5. 등록 ID = **인스턴스 ID**(도감 › 인스턴스 항목의 ID). `Item.id` 필드 값과는 상관없다.
+5. 등록 ID = **인스턴스 ID**(DB › 인스턴스 항목의 ID). `Item.id` 필드 값과는 상관없다.
 6. 코드로 능력 정의를 만들려면 `usable.ToDefinition(id, displayName)`.
 
 개수 줄이기 같은 뒤처리는 게임 코드가 한다(결과 안에서 하면 같은 Undo 단위가 된다. 3-4).
@@ -233,7 +233,7 @@ public class UserAlive : SimpleCondition
 
 ## 3. 상황별 예제
 
-예제는 다음 형식을 쓴다(도감 › 플레이어 데이터에 `battle`(Battle), `party`(Party)가 있다고 본다).
+예제는 다음 형식을 쓴다(DB › 플레이어 데이터에 `battle`(Battle), `party`(Party)가 있다고 본다).
 
 ```csharp
 using System;
@@ -250,7 +250,7 @@ using UnityEngine;
 
 ### 3-1. 스플래시: 고른 적 + 주변 1칸의 적에게 10 피해
 
-**에디터**(도감 › 능력 `splash`): `trigger` = `사용` / `outcomes` = `대상에게 효과`(대상 `주변 n칸의 적 추가` range 1, 효과 `피해` amount 10).
+**에디터**(DB › 능력 `splash`): `trigger` = `사용` / `outcomes` = `대상에게 효과`(대상 `주변 n칸의 적 추가` range 1, 효과 `피해` amount 10).
 
 **게임 코드**: `Game.Use("splash", hero, orc1);`
 
@@ -286,7 +286,7 @@ public class SpendMana : Effect<Unit>
 }
 ```
 
-**에디터**(도감 › 능력 `fireball`):
+**에디터**(DB › 능력 `fireball`):
 
 - `trigger`: `사용` AND `사용자 마나`(cost 3)
 - `outcomes`:
@@ -298,7 +298,7 @@ public class SpendMana : Effect<Unit>
 ### 3-4. 포션(사용 기능 + `[BindTo]`)
 
 1. 코드: 위의 `Item` 클래스.
-2. 도감 › 인스턴스 `potion`: 형식 `Item`, `+ 기능` → `usable`.
+2. DB › 인스턴스 `potion`: 형식 `Item`, `+ 기능` → `usable`.
 3. 결과를 코드로:
 
 ```csharp
@@ -329,7 +329,7 @@ using GBible.Data;
 public class Consumable
 {
     public string id;
-    [DataRef(typeof(AbilityData))] public string ability;   // 도감 › 능력 목록에서 고르는 칸
+    [DataRef(typeof(AbilityData))] public string ability;   // DB › 능력 목록에서 고르는 칸
     public int maxStack = 10;
 }
 
@@ -337,7 +337,7 @@ public class Consumable
 void UseItem(Consumable item, Unit user, params object[] targets) => Game.Use(item.ability, user, targets);
 ```
 
-능력 쪽은 1-1처럼 트리거(사용 조건 포함)·결과를 도감에서 조립한다. 같은 능력을 여러 아이템이 함께 쓸 수 있다.
+능력 쪽은 1-1처럼 트리거(사용 조건 포함)·결과를 DB에서 조립한다. 같은 능력을 여러 아이템이 함께 쓸 수 있다.
 
 ### 3-6. 가방에 있을 때만 쓸 수 있는 능력
 
@@ -405,7 +405,7 @@ static void ChainLightning(TriggerContext c)
 }
 ```
 
-도감 › 능력 `chainLightning`의 트리거는 에디터에서 그대로 정하고(사용 조건 포함), 결과만 코드다.
+DB › 능력 `chainLightning`의 트리거는 에디터에서 그대로 정하고(사용 조건 포함), 결과만 코드다.
 
 ---
 
@@ -413,7 +413,7 @@ static void ChainLightning(TriggerContext c)
 
 - **대상·사용자에 `id`가 없다.** 사용자·대상은 id로 실려 다니고, 끝날 때 최종 대상의 id로 `능력 사용` 이벤트를 쏜다. `public string id;`가 없는 객체가 최종 대상이 되면 예외로 사용 전체가 취소된다.
 - **id가 겹친다.** 사용자·대상은 형식 없이 id만으로 플레이어 데이터 전체에서 찾는다. 서로 다른 형식이라도 같은 id가 있으면 먼저 찾은 것이 쓰인다. 소환 개체 등은 `Game.NewId("unit")`로 겹치지 않게 만든다.
-- **사용 기능을 인스턴스의 `id` 필드로 부른다.** `Game.Use`의 ID는 도감 › 인스턴스 항목의 ID다. 가방에는 인스턴스 ID를 담아 두는 것이 편하다.
+- **사용 기능을 인스턴스의 `id` 필드로 부른다.** `Game.Use`의 ID는 DB › 인스턴스 항목의 ID다. 가방에는 인스턴스 ID를 담아 두는 것이 편하다.
 - **사용 기능 필드의 형식이 다르다.** `Usable`을 상속한 형식이나 `object` 필드는 찾지 않는다(필드 형식이 정확히 `Usable`이어야 한다). 인스턴스 값의 맨 위 필드만 본다.
 - **사용 조건을 결과 코드의 예외로만 둔다.** 동작은 하지만 `Game.CanUse`가 모른다. 미리 보여야 하는 조건은 Trigger에 조건 Block으로 둔다.
 - **`Define` 뒤에 정의를 고친다.** 능력 정의는 등록할 때 복사된다. 바꾸려면 다시 `Define`한다.

@@ -30,7 +30,7 @@ namespace GBible.EditorTools.UI
     // 폴더형 데이터 탐색기. 클래스·컬렉션은 폴더, 값은 파일처럼 한 단계씩 들어가며 본다.
     //  · 고르기(Pick): 타입만 보고 필드 경로를 고른다(조건의 "필드" 칸 등).
     //  · 둘러보기(Browse): 실제 값을 보고, 값 파일을 눌러 바로 고친다. 클래스는 타입별 배치(GsDataView)로 그린다.
-    // 어디서 쓰든 같은 모양이라, 인벤토리 모니터링·도감·더미 아이템 확인이 같은 화면이 된다.
+    // 어디서 쓰든 같은 모양이라, 인벤토리 모니터링·DB·더미 아이템 확인이 같은 화면이 된다.
     public sealed class GsDataExplorer : VisualElement
     {
         sealed class Crumb
@@ -79,7 +79,7 @@ namespace GBible.EditorTools.UI
         // 폴더(클래스·배열·리스트)를 이 탐색기 안에서 들어가지 않고 따로 연다(상세 창의 새 탭). true를 돌려주면 안에서 들어가지 않는다.
         public Func<ExplorerItem, bool> OpenInTab;
 
-        // 인스턴스 편집(도감 상세): [Hide] 필드는 감추고 [ShowIf]는 조건대로, 기능 필드(비어 있을 수 있는 [SerializeReference])는
+        // 인스턴스 편집(DB 상세): [Hide] 필드는 감추고 [ShowIf]는 조건대로, 기능 필드(비어 있을 수 있는 [SerializeReference])는
         // 붙어 있으면 '빼기', 비어 있으면 '+ 기능'으로 붙인다. 모니터처럼 실제 값을 살피는 곳에서는 끈다(모든 필드를 보인다).
         public bool InstanceEditing;
 
@@ -250,7 +250,7 @@ namespace GBible.EditorTools.UI
                 _pickFolder.style.display = here.Path.Length > 0 && FieldPaths.ElementTypeOf(here.Type) != null ? DisplayStyle.Flex : DisplayStyle.None;
 
             _list.Clear();
-            // 둘러보기에서 클래스(컬렉션이 아닌 객체)는 타입별 배치로 그린다(도감·상세 패널·더미 생성기와 같은 모양).
+            // 둘러보기에서 클래스(컬렉션이 아닌 객체)는 타입별 배치로 그린다(DB·상세 패널·더미 생성기와 같은 모양).
             if (_browse && here.Children == null && here.Value != null && !FieldPaths.IsCollectionValue(here.Value) &&
                 DataModel.Of(here.Value.GetType()).Kind == DataKind.Object)
             {
@@ -805,7 +805,7 @@ namespace GBible.EditorTools.UI
                 var field = member.Info as FieldInfo;
                 var target = Current;
                 var serialized = _crumb.Serialized == null || field == null ? null : Join(_crumb.Serialized, field.Name);
-                // 트리거·결과 같은 블록 필드는 도감과 같은 편집기로(상세 패널이 넘겨준 BlockEditor).
+                // 트리거·결과 같은 블록 필드는 DB와 같은 편집기로(상세 패널이 넘겨준 BlockEditor).
                 if (serialized != null && _explorer.BlockEditor != null && IsBlockField(field) && _explorer.BlockEditor(serialized) is { } editor)
                 {
                     var section = Gs.Col("gs-explorer__block");

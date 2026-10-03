@@ -2,7 +2,7 @@ using System;
 
 namespace GBible
 {
-    // 인스턴스(도감 › 인스턴스)를 편집할 때 이 필드를 보이지 않는다. 값은 그대로 저장·복사된다.
+    // 인스턴스(DB › 인스턴스)를 편집할 때 이 필드를 보이지 않는다. 값은 그대로 저장·복사된다.
     // 에디터의 클래스 상세에서 켜고 꺼도 이 어트리뷰트가 코드에 쓰인다.
     [AttributeUsage(AttributeTargets.Field, Inherited = true)]
     public sealed class HideAttribute : Attribute

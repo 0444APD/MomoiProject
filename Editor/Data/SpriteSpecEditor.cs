@@ -211,12 +211,12 @@ namespace GBible.EditorTools
             {
                 _scheduled = false;
                 if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) return;
-                // 도감에 적용 대기 중인 규격 변경은 적용된 뒤에 베이크한다.
+                // DB에 적용 대기 중인 규격 변경은 적용된 뒤에 베이크한다.
                 if (EditorDatabase.Staging.HasChanges) return;
                 var (rebaked, review) = RebakeStale();
                 if (rebaked > 0) Debug.Log($"[MomoiProject] 바뀐 스프라이트 규격으로 {rebaked}개를 다시 베이크했습니다.");
                 if (review.Count > 0)
-                    Debug.LogWarning("[MomoiProject] 규격이 바뀌어 예외 촬영을 확인해야 합니다(도감 › 스프라이트 규격에서 표시):\n  " + string.Join("\n  ", review));
+                    Debug.LogWarning("[MomoiProject] 규격이 바뀌어 예외 촬영을 확인해야 합니다(DB › 스프라이트 규격에서 표시):\n  " + string.Join("\n  ", review));
             };
         }
 

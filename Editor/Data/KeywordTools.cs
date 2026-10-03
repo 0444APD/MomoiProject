@@ -8,7 +8,7 @@ using UnityEditor;
 namespace GBible.EditorTools
 {
     // 키워드(코드가 원본)와 필드 연결을 한곳에서. 키워드 탭·클래스 상세·드롭다운·검증이 함께 쓴다.
-    // 키워드 그룹·키워드는 코드([KeywordGroup] static class + const string)이고, 도감에서 한 변경은 저장(Ctrl+S) 때 코드에 쓰인다.
+    // 키워드 그룹·키워드는 코드([KeywordGroup] static class + const string)이고, DB에서 한 변경은 저장(Ctrl+S) 때 코드에 쓰인다.
     // 이 목록은 컴파일된 코드에 저장 전 변경(ClassStaging)을 더한 모습이다.
     public static class KeywordTools
     {
@@ -87,7 +87,7 @@ namespace GBible.EditorTools
         public static bool IsKeywordField(FieldInfo field) =>
             field != null && (field.FieldType == typeof(string) || FieldPaths.ElementTypeOf(field.FieldType) == typeof(string));
 
-        // 키워드 그룹을 연결할 수 있는 필드(이미 용도가 정해진 칸 — 다른 도감 항목·이벤트·필드 경로 등 — 은 뺀다).
+        // 키워드 그룹을 연결할 수 있는 필드(이미 용도가 정해진 칸 — 다른 DB 항목·이벤트·필드 경로 등 — 은 뺀다).
         public static bool CanConnect(FieldInfo field) => IsKeywordField(field) && !HasFixedPurpose(field);
 
         static bool HasFixedPurpose(FieldInfo field)
@@ -111,7 +111,7 @@ namespace GBible.EditorTools
 
         public static string GroupOf(Type type, FieldInfo field) => GroupOf(field);
 
-        // 키워드를 담을 수 있는 필드 전체(데이터 클래스·도감 종류·이벤트). 상속받은 필드는 선언한 클래스에 한 번만.
+        // 키워드를 담을 수 있는 필드 전체(데이터 클래스·DB 종류·이벤트). 상속받은 필드는 선언한 클래스에 한 번만.
         public static IEnumerable<(Type type, FieldInfo field)> Fields()
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -197,7 +197,7 @@ namespace GBible.EditorTools
         }
 
         // 필드의 규칙을 고친다(없으면 만든다). 고친 뒤 아무 뜻도 남지 않은 규칙은 지운다.
-        // staged(기본): 도감의 다른 변경과 함께 모아 두었다가 저장할 때 에셋에 쓴다. 아니면 바로 쓴다(배치 작업용).
+        // staged(기본): DB의 다른 변경과 함께 모아 두었다가 저장할 때 에셋에 쓴다. 아니면 바로 쓴다(배치 작업용).
         static FieldRuleData EditRule(Type type, FieldInfo field, string undoName, Action<FieldRuleData> edit, bool staged)
         {
             type = field.DeclaringType ?? type;

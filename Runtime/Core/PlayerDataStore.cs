@@ -14,7 +14,7 @@ namespace GBible
         Meta,
     }
 
-    // 타입이 붙은 플레이어 데이터 키. 도감 창에서 이름을 지은 키는 코드 생성(GameIds)으로 이 형태로 제공된다.
+    // 타입이 붙은 플레이어 데이터 키. DB 창에서 이름을 지은 키는 코드 생성(GameIds)으로 이 형태로 제공된다.
     // 문자열 키 대신 쓰면 값의 타입이 컴파일 단계에서 맞춰지고 오타가 날 수 없다.
     public readonly struct PlayerDataKey<T>
     {
@@ -165,7 +165,7 @@ namespace GBible
             return Get<T>(key);
         }
 
-        // 타입을 지정해 등록한다(데이터베이스 창의 플레이어 데이터가 이 경로로 등록된다).
+        // 타입을 지정해 등록한다(DB 창의 플레이어 데이터가 이 경로로 등록된다).
         // 클래스·컬렉션인데 기본값이 없으면 기본 생성자로 만든다.
         public void DefineOfType(string key, DataZone zone, Type type, object defaultValue, string label = null)
         {
@@ -1226,7 +1226,7 @@ namespace GBible
         Slot GetSlot(string key)
         {
             if (key != null && _slots.TryGetValue(key, out var slot)) return slot;
-            throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 플레이어 데이터 '{key}'입니다. 데이터베이스 창의 플레이어 데이터에 등록하거나 Define으로 먼저 등록하세요.");
+            throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 플레이어 데이터 '{key}'입니다. DB 창의 플레이어 데이터에 등록하거나 Define으로 먼저 등록하세요.");
         }
 
         static string ZoneName(DataZone zone) => zone == DataZone.Meta ? "메타" : "세션";

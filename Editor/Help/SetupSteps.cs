@@ -172,9 +172,9 @@ namespace GBible.EditorTools
                 Summary = "등급·부위·태그 같은 식별용 string 필드가 어떤 키워드 그룹에서 고를지 정합니다.",
                 Body = "키워드는 코드다: `[KeywordGroup(\"등급\")] public static class Rarity { public const string Legendary = \"legendary\"; }`. 필드는 `[Keyword(typeof(Rarity))]`로 그룹에 연결합니다.\n\n" +
                        "## 방법\n" +
-                       "- 도감의 키워드 탭에서 그룹과 키워드를 만들고 고칩니다(저장하면 코드에 써집니다). 코드에서 직접 써도 같습니다.\n" +
+                       "- DB의 키워드 탭에서 그룹과 키워드를 만들고 고칩니다(저장하면 코드에 써집니다). 코드에서 직접 써도 같습니다.\n" +
                        "- 클래스 탭에서 필드를 고르고 '키워드 연결'로 그룹을 고르거나, 코드에서 필드에 `[Keyword(typeof(그룹))]`을 붙입니다.\n\n" +
-                       "string 필드는 하나, string 배열·리스트 필드는 여러 개를 고릅니다. 비면 안 되는 값은 도감의 필드 규칙에서 '필수'를 켭니다.\n\n" +
+                       "string 필드는 하나, string 배열·리스트 필드는 여러 개를 고릅니다. 비면 안 되는 값은 DB의 필드 규칙에서 '필수'를 켭니다.\n\n" +
                        "아래 상태 줄의 '연결 안 된 필드'는 아직 그룹이 없는 식별용 필드 후보입니다. 자유 입력이 맞는 필드(이름 등)라면 그대로 둡니다.",
                 HelpTopic = "window:keywords",
                 Check = () =>
@@ -244,9 +244,9 @@ namespace GBible.EditorTools
             yield return new SetupStep
             {
                 Id = "codex", Order = 80, Title = "인스턴스·프리팹 등록",
-                Summary = "테스트용 인스턴스(인스턴스)와 조립에 쓸 프리팹을 도감에 등록합니다.",
+                Summary = "테스트용 인스턴스(인스턴스)와 조립에 쓸 프리팹을 DB에 등록합니다.",
                 Body = "인스턴스는 프로젝트 클래스에 값을 미리 채운 인스턴스입니다. 더미 아이템이나 테스트 몬스터 설정을 만들어 두고 코드에서 사본을 받아 씁니다.\n\n" +
-                       "프리팹을 등록하면 도감에서 컴포넌트 필드를 탐색기로 보고 고칠 수 있습니다. 프리팹 항목은 도감에서 지우지 않고, 프로젝트 창에서 에셋을 지우면 자동으로 정리됩니다.",
+                       "프리팹을 등록하면 DB에서 컴포넌트 필드를 탐색기로 보고 고칠 수 있습니다. 프리팹 항목은 DB에서 지우지 않고, 프로젝트 창에서 에셋을 지우면 자동으로 정리됩니다.",
                 HelpTopic = HelpIds.Data(typeof(InstanceData)),
                 Optional = true,
                 Check = () => (Count<InstanceData>() + Count<PrefabData>() > 0, $"인스턴스 {Count<InstanceData>()}개 · 프리팹 {Count<PrefabData>()}개"),
@@ -255,8 +255,8 @@ namespace GBible.EditorTools
             yield return new SetupStep
             {
                 Id = "game-ids", Order = 90, Title = "식별자 코드 확인",
-                Summary = "도감의 ID가 코드에서 쓸 수 있게 GameIds.cs로 만들어졌는지 확인합니다.",
-                Body = "GameIds.cs는 도감이 바뀔 때마다 자동으로 다시 만들어집니다. 코드에서는 문자열 대신 `GameIds.PlayerData.Gold`처럼 씁니다.\n\n" +
+                Summary = "DB의 ID가 코드에서 쓸 수 있게 GameIds.cs로 만들어졌는지 확인합니다.",
+                Body = "GameIds.cs는 DB가 바뀔 때마다 자동으로 다시 만들어집니다. 코드에서는 문자열 대신 `GameIds.PlayerData.Gold`처럼 씁니다.\n\n" +
                        "파일이 없거나 오래됐다면 '다시 만들기'를 누릅니다.",
                 HelpTopic = "guide:ids",
                 Check = () =>
@@ -269,8 +269,8 @@ namespace GBible.EditorTools
             yield return new SetupStep
             {
                 Id = "validation", Order = 100, Title = "검증 오류 해결",
-                Summary = "도감 전체의 오류를 없앱니다. 오류가 있으면 빌드가 막힙니다.",
-                Body = "끊긴 참조, 빠진 필수 값, ID 형식 등을 검사합니다. 도감 검색 칸에 `invalid`를 입력하면 오류가 있는 항목만 보입니다.",
+                Summary = "DB 전체의 오류를 없앱니다. 오류가 있으면 빌드가 막힙니다.",
+                Body = "끊긴 참조, 빠진 필수 값, ID 형식 등을 검사합니다. DB 검색 칸에 `invalid`를 입력하면 오류가 있는 항목만 보입니다.",
                 HelpTopic = "guide:validation",
                 Check = () =>
                 {

@@ -73,7 +73,7 @@ namespace GBible
         // 마우스를 올렸을 때 보이는 설명 문장(없으면 Describe).
         public virtual string Explain(INameResolver names) => Describe(names);
 
-        // 자연어 요약(도감·로그 기본 표시). Describe는 코드 형태(Alt를 누르면 보임).
+        // 자연어 요약(DB·로그 기본 표시). Describe는 코드 형태(Alt를 누르면 보임).
         public virtual string Natural(INameResolver names) => Describe(names);
 
         // 시간 기반 조건만 0보다 크게 선언한다(초 단위 확인 주기).

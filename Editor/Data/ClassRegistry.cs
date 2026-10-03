@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace GBible.EditorTools
 {
-    // 도감 › 클래스·이벤트 탭의 설정: 새 클래스의 네임스페이스, 도감에서 만든 클래스의 파일 위치 기억.
+    // DB › 클래스·이벤트 탭의 설정: 새 클래스의 네임스페이스, DB에서 만든 클래스의 파일 위치 기억.
     // 그룹은 여기 두지 않는다: 그룹 = Assets/Code 아래 폴더(ClassFolders). ProjectSettings/MomoiProject/Classes.json에 두어 팀과 공유한다.
     public static class ClassRegistry
     {
@@ -19,14 +19,14 @@ namespace GBible.EditorTools
         {
             // 클래스 전체 이름.
             public string type;
-            // 도감에서 만든 클래스의 파일 경로(찾기 쉽게 기억해 둔다. 파일을 옮기면 이름으로 다시 찾는다).
+            // DB에서 만든 클래스의 파일 경로(찾기 쉽게 기억해 둔다. 파일을 옮기면 이름으로 다시 찾는다).
             public string path = "";
         }
 
         [Serializable]
         public sealed class Settings
         {
-            [Tooltip("도감에서 만든 클래스의 네임스페이스(비우면 없음)")]
+            [Tooltip("DB에서 만든 클래스의 네임스페이스(비우면 없음)")]
             public string codeNamespace = "Game.Data";
             public List<Entry> classes = new List<Entry>();
         }
@@ -60,7 +60,7 @@ namespace GBible.EditorTools
         // 저장하지 않은 변경이 있는지(클래스 파일 위치 기억 등).
         public static bool IsDirty => !string.IsNullOrEmpty(UnityEditor.SessionState.GetString(StashKey, ""));
 
-        // 고친 것을 도감의 다른 변경과 함께 모아 둔다(파일에는 저장할 때 쓴다: CodexChanges.Save).
+        // 고친 것을 DB의 다른 변경과 함께 모아 둔다(파일에는 저장할 때 쓴다: CodexChanges.Save).
         public static void Save()
         {
             UnityEditor.SessionState.SetString(StashKey, JsonUtility.ToJson(Current));

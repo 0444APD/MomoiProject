@@ -189,7 +189,7 @@ namespace GBible.EditorTools.UI
                         });
                     }
                 }
-                if (keys.Count == 0) items.Add(new GsDropdownItem("도감 › 플레이어 데이터 탭에 아직 항목이 없습니다") { Group = "플레이어 데이터에 주기", Disabled = true });
+                if (keys.Count == 0) items.Add(new GsDropdownItem("DB › 플레이어 데이터 탭에 아직 항목이 없습니다") { Group = "플레이어 데이터에 주기", Disabled = true });
                 else if (items.Count == before) items.Add(new GsDropdownItem("더 고를 필드가 없습니다(모두 골랐습니다)") { Group = "플레이어 데이터에 주기", Disabled = true });
             }
 
@@ -359,7 +359,7 @@ namespace GBible.EditorTools.UI
             onStructure?.Invoke();
         }
 
-        // 클래스: 도감 › 인스턴스에서 만든 그 형식의 인스턴스 중 하나.
+        // 클래스: DB › 인스턴스에서 만든 그 형식의 인스턴스 중 하나.
         static VisualElement InstanceSlot(SerializedProperty property, Type type, Action onStructure)
         {
             var db = EditorDatabase.Instance;
@@ -383,10 +383,10 @@ namespace GBible.EditorTools.UI
                         };
                     }).ToList();
                 if (items.Count == 0)
-                    items.Add(new GsDropdownItem($"{DataModel.FriendlyName(type)} 인스턴스가 없습니다 — 도감 › 인스턴스에서 먼저 만드세요") { Disabled = true });
+                    items.Add(new GsDropdownItem($"{DataModel.FriendlyName(type)} 인스턴스가 없습니다 — DB › 인스턴스에서 먼저 만드세요") { Disabled = true });
                 GsDropdown.Show(anchor, items, placeholder: "인스턴스 검색");
             });
-            pill.tooltip = template != null ? DataModel.Summary(template.value) + "\n고치려면 도감 › 인스턴스에서 고칩니다." : $"{DataModel.FriendlyName(type)} 인스턴스 중 하나를 고릅니다.";
+            pill.tooltip = template != null ? DataModel.Summary(template.value) + "\n고치려면 DB › 인스턴스에서 고칩니다." : $"{DataModel.FriendlyName(type)} 인스턴스 중 하나를 고릅니다.";
             return pill;
         }
 
@@ -411,7 +411,7 @@ namespace GBible.EditorTools.UI
                                 var pick = d.Id;
                                 return new GsDropdownItem(pick, () => Set(property, pick, onStructure)) { Group = db.GroupLabel(d), Selected = pick == current };
                             }).ToList();
-                        if (items.Count == 0) items.Add(new GsDropdownItem($"도감 › {kind} 탭에 아직 항목이 없습니다") { Disabled = true });
+                        if (items.Count == 0) items.Add(new GsDropdownItem($"DB › {kind} 탭에 아직 항목이 없습니다") { Disabled = true });
                         GsDropdown.Show(anchor, items, placeholder: $"{kind} 검색");
                     });
             }

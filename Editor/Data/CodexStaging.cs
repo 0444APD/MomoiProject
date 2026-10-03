@@ -24,11 +24,11 @@ namespace GBible.EditorTools
         public List<FieldChange> Fields = new List<FieldChange>();
     }
 
-    // 도감의 변경을 Unity 에셋에 바로 쓰지 않고 모아 두는 곳. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
+    // DB의 변경을 Unity 에셋에 바로 쓰지 않고 모아 두는 곳. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
     //  · 수정: 원본의 작업본(메모리 사본)을 고친다. 적용하면 원본에 복사하고, ID가 바뀌었으면 ID 바꾸기(참조 갱신)를 한다.
     //  · 추가: 메모리에만 있는 새 항목. 적용하면 에셋으로 만든다.
     //  · 삭제: 목록에서만 뺀다. 적용하면 휴지통으로.
-    // EditorDatabase.All은 이 변경을 덮어씌운 모습을 돌려주므로, 도감의 모든 화면(목록·드롭다운·검증)이 적용 전 상태를 그대로 본다.
+    // EditorDatabase.All은 이 변경을 덮어씌운 모습을 돌려주므로, DB의 모든 화면(목록·드롭다운·검증)이 적용 전 상태를 그대로 본다.
     // 생성 코드(GameIds)·런타임 목록 동기화는 EditorDatabase.Committed(실제 에셋)만 본다.
     [InitializeOnLoad]
     public sealed class CodexStaging
@@ -82,7 +82,7 @@ namespace GBible.EditorTools
 
         public GameData Add(Type type, string id)
         {
-            var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 도감 종류가 아닙니다.");
+            var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 DB 종류가 아닙니다.");
             if (!EditorDatabase.Instance.CanUseId(id, null, out var error)) throw new ArgumentException("[MomoiProject] " + error);
             var data = (GameData)ScriptableObject.CreateInstance(type);
             data.EditorAssignId(id);
@@ -149,7 +149,7 @@ namespace GBible.EditorTools
             var orderAfter = new SerializedObject(copy).FindProperty("order");
             if (orderBefore != null && orderAfter != null && orderBefore.intValue != orderAfter.intValue)
                 fields.Add(new FieldChange { Path = "order", Label = "순서", Old = orderBefore.intValue.ToString(), New = orderAfter.intValue.ToString() });
-            // 도감 목록의 폴더·상위 그룹(숨은 칸이라 위의 비교에 들지 않는다).
+            // DB 목록의 폴더·상위 그룹(숨은 칸이라 위의 비교에 들지 않는다).
             if (original.Folder != copy.Folder)
                 fields.Add(new FieldChange { Path = "folder", Label = "폴더", Old = Place(original.Folder), New = Place(copy.Folder) });
             if (original is INestedData nestedBefore && copy is INestedData nestedAfter && (nestedBefore.Parent ?? "") != (nestedAfter.Parent ?? ""))
@@ -192,7 +192,7 @@ namespace GBible.EditorTools
                 var oldId = original.Id;
                 var name = original.name;
                 var flags = original.hideFlags;
-                Undo.RecordObject(original, "도감 변경 적용");
+                Undo.RecordObject(original, "DB 변경 적용");
                 EditorUtility.CopySerialized(copy, original);
                 original.name = name;
                 original.hideFlags = flags;
@@ -332,15 +332,15 @@ namespace GBible.EditorTools
             Cancel,
         }
 
-        // 창 밖(플레이·종료·창 닫기)에서 묻는 간단한 확인 창. 도감 창 안에서는 변경 목록 확인 창를 쓴다.
+        // 창 밖(플레이·종료·창 닫기)에서 묻는 간단한 확인 창. DB 창 안에서는 변경 목록 확인 창를 쓴다.
         public static AskResult AskBeforeLeaving(string when)
         {
             if (!CodexChanges.HasChanges) return AskResult.Nothing;
-            // 도감 항목·필드 연결·클래스 코드·클래스 그룹을 함께 묻는다.
+            // DB 항목·필드 연결·클래스 코드·클래스 그룹을 함께 묻는다.
             var all = CodexChanges.Rows().Select(c => string.IsNullOrEmpty(c.New) ? $"· {c.Label}" : $"· {c.Label}  {c.New}").ToList();
             var lines = string.Join("\n", all.Take(12)) + (all.Count > 12 ? $"\n… 외 {all.Count - 12}건" : "");
-            var choice = EditorUtility.DisplayDialogComplex("도감에 저장 안 된 변경",
-                $"{when} 도감의 변경 {all.Count}건을 저장할지 정하세요.\n\n{lines}", "저장", "취소", "되돌리기");
+            var choice = EditorUtility.DisplayDialogComplex("DB에 저장 안 된 변경",
+                $"{when} DB의 변경 {all.Count}건을 저장할지 정하세요.\n\n{lines}", "저장", "취소", "되돌리기");
             switch (choice)
             {
                 case 0:

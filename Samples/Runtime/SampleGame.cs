@@ -88,7 +88,7 @@ namespace GBible.Samples
     }
 
     // 샘플 연결: 세션이 시작되면 행동 처리기와 디버그 명령을 등록한다.
-    // 샘플 키워드 그룹(코드가 원본, 도감 › 키워드 탭에 보인다).
+    // 샘플 키워드 그룹(코드가 원본, DB › 키워드 탭에 보인다).
     [KeywordGroup("장비 부위")]
     public static class SampleEquipmentSlot
     {
@@ -132,7 +132,7 @@ namespace GBible.Samples
     {
         // 게임 중 바뀌는 값은 반드시 플레이어 데이터 저장소에 둔다(static 변수에 두면 Undo·되감기에서 빠진다).
         const string ComboKey = "sample:combo";
-        // 도감의 플레이어 데이터(샘플 데이터 만들기로 생성). 없으면 장비 명령은 안내만 한다.
+        // DB의 플레이어 데이터(샘플 데이터 만들기로 생성). 없으면 장비 명령은 안내만 한다.
         const string InventoryKey = "player.inventory";
         // 지갑 골드(쓰고 줄어드는 자원 → 플레이어 데이터). 번 골드 총합은 로그(goldEarned)가 이벤트로 센다.
         const string GoldKey = "player.gold";
@@ -158,7 +158,7 @@ namespace GBible.Samples
             });
             session.Debug.Register("샘플", "상자 열기", () => session.Do(new OpenChestAction()), "드롭 난수 스트림으로 골드를 얻습니다.");
             session.Debug.Register("샘플", "드래곤(보스) 공격", () => session.Do(new AttackAction { target = "드래곤" }), "보스 태그가 붙은 처치 이벤트 → 보스 처치 수·용 사냥꾼");
-            session.Debug.Register("샘플", "장비 획득(인스턴스)", () => Guarded(session, new LootAction()), "도감의 장비 인스턴스 중 하나의 사본을 인벤토리에 넣습니다.");
+            session.Debug.Register("샘플", "장비 획득(인스턴스)", () => Guarded(session, new LootAction()), "DB의 장비 인스턴스 중 하나의 사본을 인벤토리에 넣습니다.");
             session.Debug.Register("샘플", "첫 장비 강화", () => Guarded(session, new EnhanceAction()), "첫 장비에 강화 효과를 하나 붙입니다(강화 장인 조건).");
             session.Debug.Register("샘플", "Undo", () => session.Undo(), "마지막 행동을 되돌립니다(몇 번이든 뒤에서부터).");
         }
@@ -188,7 +188,7 @@ namespace GBible.Samples
             session.Do(action);
         }
 
-        // 도감의 장비 인스턴스 중 하나(드롭 난수)의 사본을 넣는다.
+        // DB의 장비 인스턴스 중 하나(드롭 난수)의 사본을 넣는다.
         static void Loot(GameSession session)
         {
             var templates = GameDatabase.Load()?.All<InstanceData>().Where(t => t.value is SampleEquipment).ToList();

@@ -9,7 +9,7 @@ namespace GBible
     // 언어별 텍스트 표(키 → 문장 틀)와 현재 언어. 틀을 찾아 TextFormat으로 채워 최종 글자를 만든다.
     //
     //  · 찾는 순서: 현재 언어 → Fallbacks에 등록한 언어들 → 기본 언어(pt-BR → pt) → 원문 언어(SourceLanguage).
-    //  · 값이 도감 ID 글자면('dragonArmor') 그 언어의 'dragonArmor.name' 텍스트로 바꿔 넣는다.
+    //  · 값이 DB ID 글자면('dragonArmor') 그 언어의 'dragonArmor.name' 텍스트로 바꿔 넣는다.
     //  · [[id]] 용어는 'id.name' 텍스트를 용어에 넘긴 값(count 등)으로 채운 뒤 DecorateTerm으로 꾸민다.
     //  · 키가 어디에도 없으면 '[키]'를 돌려주고 Missing을 알린다.
     //
@@ -182,7 +182,7 @@ namespace GBible
         public string FormatTemplate(string template, IReadOnlyDictionary<string, object> args = null) =>
             Run(TextFormat.Parse(template), _language, args);
 
-        // 도감 ID의 현재 언어 이름('id.name'). 없으면 null.
+        // DB ID의 현재 언어 이름('id.name'). 없으면 null.
         public string NameOf(string id, IReadOnlyDictionary<string, object> args = null)
         {
             if (string.IsNullOrEmpty(id)) return null;

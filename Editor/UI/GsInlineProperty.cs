@@ -88,7 +88,7 @@ namespace GBible.EditorTools.UI
         bool IsAchievementRef => _field != null && _field.IsDefined(typeof(AchievementRefAttribute), false);
         bool IsEventTypeRef => _field != null && _field.IsDefined(typeof(EventTypeRefAttribute), false);
         EventFieldRefAttribute EventFieldRef => _field?.GetCustomAttribute<EventFieldRefAttribute>();
-        // [DataRef] 또는 도감의 필드 규칙으로 정해진 참조 종류.
+        // [DataRef] 또는 DB의 필드 규칙으로 정해진 참조 종류.
         Type DataRefType => EditorDatabase.RefTypeOf(_field);
         bool IsDataTypeRef => _field != null && _field.IsDefined(typeof(DataTypeRefAttribute), false);
         bool Has<T>() where T : Attribute => _field != null && _field.IsDefined(typeof(T), false);
@@ -208,7 +208,7 @@ namespace GBible.EditorTools.UI
                 }
                 if (field != null && field.IsDefined(typeof(GameDataTypeRefAttribute), false))
                 {
-                    if (string.IsNullOrEmpty(id)) return ("도감 종류 선택", true, false);
+                    if (string.IsNullOrEmpty(id)) return ("DB 종류 선택", true, false);
                     var dataType = TypeResolver.Find(id);
                     return dataType != null ? (DataTypes.Find(dataType)?.DisplayName ?? dataType.Name, false, false) : ($"없는 종류: {id}", false, true);
                 }
@@ -366,7 +366,7 @@ namespace GBible.EditorTools.UI
                     ShowTypeList(ClassTypes.All(), ClassTypes.Label, ClassTypes.GroupOf, "클래스 검색");
                     return;
                 case SerializedPropertyType.String when Has<GameDataTypeRefAttribute>():
-                    ShowTypeList(DataTypes.All.Select(i => i.Type), t => DataTypes.Find(t)?.DisplayName ?? t.Name, t => DataTypes.Find(t)?.Group, "도감 종류 검색");
+                    ShowTypeList(DataTypes.All.Select(i => i.Type), t => DataTypes.Find(t)?.DisplayName ?? t.Name, t => DataTypes.Find(t)?.Group, "DB 종류 검색");
                     return;
                 case SerializedPropertyType.String when Has<MemberRefAttribute>():
                     ShowMemberMenu();
@@ -413,7 +413,7 @@ namespace GBible.EditorTools.UI
                 var id = d.Id;
                 return new GsDropdownItem(id, () => SetString(id)) { Group = db.GroupLabel(d), Selected = _property.stringValue == id };
             }).ToList();
-            if (items.Count == 0) items.Add(new GsDropdownItem($"도감 › {kind} 탭에 아직 항목이 없습니다 — 먼저 만드세요") { Disabled = true });
+            if (items.Count == 0) items.Add(new GsDropdownItem($"DB › {kind} 탭에 아직 항목이 없습니다 — 먼저 만드세요") { Disabled = true });
             OpenMenu(items, placeholder: $"{kind} 검색");
         }
 

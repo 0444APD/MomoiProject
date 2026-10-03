@@ -9,11 +9,11 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools
 {
-    // 상세 창: 도감 항목의 상세 속성을 따로 띄우는 창(도킹 가능). 위쪽에 탭이 쌓인다(크롬처럼).
-    //  · 도감에서 항목을 열면 항목 탭. 이미 열린 항목이면 그 탭으로 간다.
+    // 상세 창: DB 항목의 상세 속성을 따로 띄우는 창(도킹 가능). 위쪽에 탭이 쌓인다(크롬처럼).
+    //  · DB에서 항목을 열면 항목 탭. 이미 열린 항목이면 그 탭으로 간다.
     //  · 항목 안의 클래스·배열·리스트를 누르면 그 값의 탭이 바로 오른쪽에 열린다(안쪽으로 계속 들어갈 수 있다).
     //  · 탭을 닫으면 그 안쪽 탭도 함께 닫힌다.
-    // 값은 바로 반영되고(도감의 적용 대기 목록), Unity 적용은 저장(Ctrl+S)할 때 한다.
+    // 값은 바로 반영되고(DB의 적용 대기 목록), Unity 적용은 저장(Ctrl+S)할 때 한다.
     public sealed class DetailWindow : EditorWindow
     {
         sealed class Tab
@@ -29,7 +29,7 @@ namespace GBible.EditorTools
             public Func<GameData, DetailOptions> Options;
             // 안쪽 탭: 같은 값이면 새로 열지 않고 그 탭으로 간다.
             public object Value;
-            // 직접 그리는 탭(클래스 상세 등): 같은 키면 그 탭으로 가고, 도감이 바뀌면 다시 그린다.
+            // 직접 그리는 탭(클래스 상세 등): 같은 키면 그 탭으로 가고, DB가 바뀌면 다시 그린다.
             public string CustomKey;
             public Func<VisualElement, VisualElement> Build;
         }
@@ -49,7 +49,7 @@ namespace GBible.EditorTools
             return window;
         }
 
-        // 도감 항목을 연다. options: 작업본을 받아 패널 설정을 만든다(적용 뒤 다시 열 때도 쓴다).
+        // DB 항목을 연다. options: 작업본을 받아 패널 설정을 만든다(적용 뒤 다시 열 때도 쓴다).
         public static void OpenItem(GameData item, Func<GameData, DetailOptions> options)
         {
             var window = Get();
@@ -65,7 +65,7 @@ namespace GBible.EditorTools
             window.Activate(tab);
         }
 
-        // 직접 그리는 탭을 연다(도감 항목이 아닌 것: 클래스 상세 등). build는 창의 뿌리(확인 창을 띄울 곳)를 받아 내용을 만든다.
+        // 직접 그리는 탭을 연다(DB 항목이 아닌 것: 클래스 상세 등). build는 창의 뿌리(확인 창을 띄울 곳)를 받아 내용을 만든다.
         // 같은 키의 탭이 있으면 다시 그려서 그 탭으로 간다.
         public static void OpenCustom(string key, string title, string caption, Func<VisualElement, VisualElement> build)
         {
@@ -118,7 +118,7 @@ namespace GBible.EditorTools
             host.Clear();
             _root = Gs.Col();
             Gs.Apply(_root);
-            // Ctrl+S: 도감에 모아 둔 변경을 저장한다.
+            // Ctrl+S: DB에 모아 둔 변경을 저장한다.
             _root.RegisterCallback<KeyDownEvent>(e =>
             {
                 if (e.keyCode != KeyCode.S || !e.actionKey || e.shiftKey || e.altKey) return;
@@ -221,7 +221,7 @@ namespace GBible.EditorTools
                 var empty = Gs.Box("gs-empty");
                 empty.Add(Gs.Label("열린 항목이 없습니다", "gs-title"));
                 empty.Add(Gs.Space(8));
-                empty.Add(Gs.Label("도감에서 항목을 누르면 여기에 탭으로 열립니다.", "gs-caption"));
+                empty.Add(Gs.Label("DB에서 항목을 누르면 여기에 탭으로 열립니다.", "gs-caption"));
                 _body.Add(empty);
                 return;
             }
@@ -291,7 +291,7 @@ namespace GBible.EditorTools
         }
 
         // ── 적용·되돌리기 뒤 다시 잇기 ─────────────────────────
-        // 도감이 변경을 적용하거나 되돌리면 작업본이 사라진다. 같은 ID의 항목으로 탭을 다시 연다(없어졌으면 닫는다).
+        // DB가 변경을 적용하거나 되돌리면 작업본이 사라진다. 같은 ID의 항목으로 탭을 다시 연다(없어졌으면 닫는다).
 
         void QueueRebind()
         {
@@ -301,7 +301,7 @@ namespace GBible.EditorTools
 
             void Run()
             {
-                // 에셋을 가져오는 중에는 끝날 때까지 미룬다(도감 창과 같은 규칙).
+                // 에셋을 가져오는 중에는 끝날 때까지 미룬다(DB 창과 같은 규칙).
                 if (EditorApplication.isUpdating)
                 {
                     _root.schedule.Execute(Run).StartingIn(100);

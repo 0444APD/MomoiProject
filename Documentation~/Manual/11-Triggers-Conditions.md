@@ -56,7 +56,7 @@
 
 ## 2. 에디터에서 쓰는 법
 
-도감 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 코드의 변수 이름이고 `[FieldLabel]` 글자 "트리거"는 마우스를 올리면 보인다)는 **한 줄 식 편집기**로 그려진다.
+DB 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 코드의 변수 이름이고 `[FieldLabel]` 글자 "트리거"는 마우스를 올리면 보인다)는 **한 줄 식 편집기**로 그려진다.
 
 ### 2-1. 블럭 더하기
 
@@ -92,7 +92,7 @@
 | 도전과제 달성 | 도전과제 | `AchievementUnlockedCondition` | `{achievement} 달성` | 다른 도전과제를 달성했는지 |
 | (프로젝트 조건) | `[BlockInfo]`의 분류 | `SimpleCondition` 상속 | `[BlockInfo]`의 문장 | 코드로 쓴 조건(4장) |
 
-도전과제·능력은 도감 상세 위쪽 요약에 "트리거 …" 한 줄이 자연어로 보인다(로그는 "반영 …" 줄). **Alt**를 누르고 있으면 코드 형태(`on 유닛 처치 where combo >= 10 && …`)로 바뀐다. 문제가 있으면 검증 오류가 빨간 글씨로 뜨고, 오류가 있으면 빌드가 막힌다.
+도전과제·능력은 DB 상세 위쪽 요약에 "트리거 …" 한 줄이 자연어로 보인다(로그는 "반영 …" 줄). **Alt**를 누르고 있으면 코드 형태(`on 유닛 처치 where combo >= 10 && …`)로 바뀐다. 문제가 있으면 검증 오류가 빨간 글씨로 뜨고, 오류가 있으면 빌드가 막힌다.
 
 ---
 
@@ -204,7 +204,7 @@ public class AllEnemiesDown : SimpleCondition
 
 문법 요소를 차례로:
 
-1. **`[Serializable]`** — 필수. Block은 도감 에셋에 저장된다.
+1. **`[Serializable]`** — 필수. Block은 DB 에셋에 저장된다.
 2. **`[BlockInfo("표시 이름")]`** — 필수. `+ 블럭` 목록에 이 이름으로 나온다.
    - `Category`: 목록의 분류(트리거 칸에서는 "조건 충족 · 분류"로 묶인다).
    - `Description`: 목록·툴팁 설명.
@@ -287,7 +287,7 @@ public class PlayedSeconds : Condition
 | `bool TryGetProgress(…)` | 아니오 | 진행도(예: 37 / 100) |
 | `void Validate(IValidationContext)` | 아니오 | 에디터 검증(`context.Error`·`context.Warning`) |
 
-보는 값도 없고(`CollectDependencies`가 비고) `PollInterval`도 0이면 영원히 다시 평가되지 않는다. 도감 검증이 "조건이 아무 값도 관찰하지 않아 발동할 수 없습니다(블록 계약 위반)." 오류를 띄운다.
+보는 값도 없고(`CollectDependencies`가 비고) `PollInterval`도 0이면 영원히 다시 평가되지 않는다. DB 검증이 "조건이 아무 값도 관찰하지 않아 발동할 수 없습니다(블록 계약 위반)." 오류를 띄운다.
 
 ### 4-4. 자동 다시 평가(`ConditionWatcher`)
 
@@ -306,7 +306,7 @@ Unity 밖(서버·테스트)에서 세션을 직접 돌리면 매 프레임 Flus
 
 ## 5. 칸 표시 어트리뷰트 `[TriggerSlot]` · `[OutcomeSlot]`
 
-Trigger·Outcome 칸이 있는 클래스(도감 항목, 인스턴스 기능)는 필드에 표시를 붙여 고를 수 있는 범위를 잠근다.
+Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필드에 표시를 붙여 고를 수 있는 범위를 잠근다.
 
 ```csharp
 [SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition)] public Trigger trigger;
@@ -323,7 +323,7 @@ Trigger·Outcome 칸이 있는 클래스(도감 항목, 인스턴스 기능)는 
 - `Trigger` 필드, `List<Outcome>` 필드에 직접 붙이거나, `List<TriggerRule>` 필드에 붙이면 규칙마다의 `when`·`then`에 적용된다.
 - `Trigger`·`Outcome`을 담는 필드에는 `[SerializeReference]`가 필요하다(`TriggerRule`의 `when`·`then`은 이미 붙어 있다).
 - 표시가 없는 칸은 전부 허락한다.
-- 검증(도감 저장·빌드 때): 잠금 밖의 종류 "이 칸에서는 '…' 트리거를 쓸 수 없습니다", 고정 칸의 개수, 값을 관찰하지 않는 조건, 플레이어 데이터 검사·주기의 경로를 모든 기능에서 같은 규칙으로 본다.
+- 검증(DB 저장·빌드 때): 잠금 밖의 종류 "이 칸에서는 '…' 트리거를 쓸 수 없습니다", 고정 칸의 개수, 값을 관찰하지 않는 조건, 플레이어 데이터 검사·주기의 경로를 모든 기능에서 같은 규칙으로 본다.
 
 ---
 
@@ -494,4 +494,4 @@ session.Triggers.Register("shopHint",
 - **이벤트 형식이 아니라 상위 형식을 고른다.** 이벤트 받기는 형식이 정확히 같아야 한다.
 - **Unity 밖에서 Flush를 잊는다.** 서버·테스트에서 `Data.Set`으로 값을 바꾼 뒤 `session.Triggers.Flush()`를 부르지 않으면 조건 충족 잎이 발동하지 않는다.
 - **`NOT`으로 이벤트를 거른다.** "보스가 아닌 처치"는 `NOT(이벤트 받기)`가 아니라 이벤트 받기의 조건 칸에 `IsBoss 거짓`(또는 `tags` 미포함 `boss`)으로 쓴다.
-- **필드 경로가 깨진다.** 이벤트·플레이어 데이터 클래스의 필드 이름을 바꾸면 경로 글자는 따라가지 않는다. 도감 검증 오류("'…'에 '…' 필드가 없습니다.")가 뜬 칸을 다시 고른다.
+- **필드 경로가 깨진다.** 이벤트·플레이어 데이터 클래스의 필드 이름을 바꾸면 경로 글자는 따라가지 않는다. DB 검증 오류("'…'에 '…' 필드가 없습니다.")가 뜬 칸을 다시 고른다.

@@ -201,14 +201,14 @@ namespace GBible.EditorTools
             }
         }
 
-        [MenuItem(Menu + "도감 이름 키 채우기", priority = 44)]
+        [MenuItem(Menu + "DB 이름 키 채우기", priority = 44)]
         static void FillNamesMenu()
         {
             var added = FillCodexNames(EnsureSettings());
             Debug.Log(added == 0 ? "[다국어] 새로 채울 이름 키가 없습니다." : $"[다국어] 원문 표에 이름 키 {added}개를 더했습니다(값은 ID, 원문 표에서 이름으로 바꿔 주세요).");
         }
 
-        // 도감 항목마다 '<id>.name' 키가 원문 표에 있게 한다(없으면 ID를 값으로 더한다).
+        // DB 항목마다 '<id>.name' 키가 원문 표에 있게 한다(없으면 ID를 값으로 더한다).
         public static int FillCodexNames(LocalizationSettings settings)
         {
             FillTables(settings);
@@ -221,7 +221,7 @@ namespace GBible.EditorTools
                 .Distinct()
                 .ToList();
             if (add.Count == 0) return 0;
-            Undo.RecordObject(table, "도감 이름 키 채우기");
+            Undo.RecordObject(table, "DB 이름 키 채우기");
             foreach (var id in add) table.entries.Add(new TextTable.Entry { key = id + ".name", text = id });
             Save(table);
             GameLanguage.Reload();

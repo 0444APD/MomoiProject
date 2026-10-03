@@ -46,7 +46,7 @@ namespace GBible.EditorTools.UI
             GsTooltip.Attach(root);
             if (!root.ClassListContains("gs-dual-host"))
             {
-                // Alt를 누르고 있는 동안 두 가지 표현이 있는 글자(도감 요약·로그)를 코드 형태로 바꿔 보여 준다.
+                // Alt를 누르고 있는 동안 두 가지 표현이 있는 글자(DB 요약·로그)를 코드 형태로 바꿔 보여 준다.
                 root.AddToClassList("gs-dual-host");
                 root.RegisterCallback<KeyDownEvent>(e => SetShowCode(root, e.altKey), TrickleDown.TrickleDown);
                 root.RegisterCallback<KeyUpEvent>(e => SetShowCode(root, e.altKey), TrickleDown.TrickleDown);

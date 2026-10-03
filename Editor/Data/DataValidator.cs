@@ -305,7 +305,7 @@ namespace GBible.EditorTools
             var errors = DataValidator.ValidateAll().Where(i => i.Severity == ValidationSeverity.Error).ToList();
             if (errors.Count == 0) return;
             var lines = errors.Take(20).Select(e => $"- {(e.Asset != null ? e.Asset.DisplayName : "?")}: {e.Message}");
-            throw new BuildFailedException($"[MomoiProject] 데이터 검증 오류 {errors.Count}건으로 빌드를 중단합니다. 데이터베이스 창에서 확인하세요.\n" + string.Join("\n", lines));
+            throw new BuildFailedException($"[MomoiProject] 데이터 검증 오류 {errors.Count}건으로 빌드를 중단합니다. DB 창에서 확인하세요.\n" + string.Join("\n", lines));
         }
     }
 }

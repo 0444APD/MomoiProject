@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.Tests
 {
-    // 도감: 인스턴스·프리팹 항목.
+    // DB: 인스턴스·프리팹 항목.
     public class CodexTests
     {
         [Test]

@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace GBible.Tests
 {
-    // 도감의 변경 모아 두기: 적용 전에는 에셋이 그대로이고, 도감이 보는 모습(All)에만 나타난다.
+    // DB의 변경 모아 두기: 적용 전에는 에셋이 그대로이고, DB가 보는 모습(All)에만 나타난다.
     public class CodexStagingTests
     {
         static CodexStaging Staging => EditorDatabase.Staging;
@@ -15,7 +15,7 @@ namespace GBible.Tests
         public void TearDown() => Staging.Discard();
 
         [Test]
-        public void 새_항목은_적용_전에는_도감에만_보인다()
+        public void 새_항목은_적용_전에는_DB에만_보인다()
         {
             var added = Staging.Add(typeof(SpritePresetGroupData), "testStagedGroup");
             Assert.IsTrue(EditorDatabase.Instance.All.Contains(added));

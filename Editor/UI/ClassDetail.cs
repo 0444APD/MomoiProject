@@ -12,10 +12,10 @@ namespace GBible.EditorTools.UI
     // 클래스 상세(상세 창의 탭): 코드로 정의한 클래스의 결과를 확인한다(읽기 전용, 클래스는 코드에서 고친다).
     //  · 필드마다 이름·형식·연결된 키워드 그룹. 형식이 다른 클래스면 그 클래스로 바로 이동.
     //  · 스크립트(cs) 열기·프로젝트 창에서 보기.
-    //  · 코드가 아닌 에디터 설정(스프라이트 규격 그룹, 필수 여부)은 여기서 정하고 도감 저장(Ctrl+S) 때 쓴다.
+    //  · 코드가 아닌 에디터 설정(스프라이트 규격 그룹, 필수 여부)은 여기서 정하고 DB 저장(Ctrl+S) 때 쓴다.
     public static class ClassDetail
     {
-        // 도감·키워드 탭·값 칸 어디서든: 클래스 상세를 열고 focusField가 있으면 그 필드를 강조한다.
+        // DB·키워드 탭·값 칸 어디서든: 클래스 상세를 열고 focusField가 있으면 그 필드를 강조한다.
         public static void Open(string fullName, string focusField = null)
         {
             var entry = ClassCatalog.Find(fullName);
@@ -83,7 +83,7 @@ namespace GBible.EditorTools.UI
                 tools.Add(ping);
             }
             if (entry.Kind == ClassKind.Codex && entry.Type != null)
-                tools.Add(new GsButton("도감 탭 열기", () => DatabaseWindow.ShowType(entry.Type), GsButtonKind.Ghost));
+                tools.Add(new GsButton("DB 탭 열기", () => DatabaseWindow.ShowType(entry.Type), GsButtonKind.Ghost));
             root.Add(tools);
 
             // ── 필드 ──
@@ -161,7 +161,7 @@ namespace GBible.EditorTools.UI
             {
                 var hidden = new Toggle("인스턴스에서 숨김  [Hide]") { value = InstanceFields.IsHidden(info) };
                 hidden.style.marginTop = 6;
-                hidden.tooltip = "도감 › 인스턴스에서 이 필드를 보이지 않습니다(값은 그대로 저장·복사). 저장(Ctrl+S)할 때 코드에 [Hide]를 붙이거나 뗍니다.";
+                hidden.tooltip = "DB › 인스턴스에서 이 필드를 보이지 않습니다(값은 그대로 저장·복사). 저장(Ctrl+S)할 때 코드에 [Hide]를 붙이거나 뗍니다.";
                 hidden.RegisterValueChangedCallback(e => ClassStaging.SetFieldAttribute(entry.FullName, info.Name, InstanceFields.Hide, e.newValue));
                 row.Add(hidden);
                 var showIf = info.GetCustomAttribute<ShowIfAttribute>(true);
@@ -176,7 +176,7 @@ namespace GBible.EditorTools.UI
                 var group = KeywordTools.GroupOf(info);
                 var rule = KeywordTools.RuleOf(declaring, info);
                 string text;
-                if (group == null) text = rule == null || rule.source == FieldRuleSource.Free || rule.source == FieldRuleSource.Keyword ? "연결 없음(자유 입력)" : rule.source == FieldRuleSource.Data ? "도감 항목에서 고름" : "플레이어 데이터에서 고름";
+                if (group == null) text = rule == null || rule.source == FieldRuleSource.Free || rule.source == FieldRuleSource.Keyword ? "연결 없음(자유 입력)" : rule.source == FieldRuleSource.Data ? "DB 항목에서 고름" : "플레이어 데이터에서 고름";
                 else text = KeywordTools.FindGroup(group)?.DisplayName ?? group;
                 var many = KeywordTools.IsMulti(info) ? "여러 개 고름" : "하나 고름";
                 row.Add(LinkRow("키워드 그룹", text, many, group != null, anchor => PickKeywordGroup(host, anchor, declaring, info, group)));
@@ -200,7 +200,7 @@ namespace GBible.EditorTools.UI
             if (declaring != typeof(GameData))
             {
                 var required = EditorDatabase.IsRequired(info);
-                var toggle = new Toggle("필수 (비어 있으면 도감 검증 오류)") { value = required };
+                var toggle = new Toggle("필수 (비어 있으면 DB 검증 오류)") { value = required };
                 toggle.style.marginTop = 6;
                 toggle.RegisterValueChangedCallback(e => KeywordTools.SetRequired(declaring, info, e.newValue));
                 row.Add(toggle);
@@ -277,7 +277,7 @@ namespace GBible.EditorTools.UI
                     Selected = current == id,
                 });
             }
-            if (items.Count == 1) items.Add(new GsDropdownItem("도감 › 스프라이트 규격에서 그룹을 먼저 만드세요") { Disabled = true });
+            if (items.Count == 1) items.Add(new GsDropdownItem("DB › 스프라이트 규격에서 그룹을 먼저 만드세요") { Disabled = true });
             GsDropdown.Show(anchor, items, placeholder: "폴더 검색");
         }
 

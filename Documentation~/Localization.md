@@ -11,11 +11,11 @@ GameLanguage.Set("en");                                             // 바꾸고
 
 ## 구성
 
-`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/MomoiProject), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject → 다국어`(설정 열기, 시트 내보내기·가져오기, 번역 검사, 도감 이름 키 채우기)다.
+`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/MomoiProject), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject → 다국어`(설정 열기, 시트 내보내기·가져오기, 번역 검사, DB 이름 키 채우기)다.
 
 ## 문장 틀 문법
 
-값은 `{name}`으로 넣는다. 숫자는 언어에 맞는 천 단위 표기(ko·en `1,234,567.5`, de `1.234.567,5`)로, 도감 ID 글자(`template.dragonArmor`)는 그 언어의 `template.dragonArmor.name` 텍스트로 바뀐다. 이름 텍스트에도 같은 값이 넘어가므로 영어 이름이 `{count, plural, …}`로 단수·복수를 가를 수 있다. `new TextKey("ui.gold")`를 값으로 넘기면 그 키의 현재 언어 글자가 들어간다. 값이 빠지면 틀 조각(`{name}`)이 그대로 보인다.
+값은 `{name}`으로 넣는다. 숫자는 언어에 맞는 천 단위 표기(ko·en `1,234,567.5`, de `1.234.567,5`)로, DB ID 글자(`template.dragonArmor`)는 그 언어의 `template.dragonArmor.name` 텍스트로 바뀐다. 이름 텍스트에도 같은 값이 넘어가므로 영어 이름이 `{count, plural, …}`로 단수·복수를 가를 수 있다. `new TextKey("ui.gold")`를 값으로 넘기면 그 키의 현재 언어 글자가 들어간다. 값이 빠지면 틀 조각(`{name}`)이 그대로 보인다.
 
 서식은 `{n, number}`, `{n, number, integer}`(반올림), `{n, number, percent}`(0.5 → 50%), `{n, number, 0.0}`(.NET 서식), `{d, date}`·`{d, date, long}`, `{t, time}`·`{t, time, long}`이다.
 

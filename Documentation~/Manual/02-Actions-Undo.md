@@ -286,7 +286,7 @@ public static class UndoSetup
 - `Undo()` 한 번 = 스냅샷 한 칸 되감기. 찍은 뒤로 아무 일도 없었으면 한 칸 더 뒤로 간다.
 - 되감으면 세션·메타 구역의 값, 난수, **게임 시계(시간·틱)**가 함께 돌아간다. 되감은 구간의 행동은 "Undo됨"으로 표시되고, 그 구간에 달성한 도전과제·보상은 다시 적용되어 유지된다.
 - 스냅샷 방식에서는 행동별 Undo 이력을 남기지 않는다.
-- 스냅샷은 저장 파일과 같은 모습(저장 트리)으로 찍되 메모리 안에만 둔다. 그래서 도감 항목이 아닌 에셋 참조(스프라이트 등)도 되감은 뒤 그대로다.
+- 스냅샷은 저장 파일과 같은 모습(저장 트리)으로 찍되 메모리 안에만 둔다. 그래서 DB 항목이 아닌 에셋 참조(스프라이트 등)도 되감은 뒤 그대로다.
 
 ### 2.12 행동 밖 변경과 Undo 경고
 
@@ -664,12 +664,12 @@ public class EnterBossRoom : SimpleAction
         var data = Game.Session.Data;
         data.Set("dungeon.floor", 10.0);                     // Undo 대상
         using (data.Permanent())
-            data.Set("codex.bossSeen", true);                 // 한 번 본 보스 도감은 되돌리지 않는다
+            data.Set("codex.bossSeen", true);                 // 한 번 본 보스 DB는 되돌리지 않는다
     }
 }
 ```
 
-두 키 모두 정의되어 있어야 한다(도감 또는 `Define`).
+두 키 모두 정의되어 있어야 한다(DB 또는 `Define`).
 
 ---
 

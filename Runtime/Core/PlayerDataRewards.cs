@@ -135,7 +135,7 @@ namespace GBible
     // 보상: 플레이어 데이터 필드 하나에 준다. 필드 형식에 따라
     //   숫자 → amount만큼 증감 / 글자·참거짓·enum → value로 정하기 / 클래스 → value(인스턴스 ID)의 사본으로 정하기 /
     //   컬렉션 → items의 요소마다(숫자·값·인스턴스 ID) 넣기 / 딕셔너리 → keys[i]에 items[i](숫자면 증감, 아니면 값·인스턴스로 덮어쓰기).
-    // 인스턴스는 도감 › 인스턴스에서 만든 인스턴스만 고른다(보상 안에서 새로 만들거나 고치지 않는다). 런타임은 session.Instances로 찾는다.
+    // 인스턴스는 DB › 인스턴스에서 만든 인스턴스만 고른다(보상 안에서 새로 만들거나 고치지 않는다). 런타임은 session.Instances로 찾는다.
     [Serializable]
     [BlockInfo("플레이어 데이터에 주기", Category = "플레이어 데이터",
         Description = "플레이어 데이터 필드 하나에 줍니다. 숫자는 증감, 글자·enum은 값, 클래스는 인스턴스, 리스트는 요소(숫자·값·인스턴스)를 넣습니다.")]
@@ -363,7 +363,7 @@ namespace GBible
             if (string.IsNullOrEmpty(key)) context.Error("보상을 줄 플레이어 데이터가 선택되지 않았습니다.");
         }
 
-        // 플레이어 데이터의 값 형식을 알 때의 검사(도감 검증기가 부른다). 인스턴스가 있는지는 도감 검증기가 따로 본다.
+        // 플레이어 데이터의 값 형식을 알 때의 검사(DB 검증기가 부른다). 인스턴스가 있는지는 DB 검증기가 따로 본다.
         public void Validate(Type root, List<string> errors)
         {
             if (root == null) return;

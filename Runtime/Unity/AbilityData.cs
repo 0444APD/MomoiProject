@@ -7,14 +7,14 @@ namespace GBible.Data
     // 능력: 스킬·버프 발동처럼 "쓰는 순간" 발동하는 것. 트리거 = 사용(+ 원하면 AND로 사용 조건), 결과 = 대상에게 효과·플레이어 데이터에 주기·코딩한 결과.
     // 다른 기능(로그·도전과제·아이템 …)과 같은 트리거·결과 편집 화면을 쓰고, 잠금만 다르다.
     // 게임에서는 Game.Use("능력 ID", 사용자, 고른 대상들).
-    [Database("능력", Group = "도감", Order = 30, IdPrefix = "ability")]
+    [Database("능력", Group = "DB", Order = 30, IdPrefix = "ability")]
     [CreateAssetMenu(menuName = "MomoiProject/능력", fileName = "NewAbility")]
     public sealed class AbilityData : GameData, ILegacyData, IUsableData
     {
         [FieldLabel("트리거"), SerializeReference, TriggerSlot(TriggerKinds.Use | TriggerKinds.Condition)] public Trigger trigger = new UseTrigger();
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded)]
         public List<Outcome> outcomes = new List<Outcome>();
-        // 예전 저장 형식(대상·효과). 도감을 열면 결과의 "대상에게 효과" 하나로 옮겨진다.
+        // 예전 저장 형식(대상·효과). DB를 열면 결과의 "대상에게 효과" 하나로 옮겨진다.
         [HideInInspector, SerializeReference] public List<TargetSelector> targets = new List<TargetSelector>();
         [HideInInspector, SerializeReference] public List<Effect> effects = new List<Effect>();
 

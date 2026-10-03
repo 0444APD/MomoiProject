@@ -69,7 +69,7 @@ namespace GBible.Tests
             else Assert.IsNotNull(((Trigger)instance).Describe(new FakeNames()), $"{type.Name}: Describe가 null입니다");
         }
 
-        // 트리거·결과 칸이 있는 도감 종류는 모두 같은 표시([TriggerSlot]·[OutcomeSlot])로 잠금을 정한다.
+        // 트리거·결과 칸이 있는 DB 종류는 모두 같은 표시([TriggerSlot]·[OutcomeSlot])로 잠금을 정한다.
         [Test]
         public void 트리거_결과_칸은_잠금_표시를_가진다()
         {

@@ -16,7 +16,7 @@ namespace GBible
         public struct Arg
         {
             public string name;
-            [Tooltip("숫자로 읽히면 숫자로(복수형·천 단위 표기), 아니면 글자로. 도감 ID면 그 이름으로 바뀐다.")]
+            [Tooltip("숫자로 읽히면 숫자로(복수형·천 단위 표기), 아니면 글자로. DB ID면 그 이름으로 바뀐다.")]
             public string value;
         }
 

@@ -6,12 +6,12 @@
 
 | 말 | 뜻 |
 |---|---|
-| 텍스트 키 | 문장 하나의 이름. 예: `ui.start`, `reward.gain`. 도감 항목의 이름은 `<ID>.name`(예: `instance.potion.name`). |
+| 텍스트 키 | 문장 하나의 이름. 예: `ui.start`, `reward.gain`. DB 항목의 이름은 `<ID>.name`(예: `instance.potion.name`). |
 | 문장 틀 | 키에 들어 있는 글. `{item:을} {count}개 얻었습니다.`처럼 값 자리·조사·복수형을 문법으로 적는다. ICU MessageFormat(업계 공통 규격)의 주요 부분 + 한국어 조사 + 용어. |
 | 원문 언어 | 작가가 쓰는 언어(기본 `ko`). 모든 언어의 마지막 대체 언어다. |
 | 텍스트 표 | 한 언어의 키 → 문장 틀 목록(`TextTable` 에셋). |
 | 시트 | 모든 언어의 표를 한 장으로 주고받는 CSV 파일. 번역가가 구글 시트·엑셀에서 연다. |
-| 용어 | 문장 속 `[[id]]`. 키워드·도감 항목 이름을 넣고 색·아이콘·툴팁 링크로 꾸민다. |
+| 용어 | 문장 속 `[[id]]`. 키워드·DB 항목 이름을 넣고 색·아이콘·툴팁 링크로 꾸민다. |
 
 구성: `Runtime/Core`의 `TextFormat`(틀 해석), `TextCatalog`(언어별 표·현재 언어·대체 순서), `Texts`(어디서든 부르는 입구), `KoreanParticles`(조사), `PluralRules`(복수 구분), `Csv`·`TextSheet`(시트)는 Unity 없이도 돈다(서버·테스트). `Runtime/Unity/Localization`의 `LocalizationSettings`·`TextTable`·`GameLanguage`·`LocalizedText`가 Unity 쪽이다.
 
@@ -32,7 +32,7 @@
    - **languages**: 언어마다 **code**(BCP-47: `ko`, `en`, `ja`, `zh-Hans`, `zh-Hant`, `pt-BR` …), **nativeName**(언어 선택 화면에 보일 그 언어의 이름: 한국어, English, 日本語), **fallbacks**(이 언어에 없는 문장을 찾을 언어들, 쉼표로), **table**(텍스트 표).
 3. 언어를 더하고 표를 비워 두면, 시트 내보내기·가져오기 때 `Texts_<code>.asset`이 자동으로 만들어져 연결된다.
 4. 표(`TextTable`)는 **language**와 **entries**(key · text) 목록이다. 인스펙터에서 직접 고치거나 시트로 주고받는다. 직접 만들려면 `Create → MomoiProject → 다국어 → 텍스트 표`(설정은 `… → 다국어 설정`).
-5. 메뉴 `MomoiProject → 다국어 → 도감 이름 키 채우기`: 도감 항목마다 `<ID>.name` 키를 원문 표에 더한다(값은 ID). 콘솔 "[다국어] 원문 표에 이름 키 n개를 더했습니다(값은 ID, 원문 표에서 이름으로 바꿔 주세요)." 그다음 원문 표에서 값을 실제 이름으로 고친다.
+5. 메뉴 `MomoiProject → 다국어 → DB 이름 키 채우기`: DB 항목마다 `<ID>.name` 키를 원문 표에 더한다(값은 ID). 콘솔 "[다국어] 원문 표에 이름 키 n개를 더했습니다(값은 ID, 원문 표에서 이름으로 바꿔 주세요)." 그다음 원문 표에서 값을 실제 이름으로 고친다.
 
 ### 코드로 쓰는 법
 
@@ -77,7 +77,7 @@ string same = Texts.Get("reward.gain", new { item = "dragonArmor", count = 3 });
 
 **`Texts.Get(키, IReadOnlyDictionary<string, object>)`** — 값을 모아 둔 딕셔너리로.
 
-**`Texts.NameOf(id)`** — 도감 ID의 현재 언어 이름(`<id>.name`). 없으면 ID 그대로.
+**`Texts.NameOf(id)`** — DB ID의 현재 언어 이름(`<id>.name`). 없으면 ID 그대로.
 
 ```csharp
 string potion = Texts.NameOf("instance.potion");
@@ -347,7 +347,7 @@ public sealed class GoldLabel : MonoBehaviour
 ### 에디터에서
 
 1. 글자 컴포넌트가 있는 오브젝트에 `Add Component → MomoiProject → 다국어 텍스트`.
-2. **key**: 텍스트 키. **args**: 값 목록(**name** · **value**). 값이 숫자로 읽히면 숫자로(복수형·천 단위 표기), 아니면 글자로(도감 ID면 이름으로) 넘긴다.
+2. **key**: 텍스트 키. **args**: 값 목록(**name** · **value**). 값이 숫자로 읽히면 숫자로(복수형·천 단위 표기), 아니면 글자로(DB ID면 이름으로) 넘긴다.
 3. **target**: 글자를 넣을 컴포넌트. 비우면 같은 오브젝트에서 `text` 속성이 있는 컴포넌트를 찾는다.
 4. **onText**: 글자가 바뀔 때마다 불리는 이벤트(직접 넣을 곳이 따로 있을 때).
 5. 편집 모드에서도 동작하므로 인스펙터에서 키를 바꾸면 바로 보인다.

@@ -816,7 +816,7 @@
 .gs-kw__group--current { border-color: var(--gs-success); }
 
 
-/* ── 도감 그룹(키워드·스프라이트 규격·클래스·이벤트): 그룹 제목 줄 + 그 아래로 요소가 한 줄씩. 제목 왼쪽 화살표로 접고 펼친다 ── */
+/* ── DB 그룹(키워드·스프라이트 규격·클래스·이벤트): 그룹 제목 줄 + 그 아래로 요소가 한 줄씩. 제목 왼쪽 화살표로 접고 펼친다 ── */
 .gs-grouped__toolbar { margin-bottom: 12px; }
 .gs-grouped__list { max-width: 1100px; }
 .gs-group { margin-bottom: 18px; }
@@ -873,7 +873,7 @@
 .gs-group__head--toggle > .gs-group__tools { opacity: 0; transition-property: opacity; transition-duration: 0.12s; }
 .gs-group__head--toggle:hover > .gs-group__tools { opacity: 1; }
 .gs-grouped--dragging { opacity: 0.35; }
-/* 도감 공용 목록(CodexTree): 하위 폴더는 촘촘히, 끌어 놓을 폴더는 제목 줄과 안쪽을 강조 */
+/* DB 공용 목록(CodexTree): 하위 폴더는 촘촘히, 끌어 놓을 폴더는 제목 줄과 안쪽을 강조 */
 .gs-tree__folder--nested { margin-bottom: 2px; }
 .gs-tree__folder--nested.gs-group--folded { margin-bottom: 2px; }
 .gs-tree__folder--drop > .gs-group__head { background-color: var(--gs-accent-soft); }

@@ -54,7 +54,7 @@ Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 �
 - **언제**: 씬 코드가 들고 있던 id로 객체를 다시 찾을 때. 객체를 오래 들고 있지 말고 id로 들고 있다가 쓸 때 `Find`한다(Undo·불러오기 뒤에는 다른 인스턴스일 수 있다).
 
 ### `GameIds` (자동 생성 상수)
-- 도감의 ID가 코드 상수로 생성된다(`MomoiProject > 식별자 코드 다시 만들기`, 네임스페이스 `GBible.Ids`).
+- DB의 ID가 코드 상수로 생성된다(`MomoiProject > 식별자 코드 다시 만들기`, 네임스페이스 `GBible.Ids`).
   - 이름은 ID를 파스칼 표기로 바꾼 것(`player.gold` → `PlayerGold`, `ability.splash` → `AbilitySplash`)
   - `GameIds.PlayerData.PlayerGold` → `PlayerDataKey<int>` (형식이 붙은 플레이어 데이터 키, `.Id`가 ID 문자열)
   - `GameIds.Ability.AbilitySplash`, `GameIds.Achievement.FirstHunt` … → ID 문자열
@@ -111,7 +111,7 @@ Game.Do(new MoveUnit { target = unit.id, x = 3, y = 4 });
 
 ## 2-1. 트리거·결과 — 로그·도전과제·능력·아이템 공통
 
-도감의 "조건 → 보상" 기능은 모두 같은 두 칸으로 이루어진다. 두 칸의 편집 화면·동작은 하나이고, 기능마다 다른 것은 **칸에서 고를 수 있는 범위(잠금)**뿐이다.
+DB의 "조건 → 보상" 기능은 모두 같은 두 칸으로 이루어진다. 두 칸의 편집 화면·동작은 하나이고, 기능마다 다른 것은 **칸에서 고를 수 있는 범위(잠금)**뿐이다.
 
 | 칸 | 고르는 것 |
 |---|---|
@@ -152,7 +152,7 @@ public class QuestData : GameData
 ## 3. 능력 = 아이템 사용 효과·스킬·버프 발동
 
 ### `Game.Use(string ability, object user, params object[] targets)`
-- 도감 › 능력의 능력을 쓴다. `user`·`targets`는 객체 또는 id 문자열. 내부적으로 `UseAbility` 행동 하나라 Undo 한 번에 통째로 되돌아간다.
+- DB › 능력의 능력을 쓴다. `user`·`targets`는 객체 또는 id 문자열. 내부적으로 `UseAbility` 행동 하나라 Undo 한 번에 통째로 되돌아간다.
 - 흐름: 트리거 검사(사용 조건이 거짓이면 행동 실패) → 결과를 차례로(`대상에게 효과`: 대상 Block들을 위에서부터, 앞 결과가 다음 입력, 대상 Block이 없으면 고른 대상 그대로 → 대상마다 효과 Block) → `AbilityUsed` 이벤트.
 - 아이템도 같다: 아이템에 `사용` 기능을 붙이면 `Game.Use(아이템 ID, 사용자, 대상들)`로 쓴다(개수 줄이기는 인벤토리 쪽에서).
 
@@ -190,7 +190,7 @@ public class AddEnemiesAround : TargetSelector<Unit>
 - 기본 제공: `SelfTarget`("사용자 자신" — 나에게 부여).
 
 ### 능력 데이터
-- 도감 › 능력(`AbilityData`): `trigger`(기본 `사용`) + `outcomes`(결과 목록)를 에디터에서 조립(2-1).
+- DB › 능력(`AbilityData`): `trigger`(기본 `사용`) + `outcomes`(결과 목록)를 에디터에서 조립(2-1).
 - 코드로 정의(테스트 등): `session.Abilities.Define(new AbilityDefinition { Id = "…", When = … })` 후 `Outcomes`에 결과 추가(짧은 형태 `Targets`·`Effects`도 된다).
 
 ---
@@ -277,7 +277,7 @@ Block 클래스에는 `[Serializable]`도 필수. 둘 다 계약 테스트가 �
 | 어트리뷰트 | 칸이 하는 일 |
 |---|---|
 | `[FieldLabel("설명")]` | 마우스를 올리면 보이는 설명 |
-| `[DataRef(typeof(AbilityData))]` (string 필드) | 그 도감 종류의 항목 목록에서 고르기. 키워드는 필드에 `[Keyword(typeof(그룹))]`(클래스 상세에서도 연결) |
+| `[DataRef(typeof(AbilityData))]` (string 필드) | 그 DB 종류의 항목 목록에서 고르기. 키워드는 필드에 `[Keyword(typeof(그룹))]`(클래스 상세에서도 연결) |
 | `[PlayerDataRef]` (string) | 플레이어 데이터 목록에서 고르기 |
 | `[StatRef]` (string) | 로그 목록에서 고르기 |
 | `[AchievementRef]` (string) | 도전과제 목록에서 고르기 |
@@ -296,8 +296,8 @@ Game.Events.Publish(new EnemyKilled { unit = target.id, combo = 3 });        // 
 var sub = Game.Events.Subscribe<EnemyKilled>(e => PlayEffect(e.unit));     // 씬 코드에서 받기(연출)
 sub.Dispose();                                                              // 그만 받기
 ```
-- `[GameEvent("이름")]`: 도감 › 이벤트 탭과 로그 규칙의 이벤트 목록에 나온다.
-- 로그(도감 › 로그)는 이벤트를 규칙대로 집계한다(횟수·합계·최대, 이벤트 필드 조건으로 거르기). 도전과제는 그 로그를 본다.
+- `[GameEvent("이름")]`: DB › 이벤트 탭과 로그 규칙의 이벤트 목록에 나온다.
+- 로그(DB › 로그)는 이벤트를 규칙대로 집계한다(횟수·합계·최대, 이벤트 필드 조건으로 거르기). 도전과제는 그 로그를 본다.
 - 이벤트를 받는 쪽에서 플레이어 데이터를 바꾸지 않는다. 연출·UI만(상태를 바꿀 일은 행동·효과에서).
 - 기본 제공 이벤트: `AbilityUsed`(능력 ID·사용자·최종 대상들).
 
@@ -309,7 +309,7 @@ sub.Dispose();                                                              // �
 |---|---|
 | `Game.Random("이름").Range(min, max)` | 정수 `min` 이상 `max` 미만. 이름별로 따로 흐르는 결정론적 난수(같은 시드·같은 행동 → 같은 결과, Undo하면 되돌아감). 이름은 용도별로("damage", "loot") 나누면 한 곳의 소비가 다른 곳 결과를 흔들지 않는다. |
 | `Game.NewId("unit")` | "unit1", "unit2" … 소환처럼 개체를 새로 만들 때. 번호가 플레이어 데이터에 있어서 Undo·저장·멀티플레이에서도 같다. |
-| `Game.Session.CopyInstance("instance.sword")` | 도감 › 인스턴스의 원본 사본(원본은 안 바뀜). 예: 행동 안에서 `bag.items.Add((Item)Game.Session.CopyInstance(id));` |
+| `Game.Session.CopyInstance("instance.sword")` | DB › 인스턴스의 원본 사본(원본은 안 바뀜). 예: 행동 안에서 `bag.items.Add((Item)Game.Session.CopyInstance(id));` |
 
 `UnityEngine.Random`·`System.Random`은 게임 로직에 쓰지 않는다(연출용 흔들림 정도만).
 
@@ -317,14 +317,14 @@ sub.Dispose();                                                              // �
 
 ## 9. 검증 (에디터의 오류 표시)
 
-Block·도감 데이터 클래스에서 잘못된 칸을 에디터 검증에 띄운다.
+Block·DB 데이터 클래스에서 잘못된 칸을 에디터 검증에 띄운다.
 ```csharp
 public override void Validate(IValidationContext context)        // Block(Condition·Reward)
 {
     if (amount <= 0) context.Error("피해량은 1 이상이어야 합니다.");
     if (string.IsNullOrEmpty(title)) context.Warning("칭호가 비어 있습니다.");
 }
-public override void ValidateData(IValidationContext context) { … } // 도감 데이터 클래스(GameData)
+public override void ValidateData(IValidationContext context) { … } // DB 데이터 클래스(GameData)
 ```
 - `Error`는 빌드를 막는다. `Warning`은 표시만.
 
@@ -334,9 +334,9 @@ public override void ValidateData(IValidationContext context) { … } // 도감 
 
 | 형태 | 뜻 |
 |---|---|
-| `GBibleRuntime.Start()` | 세션을 만들고 도감 데이터(플레이어 데이터·로그·도전과제·능력·인스턴스)를 등록. 이미 있으면 그것을 준다. |
+| `GBibleRuntime.Start()` | 세션을 만들고 DB 데이터(플레이어 데이터·로그·도전과제·능력·인스턴스)를 등록. 이미 있으면 그것을 준다. |
 | `GBibleRuntime.Session` / `.Game` | 지금 세션 / 그 `GameApi` |
 | `session.ExportMeta()` / `ImportMeta(json)` | 프로필(메타 구역: 계정 단위로 남는 것) 저장·불러오기 |
 | `session.ExportRun()` / `ImportRun(json)` / `NewRun()` | 이번 판(세션 구역) 저장·불러오기·새 판 |
 
-플레이어 데이터의 "구역"(도감 › 플레이어 데이터의 칸): 메타 = 판이 바뀌어도 남음(재화·도감 해금), 세션 = 이번 판에만(유닛 위치·턴).
+플레이어 데이터의 "구역"(DB › 플레이어 데이터의 칸): 메타 = 판이 바뀌어도 남음(재화·DB 해금), 세션 = 이번 판에만(유닛 위치·턴).

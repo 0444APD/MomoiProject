@@ -91,13 +91,13 @@ namespace GBible.EditorTools
             if (topics.Count == 0) _list.Add(Gs.Label("검색 결과가 없습니다.", "gs-caption"));
         }
 
-        // 안내 → 도감 종류 → 모니터 탭 → 블록 순.
+        // 안내 → DB 종류 → 모니터 탭 → 블록 순.
         static int CategoryOrder(string category)
         {
             switch (category)
             {
                 case "안내": return 0;
-                case "도감 종류": return 1;
+                case "DB 종류": return 1;
                 case "모니터 탭": return 2;
                 case "화면 배치 블록": return 3;
                 case "조건 블록": return 4;

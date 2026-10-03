@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GBible.Data
 {
-    // 플레이어 데이터: 저장소에 담을 플레이어 데이터 하나. 데이터베이스 창에서 ID(=키)와 값 형식을 정하면
+    // 플레이어 데이터: 저장소에 담을 플레이어 데이터 하나. DB 창에서 ID(=키)와 값 형식을 정하면
     // 런타임이 시작할 때 자동으로 등록하고, 코드에서는 생성된 GameIds.PlayerData.XXX로 타입까지 맞춰 쓴다.
     [Database("플레이어 데이터", Group = "선언", Order = 4, IdPrefix = "playerData")]
     [CreateAssetMenu(menuName = "MomoiProject/플레이어 데이터", fileName = "NewPlayerData")]

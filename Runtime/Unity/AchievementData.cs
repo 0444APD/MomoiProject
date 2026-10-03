@@ -13,7 +13,7 @@ namespace GBible.Data
         [FieldLabel("아이콘")] public Sprite icon;
         [FieldLabel("트리거"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition)] public Trigger trigger;
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
-        // 예전 저장 형식(달성 조건·보상). 도감을 열면 위의 트리거·결과로 옮겨진다. 코드에서 넣어도 같은 길로 돈다.
+        // 예전 저장 형식(달성 조건·보상). DB를 열면 위의 트리거·결과로 옮겨진다. 코드에서 넣어도 같은 길로 돈다.
         [HideInInspector, SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition)] public Condition condition;
         [HideInInspector, SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Reward> rewards = new List<Reward>();
 

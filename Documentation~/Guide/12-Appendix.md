@@ -9,10 +9,10 @@
 | 말 | 뜻 |
 |---|---|
 | 행동 (`GameAction`) | 플레이어 입력 하나를 담은 데이터 클래스. 행동 하나 = Undo 한 단위 = 네트워크 한 묶음. |
-| Block | 기획자가 도감에서 골라 조립하는 로직 단위. 효과 Block(무엇을)·대상 Block(누구에게)·조건 Block(언제만)·코딩한 결과(`Reward`). |
-| Trigger · Outcome | 도감 항목의 "언제(Trigger) → 무엇을(Outcome, 결과)" 두 칸. |
+| Block | 기획자가 DB에서 골라 조립하는 로직 단위. 효과 Block(무엇을)·대상 Block(누구에게)·조건 Block(언제만)·코딩한 결과(`Reward`). |
+| Trigger · Outcome | DB 항목의 "언제(Trigger) → 무엇을(Outcome, 결과)" 두 칸. |
 | 컨텍스트 (`TriggerContext`) | Trigger가 발동한 순간의 정보(세션·받은 이벤트·사용자·고른 대상 …). |
-| `[BindTo]` | 도감 항목 하나의 결과를 코드 함수 하나로 바꾸는 어트리뷰트. |
+| `[BindTo]` | DB 항목 하나의 결과를 코드 함수 하나로 바꾸는 어트리뷰트. |
 
 ---
 
@@ -82,7 +82,7 @@ public class CardUpgraded
 }
 ```
 
-- `[GameEvent("표시 이름")]` — 도감·Trigger·모니터 목록에 이 이름으로 나오고, 값 읽기 코드가 생겨 조건·로그가 리플렉션 없이 읽는다.
+- `[GameEvent("표시 이름")]` — DB·Trigger·모니터 목록에 이 이름으로 나오고, 값 읽기 코드가 생겨 조건·로그가 리플렉션 없이 읽는다.
 - 필드 — 조건·로그가 고를 값. 객체 대신 id를 둔다. 상속해서 종류를 나누지 않는다(필드로 나누고 값 조건으로 거른다).
 - 쏘기는 행동 안에서 `Game.Events.Publish(new CardUpgraded { … })`, 받기는 Trigger의 '이벤트 받기' 또는 화면의 `Game.Events.Subscribe<CardUpgraded>(…)`.
 
@@ -106,7 +106,7 @@ public class GainEnergy : Effect<Hero>
 
 - `BlockInfo` — 이름은 기획자가 고르는 목록의 글, `Category`는 묶음, `Description`은 설명. 칸이 있는 Block은 `Sentence = "에너지 +{amount}"`처럼 한 줄 문장을 줄 수 있다.
 - `Effect<Hero>` — 대상 형식. 대상 Block이 고른 객체 중 이 형식인 것에만 `Apply`가 불린다.
-- `public int amount` — 기획자가 도감에서 정하는 수치. 필드 초기값이 기본값이다.
+- `public int amount` — 기획자가 DB에서 정하는 수치. 필드 초기값이 기본값이다.
 - `Apply(Hero target)` — 대상 하나에 한 번. 값은 그냥 고친다. 사용자는 `User<Hero>()`로 받는다.
 - `Describe()` — 결과 요약에 보일 짧은 글.
 
@@ -154,7 +154,7 @@ public static class TemplateCode
 }
 ```
 
-- `[BindTo(ID)]` — 그 ID의 도감 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스, 그리고 연결을 확인하는 프로젝트 고유 기능 — 1-8)의 결과가 이 함수가 된다. 도감의 결과 칸은 잠기고 함수 이름과 `cs 열기`가 보인다. ID는 늘 `GameIds` 상수로(항목을 만들고 저장하면 생긴다).
+- `[BindTo(ID)]` — 그 ID의 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스, 그리고 연결을 확인하는 프로젝트 고유 기능 — 1-8)의 결과가 이 함수가 된다. DB의 결과 칸은 잠기고 함수 이름과 `cs 열기`가 보인다. ID는 늘 `GameIds` 상수로(항목을 만들고 저장하면 생긴다).
 - `static void` — 필수. 접근 수준·클래스 이름은 상관없다.
 - 매개변수는 넷 중 하나: `()` · `(이벤트 e)` · `(TriggerContext c)` · `(이벤트 e, TriggerContext c)`. 받을 이벤트는 첫 매개변수의 형식이고, 컨텍스트는 늘 마지막이다.
 - 이벤트로 발동하는 항목이면 `(BattleWon e, TriggerContext c)`처럼 이벤트를 받는다. 조건으로 달성하는 도전과제·사용 기능·능력에는 이벤트가 없으므로 `(TriggerContext c)`만.
@@ -174,7 +174,7 @@ public class BlessingData : GameData
 }
 ```
 
-- `[Database("탭 이름", Group, Order, IdPrefix)]` + `GameData` — 도감에 탭이 생긴다. 항목은 ID로만 식별한다.
+- `[Database("탭 이름", Group, Order, IdPrefix)]` + `GameData` — DB에 탭이 생긴다. 항목은 ID로만 식별한다.
 - `[SerializeReference]` — Trigger·Outcome은 추상 형식이라 실제 형식째 저장해야 한다. 필수.
 - `[TriggerSlot(…)]` — 이 칸에서 고를 수 있는 Trigger 잎. 감시하는 기능은 `Event`·`Condition`(`Use`는 `Game.Use`로 쓰는 것에만 의미가 있다).
 - `[OutcomeSlot(…)]` — 고를 수 있는 결과 종류(플레이어 데이터에 주기 `PlayerData`, 코딩한 결과 `Coded`, 대상에게 효과 `Targeted`, 로그에 기록 `Record`, 전부 `All`).
@@ -231,7 +231,7 @@ static void Started(GameSession session)
 
 - `AfterAssembliesLoaded` — `GBibleRuntime`은 첫 씬을 불러오기 전에 세션을 만든다. 그보다 먼저 연결해야 하므로 이 시점이다. `Awake`에서는 늦다.
 - `Configuring` — 세션을 만들기 직전. Undo 방식·이력 상한·시드·저장 버전과 변환을 정한다. 세션은 아직 없다. 저장 변환은 반드시 여기서 등록한다(프로필을 곧바로 불러오므로).
-- `Started` — 세션 준비가 끝난 뒤(도감 데이터 등록·프로필 불러오기 다음). 코드로만 정의하는 값, 디버그 명령, 프로젝트 기능의 감시를 등록한다.
+- `Started` — 세션 준비가 끝난 뒤(DB 데이터 등록·프로필 불러오기 다음). 코드로만 정의하는 값, 디버그 명령, 프로젝트 기능의 감시를 등록한다.
 - 도메인 리로드를 꺼도 매 플레이마다 다시 연결되도록 시스템이 이벤트를 비우므로, 이 연결은 매번 이렇게 한다.
 
 ---
@@ -247,7 +247,7 @@ static void Started(GameSession session)
 - [ ] 쓸 선택 모듈을 켰다(`Features.json`이 바뀌었다).
 - [ ] 규칙 코드는 `Rules`에, 화면·씬 코드는 `Client`에 있다.
 - [ ] 시작 설정이 만든 `RunState`·`Profile` 뼈대에 필드를 채웠다.
-- [ ] 판·프로필 플레이어 데이터를 도감에 만들고 저장했다. `GameIds.cs`가 `Assets/Code/Rules/Generated/`에 있다.
+- [ ] 판·프로필 플레이어 데이터를 DB에 만들고 저장했다. `GameIds.cs`가 `Assets/Code/Rules/Generated/`에 있다.
 - [ ] `Client/Bootstrap.cs`의 `Configure`에 Undo 방식·시드가 있고, `Started`에서 플레이어 데이터를 다시 정의하지 않는다.
 - [ ] 모니터 머리에 고정 시드가 보이고, 디버그 명령 → Undo가 된다.
 - [ ] 콘솔에 "[MomoiProject]" 경고가 없다.
@@ -263,8 +263,8 @@ static void Started(GameSession session)
 - [ ] 플레이어 입력과 규칙의 한 걸음이 모두 행동이고, 행동 필드는 id와 값뿐이다.
 - [ ] 다른 기능이 반응할 순간이 모두 `[GameEvent]` 이벤트이고, 조건·로그가 읽을 값이 필드에 있다.
 - [ ] 찾거나 가리킬 객체에 `public string id;`가 있고, 연결은 id 글자다. 에셋 참조를 플레이어 데이터에 두지 않았다.
-- [ ] 효과는 Block 목록, 예외는 `[BindTo]` 목록, 새 종류는 도감 종류로 적었다.
-- [ ] 클래스 목록과 도감 항목 목록을 팀과 맞췄다.
+- [ ] 효과는 Block 목록, 예외는 `[BindTo]` 목록, 새 종류는 DB 종류로 적었다.
+- [ ] 클래스 목록과 DB 항목 목록을 팀과 맞췄다.
 
 ### 03. 게임 루프
 
@@ -289,7 +289,7 @@ static void Started(GameSession session)
 - [ ] 로그·조건이 읽을 값이 이벤트 필드에 있다.
 - [ ] 항목의 ID가 게임에 나오는 자리(덱·상점·전투·가방)에 들어가 있다.
 - [ ] 모니터에서 반응을 보고 Undo까지 확인했다.
-- [ ] 도감 사이드바가 "검증 통과"다.
+- [ ] DB 사이드바가 "검증 통과"다.
 - [ ] 프로젝트 기능은 `BoundOutcomes`를 확인하고 `RunOutcomes`로 결과를 실행한다.
 
 ### 05. 기획자와 함께 일하기
@@ -297,13 +297,13 @@ static void Started(GameSession session)
 - [ ] 프로그래머가 만들 것과 기획자가 채울 것을 표로 적어 공유했다.
 - [ ] 고르는 값은 모두 키워드 그룹이고, 필드에 `[Keyword]`가 붙어 있다(enum 칸이 없다).
 - [ ] 게임이 채우는 칸은 `[Hide]`, 조건부 칸은 `[ShowIf]`로 정리했다.
-- [ ] 다른 도감 항목을 가리키는 칸에는 모두 `[DataRef]`가 있다.
+- [ ] 다른 DB 항목을 가리키는 칸에는 모두 `[DataRef]`가 있다.
 - [ ] 모든 Block에 `[BlockInfo]` 이름·분류·설명이 있고, 칸이 있는 Block에는 `Sentence`가 있다.
 - [ ] 비면 안 되는 칸에 필수, 그림 칸에 스프라이트 규격 그룹을 정했다.
-- [ ] 도감 종류·조건·결과 Block에 필요한 `ValidateData`·`Validate`를 넣었다.
+- [ ] DB 종류·조건·결과 Block에 필요한 `ValidateData`·`Validate`를 넣었다.
 - [ ] 코드에는 ID 문자열 대신 `GameIds`를 쓴다.
 - [ ] 출시 뒤 바꾸면 안 되는 ID(저장 파일에 글자로 들어가는 ID)를 기획자와 공유했다.
-- [ ] 도감 사이드바가 "검증 통과"다.
+- [ ] DB 사이드바가 "검증 통과"다.
 
 ### 06. 화면과 연출
 
@@ -314,7 +314,7 @@ static void Started(GameSession session)
 - [ ] 받는 쪽 코드에서 플레이어 데이터를 바꾸지 않는다.
 - [ ] 행동 안에서 받은 이벤트는 행동이 성공한 뒤 틀고, 실패하면 버린다.
 - [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
-- [ ] 화면의 모든 글이 텍스트 키이고, 도감 항목 이름은 `<ID>.name`이다.
+- [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다.
 - [ ] 언어를 바꾸면 화면 글자가 다시 그려진다.
 - [ ] 다이얼로그는 말·연출만, 규칙이 있는 일은 행동이 맡는다.
 - [ ] 그림은 판 데이터가 아니라 원본 인스턴스에서 읽는다.
@@ -369,7 +369,7 @@ static void Started(GameSession session)
 
 출시 전:
 
-- [ ] 도감 사이드바 아래가 "검증 통과"다.
+- [ ] DB 사이드바 아래가 "검증 통과"다.
 - [ ] 필드 규칙의 필수 값이 비어 있지 않다.
 - [ ] 콘솔에 "예전 방식(리플렉션)"·"읽기 코드가 없어 리플렉션으로 읽습니다"·"저장할 수 없는 참조입니다"·`[BindTo]` 연결 경고가 없다(있다면 이유를 안다).
 - [ ] 개발용 시드 고정·디버그 명령이 개발 빌드에서만 켜진다.
@@ -501,12 +501,12 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 ### 3-10. 에디터 설정과 도구
 
 - **MomoiProject › 내 코드 범위** — 클래스를 고르는 목록(값 형식·인스턴스 형식·필드 규칙)에 보일 폴더·네임스페이스. 플러그인 폴더의 클래스가 목록에 섞이거나 내 클래스가 안 보일 때 고친다(`ProjectSettings/MomoiProject/ProjectCode.json`).
-- **도감 › 프리팹** — 프리팹을 도감에 등록해 컴포넌트 필드를 탐색기로 고친다. 수정은 바로 적용된다(작업본을 거치지 않는다).
+- **DB › 프리팹** — 프리팹을 DB에 등록해 컴포넌트 필드를 탐색기로 고친다. 수정은 바로 적용된다(작업본을 거치지 않는다).
 - **`GameFeatures`**(에디터 코드, `GBible.EditorTools`) — 선택 기능이 켜졌는지 에디터 도구에서 확인한다: `GameFeatures.IsActive(GameFeatures.Find("dialogue"))`.
 - **`TextCatalog`** — 테스트·도구에서 텍스트 표를 따로 만들어 문장 틀을 시험한다: `new TextCatalog { SourceLanguage = "ko", Language = "ko" }` → `SetTable` → `Get`.
 - **결과 '다이얼로그 재생'** — 코드 없이 도전과제·유물 같은 항목의 결과로 다이얼로그를 연다. 카드 던전은 상점 층에서 코드(`Dialogues.Play`)로 열었다([06장](06-Presentation.md)).
 
-→ [21. 도감](../Manual/21-Editor-Database.md) 6.9·8, [20. 시작하기](../Manual/20-Setup.md) 6절, [23. 텍스트와 현지화](../Manual/23-Text-Localization.md) 7절, [24. 다이얼로그](../Manual/24-Dialogue.md) 5.5
+→ [21. DB](../Manual/21-Editor-Database.md) 6.9·8, [20. 시작하기](../Manual/20-Setup.md) 6절, [23. 텍스트와 현지화](../Manual/23-Text-Localization.md) 7절, [24. 다이얼로그](../Manual/24-Dialogue.md) 5.5
 
 ### 3-11. 난수 뽑기의 나머지 · 로그 시험 API
 
@@ -527,7 +527,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 기능 | 매뉴얼 | 처음 쓴 곳 |
 |---|---|---|
 | 설치, `com.unity.nuget.mono-cecil` | 20 | 01 §4-1 |
-| 도감을 열어 `GameDatabase` 만들기 | 20 · 21 | 01 §4-2(시작 설정이 만든다) |
+| DB를 열어 `GameDatabase` 만들기 | 20 · 21 | 01 §4-2(시작 설정이 만든다) |
 | 선택 기능 켜기(기능 활성화), `#if GBIBLE_*` | 20 | 01 §4-2 |
 | 어셈블리·asmdef 참조 | 20 | 01 §3, §4-2 |
 | `GBibleRuntime.Session`·`Game` | 20 · 03 | 01 §4-5 |
@@ -550,7 +550,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 |---|---|---|
 | `[Serializable]` 데이터 클래스 | 01 | 01 §4-3 |
 | `[PlayerData]` | 01 | 12 §3-7 |
-| 도감 › 플레이어 데이터(구역·값 형식) | 01 · 21 | 01 §4-4 |
+| DB › 플레이어 데이터(구역·값 형식) | 01 · 21 | 01 §4-4 |
 | 구역 `DataZone.Session`·`Meta` | 01 · 06 | 01 §4-4, 02 §3-2 |
 | `session.Data.Define`·`IsDefined` | 01 | 01 §4-4(언급), 08 |
 | `session.Data.Get`·`Set`·`Modify` | 01 | 12 §3-7 |
@@ -600,7 +600,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 | 기능 | 매뉴얼 | 처음 쓴 곳 |
 |---|---|---|
-| 도감 › 인스턴스 | 04 · 21 | 02 §4-7, 04 §4-1 |
+| DB › 인스턴스 | 04 · 21 | 02 §4-7, 04 §4-1 |
 | `session.CopyInstance` | 04 | 03 §4-3 |
 | `session.Instances`(원본을 복사 없이 읽기) | 04 | 06 §3, 08 §4(테스트), 09 카드 던전에서 실제로 |
 | `[Hide]`·`[ShowIf]` | 04 | 02 §4-2, 05 §4 |
@@ -646,7 +646,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `session.Triggers.Register`·`RunOutcomes` | 11 · 17 | 04 §4-10 |
 | `Triggers.Watcher.EvaluateAll` | 11 · 17 | 04 §5 |
 | `TryGetProgress`(도전과제·Trigger 진행도) | 14 · 17 | 12 §3-3 |
-| 결과 '플레이어 데이터에 주기'(도감) | 12 | 04 §4-6 |
+| 결과 '플레이어 데이터에 주기'(DB) | 12 | 04 §4-6 |
 | 결과 '로그에 기록'·로그 반영 규칙 | 12 · 15 | 04 §4-5 |
 | 결과 '대상에게 효과'·`Effect<T>`·`TargetSelector<T>` | 12 · 16 | 02 §4-8, 04 §4-2 |
 | 기본 대상 '사용자 자신'(`SelfTarget`) | 16 | 02 §4-8, 04 §4-2 |
@@ -660,22 +660,22 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `BoundOutcomes.Has`·`Create` | 13 · 17 | 04 §4-10 |
 | `BoundOutcomes.Problems` | 13 | 12 §3-2 |
 
-### 도감 기능
+### DB 기능
 
 | 기능 | 매뉴얼 | 처음 쓴 곳 |
 |---|---|---|
-| 도전과제(도감) | 14 | 04 §4-6 |
+| 도전과제(DB) | 14 | 04 §4-6 |
 | `session.Achievements.IsUnlocked` | 14 | 12 §3-3 |
-| 로그(도감, 범위·집계) | 15 | 04 §4-5 |
+| 로그(DB, 범위·집계) | 15 | 04 §4-5 |
 | `session.Stats.Report`·`Get` | 15 | 12 §1-7·3-3 |
-| 능력(도감 › 능력) | 16 | 04 §5 |
+| 능력(DB › 능력) | 16 | 04 §5 |
 | `AbilityDefinition`·`session.Abilities.Define` | 16 | 08 §4(테스트에서 언급) |
-| 도감 종류 `GameData`·`[Database]` | 17 · 21 | 02 §4-7, 04 §4-10 |
+| DB 종류 `GameData`·`[Database]` | 17 · 21 | 02 §4-7, 04 §4-10 |
 | `ValidateData` | 17 | 04 §4-10, 05 §4 |
 | `[DataRef]` | 17 · 21 | 05 §4 |
 | `[FieldLabel]` | 17 | 04 §4-10, 05 §3 |
 | `[PlayerDataRef]`·`[StatRef]`·`[AchievementRef]`·`[EventTypeRef]` | 11 · 12 | 05 §3 |
-| 도감 저장 흐름(작업본 → Ctrl+S) | 21 | 01 §4-4 |
+| DB 저장 흐름(작업본 → Ctrl+S) | 21 | 01 §4-4 |
 | ID 바꾸기·삭제 보호 | 21 | 05 §4 |
 | 검증(사이드바 "검증 통과", 빌드 중단) | 21 | 04 §2 |
 | 클래스 탭(클래스 상세, `[Hide]` 토글) | 21 | 05 §4 |
@@ -709,7 +709,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `Texts.Get`·`Texts.NameOf`·문장 틀(조사·복수·용어) | 23 | 06 §4 |
 | `GameLanguage`(`Changed`) | 23 | 06 §4 |
 | `LocalizedText` | 23 | 06 §4(언급) |
-| 다국어 › 도감 이름 키 채우기 · 번역 검사 | 23 | 05 §4, 08 §4(대응표) |
+| 다국어 › DB 이름 키 채우기 · 번역 검사 | 23 | 05 §4, 08 §4(대응표) |
 | 시트(CSV) 내보내기·가져오기 | 23 | 05 §5(언급) |
 | `TextCatalog` | 23 | 12 §3-10 |
 | 다이얼로그 그래프·스탠딩 프로필·UI 템플릿 만들기 | 24 | 06 §4 |

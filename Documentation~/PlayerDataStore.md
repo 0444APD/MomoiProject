@@ -16,7 +16,7 @@
 
 쓰는 규칙은 두 가지뿐입니다.
 
-1. 키(ID)는 도감 창 한곳에서만 짓고, 나머지는 목록에서 고르거나 생성된 코드(`GameIds`)로 씁니다.
+1. 키(ID)는 DB 창 한곳에서만 짓고, 나머지는 목록에서 고르거나 생성된 코드(`GameIds`)로 씁니다.
 2. 저장소 안의 값은 반드시 `Set`(통째로 교체) 또는 `Modify`(일부 수정)로 바꿉니다.
 
 ---
@@ -85,9 +85,9 @@ public class Inventory
 }
 ```
 
-### 3.2 도감 창에서 플레이어 데이터 만들기
+### 3.2 DB 창에서 플레이어 데이터 만들기
 
-1. 메뉴 `MomoiProject > 도감`를 엽니다.
+1. 메뉴 `MomoiProject > DB`를 엽니다.
 2. 왼쪽의 `선언 > 플레이어 데이터`를 고르고 `+ 추가`를 누릅니다.
 3. 창이 뜨면 ID(예: `player.inventory`)를 입력합니다. 항목은 따로 이름을 두지 않고 ID로만 식별합니다.
 4. 상세 패널에서 구역(메타)과 값 형식(`Inventory`)을 목록에서 고릅니다.
@@ -338,7 +338,7 @@ GBibleRuntime.Configuring += options =>
 
 `GBibleRuntime`을 쓰지 않고 세션을 직접 만든다면 `new GameSession(options)` 전에 `options.Migrations`에 등록하거나, `ImportMeta`보다 먼저 `session.Migrations`에 등록하세요.
 
-필드 이름만 바꾼 경우는 변환 없이 `[FormerlySerializedAs("예전이름")]`만 달면 됩니다. 플레이어 데이터·수치·도전과제의 ID를 도감 창에서 바꾼 경우도 변환이 필요 없습니다(11.3 참고).
+필드 이름만 바꾼 경우는 변환 없이 `[FormerlySerializedAs("예전이름")]`만 달면 됩니다. 플레이어 데이터·수치·도전과제의 ID를 DB 창에서 바꾼 경우도 변환이 필요 없습니다(11.3 참고).
 
 ---
 
@@ -358,7 +358,7 @@ GBibleRuntime.Configuring += options =>
 
 ### 11.1 규칙
 
-- ID는 도감 창에서 항목을 만들 때 한 번 짓습니다.
+- ID는 DB 창에서 항목을 만들 때 한 번 짓습니다.
 - 형식은 lowerCamelCase입니다. 영문 소문자로 시작하고, 단어 사이는 대문자로 잇습니다(띄어쓰기·밑줄 없음). 분류는 점(.)으로 나눕니다. 예: `playerGold`, `player.inventory`, `killsTotal`
 - 대소문자만 다른 ID는 같은 ID로 봅니다(Windows 파일 이름이 대소문자를 구분하지 않기 때문). 따로 표시 이름은 없고, 플레이어에게 보일 글자는 이후 텍스트 시트·번역에서 ID로 찾습니다.
 - 모든 ID는 프로젝트 전체에서 하나뿐이어야 합니다.
@@ -379,7 +379,7 @@ PlayerDataKey<Inventory> key = GameIds.PlayerData.PlayerInventory;
 [Database("몬스터", Group = "전투")]
 public class MonsterData : GameData
 {
-    public List<string> weakTo = new List<string>();   // 키워드: 도감 › 클래스의 클래스 상세에서 그룹을 연결
+    public List<string> weakTo = new List<string>();   // 키워드: DB › 클래스의 클래스 상세에서 그룹을 연결
     [DataRef(typeof(ItemData))] public string dropItem;
 }
 ```
@@ -399,7 +399,7 @@ public class MonsterData : GameData
 
 ### 11.5 키워드와 필드 연결
 
-등급·부위·속성·태그처럼 식별에 쓰는 string 값은 모두 **키워드**입니다. 키워드는 코드입니다: `[KeywordGroup("표시 이름")]`을 붙인 static 클래스의 `const string`이 키워드이고, 안쪽 static 클래스가 하위 그룹입니다. 도감의 **키워드** 탭에서 만들고 고쳐도 같은 코드가 써집니다(Ctrl+S로 저장).
+등급·부위·속성·태그처럼 식별에 쓰는 string 값은 모두 **키워드**입니다. 키워드는 코드입니다: `[KeywordGroup("표시 이름")]`을 붙인 static 클래스의 `const string`이 키워드이고, 안쪽 static 클래스가 하위 그룹입니다. DB의 **키워드** 탭에서 만들고 고쳐도 같은 코드가 써집니다(Ctrl+S로 저장).
 
 ```csharp
 [KeywordGroup("등급")]
@@ -417,18 +417,18 @@ public class SampleEquipment
 }
 ```
 
-필드 연결은 필드의 `[Keyword(typeof(그룹))]`입니다. 도감의 **클래스** 탭(클래스 상세의 '키워드 연결')에서 골라도 같은 어트리뷰트가 코드에 붙습니다. 하나인지 여러 개인지는 필드 형식으로 정해집니다. 비면 안 되는 값은 필드 규칙의 '필수'로 정합니다. 자세한 것은 `Manual/05-Keywords.md`.
+필드 연결은 필드의 `[Keyword(typeof(그룹))]`입니다. DB의 **클래스** 탭(클래스 상세의 '키워드 연결')에서 골라도 같은 어트리뷰트가 코드에 붙습니다. 하나인지 여러 개인지는 필드 형식으로 정해집니다. 비면 안 되는 값은 필드 규칙의 '필수'로 정합니다. 자세한 것은 `Manual/05-Keywords.md`.
 
 **필드 규칙**(값 출처·필수)은 클래스 상세에서 보고 고칩니다.
 
 | 칸 | 뜻 |
 |---|---|
-| 클래스 · 필드 | 규칙을 걸 필드(데이터 클래스·도감 종류·이벤트의 필드). 상속받은 필드는 선언한 클래스에 걸린다 |
-| 값 출처 | 키워드 / 도감 항목(종류 지정) / 플레이어 데이터 / 자유 입력 |
+| 클래스 · 필드 | 규칙을 걸 필드(데이터 클래스·DB 종류·이벤트의 필드). 상속받은 필드는 선언한 클래스에 걸린다 |
+| 값 출처 | 키워드 / DB 항목(종류 지정) / 플레이어 데이터 / 자유 입력 |
 | 키워드 그룹 | 고를 범위. 비우면 모든 키워드 |
-| 필수 | 비어 있으면 도감 검증 오류, 게임 중에는 경고 로그 + 모니터 표시 |
+| 필수 | 비어 있으면 DB 검증 오류, 게임 중에는 경고 로그 + 모니터 표시 |
 
-규칙은 `[DataRef]`와 똑같이 취급됩니다. 도감·탐색기·이벤트 호출·조건식 값 칸이 목록을 띄우고, ID를 바꾸면 값이 따라가며, 없는 값은 검증에서 걸립니다.
+규칙은 `[DataRef]`와 똑같이 취급됩니다. DB·탐색기·이벤트 호출·조건식 값 칸이 목록을 띄우고, ID를 바꾸면 값이 따라가며, 없는 값은 검증에서 걸립니다.
 
 ### 11.6 생성 코드의 위치
 
@@ -466,7 +466,7 @@ public class SampleEquipment
 
 | 증상 | 원인과 해결 |
 |---|---|
-| "정의되지 않은 플레이어 데이터" 오류 | 도감 창에서 플레이어 데이터를 만들지 않았습니다. 코드에는 `GameIds`를 쓰세요. |
+| "정의되지 않은 플레이어 데이터" 오류 | DB 창에서 플레이어 데이터를 만들지 않았습니다. 코드에는 `GameIds`를 쓰세요. |
 | "Modify를 거치지 않고 바뀌었습니다" 경고 | `Get`으로 받은 인스턴스를 직접 고쳤습니다. `Modify` 안에서 고치세요. |
 | "담을 수 없는 필드" 오류 | 함수·`object` 필드가 있습니다. `[NonSerialized]`를 붙이거나 데이터로 바꾸세요. |
 | "순환 참조" 오류 | 객체끼리 서로를 가리킵니다. 한쪽은 ID(`[DataRef]` 문자열)로 가리키세요. |
@@ -483,7 +483,7 @@ public class SampleEquipment
 | `PlayerDataStore` | `Get(key)`, `Get<T>(id)` | 읽기(데이터 값은 실제 인스턴스) |
 | | `Set(key, value)` | 통째로 바꾸기 |
 | | `Modify(key, action)` | 클래스·컬렉션 일부 바꾸기 |
-| | `Define(key, zone, default)` | 코드에서 직접 등록(보통은 도감 창) |
+| | `Define(key, zone, default)` | 코드에서 직접 등록(보통은 DB 창) |
 | | `Changed`, `DataChanged` | 변경 알림 |
 | | `Identity.IdOf(instance)` | 컬렉션 요소의 내부 ID |
 | | `CheckUntrackedChanges()` | 누락 검사 수동 실행 |

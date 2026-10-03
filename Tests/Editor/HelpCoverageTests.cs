@@ -18,12 +18,12 @@ namespace GBible.Tests
                                             !type.Assembly.GetName().Name.StartsWith("GBible.Tests", StringComparison.Ordinal);
 
         [Test]
-        public void 기본_도감_종류는_직접_쓴_도움말이_있다()
+        public void 기본_DB_종류는_직접_쓴_도움말이_있다()
         {
             var missing = DataTypes.All.Where(i => IsLibrary(i.Type))
                 .Where(i => HelpRegistry.Find(HelpIds.Data(i.Type)) is var topic && (topic == null || topic.Generated))
                 .Select(i => i.Type.FullName).ToList();
-            Assert.IsEmpty(missing, "도움말이 없는 도감 종류:\n" + string.Join("\n", missing));
+            Assert.IsEmpty(missing, "도움말이 없는 DB 종류:\n" + string.Join("\n", missing));
         }
 
         [Test]
@@ -87,9 +87,9 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 설정이_필요한_기본_도감_종류는_설정_단계에서_다룬다()
+        public void 설정이_필요한_기본_DB_종류는_설정_단계에서_다룬다()
         {
-            // 도움말만 있고 시작하기에서 빠진 종류가 없게: 각 기본 도감 종류는 어떤 단계의 도움말 연결이나 관련 항목으로 이어져야 한다.
+            // 도움말만 있고 시작하기에서 빠진 종류가 없게: 각 기본 DB 종류는 어떤 단계의 도움말 연결이나 관련 항목으로 이어져야 한다.
             var reachable = new HashSet<string>();
             foreach (var step in SetupRegistry.All)
             {
@@ -98,7 +98,7 @@ namespace GBible.Tests
                 if (topic?.Related != null) reachable.UnionWith(topic.Related);
             }
             var missing = DataTypes.All.Where(i => IsLibrary(i.Type)).Select(i => HelpIds.Data(i.Type)).Where(id => !reachable.Contains(id)).ToList();
-            Assert.IsEmpty(missing, "시작하기에서 이어지지 않는 도감 종류:\n" + string.Join("\n", missing));
+            Assert.IsEmpty(missing, "시작하기에서 이어지지 않는 DB 종류:\n" + string.Join("\n", missing));
         }
     }
 }

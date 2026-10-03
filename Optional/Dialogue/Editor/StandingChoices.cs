@@ -44,7 +44,7 @@ namespace GBible.EditorTools.Graph
                 };
             }
             if (!any)
-                yield return new GsDropdownItem(profiles.Count == 0 ? "스탠딩 프로필이 없습니다 — 도감에서 먼저 만드세요" : "스탠딩 목록이 비었습니다 — 스탠딩 프로필에서 추가하세요") { Disabled = true };
+                yield return new GsDropdownItem(profiles.Count == 0 ? "스탠딩 프로필이 없습니다 — DB에서 먼저 만드세요" : "스탠딩 목록이 비었습니다 — 스탠딩 프로필에서 추가하세요") { Disabled = true };
         }
     }
 }

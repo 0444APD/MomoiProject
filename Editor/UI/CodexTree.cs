@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // 도감 탭 공용 목록(모든 탭이 클래스 탭과 같은 모양): 폴더(중첩, 접고 펼침)와 요소 줄.
+    // DB 탭 공용 목록(모든 탭이 클래스 탭과 같은 모양): 폴더(중첩, 접고 펼침)와 요소 줄.
     //   · 폴더 줄: 버튼 빼고 어디를 눌러도 접고 펼친다. 마우스를 올린 줄만 옅게 밝아지고 도구 버튼이 보인다.
     //   · 요소 줄: 누르면 연다(상세).
     //   · 끌어 놓기: 요소나 폴더를 끌어 다른 폴더 위에 놓으면 그 폴더 안으로 옮긴다. 순서는 따로 두지 않는다.
@@ -91,7 +91,7 @@ namespace GBible.EditorTools.UI
 
         // ── 그리기 ─────────────────────────────────────────────
 
-        // list에 그린다. host: 끌 때 유령 글자·표시를 띄울 곳(도감 창 뿌리). only: 그 폴더만(새 창).
+        // list에 그린다. host: 끌 때 유령 글자·표시를 띄울 곳(DB 창 뿌리). only: 그 폴더만(새 창).
         public void Build(VisualElement list, VisualElement host, string only = null)
         {
             Index();

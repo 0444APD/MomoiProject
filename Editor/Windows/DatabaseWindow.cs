@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools
 {
-    // 공용 데이터베이스 창: GameData를 상속한 모든 타입을 시트·카드로 보고, 검색·추가·수정한다.
+    // 공용 DB 창: GameData를 상속한 모든 타입을 시트·카드로 보고, 검색·추가·수정한다.
     public sealed class DatabaseWindow : EditorWindow
     {
         // 예전 목록(시트·카드 보기와 보기 설정). 지우지 않고 숨겨 두었다: true면 전용 화면이 없는 종류가 다시 시트·카드로 보인다.
@@ -38,10 +38,10 @@ namespace GBible.EditorTools
 
         // 사이드바 맨 위의 "시작하기" 탭(타입 대신 이 값이 선택된다).
         const string SetupKey = "$setup";
-        // 도감 종류에 딸리지 않은 독립 탭(클래스·이벤트)의 키 앞머리.
+        // DB 종류에 딸리지 않은 독립 탭(클래스·이벤트)의 키 앞머리.
         const string PagePrefix = "$page:";
 
-        // 사이드바의 탭 하나: 도감 종류(Type) 또는 독립 화면(Page). 꺼진 기능의 탭은 흐리게만 보인다(DisabledReason).
+        // 사이드바의 탭 하나: DB 종류(Type) 또는 독립 화면(Page). 꺼진 기능의 탭은 흐리게만 보인다(DisabledReason).
         sealed class TabEntry
         {
             public string Key;
@@ -58,9 +58,10 @@ namespace GBible.EditorTools
         {
             switch (group)
             {
+                case BootstrapPage.Group: return -10;
                 case ClassesPage.DeclareGroup: return 0;
                 case "진행": return 10;
-                case "도감": return 20;
+                case "DB": return 20;
                 case "이미지": return 30;
                 case "샘플": return 90;
             }
@@ -102,11 +103,11 @@ namespace GBible.EditorTools
         GsButton _createButton;
         GsButton _linkButton;
 
-        [MenuItem("MomoiProject/도감", priority = 0)]
+        [MenuItem("MomoiProject/DB", priority = 0)]
         public static void Open() => OpenWindow();
 
         // 탭마다 옮기는 데 걸린 시간(본문 그리기까지)을 콘솔에 남긴다. 느린 탭을 찾을 때 쓴다.
-        [MenuItem("Tests/도감 탭 전환 시간 재기", priority = 60)]
+        [MenuItem("Tests/DB 탭 전환 시간 재기", priority = 60)]
         static void MeasureTabs()
         {
             var window = OpenWindow();
@@ -123,13 +124,13 @@ namespace GBible.EditorTools
                 lines.Add($"{tab.Group} › {tab.Label}: {watch.Elapsed.TotalMilliseconds:0.0}ms");
             }
             window.Navigate(back);
-            Debug.Log("[MomoiProject] 도감 탭 전환 시간\n" + string.Join("\n", lines));
+            Debug.Log("[MomoiProject] DB 탭 전환 시간\n" + string.Join("\n", lines));
         }
 
         static DatabaseWindow OpenWindow()
         {
             var window = GsWindows.Get<DatabaseWindow>();
-            window.titleContent = new GUIContent("도감");
+            window.titleContent = new GUIContent("DB");
             window.minSize = new Vector2(980, 560);
             return window;
         }
@@ -197,7 +198,7 @@ namespace GBible.EditorTools
         }
 
         // ── 탭 이동과 저장 ──────────────────────────────────────
-        // 도감의 변경은 Unity에 바로 쓰지 않고 모아 둔다. 탭을 옮겨도 그대로 남고,
+        // DB의 변경은 Unity에 바로 쓰지 않고 모아 둔다. 탭을 옮겨도 그대로 남고,
         // Ctrl+S 또는 사이드바의 저장 버튼으로 한 번에 저장한다(CodexChanges). 창을 닫거나 플레이·종료하기 전에는 묻는다.
 
         static CodexStaging Staging => EditorDatabase.Staging;
@@ -247,7 +248,7 @@ namespace GBible.EditorTools
         void OnDestroy()
         {
             // 창을 닫아도 변경은 사라지지 않지만, 잊지 않도록 묻는다('취소'면 다음에 열 때까지 그대로 둔다).
-            CodexStaging.AskBeforeLeaving("도감 창을 닫기 전에");
+            CodexStaging.AskBeforeLeaving("DB 창을 닫기 전에");
         }
 
         bool ShowingSetup
@@ -505,6 +506,10 @@ namespace GBible.EditorTools
                     item.SetActive(type == selected);
                     _sidebar.Add(item);
                 }
+                // 시작 파일 그룹: Bootstrap 탭 아래에 판·프로필 클래스 바로가기(누르면 코드 파일을 연다).
+                if (group.Key == BootstrapPage.Group)
+                    foreach (var (label, id, className) in StartFiles.DataShortcuts)
+                        _sidebar.Add(DataShortcut(label, id, className));
             }
 
             // 탭이 하나도 없는 선택 기능도 켜고 끌 수 있게 그룹을 보인다.
@@ -556,6 +561,23 @@ namespace GBible.EditorTools
             }
         }
 
+        // 판·프로필 데이터 클래스 바로가기: 탭이 아니라 누르면 그 클래스의 cs 파일을 연다.
+        VisualElement DataShortcut(string label, string id, string className)
+        {
+            var (file, typeName) = StartFiles.DataFile(id, className);
+            var item = new GsNavItem(typeName, Gs.PaletteFor("class:" + typeName), () =>
+            {
+                var (now, _) = StartFiles.DataFile(id, className);
+                if (now != null) StartFiles.Open(now);
+            });
+            item.SetCount("cs ↗");
+            item.tooltip = file != null
+                ? $"{file} 열기 — 플레이어 데이터 '{id}'의 값 형식"
+                : $"'{label}' 클래스를 찾지 못했습니다. 메뉴 MomoiProject › 시작 설정에서 '적용'하면 Assets/Code/Rules/PlayerData.cs가 만들어집니다.";
+            if (file == null) item.SetEnabled(false);
+            return item;
+        }
+
         // ── 선택 기능 켜고 끄기 ─────────────────────────────────
         // 사이드바의 '기능 활성화' 버튼: 탭이 아니라 누르면 바로 켜고 끈다(확인 뒤). 오른쪽 끝의 스위치가 지금 상태다.
 
@@ -580,7 +602,7 @@ namespace GBible.EditorTools
             var enable = !GameFeatures.IsEnabled(feature);
             string message;
             if (enable)
-                message = $"'{feature.Name}'을(를) 켭니다. Unity가 다시 컴파일한 뒤 이 기능의 탭·메뉴가 열리고, 기능의 클래스가 도감 › 클래스의 '{feature.Name}' 그룹에 자동으로 들어옵니다.\n\n{feature.Description}";
+                message = $"'{feature.Name}'을(를) 켭니다. Unity가 다시 컴파일한 뒤 이 기능의 탭·메뉴가 열리고, 기능의 클래스가 DB › 클래스의 '{feature.Name}' 그룹에 자동으로 들어옵니다.\n\n{feature.Description}";
             else
             {
                 var types = GameFeatures.ClassTypes(feature).ToList();
@@ -630,7 +652,7 @@ namespace GBible.EditorTools
             else _helpSlot.Add(HelpUI.Button("guide:codex"));
             if (type == null)
             {
-                _title.text = "도감";
+                _title.text = "DB";
                 _caption.text = "GameData를 상속한 클래스를 만들면 여기에 자동으로 나타납니다.";
                 return;
             }
@@ -980,7 +1002,7 @@ namespace GBible.EditorTools
         }
 
 
-        // ID 바꾸기도 모아 둔다: 이 항목과, 이 ID를 가리키는 항목들의 작업본을 함께 고친다(도감이 바로 새 ID로 보인다).
+        // ID 바꾸기도 모아 둔다: 이 항목과, 이 ID를 가리키는 항목들의 작업본을 함께 고친다(DB가 바로 새 ID로 보인다).
         // 적용하면 내용을 원본에 옮긴 뒤 ID 바꾸기(파일 이름·변경 이력·GameIds)가 실제로 일어난다.
         static int StageRename(GameData item, string newId)
         {
@@ -1002,7 +1024,7 @@ namespace GBible.EditorTools
         }
 
         // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
-        // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 도감 목록에 바로 보이고, Unity 에셋에는 저장(Ctrl+S)할 때 적용된다.
+        // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 DB 목록에 바로 보이고, Unity 에셋에는 저장(Ctrl+S)할 때 적용된다.
 
         // 상세 창(탭)으로 연다. 적용·되돌리기로 작업본이 바뀌면 상세 창이 같은 설정 함수로 다시 연다.
         void OpenDetail(GameData item, string focusPath = null)
@@ -1055,7 +1077,7 @@ namespace GBible.EditorTools
             }));
             if (item is PrefabData prefabEntry)
             {
-                // 프리팹은 도감에서 지우지 않는다. 프로젝트 창의 프리팹으로 이동해 거기서 지운다(항목은 자동 정리).
+                // 프리팹은 DB에서 지우지 않는다. 프로젝트 창의 프리팹으로 이동해 거기서 지운다(항목은 자동 정리).
                 options.Actions.Add(("프로젝트에서 보기", _ => ShowInProject(prefabEntry.prefab)));
             }
             else
@@ -1127,7 +1149,7 @@ namespace GBible.EditorTools
         {
             if (item is PrefabData)
             {
-                GsDialog.Show(_root, "도감에서 지울 수 없습니다", "프리팹은 프로젝트 창에서 직접 지우세요. '프로젝트에서 보기'로 이동할 수 있고, 프리팹을 지우면 이 항목도 자동으로 정리됩니다.", null,
+                GsDialog.Show(_root, "DB에서 지울 수 없습니다", "프리팹은 프로젝트 창에서 직접 지우세요. '프로젝트에서 보기'로 이동할 수 있고, 프리팹을 지우면 이 항목도 자동으로 정리됩니다.", null,
                     new DialogButton("확인", GsButtonKind.Primary, null));
                 return;
             }

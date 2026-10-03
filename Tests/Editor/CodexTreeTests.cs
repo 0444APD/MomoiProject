@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.Tests
 {
-    // 도감 공용 목록(CodexTree)과 정리용 폴더(CodexFolders): 정렬(폴더 먼저, 이름순)·중첩·검색·경로 바꾸기.
+    // DB 공용 목록(CodexTree)과 정리용 폴더(CodexFolders): 정렬(폴더 먼저, 이름순)·중첩·검색·경로 바꾸기.
     public class CodexTreeTests
     {
         static CodexTree Sample()

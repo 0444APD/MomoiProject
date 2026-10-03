@@ -1,10 +1,10 @@
 # 17. 프로젝트 고유 기능 만들기(퀘스트 예)
 
-**한 줄 요약**: 로그·도전과제·능력처럼 "Trigger → 결과" 구조를 가진 기능을 프로젝트가 직접 만들 수 있다. 도감 종류 클래스에 `Trigger` 필드와 `List<Outcome>` 필드를 두고 `[TriggerSlot]`·`[OutcomeSlot]` 표시만 붙이면 같은 편집 화면·검증이 붙고, 런타임에서는 `session.Triggers.Register`로 감시하고 `RunOutcomes`로 결과를 실행한다.
+**한 줄 요약**: 로그·도전과제·능력처럼 "Trigger → 결과" 구조를 가진 기능을 프로젝트가 직접 만들 수 있다. DB 종류 클래스에 `Trigger` 필드와 `List<Outcome>` 필드를 두고 `[TriggerSlot]`·`[OutcomeSlot]` 표시만 붙이면 같은 편집 화면·검증이 붙고, 런타임에서는 `session.Triggers.Register`로 감시하고 `RunOutcomes`로 결과를 실행한다.
 
 **언제 쓰는가**
 
-- 퀘스트, 일일 미션, 튜토리얼 단계, 이벤트 기간 보상처럼 "언제(조건) → 무엇을(보상)"을 기획자가 도감에서 항목마다 조립해야 하는 기능.
+- 퀘스트, 일일 미션, 튜토리얼 단계, 이벤트 기간 보상처럼 "언제(조건) → 무엇을(보상)"을 기획자가 DB에서 항목마다 조립해야 하는 기능.
 - 기본 기능(도전과제 = 한 번, 로그 = 숫자 기록)과 진행·저장·반복 규칙이 달라서 직접 다뤄야 할 때.
 
 이 문서에서 쓰는 용어:
@@ -13,7 +13,7 @@
 |---|---|
 | Trigger | 언제 발동하는지(→ `11-Triggers-Conditions.md`). |
 | Outcome | 무엇을 하는지(→ `12-Outcomes.md`). |
-| 도감 종류 | `GameData`를 상속한 클래스. 상속하면 코드 추가 없이 도감에 탭이 생긴다. |
+| DB 종류 | `GameData`를 상속한 클래스. 상속하면 코드 추가 없이 DB에 탭이 생긴다. |
 | 감시 | `session.Triggers`가 Trigger를 지켜보다가 참이 되는 순간 등록한 함수를 부르는 것(`Register`). |
 | TriggerContext (컨텍스트) | 발동한 순간의 정보(`Owner`·`Event` …). |
 | Permanent | `session.Data.Permanent()` 안의 변경은 Undo 이력에 들어가지 않는다(도전과제 달성이 쓰는 방식). |
@@ -24,8 +24,8 @@
 
 코드(2장)를 쓰고 컴파일하면:
 
-1. `MomoiProject → 도감` 사이드바에 `[Database]`에서 정한 이름의 탭(예: **진행** 그룹의 **퀘스트**)이 생긴다.
-2. `+ 퀘스트`로 항목을 만들고 제목(= ID)을 짓는다. 도감 ID는 모든 종류에서 하나뿐이다(퀘스트 ID가 도전과제 ID와 겹칠 수 없다).
+1. `MomoiProject → DB` 사이드바에 `[Database]`에서 정한 이름의 탭(예: **진행** 그룹의 **퀘스트**)이 생긴다.
+2. `+ 퀘스트`로 항목을 만들고 제목(= ID)을 짓는다. DB ID는 모든 종류에서 하나뿐이다(퀘스트 ID가 도전과제 ID와 겹칠 수 없다).
 3. Trigger 필드(`trigger`)는 한 줄 식 편집기로, 결과 필드(`outcomes`)는 결과 목록 편집기로 그려진다. `+ 블럭`·`+ 결과 추가` 목록에는 필드의 잠금에 있는 종류만 나온다.
 4. 검증(잠금 밖 종류, 비어 있는 칸, 플레이어 데이터 경로, 읽을 이벤트가 없는 반영할 값 …)이 기본 기능과 같은 규칙으로 돈다. 클래스의 `ValidateData`로 기능 고유의 검사를 더할 수 있다.
 5. 결과를 코드로 쓰려면 `[BindTo(퀘스트 ID)]`. 에디터는 그 항목의 결과 칸을 잠그고 연결된 코드를 보인다. 런타임에서 그것을 결과로 쓰는 일은 기능 코드가 한다(2-8).
@@ -34,7 +34,7 @@
 
 ## 2. 코드로 쓰는 법 — 문법 요소를 하나씩
 
-### 2-1. 도감 종류: `GameData` + `[Database]`
+### 2-1. DB 종류: `GameData` + `[Database]`
 
 ```csharp
 using System.Collections.Generic;
@@ -51,7 +51,7 @@ public class QuestData : GameData
 | `[Database]` 인자 | 뜻 |
 |---|---|
 | 첫 값 | 탭 이름 |
-| `Group` | 사이드바 그룹(기본 기능은 `선언`·`진행`·`도감`을 쓴다) |
+| `Group` | 사이드바 그룹(기본 기능은 `선언`·`진행`·`DB`을 쓴다) |
 | `Order` | 그룹 안 순서 |
 | `IdPrefix` | 새 항목 ID 앞부분(없으면 클래스 이름에서) |
 
@@ -153,7 +153,7 @@ public class QuestLog
 {
     public List<string> done = new List<string>();
 }
-// 도감 › 플레이어 데이터: ID "quest.log", 구역 메타, 값 형식 QuestLog
+// DB › 플레이어 데이터: ID "quest.log", 구역 메타, 값 형식 QuestLog
 ```
 
 ```csharp
@@ -201,7 +201,7 @@ public class QuestData : GameData
     }
 }
 
-// 완료 기록(도감 › 플레이어 데이터: "quest.log", 메타 구역, 값 형식 QuestLog)
+// 완료 기록(DB › 플레이어 데이터: "quest.log", 메타 구역, 값 형식 QuestLog)
 [Serializable]
 public class QuestLog
 {
@@ -294,7 +294,7 @@ public static class QuestRewards
 
 ### 3-4. 완료한 퀘스트 수를 로그로
 
-도감 › 로그 `questsDone`: 반영 규칙 `퀘스트 완료 받기`(반영할 값 비움). 도전과제 "퀘스트 10개 완료" = `비교(questsDone >= 10)`.
+DB › 로그 `questsDone`: 반영 규칙 `퀘스트 완료 받기`(반영할 값 비움). 도전과제 "퀘스트 10개 완료" = `비교(questsDone >= 10)`.
 
 ---
 
@@ -365,7 +365,7 @@ static void WatchStep(GameSession session, ChainQuestData quest)
 
 ### 4-3. Unity 없이(서버·테스트)
 
-도감 없이도 같은 API로 돈다. Trigger·결과를 코드로 만들어 등록한다.
+DB 없이도 같은 API로 돈다. Trigger·결과를 코드로 만들어 등록한다.
 
 ```csharp
 var session = new GameSession();
@@ -389,4 +389,4 @@ session.Triggers.Register("bonus", when, repeat: true, fire: m => session.Trigge
 - **`fire` 안에서 결과를 직접 부른다.** `outcome.Run(…)`을 직접 부르지 말고 `RunOutcomes`를 쓴다. 그래야 컨텍스트(`Current`)가 결과·조건 Block에 보이고 Journal에 남는다.
 - **`fire` 안에서 행동을 실행할 때**: 이벤트는 대개 행동 안에서 쏘이므로 `fire`도 행동 안에서 불린다. 여기서 부른 `Game.Do`·`Game.Use`는 그 행동의 일부로 실행된다. 조건 충족으로 발동하면(행동이 끝난 뒤) 새 행동이 된다.
 - **로그에 기록을 허락하고 로그 칸을 비운다.** 프로젝트 기능에서 로그에 기록의 로그 칸을 비우면 그 항목 ID는 로그가 아니라 아무것도 기록하지 않고 경고만 남는다. `OutcomeKinds.Record`를 허락한다면 로그를 꼭 고르게 하거나 `ValidateData`로 검사한다.
-- **인스턴스 기능 필드로 트리거·결과를 둘 때**: 인스턴스 값 안의 트리거·결과도 도감과 같은 편집기로 그려진다. 다만 원본 하나에 하나씩 정하는 값이라, 여러 항목이 공유하거나 기획자가 따로 관리할 기능은 도감 종류(`GameData`)로 만든다.
+- **인스턴스 기능 필드로 트리거·결과를 둘 때**: 인스턴스 값 안의 트리거·결과도 DB와 같은 편집기로 그려진다. 다만 원본 하나에 하나씩 정하는 값이라, 여러 항목이 공유하거나 기획자가 따로 관리할 기능은 DB 종류(`GameData`)로 만든다.

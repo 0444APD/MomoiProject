@@ -90,7 +90,7 @@ namespace GBible.EditorTools
             _topics = _byId.Values.OrderBy(t => t.Category ?? "").ThenBy(t => t.Order).ThenBy(t => t.Title).ToList();
         }
 
-        // 설명 문구를 이미 갖고 있는 기능(조건·보상·필터 블록, 배치 블록, 프로젝트에서 만든 도감 종류)은 항목을 자동으로 만든다.
+        // 설명 문구를 이미 갖고 있는 기능(조건·보상·필터 블록, 배치 블록, 프로젝트에서 만든 DB 종류)은 항목을 자동으로 만든다.
         static IEnumerable<HelpTopic> Generated(List<HelpTopic> written)
         {
             var ids = new HashSet<string>(written.Select(t => t.Id));
@@ -136,9 +136,9 @@ namespace GBible.EditorTools
                 {
                     Id = id,
                     Title = info.DisplayName,
-                    Category = "도감 종류",
+                    Category = "DB 종류",
                     Order = 500,
-                    Summary = $"프로젝트에서 만든 도감 종류입니다({info.Type.Name}).",
+                    Summary = $"프로젝트에서 만든 DB 종류입니다({info.Type.Name}).",
                     Body = $"'{info.DisplayName}'은(는) 프로젝트 코드에서 GameData를 상속해 만든 종류입니다. 이 종류 전용 설명은 아직 없습니다.\n\n" +
                            "설명을 추가하려면 IHelpProvider를 구현한 클래스에서 id가 \"" + id + "\"인 항목을 제공하세요.",
                     Related = new[] { "guide:codex" },

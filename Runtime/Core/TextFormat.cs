@@ -8,7 +8,7 @@ namespace GBible
 {
     // 문장 틀 해석기: ICU MessageFormat의 주요 부분 + 우리 확장 두 가지.
     //
-    //   {name}                          값 넣기(숫자는 언어별 천 단위 표기, 도감 ID면 현재 언어의 이름)
+    //   {name}                          값 넣기(숫자는 언어별 천 단위 표기, DB ID면 현재 언어의 이름)
     //   {name, number} / {n, number, integer | percent | 0.0}
     //   {d, date[, short|long]} / {t, time[, short|long]}
     //   {n, plural, [offset:1] =0 {…} one {# item} other {# items}}   # = 그 숫자
@@ -334,13 +334,13 @@ namespace GBible
 
         // ── 만들기 ─────────────────────────────────────────────
 
-        // 틀을 채울 때 필요한 것들. 언어·문화권, 값, 도감 ID → 이름, 용어 → 글자, 용어 꾸밈.
+        // 틀을 채울 때 필요한 것들. 언어·문화권, 값, DB ID → 이름, 용어 → 글자, 용어 꾸밈.
         public sealed class Context
         {
             public string Language = "";
             public CultureInfo Culture = CultureInfo.InvariantCulture;
             public IReadOnlyDictionary<string, object> Args;
-            // 값이 도감 ID 같은 글자면 현재 언어의 이름으로(없으면 null → 글자 그대로).
+            // 값이 DB ID 같은 글자면 현재 언어의 이름으로(없으면 null → 글자 그대로).
             public Func<string, string> ResolveName;
             // 텍스트 키(TextKey 값) → 글자.
             public Func<string, string> ResolveKey;

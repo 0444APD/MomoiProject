@@ -37,9 +37,9 @@ namespace GBible.EditorTools
         public string ClassName => (type ?? "").Substring((type ?? "").LastIndexOf('.') + 1);
     }
 
-    // 도감에서 한 코드 변경(키워드 그룹·키워드, 필드의 어트리뷰트)을 모아 두는 곳. 도감의 다른 변경처럼 저장(Ctrl+S)할 때 한 번에 파일에 쓴다.
+    // DB에서 한 코드 변경(키워드 그룹·키워드, 필드의 어트리뷰트)을 모아 두는 곳. DB의 다른 변경처럼 저장(Ctrl+S)할 때 한 번에 파일에 쓴다.
     // 파일을 쓰면 Unity가 다시 컴파일하므로, 하나씩 쓰지 않고 모아서 한 번만 컴파일되게 한다.
-    // 스크립트가 다시 불러와져도 남도록 SessionState에 둔다. 클래스 자체는 코드에서 만든다(도감은 만들지 않는다).
+    // 스크립트가 다시 불러와져도 남도록 SessionState에 둔다. 클래스 자체는 코드에서 만든다(DB는 만들지 않는다).
     public static class ClassStaging
     {
         static readonly string StashKey = LegacyNames.Session("GBible.ClassStaging");
@@ -228,7 +228,7 @@ namespace GBible.EditorTools
         }
 
         public static string KindText(string kind) =>
-            kind == nameof(ClassKind.Codex) ? "도감 종류" : kind == nameof(ClassKind.Event) ? "이벤트" : "데이터 클래스";
+            kind == nameof(ClassKind.Codex) ? "DB 종류" : kind == nameof(ClassKind.Event) ? "이벤트" : "데이터 클래스";
 
         // ── 적용 ───────────────────────────────────────────────
 

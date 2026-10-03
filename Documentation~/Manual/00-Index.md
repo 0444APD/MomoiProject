@@ -20,7 +20,7 @@ Momoi Project(코드 이름 `GBible`)의 기능별 사용법이다. 각 장은 �
 | [01. 플레이어 데이터](01-PlayerData.md) | 게임 중에 바뀌는 값을 두는 곳. 평범한 `[Serializable]` 클래스를 쓰고, 필드는 그냥 고친다(Mirror·Sync가 기록). |
 | [02. 행동과 Undo](02-Actions-Undo.md) | 플레이어 입력 하나 = 행동 하나 = Undo 한 단위 = 네트워크 한 묶음. 스냅샷 되감기, 지연 효과. |
 | [03. Game API](03-GameApi.md) | `Game.Find`·`All`·`Do`·`Use`·`Random`·`Events` 등 게임 코드의 창구. |
-| [04. 인스턴스](04-Instances.md) | 클래스의 원본 값(철검, 고블린 …)을 도감에서 채우고 게임에서는 사본을 쓴다. `[Hide]`·`[ShowIf]`, 기능 필드. |
+| [04. 인스턴스](04-Instances.md) | 클래스의 원본 값(철검, 고블린 …)을 DB에서 채우고 게임에서는 사본을 쓴다. `[Hide]`·`[ShowIf]`, 기능 필드. |
 | [05. 키워드](05-Keywords.md) | 등급·태그처럼 정해진 목록에서 고르는 값. `[KeywordGroup]`·`[Keyword]`. |
 | [06. 저장·불러오기](06-SaveLoad.md) | 프로필(메타)과 판(세션) 저장, 버전과 변환. |
 | [07. 난수와 시간](07-Random-Time.md) | Undo·되감기와 맞는 난수(`Game.Random`)와 게임 시계. |
@@ -41,7 +41,7 @@ Momoi Project(코드 이름 `GBible`)의 기능별 사용법이다. 각 장은 �
 | 장 | 내용 |
 |---|---|
 | [20. 시작하기](20-Setup.md) | 설치, 자동 시작, 세션 옵션, `GameIds`. |
-| [21. 도감](21-Editor-Database.md) | 데이터베이스 창의 모든 탭과 상세 창, 검증. |
+| [21. DB](21-Editor-Database.md) | DB 창의 모든 탭과 상세 창, 검증. |
 | [22. 모니터와 디버깅](22-Monitor-Debug.md) | 플레이 중 기록·값·행동·이벤트 호출·디버그 명령. |
 | [23. 텍스트와 현지화](23-Text-Localization.md) | `Texts`, 문장 틀(조사·복수·선택), 언어 표, CSV. |
 | [24. 다이얼로그](24-Dialogue.md) | 대사 그래프, 재생, 선택지·조건·값 바꾸기, 저장 이어 하기. |
@@ -101,7 +101,7 @@ public class Attack : GameAction<Unit>
     }
 }
 
-// 13. [BindTo]: 도감의 도전과제 "firstBlood"(Trigger = 유닛 처치 받기)의 결과를 함수 하나로.
+// 13. [BindTo]: DB의 도전과제 "firstBlood"(Trigger = 유닛 처치 받기)의 결과를 함수 하나로.
 public static class BattleLogic
 {
     [BindTo("firstBlood")]
@@ -118,8 +118,8 @@ public static class BattleLogic
 ```
 
 에디터에서 할 일:
-- 도감 › 도전과제에 `firstBlood`를 만들고, Trigger에 '이벤트 받기 › 유닛 처치'를 넣는다(14장). 결과 칸은 `[BindTo]` 때문에 잠겨 있고 `BattleLogic.FirstBlood`가 보인다(13장).
-- 도감 › 로그에 '처치 수'를 만들면, 같은 이벤트를 받을 때마다 1씩 쌓인다(15장).
+- DB › 도전과제에 `firstBlood`를 만들고, Trigger에 '이벤트 받기 › 유닛 처치'를 넣는다(14장). 결과 칸은 `[BindTo]` 때문에 잠겨 있고 `BattleLogic.FirstBlood`가 보인다(13장).
+- DB › 로그에 '처치 수'를 만들면, 같은 이벤트를 받을 때마다 1씩 쌓인다(15장).
 - 플레이 중 모니터에서 기록·값·행동을 보고, '이벤트 호출'로 `UnitKilled`를 직접 쏴 볼 수 있다(22장).
 
 ---
@@ -136,7 +136,7 @@ public static class BattleLogic
 | 그 항목만의 특별한 결과를 코드로 | 13 |
 | 스킬·포션 사용 | 16, 13 |
 | 3초 뒤에 발동하는 효과 | 02(지연 효과) |
-| 아이템 원본을 도감에서 만들고 게임에서 사본 쓰기 | 04, 25 |
+| 아이템 원본을 DB에서 만들고 게임에서 사본 쓰기 | 04, 25 |
 | 등급·태그 목록 관리 | 05 |
 | 번역·조사 처리 | 23 |
 | 저장 파일이 안 맞을 때 | 06 |

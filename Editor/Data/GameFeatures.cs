@@ -11,23 +11,23 @@ namespace GBible.EditorTools
 {
     // 프로젝트마다 켜고 끄는 선택 기능(다이얼로그 시스템 등) 하나.
     // 기능의 코드는 자기 어셈블리에 있고, 스크립팅 심볼(Symbol)이 있을 때만 컴파일된다(asmdef의 defineConstraints).
-    // 끄면 기능의 클래스·도감 탭·메뉴가 모두 사라지고, 만들어 둔 데이터 에셋은 그대로 남아 다시 켜면 돌아온다.
+    // 끄면 기능의 클래스·DB 탭·메뉴가 모두 사라지고, 만들어 둔 데이터 에셋은 그대로 남아 다시 켜면 돌아온다.
     public sealed class GameFeature
     {
         public string Id;
         public string Name;
         public string Description;
         public string Symbol;
-        // 기능의 게임 쪽 어셈블리 이름(이 안의 도감 종류가 기능의 클래스다).
+        // 기능의 게임 쪽 어셈블리 이름(이 안의 DB 종류가 기능의 클래스다).
         public string[] Assemblies = Array.Empty<string>();
-        // 꺼져 있을 때 도감 사이드바에 흐리게 보일 탭 이름(켜면 실제 탭으로 바뀐다).
+        // 꺼져 있을 때 DB 사이드바에 흐리게 보일 탭 이름(켜면 실제 탭으로 바뀐다).
         public string[] TabNames = Array.Empty<string>();
-        // 기능의 데이터 클래스(도감 종류가 아닌 것) 가운데 프로젝트가 직접 쓰는 것의 전체 이름.
-        // 플레이어 데이터의 값 형식으로 고를 수 있다(도감 › 클래스 탭에는 보이지 않는다)(예: 인벤토리).
+        // 기능의 데이터 클래스(DB 종류가 아닌 것) 가운데 프로젝트가 직접 쓰는 것의 전체 이름.
+        // 플레이어 데이터의 값 형식으로 고를 수 있다(DB › 클래스 탭에는 보이지 않는다)(예: 인벤토리).
         public string[] DataClasses = Array.Empty<string>();
 
         // 기능의 코드가 이 프로젝트에 들어 있는지(폴더째 지운 프로젝트에서는 켤 수 없다).
-        // 에셋 검색은 느려서(도감 사이드바를 그릴 때마다 불린다) 기억해 두고, 프로젝트 파일이 바뀌면 다시 찾는다.
+        // 에셋 검색은 느려서(DB 사이드바를 그릴 때마다 불린다) 기억해 두고, 프로젝트 파일이 바뀌면 다시 찾는다.
         public bool Installed
         {
             get
@@ -138,7 +138,7 @@ namespace GBible.EditorTools
             return All.FirstOrDefault(f => f.Assemblies.Contains(assembly));
         }
 
-        // 켜진 기능의 도감 종류(기능의 필수 클래스).
+        // 켜진 기능의 DB 종류(기능의 필수 클래스).
         public static IEnumerable<Type> ClassTypes(GameFeature feature) =>
             DataTypes.All.Select(i => i.Type).Where(t => Of(t) == feature && IsEnabled(feature));
 

@@ -14,7 +14,7 @@ namespace GBible.EditorTools
 
         static EditorDatabase Db => EditorDatabase.Instance;
 
-        // 도감 창이 열려 있으면 도감 안의 변경으로 모아 둔다(저장(Ctrl+S)할 때 적용). 아니면 바로 에셋으로 만든다.
+        // DB 창이 열려 있으면 DB 안의 변경으로 모아 둔다(저장(Ctrl+S)할 때 적용). 아니면 바로 에셋으로 만든다.
         public static bool StageByDefault => EditorWindow.HasOpenInstances<DatabaseWindow>();
 
         public static int OrderOf(GameData data) => (data as IOrderedData)?.Order ?? 0;

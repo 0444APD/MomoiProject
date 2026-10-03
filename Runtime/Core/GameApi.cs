@@ -27,7 +27,7 @@ namespace GBible
 
         public ActionRecord Do(GameAction action) => Session.Do(action);
 
-        // 능력(도감 › 능력)을 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열).
+        // 능력(DB › 능력)을 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열).
         public ActionRecord Use(string ability, object user, params object[] targets) =>
             Session.Do(new UseAbility
             {

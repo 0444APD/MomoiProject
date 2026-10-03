@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace GBible.EditorTools
 {
-    // 도감 › 클래스·이벤트 탭에 보이는 클래스 하나.
+    // DB › 클래스·이벤트 탭에 보이는 클래스 하나.
     public sealed class ClassEntry
     {
         public string FullName;
@@ -18,7 +18,7 @@ namespace GBible.EditorTools
         public ClassKind Kind;
         // 컴파일된 형식(적용 전인 새 클래스는 null).
         public Type Type;
-        // 도감 종류·이벤트의 표시 이름.
+        // DB 종류·이벤트의 표시 이름.
         public string Label;
         public string Group;
         // 자동 그룹(기본·기능 이름)에 속한다: 그룹을 옮길 수 없다.
@@ -40,7 +40,7 @@ namespace GBible.EditorTools
 
     // 클래스 탭의 내용: 컴파일된 클래스(코드가 원본) + 켜진 기능의 클래스.
     // 컴파일된 형식은 TypeCache에서 읽는다. TypeCache는 컴파일할 때 Unity가 만들어 두는 목록이라,
-    // 프로그래머가 코드를 고쳐도 다시 컴파일된 뒤 도감을 그릴 때 한 번 읽는 것으로 끝난다(감시·주기 검사 없음).
+    // 프로그래머가 코드를 고쳐도 다시 컴파일된 뒤 DB를 그릴 때 한 번 읽는 것으로 끝난다(감시·주기 검사 없음).
     public static class ClassCatalog
     {
         public const string BuiltInGroup = "기본";
@@ -48,7 +48,7 @@ namespace GBible.EditorTools
         const string BuiltInReason = "모든 프로젝트가 쓰는 기본 클래스라 고치거나 지울 수 없습니다.";
 
         static string FeatureReason(GameFeature feature) =>
-            $"'{feature.Name}' 기능의 클래스라 고치거나 지울 수 없습니다. 쓰지 않으려면 도감 사이드바의 '{feature.Name}' 아래 '기능 활성화'를 눌러 기능을 끄세요.";
+            $"'{feature.Name}' 기능의 클래스라 고치거나 지울 수 없습니다. 쓰지 않으려면 DB 사이드바의 '{feature.Name}' 아래 '기능 활성화'를 눌러 기능을 끄세요.";
 
         // ── 목록 ───────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ namespace GBible.EditorTools
             else
             {
                 // 개발자가 새로 선언한 클래스만. 시스템이 만든 클래스(스프라이트 규격·기능의 아이템·인벤토리 등)는
-                // 각자의 도감 탭에서 관리하고, 필드의 키워드 연결은 그 탭의 '필드 연결'로 연다.
+                // 각자의 DB 탭에서 관리하고, 필드의 키워드 연결은 그 탭의 '필드 연결'로 연다.
                 foreach (var type in DataClasses()) result.Add(Describe(type, ClassKind.Data));
                 foreach (var info in DataTypes.All)
                     if (IsDeveloperClass(info.Type))
@@ -71,7 +71,7 @@ namespace GBible.EditorTools
             return result.OrderBy(e => e.Name, StringComparer.Ordinal).ToList();
         }
 
-        // 목록에 없는 클래스(시스템이 만든 도감 종류·기능 클래스)도 상세는 열 수 있다(도감 탭의 '필드 연결').
+        // 목록에 없는 클래스(시스템이 만든 DB 종류·기능 클래스)도 상세는 열 수 있다(DB 탭의 '필드 연결').
         public static ClassEntry Find(string fullName)
         {
             var listed = All(ClassRegistry.ClassTab).Concat(All(ClassRegistry.EventTab)).FirstOrDefault(e => e.FullName == fullName);
@@ -87,7 +87,7 @@ namespace GBible.EditorTools
 
         static bool IsLibrary(Type type) => type.Assembly.GetName().Name.StartsWith("GBible", StringComparison.Ordinal);
 
-        // 프로젝트의 데이터 클래스: [Serializable]이 붙은 내 코드의 클래스(컴포넌트·행동·조건·보상 블록·이벤트·도감 종류 제외).
+        // 프로젝트의 데이터 클래스: [Serializable]이 붙은 내 코드의 클래스(컴포넌트·행동·조건·보상 블록·이벤트·DB 종류 제외).
         static IEnumerable<Type> DataClasses() =>
             TypeCache.GetTypesWithAttribute<SerializableAttribute>()
                 .Where(t => t.IsClass && !t.IsEnum && IsDeveloperClass(t) &&

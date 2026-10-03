@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.Tests
 {
-    // 코드 글자 다루기: 도감이 코드에 써 넣는 것(키워드 그룹·키워드, 필드의 어트리뷰트)과 적용 전 변경 모으기. 클래스 탭은 읽기 전용.
+    // 코드 글자 다루기: DB가 코드에 써 넣는 것(키워드 그룹·키워드, 필드의 어트리뷰트)과 적용 전 변경 모으기. 클래스 탭은 읽기 전용.
     public class ClassCodeTests
     {
         const string HandWritten =

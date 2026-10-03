@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace GBible
 {
-    // 키워드 그룹: 키워드(고르는 값) 모음을 코드로 정의한다. 코드가 원본이고, 도감 › 키워드 탭은 이 코드를 읽고 고친다.
+    // 키워드 그룹: 키워드(고르는 값) 모음을 코드로 정의한다. 코드가 원본이고, DB › 키워드 탭은 이 코드를 읽고 고친다.
     //   [KeywordGroup("등급")]
     //   public static class Rarity
     //   {

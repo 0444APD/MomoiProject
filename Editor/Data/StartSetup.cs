@@ -14,7 +14,7 @@ namespace GBible.EditorTools
     //     Rules  = 규칙(데이터·행동·이벤트·Block·[BindTo]) — GBible.Core·GBible.Unity(+ 데이터 모듈)만 참조
     //     Client = Unity 쪽(시작 설정 코드·화면·연출) — Rules + GBible + 켠 모듈
     //     Editor = 에디터 확장(Editor 전용), Tests = EditMode 규칙 테스트
-    //   그 밖: Product Name, 선택 모듈, 언어, 시작 파일(Bootstrap.cs·플레이어 데이터 뼈대), 도감 에셋.
+    //   그 밖: Product Name, 선택 모듈, Undo 방식(DB 에셋의 세션 옵션), 언어, 시작 파일(Bootstrap.cs·플레이어 데이터 뼈대), DB 에셋.
     // 이미 있는 파일은 덮어쓰지 않는다(다시 열어도 안전). 모듈을 켜고 끄면 asmdef 참조를 따라 맞춘다.
     [InitializeOnLoad]
     public static class StartSetup
@@ -77,6 +77,8 @@ namespace GBible.EditorTools
                 choices.languages = new HashSet<string>(settings.languages.Select(l => l.code), StringComparer.Ordinal);
             }
             choices.languages.Add(choices.sourceLanguage);
+            var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
+            if (database != null) choices.history = database.History;
             return choices;
         }
 
@@ -113,8 +115,8 @@ namespace GBible.EditorTools
             var bootstrap = FolderOf("Client") + "/Bootstrap.cs";
             if (!File.Exists(bootstrap))
             {
-                File.WriteAllText(bootstrap, BootstrapCode(choices.history), new UTF8Encoding(false));
-                done.Add($"{bootstrap} 만듦(되돌리기: {choices.history})");
+                File.WriteAllText(bootstrap, BootstrapCode, new UTF8Encoding(false));
+                done.Add($"{bootstrap} 만듦");
             }
             var playerData = FolderOf("Rules") + "/PlayerData.cs";
             if (!File.Exists(playerData))
@@ -123,11 +125,20 @@ namespace GBible.EditorTools
                 done.Add($"{playerData} 만듦");
             }
 
-            if (AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath) == null)
+            var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
+            if (database == null)
             {
                 EditorDatabase.EnsureFolder(Path.GetDirectoryName(EditorDatabase.DatabaseAssetPath).Replace('\\', '/'));
-                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDatabase>(), EditorDatabase.DatabaseAssetPath);
+                database = ScriptableObject.CreateInstance<GameDatabase>();
+                AssetDatabase.CreateAsset(database, EditorDatabase.DatabaseAssetPath);
                 done.Add($"{EditorDatabase.DatabaseAssetPath} 만듦");
+            }
+            // Undo 방식은 DB 에셋의 세션 옵션(DB › 시작 파일 › Bootstrap 화면과 같은 값)에 넣는다.
+            if (database.History != choices.history)
+            {
+                database.EditorSetSessionOptions(choices.history, database.HistoryLimit, database.SnapshotInterval, database.SnapshotLimit, database.FixSeedInDevelopment, database.DevelopmentSeed);
+                EditorUtility.SetDirty(database);
+                done.Add($"Undo 방식: {choices.history}");
             }
 
             SyncModuleReferences();
@@ -233,43 +244,42 @@ namespace GBible.EditorTools
 
         // ── 시작 파일 ─────────────────────────────────────────
 
-        static string BootstrapCode(HistoryMode history) =>
-$@"// 시작 설정이 만든 파일. 자유롭게 고친다.
+        const string BootstrapCode =
+@"// 시작 설정이 만든 파일. 자유롭게 고친다.
 // 세션이 만들어지기 전(Configuring)과 만들어진 뒤(Started)에 할 일을 둔다.
 using GBible;
 using UnityEngine;
 
-namespace {Prefix}
-{{
+namespace MomoiProject
+{
     public static class Bootstrap
-    {{
+    {
         // GBibleRuntime이 첫 씬을 읽기 전에 세션을 만들므로, 그보다 먼저 구독한다.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         static void Hook()
-        {{
+        {
             GBibleRuntime.Configuring += Configure;
             GBibleRuntime.Started += Started;
-        }}
+        }
 
+        // 세션을 만들기 직전. Undo 방식·보관 수·시드는 DB › 시작 파일 › Bootstrap 화면에서 정하고, 그 값이 options에 먼저 들어 있다.
+        // 여기서 options를 바꾸면 그 값이 우선한다(조건에 따라 바꿀 때만). 예: options.SaveVersion = 2;
         static void Configure(SessionOptions options)
-        {{
-            options.History = HistoryMode.{history};   // 되돌리기: Actions(행동 단위·턴제) / Snapshots(스냅샷·실시간) / None
-            // options.HistoryLimit = 200;                  // 행동 단위 Undo를 몇 개까지 남길지(0 = 제한 없음)
-            // if (Debug.isDebugBuild) options.Seed = 12345;   // 개발 빌드에서 시드 고정(버그 재현)
-        }}
+        {
+        }
 
+        // 세션 준비가 끝난 뒤(DB 데이터 등록·저장 불러오기까지). 행동 처리기, 프로젝트 고유 기능의 감시 등록, 개발용 명령 등.
         static void Started(GameSession session)
-        {{
-            // 개발용 명령, 프로젝트 고유 기능의 감시 등록 등.
-        }}
-    }}
-}}
+        {
+        }
+    }
+}
 ";
 
         const string PlayerDataCode =
 @"// 시작 설정이 만든 파일. 판(세션 구역)·프로필(메타 구역) 플레이어 데이터의 뼈대.
-// 도감 › 플레이어 데이터에서 값 형식으로 고른다(예: ID ""run"" = RunState·세션, ""profile"" = Profile·메타).
-// 필드는 그냥 고치면 기록된다(Undo·저장·멀티). 이름은 바꿔도 된다(도감 항목을 만들기 전이라면).
+// DB › 플레이어 데이터에서 값 형식으로 고른다(예: ID ""run"" = RunState·세션, ""profile"" = Profile·메타).
+// 필드는 그냥 고치면 기록된다(Undo·저장·멀티). 이름은 바꿔도 된다(DB 항목을 만들기 전이라면).
 using System;
 using System.Collections.Generic;
 

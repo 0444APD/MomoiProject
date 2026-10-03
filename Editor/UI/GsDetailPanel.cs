@@ -12,12 +12,12 @@ namespace GBible.EditorTools.UI
     {
         // 제목으로 쓸 필드(패널 위쪽에 크게, 편집 가능).
         public string TitlePath = "displayName";
-        // TitlePath가 없을 때 보일 제목. TitleCommit이 있으면 제목을 눌러 고칠 수 있다(도감: ID 바꾸기).
+        // TitlePath가 없을 때 보일 제목. TitleCommit이 있으면 제목을 눌러 고칠 수 있다(DB: ID 바꾸기).
         public string Title;
         // 새 제목 검사(문제가 있으면 문구, 없으면 null)와 반영.
         public Func<string, string> TitleValidate;
         public Action<GsDetailPanel, string> TitleCommit;
-        // 위쪽 왼편 이미지 칸을 보일지(도감 항목은 쓰지 않는다. 이미지 필드는 본문에 나온다).
+        // 위쪽 왼편 이미지 칸을 보일지(DB 항목은 쓰지 않는다. 이미지 필드는 본문에 나온다).
         public bool ShowMedia = true;
         // 클래스·배열·리스트 필드에 들어갈 때 따로 여는 방법(상세 창의 새 탭). true면 패널 안에서 들어가지 않는다.
         public Func<ExplorerItem, bool> OpenNested;
@@ -39,7 +39,7 @@ namespace GBible.EditorTools.UI
         public Action<UnityEngine.Object> Saved;
         // 제목 옆 "?" 버튼이 여는 도움말 항목.
         public string HelpTopic;
-        // 도감처럼 변경을 모아 두는 곳: 저장 확인 없이 작업본에 바로 반영하고, Unity 적용은 저장(Ctrl+S)할 때 한다.
+        // DB처럼 변경을 모아 두는 곳: 저장 확인 없이 작업본에 바로 반영하고, Unity 적용은 저장(Ctrl+S)할 때 한다.
         public bool Staged;
     }
 
@@ -179,7 +179,7 @@ namespace GBible.EditorTools.UI
             footer.Add(_revert);
             footer.Add(Gs.HSpace(8));
             _save = new GsButton(_options.Staged ? "반영" : "저장", Save, GsButtonKind.Primary);
-            if (_options.Staged) _save.tooltip = "도감 목록에 바로 반영합니다. Unity 에셋에는 저장(Ctrl+S)할 때 적용합니다.";
+            if (_options.Staged) _save.tooltip = "DB 목록에 바로 반영합니다. Unity 에셋에는 저장(Ctrl+S)할 때 적용합니다.";
             footer.Add(_save);
             if (_options.Staged)
             {
@@ -246,7 +246,7 @@ namespace GBible.EditorTools.UI
             }
             else if (!string.IsNullOrEmpty(_options.Title))
             {
-                // 고칠 수 없는 제목(도감 항목의 ID. ID는 'ID 바꾸기'로만 바꾼다).
+                // 고칠 수 없는 제목(DB 항목의 ID. ID는 'ID 바꾸기'로만 바꾼다).
                 _titleSlot.Add(_options.TitleCommit != null ? EditableTitle() : Gs.Label(_options.Title, "gs-display"));
             }
 
@@ -298,7 +298,7 @@ namespace GBible.EditorTools.UI
             return section;
         }
 
-        // 클래스·컬렉션 필드는 탐색기로 연다(도감·모니터와 같은 모양). 조건·보상 같은 블록 트리는 문장 편집기를 쓴다.
+        // 클래스·컬렉션 필드는 탐색기로 연다(DB·모니터와 같은 모양). 조건·보상 같은 블록 트리는 문장 편집기를 쓴다.
         static bool UsesExplorer(SerializedProperty property, System.Reflection.FieldInfo field)
         {
             if (field == null) return false;
@@ -358,9 +358,9 @@ namespace GBible.EditorTools.UI
             });
             explorer.AddToClassList("gs-explorer--embedded");
             explorer.OpenInTab = _options.OpenNested;
-            // 도감 항목(인스턴스 등)의 값: [Hide]·[ShowIf]·기능 필드 규칙대로.
+            // DB 항목(인스턴스 등)의 값: [Hide]·[ShowIf]·기능 필드 규칙대로.
             explorer.InstanceEditing = true;
-            // 값 안의 트리거·결과(예: 사용 기능)는 도감과 같은 편집기로. [BindTo]가 연결된 항목이면 결과 칸은 잠긴 보기.
+            // 값 안의 트리거·결과(예: 사용 기능)는 DB와 같은 편집기로. [BindTo]가 연결된 항목이면 결과 칸은 잠긴 보기.
             var basePath = property.propertyPath;
             explorer.BlockEditor = relative =>
             {
@@ -448,7 +448,7 @@ namespace GBible.EditorTools.UI
             return inline;
         }
 
-        // 편집 중인 사본(도감이 ID를 바꿀 때 사본의 ID도 맞춘다).
+        // 편집 중인 사본(DB가 ID를 바꿀 때 사본의 ID도 맞춘다).
         public UnityEngine.Object DraftTarget => _draft;
 
         // 고칠 수 있는 제목: 평소엔 큰 글자, 마우스를 올리면 상자, 누르면 입력 칸. Enter·바깥 클릭으로 확정, Esc로 취소.
@@ -566,7 +566,7 @@ namespace GBible.EditorTools.UI
             ReflectIfStaged();
         }
 
-        // 도감(변경 모아 두기): 바꾼 값은 바로 작업본에 반영한다(확인·저장 단계 없음). Unity 적용은 저장(Ctrl+S)할 때.
+        // DB(변경 모아 두기): 바꾼 값은 바로 작업본에 반영한다(확인·저장 단계 없음). Unity 적용은 저장(Ctrl+S)할 때.
         void ReflectIfStaged()
         {
             if (!_options.Staged || _draft == null || _target == null) return;

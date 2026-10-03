@@ -6,7 +6,7 @@ namespace GBible
 {
     // 능력: 스킬·사용 아이템처럼 "쓰는 순간" 발동하는 것. 다른 기능과 같은 트리거·결과 두 칸으로 이루어진다(Triggers.cs).
     //   트리거 = 사용(고정) + 원하면 AND로 사용 조건(조건 충족). 결과 = 대상에게 효과·플레이어 데이터에 주기·코딩한 결과.
-    // 기획자는 도감 › 능력에서 Block을 조립하고 수치를 정하고, 프로그래머는 새 동작이 필요할 때만 Block 클래스를 하나 만든다.
+    // 기획자는 DB › 능력에서 Block을 조립하고 수치를 정하고, 프로그래머는 새 동작이 필요할 때만 Block 클래스를 하나 만든다.
     //   Game.Use("ability.splash", 사용자, 고른 대상들)
     //   → 트리거 검사(사용 조건이 거짓이면 실패) → 결과를 차례로(대상에게 효과: 대상 Block → 대상마다 효과 Block)
     //   → AbilityUsed 이벤트(로그·도전과제가 반응). 전체가 행동 하나라 Undo 한 번에 되돌아간다.
@@ -35,7 +35,7 @@ namespace GBible
 
         public virtual string Describe() => BlockNames.Of(GetType());
 
-        // 도감 검증(저장할 때·검증 창)에서 부른다. 값이 맞지 않으면 context.Error·Warning(예: 음수 피해).
+        // DB 검증(저장할 때·검증 창)에서 부른다. 값이 맞지 않으면 context.Error·Warning(예: 음수 피해).
         public virtual void Validate(IValidationContext context)
         {
         }
@@ -79,7 +79,7 @@ namespace GBible
 
         public virtual string Describe() => BlockNames.Of(GetType());
 
-        // 도감 검증에서 부른다(값 검사).
+        // DB 검증에서 부른다(값 검사).
         public virtual void Validate(IValidationContext context)
         {
         }

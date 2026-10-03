@@ -8,10 +8,10 @@ using UnityEngine;
 
 namespace GBible.EditorTools
 {
-    // 도감 탭(도감 종류)마다의 폴더. 정리용일 뿐 게임 동작에는 쓰지 않는다(디스크 폴더와도 상관없다).
+    // DB 탭(DB 종류)마다의 폴더. 정리용일 뿐 게임 동작에는 쓰지 않는다(디스크 폴더와도 상관없다).
     //   폴더 경로 = "전투/보스"처럼 '/'로 잇는다. 항목이 어느 폴더에 있는지는 항목 자신(GameData.Folder)에 적는다.
     //   여기에는 폴더 목록만 둔다(빈 폴더도 남도록). 항목이 들어 있는 폴더와 그 상위 폴더는 적지 않아도 보인다.
-    // ProjectSettings/MomoiProject/CodexFolders.json에 두어 팀과 공유한다. 도감의 다른 변경처럼 저장(Ctrl+S)할 때 파일에 쓴다.
+    // ProjectSettings/MomoiProject/CodexFolders.json에 두어 팀과 공유한다. DB의 다른 변경처럼 저장(Ctrl+S)할 때 파일에 쓴다.
     public static class CodexFolders
     {
         public const string SettingsPath = "ProjectSettings/MomoiProject/CodexFolders.json";

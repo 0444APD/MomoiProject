@@ -7,8 +7,8 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // 도감의 스프라이트 규격 탭: 규격 그룹과 규격(출력 크기)을 한 화면에서 만들고, 끌어서 정리한다.
-    // 그룹을 어느 스프라이트 필드에 쓸지는 도감 › 클래스 › 클래스 상세에서 필드마다 정한다.
+    // DB의 스프라이트 규격 탭: 규격 그룹과 규격(출력 크기)을 한 화면에서 만들고, 끌어서 정리한다.
+    // 그룹을 어느 스프라이트 필드에 쓸지는 DB › 클래스 › 클래스 상세에서 필드마다 정한다.
     // 베이크는 그렇게 연결된 필드에 원본 스프라이트를 넣는 순간 맞춤 창이 열려 이루어진다.
     public sealed class SpritePresetsPage : GroupedCodexPage
     {
@@ -42,7 +42,7 @@ namespace GBible.EditorTools.UI
             row.Add(label);
             if (fields.Count == 0)
             {
-                var none = Gs.Label("없음 — 도감 › 클래스에서 클래스를 눌러 스프라이트 필드에 이 그룹을 연결하면, 그 필드에 원본을 넣을 때 베이크됩니다", "gs-caption");
+                var none = Gs.Label("없음 — DB › 클래스에서 클래스를 눌러 스프라이트 필드에 이 그룹을 연결하면, 그 필드에 원본을 넣을 때 베이크됩니다", "gs-caption");
                 none.style.opacity = 0.7f;
                 row.Add(none);
             }

@@ -7,14 +7,14 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // 도감 탭의 전용 화면에 넘기는 것들.
+    // DB 탭의 전용 화면에 넘기는 것들.
     public sealed class CodexPageContext
     {
-        // 확인 창를 띄울 도감 창 뿌리(gs-root).
+        // 확인 창를 띄울 DB 창 뿌리(gs-root).
         public VisualElement Host;
-        // 화면을 그릴 곳(도감 본문 스크롤 안).
+        // 화면을 그릴 곳(DB 본문 스크롤 안).
         public VisualElement Content;
-        // 도감 검색 칸의 글자.
+        // DB 검색 칸의 글자.
         public string Search = "";
         public List<ValidationIssue> Issues = new List<ValidationIssue>();
         // 항목의 상세 화면(작업본)을 연다.
@@ -25,7 +25,7 @@ namespace GBible.EditorTools.UI
         public string Group;
     }
 
-    // 시트·카드 대신 쓰는 도감 탭 화면. [Database(Page = "키")]가 붙은 종류의 탭에서 쓰인다(TypeCache로 찾는다).
+    // 시트·카드 대신 쓰는 DB 탭 화면. [Database(Page = "키")]가 붙은 종류의 탭에서 쓰인다(TypeCache로 찾는다).
     // 이 화면에서의 변경도 EditorDatabase.Staging에 모아 두고, 저장(Ctrl+S)할 때 적용한다.
     public abstract class CodexPage
     {
@@ -36,7 +36,7 @@ namespace GBible.EditorTools.UI
         public virtual string CreateLabel => "+ 새로 만들기";
         public abstract void Create(CodexPageContext context);
 
-        // 도감 종류에 딸리지 않은 독립 탭(클래스·이벤트): 사이드바에 보일 이름·그룹·순서. 종류의 전용 화면이면 TabLabel이 null.
+        // DB 종류에 딸리지 않은 독립 탭(클래스·이벤트): 사이드바에 보일 이름·그룹·순서. 종류의 전용 화면이면 TabLabel이 null.
         public virtual string TabLabel => null;
         public virtual string TabGroup => null;
         public virtual int TabOrder => 0;
@@ -65,7 +65,7 @@ namespace GBible.EditorTools.UI
         public static CodexPage Find(string key)
         {
             if (key == null) return null;
-            // 도감 종류의 공용 목록(전용 화면이 없는 종류): "data:" + 종류 전체 이름.
+            // DB 종류의 공용 목록(전용 화면이 없는 종류): "data:" + 종류 전체 이름.
             if (key.StartsWith(DataListPage.Prefix, StringComparison.Ordinal))
             {
                 var info = DataTypes.All.FirstOrDefault(i => i.Type.FullName == key.Substring(DataListPage.Prefix.Length));

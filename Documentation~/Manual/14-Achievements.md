@@ -23,7 +23,7 @@
 
 ### 1-1. 도전과제 만들기
 
-1. `MomoiProject → 도감` → 사이드바 **진행** 그룹의 **도전과제** 탭.
+1. `MomoiProject → DB` → 사이드바 **진행** 그룹의 **도전과제** 탭.
 2. 목록 맨 위 줄(또는 폴더 줄)에 마우스를 올려 **`+ 도전과제`**를 누른다. 새 항목이 생기고 상세가 열린다.
 3. 제목(= ID)을 눌러 이름을 짓는다(lowerCamelCase와 점, 예: `firstBlood`, `hunt.hunter100`).
 4. 칸을 채운다. 칸 이름표는 코드의 변수 이름이고, 마우스를 올리면 한국어 설명이 보인다.
@@ -83,13 +83,13 @@ session.Achievements.Define(def);
 | 멤버 | 뜻 |
 |---|---|
 | `Id` | 필수. 비면 예외 |
-| `DisplayName` | 표시 이름(Journal·모니터·`AchievementUnlocked`). 도감 항목은 ID가 표시 이름이다 |
+| `DisplayName` | 표시 이름(Journal·모니터·`AchievementUnlocked`). DB 항목은 ID가 표시 이름이다 |
 | `When` (`Trigger`) | 언제 달성되는지. `null`이면 달성될 수 없고 Journal에 경고 |
 | `Outcomes` (`List<Outcome>`) | 결과 |
 | `Condition` (짧은 형태) | 조건 하나로 된 Trigger를 읽고 쓴다(`When = new ConditionTrigger { condition = … }`과 같다) |
 | `Rewards` (짧은 형태, `List<Reward>`) | 코딩한 결과만. `Outcomes` 뒤에 실행된다 |
 
-게임에서는 런타임이 시작할 때 도감의 모든 도전과제(`AchievementData.ToDefinition()`)를 정의한다. 코드로 정의하는 것은 서버·테스트·도감 밖에서 만드는 도전과제용이다.
+게임에서는 런타임이 시작할 때 DB의 모든 도전과제(`AchievementData.ToDefinition()`)를 정의한다. 코드로 정의하는 것은 서버·테스트·DB 밖에서 만드는 도전과제용이다.
 
 ### 2-2. `session.Achievements` — `AchievementSystem`
 
@@ -173,8 +173,8 @@ session.Achievements.Define(firstBlood);
 
 ### 3-2. 처치 100회(로그 + 비교)
 
-1. 도감 › 로그 `kills`: 범위 `누적`, 집계 `합계`, 반영 규칙 `유닛 처치 받기`(반영할 값 비움 = 횟수).
-2. 도감 › 도전과제 `hunter100`: `trigger` = `비교`(`kills >= 100`).
+1. DB › 로그 `kills`: 범위 `누적`, 집계 `합계`, 반영 규칙 `유닛 처치 받기`(반영할 값 비움 = 횟수).
+2. DB › 도전과제 `hunter100`: `trigger` = `비교`(`kills >= 100`).
 
 모니터 카드에 `37 / 100` 같은 진행도가 보인다. 처치 행동이 끝날 때(Flush) 조건이 다시 평가되어 100번째 처치 행동 직후 달성된다.
 
@@ -277,6 +277,6 @@ foreach (var def in achievements.Definitions)
 - **보상이 행동과 같은 값을 바꾼다.** 도전과제의 결과는 Undo 이력 밖이다. 달성시킨 행동이 같은 필드를 바꿨다면 그 행동을 Undo할 때 그 필드는 행동 전 값으로 돌아가고 Journal에 "Undo …가 행동 밖에서 바뀐 값을 덮었습니다" 경고가 남을 수 있다. 보상은 행동이 건드리지 않는 값(메타 구역의 재화·칭호 등)에 주는 것이 안전하다.
 - **조건만으로 된 도전과제에 이벤트 값을 쓰는 결과를 둔다.** 조건 충족으로 발동하면 `Context.Event`가 `null`이다. 이벤트 값이 필요하면 이벤트 받기를 AND로 넣는다.
 - **로그에 기록의 로그 칸을 비운다.** 도전과제 안의 로그에 기록은 로그를 꼭 고른다(비우면 아무것도 기록하지 않고 경고만 남는다).
-- **ID를 바꾼 뒤 저장 파일.** 도감에서 ID를 바꾸면 이름 바꾸기 기록으로 예전 달성 표시가 이어진다(출시 뒤). 코드의 `[BindTo]`는 `GameIds` 상수를 쓰면 함께 맞춰진다.
+- **ID를 바꾼 뒤 저장 파일.** DB에서 ID를 바꾸면 이름 바꾸기 기록으로 예전 달성 표시가 이어진다(출시 뒤). 코드의 `[BindTo]`는 `GameIds` 상수를 쓰면 함께 맞춰진다.
 - **서버·테스트에서 Flush를 잊는다.** `Data.Set`으로 값을 직접 바꾼 뒤에는 `session.Achievements.Flush()`를 불러야 조건이 평가된다(행동으로 바꾸면 자동).
 - **강제 달성과 트리거로 달성을 헷갈린다.** 강제 달성은 로그·이벤트를 건드리지 않는다. 연쇄 반응(다른 로그·도전과제)까지 보려면 트리거로 달성을 쓴다.

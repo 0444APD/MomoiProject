@@ -47,14 +47,14 @@ namespace GBible.Tests
     [Serializable] public sealed class ScenarioLoot : GameAction { public string template; public override string Describe() => $"{template} 획득"; }
     [Serializable] public sealed class ScenarioEnhance : GameAction { public string effect; public override string Describe() => $"첫 장비 {effect} 강화"; }
 
-    // 끝까지 검증: 도감에서 정의할 것(수치 규칙·도전과제 조건식·플레이어 데이터·인스턴스)을 데이터로 만들고,
+    // 끝까지 검증: DB에서 정의할 것(수치 규칙·도전과제 조건식·플레이어 데이터·인스턴스)을 데이터로 만들고,
     // 행동 → 이벤트 → 수치 → 조건식 → 달성·보상 → Undo → 저장·이어하기가 코드 추가 없이 맞물리는지 확인한다.
     public class ScenarioTests
     {
         const string Inventory = "player.inventory";
         const string Floor = "run.floor";
 
-        // 도감의 인스턴스에 해당(개발자가 미리 채워 둔 인스턴스).
+        // DB의 인스턴스에 해당(개발자가 미리 채워 둔 인스턴스).
         static readonly Dictionary<string, ScenarioEquipment> Templates = new Dictionary<string, ScenarioEquipment>
         {
             ["training_sword"] = new ScenarioEquipment { name = "훈련용 검", grade = 1, tags = { "melee" } },
@@ -65,11 +65,11 @@ namespace GBible.Tests
         {
             var session = new GameSession(new SessionOptions { Seed = 77 });
 
-            // 플레이어 데이터(도감: 플레이어 데이터)
+            // 플레이어 데이터(DB: 플레이어 데이터)
             session.Data.Define(Inventory, DataZone.Meta, new ScenarioInventory(), "인벤토리");
             session.Data.Define(Floor, DataZone.Session, 1, "현재 층");
 
-            // 수치(도감: 수치) — 보스 처치 수는 이벤트 조건식으로 거른다.
+            // 수치(DB: 수치) — 보스 처치 수는 이벤트 조건식으로 거른다.
             var kills = new StatDefinition { Id = "kills", DisplayName = "처치 수", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
             kills.Rules.Add(new StatRule { eventType = typeof(ScenarioKilled).FullName });
             var bossKills = new StatDefinition { Id = "boss_kills", DisplayName = "보스 처치 수", Scope = StatScope.Total, Aggregate = StatAggregate.Sum };
@@ -78,7 +78,7 @@ namespace GBible.Tests
             session.Stats.Define(kills);
             session.Stats.Define(bossKills);
 
-            // 도전과제(도감: 도전과제) — 조건식 트리
+            // 도전과제(DB: 도전과제) — 조건식 트리
             var dragonSlayer = new AchievementDefinition
             {
                 Id = "dragon_slayer",

@@ -51,7 +51,7 @@ namespace GBible
         public TriggerSystem Triggers { get; }
         public StatSystem Stats { get; }
         public AchievementSystem Achievements { get; }
-        // 능력(도감 › 능력): 아이템 사용 효과·스킬 등. Game.Use로 쓴다.
+        // 능력(DB › 능력): 아이템 사용 효과·스킬 등. Game.Use로 쓴다.
         public AbilitySystem Abilities { get; }
         // 게임 코드의 창구(All·Find·Random·Do·Use). Block 안에서는 Game 속성으로 쓴다.
         public GameApi Game { get; }
@@ -62,7 +62,7 @@ namespace GBible
         // 런타임이 데이터베이스(플레이어 데이터·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
         public Dictionary<string, string> SaveSchema;
 
-        // 인스턴스(도감 › 인스턴스에서 만든 인스턴스: 아이템 A, 버프 B …)의 원본을 ID로 찾는다. 런타임이 데이터베이스로 채운다.
+        // 인스턴스(DB › 인스턴스에서 만든 인스턴스: 아이템 A, 버프 B …)의 원본을 ID로 찾는다. 런타임이 데이터베이스로 채운다.
         // 보상 등은 원본이 아니라 CopyInstance의 깊은 사본을 넣는다(비교 코드가 있으면 생성 코드로, 리플렉션 없음).
         public Func<string, object> Instances;
 

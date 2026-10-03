@@ -1,6 +1,6 @@
 # 13. `[BindTo]` — 항목 하나의 결과를 코드로 쓰기
 
-**한 줄 요약**: `[BindTo(id)]`를 static 함수(또는 `Reward` 클래스)에 붙이면, 그 ID를 가진 도감 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스)의 결과가 그 코드로 바뀐다. 그 항목의 결과 칸은 에디터에서 잠기고, 연결된 코드 이름과 `cs 열기`만 보인다.
+**한 줄 요약**: `[BindTo(id)]`를 static 함수(또는 `Reward` 클래스)에 붙이면, 그 ID를 가진 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스)의 결과가 그 코드로 바뀐다. 그 항목의 결과 칸은 에디터에서 잠기고, 연결된 코드 이름과 `cs 열기`만 보인다.
 
 **언제 쓰는가**
 
@@ -17,7 +17,7 @@
 | Outcome | Trigger가 발동했을 때 하는 일(결과). `[BindTo]` 코드는 그 항목의 Outcome이 된다. |
 | Trigger | 언제 발동하는지(→ `11-Triggers-Conditions.md`). `[BindTo]`는 Trigger를 바꾸지 않는다. |
 | TriggerContext (컨텍스트) | 발동한 순간의 정보: `Session`·`Game`·`Owner`·`Event`·`IsUse`·`User`·`Picked`. |
-| 연결 | `[BindTo(id)]`로 코드와 도감 항목을 잇는 것. |
+| 연결 | `[BindTo(id)]`로 코드와 DB 항목을 잇는 것. |
 
 ---
 
@@ -26,7 +26,7 @@
 `[BindTo]`는 에디터에서 만드는 것이 아니다. 코드를 쓰면 에디터가 따라 바뀐다.
 
 1. 코드에 `[BindTo("firstBlood")]` 함수를 쓰고 Unity가 컴파일을 마친다.
-2. `MomoiProject → 도감`에서 그 ID의 항목(예: 도전과제 `firstBlood`)을 연다.
+2. `MomoiProject → DB`에서 그 ID의 항목(예: 도전과제 `firstBlood`)을 연다.
 3. 결과 칸 자리에 다음이 보인다.
    - 안내: "코드로 쓴 결과가 이 항목에 연결되어 있습니다([BindTo]). 결과는 코드에서 고칩니다."
    - 연결된 코드마다 한 줄:
@@ -60,7 +60,7 @@ public static class AchievementLogic
 }
 ```
 
-- 인자는 도감 항목의 ID다. 도전과제·로그·능력은 그 항목의 ID, 사용 기능은 **인스턴스의 ID**(도감 › 인스턴스의 항목 ID)다.
+- 인자는 DB 항목의 ID다. 도전과제·로그·능력은 그 항목의 ID, 사용 기능은 **인스턴스의 ID**(DB › 인스턴스의 항목 ID)다.
 - 함수와 클래스에 붙는다. 함수가 든 클래스는 어디든 된다(static 클래스가 아니어도, 이름이 무엇이든).
 
 ### 2-2. ID는 `GameIds` 상수로
@@ -239,7 +239,7 @@ public class UnitKilled
 
 ### 3-1. 도전과제 보상: 처치한 유닛에게 경험치 + 파티 골드
 
-**에디터**: 도감 › 도전과제 `firstBlood`의 트리거를 `유닛 처치 받기`로 둔다.
+**에디터**: DB › 도전과제 `firstBlood`의 트리거를 `유닛 처치 받기`로 둔다.
 
 ```csharp
 public static class AchievementRewards
@@ -274,7 +274,7 @@ static void RichParty(TriggerContext c)
 
 ### 3-3. 처치 로그를 직접 기록: 보스는 10점
 
-**에디터**: 도감 › 로그 `huntScore`(합계), 반영 규칙 `유닛 처치 받기`.
+**에디터**: DB › 로그 `huntScore`(합계), 반영 규칙 `유닛 처치 받기`.
 
 ```csharp
 public static class LogRules
@@ -301,7 +301,7 @@ static void KillsByTeam(UnitKilled e, TriggerContext c)
 
 ### 3-5. 포션 사용: 사용자 회복 + 개수 줄이기
 
-**에디터**: 아이템 클래스에 사용 기능 필드를 두고(→ `16-Abilities-Usable.md`), 도감 › 인스턴스에 `potion`을 만들어 `+ 기능` → `usable`을 붙인다.
+**에디터**: 아이템 클래스에 사용 기능 필드를 두고(→ `16-Abilities-Usable.md`), DB › 인스턴스에 `potion`을 만들어 `+ 기능` → `usable`을 붙인다.
 
 ```csharp
 public static class ItemUses
@@ -387,7 +387,7 @@ static void HunterTier(TriggerContext c)
 
 - **ID 오타·이름 바꾸기.** 연결할 항목이 없는 ID는 연결되지 않고, 게임이 켜질 때 콘솔에 경고가 한 번 뜬다. `GameIds` 상수를 쓴다(ID를 바꾸면 상수 이름도 바뀌어 컴파일 오류로 드러난다).
 - **사용 기능·능력에 이벤트 매개변수.** `Game.Use`에는 이벤트가 없으므로 `(UnitKilled e, …)` 함수는 실행되지 않고 경고만 남는다. `(TriggerContext c)`를 쓴다.
-- **사용 기능은 인스턴스 ID로.** `Item.id` 같은 클래스 필드가 아니라 도감 › 인스턴스 항목의 ID에 연결한다. 그 인스턴스의 값에 사용 기능 필드가 붙어 있어야(`null`이 아니어야) 쓸 수 있는 항목으로 등록된다.
+- **사용 기능은 인스턴스 ID로.** `Item.id` 같은 클래스 필드가 아니라 DB › 인스턴스 항목의 ID에 연결한다. 그 인스턴스의 값에 사용 기능 필드가 붙어 있어야(`null`이 아니어야) 쓸 수 있는 항목으로 등록된다.
 - **로그에 연결하고 Report를 잊는다.** 연결된 로그는 자동 기록이 멈춘다. 함수가 `c.Session.Stats.Report(c.Owner, 값)`을 불러야 값이 오른다.
 - **결과 칸이 왜 잠겼는지 모른다.** 다른 사람이 쓴 `[BindTo]`가 그 ID에 연결되어 있다. `cs 열기`로 코드를 확인한다. 연결을 빼면 예전 결과가 다시 쓰인다.
 - **`cs 열기`가 파일을 못 찾는다.** 스크립트 파일 이름에 클래스 이름이 들어 있어야 찾는다(`AchievementRewards` 클래스 → `AchievementRewards.cs`). 못 찾으면 콘솔에 "스크립트 파일을 찾지 못했습니다" 경고가 뜬다.

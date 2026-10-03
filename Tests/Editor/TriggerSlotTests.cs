@@ -109,7 +109,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 같은_칸_찾기가_도감_종류와_기능_목록_안쪽까지_본다()
+        public void 같은_칸_찾기가_DB_종류와_기능_목록_안쪽까지_본다()
         {
             var achievement = Make<AchievementData>("achievement1");
             achievement.trigger = Kill();

@@ -11,7 +11,7 @@ using UnityEngine.UIElements;
 namespace GBible.EditorTools.Graph
 {
     // 그래프 에셋(다이얼로그·연출 프리셋)을 왼쪽 목록에서 고르고 오른쪽 그래프에서 편집하는 창의 공통 부분.
-    // 편집은 에셋에 바로 저장한다(도감의 모아 두기 적용과 별개, Undo 가능).
+    // 편집은 에셋에 바로 저장한다(DB의 모아 두기 적용과 별개, Undo 가능).
     public abstract class GraphAssetWindow : EditorWindow
     {
         [SerializeField] string _selected;
@@ -63,7 +63,7 @@ namespace GBible.EditorTools.Graph
             _root.style.alignItems = Align.Stretch;
             host.Add(_root);
 
-            // 왼쪽 목록: 도감의 모든 탭과 같은 모양(CodexTree). 폴더는 정리용이고, 끌어서 다른 폴더로 옮긴다.
+            // 왼쪽 목록: DB의 모든 탭과 같은 모양(CodexTree). 폴더는 정리용이고, 끌어서 다른 폴더로 옮긴다.
             var side = Gs.Col("gs-graph-window__side");
             _list = Gs.Col();
             var scroll = new ScrollView();
@@ -94,7 +94,7 @@ namespace GBible.EditorTools.Graph
             });
         }
 
-        // 이 창의 편집은 에셋에 바로 저장하므로, 폴더 옮기기·만들기도 바로 적용한다(도감의 Ctrl+S를 기다리지 않는다).
+        // 이 창의 편집은 에셋에 바로 저장하므로, 폴더 옮기기·만들기도 바로 적용한다(DB의 Ctrl+S를 기다리지 않는다).
         void RefreshList()
         {
             if (_list == null) return;

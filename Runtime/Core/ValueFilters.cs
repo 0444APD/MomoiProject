@@ -20,7 +20,7 @@ namespace GBible
         public abstract string Describe();
         // 마우스를 올렸을 때 보이는 설명 문장.
         public virtual string Explain() => Describe();
-        // 자연어 요약(도감·로그 기본 표시): 등급이 3 이상 그리고 (태그에 boss 포함 또는 …)
+        // 자연어 요약(DB·로그 기본 표시): 등급이 3 이상 그리고 (태그에 boss 포함 또는 …)
         public abstract string Natural();
 
         public static string NaturalOrAll(ValueFilter filter) => filter == null ? "항상" : filter.Natural();

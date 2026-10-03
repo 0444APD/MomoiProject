@@ -23,10 +23,10 @@ namespace GBible.EditorTools
         List<GameData> _view;
         public static event Action Changed;
 
-        // 도감에서 모아 둔(아직 적용하지 않은) 변경. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
+        // DB에서 모아 둔(아직 적용하지 않은) 변경. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
         public static CodexStaging Staging { get; } = new CodexStaging();
 
-        // 도감이 보는 모습: 실제 에셋 + 적용 대기 중인 변경(추가·수정·삭제). 목록·드롭다운·검증이 이것을 쓴다.
+        // DB가 보는 모습: 실제 에셋 + 적용 대기 중인 변경(추가·수정·삭제). 목록·드롭다운·검증이 이것을 쓴다.
         public IReadOnlyList<GameData> All => Staging.IsEmpty ? Committed : _view ??= Staging.Overlay(Committed);
 
         // 실제 에셋만(적용된 것). 생성 코드·런타임 목록 동기화처럼 Unity에 쓰는 쪽이 쓴다.
@@ -67,7 +67,7 @@ namespace GBible.EditorTools
             if (notify) Changed?.Invoke();
         }
 
-        // 적용 대기 중인 변경이 바뀌었다(에셋은 그대로, 도감이 보는 모습만 다시 만든다).
+        // 적용 대기 중인 변경이 바뀌었다(에셋은 그대로, DB가 보는 모습만 다시 만든다).
         public static void StagingChanged()
         {
             if (_instance != null) _instance._view = null;
@@ -91,7 +91,7 @@ namespace GBible.EditorTools
 
         // ── 생성과 ID ─────────────────────────────────────────
 
-        // id를 주지 않으면 접두어+연번(예: keyword3)으로 제안한 ID를 쓴다. 도감은 만들기 전에 ID를 묻는다.
+        // id를 주지 않으면 접두어+연번(예: keyword3)으로 제안한 ID를 쓴다. DB는 만들기 전에 ID를 묻는다.
         public GameData Create(Type type, string id = null)
         {
             var info = DataTypes.Find(type) ?? throw new ArgumentException($"{type.Name}은 데이터베이스 타입이 아닙니다.");
@@ -106,7 +106,7 @@ namespace GBible.EditorTools
             return data;
         }
 
-        // 메모리의 항목을 에셋으로 저장한다(종류 이름 폴더, 파일 이름 = ID). 도감의 '적용'이 새 항목에 쓴다.
+        // 메모리의 항목을 에셋으로 저장한다(종류 이름 폴더, 파일 이름 = ID). DB의 '적용'이 새 항목에 쓴다.
         public void CreateAsset(GameData data)
         {
             var info = DataTypes.Find(data.GetType()) ?? throw new ArgumentException($"{data.GetType().Name}은 데이터베이스 타입이 아닙니다.");
@@ -153,7 +153,7 @@ namespace GBible.EditorTools
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
             if (database == null)
             {
-                Debug.LogWarning("[MomoiProject] GameDatabase가 아직 없습니다. 데이터베이스 창을 한 번 여세요.");
+                Debug.LogWarning("[MomoiProject] GameDatabase가 아직 없습니다. DB 창을 한 번 여세요.");
                 return;
             }
             var next = !database.IsReleased;
@@ -217,7 +217,7 @@ namespace GBible.EditorTools
             if (field.IsDefined(typeof(AchievementRefAttribute), false)) return typeof(AchievementData);
             var attribute = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
             if (attribute != null) return attribute;
-            // 필드 규칙(도감에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
+            // 필드 규칙(DB에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
             var rule = RuleFor(field);
             // 규칙의 값 출처는 글자 필드(또는 string 리스트)에만 적용한다(스프라이트 필드의 규칙은 규격 그룹용).
             if (rule == null || (field.FieldType != typeof(string) && FieldPaths.ElementTypeOf(field.FieldType) != typeof(string))) return null;
@@ -297,7 +297,7 @@ namespace GBible.EditorTools
             return usages.Count;
         }
 
-        // 프로젝트에서 프리팹 에셋을 지우면 그 프리팹을 가리키던 도감 항목도 지운다(연결만 남은 빈 항목이 생기지 않게).
+        // 프로젝트에서 프리팹 에셋을 지우면 그 프리팹을 가리키던 DB 항목도 지운다(연결만 남은 빈 항목이 생기지 않게).
         public int RemoveOrphanPrefabEntries()
         {
             int removed = 0;
@@ -306,7 +306,7 @@ namespace GBible.EditorTools
                 if (entry.prefab != null || string.IsNullOrEmpty(entry.PrefabGuid)) continue;
                 if (!string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(entry.PrefabGuid))) continue;
                 AssetDatabase.MoveAssetToTrash(AssetDatabase.GetAssetPath(entry));
-                Debug.Log($"[MomoiProject] 프리팹이 지워져 도감 항목 '{entry.DisplayName}'을(를) 정리했습니다.");
+                Debug.Log($"[MomoiProject] 프리팹이 지워져 DB 항목 '{entry.DisplayName}'을(를) 정리했습니다.");
                 removed++;
             }
             if (removed > 0) MarkDirty();

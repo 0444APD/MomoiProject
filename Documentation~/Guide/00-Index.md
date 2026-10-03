@@ -25,11 +25,11 @@ Momoi Project(코드 이름 `GBible`)로 **프로젝트를 시작해서 출시�
 
 | 장 | 이 단계에서 하는 일 |
 |---|---|
-| [01. 프로젝트 시작하기](01-StartProject.md) | 패키지 설치, 시작 설정 창(Product Name·선택 모듈·Undo 방식·언어 → 코드 폴더·asmdef·시작 파일 자동 생성), 코드 둘 자리(Rules·Client·Editor·Tests), 데이터 클래스 → 도감 → GameIds, Bootstrap(Configuring·Started·시드), 첫 플레이 확인 |
+| [01. 프로젝트 시작하기](01-StartProject.md) | 패키지 설치, 시작 설정 창(Product Name·선택 모듈·Undo 방식·언어 → 코드 폴더·asmdef·시작 파일 자동 생성), 코드 둘 자리(Rules·Client·Editor·Tests), 데이터 클래스 → DB → GameIds, Bootstrap(Configuring·Started·시드), 첫 플레이 확인 |
 | [02. 기획을 코드 구조로](02-DesignToCode.md) | 이 값은 플레이어 데이터인가·인스턴스인가·이벤트인가·행동인가·키워드인가 판단하기, 판과 프로필 나누기, "판 데이터에는 ID와 바뀌는 값만", 기획서 한 장을 클래스 목록으로 |
 | [03. 게임 루프](03-GameLoop.md) | 입력 → 행동 → 이벤트 → 화면의 한 바퀴, 런 스크립트, 판·전투·턴 진행, 행동 안의 행동, 실패하면 전체 취소, 지연 효과, 씬 전환 |
 | [04. 콘텐츠 더하기](04-AddingContent.md) | 새 카드·몬스터·물약·유물·도전과제·로그를 넣는 표준 절차, Block으로 만들지 `[BindTo]`로 쓸지 고르기, 프로젝트 고유 기능 만들기 |
-| [05. 기획자와 함께 일하기](05-WorkingWithDesigners.md) | 프로그래머가 만들어 둘 것과 기획자가 도감에서 채울 것, 키워드·`[Hide]`·`[ShowIf]`·Block 설명·필드 규칙으로 기획자 화면 정리, ID 바꾸기와 검증 |
+| [05. 기획자와 함께 일하기](05-WorkingWithDesigners.md) | 프로그래머가 만들어 둘 것과 기획자가 DB에서 채울 것, 키워드·`[Hide]`·`[ShowIf]`·Block 설명·필드 규칙으로 기획자 화면 정리, ID 바꾸기와 검증 |
 | [06. 화면과 연출](06-Presentation.md) | 값 변경 알림으로 화면 갱신, 이벤트를 받아 연출, 데이터와 연출 시간 나누기, 텍스트·현지화, 다이얼로그, 소리, 인벤토리 화면 |
 | [07. 장르별 설정](07-GenreRecipes.md) | 덱빌딩·턴제 전술·실시간 액션·수집형·방치형마다 Undo 방식, 저장 구역, 난수 흐름 고르기 |
 | [08. 시험과 디버깅](08-TestAndDebug.md) | 고정 시드로 재현, 모니터(기록·데이터·행동·이벤트 호출·명령), Undo로 앞뒤 보기, 시뮬레이션, 규칙 테스트, 경고 메시지별 대응 |

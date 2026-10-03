@@ -8,13 +8,13 @@
 | 용어 | 뜻 |
 |---|---|
 | `Session` (`GameSession`) | 게임 한 판의 실행 전체. Data·Events·Random·Journal·Actions·Abilities를 들고 있다. |
-| `Data` (`session.Data`) | 값 저장소(PlayerDataStore). 플레이어 데이터(도감 › 플레이어 데이터)가 여기 등록된다. 플레이어 데이터는 전부 여기에 둔다. |
+| `Data` (`session.Data`) | 값 저장소(PlayerDataStore). 플레이어 데이터(DB › 플레이어 데이터)가 여기 등록된다. 플레이어 데이터는 전부 여기에 둔다. |
 | 플레이어 데이터 클래스 | 플레이어 데이터에 담는 평범한 `[Serializable]` 클래스. 필드·`List`·`Dictionary`를 그냥 고친다. |
 | Mirror · Sync · ChangeSet | 시스템이 플레이어 데이터의 사본(Mirror)을 들고 있다가 Sync할 때 바뀐 곳만 기록한다. 그 기록이 ChangeSet(앞으로 = 새 값, 뒤로 = 옛 값)이다. |
 | `GameApi` | 게임 코드의 창구. Block 안에서는 `Game` 속성, 씬 코드에서는 `GBibleRuntime.Game`. |
 | `GameAction` | 플레이어 입력 하나(이동·사용·구매). 데이터라서 서버 전송·리플레이가 되고, 실행 한 번이 Undo 한 단위. |
 | `Block` | 에디터에서 골라 조립하는 로직 단위: `Condition`(조건), `Reward`(보상), `Effect`(효과), `TargetSelector`(대상). |
-| `Ability` | 도감 › 능력. 대상 Block + 효과 Block을 조립한 것(아이템 사용 효과·스킬·버프 발동). `Game.Use`로 쓴다. |
+| `Ability` | DB › 능력. 대상 Block + 효과 Block을 조립한 것(아이템 사용 효과·스킬·버프 발동). `Game.Use`로 쓴다. |
 
 ## 예제 (턴제)
 
@@ -39,7 +39,7 @@ public class MoveUnit : GameAction<Unit>
     protected override void Run(Unit u) { u.x = x; u.y = y; }      // 그냥 대입 → 행동 끝 Sync에서 기록
 }
 
-// 효과 Block: 도감 › 능력에서 조립하고 수치를 정한다.
+// 효과 Block: DB › 능력에서 조립하고 수치를 정한다.
 [Serializable, BlockInfo("피해", Category = "전투")]
 public class Damage : Effect<Unit>
 {

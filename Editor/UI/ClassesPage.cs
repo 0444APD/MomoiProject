@@ -4,10 +4,10 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // 도감의 클래스 탭: 프로젝트가 코드로 정의한 클래스(아이템·유닛 …)와 도감 종류를 폴더별로 본다(읽기 전용).
+    // DB의 클래스 탭: 프로젝트가 코드로 정의한 클래스(아이템·유닛 …)와 DB 종류를 폴더별로 본다(읽기 전용).
     // 클래스는 코드(C# 파일)에서 만들고 고친다. 이 탭은 결과를 확인하는 곳: 눌러서 필드의 이름·형식·키워드 연결을 보고,
     // 다른 클래스 형식으로 이동하거나 스크립트를 연다. 폴더 = Assets/Code 아래 실제 폴더.
-    // 목록 모양·조작은 모든 도감 탭 공용(CodexTree).
+    // 목록 모양·조작은 모든 DB 탭 공용(CodexTree).
     public class ClassesPage : CodexPage
     {
         public const string PageKey = "classes";
@@ -120,14 +120,14 @@ namespace GBible.EditorTools.UI
                 caption += (caption.Length > 0 ? "  ·  " : "") + $"필드 {fields}개";
             }
             var row = GsGroupSection.Row(entry.Name, caption);
-            if (entry.Kind == ClassKind.Codex) row.Add(new GsBadge("도감 종류", Gs.PaletteFor("kind:codex")));
+            if (entry.Kind == ClassKind.Codex) row.Add(new GsBadge("DB 종류", Gs.PaletteFor("kind:codex")));
             if (entry.Locked) row.Add(new GsBadge("시스템", Gs.PaletteFor("locked")));
             row.tooltip = entry.FullName + "\n눌러서 필드 보기";
             return row;
         }
     }
 
-    // 도감의 이벤트 탭: [GameEvent] 클래스를 폴더별로 본다(읽기 전용, 코드에서 만든다). 클래스 탭과 같은 폴더를 쓴다.
+    // DB의 이벤트 탭: [GameEvent] 클래스를 폴더별로 본다(읽기 전용, 코드에서 만든다). 클래스 탭과 같은 폴더를 쓴다.
     // 에디터에서 이벤트를 쏘는 곳은 모니터(플레이 중)의 이벤트 탭이다.
     public sealed class EventsPage : ClassesPage
     {

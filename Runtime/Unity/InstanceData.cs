@@ -5,9 +5,9 @@ using UnityEngine.Serialization;
 namespace GBible.Data
 {
     // 인스턴스: 클래스(코드로 정의한 아이템·유닛 …)로 만든 원본 하나(몬스터A, 아이템A …). 게임은 이 원본의 깊은 사본을 쓴다.
-    // 도감 › 인스턴스에서 형식을 고르면 빈 객체가 만들어지고, 값을 채운다(필드 보이기·숨기기는 클래스의 [Hide]·[ShowIf]).
+    // DB › 인스턴스에서 형식을 고르면 빈 객체가 만들어지고, 값을 채운다(필드 보이기·숨기기는 클래스의 [Hide]·[ShowIf]).
     // 이 에셋은 저장용 껍데기다(평범한 C# 객체는 혼자 에셋이 될 수 없다). 게임 코드는 value(클래스 객체)만 다룬다.
-    [Database("인스턴스", Group = "도감", Order = 50, IdPrefix = "instance")]
+    [Database("인스턴스", Group = "DB", Order = 50, IdPrefix = "instance")]
     [CreateAssetMenu(menuName = "MomoiProject/인스턴스", fileName = "NewInstance")]
     public sealed class InstanceData : GameData
     {

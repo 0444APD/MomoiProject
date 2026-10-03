@@ -92,7 +92,7 @@ namespace GBible.Tests
         }
     }
 
-    // [BindTo]: 코드로 쓴 결과를 도감 항목에 연결한다(그 항목의 결과 칸 대신).
+    // [BindTo]: 코드로 쓴 결과를 DB 항목에 연결한다(그 항목의 결과 칸 대신).
     [BindTo("bound.achievement")]
     public sealed class MtBoundReward : Reward
     {

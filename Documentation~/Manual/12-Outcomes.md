@@ -19,7 +19,7 @@
 | Trigger | 언제 발동하는지(→ `11-Triggers-Conditions.md`). |
 | Block | 에디터에서 골라 조립하는 로직 단위(조건·결과·효과·대상). |
 | TriggerContext (컨텍스트) | 발동한 순간의 정보(이벤트·사용자·고른 대상·항목 ID). 결과 코드가 읽는다. |
-| 인스턴스 | 도감 › 인스턴스에서 만든 클래스 객체 원본(아이템 A, 몬스터 B …). 결과는 원본이 아니라 깊은 사본을 넣는다. |
+| 인스턴스 | DB › 인스턴스에서 만든 클래스 객체 원본(아이템 A, 몬스터 B …). 결과는 원본이 아니라 깊은 사본을 넣는다. |
 | Undo | 마지막 행동 되돌리기. |
 
 ---
@@ -138,7 +138,7 @@ public class GiveGold : Reward
 
 문법 요소를 차례로:
 
-1. **`[Serializable]`** — 필수(도감 에셋에 저장된다).
+1. **`[Serializable]`** — 필수(DB 에셋에 저장된다).
 2. **`[BlockInfo("표시 이름", Category, Description, Sentence)]`** — 필수. `+ 결과 추가` › 코딩한 결과 목록의 이름. `Sentence`의 `{필드이름}`은 누르면 바뀌는 칸.
 3. **`: Reward`** — 기반 클래스(`Outcome`을 상속한다. `Kind`는 `Coded`).
 4. **public 필드** — 에디터 칸. 항목마다 값이 다르다.
@@ -246,7 +246,7 @@ public class UnitAtSlot : TargetSelector<Unit>
 
 ## 4. 상황별 예제
 
-예제는 다음 형식을 쓴다(도감 › 플레이어 데이터에 `party`(Party, 메타 구역), `battle`(Battle, 세션 구역)이 있다고 본다).
+예제는 다음 형식을 쓴다(DB › 플레이어 데이터에 `party`(Party, 메타 구역), `battle`(Battle, 세션 구역)이 있다고 본다).
 
 ```csharp
 using System;
@@ -301,7 +301,7 @@ public class GoldInterest : Reward
 | 철 3개·나무 1개 | `party › materials` (키와 값 넣기) | `+` → `iron` → `3`, `+` → `wood` → `1` |
 | 철 1개 소모 | `party › materials` | `iron` → `-1` |
 
-인스턴스를 줄 때마다 원본의 **깊은 사본**이 들어가므로, 두 번 줘도 서로 다른 객체다. 원본(도감 › 인스턴스)은 바뀌지 않는다.
+인스턴스를 줄 때마다 원본의 **깊은 사본**이 들어가므로, 두 번 줘도 서로 다른 객체다. 원본(DB › 인스턴스)은 바뀌지 않는다.
 
 ### 4-3. 아군 하수인 3번의 체력 증가
 

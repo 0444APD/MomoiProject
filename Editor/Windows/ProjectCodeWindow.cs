@@ -40,7 +40,7 @@ namespace GBible.EditorTools
 
             _root.Add(Gs.Label("내 코드 범위", "gs-title"));
             var intro = Gs.Label("클래스를 고르는 목록(플레이어 데이터 값 형식, 인스턴스, 필드 규칙, 키워드 연결)에는 이 프로젝트에서 직접 만든 데이터 클래스만 보입니다. " +
-                                 "Unity·패키지·이 라이브러리·Plugins 폴더의 스크립트, 컴포넌트·ScriptableObject(도감 종류 제외)·어트리뷰트·정적 유틸 클래스는 자동으로 빠집니다. " +
+                                 "Unity·패키지·이 라이브러리·Plugins 폴더의 스크립트, 컴포넌트·ScriptableObject(DB 종류 제외)·어트리뷰트·정적 유틸 클래스는 자동으로 빠집니다. " +
                                  "프로젝트 구조가 달라 더 거를 것이 있을 때만 아래를 고칩니다.", "gs-text-2");
             intro.style.whiteSpace = WhiteSpace.Normal;
             intro.style.marginTop = 6;

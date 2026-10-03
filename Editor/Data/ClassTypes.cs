@@ -7,8 +7,8 @@ using UnityEngine;
 
 namespace GBible.EditorTools
 {
-    // 필드 규칙을 걸 수 있는 클래스: 데이터 클래스(저장소·인스턴스에 담는 것), 도감 종류, 이벤트.
-    // 내 코드만 보인다(ProjectCode: 플러그인·패키지·이 라이브러리의 기본 도감 종류는 빠진다). 이벤트는 [GameEvent]를 붙인 것만.
+    // 필드 규칙을 걸 수 있는 클래스: 데이터 클래스(저장소·인스턴스에 담는 것), DB 종류, 이벤트.
+    // 내 코드만 보인다(ProjectCode: 플러그인·패키지·이 라이브러리의 기본 DB 종류는 빠진다). 이벤트는 [GameEvent]를 붙인 것만.
     public static class ClassTypes
     {
         public static IEnumerable<Type> All() =>
@@ -28,7 +28,7 @@ namespace GBible.EditorTools
         }
 
         public static string GroupOf(Type type) =>
-            GameFeatures.Of(type) is GameFeature feature ? feature.Name : typeof(GameData).IsAssignableFrom(type) ? "도감 종류" : type.IsDefined(typeof(GameEventAttribute), false) ? "이벤트" : "데이터 클래스";
+            GameFeatures.Of(type) is GameFeature feature ? feature.Name : typeof(GameData).IsAssignableFrom(type) ? "DB 종류" : type.IsDefined(typeof(GameEventAttribute), false) ? "이벤트" : "데이터 클래스";
 
         // 규칙을 걸 수 있는 필드: 저장되는 필드(public 또는 [SerializeField], [NonSerialized] 제외).
         public static IEnumerable<FieldInfo> FieldsOf(Type type)

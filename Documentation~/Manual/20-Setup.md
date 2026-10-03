@@ -8,8 +8,8 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 |---|---|
 | 세션(`GameSession`) | 게임 한 판에 필요한 모든 시스템(플레이어 데이터·이벤트·난수·기록·행동 …)을 묶은 객체 하나. static 전역 상태를 두지 않으므로 멀티플레이 서버나 테스트는 세션을 여러 개 만들 수 있다. |
 | `GameApi` | 게임 코드가 쓰는 창구(`All`·`Find`·`Do`·`Use`·`Random` …). 세션마다 하나(`session.Game`)다. |
-| 도감 | `MomoiProject → 도감` 창. 데이터 에셋(`GameData`)을 만들고 고치는 데이터베이스 창이다. 자세히는 `21-Editor-Database.md`. |
-| 플레이어 데이터 | 게임 중 바뀌는 값(골드·인벤토리·유닛 …)을 담는 칸. 도감 › 플레이어 데이터에서 ID와 값 형식을 정한다. |
+| DB | `MomoiProject → DB` 창. 데이터 에셋(`GameData`)을 만들고 고치는 DB 창이다. 자세히는 `21-Editor-Database.md`. |
+| 플레이어 데이터 | 게임 중 바뀌는 값(골드·인벤토리·유닛 …)을 담는 칸. DB › 플레이어 데이터에서 ID와 값 형식을 정한다. |
 | Undo | 마지막 행동(`Game.Do`로 실행한 것)을 되돌리는 기능. 이름 그대로 쓴다. |
 
 ---
@@ -25,27 +25,27 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 1. 저장소를 대상 프로젝트의 `Assets` 아래에 복사하거나 `git clone`한다(이 프로젝트는 `Assets/Code/System`). 폴더 위치에 의존하지 않는다.
 2. Unity 6(6000.6.3f1에서 확인)으로 연다.
 3. 패키지 `com.unity.nuget.mono-cecil`이 프로젝트에 있는지 확인한다(Burst·Collections가 함께 가져오는 경우가 많다). 이 패키지가 있어야 컴파일할 때 플레이어 데이터 비교 코드가 만들어진다(아래 9절).
-4. 메뉴 `MomoiProject → 도감`을 한 번 연다. 도감 창이 열리면서 데이터 에셋 목록을 모아 런타임용 목록(`GameDatabase`)을 `Assets/MomoiProjectData/Resources/MomoiProject/GameDatabase.asset`에 만든다(항목이 하나라도 있을 때).
+4. 메뉴 `MomoiProject → DB`을 한 번 연다. DB 창이 열리면서 데이터 에셋 목록을 모아 런타임용 목록(`GameDatabase`)을 `Assets/MomoiProjectData/Resources/MomoiProject/GameDatabase.asset`에 만든다(항목이 하나라도 있을 때).
 5. 플레이 버튼을 누른다. 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`(세션 진행)과 `[오디오]` 오브젝트가 생기면 정상이다.
 
 만들어지는 곳:
 
 | 위치 | 내용 |
 |---|---|
-| `Assets/MomoiProjectData/` | 도감 항목 에셋(종류 이름 폴더), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
+| `Assets/MomoiProjectData/` | DB 항목 에셋(종류 이름 폴더), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
 | `Assets/MomoiProjectGenerated/GameIds.cs` | 식별자 코드(8절). 플레이어 데이터 값 형식이 asmdef 안에 있으면 그 asmdef 폴더의 `Generated/`에 생긴다. |
 | `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`, `Ids.json`, `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
 
 ### 주의할 점
 
-- 저장소 폴더 안(`Assets/Code/System`)에는 게임 코드를 두지 않는다. 도감의 클래스 탭은 `Assets/Code` 아래 폴더를 "내 코드" 폴더로 보고, 이 라이브러리 폴더는 목록에서 뺀다.
-- 런타임이 `GameDatabase`를 찾지 못하면 기록(Journal)에 경고 "GameDatabase를 찾을 수 없습니다. 에디터에서 데이터베이스 창을 한 번 열면 자동으로 만들어집니다."가 남고, 도감 데이터 없이 빈 세션으로 시작한다.
+- 저장소 폴더 안(`Assets/Code/System`)에는 게임 코드를 두지 않는다. DB의 클래스 탭은 `Assets/Code` 아래 폴더를 "내 코드" 폴더로 보고, 이 라이브러리 폴더는 목록에서 뺀다.
+- 런타임이 `GameDatabase`를 찾지 못하면 기록(Journal)에 경고 "GameDatabase를 찾을 수 없습니다. 에디터에서 DB 창을 한 번 열면 자동으로 만들어집니다."가 남고, DB 데이터 없이 빈 세션으로 시작한다.
 
 ---
 
 ## 2. 런타임 자동 시작 — `GBibleRuntime`
 
-**한 줄 요약.** 플레이를 시작하면 `GBibleRuntime`이 세션을 하나 만들고 도감 데이터를 모두 등록한다. 씬에 아무것도 둘 필요가 없다.
+**한 줄 요약.** 플레이를 시작하면 `GBibleRuntime`이 세션을 하나 만들고 DB 데이터를 모두 등록한다. 씬에 아무것도 둘 필요가 없다.
 
 **언제.** 싱글 게임은 항상 이것 하나를 쓴다. 서버·테스트·시뮬레이션은 `new GameSession(...)`으로 직접 만든다.
 
@@ -55,9 +55,9 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 1. `Mirror.Initialize()` — 플레이어 데이터 비교 코드를 모은다. 리플렉션(실행 중에 형식 정보를 읽는 무거운 작업)은 게임이 켜질 때 여기서 한 번만 한다.
 2. `[BindTo]` 코드 결과를 모으고, 모양이 맞지 않는 함수는 콘솔에 경고한다.
-3. `SessionOptions`를 만들고 `Configuring` 이벤트를 쏜다(3절).
+3. `GameDatabase.Load()`로 DB 에셋을 읽고, `SessionOptions`를 만들어 DB › 시작 파일 › Bootstrap 화면의 세션 옵션을 넣은 뒤 `Configuring` 이벤트를 쏜다(3절). 코드가 화면 값을 바꾸면 기록에 남긴다.
 4. `new GameSession(options)`.
-5. `GameDatabase.Load()`로 도감 데이터를 읽어 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제를 세션에 등록한다. `[BindTo("ID")]`의 ID가 어느 도전과제·로그·능력·사용 기능 인스턴스에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 … 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
+5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제를 세션에 등록한다. `[BindTo("ID")]`의 ID가 어느 도전과제·로그·능력·사용 기능 인스턴스에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 … 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
 6. 저장 호환 검사(개발 중이면 호환되지 않는 저장을 지운다), ID 이름 바꾸기 이력 적용, 프로필(`profile.json`) 불러오기.
 7. 기본 디버그 명령(저장·시간)을 등록하고, 경고·오류 기록을 콘솔로 보낸다.
 8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`).
@@ -167,13 +167,24 @@ public static class RoguelikeBoot
 
 ## 3. 세션 옵션 — `Configuring`과 `SessionOptions`
 
-**한 줄 요약.** 세션을 만들기 직전에 `Configuring` 이벤트를 받아 옵션(되돌리기 방식·시드·저장 버전 …)을 바꾼다.
+**한 줄 요약.** Undo 방식·보관 수·시드는 DB › 시작 파일 › Bootstrap 화면에서 정한다. 화면에 없는 옵션(저장 버전 …)이나 조건에 따른 변경은 세션을 만들기 직전의 `Configuring` 이벤트에서 코드로 바꾼다. 코드가 이긴다.
 
 **언제.** 실시간 게임이라 스냅샷 되감기를 쓸 때, 재현 가능한 고정 시드가 필요할 때, 출시 후 저장 구조를 바꿀 때.
 
 ### 에디터에서
 
-에디터 설정은 없다. 출시 여부만 메뉴 `MomoiProject → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
+DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 옵션 화면이 열린다. 고친 값은 DB 에셋(`GameDatabase`)에 바로 저장된다(Ctrl+S 필요 없음). 화면 위 **cs 열기**는 `Client/Bootstrap.cs`를 연다.
+
+| 칸 | 같은 뜻의 `SessionOptions` | 기본 |
+|---|---|---|
+| Undo 방식(행동 단위·스냅샷·쓰지 않음) | `History` | 행동 단위 |
+| Undo 보관 수(행동 단위일 때) | `HistoryLimit` | 0(제한 없음) |
+| 스냅샷 간격(초)·스냅샷 보관 수(스냅샷일 때) | `SnapshotInterval`·`SnapshotLimit` | 1초·30개 |
+| 개발 빌드에서 시드 고정 + 시드 | 개발 빌드에서만 `Seed` | 끔(지금 시각) |
+
+게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **기록**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
+
+출시 여부는 메뉴 `MomoiProject → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
 
 - 개발 중(체크 해제, 기본): 데이터 구조가 호환되지 않게 바뀌면 저장을 변환하지 않고 지운다. 기록에 "개발 중 데이터 구조가 바뀌어 저장을 초기화했습니다: …" 경고가 남는다.
 - 출시됨(체크): 저장을 지우지 않는다. ID 이름 바꾸기 이력을 남겨 예전 이름으로 저장된 값을 이어받고, 구조 변경은 저장 버전 변환(`Migrations`)으로 처리한다.
@@ -336,7 +347,7 @@ public static class GameBoot
 
 **`session.Debug.Register(분류, 이름, 동작, 설명)`** — 모니터의 명령 탭에 버튼을 더한다(`22-Monitor-Debug.md`).
 
-**`session.Data.Define(키, 구역, 기본값, 표시 이름)`** — 도감에 없는, 코드에서만 쓰는 값을 등록한다. 샘플(`SampleGame`)이 콤보 수를 이렇게 둔다.
+**`session.Data.Define(키, 구역, 기본값, 표시 이름)`** — DB에 없는, 코드에서만 쓰는 값을 등록한다. 샘플(`SampleGame`)이 콤보 수를 이렇게 둔다.
 
 ```csharp
 session.Data.Define("sample:combo", DataZone.Session, 0, "현재 콤보");
@@ -350,7 +361,7 @@ GBibleRuntime.Stopped += session => UnityEngine.Debug.Log($"기록 {session.Jour
 
 ### 상황별 예제
 
-**디버그 빌드에서만 치트 명령.** 도감 › 플레이어 데이터에 `playerGold`(숫자)가 있다고 하자.
+**디버그 빌드에서만 치트 명령.** DB › 플레이어 데이터에 `playerGold`(숫자)가 있다고 하자.
 
 ```csharp
 using GBible;
@@ -393,20 +404,20 @@ public sealed class QuestTracker : MonoBehaviour
 
 ### 주의할 점
 
-- `Started`에서 쏜 이벤트·바꾼 값도 기록에 남는다. 처음 값은 도감의 기본값으로 정하는 편이 낫다.
+- `Started`에서 쏜 이벤트·바꾼 값도 기록에 남는다. 처음 값은 DB의 기본값으로 정하는 편이 낫다.
 - `Stopped`는 `OnApplicationQuit`에서 불린다. 에디터에서 플레이를 멈출 때도 불린다.
 
 ---
 
 ## 5. 런타임 데이터 목록 — `GameDatabase`
 
-**한 줄 요약.** 모든 도감 항목(`GameData`)의 목록 에셋. 에디터가 자동으로 채우고, 런타임은 `GameDatabase.Load()`로 읽는다.
+**한 줄 요약.** 모든 DB 항목(`GameData`)의 목록 에셋. 에디터가 자동으로 채우고, 런타임은 `GameDatabase.Load()`로 읽는다.
 
-**언제.** 게임 코드가 도감 데이터(도전과제 목록, 스탠딩 프로필, 인스턴스 원본 …)를 직접 훑어볼 때.
+**언제.** 게임 코드가 DB 데이터(도전과제 목록, 스탠딩 프로필, 인스턴스 원본 …)를 직접 훑어볼 때.
 
 ### 에디터에서
 
-직접 편집하지 않는다. 도감에서 항목을 만들고 저장(Ctrl+S)하면, 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProjectData/Resources/MomoiProject/GameDatabase.asset`이다.
+직접 편집하지 않는다. DB에서 항목을 만들고 저장(Ctrl+S)하면, 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProjectData/Resources/MomoiProject/GameDatabase.asset`이다.
 
 ### 코드로 쓰는 법
 
@@ -466,13 +477,13 @@ var copy = potion.CreateInstance();   // 깊은 사본
 ### 주의할 점
 
 - 런타임에 `Resources.Load`는 한 번만 하고 결과를 들고 있는다(매 프레임 부르지 않는다).
-- 저장(Ctrl+S)하지 않은 도감 변경은 목록에 없다. 플레이를 시작할 때 저장하지 않은 변경이 있으면 도감이 저장할지 묻는다.
+- 저장(Ctrl+S)하지 않은 DB 변경은 목록에 없다. 플레이를 시작할 때 저장하지 않은 변경이 있으면 DB가 저장할지 묻는다.
 
 ---
 
 ## 6. 선택 기능 켜고 끄기 — `GameFeatures`
 
-**한 줄 요약.** 다이얼로그 시스템·인벤토리 시스템처럼 프로젝트마다 쓸지 말지 정하는 모듈을 도감 사이드바의 스위치로 켜고 끈다.
+**한 줄 요약.** 다이얼로그 시스템·인벤토리 시스템처럼 프로젝트마다 쓸지 말지 정하는 모듈을 DB 사이드바의 스위치로 켜고 끈다.
 
 **언제.** 모듈을 처음 쓸 때, 쓰지 않는 모듈을 빌드에서 뺄 때.
 
@@ -485,7 +496,7 @@ var copy = potion.CreateInstance();   // 깊은 사본
 
 ### 에디터에서
 
-1. `MomoiProject → 도감`을 연다.
+1. `MomoiProject → DB`을 연다.
 2. 왼쪽 사이드바 아래쪽에 기능 이름의 그룹(예: "다이얼로그 시스템")이 있다. 그 첫 줄 **기능 활성화**(오른쪽 끝 스위치)를 누른다.
 3. 확인 창("기능 켜기" / "기능 끄기")에서 **켜기** 또는 **끄기**를 누른다.
 4. Unity가 다시 컴파일한다. 컴파일이 끝나면 탭·메뉴가 열린다. 꺼진 기능의 탭은 사이드바에 흐리게 보이고 들어갈 수 없다(마우스를 올리면 "'다이얼로그 시스템' 기능이 꺼져 있습니다. 위의 '기능 활성화'를 눌러 켜면 열립니다.").
@@ -546,13 +557,13 @@ static class FeatureCheck
 
 ## 7. 식별자 코드 — `GameIds`
 
-**한 줄 요약.** 도감의 모든 ID를 C# 상수로 만든 파일 `GameIds.cs`. 코드에서 ID를 글자로 쓰지 않고 자동완성으로 골라 오타를 컴파일 단계에서 막는다.
+**한 줄 요약.** DB의 모든 ID를 C# 상수로 만든 파일 `GameIds.cs`. 코드에서 ID를 글자로 쓰지 않고 자동완성으로 골라 오타를 컴파일 단계에서 막는다.
 
 **언제.** 게임 코드에서 플레이어 데이터·능력·도전과제·인스턴스 ID를 쓸 때마다.
 
 ### 에디터에서
 
-- 자동: 도감 변경을 저장(Ctrl+S)하면 다시 만든다. 내용이 같으면 파일을 건드리지 않는다.
+- 자동: DB 변경을 저장(Ctrl+S)하면 다시 만든다. 내용이 같으면 파일을 건드리지 않는다.
 - 수동: 메뉴 `MomoiProject → 식별자 코드 다시 만들기`. 콘솔에 "[MomoiProject] 식별자 코드를 만들었습니다: 경로"가 찍힌다.
 - 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다). 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProjectGenerated/`. `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다.
 
@@ -578,7 +589,7 @@ namespace GBible.Ids
 ```
 
 - **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `instance.potion` → `InstancePotion`).
-- **분류 이름**: 도감 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`). 플레이어 데이터만 `PlayerData`.
+- **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`). 플레이어 데이터만 `PlayerData`.
 - **플레이어 데이터 = `PlayerDataKey<T>`**: 값 형식이 붙은 키. `.Id`가 ID 글자이고, `string`으로 바로 바뀐다(암시 변환).
 - **그 밖의 항목 = `const string`**: `[BindTo(...)]` 같은 어트리뷰트 인자에도 쓸 수 있다.
 
@@ -623,12 +634,12 @@ public static class AchievementRewards
 GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 ```
 
-(위 두 예제는 도감에 `firstHunt` 도전과제, `ability.heal` 능력, `player.gold`(int) 플레이어 데이터가 있을 때 컴파일된다.)
+(위 두 예제는 DB에 `firstHunt` 도전과제, `ability.heal` 능력, `player.gold`(int) 플레이어 데이터가 있을 때 컴파일된다.)
 
 ### 주의할 점
 
 - 생성 파일은 직접 고치지 않는다(다시 만들면 덮인다).
-- 저장(Ctrl+S)하지 않은 도감 항목은 생성 코드에 없다. 저장한 뒤 컴파일이 끝나야 새 상수가 보인다.
+- 저장(Ctrl+S)하지 않은 DB 항목은 생성 코드에 없다. 저장한 뒤 컴파일이 끝나야 새 상수가 보인다.
 - 값 형식을 이 위치에서 참조할 수 없으면(예: 다른 asmdef의 클래스) 그 플레이어 데이터는 `PlayerDataKey<T>` 대신 `const string`으로 만들어지고 `Game.Data()`에도 빠진다. `Ids.json`의 `folder`를 그 형식의 asmdef 쪽으로 바꾸면 형식이 붙는다.
 - 키워드는 `GameIds`에 없다. 키워드 그룹 코드(`[KeywordGroup] static class`)의 상수가 곧 ID다.
 
@@ -642,7 +653,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 |---|---|---|---|
 | `GBible.Core` | `Runtime/Core` | 게임 로직(세션·플레이어 데이터·이벤트·트리거·텍스트 …). Unity 없이 .NET에서도 컴파일되도록 쓴다. | 예 |
 | `GBible.Unity` | `Runtime/Unity` | `GameData`·`GameDatabase`·`GBibleRuntime`·`GameTime`·오디오·다국어 Unity 쪽 | 예 |
-| `GBible.Editor` | `Editor` | 도감·모니터·오디오 창, 검증기, 생성 코드 | 예(에디터) |
+| `GBible.Editor` | `Editor` | DB·모니터·오디오 창, 검증기, 생성 코드 | 예(에디터) |
 | `GBible.Dialogue` · `.Editor` | `Optional/Dialogue` | 선택 모듈(`GBIBLE_DIALOGUE`) | 예 |
 | `GBible.Inventory` | `Optional/Inventory` | 선택 모듈(`GBIBLE_INVENTORY`) | 예 |
 | `Unity.GBible.CodeGen` | `CodeGen` | 컴파일할 때 Mirror 비교 코드를 만든다(에디터 전용, `com.unity.nuget.mono-cecil`이 있을 때만) | 아니오 |
@@ -665,7 +676,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 플레이어 데이터는 Mirror로 기록된다. Mirror는 시스템이 들고 있는 플레이어 데이터의 사본이고, Sync는 지금 값과 사본을 비교해 바뀐 곳만 기록하는 동작이다(`Coding.md`). 비교 코드는 `Unity.GBible.CodeGen`이 컴파일할 때마다 `GBible.Core`와 **그것을 참조하는 어셈블리**의 `[Serializable]` 클래스·구조체 안에 만든다. 그래서:
 
 - 플레이어 데이터 클래스는 `GBible.Core`를 참조하는 어셈블리(`Assembly-CSharp` 포함)에 둔다.
-- `com.unity.nuget.mono-cecil` 패키지가 없으면 비교 코드가 만들어지지 않고, 예전 방식(리플렉션 비교, 느림)으로 돌며 기록에 "예전 방식(리플렉션)으로 비교합니다" 경고가 남는다. 도감 › 플레이어 데이터 검증에도 같은 경고가 뜬다.
+- `com.unity.nuget.mono-cecil` 패키지가 없으면 비교 코드가 만들어지지 않고, 예전 방식(리플렉션 비교, 느림)으로 돌며 기록에 "예전 방식(리플렉션)으로 비교합니다" 경고가 남는다. DB › 플레이어 데이터 검증에도 같은 경고가 뜬다.
 
 ### 주의할 점
 
@@ -676,11 +687,11 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ## 9. 시작하기 단계 (현재 숨김)
 
-에디터 코드에는 새 프로젝트의 설정 단계를 순서대로 안내하는 "시작하기" 탭과 도움말 창이 있다(`Editor/Help/SetupSteps.cs`: 프로젝트 상태 확인 → 키워드 → 플레이어 데이터 → 스프라이트 규격 → 로그 → 도전과제 → 인스턴스·프리팹 → 식별자 코드 → 검증 오류 → 플레이하며 확인). 지금은 `HelpFeature.Enabled = false`라 도감 사이드바에 나오지 않는다. 그 안의 글 일부는 예전 구조(키워드 연결 창)를 설명하므로, 다시 켤 때까지는 이 설명서를 따른다.
+에디터 코드에는 새 프로젝트의 설정 단계를 순서대로 안내하는 "시작하기" 탭과 도움말 창이 있다(`Editor/Help/SetupSteps.cs`: 프로젝트 상태 확인 → 키워드 → 플레이어 데이터 → 스프라이트 규격 → 로그 → 도전과제 → 인스턴스·프리팹 → 식별자 코드 → 검증 오류 → 플레이하며 확인). 지금은 `HelpFeature.Enabled = false`라 DB 사이드바에 나오지 않는다. 그 안의 글 일부는 예전 구조(키워드 연결 창)를 설명하므로, 다시 켤 때까지는 이 설명서를 따른다.
 
 설정 순서만 정리하면 다음과 같다.
 
-1. 도감을 한 번 연다(GameDatabase 생성).
+1. DB를 한 번 연다(GameDatabase 생성).
 2. 키워드 그룹을 만들고 필드에 연결한다(`21-Editor-Database.md` 키워드 탭).
 3. 플레이어 데이터를 만든다(ID·구역·값 형식).
 4. 필요하면 스프라이트 규격, 로그, 도전과제, 인스턴스를 만든다.
