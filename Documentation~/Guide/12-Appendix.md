@@ -246,7 +246,7 @@ static void Started(GameSession session)
 - [ ] `com.unity.nuget.mono-cecil` 패키지가 있다.
 - [ ] 도감을 한 번 열었고 `GameDatabase.asset`이 생겼다.
 - [ ] 쓸 선택 모듈을 켰다(`Features.json`이 바뀌었다).
-- [ ] 게임 로직·화면·에디터 asmdef가 있고, 화면 → 게임 로직 방향으로만 참조한다. 이름이 `Unity`·`GBible.`로 시작하지 않는다.
+- [ ] (asmdef로 나눴다면) 화면 → 게임 로직 방향으로만 참조하고, 이름이 `Unity`·`GBible.`로 시작하지 않는다.
 - [ ] 판·프로필 플레이어 데이터를 도감에 만들고 저장했다. `GameIds.cs`가 게임 로직 폴더의 `Generated/`에 있다.
 - [ ] Bootstrap이 `AfterAssembliesLoaded`에서 `Configuring`·`Started`를 연결한다.
 - [ ] 모니터 머리에 고정 시드가 보이고, 디버그 명령 → Undo가 된다.

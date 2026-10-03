@@ -25,7 +25,7 @@
 1. 저장소 폴더를 `Assets` 아래에 넣고 `com.unity.nuget.mono-cecil` 패키지가 있는지 본다.
 2. `MomoiProject → 도감`을 한 번 열어 런타임 데이터 목록(`GameDatabase`)이 생기게 한다.
 3. 쓸 선택 모듈(인벤토리 시스템·다이얼로그 시스템)을 도감 사이드바에서 켠다.
-4. 게임 코드 폴더와 asmdef 세 개(게임 로직·화면·에디터)를 만든다.
+4. 게임 코드 폴더를 만든다. asmdef(게임 로직·화면·에디터)로 나눌지는 선택이다 — 나누지 않아도 모두 동작한다(아래 판단 기준).
 5. 플레이어 데이터가 될 데이터 클래스와 키워드부터 쓰고 컴파일한다.
 6. 도감 › 플레이어 데이터에 판(`run`)·프로필(`profile`)을 만들고 저장(Ctrl+S)해서 `GameIds.cs`가 생기게 한다.
 7. Bootstrap을 쓴다: 세션 옵션(`Configuring`)과 시작 뒤 할 일(`Started`).
@@ -43,7 +43,17 @@
 | 대사·컷신·상점 주인 대화가 있다 | 다이얼로그 시스템을 켠다. |
 | 둘 다 없다 | 켜지 않는다. 폴더(`Optional/…`)를 통째로 지워도 된다. |
 
-**asmdef를 어떻게 나눌까**
+**asmdef를 만들까**
+
+만들지 않아도 된다. 게임 코드를 `Assets` 아래 아무 폴더에 두면 Unity 기본 어셈블리(`Assembly-CSharp`)에 들어가고, GBible 어셈블리는 자동 참조라 `using GBible;`이 바로 된다. Mirror 생성 코드·`GameIds`·도감 클래스 목록도 그대로 동작한다(`GameIds.cs`는 `Assets/MomoiProjectGenerated/`에 생긴다). 에디터 확장은 Unity 규칙대로 `Editor` 폴더에 둔다. 처음에는 나누지 않고 시작해도 된다.
+
+| 이럴 때 | 나눈다 |
+|---|---|
+| 코드가 커져 컴파일이 느리다 | 고친 어셈블리만 다시 컴파일된다 |
+| 화면 코드가 게임 값을 직접 고치지 못하게 막고 싶다 | 참조 방향(화면 → 로직)을 컴파일러가 강제한다 |
+| 나중에 게임 로직만 서버에서 돌릴 수도 있다 | 화면과 섞이지 않은 로직 어셈블리가 따로 있으면 쉽다 |
+
+**나눈다면 이렇게**
 
 | 어셈블리 | 들어가는 것 | 참조 |
 |---|---|---|
@@ -54,7 +64,6 @@
 - 화면은 게임 로직을 참조하고, 게임 로직은 화면을 모른다. 이렇게 두면 "화면이 값을 바꾸는" 실수가 구조로 막히고, 나중에 게임 로직만 따로 시험하기도 쉽다.
 - 플레이어 데이터 클래스가 게임 로직 asmdef에 있으면 `GameIds.cs`는 그 asmdef 폴더의 `Generated/`에 생긴다. 화면 asmdef는 게임 로직을 참조하므로 `GameIds`와 `Game.Data()`를 그대로 쓴다.
 - asmdef 이름을 `Unity`나 `GBible.`로 시작하게 짓지 않고, `Assets/Plugins` 아래에 두지 않는다. 도감은 그런 어셈블리를 "내 코드"가 아닌 것으로 보고 클래스 목록에서 뺀다.
-- asmdef를 나누지 않고 `Assembly-CSharp`에 두어도 동작한다(자동 참조). 이때 `GameIds.cs`는 `Assets/MomoiProjectGenerated/`에 생긴다.
 
 **Undo 방식과 시드**
 
@@ -84,6 +93,8 @@
 켜짐 상태는 `ProjectSettings/MomoiProject/Features.json`에 남아 팀이 같이 쓴다. 모듈을 쓰는 게임 코드는 모듈을 꺼도 컴파일이 깨지지 않게 `#if GBIBLE_DIALOGUE`·`#if GBIBLE_INVENTORY`로 감쌀 수 있다. 카드 던전은 판 데이터 안에 인벤토리를 두므로(아래 4-4) 인벤토리를 늘 켜 두는 전제로 감싸지 않는다.
 
 ### 4-3. 폴더와 asmdef
+
+카드 던전은 나중에 서버를 붙일 수도 있어 셋으로 나눴다. 나누지 않는다면 이 절은 건너뛰고 폴더만 만든다.
 
 ```
 Assets/Code/
@@ -230,7 +241,7 @@ if (Debug.isDebugBuild)
 - [ ] `com.unity.nuget.mono-cecil` 패키지가 있다.
 - [ ] 도감을 한 번 열었고 `GameDatabase.asset`이 생겼다.
 - [ ] 쓸 선택 모듈을 켰다(`Features.json`이 바뀌었다).
-- [ ] 게임 로직·화면·에디터 asmdef가 있고, 화면 → 게임 로직 방향으로만 참조한다. 이름이 `Unity`·`GBible.`로 시작하지 않는다.
+- [ ] (asmdef로 나눴다면) 화면 → 게임 로직 방향으로만 참조하고, 이름이 `Unity`·`GBible.`로 시작하지 않는다.
 - [ ] 판·프로필 플레이어 데이터를 도감에 만들고 저장했다. `GameIds.cs`가 게임 로직 폴더의 `Generated/`에 있다.
 - [ ] Bootstrap이 `AfterAssembliesLoaded`에서 `Configuring`·`Started`를 연결한다.
 - [ ] 모니터 머리에 고정 시드가 보이고, 디버그 명령 → Undo가 된다.
