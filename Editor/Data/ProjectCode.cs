@@ -95,6 +95,8 @@ namespace GBible.EditorTools
         static (bool, string) Judge(string name, string[] sources, Settings settings)
         {
             if (name.StartsWith("Unity", StringComparison.Ordinal)) return (false, "Unity");
+            // 샘플은 라이브러리(패키지) 안에 있어도 내 코드로 본다(GBIBLE_SAMPLES로 켰을 때만 컴파일된다).
+            if (name.StartsWith("GBible.Samples", StringComparison.Ordinal)) return (true, "샘플");
             if (name.StartsWith("GBible.", StringComparison.Ordinal) && !name.StartsWith("GBible.Samples", StringComparison.Ordinal))
                 return (false, "MomoiProject 라이브러리");
             if (name.EndsWith("-firstpass", StringComparison.Ordinal)) return (false, "플러그인(Plugins·Standard Assets)");

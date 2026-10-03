@@ -1,0 +1,13 @@
+{
+  "name": "com.momoi.gbible",
+  "version": "0.1.0",
+  "displayName": "GBible",
+  "description": "Momoi Project 게임 시스템: 플레이어 데이터(Mirror·Sync)·행동과 Undo·이벤트·트리거와 결과·도전과제·로그·도감·현지화. 선택 모듈: 다이얼로그·인벤토리.",
+  "unity": "6000.0",
+  "author": {
+    "name": "0444APD"
+  },
+  "dependencies": {
+    "com.unity.nuget.mono-cecil": "1.11.4"
+  }
+}

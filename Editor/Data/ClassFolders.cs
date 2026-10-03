@@ -9,7 +9,7 @@ namespace GBible.EditorTools
     // 도감 › 클래스·이벤트 탭의 그룹 = Assets/Code 아래의 폴더(동기화).
     //   그룹 "전투/버프" = 폴더 Assets/Code/전투/버프. 클래스의 그룹 = 그 스크립트 파일이 있는 폴더.
     //   프로젝트 창에서 폴더를 만들거나 옮겨도 그대로 보이고, 도감에서 그룹을 만들거나 지우면 저장(Ctrl+S)할 때 폴더가 생기고 지워진다.
-    // 이 라이브러리 폴더(Assets/Code/System)는 그룹이 아니다.
+    // 예전처럼 라이브러리를 Assets/Code/System에 둔 프로젝트에서는 그 폴더를 그룹으로 보지 않는다(지금은 Packages/com.momoi.gbible).
     public static class ClassFolders
     {
         public const string Root = "Assets/Code";
