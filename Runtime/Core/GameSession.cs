@@ -26,7 +26,7 @@ namespace GBible
         // Snapshots: 스냅샷 간격(게임 시간 초)과 보관 개수.
         public double SnapshotInterval = 1.0;
         public int SnapshotLimit = 30;
-        // 저장 데이터 버전. 출시 후 데이터 구조를 바꾸면 올리고 Migrations에 변환을 등록한다.
+        // 저장 데이터 버전의 최솟값. 보통 그대로 두면 된다: 실제 버전은 이 값과 Migrations에 등록한 변환의 가장 높은 버전 중 큰 쪽(GameSession.SaveVersion).
         public int SaveVersion = 1;
         // 저장 버전 변환. 불러오기 전에 등록되도록 옵션에 둔다(GBibleRuntime.Configuring에서 등록).
         public SaveMigrations Migrations = new SaveMigrations();
@@ -58,6 +58,8 @@ namespace GBible
         public DebugCommands Debug { get; }
         public SessionOptions Options { get; }
         public SaveMigrations Migrations => Options.Migrations;
+        // 지금 게임의 저장 버전: 옵션의 값과 등록한 변환의 가장 높은 버전 중 큰 쪽.
+        public int SaveVersion => Math.Max(Options.SaveVersion, Options.Migrations.LatestVersion);
         // 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식). 불러올 때 호환 여부를 판단하는 데 쓴다.
         // 런타임이 데이터베이스(플레이어 데이터·수치·도전과제)로부터 채운다. 비어 있으면 남기지 않는다.
         public Dictionary<string, string> SaveSchema;
@@ -292,7 +294,7 @@ namespace GBible
         {
             var root = new Dictionary<string, object>
             {
-                ["version"] = (double)Options.SaveVersion,
+                ["version"] = (double)SaveVersion,
                 ["state"] = Data.Export(DataZone.Meta),
             };
             AddSchema(root);
@@ -304,11 +306,12 @@ namespace GBible
             if (string.IsNullOrEmpty(json)) return;
             if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[MomoiProject] 저장 데이터 형식이 올바르지 않습니다.");
             var version = root.TryGetValue("version", out var v) && v is double number ? (int)number : 1;
-            if (version > Options.SaveVersion)
-                throw new FormatException($"[MomoiProject] 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}). 게임을 업데이트하세요.");
+            if (version > SaveVersion)
+                throw new FormatException($"[MomoiProject] 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{SaveVersion}). 게임을 업데이트하세요.");
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
             {
-                if (version < Options.SaveVersion) Migrations.Run(values, version, Options.SaveVersion, Journal);
+                if (version < SaveVersion) Migrations.Run(values, version, SaveVersion, Journal);
+                Migrations.EveryLoad?.Invoke(values);
                 Data.Import(values, DataZone.Meta);
             }
             Journal.Append(JournalKind.System, "Save", $"프로필 데이터 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
@@ -326,7 +329,7 @@ namespace GBible
                 random[pair.Key] = pair.Value.Select(v => (object)v.ToString("x16", System.Globalization.CultureInfo.InvariantCulture)).ToList();
             var root = new Dictionary<string, object>
             {
-                ["version"] = (double)Options.SaveVersion,
+                ["version"] = (double)SaveVersion,
                 ["kind"] = "run",
                 ["seed"] = Random.MasterSeed.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
                 ["tick"] = (double)Clock.Tick,
@@ -344,8 +347,8 @@ namespace GBible
             if (string.IsNullOrEmpty(json)) return;
             if (!(MiniJson.Deserialize(json) is Dictionary<string, object> root)) throw new FormatException("[MomoiProject] 판 저장 데이터 형식이 올바르지 않습니다.");
             var version = root.TryGetValue("version", out var v) && v is double number ? (int)number : 1;
-            if (version > Options.SaveVersion)
-                throw new FormatException($"[MomoiProject] 판 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{Options.SaveVersion}).");
+            if (version > SaveVersion)
+                throw new FormatException($"[MomoiProject] 판 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{SaveVersion}).");
 
             if (root.TryGetValue("seed", out var seed) && seed is string seedText)
                 Random.Reseed(ulong.Parse(seedText, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture));
@@ -363,7 +366,8 @@ namespace GBible
 
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
             {
-                if (version < Options.SaveVersion) Migrations.Run(values, version, Options.SaveVersion, Journal);
+                if (version < SaveVersion) Migrations.Run(values, version, SaveVersion, Journal);
+                Migrations.EveryLoad?.Invoke(values);
                 Data.Import(values, DataZone.Session);
             }
             // 불러온 시점부터 새로 시작한다(이전 판의 Undo 이력·스냅샷은 버린다).

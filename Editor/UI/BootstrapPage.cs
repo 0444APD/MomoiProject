@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 namespace GBible.EditorTools.UI
 {
     // DB 사이드바 맨 위 '시작 파일' 그룹: 프로젝트마다 하나씩 있는 시작 코드로 바로 가는 곳.
-    //   Bootstrap — 이 화면. 세션 옵션(Undo 방식·보관 수·시드)을 고치고, Bootstrap.cs를 연다.
+    //   Bootstrap — 이 화면. 세션 옵션(Undo 방식·보관 수·시드)·판 저장·고급 설정을 고치고, Bootstrap.cs를 연다.
     //   RunState·Profile — 탭이 아니라 누르면 바로 코드 파일을 연다(DatabaseWindow가 이 그룹 아래에 붙인다).
     // 세션 옵션은 GameDatabase 에셋에 바로 저장된다(작업본·Ctrl+S를 거치지 않는다). 게임이 켜질 때 SessionOptions에 먼저 들어가고,
     // Bootstrap 코드의 Configure가 바꾸면 그 값이 우선한다(바꾼 것은 모니터 기록에 남는다).
@@ -118,12 +118,74 @@ namespace GBible.EditorTools.UI
             root.Add(seedField);
             fixToggle.RegisterValueChangedCallback(e => { fixSeed = e.newValue; seedField.SetEnabled(fixSeed); Save(); });
 
+            // ── 판 저장 ──
+            var runSave = database.RunSave;
+            var endEvent = database.RunEndEvent ?? "";
+            void SaveRunOptions()
+            {
+                Undo.RecordObject(database, "판 저장 설정 변경");
+                database.EditorSetSaveOptions(runSave, endEvent);
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            }
+
+            Heading(root, "판 저장", "진행 중인 판(이어 하기)을 언제 저장할지. 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.");
+            var saveMode = new DropdownField(RunSaveNames.ToList(), (int)runSave);
+            saveMode.RegisterValueChangedCallback(_ => { runSave = (RunSaveMode)saveMode.index; SaveRunOptions(); });
+            root.Add(saveMode);
+
+            var events = TypeCache.GetTypesWithAttribute<GameEventAttribute>()
+                .Where(t => !t.IsAbstract && ClassCatalog.IsDeveloperClass(t))
+                .OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+            var eventChoices = new[] { "(없음)" }.Concat(events.Select(t => $"{EventBus.DisplayNameOf(t)} ({t.Name})")).ToList();
+            var current = events.FindIndex(t => t.FullName == endEvent);
+            if (current < 0 && !string.IsNullOrEmpty(endEvent))
+            {
+                eventChoices.Add($"찾을 수 없음: {endEvent}");
+                current = eventChoices.Count - 2;
+            }
+            var endField = new DropdownField("판 끝 이벤트", eventChoices, current + 1);
+            endField.tooltip = "이 이벤트를 받으면 그 행동이 끝난 뒤 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤 다른 행동이 판 데이터를 바꾸면(새 판) 다시 저장한다.";
+            endField.RegisterValueChangedCallback(_ =>
+            {
+                var index = endField.index - 1;
+                if (index >= events.Count) return;
+                endEvent = index < 0 ? "" : events[index].FullName;
+                SaveRunOptions();
+            });
+            root.Add(endField);
+
+            // ── 고급(보통 그대로) ──
+            var advanced = new Foldout { text = "고급", value = false };
+            advanced.style.marginTop = 14;
+            var journal = database.JournalCapacity;
+            var detect = database.DetectUntrackedChanges;
+            void SaveAdvanced()
+            {
+                Undo.RecordObject(database, "고급 설정 변경");
+                database.EditorSetAdvanced(journal, detect);
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            }
+            var journalField = new IntegerField("기록 보관 줄 수") { value = journal };
+            journalField.tooltip = "모니터 기록(Journal)에 남기는 최대 줄 수. 넘치면 오래된 줄부터 지운다.";
+            journalField.RegisterValueChangedCallback(e => { journal = Math.Max(64, e.newValue); SaveAdvanced(); });
+            advanced.Add(journalField);
+            var detectField = new Toggle("개발 빌드에서 Modify 누락 검사") { value = detect };
+            detectField.tooltip = "예전 방식(Mirror를 쓰지 않는) 데이터를 행동 밖에서 고친 것을 찾는다. 값 전체를 비교하므로 출시 빌드에서는 늘 꺼진다.";
+            detectField.RegisterValueChangedCallback(e => { detect = e.newValue; SaveAdvanced(); });
+            advanced.Add(detectField);
+            root.Add(advanced);
+
             Heading(root, "코드로 정하는 것", null);
-            var note = Gs.Label("저장 버전과 버전 변환(SaveVersion·Migrations), 판 자동 저장(GBibleRuntime.AutoSaveRun)은 코드에서 정한다. " +
-                                "위 값도 코드에서 조건에 따라 바꿔야 하면 Bootstrap의 Configure에서 options를 고친다. 그때 바뀐 값은 플레이 중 모니터 기록에 \"코드(Configuring)가 … 바꿨습니다\"로 남는다.", "gs-text-2");
+            var note = Gs.Label("출시 뒤 저장 구조를 바꿨을 때의 변환(options.Migrations)만 코드로 등록한다. 저장 버전은 등록한 변환을 따라 저절로 올라간다. " +
+                                "DB 항목 ID를 바꾼 것은 저장을 불러올 때 저절로 이어받는다([DataRef] 필드). " +
+                                "위 값을 조건에 따라 바꿔야 하면 Bootstrap의 Configure에서 options를 고친다. 그때 바뀐 값은 플레이 중 모니터 기록에 \"코드(Configuring)가 … 바꿨습니다\"로 남는다.", "gs-text-2");
             note.style.whiteSpace = WhiteSpace.Normal;
             root.Add(note);
         }
+
+        static readonly string[] RunSaveNames = { "끌 때 저장", "행동마다 저장(턴제)", "저장하지 않음(이어 하기 없음)" };
 
         static void Heading(VisualElement root, string title, string caption)
         {

@@ -304,6 +304,29 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 저장_버전은_등록한_변환을_따라간다()
+        {
+            var session = new GameSession();
+            session.Migrations.RenameKey(2, "m:money", "m:inventory");
+            session.Migrations.MoveField(3, "m:inventory", "coins", "gold");
+            Assert.AreEqual(3, session.SaveVersion, "SaveVersion을 따로 올리지 않아도 가장 높은 변환 버전");
+            session.ImportMeta("{\"version\":1,\"state\":{\"m:money\":{\"coins\":30}}}");
+            var inventory = session.Data.Define("m:inventory", DataZone.Meta, new TestInventory());
+            Assert.AreEqual(30, inventory.gold);
+            StringAssert.Contains("\"version\":3", session.ExportMeta());
+        }
+
+        [Test]
+        public void 불러올_때마다_EveryLoad_변환을_적용한다()
+        {
+            var session = new GameSession();
+            session.Migrations.EveryLoad = state => state["m:gold"] = 7.0;
+            session.ImportMeta("{\"version\":1,\"state\":{\"m:gold\":1}}");
+            session.Data.Define("m:gold", DataZone.Meta, 0);
+            Assert.AreEqual(7, session.Data.Get<int>("m:gold"));
+        }
+
+        [Test]
         public void 게임보다_새_버전의_저장은_거부한다()
         {
             var session = new GameSession();

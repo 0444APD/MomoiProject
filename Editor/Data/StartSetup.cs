@@ -45,10 +45,25 @@ namespace GBible.EditorTools
             public HashSet<string> languages = new HashSet<string>(StringComparer.Ordinal) { "ko" };
         }
 
+        // 시작 설정이 만드는 플레이어 데이터: (ID, 구역, 클래스 이름, 설명).
+        static readonly (string id, DataZone zone, string className, string label)[] DataEntries =
+        {
+            ("run", DataZone.Session, "RunState", "판"),
+            ("profile", DataZone.Meta, "Profile", "프로필"),
+        };
+
+        const string RegenerateIdsKey = "MomoiProject.StartSetupRegenerateIds";
+
         static StartSetup()
         {
             GameFeatures.Changed -= SyncModuleReferences;
             GameFeatures.Changed += SyncModuleReferences;
+            // 시작 설정이 만든 run·profile의 클래스가 컴파일된 뒤 GameIds(Game.Data().Run …)를 다시 만든다.
+            if (SessionState.GetBool(RegenerateIdsKey, false) && TypeResolver.Find($"{Prefix}.{DataEntries[0].className}") != null)
+            {
+                SessionState.EraseBool(RegenerateIdsKey);
+                EditorApplication.delayCall += () => GameIdsGenerator.Generate(force: true);
+            }
             // 처음 한 번: 시작 설정을 마치지 않은 프로젝트면 창을 연다(배치 실행·테스트에서는 열지 않는다).
             if (!IsDone && !Application.isBatchMode) EditorApplication.delayCall += OpenOnce;
         }
@@ -133,6 +148,20 @@ namespace GBible.EditorTools
                 AssetDatabase.CreateAsset(database, EditorDatabase.DatabaseAssetPath);
                 done.Add($"{EditorDatabase.DatabaseAssetPath} 만듦");
             }
+            // 판·프로필 플레이어 데이터(run = RunState·세션, profile = Profile·메타). 이미 있으면 건드리지 않는다.
+            // 클래스는 아직 컴파일 전일 수 있으므로 형식 이름(글자)만 넣고, 다시 컴파일된 뒤 GameIds를 다시 만든다.
+            var madeEntries = false;
+            foreach (var (id, zone, className, label) in DataEntries)
+            {
+                if (EditorDatabase.Instance.FindById(id) != null) continue;
+                var entry = (PlayerDataEntry)EditorDatabase.Instance.Create(typeof(PlayerDataEntry), id);
+                entry.zone = zone;
+                entry.valueType = $"{Prefix}.{className}";
+                EditorUtility.SetDirty(entry);
+                done.Add($"DB › 플레이어 데이터 '{id}' 만듦({label}, {className})");
+                madeEntries = true;
+            }
+            if (madeEntries) SessionState.SetBool(RegenerateIdsKey, true);
             // Undo 방식은 DB 에셋의 세션 옵션(DB › 시작 파일 › Bootstrap 화면과 같은 값)에 넣는다.
             if (database.History != choices.history)
             {
@@ -263,7 +292,7 @@ namespace MomoiProject
         }
 
         // 세션을 만들기 직전. Undo 방식·보관 수·시드는 DB › 시작 파일 › Bootstrap 화면에서 정하고, 그 값이 options에 먼저 들어 있다.
-        // 여기서 options를 바꾸면 그 값이 우선한다(조건에 따라 바꿀 때만). 예: options.SaveVersion = 2;
+        // 여기서 options를 바꾸면 그 값이 우선한다(조건에 따라 바꿀 때만). 출시 뒤 저장 구조를 바꿨다면 변환도 여기서: options.Migrations.MoveField(2, ""run"", ""hero.gold"", ""gold"");
         static void Configure(SessionOptions options)
         {
         }
@@ -278,8 +307,8 @@ namespace MomoiProject
 
         const string PlayerDataCode =
 @"// 시작 설정이 만든 파일. 판(세션 구역)·프로필(메타 구역) 플레이어 데이터의 뼈대.
-// DB › 플레이어 데이터에서 값 형식으로 고른다(예: ID ""run"" = RunState·세션, ""profile"" = Profile·메타).
-// 필드는 그냥 고치면 기록된다(Undo·저장·멀티). 이름은 바꿔도 된다(DB 항목을 만들기 전이라면).
+// DB › 플레이어 데이터의 ""run""(세션 구역)·""profile""(메타 구역)이 이 두 클래스를 가리킨다(시작 설정이 만든다). 코드에서는 Game.Data().Run·Game.Data().Profile.
+// 필드는 그냥 고치면 기록된다(Undo·저장·멀티). 클래스 이름을 바꾸면 DB › 플레이어 데이터에서 값 형식도 다시 고른다.
 using System;
 using System.Collections.Generic;
 

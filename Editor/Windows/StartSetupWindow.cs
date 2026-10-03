@@ -102,8 +102,8 @@ namespace GBible.EditorTools
 
             Section("자동으로 만드는 것", null);
             Paragraph($"코드 폴더와 asmdef: {string.Join(" · ", StartSetup.Parts.Select(p => $"{StartSetup.FolderOf(p)} ({StartSetup.AssemblyOf(p)})"))}. 네임스페이스 {StartSetup.Prefix}.\n" +
-                      "시작 파일: Client/Bootstrap.cs(시작 설정 코드), Rules/PlayerData.cs(판·프로필 데이터 뼈대).\n" +
-                      "DB 에셋(GameDatabase)과 다국어 설정.");
+                      "시작 파일: Client/Bootstrap.cs(시작 코드), Rules/PlayerData.cs(판·프로필 데이터 클래스 RunState·Profile).\n" +
+                      "DB 에셋(GameDatabase)과 DB › 플레이어 데이터 run·profile(위 두 클래스를 가리킨다), 다국어 설정.");
 
             var actions = Gs.Row();
             actions.style.marginTop = 16;
@@ -119,7 +119,7 @@ namespace GBible.EditorTools
             Build();
             Section("적용함", null);
             Paragraph(done.Count == 0 ? "바꿀 것이 없었습니다." : string.Join("\n", done));
-            Paragraph("다음: Rules/PlayerData.cs의 RunState·Profile에 필드를 채우고, DB(MomoiProject › DB)에서 플레이어 데이터 'run'·'profile'을 만들어 값 형식으로 고른다. DB 사이드바 맨 위 '시작 파일'에서 Bootstrap·RunState·Profile로 바로 간다. 자세한 순서는 Documentation~/Guide/01-StartProject.md.");
+            Paragraph("다음: Rules/PlayerData.cs의 RunState·Profile에 필드를 채운다. 코드에서는 Game.Data().Run으로 쓴다. DB 사이드바 맨 위 '시작 파일'에서 Bootstrap·RunState·Profile로 바로 간다. 자세한 순서는 Documentation~/Guide/01-StartProject.md.");
         }
 
         void Section(string title, string caption)

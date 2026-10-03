@@ -4,7 +4,8 @@ using System.Linq;
 
 namespace GBible
 {
-    // 저장 데이터 버전 올리기. 출시 후 데이터 구조가 바뀌면 SessionOptions.SaveVersion을 올리고 변환을 등록한다.
+    // 저장 데이터 버전 올리기. 출시 후 데이터 구조가 바뀌면 변환을 등록한다(toVersion = 다음 버전). 게임의 저장 버전은 등록한 변환의 가장 높은 버전을 따라간다
+    // (SessionOptions.SaveVersion을 따로 올리지 않아도 된다. 더 높게 적어 두면 그 값).
     // 변환은 저장 트리(키 → 값, 데이터 값은 필드 이름 → 값 딕셔너리)를 직접 고친다.
     // 필드 이름만 바뀐 경우는 필드에 [FormerlySerializedAs("예전이름")]만 달면 변환 없이 따라간다.
     public sealed class SaveMigrations
@@ -19,6 +20,12 @@ namespace GBible
         readonly List<Step> _steps = new List<Step>();
 
         public IEnumerable<(int toVersion, string label)> Steps => _steps.OrderBy(s => s.ToVersion).Select(s => (s.ToVersion, s.Label));
+
+        // 등록한 변환 중 가장 높은 버전(없으면 1).
+        public int LatestVersion => _steps.Count == 0 ? 1 : _steps.Max(s => s.ToVersion);
+
+        // 버전과 상관없이 저장을 불러올 때마다(버전 변환 뒤에) 적용하는 변환. 런타임이 'DB 항목 ID 바꾸기 이어받기'에 쓴다.
+        public Action<Dictionary<string, object>> EveryLoad;
 
         // toVersion - 1 → toVersion 으로 올리는 변환.
         public void Add(int toVersion, string label, Action<Dictionary<string, object>> migrate)

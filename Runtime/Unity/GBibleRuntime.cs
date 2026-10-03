@@ -25,7 +25,16 @@ namespace GBible
         public static string RunSavePath => Path.Combine(Application.persistentDataPath, "MomoiProject", "run.json");
         public static bool HasSavedRun => File.Exists(RunSavePath);
         // 종료할 때 진행 중인 판을 자동으로 저장할지(불러오기는 게임이 LoadRun으로 직접 한다: 타이틀의 '이어하기' 등).
-        public static bool AutoSaveRun = true;
+        // 기본은 DB › 시작 파일 › Bootstrap의 '판 저장'(저장하지 않음이면 거짓). 코드에서 값을 넣으면 그 값이 우선한다.
+        public static bool AutoSaveRun
+        {
+            get => _autoSaveRun ?? _runSaveMode != RunSaveMode.Never;
+            set => _autoSaveRun = value;
+        }
+
+        static bool? _autoSaveRun;
+        static RunSaveMode _runSaveMode = RunSaveMode.OnQuit;
+        static RunSaver _runSaver;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -35,6 +44,9 @@ namespace GBible
             Configuring = null;
             Started = null;
             Stopped = null;
+            _autoSaveRun = null;
+            _runSaveMode = RunSaveMode.OnQuit;
+            _runSaver = null;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -113,6 +125,8 @@ namespace GBible
                     else if (rename.dataType == typeof(AchievementData).FullName) session.Data.AddAlias(PlayerDataKeys.Achievement(rename.oldId), PlayerDataKeys.Achievement(rename.newId));
                     else if (rename.dataType == typeof(PlayerDataEntry).FullName) session.Data.AddAlias(rename.oldId, rename.newId);
                 }
+                // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
+                options.Migrations.EveryLoad = SavedIdRenames.Build(database);
                 LoadProfile(session);
                 // Game.Use로 쓰는 것: 능력(IUsableData)과, 사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
                 foreach (var usable in database.Entries.OfType<IUsableData>())
@@ -128,12 +142,19 @@ namespace GBible
                 session.Achievements.EvaluateAll();
             }
 
+            // 판 저장(DB › 시작 파일 › Bootstrap): 행동마다 저장·판 끝 이벤트.
+            _runSaveMode = database?.RunSave ?? RunSaveMode.OnQuit;
+            var endEvent = string.IsNullOrEmpty(database?.RunEndEvent) ? null : TypeResolver.Find(database.RunEndEvent);
+            if (database != null && !string.IsNullOrEmpty(database.RunEndEvent) && endEvent == null)
+                session.Journal.Append(JournalKind.Warning, "Save", $"판 끝 이벤트 '{database.RunEndEvent}'를 찾을 수 없습니다(이벤트 클래스 이름이 바뀌었는지 확인).");
+            _runSaver = new RunSaver(session, _runSaveMode, endEvent);
+
             session.Journal.Appended += ForwardToConsole;
             session.Debug.Register("저장", "프로필 저장", () => SaveProfile(session));
             session.Debug.Register("저장", "프로필 삭제", DeleteProfile, "저장 파일을 지웁니다. 다음 플레이부터 적용됩니다.");
             session.Debug.Register("저장", "판 저장", () => SaveRun(session), "진행 중인 판(세션 구역·난수·시간)을 저장합니다.");
             session.Debug.Register("저장", "판 불러오기", () => LoadRun(session), "저장한 판을 이어서 진행합니다.");
-            session.Debug.Register("저장", "새 판", () => { session.NewRun(); DeleteRun(); }, "이번 판 내용을 처음 값으로 되돌리고 판 저장을 지웁니다.");
+            session.Debug.Register("저장", "새 판", () => { session.NewRun(); DeleteRun(); _runSaver?.Reset(); }, "이번 판 내용을 처음 값으로 되돌리고 판 저장을 지웁니다.");
             session.Debug.Register("시간", "일시정지 / 재개", () => GameTime.TogglePause("개발 도구"));
             session.Debug.Register("시간", "1프레임 진행", () => GameTime.StepFrame(), "일시정지 중에만 동작합니다.");
             session.Debug.Register("시간", "배속 0.25", () => GameTime.SetSpeed(0.25f));
@@ -154,9 +175,10 @@ namespace GBible
         {
             if (Session == null) return;
             SaveProfile(Session);
-            if (AutoSaveRun) SaveRun(Session);
+            if (AutoSaveRun && !(_runSaver?.Ended ?? false)) SaveRun(Session);
             Stopped?.Invoke(Session);
             Session = null;
+            _runSaver = null;
         }
 
         // 코드(Configuring)가 DB의 세션 옵션을 바꿨으면 기록에 남긴다(에디터 값이 왜 안 먹는지 바로 보이게).
@@ -264,6 +286,7 @@ namespace GBible
             try
             {
                 session.ImportRun(File.ReadAllText(RunSavePath));
+                if (session == Session) _runSaver?.Reset();
                 return true;
             }
             catch (Exception e)
@@ -272,6 +295,8 @@ namespace GBible
                 return false;
             }
         }
+
+        internal static void FrameEndSave() => _runSaver?.FrameEnd();
 
         public static void DeleteRun()
         {
@@ -299,6 +324,7 @@ namespace GBible
                     session.Data.Sync();
                     session.Achievements.Flush();
                 }
+                GBibleRuntime.FrameEndSave();
             }
             GameTime.OnFrameEnd();
         }
