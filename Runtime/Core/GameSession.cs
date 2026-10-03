@@ -121,6 +121,14 @@ namespace GBible
                 foreach (var evt in action.Events) Events.PublishObject(evt);
             });
 
+            // 행동이 성공한 뒤에 받는 쪽(Events.SubscribeAfterAction): 바깥 행동이 끝나면 모아 둔 이벤트를 주고, 실패하면 버린다.
+            Events.InAction = () => Data.InTransaction;
+            Actions.Executed += record =>
+            {
+                if (!record.Nested && record.Status == ActionStatus.Done) Events.FlushAfterAction();
+            };
+            Actions.TransactionAborted += _ => Events.DropAfterAction();
+
             Actions.TransactionStarted += id => _randomBefore[id] = Random.ExportStates();
             Actions.TransactionAborted += RestoreRandom;
             Data.TransactionUndone += tx => RestoreRandom(tx.Id);

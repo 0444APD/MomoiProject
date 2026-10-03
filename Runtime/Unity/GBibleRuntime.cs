@@ -47,6 +47,7 @@ namespace GBible
             _autoSaveRun = null;
             _runSaveMode = RunSaveMode.OnQuit;
             _runSaver = null;
+            GameView.Reset();
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -87,9 +88,14 @@ namespace GBible
             // DB › 시작 파일 › Bootstrap에서 정한 옵션이 먼저 들어가고, 코드(Configuring)가 바꾸면 그 값이 우선한다.
             var database = GameDatabase.Load();
             database?.ApplyTo(options, Debug.isDebugBuild);
+            // DB › 저장 변환(버전 순서, 같은 버전은 목록 순서). 코드(Configuring)가 그 뒤에 더 등록할 수 있다.
+            if (database != null)
+                foreach (var migration in database.All<SaveMigrationData>().OrderBy(m => m.version)) migration.Register(options.Migrations);
             var fromDatabase = (options.History, options.HistoryLimit, options.SnapshotInterval, options.SnapshotLimit, options.Seed);
             Configuring?.Invoke(options);
             var session = new GameSession(options);
+            // 개발 명령(모니터 › 명령)은 개발 빌드에서만 등록된다. 출시 빌드에서는 Register가 아무것도 하지 않는다.
+            session.Debug.Enabled = Debug.isDebugBuild;
             if (database != null) NoteCodeOverrides(session, database, fromDatabase, options);
 
             // 데이터 값 안의 에셋 참조는 데이터베이스 ID로 저장·복원한다.
@@ -134,6 +140,8 @@ namespace GBible
                 foreach (var instance in database.All<InstanceData>())
                     if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
+                // DB › 개발 명령 → 모니터 › 명령 탭 버튼(개발 빌드에서만 등록된다).
+                foreach (var command in database.All<DebugCommandData>()) command.Register(session);
                 // [BindTo] ID가 DB의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
                 var entryIds = new System.Collections.Generic.HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
                 foreach (var id in BoundOutcomes.Ids)
@@ -154,7 +162,7 @@ namespace GBible
             session.Debug.Register("저장", "프로필 삭제", DeleteProfile, "저장 파일을 지웁니다. 다음 플레이부터 적용됩니다.");
             session.Debug.Register("저장", "판 저장", () => SaveRun(session), "진행 중인 판(세션 구역·난수·시간)을 저장합니다.");
             session.Debug.Register("저장", "판 불러오기", () => LoadRun(session), "저장한 판을 이어서 진행합니다.");
-            session.Debug.Register("저장", "새 판", () => { session.NewRun(); DeleteRun(); _runSaver?.Reset(); }, "이번 판 내용을 처음 값으로 되돌리고 판 저장을 지웁니다.");
+            session.Debug.Register("저장", "새 판", () => NewRun(session), "이번 판 내용을 처음 값으로 되돌리고 판 저장을 지웁니다.");
             session.Debug.Register("시간", "일시정지 / 재개", () => GameTime.TogglePause("개발 도구"));
             session.Debug.Register("시간", "1프레임 진행", () => GameTime.StepFrame(), "일시정지 중에만 동작합니다.");
             session.Debug.Register("시간", "배속 0.25", () => GameTime.SetSpeed(0.25f));
@@ -333,6 +341,17 @@ namespace GBible
 
         internal static void FrameEndSave() => _runSaver?.FrameEnd();
 
+        // 새 판: 이번 판 값을 처음 값으로 되돌리고(Undo 기록도 비움) 판 저장 파일(run.json)을 지운다. 프로필은 그대로다.
+        // 메모리와 파일을 함께 지워야 "화면은 새 판인데 이어 하기는 예전 판"이 생기지 않는다. 행동 밖(버튼 등)에서 부른다.
+        public static void NewRun(GameSession session)
+        {
+            if (session == null) throw new ArgumentNullException(nameof(session));
+            if (session.Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 새 판을 시작할 수 없습니다. 행동 밖(버튼 등)에서 부르세요.");
+            session.NewRun();
+            DeleteRun();
+            if (session == Session) _runSaver?.Reset();
+        }
+
         public static void DeleteRun()
         {
             if (File.Exists(RunSavePath)) File.Delete(RunSavePath);
@@ -360,6 +379,7 @@ namespace GBible
                     session.Achievements.Flush();
                 }
                 GBibleRuntime.FrameEndSave();
+                GameView.FrameEnd();
             }
             GameTime.OnFrameEnd();
         }

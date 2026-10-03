@@ -37,7 +37,9 @@ namespace GBible
         Coded = 4,
         // 대상 Block이 고른 객체마다 효과 Block.
         Targeted = 8,
-        All = Record | PlayerData | Coded | Targeted,
+        // 이벤트 쏘기(PublishEventOutcome).
+        Event = 16,
+        All = Record | PlayerData | Coded | Targeted | Event,
     }
 
     // 트리거 칸의 잠금: 고를 수 있는 트리거 종류.

@@ -168,6 +168,8 @@ namespace GBible.EditorTools.UI
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(RecordOutcome)), () => Insert(new RecordOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(RecordOutcome)) });
             if ((allowed & OutcomeKinds.Targeted) != 0)
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(TargetedOutcome)), () => Insert(new TargetedOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(TargetedOutcome)) });
+            if ((allowed & OutcomeKinds.Event) != 0)
+                items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(PublishEventOutcome)), () => Insert(new PublishEventOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(PublishEventOutcome)) });
 
             if ((allowed & OutcomeKinds.PlayerData) != 0)
             {

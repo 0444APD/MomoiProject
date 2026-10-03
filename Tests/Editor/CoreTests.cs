@@ -595,4 +595,88 @@ namespace GBible.Tests
             StringAssert.Contains("JSON 오류", e.Message);
         }
     }
+    public class AfterActionEventTests
+    {
+        public sealed class Ping { public int n; }
+
+        sealed class Fire : SimpleAction
+        {
+            public int n;
+            public bool fail;
+            public override string Describe() => "쏘기";
+            protected override void Run()
+            {
+                Game.Events.Publish(new Ping { n = n });
+                if (fail) throw new InvalidOperationException("실패");
+            }
+        }
+
+        sealed class Outer : SimpleAction
+        {
+            public override string Describe() => "바깥";
+            protected override void Run()
+            {
+                Game.Do(new Fire { n = 1 });
+                Game.Events.Publish(new Ping { n = 2 });
+            }
+        }
+
+        [Test]
+        public void 행동이_성공한_뒤에_쏜_순서대로_받는다()
+        {
+            var session = new GameSession();
+            var got = new List<int>();
+            var during = new List<bool>();
+            session.Events.SubscribeAfterAction<Ping>(p => { got.Add(p.n); during.Add(session.Data.InTransaction); });
+            session.Do(new Outer());
+            CollectionAssert.AreEqual(new[] { 1, 2 }, got, "안쪽 행동의 이벤트도 바깥 행동이 끝난 뒤 순서대로");
+            Assert.IsFalse(during.Any(x => x), "행동 밖에서 받는다");
+        }
+
+        [Test]
+        public void 실패한_행동의_이벤트는_오지_않는다()
+        {
+            var session = new GameSession();
+            var got = new List<int>();
+            session.Events.SubscribeAfterAction<Ping>(p => got.Add(p.n));
+            Assert.Throws<InvalidOperationException>(() => session.Do(new Fire { n = 5, fail = true }));
+            session.Do(new Fire { n = 6 });
+            CollectionAssert.AreEqual(new[] { 6 }, got);
+        }
+
+        [Test]
+        public void 행동_밖에서_쏜_이벤트는_바로_온다()
+        {
+            var session = new GameSession();
+            var got = new List<int>();
+            var sub = session.Events.SubscribeAfterAction<Ping>(p => got.Add(p.n));
+            session.Events.Publish(new Ping { n = 9 });
+            sub.Dispose();
+            session.Events.Publish(new Ping { n = 10 });
+            CollectionAssert.AreEqual(new[] { 9 }, got);
+        }
+
+        [Test]
+        public void 이벤트_쏘기_결과는_적은_값으로_쏜다()
+        {
+            var session = new GameSession();
+            var got = new List<int>();
+            session.Events.Subscribe<Ping>(p => got.Add(p.n));
+            var outcome = new PublishEventOutcome { eventType = typeof(Ping).FullName, count = 2 };
+            outcome.values.Add(new EventFieldValue { path = "n", value = "7" });
+            outcome.Run(new TriggerContext { Session = session });
+            CollectionAssert.AreEqual(new[] { 7, 7 }, got);
+        }
+
+        [Test]
+        public void 개발_명령을_끄면_등록이_무시된다()
+        {
+            var session = new GameSession();
+            Assert.IsNotEmpty(session.Debug.All);
+            session.Debug.Enabled = false;
+            Assert.IsEmpty(session.Debug.All, "끄는 순간 비운다");
+            session.Debug.Register("x", "y", () => { });
+            Assert.IsEmpty(session.Debug.All);
+        }
+    }
 }

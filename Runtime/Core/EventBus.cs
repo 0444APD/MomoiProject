@@ -36,6 +36,11 @@ namespace GBible
 
         readonly Dictionary<Type, List<Handler>> _handlers = new Dictionary<Type, List<Handler>>();
         readonly List<Action<object>> _listeners = new List<Action<object>>();
+        // 행동이 성공한 뒤에 받는 쪽(연출): 행동 중에 쏜 이벤트는 모았다가 바깥 행동이 끝나면 차례로, 실패하면 버린다.
+        readonly Dictionary<Type, List<Handler>> _afterAction = new Dictionary<Type, List<Handler>>();
+        readonly List<(Handler handler, object evt)> _pending = new List<(Handler, object)>();
+        // 지금 행동 중인가(세션이 넣는다). 없으면 늘 바로 준다.
+        internal Func<bool> InAction;
         readonly Journal _journal;
 
         public event Action<object> Published;
@@ -54,6 +59,34 @@ namespace GBible
             list.Add(entry);
             return new Subscription(() => list.Remove(entry));
         }
+
+        // 행동이 성공한 뒤에만 받는다(화면 연출용). 행동 중에 쏜 이벤트는 바깥 행동이 성공하면 쏜 순서대로 오고, 실패하면 오지 않는다.
+        // 행동 밖에서 쏜 이벤트는 바로 온다. 규칙(값을 바꾸는 쪽)은 행동 안에서 바로 받아야 하므로 Subscribe를 쓴다.
+        public IDisposable SubscribeAfterAction<T>(Action<T> handler)
+        {
+            if (handler == null) throw new ArgumentNullException(nameof(handler));
+            if (!_afterAction.TryGetValue(typeof(T), out var list))
+                _afterAction[typeof(T)] = list = new List<Handler>();
+            var entry = new Handler { Invoke = o => handler((T)o), Original = handler };
+            list.Add(entry);
+            return new Subscription(() =>
+            {
+                list.Remove(entry);
+                _pending.RemoveAll(p => p.handler == entry);
+            });
+        }
+
+        // 바깥 행동이 성공했을 때(세션이 부른다): 모아 둔 이벤트를 쏜 순서대로 준다.
+        internal void FlushAfterAction()
+        {
+            if (_pending.Count == 0) return;
+            var ready = _pending.ToArray();
+            _pending.Clear();
+            foreach (var (handler, evt) in ready) Invoke(handler.Invoke, evt, handler.Original);
+        }
+
+        // 행동이 실패해 취소됐을 때: 모아 둔 이벤트를 버린다.
+        internal void DropAfterAction() => _pending.Clear();
 
         // 타입 무관하게 모든 이벤트를 받는다(수치 규칙 등).
         public IDisposable SubscribeAll(Action<object> listener)
@@ -81,6 +114,15 @@ namespace GBible
                 }
                 foreach (var listener in _listeners.ToArray())
                     Invoke(listener, evt, listener);
+                if (_afterAction.TryGetValue(evt.GetType(), out var after) && after.Count > 0)
+                {
+                    var inAction = InAction?.Invoke() ?? false;
+                    foreach (var handler in after.ToArray())
+                    {
+                        if (inAction) _pending.Add((handler, evt));
+                        else Invoke(handler.Invoke, evt, handler.Original);
+                    }
+                }
             }
             Published?.Invoke(evt);
         }

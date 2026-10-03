@@ -55,9 +55,26 @@ namespace GBible
         public IReadOnlyList<DebugCommand> All => _commands;
         public event Action Changed;
 
+        // 거짓이면 등록을 무시한다(출시 빌드: 런타임이 끈다). 끄는 순간 이미 등록된 명령도 비운다.
+        // 그래서 게임 코드는 개발 명령을 if (Debug.isDebugBuild)로 감싸지 않아도 된다.
+        public bool Enabled
+        {
+            get => _enabled;
+            set
+            {
+                _enabled = value;
+                if (value || _commands.Count == 0) return;
+                _commands.Clear();
+                Changed?.Invoke();
+            }
+        }
+
+        bool _enabled = true;
+
         public void Register(string group, string name, Action execute, string description = null)
         {
             if (execute == null) throw new ArgumentNullException(nameof(execute));
+            if (!_enabled) return;
             _commands.RemoveAll(c => c.Group == group && c.Name == name);
             _commands.Add(new DebugCommand { Group = group, Name = name, Description = description, Execute = execute });
             Changed?.Invoke();

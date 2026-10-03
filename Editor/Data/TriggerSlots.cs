@@ -117,6 +117,7 @@ namespace GBible.EditorTools
             if ((kinds & OutcomeKinds.PlayerData) != 0) parts.Add("플레이어 데이터에 주기");
             if ((kinds & OutcomeKinds.Targeted) != 0) parts.Add("대상에게 효과");
             if ((kinds & OutcomeKinds.Coded) != 0) parts.Add("코딩한 결과");
+            if ((kinds & OutcomeKinds.Event) != 0) parts.Add("이벤트 쏘기");
             return parts.Count == 0 ? "없음" : string.Join(" · ", parts);
         }
 
