@@ -28,7 +28,8 @@ namespace GBible
         [SerializeField] UnityEvent<string> onText = new UnityEvent<string>();
 
         readonly Dictionary<string, object> _runtimeArgs = new Dictionary<string, object>(StringComparer.Ordinal);
-        PropertyInfo _textProperty;
+        // 글자 칸의 text 속성 쓰기(붙을 때 한 번 대리자로 만들어 둔다 — 새로 고칠 때마다 리플렉션을 쓰지 않게).
+        Action<string> _setText;
         Component _boundTarget;
 
         public string Key
@@ -96,9 +97,10 @@ namespace GBible
             if (_boundTarget != component)
             {
                 _boundTarget = component;
-                _textProperty = TextProperty(component);
+                var property = TextProperty(component);
+                _setText = property == null ? null : (Action<string>)Delegate.CreateDelegate(typeof(Action<string>), component, property.GetSetMethod());
             }
-            _textProperty?.SetValue(component, text);
+            _setText?.Invoke(text);
         }
 
         static PropertyInfo TextProperty(Component component)

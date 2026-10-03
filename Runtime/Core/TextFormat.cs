@@ -387,10 +387,24 @@ namespace GBible
             }
         }
 
+        // 값 이름. 그대로 없으면 점 앞부분을 값 이름, 뒷부분을 그 값 안의 필드 경로로 본다: {run.gold} = 값 "run"의 gold 필드
+        // (값 이름 자체에 점이 있어도 된다: {player.gold}가 값 이름이면 그대로). 필드는 생성 코드로 읽는다.
         static bool TryArg(Context ctx, string name, out object value)
         {
             value = null;
-            return ctx.Args != null && ctx.Args.TryGetValue(name, out value);
+            if (ctx.Args == null) return false;
+            if (ctx.Args.TryGetValue(name, out value)) return true;
+            for (var dot = name.LastIndexOf('.'); dot > 0; dot = name.LastIndexOf('.', dot - 1))
+            {
+                if (!ctx.Args.TryGetValue(name.Substring(0, dot), out var root) || root == null) continue;
+                foreach (var found in FieldPaths.Resolve(root, name.Substring(dot + 1)))
+                {
+                    value = found;
+                    return true;
+                }
+                return false;
+            }
+            return false;
         }
 
         static void EmitArgument(ArgNode arg, Context ctx, StringBuilder b)

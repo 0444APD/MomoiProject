@@ -29,7 +29,7 @@ namespace CardDungeon
             if (!session.Data.IsDefined(GameIds.PlayerData.Run.Id)) session.Data.Define(GameIds.PlayerData.Run.Id, DataZone.Session, new RunState(), "판");
             if (!session.Data.IsDefined(GameIds.PlayerData.Profile.Id)) session.Data.Define(GameIds.PlayerData.Profile.Id, DataZone.Meta, new Profile(), "프로필");
 
-            // 개발용 명령(모니터 › 디버그 탭의 버튼).
+            // 개발용 명령(모니터 › 명령 탭의 버튼).
             if (Debug.isDebugBuild)
             {
                 session.Debug.Register("카드 던전", "골드 +100", () => session.Do(new DeveloperEditAction { label = "골드 +100", Edit = () => session.Game.Data().Run.gold += 100 }));

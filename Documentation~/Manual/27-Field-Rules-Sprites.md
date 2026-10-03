@@ -155,7 +155,7 @@ public sealed class ItemIcon : MonoBehaviour
 **`GameIds.SpritePreset.X`** — 규격 ID 상수(도감 저장 뒤 생성). 문자열 대신 쓴다.
 
 ```csharp
-image.sprite = SpriteSpecs.Get(item.icon, GameIds.SpritePreset.Icon);   // 'icon' 규격이 있을 때
+image.sprite = SpriteSpecs.Get(item.icon, GameIds.SpritePreset.Icon);   // using GBible.Ids;   // 'icon' 규격이 있을 때
 ```
 
 **`SpriteSpecs.Has(원본, 규격 ID)`** — 베이크본이 있는지.

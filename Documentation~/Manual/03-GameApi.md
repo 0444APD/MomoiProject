@@ -132,7 +132,7 @@ Game.Use("ability.fireball", "hero", "orc1");         // id로
 Game.Use("ability.selfHeal", hero);                   // 대상 없이
 ```
 
-도감 › 능력의 능력, 또는 사용 기능(`Usable`)이 붙은 인스턴스를 ID로 쓴다. `user`·`targets`는 객체 또는 id 문자열이다(객체를 넘기면 그 객체의 `id` 필드를 읽어 id로 바꾼다). 내부적으로 행동 하나(`UseAbility`)라서 Undo 한 번에 통째로 되돌아간다. 행동 안에서는 부를 수 없다. 자세히는 [16-Abilities-Usable.md](16-Abilities-Usable.md).
+도감 › 능력의 능력, 또는 사용 기능(`Usable`)이 붙은 인스턴스를 ID로 쓴다. `user`·`targets`는 객체 또는 id 문자열이다(객체를 넘기면 그 객체의 `id` 필드를 읽어 id로 바꾼다). 내부적으로 행동 하나(`UseAbility`)라서 Undo 한 번에 통째로 되돌아간다. 행동 안에서 부르면 그 행동의 일부로 그 자리에서 실행된다. 자세히는 [16-Abilities-Usable.md](16-Abilities-Usable.md).
 
 ### 2.10 `Game.CanUse(...)` — 지금 쓸 수 있는가
 

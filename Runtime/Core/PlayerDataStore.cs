@@ -658,7 +658,7 @@ namespace GBible
             var changes = DataModel.Diff(slot.Shadow, slot.Value, Identity);
             if (changes.Count == 0) return false;
             var where = changes[0].Path + (changes.Count > 1 ? $" 외 {changes.Count - 1}곳" : "");
-            var message = $"'{slot.Label}'이(가) Modify를 거치지 않고 바뀌었습니다({where}). Undo와 원인 기록에서 빠집니다. 행동 안에서 고치거나 state.Modify(\"{key}\", …)로 바꾸세요.";
+            var message = $"'{slot.Label}'이(가) Modify를 거치지 않고 바뀌었습니다({where}). Undo와 원인 기록에서 빠집니다. 행동 안에서 고치거나 session.Data.Modify(\"{key}\", …)로 바꾸세요(클래스에 [Serializable]을 붙이면 Modify 없이 기록됩니다).";
             _lastEntry[key] = _journal.Append(JournalKind.Warning, "Data", message, key).Id;
             RefreshShadow(slot);
             Changed?.Invoke(key);

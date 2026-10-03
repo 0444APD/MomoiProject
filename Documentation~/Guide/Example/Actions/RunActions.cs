@@ -24,7 +24,7 @@ namespace CardDungeon
             run.relics.Clear();
             run.relics.Add(GameIds.Relic.BurningBlood);
             run.potions.slots.Clear();
-            run.potions.Add(GameIds.Instance.HealPotion, 1, maxStack: 2);
+            run.potions.Add(GameIds.Instance.HealPotion, 1, maxStack: Rules.PotionOf(Game, GameIds.Instance.HealPotion)?.maxStack ?? 1);
             Game.Do(new StartBattle { monsters = { GameIds.Instance.Goblin, GameIds.Instance.Slime } });
         }
     }
@@ -75,8 +75,9 @@ namespace CardDungeon
             var profile = Game.Data().Profile;
             profile.bestFloor = Math.Max(profile.bestFloor, run.floor);
             profile.totalGold += run.gold;
-            run.battle = null;
             Game.Events.Publish(new RunEnded { floor = run.floor, victory = victory });
+            run.battle = null;
+            run.floor = 0;   // 판 끝: 이어 하기에서 다시 열리지 않는다(RunState.IsActive)
         }
     }
 }

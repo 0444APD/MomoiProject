@@ -91,7 +91,11 @@ namespace GBible
                     catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[MomoiProject] ", "")); }
                 }
                 foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
-                session.Instances = id => database.All<InstanceData>().FirstOrDefault(t => t.Id == id)?.value;
+                // 인스턴스 원본: ID → 값(게임이 켜질 때 한 번 표를 만든다 — 찾을 때마다 훑지 않게).
+                var instances = new System.Collections.Generic.Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var instance in database.All<InstanceData>())
+                    if (!string.IsNullOrEmpty(instance.Id) && !instances.ContainsKey(instance.Id)) instances.Add(instance.Id, instance.value);
+                session.Instances = id => id != null && instances.TryGetValue(id, out var found) ? found : null;
                 // 필드 규칙의 '필수': 저장소 값에서 비면 경고하고 채워질 때까지 모니터에 남긴다.
                 foreach (var rule in database.All<FieldRuleData>())
                     if (rule.required && rule.TargetType != null) session.Data.Require(rule.TargetType, rule.field);
@@ -112,10 +116,11 @@ namespace GBible
                 foreach (var instance in database.All<InstanceData>())
                     if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
-                // [BindTo] ID가 어느 항목(도전과제·로그·능력·사용 기능 인스턴스)에도 없으면 알린다(오타·지운 항목).
+                // [BindTo] ID가 도감의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
+                var entryIds = new System.Collections.Generic.HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
                 foreach (var id in BoundOutcomes.Ids)
-                    if (!session.Achievements.IsDefined(id) && !session.Stats.IsDefined(id) && session.Abilities.Get(id) == null)
-                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 도전과제·로그·능력·사용 기능 인스턴스가 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
+                    if (!entryIds.Contains(id))
+                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 도감 항목이 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
                 session.Achievements.EvaluateAll();
             }
 

@@ -34,6 +34,11 @@ namespace GBible
         public virtual Type TargetType => typeof(object);
 
         public virtual string Describe() => BlockNames.Of(GetType());
+
+        // 도감 검증(저장할 때·검증 창)에서 부른다. 값이 맞지 않으면 context.Error·Warning(예: 음수 피해).
+        public virtual void Validate(IValidationContext context)
+        {
+        }
     }
 
     // 대상을 T로 받는 효과. 받은 객체의 필드를 그냥 고친다.
@@ -73,6 +78,11 @@ namespace GBible
         protected abstract IEnumerable<object> Select(IEnumerable<object> targets);
 
         public virtual string Describe() => BlockNames.Of(GetType());
+
+        // 도감 검증에서 부른다(값 검사).
+        public virtual void Validate(IValidationContext context)
+        {
+        }
     }
 
     //   [Serializable, BlockInfo("주변 n칸 추가")] public class AddAround : TargetSelector<Unit> { … Select(IEnumerable<Unit> targets, Unit user) … }

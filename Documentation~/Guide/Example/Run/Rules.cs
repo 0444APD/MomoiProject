@@ -9,19 +9,22 @@ namespace CardDungeon
 {
     public static class Rules
     {
-        // 원본 카드(도감 › 인스턴스)의 사본을 만들어 덱에 넣는다. 사본마다 id가 다르다.
-        public static Card NewCard(GameApi game, string source)
+        // 덱에 카드 한 장을 넣을 판 데이터. 원본은 복사하지 않고 ID만 든다.
+        public static DeckCard NewCard(GameApi game, string card)
         {
-            var card = (Card)game.Session.CopyInstance(source) ?? throw new InvalidOperationException($"카드 '{source}'이(가) 도감에 없습니다.");
-            card.id = game.NewId("card");
-            card.source = source;
-            return card;
+            if (CardData(game, card) == null) throw new InvalidOperationException($"카드 '{card}'이(가) 도감에 없습니다.");
+            return new DeckCard { id = game.NewId("card"), card = card };
         }
 
-        // 몬스터 원본으로 이번 전투의 적 하나를 만든다.
+        // 원본(도감 › 인스턴스)을 복사 없이 읽는다. 게임 중에는 고치지 않는다(모든 판이 같이 쓰는 값).
+        public static Card CardData(GameApi game, string card) => game.Session.Instances?.Invoke(card) as Card;
+        public static MonsterData MonsterOf(GameApi game, string monster) => game.Session.Instances?.Invoke(monster) as MonsterData;
+        public static Potion PotionOf(GameApi game, string potion) => game.Session.Instances?.Invoke(potion) as Potion;
+
+        // 몬스터 원본으로 이번 전투의 적 하나를 만든다(바뀌는 값 hp만 판 데이터에, 패턴 같은 고정 값은 원본에서).
         public static Enemy NewEnemy(GameApi game, string monster)
         {
-            var data = (MonsterData)game.Session.CopyInstance(monster) ?? throw new InvalidOperationException($"몬스터 '{monster}'이(가) 도감에 없습니다.");
+            var data = MonsterOf(game, monster) ?? throw new InvalidOperationException($"몬스터 '{monster}'이(가) 도감에 없습니다.");
             return new Enemy { id = game.NewId("enemy"), name = data.title, hp = data.maxHp, maxHp = data.maxHp, monster = monster };
         }
 
@@ -56,7 +59,7 @@ namespace CardDungeon
             }
         }
 
-        public static Card CardOf(GameApi game, string cardId) => game.Find<Card>(cardId);
+        public static DeckCard CardOf(GameApi game, string cardId) => game.Find<DeckCard>(cardId);
 
         public static bool InBattle(GameApi game) => game.Data().Run.battle != null;
 

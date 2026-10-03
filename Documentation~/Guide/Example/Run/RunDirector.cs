@@ -13,7 +13,7 @@ namespace CardDungeon
         void Start()
         {
             // 저장된 판이 있으면 이어 하고, 없으면 새 판.
-            if (!GBibleRuntime.LoadRun(GBibleRuntime.Session)) Game.Do(new StartRun());
+            if (!GBibleRuntime.LoadRun(GBibleRuntime.Session) || !Game.Data().Run.IsActive) Game.Do(new StartRun());
         }
 
         // 버튼·드래그 같은 입력이 부르는 창구. 실패(에너지 부족 등)는 예외로 오고, 바뀐 값은 모두 취소되어 있다.

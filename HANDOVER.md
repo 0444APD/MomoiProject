@@ -43,7 +43,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **시뮬레이션(`Simulation`)**, **난수(`Random`, 시드)**, **데이터 모델(`DataModel`)**: 복제·비교·JSON(선언과 실제 형식이 다르면 `$type` 기록 → 다형성 저장 지원), 추적 요소 ID.
 - **식별자 규칙(`IdRules`)**: ID는 **lowerCamelCase**와 점(`playerGold`, `player.inventory`, `item.ironSword`). 대소문자만 다른 ID 금지. `Normalize`로 변환.
 - **다국어(`TextFormat`, `Texts`, `TextCatalog`, `KoreanParticles`, `PluralRules`, `Csv`, `TextSheet`)**: 1.6 참고.
-- **기능 조립(`Features`)**: 1.9 참고.
+- **기능 = 필드**: 1.9 참고.
 
 ### 1.3 Unity 런타임 (Runtime/Unity)
 
@@ -119,9 +119,9 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 
 자세히: `Documentation~/Audio.md`. 채널 **전체·브금·목소리·효과음·UI**. 브금·목소리는 직렬(한 번에 하나, 바뀌면 교차 페이드: 기본 1초/0.15초, 같은 곡은 이어서), 효과음·UI는 병렬(튼 만큼, 자리 재사용, 최대 32개 넘으면 가장 오래된 것 멈춤, 3D 효과음). 음량 = 전체 × 채널 × 소리, 음소거, PlayerPrefs 저장. 게임 시작 시 오디오 오브젝트 자동 생성·씬 유지(프리팹 불필요), 게임 시간과 무관. 재생 여부는 자체 시계로 판단(오디오 장치 없는 테스트에서도 같게). 코드: `GameAudio.PlayBgm/StopBgm/PlayVoice/StopVoice/PlaySfx/PlaySfxAt/PlayUi/Play(clip, channel)/Stop/StopAll/SetVolume/SetMuted/CurrentBgm/IsVoicePlaying/Playing`, 손잡이 `AudioHandle.Stop(fade)`. 설정(선택) `GameAudioSettings`(기본 음량, 페이드, 최대 수, 믹서 그룹). 에디터: `MomoiProject → 오디오` 창(채널을 골라 미리 듣기, 음량, 지금 나는 소리, 설정 만들기), 오디오 클립 우클릭 재생·정지. 플레이 모드가 아니어도 동작.
 
-### 1.9 기능 조립 (아이템 등)
+### 1.9 기능 = 필드 (아이템 등)
 
-종류별 상속 대신 한 클래스에 `[SerializeReference] List<기능>`을 두고 기능 클래스을 붙인다(한 아이템에 여러 기능 함께). 동작은 각 기능 클래스가 가진다. 코드는 종류가 아니라 기능을 묻는다: `features.GetFeature<T>()`·`HasFeature<T>()`·`FeaturesOf<T>()`. 규칙 `[FeatureRule(Single, ExclusiveWith, Requires)]`(기본: 한 번만), 검사 `Features.Validate(features, context)`(도감 검증). 상세 창에서 블록처럼 더하고 뺀다(`[BlockInfo]`로 이름·분류). 예시: 인벤토리 시스템의 `ItemData`(`Optional/Inventory`).
+종류별 상속 대신 클래스 하나에 기능마다 nullable `[SerializeReference]` 필드를 하나씩 둔다(`[SerializeReference] public Usable usable;` — null이면 그 기능이 없다). 코드는 `if (item.usable is { } use)`처럼 필드로 묻는다. 도감의 인스턴스 편집에서 '+ 기능'으로 붙이고 빼며, 기능 필드 안의 트리거·결과는 도감과 같은 편집기로 그린다. 예전의 목록형 기능 조립(`Features`·`ItemFeature`·`FeatureRule`)은 2026-10-02에 지웠다.
 
 ### 1.10 내 코드 범위 (클래스 목록 필터)
 
@@ -316,7 +316,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **그룹 모양**: 카드 + 칩을 버리고, 그룹 제목 줄 아래로 요소가 한 줄씩 나열된다(`GsGroupSection`, 키워드·스프라이트 규격·클래스·이벤트 탭 공용). 제목 왼쪽 화살표로 접고 펼치며, 접은 상태는 에디터를 쓰는 동안 기억한다(SessionState). 키워드·규격 탭은 제목을 끌어 그룹 순서, 줄을 끌어 항목 순서·그룹 이동(접힌 그룹에 놓으면 맨 뒤).
 - **입력 칸 밑줄**: `GsField`의 '편집 중'은 깃발 없이 실제 상태에서만 계산한다(칸 안에 글자 편집기가 떠 있음 · 칸 안 글자 입력에 포커스 · 이 칸이 연 목록이 아직 화면에 있음). 값 칸에 남은 포커스는 세지 않는다. 밑줄 색은 전환 없이 바로 바뀐다. 목록은 `TrackMenu(menu)`로 알린다(옛 MenuOpened/MenuClosed 삭제).
 - **기능 활성화는 탭이 아니라 사이드바의 토글 버튼**이다(기능 그룹의 첫 줄, 오른쪽 끝에 스위치 `GsSwitch`). 누르면 확인 뒤 켜고 끈다. `FeaturePage`는 삭제.
-- **인벤토리 시스템**(`Optional/Inventory`, 심볼 `GBIBLE_INVENTORY`, 기본 꺼짐): 뼈대만 있다. `ItemData`(도감 "아이템": 아이콘·한 칸에 겹치는 최대 개수·기능 리스트 `ItemFeature`), `Inventory`·`InventorySlot`(칸의 리스트, `Add`·`Remove`·`TryRemove`·`CountOf`·`Has`·`RoomFor`, 플레이어 데이터의 값 형식으로 쓰고 `state.Modify` 안에서 고친다). 기능의 데이터 클래스는 `GameFeature.DataClasses`에 이름을 적으면 클래스 탭의 기능 그룹과 값 형식 목록에 나온다. 슬롯 UI·장비 칸·드래그 규칙·아이템 기능 기본 제공분은 아직 없다(사양 필요).
+- **인벤토리 시스템**(`Optional/Inventory`, 심볼 `GBIBLE_INVENTORY`, 기본 꺼짐): 뼈대만 있다. `Inventory`·`InventorySlot`(칸의 리스트, 칸 = 인스턴스 ID + 개수, `Add`·`Remove`·`TryRemove`·`CountOf`·`Has`·`RoomFor`, 플레이어 데이터의 값 형식으로 쓰고 꺼내 그냥 고친다). 아이템은 프로젝트가 코드로 정의한 클래스의 인스턴스(2026-10-02에 `ItemData` 도감 종류는 지움). 기능의 데이터 클래스는 `GameFeature.DataClasses`에 이름을 적으면 클래스 탭의 기능 그룹과 값 형식 목록에 나온다. 슬롯 UI·장비 칸·드래그 규칙·아이템 기능 기본 제공분은 아직 없다(사양 필요).
 - **샘플 아이템(`SampleItem`)과 필드 시험(`SampleFieldTestData`, 메뉴, 데이터 에셋)은 삭제했다.** 기능 조립의 실제 예는 인벤토리 시스템의 `ItemData`다. 상세 패널 점검은 테스트 전용 `WideTestData`(`WideDetailTests`)가 맡는다.
 - **조건식 편집기**(`GsExpressionEditor`): 조건(Condition)·값 조건(ValueFilter) 필드는 그룹 블록을 들여 쓰던 옛 모양 대신 **한 줄 식**으로 편집한다. 요소는 셋뿐: 조건 블럭 · 논리 연산자(AND·OR·NOT) · 괄호. 아래의 `+ 블럭` · `+ 논리 연산자` · `+ 괄호`로 더하고, 연산자를 누르면 AND↔OR, NOT을 누르면 떼어진다. 연산자만 먼저 더하면 빈칸('조건 선택')이 생긴다. 항 왼쪽의 손잡이(⠿)를 끌어 순서를 바꾸거나 괄호 안으로 넣고 밖으로 뺀다(괄호로 묶기 = 빈 괄호를 만들고 블럭을 끌어 넣기). 항마다 ⋯ 메뉴(NOT·앞뒤로·괄호로 감싸기/풀기·바꾸기·삭제). AND가 OR보다 먼저 묶인다. 저장 형식(AND·OR·NOT 블럭의 트리)은 그대로이고, 편집기가 트리 ↔ 한 줄 식을 오간다(OR 안의 AND는 괄호 없이 이어 보인다). 보상 리스트는 옛 `BlockEditor` 그대로.
 - **값이 안 바뀌던 문제**: 입력 칸 밑줄을 고친 뒤, 편집을 끝낼 때 칸이 '빈 값인지' 다시 읽으면서(`serializedObject.Update`) 아직 적용하지 않은 새 값을 버리고 있었다(모든 글자·숫자 칸). 값을 먼저 적용한 뒤 칸에 알리도록 순서를 바꾸고, 적용 전 값이 있으면 다시 읽지 않게 했다.

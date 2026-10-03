@@ -7,6 +7,14 @@ namespace GBible.Tests
 {
     public sealed class LocalizationTests
     {
+        [Test]
+        public void 문장_틀의_값_안_필드를_점으로_읽는다()
+        {
+            var catalog = new TextCatalog();
+            var args = new Dictionary<string, object> { ["run"] = new GsParty { gold = 7 }, ["player.name"] = "모모이" };
+            Assert.AreEqual("모모이의 골드 7", catalog.FormatTemplate("{player.name}의 골드 {run.gold}", args));
+        }
+
         TextCatalog _texts;
 
         [SetUp]

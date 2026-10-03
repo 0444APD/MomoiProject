@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using GBible;
+using GBible.Data;
 using GBible.InventorySystem;
 using UnityEngine;
 
@@ -38,12 +39,20 @@ namespace CardDungeon
         public int intentIndex;           // 공격 패턴에서 이번 턴 차례
     }
 
-    // 덱에 든 카드 한 장 = 카드 원본(인스턴스)의 사본. 같은 카드를 여러 장 가지면 사본이 여러 개다.
+    // 덱에 든 카드 한 장(판 데이터): 원본 ID와 이 장만의 바뀌는 값만 든다. 이름·비용·그림·사용 기능 같은 고정 값은
+    // 원본(도감 › 인스턴스의 Card)에서 읽는다 — 판 저장·동기화가 작고, 원본을 고치면 모든 장에 바로 반영된다.
+    [Serializable]
+    public class DeckCard
+    {
+        public string id;                                           // 장마다 다른 id(Game.NewId("card"))
+        [DataRef(typeof(InstanceData))] public string card;         // 원본 인스턴스 ID(능력 이름으로도 쓴다)
+        public bool upgraded;
+    }
+
+    // 카드 원본(도감 › 인스턴스). 게임 중에는 읽기만 한다.
     [Serializable]
     public class Card
     {
-        public string id;                 // 사본마다 다른 id(Game.NewId("card"))
-        [Hide] public string source;      // 원본 인스턴스 ID(능력 이름으로 쓴다). 도감에서는 숨긴다.
         public string title;
         public int cost = 1;
         [Keyword(typeof(Rarity))] public string rarity = Rarity.Common;
@@ -51,7 +60,8 @@ namespace CardDungeon
         [Keyword(typeof(CardTag))] public List<string> tags = new List<string>();
         public Sprite art;
         public bool upgradable;
-        [ShowIf(nameof(upgradable))] public string upgradeTo;   // 강화하면 바뀔 카드(강화 가능할 때만 보인다)
+        [ShowIf(nameof(upgradable)), DataRef(typeof(InstanceData))] public string upgradeTo;   // 강화하면 바뀔 카드(강화 가능할 때만 보인다)
+        [Hide] public int balanceScore;   // 밸런스 도구가 채우는 값(기획자 화면에서는 숨긴다)
 
         // 기능 = 필드 하나. 사용 기능(트리거 + 결과)은 도감에서 조립하거나 [BindTo]로 코드에 쓴다.
         [SerializeReference] public Usable usable;
@@ -76,10 +86,13 @@ namespace CardDungeon
         public int floor;
         public int gold;
         public Hero hero = new Hero();
-        public List<Card> deck = new List<Card>();
+        public List<DeckCard> deck = new List<DeckCard>();
         public Battle battle;                                 // 전투 밖이면 null
-        public List<string> relics = new List<string>();      // 유물 ID(도감 › 유물)
+        [DataRef(typeof(RelicData))] public List<string> relics = new List<string>();   // 유물 ID(도감 › 유물)
         public Inventory potions = new Inventory { capacity = 3 };
+
+        // 진행 중인 판이 있는지(판이 끝나면 EndRun이 floor를 0으로).
+        public bool IsActive => floor > 0;
     }
 
     // ── 프로필 데이터: 플레이어 데이터 "profile"(메타 구역). 판이 끝나도 남는다. ──
@@ -89,7 +102,7 @@ namespace CardDungeon
     {
         public int totalGold;
         public int bestFloor;
-        public List<string> unlocked = new List<string>();    // 해금한 카드 원본 ID
+        [DataRef(typeof(InstanceData))] public List<string> unlocked = new List<string>();   // 해금한 카드 원본 ID(상점·보상 후보에 더한다)
     }
 
     // ── 도감 › 인스턴스로 원본을 만드는 클래스 ──

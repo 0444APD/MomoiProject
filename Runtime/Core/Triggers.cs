@@ -453,6 +453,8 @@ namespace GBible
         {
             if (effects.Count == 0) context.Warning("대상에게 효과: 효과가 없습니다.");
             if (effects.Contains(null) || targets.Contains(null)) context.Error("대상에게 효과: 비어 있는 Block이 있습니다(스크립트가 지워졌을 수 있음).");
+            foreach (var target in targets) target?.Validate(context);
+            foreach (var effect in effects) effect?.Validate(context);
         }
     }
 
