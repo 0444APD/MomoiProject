@@ -300,7 +300,7 @@ hero.hp = 1;                    // 행동 밖: 다음 Sync에 "행동 밖 변경
   - 겹침은 같은 경로이거나 한쪽이 다른 쪽을 품는 경우다(`units[#3]`과 `units[#3].hp`).
   - 단순 값(숫자·글자 같은 플레이어 데이터 키)도 같다: 행동이 남긴 값과 Undo 직전 값이 다르면 같은 경고를 남긴다.
   - 이 경고는 클래스 데이터(Mirror로 비교하는 데이터)에만 있고, `DescribeChanges`가 켜져 있을 때(기본)만 나온다. 숫자·글자 같은 단순 값 키는 경고 없이 행동 전 값으로 덮인다.
-- 행동 안에서 다른 행동을 `Do`(또는 `Game.Use`)하면 "행동 안에서 다른 행동을 실행할 수 없습니다" 예외다. 공통 부분은 함수로 빼서 함께 부른다.
+- 행동 안에서 다른 행동을 `Game.Do`하거나 `Game.Use`하면, 그 행동은 **바깥 행동의 일부로 그 자리에서** 실행된다(새 Undo 단위를 만들지 않는다). Undo·변경 묶음은 바깥 행동 하나이고, 안쪽에서 실패하면 바깥 행동 전체가 취소된다. 예: 카드 내기 = 에너지 지불 + 손패 이동 + `Game.Use(카드)` + 다 쓰러졌으면 `Game.Do(new WinBattle())`.
 
 ---
 
@@ -679,7 +679,6 @@ public class EnterBossRoom : SimpleAction
 |---|---|
 | Undo해도 값이 안 돌아옴 | 행동 밖에서 고쳤다(씬 코드·코루틴·이벤트를 받는 코드). 행동으로 실행한다. `Permanent()` 안이었거나, `HistoryLimit`을 넘었거나, 방식이 `None`일 수도 있다. |
 | 지연 효과에서 `NullReferenceException` | 행동 클래스의 `Game` 속성은 `Run`이 끝나면 `null`이다. `GBibleRuntime.Game`을 쓰거나 지역 변수로 받아 둔다. |
-| "행동 안에서 다른 행동을 실행할 수 없습니다" | `Run` 안에서 `Game.Do`·`Game.Use`를 불렀다. 공통 로직은 함수로 빼서 부른다. |
 | "처리기가 없습니다" | `GameAction`을 직접 상속했는데 `Actions.Register`를 하지 않았다. `GameAction<T>`·`SimpleAction`을 상속하면 등록이 필요 없다. |
 | "… '…'을(를) 찾을 수 없습니다" | `target`에 없는 id를 넣었다(또는 Undo로 대상이 사라졌다). `Find`로 먼저 확인한다. |
 | "id 필드가 없어 Find로 찾을 수 없습니다" | `GameAction<T>`의 `T`에 `public string id;` 필드가 없다. |
