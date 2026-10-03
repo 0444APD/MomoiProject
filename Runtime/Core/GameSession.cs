@@ -148,7 +148,10 @@ namespace GBible
         // 행동을 실행한다. 실행되는 즉시 끝난다(대기·확정 단계 없음).
         public ActionRecord Do(GameAction action)
         {
+            // 행동 안에서 부르면 바깥 행동의 일부로 그 자리에서 실행된다(Sync·도전과제는 바깥 행동이 끝날 때).
+            var nested = Data.InTransaction;
             var record = Actions.Execute(action);
+            if (nested) return record;
             Data.Sync();
             Achievements.Flush();
             return record;

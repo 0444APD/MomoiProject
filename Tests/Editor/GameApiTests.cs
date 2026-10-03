@@ -33,6 +33,16 @@ namespace GBible.Tests
     }
 
     [Serializable]
+    public class TbUseInside : SimpleAction
+    {
+        protected override void Run()
+        {
+            Game.Use("nested.self", "hero");
+            Game.Do(new TbEndTurn());
+        }
+    }
+
+    [Serializable]
     public class TbEndTurn : SimpleAction
     {
         protected override void Run() => Game.All<TbBoard>()[0].turn++;
@@ -143,6 +153,23 @@ namespace GBible.Tests
             _session.Abilities.Define(new AbilityDefinition { Id = "fn.use" });
             Game.Use("fn.use", "hero");
             Assert.AreSame(Game.Find("hero"), TbBoundUse.User, "컨텍스트의 사용자");
+        }
+
+        [Test]
+        public void 행동_안에서_부른_행동과_능력은_바깥_행동_하나로_묶인다()
+        {
+            var heal = new AbilityDefinition { Id = "nested.self" };
+            heal.Targets.Add(new SelfTarget());
+            heal.Effects.Add(new TbDamage { amount = -5 });
+            _session.Abilities.Define(heal);
+            var before = _session.UndoCount;
+            Game.Do(new TbUseInside());
+            Assert.AreEqual(35, Hp("hero"), "안에서 쓴 능력");
+            Assert.AreEqual(1, Game.All<TbBoard>()[0].turn, "안에서 부른 행동");
+            Assert.AreEqual(before + 1, _session.UndoCount, "Undo 단위는 하나");
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(30, Hp("hero"));
+            Assert.AreEqual(0, Game.All<TbBoard>()[0].turn);
         }
 
         [Test]

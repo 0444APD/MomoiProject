@@ -136,6 +136,8 @@ namespace GBible
         public int HistoryCount => _history.Count;
         public IReadOnlyList<Transaction> History => _history;
         public bool InTransaction => _active != null;
+        // 진행 중인 행동의 번호(없으면 -1).
+        public long ActiveTransactionId => _active?.Id ?? -1;
         // false면 행동을 이력에 남기지 않는다(실시간 게임: 스냅샷으로 되감음, 또는 Undo가 없는 게임).
         public bool RecordHistory = true;
         // 이력에 남길 최대 행동 수. 0이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 늘어난다).

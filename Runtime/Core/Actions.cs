@@ -42,6 +42,8 @@ namespace GBible
         public GameAction Action;
         public ActionStatus Status;
         public string Error;
+        // 다른 행동 안에서 실행된 행동(바깥 행동의 Undo·변경 묶음에 들어간다).
+        public bool Nested;
     }
 
     public sealed class ActionDispatcher : IInspectable
@@ -96,6 +98,18 @@ namespace GBible
             }
 
             action.tick = _clock.Tick;
+            // 행동 안에서 부른 행동(카드 사용 안의 드로우, 행동 안의 Game.Use 등): 바깥 행동의 일부로 그 자리에서 실행한다.
+            // Undo·변경 묶음은 바깥 행동 하나. 실패하면 예외가 바깥 행동으로 올라가 전체가 취소된다.
+            if (_state.InTransaction)
+            {
+                var inner = _journal.Append(JournalKind.Action, "Actions", action.Describe());
+                inner.Payload = action;
+                inner.TransactionId = _state.ActiveTransactionId;
+                using (_journal.Cause(inner.Id)) handler(action);
+                var nested = new ActionRecord { JournalId = inner.Id, Action = action, Status = ActionStatus.Done, TransactionId = _state.ActiveTransactionId, Nested = true };
+                Executed?.Invoke(nested);
+                return nested;
+            }
             var entry = _journal.Append(JournalKind.Action, "Actions", action.Describe());
             entry.Payload = action;
             var record = new ActionRecord { JournalId = entry.Id, Action = action, Status = ActionStatus.Done };
