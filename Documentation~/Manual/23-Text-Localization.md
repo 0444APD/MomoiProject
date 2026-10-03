@@ -281,7 +281,12 @@ foreach (var (code, nativeName) in GameLanguage.Available)
     UnityEngine.Debug.Log($"{code}: {nativeName}");
 ```
 
-**`GameLanguage.Changed`** — 언어가 바뀌었거나 표를 다시 읽었을 때. 직접 그리는 글은 이것을 받아 다시 만든다.
+**`GameLanguage.Changed`** — 언어가 바뀌었거나 표를 다시 읽었을 때. 플레이어 데이터를 함께 보여 주는 화면은 이것 대신 **`GameView.Redraw`**를 쓴다(아래 예제). 언어가 바뀌어도, 값이 바뀌어도 그 프레임 끝에 한 번 다시 그린다.
+
+**`GameView.Redraw(draw, 키…)`** — `IDisposable`을 돌려준다. 플레이어 데이터(키를 주면 그 키만, 비우면 아무 키나)가 바뀌거나 언어가 바뀌면 그 프레임 끝(`LateUpdate`, 행동 밖)에 `draw`를 **한 번만** 부른다. 등록한 프레임 끝에 처음 한 번 그린다. `Dispose`하면 그만 그린다.
+
+> [!note]- 왜 알림마다 바로 그리지 않는가
+> 값이 바뀌었다는 알림은 한 행동에도 여러 번 온다(행동 중간의 Sync, 실패한 행동의 되돌림, Undo). 알림마다 그리면 같은 화면을 한 프레임에 여러 번 계산한다(보이는 건 프레임당 한 번이라 낭비). 그래서 표시만 해 두고 프레임 끝에 한 번 그린다. 행동 실행 중이면 다음 프레임으로 미룬다. 직접 `_dirty` 표시·`Data.Changed` 받기·`GameLanguage.Changed` 받기·`LateUpdate`를 쓰지 않는다.
 
 **`GameLanguage.Reload()`** — 설정·표를 다시 읽는다(에디터에서 시트를 가져오면 자동으로 부른다).
 
@@ -316,22 +321,27 @@ public sealed class LanguageMenu : MonoBehaviour
 }
 ```
 
-**직접 그리는 글을 언어에 맞춰 다시 만들기.**
+**직접 그리는 글을 값·언어에 맞춰 다시 만들기.**
 
 ```csharp
+using System;
 using GBible;
 using UnityEngine;
 
 public sealed class GoldLabel : MonoBehaviour
 {
     public string Text { get; private set; }
+    IDisposable _view;
 
-    void OnEnable() { GameLanguage.Changed += Redraw; Redraw(); }
-    void OnDisable() => GameLanguage.Changed -= Redraw;
+    // playerGold가 바뀌거나 언어가 바뀌면 프레임 끝에 한 번 그린다. 처음 한 번은 바로.
+    void OnEnable()  => _view = GameView.Redraw(Redraw, "playerGold");
+    void OnDisable() => _view?.Dispose();
 
     void Redraw() => Text = Texts.Get("ui.gold", ("gold", GBibleRuntime.Session.Data.GetNumber("playerGold")));
 }
 ```
+
+키는 `GameIds.PlayerData.X.Id`로 써도 된다. 값을 보여 주지 않고 언어만 따르는 글이면 키 없이 `GameView.Redraw(Redraw)`도 되지만, 그러면 아무 값이 바뀔 때도 다시 그린다. 그런 글은 보통 `LocalizedText`(5절)로 충분하다.
 
 ### 주의할 점
 

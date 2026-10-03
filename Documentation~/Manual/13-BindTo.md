@@ -1,12 +1,13 @@
 # 13. `[BindTo]` — 항목 하나의 결과를 코드로 쓰기
 
-**한 줄 요약**: `[BindTo(id)]`를 static 함수(또는 `Reward` 클래스)에 붙이면, 그 ID를 가진 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스)의 결과가 그 코드로 바뀐다. 그 항목의 결과 칸은 에디터에서 잠기고, 연결된 코드 이름과 `cs 열기`만 보인다.
+**한 줄 요약**: `[BindTo(id)]`를 static 함수(또는 `Reward` 클래스)에 붙이면, 그 ID를 가진 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스·개발 명령)의 결과가 그 코드로 바뀐다. 그 항목의 결과 칸은 에디터에서 잠기고, 연결된 코드 이름과 `cs 열기`만 보인다.
 
 **언제 쓰는가**
 
 - 그 항목에만 있는 예외 로직: "첫 처치 도전과제는 처치한 유닛에게 경험치 50과 파티 골드 100", "전설의 포션은 체력을 다 채우고 상태 이상을 지운다".
 - 로그의 기록 방식을 바꿀 때: "보스 처치는 10점, 일반 처치는 1점으로 센다".
 - 에디터의 플레이어 데이터에 주기·대상에게 효과로 나타내기 어려운 결과.
+- 규칙 함수를 거쳐야 하는 개발 명령: "적 모두 처치"는 피해 규칙을 거쳐야 처치 이벤트·로그가 게임과 같게 돈다.
 
 원칙은 하나다: **예외 로직은 그 단위만 코드로 쓰고, 어느 항목에 쓸지는 코드에서 정한다.** Trigger(언제)는 그대로 에디터에서 조립하고, 결과(무엇을)만 코드가 맡는다.
 
@@ -60,7 +61,7 @@ public static class AchievementLogic
 }
 ```
 
-- 인자는 DB 항목의 ID다. 도전과제·로그·능력은 그 항목의 ID, 사용 기능은 **인스턴스의 ID**(DB › 인스턴스의 항목 ID)다.
+- 인자는 DB 항목의 ID다. 도전과제·로그·능력·개발 명령은 그 항목의 ID, 사용 기능은 **인스턴스의 ID**(DB › 인스턴스의 항목 ID)다.
 - 함수와 클래스에 붙는다. 함수가 든 클래스는 어디든 된다(static 클래스가 아니어도, 이름이 무엇이든).
 
 ### 2-2. ID는 `GameIds` 상수로
@@ -76,8 +77,8 @@ public static class AchievementLogic
 }
 ```
 
-- `GameIds`(`MomoiProject → 식별자 코드 다시 만들기`로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·능력·인스턴스 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`.
-- 글자를 직접 쓰면 오타나 ID 이름 바꾸기가 연결을 끊는다(게임이 켜질 때 콘솔에 "이 ID의 도전과제·로그·능력·사용 기능 인스턴스가 없어 연결되지 않았습니다" 경고). 상수를 쓰면 컴파일 오류로 먼저 드러난다.
+- `GameIds`(`MomoiProject → 식별자 코드 다시 만들기`로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·능력·인스턴스·개발 명령 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`, `GameIds.DebugCommand.X`.
+- 글자를 직접 쓰면 오타나 ID 이름 바꾸기가 연결을 끊는다(게임이 켜질 때 콘솔에 "[BindTo("id")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고). 상수를 쓰면 컴파일 오류로 먼저 드러난다.
 
 ### 2-3. 함수의 모양
 
@@ -93,7 +94,7 @@ public static class AchievementLogic
 |---|---|---|
 | `()` | 없음 | 게임 상태와 상관없는 일(외부 SDK 호출 등) |
 | `(이벤트형식 e)` | 받은 이벤트 | 이벤트 값만 필요할 때 |
-| `(TriggerContext c)` | 컨텍스트 | 사용 기능·능력(이벤트가 없다), 조건 충족으로 발동하는 도전과제 |
+| `(TriggerContext c)` | 컨텍스트 | 사용 기능·능력·개발 명령(이벤트가 없다), 조건 충족으로 발동하는 도전과제 |
 | `(이벤트형식 e, TriggerContext c)` | 둘 다 | 이벤트로 발동하고 세션도 만져야 할 때 |
 
 `TriggerContext`는 마지막 자리에만 온다. `(TriggerContext c, UnitKilled e)`는 연결되지 않는다.
@@ -196,6 +197,7 @@ public class DragonSlayerReward : Reward
   - 도전과제: 달성 순간에 실행되고 Undo 이력에 넣지 않는다.
   - 로그: 반영 규칙이 발동할 때마다 실행된다(행동 안이면 그 행동의 Undo 단위).
   - 능력·사용 기능: `Game.Use` 행동 안에서 실행된다(Undo 한 번에 통째로 되돌아간다).
+  - 개발 명령: 모니터 › 명령 탭의 버튼을 누르면 행동 하나("[개발] 버튼 이름") 안에서 실행된다(Undo된다).
 
 ### 2-11. 연결이 적용되는 기능
 
@@ -205,6 +207,7 @@ public class DragonSlayerReward : Reward
 | 로그 | 로그 ID | **모든** 반영 규칙에서 '로그에 기록' 대신 연결된 코드. 기록은 코드가 직접(`c.Session.Stats.Report(c.Owner, 값)`) |
 | 능력 | 능력 ID | 에디터에서 고른 결과 대신 연결된 코드 |
 | 사용 기능이 붙은 인스턴스 | 인스턴스 ID | 사용 기능의 결과 대신 연결된 코드(`Game.Use(인스턴스 ID, …)`) |
+| 개발 명령(DB › 개발 › 개발 명령) | 명령 ID | 에디터에서 조립한 결과 대신 연결된 코드(→ `22-Monitor-Debug.md` 7절) |
 | 프로젝트 기능(퀘스트 등) | 항목 ID | 런타임 등록 코드가 `BoundOutcomes`를 확인할 때만(→ `17-Custom-Features.md`) |
 
 ---
@@ -380,6 +383,27 @@ static void HunterTier(TriggerContext c)
 ```
 
 각 도전과제의 트리거(처치 수 10·100·1000)는 에디터에서 따로 정한다.
+
+### 3-10. 개발 명령: 적 모두 처치
+
+**에디터**: DB › 개발 › 개발 명령에 `killAll`(버튼 이름 "적 모두 처치")을 만든다. 결과 칸은 비워 둔다(연결되면 잠긴다).
+
+```csharp
+using GBible.Ids;
+
+public static class DebugCode
+{
+    [BindTo(GameIds.DebugCommand.KillAll)]
+    static void KillAll(TriggerContext c)
+    {
+        var game = c.Game;
+        foreach (var enemy in Rules.LivingEnemies(game).ToArray()) Rules.Damage(game, game.Data().Run.hero, enemy, 9999);   // 피해 규칙을 거친다
+    }
+}
+```
+
+- 개발 명령에는 이벤트가 없으므로 `(TriggerContext c)`나 `()`를 쓴다.
+- 값 하나 바꾸기(골드 +100)·이벤트 쏘기(한 턴 30 피해)처럼 결과 Block으로 조립할 수 있는 명령은 코드 없이 DB에서 만든다(`22-Monitor-Debug.md` 7절).
 
 ---
 

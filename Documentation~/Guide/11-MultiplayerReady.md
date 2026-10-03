@@ -36,7 +36,7 @@
 > |---|---|---|
 > | 입력 처리(버튼·드래그) | UI(클라이언트) | 입력을 행동으로 만들어 `Game.Do`. 직접 값을 바꾸지 않는다 |
 > | 행동의 `Run`, 효과·대상·조건 Block, 결과, `[BindTo]` 함수 | 기능 로직(서버) | 게임 값을 바꾸는 곳은 여기뿐 |
-> | Trigger 감시, 로그, 도전과제 판정 | 기능 로직(서버) | 프로젝트 고유 기능의 등록도 `Started`에서 받은 세션으로 |
+> | Trigger 감시, 로그, 도전과제 판정 | 기능 로직(서버) | 프로젝트 고유 기능의 등록 함수는 Rules에 두고 세션을 매개변수로 받는다. Unity 시작에 거는 연결(`Started`)만 Bootstrap에 |
 > | 이벤트를 받는 화면 코드 | UI(클라이언트) | 화면·연출만. 값을 바꾸지 않는다 |
 > | 화면 그리기 | UI(클라이언트) | 플레이어 데이터를 읽기만 한다 |
 > | 미리보기(이 카드를 내면 피해가 얼마) | UI(클라이언트) | 읽기 전용 계산은 괜찮다. 결과 판정은 행동이 한다 |
@@ -75,12 +75,12 @@
 - `GBibleRuntime`(정적 입구)을 부르지 않는다. 받은 것을 쓴다: Block은 물려받은 `Game`, `[BindTo]` 함수는 컨텍스트의 `c.Game`, 등록 코드는 매개변수 `session`.
 - static 게임 상태를 두지 않는다.
 
-카드 던전의 유물 감시는 받은 세션으로 등록하므로 매치마다 따로 돈다.
+카드 던전의 유물 감시(`RelicRules.Register`, Rules)는 받은 세션으로 등록하므로 매치마다 따로 돈다.
 
 ```csharp
-static void Start(GameSession session)
+public static void Register(GameSession session, IEnumerable<RelicData> relics)
 {
-    // …
+    // … 유물마다
     session.Triggers.Register(id, relic.trigger, repeat: true, fire: moment =>
     {
         var run = session.Game.Data().Run;
@@ -89,6 +89,8 @@ static void Start(GameSession session)
     });
 }
 ```
+
+Unity에서는 Client의 Bootstrap이 `Started`에서 이 함수를 한 줄로 부른다: `RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());`
 
 > [!note]- 규칙별로 왜 그런가
 > | 규칙 | 지키지 않으면 |
@@ -105,7 +107,7 @@ static void Start(GameSession session)
 > - `PlayCard`는 덱 카드 id와 적 id, `BuyCard`는 원본 ID와 가격, `DrinkPotion`은 물약 ID와 대상 id만 싣는다.
 > - 피해(`Rules.Damage`), 무작위 대상(`RandomEnemy`, 난수 흐름 `"cardTarget"`), 보상 골드(`"loot"`), 연쇄 번개(`[BindTo]`), 유물 발동(`session.Triggers.Register`)이 모두 기능 로직이다.
 > - 로그(`kills`·`maxTurnDamage`)와 도전과제(`firstWin`)는 서버의 Trigger가 받는다.
-> - 등록 내용은 세션만 받는 함수(`RelicRuntime.Start(session)`)로 두었다. 지금은 `GBibleRuntime.Started`에 연결하지만, 서버라면 서버가 세션을 만드는 자리에서 같은 함수를 부르면 된다.
+> - 유물 감시의 등록 내용은 Rules의 함수(`RelicRules.Register(session, relics)`)로 두었다. 지금은 Client의 Bootstrap이 `GBibleRuntime.Started`에서 부르지만, 서버라면 서버가 세션을 만드는 자리에서 같은 함수를 부르면 된다. 원칙: 등록 함수는 Rules에, Unity 시작에 거는 연결은 Bootstrap에.
 
 > [!note]- 게임 밖에 영향을 주는 결과
 > 결제·플랫폼 도전과제 전송처럼 게임 밖에 영향을 주는 결과 Block(`Reward`)은 `Effect`를 `RewardEffect.Irreversible`로 둔다. 지금은 표시용이지만, 멀티플레이를 붙일 때 서버만 실행하게 하는 기준이 된다. 플레이어 데이터 안에서만 일어나는 결과는 `RewardEffect.Reversible`이다.
@@ -118,7 +120,7 @@ static void Start(GameSession session)
 - 입력은 행동으로만 보낸다(`Game.Do`·`Game.Use`). 값을 직접 바꾸지 않는다.
 - `Do` 바로 뒤에서 결과를 읽지 않는다. 알림(데이터 변경·이벤트)을 받고 그린다.
 - 실패는 입력 창구 한 곳에서 받아 메시지로 넘긴다. 화면 곳곳에서 예외를 잡지 않는다.
-- 행동 안에서 쏜 이벤트는 모아 두었다가 행동이 끝난 뒤 튼다([06장](06-Presentation.md)). 받는 함수에서 값을 바꾸지 않는다.
+- 연출용 이벤트는 `session.Events.SubscribeAfterAction<T>`로 받는다. 행동이 성공한 뒤에만 오므로 연출이 늘 행동 뒤에 튼다([06장](06-Presentation.md) 3절). 받는 함수에서 값을 바꾸지 않는다.
 
 카드 던전의 입력 창구는 `RunDirector.TryPlay` 하나다. 화면은 돌려받은 메시지를 보여 주기만 한다.
 
@@ -140,9 +142,9 @@ public bool TryPlay(string cardId, string targetId, out string error)
 ```
 
 > [!note]- 왜 그런가
-> - **결과를 바로 읽지 않는다**: 싱글에서는 `Do`가 끝나면 값이 이미 바뀌어 있지만, 멀티에서는 행동을 보내기만 하고 결과(ChangeSet)는 나중에 온다. 카드 던전의 `BattleHud`는 `session.Data.Changed`에서 "다시 그릴 것 있음" 표시만 남기고 `LateUpdate`에서 그린다. 결과가 언제 오든 같은 코드다.
+> - **결과를 바로 읽지 않는다**: 싱글에서는 `Do`가 끝나면 값이 이미 바뀌어 있지만, 멀티에서는 행동을 보내기만 하고 결과(ChangeSet)는 나중에 온다. 카드 던전의 `BattleHud`는 `GameView.Redraw`에 그리는 함수를 등록해 두고, `run`이 바뀐 프레임 끝에 한 번 그린다. 결과가 언제 오든 같은 코드다.
 > - **실패를 한 곳에서**: 지금 라이브러리는 실패를 `Do`의 예외로 돌려준다. 멀티에서는 실패도 서버가 판정해 나중에 알려 준다. 예외를 잡는 곳이 창구 하나면 그때 그 창구만 고친다. 버튼을 미리 흐리게 하는 읽기 전용 검사는 화면에 둬도 되지만, 최종 판정은 행동 안의 검사다.
-> - **이벤트는 행동이 끝난 뒤**: 이벤트는 쏘는 자리에서 받는 쪽을 바로 부른다. 행동이 나중에 실패하면 값은 취소되었는데 연출만 남는다. 카드 던전의 `BattlePresenter`는 행동 안에서 받은 이벤트를 모았다가 `Executed`(성공)에서 틀고 `TransactionAborted`(실패)에서 버린다.
+> - **이벤트는 행동이 끝난 뒤**: `Subscribe`는 쏘는 자리에서 받는 쪽을 바로 부른다. 행동이 나중에 실패하면 값은 취소되었는데 연출만 남는다. `SubscribeAfterAction`은 행동 안에서 쏜 이벤트를 모아 두었다가 행동이 성공하면 넘기고 실패하면 버린다. 카드 던전의 `BattlePresenter`는 이것으로 받는다.
 > - **받는 함수에서 값을 바꾸지 않는다**: 받는 쪽 클라이언트는 서버가 보낸 이벤트를 자기 세션에서 **다시 쏜다**. 받는 함수가 값을 바꾸면 서버가 이미 반영한 변경이 한 번 더 일어난다.
 
 ## 4. 저장·Undo·여러 플레이어
@@ -169,7 +171,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 - [ ] Rules 코드에 `GBibleRuntime` 정적 입구와 static 게임 상태가 없다.
 - [ ] UI는 `Do` 직후 결과를 읽지 않고 알림을 받아 그린다.
 - [ ] 실패는 입력 창구 한 곳에서 받는다.
-- [ ] 이벤트를 받는 화면 코드는 값을 바꾸지 않고, 연출은 행동이 끝난 뒤 튼다.
+- [ ] 이벤트를 받는 화면 코드는 값을 바꾸지 않고, 연출은 `SubscribeAfterAction`으로 받는다.
 - [ ] 플레이어가 여럿이면 `actorId`를 채우고, 남에게 숨길 값은 별도 키로 나눴다.
 - [ ] 게임 밖에 영향을 주는 결과는 `RewardEffect.Irreversible`이다.
 

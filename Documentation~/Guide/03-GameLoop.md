@@ -23,8 +23,8 @@
 | 다른 기능이 반응할 순간이다 | 행동 안에서 `Game.Events.Publish` | Rules |
 | 여러 행동이 같이 쓰는 계산이다 | 평범한 static 함수(카드 던전의 `Rules`) | Rules |
 | 입력을 받아 무엇을 할지 고른다 | 런 스크립트: 행동을 만들어 `Game.Do` | Client |
-| 값을 화면에 그린다 | 화면 코드: `Game.Data()`·`Game.Find`로 읽기만 | Client |
-| 맞음·쓰러짐 연출을 튼다 | 화면 코드: 이벤트를 `Subscribe`로 받는다 | Client |
+| 값을 화면에 그린다 | 화면 코드: `Game.Data()`·`Game.Find`로 읽기만. 다시 그리기는 `GameView.Redraw` | Client |
+| 맞음·쓰러짐 연출을 튼다 | 화면 코드: 이벤트를 `SubscribeAfterAction`으로 받는다 | Client |
 
 ## 2. 한 바퀴: 카드 한 장을 낼 때
 
@@ -44,17 +44,17 @@
                적이 모두 쓰러졌으면 Game.Do(new WinBattle())
                  └ TurnEnded·BattleWon·GoldGained를 쏜다
           ③ 행동 끝 — Sync → Undo 한 단위로 기록
-  └ [화면] Game.Data().Run을 읽어 다시 그림
-     [연출] 받은 DamageDealt·EnemyKilled에 맞춰 숫자·쓰러짐
+  └ [연출] ③ 뒤에 DamageDealt·EnemyKilled를 쏜 순서대로 받아 숫자·쓰러짐  (SubscribeAfterAction)
+     [화면] 프레임 끝에 Game.Data().Run을 읽어 한 번 다시 그림           (GameView.Redraw)
 ```
 
 - **값은 ②에서만 바뀐다.** 이벤트를 받은 로그·유물의 결과도 ② 안에서 실행된다. 그래서 Undo 한 번에 에너지·손패·피해·처치 수·유물 효과가 함께 돌아간다.
-- **이벤트는 그 자리에서 바로 받는다.** `Publish`는 받는 쪽을 모두 부른 뒤 돌아온다.
-- **화면은 ③ 뒤의 결과만 본다.** 행동 중간 모습은 밖으로 나가지 않는다.
+- **규칙은 이벤트를 그 자리에서 바로 받는다.** `Publish`는 `Subscribe`한 쪽을 모두 부른 뒤 돌아온다.
+- **화면은 ③ 뒤의 결과만 본다.** 연출은 `SubscribeAfterAction`으로 행동이 성공한 뒤에 받고, 실패해 취소된 행동의 이벤트는 받지 않는다. 행동 중간 모습은 밖으로 나가지 않는다.
 
 > [!note]- ①~③에서 일어나는 일 자세히
 > - ① 그 전까지의 행동 밖 변경을 떼어 두고, 난수 상태를 보관한다.
-> - ② 비용 같은 고정 값은 카드 원본에서 읽는다(`Rules.CardData`). 받는 쪽: `DamageDealt` → 연출, `EnemyKilled` → 로그 `kills`, `TurnEnded` → 로그 `maxTurnDamage`(마지막 턴도 센다), `BattleWon` → 유물 불타는 피·도전과제 첫 승리.
+> - ② 비용 같은 고정 값은 카드 원본에서 읽는다(`Rules.CardData`). 받는 쪽: `DamageDealt` → 연출(모아 두었다가 ③ 뒤에), `EnemyKilled` → 로그 `kills`, `TurnEnded` → 로그 `maxTurnDamage`(마지막 턴도 센다), `BattleWon` → 유물 불타는 피·도전과제 첫 승리.
 > - ③ 모든 플레이어 데이터를 Sync해 Undo 한 단위로 기록하고, 변경 묶음을 전송용으로 내보낸다. 그다음 바뀐 값을 보는 조건(도전과제 등)을 다시 평가한다.
 > - 판 저장이 "행동마다 저장"이면 그 프레임 끝(행동 밖)에서 `run.json`을 쓴다(DB › 시작 파일 › Bootstrap, [10장](10-SaveAndRelease.md)).
 > - `EnemyKilled`를 쏜 다음 줄에서는 처치 수 로그가 이미 올라가 있다. 대기열이 없다.
@@ -92,7 +92,7 @@ public class RunDirector : MonoBehaviour
 > - `Undo`는 마지막 행동 하나를 되돌린다.
 
 > [!note]- 타이틀의 이어 하기 · 새 판
-> 타이틀 화면이 있으면 `GBibleRuntime.HasSavedRun`으로 '이어 하기' 버튼을 켜고, '새 판'은 `session.NewRun()` → `GBibleRuntime.DeleteRun()` → `StartRun` 순서다(카드 던전 `RunSaves`, [10장](10-SaveAndRelease.md)).
+> 타이틀 화면이 있으면 `GBibleRuntime.HasSavedRun`으로 '이어 하기' 버튼을 켜고, '새 판'은 `GBibleRuntime.NewRun(session)`(판 값·판 저장 파일을 함께 지움) → `StartRun` 순서다(카드 던전 `RunSaves`, [10장](10-SaveAndRelease.md)).
 
 ## 4. 판 · 전투 · 턴 진행
 
@@ -156,13 +156,13 @@ Game.Do(new StartBattle { monsters = { GameIds.Instance.Goblin, GameIds.Instance
 | 플레이어가 따로 누른다(카드 두 장) | 행동 두 번 |
 
 > [!note]- 알아 둘 점
-> - 공통 단계를 행동으로 만들어 두면 혼자 쓸 때(모니터·디버그 명령)와 다른 행동 안에서 쓸 때 같은 코드를 쓴다.
+> - 공통 단계를 행동으로 만들어 두면 혼자 쓸 때(모니터·개발 명령)와 다른 행동 안에서 쓸 때 같은 코드를 쓴다.
 > - Sync·조건 평가(도전과제 달성 등)는 바깥 행동이 끝날 때 한 번 한다.
 > - 모니터 **행동** 탭에는 안쪽 행동도 한 줄씩 보이지만, Undo는 바깥 행동 하나를 되돌린다.
 > - 안쪽에서 난 예외는 바깥 행동으로 올라가 **전체**를 취소한다(6절).
 
 > [!note]- 다른 장르라면: 턴제 전술
-> "공격 → 반격"처럼 한 입력에 여러 단계가 따라오면, 반격을 별도 행동으로 만들고 공격 행동 안에서 `Game.Do`한다. 반격만 디버그 명령으로 시험할 수 있고, Undo는 공격 하나로 돌아간다.
+> "공격 → 반격"처럼 한 입력에 여러 단계가 따라오면, 반격을 별도 행동으로 만들고 공격 행동 안에서 `Game.Do`한다. 반격만 개발 명령으로 시험할 수 있고, Undo는 공격 하나로 돌아간다.
 
 ## 6. 실패 = 전체 취소
 
@@ -218,7 +218,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 
 - **읽기**: `Game.Data().Run`에서 체력·에너지·손패를 읽는다.
 - **보내기**: 입력은 런 스크립트의 창구 함수로 보낸다.
-- **받기**: 연출은 `Game.Events.Subscribe<DamageDealt>(…)`처럼 이벤트를 받아 튼다. 받은 `IDisposable`은 `OnDisable`에서 `Dispose`한다.
+- **받기**: 연출은 `Game.Events.SubscribeAfterAction<DamageDealt>(…)`처럼 성공한 행동의 이벤트만 받아 튼다. 값을 다시 그리는 것은 `GameView.Redraw(그리는 함수, 키)`에 맡긴다. 받은 `IDisposable`은 `OnDisable`에서 `Dispose`한다.
 
 화면에서 플레이어 데이터를 고치지 않는다. 이벤트를 받는 코드에서도 고치지 않는다.
 
@@ -231,8 +231,9 @@ public bool TryPlay(string cardId, string targetId, out string error)
 > - **객체를 오래 들고 있기**: 고른 카드·적은 id로 들고 있다가 쓸 때 `Find`한다. Undo는 같은 객체로 되돌리지만, 판 불러오기 뒤에는 다른 인스턴스일 수 있다.
 > - 창구를 런 스크립트에 모으는 이유: 화면이 행동을 직접 만들어도 되지만, 한곳에 모아 두면 입력 목록이 한눈에 보인다.
 > - `Dispose`하는 이유: 세션은 씬보다 오래 산다.
+> - `Subscribe`와 `SubscribeAfterAction`: `Subscribe`는 행동 안에서 바로 받는다(값을 바꾸는 규칙용). `SubscribeAfterAction`은 바깥 행동이 성공한 뒤 행동 밖에서 쏜 순서대로 받는다(화면용). 연출이 이벤트를 모아 두거나 실패한 행동을 거르는 코드를 직접 쓰지 않는다.
 >
-> 값이 바뀐 것을 알고 다시 그리는 방법(`Changed`·`DataChanged`), 데이터는 한 번에 바뀌는데 연출은 시간을 두고 보여 주는 방법은 [06장](06-Presentation.md).
+> 값이 바뀌면 프레임 끝에 한 번 다시 그리는 `GameView.Redraw`, 데이터는 한 번에 바뀌는데 연출은 시간을 두고 보여 주는 방법은 [06장](06-Presentation.md).
 
 ## 8. 지연 효과
 
@@ -262,7 +263,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 
 > [!note]- 씬 전환 자세히
 > - **판을 여는 코드는 한 번만.** `RunDirector.Start`는 판을 불러오거나 새로 연다. 씬마다 `RunDirector`를 두면 씬을 옮길 때마다 저장을 다시 불러오거나 새 판을 열어 버린다. 런 스크립트는 처음 한 번 뜨는 씬(또는 씬을 옮겨도 남는 오브젝트)에 두고, 각 씬에는 그 씬의 화면 코드만 둔다.
-> - **받기를 정리한다.** 씬 오브젝트가 `Subscribe`한 것은 `OnDisable`·`OnDestroy`에서 `Dispose`한다. 하지 않으면 사라진 오브젝트를 세션이 계속 부른다.
+> - **받기를 정리한다.** 씬 오브젝트가 `SubscribeAfterAction`·`GameView.Redraw`로 받은 `IDisposable`은 `OnDisable`·`OnDestroy`에서 `Dispose`한다. 하지 않으면 사라진 오브젝트를 세션이 계속 부른다.
 > - 판을 불러온 뒤에도 같은 식(`Rules.InBattle`)으로 맞는 씬을 고른다.
 
 > [!note]- 다른 장르라면: 턴을 넘기면 Undo 못 하게
@@ -276,7 +277,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 - [ ] 한 입력에 따라오는 단계가 Undo 한 번에 돌아가는 것을 모니터로 확인했다.
 - [ ] 규칙상의 실패는 `InvalidOperationException`으로 던지고, 런 스크립트는 그것만 잡는다.
 - [ ] 반응할 순간마다 행동 안에서 이벤트를 쏜다.
-- [ ] 화면은 읽기·보내기·받기만 하고, `Subscribe`한 것을 `Dispose`한다.
+- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
 - [ ] 시간이 걸리는 효과는 나중에 새 행동으로 실행한다.
 - [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다.
 

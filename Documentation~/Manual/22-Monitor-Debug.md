@@ -1,6 +1,6 @@
 # 22. 모니터와 디버깅
 
-`MomoiProject → 모니터`는 플레이 중인 세션을 들여다보고 조작하는 창이다. 무엇이 왜 바뀌었는지(통합 기록), 지금 값이 무엇인지(데이터), 도전과제·로그를 테스트로 움직이기, 이벤트 쏘기, 행동 되돌리기, 디버그 명령, 게임 시간 조절을 한곳에서 한다.
+`MomoiProject → 모니터`는 플레이 중인 세션을 들여다보고 조작하는 창이다. 무엇이 왜 바뀌었는지(통합 기록), 지금 값이 무엇인지(데이터), 도전과제·로그를 테스트로 움직이기, 이벤트 쏘기, 행동 되돌리기, 개발 명령(DB › 개발 › 개발 명령), 게임 시간 조절을 한곳에서 한다.
 
 ## 이 문서에서 쓰는 말
 
@@ -197,7 +197,7 @@ var evt = EventSimulator.Create(typeof(EnemyKilled), new System.Collections.Gene
 
 ### 코드로 쓰는 법
 
-게임 코드에서는 `Game.Events.Publish(이벤트)`로 쏘고, `Subscribe<T>`로 받는다(연출·UI용, 반환값을 `Dispose`하면 그만 받는다).
+게임 코드에서는 `Game.Events.Publish(이벤트)`로 쏜다. 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
 
 ```csharp
 using GBible;
@@ -207,7 +207,7 @@ public sealed class KillPopup : MonoBehaviour
 {
     System.IDisposable _sub;
 
-    void OnEnable() => _sub = GBibleRuntime.Game.Events.Subscribe<EnemyKilled>(e => Debug.Log($"{e.enemy} 처치!"));
+    void OnEnable() => _sub = GBibleRuntime.Game.Events.SubscribeAfterAction<EnemyKilled>(e => Debug.Log($"{e.enemy} 처치!"));
     void OnDisable() => _sub?.Dispose();
 }
 ```
@@ -253,23 +253,68 @@ if (session.UndoCount > 0) session.Undo();   // 성공하면 true
 
 ## 7. 명령
 
-**한 줄 요약.** 게임 코드가 등록한 디버그 명령을 분류별 버튼으로 보여 준다. 마우스를 올리면 설명.
+**한 줄 요약.** 개발 명령을 분류별 버튼으로 보여 준다. 마우스를 올리면 설명. 명령은 **DB › 개발 › 개발 명령**에서 결과 Block으로 조립하는 것이 기본이고, 코드가 필요한 것만 `[BindTo]`나 `session.Debug.Register`로 쓴다.
 
-### 에디터에서
+### 에디터에서 — 명령 탭
 
 기본 명령:
 
 | 분류 | 명령 |
 |---|---|
 | 세션 | **Undo (Undo)**, **이번 판 수치 초기화** |
-| 저장 | **프로필 저장**, **프로필 삭제**, **판 저장**, **판 불러오기**, **새 판** |
+| 저장 | **프로필 저장**, **프로필 삭제**, **판 저장**, **판 불러오기**, **새 판**(`GBibleRuntime.NewRun`: 이번 판 값을 처음 값으로 + 판 저장 삭제) |
 | 시간 | **일시정지 / 재개**, **1프레임 진행**, **배속 0.25**, **배속 1**, **배속 2** |
 
-샘플을 켜면 "샘플" 분류(고블린 공격, 오크 공격 ×10, 상자 열기 …)가 더해진다.
+DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해지고, 샘플을 켜면 "샘플" 분류(고블린 공격, 오크 공격 ×10, 상자 열기 …)가 더해진다.
+
+### 에디터에서 — DB › 개발 › 개발 명령 (`DebugCommandData`)
+
+항목 하나 = 명령 탭의 버튼 하나. DB 사이드바 그룹 **개발**에 있다(`21-Editor-Database.md`).
+
+| 칸 | 뜻 |
+|---|---|
+| 버튼 이름 | 명령 탭에 보이는 이름. 비우면 ID |
+| 분류 | 명령 탭에서 묶이는 이름(기본 "개발") |
+| 설명 | 버튼에 마우스를 올리면 보이는 글 |
+| 결과 | 결과 Block 목록: **플레이어 데이터에 주기 · 이벤트 쏘기 · 로그에 기록 · 대상에게 효과 · 코딩한 결과** 등(`12-Outcomes.md`) |
+
+버튼을 누르면 결과 전체가 **행동 하나**(`DeveloperEditAction`, 타임라인에 "[개발] 버튼 이름")로 실행된다. 게임 행동처럼 기록되고 머리의 Undo로 되돌린다. 결과가 하나도 없고 `[BindTo]`도 없으면 검사가 "결과가 없습니다(무엇을 할지)."를 알린다.
+
+예(카드 던전):
+
+| ID | 버튼 이름 | 결과 |
+|---|---|---|
+| `goldPlus100` | 골드 +100 | 플레이어 데이터에 주기: run › gold +100 |
+| `turnDamage30` | 한 턴 30 피해 | 이벤트 쏘기: `TurnEnded` (turn = 1, damage = 30) — 그 이벤트를 받는 로그·도전과제·트리거가 반응 |
+| `killAll` | 적 모두 처치 | 코드(`[BindTo]`, 아래) |
+
+> [!note]- 이벤트 쏘기 Block
+> - 칸: **이벤트**(고르기) · **값**(줄마다 필드 경로 = 값) · **횟수**(1 이상).
+> - 값은 숫자·글자·참거짓·enum 필드만. 경로 `a.b`로 안쪽 필드도 적는다. 적지 않은 필드는 이벤트 클래스의 기본값이다.
+> - 모니터 이벤트 탭(5절)이 손으로 한 번 쏘는 것이라면, 이 Block은 같은 쏘기를 버튼으로 저장해 두는 것이다.
+> - 개발 명령 말고 도전과제 보상처럼 종류 제한이 '모두'인 결과 칸에서도 쓸 수 있다(`12-Outcomes.md`).
 
 ### 코드로 쓰는 법
 
-**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 같은 분류·이름이면 덮어쓴다. 보통 `GBibleRuntime.Started`에서 등록한다(`20-Setup.md` 4절).
+**코드가 필요한 명령 — DB 항목 + `[BindTo]`.** 규칙 함수를 거쳐야 하는 명령(예: 적 모두 처치 — 피해 규칙을 거쳐야 처치 이벤트·로그가 게임과 같게 돈다)은 DB 항목을 만들고 그 ID에 `[BindTo]`를 붙인다. 결과 칸은 잠기고 이 함수가 결과가 된다. 실행은 똑같이 행동 하나라 Undo된다(`13-BindTo.md`).
+
+```csharp
+using System.Linq;
+using GBible;
+using GBible.Ids;
+
+public static class DebugCode
+{
+    [BindTo(GameIds.DebugCommand.KillAll)]
+    static void KillAll(TriggerContext c)
+    {
+        var game = c.Game;
+        foreach (var enemy in Rules.LivingEnemies(game).ToArray()) Rules.Damage(game, game.Data().Run.hero, enemy, 9999);
+    }
+}
+```
+
+**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 보통 `GBibleRuntime.Started`에서 등록한다(`20-Setup.md` 4절). 동작은 그대로 불리므로, 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 불러야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
 
 ```csharp
 using GBible;
@@ -280,21 +325,18 @@ public static class DebugMenu
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     static void Hook() => GBibleRuntime.Started += session =>
     {
-        session.Debug.Register("전투", "적 처치 이벤트 10회", () =>
-        {
-            var events = new System.Collections.Generic.List<object>();
-            for (int i = 0; i < 10; i++) events.Add(new EnemyKilled { enemy = "goblin" });
-            session.SimulateEvents(events, "명령");
-        }, "로그·도전과제 반응 확인용");
         session.Debug.Register("시간", "배속 4", () => GameTime.SetSpeed(4f));
     };
 }
 ```
 
+**출시 빌드.** `session.Debug.Enabled`가 거짓이면 `Register`는 아무것도 하지 않는다. 런타임이 `Debug.isDebugBuild`로 이 값을 넣으므로, 출시 빌드에서는 DB 항목·코드 등록 모두 버튼이 생기지 않는다. 그래서 개발 명령 코드를 `if (Debug.isDebugBuild)`로 감싸지 않는다. 직접 만든 세션(테스트·서버)은 기본값 참이다.
+
 ### 주의할 점
 
 - 명령에서 난 예외는 콘솔에 찍히고 창은 계속 동작한다.
-- 명령은 세션마다 등록된다. 플레이를 다시 시작하면 `Started`에서 다시 등록된다.
+- 명령은 세션마다 등록된다. 플레이를 다시 시작하면 DB 항목과 `Started`에서 다시 등록된다.
+- 시드는 모니터 머리에 늘 보이므로 시드를 기록하는 명령은 따로 만들지 않는다. 도전과제를 트리거로 달성하는 것은 도전과제 탭의 **트리거로 달성**(4절)을 쓴다.
 
 ---
 

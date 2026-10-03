@@ -175,24 +175,42 @@ Bootstrap은 게임이 켜질 때 가장 먼저 도는 곳이다. 설정과 코�
 
 | `Started`에서 하는 일 | 예 |
 |---|---|
-| 프로젝트 고유 기능의 감시 등록 | 유물마다 발동 조건을 `session.Triggers.Register`로 건다([04장](04-AddingContent.md)) |
+| 프로젝트 고유 기능의 감시 연결 | 유물 감시를 거는 한 줄 `RelicRules.Register(session, …)`. 등록 내용은 Rules에 있다([04장](04-AddingContent.md) 8절) |
 | 행동 처리기 등록 | `session.Actions.Register<SkipFloor>(…)` |
 | 이벤트 받기(분석·외부 서비스 알림 등) | `session.Events.Subscribe<BattleWon>(…)` |
-| 개발용 명령 | 모니터 **명령** 탭의 버튼 |
 
-개발용 명령은 이렇게 쓴다.
+카드 던전의 `Started`는 한 줄이다.
 
 ```csharp
 static void Started(GameSession session)
 {
-    if (Debug.isDebugBuild)
-        session.Debug.Register("카드 던전", "골드 +100", () => session.Do(new DeveloperEditAction
-        {
-            label = "골드 +100",
-            Edit = () => session.Game.Data().Run.gold += 100,
-        }));
+    // 유물 감시(04장). 규칙은 Rules의 RelicRules, 여기서는 연결만
+    RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
 }
 ```
+
+**개발 명령**(모니터 **명령** 탭의 버튼)은 코드가 아니라 DB › 개발 › **개발 명령**에서 만든다. 항목 하나가 버튼 하나이고, 결과 칸에 결과 Block을 조립한다.
+
+| 칸 | 카드 던전 `goldPlus100` |
+|---|---|
+| 버튼 이름 | 골드 +100 |
+| 결과 | 플레이어 데이터에 주기 → `run › gold`, 증감 100 |
+
+> [!note]- 개발 명령 자세히
+> - 누르면 결과 전체가 행동 하나(`DeveloperEditAction`)로 실행된다. 게임 행동처럼 **타임라인**에 "[개발] 골드 +100"으로 남고 Undo된다.
+> - 칸: 버튼 이름(비우면 ID), 분류(명령 탭에서 묶이는 이름, 기본 "개발"), 설명, 결과.
+> - 결과 Block: 플레이어 데이터에 주기 · 이벤트 쏘기 · 로그에 기록 · 대상에게 효과 · 코딩한 결과. **이벤트 쏘기**는 이벤트를 고르고 값 줄(필드 경로 = 값)과 횟수를 적는다. 그 이벤트를 받는 로그·도전과제·트리거가 반응한다(카드 던전 "한 턴 30 피해": `TurnEnded` turn = 1, damage = 30).
+> - 규칙 함수를 거쳐야 하는 명령은 항목을 만들고 그 ID에 `[BindTo]`를 붙인다. 카드 던전 "적 모두 처치"는 피해 규칙을 거쳐야 처치 이벤트·로그가 게임과 같게 돈다.
+> ```csharp
+> [BindTo(GameIds.DebugCommand.KillAll)]
+> static void KillAll(TriggerContext c)
+> {
+>     var game = c.Game;
+>     foreach (var enemy in Rules.LivingEnemies(game).ToArray()) Rules.Damage(game, game.Data().Run.hero, enemy, 9999);
+> }
+> ```
+> - 출시 빌드에서는 개발 명령이 등록되지 않는다(`session.Debug.Enabled`가 거짓). 그래서 `if (Debug.isDebugBuild)`로 감싸지 않는다.
+> - 코드로 직접 버튼을 거는 `session.Debug.Register(분류, 이름, 동작)`도 그대로 있다. 출시 빌드에서 무시되는 것도 같다.
 
 > [!note]- 설정 칸 자세히
 > - Undo 방식을 "스냅샷"으로 바꾸면 보관 수 대신 스냅샷 간격(초)·스냅샷 보관 수 칸이 나온다. 간격 × 개수 = 되감을 수 있는 시간.
@@ -204,7 +222,7 @@ static void Started(GameSession session)
 
 > [!note]- `Configure`는 언제 쓰나
 > 화면에서 고를 수 있는 값은 화면에서 정한다. 코드가 필요한 경우는 둘뿐이다.
-> - 출시 뒤 저장 구조를 바꿨을 때의 변환 등록(`options.Migrations`, [10장](10-SaveAndRelease.md)). 저장 버전은 등록한 변환을 따라 저절로 올라간다.
+> - 출시 뒤 저장 구조를 바꿨을 때, 값을 계산해 고치는 변환(`options.Migrations.Add`, [10장](10-SaveAndRelease.md) 7절). 필드 옮김·키 이름 바꿈·키 삭제는 코드 없이 DB › 개발 › **저장 변환** 표에 적는다. 저장 버전은 등록한 변환을 따라 저절로 올라간다.
 > - 조건에 따라 바꿀 때. 예: "데모 빌드는 Undo를 끈다".
 > ```csharp
 > static void Configure(SessionOptions options)
@@ -219,9 +237,8 @@ static void Started(GameSession session)
 > - 두 함수는 `[RuntimeInitializeOnLoadMethod(AfterAssembliesLoaded)]`인 `Hook`에서 `GBibleRuntime.Configuring`·`GBibleRuntime.Started`에 연결되어 있다(시작 설정이 만든 파일 그대로). `GBibleRuntime`은 첫 씬을 불러오기 전에 세션을 만들므로, `MonoBehaviour.Awake`에서 연결하면 늦다.
 > - `Configure`는 세션을 만들기 **직전**(세션 없음), `Started`는 준비가 **끝난 뒤**(DB 등록·저장 불러오기까지)다.
 > - Bootstrap이 Client에 있는 이유: Unity의 게임 시작에 붙는 코드라서. 서버라면 서버가 세션을 만드는 자리에서 같은 일을 한다.
-> - 등록할 것이 늘어나면 기능마다 자기 파일에서 `GBibleRuntime.Started += …`로 따로 연결해도 된다(카드 던전의 유물 감시 `RelicRuntime`).
-> - `Started`에서 하지 않는 것: 플레이어 데이터 정의(DB가 했다), 처음 값 넣기(판을 시작하는 행동 `StartRun`이나 클래스 초기값이 정한다, [03장](03-GameLoop.md)).
-> - 값을 고치는 개발용 명령을 `DeveloperEditAction`으로 감싸면 게임 행동처럼 기록되고 Undo된다. `Game.Data()`를 쓰려면 파일 위에 `using GBible.Ids;`.
+> - 프로젝트 고유 기능은 나눠 둔다. **등록 함수**(무엇을 감시하고 무엇을 할지)는 Rules에(서버에서도 그대로 부른다), **Unity 시작에 거는 연결**은 `Started`에 한 줄. 카드 던전의 유물은 `RelicRules.Register`(Rules) + 위 한 줄(Bootstrap)이다. `GameDatabase`를 쓰려면 파일 위에 `using GBible.Data;`.
+> - `Started`에서 하지 않는 것: 플레이어 데이터 정의(DB가 했다), 처음 값 넣기(판을 시작하는 행동 `StartRun`이나 클래스 초기값이 정한다, [03장](03-GameLoop.md)), 개발 명령(DB › 개발 명령이 게임이 켜질 때 저절로 등록된다).
 
 ## 5. 첫 플레이 확인
 
@@ -234,7 +251,7 @@ static void Started(GameSession session)
 
 > [!note]- 더 확인할 것
 > - 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`·`[오디오]` 오브젝트가 있다. 세션은 씬과 상관없이 이 오브젝트와 함께 산다.
-> - **행동** 탭에 "[개발] 골드 +100"이 생긴다.
+> - **타임라인** 탭에 "[개발] 골드 +100"이 생긴다.
 > - 아직 판을 여는 행동이 없으므로 `run`은 빈 값 그대로다. 다음 장에서 기획을 클래스로 옮긴다.
 
 > [!note]- 다른 장르라면
@@ -249,7 +266,7 @@ static void Started(GameSession session)
 - [ ] 규칙 코드는 Rules에, Unity에 붙는 코드는 Client에 있다.
 - [ ] `RunState`·`Profile`에 필드를 채웠다.
 - [ ] DB › 시작 파일 › Bootstrap에서 Undo 방식·보관 수·시드·판 저장을 정했다.
-- [ ] 모니터에 고정 시드가 보이고, 디버그 명령 → Undo가 된다.
+- [ ] DB › 개발 › 개발 명령에 명령을 만들었고, 모니터에 고정 시드가 보이고, 그 명령 → Undo가 된다.
 
 > [!note]- 더 보기(매뉴얼)
 > - [20. 시작하기](../Manual/20-Setup.md) — 자동 시작 순서, `SessionOptions`, 선택 기능, `GameIds` 규칙

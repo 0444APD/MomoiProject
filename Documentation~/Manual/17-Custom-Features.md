@@ -51,7 +51,7 @@ public class QuestData : GameData
 | `[Database]` 인자 | 뜻 |
 |---|---|
 | 첫 값 | 탭 이름 |
-| `Group` | 사이드바 그룹(기본 기능은 `선언`·`진행`·`DB`을 쓴다) |
+| `Group` | 사이드바 그룹(기본 기능은 `선언`·`진행`·`DB`·`개발`을 쓴다) |
 | `Order` | 그룹 안 순서 |
 | `IdPrefix` | 새 항목 ID 앞부분(없으면 클래스 이름에서) |
 
@@ -75,7 +75,7 @@ public Trigger trigger;
 public List<Outcome> outcomes = new List<Outcome>();
 ```
 
-- `OutcomeKinds.All`이면 로그에 기록까지 전부.
+- `OutcomeKinds.All`이면 로그에 기록·이벤트 쏘기까지 전부.
 - `Fixed = true`면 그 종류 하나로 고정된다(로그처럼 세부 칸만).
 
 ### 2-4. 규칙 여러 줄: `List<TriggerRule>`
@@ -103,19 +103,59 @@ public override void ValidateData(IValidationContext context)
 
 `context.Error`는 빌드를 막고, `context.Warning`은 표시만 한다.
 
-### 2-6. 런타임 시작에 끼어들기: `GBibleRuntime.Started`
+### 2-6. 등록 함수는 Rules에, 연결은 Bootstrap에
+
+기능 하나를 두 곳에 나눠 쓴다.
+
+| 무엇 | 어디 | 왜 |
+|---|---|---|
+| **등록 함수** — 세션과 DB 항목을 받아 감시를 등록하는 함수(`QuestRules.Register(session, quests)`) | Rules(규칙 코드) | 게임 규칙이라 서버에서도 그대로 쓴다. 서버는 세션을 직접 만든 뒤 같은 함수를 부른다 |
+| **연결** — Unity가 켜질 때 그 함수를 부르는 한 줄 | Client의 `Bootstrap.Started` | Unity 시작 방식(`GBibleRuntime.Started`)은 클라이언트에만 있다 |
 
 ```csharp
-public static class QuestRuntime
+// Rules 쪽: 등록 함수(Unity 시작 방식을 모른다)
+public static class QuestRules
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += Register;
+    public static void Register(GameSession session, IEnumerable<QuestData> quests) { /* 2-7 */ }
+}
 
-    static void Register(GameSession session) { /* 2-7 */ }
+// Client의 Bootstrap.cs: 연결 한 줄
+static void Started(GameSession session)
+{
+    QuestRules.Register(session, GameDatabase.Load()?.All<QuestData>());
 }
 ```
 
-`Started`는 세션이 준비된 뒤(플레이어 데이터·로그·능력·도전과제 정의와 프로필 불러오기가 끝난 뒤) 불린다. 데이터는 `GameDatabase.Load().All<QuestData>()`로 읽는다.
+`Bootstrap.Started`는 `GBibleRuntime.Started`에 연결된 함수다(`20-Setup.md` 4절). 세션이 준비된 뒤(플레이어 데이터·로그·능력·도전과제 정의와 프로필 불러오기가 끝난 뒤) 불린다. 기능마다 자기 `[RuntimeInitializeOnLoadMethod]`와 `Started +=`를 따로 두지 않는다. 그러면 연결이 여러 파일에 흩어지고, 서버에서 같은 등록을 부를 길이 없다.
+
+> [!note]- 예: 카드 던전의 유물
+> ```csharp
+> // Rules/Relics/Relics.cs
+> public static class RelicRules
+> {
+>     public static void Register(GameSession session, IEnumerable<RelicData> relics)
+>     {
+>         if (relics == null) return;
+>         foreach (var relic in relics)
+>         {
+>             var id = relic.Id;
+>             IEnumerable<Outcome> outcomes = BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : relic.outcomes;
+>             session.Triggers.Register(id, relic.trigger, repeat: true, fire: moment =>
+>             {
+>                 var run = session.Game.Data().Run;
+>                 if (run == null || !run.relics.Contains(id)) return;   // 가지고 있을 때만
+>                 session.Triggers.RunOutcomes(outcomes, moment, "Relics");
+>             });
+>         }
+>     }
+> }
+>
+> // Client/Bootstrap.cs
+> static void Started(GameSession session)
+> {
+>     RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
+> }
+> ```
 
 ### 2-7. 감시 등록: `session.Triggers.Register(owner, when, repeat, fire)`
 
@@ -143,7 +183,7 @@ session.Triggers.RunOutcomes(outcomes, moment, "Quests");
 ```
 
 - `RunOutcomes(결과들, 컨텍스트, 출처)`는 결과를 차례로 실행하고, 결과마다 Journal에 "결과: …"(출처 `Quests`)를 남긴다. 결과가 꺼낸 객체를 고쳐도 기록된다.
-- `[BindTo]` 연결은 기본 기능(도전과제·로그·능력)만 스스로 확인한다. 프로젝트 기능은 `BoundOutcomes.Has(id)`로 직접 확인해 바꿔 써야 한다. 확인하지 않으면 에디터에는 결과 칸이 잠겨 보이는데 실제로는 숨은 예전 결과가 돈다.
+- `[BindTo]` 연결은 기본 기능(도전과제·로그·능력·개발 명령)만 스스로 확인한다. 프로젝트 기능은 `BoundOutcomes.Has(id)`로 직접 확인해 바꿔 써야 한다. 확인하지 않으면 에디터에는 결과 칸이 잠겨 보이는데 실제로는 숨은 예전 결과가 돈다.
 
 ### 2-9. 완료 저장과 Undo: 플레이어 데이터 + `Permanent`
 
@@ -215,24 +255,21 @@ public class QuestCompleted
     public string questId;
 }
 
-// ── 런타임 ─────────────────────────────────────────────────
-public static class QuestRuntime
+// ── 규칙(Rules): 등록 함수. 서버에서도 그대로 부른다 ──────────────
+public static class QuestRules
 {
     const string LogKey = "quest.log";
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += Start;
-
-    static void Start(GameSession session)
+    public static void Register(GameSession session, IEnumerable<QuestData> quests)
     {
-        var database = GameDatabase.Load();
-        if (database == null || !session.Data.IsDefined(LogKey)) return;
-        foreach (var quest in database.All<QuestData>()) Watch(session, quest);
+        if (quests == null || !session.Data.IsDefined(LogKey)) return;
+        var all = quests.ToList();
+        foreach (var quest in all) Watch(session, quest, all);
         session.Triggers.Watcher.EvaluateAll();           // 이미 조건을 넘은 퀘스트도 완료
     }
 
     // 완료하지 않았고, 선행 퀘스트를 마친 퀘스트만 감시한다.
-    static void Watch(GameSession session, QuestData quest)
+    static void Watch(GameSession session, QuestData quest, List<QuestData> all)
     {
         var log = session.Data.Get<QuestLog>(LogKey);
         if (log.done.Contains(quest.Id) || session.Triggers.IsRegistered(quest.Id)) return;
@@ -250,7 +287,7 @@ public static class QuestRuntime
                 session.Events.Publish(new QuestCompleted { questId = id });
             }
             // 이 퀘스트를 선행으로 가진 퀘스트를 열어 준다.
-            foreach (var next in GameDatabase.Load().All<QuestData>().Where(q => q.requires == id)) Watch(session, next);
+            foreach (var next in all.Where(q => q.requires == id)) Watch(session, next, all);
         });
     }
 
@@ -261,6 +298,9 @@ public static class QuestRuntime
         return quest.trigger != null && quest.trigger.TryGetProgress(session, out var now, out var goal) ? $"{now} / {goal}" : "진행 중";
     }
 }
+
+// ── 연결(Client/Bootstrap.cs의 Started에 한 줄) ──────────────────
+// QuestRules.Register(session, GameDatabase.Load()?.All<QuestData>());
 ```
 
 ### 3-2. 에디터에서 퀘스트 조립
@@ -290,7 +330,7 @@ public static class QuestRewards
 }
 ```
 
-`QuestRuntime.Watch`가 `BoundOutcomes`를 확인하므로 이 함수가 `quest.boss`의 결과가 된다(에디터의 결과 칸은 잠긴다).
+`QuestRules.Watch`가 `BoundOutcomes`를 확인하므로 이 함수가 `quest.boss`의 결과가 된다(에디터의 결과 칸은 잠긴다).
 
 ### 3-4. 완료한 퀘스트 수를 로그로
 
@@ -365,7 +405,7 @@ static void WatchStep(GameSession session, ChainQuestData quest)
 
 ### 4-3. Unity 없이(서버·테스트)
 
-DB 없이도 같은 API로 돈다. Trigger·결과를 코드로 만들어 등록한다.
+DB 없이도 같은 API로 돈다. 등록 함수를 Rules에 둔 기능은 서버가 세션을 만든 뒤 같은 함수(`QuestRules.Register(session, quests)`)를 부르면 된다. 아래는 Trigger·결과를 코드로 만들어 직접 등록하는 예다.
 
 ```csharp
 var session = new GameSession();

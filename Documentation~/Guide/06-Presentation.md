@@ -17,49 +17,50 @@
 ## 1. 화면 갱신
 
 - 화면에 보일 값(체력·골드·손패·물약 칸)이 모두 플레이어 데이터나 원본 인스턴스에 있는지 본다. 없으면 [02장](02-DesignToCode.md)으로 돌아가 필드를 더한다.
-- `session.Data.Changed`를 받으면 "다시 그릴 것"으로 **표시만** 하고, `LateUpdate`에서 한 번 그린다.
-- 받기는 `OnEnable`, 그만 받기는 `OnDisable`에서 한다.
+- 그리는 함수 하나(`Redraw`)를 만들고 `GameView.Redraw(Redraw, 키)`에 등록한다. 그 플레이어 데이터가 바뀌거나 **언어가 바뀐** 프레임 끝에 한 번 불러 준다.
+- 등록은 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
 
 카드 던전 전투 화면(`BattleHud`, UI Toolkit)은 이렇게 한다.
 
 ```csharp
-bool _dirty = true;
+IDisposable _view;
 
-void OnEnable() => GBibleRuntime.Session.Data.Changed += OnDataChanged;
-
-void OnDisable()
+void OnEnable()
 {
-    var session = GBibleRuntime.Session;   // 게임을 끌 때는 세션이 먼저 사라질 수 있다
-    if (session != null) session.Data.Changed -= OnDataChanged;
+    // … 요소 찾기·버튼 연결
+    _view = GameView.Redraw(Redraw, GameIds.PlayerData.Run.Id);   // run이나 언어가 바뀌면 프레임 끝에 한 번
 }
 
-void OnDataChanged(string key)
-{
-    if (key == GameIds.PlayerData.Run.Id) _dirty = true;   // 여기서는 표시만 한다
-}
+void OnDisable() => _view?.Dispose();
 
-void LateUpdate()
+void Redraw()   // Game.Data().Run을 읽어 글자·손패·물약 칸을 다시 만든다
 {
-    if (!_dirty) return;
-    _dirty = false;
-    Redraw();   // Game.Data().Run을 읽어 글자·손패·물약 칸을 다시 만든다
+    var run = GBibleRuntime.Game.Data().Run;
+    _hp.text = Texts.Get("hud.hp", ("hp", run.hero.hp), ("max", run.hero.maxHp));
+    // … 골드·에너지·손패·물약 칸
 }
 ```
 
-> [!note]- 왜 알림에서 바로 그리지 않나
-> 행동 하나에도 알림은 여러 번 온다. 행동 안에서 `Game.Find`·`Game.All`이 중간에 Sync하면 그때 한 번, 행동이 끝날 때 또 한 번 온다. 행동이 실패하면 진행분을 Sync한 알림과 되돌린 알림이 함께 오고, Undo해도 온다. 그래서 알림에서는 표시만 하고 프레임 끝에 한 번 그린다.
+> [!note]- 왜 알림마다 그리지 않나
+> 값이 바뀌었다는 알림은 행동 하나에도 여러 번 온다. 행동 안에서 `Game.Find`·`Game.All`이 중간에 Sync하면 그때 한 번, 행동이 끝날 때 또 한 번 온다. 행동이 실패하면 진행분을 Sync한 알림과 되돌린 알림이 함께 오고, Undo해도 온다. 알림마다 그리면 같은 화면을 한 프레임에 여러 번 계산하지만, 플레이어 눈에 보이는 것은 프레임당 한 번이다. 그래서 `GameView`는 알림이 오면 "다시 그릴 것"으로 **표시만** 하고, 프레임 끝(행동 밖)에 한 번 그린다.
 >
-> 카드 던전은 판의 모든 값이 플레이어 데이터 `run` 하나에 있으므로, `run` 키가 오면 화면 전체를 다시 그린다.
+> 언어가 바뀌어도 같은 프레임 끝에 다시 그린다. 화면 글은 모두 `Texts.Get`으로 만드므로(5절), 다시 그리면 새 언어로 바뀐다.
 >
-> 그만 받기를 빼먹으면 안 된다. 세션은 씬보다 오래 살아서, 사라진 화면 오브젝트를 계속 부른다.
+> 처음 한 번은 등록한 프레임 끝에 그린다. 화면이 켜질 때 따로 그릴 필요가 없다.
+
+> [!note]- 키 고르기 · 해제
+> - 키를 주면 그 플레이어 데이터가 바뀔 때만, 비우면(`GameView.Redraw(Redraw)`) 어느 플레이어 데이터가 바뀌어도 그린다. 키는 여러 개 줄 수 있다.
+> - 카드 던전은 판의 모든 값이 플레이어 데이터 `run` 하나에 있으므로, `run`이 바뀌면 화면 전체를 다시 그린다.
+> - 해제를 빼먹으면 안 된다. 등록은 씬보다 오래 살아서, 사라진 화면 오브젝트의 `Redraw`를 계속 부른다.
 
 > [!note]- 어떤 알림을 받나
 > | 이럴 때 | 이것 |
 > |---|---|
-> | 어떤 플레이어 데이터가 바뀌었으면 화면을 다시 그린다 | `session.Data.Changed`(`Action<string>`, 바뀐 키) |
-> | 무엇이 바뀌었는지(손패에 한 장 추가, 적 하나 제거)에 따라 다르게 움직인다 | `session.Data.DataChanged`(키 + 바뀐 경로 목록 `DataChange`: 종류 Set·Insert·Remove·Reorder, 경로, 옛 값·새 값) |
+> | 플레이어 데이터나 언어가 바뀌면 화면을 다시 그린다 | `GameView.Redraw(그리기, 키…)`(프레임 끝에 한 번) |
+> | 무엇이 바뀌었는지(손패에 한 장 추가, 적 하나 제거)에 따라 다르게 움직인다 | `session.Data.DataChanged`(키 + 바뀐 경로 목록 `DataChange`: 종류 Set·Insert·Remove·Reorder, 경로, 옛 값·새 값). 알림마다 오므로 바뀐 곳을 모아 두고 프레임 끝에 반영한다 |
+> | 바뀐 키만 직접 받는다 | `session.Data.Changed`(`Action<string>`, 바뀐 키). `GameView`가 안에서 쓰는 알림이다 |
 > | 다른 쪽(서버·클라이언트)에 변경을 보낸다 | `session.Data.Synced`(ChangeSet). 화면용이 아니다([11장](11-MultiplayerReady.md)) |
-> | "피해를 줬다", "적이 쓰러졌다"처럼 일어난 일에 맞춰 연출한다 | 이벤트를 받는다(`Game.Events.Subscribe<T>`, 3절) |
+> | "피해를 줬다", "적이 쓰러졌다"처럼 일어난 일에 맞춰 연출한다 | 이벤트를 받는다(`session.Events.SubscribeAfterAction<T>`, 3절) |
 > | 행동이 끝났을 때 한 번 무언가 한다 | `session.Actions.Executed`(`ActionRecord`, 안쪽 행동이면 `Nested`가 참) |
 > | 실패해 취소된 행동을 안다 | `session.Actions.TransactionAborted` |
 
@@ -113,42 +114,37 @@ void Drink(string potion)
 ## 3. 이벤트로 연출
 
 - 규칙이 쏜 이벤트를 받아 연출을 튼다. 카드 던전은 `Rules.Damage`가 쏘는 `DamageDealt`·`EnemyKilled`를 받는다.
-- 행동 안에서 받은 이벤트는 모아 두었다가, 행동이 성공하면(`Executed`) 틀 차례로 옮기고 실패하면(`TransactionAborted`) 버린다.
-- 받는 쪽에서는 플레이어 데이터를 바꾸지 않는다.
+- 연출은 `session.Events.SubscribeAfterAction<T>`로 받는다. 행동이 **성공한 뒤에만**, 쏜 순서대로 온다. 실패해 취소된 행동의 이벤트는 오지 않는다.
+- 받은 이벤트는 틀 차례 대기열(`_queue`)에 넣는다(4절). 받는 쪽에서는 플레이어 데이터를 바꾸지 않는다.
 
 ```csharp
 void OnEnable()
 {
     _session = GBibleRuntime.Session;
-    _subscriptions.Add(_session.Events.Subscribe<DamageDealt>(Receive));
-    _subscriptions.Add(_session.Events.Subscribe<EnemyKilled>(Receive));
-    _session.Actions.Executed += OnExecuted;
-    _session.Actions.TransactionAborted += OnAborted;
+    _subscriptions.Add(_session.Events.SubscribeAfterAction<DamageDealt>(e => _queue.Enqueue(e)));
+    _subscriptions.Add(_session.Events.SubscribeAfterAction<EnemyKilled>(e => _queue.Enqueue(e)));
 }
-// OnDisable: _subscriptions를 모두 Dispose하고, Executed·TransactionAborted를 -= 한다.
 
-void Receive(object e)
+void OnDisable()
 {
-    if (_session.Data.InTransaction) _pending.Add(e);   // 행동이 아직 실패할 수 있다
-    else _queue.Enqueue(e);
+    foreach (var subscription in _subscriptions) subscription.Dispose();
+    _subscriptions.Clear();
 }
-
-void OnExecuted(ActionRecord record)
-{
-    if (record.Nested) return;   // 안쪽 행동은 바깥 행동이 끝날 때 함께 튼다
-    foreach (var e in _pending) _queue.Enqueue(e);
-    _pending.Clear();
-}
-
-void OnAborted(long transactionId) => _pending.Clear();   // 실패해 취소된 행동의 연출은 버린다
 ```
 
-> [!note]- 왜 모아 두나
-> 이벤트는 쏘는 그 자리에서 받는 쪽을 모두 부른다(대기열이 없다). 카드 효과가 피해를 준 뒤 같은 행동 안에서 예외가 나면, 값은 모두 취소되었는데 피해 숫자는 이미 떠 버린다. 그래서 행동이 끝날 때까지 모은다.
+> [!note]- 왜 행동이 끝난 뒤에 받나
+> `Subscribe`로 받으면 이벤트를 쏘는 그 자리, 즉 행동 한가운데에서 불린다. 화염구가 피해를 준 뒤 같은 행동 안에서 예외가 나면, 값은 모두 취소되었는데 피해 숫자는 이미 떠 버린다. 실패한 행동의 연출은 보여 주면 안 된다.
 >
-> 행동 밖에서 쏜 이벤트(도전과제 달성처럼 행동이 끝난 뒤 쏘는 것)는 바로 틀 차례에 넣는다.
->
-> `PlayCard` 안에서 부르는 `Game.Use`·`Game.Do(new WinBattle())`는 바깥 행동의 일부로 실행되며, `Executed`도 `Nested`가 참인 기록으로 한 번 더 온다. `Nested`를 걸러야 연출이 반쯤 끊겨 나오지 않는다.
+> `SubscribeAfterAction`은 행동 안에서 쏜 이벤트를 모아 두었다가, 바깥 행동이 성공하면 쏜 순서대로 넘기고 실패하면 버린다. 그래서 받는 순간은 늘 행동 밖이고, 데이터는 이미 최종 모습이다.
+> - `PlayCard` 안에서 부르는 `Game.Use`·`Game.Do(new WinBattle())`가 쏜 이벤트도 바깥 행동(`PlayCard`)이 끝날 때 함께 온다. 연출이 반쯤 끊겨 나오지 않는다.
+> - 행동 밖에서 쏜 이벤트(도전과제 달성처럼 행동이 끝난 뒤 쏘는 것)는 바로 온다.
+> - `Dispose`하면 아직 모아 둔 것도 버린다.
+
+> [!note]- `Subscribe`와 `SubscribeAfterAction`
+> | 받는 쪽 | 이것 |
+> |---|---|
+> | 화면 연출(피해 숫자·소리·흔들림) | `SubscribeAfterAction` |
+> | 규칙 코드(행동 안에서 바로 반응해 값을 바꾸는 쪽) | `Subscribe` |
 
 > [!note]- 연출에서 하지 않는 것
 > | 하지 않는 것 | 이유 |
@@ -185,7 +181,7 @@ void Update()
 
 - 화면의 모든 글은 텍스트 키로 찾는다: `Texts.Get(키, (이름, 값), …)`.
 - DB 항목 이름은 값으로 **ID**를 넘기면 문장 틀이 그 언어의 `<ID>.name` 텍스트로 바꾼다.
-- 언어가 바뀌면 `GameLanguage.Changed`가 온다. 이것도 "다시 그릴 것"으로 받는다(`GameLanguage.Changed += MarkDirty`).
+- 언어가 바뀌면 `GameView.Redraw`에 등록한 화면은 그 프레임 끝에 저절로 다시 그려진다(1절). 따로 받을 것이 없다.
 
 ```csharp
 // "card"에 원본 ID를 넘기면 문장 틀이 <원본 ID>.name 텍스트(현재 언어의 카드 이름)로 바꾼다.
@@ -214,7 +210,7 @@ _hand.Add(new Button(() => Play(id)) { text = Texts.Get("card.button", ("card", 
 > - 틀에서 점으로 객체 안의 필드를 읽는다(`{hero.hp}`). 다이얼로그 대사도 같은 규칙이다(6절).
 
 > [!note]- `LocalizedText` 컴포넌트와 UI Toolkit
-> 인스펙터만으로 쓰는 `LocalizedText` 컴포넌트는 같은 오브젝트의 `text` 속성이 있는 컴포넌트(TextMeshPro 등)에 글을 넣는다. 붙을 때 한 번 글 넣는 대리자를 만들어 두므로 새로 고칠 때마다 리플렉션을 쓰지 않는다. UI Toolkit의 `Label`은 컴포넌트가 아니라 대상이 될 수 없으므로, 카드 던전처럼 `Texts.Get`과 `GameLanguage.Changed`로 직접 넣는다.
+> 인스펙터만으로 쓰는 `LocalizedText` 컴포넌트는 같은 오브젝트의 `text` 속성이 있는 컴포넌트(TextMeshPro 등)에 글을 넣는다. 붙을 때 한 번 글 넣는 대리자를 만들어 두므로 새로 고칠 때마다 리플렉션을 쓰지 않는다. UI Toolkit의 `Label`은 컴포넌트가 아니라 대상이 될 수 없으므로, 카드 던전처럼 `Redraw`에서 `Texts.Get`으로 넣고 `GameView.Redraw`로 언어가 바뀔 때 다시 그린다. `GameView`를 쓰지 않는 코드라면 `GameLanguage.Changed`를 직접 받는다.
 
 > [!note]- 행동의 실패 메시지
 > 행동이 던지는 실패 메시지("에너지가 모자랍니다.")는 코드에 적힌 한국어 그대로 화면에 온다. 여러 언어로 낼 게임이면 행동이 텍스트 키를 담아 던지고 화면이 `Texts.Get`으로 바꾸게 규칙을 정해 둔다.
@@ -307,10 +303,10 @@ for (var i = run.potions.slots.Count; i < run.potions.capacity; i++)
 ## 9. 체크리스트
 
 - [ ] 화면 코드는 Client 폴더에 있고, 플레이어 데이터를 읽기만 한다.
-- [ ] `Data.Changed`(필요하면 `DataChanged`)를 받아 표시만 하고, 프레임 끝에 한 번 그린다.
-- [ ] 받기는 `OnEnable`, 그만 받기(`-=`·`Dispose`)는 `OnDisable`에서 한다.
+- [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번 그린다.
+- [ ] 등록·받기는 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
 - [ ] 버튼은 id를 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
-- [ ] 행동 안에서 받은 이벤트는 행동이 성공한 뒤 틀고, 실패하면 버린다.
+- [ ] 연출은 `SubscribeAfterAction`으로 받아, 성공한 행동의 이벤트만 튼다.
 - [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
 - [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 언어를 바꾸면 다시 그려진다.
 - [ ] 다이얼로그는 말·연출만, 규칙이 있는 일은 행동이 맡는다.
@@ -318,7 +314,7 @@ for (var i = run.potions.slots.Count; i < run.potions.capacity; i++)
 
 > [!note]- 더 보기(매뉴얼)
 > - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — `Changed`·`DataChanged`·`Synced`, Sync가 일어나는 때
-> - [10. 이벤트](../Manual/10-Events.md) — `Subscribe`·`Dispose`, 받는 쪽 규칙
+> - [10. 이벤트](../Manual/10-Events.md) — `Subscribe`·`SubscribeAfterAction`·`Dispose`, 받는 쪽 규칙
 > - [07. 난수와 시간](../Manual/07-Random-Time.md) — `GameTime`, 게임 시계
 > - [23. 텍스트와 현지화](../Manual/23-Text-Localization.md) — `Texts`, 문장 틀, `GameLanguage`
 > - [24. 다이얼로그](../Manual/24-Dialogue.md) — 그래프·신호·저장 이어 가기

@@ -285,7 +285,7 @@ public class TurnEnded
 
 > [!note]- `[GameEvent]`가 하는 일, 상속하지 않는 이유
 > - `[GameEvent("표시 이름")]`을 붙이면 DB·모니터 목록에 이 이름으로 나오고, 컴파일할 때 값 읽기 코드가 생겨 조건·로그가 실행 중 리플렉션 없이 값을 읽는다.
-> - 이벤트는 상속하지 않는다. 이벤트 받기와 `Subscribe<T>`는 형식이 정확히 같을 때만 받는다. 종류를 나누려면 필드를 두고 값 조건으로 거른다.
+> - 이벤트는 상속하지 않는다. 이벤트 받기와 `Subscribe<T>`·`SubscribeAfterAction<T>`는 형식이 정확히 같을 때만 받는다. 종류를 나누려면 필드를 두고 값 조건으로 거른다.
 
 ## 6. 키워드: 고르는 값
 
@@ -323,7 +323,7 @@ public static class Rarity
 > 사용 기능이 붙은 인스턴스는 게임이 켜질 때 인스턴스 ID로 등록되어 `Game.Use(인스턴스 ID, 사용자, 대상들)`로 쓴다. 효과는 기획자가 Block으로 조립한다.
 
 > [!note]- 유물이 DB 종류인 이유
-> 유물은 "가지고 있는 동안, 어떤 순간마다(반복), 무언가 한다"(기획 10번). 도전과제는 한 번이라 맞지 않고, 로그는 숫자만 쌓고, 사용 기능은 쓰는 순간에만 발동한다. 그래서 `GameData`를 상속한 `RelicData`에 Trigger 칸과 결과 칸을 두면 DB에 '유물' 탭이 생기고 기본 기능과 같은 편집 화면을 쓴다. 런타임에서 감시하고 결과를 실행하는 코드는 프로젝트가 쓴다([04장](04-AddingContent.md)).
+> 유물은 "가지고 있는 동안, 어떤 순간마다(반복), 무언가 한다"(기획 10번). 도전과제는 한 번이라 맞지 않고, 로그는 숫자만 쌓고, 사용 기능은 쓰는 순간에만 발동한다. 그래서 `GameData`를 상속한 `RelicData`에 Trigger 칸과 결과 칸을 두면 DB에 '유물' 탭이 생기고 기본 기능과 같은 편집 화면을 쓴다. 런타임에서 감시하고 결과를 실행하는 코드는 프로젝트가 쓴다. 등록 함수(`RelicRules.Register`)는 Rules에, Unity 시작에 거는 연결은 `Bootstrap.Started` 한 줄로 둔다([04장](04-AddingContent.md)).
 
 ## 8. 효과: Block · `[BindTo]` · 규칙 함수
 
@@ -397,9 +397,9 @@ public static class Rarity
 | `Rules/Actions/BattleActions.cs` | `StartBattle`·`DrawCards`·`PlayCard`·`EndTurn`·`WinBattle` | 3~8 |
 | `Rules/Cards/CardBlocks.cs` | 효과 Block 넷, 대상 Block 둘 | 5 |
 | `Rules/Cards/CardCode.cs` | `[BindTo]`: 연쇄 번개, 첫 승리 | 11 |
-| `Rules/Relics/Relics.cs` | DB 종류 `RelicData`, 감시 `RelicRuntime`, `[BindTo]` 불타는 피 | 10 |
+| `Rules/Relics/Relics.cs` | DB 종류 `RelicData`, 감시 등록 함수 `RelicRules.Register`, `[BindTo]` 불타는 피 | 10 |
 | `Rules/Run/Rules.cs` | 규칙 함수(원본 읽기 `CardData`·`MonsterOf`·`PotionOf`, 덱 카드·적 만들기, 피해, 섞기) | 4, 6 |
-| `Client/Bootstrap.cs` | 시작 코드(01장 4절) | — |
+| `Client/Bootstrap.cs` | 시작 코드(01장 4절). `Started`에서 유물 감시 연결 한 줄(`RelicRules.Register`) | 10 |
 | `Client/RunDirector.cs` | 씬의 런 스크립트([03장](03-GameLoop.md)) | 13 |
 
 | DB 탭 | 항목 |
@@ -410,6 +410,7 @@ public static class Rarity
 | 도전과제 | `firstWin`, `bigTurn` |
 | 유물 | `anchor`, `burningBlood` |
 | 다이얼로그 | `shopkeeper`([06장](06-Presentation.md)) |
+| 개발 › 개발 명령 | `goldPlus100`·`turnDamage30`·`killAll`(`killAll`만 `[BindTo]` 코드, [08장](08-TestAndDebug.md)) |
 
 기획 13번(되돌리기)은 클래스가 아니다. DB › 시작 파일 › Bootstrap의 Undo 방식 "행동 단위"와 "값은 행동 안에서만 바꾼다"는 규칙([03장](03-GameLoop.md))으로 해결된다.
 

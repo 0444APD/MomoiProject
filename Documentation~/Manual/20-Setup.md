@@ -55,11 +55,11 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 1. `Mirror.Initialize()` — 플레이어 데이터 비교 코드를 모은다. 리플렉션(실행 중에 형식 정보를 읽는 무거운 작업)은 게임이 켜질 때 여기서 한 번만 한다.
 2. `[BindTo]` 코드 결과를 모으고, 모양이 맞지 않는 함수는 콘솔에 경고한다.
-3. `GameDatabase.Load()`로 DB 에셋을 읽고, `SessionOptions`를 만들어 DB › 시작 파일 › Bootstrap 화면의 세션 옵션을 넣은 뒤 `Configuring` 이벤트를 쏜다(3절). 코드가 화면 값을 바꾸면 기록에 남긴다.
-4. `new GameSession(options)`.
-5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제를 세션에 등록한다. `[BindTo("ID")]`의 ID가 어느 도전과제·로그·능력·사용 기능 인스턴스에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 … 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
+3. `GameDatabase.Load()`로 DB 에셋을 읽고, `SessionOptions`를 만들어 DB › 시작 파일 › Bootstrap 화면의 세션 옵션과 DB › 개발 › 저장 변환 표(버전 순서)를 넣은 뒤 `Configuring` 이벤트를 쏜다(3절). 코드가 화면 값을 바꾸면 기록에 남긴다.
+4. `new GameSession(options)`. 개발 명령은 개발 빌드에서만 받도록 `session.Debug.Enabled = Debug.isDebugBuild`.
+5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제·개발 명령을 세션에 등록한다. `[BindTo("ID")]`의 ID가 DB의 어느 항목에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
 6. 저장 호환 검사(개발 중이면 호환되지 않는 저장을 지운다), ID 이름 바꾸기 이력 적용, 프로필(`profile.json`) 불러오기.
-7. 기본 디버그 명령(저장·시간)을 등록하고, 경고·오류 기록을 콘솔로 보낸다.
+7. 기본 개발 명령(저장·시간)을 등록하고, 경고·오류 기록을 콘솔로 보낸다.
 8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`).
 9. `Started` 이벤트를 쏜다(4절).
 
@@ -95,7 +95,9 @@ public sealed class HudView : MonoBehaviour
 
 **`GBibleRuntime.HasSavedRun` / `LoadRun(session)`** — 저장한 판이 있는지, 있으면 불러온다(성공하면 `true`). 판 불러오기는 자동으로 하지 않는다. 타이틀의 '이어하기' 같은 곳에서 게임이 직접 부른다.
 
-**`GBibleRuntime.DeleteRun()`** — 판 저장 파일을 지운다.
+**`GBibleRuntime.NewRun(session)`** — 새 판. 이번 판 값을 처음 값으로 되돌리고(Undo 기록도 비움) 판 저장 파일을 지우고 판 끝 상태를 푼다. 행동 밖(버튼 등)에서 부른다(`06-SaveLoad.md` 2.3).
+
+**`GBibleRuntime.DeleteRun()`** — 판 저장 파일만 지운다.
 
 **`GBibleRuntime.AutoSaveRun`** — 끝낼 때 판을 자동 저장할지. 기본은 DB › 시작 파일 › Bootstrap의 **판 저장**을 따른다("저장하지 않음"이면 `false`). 코드에서 값을 넣으면 그 값이 우선한다. 행동마다 저장·판 끝 이벤트도 같은 화면에서 정한다(`06-SaveLoad.md` 2.2).
 
@@ -122,8 +124,7 @@ public sealed class TitleMenu : MonoBehaviour
 
     public void OnNewGame()
     {
-        GBibleRuntime.Session.NewRun();   // 이번 판(세션 구역) 값을 처음 값으로
-        GBibleRuntime.DeleteRun();        // 예전 판 저장 지우기
+        GBibleRuntime.NewRun(GBibleRuntime.Session);   // 이번 판 값을 처음 값으로 + 예전 판 저장 지우기
     }
 }
 ```
@@ -189,7 +190,7 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 출시 여부는 메뉴 `MomoiProject → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
 
 - 개발 중(체크 해제, 기본): 데이터 구조가 호환되지 않게 바뀌면 저장을 변환하지 않고 지운다. 기록에 "개발 중 데이터 구조가 바뀌어 저장을 초기화했습니다: …" 경고가 남는다.
-- 출시됨(체크): 저장을 지우지 않는다. ID 이름 바꾸기 이력을 남겨 예전 이름으로 저장된 값을 이어받고, 구조 변경은 저장 버전 변환(`Migrations`)으로 처리한다.
+- 출시됨(체크): 저장을 지우지 않는다. ID 이름 바꾸기 이력을 남겨 예전 이름으로 저장된 값을 이어받고, 구조 변경은 저장 버전 변환(DB › 개발 › 저장 변환 표, 또는 코드의 `Migrations`)으로 처리한다.
 
 ### 코드로 쓰는 법
 
@@ -240,7 +241,7 @@ options.Seed = 20261003UL;
 
 **`JournalCapacity`** — 통합 기록(Journal)에 보관할 줄 수(기본 4096). 넘치면 오래된 줄부터 밀려난다. Bootstrap 화면 **고급 › 기록 보관 줄 수**와 같다.
 
-**`Migrations`** — 저장 데이터 버전 변환. 출시 후 구조를 바꾸면 변환을 등록한다(버전 2부터). 저장 버전은 등록한 변환의 가장 높은 버전으로 저절로 올라간다(`session.SaveVersion`). `SaveVersion` 옵션은 최솟값이라 보통 손대지 않는다. DB 항목 ID 바꾸기는 변환 없이 런타임이 이어받는다(`06-SaveLoad.md` 2.7).
+**`Migrations`** — 저장 데이터 버전 변환. 출시 후 구조를 바꾸면 변환을 등록한다(버전 2부터). 키·경로만 받는 변환(필드 옮김·키 이름 바꿈·키 삭제)은 보통 **DB › 개발 › 저장 변환** 표에 적는다. 표는 `Configuring` 직전에 버전 순서로 여기에 등록되고, 코드는 그 뒤에 더한다. 코드로는 값을 계산해 바꾸는 `Add`만 쓰는 것이 기본이다. 저장 버전은 등록한 변환의 가장 높은 버전으로 저절로 올라간다(`session.SaveVersion`). `SaveVersion` 옵션은 최솟값이라 보통 손대지 않는다. DB 항목 ID 바꾸기는 변환 없이 런타임이 이어받는다(`06-SaveLoad.md` 1.4 · 2.7).
 
 ```csharp
 options.Migrations.RenameKey(2, "gold", "playerGold");   // 저장 버전 2
@@ -286,7 +287,7 @@ public static class ReplaySeed
 }
 ```
 
-**출시 후 구조 변경: 인벤토리의 골드를 지갑으로 옮김.** 버전 3에서 `inventory` 값의 `gold` 필드를 `wallet.gold`로 옮긴다.
+**출시 후 구조 변경: 인벤토리의 골드를 지갑으로 옮김.** 버전 3에서 `inventory` 값의 `gold` 필드를 `wallet.gold`로 옮긴다. 보통은 DB › 개발 › 저장 변환에 두 줄(버전 2 · 키 이름 바꿈 · `gold` → `playerGold`, 버전 3 · 필드 옮김 · `inventory` · `gold` → `wallet.gold`)을 적는다. 코드로 하면 이렇다.
 
 ```csharp
 using GBible;
@@ -314,7 +315,7 @@ var session = new GameSession(new SessionOptions { Seed = 7, History = HistoryMo
 ### 주의할 점
 
 - `MonoBehaviour.Awake`에서 `Configuring`을 연결하면 늦다(세션이 이미 만들어졌다). 꼭 `AfterAssembliesLoaded`(또는 `BeforeSplashScreen`)에서 연결한다.
-- `Configuring` 안에서는 세션이 아직 없다. 행동 처리기·디버그 명령은 `Started`에서 등록한다.
+- `Configuring` 안에서는 세션이 아직 없다. 행동 처리기·코드로 쓰는 개발 명령은 `Started`에서 등록한다(DB › 개발 › 개발 명령의 항목은 런타임이 등록한다).
 - 개발 중 상태에서는 키를 지우거나 형식을 바꾸면 저장이 지워진다. 키를 더하기만 한 경우는 그대로 이어간다.
 
 ---
@@ -323,7 +324,7 @@ var session = new GameSession(new SessionOptions { Seed = 7, History = HistoryMo
 
 **한 줄 요약.** 세션 준비가 끝나면 `Started`, 게임을 끝낼 때 `Stopped`를 쏜다. 둘 다 `Action<GameSession>`이다.
 
-**언제.** 행동 처리기·디버그 명령·코드로만 정의하는 플레이어 데이터를 등록할 때(`Started`), 끝낼 때 외부 서비스에 알릴 때(`Stopped`).
+**언제.** 행동 처리기·프로젝트 기능의 감시·코드로만 정의하는 플레이어 데이터를 등록할 때(`Started`), 끝낼 때 외부 서비스에 알릴 때(`Stopped`).
 
 ### 코드로 쓰는 법
 
@@ -345,7 +346,7 @@ public static class GameBoot
 }
 ```
 
-**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 모니터의 명령 탭에 버튼을 더한다(`22-Monitor-Debug.md`).
+**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 모니터의 명령 탭에 버튼을 코드로 더한다. 출시 빌드에서는 `session.Debug.Enabled`가 거짓이라 아무것도 하지 않으므로 `if (Debug.isDebugBuild)`로 감싸지 않는다. 결과 Block으로 조립할 수 있는 명령은 코드 대신 DB › 개발 › 개발 명령에 만든다(`22-Monitor-Debug.md` 7절).
 
 **`session.Data.Define(키, 구역, 기본값, 표시 이름)`** — DB에 없는, 코드에서만 쓰는 값을 등록한다. 샘플(`SampleGame`)이 콤보 수를 이렇게 둔다.
 
@@ -361,7 +362,9 @@ GBibleRuntime.Stopped += session => UnityEngine.Debug.Log($"기록 {session.Jour
 
 ### 상황별 예제
 
-**디버그 빌드에서만 치트 명령.** DB › 플레이어 데이터에 `playerGold`(숫자)가 있다고 하자.
+**개발 빌드에서만 치트 명령.** DB › 플레이어 데이터에 `playerGold`(숫자)가 있다고 하자. 보통은 DB › 개발 › 개발 명령에 항목을 만들고 결과에 `플레이어 데이터에 주기 · playerGold` 증감 1000을 넣는다. 코드는 없고, 누르면 행동 하나로 실행되어 Undo된다.
+
+규칙 함수를 불러야 해서 코드로 쓸 때는 `Started`에서 등록한다. 출시 빌드에서는 런타임이 등록을 무시하므로 감싸는 검사가 없다.
 
 ```csharp
 using GBible;
@@ -370,17 +373,15 @@ using UnityEngine;
 public static class Cheats
 {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook()
+    static void Hook() => GBibleRuntime.Started += session =>
     {
-        if (!Debug.isDebugBuild) return;
-        GBibleRuntime.Started += session =>
-        {
-            session.Debug.Register("치트", "골드 +1000", () =>
-                session.Data.Set("playerGold", session.Data.GetNumber("playerGold") + 1000));
-        };
-    }
+        // 값을 바꾸는 명령은 행동으로 실행해야 기록·Undo된다(SkipToBoss는 게임이 만든 행동).
+        session.Debug.Register("치트", "보스 앞으로", () => session.Do(new SkipToBoss()));
+    };
 }
 ```
+
+같은 일을 DB 항목 + `[BindTo]`로도 쓸 수 있다(`13-BindTo.md` 3-10). 그쪽은 행동으로 감싸는 일을 런타임이 한다.
 
 **씬이 바뀌어도 남는 매니저가 세션을 늦게 받는 경우.** `Started`를 놓쳤을 수 있으면 지금 세션을 먼저 확인한다.
 

@@ -78,7 +78,7 @@ profile.totalGold += run.gold;
 ```
 
 > [!note]- 새 판과 이어 하기
-> - 새 판을 열면 `session.NewRun()`이 `Session` 구역만 처음 값으로 돌리고(Undo 이력도 비운다) 프로필은 그대로 둔다.
+> - 새 판을 열면(`GBibleRuntime.NewRun(session)`) `Session` 구역만 처음 값으로 돌리고(Undo 이력도 비운다) 판 저장 파일도 지운다. 프로필은 그대로 둔다.
 > - 판 저장(`run.json`)에는 `Session` 구역과 난수 상태·게임 시계가 들어간다. 그래서 이어 하면 다음 카드 섞기 결과까지 저장한 순간과 같다.
 > - 판 저장 시점은 Bootstrap 화면의 **판 저장**(끌 때 저장 / 행동마다 저장 / 저장하지 않음)으로 정한다. 카드 던전은 행동마다 저장, 판 끝 이벤트 `RunEnded`([10장](10-SaveAndRelease.md)).
 

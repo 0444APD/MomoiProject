@@ -13,7 +13,8 @@
 | 용어 | 뜻 |
 |---|---|
 | 쏜다 | 게임 코드(또는 모니터 도구)가 이벤트 인스턴스를 만들어 세션의 이벤트 버스(`EventBus`)에 넘긴다(`Publish`). |
-| 받는다 | Trigger·로그 규칙·`Subscribe`로 등록한 함수가 쏜 이벤트를 넘겨받는다. |
+| 받는다 | Trigger·로그 규칙·`Subscribe`·`SubscribeAfterAction`으로 등록한 함수가 쏜 이벤트를 넘겨받는다. |
+| 행동 | `Game.Do`로 실행하는 값 변경 한 묶음. 실패하면 바꾼 것이 모두 취소되고, Undo 한 단위다(→ `02-Actions-Undo.md`). |
 | Trigger | "언제"를 정하는 칸. 이벤트 받기·조건 충족·사용을 AND·OR·NOT으로 조립한다(→ `11-Triggers-Conditions.md`). |
 | Journal | 세션의 통합 기록. 쏜 이벤트와 그 뒤에 일어난 변화가 원인과 함께 남는다(모니터의 타임라인). |
 
@@ -47,6 +48,8 @@ Trigger의 **이벤트 받기** 블럭(문장 `{eventType} 받기`)에서 이벤
 호출한 이벤트는 게임과 같은 길로 간다: 행동(`GameAction`) 하나(행동 탭에 "[테스트] (이벤트 문장) ×횟수 — 모니터 이벤트 호출", 공개 범위 "개발자")로 기록되고, 로그·도전과제·트리거가 실제로 반응하며, **Undo**(마지막 행동 되돌리기)로 되돌릴 수 있다. 도전과제 달성과 보상은 Undo해도 남는다(→ `14-Achievements.md`).
 
 이벤트를 모니터에서 쏘려면 이벤트 클래스에 **매개변수 없는 생성자**가 있어야 한다(구조체는 늘 된다). 없으면 탭에 오류가 뜬다.
+
+같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 › 개발 명령에 항목을 만들고 결과에 **이벤트 쏘기** Block(이벤트 · 값 줄 · 횟수)을 넣는다. 모니터 › 명령 탭에 버튼이 생긴다(→ `22-Monitor-Debug.md` 7절, `12-Outcomes.md`).
 
 ### 1-4. 모니터 › 타임라인
 
@@ -155,7 +158,16 @@ public class UnitKilled : IDescribable
 - 구현하지 않으면 기본 문장은 `표시 이름 (필드=값, 필드=값 …)`이다. 예: `유닛 처치 (killerId=hero, victimId=orc1, exp=10, …)`.
 - 필드가 많거나 리스트가 있어 기본 문장이 읽기 어려울 때 구현한다.
 
-### 2-7. `Subscribe<T>(Action<T>)` — 씬 코드에서 받기
+### 2-7. 코드에서 받기 — 연출은 `SubscribeAfterAction<T>`, 규칙은 `Subscribe<T>`
+
+받는 함수를 등록하는 길은 둘이다. 받는 **시점**이 다르다.
+
+| | `SubscribeAfterAction<T>(Action<T>)` | `Subscribe<T>(Action<T>)` |
+|---|---|---|
+| 받는 때 | 행동 안에서 쏜 이벤트: **바깥 행동이 성공한 뒤**, 쏜 순서대로(안쪽 행동의 이벤트 포함). 행동 밖에서 쏜 이벤트: 바로 | 쏜 그 자리에서 바로(행동 안이면 행동 안에서) |
+| 실패한 행동의 이벤트 | 오지 않는다(버린다) | 이미 받았다(값은 취소됐는데 연출은 나간 상태가 된다) |
+| 받는 시점의 위치 | 늘 행동 밖(`session.Data.InTransaction` 거짓) | 행동 안일 수 있다 |
+| 쓰는 곳 | **화면 연출·UI**(피격 숫자, 효과음, 토스트) | **규칙**(값을 바꾸는 쪽, 행동 안에서 바로 반응해야 하는 것) |
 
 ```csharp
 using System;
@@ -166,17 +178,20 @@ public class KillEffects : MonoBehaviour
 {
     IDisposable _onKill;
 
-    void OnEnable()  => _onKill = GBibleRuntime.Game.Events.Subscribe<UnitKilled>(e => PlayHitEffect(e.victimId));
-    void OnDisable() => _onKill?.Dispose();          // 그만 받기
+    // 성공한 행동의 처치만, 행동이 끝난 뒤 쏜 순서대로 온다.
+    void OnEnable()  => _onKill = GBibleRuntime.Game.Events.SubscribeAfterAction<UnitKilled>(e => PlayHitEffect(e.victimId));
+    void OnDisable() => _onKill?.Dispose();          // 그만 받기(모아 둔 것도 버린다)
 
     void PlayHitEffect(string unitId) { /* 연출 */ }
 }
 ```
 
+- 연출 스크립트는 예외 없이 `SubscribeAfterAction`을 쓴다. 행동이 성공했는지 기다리는 대기열·`Actions.Executed`/실패 처리·안쪽 행동 거르기 같은 코드를 직접 쓰지 않는다.
+- 한 행동에서 여러 이벤트가 오면 한꺼번에 이어서 불린다. 시간 간격을 두고 틀려면 받은 것을 큐에 넣고 `Update`에서 하나씩 꺼낸다(3-7).
 - 돌려받는 `IDisposable`을 `Dispose()`하면 그만 받는다. 씬 오브젝트는 `OnDisable`·`OnDestroy`에서 꼭 Dispose한다(세션은 씬보다 오래 산다).
-- `T`와 **정확히 같은 형식**의 이벤트만 받는다. `UnitKilled`를 상속한 `BossKilled`를 쏘면 `Subscribe<UnitKilled>`는 받지 않는다.
+- `T`와 **정확히 같은 형식**의 이벤트만 받는다. `UnitKilled`를 상속한 `BossKilled`를 쏘면 `<UnitKilled>`로 받는 쪽은 받지 않는다.
 - 받는 함수에서 예외가 나도 다른 받는 쪽은 계속 불린다. 예외는 삼키지 않고 Journal에 오류(출처 `Events`)로 남는다.
-- **받는 쪽(씬 코드)에서는 플레이어 데이터를 바꾸지 않는다.** 연출·UI만 한다. 값을 바꾸는 일은 행동·결과(Outcome)에서 한다(그래야 Undo·저장·멀티플레이가 맞는다).
+- **연출 쪽(씬 코드)에서는 플레이어 데이터를 바꾸지 않는다.** 연출·UI만 한다. 값을 바꾸는 일은 행동·결과(Outcome)나 `Subscribe`로 받는 규칙에서 한다(그래야 Undo·저장·멀티플레이가 맞는다).
 
 ### 2-8. `SubscribeAll(Action<object>)` — 모든 이벤트 받기
 
@@ -194,7 +209,7 @@ all.Dispose();
 | 멤버 | 뜻 |
 |---|---|
 | `event Action<object> Published` | 모든 받는 쪽을 부른 **뒤**에 한 번 불린다. |
-| `int SubscriberCount(Type)` | 그 형식을 `Subscribe`로 받는 곳의 수(`SubscribeAll`은 세지 않는다). |
+| `int SubscriberCount(Type)` | 그 형식을 `Subscribe`로 받는 곳의 수(`SubscribeAll`·`SubscribeAfterAction`은 세지 않는다). |
 | `static string EventBus.DisplayNameOf(Type)` | `[GameEvent]`의 표시 이름(없으면 클래스 이름). |
 | `static string EventBus.Describe(object)` | Journal에 쓰는 문장(2-6 규칙). |
 
@@ -294,7 +309,7 @@ session.Events.Publish(new GoldEarned { amount = 50, source = "chest" });
 public class AchievementToast : MonoBehaviour
 {
     IDisposable _sub;
-    void OnEnable()  => _sub = GBibleRuntime.Game.Events.Subscribe<AchievementUnlocked>(e => Show(e.DisplayName));
+    void OnEnable()  => _sub = GBibleRuntime.Game.Events.SubscribeAfterAction<AchievementUnlocked>(e => Show(e.DisplayName));
     void OnDisable() => _sub?.Dispose();
     void Show(string title) { /* 토스트 UI */ }
 }
@@ -323,6 +338,49 @@ public static void FireByName(GameSession session, string fullName)
 
 `session.SimulateEvents(이벤트들, 이유)`는 모니터의 이벤트 호출과 같은 길이다: 이벤트들을 행동 하나 안에서 차례로 쏜다.
 
+### 3-7. 전투 연출을 시간 간격으로 차례차례
+
+```csharp
+using System;
+using System.Collections.Generic;
+using GBible;
+using UnityEngine;
+
+public class BattlePresenter : MonoBehaviour
+{
+    [SerializeField] float gap = 0.25f;
+
+    readonly Queue<object> _queue = new Queue<object>();
+    readonly List<IDisposable> _subscriptions = new List<IDisposable>();
+    float _wait;
+
+    void OnEnable()
+    {
+        var events = GBibleRuntime.Session.Events;
+        _subscriptions.Add(events.SubscribeAfterAction<DamageDealt>(e => _queue.Enqueue(e)));
+        _subscriptions.Add(events.SubscribeAfterAction<UnitKilled>(e => _queue.Enqueue(e)));
+    }
+
+    void OnDisable()
+    {
+        foreach (var s in _subscriptions) s.Dispose();
+        _subscriptions.Clear();
+    }
+
+    void Update()
+    {
+        _wait -= Time.deltaTime;
+        if (_wait > 0 || _queue.Count == 0) return;
+        Play(_queue.Dequeue());
+        _wait = gap;
+    }
+
+    void Play(object e) { /* DamageDealt → 피해 숫자, UnitKilled → 처치 효과 */ }
+}
+```
+
+데이터는 행동이 끝난 순간 이미 최종 모습이다(적은 빠졌고 체력은 깎였다). 연출은 그 뒤를 시간 간격으로 따라간다. 실패한 카드 내기의 피해는 큐에 들어오지 않는다.
+
 ---
 
 ## 4. 주의할 점 / 자주 하는 실수
@@ -330,8 +388,9 @@ public static void FireByName(GameSession session, string fullName)
 - **이벤트 클래스 이름·네임스페이스를 바꾸면** 이미 만든 Trigger·로그 규칙이 그 이벤트를 찾지 못한다. 데이터에는 형식의 전체 이름(`네임스페이스.클래스`)이 저장되기 때문이다. DB 검증이 "이벤트 받기: 이벤트 '…'을 찾을 수 없습니다(이름이 바뀌었는지 확인)" 오류를 띄우므로, 바꾼 뒤 그 칸에서 이벤트를 다시 고른다.
 - **필드 이름을 바꾸면** 그 필드를 쓰던 값 조건·반영할 값이 깨진다(DB 검증 오류로 보인다).
 - **`[GameEvent]`를 빼먹으면** 이벤트 목록에 안 나오고, 조건·로그·기록 문장이 그 이벤트의 값을 리플렉션으로 읽는다(게임이 켜진 뒤 한 번 "읽기 코드가 없어 리플렉션으로 읽습니다" 경고). `[GameEvent]`가 붙은 형식은 컴파일 때 읽기 코드가 생긴다.
-- **상속한 이벤트는 따로 받는다.** `Subscribe<T>`와 Trigger의 이벤트 받기는 형식이 정확히 같을 때만 받는다. 종류를 나누려면 상속 대신 필드(`tags`, `kind`)를 두고 값 조건으로 거른다.
-- **받는 쪽에서 값을 바꾸지 않는다.** `Subscribe` 함수 안에서 플레이어 데이터를 고치면 Undo 단위·서버 전송에서 빠진다. 값을 바꿔야 하면 그 일을 Trigger의 결과(Outcome)로 두거나, 이벤트를 쏜 행동 안에서 한다.
+- **연출을 `Subscribe`로 받는다.** 행동 안에서 바로 불리므로, 그 행동이 뒤에서 실패해 값이 취소돼도 연출은 이미 나간다. 연출은 `SubscribeAfterAction`으로 받는다(2-7).
+- **상속한 이벤트는 따로 받는다.** `Subscribe<T>`·`SubscribeAfterAction<T>`와 Trigger의 이벤트 받기는 형식이 정확히 같을 때만 받는다. 종류를 나누려면 상속 대신 필드(`tags`, `kind`)를 두고 값 조건으로 거른다.
+- **연출 쪽에서 값을 바꾸지 않는다.** `SubscribeAfterAction` 함수는 행동 밖에서 불리므로, 그 안에서 플레이어 데이터를 고치면 Undo 단위·서버 전송에서 빠진다. 값을 바꿔야 하면 그 일을 Trigger의 결과(Outcome)로 두거나, 이벤트를 쏜 행동 안에서 한다.
 - **Dispose를 잊지 않는다.** 씬이 바뀌어도 세션은 남아 있어, Dispose하지 않은 함수가 사라진 오브젝트를 계속 부른다.
 - **결과가 같은 이벤트를 다시 쏘면** 사슬이 16단계에서 끊기고 경고가 남는다("트리거 사슬이 16단계를 넘어 끊었습니다"). 결과에서 이벤트를 쏠 때는 다른 이벤트를 쓴다.
 - **모니터에서 쏘려면 매개변수 없는 생성자.** 생성자에 인자가 필요한 이벤트는 이벤트 호출·트리거로 달성이 만들지 못한다.

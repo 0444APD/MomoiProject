@@ -229,7 +229,7 @@ public static class BattleSetup
 | `IsData(key)` | 데이터 값(클래스·컬렉션) 키인지 |
 | `TypeOf(key)` / `ZoneOf(key)` / `LabelOf(key)` | 형식·구역·표시 이름 |
 | `Keys` | 모든 키 |
-| `Changed` (이벤트 `Action<string>`) | 키의 값이 바뀌면(Undo 포함) 그 키를 쏜다 |
+| `Changed` (이벤트 `Action<string>`) | 키의 값이 바뀌면(Undo 포함) 그 키를 쏜다. 한 행동에도 여러 번 올 수 있으므로(중간 Sync·실패한 행동의 되돌림) 화면 갱신은 이것을 직접 받지 않고 `GameView.Redraw(그리기, 키…)`를 쓴다: 값이나 언어가 바뀌면 그 프레임 끝에 한 번만 그린다([23-Text-Localization.md](23-Text-Localization.md) 4절) |
 | `DataChanged` (이벤트) | 데이터 값이 바뀌면 키와 바뀐 경로 목록(`DataChange`)을 쏜다 |
 | `Synced` (이벤트 `Action<ChangeSet>`) | Sync가 만든 ChangeSet을 쏜다. 행동 안의 변경은 행동이 끝날 때 차례대로 한꺼번에 쏜다(멀티플레이 전송용) |
 | `Identity.IdOf(객체)` | 컬렉션 요소에 시스템이 붙인 내부 번호(기록의 `items[#12]`) |

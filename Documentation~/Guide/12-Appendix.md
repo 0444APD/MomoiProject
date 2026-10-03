@@ -190,16 +190,13 @@ public class BlessingData : GameData
 런타임 쪽 뼈대:
 
 ```csharp
-public static class BlessingRuntime
+// Rules: 등록 함수(서버에서도 그대로 쓴다)
+public static class BlessingRules
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += Start;
-
-    static void Start(GameSession session)
+    public static void Register(GameSession session, IEnumerable<BlessingData> blessings)
     {
-        var database = GameDatabase.Load();
-        if (database == null) return;
-        foreach (var blessing in database.All<BlessingData>())
+        if (blessings == null) return;
+        foreach (var blessing in blessings)
         {
             var id = blessing.Id;
             IEnumerable<Outcome> outcomes = BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : blessing.outcomes;   // [BindTo] 확인은 기능 코드의 몫
@@ -211,11 +208,14 @@ public static class BlessingRuntime
         }
     }
 }
+
+// Client/Bootstrap.cs의 Started: 연결은 한 줄
+BlessingRules.Register(session, GameDatabase.Load()?.All<BlessingData>());
 ```
 
 > [!note]- 런타임 쪽 줄마다의 뜻
-> - `Hook` — `GBibleRuntime.Started`에 `AfterAssembliesLoaded` 시점에 연결한다. Bootstrap의 `Started`에 써도 된다([04장](04-AddingContent.md) 8절의 `RelicRuntime`).
-> - `GameDatabase.Load()` — 런타임 데이터 목록. `All<T>()`로 그 종류의 항목만 훑는다.
+> - 나누는 까닭 — 등록 함수(`BlessingRules.Register`)는 규칙이라 Rules에 두고, Unity 시작에 거는 연결은 Client의 Bootstrap `Started` 한 줄로 한다. 서버라면 서버가 세션을 만든 뒤 같은 함수를 부른다([04장](04-AddingContent.md) 8절의 `RelicRules`).
+> - `GameDatabase.Load()` — 런타임 데이터 목록. `All<T>()`로 그 종류의 항목만 넘긴다.
 > - `BoundOutcomes.Has/Create` — 기본 기능과 달리 프로젝트 기능은 `[BindTo]` 연결을 스스로 확인해야 한다. 빼먹으면 에디터는 결과 칸을 잠가 보이는데 실제로는 숨은 예전 결과가 돈다.
 > - `session.Triggers.Register(owner, when, repeat, fire)` — Trigger를 감시하다 참이 되는 순간 `fire`를 부른다. `repeat: false`면 한 번 발동하고 끝난다.
 > - `RunOutcomes(결과들, 컨텍스트, 출처)` — 결과를 차례로 실행하고 기록(Journal)에 남긴다. `outcome.Run`을 직접 부르지 않는다.
@@ -224,7 +224,7 @@ public static class BlessingRuntime
 
 ### 1-9. Bootstrap
 
-설정 값(Undo 방식·보관 수·스냅샷·시드·판 저장·판 끝 이벤트·기록 보관 줄 수·Modify 누락 검사)은 코드가 아니라 DB › 시작 파일 › **Bootstrap** 화면에서 고른다([01장](01-StartProject.md) 4절). 코드는 시작 설정이 만든 `Client/Bootstrap.cs`(화면 위 **cs 열기**)에 있다.
+설정 값(Undo 방식·보관 수·스냅샷·Undo 끊는 이벤트·시드·판 저장·판 끝 이벤트·프로필도 행동마다 저장·시작할 때 이어 하기·기록 보관 줄 수·Modify 누락 검사)은 코드가 아니라 DB › 시작 파일 › **Bootstrap** 화면에서 고른다([01장](01-StartProject.md) 4절). 코드는 시작 설정이 만든 `Client/Bootstrap.cs`(화면 위 **cs 열기**)에 있다.
 
 ```csharp
 [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
@@ -236,13 +236,14 @@ static void Hook()
 
 static void Configure(SessionOptions options)
 {
-    // 화면에서 고를 수 없는 것만. 주로 출시 뒤 저장 변환.
-    // options.Migrations.MoveField(2, "run", "hero.gold", "gold");
+    // 화면에서 고를 수 없는 것만. 주로 값을 계산하는 저장 변환(필드 옮김·키 이름 바꿈·키 삭제는 DB › 개발 › 저장 변환 표).
+    // options.Migrations.Add(4, "골드 단위 10배", state => { … });
 }
 
 static void Started(GameSession session)
 {
-    // session.Debug.Register(…)  session.Actions.Register<…>(…)  session.Events.Subscribe<…>(…)  session.Triggers.Register(…)
+    // RelicRules.Register(session, …)  session.Actions.Register<…>(…)  session.Events.Subscribe<…>(…)
+    // 개발 명령은 DB › 개발 › 개발 명령(결과 Block 조립, 코드가 필요하면 [BindTo]).
 }
 ```
 
@@ -250,7 +251,7 @@ static void Started(GameSession session)
 > - `AfterAssembliesLoaded` — `GBibleRuntime`은 첫 씬을 불러오기 전에 세션을 만든다. 그보다 먼저 연결해야 하므로 이 시점이다. `Awake`에서는 늦다.
 > - `Configuring` — 세션을 만들기 직전(세션은 아직 없다). 쓰는 곳은 둘이다. 출시 뒤 저장 변환 등록(`options.Migrations`, [10장](10-SaveAndRelease.md) 7절)과 조건에 따른 덮어쓰기(데모 빌드는 Undo 끄기, 일일 도전 시드 — [07장](07-GenreRecipes.md) 2·4절). 저장 변환은 반드시 여기서 등록한다(프로필을 곧바로 불러오므로). 저장 버전은 등록한 변환 중 가장 높은 번호를 따라 저절로 정해진다.
 > - 코드가 화면 값을 바꾸면 코드가 이기고, 모니터 타임라인에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 화면 칸과 `SessionOptions`의 대응은 [07장](07-GenreRecipes.md) 2절.
-> - `Started` — 세션 준비가 끝난 뒤(DB 데이터 등록·저장 불러오기 다음). 디버그 명령, 행동 처리기, 이벤트 받기, 프로젝트 기능의 감시를 등록한다. 플레이어 데이터는 DB가 이미 정의했으므로 여기서 `Define`하지 않는다.
+> - `Started` — 세션 준비가 끝난 뒤(DB 데이터 등록·저장 불러오기 다음). 프로젝트 기능의 감시 등록 함수 호출(Rules의 `…Rules.Register`), 행동 처리기, 이벤트 받기를 등록한다. 개발 명령은 DB › 개발 › 개발 명령에 둔다(출시 빌드에서는 저절로 빠진다). 플레이어 데이터는 DB가 이미 정의했으므로 여기서 `Define`하지 않는다.
 > - 도메인 리로드를 꺼도 매 플레이마다 다시 연결되도록 시스템이 이벤트를 비우므로, 이 연결은 매번 이렇게 한다.
 
 ---
@@ -266,7 +267,7 @@ static void Started(GameSession session)
 - [ ] 규칙 코드는 Rules에, Unity에 붙는 코드는 Client에 있다.
 - [ ] `RunState`·`Profile`에 필드를 채웠다.
 - [ ] DB › 시작 파일 › Bootstrap에서 Undo 방식·보관 수·시드·판 저장을 정했다.
-- [ ] 모니터에 고정 시드가 보이고, 디버그 명령 → Undo가 된다.
+- [ ] DB › 개발 › 개발 명령에 명령을 만들었고, 모니터에 고정 시드가 보이고, 그 명령 → Undo가 된다.
 
 ### 02. 기획을 코드 구조로
 
@@ -288,7 +289,7 @@ static void Started(GameSession session)
 - [ ] 한 입력에 따라오는 단계가 Undo 한 번에 돌아가는 것을 모니터로 확인했다.
 - [ ] 규칙상의 실패는 `InvalidOperationException`으로 던지고, 런 스크립트는 그것만 잡는다.
 - [ ] 반응할 순간마다 행동 안에서 이벤트를 쏜다.
-- [ ] 화면은 읽기·보내기·받기만 하고, `Subscribe`한 것을 `Dispose`한다.
+- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
 - [ ] 시간이 걸리는 효과는 나중에 새 행동으로 실행한다.
 - [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다.
 
@@ -320,10 +321,10 @@ static void Started(GameSession session)
 ### 06. 화면과 연출
 
 - [ ] 화면 코드는 Client 폴더에 있고, 플레이어 데이터를 읽기만 한다.
-- [ ] `Data.Changed`(필요하면 `DataChanged`)를 받아 표시만 하고, 프레임 끝에 한 번 그린다.
-- [ ] 받기는 `OnEnable`, 그만 받기(`-=`·`Dispose`)는 `OnDisable`에서 한다.
+- [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번 그린다.
+- [ ] 등록·받기는 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
 - [ ] 버튼은 id를 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
-- [ ] 행동 안에서 받은 이벤트는 행동이 성공한 뒤 틀고, 실패하면 버린다.
+- [ ] 연출은 `SubscribeAfterAction`으로 받아, 성공한 행동의 이벤트만 튼다.
 - [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
 - [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 언어를 바꾸면 다시 그려진다.
 - [ ] 다이얼로그는 말·연출만, 규칙이 있는 일은 행동이 맡는다.
@@ -341,12 +342,17 @@ static void Started(GameSession session)
 ### 08. 시험과 디버깅
 
 - [ ] DB › 시작 파일 › Bootstrap에서 개발 빌드 시드를 고정했다.
-- [ ] 시험 준비용 디버그 명령이 있고, 값을 바꾸는 명령은 `DeveloperEditAction`으로 Undo된다.
+- [ ] 시험 준비용 개발 명령이 DB › 개발 › 개발 명령에 있고, 누르면 행동 하나로 기록·Undo된다. 규칙을 거쳐야 하는 명령만 `[BindTo]` 코드다.
 - [ ] 버그를 보면 판을 저장하고, 저장 파일과 시드를 보고에 붙인다.
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
 - [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다.
 - [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
+
+> [!note]- 다른 장르라면
+> - **실시간 액션**: 행동 단위가 아니라 스냅샷으로 되감는다(Bootstrap의 Undo 방식 "스냅샷"). 모니터 머리에 "되감기 스냅샷 n (n초 간격)"이 보이고, **Undo**는 마지막 스냅샷으로 되감는다. 버그 직전으로 돌아가 보려면 `session.CaptureSnapshot()`을 부르는 개발 명령(`session.Debug.Register`)을 만들어 두고 그 순간 근처에서 누른다. 빠른 장면은 모니터의 **일시정지**·**1프레임**·배속(0.25× …)으로 늦춰 본다.
+> - **턴제 전술**: AI처럼 판단이 복잡한 코드는 AI가 고른 행동의 `Describe()`를 읽기 쉽게 쓴다("오크1 → 영웅 공격"). 행동 탭·타임라인만으로 AI의 선택을 따라갈 수 있다.
+> - **수집형·방치형**: 프로필이 오래 쌓이므로 명령 › 저장 › **프로필 삭제**(다음 플레이부터)와 **새 판**으로 처음 상태를 자주 시험한다. 오래된 프로필 파일을 몇 개 보관해 두었다가 출시 전 저장 변환을 시험한다.
 
 ### 09. 3요소를 지키는 습관
 
@@ -356,12 +362,16 @@ static void Started(GameSession session)
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
 - [ ] 행동 필드는 id와 숫자·글자·enum뿐이다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
-- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고 `OnDisable`에서 `Dispose`한다.
+- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
 - [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.
 - [ ] 게임 값을 담은 static 변수가 없고, Block·결과 코드는 `GBibleRuntime` 대신 받은 세션을 쓴다.
 - [ ] 텍스트 인자는 `("이름", 값)` 형태다.
 - [ ] 콘솔·타임라인에 "예전 방식(리플렉션)", "읽기 코드가 없어 리플렉션으로 읽습니다", "저장할 수 없는 참조입니다" 경고가 없다(있다면 이유를 안다).
 - [ ] DB › 시작 파일 › Bootstrap에서 Undo 보관 수를 정했다.
+
+> [!note]- 다른 장르라면
+> - **실시간 액션**: 위치·속도는 매 프레임 MonoBehaviour에서 움직이고, 규칙에 필요한 값(체력·쿨다운 시각·현재 칸)만 플레이어 데이터에 둔다. 입력은 여전히 행동이지만 Undo는 스냅샷 되감기(Bootstrap의 Undo 방식 "스냅샷")다. 쿨다운은 `Time.time`이 아니라 `session.Clock.Time` 기준 시각으로 적어야 되감을 때 함께 돌아간다.
+> - **시뮬레이션·방치형(유닛 수천 개)**: 객체 수가 성능을 정한다. 계산으로 얻을 수 있는 값(누적 생산량 등)은 저장하지 않고, 자주 바뀌는 묶음을 별도 플레이어 데이터로 나눈다.
 
 ### 10. 저장과 출시
 
@@ -371,7 +381,7 @@ static void Started(GameSession session)
 - [ ] DB › Bootstrap에서 판 저장과 판 끝 이벤트를 골랐다.
 - [ ] 끝난 판은 이어 하기가 열지 않는다(`RunState.IsActive`).
 - [ ] '이어 하기'는 `HasSavedRun`일 때만 켜지고, 불러오기 실패 때 새 판으로 넘어간다.
-- [ ] '새 판'은 `NewRun`과 `DeleteRun`을 함께 부른다.
+- [ ] '새 판'은 `GBibleRuntime.NewRun(session)`을 행동 밖에서 부른다.
 - [ ] 플레이어 데이터에 에셋 참조 대신 ID를 둔다.
 - [ ] 모니터 저장 명령으로 저장 → 끄기 → 불러오기를 해 보고 값·난수 결과가 이어지는 것을 봤다.
 
@@ -381,7 +391,16 @@ static void Started(GameSession session)
 - [ ] 콘솔에 "예전 방식(리플렉션)"·"저장할 수 없는 참조입니다"·`[BindTo]` 연결 경고가 없다(있다면 이유를 안다).
 - [ ] 저장 값 안의 DB 항목 ID 필드에 `[DataRef(종류)]`가 붙어 있다.
 - [ ] `MomoiProject → 출시됨 (저장 호환 유지)`에 체크가 있다.
-- [ ] 출시 뒤 구조를 바꾸면 `Configure`에 변환을 등록한다는 것을 팀이 안다.
+- [ ] 출시 뒤 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(값 계산이 필요하면 `Configure`에 `Migrations.Add`)는 것을 팀이 안다.
+
+> [!note]- 출시 전 더 볼 것
+> - 검증 오류가 있으면 빌드가 "데이터 검증 오류 n건으로 빌드를 중단합니다"로 막힌다.
+> - 필드 규칙의 필수 값이 비어 있지 않다(모니터 머리에 "필수 값 비어 있음"이 없다).
+> - 콘솔에 "읽기 코드가 없어 리플렉션으로 읽습니다"가 없다.
+> - 개발용 시드 고정과 개발 명령은 출시 빌드에서 저절로 꺼진다(개발 명령은 `session.Debug.Enabled`가 거짓이면 등록되지 않는다). 코드로 건 `session.Debug.Register`도 같으니 `if (Debug.isDebugBuild)`로 감싸지 않는다.
+> - 쓰지 않는 선택 모듈(다이얼로그·인벤토리)을 껐다.
+> - Undo 보관 수와 판 저장 설정이 출시 빌드에 맞다.
+> - `GameIds.cs`가 최신이다(DB를 저장하고 컴파일까지 끝났다).
 
 ### 11. 멀티플레이 대비
 
@@ -392,11 +411,9 @@ static void Started(GameSession session)
 - [ ] Rules 코드에 `GBibleRuntime` 정적 입구와 static 게임 상태가 없다.
 - [ ] UI는 `Do` 직후 결과를 읽지 않고 알림을 받아 그린다.
 - [ ] 실패는 입력 창구 한 곳에서 받는다.
-- [ ] 이벤트를 받는 화면 코드는 값을 바꾸지 않고, 연출은 행동이 끝난 뒤 튼다.
+- [ ] 이벤트를 받는 화면 코드는 값을 바꾸지 않고, 연출은 `SubscribeAfterAction`으로 받는다.
 - [ ] 플레이어가 여럿이면 `actorId`를 채우고, 남에게 숨길 값은 별도 키로 나눴다.
 - [ ] 게임 밖에 영향을 주는 결과는 `RewardEffect.Irreversible`이다.
-
----
 
 ## 3. 본문에서 쓰지 않은 기능
 
@@ -530,7 +547,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 ### 3-11. 난수 뽑기의 나머지 · 로그 시험 API
 
 - `RandomStream`은 `Range(min, max)` 말고도 `Chance(p)`(p 확률로 참), `NextDouble()`([0, 1) 실수), `NextUInt()`·`NextULong()`을 준다. 치명타라면 `Game.Random("damage").Chance(0.15)`. 흐름 이름은 [07장](07-GenreRecipes.md) 4절처럼 용도마다 나눈다.
-- `session.TrySimulateStat(로그 ID, 양, out 설명, out 오류)` — 모니터 로그 탭의 "이벤트로 더하기"와 같다. 반영 규칙을 거꾸로 따라가 실제 이벤트를 쏜다(행동 하나, Undo 가능). 테스트·디버그 명령에서 "처치 100회"를 만들 때 쓴다.
+- `session.TrySimulateStat(로그 ID, 양, out 설명, out 오류)` — 모니터 로그 탭의 "이벤트로 더하기"와 같다. 반영 규칙을 거꾸로 따라가 실제 이벤트를 쏜다(행동 하나, Undo 가능). 테스트·개발 명령에서 "처치 100회"를 만들 때 쓴다.
 - `EventSimulator.Create(형식, 이름→값)` — 이벤트 객체를 필드 이름으로 만든다(도구용).
 
 → [07. 난수와 시간](../Manual/07-Random-Time.md) 2.2, [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) 4절
@@ -600,7 +617,9 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 지연 효과(나중에 `Game.Do`) | 02 | 03 §8 |
 | `actorId`·`Visibility` | 02 | 11 §4 |
 | `DeveloperEditAction` | 22 | 01 §4, 08 §2 |
-| `session.Actions.Executed`·`TransactionAborted` | 02 | 06 §1·§3 |
+| `session.Actions.Executed`·`TransactionAborted` | 02 | 03 §2(언급) |
+| `Events.SubscribeAfterAction<T>`(성공한 행동의 이벤트만) | 10 | 06 §3, 03 §7, 11 §3 |
+| `GameView.Redraw`(값·언어가 바뀌면 프레임당 한 번 그리기) | 23 | 06 §1·§5 |
 
 ### Game API
 
@@ -643,13 +662,13 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `SaveRun`·`SaveProfile`·`DeleteRun`·`HasSavedRun` | 06 · 20 | 03 §3(언급), 07 §6, 10 §2·§3 |
 | 판 저장 설정(끌 때 / 행동마다 / 저장하지 않음), `AutoSaveRun`(코드로 덮어쓰기) | 06 · 20 | 01 §4, 10 §2 |
 | 판 끝 이벤트(받으면 판 저장 지우기·프로필 바로 저장) | 06 · 20 | 01 §4, 02 §3, 10 §2 |
-| `session.NewRun()` | 06 | 03 §3(언급), 07 §3, 10 §3 |
+| `GBibleRuntime.NewRun(session)`(판 값 + 판 저장 파일 함께), `session.NewRun()`(테스트·서버) | 06 | 03 §3, 10 §3 |
 | `ExportMeta`·`ImportMeta`·`ExportRun`·`ImportRun` | 06 | 10 §3(다른 장르라면), 11 §4 |
 | `SavePath`·`RunSavePath` | 06 | 08 §1, 10 §5 |
 | 개발 중 저장 초기화, 모니터 저장 명령 | 06 · 22 | 08 §1, 10 §5 |
 | 출시됨 (저장 호환 유지) | 06 · 20 | 05 §8, 10 §6 |
 | 저장 값 안의 DB 항목 ID 자동 변환(`[DataRef]` 필드) | 06 · 21 | 02 §9(언급), 05 §8, 10 §7 |
-| `options.Migrations`(`Add`·`RenameKey`·`RemoveKey`·`MoveField`), 저장 버전(변환을 따라 저절로) | 06 | 01 §4(언급), 10 §7 |
+| DB › 개발 › 저장 변환(필드 옮김·키 이름 바꿈·키 삭제), `options.Migrations.Add`(값 계산), 저장 버전(변환을 따라 저절로) | 06 · 21 | 01 §4(언급), 10 §7 |
 | `[FormerlySerializedAs]` | 06 | 10 §5·§7 |
 | `session.Data.AddAlias` | 06 | 10 §7 |
 | `IsSaveCompatible`·`SaveSchema` | 06 | 12 §3-8 |
@@ -715,7 +734,8 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
 |---|---|---|
 | 모니터 열기, 데이터·명령·행동 탭, Undo 버튼 | 22 | 01 §5 |
-| `session.Debug.Register` | 22 | 01 §4, 08 §2 |
+| DB › 개발 › 개발 명령(결과 Block 조립, `[BindTo]`), 결과 Block "이벤트 쏘기" | 22 · 12 | 01 §4, 04 §10, 08 §2 |
+| `session.Debug.Register`(코드로 등록), `session.Debug.Enabled`(출시 빌드에서 꺼짐) | 22 | 08 §2 |
 | 타임라인(묶어 보기·인과 관계) | 22 | 04 §11, 08 §3 |
 | 이벤트 호출 | 22 | 04 §11, 08 §5 |
 | 도전과제·로그 테스트(트리거로 달성·강제 달성·이벤트로 더하기) | 22 | 04 §11, 08 §3·§5 |

@@ -8,7 +8,7 @@
 > | 인스턴스 | 클래스의 원본 값 하나(타격 카드, 드래곤 …)를 DB › 인스턴스에 채워 둔 항목. 게임 중에는 읽기만 하고, 판 데이터에는 원본 ID와 바뀌는 값만 둔다. |
 > | 사용 기능(`Usable`) | 클래스에 붙이는 기능 필드. 붙어 있는 인스턴스는 게임이 켜질 때 인스턴스 ID로 등록되어 `Game.Use(인스턴스 ID, 사용자, 대상들)`로 쓴다. |
 > | Trigger | DB 항목의 "언제" 칸. 잎(이벤트 받기 · 조건 충족 · 사용)을 AND·OR·NOT으로 조립한다. |
-> | Outcome(결과) | DB 항목의 "무엇을" 칸. 로그에 기록 · 플레이어 데이터에 주기 · 대상에게 효과 · 코딩한 결과. |
+> | Outcome(결과) | DB 항목의 "무엇을" 칸. 로그에 기록 · 플레이어 데이터에 주기 · 대상에게 효과 · 이벤트 쏘기 · 코딩한 결과. |
 > | Block | 기획자가 DB에서 골라 조립하는 로직 단위. 대상 Block(누구에게, `TargetSelector<T>`)·효과 Block(무엇을, `Effect<T>`)·조건 Block(`SimpleCondition`)·코딩한 결과(`Reward`). 프로그래머가 동작 하나를 Block 하나로 만든다. |
 > | `[BindTo]` | static 함수에 붙여 그 ID를 가진 DB 항목 하나의 결과를 코드로 바꾸는 어트리뷰트. 그 항목의 결과 칸은 잠긴다. |
 > | 컨텍스트(`TriggerContext`) | Trigger가 발동한 순간의 정보: 이벤트(`Event`), 사용자(`User`), 고른 대상(`Picked`), 항목 ID(`Owner`), `Game`. 결과·`[BindTo]` 함수가 읽는다. |
@@ -37,7 +37,7 @@
 > | 새 동작이 필요하고, 다른 항목도 쓸 만하다 | Block 클래스 하나 | Block 하나 |
 > | 그 항목에만 있는 흐름이다 | `[BindTo]` 함수 하나 | 함수 하나 |
 > | 반응할 순간이 아직 없다 | 이벤트(또는 필드)를 더하고 행동에서 쏜다 | 이벤트 + 쏘는 한 줄 |
-> | 기존 기능(도전과제=한 번, 로그=숫자, 사용 기능=쓰는 순간)과 규칙이 다른 새 종류다 | DB 종류 + 런타임 감시 | 8절 |
+> | 기존 기능(도전과제=한 번, 로그=숫자, 사용 기능=쓰는 순간)과 규칙이 다른 새 종류다 | DB 종류 + 감시 등록 | 8절 |
 
 ## 2. Block과 `[BindTo]` 고르기
 
@@ -200,19 +200,15 @@ public class RelicData : GameData
 }
 ```
 
-**런타임** — 게임이 켜질 때(`Started`) 모든 유물의 Trigger를 감시에 등록하고, 발동하면 그 유물을 가지고 있을 때만 결과를 실행한다. Bootstrap에 써도 되지만 카드 던전은 기능 파일(`RelicRuntime`)에서 따로 연결했다([01장](01-StartProject.md) 4절).
+**감시** — 모든 유물의 Trigger를 감시에 등록하고, 발동하면 그 유물을 가지고 있을 때만 결과를 실행한다. 등록 함수는 Rules에 둔다(서버에서도 그대로 부른다).
 
 ```csharp
-public static class RelicRuntime
+public static class RelicRules
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += Start;
-
-    static void Start(GameSession session)
+    public static void Register(GameSession session, IEnumerable<RelicData> relics)
     {
-        var database = GameDatabase.Load();
-        if (database == null) return;
-        foreach (var relic in database.All<RelicData>())
+        if (relics == null) return;
+        foreach (var relic in relics)
         {
             var id = relic.Id;
             IEnumerable<Outcome> outcomes = BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : relic.outcomes;
@@ -227,6 +223,12 @@ public static class RelicRuntime
 }
 ```
 
+게임이 켜질 때 부르는 연결은 Client의 Bootstrap `Started`에 한 줄 더한다([01장](01-StartProject.md) 4절).
+
+```csharp
+RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
+```
+
 `RunState`에 가진 유물 목록 `[DataRef(typeof(RelicData))] public List<string> relics`를 더한다.
 
 > [!note]- 데이터 칸 자세히
@@ -236,7 +238,8 @@ public static class RelicRuntime
 > - 표시 이름 필드는 두지 않는다. ID가 이름이고, 플레이어에게 보일 이름은 텍스트로 붙인다([06장](06-Presentation.md)).
 > - `ValidateData`를 덮어써 "발동이 없다", "비어 있는 효과 칸이 있다"를 오류로 낸다([05장](05-WorkingWithDesigners.md) 7절).
 
-> [!note]- 런타임 코드 한 줄씩
+> [!note]- 감시 코드 한 줄씩
+> - **Rules와 Bootstrap으로 나누는 이유** — 무엇을 감시하고 무엇을 할지는 규칙이라 Rules에 둔다. Unity의 게임 시작에 거는 것(`Started`, `GameDatabase.Load`)만 Client에 둔다. 서버라면 세션을 만든 뒤 같은 `RelicRules.Register`를 부른다.
 > - **`BoundOutcomes.Has(id)`** — `[BindTo]` 연결은 기본 기능만 스스로 확인한다. 프로젝트 기능은 이 한 줄로 직접 확인해 바꿔 쓴다. 빠뜨리면 DB에는 결과 칸이 잠겨 보이는데 실제로는 숨은 예전 결과가 돈다.
 > - **`Register(owner, when, repeat, fire)`** — `owner`는 항목 ID(컨텍스트의 `Owner`가 된다). 유물은 여러 번 발동하므로 `repeat: true`. 한 번만 발동하는 기능(퀘스트)이면 `false`로 두고 완료를 플레이어 데이터에 저장한다.
 > - **가졌는지 확인** — 모든 유물을 감시하되 발동 순간에 `run.relics`를 본다. 유물을 얻고 잃을 때마다 등록을 바꾸지 않아도 되고, 가진 유물 목록이 플레이어 데이터라 Undo·저장이 따라온다.
@@ -297,11 +300,21 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 | 유물 | 가진 유물(`RunState.relics`) |
 | 로그·도전과제 | 없음(이벤트를 받으면 저절로) |
 
-시험할 때는 개발용 명령으로 넣으면 빠르다. Bootstrap의 `Started`에 한 줄 더한다([01장](01-StartProject.md) 4절).
+시험할 때는 개발 명령으로 넣으면 빠르다. DB › 개발 › **개발 명령**에 항목을 하나 더한다([01장](01-StartProject.md) 4절).
+
+- 값을 넣기만 하면 되는 것은 결과 Block으로 끝난다. 예: 유물 닻 → 결과 `플레이어 데이터에 주기` → `run › relics`, 넣을 요소 `anchor`.
+- 규칙 함수를 거쳐야 하는 것은 그 항목 ID에 `[BindTo]`. 예: 덱 카드(원본 ID + 이 장의 id)는 `Rules.NewCard`가 만든다.
 
 ```csharp
-session.Debug.Register("카드 던전", "연쇄 번개 받기", () => session.Do(new BuyCard { source = GameIds.Instance.ChainLightning, price = 0 }));
+[BindTo(GameIds.DebugCommand.GetChainLightning)]
+static void GetChainLightning(TriggerContext c)
+{
+    var game = c.Game;
+    game.Data().Run.deck.Add(Rules.NewCard(game, GameIds.Instance.ChainLightning));
+}
 ```
+
+누르면 행동 하나로 실행되어 Undo된다. 출시 빌드에는 버튼이 없다.
 
 ## 11. 모니터로 시험하고 검증하기
 
@@ -313,7 +326,7 @@ session.Debug.Register("카드 던전", "연쇄 번개 받기", () => session.Do
 > | 항목 | 모니터에서 | 확인할 것 |
 > |---|---|---|
 > | 카드·물약 | 게임 화면에서 내기·마시기 → **행동** 탭 | "카드 내기" 아래 "능력 사용: fireball (hero)"가 안쪽 행동으로 보이고, **타임라인** 묶어 보기에서 그 아래에 바뀐 값·이벤트가 이어진다. **Undo** 한 번에 에너지·피해·물약 개수가 함께 돌아간다. |
-> | 로그 | **이벤트** 탭에서 `턴 끝`을 고르고 `damage`를 채워 **이벤트 호출** | 아래 "반응하는 로그"에 `maxTurnDamage`가 보이고, **로그** 탭의 값이 바뀐다. |
+> | 로그 | **이벤트** 탭에서 `턴 끝`을 고르고 `damage`를 채워 **이벤트 호출**(자주 쓰면 개발 명령으로: 카드 던전 **명령** 탭의 "한 턴 30 피해" = 결과 `이벤트 쏘기`) | 아래 "반응하는 로그"에 `maxTurnDamage`가 보이고, **로그** 탭의 값이 바뀐다. |
 > | 도전과제 | **도전과제** 탭에서 카드를 누르고 **트리거로 달성** | 부족한 로그를 이벤트로 채워 게임과 같은 길로 달성된다. Undo하면 로그는 돌아가고 달성은 남는다. 연쇄 반응 없이 결과만 보려면 **강제 달성**. |
 > | 유물 닻 | **데이터** 탭에서 `run › relics`에 **+ 추가**로 `anchor`를 넣고, 이벤트 탭에서 `턴 시작`(turn 1)을 호출 | `run › hero › block`이 오른다. turn 2로 호출하면 그대로다. |
 > | 유물 불타는 피 | 데이터 탭에서 `run › hero › hp`를 최대보다 낮추고, 이벤트 탭에서 `전투 승리` 호출 | 체력이 6 오른다(최대 체력까지). 시작 유물이라 `relics`에 이미 들어 있다. |

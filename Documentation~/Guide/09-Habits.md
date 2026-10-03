@@ -97,22 +97,22 @@ public class PlayCard : GameAction<DeckCard>
 > [!note]- 행동 안의 행동
 > 행동 안에서 다른 행동(`Game.Do`)이나 능력(`Game.Use`)을 부르면 바깥 행동의 일부로 그 자리에서 실행된다(카드 내기 안의 `Game.Use`, 턴 끝 안의 `DrawCards`). Undo·ChangeSet은 바깥 행동 하나로 묶이고, 안쪽이 실패하면 바깥 전체가 취소된다. 그래서 "한 입력 = 한 묶음"이 유지된다.
 >
-> 공통 로직을 행동으로 만들지 함수로 만들지는 "혼자서도 입력이 될 수 있는가"로 정한다. 카드 뽑기는 디버그 명령이나 다른 카드에서 혼자 실행될 수 있어 행동이고, 피해 계산은 입력이 아니라서 함수(`Rules.Damage`)다.
+> 공통 로직을 행동으로 만들지 함수로 만들지는 "혼자서도 입력이 될 수 있는가"로 정한다. 카드 뽑기는 개발 명령이나 다른 카드에서 혼자 실행될 수 있어 행동이고, 피해 계산은 입력이 아니라서 함수(`Rules.Damage`)다.
 
 > [!note]- 이벤트를 받는 쪽 예
-> 전투 화면은 피해 이벤트를 받아 숫자만 띄운다. 체력 바 값은 이벤트가 아니라 플레이어 데이터에서 읽는다.
+> 전투 화면은 피해 이벤트를 받아 숫자만 띄운다. 체력 바 값은 이벤트가 아니라 플레이어 데이터에서 읽는다(`GameView.Redraw`, [06장](06-Presentation.md) 1절).
 > ```csharp
-> _onDamage = GBibleRuntime.Game.Events.Subscribe<DamageDealt>(e => ShowDamageNumber(e.targetId, e.amount));
+> _onDamage = GBibleRuntime.Session.Events.SubscribeAfterAction<DamageDealt>(e => ShowDamageNumber(e.targetId, e.amount));
 > // OnDisable에서 _onDamage.Dispose();
 > ```
-> `ShowDamageNumber` 안에서 `hp`를 고치면 안 된다. 그 순간은 행동 안일 수도 밖일 수도 있고, 어느 쪽이든 서버가 모르는 변경이 된다.
+> 연출은 `SubscribeAfterAction`으로 받는다. 행동이 성공한 뒤에만 오므로, 실패해 취소된 행동의 피해 숫자가 뜨지 않는다([06장](06-Presentation.md) 3절).
+>
+> `ShowDamageNumber` 안에서 `hp`를 고치면 안 된다. 행동이 끝난 뒤의 변경이라 Undo 단위에서 빠지고, 서버가 모르는 변경이 된다.
 
-> [!note]- 디버그 명령도 행동으로
-> 개발용 "골드 +100"도 값을 직접 바꾸지 않고 `DeveloperEditAction`으로 감싼다. 모니터에서 Undo되고 덮어쓰기 경고도 없다([08장](08-TestAndDebug.md) 2절).
-> ```csharp
-> session.Debug.Register("카드 던전", "골드 +100", () =>
->     session.Do(new DeveloperEditAction { label = "골드 +100", Edit = () => session.Game.Data().Run.gold += 100 }));
-> ```
+> [!note]- 개발 명령도 행동으로
+> 개발용 "골드 +100"도 값을 직접 바꾸지 않는다. DB › 개발 › 개발 명령의 결과 Block(플레이어 데이터에 주기)으로 조립하면, 누를 때 행동 하나(`DeveloperEditAction`)로 실행되어 모니터에서 Undo되고 덮어쓰기 경고도 없다. 규칙을 거쳐야 하는 명령(적 모두 처치)만 그 ID에 `[BindTo]` 코드를 붙인다([08장](08-TestAndDebug.md) 2절).
+>
+> 출시 빌드에서는 개발 명령이 저절로 빠지므로 `if (Debug.isDebugBuild)`로 감싸지 않는다.
 
 > [!note]- 난수 흐름 나누기
 > 카드 던전은 난수 흐름을 쓰임마다 나눈다: 덱 섞기 `"deck"`, 무작위 대상 `"cardTarget"`, 보상 골드 `"loot"`. 한쪽에서 뽑는 횟수가 바뀌어도(카드 효과를 고쳐 대상 뽑기가 한 번 늘어도) 다른 쪽 결과는 그대로라서, 고정 시드 재현이 덜 흔들린다.
@@ -251,7 +251,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
 - [ ] 행동 필드는 id와 숫자·글자·enum뿐이다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
-- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고 `OnDisable`에서 `Dispose`한다.
+- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
 - [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.
 - [ ] 게임 값을 담은 static 변수가 없고, Block·결과 코드는 `GBibleRuntime` 대신 받은 세션을 쓴다.
 - [ ] 텍스트 인자는 `("이름", 값)` 형태다.
