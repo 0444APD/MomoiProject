@@ -217,7 +217,7 @@ namespace GBible.EditorTools
                 case "Rules": return new List<string> { "GBible.Core", "GBible.Unity" }.Concat(ModuleAssemblies(true)).ToList();
                 case "Client": return new List<string> { AssemblyOf("Rules"), "GBible.Core", "GBible.Unity" }.Concat(ModuleAssemblies(false)).ToList();
                 case "Editor": return new List<string> { AssemblyOf("Rules"), AssemblyOf("Client"), "GBible.Core", "GBible.Unity", "GBible.Editor" }.Concat(ModuleAssemblies(false)).ToList();
-                default: return new List<string> { AssemblyOf("Rules"), "GBible.Core", "GBible.Unity", "UnityEngine.TestRunner", "UnityEditor.TestRunner" };
+                default: return new List<string> { AssemblyOf("Rules"), "GBible.Core", "GBible.Unity", "UnityEngine.TestRunner", "UnityEditor.TestRunner" }.Concat(ModuleAssemblies(true)).ToList();
             }
         }
 
@@ -247,7 +247,7 @@ namespace GBible.EditorTools
         public static void SyncModuleReferences()
         {
             var changed = false;
-            foreach (var part in new[] { "Rules", "Client", "Editor" })
+            foreach (var part in new[] { "Rules", "Client", "Editor", "Tests" })
             {
                 var path = AsmdefPathOf(part);
                 if (!File.Exists(path)) continue;
@@ -255,7 +255,7 @@ namespace GBible.EditorTools
                 var json = MiniJson.Deserialize(text) as Dictionary<string, object>;
                 if (json == null || !(json.TryGetValue("references", out var raw) && raw is List<object> list)) continue;
                 var references = list.Select(r => r as string).Where(r => r != null).ToList();
-                var wanted = new HashSet<string>(ModuleAssemblies(part == "Rules"), StringComparer.Ordinal);
+                var wanted = new HashSet<string>(ModuleAssemblies(part == "Rules" || part == "Tests"), StringComparer.Ordinal);
                 var next = references.Where(r => !AllModuleAssemblies.Contains(r) || wanted.Contains(r)).ToList();
                 foreach (var module in wanted)
                     if (!next.Contains(module)) next.Add(module);

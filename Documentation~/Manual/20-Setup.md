@@ -97,7 +97,7 @@ public sealed class HudView : MonoBehaviour
 
 **`GBibleRuntime.DeleteRun()`** — 판 저장 파일을 지운다.
 
-**`GBibleRuntime.AutoSaveRun`** — 끝낼 때 판을 자동 저장할지(기본 `true`). static 필드라 값을 그냥 바꾼다.
+**`GBibleRuntime.AutoSaveRun`** — 끝낼 때 판을 자동 저장할지. 기본은 DB › 시작 파일 › Bootstrap의 **판 저장**을 따른다("저장하지 않음"이면 `false`). 코드에서 값을 넣으면 그 값이 우선한다. 행동마다 저장·판 끝 이벤트도 같은 화면에서 정한다(`06-SaveLoad.md` 2.2).
 
 저장 파일의 내용·구역·호환 규칙은 `06-SaveLoad.md`에서 자세히 다룬다.
 
@@ -144,7 +144,7 @@ public static class Checkpoint
 }
 ```
 
-**판 자동 저장을 끄는 로그라이크.** 판이 끝나면 저장이 남지 않아야 하는 게임.
+**판 자동 저장을 끄는 로그라이크.** 판이 끝나면 저장이 남지 않아야 하는 게임. 보통은 Bootstrap 화면의 **판 저장**을 "저장하지 않음"으로 고른다. 코드로 하면 이렇다.
 
 ```csharp
 using GBible;
@@ -182,7 +182,7 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 스냅샷 간격(초)·스냅샷 보관 수(스냅샷일 때) | `SnapshotInterval`·`SnapshotLimit` | 1초·30개 |
 | 개발 빌드에서 시드 고정 + 시드 | 개발 빌드에서만 `Seed` | 끔(지금 시각) |
 
-게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **기록**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
+게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 
 출시 여부는 메뉴 `MomoiProject → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
 
@@ -236,22 +236,21 @@ options.SnapshotLimit = 60;
 options.Seed = 20261003UL;
 ```
 
-**`JournalCapacity`** — 통합 기록(Journal)에 보관할 줄 수(기본 4096). 넘치면 오래된 줄부터 밀려난다.
+**`JournalCapacity`** — 통합 기록(Journal)에 보관할 줄 수(기본 4096). 넘치면 오래된 줄부터 밀려난다. Bootstrap 화면 **고급 › 기록 보관 줄 수**와 같다.
 
-**`SaveVersion` / `Migrations`** — 저장 데이터 버전(기본 1)과 버전 변환. 출시 후 구조를 바꾸면 버전을 올리고 변환을 등록한다. 변환은 버전 2부터 등록한다.
+**`Migrations`** — 저장 데이터 버전 변환. 출시 후 구조를 바꾸면 변환을 등록한다(버전 2부터). 저장 버전은 등록한 변환의 가장 높은 버전으로 저절로 올라간다(`session.SaveVersion`). `SaveVersion` 옵션은 최솟값이라 보통 손대지 않는다. DB 항목 ID 바꾸기는 변환 없이 런타임이 이어받는다(`06-SaveLoad.md` 2.7).
 
 ```csharp
-options.SaveVersion = 2;
-options.Migrations.RenameKey(2, "gold", "playerGold");
+options.Migrations.RenameKey(2, "gold", "playerGold");   // 저장 버전 2
 ```
 
 `SaveMigrations`에는 `RenameKey(버전, 예전 키, 새 키)`, `RemoveKey(버전, 키)`, `MoveField(버전, 키, 예전 경로, 새 경로)`, 직접 고치는 `Add(버전, 설명, Action<Dictionary<string, object>>)`가 있다. 필드 이름만 바뀐 경우는 필드에 Unity의 `[FormerlySerializedAs("예전이름")]`만 달면 변환 없이 따라간다.
 
-**`DetectUntrackedChanges`** — 예전 방식(리플렉션 비교) 데이터에서 Modify를 거치지 않은 수정을 찾는 검사. 값 전체를 비교하므로 비싸다. 런타임은 개발 빌드(`Debug.isDebugBuild`)에서만 켠다.
+**`DetectUntrackedChanges`** — 예전 방식(리플렉션 비교) 데이터에서 Modify를 거치지 않은 수정을 찾는 검사. 값 전체를 비교하므로 비싸다. 런타임은 개발 빌드(`Debug.isDebugBuild`)에서만, Bootstrap 화면 **고급 › 개발 빌드에서 Modify 누락 검사**가 켜져 있을 때 켠다.
 
 ### 상황별 예제
 
-**실시간 액션 게임: 0.5초 간격 스냅샷 되감기(최근 30초).**
+**실시간 액션 게임: 0.5초 간격 스냅샷 되감기(최근 30초).** 보통은 Bootstrap 화면에서 Undo 방식 "스냅샷", 간격 0.5, 보관 수 60을 고른다. 코드로 하면 이렇다.
 
 ```csharp
 using GBible;
@@ -269,7 +268,7 @@ public static class ActionGameOptions
 }
 ```
 
-**버그 재현용 고정 시드.** 개발 빌드에서만 시드를 고정한다.
+**버그 재현용 고정 시드.** 개발 빌드에서만 시드를 고정한다. 보통은 Bootstrap 화면의 **개발 빌드에서 시드 고정**을 켠다. 코드로 하면 이렇다.
 
 ```csharp
 using GBible;
@@ -296,7 +295,6 @@ public static class SaveVersions
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     static void Hook() => GBibleRuntime.Configuring += options =>
     {
-        options.SaveVersion = 3;
         options.Migrations.RenameKey(2, "gold", "playerGold");
         options.Migrations.MoveField(3, "inventory", "gold", "wallet.gold");
     };

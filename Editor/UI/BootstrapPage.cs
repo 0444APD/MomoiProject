@@ -12,7 +12,7 @@ namespace GBible.EditorTools.UI
     //   Bootstrap — 이 화면. 세션 옵션(Undo 방식·보관 수·시드)·판 저장·고급 설정을 고치고, Bootstrap.cs를 연다.
     //   RunState·Profile — 탭이 아니라 누르면 바로 코드 파일을 연다(DatabaseWindow가 이 그룹 아래에 붙인다).
     // 세션 옵션은 GameDatabase 에셋에 바로 저장된다(작업본·Ctrl+S를 거치지 않는다). 게임이 켜질 때 SessionOptions에 먼저 들어가고,
-    // Bootstrap 코드의 Configure가 바꾸면 그 값이 우선한다(바꾼 것은 모니터 기록에 남는다).
+    // Bootstrap 코드의 Configure가 바꾸면 그 값이 우선한다(바꾼 것은 모니터 타임라인에 남는다).
     public sealed class BootstrapPage : CodexPage
     {
         public const string PageKey = "bootstrap";
@@ -121,15 +121,16 @@ namespace GBible.EditorTools.UI
             // ── 판 저장 ──
             var runSave = database.RunSave;
             var endEvent = database.RunEndEvent ?? "";
+            var profileEach = database.SaveProfileEachAction;
             void SaveRunOptions()
             {
                 Undo.RecordObject(database, "판 저장 설정 변경");
-                database.EditorSetSaveOptions(runSave, endEvent);
+                database.EditorSetSaveOptions(runSave, endEvent, profileEach);
                 EditorUtility.SetDirty(database);
                 AssetDatabase.SaveAssetIfDirty(database);
             }
 
-            Heading(root, "판 저장", "진행 중인 판(이어 하기)을 언제 저장할지. 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.");
+            Heading(root, "판 저장", "진행 중인 판(이어 하기)을 언제 저장할지. 프로필은 이 설정과 상관없이 끌 때(모바일은 백그라운드로 갈 때도) 늘 저장된다.");
             var saveMode = new DropdownField(RunSaveNames.ToList(), (int)runSave);
             saveMode.RegisterValueChangedCallback(_ => { runSave = (RunSaveMode)saveMode.index; SaveRunOptions(); });
             root.Add(saveMode);
@@ -154,6 +155,10 @@ namespace GBible.EditorTools.UI
                 SaveRunOptions();
             });
             root.Add(endField);
+            var profileField = new Toggle("프로필도 행동마다 저장") { value = profileEach };
+            profileField.tooltip = "끄면 프로필은 끌 때(모바일은 백그라운드로 갈 때도)와 판 끝 이벤트 때만 저장된다. 진행이 거의 프로필에 있는 게임(수집형·방치형)은 켠다.";
+            profileField.RegisterValueChangedCallback(e => { profileEach = e.newValue; SaveRunOptions(); });
+            root.Add(profileField);
 
             // ── 고급(보통 그대로) ──
             var advanced = new Foldout { text = "고급", value = false };
@@ -180,7 +185,7 @@ namespace GBible.EditorTools.UI
             Heading(root, "코드로 정하는 것", null);
             var note = Gs.Label("출시 뒤 저장 구조를 바꿨을 때의 변환(options.Migrations)만 코드로 등록한다. 저장 버전은 등록한 변환을 따라 저절로 올라간다. " +
                                 "DB 항목 ID를 바꾼 것은 저장을 불러올 때 저절로 이어받는다([DataRef] 필드). " +
-                                "위 값을 조건에 따라 바꿔야 하면 Bootstrap의 Configure에서 options를 고친다. 그때 바뀐 값은 플레이 중 모니터 기록에 \"코드(Configuring)가 … 바꿨습니다\"로 남는다.", "gs-text-2");
+                                "위 값을 조건에 따라 바꿔야 하면 Bootstrap의 Configure에서 options를 고친다. 그때 바뀐 값은 플레이 중 모니터 타임라인에 \"코드(Configuring)가 … 바꿨습니다\"로 남는다.", "gs-text-2");
             note.style.whiteSpace = WhiteSpace.Normal;
             root.Add(note);
         }

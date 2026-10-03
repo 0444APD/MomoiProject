@@ -27,6 +27,8 @@ namespace GBible.Data
         // 판 저장(이어 하기): 언제 저장할지, 어떤 이벤트를 받으면 판이 끝난 것으로 볼지(그때 판 저장을 지우고 프로필을 바로 저장).
         [SerializeField] RunSaveMode runSave = RunSaveMode.OnQuit;
         [SerializeField] string runEndEvent = "";
+        // 프로필도 바깥 행동이 끝날 때마다 저장할지(수집형·방치형처럼 진행이 프로필에 있는 게임. 끄면 끌 때·판 끝에만).
+        [SerializeField] bool saveProfileEachAction;
         // 고급: 기록(Journal) 보관 줄 수, 개발 빌드의 Modify 누락 검사(예전 방식 데이터).
         [SerializeField] int journalCapacity = 4096;
         [SerializeField] bool detectUntrackedChanges = true;
@@ -51,6 +53,7 @@ namespace GBible.Data
         public long DevelopmentSeed => developmentSeed;
         public RunSaveMode RunSave => runSave;
         public string RunEndEvent => runEndEvent;
+        public bool SaveProfileEachAction => saveProfileEachAction;
         public int JournalCapacity => journalCapacity;
         public bool DetectUntrackedChanges => detectUntrackedChanges;
 
@@ -71,10 +74,11 @@ namespace GBible.Data
 
         public void EditorSetReleased(bool value) => released = value;
 
-        public void EditorSetSaveOptions(RunSaveMode mode, string endEvent)
+        public void EditorSetSaveOptions(RunSaveMode mode, string endEvent, bool profileEachAction)
         {
             runSave = mode;
             runEndEvent = endEvent ?? "";
+            saveProfileEachAction = profileEachAction;
         }
 
         public void EditorSetAdvanced(int journalCapacity, bool detectUntrackedChanges)

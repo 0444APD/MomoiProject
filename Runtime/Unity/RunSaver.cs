@@ -5,12 +5,14 @@ namespace GBible
 {
     // DB › 시작 파일 › Bootstrap의 '판 저장' 설정을 실행한다(게임 코드가 저장 컴포넌트를 따로 쓰지 않게).
     //   행동마다 저장: 바깥 행동이 끝나거나 Undo하면 표시만 남기고, 프레임 끝(행동 밖)에서 판을 저장한다.
+    //   프로필도 행동마다: 같은 때 프로필도 저장한다.
     //   판 끝 이벤트: 받으면 그 행동이 끝난 뒤 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤로는 판을 저장하지 않다가,
     //                 다른 행동이 판 데이터(세션 구역)를 바꾸면(= 새 판 시작) 다시 저장한다.
     sealed class RunSaver
     {
         readonly GameSession _session;
         readonly bool _eachAction;
+        readonly bool _profileEachAction;
         readonly Type _endEvent;
         bool _dirty;
         bool _endPending;
@@ -19,12 +21,13 @@ namespace GBible
         // 판 끝 이벤트를 받은 뒤 새 판이 시작되기 전까지 참(이때는 끌 때도 판을 저장하지 않는다).
         public bool Ended { get; private set; }
 
-        public RunSaver(GameSession session, RunSaveMode mode, Type endEvent)
+        public RunSaver(GameSession session, RunSaveMode mode, Type endEvent, bool profileEachAction)
         {
             _session = session;
             _eachAction = mode == RunSaveMode.AfterEachAction;
+            _profileEachAction = profileEachAction;
             _endEvent = endEvent;
-            if (_eachAction)
+            if (_eachAction || _profileEachAction)
             {
                 session.Actions.Executed += OnExecuted;
                 session.Data.TransactionUndone += _ => _dirty = true;
@@ -92,7 +95,8 @@ namespace GBible
             }
             if (!_dirty) return;
             _dirty = false;
-            if (!Ended) GBibleRuntime.SaveRun(_session);
+            if (_profileEachAction) GBibleRuntime.SaveProfile(_session);
+            if (_eachAction && !Ended) GBibleRuntime.SaveRun(_session);
         }
     }
 }

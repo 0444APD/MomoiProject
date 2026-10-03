@@ -20,7 +20,7 @@
 | 프로필 | 메타 구역 전체. `ExportMeta`/`ImportMeta`. 파일 `profile.json`. |
 | 판(런) | 세션 구역 전체 + 난수 상태 + 게임 시계. `ExportRun`/`ImportRun`. 파일 `run.json`. |
 | 저장 트리 | 저장 직전의 중간 모습. 키 → 값, 클래스는 "필드 이름 → 값" 딕셔너리, 리스트는 리스트. JSON으로 바뀐다. |
-| 저장 버전 | 저장 파일에 적는 정수(`SessionOptions.SaveVersion`, 기본 1). |
+| 저장 버전 | 저장 파일에 적는 정수. 등록한 변환의 가장 높은 버전을 저절로 따라간다(`session.SaveVersion`, 변환이 없으면 1). |
 | 변환(마이그레이션) | 예전 버전의 저장 트리를 지금 구조로 고치는 코드(`SaveMigrations`). |
 | 개발 중 / 출시됨 | 프로젝트 상태. 개발 중에는 호환되지 않는 저장을 지우고, 출시 후에는 이어받는다. |
 
@@ -75,12 +75,18 @@ bool canContinue = GBibleRuntime.HasSavedRun;     // run.json이 있는가
 | 때 | `GBibleRuntime`이 하는 일 |
 |---|---|
 | 게임 시작(씬을 불러오기 전) | 세션을 만들고, 개발 중이면 호환되지 않는 저장을 지운 뒤, `profile.json`을 불러온다(`ImportMeta`) |
-| 게임 종료(`OnApplicationQuit`) | 프로필을 저장하고, `AutoSaveRun`이 켜져 있으면 판도 저장한다 |
+| 바깥 행동이 끝날 때·Undo 뒤(판 저장 "행동마다 저장"일 때) | 그 프레임 끝(행동 밖)에서 판을 저장한다 |
+| 바깥 행동이 끝날 때·Undo 뒤("프로필도 행동마다 저장"을 켰을 때) | 그 프레임 끝에서 프로필을 저장한다 |
+| 앱이 백그라운드로 갈 때(`OnApplicationPause`) | 끌 때와 같이 프로필과(설정대로) 판을 저장한다 |
+| 판 끝 이벤트를 받은 행동이 끝날 때(설정했을 때) | 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤 다른 행동이 세션 구역 값을 바꿀 때(새 판)까지 판을 저장하지 않는다 |
+| 게임 종료(`OnApplicationQuit`) | 프로필을 저장하고, `AutoSaveRun`이 참이면(판 저장이 "저장하지 않음"이 아니면) 판도 저장한다. 판 끝 이벤트 뒤 아직 새 판이 아니면 저장하지 않는다 |
 
 판은 **자동으로 불러오지 않는다.** 타이틀의 "이어하기"처럼 게임이 원하는 때 `LoadRun`을 부른다.
 
+판 저장 시점은 DB › 시작 파일 › **Bootstrap**의 **판 저장**(끌 때 저장 / 행동마다 저장 / 저장하지 않음)과 **판 끝 이벤트**에서 정한다. 코드로 덮어쓸 수도 있다(코드 값이 우선).
+
 ```csharp
-GBibleRuntime.AutoSaveRun = false;    // 끌 때 판을 저장하지 않는다(기본 true)
+GBibleRuntime.AutoSaveRun = false;    // 끌 때 판을 저장하지 않는다(설정보다 우선)
 ```
 
 ### 2.3 직접 저장·불러오기: `GBibleRuntime`
@@ -169,9 +175,11 @@ public class HeroSave
 
 필드 이름만 바꿨다면 변환 없이 이것만 단다.
 
-### 2.7 저장 버전과 변환: `SaveVersion` · `SaveMigrations`
+### 2.7 저장 버전과 변환: `SaveMigrations`
 
-출시 후 데이터 구조를 호환되지 않게 바꿀 때 쓴다(개발 중에는 저장을 지우므로 필요 없다).
+출시 후 데이터 구조를 호환되지 않게 바꿀 때 쓴다(개발 중에는 저장을 지우므로 필요 없다). 변환만 등록하면 된다. 저장 버전은 등록한 변환의 가장 높은 버전(아래 예에서 4)으로 저절로 올라간다.
+
+DB 항목 ID(인스턴스·유물 …)를 바꾼 것은 변환을 쓰지 않아도 된다. 출시됨 상태에서 ID를 바꾸면 이력이 남고, 런타임이 저장을 불러올 때 `[DataRef]`가 붙은 string·string 리스트 필드의 예전 ID를 새 ID로 바꾼다.
 
 ```csharp
 using System.Collections.Generic;
@@ -183,7 +191,6 @@ public static class SaveSetup
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     static void Hook() => GBibleRuntime.Configuring += options =>
     {
-        options.SaveVersion = 4;
         options.Migrations.RenameKey(2, "player.money", "player.wallet");                      // v1 → v2
         options.Migrations.MoveField(3, "player.inventory", "items[].title", "items[].name");  // v2 → v3
         options.Migrations.RemoveKey(3, "player.oldFlag");                                      // v2 → v3
@@ -199,7 +206,7 @@ public static class SaveSetup
 
 | 멤버 | 뜻 |
 |---|---|
-| `SessionOptions.SaveVersion` | 지금 게임의 저장 버전(기본 1). 저장 파일에 적힌다 |
+| `session.SaveVersion` | 지금 게임의 저장 버전 = `SessionOptions.SaveVersion`(최솟값, 기본 1)과 등록한 변환의 가장 높은 버전 중 큰 쪽. 저장 파일에 적힌다 |
 | `Migrations.Add(toVersion, label, Action<Dictionary<string, object>>)` | `toVersion - 1` → `toVersion` 변환. 저장 트리(키 → 값)를 직접 고친다. `toVersion`은 2부터 |
 | `Migrations.RenameKey(toVersion, oldKey, newKey)` | 플레이어 데이터 키 이름 바꾸기 |
 | `Migrations.RemoveKey(toVersion, key)` | 더 이상 쓰지 않는 키 지우기 |
@@ -355,8 +362,7 @@ public static class InventoryMigration
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     static void Hook() => GBibleRuntime.Configuring += options =>
     {
-        options.SaveVersion = 2;
-        options.Migrations.MoveField(2, "player.inventory", "coins", "wallet.gold");
+        options.Migrations.MoveField(2, "player.inventory", "coins", "wallet.gold");   // 저장 버전은 2로 저절로
     };
 }
 ```
@@ -369,7 +375,7 @@ public static class InventoryMigration
 |---|---|
 | 개발 중 플레이를 시작했더니 저장이 사라짐 | 키·필드를 지웠거나 이름·형식을 바꿨다. 개발 중에는 의도된 동작이다(콘솔 경고에 이유가 있다). 출시 후에는 **MomoiProject › 출시됨 (저장 호환 유지)**을 켠다. |
 | 불러온 값이 기본값 | 필드 이름을 바꿨다. `[FormerlySerializedAs("예전이름")]`을 단다. |
-| "이 게임보다 새 버전입니다" | 저장 파일의 버전이 `SaveVersion`보다 크다. 게임을 업데이트하거나 버전을 확인한다. |
+| "이 게임보다 새 버전입니다" | 저장 파일의 버전이 지금 게임의 저장 버전(등록한 변환의 가장 높은 버전)보다 크다. 게임을 업데이트하거나, 변환을 지우지 않았는지 확인한다. |
 | 변환이 적용되지 않음 | `Configuring`보다 늦게(예: `Started`에서) 등록했다. 프로필은 세션을 만들자마자 불러온다. |
 | 이어하기 후 Undo가 안 됨 | Undo 이력은 저장하지 않는다. 불러온 시점부터 새로 쌓인다. |
 | 판 저장에 프로필 값이 없음 | 판 저장은 세션 구역만 담는다. 메타 구역은 프로필 저장이다. |

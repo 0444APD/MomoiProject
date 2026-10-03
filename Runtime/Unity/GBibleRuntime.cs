@@ -147,7 +147,7 @@ namespace GBible
             var endEvent = string.IsNullOrEmpty(database?.RunEndEvent) ? null : TypeResolver.Find(database.RunEndEvent);
             if (database != null && !string.IsNullOrEmpty(database.RunEndEvent) && endEvent == null)
                 session.Journal.Append(JournalKind.Warning, "Save", $"판 끝 이벤트 '{database.RunEndEvent}'를 찾을 수 없습니다(이벤트 클래스 이름이 바뀌었는지 확인).");
-            _runSaver = new RunSaver(session, _runSaveMode, endEvent);
+            _runSaver = new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false);
 
             session.Journal.Appended += ForwardToConsole;
             session.Debug.Register("저장", "프로필 저장", () => SaveProfile(session));
@@ -169,6 +169,14 @@ namespace GBible
 
             Started?.Invoke(session);
             return session;
+        }
+
+        // 앱이 백그라운드로 갈 때(모바일은 종료 알림이 오지 않을 수 있다): 끌 때와 같이 프로필과(설정대로) 판을 저장한다.
+        internal static void SaveForBackground()
+        {
+            if (Session == null || Session.Data.InTransaction) return;
+            SaveProfile(Session);
+            if (AutoSaveRun && !(_runSaver?.Ended ?? false)) SaveRun(Session);
         }
 
         internal static void Stop()
@@ -330,5 +338,10 @@ namespace GBible
         }
 
         void OnApplicationQuit() => GBibleRuntime.Stop();
+
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) GBibleRuntime.SaveForBackground();
+        }
     }
 }

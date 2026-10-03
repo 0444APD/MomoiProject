@@ -86,7 +86,7 @@ Rules에서 Client의 코드(예: `BattleHud`)를 부르면 컴파일 오류가 
 > | `MomoiProject.Rules` | `GBible.Core`, `GBible.Unity`, 켠 모듈 중 데이터 형식을 내놓는 것(`GBible.Inventory`) |
 > | `MomoiProject.Client` | Rules, `GBible.Core`, `GBible.Unity`, 켠 모듈 전부 |
 > | `MomoiProject.Editor` | 위 둘 + `GBible.Editor`. Editor 플랫폼 전용 |
-> | `MomoiProject.Tests` | Rules, `GBible.Core`, `GBible.Unity`, Test Runner, NUnit. 테스트 실행 때만 |
+> | `MomoiProject.Tests` | Rules, `GBible.Core`, `GBible.Unity`, 켠 데이터 모듈, Test Runner, NUnit. 테스트 실행 때만 |
 
 > [!note]- 하위 폴더
 > Rules·Client 아래 하위 폴더는 자유다. DB의 클래스·이벤트 탭은 `Assets/Code` 아래 실제 폴더별로 묶어 보여 준다(그룹 "Rules/Data" = 폴더 `Assets/Code/Rules/Data`). 카드 던전은 이렇게 나눴다.
@@ -197,9 +197,9 @@ static void Started(GameSession session)
 > [!note]- 설정 칸 자세히
 > - Undo 방식을 "스냅샷"으로 바꾸면 보관 수 대신 스냅샷 간격(초)·스냅샷 보관 수 칸이 나온다. 간격 × 개수 = 되감을 수 있는 시간.
 > - 시드는 개발 빌드에서만 고정된다. 에디터 플레이는 개발 빌드로 친다. 출시 빌드는 늘 지금 시각을 시드로 쓴다. 같은 시드에 같은 행동이면 `Game.Random`의 결과(덱 섞기·보상 골드)가 같다.
-> - 판 저장·판 끝 이벤트는 [10장](10-SaveAndRelease.md)에서 자세히 본다. 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.
+> - 판 저장·판 끝 이벤트는 [10장](10-SaveAndRelease.md)에서 자세히 본다. 프로필은 이 설정과 상관없이 끌 때(모바일은 백그라운드로 갈 때도) 늘 저장된다.
 > - **고급**(접혀 있음): 기록 보관 줄 수, 개발 빌드의 Modify 누락 검사. 보통 그대로 둔다.
-> - 이 값들은 게임이 켜질 때 `SessionOptions`에 먼저 들어간다. 코드(`Configure`)가 같은 값을 바꾸면 코드가 이기고, 모니터 **기록**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다.
+> - 이 값들은 게임이 켜질 때 `SessionOptions`에 먼저 들어간다. 코드(`Configure`)가 같은 값을 바꾸면 코드가 이기고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다.
 
 > [!note]- `Configure`는 언제 쓰나
 > 화면에서 고를 수 있는 값은 화면에서 정한다. 코드가 필요한 경우는 둘뿐이다.

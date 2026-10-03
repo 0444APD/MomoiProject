@@ -6,7 +6,7 @@ using GBible.Data;
 namespace GBible
 {
     // 출시 뒤 DB 항목(인스턴스·유물 …)의 ID를 바꾸면, 저장 파일 안에 글자로 들어간 그 ID를 불러올 때 새 ID로 바꾼다.
-    // 대상은 [DataRef(종류)]가 붙은 string 필드와 string 리스트·배열(덱 카드의 원본 ID, 가방 칸의 아이템 ID, 가진 유물 ID …).
+    // 대상은 [DataRef(종류)]가 붙었거나 DB › 필드 규칙에서 값 출처를 "DB 항목"으로 연결한 string 필드와 string 리스트·배열\n    // (덱 카드의 원본 ID, 가방 칸의 아이템 ID, 가진 유물 ID …).
     // 어느 필드를 볼지는 게임이 켜질 때 한 번 정해 두고(형식 정보는 DataModel의 캐시), 불러올 때는 저장 트리만 훑는다.
     static class SavedIdRenames
     {
@@ -26,7 +26,13 @@ namespace GBible
             }
             if (maps.Count == 0) return null;
 
-            var planner = new Planner(maps);
+            // 필드 규칙으로 DB 종류에 연결한 필드: (클래스, 필드 이름) → DB 종류.
+            var rules = new Dictionary<(Type, string), Type>();
+            foreach (var rule in database.All<FieldRuleData>())
+                if (rule.source == FieldRuleSource.Data && rule.TargetType is Type target && TypeResolver.Find(rule.dataType) is Type kind && !string.IsNullOrEmpty(rule.field))
+                    rules[(target, rule.field)] = kind;
+
+            var planner = new Planner(maps, rules);
             var plans = new Dictionary<string, Plan>(StringComparer.Ordinal);
             foreach (var entry in database.All<PlayerDataEntry>())
                 if (entry.ValueType != null && planner.For(entry.ValueType) is Plan plan) plans[entry.Id] = plan;
@@ -111,12 +117,14 @@ namespace GBible
         sealed class Planner
         {
             readonly List<(Type type, Dictionary<string, string> map)> _maps;
+            readonly Dictionary<(Type, string), Type> _rules;
             readonly Dictionary<Type, Plan> _done = new Dictionary<Type, Plan>();
             readonly HashSet<Type> _visiting = new HashSet<Type>();
 
-            public Planner(List<(Type type, Dictionary<string, string> map)> maps)
+            public Planner(List<(Type type, Dictionary<string, string> map)> maps, Dictionary<(Type, string), Type> rules)
             {
                 _maps = maps;
+                _rules = rules;
             }
 
             // 이 형식의 값 안에 바꿀 ID가 있을 수 있으면 계획, 없으면 null.
@@ -142,9 +150,10 @@ namespace GBible
                         var objectPlan = new ObjectPlan { Owner = this, Declared = type };
                         foreach (var field in info.Fields)
                         {
-                            var fieldPlan = field.Field != null && field.Field.GetCustomAttributes(typeof(DataRefAttribute), true).FirstOrDefault() is DataRefAttribute reference
-                                ? IdsOf(field.Type, reference.DataType)
-                                : For(field.Type);
+                            var refType = field.Field != null && field.Field.GetCustomAttributes(typeof(DataRefAttribute), true).FirstOrDefault() is DataRefAttribute reference
+                                ? reference.DataType
+                                : _rules.TryGetValue((field.Field?.DeclaringType ?? type, field.Name), out var ruled) ? ruled : null;
+                            var fieldPlan = refType != null ? IdsOf(field.Type, refType) : For(field.Type);
                             if (fieldPlan != null) objectPlan.Fields.Add((new[] { field.Name }.Concat(field.FormerNames).ToArray(), fieldPlan));
                         }
                         if (objectPlan.Fields.Count > 0) plan = objectPlan;
