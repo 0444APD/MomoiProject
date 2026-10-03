@@ -2,7 +2,7 @@
 
 팀 공용 게임 시스템 라이브러리. 어느 Unity 프로젝트에 넣어도 독립적으로 동작하고, 요소 추가·조건·보상은 전용 에디터에서 메뉴 선택과 숫자 입력만으로 만든다.
 
-**기능별 사용법과 코드 예제는 [`Documentation~/Manual/00-Index.md`](Documentation~/Manual/00-Index.md)(매뉴얼)부터 본다.** 설계와 결정 사항은 [`Documentation~/Architecture.md`](Documentation~/Architecture.md)에 있다. 구현이 문서와 달라지면 문서를 먼저 고친다.
+**기능별 사용법과 코드 예제는 [`Documentation~/Manual/00-Index.md`](Documentation~/Manual/00-Index.md)(매뉴얼)부터 본다.** **프로젝트를 진행하는 순서와 판단 기준은 [`Documentation~/Guide/00-Index.md`](Documentation~/Guide/00-Index.md)(프로그래머 가이드).** 설계와 결정 사항은 [`Documentation~/Architecture.md`](Documentation~/Architecture.md)에 있다. 구현이 문서와 달라지면 문서를 먼저 고친다.
 
 **처음 이어받는 사람은 [`HANDOVER.md`](HANDOVER.md)부터 읽는다**: 모든 기능 설명, 설계 철학, 작업 규칙, 개발 흐름, 진행 중·앞으로의 안건, 미해결·보류 사항.
 
