@@ -219,7 +219,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 
 ### 4-6. 화면과 시스템의 경계
 
-화면 코드(화면 asmdef, 01장 4-3)는 다음만 한다.
+화면 코드(`Client` 폴더, 01장 3절)는 다음만 한다.
 
 - **읽기**: `Game.Data().Run`에서 체력·에너지·손패를 읽는다. 손패는 덱 카드 id 리스트이므로 한 장은 `Rules.CardOf(Game, id)`(안에서 `Game.Find<DeckCard>`)로 찾고, 그 장의 이름·비용·그림은 `Rules.CardData(Game, deckCard.card)`로 원본에서 읽는다. 강화 여부처럼 판마다 다른 값만 덱 카드에서 읽는다.
 - **보내기**: 입력은 런 스크립트의 창구 함수로 보낸다. 화면이 행동을 직접 만들어도 되지만, 창구를 한곳에 모아 두면 입력 목록이 한눈에 보인다.

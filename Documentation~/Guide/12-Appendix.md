@@ -242,13 +242,13 @@ static void Started(GameSession session)
 
 ### 01. 프로젝트 시작하기
 
-- [ ] 저장소가 `Assets` 아래에 있고, 게임 코드는 그 폴더 밖(`Assets/Code/<게임>/`)에 있다.
-- [ ] `com.unity.nuget.mono-cecil` 패키지가 있다.
-- [ ] 도감을 한 번 열었고 `GameDatabase.asset`이 생겼다.
+- [ ] GBible이 `Packages/com.momoi.gbible`에 있고, Package Manager에 GBible과 `com.unity.nuget.mono-cecil`이 보인다.
+- [ ] 시작 설정을 적용했다. `Assets/Code/Rules·Client·Editor·Tests`와 각 asmdef, `GameDatabase.asset`이 생겼다.
 - [ ] 쓸 선택 모듈을 켰다(`Features.json`이 바뀌었다).
-- [ ] (asmdef로 나눴다면) 화면 → 게임 로직 방향으로만 참조하고, 이름이 `Unity`·`GBible.`로 시작하지 않는다.
-- [ ] 판·프로필 플레이어 데이터를 도감에 만들고 저장했다. `GameIds.cs`가 게임 로직 폴더의 `Generated/`에 있다.
-- [ ] Bootstrap이 `AfterAssembliesLoaded`에서 `Configuring`·`Started`를 연결한다.
+- [ ] 규칙 코드는 `Rules`에, 화면·씬 코드는 `Client`에 있다.
+- [ ] 시작 설정이 만든 `RunState`·`Profile` 뼈대에 필드를 채웠다.
+- [ ] 판·프로필 플레이어 데이터를 도감에 만들고 저장했다. `GameIds.cs`가 `Assets/Code/Rules/Generated/`에 있다.
+- [ ] `Client/Bootstrap.cs`의 `Configure`에 Undo 방식·시드가 있고, `Started`에서 플레이어 데이터를 다시 정의하지 않는다.
 - [ ] 모니터 머리에 고정 시드가 보이고, 디버그 명령 → Undo가 된다.
 - [ ] 콘솔에 "[MomoiProject]" 경고가 없다.
 
@@ -527,20 +527,20 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 기능 | 매뉴얼 | 처음 쓴 곳 |
 |---|---|---|
 | 설치, `com.unity.nuget.mono-cecil` | 20 | 01 §4-1 |
-| 도감을 열어 `GameDatabase` 만들기 | 20 · 21 | 01 §4-1 |
+| 도감을 열어 `GameDatabase` 만들기 | 20 · 21 | 01 §4-2(시작 설정이 만든다) |
 | 선택 기능 켜기(기능 활성화), `#if GBIBLE_*` | 20 | 01 §4-2 |
-| 어셈블리·asmdef 참조 | 20 | 01 §4-3 |
-| `GBibleRuntime.Session`·`Game` | 20 · 03 | 01 §4-6 |
-| `Configuring`·`SessionOptions`(`History`·`HistoryLimit`·`Seed`) | 20 · 02 | 01 §4-6 |
+| 어셈블리·asmdef 참조 | 20 | 01 §3, §4-2 |
+| `GBibleRuntime.Session`·`Game` | 20 · 03 | 01 §4-5 |
+| `Configuring`·`SessionOptions`(`History`·`HistoryLimit`·`Seed`) | 20 · 02 | 01 §4-5 |
 | `HistoryMode.Snapshots`·`SnapshotInterval`·`SnapshotLimit` | 02 | 01 §5(언급), 07 §5 |
 | `HistoryMode.None` | 02 | 01 §3, 07 §5 |
 | `CaptureSnapshot` | 02 | 07 §5 |
 | `JournalCapacity` | 20 · 22 | 12 §3-4 |
 | `DetectUntrackedChanges` | 20 · 01 | 12 §3-7 |
-| `Started` | 20 | 01 §4-6 |
+| `Started` | 20 | 01 §4-5 |
 | `Stopped` | 20 | 12 §3-8 |
-| `GameIds` 생성(식별자 코드 다시 만들기), `PlayerDataKey<T>` | 20 · 01 | 01 §4-5 |
-| `Game.Data()` | 01 · 03 | 01 §4-5 |
+| `GameIds` 생성(식별자 코드 다시 만들기), `PlayerDataKey<T>` | 20 · 01 | 01 §4-4 |
+| `Game.Data()` | 01 · 03 | 01 §4-4 |
 | `GameDatabase.Load()`·`All<T>()` | 20 | 04 §4-10 |
 | `GameFeatures`(에디터 API) | 20 | 12 §3-10 |
 
@@ -548,11 +548,11 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 | 기능 | 매뉴얼 | 처음 쓴 곳 |
 |---|---|---|
-| `[Serializable]` 데이터 클래스 | 01 | 01 §4-4 |
+| `[Serializable]` 데이터 클래스 | 01 | 01 §4-3 |
 | `[PlayerData]` | 01 | 12 §3-7 |
-| 도감 › 플레이어 데이터(구역·값 형식) | 01 · 21 | 01 §4-5 |
-| 구역 `DataZone.Session`·`Meta` | 01 · 06 | 01 §4-5, 02 §3-2 |
-| `session.Data.Define`·`IsDefined` | 01 | 01 §4-6 |
+| 도감 › 플레이어 데이터(구역·값 형식) | 01 · 21 | 01 §4-4 |
+| 구역 `DataZone.Session`·`Meta` | 01 · 06 | 01 §4-4, 02 §3-2 |
+| `session.Data.Define`·`IsDefined` | 01 | 01 §4-4(언급), 08 |
 | `session.Data.Get`·`Set`·`Modify` | 01 | 12 §3-7 |
 | `Changed`·`DataChanged` | 01 | 06 §4 |
 | `Synced`·`Snapshot`·`MirrorReceiver` | 01 · Coding.md | 06 §3(`Synced` 언급), 11 |
@@ -570,12 +570,12 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `Game.Do`·`ActionRecord` | 02 · 03 | 03 §4-2 |
 | 실패 = 예외 = 전체 취소 | 02 | 03 §4-5 |
 | 행동 안의 행동(`Game.Do`·`Game.Use` 중첩) | 02 · 22 | 02 §4-3, 03 §4-4 |
-| `session.Undo()` | 02 | 01 §4-7(모니터), 03 §4-2 |
+| `session.Undo()` | 02 | 01 §4-6(모니터), 03 §4-2 |
 | `UndoCount` | 02 | 12 §3-7 |
 | `Data.ClearHistory()` | 02 | 03 §5, 07 §4 |
 | 지연 효과(나중에 `Game.Do`) | 02 | 03 §4-7 |
 | `actorId`·`Visibility` | 02 | 11 판단 기준 |
-| `DeveloperEditAction` | 22 | 01 §4-6 |
+| `DeveloperEditAction` | 22 | 01 §4-5 |
 | `session.Actions.Executed`·`TransactionAborted` | 02 | 06 §4 |
 
 ### Game API
@@ -588,7 +588,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `Game.Find(id)` | 03 | 12 §3-7 |
 | `Game.Use` | 03 · 16 | 03 §4-1 |
 | `Game.CanUse` | 03 · 16 | 03 §3 |
-| `Game.Random`·`RandomStream.Range` | 03 · 07 | 01 §4-6(언급), 07 §4 |
+| `Game.Random`·`RandomStream.Range` | 03 · 07 | 01 §4-5(언급), 07 §4 |
 | `RandomStream`의 그 밖의 뽑기(`Chance`·`NextDouble` …) | 07 | 12 §3-11 |
 | `session.Random.MasterSeed` | 07 | 08 §4 |
 | `Game.NewId` | 03 | 02 §4-9 |
@@ -675,7 +675,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `[DataRef]` | 17 · 21 | 05 §4 |
 | `[FieldLabel]` | 17 | 04 §4-10, 05 §3 |
 | `[PlayerDataRef]`·`[StatRef]`·`[AchievementRef]`·`[EventTypeRef]` | 11 · 12 | 05 §3 |
-| 도감 저장 흐름(작업본 → Ctrl+S) | 21 | 01 §4-5 |
+| 도감 저장 흐름(작업본 → Ctrl+S) | 21 | 01 §4-4 |
 | ID 바꾸기·삭제 보호 | 21 | 05 §4 |
 | 검증(사이드바 "검증 통과", 빌드 중단) | 21 | 04 §2 |
 | 클래스 탭(클래스 상세, `[Hide]` 토글) | 21 | 05 §4 |
@@ -688,8 +688,8 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 | 기능 | 매뉴얼 | 처음 쓴 곳 |
 |---|---|---|
-| 모니터 열기, 데이터·명령·행동 탭, Undo 버튼 | 22 | 01 §4-7 |
-| `session.Debug.Register` | 22 | 01 §4-6 |
+| 모니터 열기, 데이터·명령·행동 탭, Undo 버튼 | 22 | 01 §4-6 |
+| `session.Debug.Register` | 22 | 01 §4-5 |
 | 타임라인(묶어 보기·인과 관계) | 22 | 04 §4-9, 08 §4 |
 | 이벤트 호출 | 22 | 04 §4-9 |
 | 도전과제·로그 테스트(트리거로 달성·강제 달성·이벤트로 더하기) | 22 | 04 §4-9, 08 §3 |
@@ -716,7 +716,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `Dialogues.Play`·`Signaled`·`IsPlaying`·`ResumeSaved` | 24 | 06 §4 |
 | `DialogueUIExtension` | 24 | 06 §5 |
 | 결과 '다이얼로그 재생' | 24 | 12 §3-10 |
-| 인벤토리 `Inventory` 형식 | 25 | 01 §4-4 |
+| 인벤토리 `Inventory` 형식 | 25 | 01 §4-3 |
 | 인벤토리 API(`TryRemove`·`slots` …) | 25 | 04 §4-4, 06 §4 |
 | 오디오 `GameAudio`(`PlayBgm`·`PlaySfx`·`SetVolume`·`VolumeChanged`) | 26 | 06 §4 |
 

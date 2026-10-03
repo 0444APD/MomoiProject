@@ -25,7 +25,7 @@ Momoi Project(코드 이름 `GBible`)로 **프로젝트를 시작해서 출시�
 
 | 장 | 이 단계에서 하는 일 |
 |---|---|
-| [01. 프로젝트 시작하기](01-StartProject.md) | 설치, 선택 모듈 켜기, 폴더와 asmdef 나누기, 시작 설정(Configuring·Started·시드·Undo 방식), GameIds 만들기, 첫 플레이 확인 |
+| [01. 프로젝트 시작하기](01-StartProject.md) | 패키지 설치, 시작 설정 창(Product Name·선택 모듈·Undo 방식·언어 → 코드 폴더·asmdef·시작 파일 자동 생성), 코드 둘 자리(Rules·Client·Editor·Tests), 데이터 클래스 → 도감 → GameIds, Bootstrap(Configuring·Started·시드), 첫 플레이 확인 |
 | [02. 기획을 코드 구조로](02-DesignToCode.md) | 이 값은 플레이어 데이터인가·인스턴스인가·이벤트인가·행동인가·키워드인가 판단하기, 판과 프로필 나누기, "판 데이터에는 ID와 바뀌는 값만", 기획서 한 장을 클래스 목록으로 |
 | [03. 게임 루프](03-GameLoop.md) | 입력 → 행동 → 이벤트 → 화면의 한 바퀴, 런 스크립트, 판·전투·턴 진행, 행동 안의 행동, 실패하면 전체 취소, 지연 효과, 씬 전환 |
 | [04. 콘텐츠 더하기](04-AddingContent.md) | 새 카드·몬스터·물약·유물·도전과제·로그를 넣는 표준 절차, Block으로 만들지 `[BindTo]`로 쓸지 고르기, 프로젝트 고유 기능 만들기 |
