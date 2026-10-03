@@ -152,7 +152,7 @@ namespace GBible.EditorTools
         }
 
         // 플레이어 데이터를 이름으로 읽고 쓰는 창구: Game.Data().PlayerGold += 100;  Game.Data().PlayerInventory.slots.Add(…);
-        // 숫자·글자 같은 단순 값은 읽고 쓰기(쓰면 기록), 클래스·리스트 값은 꺼내서 안쪽 필드를 고친다(플레이어 데이터 클래스면 쓰는 순간 기록).
+        // 숫자·글자 같은 단순 값은 읽고 쓰기(쓰면 기록), 클래스·리스트 값은 꺼내서 안쪽 필드를 고친다(행동 끝·프레임 끝 Sync가 기록).
         static void AppendPlayerDataView(StringBuilder b, IEnumerable<PlayerDataEntry> keys, HashSet<string> visible)
         {
             b.AppendLine();
