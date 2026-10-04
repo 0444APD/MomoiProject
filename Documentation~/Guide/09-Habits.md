@@ -52,21 +52,23 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 멀티가 붙으면 클라이언트는 행동만 보내고, 서버가 행동을 실행해 생긴 ChangeSet을 모두에게 보낸다([11장](11-MultiplayerReady.md)). 싱글 게임에서도 지금 지켜 두면 나중에 고칠 것이 없다.
 
 - **게임 값은 행동(`Game.Do`)·Block·결과·`[BindTo]` 함수 안에서만 바꾼다.**
-- **행동 필드는 id와 숫자·글자·bool·enum뿐이다.** 객체 참조를 싣지 않는다.
+- **행동에는 필요한 정보를 필드로 넣는다.** 대상(덱 카드·적)은 객체 그대로 넣는다. 시스템이 기록·전송에는 id만 남기고, `Run` 직전에 id로 지금 객체를 다시 찾아 넣는다.
+- **대상 클래스는 `public string id;`가 있고 플레이어 데이터 안에 있다.** Unity 객체·델리게이트·데이터 밖 객체는 행동에 넣지 않는다.
 - **이벤트를 받는 쪽은 화면·연출만 한다.** 값을 고치지 않는다.
 - **규칙 난수는 `Game.Random("이름")`, 시간은 게임 시계(`session.Clock.Time`).**
 - **세션은 매개변수로 받는다**(`c.Game`·`session`). 게임 값을 static 변수에 두지 않는다.
 
 ```csharp
 [Serializable, BlockInfo("카드 내기")]
-public class PlayCard : GameAction<DeckCard>
+public class PlayCard : GameAction
 {
-    public string targetId;                          // 고른 적: 객체가 아니라 id
+    public DeckCard card;     // 낼 카드(덱 카드)
+    public Fighter target;    // 고른 적(없으면 null)
 
-    protected override void Run(DeckCard card)       // card = Game.Find<DeckCard>(target)
+    protected override void Run()
     {
         var run = Game.Data().Run;
-        var data = Rules.CardData(Game, card.card);  // 카드 원본(읽기만)
+        var data = Rules.CardData(Game, card.card);
         var battle = run.battle ?? throw new InvalidOperationException("전투 중이 아닙니다.");
         if (!battle.hand.Contains(card.id)) throw new InvalidOperationException("손에 없는 카드입니다.");
         if (battle.energy < data.cost) throw new InvalidOperationException("에너지가 모자랍니다.");
@@ -74,20 +76,34 @@ public class PlayCard : GameAction<DeckCard>
         battle.energy -= data.cost;
         battle.hand.Remove(card.id);
         battle.discard.Add(card.id);
-        // … Game.Use(card.card, …)로 효과, Game.Events.Publish(new CardPlayed { … })로 이벤트를 쏜다
+
+        if (target == null) Game.Use(card.card, run.hero);
+        else Game.Use(card.card, run.hero, target);
+        Game.Events.Publish(new CardPlayed { cardId = card.id, source = card.card, userId = run.hero.id, cost = data.cost });
+
+        if (battle.enemies.Count == 0) Game.Do(new WinBattle());
     }
 }
 ```
 
-씬은 입력을 행동으로 바꿔 보내기만 한다: `Game.Do(new PlayCard { target = cardId, targetId = targetId })`. 화면은 데이터를 읽어 그린다.
+씬은 입력을 행동으로 바꿔 보내기만 한다: `Game.Do(new PlayCard { card = card, target = target })`. 화면은 데이터를 읽어 그린다.
+
+> [!note]- 대상을 객체로 넣어도 되는 이유
+> 행동은 저장·리플레이·서버 전송에 실리는 데이터다. 객체를 그대로 보낼 수는 없으므로, 시스템이 대상 필드(형식에 `string id`가 있는 클래스)를 기록·전송할 때 id만 남긴다. 실행 직전에는 그 id로 지금 데이터에서 객체를 다시 찾아 필드에 넣는다.
+> - **싱글에서 방금 고른 객체**: 같은 객체가 그대로 쓰인다(확인만 한다).
+> - **Undo·판 불러오기 뒤 버튼이 쥔 옛 객체**: 같은 id의 지금 객체로 바뀐다. 사라진 옛 객체를 고치는 일이 없다.
+> - **멀티**: id만 건너가고 받는 쪽(서버)이 자기 데이터의 객체를 넣는다.
+> - **타임라인·리플레이**: id로 남는다. `Describe`를 쓰지 않으면 "카드 내기 (card7, enemy2)"처럼 보인다.
+> - **못 찾으면**(죽은 적 등) "Fighter 'enemy2'을(를) 찾을 수 없습니다"로 행동이 실패하고 아무것도 바뀌지 않는다.
+> - DB 원본은 플레이어 데이터가 아니라서 찾기 대상이 아니다. 원본은 `[DataRef]` 원본 ID 글자로 넣는다(`BuyCard.source`).
 
 > [!note]- 이럴 때 이렇게(이유)
 > | 이럴 때 | 이렇게 한다 | 이유 |
 > |---|---|---|
 > | 게임 값을 바꾼다 | 행동(`Game.Do`)·Block·결과·`[BindTo]` 함수 안에서 | 행동 밖에서 바꾼 값은 Undo되지 않고, 멀티에서는 서버가 모르는 변경이 된다 |
-> | 행동이 대상을 가리킨다 | `target`·`targetId` 같은 **id 글자** | 객체 참조는 저장·전송·리플레이가 안 된다 |
-> | 행동이 값을 싣는다 | 숫자·글자·bool·enum·id 리스트 | 행동은 데이터다. 스프라이트·MonoBehaviour·델리게이트는 실을 수 없다 |
-> | 무언가를 오래 기억한다(선택한 카드 등) | id로 들고, 쓸 때 `Game.Find`로 다시 찾는다 | Undo·불러오기·받는 쪽에서는 다른 인스턴스일 수 있다 |
+> | 행동이 대상을 가리킨다 | 대상 객체를 필드에 그대로(`card`·`target`, 리스트도 된다) | 시스템이 id로 기록·전송하고 실행 직전에 지금 객체로 바꿔 넣는다 |
+> | 행동이 값을 싣는다 | 숫자·글자·bool·enum, 원본 ID 글자, id 없는 작은 클래스(값으로 복사) | 행동은 데이터다. 스프라이트·MonoBehaviour·델리게이트는 실을 수 없다 |
+> | 무언가를 오래 기억한다(선택한 카드 등) | 행동에 넣을 거라면 객체 그대로 둬도 된다. 화면이 직접 읽을 때는 `Game.Data()`·`Game.Find`로 다시 꺼낸다 | 불러오기 뒤에는 쥐고 있던 객체가 옛 인스턴스일 수 있다 |
 > | 이벤트를 받아 무언가 한다 | 화면·연출만 | 받는 쪽에서 값을 바꾸면 Undo 단위와 서버 전송에서 빠진다 |
 > | 규칙에 난수가 든다 | `Game.Random("이름")` | 시드·Undo·저장·서버와 맞는 결정론 난수. 연출용 흔들림은 `UnityEngine.Random` |
 > | 시간에 따라 바뀐다(쿨다운 등) | 게임 시계(`session.Clock.Time`) 기준 시각을 플레이어 데이터에 | `Time.time`은 되감기·저장과 맞지 않는다 |
@@ -209,8 +225,8 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > | MonoBehaviour 필드에 게임 값(골드·체력·덱)을 둔다 | Undo·저장·동기화에서 빠진다 | 플레이어 데이터에 둔다 |
 > | 씬 코드·코루틴·이벤트를 받는 함수에서 플레이어 데이터를 고친다 | "행동 밖 변경"으로 기록되고 Undo되지 않는다. 그 행동을 Undo하면 "행동 밖에서 바뀐 값을 덮었습니다" 경고 | 행동을 만들어 `Game.Do` |
 > | 행동 안에서 기다린다(코루틴·`await`) | 행동은 한 번에 끝나야 한다 | 결과를 이벤트로 쏘고 연출은 따로. 시간이 걸리는 효과는 나중에 별도 행동으로 |
-> | 행동 필드에 객체 참조를 둔다 | 저장·리플레이·서버 전송이 안 된다 | id |
-> | 객체를 오래 쥐고 있는다 | 불러오기·받는 쪽에서 엉뚱한 인스턴스 | id로 쥐고 `Game.Find` |
+> | 행동 필드에 Unity 객체·델리게이트·데이터 밖 객체를 둔다 | id로 바꿀 수 없어 저장·리플레이·서버 전송이 안 된다 | 대상은 데이터 안의 id 있는 객체, 원본은 원본 ID |
+> | 쥐고 있던 객체를 화면이 그대로 읽는다 | 불러오기 뒤에는 옛 인스턴스를 읽는다 | 그릴 때 `Game.Data()`·`Game.Find`로 다시 꺼낸다(행동에 넣는 것은 괜찮다) |
 > | 규칙 난수에 `UnityEngine.Random` | Undo로 다시 뽑기가 되고, 시드 재현·서버 판정이 깨진다 | `Game.Random("이름")` |
 > | 연출 난수에 `Game.Random` | Undo가 모든 난수 흐름을 행동 직전으로 되돌리므로 연출 소비까지 되감기고, 규칙 결과가 연출 때문에 달라진다 | `UnityEngine.Random` |
 > | `[BindTo]` 함수·Block 안에 static 변수로 상태를 둔다 | 세션이 여러 개면 섞인다 | 플레이어 데이터 |
@@ -249,7 +265,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
-- [ ] 행동 필드는 id와 숫자·글자·enum뿐이다.
+- [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
 - [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.

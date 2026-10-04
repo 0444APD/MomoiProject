@@ -312,9 +312,9 @@ public class Bag
 }
 
 [Serializable]
-public class DropLoot : SimpleAction
+public class DropLoot : GameAction
 {
-    public List<string> table = new List<string> { "ironSword", "steelSword", "potion" };
+    [DataRef(typeof(InstanceData))] public List<string> table = new List<string> { "ironSword", "steelSword", "potion" };   // DB 원본은 글자 ID로
 
     protected override void Run()
     {
@@ -353,9 +353,9 @@ public class Stage
 }
 
 [Serializable]
-public class SpawnWave : SimpleAction
+public class SpawnWave : GameAction
 {
-    public string monster = "goblin";
+    [DataRef(typeof(InstanceData))] public string monster = "goblin";
     public int count = 3;
 
     protected override void Run()
@@ -419,17 +419,20 @@ public class Hero
 }
 
 [Serializable]
-public class ApplyBuff : GameAction<Hero>
+public class ApplyBuff : GameAction
 {
-    public string buff = "rage";
-    protected override void Run(Hero h)
+    public Hero hero;                                              // 플레이어 데이터 안의 객체: 참조 필드
+    [DataRef(typeof(InstanceData))] public string buff = "rage";   // DB 원본: 글자 ID
+    protected override void Run()
     {
-        if (Game.Session.CopyInstance(buff) is BuffState copy) h.buffs.Add(copy);
+        if (Game.Session.CopyInstance(buff) is BuffState copy) hero.buffs.Add(copy);
     }
 }
 ```
 
 사본마다 `turns`가 따로 줄어든다(원본은 그대로).
+
+행동에서 DB 원본(인스턴스)을 가리킬 때는 객체가 아니라 `[DataRef]` 글자 ID로 둔다. 원본은 플레이어 데이터가 아니라서 참조 필드로 넣으면 "찾을 수 없습니다"로 실패한다([02-Actions-Undo.md](02-Actions-Undo.md) 2.2).
 
 ---
 

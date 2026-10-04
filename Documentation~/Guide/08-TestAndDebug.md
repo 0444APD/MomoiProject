@@ -191,7 +191,7 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
     var battle = Game.Data().Run.battle;
     battle.energy = 0;                                   // 시험 준비(행동 밖 변경)
     var hand = new List<string>(battle.hand);
-    Assert.Throws<InvalidOperationException>(() => Game.Do(new PlayCard { target = hand[0] }));
+    Assert.Throws<InvalidOperationException>(() => Game.Do(new PlayCard { card = Rules.CardOf(Game, hand[0]) }));
     CollectionAssert.AreEqual(hand, Game.Data().Run.battle.hand);
 }
 ```
@@ -239,8 +239,10 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > | '…'은(는) 예전 방식(리플렉션)으로 비교합니다: 이유 | 비교 코드로 다룰 수 없는 형식이 들어 있다(`[Serializable]` 없음, `HashSet`, 중첩 컬렉션, 뿌리가 컬렉션 …) | 이유에 적힌 형식을 `List`·`Dictionary`·`[Serializable]` 클래스로 바꾼다 |
 > | '…' 값이 큽니다(요소 n개) | 예전 방식 값이 커서 수정마다 전체를 복제·비교한다 | 빠른 비교로 옮기거나, 자주 바뀌는 부분을 다른 키로 나눈다 |
 > | 정의되지 않은 플레이어 데이터 '…' | DB에 없거나 `Define` 전에 읽었다 | DB › 플레이어 데이터에 만들고 저장한다. 테스트는 `Define`을 먼저 한다 |
-> | … '…'을(를) 찾을 수 없습니다 | `GameAction<T>`의 `target`에 없는 id를 넣었다(Undo로 사라졌을 수도) | 입력이 쥔 id가 최신인지 확인하고, 지연 실행이면 `Find`로 먼저 확인한다 |
-> | …에 string id 필드가 없어 Find로 찾을 수 없습니다 | `Find`·`GameAction<T>`의 형식에 `public string id;`가 없다 | id 필드를 더한다 |
+> | … '…'을(를) 찾을 수 없습니다(행동 '…'의 '…') | 행동의 대상 필드에 넣은 객체의 id가 지금 데이터에 없다(죽은 적, Undo로 사라진 객체) | 정상적인 실패면 그대로 둔다. 지연 실행이면 `Do` 전에 `Find`로 먼저 확인한다 |
+> | 행동 '…'의 '…': id가 비어 있는 …입니다 | 데이터에 넣지 않은 새 객체를 대상 필드에 넣었다 | 데이터 안의 객체를 넣는다. 새 객체는 행동 안에서 `Game.NewId`로 id를 주어 만든다 |
+> | …에 string id 필드가 없어 Find로 찾을 수 없습니다 | `Find`의 형식에 `public string id;`가 없다 | id 필드를 더한다 |
+> | 행동 '…'의 처리기가 없습니다 | 행동 클래스에 `Run`도 없고 `Actions.Register`로 등록한 처리기도 없다 | `Run`을 쓰거나 처리기를 등록한다 |
 > | 행동 실패, 변경 취소: … | 행동 안에서 예외가 났고 바꾼 것이 모두 취소됐다 | 예상된 실패(에너지 부족 등)면 정상이다. 아니면 오류 메시지를 따라간다 |
 > | 트리거 사슬이 16단계를 넘어 끊었습니다 | 결과가 자기 트리거의 이벤트를 다시 쏜다 | 결과에서는 다른 이벤트를 쏜다 |
 > | 조건 연쇄 평가가 16회를 넘었습니다 | 조건 충족 → 결과 → 다른 조건 충족이 끝없이 돈다 | 서로를 조건으로 보는 항목을 끊는다 |

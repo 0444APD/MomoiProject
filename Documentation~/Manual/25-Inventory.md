@@ -101,7 +101,7 @@ public class Item
 
 ### 3.2 꺼내기
 
-행동(`GameAction`·`SimpleAction`) 안에서는 꺼내서 바로 고친다.
+행동(`GameAction`) 안에서는 꺼내서 바로 고친다.
 
 ```csharp
 var inventory = Game.Get<Inventory>("player.inventory");
@@ -182,9 +182,9 @@ using GBible;
 using GBible.InventorySystem;
 
 [Serializable]
-public sealed class BuyItem : SimpleAction
+public sealed class BuyItem : GameAction
 {
-    public string item;      // 인스턴스 ID
+    [DataRef(typeof(InstanceData))] public string item;   // 인스턴스 ID(DB 원본은 객체가 아니라 글자 ID로)
     public int count = 1;
 
     protected override void Run()
@@ -217,9 +217,9 @@ using GBible.InventorySystem;
 public class ItemDropped { public string item; public int count; }
 
 [Serializable]
-public sealed class PickUpLoot : SimpleAction
+public sealed class PickUpLoot : GameAction
 {
-    public string item;
+    [DataRef(typeof(InstanceData))] public string item;
     public int count;
     public int maxStack = 99;
 
@@ -301,9 +301,9 @@ using GBible;
 using GBible.InventorySystem;
 
 [Serializable]
-public sealed class DeliverQuestItems : SimpleAction
+public sealed class DeliverQuestItems : GameAction
 {
-    public string item = "instance.goblinEar";
+    [DataRef(typeof(InstanceData))] public string item = "instance.goblinEar";
     public int count = 5;
     public int rewardGold = 300;
 

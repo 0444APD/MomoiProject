@@ -58,7 +58,7 @@
 > | 게임 중에 바뀌고, 되돌리거나·저장하거나·조건으로 검사할 값 | 플레이어 데이터. 원본의 고정 값은 복사하지 않고 원본 ID만 둔다 | `RunState`, `Profile`, 덱의 한 장 `DeckCard` |
 > | 다른 값에서 계산되는 값 | 저장하지 않는다(읽기 속성이나 함수) | `Fighter.IsDead` |
 > | 매 프레임 바뀌는 값, 화면 상태(위치·애니메이션·끌고 있는 카드·열린 창) | MonoBehaviour 필드(Client) | 카드를 끄는 손 위치 |
-> | 플레이어 입력 하나, 또는 규칙이 한 걸음 나아가는 단위 | 행동(`SimpleAction`·`GameAction<T>`) | 카드 내기, 턴 끝 |
+> | 플레이어 입력 하나, 또는 규칙이 한 걸음 나아가는 단위 | 행동(`GameAction`) | 카드 내기, 턴 끝 |
 > | "~하면 / ~할 때" 다른 기능이 반응하는 순간 | 이벤트(`[GameEvent]`) | 턴 끝, 전투 승리 |
 > | 정해진 목록에서 고르는 글자 값 | 키워드(`[KeywordGroup]` + `[Keyword]`) | 등급·속성·카드 종류·상태 |
 > | 한 번 이루면 끝나는 목표 | 도전과제(DB, 코드 없음 또는 `[BindTo]`) | 첫 승리, 한 턴 30 피해 |
@@ -222,36 +222,48 @@ profile.totalGold += run.gold;
 
 플레이어 입력 하나, 또는 규칙이 한 걸음 나아가는 단위를 행동으로 만든다.
 
-- 대상 객체가 하나 있으면 `GameAction<T>`, 없으면 `SimpleAction`.
-- 필드에는 id와 숫자 같은 값만 둔다. 행동은 저장·리플레이·서버 전송에 그대로 실리는 데이터다.
+- `GameAction`을 상속하고, 필요한 정보를 필드로 두고, `Run()`에 규칙을 쓴다.
+- 대상 객체(덱 카드·적)는 **객체 그대로** 필드에 넣는다. 없으면 `null`로 둔다.
 
 ```csharp
 [Serializable, BlockInfo("카드 내기")]
-public class PlayCard : GameAction<DeckCard>
+public class PlayCard : GameAction
 {
-    public string targetId;            // 고른 적의 id
+    public DeckCard card;     // 낼 카드(덱 카드)
+    public Fighter target;    // 고른 적(없으면 null)
 
-    protected override void Run(DeckCard card)
+    protected override void Run()
     {
         // … 본문은 03장에서 본다
     }
 }
 ```
 
-덱 카드의 id는 `GameAction<DeckCard>`가 물려주는 `target` 필드에 담긴다. 시스템이 `target`으로 판 데이터에서 그 장을 찾아 `Run`에 넘겨 준다.
+부르는 쪽은 `Game.Do(new PlayCard { card = deckCard, target = enemy })`다. 시스템은 대상 필드를 기록·전송할 때 id만 남기고, `Run` 직전에 그 id로 지금 데이터에서 객체를 다시 찾아 필드에 넣는다. 그래서 Undo·판 불러오기 뒤에 버튼이 옛 객체를 쥐고 있어도, 멀티에서 id만 건너가도 `Run` 안의 `card`·`target`은 늘 지금 데이터의 객체다.
+
+대상 클래스의 조건은 두 가지다. `public string id;`가 있고, 플레이어 데이터 안에 들어 있다(9절).
+
+> [!note]- 대상 필드 자세히
+> - **대상으로 다뤄지는 필드**: 형식이 `string id`가 있는 클래스(`DeckCard`·`Fighter`·`Enemy` …)인 필드. 개수 제한이 없고 `List<Fighter> targets` 같은 리스트·배열도 된다.
+> - **id 겹침**: 같은 형식 안에서 id가 겹치지 않아야 한다. 부모 형식(`Fighter`)으로 찾으면 그 부모를 나누는 형식끼리(`Hero`·`Enemy`)도 겹치지 않아야 한다. 데이터 안의 깊이는 상관없다.
+> - **값으로 복사되는 필드**: 숫자·글자·bool·enum, id가 없는 클래스. DB 원본을 가리킬 때는 객체가 아니라 `[DataRef]` 원본 ID 글자다(원본은 플레이어 데이터가 아니라 찾기 대상이 아니다).
+> - **못 찾으면**(죽은 적 등) "Fighter 'enemy2'을(를) 찾을 수 없습니다(행동 'PlayCard'의 'target')"로 행동이 실패하고 아무것도 바뀌지 않는다. id가 빈 새 객체를 넣어도 실패한다. 새 객체는 행동 안에서 `Game.NewId(접두어)`로 id를 주어 만든다.
+> - **넣지 않는 것**: Unity 객체(에셋·컴포넌트)·델리게이트·플레이어 데이터 밖의 객체.
+> - **타임라인 글**: `Describe`를 쓰지 않으면 "Block 이름 (대상 id들)"로 나온다(예: "카드 내기 (card7, enemy2)"). 바꾸고 싶을 때만 `Describe`를 덮어쓴다.
+> - **처리기를 밖에서 등록**(`session.Actions.Register<T>(처리기)`)하는 방식도 있다. 그때도 실행 직전에 대상 필드를 다시 찾는다. `Run`도 처리기도 없으면 "행동 'X'의 처리기가 없습니다"로 실패한다([12장](12-Appendix.md) 3-1).
 
 > [!note]- 카드 던전의 행동 목록
-> | 기획 | 행동 | 대상 |
+> | 기획 | 행동 | 필드 |
 > |---|---|---|
-> | 판을 시작한다(2) | `StartRun` | 없음 → `SimpleAction` |
-> | 전투를 연다(3) | `StartBattle` | 없음(몬스터 ID 리스트를 필드로) |
-> | 카드를 뽑는다(4) | `DrawCards` | 없음(장 수를 필드로) |
-> | 카드를 낸다(5) | `PlayCard` | 덱 카드 한 장 → `GameAction<DeckCard>`, 고른 적은 `targetId` |
+> | 판을 시작한다(2) | `StartRun` | 없음 |
+> | 전투를 연다(3) | `StartBattle` | 몬스터 ID 리스트 |
+> | 카드를 뽑는다(4) | `DrawCards` | 장 수 |
+> | 카드를 낸다(5) | `PlayCard` | 덱 카드 `card`, 고른 적 `target`(객체) |
 > | 턴을 끝낸다(7) | `EndTurn` | 없음 |
 > | 전투에 이긴다(8) | `WinBattle` | 없음 |
-> | 카드를 산다(9) | `BuyCard` | 없음(원본 ID·가격을 필드로) |
-> | 물약을 마신다(9) | `DrinkPotion` | 없음(물약 ID·대상 id를 필드로) |
-> | 판을 끝낸다(1) | `EndRun` | 없음(승리 여부를 필드로) |
+> | 카드를 산다(9) | `BuyCard` | 원본 ID·가격 |
+> | 물약을 마신다(9) | `DrinkPotion` | 물약 원본 ID(`[DataRef]`)·대상(`Fighter`, 없으면 null) |
+> | 판을 끝낸다(1) | `EndRun` | 승리 여부 |
 
 > [!note]- 플레이어가 누르지 않는 것도 행동으로
 > `StartBattle`·`DrawCards`·`WinBattle`·`EndRun`은 플레이어가 직접 누르지 않아도 행동으로 만든다. 다른 행동 안에서 불리면(`Game.Do`) 바깥 행동의 일부로 그 자리에서 실행되므로, 혼자 쓸 때(디버그 명령·모니터)와 다른 행동 안에서 쓸 때 모두 같은 코드다. 이어지는 방식은 [03장](03-GameLoop.md) 5절.
@@ -360,7 +372,7 @@ public static class Rarity
 > | 이럴 때 | 왜 |
 > |---|---|
 > | `Game.Find<T>(id)`로 다시 찾는다 | `Find`는 `id` 필드로 찾는다. |
-> | 행동의 대상이다(`GameAction<T>`) | 행동은 대상을 객체가 아니라 `target`(id)으로 실어 나른다. |
+> | 행동의 대상 필드다(`PlayCard.card`·`target`) | 행동에는 객체를 넣지만, 시스템은 기록·전송에 id만 남기고 실행 직전에 그 id로 지금 객체를 다시 찾는다(4절). |
 > | `Game.Use`의 사용자·대상이다 | 사용 행동은 id만 담고, 끝날 때 최종 대상의 id로 `능력 사용` 이벤트를 쏜다. `id`가 없으면 예외로 사용 전체가 취소된다. |
 > | 같은 원본을 가리키는 판 데이터가 여러 개다(같은 카드 여러 장) | 원본 ID로는 장을 구별할 수 없다. `Game.NewId("접두어")`로 장마다 새 id를 준다. |
 >
@@ -421,7 +433,7 @@ public static class Rarity
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있다. 고정 값은 원본에서 읽는다.
 - [ ] 계산되는 값을 필드로 두지 않았고, 화면 상태는 MonoBehaviour 쪽이다.
 - [ ] 종류를 자식 클래스가 아니라 키워드 필드·기능 필드로 나타냈다.
-- [ ] 입력과 규칙의 한 걸음이 모두 행동이고, 행동 필드는 id와 값뿐이다.
+- [ ] 입력과 규칙의 한 걸음이 모두 행동이고, 필요한 정보가 필드에 있다(대상은 id가 있는 플레이어 데이터 객체로).
 - [ ] 반응할 순간이 모두 `[GameEvent]` 이벤트이고, 조건·로그가 읽을 값이 필드에 있다.
 - [ ] 찾거나 가리킬 객체에 `id`가 있고, 연결은 id 글자다.
 - [ ] 클래스 목록과 DB 항목 목록을 팀과 맞췄다.
@@ -431,7 +443,7 @@ public static class Rarity
 > - [04. 인스턴스](../Manual/04-Instances.md) — 원본과 사본, `[Hide]`·`[ShowIf]`, 기능 필드
 > - [05. 키워드](../Manual/05-Keywords.md)
 > - [10. 이벤트](../Manual/10-Events.md) — 필드 설계, 상속한 이벤트
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — 행동 클래스 두 가지
+> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — 행동 클래스, 대상 필드
 > - [16. 능력과 사용 기능](../Manual/16-Abilities-Usable.md) — `Usable`
 > - [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md) — DB 종류 + Trigger 감시
 > - [03. Game API](../Manual/03-GameApi.md) — `Find`·`NewId`

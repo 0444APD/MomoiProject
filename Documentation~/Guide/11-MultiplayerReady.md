@@ -70,7 +70,8 @@
 ## 2. 기능 로직(Rules)이 지킬 것
 
 - 게임 값을 바꾸는 코드는 행동·Block·결과·`[BindTo]` 안에만 둔다.
-- 행동 필드는 id와 숫자·글자·bool·enum뿐이다. 객체 참조·에셋·델리게이트를 싣지 않는다.
+- 행동에는 필요한 정보를 필드로 넣고, 대상(덱 카드·적)은 객체 그대로 넣는다. 시스템이 보낼 때는 id만 싣고, 받는 쪽(서버)이 `Run` 직전에 그 id로 자기 데이터의 객체를 찾아 넣는다.
+- 그래서 대상 클래스는 `public string id;`가 있고 플레이어 데이터 안에 있어야 한다. 에셋·델리게이트·데이터 밖 객체는 싣지 않는다.
 - 난수는 `Game.Random`만 쓴다.
 - `GBibleRuntime`(정적 입구)을 부르지 않는다. 받은 것을 쓴다: Block은 물려받은 `Game`, `[BindTo]` 함수는 컨텍스트의 `c.Game`, 등록 코드는 매개변수 `session`.
 - static 게임 상태를 두지 않는다.
@@ -96,7 +97,7 @@ Unity에서는 Client의 Bootstrap이 `Started`에서 이 함수를 한 줄로 �
 > | 규칙 | 지키지 않으면 |
 > |---|---|
 > | 값은 행동 안에서만 바꾼다 | 서버가 모르는 변경이 생긴다. 클라이언트끼리 모습이 갈린다 |
-> | 행동 필드는 id·값이다 | 객체 참조는 보낼 수 없다. id는 서버에서 `Game.Find`로 같은 객체를 찾는다 |
+> | 대상은 id 있는 데이터 객체다 | 객체는 그대로 보낼 수 없다. 시스템이 id로 바꿔 보내고 서버가 같은 id의 객체를 넣는데, id가 없거나 데이터 밖의 객체면 찾을 수 없다 |
 > | 결과는 한 곳에서 계산한다 | 클라이언트마다 계산하면 난수·순서 차이로 결과가 갈린다. 서버 권한이면 치팅도 막는다 |
 > | 난수는 `Game.Random` | 서버가 같은 시드·같은 행동으로 같은 결과를 낸다. 리플레이도 된다 |
 > | static 상태 금지, 세션은 매개변수로 | 서버는 매치마다 세션을 만든다. static 변수는 모든 매치가 나눠 쓴다 |
@@ -104,7 +105,8 @@ Unity에서는 Client의 Bootstrap이 `Started`에서 이 함수를 한 줄로 �
 > | UnityEngine 형식(`MonoBehaviour`·`Time`·`UnityEngine.Random`)에 기대지 않는다 | 서버는 Unity 없이 돈다. 그림 같은 에셋 필드는 예외(규칙은 ID로 다룬다) |
 
 > [!note]- 카드 던전에서 확인한 것
-> - `PlayCard`는 덱 카드 id와 적 id, `BuyCard`는 원본 ID와 가격, `DrinkPotion`은 물약 ID와 대상 id만 싣는다.
+> - `PlayCard`는 덱 카드와 적을 객체로 들지만 보낼 때는 두 id만 실린다. `BuyCard`는 원본 ID와 가격, `DrinkPotion`은 물약 ID와 대상 id만 싣는다.
+> - 지금 싱글에서도 같은 길을 탄다. 실행 직전에 id로 다시 찾으므로 Undo·판 불러오기 뒤에 버튼이 쥔 옛 객체도 지금 객체로 바뀐다.
 > - 피해(`Rules.Damage`), 무작위 대상(`RandomEnemy`, 난수 흐름 `"cardTarget"`), 보상 골드(`"loot"`), 연쇄 번개(`[BindTo]`), 유물 발동(`session.Triggers.Register`)이 모두 기능 로직이다.
 > - 로그(`kills`·`maxTurnDamage`)와 도전과제(`firstWin`)는 서버의 Trigger가 받는다.
 > - 유물 감시의 등록 내용은 Rules의 함수(`RelicRules.Register(session, relics)`)로 두었다. 지금은 Client의 Bootstrap이 `GBibleRuntime.Started`에서 부르지만, 서버라면 서버가 세션을 만드는 자리에서 같은 함수를 부르면 된다. 원칙: 등록 함수는 Rules에, Unity 시작에 거는 연결은 Bootstrap에.
@@ -125,12 +127,12 @@ Unity에서는 Client의 Bootstrap이 `Started`에서 이 함수를 한 줄로 �
 카드 던전의 입력 창구는 `RunDirector.TryPlay` 하나다. 화면은 돌려받은 메시지를 보여 주기만 한다.
 
 ```csharp
-public bool TryPlay(string cardId, string targetId, out string error)
+public bool TryPlay(DeckCard card, Fighter target, out string error)
 {
     error = null;
     try
     {
-        Game.Do(new PlayCard { target = cardId, targetId = targetId });
+        Game.Do(new PlayCard { card = card, target = target });
         return true;
     }
     catch (System.InvalidOperationException e)
@@ -165,7 +167,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 ## 5. 체크리스트
 
 - [ ] 모든 입력이 `Game.Do`·`Game.Use`로 들어간다.
-- [ ] 행동 필드에 객체 참조·에셋·델리게이트가 없다.
+- [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, 에셋·델리게이트가 없다.
 - [ ] 게임 값을 바꾸는 코드는 행동·Block·결과·`[BindTo]` 안에만 있다.
 - [ ] 규칙 난수는 모두 `Game.Random`이다.
 - [ ] Rules 코드에 `GBibleRuntime` 정적 입구와 static 게임 상태가 없다.

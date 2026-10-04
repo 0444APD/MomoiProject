@@ -415,7 +415,7 @@ using UnityEngine;
 
 // 구매는 플레이어 입력이므로 행동으로 만든다(Undo 한 단위).
 [Serializable]
-public class BuyItem : SimpleAction
+public class BuyItem : GameAction
 {
     public string itemName;
     public int price;
@@ -471,10 +471,11 @@ public class Board
 }
 
 [Serializable]
-public class Strike : GameAction<TacticsUnit>
+public class Strike : GameAction
 {
+    public TacticsUnit target;                                 // 대상은 객체로(기록에는 id만, 실행 직전에 지금 객체로)
     public int damage;
-    protected override void Run(TacticsUnit target)
+    protected override void Run()
     {
         target.hp -= damage;                                   // 그냥 고친다
         if (target.hp <= 0) Game.All<Board>()[0].units.Remove(target);
@@ -482,7 +483,7 @@ public class Strike : GameAction<TacticsUnit>
 }
 ```
 
-전장을 DB의 `battle.board`(Session, `Board`)로 만들었거나 코드에서 `session.Data.Define("battle.board", DataZone.Session, new Board())`로 정의했다면, 행동은 `Game.Do(new Strike { target = "orc1", damage = 12 })`로 실행한다. Undo하면 HP와 리스트에서 빠진 유닛이 **같은 객체로** 제자리에 돌아온다.
+전장을 DB의 `battle.board`(Session, `Board`)로 만들었거나 코드에서 `session.Data.Define("battle.board", DataZone.Session, new Board())`로 정의했다면, 행동은 `Game.Do(new Strike { target = orc, damage = 12 })`(`orc`는 전장의 `TacticsUnit` 객체)로 실행한다. Undo하면 HP와 리스트에서 빠진 유닛이 **같은 객체로** 제자리에 돌아온다.
 
 ### 7.3 카드 게임: 덱·손패·카드별 사용 횟수
 
@@ -502,7 +503,7 @@ public class CardState
 }
 
 [Serializable]
-public class PlayCard : SimpleAction
+public class PlayCard : GameAction
 {
     public string card;
     public int cost;
@@ -541,16 +542,17 @@ public class Fighter
 }
 
 [Serializable]
-public class TickBuffs : GameAction<Fighter>
+public class TickBuffs : GameAction
 {
-    protected override void Run(Fighter f)
+    public Fighter fighter;
+    protected override void Run()
     {
-        foreach (var buff in f.buffs)
+        foreach (var buff in fighter.buffs)
         {
-            if (buff is Poison p) f.hp -= p.damage;
+            if (buff is Poison p) fighter.hp -= p.damage;
             buff.turns--;
         }
-        f.buffs.RemoveAll(b => b.turns <= 0);
+        fighter.buffs.RemoveAll(b => b.turns <= 0);
     }
 }
 ```
@@ -572,7 +574,7 @@ var board = session.Data.Define("battle.board", DataZone.Session, new Board
     },
 }, "전장");
 
-session.Game.Do(new Strike { target = "orc1", damage = 12 });
+session.Game.Do(new Strike { target = board.units[1], damage = 12 });   // 대상은 데이터 안의 객체
 // board.units[1].hp == 18
 session.Undo();
 // board.units[1].hp == 30
@@ -585,7 +587,7 @@ var hero = session.Game.Find<TacticsUnit>("hero");
 hero.hp = 12;               // 행동 밖: 다음 Sync(프레임 끝 등)에 행동 밖 변경으로 기록
 session.EndFrame(0.016);    // GBibleRuntime 없이 직접 만든 세션이면 프레임 끝을 직접 부른다
 
-session.Game.Do(new Strike { target = "hero", damage = 2 });   // hp 10
+session.Game.Do(new Strike { target = hero, damage = 2 });     // hp 10
 session.Undo();                                                 // hp 12 (행동 밖 변경은 그대로)
 ```
 
@@ -604,4 +606,4 @@ session.Undo();                                                 // hp 12 (행동
 | "담을 수 없는 필드" 오류 | 함수·`object`·다차원 배열 필드가 있다. 데이터가 아니면 `[NonSerialized]`를 붙인다. |
 | 모니터 타임라인에 기록이 매 프레임 쌓임 | 매 프레임 바뀌는 값을 플레이어 데이터에 넣었다. MonoBehaviour 쪽으로 옮긴다. |
 | 스프라이트 같은 에셋 참조가 불러온 뒤 비어 있음 | 저장 파일에는 `GameData`(DB 항목) 참조만 ID로 담긴다(되감기 스냅샷은 메모리 안이라 참조를 그대로 둔다). 그 밖의 에셋 참조는 저장 파일에 담기지 않고, 저장할 때 "저장할 수 없는 참조입니다" 경고가 난다. 에셋은 DB ID나 인스턴스 쪽에 두고 플레이어 데이터에는 ID를 둔다. |
-| 오래 쥔 객체가 Undo·불러오기 뒤 엉뚱함 | Undo는 빠졌던 객체를 원래 인스턴스로 되돌리지만, 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 오래 들고 있을 것은 id로 들고 `Game.Find`로 다시 찾는다. |
+| 오래 쥔 객체가 Undo·불러오기 뒤 엉뚱함 | Undo는 빠졌던 객체를 원래 인스턴스로 되돌리지만, 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 값을 읽으려고 오래 들고 있을 것은 id로 들고 `Game.Find`로 다시 찾는다. 행동의 참조 필드에 넣는 것은 옛 객체여도 된다(실행 직전에 같은 id의 지금 객체로 바뀐다, 02 2.2). |

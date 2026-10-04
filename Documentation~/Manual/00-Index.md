@@ -84,20 +84,21 @@ public class UnitKilled
     public string victimId;
 }
 
-// 02. 행동: 플레이어 입력 하나. 대상은 id로 저장되고 Run에서 객체로 받는다.
-[Serializable]
-public class Attack : GameAction<Unit>
+// 02. 행동: 플레이어 입력 하나. 대상은 객체로 넣는다(기록에는 id만, 실행 직전에 지금 객체로 다시 찾는다).
+[Serializable, BlockInfo("공격")]
+public class Attack : GameAction
 {
-    public string attacker;
+    public Unit attacker;
+    public Unit target;
     public int damage = 10;
 
-    protected override void Run(Unit target)
+    protected override void Run()
     {
         target.hp -= damage;                                   // 그냥 대입: 행동 끝 Sync가 기록
         if (target.hp > 0) return;
         var battle = Game.All<Battle>()[0];
         battle.enemies.Remove(target);                         // 리스트도 그냥: Undo하면 같은 객체로 돌아온다
-        Game.Events.Publish(new UnitKilled { killerId = attacker, victimId = target.id });   // 이벤트를 쏜다
+        Game.Events.Publish(new UnitKilled { killerId = attacker.id, victimId = target.id });   // 이벤트를 쏜다
     }
 }
 
@@ -113,7 +114,7 @@ public static class BattleLogic
 
 // 게임 코드
 // GBibleRuntime.Session.Data.Define("battle", DataZone.Session, new Battle { … }, "전투");
-// GBibleRuntime.Game.Do(new Attack { target = "goblin1", attacker = "hero", damage = 12 });
+// GBibleRuntime.Game.Do(new Attack { attacker = hero, target = goblin, damage = 12 });   // hero·goblin: 데이터 안의 Unit 객체
 // GBibleRuntime.Session.Undo();   // 피해·제거·처치 이벤트로 생긴 로그 증가까지 행동 하나가 통째로 되돌아간다
 ```
 

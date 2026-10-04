@@ -150,6 +150,12 @@ namespace GBible.Tests
             Assert.AreEqual(bx, a.x);
             Assert.AreEqual(ax, b.x);
             Assert.AreEqual(hp - 1, all[2].hp);
+
+            var list = new List<TbUnit> { new TbUnit { id = all[2].id } };
+            var action = new TbSwap { a = a, b = b, others = list };
+            Game.Do(action);
+            Assert.IsFalse(ReferenceEquals(list[0], all[2]), "넣어 준 목록은 그대로 둔다");
+            Assert.IsTrue(ReferenceEquals(all[2], action.others[0]), "행동은 새 목록에 지금 객체를 담는다");
         }
 
         [Test]

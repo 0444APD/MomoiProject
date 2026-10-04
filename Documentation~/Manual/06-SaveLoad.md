@@ -310,7 +310,7 @@ using System;
 using GBible;
 
 [Serializable]
-public class EndRun : SimpleAction
+public class EndRun : GameAction
 {
     public int earnedShards;
     protected override void Run()

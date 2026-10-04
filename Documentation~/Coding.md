@@ -31,12 +31,13 @@ public static class Board
         game.All<Unit>().Where(u => u != center && Distance(center, u) <= n);
 }
 
-// 플레이어 입력 = 행동. 등록 없이 Game.Do로 실행한다.
-[Serializable]
-public class MoveUnit : GameAction<Unit>
+// 플레이어 입력 = 행동. GameAction을 상속하고 Run을 쓴다. 등록 없이 Game.Do로 실행한다.
+[Serializable, BlockInfo("이동")]
+public class MoveUnit : GameAction
 {
+    public Unit unit;                                              // 대상은 객체로(기록에는 id만, 실행 직전에 지금 객체로 다시 찾는다)
     public int x, y;
-    protected override void Run(Unit u) { u.x = x; u.y = y; }      // 그냥 대입 → 행동 끝 Sync에서 기록
+    protected override void Run() { unit.x = x; unit.y = y; }      // 그냥 대입 → 행동 끝 Sync에서 기록
 }
 
 // 효과 Block: DB › 능력에서 조립하고 수치를 정한다.
@@ -70,11 +71,11 @@ public class AllEnemiesDown : SimpleCondition
 // 씬: 입력을 행동으로, 그리기만.
 public class RunManager : MonoBehaviour
 {
-    string _selected;                                              // 오래 들고 있을 것은 id로
+    Unit _selected;                                                // 행동에 넣을 객체는 그대로 쥐어도 된다(Undo·불러오기 뒤에도 실행 직전에 지금 객체로 바뀐다)
     GameApi Game => GBibleRuntime.Game;
 
-    public void OnClickUnit(Unit u) => _selected = u.id;
-    public void OnClickTile(int x, int y) => Game.Do(new MoveUnit { target = _selected, x = x, y = y });
+    public void OnClickUnit(Unit u) => _selected = u;
+    public void OnClickTile(int x, int y) => Game.Do(new MoveUnit { unit = _selected, x = x, y = y });
     public void OnClickSkill(Unit target) => Game.Use("ability.splash", _selected, target);
     void Update() { foreach (var u in Game.All<Unit>()) { /* 그리기 */ } }
 }
@@ -83,10 +84,10 @@ public class RunManager : MonoBehaviour
 ## 규칙
 
 1. **플레이어 데이터는 플레이어 데이터에, 클래스는 플레이어 데이터 클래스로.** 유닛·판·턴처럼 바뀌는 값은 `[Serializable]` 클래스로 플레이어 데이터에 둔다. MonoBehaviour 필드에 두면 Undo·저장·동기화에서 빠진다.
-2. **플레이어 입력은 행동으로.** 이동·사용·구매는 `GameAction<T>`·`SimpleAction`으로 만들어 `Game.Do`/`Game.Use`로 실행한다(Undo 한 단위, 서버 전송·리플레이). 행동·효과 안에서는 객체 필드를 그냥 고친다.
+2. **플레이어 입력은 행동으로.** 이동·사용·구매는 `GameAction`을 상속한 행동(필드 + `protected override void Run()`)으로 만들어 `Game.Do`/`Game.Use`로 실행한다(Undo 한 단위, 서버 전송·리플레이). 대상은 객체로 필드에 넣는다(`string id`가 있는 클래스면 시스템이 id로 기록하고 실행 직전에 지금 객체로 다시 찾는다). DB 원본은 `[DataRef]` 글자 ID로. 행동·효과 안에서는 객체 필드를 그냥 고친다.
 3. **로직은 한 번에 끝낸다.** 행동·효과 안에서 기다리지 않는다(코루틴·await). 연출은 끝난 결과(이벤트·Journal)를 보고 따로 재생한다.
 
-그 밖: 난수는 `Game.Random`, 오래 들고 있을 것은 id(`Game.Find`로 다시 찾기), 개체로 찾을 클래스에는 `public string id;`.
+그 밖: 난수는 `Game.Random`, 값을 읽으려고 오래 들고 있을 것은 id(`Game.Find`로 다시 찾기), 개체로 찾거나 행동의 대상으로 넣을 클래스에는 `public string id;`.
 
 ## 쓰기가 기록되는 방식 (Mirror)
 

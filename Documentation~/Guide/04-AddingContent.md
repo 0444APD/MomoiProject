@@ -94,8 +94,8 @@ public class DealDamage : Effect<Fighter>
 > [!note]- 타격·수비와 카드를 내는 코드
 > 타격은 같은 방법으로 `피해` 하나, 수비는 대상에 `사용자 자신`, 효과에 `방어도`를 둔다. 카드를 낼 때 `PlayCard`가 카드 원본 ID로 `Game.Use`를 부르고 주인공을 사용자로 넘기므로 `사용자 자신`이 주인공이 된다.
 > ```csharp
-> if (string.IsNullOrEmpty(targetId)) Game.Use(card.card, run.hero);
-> else Game.Use(card.card, run.hero, targetId);
+> if (target == null) Game.Use(card.card, run.hero);
+> else Game.Use(card.card, run.hero, target);
 > ```
 > `card.card`는 덱 카드가 든 원본 인스턴스 ID다. 사용 기능은 인스턴스 ID로 등록되므로 덱의 장마다 사용 기능을 들고 있을 필요가 없다. 효과를 고치면 모든 장에 바로 반영된다.
 
@@ -137,8 +137,8 @@ static void ChainLightning(TriggerContext c)
 > ```csharp
 > var run = Game.Data().Run;
 > if (!run.potions.TryRemove(potion)) throw new InvalidOperationException("물약이 없습니다.");
-> if (string.IsNullOrEmpty(targetId)) Game.Use(potion, run.hero);
-> else Game.Use(potion, run.hero, targetId);
+> if (target == null) Game.Use(potion, run.hero);
+> else Game.Use(potion, run.hero, target);
 > ```
 
 > [!note]- 다른 장르라면

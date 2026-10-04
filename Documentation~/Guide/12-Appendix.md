@@ -17,13 +17,15 @@
 
 모두 카드 던전에 맞춘 이름이다. 복사한 뒤 이름과 내용을 바꾼다. 줄마다의 뜻은 뼈대 아래 접힌 칸에 있다.
 
-### 1-1. 대상이 있는 행동
+### 1-1. 행동 — 대상이 있을 때
 
 ```csharp
 [Serializable, BlockInfo("카드 강화")]
-public class UpgradeCard : GameAction<DeckCard>
+public class UpgradeCard : GameAction
 {
-    protected override void Run(DeckCard card)
+    public DeckCard card;
+
+    protected override void Run()
     {
         var data = Rules.CardData(Game, card.card);          // 원본: 읽기만
         if (card.upgraded || !data.upgradable) throw new InvalidOperationException("강화할 수 없는 카드입니다.");   // 실패 = 전체 취소
@@ -32,27 +34,34 @@ public class UpgradeCard : GameAction<DeckCard>
         card.upgraded = true;
         Game.Events.Publish(new CardUpgraded { cardId = card.id, from = from, to = card.card });
     }
-
-    public override string Describe() => $"카드 강화: {target}";
 }
 ```
 
+부르는 쪽: `Game.Do(new UpgradeCard { card = deckCard })`.
+
 > [!note]- 줄마다의 뜻
 > - `[Serializable]` — 행동은 데이터다. 저장·리플레이·서버 전송에 실린다.
-> - `[BlockInfo("…")]` — 모니터 행동 탭에 보일 이름(`Describe`가 없을 때).
-> - `GameAction<DeckCard>` — 대상 하나에 대한 행동. 대상 클래스에는 `public string id;`가 있어야 한다. 물려받은 `target` 필드에 대상 id를 담아 보낸다: `Game.Do(new UpgradeCard { target = cardId })`.
-> - `Run(DeckCard card)` — 시스템이 `Game.Find<DeckCard>(target)`로 찾은 객체를 넘긴다. 못 찾으면 행동이 실패한다.
+> - `[BlockInfo("…")]` — 모니터 행동 탭·타임라인에 보일 이름.
+> - `GameAction` — 모든 행동이 상속하는 클래스 하나. 대상이 있든 없든 같다.
+> - `public DeckCard card` — 대상은 객체 그대로 필드로 둔다. 형식에 `public string id;`가 있고 플레이어 데이터 안에 있는 클래스면 대상 필드가 된다. 시스템은 기록·전송에 id만 남기고, `Run` 직전에 그 id로 지금 데이터의 객체를 다시 찾아 넣는다(Undo·불러오기·멀티에서도 맞다). 대상이 여럿이면 필드를 더 두거나 `List<Fighter>`로 둔다. 없을 수 있으면 `null`로 둔다.
+> - `Run()` — 매개변수가 없다. 필드와 `Game`으로 규칙을 쓴다.
 > - `Rules.CardData` — 비용·강화 대상 같은 고정 값은 원본(인스턴스)에서 읽는다. 판 데이터(`DeckCard`)는 원본 ID와 바뀌는 값만 든다.
 > - `throw` — 규칙상 할 수 없으면 예외를 던진다. 이 행동이 바꾼 값·난수가 모두 되돌아가고 예외가 `Do`를 부른 쪽으로 간다.
 > - `Game` — 이 행동이 도는 세션의 창구. `Run`이 도는 동안만 들어 있다.
 > - `Game.Events.Publish` — 다른 기능(로그·도전과제·화면)이 반응할 순간에 이벤트를 쏜다.
-> - `Describe()` — 모니터 행동 탭·타임라인의 문장.
 
-### 1-2. 대상이 없는 행동
+> [!note]- 대상 필드 자세히
+> - 못 찾으면(사라진 카드·죽은 적) "DeckCard 'card7'을(를) 찾을 수 없습니다(행동 'UpgradeCard'의 'card')"로 행동이 실패하고 아무것도 바뀌지 않는다.
+> - id가 빈 새 객체를 넣어도 실패한다. 새 객체는 행동 안에서 `Game.NewId("접두어")`로 id를 주어 만든다.
+> - 같은 형식 안에서 id가 겹치지 않아야 한다(부모 형식으로 찾으면 그 부모를 나누는 형식끼리도).
+> - DB 원본은 객체가 아니라 `[DataRef]` 원본 ID 글자로 둔다. Unity 객체·델리게이트는 넣지 않는다.
+> - `Describe()`를 쓰지 않으면 타임라인 글은 "Block 이름 (대상 id들)"이다(예: "카드 강화 (card7)"). 다른 문장이 필요할 때만 덮어쓴다: `public override string Describe() => $"카드 강화: {card.id}";`
+
+### 1-2. 행동 — 대상이 없을 때
 
 ```csharp
 [Serializable, BlockInfo("휴식")]
-public class Rest : SimpleAction
+public class Rest : GameAction
 {
     public int percent = 30;
 
@@ -65,8 +74,8 @@ public class Rest : SimpleAction
 ```
 
 > [!note]- 줄마다의 뜻
-> - `SimpleAction` — 대상이 없다. 필요한 객체는 `Game.Data()`·`Game.Find`·`Game.All`로 찾는다.
-> - `public int percent` — 행동이 실어 나르는 값. id와 숫자·글자만 둔다.
+> - 1-1과 같은 `GameAction`이다. 대상 필드가 없을 뿐이다. 필요한 객체는 `Game.Data()`·`Game.Find`·`Game.All`로 찾는다.
+> - `public int percent` — 행동이 실어 나르는 값. 숫자·글자·bool·enum·원본 ID는 값 그대로 실린다.
 > - 다른 행동 안에서 `Game.Do(new Rest())`를 부르면 바깥 행동의 일부로 실행된다(Undo는 바깥 하나).
 
 ### 1-3. 이벤트
@@ -276,7 +285,7 @@ static void Started(GameSession session)
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있다. 고정 값은 원본에서 읽는다.
 - [ ] 계산되는 값을 필드로 두지 않았고, 화면 상태는 MonoBehaviour 쪽이다.
 - [ ] 종류를 자식 클래스가 아니라 키워드 필드·기능 필드로 나타냈다.
-- [ ] 입력과 규칙의 한 걸음이 모두 행동이고, 행동 필드는 id와 값뿐이다.
+- [ ] 입력과 규칙의 한 걸음이 모두 행동이고, 필요한 정보가 필드에 있다(대상은 id가 있는 플레이어 데이터 객체로).
 - [ ] 반응할 순간이 모두 `[GameEvent]` 이벤트이고, 조건·로그가 읽을 값이 필드에 있다.
 - [ ] 찾거나 가리킬 객체에 `id`가 있고, 연결은 id 글자다.
 - [ ] 클래스 목록과 DB 항목 목록을 팀과 맞췄다.
@@ -323,7 +332,7 @@ static void Started(GameSession session)
 - [ ] 화면 코드는 Client 폴더에 있고, 플레이어 데이터를 읽기만 한다.
 - [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번 그린다.
 - [ ] 등록·받기는 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
-- [ ] 버튼은 id를 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
+- [ ] 버튼은 행동에 넣을 값(대상 객체·원본 ID)을 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
 - [ ] 연출은 `SubscribeAfterAction`으로 받아, 성공한 행동의 이벤트만 튼다.
 - [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
 - [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 언어를 바꾸면 다시 그려진다.
@@ -360,7 +369,7 @@ static void Started(GameSession session)
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
-- [ ] 행동 필드는 id와 숫자·글자·enum뿐이다.
+- [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
 - [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.
@@ -405,7 +414,7 @@ static void Started(GameSession session)
 ### 11. 멀티플레이 대비
 
 - [ ] 모든 입력이 `Game.Do`·`Game.Use`로 들어간다.
-- [ ] 행동 필드에 객체 참조·에셋·델리게이트가 없다.
+- [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, 에셋·델리게이트가 없다.
 - [ ] 게임 값을 바꾸는 코드는 행동·Block·결과·`[BindTo]` 안에만 있다.
 - [ ] 규칙 난수는 모두 `Game.Random`이다.
 - [ ] Rules 코드에 `GBibleRuntime` 정적 입구와 static 게임 상태가 없다.
@@ -419,7 +428,7 @@ static void Started(GameSession session)
 
 본문(01~11장)의 카드 던전 흐름에 자리가 없었던 기능을 짧게 적는다. 자세한 것은 매뉴얼 장을 본다.
 
-### 3-1. 처리기를 따로 등록하는 행동 — `GameAction` + `Actions.Register`
+### 3-1. 처리기를 따로 등록하는 행동 — `Actions.Register`
 
 행동 클래스에는 데이터만 두고 처리 코드는 시작 코드에 둔다. 처리 코드를 행동 클래스 밖에 모으고 싶을 때(서버 쪽에서만 처리를 바꾸고 싶을 때 등) 쓴다. 01장 4절의 `Started` 표에 이름만 나온다.
 
@@ -433,7 +442,7 @@ public sealed class SkipFloor : GameAction
 }
 ```
 
-`GameAction`을 직접 상속하면 `Describe()`를 꼭 써야 하고, 처리기를 `Started`에서 한 번 등록한다: `session.Actions.Register<SkipFloor>(action => session.Game.Data().Run.floor += action.floors);`. 한 형식에 처리기는 하나다. 대부분은 `SimpleAction`·`GameAction<T>`로 충분하다. → [02. 행동과 Undo](../Manual/02-Actions-Undo.md) 2.5
+`Run`을 쓰지 않고, 처리기를 `Started`에서 한 번 등록한다: `session.Actions.Register<SkipFloor>(action => session.Game.Data().Run.floor += action.floors);`. 한 형식에 처리기는 하나다. 이때도 대상 필드는 처리기가 불리기 직전에 id로 다시 찾아 넣는다. `Run`도 처리기도 없으면 "행동 'SkipFloor'의 처리기가 없습니다"로 실패한다. 대부분은 행동 클래스에 `Run`을 쓰는 것(1-1)으로 충분하다. → [02. 행동과 Undo](../Manual/02-Actions-Undo.md) 2.5
 
 ### 3-2. 코딩한 결과 Block — `Reward`
 
@@ -508,7 +517,8 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 ### 3-7. 찾기·저장소 보조 멤버
 
 - `Game.All<T>(키)` — 플레이어 데이터 하나 안의 `T`만 모은다(두 플레이어의 보드를 따로 볼 때).
-- `Game.Find(id)` — 형식을 모를 때 id로 찾는다. 형식을 알면 `Find<T>`.
+- `Game.Find(id)` — 형식을 모를 때 id로 찾는다. 형식을 알면 `Find<T>`. 형식을 실행 중에 정할 때는 `Game.Find(형식, id)`.
+- `GameApi.HasId(형식)` — 그 형식에 `string id`가 있는지(행동의 대상 필드가 되는지).
 - `session.Data.Get<T>(키)`·`Set(키, 값)`·`Modify<T>(키, 람다)` — 생성된 `Game.Data()` 대신 키 글자로 읽고 쓴다. `Modify`는 람다가 끝날 때 그 키를 Sync하고, 람다 안에서 예외가 나면 그 키를 되돌린다.
 - `session.UndoCount` — 되돌릴 수 있는 횟수(Undo 버튼을 흐리게 할 때).
 - `session.Data.TransactionUndone` — Undo가 끝났을 때 오는 저장소 이벤트. 기본 판 저장("행동마다 저장")이 Undo 뒤 저장에 쓴다. 게임 코드가 직접 쓸 일은 드물다.
@@ -604,9 +614,10 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
 |---|---|---|
-| `SimpleAction`·`GameAction<T>`·`target` | 02 | 02 §4 |
-| `Describe()` | 02 | 08 §8(다른 장르라면), 12 §1-1 |
-| `GameAction` + `Actions.Register` | 02 | 01 §4(언급), 12 §3-1 |
+| `GameAction`·`Run()` | 02 | 02 §4, 12 §1-1·§1-2 |
+| 대상 필드(id 있는 객체, 실행 직전 다시 찾기) | 02 | 02 §4, 03 §2, 06 §2, 09 §2, 11 §2, 12 §1-1 |
+| `Describe()`(기본: Block 이름 + 대상 id) | 02 | 08 §8(다른 장르라면), 12 §1-1 |
+| `Actions.Register` | 02 | 01 §4(언급), 12 §3-1 |
 | `Game.Do`·`ActionRecord` | 02 · 03 | 03 §2, 06 §1·§3 |
 | 실패 = 예외 = 전체 취소 | 02 | 03 §6 |
 | 행동 안의 행동(`Game.Do`·`Game.Use` 중첩) | 02 · 22 | 02 §4, 03 §5 |
@@ -628,7 +639,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `Game.Find<T>` | 03 | 02 §9, 03 §7 |
 | `Game.All<T>()` | 03 | 06 §1(언급), 09 §6 |
 | `Game.All<T>(키)` | 03 | 12 §3-7 |
-| `Game.Find(id)` | 03 | 12 §3-7 |
+| `Game.Find(id)`·`Game.Find(형식, id)`·`GameApi.HasId` | 03 | 12 §3-7 |
 | `Game.Use` | 03 · 16 | 03 §2, 04 §4 |
 | `Game.CanUse` | 03 · 16 | 03 §6 |
 | `Game.Random`·`RandomStream.Range` | 03 · 07 | 01 §4(언급), 07 §4 |

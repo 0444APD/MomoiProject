@@ -36,7 +36,7 @@
 
 | 위치 | 쓰는 법 |
 |---|---|
-| 행동(`GameAction<T>`·`SimpleAction`)·조건(`SimpleCondition`)·효과·대상 Block 안 | 물려받은 `Game` 속성. 그 코드가 실행되는 동안만 들어 있다. |
+| 행동(`GameAction`)·조건(`SimpleCondition`)·효과·대상 Block 안 | 물려받은 `Game` 속성. 그 코드가 실행되는 동안만 들어 있다. |
 | 씬 코드(MonoBehaviour) | `GBibleRuntime.Game` (보통 `GameApi Game => GBibleRuntime.Game;`로 줄여 둔다) |
 | 테스트·서버·시뮬레이션 | `session.Game` |
 
@@ -88,6 +88,12 @@ Unit hero = Game.Find<Unit>("hero");      // 없으면 null
 - `T`에 `string` 형식의 `id`(또는 `Id`) 필드가 없으면 "id 필드가 없어 Find로 찾을 수 없습니다. 'public string id;'를 더하세요." 예외다.
 - 같은 id가 여러 개면 `All`과 같은 순서에서 처음 만난 것이다. id는 겹치지 않게 만든다(`NewId`).
 
+형식을 실행 중에 정해야 할 때는 `Game.Find(Type, id)`를 쓴다. 규칙은 `Find<T>`와 같고 `object`를 돌려준다. 행동의 참조 필드를 실행 직전에 다시 찾을 때 시스템이 쓰는 찾기가 이것이다.
+
+```csharp
+object target = Game.Find(typeof(Unit), "orc1");   // Find<Unit>("orc1")와 같다
+```
+
 ### 2.5 `Game.Find(id)` — 형식 없이 찾기
 
 ```csharp
@@ -119,10 +125,10 @@ Game.Data().PlayerInventory.items.Add(new Item());     // 클래스 값: 실제 
 ### 2.8 `Game.Do(action)` — 행동 실행
 
 ```csharp
-ActionRecord record = Game.Do(new MoveUnit { target = "hero", x = 3, y = 4 });
+ActionRecord record = Game.Do(new MoveUnit { unit = hero, x = 3, y = 4 });   // hero: 데이터 안의 Unit 객체
 ```
 
-`session.Do`와 같다. 행동 하나가 Undo 한 단위다. 자세히는 [02-Actions-Undo.md](02-Actions-Undo.md).
+`session.Do`와 같다. 행동 하나가 Undo 한 단위다. 대상은 객체로 넣는다: `string id`가 있는 클래스 형식의 필드는 기록에 id만 남고, 실행 직전에 그 id로 지금 데이터에서 다시 찾아 넣는다(못 찾으면 행동 실패). 자세히는 [02-Actions-Undo.md](02-Actions-Undo.md).
 
 ### 2.9 `Game.Use(ability, user, params targets)` — 능력·아이템 쓰기
 
@@ -177,6 +183,8 @@ string id = GameApi.IdOf(hero);   // hero.id
 ```
 
 객체의 `id` 필드(또는 `Id` 속성) 값을 읽는다. 그런 멤버가 없으면 예외다. 멤버는 형식마다 처음 한 번 찾고, 값은 생성 코드로 읽는다(리플렉션 없음). 형식을 알면 `hero.id`를 바로 쓴다.
+
+`GameApi.HasId(type)`은 그 형식에 `string id`(필드·속성)가 있는지(찾거나 가리킬 수 있는 객체인지)를 알려 준다. 행동의 필드가 참조 필드인지도 이것으로 정해진다.
 
 ### 2.15 확장 메서드로 장르 규칙 더하기
 
@@ -281,12 +289,13 @@ using System.Linq;
 using GBible;
 
 [Serializable]
-public class Shockwave : GameAction<Unit>
+public class Shockwave : GameAction
 {
+    public Unit caster;                        // 참조 필드: 실행 직전에 지금 객체로 다시 찾는다
     public int range = 1;
     public int damage = 6;
 
-    protected override void Run(Unit caster)
+    protected override void Run()
     {
         foreach (var enemy in Game.Around(caster, range).Where(u => u.team != caster.team).ToList())
             enemy.hp -= damage + Game.Random("damage").Range(0, 3);
@@ -310,7 +319,7 @@ public class Arena
 }
 
 [Serializable]
-public class SummonWolf : SimpleAction
+public class SummonWolf : GameAction
 {
     public int x, y;
     protected override void Run()
@@ -391,7 +400,7 @@ session.Data.Define("arena", DataZone.Session, new Arena
     units = { new Unit { id = "hero", team = "ally" }, new Unit { id = "orc1", team = "enemy", x = 1 } },
 });
 var game = session.Game;
-game.Do(new Shockwave { target = "hero" });
+game.Do(new Shockwave { caster = game.Find<Unit>("hero") });
 var orc = game.Find<Unit>("orc1");    // hp가 줄어 있다
 session.Undo();                        // 다시 30
 ```
@@ -407,6 +416,6 @@ session.Undo();                        // 다시 30
 | 씬 코드에서 고친 값이 Undo되지 않음 | `Find`·`All`로 꺼낸 객체를 행동 밖에서 고쳤다. 씬 코드는 읽기·그리기만 하고, 바꾸는 일은 `Game.Do`로 한다. |
 | `All<T>()`가 원하지 않는 객체까지 줌 | 같은 형식이 여러 플레이어 데이터에 있다. `All<T>("키")`로 한 곳만 본다. |
 | `All<T>()`가 준 리스트에 더했는데 반영되지 않음 | 돌려받은 리스트는 새 리스트다. 플레이어 데이터 안의 리스트(예: `board.units`)에 더한다. |
-| 오래 쥔 객체가 엉뚱한 값 | 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. id로 들고 있다가 쓸 때 `Find`한다. |
+| 오래 쥔 객체가 엉뚱한 값 | 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 값을 읽을 때는 id로 들고 있다가 `Find`한다. 행동에 넣는 것은 그 객체 그대로도 된다(실행 직전에 같은 id의 지금 객체로 바뀐다). |
 | 행동 클래스 밖에서 `Game` 속성이 `null` | 행동·Block의 `Game` 속성은 그 코드가 실행되는 동안만 있다. 씬 코드는 `GBibleRuntime.Game`. |
 | 프레임이 느려짐 | `Find`를 객체마다 반복했다. `All`을 한 번 불러 쓰거나 id → 객체 사전을 프레임마다 한 번 만든다. |

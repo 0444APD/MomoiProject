@@ -258,7 +258,7 @@ session.Events.Publish(new UnitKilled { damage = 5, tags = { "boss" } });
 
 ```csharp
 [Serializable]
-public class EndTurn : SimpleAction
+public class EndTurn : GameAction
 {
     protected override void Run()
     {

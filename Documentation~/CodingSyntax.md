@@ -51,7 +51,8 @@ Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 �
 ### `Game.Find<T>(string id)` / `Game.Find(string id)`
 - **하는 일**: `id` 필드가 같은 `T`를 찾는다(없으면 `null`). 형식 없이 부르면 id 필드가 있는 모든 객체에서 찾는다.
 - **조건**: `T`에 `public string id;`(또는 `Id`) 필드·속성이 있어야 한다. 없으면 "id 필드를 더하라"는 예외.
-- **언제**: 씬 코드가 들고 있던 id로 객체를 다시 찾을 때. 객체를 오래 들고 있지 말고 id로 들고 있다가 쓸 때 `Find`한다(Undo·불러오기 뒤에는 다른 인스턴스일 수 있다).
+- **언제**: 씬 코드가 들고 있던 id로 객체를 다시 찾을 때. 값을 읽으려고 객체를 오래 들고 있지 말고 id로 들고 있다가 쓸 때 `Find`한다(Undo·불러오기 뒤에는 다른 인스턴스일 수 있다). 행동의 대상으로 넣을 때는 쥔 객체 그대로도 된다(실행 직전에 시스템이 다시 찾는다).
+- `Game.Find(Type, id)`: 형식을 실행 중에 정할 때(행동의 참조 필드를 다시 찾을 때 시스템이 쓰는 것). `GameApi.HasId(Type)`은 그 형식에 `string id`가 있는지 알려 준다.
 
 ### `GameIds` (자동 생성 상수)
 - DB의 ID가 코드 상수로 생성된다(`MomoiProject > 식별자 코드 다시 만들기`, 네임스페이스 `GBible.Ids`).
@@ -71,33 +72,40 @@ Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 �
 
 플레이어 입력(이동·사용·구매·턴 넘기기)은 행동 클래스로 만든다. 행동은 **데이터**라서 저장·서버 전송·리플레이가 되고, `Game.Do` 한 번이 Undo 한 단위다.
 
-### `GameAction<T>` — 대상이 있는 행동
+### `GameAction` — 모든 행동의 바탕
 ```csharp
-[Serializable] public class MoveUnit : GameAction<Unit>
+[Serializable, BlockInfo("이동")] public class MoveUnit : GameAction
 {
-    public int x, y;                                         // 행동이 실어 나르는 값(데이터)
-    protected override void Run(Unit u) { u.x = x; u.y = y; } // 대상 객체를 받아 그냥 고친다
+    public Unit unit;                                        // 대상(참조 필드): 객체를 넣는다
+    public int x, y;                                         // 그냥 값
+    protected override void Run() { unit.x = x; unit.y = y; } // unit은 지금 데이터 안의 실제 객체
 }
-Game.Do(new MoveUnit { target = unit.id, x = 3, y = 4 });
-```
-- `target`(string): 물려받은 필드. 대상의 **id**를 넣는다(객체가 아니라 id라서 데이터로 남는다).
-- `Run(T)`: 시스템이 `Find<T>(target)`으로 찾은 객체를 넘겨준다. 못 찾으면 행동이 실패하고 아무것도 안 바뀐다.
-- `Describe()`: 행동 로그 문장. 안 쓰면 `[BlockInfo]` 이름(없으면 클래스 이름) + 대상 id. 바꾸려면 `public override string Describe() => …`.
-- 등록이 필요 없다(`Actions.Register` 불필요).
+Game.Do(new MoveUnit { unit = hero, x = 3, y = 4 });
 
-### `SimpleAction` — 대상이 없는 행동
-```csharp
-[Serializable] public class EndTurn : SimpleAction
+[Serializable, BlockInfo("턴 넘기기")] public class EndTurn : GameAction
 {
-    protected override void Run() => Game.All<Board>()[0].turn++;
+    protected override void Run() => Game.All<Board>()[0].turn++;   // 대상 없는 행동도 같은 모양
 }
 ```
+- **형태**: `GameAction`을 상속 + 필요한 정보를 필드로 + `protected override void Run()`(매개변수 없음). `Run` 안에서는 물려받은 `Game`(데이터·난수·이벤트·다른 행동)을 쓴다. `Game`은 `Run`이 실행되는 동안만 들어 있다.
+- **참조 필드**: 형식이 `string id`가 있는 클래스인 필드(와 그 `List<>`·배열)는 개수 제한 없이 대상으로 쓴다. 없으면 `null`.
+  - 기록·전송에는 id만 남고, **실행 직전**에 그 id로 지금 데이터에서 다시 찾아 필드에 넣는다(`Game.Find(Type, id)`). 그래서 Undo·불러오기 뒤에 쥐고 있던 옛 객체를 넣어도 `Run`에서는 지금 객체다.
+  - 못 찾으면 "Unit 'orc2'을(를) 찾을 수 없습니다(행동 'MoveUnit'의 'unit')"로 행동이 실패하고 아무것도 안 바뀐다. id가 빈 객체(방금 `new`로 만든 것)를 넣어도 실패한다 — 새 객체는 행동 안에서 만들고 id는 `Game.NewId`.
+  - 대상 클래스 조건: `public string id;`, 플레이어 데이터 안에 있다(깊이 상관없음), 같은 형식(부모 형식으로 찾으면 그 자식들끼리도) 안에서 id가 겹치지 않는다.
+- **참조가 아닌 필드**: 숫자·글자·`bool`·`enum`·id 없는 클래스(값으로 다룬다). DB 원본을 가리킬 때는 `[DataRef(typeof(…))] public string`(원본은 플레이어 데이터가 아니라서 찾기 대상이 아니다). Unity 객체·델리게이트는 넣지 않는다.
+- `Describe()`: 행동 로그 문장. 안 쓰면 `[BlockInfo]` 이름(없으면 클래스 이름) + 참조 필드의 id들(예: `이동 (hero)`). 바꾸려면 `public override string Describe() => …`(참조 필드에서는 id만 읽는다).
+- 등록이 필요 없다.
+
+### `session.Actions.Register<T>(handler)` — 처리기를 밖에서
+- `Run` 대신 세션 준비 코드에서 처리기를 등록하는 방식도 된다(`session.Actions.Register<MoveUnit>(a => …)`). 처리기에도 참조 필드를 다시 찾은 행동이 넘어온다. 한 형식에 하나, 등록하면 `Run` 대신 처리기가 실행된다.
+- `Run`도 처리기도 없으면 "행동 'X'의 처리기가 없습니다. 행동 클래스에 Run을 쓰거나 Actions.Register로 처리기를 등록하세요."로 실패한다.
 
 ### `Game.Do(action)` 안에서 시스템이 하는 일
 1. 행동을 Journal에 남긴다.
-2. `Run` 안의 쓰기를 이 행동의 Undo 단위로 묶는다. 플레이어 데이터는 행동이 끝날 때 Sync가 사본과 비교해 바뀐 곳을 기록한다(Mirror). → **Modify 같은 감싸기가 필요 없는 이유**.
-3. 예외가 나면 그 행동이 바꾼 것을 전부 되돌리고 예외를 다시 던진다.
-4. 끝난 뒤 관련 조건(도전과제)을 다시 평가한다.
+2. 참조 필드를 id로 지금 데이터에서 다시 찾아 넣는다(못 찾으면 실패).
+3. `Run` 안의 쓰기를 이 행동의 Undo 단위로 묶는다. 플레이어 데이터는 행동이 끝날 때 Sync가 사본과 비교해 바뀐 곳을 기록한다(Mirror). → **Modify 같은 감싸기가 필요 없는 이유**.
+4. 예외가 나면 그 행동이 바꾼 것을 전부 되돌리고 예외를 다시 던진다.
+5. 끝난 뒤 관련 조건(도전과제)을 다시 평가한다.
 
 ### 주의
 - 행동 안에서 기다리지 않는다(코루틴·await). 로직은 한 번에 끝내고 연출은 결과를 보고 따로.

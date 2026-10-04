@@ -15,8 +15,9 @@
 
 | 용어 | 뜻 |
 |---|---|
-| 행동 (`GameAction`) | 플레이어 입력 하나를 담은 **데이터** 클래스. 메서드 호출이 아니라 데이터라서 기록·리플레이·서버 전송이 된다. |
+| 행동 (`GameAction`) | 플레이어 입력 하나를 담은 **데이터** 클래스. 메서드 호출이 아니라 데이터라서 기록·리플레이·서버 전송이 된다. 모든 행동은 `GameAction` 하나를 상속한다. |
 | `Game` (`GameApi`) | 게임 코드의 창구. 행동 클래스 안에서는 `Game` 속성으로 쓴다. 자세히는 [03-GameApi.md](03-GameApi.md). |
+| 참조 필드 | 행동의 필드 중 형식이 "`string id`가 있는 클래스"(또는 그 리스트·배열)인 것. 프로그래머는 객체를 넣고, 시스템은 기록·전송에 id만 남겼다가 실행 직전에 그 id로 지금 데이터에서 객체를 다시 찾아 넣는다. |
 | Transaction | 행동 하나가 일으킨 변경 전체. Undo는 Transaction 단위로 되돌린다(코드 형식 `Transaction`). |
 | Sync · ChangeSet | 시스템이 플레이어 데이터의 사본(Mirror)과 실제 값을 비교해 바뀐 곳을 찾는 동작이 Sync, 찾아낸 변경 묶음이 ChangeSet이다. 자세히는 [01-PlayerData.md](01-PlayerData.md). |
 | Undo | 마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌리는 것. `session.Undo()`. |
@@ -42,44 +43,7 @@
 
 ## 2. 코드로 쓰는 법 — 문법 요소
 
-### 2.1 대상이 있는 행동: `GameAction<T>`
-
-```csharp
-using System;
-using GBible;
-
-[Serializable]
-public class Unit
-{
-    public string id;
-    public int x, y;
-    public int hp = 30;
-}
-
-[Serializable]
-public class MoveUnit : GameAction<Unit>
-{
-    public int x, y;                                         // 행동이 실어 나르는 값
-
-    protected override void Run(Unit u) { u.x = x; u.y = y; } // 찾은 대상을 그냥 고친다
-}
-```
-
-| 요소 | 하는 일 |
-|---|---|
-| `GameAction<T>` | 대상 하나에 대한 행동. `T`는 클래스이고 `string id` 필드가 있어야 한다. |
-| `target` (물려받은 `string` 필드) | 대상의 **id**. 객체가 아니라 id라서 데이터로 남는다. |
-| `Run(T target)` | 시스템이 `Game.Find<T>(target)`로 찾은 객체를 넘겨준다. 못 찾으면 "찾을 수 없습니다" 예외로 행동이 실패한다. |
-| `Game` (물려받은 속성) | 지금 세션의 `GameApi`. **`Run`이 실행되는 동안에만** 들어 있고, 끝나면 `null`이다. |
-| `[Serializable]` | 행동은 데이터다. 붙여 두어야 저장·전송·리플레이에 쓸 수 있다. |
-
-```csharp
-Game.Do(new MoveUnit { target = "hero", x = 3, y = 4 });
-```
-
-등록 없이 바로 실행된다.
-
-### 2.2 대상이 없는 행동: `SimpleAction`
+### 2.1 행동 만들기: `GameAction` + `Run()`
 
 ```csharp
 using System;
@@ -91,14 +55,110 @@ public class Board
     public int turn;
 }
 
-[Serializable]
-public class EndTurn : SimpleAction
+[Serializable, BlockInfo("턴 넘기기")]
+public class EndTurn : GameAction
 {
     protected override void Run() => Game.All<Board>()[0].turn++;
 }
 ```
 
-`Run()`에 대상이 없다. 필요한 것은 `Game.All`·`Game.Find`로 찾는다. `Game` 속성 규칙은 `GameAction<T>`와 같다.
+```csharp
+Game.Do(new EndTurn());
+```
+
+| 요소 | 하는 일 |
+|---|---|
+| `GameAction` | 모든 행동의 바탕 클래스. 행동은 이것 하나만 상속한다. |
+| 필드 | 행동이 실어 나르는 정보(대상·수치·선택지). 대상 객체도 필드로 넣는다(2.2). |
+| `protected override void Run()` | 처리 내용. 매개변수가 없다. 필요한 것은 필드와 `Game`으로 얻는다. |
+| `Game` (물려받은 속성) | 지금 세션의 `GameApi`(데이터·난수·이벤트·다른 행동). **`Run`이 실행되는 동안에만** 들어 있고, 끝나면 `null`이다. |
+| `[Serializable]` | 행동은 데이터다. 붙여 두어야 저장·전송·리플레이에 쓸 수 있다. |
+| `[BlockInfo("이름")]` | 모니터·타임라인에 보일 이름. 없으면 클래스 이름이 쓰인다. |
+
+등록 없이 바로 실행된다.
+
+### 2.2 대상은 객체로: 참조 필드
+
+행동이 다룰 대상(유닛·카드·적·아이템)은 **객체를 그대로 필드에 넣는다.** 필드 형식이 `string id`가 있는 클래스면 그 필드는 참조 필드가 된다. 개수 제한은 없고, 리스트·배열도 되고, 없으면 `null`로 둔다.
+
+```csharp
+using System;
+using System.Collections.Generic;
+using GBible;
+
+[Serializable]
+public class Unit
+{
+    public string id;
+    public int x, y;
+    public int hp = 30;
+}
+
+[Serializable, BlockInfo("이동")]
+public class MoveUnit : GameAction
+{
+    public Unit unit;                                        // 참조 필드(대상)
+    public int x, y;                                         // 그냥 값
+
+    protected override void Run() { unit.x = x; unit.y = y; } // 지금 데이터 안의 객체를 그냥 고친다
+}
+
+[Serializable, BlockInfo("연쇄 번개")]
+public class ChainLightning : GameAction
+{
+    public Unit caster;                                      // 하나
+    public List<Unit> targets = new List<Unit>();            // 여럿(리스트·배열) — 실행 직전에 새 목록에 지금 객체를 담아 바꿔 넣는다(넣어 준 목록은 고치지 않는다)
+    public Unit bonus;                                       // 고르지 않았으면 null
+    public int damage = 5;
+
+    protected override void Run()
+    {
+        foreach (var t in targets) t.hp -= damage;
+        if (bonus != null) bonus.hp -= damage * 2;
+    }
+}
+```
+
+```csharp
+Game.Do(new MoveUnit { unit = hero, x = 3, y = 4 });
+Game.Do(new ChainLightning { caster = hero, targets = new List<Unit> { orc1, orc2 } });
+```
+
+**시스템이 참조 필드에 하는 일**
+
+1. 기록(타임라인)·전송에는 객체가 아니라 그 객체의 **id만** 남는다.
+2. **실행 직전**(행동 안, `Run` 바로 앞)에 그 id로 지금 플레이어 데이터에서 객체를 다시 찾아 필드에 넣는다(`Game.Find(형식, id)`와 같은 찾기). 리스트·배열은 칸마다 바꿔 넣는다. `null`인 필드·칸은 건너뛴다.
+
+그래서 `Run` 안의 참조 필드는 언제나 **지금 데이터 안의 실제 객체**다.
+
+| 상황 | 결과 |
+|---|---|
+| 싱글에서 방금 고른 객체를 넣음 | 같은 객체가 그대로 쓰인다(확인만 한다). |
+| Undo·판 불러오기 뒤에 버튼이 쥐고 있던 옛 객체를 넣음 | 같은 id의 지금 객체로 바뀐다. 데이터 밖의 옛 객체(유령 객체)를 고치는 일이 없다. |
+| 멀티플레이(설계) | 객체 대신 id만 건너가고, 받는 쪽이 자기 데이터의 객체를 넣는다. |
+| 타임라인·리플레이 | id로 남는다. |
+
+**실패하는 경우** — 행동 안에서 일어나므로 행동이 실패하고 아무것도 바뀌지 않는다(2.7).
+
+- 그 id의 객체가 지금 데이터에 없다(쓰러져 리스트에서 빠짐, Undo로 사라짐): "Unit 'orc2'을(를) 찾을 수 없습니다(행동 'ChainLightning'의 'targets')".
+- id가 빈 객체를 넣었다(방금 `new`로 만든 객체): "… id가 비어 있는 Unit입니다. 데이터 안의 객체를 넣으세요(새 객체는 행동 안에서 만든다)." 새 객체는 행동 안에서 만들고 id는 `Game.NewId(접두어)`로 정한다.
+
+**참조가 되는 것과 아닌 것**
+
+| 필드 형식 | 다루는 법 |
+|---|---|
+| `string id`가 있는 클래스, 그 `List<>`·배열 | 참조. id로 기록하고 실행 직전에 다시 찾는다. |
+| 숫자·글자·`bool`·`enum` | 값 그대로. |
+| `id`가 없는 클래스 | 값으로 다룬다(내용이 그대로 기록·전송되고, 다시 찾지 않는다). |
+| DB 원본(카드 원본·인스턴스 등)을 가리킬 때 | 객체가 아니라 `[DataRef(typeof(DB 종류))] public string` 필드. 원본은 플레이어 데이터가 아니라서 찾기 대상이 아니다. |
+
+**대상 클래스의 조건**
+
+- `public string id;` 필드(또는 `Id` 속성)가 있다.
+- 플레이어 데이터 안에 객체로 들어 있다(깊이는 상관없다. 리스트 안의 리스트도 된다).
+- 같은 형식 안에서 id가 겹치지 않는다. 필드 형식이 부모 클래스(예: `Fighter`, 그 자식 `Hero`·`Enemy`)면 그 부모를 공유하는 형식끼리도 겹치지 않아야 한다. 새 객체의 id는 `Game.NewId(접두어)`로 만든다.
+
+Unity 객체(`MonoBehaviour`·`ScriptableObject`)·델리게이트·플레이어 데이터 밖의 객체는 대상으로 넣지 않는다.
 
 ### 2.3 행동 로그 문장: `Describe()`
 
@@ -106,22 +166,25 @@ public class EndTurn : SimpleAction
 using System;
 using GBible;
 
-[Serializable]
-public class Heal : GameAction<Unit>
+[Serializable, BlockInfo("회복")]
+public class Heal : GameAction
 {
+    public Unit unit;
     public int amount = 10;
-    protected override void Run(Unit u) => u.hp += amount;
-    public override string Describe() => $"{target} 회복 +{amount}";
+    protected override void Run() => unit.hp += amount;
+    public override string Describe() => $"{unit?.id} 회복 +{amount}";
 }
 ```
 
-모니터의 행동 탭·타임라인에 보일 문장이다. 쓰지 않으면 `GameAction<T>`는 "`[BlockInfo]` 이름(없으면 클래스 이름) (대상 id)", `SimpleAction`은 "`[BlockInfo]` 이름(없으면 클래스 이름)"이다.
+모니터의 행동 탭·타임라인에 보일 문장이다. 쓰지 않으면 "`[BlockInfo]` 이름(없으면 클래스 이름) (참조 필드의 id들)"이다. 예: `연쇄 번개 (hero, orc1, orc2)`, 참조 필드가 없거나 모두 `null`이면 `턴 넘기기`.
+
+`Describe`는 참조 필드를 다시 찾기 **전**에도 불린다. 참조 필드에서는 id만 읽고, 체력 같은 값은 읽지 않는다(옛 객체의 값일 수 있다).
 
 ### 2.4 공통 멤버: `actorId` · `tick` · `Visibility`
 
 ```csharp
-[Serializable]
-public class OpenChest : SimpleAction
+[Serializable, BlockInfo("상자 열기")]
+public class OpenChest : GameAction
 {
     public override ActionVisibility Visibility => ActionVisibility.Private;
     protected override void Run() { /* … */ }
@@ -136,20 +199,19 @@ Game.Do(new OpenChest { actorId = 2 });
 | `tick` (`long`) | 실행할 때 시스템이 게임 시계의 틱(`session.Clock.Tick`)을 적는다. |
 | `Visibility` | `Public`(모두) · `Private`(본인만) · `Developer`(개발자 모니터만). 지금은 모니터 행동 탭에 표시된다. |
 
-### 2.5 처리기를 따로 등록하는 행동: `GameAction` + `Actions.Register`
+### 2.5 처리기를 따로 등록하는 행동: `Actions.Register`
 
-처리 코드를 행동 클래스 밖(세션 준비 코드)에 두는 방식이다. 행동 클래스는 데이터만 갖는다.
+처리 코드를 행동 클래스 밖(세션 준비 코드)에 두는 방식이다. 행동 클래스는 데이터만 갖고 `Run`을 쓰지 않는다.
 
 ```csharp
 using System;
 using GBible;
 using UnityEngine;
 
-[Serializable]
-public sealed class AttackGoblin : GameAction
+[Serializable, BlockInfo("공격")]
+public sealed class AttackUnit : GameAction
 {
-    public string target = "goblin";
-    public override string Describe() => $"플레이어 {actorId}: {target} 공격";   // 필수(abstract)
+    public Unit target;                                      // 참조 필드는 여기서도 똑같이 다룬다
 }
 
 public static class CombatSetup
@@ -158,23 +220,27 @@ public static class CombatSetup
     static void Hook() => GBibleRuntime.Started += session =>
     {
         session.Data.Define("battle.combo", DataZone.Session, 0, "콤보");
-        session.Actions.Register<AttackGoblin>(action =>
+        session.Actions.Register<AttackUnit>(action =>
         {
+            // action.target은 이미 지금 데이터의 객체로 바뀌어 있다
             var hit = session.Random.Get("combat").Chance(0.7);
+            if (hit) action.target.hp -= 5;
             session.Data.Set("battle.combo", hit ? session.Data.GetNumber("battle.combo") + 1 : 0);
         });
     };
 }
 ```
 
+- 처리기에도 실행 직전에 참조 필드를 다시 찾아 넣은 행동이 넘어온다(못 찾으면 처리기를 부르기 전에 실패).
+- 처리기 안에서는 행동의 `Game` 속성이 비어 있다. `session.Game`을 쓴다.
 - 한 형식에 처리기는 하나다. 두 번 등록하면 "이미 등록되어 있습니다" 예외다.
-- `GameAction`을 직접 상속하고 처리기도 없으면 `Do`가 "처리기가 없습니다" 예외를 낸다.
-- 처리기가 등록되어 있으면 클래스 안의 `Run`보다 처리기가 먼저다.
+- 처리기가 등록되어 있으면 클래스 안의 `Run` 대신 처리기가 실행된다.
+- `Run`도 처리기도 없으면 `Do`가 "행동 'X'의 처리기가 없습니다. 행동 클래스에 Run을 쓰거나 Actions.Register로 처리기를 등록하세요."로 실패한다.
 
 ### 2.6 실행: `Game.Do` / `session.Do`
 
 ```csharp
-ActionRecord record = Game.Do(new MoveUnit { target = "hero", x = 1, y = 0 });
+ActionRecord record = Game.Do(new MoveUnit { unit = hero, x = 1, y = 0 });
 // record.Status: ActionStatus.Done / Undone / Failed
 // record.Action, record.JournalId, record.TransactionId, record.Error
 ```
@@ -186,31 +252,32 @@ ActionRecord record = Game.Do(new MoveUnit { target = "hero", x = 1, y = 0 });
 1. 처리 방법을 찾는다(등록한 처리기 → 클래스 안의 `Run`).
 2. `tick`을 적고 기록(Journal)에 행동 한 줄을 남긴다.
 3. **행동 시작**: 지금까지의 행동 밖 변경을 먼저 Sync해 따로 떼어 두고, Transaction을 연다. 모든 난수 스트림의 상태를 보관한다.
-4. `Run`(또는 처리기)을 실행한다. 이 안에서 `Game.Find`·`Game.All`이 중간에 Sync해도 모두 같은 Transaction에 들어간다.
-5. **행동 끝**: 모든 플레이어 데이터를 Sync해 Transaction을 닫는다. 행동 동안 모아 둔 ChangeSet을 차례대로 `Synced` 이벤트로 쏜다(한 행동 = 한 묶음). 되돌리기 방식이 행동 단위면 Undo 이력에 넣는다.
-6. 바뀐 값을 보는 조건(도전과제·트리거)을 다시 평가한다.
+4. 참조 필드를 id로 지금 데이터에서 다시 찾아 넣는다(못 찾으면 여기서 실패).
+5. `Run`(또는 처리기)을 실행한다. 이 안에서 `Game.Find`·`Game.All`이 중간에 Sync해도 모두 같은 Transaction에 들어간다.
+6. **행동 끝**: 모든 플레이어 데이터를 Sync해 Transaction을 닫는다. 행동 동안 모아 둔 ChangeSet을 차례대로 `Synced` 이벤트로 쏜다(한 행동 = 한 묶음). 되돌리기 방식이 행동 단위면 Undo 이력에 넣는다.
+7. 바뀐 값을 보는 조건(도전과제·트리거)을 다시 평가한다.
 
 값이 하나도 바뀌지 않은 행동(빗나간 공격 등)도 Undo 한 단위로 남는다. 난수 소비를 되돌려야 하기 때문이다.
 
 ### 2.7 실패: 예외가 나면 전부 취소
 
 ```csharp
-[Serializable]
-public class Buy : SimpleAction
+[Serializable] public class Wallet { public string id; public int gold; }
+
+[Serializable, BlockInfo("사기")]
+public class Buy : GameAction
 {
+    public Wallet wallet;
     public int price;
     protected override void Run()
     {
-        var wallet = Game.All<Wallet>()[0];
         wallet.gold -= price;                                                // 먼저 깎아도
         if (wallet.gold < 0) throw new InvalidOperationException("골드 부족"); // 예외면 깎은 것까지 되돌아간다
     }
 }
-
-[Serializable] public class Wallet { public int gold; }
 ```
 
-행동 안에서 예외가 나면:
+행동 안에서 예외가 나면(참조 필드를 찾지 못한 경우도 같다):
 
 - 그 행동이 바꾼 플레이어 데이터를 모두 되돌린다(Transaction 단위 원자성).
 - 난수 스트림도 행동 전 상태로 돌린다.
@@ -219,7 +286,7 @@ public class Buy : SimpleAction
 - 예외는 `Do`를 부른 쪽으로 **다시 던져진다**. 예상되는 실패라면 부른 쪽에서 잡는다.
 
 ```csharp
-try { Game.Do(new Buy { price = 50 }); }
+try { Game.Do(new Buy { wallet = myWallet, price = 50 }); }
 catch (InvalidOperationException e) { /* "골드 부족" 안내 */ }
 ```
 
@@ -300,7 +367,7 @@ hero.hp = 1;                    // 행동 밖: 다음 Sync에 "행동 밖 변경
   - 겹침은 같은 경로이거나 한쪽이 다른 쪽을 품는 경우다(`units[#3]`과 `units[#3].hp`).
   - 단순 값(숫자·글자 같은 플레이어 데이터 키)도 같다: 행동이 남긴 값과 Undo 직전 값이 다르면 같은 경고를 남긴다.
   - 이 경고는 클래스 데이터(Mirror로 비교하는 데이터)에만 있고, `DescribeChanges`가 켜져 있을 때(기본)만 나온다. 숫자·글자 같은 단순 값 키는 경고 없이 행동 전 값으로 덮인다.
-- 행동 안에서 다른 행동을 `Game.Do`하거나 `Game.Use`하면, 그 행동은 **바깥 행동의 일부로 그 자리에서** 실행된다(새 Undo 단위를 만들지 않는다). Undo·변경 묶음은 바깥 행동 하나이고, 안쪽에서 실패하면 바깥 행동 전체가 취소된다. 예: 카드 내기 = 에너지 지불 + 손패 이동 + `Game.Use(카드)` + 다 쓰러졌으면 `Game.Do(new WinBattle())`.
+- 행동 안에서 다른 행동을 `Game.Do`하거나 `Game.Use`하면, 그 행동은 **바깥 행동의 일부로 그 자리에서** 실행된다(새 Undo 단위를 만들지 않는다). 안쪽 행동의 참조 필드도 실행 직전에 다시 찾는다. Undo·변경 묶음은 바깥 행동 하나이고, 안쪽에서 실패하면 바깥 행동 전체가 취소된다. 예: 카드 내기 = 에너지 지불 + 손패 이동 + `Game.Use(카드)` + 다 쓰러졌으면 `Game.Do(new WinBattle())`.
 
 ---
 
@@ -315,7 +382,7 @@ hero.hp = 1;                    // 행동 밖: 다음 Sync에 "행동 밖 변경
 3. 시작한 행동을 Undo해도 코루틴은 멈추지 않는다.
 4. 그 사이에 대상이 Undo·사망·불러오기로 사라졌을 수 있다.
 
-**되돌릴 수 있게 하려면 람다·코루틴 안에서 `Game.Do(...)`로 행동을 실행한다.** 그러면 지연 효과 한 번 한 번이 각각 Undo 한 단위가 된다. 그리고 실행하기 전에 대상이 아직 있는지 id로 다시 찾는다. 남은 횟수 같은 진행 상태는 플레이어 데이터에 두면 Undo·저장이 함께 따라온다.
+**되돌릴 수 있게 하려면 람다·코루틴 안에서 `Game.Do(...)`로 행동을 실행한다.** 그러면 지연 효과 한 번 한 번이 각각 Undo 한 단위가 된다. 람다가 쥔 객체가 옛 객체여도 행동의 참조 필드는 실행 직전에 지금 객체로 바뀐다. 다만 대상이 아예 사라졌으면 행동이 실패하므로, 실행하기 전에 `Find`로 아직 있는지 확인한다. 남은 횟수 같은 진행 상태는 플레이어 데이터에 두면 Undo·저장이 함께 따라온다.
 
 ```csharp
 using System;
@@ -331,31 +398,33 @@ public class PoisonedUnit
     public int poisonTicks;          // 남은 횟수도 플레이어 데이터에(Undo·저장에 함께)
 }
 
-[Serializable]
-public class ApplyPoison : GameAction<PoisonedUnit>
+[Serializable, BlockInfo("독 걸기")]
+public class ApplyPoison : GameAction
 {
+    public PoisonedUnit unit;
     public int ticks = 3;
-    protected override void Run(PoisonedUnit u) => u.poisonTicks = ticks;
+    protected override void Run() => unit.poisonTicks = ticks;
 }
 
-[Serializable]
-public class PoisonTick : GameAction<PoisonedUnit>
+[Serializable, BlockInfo("독 피해")]
+public class PoisonTick : GameAction
 {
+    public PoisonedUnit unit;
     public int damage = 2;
-    protected override void Run(PoisonedUnit u)
+    protected override void Run()
     {
-        if (u.poisonTicks <= 0) return;
-        u.hp -= damage;
-        u.poisonTicks--;
+        if (unit.poisonTicks <= 0) return;
+        unit.hp -= damage;
+        unit.poisonTicks--;
     }
 }
 
 public class PoisonDriver : MonoBehaviour
 {
-    public void Poison(string unitId)
+    public void Poison(PoisonedUnit unit)
     {
-        GBibleRuntime.Game.Do(new ApplyPoison { target = unitId, ticks = 3 });
-        StartCoroutine(Tick(unitId));
+        GBibleRuntime.Game.Do(new ApplyPoison { unit = unit, ticks = 3 });
+        StartCoroutine(Tick(unit.id));
     }
 
     IEnumerator Tick(string unitId)
@@ -364,9 +433,9 @@ public class PoisonDriver : MonoBehaviour
         {
             yield return new WaitForSeconds(1f);                  // 게임 시간(일시정지·배속을 따른다)
             var game = GBibleRuntime.Game;
-            var unit = game?.Find<PoisonedUnit>(unitId);
+            var unit = game?.Find<PoisonedUnit>(unitId);          // 지금 값(poisonTicks)을 보려면 지금 객체로
             if (unit == null || unit.poisonTicks <= 0) yield break;   // Undo·사망으로 사라졌거나 끝났으면 멈춘다
-            game.Do(new PoisonTick { target = unitId });           // 한 번 한 번이 Undo 한 단위
+            game.Do(new PoisonTick { unit = unit });              // 한 번 한 번이 Undo 한 단위
         }
     }
 }
@@ -403,34 +472,37 @@ public class DelayQueue : MonoBehaviour
     }
 }
 
-[Serializable]
-public class Blast : GameAction<PoisonedUnit>
+[Serializable, BlockInfo("폭발")]
+public class Blast : GameAction
 {
+    public PoisonedUnit unit;
     public int damage;
-    protected override void Run(PoisonedUnit u) => u.hp -= damage;
+    protected override void Run() => unit.hp -= damage;
 }
 
-[Serializable]
-public class DelayedBlast : GameAction<PoisonedUnit>
+[Serializable, BlockInfo("지연 폭발")]
+public class DelayedBlast : GameAction
 {
-    protected override void Run(PoisonedUnit u)
+    public PoisonedUnit unit;
+
+    protected override void Run()
     {
         var game = Game;   // Run이 끝나면 Game 속성은 null이 되므로 지역 변수로 받아 둔다
-        var id = u.id;
+        var u = unit;
 
-        // 나쁨: 2초 뒤 직접 고침 → 행동 밖 변경, Undo 안 됨. u를 그대로 쓰면 Undo 뒤의 다른 객체를 놓칠 수도 있다.
+        // 나쁨: 2초 뒤 직접 고침 → 행동 밖 변경, Undo 안 됨. 그 사이 Undo·불러오기가 있었으면 u는 데이터 밖의 옛 객체일 수도 있다.
         DelayQueue.Instance.After(2f, () => u.hp -= 10);
 
-        // 좋음: 2초 뒤 행동으로 실행 → 그 효과가 Undo 한 단위. 대상이 아직 있는지 먼저 확인한다.
+        // 좋음: 2초 뒤 행동으로 실행 → 그 효과가 Undo 한 단위. u가 옛 객체여도 실행 직전에 같은 id의 지금 객체로 바뀐다.
         DelayQueue.Instance.After(2f, () =>
         {
-            if (game.Find<PoisonedUnit>(id) != null) game.Do(new Blast { target = id, damage = 10 });
+            if (game.Find<PoisonedUnit>(u.id) != null) game.Do(new Blast { unit = u, damage = 10 });
         });
     }
 }
 ```
 
-`GameAction<T>`는 대상을 찾지 못하면 예외로 실패하므로, 지연 실행에서는 `Find`로 먼저 확인하거나 `Do`를 `try`로 감싼다.
+참조 필드의 대상을 찾지 못하면 행동이 예외로 실패하므로, 지연 실행에서는 `Find`로 먼저 확인하거나 `Do`를 `try`로 감싼다.
 
 ---
 
@@ -462,35 +534,36 @@ public class Battlefield
     public List<TacticsUnit> units = new List<TacticsUnit>();
 }
 
-[Serializable]
-public class Move : GameAction<TacticsUnit>
+[Serializable, BlockInfo("이동")]
+public class Move : GameAction
 {
+    public TacticsUnit unit;
     public int x, y;
-    protected override void Run(TacticsUnit u)
+    protected override void Run()
     {
-        if (u.acted) throw new InvalidOperationException("이미 행동했습니다.");
-        u.x = x;
-        u.y = y;
-        u.acted = true;
+        if (unit.acted) throw new InvalidOperationException("이미 행동했습니다.");
+        unit.x = x;
+        unit.y = y;
+        unit.acted = true;
     }
 }
 
-[Serializable]
-public class Attack : GameAction<TacticsUnit>
+[Serializable, BlockInfo("공격")]
+public class Attack : GameAction
 {
-    public string attacker;
-    protected override void Run(TacticsUnit target)
+    public TacticsUnit attacker;
+    public TacticsUnit target;
+    protected override void Run()
     {
-        var from = Game.Find<TacticsUnit>(attacker);
         var damage = 8 + Game.Random("damage").Range(0, 5);     // 결정론 난수: Undo하면 함께 되돌아간다
         target.hp -= damage;
-        from.acted = true;
+        attacker.acted = true;
         if (target.hp <= 0) Game.All<Battlefield>()[0].units.Remove(target);
     }
 }
 
-[Serializable]
-public class NextTurn : SimpleAction
+[Serializable, BlockInfo("턴 넘기기")]
+public class NextTurn : GameAction
 {
     protected override void Run()
     {
@@ -502,18 +575,18 @@ public class NextTurn : SimpleAction
 
 public class TacticsInput : MonoBehaviour
 {
-    string _selected;                                    // 오래 들고 있을 것은 id로
+    TacticsUnit _selected;                               // 행동에 넣을 객체는 그대로 쥐어도 된다(실행 직전에 지금 객체로 바뀐다)
     GameApi Game => GBibleRuntime.Game;
 
-    public void OnClickUnit(TacticsUnit u) => _selected = u.id;
-    public void OnClickTile(int x, int y) => Game.Do(new Move { target = _selected, x = x, y = y });
-    public void OnClickEnemy(TacticsUnit enemy) => Game.Do(new Attack { target = enemy.id, attacker = _selected });
+    public void OnClickUnit(TacticsUnit u) => _selected = u;
+    public void OnClickTile(int x, int y) => Game.Do(new Move { unit = _selected, x = x, y = y });
+    public void OnClickEnemy(TacticsUnit enemy) => Game.Do(new Attack { attacker = _selected, target = enemy });
     public void OnClickEndTurn() => Game.Do(new NextTurn());
     public void OnClickUndo() => Game.Session.Undo();
 }
 ```
 
-Undo하면 쓰러져 리스트에서 빠졌던 적이 같은 객체로 제자리에 돌아오고, 피해 난수도 되돌아가 다시 공격하면 같은 피해가 나온다.
+Undo하면 쓰러져 리스트에서 빠졌던 적이 같은 객체로 제자리에 돌아오고, 피해 난수도 되돌아가 다시 공격하면 같은 피해가 나온다. 타임라인에는 `공격 (hero, orc1)`처럼 id로 남는다.
 
 ### 4.2 카드 게임: 턴 안에서만 되돌리기
 
@@ -533,10 +606,10 @@ public class Duel
     public List<string> field = new List<string>();
 }
 
-[Serializable]
-public class PlayCard : SimpleAction
+[Serializable, BlockInfo("카드 내기")]
+public class PlayCard : GameAction
 {
-    public string card;
+    public string card;          // 손패는 카드 이름 글자 목록이므로 그냥 값
     public int cost;
     protected override void Run()
     {
@@ -546,10 +619,11 @@ public class PlayCard : SimpleAction
         duel.mana -= cost;
         duel.field.Add(card);
     }
+    public override string Describe() => $"카드 내기 {card}";
 }
 
-[Serializable]
-public class PassTurn : SimpleAction
+[Serializable, BlockInfo("턴 넘기기")]
+public class PassTurn : GameAction
 {
     protected override void Run()
     {
@@ -569,6 +643,8 @@ public static class DuelFlow
 }
 ```
 
+`card`는 참조 필드가 아니라 글자라서 기본 `Describe`에는 보이지 않는다. 보이게 하려고 `Describe`를 덮어썼다.
+
 ### 4.3 RPG 상점: 조건이 맞지 않으면 아무것도 바꾸지 않기
 
 ```csharp
@@ -579,20 +655,21 @@ using GBible;
 [Serializable]
 public class Shop
 {
+    public string id = "shop";
     public int gold = 100;
     public Dictionary<string, int> stock = new Dictionary<string, int> { ["potion"] = 3 };
     public List<string> bag = new List<string>();
 }
 
-[Serializable]
-public class Purchase : SimpleAction
+[Serializable, BlockInfo("구매")]
+public class Purchase : GameAction
 {
-    public string item;
+    public Shop shop;                                         // 플레이어 데이터 안의 객체: 참조 필드
+    [DataRef(typeof(InstanceData))] public string item;       // DB 원본(인스턴스): 글자 ID
     public int price;
 
     protected override void Run()
     {
-        var shop = Game.All<Shop>()[0];
         if (!shop.stock.TryGetValue(item, out var left) || left <= 0) throw new InvalidOperationException("품절");
         if (shop.gold < price) throw new InvalidOperationException("골드 부족");
         shop.gold -= price;
@@ -605,6 +682,8 @@ public class Purchase : SimpleAction
 ```
 
 검사를 앞에 두고 실패하면 예외를 던진다. 중간에 실패해도 Transaction 전체가 되돌아가므로 골드만 깎이는 일이 없다. 조용히 아무 일도 하지 않고 `return`하면 "값이 바뀌지 않은 행동"으로 Undo 이력에 한 칸 남는다.
+
+상점(`Shop`)은 플레이어 데이터라서 객체로 넣고, 팔 아이템은 DB 원본이라서 `[DataRef]` 글자로 넣는다. 원본 객체를 참조 필드에 넣으면 플레이어 데이터에 없으므로 "찾을 수 없습니다"로 실패한다.
 
 ### 4.4 실시간 액션: 스냅샷 되감기와 스킬 쿨다운
 
@@ -621,18 +700,19 @@ public class Caster
     public double fireballReadyAt;      // 게임 시계 기준 시각(초)
 }
 
-[Serializable]
-public class CastFireball : GameAction<Caster>
+[Serializable, BlockInfo("파이어볼")]
+public class CastFireball : GameAction
 {
     public const double Cooldown = 3.0;
+    public Caster caster;
 
-    protected override void Run(Caster c)
+    protected override void Run()
     {
         var now = Game.Session.Clock.Time;
-        if (now < c.fireballReadyAt) throw new InvalidOperationException("쿨다운 중");
-        if (c.mp < 10) throw new InvalidOperationException("MP 부족");
-        c.mp -= 10;
-        c.fireballReadyAt = now + Cooldown;
+        if (now < caster.fireballReadyAt) throw new InvalidOperationException("쿨다운 중");
+        if (caster.mp < 10) throw new InvalidOperationException("MP 부족");
+        caster.mp -= 10;
+        caster.fireballReadyAt = now + Cooldown;
     }
 }
 
@@ -648,7 +728,9 @@ public static class RealtimeSetup
 }
 ```
 
-쿨다운을 `Time.time`이 아니라 게임 시계(`session.Clock.Time`)로 적어 두면, 스냅샷을 되감을 때 시계와 `fireballReadyAt`이 함께 돌아가 쿨다운이 어긋나지 않는다. 남은 쿨다운 표시는 `c.fireballReadyAt - Game.Session.Clock.Time`.
+쿨다운을 `Time.time`이 아니라 게임 시계(`session.Clock.Time`)로 적어 두면, 스냅샷을 되감을 때 시계와 `fireballReadyAt`이 함께 돌아가 쿨다운이 어긋나지 않는다. 남은 쿨다운 표시는 `caster.fireballReadyAt - Game.Session.Clock.Time`.
+
+되감기·불러오기 뒤에는 씬 코드가 쥔 `Caster`가 데이터 밖의 옛 객체일 수 있다. 행동에 넣는 것은 그대로 괜찮지만(실행 직전에 같은 id의 지금 객체로 바뀐다), 화면에 값을 그릴 때는 `Game.Find<Caster>(id)`로 지금 객체를 읽는다.
 
 ### 4.5 행동 안에서 되돌리지 않을 기록 남기기
 
@@ -656,8 +738,8 @@ public static class RealtimeSetup
 using System;
 using GBible;
 
-[Serializable]
-public class EnterBossRoom : SimpleAction
+[Serializable, BlockInfo("보스 방 입장")]
+public class EnterBossRoom : GameAction
 {
     protected override void Run()
     {
@@ -679,9 +761,13 @@ public class EnterBossRoom : SimpleAction
 |---|---|
 | Undo해도 값이 안 돌아옴 | 행동 밖에서 고쳤다(씬 코드·코루틴·이벤트를 받는 코드). 행동으로 실행한다. `Permanent()` 안이었거나, `HistoryLimit`을 넘었거나, 방식이 `None`일 수도 있다. |
 | 지연 효과에서 `NullReferenceException` | 행동 클래스의 `Game` 속성은 `Run`이 끝나면 `null`이다. `GBibleRuntime.Game`을 쓰거나 지역 변수로 받아 둔다. |
-| "처리기가 없습니다" | `GameAction`을 직접 상속했는데 `Actions.Register`를 하지 않았다. `GameAction<T>`·`SimpleAction`을 상속하면 등록이 필요 없다. |
-| "… '…'을(를) 찾을 수 없습니다" | `target`에 없는 id를 넣었다(또는 Undo로 대상이 사라졌다). `Find`로 먼저 확인한다. |
-| "id 필드가 없어 Find로 찾을 수 없습니다" | `GameAction<T>`의 `T`에 `public string id;` 필드가 없다. |
+| "행동 'X'의 처리기가 없습니다" | 행동 클래스에 `protected override void Run()`을 쓰지 않았고 `Actions.Register`도 하지 않았다. |
+| "X 'id'을(를) 찾을 수 없습니다(행동 'A'의 '필드')" | 참조 필드에 넣은 객체의 id가 지금 데이터에 없다(쓰러져 빠짐·Undo로 사라짐). 지연 실행이면 `Find`로 먼저 확인한다. DB 원본 객체를 넣었다면 `[DataRef]` 글자 필드로 바꾼다. |
+| "… id가 비어 있는 X입니다" | 방금 `new`로 만든 객체(데이터 밖)를 넣었다. 새 객체는 행동 안에서 만들고 id는 `Game.NewId(접두어)`로 정한다. |
+| Undo·불러오기 뒤 행동이 화면에 안 보이는 옛 객체를 고침 | 대상 클래스에 `public string id;`가 없어 참조가 아니라 값으로 다뤄졌다. id를 더한다. |
+| 엉뚱한 객체가 고쳐짐 | 같은 형식(또는 같은 부모를 가진 형식)끼리 id가 겹친다. 새 객체의 id는 `Game.NewId`로 만든다. |
+| `Describe`에 이상한 값이 보임 | `Describe`는 참조 필드를 다시 찾기 전에도 불린다. 참조 필드에서는 id만 읽는다. |
+| Unity 객체·델리게이트를 필드에 넣음 | 행동은 데이터라서 기록·전송·리플레이가 안 된다. 플레이어 데이터 안의 객체, DB 원본은 `[DataRef]` 글자, 그 밖은 값으로 넣는다. |
 | Undo 뒤 "행동 밖에서 바뀐 값을 덮었습니다" 경고 | 행동이 바꾼 곳을 행동 밖에서 다시 고쳤다. 그 변경도 행동으로 만든다. |
 | 행동 안에서 기다리기(코루틴·`await`) | 행동은 한 번에 끝나야 한다. 연출은 끝난 결과(이벤트·기록)를 보고 따로 재생하고, 시간이 걸리는 효과는 3장처럼 나눈다. |
 | Undo로 좋은 난수를 다시 뽑으려 함 | Undo하면 난수 상태도 돌아가 같은 행동은 같은 결과를 낸다. |

@@ -80,7 +80,7 @@ void Redraw()   // Game.Data().Run을 읽어 글자·손패·물약 칸을 다�
 
 ## 2. 입력은 행동으로
 
-- 버튼은 객체가 아니라 **id**를 쥔다.
+- 버튼은 행동에 넣을 값을 쥔다. 대상(덱 카드·적)은 **객체 그대로** 쥐어도 된다. 원본(물약 등)은 원본 ID다.
 - 누르면 `Game.Do(new 행동 { … })`를 보낸다.
 - 실패(에너지 부족 등)는 예외로 온다. 잡아서 메시지만 보인다.
 
@@ -99,15 +99,15 @@ void Drink(string potion)
 }
 ```
 
-> [!note]- 왜 id를 쥐나 · 손패 버튼
-> Undo·불러오기 뒤에는 같은 카드가 다른 객체일 수 있지만 id는 같다. 그래서 손패 버튼은 덱의 한 장(`DeckCard`)의 `id`를 쥔다.
+> [!note]- 왜 객체를 쥐어도 되나 · 손패 버튼
+> Undo·불러오기 뒤에는 같은 카드가 다른 객체일 수 있다. 그래도 행동은 실행 직전에 대상 필드의 id로 지금 데이터의 객체를 다시 찾아 넣으므로, 버튼이 옛 객체를 쥐고 있어도 맞는 카드가 나간다. 그래서 손패 버튼은 덱의 한 장(`DeckCard`) 객체를 그대로 쥔다(`Play(picked)`).
 >
 > 카드 던전은 입력을 행동으로 바꾸는 창구를 런 스크립트(`RunDirector.TryPlay`)에 모았다. 화면은 결과 메시지만 보인다.
 > ```csharp
-> void Play(string cardId)
+> void Play(DeckCard card)
 > {
->     var target = Rules.LivingEnemies(GBibleRuntime.Game).FirstOrDefault()?.id;   // 대상 고르기 화면은 생략
->     _message.text = director.TryPlay(cardId, target, out var error) ? "" : error;
+>     var target = Rules.LivingEnemies(GBibleRuntime.Game).FirstOrDefault();   // 대상 고르기 화면은 생략
+>     _message.text = director.TryPlay(card, target, out var error) ? "" : error;
 > }
 > ```
 
@@ -185,7 +185,7 @@ void Update()
 
 ```csharp
 // "card"에 원본 ID를 넘기면 문장 틀이 <원본 ID>.name 텍스트(현재 언어의 카드 이름)로 바꾼다.
-_hand.Add(new Button(() => Play(id)) { text = Texts.Get("card.button", ("card", card.card), ("cost", Rules.CardData(GBibleRuntime.Game, card.card)?.cost ?? 0)) });
+_hand.Add(new Button(() => Play(picked)) { text = Texts.Get("card.button", ("card", card.card), ("cost", Rules.CardData(GBibleRuntime.Game, card.card)?.cost ?? 0)) });
 ```
 
 > [!note]- 카드 던전 전투 화면의 키
@@ -305,7 +305,7 @@ for (var i = run.potions.slots.Count; i < run.potions.capacity; i++)
 - [ ] 화면 코드는 Client 폴더에 있고, 플레이어 데이터를 읽기만 한다.
 - [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번 그린다.
 - [ ] 등록·받기는 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
-- [ ] 버튼은 id를 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
+- [ ] 버튼은 행동에 넣을 값(대상 객체·원본 ID)을 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
 - [ ] 연출은 `SubscribeAfterAction`으로 받아, 성공한 행동의 이벤트만 튼다.
 - [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
 - [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 언어를 바꾸면 다시 그려진다.

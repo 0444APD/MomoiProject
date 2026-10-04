@@ -255,12 +255,11 @@ public class Loadout
 }
 
 [Serializable]
-public class EquipItem : SimpleAction
+public class EquipItem : GameAction
 {
-    public string itemId;
+    public Equipment item;                              // 대상은 객체로(실행 직전에 지금 객체로 다시 찾는다)
     protected override void Run()
     {
-        var item = Game.Find<Equipment>(itemId);
         Game.All<Loadout>()[0].worn[item.slot] = item;     // 부위 키워드를 딕셔너리 키로
     }
 }
@@ -287,11 +286,12 @@ public sealed class EnemyKilled
 }
 
 [Serializable]
-public class Finish : GameAction<Monster>
+public class Finish : GameAction
 {
-    protected override void Run(Monster m)
+    public Monster monster;
+    protected override void Run()
     {
-        Game.Events.Publish(new EnemyKilled { enemy = m.id, tags = new List<string>(m.tags) });
+        Game.Events.Publish(new EnemyKilled { enemy = monster.id, tags = new List<string>(monster.tags) });
     }
 }
 ```

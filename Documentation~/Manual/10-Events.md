@@ -91,7 +91,7 @@ public class UnitKilled
 
 - 에디터와 조건이 읽는 것은 **public 필드**와 **읽을 수 있는 public 속성**(인덱서 제외)이다. private 필드는 보이지 않는다.
 - 필드 형식은 숫자·글자·참거짓·enum·리스트·배열·딕셔너리·다른 클래스 무엇이든 된다. 조건은 형식에 맞는 비교만 보여 준다(숫자는 이상·이하, 리스트는 포함·개수 …).
-- 객체를 통째로 넣기보다 **id**(`killerId`)를 넣는다. 이벤트는 기록에 남고 모니터에서 다시 만들어지므로, 값으로 다시 찾을 수 있는 것이 좋다.
+- 객체를 통째로 넣기보다 **id**(`killerId`)를 넣는다. 이벤트는 기록에 남고 모니터에서 다시 만들어지므로, 값으로 다시 찾을 수 있는 것이 좋다. (행동과 다르다: 행동의 대상 필드는 객체를 넣어도 시스템이 id로 다루지만, 이벤트 필드는 그런 변환이 없다.)
 
 ### 2-3. 읽기 전용 속성 — 계산한 값도 조건에 쓴다
 
@@ -118,13 +118,14 @@ using GBible;
 public class Unit { public string id; public int hp = 30; }   // 플레이어 데이터 클래스
 
 [Serializable]
-public class KillAction : GameAction<Unit>
+public class KillAction : GameAction
 {
-    public string killer;
-    protected override void Run(Unit victim)
+    public Unit killer;
+    public Unit victim;
+    protected override void Run()
     {
         victim.hp = 0;
-        Game.Events.Publish(new UnitKilled { killerId = killer, victimId = victim.id, exp = 10 });
+        Game.Events.Publish(new UnitKilled { killerId = killer.id, victimId = victim.id, exp = 10 });
     }
 }
 ```
@@ -246,20 +247,21 @@ public class UnitKilled
 }
 
 [Serializable]
-public class Attack : GameAction<Unit>
+public class Attack : GameAction
 {
-    public string attacker;
+    public Unit attacker;
+    public Unit target;
     public int damage;
 
-    protected override void Run(Unit target)
+    protected override void Run()
     {
         target.hp -= damage;
         if (target.hp > 0) return;
-        Game.Events.Publish(new UnitKilled { killerId = attacker, victimId = target.id, exp = 10 });
+        Game.Events.Publish(new UnitKilled { killerId = attacker.id, victimId = target.id, exp = 10 });
     }
 }
 
-// 씬 코드: GBibleRuntime.Game.Do(new Attack { target = "orc1", attacker = "hero", damage = 12 });
+// 씬 코드: GBibleRuntime.Game.Do(new Attack { attacker = hero, target = orc, damage = 12 });   // hero·orc: 데이터 안의 Unit 객체
 ```
 
 이 이벤트 하나로 로그("처치 수", "보스 처치 수")·도전과제("첫 처치")·퀘스트가 동시에 반응한다. 공격 행동은 그 기능들을 몰라도 된다.
@@ -272,15 +274,16 @@ public class Attack : GameAction<Unit>
 public class Battle { public List<Unit> units = new List<Unit>(); public int combo; }
 
 [Serializable]
-public class FinishingBlow : GameAction<Unit>
+public class FinishingBlow : GameAction
 {
-    public string attacker;
-    protected override void Run(Unit target)
+    public Unit attacker;
+    public Unit target;
+    protected override void Run()
     {
         target.hp = 0;
         var battle = Game.All<Battle>()[0];
         battle.combo++;
-        Game.Events.Publish(new UnitKilled { killerId = attacker, victimId = target.id, combo = battle.combo });
+        Game.Events.Publish(new UnitKilled { killerId = attacker.id, victimId = target.id, combo = battle.combo });
     }
 }
 ```

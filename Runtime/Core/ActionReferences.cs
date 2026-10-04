@@ -15,6 +15,7 @@ namespace GBible
         {
             public string Name;
             public Type ElementType;
+            public Type FieldType;
             public bool Many;
             public MemberAccess Access;
         }
@@ -34,15 +35,18 @@ namespace GBible
                     field.Access.Set(action, Live(game, action, field, value));
                     continue;
                 }
+                // 넣어 준 목록은 고치지 않고 새 목록에 담아 바꿔 넣는다(데이터 안의 목록을 그대로 넣었어도 그 목록이 바뀌지 않게).
                 if (value is Array array)
                 {
+                    var copy = Array.CreateInstance(field.ElementType, array.Length);
                     for (int i = 0; i < array.Length; i++)
-                        if (array.GetValue(i) is { } item) array.SetValue(Live(game, action, field, item), i);
+                        if (array.GetValue(i) is { } item) copy.SetValue(Live(game, action, field, item), i);
+                    field.Access.Set(action, copy);
                 }
-                else if (value is IList list)
+                else if (value is IList list && DataModel.Create(field.FieldType) is IList fresh)
                 {
-                    for (int i = 0; i < list.Count; i++)
-                        if (list[i] is { } item) list[i] = Live(game, action, field, item);
+                    foreach (var item in list) fresh.Add(item == null ? null : Live(game, action, field, item));
+                    field.Access.Set(action, fresh);
                 }
             }
         }
@@ -103,7 +107,7 @@ namespace GBible
                     }
                     var info = DataModel.Of(fieldType);
                     if ((info.Kind == DataKind.List || info.Kind == DataKind.Array || info.Kind == DataKind.Collection) && IsReferenceType(info.ElementType))
-                        fields.Add(new Field { Name = field.Name, ElementType = info.ElementType, Many = true, Access = FieldAccess.Find(type, field.Name) });
+                        fields.Add(new Field { Name = field.Name, ElementType = info.ElementType, FieldType = fieldType, Many = true, Access = FieldAccess.Find(type, field.Name) });
                 }
                 var plan = fields.ToArray();
                 Plans[type] = plan;

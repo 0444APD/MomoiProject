@@ -193,11 +193,12 @@ public class Duelist
 }
 
 [Serializable]
-public class Slash : GameAction<Duelist>
+public class Slash : GameAction
 {
+    public Duelist target;                                            // 대상은 객체로
     public int baseDamage = 8;
 
-    protected override void Run(Duelist target)
+    protected override void Run()
     {
         var rng = Game.Random("combat");
         if (rng.Range(0, 100) >= target.accuracy) return;            // 빗나감(난수 소비도 Undo 단위)
@@ -224,7 +225,7 @@ public class LootBag
 }
 
 [Serializable]
-public class OpenChest : SimpleAction
+public class OpenChest : GameAction
 {
     static readonly (string item, int weight)[] Table = { ("potion", 60), ("ironSword", 30), ("dragonScale", 10) };
 
@@ -260,7 +261,7 @@ public class DungeonMap
 }
 
 [Serializable]
-public class GenerateFloor : SimpleAction
+public class GenerateFloor : GameAction
 {
     public int floor;
     protected override void Run()
@@ -299,20 +300,22 @@ public class Runner
 }
 
 [Serializable]
-public class DrinkHaste : GameAction<Runner>
+public class DrinkHaste : GameAction
 {
+    public Runner runner;
     public double seconds = 5;
-    protected override void Run(Runner r) =>
-        r.buffs.Add(new TimedBuff { name = "haste", endsAt = Game.Session.Clock.Time + seconds });
+    protected override void Run() =>
+        runner.buffs.Add(new TimedBuff { name = "haste", endsAt = Game.Session.Clock.Time + seconds });
 }
 
 [Serializable]
-public class ExpireBuffs : GameAction<Runner>
+public class ExpireBuffs : GameAction
 {
-    protected override void Run(Runner r)
+    public Runner runner;
+    protected override void Run()
     {
         var now = Game.Session.Clock.Time;
-        r.buffs.RemoveAll(b => b.endsAt <= now);
+        runner.buffs.RemoveAll(b => b.endsAt <= now);
     }
 }
 
@@ -326,7 +329,7 @@ public class BuffTicker : MonoBehaviour
         var runner = game?.Find<Runner>(runnerId);
         if (runner == null) return;
         var now = game.Session.Clock.Time;
-        if (runner.buffs.Exists(b => b.endsAt <= now)) game.Do(new ExpireBuffs { target = runnerId });
+        if (runner.buffs.Exists(b => b.endsAt <= now)) game.Do(new ExpireBuffs { runner = runner });
     }
 }
 ```

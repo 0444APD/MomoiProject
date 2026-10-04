@@ -32,12 +32,12 @@
 
 ```
 [화면] 카드를 적 위에 놓음
-  └ RunDirector.TryPlay(카드 id, 적 id)
-      └ Game.Do(new PlayCard { target = 카드 id, targetId = 적 id })
-          ① 행동 시작
-          ② PlayCard.Run(덱 카드)
+  └ RunDirector.TryPlay(덱 카드, 적)
+      └ Game.Do(new PlayCard { card = 덱 카드, target = 적 })
+          ① 행동 시작 — card·target을 id로 지금 데이터에서 다시 찾아 넣음
+          ② PlayCard.Run()
                에너지 − 비용, 손패 → 버린 더미
-               Game.Use("fireball", 주인공, 적 id)        ← 행동 안의 행동
+               Game.Use("fireball", 주인공, 적)           ← 행동 안의 행동
                  └ 피해 Block → Rules.Damage → DamageDealt·EnemyKilled를 쏜다
                  └ 상태 걸기 Block → 화상
                CardPlayed를 쏜다
@@ -53,7 +53,7 @@
 - **화면은 ③ 뒤의 결과만 본다.** 연출은 `SubscribeAfterAction`으로 행동이 성공한 뒤에 받고, 실패해 취소된 행동의 이벤트는 받지 않는다. 행동 중간 모습은 밖으로 나가지 않는다.
 
 > [!note]- ①~③에서 일어나는 일 자세히
-> - ① 그 전까지의 행동 밖 변경을 떼어 두고, 난수 상태를 보관한다.
+> - ① 그 전까지의 행동 밖 변경을 떼어 두고, 난수 상태를 보관한다. 대상 필드(`card`·`target`)는 id로 지금 데이터의 객체를 다시 찾아 넣는다. 싱글에서 방금 고른 객체면 같은 객체가 그대로 쓰이고, 못 찾으면 행동이 실패한다(02장 4절).
 > - ② 비용 같은 고정 값은 카드 원본에서 읽는다(`Rules.CardData`). 받는 쪽: `DamageDealt` → 연출(모아 두었다가 ③ 뒤에), `EnemyKilled` → 로그 `kills`, `TurnEnded` → 로그 `maxTurnDamage`(마지막 턴도 센다), `BattleWon` → 유물 불타는 피·도전과제 첫 승리.
 > - ③ 모든 플레이어 데이터를 Sync해 Undo 한 단위로 기록하고, 변경 묶음을 전송용으로 내보낸다. 그다음 바뀐 값을 보는 조건(도전과제 등)을 다시 평가한다.
 > - 판 저장이 "행동마다 저장"이면 그 프레임 끝(행동 밖)에서 `run.json`을 쓴다(DB › 시작 파일 › Bootstrap, [10장](10-SaveAndRelease.md)).
@@ -183,12 +183,12 @@ battle.discard.Add(card.id);
 런 스크립트는 그 예외만 잡아 화면에 이유를 보여 준다.
 
 ```csharp
-public bool TryPlay(string cardId, string targetId, out string error)
+public bool TryPlay(DeckCard card, Fighter target, out string error)
 {
     error = null;
     try
     {
-        Game.Do(new PlayCard { target = cardId, targetId = targetId });
+        Game.Do(new PlayCard { card = card, target = target });
         return true;
     }
     catch (System.InvalidOperationException e)
@@ -228,7 +228,7 @@ public bool TryPlay(string cardId, string targetId, out string error)
 > [!note]- 하지 않는 것, 그 이유
 > - **화면에서 고치기**: `Find`로 꺼낸 객체를 씬 코드에서 고치면 행동 밖 변경이 된다. 기록은 남지만 Undo되지 않고, 멀티플레이에서 행동 묶음으로 나가지 않는다. 마지막 행동이 바꾼 곳과 겹치면 Undo가 덮어쓰고 "행동 밖에서 바뀐 값을 덮었습니다" 경고가 남는다.
 > - **받는 코드에서 고치기**: 같은 이유다. 값을 바꿔야 하는 반응은 Trigger의 결과(도전과제·유물)나 이벤트를 쏜 행동 안에서 한다.
-> - **객체를 오래 들고 있기**: 고른 카드·적은 id로 들고 있다가 쓸 때 `Find`한다. Undo는 같은 객체로 되돌리지만, 판 불러오기 뒤에는 다른 인스턴스일 수 있다.
+> - **들고 있던 객체를 직접 읽기**: 버튼이 덱 카드·적 객체를 쥐고 있다가 행동에 넣는 것은 괜찮다. 행동이 실행 직전에 id로 지금 객체를 다시 찾는다. 하지만 그 객체를 화면이 직접 읽으면 판 불러오기 뒤에는 옛 인스턴스일 수 있다. 그릴 때는 `Game.Data()`·`Find`로 다시 꺼낸다.
 > - 창구를 런 스크립트에 모으는 이유: 화면이 행동을 직접 만들어도 되지만, 한곳에 모아 두면 입력 목록이 한눈에 보인다.
 > - `Dispose`하는 이유: 세션은 씬보다 오래 산다.
 > - `Subscribe`와 `SubscribeAfterAction`: `Subscribe`는 행동 안에서 바로 받는다(값을 바꾸는 규칙용). `SubscribeAfterAction`은 바깥 행동이 성공한 뒤 행동 밖에서 쏜 순서대로 받는다(화면용). 연출이 이벤트를 모아 두거나 실패한 행동을 거르는 코드를 직접 쓰지 않는다.
@@ -240,13 +240,13 @@ public bool TryPlay(string cardId, string targetId, out string error)
 행동은 한 번에 끝난다. 행동 안에서 코루틴·`await`로 기다리지 않는다.
 
 - **턴제의 "나중"은 다음 행동 안이다.** "턴이 끝날 때마다 화상 피해"는 남은 횟수·상태를 플레이어 데이터(`Fighter.statuses`)에 두고 `EndTurn` 안에서 처리한다.
-- **시간이 걸리는 효과는 나중에 새 행동으로.** 코루틴·타이머에서 `GBibleRuntime.Game.Do(…)`한다. 실행 전에 대상이 아직 있는지 id로 다시 찾는다.
+- **시간이 걸리는 효과는 나중에 새 행동으로.** 코루틴·타이머에서 `GBibleRuntime.Game.Do(…)`한다. 대상 필드는 실행 직전에 다시 찾고, 대상이 사라졌으면 행동이 실패한다(바뀌는 것 없음).
 
 > [!note]- 지연 효과 자세히
 > - 턴제 쪽은 Undo·저장이 따라오고 난수도 결정론을 지킨다. 카드 던전의 지금 `EndTurn`은 상태를 아직 처리하지 않는다. 화상·빙결이 효과를 내게 하려면 적 공격 앞뒤에 상태 처리를 더한다.
 > - 코루틴·타이머 콜백은 어떤 행동의 바깥이다. 행동의 `Run` 안에서 만든 람다라도 실제로 도는 시점에는 그 행동이 끝나 있고, 행동의 `Game` 속성은 `null`이다. 그래서 `GBibleRuntime.Game`을 쓴다.
 > - 지연 효과 한 번 한 번이 Undo 한 단위가 된다.
-> - 대상은 Undo·사망으로 사라졌을 수 있다.
+> - 대상은 Undo·사망으로 사라졌을 수 있다. 실패 예외 대신 조용히 넘기려면 `Do` 전에 `Game.Find`로 있는지 확인한다.
 > - 시작한 행동을 Undo해도 코루틴은 멈추지 않는다. 남은 횟수를 플레이어 데이터에 두면, Undo로 횟수가 0이 되었을 때 코루틴이 스스로 멈추게 쓸 수 있다.
 > - 카드 던전에서 시간이 걸리는 것은 연출뿐이다. 데이터는 행동 하나로 즉시 바뀌고, 화면이 이벤트를 받아 시간을 두고 보여 준다([06장](06-Presentation.md)).
 

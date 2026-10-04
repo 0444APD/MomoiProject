@@ -133,7 +133,7 @@ for (var i = pile.Count - 1; i > 0; i--)
 1절 표대로 Bootstrap 화면을 고르고, 장르마다 아래를 더 본다.
 
 > [!note]- 턴제 전술
-> - 카드 던전과 같이 행동 단위다. 이동·공격·턴 넘기기가 각각 행동이고, 대상은 유닛 id(`GameAction<Unit>`의 `target`)로 보낸다.
+> - 카드 던전과 같이 행동 단위다. 이동·공격·턴 넘기기가 각각 행동이고, 대상 유닛은 객체 그대로 필드에 넣는다(`public Unit unit; public Unit target;`, `Unit`에 `public string id;`). 실행 직전에 id로 지금 유닛을 다시 찾는다.
 > - 명중·피해는 `damage`, 적의 판단은 `ai` 흐름으로 나눈다. 적 AI가 생각을 더 하게 바꿔도 플레이어 공격의 결과는 바뀌지 않는다.
 > - 소환된 유닛은 `Game.NewId("unit")`으로 id를 받으므로 Undo·저장·멀티플레이에서도 같은 id다.
 > - 아군 턴 전체를 되돌리게 할지, 유닛 하나의 행동만 되돌리게 할지는 Undo 끊는 이벤트로 어느 이벤트를 고르는지로 정한다(유닛 행동 끝 이벤트 / 아군 턴 끝 이벤트).
@@ -143,10 +143,21 @@ for (var i = pile.Count - 1; i > 0; i--)
 >
 > `Undo()` 한 번이 스냅샷 한 칸 되감기이고, 플레이어 데이터·난수·게임 시계가 함께 돌아간다. 그래서 쿨다운은 게임 시계 기준 시각으로 적는다.
 > ```csharp
-> var now = Game.Session.Clock.Time;
-> if (now < hero.dashReadyAt) throw new InvalidOperationException("쿨다운 중");
-> hero.dashReadyAt = now + Cooldown;   // 되감으면 시계와 이 값이 함께 돌아간다
+> [Serializable, BlockInfo("돌진")]
+> public class Dash : GameAction
+> {
+>     public const double Cooldown = 2.0;
+>     public ArenaHero hero;
+>
+>     protected override void Run()
+>     {
+>         var now = Game.Session.Clock.Time;
+>         if (now < hero.dashReadyAt) throw new InvalidOperationException("쿨다운 중");
+>         hero.dashReadyAt = now + Cooldown;   // 되감으면 시계와 이 값이 함께 돌아간다
+>     }
+> }
 > ```
+> - `hero`는 주인공 객체 그대로 넣는다(`Game.Do(new Dash { hero = arenaHero })`). 되감기·불러오기 뒤에 입력 쪽이 옛 객체를 쥐고 있어도 실행 직전에 id로 지금 객체를 다시 찾는다.
 > - 보스 방 입구처럼 꼭 돌아올 수 있어야 하는 순간은 간격을 기다리지 않고 `GBibleRuntime.Session.CaptureSnapshot()`으로 직접 찍는다(행동 실행 중에는 부를 수 없다).
 > - 위치·속도·애니메이션은 MonoBehaviour에 두고, 플레이어 데이터에는 체력·쿨다운·획득물처럼 규칙이 다루는 값만 둔다.
 > - 스냅샷 방식에서는 행동별 Undo 이력을 남기지 않는다.
