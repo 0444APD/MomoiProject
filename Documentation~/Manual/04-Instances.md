@@ -267,6 +267,28 @@ new PlayerDataReward { key = "player.hero", path = "weapon", value = "ironSword"
 
 ---
 
+**인스턴스를 가리키는 칸: `[DataRef]`.** 다른 데이터에서 인스턴스를 가리킬 때는 글자 ID 칸에 `[DataRef]`를 단다(원본은 객체로 들고 다니지 않는다).
+
+| 어트리뷰트 | 목록에 뜨는 것 | 다른 것을 고르면 |
+|---|---|---|
+| `[DataRef(typeof(Card))]` (인스턴스 값의 클래스) | 값이 `Card`(또는 그 하위 클래스)인 인스턴스만 | 검증 오류 "'goblin'은(는) Card 인스턴스가 아닙니다" |
+| `[DataRef(typeof(InstanceData))]` | 모든 인스턴스 | — |
+
+```csharp
+[Serializable] public class DeckCard
+{
+    public string id;
+    [DataRef(typeof(Card))] public string card;          // 카드 칸에 몬스터가 들어갈 수 없다
+}
+[Serializable] public class Enemy
+{
+    public string id;
+    [DataRef(typeof(Monster))] public string monster;
+}
+```
+
+클래스로 거른 칸도 ID 바꾸기 따라가기, 출시 뒤 저장 안의 ID 이어받기는 똑같이 된다.
+
 ## 3. 상황별 예제
 
 ### 3.1 RPG: 장비 아이템 정의 · DB에서 채우기 · 드롭
@@ -355,7 +377,7 @@ public class Stage
 [Serializable]
 public class SpawnWave : GameAction
 {
-    [DataRef(typeof(InstanceData))] public string monster = "goblin";
+    [DataRef(typeof(Monster))] public string monster = "goblin";   // Monster 인스턴스만
     public int count = 3;
 
     protected override void Run()

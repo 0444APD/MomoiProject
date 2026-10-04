@@ -101,7 +101,7 @@ public class Card                      // 원본(DB › 인스턴스). 읽기만
     [Keyword(typeof(CardTag))] public List<string> tags = new List<string>();
     public Sprite art;
     public bool upgradable;
-    [ShowIf(nameof(upgradable)), DataRef(typeof(InstanceData))] public string upgradeTo;
+    [ShowIf(nameof(upgradable)), DataRef(typeof(Card))] public string upgradeTo;
     [Hide] public int balanceScore;
     [SerializeReference] public Usable usable;   // 쓰는 순간의 효과(기능 = 필드 하나)
 }
@@ -110,7 +110,7 @@ public class Card                      // 원본(DB › 인스턴스). 읽기만
 public class DeckCard                  // 판 데이터: 덱에 든 한 장
 {
     public string id;                                       // 장마다 다른 id(Game.NewId("card"))
-    [DataRef(typeof(InstanceData))] public string card;     // 원본 인스턴스 ID
+    [DataRef(typeof(Card))] public string card;     // 원본 인스턴스 ID(Card 인스턴스만 고를 수 있다)
     public bool upgraded;
 }
 ```

@@ -67,7 +67,7 @@ public static class Rarity
 
 ```csharp
 public bool upgradable;
-[ShowIf(nameof(upgradable)), DataRef(typeof(InstanceData))] public string upgradeTo;   // 강화 가능할 때만 보인다
+[ShowIf(nameof(upgradable)), DataRef(typeof(Card))] public string upgradeTo;   // 강화 가능할 때만 보인다
 [Hide] public int balanceScore;                                                       // 밸런스 도구가 채우는 값
 [SerializeReference] public Usable usable;                                            // 기능 필드
 ```
@@ -100,7 +100,9 @@ public bool upgradable;
 
 | 칸 | 붙인 것 |
 |---|---|
-| `Card.upgradeTo`, `DeckCard.card`, `Profile.unlocked` | `[DataRef(typeof(InstanceData))]` |
+| `Card.upgradeTo`, `DeckCard.card`, `Profile.unlocked` | `[DataRef(typeof(Card))]` — 값이 `Card`인 인스턴스만 목록에 뜨고, 다른 클래스를 고르면 검증 오류 |
+| `Enemy.monster` | `[DataRef(typeof(MonsterData))]` |
+| 클래스를 가리지 않는 칸(가방 칸의 아이템 등) | `[DataRef(typeof(InstanceData))]` — 모든 인스턴스 |
 | `RunState.relics` | `[DataRef(typeof(RelicData))]` |
 
 > [!note]- 붙이면 무엇이 달라지나

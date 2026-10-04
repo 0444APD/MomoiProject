@@ -402,7 +402,8 @@ namespace GBible.EditorTools.UI
             {
                 var db = EditorDatabase.Instance;
                 var target = string.IsNullOrEmpty(current) ? null : db.FindById(current);
-                var kind = DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name;
+                if (target != null && !EditorDatabase.MatchesRef(leaf, target)) target = null;
+                var kind = EditorDatabase.RefKindLabel(leaf);
                 return Pill(string.IsNullOrEmpty(current) ? $"{kind} 선택" : target != null ? target.DisplayName : $"없는 {kind}: {current}",
                     string.IsNullOrEmpty(current), !string.IsNullOrEmpty(current) && target == null, anchor =>
                     {

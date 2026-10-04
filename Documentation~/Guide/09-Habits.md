@@ -188,7 +188,7 @@ public class PlayCard : GameAction
 public class DeckCard
 {
     public string id;                                           // 장마다 다른 id(Game.NewId("card"))
-    [DataRef(typeof(InstanceData))] public string card;         // 원본 인스턴스 ID(능력 이름으로도 쓴다)
+    [DataRef(typeof(Card))] public string card;         // 원본 인스턴스 ID(능력 이름으로도 쓴다)
     public bool upgraded;
 }
 

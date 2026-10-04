@@ -234,7 +234,14 @@ namespace GBible.EditorTools
                     }
                     var target = all.FirstOrDefault(d => d != null && d.Id == id);
                     if (target == null || !refType.IsInstanceOfType(target))
+                    {
                         context.Error($"{property.displayName}: 없는 {kind} '{id}'를 가리킵니다. 목록에서 다시 고르거나 {kind}을(를) 먼저 만드세요.");
+                        return;
+                    }
+                    // [DataRef(typeof(Card))]: 값이 그 클래스인 인스턴스여야 한다(카드 칸에 몬스터를 고른 경우).
+                    var field = PropertyUtil.GetField(property, out _);
+                    if (!EditorDatabase.MatchesRef(field, target))
+                        context.Error($"{property.displayName}: '{id}'은(는) {EditorDatabase.RefKindLabel(field)} 인스턴스가 아닙니다. 이 칸에는 {EditorDatabase.RefKindLabel(field)}만 고를 수 있습니다.");
                 });
             }
             catch (Exception e)

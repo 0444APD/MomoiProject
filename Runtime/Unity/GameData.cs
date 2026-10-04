@@ -52,6 +52,8 @@ namespace GBible.Data
 
     // 문자열 필드가 어떤 데이터베이스 항목의 ID인지 표시한다. 에디터는 직접 입력 대신 그 타입 항목만 목록으로 보여 주고,
     // 검증기는 없는 ID를 찾아내며, ID 이름을 바꾸면 이 필드들의 값도 함께 바뀐다. List<string>에도 쓸 수 있다.
+    // GameData가 아닌 클래스를 적으면 그 클래스의 인스턴스만 고른다: [DataRef(typeof(Card))] = DB › 인스턴스 중 값이 Card인 것.
+    // ([DataRef(typeof(InstanceData))]는 모든 인스턴스.)
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class DataRefAttribute : Attribute
     {

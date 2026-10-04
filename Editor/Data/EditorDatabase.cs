@@ -216,7 +216,8 @@ namespace GBible.EditorTools
             if (field.IsDefined(typeof(StatRefAttribute), false)) return typeof(StatData);
             if (field.IsDefined(typeof(AchievementRefAttribute), false)) return typeof(AchievementData);
             var attribute = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
-            if (attribute != null) return attribute;
+            // [DataRef(typeof(Card))]처럼 GameData가 아닌 클래스: 종류는 인스턴스, 고를 수 있는 것은 RefClassOf로 거른다.
+            if (attribute != null) return typeof(GameData).IsAssignableFrom(attribute) ? attribute : typeof(InstanceData);
             // 필드 규칙(DB에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
             var rule = RuleFor(field);
             // 규칙의 값 출처는 글자 필드(또는 string 리스트)에만 적용한다(스프라이트 필드의 규칙은 규격 그룹용).
@@ -251,8 +252,34 @@ namespace GBible.EditorTools
         {
             var type = RefTypeOf(field);
             if (type == null) return Enumerable.Empty<GameData>();
-            var items = OfType(type);
-            return items;
+            return OfType(type).Where(item => MatchesRef(field, item));
+        }
+
+        // [DataRef(typeof(Card))]처럼 인스턴스 값의 클래스로 거르는 필드면 그 클래스(아니면 null).
+        public static Type RefClassOf(System.Reflection.FieldInfo field)
+        {
+            if (field == null) return null;
+            var attribute = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
+            return attribute != null && !typeof(GameData).IsAssignableFrom(attribute) ? attribute : null;
+        }
+
+        // 그 항목이 이 필드에서 고를 수 있는 것인가(종류 + 인스턴스 클래스).
+        public static bool MatchesRef(System.Reflection.FieldInfo field, GameData target)
+        {
+            if (target == null) return false;
+            var type = RefTypeOf(field);
+            if (type == null || !type.IsInstanceOfType(target)) return false;
+            var cls = RefClassOf(field);
+            return cls == null || target is InstanceData instance && instance.InstanceType != null && cls.IsAssignableFrom(instance.InstanceType);
+        }
+
+        // 화면에 보일 참조 종류 이름("카드 인스턴스", "유물" …).
+        public static string RefKindLabel(System.Reflection.FieldInfo field)
+        {
+            var cls = RefClassOf(field);
+            if (cls != null) return DataModel.FriendlyName(cls);
+            var type = RefTypeOf(field);
+            return type == null ? "" : DataTypes.Find(type)?.DisplayName ?? type.Name;
         }
 
         public static bool IsRequired(System.Reflection.FieldInfo field) => RuleFor(field)?.required ?? false;

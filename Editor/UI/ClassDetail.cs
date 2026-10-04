@@ -183,7 +183,7 @@ namespace GBible.EditorTools.UI
             }
             else if (KeywordTools.IsKeywordField(info) && EditorDatabase.RefTypeOf(info) is Type reference)
             {
-                row.Add(Caption($"코드에서 '{DataTypes.Find(reference)?.DisplayName ?? reference.Name}' 항목을 고르도록 정해진 필드입니다."));
+                row.Add(Caption($"코드에서 '{EditorDatabase.RefKindLabel(info)}' 항목을 고르도록 정해진 필드입니다."));
             }
 
             if (KeywordTools.IsSpriteField(info))

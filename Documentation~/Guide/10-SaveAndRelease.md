@@ -221,9 +221,9 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > [!note]- 저장 값 안의 DB 항목 ID가 저절로 바뀌는 조건
 > 출시 후 기획자가 카드 `strike`를 `slash`로 바꿨다고 하자. 플레이어의 저장 파일에는 덱 카드의 `"card": "strike"`가 그대로 있다. 런타임은 저장을 불러올 때(버전 변환 뒤에) 이런 글자를 새 ID로 바꾼다. 대상은 **`[DataRef(종류)]`가 붙은 `string` 필드와 `string` 리스트·배열**이다. 클래스 안 깊이 있어도, 리스트·딕셔너리 값 안에 있어도 찾는다.
 > ```csharp
-> [DataRef(typeof(InstanceData))] public string card;                                  // DeckCard: 덱 카드의 원본 ID
+> [DataRef(typeof(Card))] public string card;                                          // DeckCard: 덱 카드의 원본 ID
 > [DataRef(typeof(RelicData))] public List<string> relics = new List<string>();        // RunState: 가진 유물
-> [DataRef(typeof(InstanceData))] public List<string> unlocked = new List<string>();   // Profile: 해금한 카드
+> [DataRef(typeof(Card))] public List<string> unlocked         = new List<string>();   // Profile: 해금한 카드
 > ```
 > 인벤토리 칸의 아이템 ID(`InventorySlot.item`)에는 이미 붙어 있다. `[DataRef]`도 필드 규칙 연결도 없는 필드, 딕셔너리의 **키**로 쓴 ID는 바뀌지 않는다. 그런 곳은 `[DataRef]`를 달거나 `Migrations.Add`로 직접 고친다.
 

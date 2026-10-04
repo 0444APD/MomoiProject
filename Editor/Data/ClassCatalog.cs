@@ -148,7 +148,7 @@ namespace GBible.EditorTools
         {
             var text = TypeName(field.FieldType);
             var reference = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
-            if (reference != null) text += $" · {DataTypes.Find(reference)?.DisplayName ?? reference.Name} 참조";
+            if (reference != null) text += $" · {EditorDatabase.RefKindLabel(field)} 참조";
             return text;
         }
 

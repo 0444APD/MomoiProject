@@ -195,9 +195,10 @@ namespace GBible.EditorTools.UI
                 var dataRef = EditorDatabase.RefTypeOf(field);
                 if (dataRef != null)
                 {
-                    var kind = DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name;
+                    var kind = EditorDatabase.RefKindLabel(field);
                     if (string.IsNullOrEmpty(id)) return EditorDatabase.IsRequired(field) ? ($"{kind} 선택 (필수)", true, true) : ($"{kind} 선택", true, false);
                     var target = db.FindById(id);
+                    if (target != null && dataRef.IsInstanceOfType(target) && !EditorDatabase.MatchesRef(field, target)) return ($"{kind}이 아님: {id}", false, true);
                     return target != null && dataRef.IsInstanceOfType(target) ? (target.DisplayName, false, false) : ($"없는 {kind}: {id}", false, true);
                 }
                 if (field != null && field.IsDefined(typeof(ClassTypeRefAttribute), false))

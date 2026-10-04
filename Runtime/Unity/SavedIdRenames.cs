@@ -168,6 +168,8 @@ namespace GBible
             // [DataRef(종류)] 필드: string이면 그 값, string 리스트·배열이면 각 요소.
             Plan IdsOf(Type fieldType, Type dataType)
             {
+                // [DataRef(typeof(Card))]: 인스턴스 값의 클래스로 거르는 필드도 ID는 인스턴스 ID다.
+                if (dataType != null && !typeof(GameData).IsAssignableFrom(dataType)) dataType = typeof(InstanceData);
                 var map = MapFor(dataType);
                 if (map == null) return null;
                 var id = new IdPlan { Map = map };
