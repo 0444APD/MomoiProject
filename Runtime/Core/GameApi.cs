@@ -207,6 +207,15 @@ namespace GBible
         public string Roll(string tableId) => Session.Tables.Roll(tableId).FirstOrDefault();
         public List<string> Roll(string tableId, int count, bool unique = false) => Session.Tables.Roll(tableId, count, unique);
 
+        // ── 월드 상태 ───────────────────────────────────────────
+        // 씬에 놓인 것들의 상태를 이름으로 기억한다(행동 안에서 바꾼다). 판 값이 프로필 값보다 앞선다.
+        //   Game.SetWorld("forest.chest3", "opened");   Game.WorldFlag("forest.boss")
+        public string World(string id) => Session.World.Get(id);
+        public bool WorldFlag(string id) => WorldStateSystem.IsTrue(Session.World.Get(id));
+        public void SetWorld(string id, string value, bool permanent = false) => Session.World.Set(id, value, permanent);
+        public void SetWorld(string id, bool flag, bool permanent = false) => Session.World.Set(id, flag ? "true" : null, permanent);
+        public void ClearWorld(string id) => Session.World.Clear(id);
+
         // ── 선택 대기 ───────────────────────────────────────────
         // 플레이어에게 고르기를 요구한다(행동 안에서). 고르면 then의 [Chosen] 필드에 고른 것이 들어가 실행된다. 돌려주는 값은 선택 id.
         //   Game.Ask("버릴 카드", run.hand, new DiscardChosen(), min: 1, max: 1);

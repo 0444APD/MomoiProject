@@ -528,6 +528,16 @@ namespace GBible
     [AddComponentMenu("")]
     sealed class GBibleHost : MonoBehaviour
     {
+        // 연출 대기열(GameView.Present)의 코루틴을 돌리는 오브젝트.
+        internal static GBibleHost Instance { get; private set; }
+
+        void Awake() => Instance = this;
+
+        void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
         void LateUpdate()
         {
             var session = GBibleRuntime.Session;
@@ -543,6 +553,7 @@ namespace GBible
                 }
                 GBibleRuntime.FrameEndSave();
                 GameView.FrameEnd();
+                GameView.Pump();
             }
             GameTime.OnFrameEnd();
         }
