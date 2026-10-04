@@ -91,11 +91,12 @@ public static class SeedSetup
 ### 2.5 게임 시계: `session.Clock` (`GameClock`)
 
 ```csharp
-long tick = Game.Session.Clock.Tick;     // 프레임 끝을 지난 횟수
+long tick = Game.Session.Clock.Tick;     // 프레임 끝을 지난 횟수(고정 틱이면 틱 수)
 double now = Game.Session.Clock.Time;    // 게임 시간(초)
 ```
 
 - `GBibleRuntime`이 매 프레임 끝(`LateUpdate`)에 `session.EndFrame(Time.deltaTime)`을 부르고, 그때 `Tick`이 1 오르고 `Time`에 `deltaTime`이 더해진다. `Time.deltaTime`은 `Time.timeScale`을 따르므로 배속·일시정지가 시계에 그대로 반영된다.
+- 고정 틱(DB › Bootstrap의 초당 틱 수, `33-Tick-Preview-Csv.md`)을 켜면 프레임마다가 아니라 틱마다 `Tick`이 1 오르고 `Time`에 1/틱 초가 더해진다(한 프레임에 여러 틱일 수 있다).
 - 일시정지 중(`deltaTime`이 0)에는 `EndFrame`을 부르지 않는다. 시계가 멈추고 스냅샷도 찍히지 않지만, 플레이어 데이터 Sync와 조건 평가는 계속한다.
 - 세션을 직접 만들었다면 `session.EndFrame(deltaTime)`을 직접 부른다.
 - 행동을 실행하면 그때의 `Tick`이 행동의 `tick` 필드에 적힌다. 기록(Journal)의 각 줄도 틱을 갖는다.

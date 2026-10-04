@@ -26,7 +26,7 @@
 | `[Chosen]` | 이어서 할 행동의 필드에 붙이는 어트리뷰트. 고른 것이 그 필드에 들어간다. |
 | 컨텍스트 (`TriggerContext`) | 결과가 도는 순간의 정보. 상태 효과의 결과에서는 `User`가 가진 쪽, `Owner`가 상태 효과 ID다. |
 
-> **상태 효과와 키워드 '상태'** — 가이드의 카드 던전에는 키워드 그룹 `Status`(`burn`·`frozen`)와 효과 Block `상태 걸기`가 있다. 그 Block은 `Fighter.statuses`에 글자를 넣기만 하는 예제다. 지속·중첩·턴마다의 효과가 필요한 것은 이 장의 상태 효과(DB › 상태 효과, ID 상수는 `GameIds.Status`)로 만든다.
+> **상태 효과와 키워드** — 화상·빙결 같은 상태는 키워드 목록(05장)에 글자로 두지 않고 이 장의 상태 효과(DB › 상태 효과, ID 상수는 `GameIds.Status`)로 만든다. 걸린 것은 대상의 필드가 아니라 플레이어 데이터 `$statuses`에 있다(2-4). 그래야 지속·중첩·턴마다의 효과·만료가 붙는다.
 
 ---
 
@@ -89,7 +89,7 @@
 - 지속의 **가진 쪽 필드**를 고르면, 셀 이벤트의 그 필드가 가진 쪽 id일 때만 센다(예: 턴 끝 이벤트에 플레이어 id가 있으면 "내 턴이 끝날 때만"). 비우면 그 이벤트를 받을 때마다 센다.
 - 셀 이벤트는 형식이 정확히 같아야 한다(상속한 형식은 따로다).
 - 시간 만료도 행동이라 Undo된다(스냅샷 방식이면 되감기로 돌아온다).
-- 끝날 때 결과는 가진 쪽이 아직 데이터에 있을 때만 돈다. 가진 쪽이 먼저 사라졌으면(쓰러져 전투에서 빠진 적) 결과 없이 정리된다.
+- 끝날 때 결과는 가진 쪽이 아직 데이터에 있을 때만 돈다. 가진 쪽이 먼저 사라졌으면(쓰러져 전투에서 빠진 적) 그 행동이 끝날 때 결과 없이 정리된다(2-3).
 
 ### 2-3. 걸려 있는 동안
 
@@ -107,7 +107,7 @@
 
 **한계** — 트리거 안의 조건(조건 충족 잎·이벤트 조건)은 가진 쪽마다 따로 검사하지 않는다. 한 번 검사하고, 가진 쪽은 가진 쪽 필드로만 거른다. 가진 쪽의 값에 따라 달라지는 조건("체력이 절반 이하인 가진 쪽만")은 `[BindTo]` 코드에서 `c.User`를 보고 판단한다(4-3).
 
-**가진 쪽이 사라지면** — 가진 쪽이 플레이어 데이터에서 빠지면 그 상태 효과는 다음에 트리거가 발동할 때, 또는 지속이 끝날 때 결과 없이 정리된다.
+**가진 쪽이 사라지면** — 가진 쪽을 플레이어 데이터에서 뺀 행동(쓰러진 적을 전투에서 빼는 피해)이 끝나기 직전에, **그 행동 안에서** 그 대상에 걸린 상태 효과를 모두 지운다. 끝날 때 결과는 돌지 않는다. 그 대상의 이번 판 Modifier(상태 효과의 능력치 보정 포함, 28장 2-2)도 함께 지운다. 그 행동을 Undo하면 대상과 함께 돌아온다. 영구 Modifier는 지우지 않는다(대상이 다음 판에 다시 생긴다).
 
 ### 2-4. 걸린 것이 사는 곳
 
@@ -130,7 +130,8 @@
   - 시간 예약: 타임라인에 경고 "예약 실행이 실패해 지웁니다: (행동) — (이유)"를 남기고 지운다(매 프레임 다시 시도하지 않는다).
   - 이벤트 예약: 이벤트를 받는 쪽의 오류처럼 타임라인에 오류로 남고, 이벤트를 쏜 행동은 계속된다. 예약된 행동이 실패 전까지 바꾼 것은 남는다. 그래서 예약할 행동은 실패할 일(모자란 비용 등)을 먼저 확인하고 고친다.
 - **저장**: `$schedule`(세션, "예약"), `permanent: true`면 `$schedule.meta`(메타, "영구 예약"). 판 저장·불러오기로 이어진다.
-- **시각은 게임 시계**(`session.Clock.Time`) 기준이다. 게임 시계는 게임을 켤 때 0에서 시작하고, 판을 불러오면 그 판의 시각으로 돌아간다. 그래서 판을 넘는 `permanent` 예약을 시간으로 걸면 언제 실행될지 정해지지 않는다. 판을 넘는 예약은 이벤트 예약으로 쓴다.
+- **시각은 게임 시계**(`session.Clock.Time`) 기준이다. 게임 시계는 게임을 켤 때 0에서 시작하고, 판을 불러오면 그 판의 시각으로 돌아간다. 그래서 판을 넘는 시각은 정해지지 않는다. **영구 예약은 이벤트 예약(`ScheduleOn`)만** 쓸 수 있고, 시간 예약에 `permanent: true`를 주면 `InvalidOperationException`("[MomoiProject] 영구 예약은 이벤트 예약(ScheduleOn)만 쓸 수 있습니다(게임 시간은 판마다 0부터 다시 흐릅니다).")으로 그 행동이 취소된다.
+- 고정 틱(33장)을 켜면 시간 예약은 틱마다 확인된다(프레임 속도와 상관없이 같은 틱에 실행).
 
 ### 2-6. 선택 대기
 
@@ -189,7 +190,7 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 - 검증 오류: "지속: 횟수를 셀 이벤트를 고르세요." / "지속: 횟수는 1 이상이어야 합니다." / "지속: 시간은 0보다 커야 합니다." / "능력치 보정: 능력치(숫자 필드 이름)를 적으세요." / "비어 있는 결과 칸이 있습니다(스크립트가 지워졌을 수 있음)."
 - 검증 경고: "지속이 영구라 끝날 때 결과가 돌지 않습니다(풀어서 없앨 때는 돌지 않습니다)." / "걸려 있는 동안 트리거가 없어 결과가 돌지 않습니다." / "트리거가 있는데 결과가 없습니다." 트리거·결과 자신의 검증도 함께 뜬다.
 
-> **`[BindTo]`와 세 결과 칸** — 상태 효과 ID에 `[BindTo]`를 붙이면 코드가 `outcomes`(걸려 있는 동안의 결과)를 대신한다(4-3). 이때 DB에서는 `outcomes`·`onApply`·`onExpire` 세 칸이 모두 잠겨 보이지만, 실행할 때 코드로 바뀌는 것은 `outcomes`뿐이고 `onApply`·`onExpire`는 저장된 내용 그대로 돈다. 걸릴 때·끝날 때 결과가 있는 상태 효과는 `[BindTo]` 대신 `outcomes` 칸에 코딩한 결과 Block(`Reward`, 12장 3-2)을 둔다. 걸릴 때·끝날 때 결과를 코드로 쓸 때도 그 칸에 코딩한 결과 Block을 둔다.
+> **`[BindTo]`와 세 결과 칸** — 상태 효과 ID에 `[BindTo]`를 붙이면 코드가 `outcomes`(걸려 있는 동안의 결과)를 대신한다(4-3). DB에서도 `outcomes` 칸만 잠기고(연결된 함수 이름 · `cs 열기`), `onApply`·`onExpire`는 그대로 고친다. 두 칸은 `[OutcomeSlot(…, BindTo = false)]`라서 코드가 대신하지 않는다(13장 2-11). 걸릴 때·끝날 때 결과를 코드로 쓰려면 그 칸에 코딩한 결과 Block(`Reward`, 12장 3-2)을 둔다.
 
 ### 3-2. 효과 `상태 효과 걸기` · `상태 효과 풀기`
 
@@ -231,7 +232,7 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 | `effects` | 고른 것에 효과 | `+ 효과 추가`. 고른 것마다 모든 효과를 실행한다(효과의 대상 형식과 다른 것은 건너뛴다) |
 | `then` | 고른 뒤 결과 | `+ 결과 추가`. 효과 다음에 한 번 돈다. 안에 `선택 요구`를 또 넣으면 이어 고르기가 된다 |
 
-- 후보 중 `id`가 있는 객체만 후보가 된다. 이 Block이 만든 선택의 후보 이름은 id다. 화면은 id로 객체를 찾아 이름을 그린다(5-10).
+- 후보 중 `id`가 있는 객체만 후보가 된다. 후보 이름은 텍스트 표의 `<id>.name`이고, 없으면 id다. DB 원본처럼 이름 키가 있는 id는 이름이 보이고, 판 안에서 만든 개체(덱 카드 `card3`)는 id가 보인다. 그런 후보는 화면이 id로 객체를 찾아 이름을 그린다(5-10).
 - 사용자·`Owner`는 요구한 순간 그대로 이어진다. 고른 것에 효과의 `User<T>()`, 고른 뒤 결과의 `User`가 요구할 때의 사용자이고, 고른 뒤 결과의 `Picked`는 고른 것들이다. 받은 이벤트는 이어지지 않는다(`Event`가 비어 있다).
 - 효과·결과는 요구한 순간의 **사본**이 선택과 함께 저장된다. 그 사이 DB를 고쳐도 기다리는 선택에는 영향이 없다.
 - 후보가 없으면 기다리지 않고 바로 이어 간다. 효과는 없고, 고른 뒤 결과는 돈다.
@@ -326,7 +327,7 @@ public static class StatusCode
 }
 ```
 
-- 연결된 코드는 `outcomes`(걸려 있는 동안의 결과)를 대신한다. `onApply`·`onExpire`는 대신하지 않는다(3-1의 주의).
+- 연결된 코드는 `outcomes`(걸려 있는 동안의 결과)를 대신한다. `onApply`·`onExpire`는 대신하지 않고 DB에서 그대로 고친다(3-1).
 - 가진 쪽마다 한 번씩 불린다. 가진 쪽 필드로 걸러진 뒤다.
 - 조건 충족만으로 된 트리거에는 이벤트가 없으므로 `(TriggerContext c)`만 받는다.
 - 가진 쪽에 따른 조건은 여기서 판단한다: `if (((Fighter)c.User).hp * 2 > ((Fighter)c.User).maxHp) return;`
@@ -393,14 +394,14 @@ Game.CancelSchedules(GameIds.Instance.Foresight);                               
 
 | 멤버 | 뜻 |
 |---|---|
-| `string ScheduleAfter(double seconds, GameAction action, string source = null, bool permanent = false)` | 게임 시간 `seconds`초 뒤(0보다 작으면 0) 프레임 끝에 실행. 돌려주는 값은 예약 id(`$schedule1` …) |
+| `string ScheduleAfter(double seconds, GameAction action, string source = null, bool permanent = false)` | 게임 시간 `seconds`초 뒤(0보다 작으면 0) 프레임 끝(고정 틱이면 그 틱)에 실행. 돌려주는 값은 예약 id(`$schedule1` …). `permanent: true`는 예외(2-5) |
 | `string ScheduleOn<TEvent>(int count, GameAction action, string source = null, bool permanent = false)` | `TEvent`를 `count`번(1보다 작으면 1) 받은 순간, 그 이벤트를 쏜 행동 안에서 실행 |
 | `bool CancelSchedule(string id)` | 그 예약을 지운다. 지웠으면 `true` |
 | `int CancelSchedules(string source)` | 그 출처의 예약을 모두 지운다. 지운 개수 |
 
 - `action`은 행동 객체다. 대상 필드는 id만 남고 실행 직전에 다시 찾는다(2-5). 행동 클래스는 다른 행동처럼 `[Serializable]`로 둔다.
 - `source`는 나중에 한꺼번에 지울 때 쓰는 글자(보통 이 예약을 건 항목 ID)다.
-- `permanent: true`면 메타 구역(프로필)에 저장되어 새 판에도 남는다(2-5의 게임 시계 주의).
+- `permanent: true`면 메타 구역(프로필)에 저장되어 새 판에도 남는다. 이벤트 예약(`ScheduleOn`)만 된다. `ScheduleAfter`에 주면 `InvalidOperationException`(2-5).
 - 걸기·취소 모두 행동 안에서 부른다.
 - `action`이 `null`이면 `ArgumentNullException`.
 
@@ -429,20 +430,24 @@ Game.CancelSchedules(GameIds.Instance.Foresight);                               
 // 후보 = id가 있는 객체(덱 카드·적 …)
 Game.Ask("버릴 카드", handCards, new DiscardChosen(), min: 1, max: 1, label: o => Rules.CardData(Game, ((DeckCard)o).card)?.title);
 
-// 후보 = 글 선택지(객체가 아닌 것: DB 원본 ID, "공격/방어" 같은 선택)
+// 후보 = id 글자(손패 battle.hand 같은 id 목록을 그대로, DB 원본 ID)
+Game.Ask("버릴 카드", Game.Data().Run.battle.hand, new DiscardChosen());
+
+// 후보 = 글 선택지(id와 보일 글을 직접: "공격/방어" 같은 선택)
 Game.Ask("자세", new[] { new ChoiceCandidate("attack", "공격"), new ChoiceCandidate("guard", "방어") }, new ChooseStance());
 ```
 
 | 멤버 | 뜻 |
 |---|---|
-| `string Ask(string prompt, IEnumerable<object> candidates, GameAction then, int min = 1, int max = 1, string source = null, string player = null, Func<object, string> label = null)` | 객체 후보로 요구한다. 후보는 `id`가 있는 객체. `label`은 후보마다 보일 이름을 만드는 함수(비우거나 `null`을 돌려주면 id) |
-| `string Ask(string prompt, IEnumerable<ChoiceCandidate> options, GameAction then, int min = 1, int max = 1, string source = null, string player = null)` | 글 선택지로 요구한다 |
+| `string Ask(string prompt, IEnumerable<object> candidates, GameAction then, int min = 1, int max = 1, string source = null, string player = null, Func<object, string> label = null)` | 후보로 요구한다. 후보는 `id`가 있는 객체 또는 id 글자(글자 자체가 id). `label`은 후보마다 보일 이름을 만드는 함수. 비우거나 `null`을 돌려주면 텍스트 표의 `<id>.name`(없으면 id) |
+| `string Ask(string prompt, IEnumerable<ChoiceCandidate> options, GameAction then, int min = 1, int max = 1, string source = null, string player = null)` | 글 선택지로 요구한다(보일 글을 직접 준다) |
 
 - 돌려주는 값은 선택 id(`$choice1` …). 후보가 없어 바로 이어 간 경우는 `null`.
 - `then`은 이어서 할 행동이다. `[Chosen]` 필드가 있어야 한다(4-9). 없으면 `InvalidOperationException`("[MomoiProject] 이어서 할 행동 'X'에 고른 것을 받을 [Chosen] 필드가 없습니다.").
 - `source`는 요구한 항목 ID(기록용), `player`는 답할 플레이어(2-6).
 - 행동 안에서 부른다. 다음 줄은 고르기 전에 실행된다.
-- 객체 후보 형식에 `id`가 없으면 예외다. 카드 던전의 손패(`battle.hand`)는 덱 카드 **id 글자 리스트**라서 그대로 넘기면 "[MomoiProject] String에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다." 예외가 난다. 덱 카드 객체로 바꿔 넘기거나(`hand.Select(id => Rules.CardOf(Game, id))`), id로 `ChoiceCandidate`를 만든다.
+- 후보가 글자면 그 글자가 id다. 카드 던전의 손패(`battle.hand`)는 덱 카드 **id 글자 리스트**라서 그대로 넘긴다. 이어서 할 행동의 `[Chosen]`이 객체 칸(`List<DeckCard>`)이면 답할 때 그 id로 지금 데이터의 덱 카드를 찾아 넣는다(4-9).
+- 객체 후보 형식에 `id`가 없으면 예외다("[MomoiProject] Unit에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다.").
 
 ### 4-9. `[Chosen]` — 고른 것을 받는 칸
 
@@ -484,7 +489,7 @@ Game.Answer(choice.id, picked.Cast<object>().ToList());    // 목록으로
 | `ActionRecord Answer(string choiceId, IEnumerable<object> picked)` · `Answer(string choiceId, params object[] picked)` | 답한다(행동 밖, 플레이어 입력에서). 고른 것은 객체 또는 id 글자. 행동 `ChoiceAnswer` 하나로 실행된다 |
 | `bool CancelChoice(string choiceId)` | 기다리는 선택을 답 없이 지운다(이어서 할 행동은 돌지 않는다). 행동 안에서 부른다 |
 
-답하기가 실패하면 예외가 `Answer`를 부른 쪽으로 온다. 플레이어에게 보일 실패라 `GameFailure`(`InvalidOperationException`을 상속)이고, 메시지는 텍스트 표에 그 키가 있으면 번역된 글이다.
+답하기가 실패하면 예외가 `Answer`를 부른 쪽으로 온다. 플레이어에게 보일 실패라 `GameFailure`(`InvalidOperationException`을 상속, `30-Balance-Tables.md` 2-4)이고, 메시지는 텍스트 표에 그 키가 있으면 번역된 글이다.
 
 | 경우 | 메시지(기본 문장) | 텍스트 키(`FailureKeys`) |
 |---|---|---|
@@ -759,9 +764,9 @@ static void Survey(TriggerContext c)
 {
     var game = c.Game;
     game.Do(new DrawCards { count = 2 });
-    var hand = game.Data().Run.battle.hand.Select(id => Rules.CardOf(game, id));     // 손패는 id 리스트 → 덱 카드 객체로
+    var hand = game.Data().Run.battle.hand;                                           // 덱 카드 id 리스트를 그대로 후보로
     game.Ask("버릴 카드", hand, new DiscardChosen(), min: 1, max: 1, source: c.Owner,
-        label: o => Rules.CardData(game, ((DeckCard)o).card)?.title);
+        label: o => Rules.CardData(game, Rules.CardOf(game, (string)o).card)?.title);  // 보일 이름 = 카드 원본의 이름
     // 여기 아래는 고르기 전에 바로 실행된다. 고른 뒤의 일은 DiscardChosen에 쓴다.
 }
 
@@ -788,7 +793,8 @@ public class DiscardChosen : GameAction
 | 플레이어가 고른다: `Game.Answer(choice.id, card)` → 버리기 | `ChoiceAnswer` 하나 |
 
 - Undo 한 번이면 버리기만 돌아가고 다시 고르기를 기다린다. 한 번 더 Undo하면 정리를 내기 전으로 돌아간다.
-- 손패 id를 그대로 받고 싶으면 글 선택지로 요구하고(`battle.hand.Select(id => new ChoiceCandidate(id, 이름))`), 이어서 할 행동에서 `[Chosen] public List<string> cardIds;`로 받는다.
+- 후보는 id 글자 그대로지만 `[Chosen]`이 `List<DeckCard>`라서 답할 때 덱 카드 객체로 찾아 넣는다. id 그대로 받고 싶으면 `[Chosen] public List<string> cardIds;`.
+- `label`을 비우면 후보 이름은 텍스트 표의 `<id>.name`이다. 덱 카드 id(`card3`)에는 이름 키가 없으므로 id가 보인다. 그래서 카드 원본의 이름을 `label`로 준다.
 - 손패가 비어 있으면 기다리지 않고 바로 `DiscardChosen`이 돈다(버릴 것 없음).
 
 ### 5-8. 보상 3개 중 1개 — DB 원본 ID · 글 선택지
@@ -797,7 +803,7 @@ public class DiscardChosen : GameAction
 
 ```csharp
 // WinBattle.Run 끝에
-var pool = new[] { GameIds.Instance.Strike, GameIds.Instance.Defend, GameIds.Instance.Fireball };   // 보통은 Game.Random으로 고른다
+var pool = new[] { GameIds.Instance.Strike, GameIds.Instance.Defend, GameIds.Instance.Fireball };   // 보통은 가중치 표로 뽑는다(30장 5-5)
 var options = pool.Select(id => new ChoiceCandidate(id, Rules.CardData(Game, id).title));
 Game.Ask("카드 보상", options, new TakeCardReward(), min: 0, max: 1);   // 최소 0 = 건너뛰기 허용
 
@@ -885,7 +891,7 @@ Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", cost);
 3. 플레이어가 한 장을 고르면 그 덱 카드에 `free`가 걸린다(상태 효과는 id가 있는 객체면 무엇에든 걸린다).
 4. 그 카드를 내면 비용 0. 턴이 끝나면 `free`가 저절로 풀린다.
 
-- 시험: 모니터 **명령** 탭의 "선택 대기 · 비용 0으로 만들 카드" 패널에서 고른다. 버튼에는 `card3`처럼 덱 카드 id가 보인다(이 Block은 이름을 붙이지 않는다). 데이터 탭 `$statuses`에서 `target`이 그 id인 `free` 줄을 확인한다.
+- 시험: 모니터 **명령** 탭의 "선택 대기 · 비용 0으로 만들 카드" 패널에서 고른다. 버튼에는 후보 이름(텍스트 표의 `<id>.name`)이 보이는데, 덱 카드 id에는 이름 키가 없어 `card3`처럼 id가 보인다. 데이터 탭 `$statuses`에서 `target`이 그 id인 `free` 줄을 확인한다.
 - 손패가 비어 있으면 기다리지 않는다(효과 없음).
 - 같은 조립으로 "손패에서 2장 골라 버리기"(`max` 2, 효과 `버리기` Block), "적 하나를 골라 독"(후보 `모든 적`, 효과 `상태 효과 걸기`(`poison`))도 된다.
 
@@ -951,7 +957,7 @@ public class ChoicePanel : MonoBehaviour
         }
     }
 
-    // 선택 요구 Block의 후보는 이름이 id다. 덱 카드면 카드 이름으로 바꿔 그린다.
+    // 후보 이름은 텍스트 표의 '<id>.name'(없으면 id)이다. 덱 카드는 이름 키가 없어 id가 이름이므로 카드 이름으로 바꿔 그린다.
     static string NameOf(ChoiceCandidate option) =>
         Rules.CardOf(Game, option.id) is DeckCard card ? Rules.CardData(Game, card.card)?.title ?? option.label : option.label;
 
@@ -1027,20 +1033,21 @@ _hand.SetEnabled(!GBibleRuntime.Game.IsWaiting);     // Redraw 안
 | `Game.RemoveModifiers("rage")`로 분노 보정이 안 떨어짐 | 상태 효과의 보정 출처는 걸린 것의 id(`$status1`)다. `Game.RemoveStatus`로 푼다. |
 | 상태 효과 결과 안에서 "체력이 절반 이하인 가진 쪽만" 조건이 안 먹음 | 트리거의 조건은 가진 쪽마다 따로 검사하지 않는다(조건 Block의 `Context.User`가 비어 있다). `[BindTo]` 코드에서 `c.User`를 보고 판단한다(4-3). |
 | 상태 효과의 결과가 Undo되지 않음 | 트리거가 조건 충족만으로 되어 있어 행동이 끝난 뒤에 돌았다. 판 값을 바꾸는 상태 효과는 이벤트 받기·가로채기로 발동시킨다. |
-| `[BindTo]`를 붙였더니 걸릴 때·끝날 때 결과 칸도 잠김 | 에디터는 세 칸을 모두 잠가 보이지만 코드가 대신하는 것은 `outcomes`뿐이고, 숨은 걸릴 때·끝날 때 결과는 그대로 돈다. 걸릴 때·끝날 때 결과가 있는 상태 효과는 `[BindTo]` 대신 코딩한 결과 Block을 쓴다(3-1). |
+| `[BindTo]`를 붙였는데 걸릴 때·끝날 때 결과가 그대로 돎 | 정상이다. 코드가 대신하는 것은 `outcomes`(걸려 있는 동안의 결과)뿐이다. 걸릴 때·끝날 때 결과는 DB에서 그대로 고친다(3-1). |
+| 쓰러진 적에게 걸려 있던 상태 효과가 모니터에서 사라짐 | 정상이다. 대상을 데이터에서 뺀 행동이 끝날 때 그 행동 안에서 지운다(끝날 때 결과 없음, 2-3). Undo하면 돌아온다. |
 | 능력치 보정이 든 상태 효과를 걸었더니 행동이 실패("…숫자 필드 '…'가 없어…") | `attribute` 오타이거나 그 대상 형식에 숫자 필드가 없다. 칸이 글자라 DB 검증이 잡지 못한다. |
 | 예약한 행동이 다음 전투에서 실행됨 | 예약은 판 동안 남는다. 카드 던전은 전투 승리도 턴 끝을 쏜다. 전투를 끝내는 행동에서 `Game.CancelSchedules(출처)`(5-6). |
 | 예약이 실행되지 않고 "대상이 없어 예약을 실행하지 않았습니다" | 실행할 때 대상 필드의 객체가 데이터에 없다(쓰러진 적). 정상 동작이다. |
 | 이벤트 예약이 실패했는데 앞부분 변경이 남음 | 이벤트 예약은 이벤트를 받는 쪽처럼 돈다. 실패해도 이벤트를 쏜 행동은 계속되고, 예약된 행동이 실패 전까지 바꾼 것은 남는다. 실패할 일을 먼저 확인한다(2-5). |
-| `permanent` 시간 예약이 엉뚱한 때 실행됨 | 게임 시계는 게임을 켤 때 0에서 시작하고 판을 불러오면 그 판의 시각이 된다. 판을 넘는 예약은 이벤트 예약으로(2-5). |
+| "영구 예약은 이벤트 예약(ScheduleOn)만 쓸 수 있습니다" | `ScheduleAfter`에 `permanent: true`를 줬다. 게임 시계는 판마다 다시 흐르므로 판을 넘는 시간 예약은 없다. 판을 넘는 예약은 이벤트 예약으로(2-5). |
 | `Ask` 다음 줄이 고르기 전에 실행됨 | 행동은 멈추지 않는다. 고른 뒤의 일은 이어서 할 행동(`[Chosen]`이 있는 행동)에 쓴다. |
 | "[MomoiProject] 이어서 할 행동 'X'에 고른 것을 받을 [Chosen] 필드가 없습니다." | 이어서 할 행동에 `[Chosen]` 필드를 둔다(4-9). |
 | "…[Chosen] 필드는 string, id가 있는 클래스, 그 리스트·배열이어야 합니다." | `int`·id 없는 클래스 같은 형식에 붙였다. |
-| 손패를 넘겼더니 "String에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다." | 객체 후보 `Ask`에 id 글자 리스트를 넘겼다. 덱 카드 객체로 바꾸거나 `ChoiceCandidate`로 넘긴다(4-8). |
+| 후보를 넘겼더니 "…에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다." | 후보 객체의 클래스에 `id`가 없다. `public string id;`를 두거나 id 글자·`ChoiceCandidate`로 넘긴다(4-8). |
 | 답하기가 "1개를 골라야 합니다(고른 것 0개)."로 실패 | 개수가 최소~최대 밖이다. 아무것도 바뀌지 않았고 선택은 그대로 기다린다. 화면이 메시지를 보여 주고 다시 고르게 한다. |
 | 고른 카드가 답하기 전에 없어져 답하기가 실패("…을(를) 찾을 수 없습니다") | `[Chosen]`이 객체 칸이면 답하는 순간 다시 찾는다. 사라질 수 있는 후보는 `string` 칸으로 받고 이어서 할 행동에서 확인한다(4-9). |
 | 답하기를 Undo했더니 고르기 창이 안 열림 | `ChoiceRequested`는 다시 오지 않는다. 창의 내용은 `GameView.Redraw(…, ChoiceSystem.Key)`로 `Game.Choice`에서 그린다(5-10). |
 | 고르는 중에 다른 카드가 눌림 | 시스템은 다른 행동을 막지 않는다. 입력 창구가 `Game.IsWaiting`으로 막는다(5-10). |
-| 선택 요구의 버튼에 id만 보임 | `선택 요구` Block은 후보 이름을 붙이지 않는다. 화면이 id로 객체를 찾아 이름을 그린다. 코드의 `Game.Ask`는 `label`로 이름을 줄 수 있다. |
+| 선택 요구의 버튼에 id만 보임 | 후보 이름은 텍스트 표의 `<id>.name`이고 없으면 id다. DB 항목 ID면 이름 키를 채운다(23장 1절). 판 안의 개체(`card3`)는 이름 키가 없으므로 화면이 id로 객체를 찾아 이름을 그린다(5-10). 코드의 `Game.Ask`는 `label`로 이름을 줄 수 있다. |
 | 유물의 선택 요구가 기다리지 않고 지나감 | 후보가 없었다. 유물·상태 효과에는 고른 대상이 없으므로 후보 칸에 대상 Block(`모든 적` 등)을 둔다. 전투 밖이면 적이 없어 후보도 없다. |
 | 멀티플레이에서 다른 플레이어가 대신 답함 | `player`는 기록만 한다. 답할 플레이어 검사는 화면·서버가 한다. |

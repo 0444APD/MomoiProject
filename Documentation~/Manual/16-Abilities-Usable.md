@@ -77,9 +77,9 @@ void OnClickById()                          => Game.Use("fireball", "hero", "orc
 
 - 돌려주는 값은 행동 기록(`ActionRecord`)이다.
 - 내부에서 `UseAbility` 행동 하나를 `Game.Do`한다. 다른 행동 안에서 부르면 그 행동의 일부로 그 자리에서 실행된다(Undo 한 단위 = 바깥 행동).
-- 실패하면 `InvalidOperationException`을 던지고 **아무것도 바뀌지 않는다**:
-  - 없는 ID: "능력 '…'이(가) 없습니다."
-  - 사용 조건 거짓: "능력 '…'의 사용 조건을 만족하지 않습니다: (트리거 문장)"
+- 실패하면 예외를 던지고 **아무것도 바뀌지 않는다**:
+  - 없는 ID: `InvalidOperationException` "[MomoiProject] 능력 '…'이(가) 없습니다."(프로그래머 실수)
+  - 사용 조건 거짓: 플레이어용 실패 `GameFailure`(`InvalidOperationException`을 상속). 키 `FailureKeys.CannotUse`(`momoi.fail.cannotUse`), 값 `{ability}`(이름: 텍스트 표의 `<ID>.name`) · `{condition}`(트리거 문장), 기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition})." 텍스트 표에 키를 넣으면 번역된다(`30-Balance-Tables.md` 2-4).
 
 ### 2-2. 실행 흐름
 
@@ -101,7 +101,7 @@ bool ok2 = Game.CanUse("fireball", caster, new object[] { target }, out var reas
 ```
 
 - Trigger(사용 조건)만 검사하고 아무것도 바꾸지 않는다. 버튼을 미리 흐리게 할 때 쓴다.
-- 이유 글자: 없는 ID면 "'…'은(는) 쓸 수 있는 능력·아이템이 아닙니다.", 조건이 거짓이면 "사용 조건을 만족하지 않습니다: (트리거 문장)".
+- 이유 글자: 없는 ID면 "'…'은(는) 쓸 수 있는 능력·아이템이 아닙니다.", 조건이 거짓이면 `Game.Use`가 던지는 실패(`FailureKeys.CannotUse`)와 같은 글이다(지금 언어, 기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition})."). 텍스트 표에서 번역한 글이 툴팁에도 그대로 보인다.
 
 ### 2-4. `UseAbility` — 능력 사용 행동(데이터)
 

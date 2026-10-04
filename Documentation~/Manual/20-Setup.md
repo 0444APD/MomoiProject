@@ -51,17 +51,18 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 ### 흐름
 
-`[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`로 첫 씬을 불러오기 전에 `GBibleRuntime.Start()`가 불린다. 순서는 다음과 같다.
+`[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`로 첫 씬을 불러오기 전에 `GBibleRuntime.Start()`가 불린다. 맨 먼저 설정 파일(`settings.json`)을 읽어 적용 대상(언어·음량·화면)을 적용하고, 마지막으로 쓴 저장 슬롯을 정한다(`31-Slots-Settings-Input.md`). 그다음 순서는 다음과 같다.
 
 1. `Mirror.Initialize()` — 플레이어 데이터 비교 코드를 모은다. 리플렉션(실행 중에 형식 정보를 읽는 무거운 작업)은 게임이 켜질 때 여기서 한 번만 한다.
 2. `[BindTo]` 코드 결과를 모으고, 모양이 맞지 않는 함수는 콘솔에 경고한다.
 3. `GameDatabase.Load()`로 DB 에셋을 읽고, `SessionOptions`를 만들어 DB › 시작 파일 › Bootstrap 화면의 세션 옵션과 DB › 개발 › 저장 변환 표(버전 순서)를 넣은 뒤 `Configuring` 이벤트를 쏜다(3절). 코드가 화면 값을 바꾸면 기록에 남긴다.
 4. `new GameSession(options)`. 개발 명령은 개발 빌드에서만 받도록 `session.Debug.Enabled = Debug.isDebugBuild`.
-5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·능력·사용 기능이 붙은 인스턴스·도전과제·개발 명령을 세션에 등록한다. `[BindTo("ID")]`의 ID가 DB의 어느 항목에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
+5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·상태 효과·밸런스 값·가중치 표·능력·사용 기능이 붙은 인스턴스·도전과제·개발 명령을 세션에 등록한다. `[BindTo("ID")]`의 ID가 DB의 어느 항목에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
 6. 저장 호환 검사(개발 중이면 호환되지 않는 저장을 지운다), ID 이름 바꾸기 이력 적용, 프로필(`profile.json`) 불러오기.
 7. 기본 개발 명령(저장·시간)을 등록하고, 경고·오류 기록을 콘솔로 보낸다.
-8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`).
-9. `Started` 이벤트를 쏜다(4절).
+8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`). 슬롯을 바꿔 세션을 다시 만들어도 오브젝트는 하나다.
+9. Bootstrap 화면의 씬 흐름을 정해 두었으면 그 필드를 따라가기 시작한다(`GameScenes.Follow`, `32-View-Presentation-Scenes.md`).
+10. `Started` 이벤트를 쏜다(4절). 시작할 때 이어 하기를 켰으면 그 뒤에 판을 불러오거나 새 판 행동을 실행한다.
 
 게임을 끝내면(`OnApplicationQuit`) 프로필을 저장하고, `AutoSaveRun`이 참이면 진행 중인 판도 저장한 뒤 `Stopped`를 쏜다.
 
@@ -89,7 +90,7 @@ public sealed class HudView : MonoBehaviour
 
 **`GBibleRuntime.Start()`** — 세션을 만들어 돌려준다. 이미 있으면 그것을 돌려준다. 자동 시작이 있으므로 직접 부를 일은 드물다.
 
-**`GBibleRuntime.SavePath` / `RunSavePath`** — 프로필(`<persistentDataPath>/MomoiProject/profile.json`)과 판(`.../run.json`) 저장 파일 경로.
+**`GBibleRuntime.SavePath` / `RunSavePath`** — 지금 슬롯의 프로필(`profile.json`)과 판(`run.json`) 저장 파일 경로. 기본 슬롯이면 `<persistentDataPath>/MomoiProject/` 바로 아래, 다른 슬롯이면 `.../MomoiProject/slots/<이름>/`(슬롯은 `31-Slots-Settings-Input.md`).
 
 **`GBibleRuntime.SaveProfile(session)` / `SaveRun(session)`** — 지금 상태를 파일에 쓴다. 프로필 = 메타 구역(판이 바뀌어도 남는 값), 판 = 세션 구역(이번 판)·난수·시간.
 
@@ -184,6 +185,8 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 개발 빌드에서 시드 고정 + 시드 | 개발 빌드에서만 `Seed` | 끔(지금 시각) |
 | Undo 끊는 이벤트(선택) | 그 이벤트를 쏜 바깥 행동이 끝나면 `session.ClearUndo()` | 없음 |
 | 시작할 때 이어 하기 + 새 판 행동(선택) | `Started` 뒤 `LoadRun`, 없으면 `session.Do(new 새 판 행동())` | 끔 |
+| 고정 틱(실시간) › 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
+| 씬 흐름(선택) › 플레이어 데이터 · 필드(씬 이름이 든 글자) · 빈 값일 때 씬 | `Started` 직전 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)` | 쓰지 않음 |
 
 게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 
@@ -237,6 +240,12 @@ options.SnapshotLimit = 60;
 
 ```csharp
 options.Seed = 20261003UL;
+```
+
+**`TickRate`** — 고정 틱: 초당 틱 수(기본 0 = 끔). 켜면 게임 시간이 1/틱 초씩 일정하게 흐르고 시간 예약·상태 효과의 시간 지속·시간 조건·`session.Ticked`가 틱마다 돌아 프레임 속도와 상관없이 같은 결과가 난다(`33-Tick-Preview-Csv.md`). Bootstrap 화면 **고정 틱(실시간)**과 같다.
+
+```csharp
+options.TickRate = 30;
 ```
 
 **`JournalCapacity`** — 통합 기록(Journal)에 보관할 줄 수(기본 4096). 넘치면 오래된 줄부터 밀려난다. Bootstrap 화면 **고급 › 기록 보관 줄 수**와 같다.
@@ -492,6 +501,7 @@ var copy = potion.CreateInstance();   // 깊은 사본
 |---|---|---|---|
 | 다이얼로그 시스템 | `GBIBLE_DIALOGUE` | `GBible.Dialogue` (+ `.Editor`) | 스탠딩 프로필, 장소, 메뉴 `MomoiProject → 다이얼로그 시스템 → …` |
 | 인벤토리 시스템 | `GBIBLE_INVENTORY` | `GBible.Inventory` | 없음(플레이어 데이터의 값 형식에 `Inventory`·`InventorySlot`이 나온다) |
+| 입력(키 바꾸기) | `GBIBLE_INPUT` | `GBible.Input`(Input System 패키지 `com.unity.inputsystem`이 있을 때만 컴파일) | 없음(`GameInput`: 키 바꾸기·되돌리기·저장, `31-Slots-Settings-Input.md`) |
 
 스크립팅 심볼은 `#if`로 코드를 켜고 끄는 컴파일 표시다. 모듈의 asmdef는 이 심볼이 있을 때만 컴파일된다(asmdef의 defineConstraints).
 
@@ -590,7 +600,7 @@ namespace GBible.Ids
 ```
 
 - **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `instance.potion` → `InstancePotion`).
-- **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`). 플레이어 데이터만 `PlayerData`.
+- **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`, `StatusData` → `Status`, `BalanceData` → `Balance`, `WeightTableData` → `WeightTable`, `SettingData` → `Setting`). 플레이어 데이터만 `PlayerData`.
 - **플레이어 데이터 = `PlayerDataKey<T>`**: 값 형식이 붙은 키. `.Id`가 ID 글자이고, `string`으로 바로 바뀐다(암시 변환).
 - **그 밖의 항목 = `const string`**: `[BindTo(...)]` 같은 어트리뷰트 인자에도 쓸 수 있다.
 
@@ -657,6 +667,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 | `GBible.Editor` | `Editor` | DB·모니터·오디오 창, 검증기, 생성 코드 | 예(에디터) |
 | `GBible.Dialogue` · `.Editor` | `Optional/Dialogue` | 선택 모듈(`GBIBLE_DIALOGUE`) | 예 |
 | `GBible.Inventory` | `Optional/Inventory` | 선택 모듈(`GBIBLE_INVENTORY`) | 예 |
+| `GBible.Input` | `Optional/Input` | 선택 모듈(`GBIBLE_INPUT`, Input System 패키지가 있을 때만). 참조: `Unity.InputSystem` | 예 |
 | `Unity.GBible.CodeGen` | `CodeGen` | 컴파일할 때 Mirror 비교 코드를 만든다(에디터 전용, `com.unity.nuget.mono-cecil`이 있을 때만) | 아니오 |
 | `GBible.Samples` · `.Samples.Editor` | `Samples` | `GBIBLE_SAMPLES` 심볼이 있을 때만 | 아니오 |
 

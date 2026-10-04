@@ -1,6 +1,6 @@
 # 13. `[BindTo]` — 항목 하나의 결과를 코드로 쓰기
 
-**한 줄 요약**: `[BindTo(id)]`를 static 함수(또는 `Reward` 클래스)에 붙이면, 그 ID를 가진 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스·개발 명령)의 결과가 그 코드로 바뀐다. 그 항목의 결과 칸은 에디터에서 잠기고, 연결된 코드 이름과 `cs 열기`만 보인다.
+**한 줄 요약**: `[BindTo(id)]`를 static 함수(또는 `Reward` 클래스)에 붙이면, 그 ID를 가진 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스·개발 명령·상태 효과)의 결과가 그 코드로 바뀐다. 코드가 대신하는 결과 칸은 에디터에서 잠기고, 연결된 코드 이름과 `cs 열기`만 보인다.
 
 **언제 쓰는가**
 
@@ -40,6 +40,8 @@
 
 사용 기능이 붙은 인스턴스도 같다: 인스턴스 값 안의 사용 기능(`then`) 자리에 이 잠긴 보기가 나온다.
 
+**잠기는 것은 코드가 대신하는 칸뿐이다.** 상태 효과는 `outcomes`(걸려 있는 동안의 결과)만 잠기고, `onApply`(걸릴 때 결과)·`onExpire`(끝날 때 결과)는 그대로 고친다. 그 두 칸은 `[OutcomeSlot(…, BindTo = false)]`라서 코드가 대신하지 않는다(2-11).
+
 연결하기 전에 에디터에서 골라 둔 결과는 지워지지 않고 숨겨질 뿐이다. `[BindTo]`를 빼면 다시 보이고 다시 쓰인다.
 
 ---
@@ -61,7 +63,7 @@ public static class AchievementLogic
 }
 ```
 
-- 인자는 DB 항목의 ID다. 도전과제·로그·능력·개발 명령은 그 항목의 ID, 사용 기능은 **인스턴스의 ID**(DB › 인스턴스의 항목 ID)다.
+- 인자는 DB 항목의 ID다. 도전과제·로그·능력·개발 명령·상태 효과는 그 항목의 ID, 사용 기능은 **인스턴스의 ID**(DB › 인스턴스의 항목 ID)다.
 - 함수와 클래스에 붙는다. 함수가 든 클래스는 어디든 된다(static 클래스가 아니어도, 이름이 무엇이든).
 
 ### 2-2. ID는 `GameIds` 상수로
@@ -77,7 +79,7 @@ public static class AchievementLogic
 }
 ```
 
-- `GameIds`(`MomoiProject → 식별자 코드 다시 만들기`로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·능력·인스턴스·개발 명령 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`, `GameIds.DebugCommand.X`.
+- `GameIds`(`MomoiProject → 식별자 코드 다시 만들기`로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·능력·인스턴스·개발 명령·상태 효과 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`, `GameIds.DebugCommand.X`, `GameIds.Status.X`.
 - 글자를 직접 쓰면 오타나 ID 이름 바꾸기가 연결을 끊는다(게임이 켜질 때 콘솔에 "[BindTo("id")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고). 상수를 쓰면 컴파일 오류로 먼저 드러난다.
 
 ### 2-3. 함수의 모양
@@ -93,7 +95,7 @@ public static class AchievementLogic
 | 매개변수 | 받는 것 | 쓰는 곳 |
 |---|---|---|
 | `()` | 없음 | 게임 상태와 상관없는 일(외부 SDK 호출 등) |
-| `(이벤트형식 e)` | 받은 이벤트 | 이벤트 값만 필요할 때 |
+| `(이벤트형식 e)` | 받은 이벤트(가로채기로 발동하면 의도, `28-Attributes-Intercepts.md` 4-10) | 이벤트 값만 필요할 때 |
 | `(TriggerContext c)` | 컨텍스트 | 사용 기능·능력·개발 명령(이벤트가 없다), 조건 충족으로 발동하는 도전과제 |
 | `(이벤트형식 e, TriggerContext c)` | 둘 다 | 이벤트로 발동하고 세션도 만져야 할 때 |
 
@@ -198,6 +200,7 @@ public class DragonSlayerReward : Reward
   - 로그: 반영 규칙이 발동할 때마다 실행된다(행동 안이면 그 행동의 Undo 단위).
   - 능력·사용 기능: `Game.Use` 행동 안에서 실행된다(Undo 한 번에 통째로 되돌아간다).
   - 개발 명령: 모니터 › 명령 탭의 버튼을 누르면 행동 하나("[개발] 버튼 이름") 안에서 실행된다(Undo된다).
+  - 상태 효과: 걸려 있는 동안 트리거가 발동할 때 가진 쪽마다 실행된다(`c.User` = 가진 쪽, `c.Owner` = 상태 효과 ID. 이벤트 받기·가로채기면 그 이벤트를 쏜 행동 안, `29-Statuses-Schedules-Choices.md` 4-3).
 
 ### 2-11. 연결이 적용되는 기능
 
@@ -208,7 +211,18 @@ public class DragonSlayerReward : Reward
 | 능력 | 능력 ID | 에디터에서 고른 결과 대신 연결된 코드 |
 | 사용 기능이 붙은 인스턴스 | 인스턴스 ID | 사용 기능의 결과 대신 연결된 코드(`Game.Use(인스턴스 ID, …)`) |
 | 개발 명령(DB › 개발 › 개발 명령) | 명령 ID | 에디터에서 조립한 결과 대신 연결된 코드(→ `22-Monitor-Debug.md` 7절) |
+| 상태 효과(DB › 상태 효과) | 상태 효과 ID | `outcomes`(걸려 있는 동안의 결과) 대신 연결된 코드. `onApply`(걸릴 때 결과)·`onExpire`(끝날 때 결과)는 대신하지 않고 DB에서 고친 그대로 돈다(→ `29-Statuses-Schedules-Choices.md` 3-1·4-3) |
 | 프로젝트 기능(퀘스트 등) | 항목 ID | 런타임 등록 코드가 `BoundOutcomes`를 확인할 때만(→ `17-Custom-Features.md`) |
+
+**코드가 대신하지 않는 칸 — `[OutcomeSlot(…, BindTo = false)]`.** 한 항목에 결과 칸이 여럿이고 그중 일부만 코드가 대신한다면, 대신하지 않는 칸의 `[OutcomeSlot]`에 `BindTo = false`를 준다. 에디터는 그 ID에 `[BindTo]`가 있어도 그 칸을 잠그지 않고 그대로 고치게 한다. 상태 효과의 걸릴 때·끝날 때 결과가 이 칸이다.
+
+```csharp
+[FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();          // [BindTo]가 대신한다(잠김)
+[FieldLabel("끝날 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.Coded, BindTo = false)]
+public List<Outcome> onExpire = new List<Outcome>();                                                                                       // 늘 DB에서 고친다
+```
+
+`BindTo = false`는 에디터의 잠금만 정한다. 실행할 때 어느 칸을 코드로 바꿀지는 그 기능의 등록 코드가 정한다(프로젝트 기능이면 `BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : outcomes`를 대신할 칸에만 쓴다, 17장 2-8).
 
 ---
 
@@ -414,6 +428,7 @@ public static class DebugCode
 - **사용 기능은 인스턴스 ID로.** `Item.id` 같은 클래스 필드가 아니라 DB › 인스턴스 항목의 ID에 연결한다. 그 인스턴스의 값에 사용 기능 필드가 붙어 있어야(`null`이 아니어야) 쓸 수 있는 항목으로 등록된다.
 - **로그에 연결하고 Report를 잊는다.** 연결된 로그는 자동 기록이 멈춘다. 함수가 `c.Session.Stats.Report(c.Owner, 값)`을 불러야 값이 오른다.
 - **결과 칸이 왜 잠겼는지 모른다.** 다른 사람이 쓴 `[BindTo]`가 그 ID에 연결되어 있다. `cs 열기`로 코드를 확인한다. 연결을 빼면 예전 결과가 다시 쓰인다.
+- **상태 효과에 연결했는데 걸릴 때·끝날 때 결과가 그대로 돈다.** 정상이다. 코드가 대신하는 것은 `outcomes`뿐이다(2-11). 그 두 칸도 코드로 쓰려면 칸에 코딩한 결과 Block(`Reward`)을 둔다.
 - **`cs 열기`가 파일을 못 찾는다.** 스크립트 파일 이름에 클래스 이름이 들어 있어야 찾는다(`AchievementRewards` 클래스 → `AchievementRewards.cs`). 못 찾으면 콘솔에 "스크립트 파일을 찾지 못했습니다" 경고가 뜬다.
 - **함수 안의 static 상태.** 세션은 여러 개일 수 있다(멀티플레이 서버·시뮬레이션). 바뀌는 값은 static 변수가 아니라 플레이어 데이터에 둔다.
 - **함수 안에서 행동을 실행한다.** 능력 사용·로그 반영은 이미 행동 안에서 돌 수 있다. 그 안에서 `Game.Do`·`Game.Use`를 부르면 바깥 행동의 일부로 실행된다(Undo는 바깥 행동 하나).

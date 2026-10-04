@@ -93,6 +93,13 @@ string log = Texts.Get("log.gain", ("what", new TextKey("ui.gold")), ("count", 5
 
 **`Texts.Language`** — 현재 언어 코드(읽기·쓰기). Unity 게임에서는 `GameLanguage.Set`을 쓴다(저장까지 한다).
 
+**플레이어에게 보일 실패 — `Game.Fail` · `GameFailure`** — 행동 안에서 `throw Game.Fail(키, 기본 문장, (이름, 값)…)`을 던지면 행동이 취소되고, 예외의 `Message`가 그 키의 지금 언어 글이다(표에 없으면 기본 문장, 같은 틀 문법). 라이브러리가 던지는 실패(비용이 모자람·선택 개수·사용 조건)도 같은 형식이라, 그 키(`FailureKeys`, `momoi.fail.*`)를 표에 넣으면 번역된다. 자세히는 `30-Balance-Tables.md` 2-4·5-8.
+
+```csharp
+throw Game.Fail("fail.frozen", "얼어 있어 {turns}턴 동안 움직일 수 없습니다.", ("turns", 2));
+// 표(en): fail.frozen = "Frozen for {turns, plural, one {# turn} other {# turns}}."
+```
+
 ### 주의할 점
 
 - 키가 어디에도 없으면 `[키]`를 돌려준다. 개발 빌드에서는 콘솔에 "[다국어] 'en'에 텍스트 'shop.title'가 없습니다." 경고가 남는다.
@@ -266,7 +273,7 @@ burn.name (ko)   = 화상
 
 ### 코드로 쓰는 법
 
-**`GameLanguage.Set(코드)`** — 언어를 바꾸고 PlayerPrefs에 저장한다. 지원 언어 중 가장 가까운 것을 고른다(`en-US` → `en`). 저장하지 않으려면 `Set(코드, remember: false)`.
+**`GameLanguage.Set(코드)`** — 언어를 바꾸고 PlayerPrefs에 저장한다. 지원 언어 중 가장 가까운 것을 고른다(`en-US` → `en`). 저장하지 않으려면 `Set(코드, remember: false)`. 설정 화면이 있으면 DB › 설정에 적용 대상 `언어`인 칸을 두는 편이 낫다: 선택지가 지원 언어로 저절로 채워지고, 값은 설정 파일에 남는다(`31-Slots-Settings-Input.md` 5-4).
 
 ```csharp
 using GBible;
@@ -283,7 +290,7 @@ foreach (var (code, nativeName) in GameLanguage.Available)
 
 **`GameLanguage.Changed`** — 언어가 바뀌었거나 표를 다시 읽었을 때. 플레이어 데이터를 함께 보여 주는 화면은 이것 대신 **`GameView.Redraw`**를 쓴다(아래 예제). 언어가 바뀌어도, 값이 바뀌어도 그 프레임 끝에 한 번 다시 그린다.
 
-**`GameView.Redraw(draw, 키…)`** — `IDisposable`을 돌려준다. 플레이어 데이터(키를 주면 그 키만, 비우면 아무 키나)가 바뀌거나 언어가 바뀌면 그 프레임 끝(`LateUpdate`, 행동 밖)에 `draw`를 **한 번만** 부른다. 등록한 프레임 끝에 처음 한 번 그린다. `Dispose`하면 그만 그린다.
+**`GameView.Redraw(draw, 키…)`** — `IDisposable`을 돌려준다. 플레이어 데이터(키를 주면 그 키만, 비우면 아무 키나)가 바뀌거나 언어가 바뀌면 그 프레임 끝(`LateUpdate`, 행동 밖)에 `draw`를 **한 번만** 부른다. 등록한 프레임 끝에 처음 한 번 그린다. `Dispose`하면 그만 그린다. 연출 대기열이 재생 중이면 끝날 때까지 미룬다(기다리지 않으려면 `Redraw(draw, waitForPresentation: false, 키…)`, `32-View-Presentation-Scenes.md` 2-1).
 
 > [!note]- 왜 알림마다 바로 그리지 않는가
 > 값이 바뀌었다는 알림은 한 행동에도 여러 번 온다(행동 중간의 Sync, 실패한 행동의 되돌림, Undo). 알림마다 그리면 같은 화면을 한 프레임에 여러 번 계산한다(보이는 건 프레임당 한 번이라 낭비). 그래서 표시만 해 두고 프레임 끝에 한 번 그린다. 행동 실행 중이면 다음 프레임으로 미룬다. 직접 `_dirty` 표시·`Data.Changed` 받기·`GameLanguage.Changed` 받기·`LateUpdate`를 쓰지 않는다.

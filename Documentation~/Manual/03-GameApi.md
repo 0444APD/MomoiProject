@@ -148,7 +148,7 @@ bool ok2 = Game.CanUse("ability.heal", hero, out string why);              // �
 bool ok3 = Game.CanUse("ability.heal", hero, new object[] { ally }, out why);
 ```
 
-능력의 트리거(사용 조건)만 검사한다. 아무것도 바꾸지 않는다. 버튼을 미리 흐리게 하거나 이유를 툴팁으로 보일 때 쓴다. 없는 ID면 `false`와 "쓸 수 있는 능력·아이템이 아닙니다", 조건이 거짓이면 "사용 조건을 만족하지 않습니다: …"가 `reason`에 들어간다.
+능력의 트리거(사용 조건)만 검사한다. 아무것도 바꾸지 않는다. 버튼을 미리 흐리게 하거나 이유를 툴팁으로 보일 때 쓴다. 없는 ID면 `false`와 "쓸 수 있는 능력·아이템이 아닙니다", 조건이 거짓이면 `Game.Use`가 던지는 실패(`FailureKeys.CannotUse`)와 같은 지금 언어의 글("{ability}: 사용 조건을 만족하지 않습니다({condition}).", `30-Balance-Tables.md` 2-4)이 `reason`에 들어간다.
 
 ### 2.11 `Game.Random(name)` — 결정론 난수
 

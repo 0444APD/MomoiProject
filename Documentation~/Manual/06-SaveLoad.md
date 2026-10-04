@@ -23,6 +23,7 @@
 | 저장 버전 | 저장 파일에 적는 정수. 등록한 변환의 가장 높은 버전을 저절로 따라간다(`session.SaveVersion`, 변환이 없으면 1). |
 | 변환(마이그레이션) | 예전 버전의 저장 트리를 지금 구조로 고치는 한 단계(`SaveMigrations`). 키·경로만 받는 변환은 DB › 개발 › 저장 변환 표에, 값을 계산하는 변환은 코드에 쓴다. |
 | 새 판 | 이번 판 값을 처음 값으로 되돌리고 판 저장 파일도 지우는 것(`GBibleRuntime.NewRun(session)`). 프로필은 그대로. |
+| 슬롯 | 저장 묶음(프로필 + 판) 하나. 슬롯마다 폴더가 따로다(2.1, `31-Slots-Settings-Input.md`). |
 | 개발 중 / 출시됨 | 프로젝트 상태. 개발 중에는 호환되지 않는 저장을 지우고, 출시 후에는 이어받는다. |
 
 ---
@@ -85,10 +86,23 @@ DB 상세의 제목(ID)을 눌러 ID를 바꾸면 참조가 모두 따라가고,
 ### 2.1 저장 위치: `GBibleRuntime.SavePath` · `RunSavePath`
 
 ```csharp
-string profilePath = GBibleRuntime.SavePath;      // {Application.persistentDataPath}/MomoiProject/profile.json
+string profilePath = GBibleRuntime.SavePath;      // {Application.persistentDataPath}/MomoiProject/profile.json (기본 슬롯)
 string runPath = GBibleRuntime.RunSavePath;        // {Application.persistentDataPath}/MomoiProject/run.json
 bool canContinue = GBibleRuntime.HasSavedRun;     // run.json이 있는가
 ```
+
+경로는 **지금 슬롯**의 것이다. 이 장의 저장·불러오기(`SaveProfile`·`SaveRun`·`LoadRun`·`NewRun`·`DeleteRun`)도 모두 지금 슬롯의 파일을 쓴다.
+
+```
+<persistentDataPath>/MomoiProject/
+  settings.json                      설정(기기마다 하나 — 슬롯과 상관없음)
+  profile.json · run.json · slot.json   기본 슬롯("")
+  slots/<이름>/profile.json · run.json · slot.json   그 밖의 슬롯
+```
+
+- `slot.json`은 슬롯 고르기 화면용 요약(저장 시각·플레이 시간·요약 한 줄)이다. 프로필이나 판을 저장할 때마다 함께 쓴다.
+- **설정 파일은 슬롯과 별개다.** 음량·언어·바꾼 키는 플레이어 데이터가 아니라 `settings.json` 하나에 남아, 슬롯을 바꾸거나 판을 지워도 그대로다(`GameSettings`).
+- 슬롯 바꾸기·지우기·복사와 요약은 `31-Slots-Settings-Input.md` 2-1·2-2.
 
 ### 2.2 자동으로 일어나는 일
 
@@ -424,3 +438,5 @@ public static class InventoryMigration
 | 새 판을 열었는데 이어하기 버튼이 보임 | `session.NewRun()`만 불렀다(파일을 지우지 않는다). `GBibleRuntime.NewRun(session)`을 쓴다. |
 | "행동 실행 중에는 새 판을 시작할 수 없습니다" | 행동의 `Run` 안에서 `GBibleRuntime.NewRun`을 불렀다. 버튼처럼 행동 밖에서 부르고, 새 판 내용은 그 뒤 행동으로 만든다. |
 | 저장 변환 표를 적었는데 적용되지 않음 | 버전이 저장 파일의 버전보다 크지 않다(이미 그 버전으로 저장된 파일에는 돌지 않는다). 또는 키가 저장 파일의 예전 이름과 다르다. |
+| 저장 파일이 `MomoiProject/` 바로 아래에 없음 | 다른 슬롯을 쓰고 있다(`slots/<이름>/`). `GBibleRuntime.Slot`·`SavePath`로 확인한다(2.1). |
+| 판을 지웠는데(새 판) 음량·언어가 그대로 | 정상이다. 설정은 슬롯·판과 상관없는 `settings.json`에 있다(2.1). |

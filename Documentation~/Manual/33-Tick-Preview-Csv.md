@@ -1,0 +1,453 @@
+# 33. 고정 틱·미리보기 실행·CSV
+
+**한 줄 요약**: 실시간 게임은 DB › Bootstrap의 **고정 틱**(초당 틱 수)을 켠다. 그러면 게임 시간이 1/틱 초씩 일정하게 흐르고, 시간 규칙(시간 예약·상태 효과의 시간 지속·시간 조건)과 `session.Ticked`가 틱마다 돌아 프레임 속도와 상관없이 같은 결과가 난다. **미리보기 실행**(`Game.Preview`)은 행동을 실제로 해 보고 결과만 읽은 뒤 모두 되돌린다. 기록·Undo·연출 이벤트·도전과제가 남지 않고 난수도 돌아가므로, 실제로 하면 미리본 값과 같다(카드에 마우스를 올리면 예상 피해). `Game.CanDo`는 지금 하면 되는지와 안 되는 이유다. **CSV**는 DB 목록을 CSV로 내보내고 가져와 구글 시트·엑셀에서 수치를 한꺼번에 고친다. 가져온 것은 DB의 다른 변경처럼 적용 전이다.
+
+**언제 쓰는가**
+
+- 실시간 아레나·디펜스처럼 시간이 흐르는 게임에서 웨이브·재생·쿨다운 같은 시간 규칙이 기기마다 같게 돌아야 할 때(고정 틱).
+- 카드·스킬에 마우스를 올리면 "예상 피해 12", "처치"를 보일 때(미리보기 실행).
+- 버튼을 흐리게 하고 "에너지가 모자랍니다"처럼 안 되는 이유를 보일 때(`CanDo`).
+- 밸런스 값·카드 비용·몬스터 체력 수십 줄을 시트에서 고칠 때(CSV).
+
+이 문서에서 쓰는 용어:
+
+| 용어 | 뜻 |
+|---|---|
+| 틱 | 게임 시간이 한 번 흐르는 단위. 고정 틱이면 1/초당 틱 수 초, 끄면 한 프레임. |
+| 고정 틱 (`TickRate`) | 초당 틱 수. 0이면 끈다(프레임마다 그 프레임 시간만큼 흐른다). |
+| `Ticked` | 틱마다(끄면 프레임마다) 쏘는 세션의 C# 이벤트. 행동 밖이다. |
+| `TickAlpha` | 다음 틱까지 지난 비율(0~1). 화면이 두 틱 사이를 부드럽게 그릴 때(보간) 쓴다. |
+| 미리보기 실행 (`Game.Preview`) | 행동을 해 보고 결과만 읽은 뒤 모두 되돌리는 것. |
+| `CanDo` | 지금 그 행동을 하면 성공하는지(미리보기로 해 본다)와 실패 이유. |
+| CSV | 쉼표로 나눈 표 글자 파일. 구글 시트·엑셀이 그대로 연다. |
+| 작업본 | DB에서 고친 내용을 저장(Ctrl+S) 전까지 모아 두는 사본(21장 3절). CSV 가져오기도 여기에 들어간다. |
+
+---
+
+## 1. 무엇으로 만드나
+
+| 기획 문장 | 만드는 것 |
+|---|---|
+| "10초마다 웨이브, 30fps 기기와 144fps 기기가 같게" | 고정 틱 30 + `Ticked`에서 시각 확인 → 행동(5-1) |
+| "웨이브 남은 시간 막대가 부드럽게" | `TickAlpha`로 보간(5-2) |
+| "카드에 마우스를 올리면 예상 피해" | `Game.Preview`(5-3) |
+| "낼 수 없는 카드는 흐리게, 이유를 툴팁으로" | `Game.CanDo`(5-4) |
+| "분석 전송은 실제로 했을 때만" | `Game.IsPreviewing`(5-5) |
+| "몬스터 체력·카드 비용을 시트에서 한꺼번에" | DB 목록의 CSV(5-6) |
+
+> **규칙: 실시간 물리·이동은 화면 코드, 규칙에 필요한 결과만 행동.** 적이 다가오는 움직임은 `Update`·물리 엔진이 한다. "맞았다", "쓰러졌다", "주웠다"처럼 규칙에 필요한 결과만 행동(`Game.Do`)으로 보낸다(28장 1절의 "문법 밖").
+
+> **규칙: 틱 규칙은 가볍게.** 30틱이면 1초에 30번 돈다. 틱마다 읽기만 하고, 바꿀 때만 행동을 실행한다(5-1).
+
+---
+
+## 2. 동작 규칙
+
+### 2-1. 고정 틱
+
+호스트(`GBibleRuntime`)가 매 프레임 끝에 `session.EndFrame(Time.deltaTime)`을 부른다(07장 2.5). 고정 틱이면 그 안에서:
+
+1. 프레임 시간을 쌓는다.
+2. 쌓인 시간이 한 틱(1/틱 초) 이상인 동안 되풀이한다(한 프레임 최대 8틱):
+   - 게임 시계를 한 틱 진행한다(`Clock.Tick` +1, `Clock.Time` + 1/틱 초).
+   - 시간 조건을 확인한다(도전과제·로그의 시간 조건).
+   - 시간 지속이 다 된 상태 효과를 끝낸다(행동 "상태 효과 만료", 29장 2-2).
+   - 시각이 된 시간 예약을 실행한다(행동 "예약 실행", 29장 2-5).
+   - `session.Ticked(1/틱 초)`를 쏜다.
+3. 8틱을 돌고도 시간이 남으면 남은 시간을 버린다(느린 프레임에서 따라잡느라 멈추지 않게. 게임이 잠깐 느려진다).
+4. `TickAlpha` = 남은 시간 ÷ 한 틱.
+
+- **프레임 속도와 상관없이 같다.** 60fps로 1초와 20fps로 1초는 같은 10틱(초당 10틱일 때)을 같은 게임 시각에 돈다. 그래서 시간 예약·상태 효과의 만료가 기기마다 같은 틱에 일어난다(재현·멀티플레이).
+- 고정 틱이면 `Clock.Tick`은 틱 수다(프레임 수가 아니다). 행동의 `tick` 필드·타임라인의 틱도 그렇다.
+- **끄면**(`TickRate` 0, 기본) 프레임마다 한 번: 시계가 그 프레임 시간만큼 흐르고 위의 일을 한 번 하며 `Ticked`도 그 프레임 시간으로 한 번 온다.
+- 일시정지(`Time.deltaTime` 0) 중에는 `EndFrame`을 부르지 않으므로 틱도 없다. 배속이면 실제 1초에 틱이 그만큼 더 돈다(게임 시간 기준).
+- `Ticked`는 **행동 밖**이다. 값을 바꾸려면 받는 쪽에서 `session.Do(행동)`을 부른다. 행동 실행 중인 틱(드물다)에는 시계만 진행하고 나머지는 건너뛴다.
+- 스냅샷 방식(20장 3절)의 간격도 게임 시계로 잰다.
+
+### 2-2. 미리보기 실행 · `CanDo`
+
+**`Game.Preview(행동, g => 읽기)`**
+
+1. 행동을 `Game.Do`와 같은 길로 실행한다(참조 필드를 지금 데이터의 객체로 다시 찾는 것, 행동이 끝나기 직전의 정리까지).
+2. 바뀐 상태 그대로 `읽기`를 부르고 그 값을 받는다.
+3. **모두 되돌린다**: 플레이어 데이터, 난수 상태. 그리고 아무것도 남기지 않는다.
+
+| 남지 않는 것 | 그래서 |
+|---|---|
+| 기록(타임라인) · 행동 로그 · Undo 이력 | 모니터에도 보이지 않는다 |
+| 행동 뒤에 받는 쪽(`SubscribeAfterAction`) | 피해 숫자·연출이 뜨지 않는다 |
+| 도전과제 달성 | 미리보기로 달성되지 않는다 |
+| 데이터 변경 알림(`Changed`·`DataChanged`·`Synced`) | 화면이 다시 그려지지 않고 멀티플레이 전송에도 실리지 않는다 |
+| 난수 | 돌아가므로 실제로 하면 미리본 값과 같다 |
+
+- **바로 받는 쪽**(`Events.Subscribe`·`SubscribeAll`)은 미리보기에서도 불린다. 규칙(로그·트리거·유물·예약·상태 효과)이 실제와 똑같이 돌아야 결과가 맞기 때문이다. 그래서 화면 연출은 `SubscribeAfterAction`으로 받는다(32장).
+- 행동이 실패하면 바꾼 것을 되돌린 뒤 그 예외를 그대로 던진다(`GameFailure`면 지금 언어의 이유).
+- **행동 밖(화면 코드)에서만** 부른다. 행동 안에서 부르면 `InvalidOperationException`("[MomoiProject] 행동 안에서는 미리보기를 할 수 없습니다(행동 밖, 화면 코드에서 부르세요).").
+- `읽기`에서는 값을 꺼내 돌려준다(체력 숫자). 데이터 객체를 돌려주면 되돌린 뒤의 객체라 미리본 값이 아니다.
+- 행동이 끝나기 직전의 정리(데이터에서 사라진 개체의 상태 효과·Modifier 지우기, 29장 2-3)도 `읽기` 전에 한다. 그래서 `읽기`는 실제 행동이 끝난 뒤와 같은 상태를 본다.
+- 미리보기 중의 값 변경은 **알리지 않는다**(위 표). 바뀌었다가 그대로 돌아오는 변경이라, 다시 그리기(`GameView.Redraw`·ViewList·데이터 연결)가 다시 그리지 않고 멀티플레이 전송에도 실리지 않는다. 그래서 다시 그리기 안(ViewList의 `bind`)에서 불러도 된다(5-4).
+- 미리보기는 행동 전체를 실제로 돌린다. 버튼이 많으면 그만큼 행동이 돈다(비용).
+
+**`Game.CanDo(행동, out 이유)`** — 미리보기로 해 보고 성공하면 참(이유 `null`), 실패하면 거짓(이유 = 예외의 메시지). `GameFailure`면 지금 언어의 글이다(30장 2-4). 프로그래머 실수(`InvalidOperationException`)도 거짓과 그 메시지가 된다. 행동 안에서 부르면 예외 대신 거짓과 "행동 안에서는 미리보기를 할 수 없습니다…"가 온다.
+
+**`Game.IsPreviewing`** — 미리보기 실행 중이면 참. 규칙 코드가 밖으로 나가는 일(분석 전송·파일 쓰기·외부 SDK)을 건너뛸 때 본다(5-5).
+
+### 2-3. CSV
+
+- 한 줄 = 항목 하나(첫 칸 `id`, ID 순서). 칸 = 그 종류의 **단순 필드**(정수 · 숫자 · 참거짓 · 글자 · enum). 묶음 필드(곡선·지속 설정·설정 값)의 안쪽은 `curve.step`처럼 점으로 이어 칸이 된다.
+- **빠지는 칸**: 목록·배열(곡선의 점, 가중치 표의 항목 줄), Block 칸(트리거·결과·`[SerializeReference]`), 에셋 참조(스프라이트·프리팹), 숨은 칸(ID·폴더).
+- 인스턴스 탭은 **값의 클래스마다** 따로 내보낸다(`Card`·`MonsterData` …). 칸 = 그 클래스의 필드(`cost`, `maxHp` …).
+- 파일은 UTF-8(BOM)이라 엑셀에서 한글이 깨지지 않는다. 숫자는 소수점 `.`, enum은 코드 이름(`Exponential`)으로 내보낸다.
+- **가져오기**: 첫 줄은 칸 이름(`id` 칸이 있어야 한다). 줄마다 같은 종류의 그 ID 항목을 고치고, 없는 ID면 새 항목(인스턴스 탭이면 그 클래스의 새 값)을 만든다. CSV에 없는 항목은 지우지 않는다.
+- 가져온 변경은 DB의 다른 변경처럼 **적용 전**(작업본)이다. 저장(Ctrl+S)하면 에셋에 쓰이고, 사이드바의 **되돌리기**로 버릴 수 있다. 가져온 뒤 검증이 다시 돌아 틀린 조합(최솟값 > 최댓값 …)을 알린다.
+
+| 칸 형식 | 읽는 값 |
+|---|---|
+| 정수 | 정수. `3.0`처럼 소수가 0이면 받는다. 천 단위 쉼표(`1,000`)는 안 된다 |
+| 숫자 | 숫자. 소수점은 `.`이고 `,`도 소수점으로 읽는다(`1,5` = 1.5) |
+| 참거짓 | `true`/`false` · `1`/`0` · `o`/`x` · `y`/`n` · `yes`/`no` · `참`/`거짓`(대소문자 무시). 빈칸은 거짓 |
+| enum | 코드 이름(`Linear`, 대소문자 무시) 또는 DB에 보이는 이름(`일정하게(+단계마다)`) |
+| 글자 | 칸의 글자 그대로(앞뒤 공백 포함) |
+
+- 칸 이름이 그 종류에 없거나 단순 칸이 아니면 "모르는 칸"으로 건너뛴다. 값을 읽지 못한 칸은 그 칸만 건너뛰고 문제로 남긴다(숫자 칸을 비우면 "숫자가 아닙니다('')").
+
+---
+
+## 3. 에디터에서 쓰는 법
+
+### 3-1. DB › 시작 파일 › Bootstrap — 고정 틱(실시간)
+
+`MomoiProject → DB` → 사이드바 **시작 파일 › Bootstrap** → **고정 틱(실시간)** → **초당 틱 수**. 고친 값은 바로 저장된다(Ctrl+S 필요 없음).
+
+| 칸 | 같은 뜻의 `SessionOptions` | 기본 |
+|---|---|---|
+| 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
+
+- 예: 30이면 1/30초마다 한 틱. 0보다 작은 값은 0이 된다.
+- 실시간 게임은 보통 Undo 방식도 "스냅샷"으로 고른다(같은 화면, 20장 3절).
+
+### 3-2. CSV 내보내기 · 가져오기
+
+1. `MomoiProject → DB`에서 탭을 고른다(밸런스 값 · 가중치 표 · 인스턴스 · 능력 · 로그 · 상태 효과 · 설정 · 프로젝트의 DB 종류 …). 키워드·클래스·이벤트·스프라이트 규격처럼 전용 화면을 쓰는 탭에는 없다.
+2. 목록 맨 위 폴더 줄(종류 이름 줄)에 마우스를 올리면 도구 버튼이 나온다. **CSV**(툴팁 "CSV로 내보내기·가져오기(구글 시트·엑셀에서 수치를 한꺼번에 고칠 때). 가져온 것은 적용 전으로 들어간다")를 누른다.
+3. 메뉴:
+
+| 탭 | 메뉴 |
+|---|---|
+| 인스턴스 | 값의 클래스마다 **Card 내보내기…** · **Card 가져오기…**("없는 id는 이 클래스의 새 인스턴스로 만듭니다"). 인스턴스가 없으면 "인스턴스가 아직 없습니다" |
+| 그 밖의 탭 | **CSV로 내보내기…** · **CSV 가져오기…**("id로 맞춰 고치고, 없는 id는 새 항목으로 만듭니다(적용 전)") |
+
+4. **내보내기**: 파일 저장 창("CSV로 내보내기", 기본 이름은 탭 이름 또는 클래스 이름 + `.csv`) → 저장하면 파일이 있는 폴더가 열린다.
+5. **가져오기**: 파일 열기 창("CSV 가져오기") → 결과 창이 뜬다.
+
+```
+3개 고침, 1개 새로 만듦(적용 전 — Ctrl+S로 적용).
+모르는 칸(건너뜀): hp
+goblin.maxHp: 정수가 아닙니다('스무')
+```
+
+- 결과 창의 문제 줄은 20줄까지 보이고 나머지는 "… 외 n개"로 센다. 문제 형식: `ID.칸: 정수가 아닙니다('…')` / `숫자가 아닙니다('…')` / `참·거짓이 아닙니다('…')` / `고를 수 있는 값이 아닙니다('…': None, Linear, …)`. 새 항목을 만들 수 없는 ID(ID 규칙 위반 등)는 `ID: 이유`.
+- "고침"은 값을 하나라도 읽은 기존 항목의 수다(값이 같아도 센다). 실제로 바뀐 칸은 목록의 "변경 · 적용 전" 배지와 바뀐 칸의 이름표 색으로 본다.
+- 첫 줄에 `id`가 없으면 "첫 줄에 'id' 칸이 없습니다.", 줄이 둘보다 적으면 "읽을 줄이 없습니다(첫 줄은 칸 이름, 그 아래가 항목)."
+
+### 3-3. 모니터에서 확인하기
+
+- 고정 틱이면 모니터 머리의 "틱 …"이 틱 수로 오른다. 시간 예약·만료는 행동 탭에 "예약 실행"·"상태 효과 만료"(개발자)로 남는다.
+- 미리보기 실행은 아무것도 남기지 않는다(그것이 정상이다).
+
+---
+
+## 4. 코드로 쓰는 법 — 문법 요소를 하나씩
+
+### 4-1. 고정 틱 — `SessionOptions.TickRate` · `Ticked` · `TickAlpha`
+
+```csharp
+GBibleRuntime.Configuring += options => options.TickRate = 30;     // Bootstrap 화면 대신 코드로(코드가 이긴다)
+session.Ticked += dt => { /* 틱마다(dt = 1/30초). 행동 밖 */ };
+var smooth = session.Clock.Time + session.TickAlpha / session.Options.TickRate;   // 지난 틱 + 다음 틱까지의 비율(고정 틱일 때만)
+```
+
+| 멤버 | 뜻 |
+|---|---|
+| `int SessionOptions.TickRate` | 초당 틱 수. 0이면 끈다 |
+| `event Action<double> GameSession.Ticked` | 틱마다(끄면 프레임마다). 인자는 그 틱(프레임)의 게임 시간(초) |
+| `double GameSession.TickAlpha` | 다음 틱까지 지난 비율(0~1). 끄면 0 |
+| `const int GameSession.MaxTicksPerFrame` | 한 프레임에 따라잡는 최대 틱 수(8) |
+| `void GameSession.EndFrame(double deltaTime)` | 호스트가 매 프레임 부른다. 세션을 직접 만들면 직접 부른다(서버·테스트) |
+
+- `Ticked`는 세션의 이벤트다. 슬롯을 바꾸면 세션이 새로 만들어지므로(31장) `GBibleRuntime.Started`에서 연결한다.
+
+### 4-2. `Game.Preview` · `Game.CanDo` · `Game.IsPreviewing`
+
+```csharp
+int hpAfter = Game.Preview(new PlayCard { card = card, target = enemy }, g => g.Find<Enemy>(enemy.id)?.hp ?? 0);
+if (!Game.CanDo(new PlayCard { card = card, target = enemy }, out var why)) tooltip.text = why;
+if (!Game.IsPreviewing) Telemetry.Send("kill");
+```
+
+| 멤버 | 뜻 |
+|---|---|
+| `T Preview<T>(GameAction action, Func<GameApi, T> read)` | 행동을 해 보고 `read`의 값을 돌려준 뒤 모두 되돌린다(2-2). 행동이 실패하면 그 예외를 던진다. `action`이 `null`이면 `ArgumentNullException` |
+| `bool CanDo(GameAction action, out string reason)` | 성공하면 참·`reason` `null`, 실패하면 거짓·`reason` = 메시지 |
+| `bool IsPreviewing` | 미리보기 실행 중인지 |
+
+`session.Actions.Preview<T>(action, Func<T> read)` · `session.Actions.IsPreviewing`은 같은 일의 세션 쪽 이름이다(`read`가 인자를 받지 않는다).
+
+### 4-3. CSV — 에디터 코드 `DataCsv`
+
+에디터 도구를 직접 만들 때 쓴다(`GBible.EditorTools`, 어셈블리 `GBible.Editor`, 에디터 전용).
+
+| 멤버 | 뜻 |
+|---|---|
+| `string Export(Type kind, Type valueClass = null)` | 그 종류(인스턴스면 그 값의 클래스)의 CSV 글자 |
+| `string Import(Type kind, Type valueClass, string text)` | CSV 글자를 작업본에 가져오고 결과 글(3-2)을 돌려준다 |
+| `void ExportToFile(Type kind, Type valueClass = null)` · `ImportFromFile(…)` | 파일 창과 함께(DB의 CSV 메뉴가 부른다) |
+| `IEnumerable<Type> InstanceClasses()` | 인스턴스 값의 클래스들(이름순) |
+
+```csharp
+// 메뉴 하나로 밸런스 값을 정해 둔 경로에 내보낸다(Assets/Code/Editor/BalanceExport.cs)
+using System.IO;
+using System.Text;
+using GBible.Data;
+using GBible.EditorTools;
+using UnityEditor;
+
+static class BalanceExport
+{
+    [MenuItem("Tools/밸런스 값 CSV 내보내기")]
+    static void Export() => File.WriteAllText("Balance/balance.csv", DataCsv.Export(typeof(BalanceData)), new UTF8Encoding(true));
+}
+```
+
+---
+
+## 5. 상황별 예제
+
+### 5-1. 실시간 아레나 — 30틱 + `Ticked`에서 가벼운 규칙
+
+카드 던전의 실시간 변형(가이드 `Genres/RealtimeVariant.cs`). 10초마다 적 웨이브가 나온다.
+
+**에디터**: DB › Bootstrap: Undo 방식 "스냅샷", 고정 틱 초당 틱 수 `30`. DB › 밸런스 값 `waveInterval` `10`, `waveSize` `3`(곡선 `일정하게` +1/웨이브, 30장).
+
+```csharp
+using System;
+using System.Collections.Generic;
+using GBible;
+using GBible.Ids;
+using UnityEngine;
+
+[Serializable] public class ArenaFoe { public string id; public int hp = 10; }
+[Serializable]
+public class ArenaState                          // 플레이어 데이터 "arena"(세션 구역)
+{
+    public int wave;
+    public double nextWaveAt;                    // 게임 시계(session.Clock.Time) 기준 시각
+    public List<ArenaFoe> foes = new List<ArenaFoe>();
+}
+
+[Serializable, BlockInfo("웨이브 소환")]
+public class SpawnWave : GameAction
+{
+    protected override void Run()
+    {
+        var arena = Game.Get<ArenaState>("arena");
+        arena.wave++;
+        var count = (int)Game.Balance(GameIds.Balance.WaveSize, arena.wave);
+        for (var i = 0; i < count; i++) arena.foes.Add(new ArenaFoe { id = Game.NewId("foe") });
+        arena.nextWaveAt = Game.Session.Clock.Time + Game.Balance(GameIds.Balance.WaveInterval);
+    }
+}
+
+public static class ArenaRules
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+    static void Hook() => GBibleRuntime.Started += session => session.Ticked += _ => Tick(session);
+
+    static void Tick(GameSession session)
+    {
+        var arena = session.Data.Get<ArenaState>("arena");
+        if (session.Clock.Time < arena.nextWaveAt) return;     // 틱마다 읽기만 — 거의 늘 여기서 끝난다
+        session.Do(new SpawnWave());                          // 바꿀 때만 행동
+    }
+}
+```
+
+- 웨이브는 30fps 기기와 144fps 기기에서 같은 틱에 나온다. 되감기(스냅샷)·판 저장도 시계와 `nextWaveAt`이 함께 돌아가 맞는다.
+- 같은 일은 시간 예약으로도 된다: `SpawnWave.Run` 끝에 `Game.ScheduleAfter(간격, new SpawnWave())`(29장 2-5). 시간 예약도 틱마다 확인되므로 결과가 같다. 틱 받는 쪽은 "체력이 절반 이하면 분노"처럼 조건을 매 틱 보는 규칙에 맞다.
+- 적의 움직임은 화면 코드가 `Update`에서 한다. 적이 주인공에게 닿으면 `Game.Do(new HitHero { foe = foe, amount = 3 })`처럼 결과만 행동으로 보낸다.
+- 틱마다 행동을 실행하면(재생 +1을 매 틱) 행동이 1초에 30개씩 쌓인다. "1초마다 1 회복"은 시각을 적어 두고 그 시각이 됐을 때만 행동을 실행한다(위와 같은 모양).
+
+### 5-2. 남은 시간 막대 — `TickAlpha` 보간
+
+게임 시계는 틱마다 1/30초씩 뛴다. 144fps 화면이 그 값을 그대로 그리면 막대가 계단처럼 움직인다.
+
+```csharp
+using GBible;
+using GBible.Ids;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class WaveTimerBar : MonoBehaviour
+{
+    [SerializeField] Image fill;
+
+    void Update()
+    {
+        var session = GBibleRuntime.Session;
+        var arena = session.Data.Get<ArenaState>("arena");
+        var now = session.Clock.Time + session.TickAlpha / session.Options.TickRate;   // 두 틱 사이의 부드러운 시각
+        var interval = session.Game.Balance(GameIds.Balance.WaveInterval);
+        fill.fillAmount = Mathf.Clamp01((float)((arena.nextWaveAt - now) / interval));
+    }
+}
+```
+
+- 틱마다 바뀌는 다른 값도 같다: 틱 받는 쪽에서 직전 값·지금 값을 적어 두고, `Update`에서 `Mathf.Lerp(직전, 지금, (float)session.TickAlpha)`로 그린다(한 틱 늦게 보이는 대신 부드럽다).
+- 읽기만 하므로 행동 밖(`Update`)에서 해도 된다.
+
+### 5-3. 예상 피해 — `Game.Preview`
+
+카드에 마우스를 올리면 고른 적에게 들어갈 피해를 보인다. 방어도·보호막(가로채기)·분노(Modifier)·유물까지 실제 규칙 그대로다.
+
+```csharp
+using System.Linq;
+using GBible;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+// 카드 프리팹에 붙인다. CardId는 손패 ViewList의 OnCreate에서 넣는다(32장 5-3).
+public class CardHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+{
+    [SerializeField] TMP_Text predictText;
+    public string CardId;
+
+    public void OnPointerEnter(PointerEventData _)
+    {
+        var game = GBibleRuntime.Game;
+        var card = Rules.CardOf(game, CardId);
+        var enemy = Rules.LivingEnemies(game).FirstOrDefault();
+        if (card == null || enemy == null) return;
+        predictText.text = Predict(game, card, enemy);
+    }
+
+    public void OnPointerExit(PointerEventData _) => predictText.text = "";
+
+    static string Predict(GameApi game, DeckCard card, Enemy enemy)
+    {
+        try
+        {
+            var hpAfter = game.Preview(new PlayCard { card = card, target = enemy },
+                g => g.Find<Enemy>(enemy.id)?.hp ?? 0);              // 쓰러지면 전투에서 빠진다 → 0
+            return hpAfter <= 0 ? "처치" : $"예상 피해 {enemy.hp - hpAfter}";
+        }
+        catch (GameFailure f)
+        {
+            return f.Message;                                         // 낼 수 없으면 그 이유(지금 언어)
+        }
+    }
+}
+```
+
+- 난수가 든 카드(피해 4~6)도 미리본 값이 실제와 같다. 난수도 되돌아가므로 같은 순간에 내면 같은 수가 나온다.
+- 미리보기 중에도 바로 받는 쪽(유물·로그·예약)이 돌아 결과가 맞다. 연출은 `SubscribeAfterAction`이라 피해 숫자가 뜨지 않는다.
+- 미리보기는 마우스를 올린 순간 한 번 한다. 모든 카드에 늘 예상 피해를 보이려면 손패 ViewList의 `bind`에서 해도 된다(미리보기는 다시 그리기를 일으키지 않는다, 2-2). 그때는 판 데이터가 바뀔 때마다 카드마다 행동이 한 번씩 돈다.
+- 행동 객체는 미리보기마다 새로 만든다.
+
+### 5-4. 낼 수 없는 카드 — `Game.CanDo`로 막기와 이유
+
+손패를 그릴 때 카드마다 낼 수 있는지 보고, 낼 수 없으면 흐리게 하고 이유를 툴팁에 둔다.
+
+```csharp
+// CardView(32장 5-3)에 더한다
+[SerializeField] CanvasGroup canvasGroup;
+[SerializeField] TMP_Text tooltipText;
+
+public void SetPlayable(bool playable, string why)
+{
+    canvasGroup.alpha = playable ? 1f : 0.5f;     // 흐리게
+    tooltipText.text = why ?? "";                  // "얼어 있어 2턴 동안 움직일 수 없습니다." / "에너지가 모자랍니다(1/2)."
+}
+
+// HandView의 bind: 그릴 때마다 카드마다 해 본다
+(view, id) =>
+{
+    var card = Rules.CardOf(Game, id);
+    view.Show(card);
+    var target = Rules.LivingEnemies(Game).FirstOrDefault();
+    view.SetPlayable(Game.CanDo(new PlayCard { card = card, target = target }, out var why), why);
+}
+```
+
+- 이유는 규칙이 던진 글 그대로다(30장 5-8의 `Game.Fail`·`FailureKeys`). 같은 문장을 화면 코드에 따로 쓰지 않는다.
+- `CanDo`는 다시 그리기를 일으키지 않으므로 `bind` 안에서 불러도 된다(2-2). 판 데이터가 바뀔 때마다 카드 수만큼 행동이 돈다. 카드가 아주 많거나 행동이 무거우면 마우스를 올릴 때만 부른다(5-3처럼).
+- 눌렀을 때는 어차피 `Game.Do`가 같은 이유로 실패한다(버튼을 막는 것은 보여 주기 위해서다).
+- 언어를 바꾸면 다시 그리기가 돌아 이유도 새 언어로 바뀐다.
+
+### 5-5. 밖으로 나가는 일 — `Game.IsPreviewing`
+
+미리보기 중에도 규칙 코드는 그대로 돈다. 규칙 코드 안에서 게임 밖으로 무언가를 보내면 미리보기 때도 보내진다.
+
+```csharp
+public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
+{
+    // … 피해 계산(28장 5-3) …
+    if (target is Enemy enemy && enemy.IsDead && !game.IsPreviewing)
+        Telemetry.Kill(enemy.monster);       // 분석 전송(프로젝트 코드): 미리보기에서는 건너뛴다
+}
+```
+
+- 가능하면 그런 일은 `SubscribeAfterAction` 받는 쪽에 둔다. 미리보기·실패한 행동에서는 오지 않으므로 `IsPreviewing`을 볼 필요도 없다.
+- 플레이어 데이터를 바꾸는 일에는 `IsPreviewing`을 보지 않는다. 미리보기도 실제와 같게 돌아야 하고, 어차피 되돌아간다.
+
+### 5-6. CSV로 수치 한꺼번에 고치기
+
+**밸런스 값**(30장 5-9)과 같은 흐름으로 인스턴스도 고친다. 예: 몬스터 체력·공격 표.
+
+1. DB › 인스턴스 탭 → 맨 위 폴더 줄 **CSV** → **MonsterData 내보내기…** → `MonsterData.csv`.
+2. 시트에서 연다. 칸은 `MonsterData`의 단순 필드(`title` · `maxHp` · `element` …)다. 공격 패턴(`attackPattern`, 목록)·초상화(스프라이트)는 나오지 않는다.
+
+```
+id,title,maxHp,element
+dragon,드래곤,120,fire
+goblin,고블린,20,neutral
+slime,슬라임,14,neutral
+```
+
+3. `maxHp`를 고치고 `orc,오크,30,neutral` 줄을 더한 뒤 CSV로 받는다.
+4. **MonsterData 가져오기…** → "2개 고침, 1개 새로 만듦(적용 전 — Ctrl+S로 적용)." → DB 목록에 `orc`가 "새 항목 · 적용 전"으로 보인다. 공격 패턴은 DB에서 채운다.
+5. 저장(Ctrl+S). `GameIds.Instance.Orc`가 생긴다.
+
+- 시트에서 행을 지워도 DB 항목은 지워지지 않는다. 지우기는 DB에서 한다(21장 4절).
+- 같은 파일을 팀이 함께 고치면 마지막에 가져온 값이 남는다. 가져오기 전에 DB 쪽 변경을 먼저 저장해 두면 되돌리기가 가져온 것만 버린다.
+- 키워드 칸(`element`)은 글자 칸이라 아무 글자나 들어간다. 키워드 그룹에 없는 값은 가져온 뒤 검증 오류로 보인다(21장 6.1).
+
+---
+
+## 6. 주의할 점 · 자주 하는 실수
+
+| 증상 | 원인과 해결 |
+|---|---|
+| 고정 틱을 켰는데 `Ticked`가 프레임마다 옴 | 초당 틱 수가 0이다. DB › Bootstrap 또는 `Configuring`의 `TickRate`. 코드가 0으로 덮지 않았는지 타임라인의 "코드(Configuring)가 … 바꿨습니다"를 본다. |
+| `Ticked`에서 값을 바꿨더니 Undo·저장에서 빠짐 | `Ticked`는 행동 밖이다. `session.Do(행동)`으로 바꾼다. |
+| 실시간 게임에서 Undo 이력이 금방 차고 느려짐 | 틱마다 행동을 실행했다. 시각을 적어 두고 그때만 실행한다(5-1). 실시간 게임은 Undo 방식을 스냅샷으로. |
+| 프레임이 크게 끊긴 뒤 게임이 잠깐 느려짐 | 한 프레임에 8틱까지만 따라잡고 남은 시간은 버린다(2-1). 의도된 동작이다. |
+| 슬롯을 바꾼 뒤 틱 규칙이 안 돎 | 예전 세션의 `Ticked`에 연결했다. `GBibleRuntime.Started`에서 연결한다(새 세션마다 다시 온다). |
+| 일시정지했는데 웨이브 시간이 흐름 | 시각을 `Time.time`으로 쟀다. 게임 시계(`session.Clock.Time`)로 적는다(07장). |
+| 막대가 계단처럼 움직임 | 틱마다 뛰는 게임 시계를 그대로 그렸다. `TickAlpha`로 보간한다(5-2). |
+| `Game.Preview`가 "행동 안에서는 미리보기를 할 수 없습니다" | 행동·`[BindTo]`·Block 안에서 불렀다. 화면 코드에서 부른다. |
+| `CanDo`가 늘 거짓이고 이유가 "행동 안에서는 미리보기를…" | 같은 원인. `CanDo`는 예외 대신 거짓을 돌려준다. |
+| 미리보기 값과 실제 값이 다름 | 미리보기와 실제 사이에 데이터가 바뀌었거나(다른 카드를 먼저 냄), 규칙 코드가 `UnityEngine.Random`·`Time.time` 같은 세션 밖의 값을 쓴다. 규칙은 `Game.Random`·게임 시계만 쓴다. |
+| 미리본 체력이 늘 지금 체력 | `read`가 데이터 객체를 돌려주고 나중에 읽었다. 되돌린 뒤의 객체다. `read` 안에서 숫자를 꺼낸다. |
+| 마우스를 올렸을 뿐인데 피해 숫자가 뜸 | 연출을 `Events.Subscribe`로 받았다. 미리보기에서도 불린다. `SubscribeAfterAction`으로(32장). |
+| 손패를 다시 그릴 때마다 느려짐 | `bind`에서 카드마다 `CanDo`·`Preview`로 행동 전체를 돌린다. 카드가 많거나 행동이 무거우면 마우스를 올릴 때만 부른다(5-3). |
+| 테스트에서 `Assert.Throws<InvalidOperationException>(() => Game.Preview(…))`가 실패 | 미리보기는 행동의 예외를 그대로 던진다. 플레이어용 실패면 `GameFailure`라, 정확한 형식만 받는 `Assert.Throws`에는 `Assert.Throws<GameFailure>`를 쓴다(30장 6절). |
+| 미리보기로 분석 이벤트가 전송됨 | 규칙 코드에서 밖으로 보냈다. `Game.IsPreviewing`을 보거나 `SubscribeAfterAction`으로 옮긴다(5-5). |
+| CSV에 곡선의 점·결과 Block이 없음 | 목록·Block 칸은 CSV에 나오지 않는다(2-3). DB에서 고친다. |
+| 가져왔는데 게임에 반영 안 됨 | 적용 전(작업본)이다. 저장(Ctrl+S). |
+| 가져오기 결과에 "모르는 칸(건너뜀)" | 칸 이름이 필드 이름과 다르다(시트에서 머리 줄을 고쳤다). 내보낸 머리 줄을 그대로 쓴다. |
+| "숫자가 아닙니다('')" | 숫자 칸을 비웠다. 빈칸은 숫자로 읽지 않는다(그 칸은 그대로). 0을 적는다. |
+| 정수 칸에 "정수가 아닙니다('1,000')" | 천 단위 쉼표는 읽지 않는다. 시트의 숫자 서식을 쉼표 없이. |
+| enum 칸에 "고를 수 있는 값이 아닙니다" | 코드 이름도 DB 이름도 아니다. 오류 줄에 고를 수 있는 코드 이름이 나온다. |
+| 엑셀에서 한글이 깨짐 | 직접 만든 파일이 UTF-8(BOM)이 아니다. 내보낸 파일을 고쳐 쓰거나, 엑셀에서 "CSV UTF-8"로 저장한다. |
+| 시트에서 지운 줄이 DB에 남음 | 가져오기는 지우지 않는다. DB에서 지운다. |

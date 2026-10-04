@@ -87,6 +87,7 @@
 
 - 플레이어 데이터라서 Undo·저장·멀티플레이가 그대로다. 처음 붙일 때 키가 저절로 정의된다.
 - 행동 안에서 붙이고 뗀다. 같은 행동 안에서 붙인 뒤 바로 읽어도 보인다.
+- 대상이 데이터에서 사라지면(쓰러져 전투에서 빠진 적) 그 대상의 **이번 판** Modifier는 그 행동이 끝나기 직전에 그 행동 안에서 지워진다(Undo하면 함께 돌아온다). 영구 Modifier는 지우지 않는다(대상이 다음 판에 다시 생긴다).
 
 ### 2-3. 이벤트와 가로채기
 
@@ -109,12 +110,14 @@
 
 ### 2-4. 비용
 
-`Game.Pay(key, path, amount)`는 다음 순서로 돈다.
+`Game.Pay(key, path, amount, what)`는 다음 순서로 돈다.
 
 1. 기본 제공 의도 `CostIntent { key, path, amount }`를 가로채기에 통과시킨다("비용 0" 같은 효과가 여기서 고친다).
 2. 막혔거나(`cancelled`) 양이 0 이하가 되었으면 아무것도 내지 않는다.
-3. 지금 값이 양보다 적으면 `InvalidOperationException` → 행동 실패, 그 행동에서 바꾼 것이 모두 취소된다(먼저 낸 다른 비용도).
+3. 지금 값이 양보다 적으면 플레이어용 실패(`GameFailure`, 키 `FailureKeys.NotEnough`, `30-Balance-Tables.md` 2-4) → 행동 실패, 그 행동에서 바꾼 것이 모두 취소된다(먼저 낸 다른 비용도). 실패 글의 `{what}`은 `what`(텍스트 키면 번역된 글, 비우면 "플레이어 데이터 › 필드")이다.
 4. 아니면 그만큼 뺀다.
+
+없는 플레이어 데이터·없는 필드·숫자가 아닌 필드는 "모자랍니다"가 아니라 프로그래머 실수(`InvalidOperationException`)다.
 
 `Game.CanPay`는 지금 값만 본다(가로채기 전). 버튼을 미리 흐리게 하는 화면용이다.
 
@@ -187,11 +190,12 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `가로채기`. 칸의 잠�
 | `key` | 플레이어 데이터 | 낼 값이 든 플레이어 데이터 |
 | `path` | 필드(비우면 값 전체) | 그 안의 숫자 필드(`energy`, `wallet.gold`) |
 | `amount` | 양 | 0 이상 |
+| `what` | 보일 이름(모자랄 때 실패 글에, 텍스트 키 또는 글, 비우면 플레이어 데이터 › 필드) | `energy.name`(텍스트 키) 또는 "에너지". 실패 글의 `{what}` 자리. 기본 문장이면 "에너지이(가) 모자랍니다(1 / 2).", 조사는 텍스트 표의 틀 `{what:이}`로 맞춘다(30장 5-8) |
 
 - 결과 종류는 플레이어 데이터(`OutcomeKinds.PlayerData`)다. 플레이어 데이터에 주기를 고를 수 있는 칸(능력·사용 기능 …)에서 쓴다.
 - 요약: `비용 battle › energy 2`.
 - 검증 오류: "비용 내기: 플레이어 데이터를 고르세요." / "비용 내기: 양은 0 이상이어야 합니다(얻는 것은 '플레이어 데이터에 주기')."
-- `Game.CanUse`는 결과를 보지 않으므로 비용이 모자란 것을 모른다. 버튼을 미리 흐리게 하려면 트리거에 `플레이어 데이터 검사`(energy 2 이상)를 `AND`로 붙인다.
+- `Game.CanUse`는 결과를 보지 않으므로 비용이 모자란 것을 모른다. 버튼을 미리 흐리게 하려면 트리거에 `플레이어 데이터 검사`(energy 2 이상)를 `AND`로 붙이거나, 그 행동을 `Game.CanDo`로 해 본다(결과까지 돌려 보고 이유를 준다, `33-Tick-Preview-Csv.md` 2-2).
 
 ### 3-6. 어느 칸에서 쓸 수 있나
 
@@ -269,7 +273,7 @@ Game.AddModifier("hero", nameof(Unit.attack), ModifierKind.Flat, 5, "smith", per
 - 돌려주는 값은 Modifier id(`$mod1`, `$mod2` …). 라이브러리가 만드는 id는 `$`로 시작해 DB 항목 ID와 겹치지 않는다(29장 2-7).
 - 행동 안에서 부른다(Undo·저장·멀티플레이 기록).
 - 대상 객체에 그 숫자 필드가 없으면 `InvalidOperationException`("[MomoiProject] Unit에 숫자 필드 'speed'가 없어 Modifier를 붙일 수 없습니다."), 이름이 비면 `ArgumentException`.
-- id 글자로 줬는데 지금 데이터에서 대상을 찾지 못하면 필드 검사 없이 그 id에 붙인다. 판 밖에서 영구 강화를 붙일 때 쓴다(5-2).
+- id 글자로 줬는데 지금 데이터에서 대상을 찾지 못하면 필드 검사 없이 그 id에 붙인다. 판 밖에서 영구 강화를 붙일 때 쓴다(5-2). 이번 판 Modifier는 대상이 없으면 그 행동이 끝날 때 지워지므로(2-2) 이렇게 붙이는 것은 영구일 때만 뜻이 있다.
 
 ### 4-4. `Game.RemoveModifiers` · `Game.Modifiers` — 떼기·보기
 
@@ -430,21 +434,22 @@ session.Triggers.Register("rule.halfDamage",
 ### 4-12. `Game.Pay` · `Game.CanPay` · `CostIntent` · `PayOutcome`
 
 ```csharp
-Game.Pay("battle", "energy", 2);                          // 행동 안에서
+Game.Pay("battle", "energy", 2, what: "energy.name");     // 행동 안에서. 모자라면 "에너지이(가) 모자랍니다(1 / 2)."(energy.name = "에너지")
 bool canPay = Game.CanPay("battle", "energy", 2);         // 화면 미리보기(가로채기 전)
-var pay = new PayOutcome { key = "battle", path = "energy", amount = 2 };   // 결과 '비용 내기'
+var pay = new PayOutcome { key = "battle", path = "energy", amount = 2, what = "energy.name" };   // 결과 '비용 내기'
 ```
 
 | 멤버 | 뜻 |
 |---|---|
-| `void Pay(string key, string path, double amount)` | 2-4의 순서로 낸다. 모자라면 `InvalidOperationException`("전투 › energy이(가) 모자랍니다(1 / 2)." — 앞부분은 플레이어 데이터의 이름 › 필드) |
+| `void Pay(string key, string path, double amount, string what = null)` | 2-4의 순서로 낸다. 모자라면 `GameFailure`(`FailureKeys.NotEnough`). 메시지의 앞부분 `{what}`은 `what`(텍스트 키면 번역된 글, 글자면 그대로). 비우면 플레이어 데이터의 이름 › 필드("전투 › energy이(가) 모자랍니다(1 / 2).") |
 | `bool CanPay(string key, string path, double amount)` | 지금 값 ≥ 양. 가로채기를 거치지 않는다 |
 | `CostIntent` | 기본 제공 의도 "비용 지불": `key`·`path`·`amount`·`cancelled` |
-| `PayOutcome` | 결과 '비용 내기'(`key`·`path`·`amount`). `Run`이 `Game.Pay`를 부른다 |
+| `PayOutcome` | 결과 '비용 내기'(`key`·`path`·`amount`·`what`). `Run`이 `Game.Pay`를 부른다 |
 
 - `path`를 비우면 값 전체(숫자 플레이어 데이터)를 낸다.
-- 없는 플레이어 데이터면 "[MomoiProject] 비용: 없는 플레이어 데이터 '…'입니다." 예외.
+- 프로그래머 실수는 `InvalidOperationException`: 없는 플레이어 데이터("[MomoiProject] 비용: 없는 플레이어 데이터 '…'입니다."), 없는 필드("[MomoiProject] 비용: 'battle'에 필드 'enrgy'가 없습니다(…)."), 숫자가 아닌 필드("[MomoiProject] 비용: 'battle › name'는 숫자 필드가 아닙니다(String).").
 - 실패가 행동 단위로 취소되므로 행동 안에서 부른다.
+- 플레이어에게 보일 실패의 번역·`{what}` 이름은 `30-Balance-Tables.md` 2-4·5-8.
 
 ### 4-13. 도우미
 
@@ -561,7 +566,7 @@ public class SmithUpgrade : GameAction
     protected override void Run()
     {
         var profile = Game.Get<Profile>("profile");
-        Game.Pay("profile", "gold", 100 + profile.smithLevel * 50);     // 모자라면 여기서 실패 — 아무것도 바뀌지 않는다
+        Game.Pay("profile", "gold", 100 + profile.smithLevel * 50, what: "gold.name");     // 모자라면 여기서 실패 — 아무것도 바뀌지 않는다
         profile.smithLevel++;
         Game.AddModifier("hero", nameof(Unit.attack), ModifierKind.Flat, 5, "smith", permanent: true);
     }
@@ -724,7 +729,7 @@ public class PlayCard : GameAction
     protected override void Run()
     {
         var cost = Game.Session.Instances?.Invoke(card) is Card data ? data.cost : 0;
-        Game.Pay("battle", "energy", cost);          // 가로채기(비용 지불) → 모자라면 실패
+        Game.Pay("battle", "energy", cost, what: "energy.name");   // 가로채기(비용 지불) → 모자라면 실패
         if (target == null) Game.Use(card, user);
         else Game.Use(card, user, target);
     }
