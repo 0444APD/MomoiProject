@@ -81,6 +81,7 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 - **이벤트를 받는 쪽은 화면·연출만 한다.** 값을 고치지 않는다.
 - **규칙 난수는 `Game.Random("이름")`, 시간은 게임 시계(`session.Clock.Time`).**
 - **세션은 매개변수로 받는다**(`c.Game`·`session`). 게임 값을 static 변수에 두지 않는다.
+- **지연·지속 효과는 상태 효과로, 플레이어가 고르는 효과는 선택 대기로.** 행동을 멈추고 기다리지 말고, 나중의 일·고른 뒤의 일은 이어서 할 행동에 쓴다(매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md)).
 
 ```csharp
 [Serializable, BlockInfo("카드 내기")]
@@ -248,7 +249,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > |---|---|---|
 > | MonoBehaviour 필드에 게임 값(골드·체력·덱)을 둔다 | Undo·저장·동기화에서 빠진다 | 플레이어 데이터에 둔다 |
 > | 씬 코드·코루틴·이벤트를 받는 함수에서 플레이어 데이터를 고친다 | "행동 밖 변경"으로 기록되고 Undo되지 않는다. 그 행동을 Undo하면 "행동 밖에서 바뀐 값을 덮었습니다" 경고 | 행동을 만들어 `Game.Do` |
-> | 행동 안에서 기다린다(코루틴·`await`) | 행동은 한 번에 끝나야 한다 | 결과를 이벤트로 쏘고 연출은 따로. 시간이 걸리는 효과는 나중에 별도 행동으로 |
+> | 행동 안에서 기다린다(코루틴·`await`) | 행동은 한 번에 끝나야 한다 | 결과를 이벤트로 쏘고 연출은 따로. 몇 턴·몇 초 뒤의 효과는 상태 효과·예약으로, 플레이어의 고르기는 `Game.Ask`(이어서 할 행동이 따로 돈다)로 |
 > | 행동 필드에 Unity 객체·델리게이트·데이터 밖 객체를 둔다 | id로 바꿀 수 없어 저장·리플레이·서버 전송이 안 된다 | 대상은 데이터 안의 id 있는 객체, 원본은 원본 ID |
 > | 쥐고 있던 객체를 화면이 그대로 읽는다 | 불러오기 뒤에는 옛 인스턴스를 읽는다 | 그릴 때 `Game.Data()`·`Game.Find`로 다시 꺼낸다(행동에 넣는 것은 괜찮다) |
 > | 규칙 난수에 `UnityEngine.Random` | Undo로 다시 뽑기가 되고, 시드 재현·서버 판정이 깨진다 | `Game.Random("이름")` |

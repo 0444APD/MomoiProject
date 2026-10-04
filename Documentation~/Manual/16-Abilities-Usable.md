@@ -32,7 +32,8 @@
    - 사용 조건을 붙이려면 `+ 블럭` → **조건 충족** 그룹의 조건 Block(예: 프로젝트가 만든 `사용자 체력 있음`)을 더한다. `사용`과 `AND`로 이어진다.
    - 이 칸에서 고를 수 있는 것은 `사용`과 조건 충족뿐이다.
 3. `outcomes`(툴팁 "결과"): `+ 결과 추가` →
-   - `대상에게 효과` → `+ 대상 추가`(비우면 고른 대상 그대로) → `+ 효과 추가`. 기본 제공 효과 `능력치 보정`·`능력치 보정 떼기`(분류 "능력치")로 버프를 코드 없이 만든다(3-10).
+   - `대상에게 효과` → `+ 대상 추가`(비우면 고른 대상 그대로) → `+ 효과 추가`. 기본 제공 효과 `능력치 보정`·`능력치 보정 떼기`(분류 "능력치")로 버프를 코드 없이 만든다(3-10). 독·보호막처럼 몇 턴 동안 이어지는 효과는 `상태 효과 걸기`·`상태 효과 풀기`(분류 "상태 효과", → `29-Statuses-Schedules-Choices.md`).
+   - `선택 요구` → 후보 중에서 플레이어가 고르게 하고, 고른 것마다 효과를 준다(→ `29-Statuses-Schedules-Choices.md` 3-3).
    - `플레이어 데이터에 주기 · …` → 필드와 값.
    - 코딩한 결과(`Reward` 클래스).
 4. 검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요."
@@ -156,12 +157,14 @@ public class AddEnemiesAround : TargetSelector<Unit>
 
 기본 제공 `SelfTarget`(`사용자 자신`): 고른 대상을 버리고 사용자 하나를 낸다.
 
-기본 제공 효과 Block(→ `28-Attributes-Intercepts.md` 3-1·3-2):
+기본 제공 효과 Block(→ `28-Attributes-Intercepts.md` 3-1·3-2, `29-Statuses-Schedules-Choices.md` 3-2):
 
 | 효과 | 코드 형식 | 하는 일 |
 |---|---|---|
 | 능력치 보정 | `AttributeModifierEffect` | 대상의 숫자 필드에 Modifier를 붙인다(`attribute`·`kind`·`value`·`permanent`). 출처 = 이 능력 ID(인스턴스면 인스턴스 ID) |
 | 능력치 보정 떼기 | `RemoveModifiersEffect` | 대상에서 그 출처의 Modifier를 모두 뗀다(`source`, 비우면 이 능력 ID) |
+| 상태 효과 걸기 | `ApplyStatusEffect` | 대상에게 상태 효과(DB › 상태 효과)를 건다(`status`·`stacks`). 이미 걸려 있으면 그 상태 효과의 다시 걸 때 규칙(중첩·갱신)을 따른다 |
+| 상태 효과 풀기 | `RemoveStatusEffect` | 대상의 상태 효과를 푼다(`status`·`stacks`, 0이면 모두). 끝날 때 결과는 돌지 않는다 |
 
 ### 2-6. `AbilityDefinition` · `session.Abilities` — 코드로 정의하기
 
@@ -420,13 +423,14 @@ DB › 능력 `chainLightning`의 트리거는 에디터에서 그대로 정하�
 
 **에디터**:
 
-- DB › 능력 `rage`: `outcomes` = `대상에게 효과` → 대상 `사용자 자신` → 효과 `능력치 보정`(attribute `attack`, kind `Percent`, value `0.2`). 요약: `사용자 자신: attack +20%`.
+- DB › 능력 `rage`: `outcomes` = `대상에게 효과` → 대상 `사용자 자신` → 효과 `능력치 보정`(attribute `attack`, kind `퍼센트(0.2 = +20%)`, value `0.2`). 요약: `사용자 자신: attack +20%`.
 - DB › 능력 `calm`: `outcomes` = `대상에게 효과` → 대상 `사용자 자신` → 효과 `능력치 보정 떼기`(source `rage`).
 
 **게임 코드**: `Game.Use("rage", hero);` → `Game.Attribute(hero, nameof(Unit.attack))`가 12가 된다(`hero.attack` 필드는 10 그대로). 전투가 끝날 때 한꺼번에 떼려면 그 행동 안에서 `Game.RemoveModifiers("rage");`.
 
 - 출처가 능력 ID(`rage`)라서 두 번 쓰면 +20%가 두 줄 붙어 +40%가 되고, 떼기는 둘 다 뗀다. 겹치지 않게 하려면 `rage`의 트리거에 사용 조건 Block을 AND로 둔다(예: `Check() => Context?.User is Unit u && Game.Modifiers(u).All(m => m.source != "rage")`).
 - 사용이 행동이라 Undo 한 번에 Modifier도 돌아간다. 계산 규칙·영구 보정·코드 API는 `28-Attributes-Intercepts.md`.
+- "3턴 동안 +20%"처럼 저절로 끝나야 하거나 "최대 3중첩"이 있으면 DB › 상태 효과에 능력치 보정을 두고, 능력에서는 `상태 효과 걸기`만 한다(→ `29-Statuses-Schedules-Choices.md` 5-2).
 
 ---
 

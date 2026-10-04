@@ -729,6 +729,20 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `TriggerKinds.Intercept`·`OutcomeKinds.Intent`(기능 칸 잠금) | 28 · 11 | 04 §8 |
 | `Game.Pay`·`CanPay`·`CostIntent`·결과 '비용 내기' | 28 · 12 | 02 §8(언급) |
 
+### 상태 효과·예약·선택 대기
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| DB › 상태 효과(중첩·다시 걸 때·지속·능력치 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과) | 29 | 04 §4(독) |
+| 효과 '상태 효과 걸기'·'상태 효과 풀기' | 29 · 16 · 12 | 04 §4(독) |
+| `[BindTo(상태 효과 ID)]`, 결과 안에서 중첩 수 `Game.StatusStacks(c.User, c.Owner)` | 29 · 13 | 04 §4(독) |
+| `Game.ApplyStatus`·`RemoveStatus`·`HasStatus`·`Statuses` | 29 | 04 §4(언급) |
+| 예약 `Game.ScheduleAfter`·`ScheduleOn`·`CancelSchedule`·`CancelSchedules` | 29 · 02 | 04 §4(언급), 09 §5(언급) |
+| 결과 '선택 요구'(`ChoiceOutcome`) | 29 · 12 | 04 §9(투척 단검) |
+| 모니터 명령 탭의 '선택 대기' 패널 | 29 | 04 §9(투척 단검) |
+| `Game.Choice`·`IsWaiting`(기다리는 동안 입력 막기는 화면의 일) | 29 | 04 §9(언급) |
+| `Game.Ask`·`[Chosen]`·`Game.Answer`, 이벤트 `ChoiceRequested` | 29 | 04 §9(언급), 09 §2·§5(언급) |
+
 ### DB 기능
 
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |

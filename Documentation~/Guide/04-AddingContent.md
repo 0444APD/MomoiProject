@@ -8,7 +8,9 @@
 > | 인스턴스 | 클래스의 원본 값 하나(타격 카드, 드래곤 …)를 DB › 인스턴스에 채워 둔 항목. 게임 중에는 읽기만 하고, 판 데이터에는 원본 ID와 바뀌는 값만 둔다. |
 > | 사용 기능(`Usable`) | 클래스에 붙이는 기능 필드. 붙어 있는 인스턴스는 게임이 켜질 때 인스턴스 ID로 등록되어 `Game.Use(인스턴스 ID, 사용자, 대상들)`로 쓴다. |
 > | Trigger | DB 항목의 "언제" 칸. 잎(이벤트 받기 · 조건 충족 · 사용)을 AND·OR·NOT으로 조립한다. |
-> | Outcome(결과) | DB 항목의 "무엇을" 칸. 로그에 기록 · 플레이어 데이터에 주기 · 대상에게 효과 · 이벤트 쏘기 · 코딩한 결과. |
+> | Outcome(결과) | DB 항목의 "무엇을" 칸. 로그에 기록 · 플레이어 데이터에 주기 · 대상에게 효과 · 선택 요구 · 이벤트 쏘기 · 코딩한 결과. |
+> | 상태 효과 | DB › 상태 효과의 항목. 대상에게 걸려 있는 동안 효과가 나는 버프·디버프(독·보호막). 중첩·지속(턴 수)·능력치 보정·트리거와 결과를 정하고, 효과 Block `상태 효과 걸기`로 건다. |
+> | 선택 요구 | 후보 중에서 플레이어가 고르게 하는 결과 Block. 행동은 답을 기다리지 않고 끝나고, 고르면 고른 것에 효과가 따로 실행된다. |
 > | Block | 기획자가 DB에서 골라 조립하는 로직 단위. 대상 Block(누구에게, `TargetSelector<T>`)·효과 Block(무엇을, `Effect<T>`)·조건 Block(`SimpleCondition`)·코딩한 결과(`Reward`). 프로그래머가 동작 하나를 Block 하나로 만든다. |
 > | `[BindTo]` | static 함수에 붙여 그 ID를 가진 DB 항목 하나의 결과를 코드로 바꾸는 어트리뷰트. 그 항목의 결과 칸은 잠긴다. |
 > | 컨텍스트(`TriggerContext`) | Trigger가 발동한 순간의 정보: 이벤트(`Event`), 사용자(`User`), 고른 대상(`Picked`), 항목 ID(`Owner`), `Game`. 결과·`[BindTo]` 함수가 읽는다. |
@@ -103,6 +105,31 @@ public class DealDamage : Effect<Fighter>
 > - 피해는 규칙 함수(`Rules.Damage`)에 맡긴다. 그래서 방어도·처치 이벤트까지 카드와 적 공격이 같은 규칙을 탄다.
 > - `[BlockInfo]`의 이름·분류·설명이 기획자가 보는 목록이 되고, `Describe`가 상세 위쪽 요약에 수치까지 보이게 한다. 한 줄 문장(`Sentence`) 등 기획자 화면 다듬기는 [05장](05-WorkingWithDesigners.md) 5절.
 > - 기획자가 넣으면 안 되는 값은 Block의 `Validate`로 막는다. 0 이하 피해를 DB 검증 오류로 만드는 예는 [05장](05-WorkingWithDesigners.md) 7절.
+
+**몇 턴 동안** 이어지는 효과(턴마다 피해를 주는 독, 3턴 동안의 보호막)는 카드 결과에 직접 쓰지 않는다. DB › **상태 효과**에 항목으로 만들고, 카드 효과에는 기본 제공 `상태 효과 걸기`를 둔다.
+
+> [!note]- 독 — 턴 끝마다 중첩만큼 피해, 3턴(상태 효과)
+> 1. DB › **상태 효과** → **+ 새로 만들기** → ID `poison`.
+> 2. `maxStacks` `0`(제한 없음), `reapply` `중첩 더하고 지속 갱신`.
+> 3. `duration`: `kind` `이벤트 횟수`, `length` `3`, `tickEvent` `턴 끝`.
+> 4. `trigger`: **+ 블럭** → `이벤트 받기` → `턴 끝`.
+> 5. 결과는 중첩 수를 읽는 계산이라 함수 하나로 쓴다. Ctrl+S로 `GameIds.Status.Poison`을 만든 뒤 Rules에 쓴다.
+> ```csharp
+> [BindTo(GameIds.Status.Poison)]
+> static void Poison(TurnEnded e, TriggerContext c)
+> {
+>     var holder = (Fighter)c.User;                                              // 가진 쪽(독이 걸린 적·주인공)
+>     Rules.Damage(c.Game, null, holder, c.Game.StatusStacks(holder, c.Owner));   // Owner = 상태 효과 ID
+> }
+> ```
+> 6. 카드 `poisonDart`(독침): 결과 `대상에게 효과` → 대상 비움(고른 적) → 효과 `피해`(4) → `상태 효과 걸기`(`poison`, 중첩 `3`).
+>
+> - 같은 턴 끝이 피해와 횟수 줄이기를 둘 다 하면 피해가 먼저다. 피해 세 번 뒤에 끝난다. 다시 걸면 중첩이 더해지고 3턴으로 돌아간다.
+> - 독 피해도 `Rules.Damage`를 거치므로 가시 갑옷 같은 가로채기를 탄다(9절).
+> - 걸린 독은 플레이어 데이터 `$statuses`에 들어 있어 Undo·판 저장이 따라온다. 시험: 독침을 내고 모니터 **데이터** 탭 `$statuses`에서 `stacks`·`remaining`을 본 뒤 턴을 끝낸다. **Undo**하면 피해와 남은 횟수가 함께 돌아간다.
+> - 화염구의 `상태 걸기`(`burn`)는 `Fighter.statuses`에 글자만 넣는 예제 Block이다. 턴마다 효과가 있는 것은 상태 효과로 만든다.
+> - 코드에서 걸 때는 `Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3)`, 화면의 상태 아이콘은 `Game.Statuses(fighter)`·`Game.StatusStacks`로 읽는다. 상태 효과 없이 "2턴 뒤 이 행동"만 걸 때는 예약(`Game.ScheduleOn<TurnEnded>(2, 행동)`)을 쓴다.
+> - 능력치 보정(분노 +10%)·가로채기(보호막 "내가 받는 피해 반감")·끝날 때 결과("3턴 뒤 폭발")도 같은 항목의 칸이다. 매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md) 5장.
 
 ## 5. 카드 — 연쇄 번개 (`[BindTo]`)
 
@@ -293,13 +320,25 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 > 이벤트는 일이 일어난 **뒤**에 온다. "받는 피해 −5"는 피해가 들어가기 **직전**에 내용을 고쳐야 하므로 가로채기로 만든다.
 > 1. DB › 유물 → `thornArmor`.
 > 2. 발동(`trigger`): **+ 블럭** → `가로채기` → 의도 `피해`. 의도 조건(`filter`)에 `필드 검사` → `targetId` `일치` `hero`.
-> 3. 효과(`outcomes`): **+ 결과 추가** → `의도 고치기` → 필드 `amount`, 방법 `Add`, 값 `-5`.
+> 3. 효과(`outcomes`): **+ 결과 추가** → `의도 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
 >
 > - `Rules.Damage`가 피해를 주기 직전에 `DamageIntent`(`sourceId`·`targetId`·`amount`·`cancelled`)를 `Game.Intercept`로 통과시킨다. 이 유물이 `amount`를 줄이고, 0 이하가 되면 피해가 들어가지 않는다. 방어도는 줄어든 뒤의 값으로 깎인다.
 > - 발동에 `가로채기`, 효과에 `의도 고치기`가 보이는 것은 `RelicData`의 잠금에 `TriggerKinds.Intercept`·`OutcomeKinds.Intent`가 있기 때문이다(8절).
 > - 시험: 모니터 **데이터** 탭에서 `run › relics`에 `thornArmor`를 넣고 턴을 끝낸다. 적 공격이 5씩 줄어 들어온다. Undo하면 함께 돌아간다.
 > - "공격한 적에게 3 되돌려 주기"는 피해가 들어간 **뒤**의 일이라 이벤트 받기(`피해` 이벤트 `DamageDealt`, 이름이 같은 의도와는 목록이 따로다)로 만든다. 가로채는 쪽은 의도만 고친다.
 > - 의도 클래스는 `Rules/Events/Intents.cs`에 있다(`[Intent("피해")]`). 순서·막기·`[BindTo]`로 쓰는 법은 매뉴얼 [28장](../Manual/28-Attributes-Intercepts.md) 5-4·5-5.
+
+> [!note]- 투척 단검 — 적 하나를 골라 피해(선택 요구, 코드 없음)
+> 유물에는 사용자도 고른 대상도 없다. "전투 첫 턴에 적 하나를 골라 피해 5"처럼 플레이어가 고르게 하려면 결과 `선택 요구`를 쓴다.
+> 1. DB › 유물 → `throwingKnife`.
+> 2. 발동(`trigger`): 닻과 같다(`이벤트 받기` → `턴 시작`, `turn` `일치` `1`).
+> 3. 효과(`outcomes`): **+ 결과 추가** → `선택 요구` → `prompt` `피해를 줄 적`, `candidates` **+ 대상 추가** → `모든 적`, `min` `1`, `max` `1`, `effects` **+ 효과 추가** → `피해`(5).
+>
+> - 요약: `모든 적에서 1개 고르기: 피해 5`.
+> - 턴 시작을 쏜 행동은 답을 기다리지 않고 끝난다. 플레이어가 고르면 답하기가 행동 하나로 실행되어 피해가 들어간다. Undo 한 번이면 피해만 돌아가고 다시 고르기를 기다린다.
+> - 시험: 데이터 탭에서 `run › relics`에 `throwingKnife`를 넣고, 전투 중에 이벤트 탭에서 `턴 시작`(turn 1)을 호출한다. 모니터 **명령** 탭 맨 위 "선택 대기 · 피해를 줄 적" 패널에서 적 버튼을 누르고 **답하기**. 버튼에는 적 id(`enemy1` …)가 보인다.
+> - 게임 화면은 기다리는 선택(`Game.Choice`)을 그리고, 기다리는 동안(`Game.IsWaiting`) 카드 내기·턴 끝을 막는다. 시스템은 막지 않는다.
+> - 화면 코드, 코드에서 고르게 하는 `Game.Ask`(카드 1장 버리기·보상 3개 중 1개)는 매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md) 5-7~5-10.
 
 ## 10. 등장시키기
 
@@ -375,4 +414,5 @@ static void GetChainLightning(TriggerContext c)
 > - [13. `[BindTo]`](../Manual/13-BindTo.md) — 함수 모양, 연결 실패 알림
 > - [14. 도전과제](../Manual/14-Achievements.md) · [15. 로그](../Manual/15-Stats-Logs.md)
 > - [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md) — DB 종류 + 감시, 퀘스트 전체 예제
+> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, 선택 요구, `Game.Ask`, 예약
 > - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 이벤트 호출, 트리거로 달성
