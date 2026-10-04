@@ -371,6 +371,16 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **행동 통합(2026-10-04, 사용자 결정)**: `GameAction<T>`·`SimpleAction`·`ISelfRunningAction`을 없애고 `GameAction` 하나(`protected virtual void Run()`, `Game` 속성, 기본 `Describe` = Block 이름 + 참조 id들). 대상은 객체로 넣는다: string id가 있는 클래스 형식 필드(와 리스트·배열)는 참조(`ActionReferences`) — 기록·전송은 id, 실행 직전(행동 안, `ActionDispatcher.Prepare`)에 `Game.Find(Type, id)`로 지금 데이터의 객체로 바꿔 넣고 못 찾으면 행동 실패. 형식별 참조 필드 목록은 `GBibleRuntime.Start`에서 `ActionReferences.PrepareAll()`. `Actions.Register` 처리기도 같은 준비를 거친다. 예시 `PlayCard { card, target }`, `RunDirector.TryPlay(DeckCard, Fighter, …)`.
 - **처음 상태로 되돌리기(2026-10-04, 사용자 요청)**: `Editor/Data/ProjectReset.cs`, 메뉴 `MomoiProject › 처음 상태로 되돌리기…`·`지금 상태를 처음 상태로 기록`. 기록 = 프로젝트 루트 `MomoiProjectBaseline/`(Assets·ProjectSettings·Packages 사본, GBible 패키지·ProjectVersion.txt 제외), 깨끗한 프로젝트(Assets/Code·DB 데이터·시작 설정 표시 없음)를 처음 열 때 StartSetup 정적 생성자에서 저절로. 되돌리기 = 기록 대비 치우기/되돌리기/다시 만들기 + 저장 파일·PlayerPrefs, 치운·덮은 것은 `MomoiProjectBackups/<시각>/`로 옮김(영구 삭제 없음), DB 작업본 버림·빈 씬, 끝나면 `EditorApplication.OpenProject`로 다시 열기. 기록이 없으면 시스템이 만든 것만(Code·DB 데이터·생성 코드·ProjectSettings/MomoiProject·GBIBLE_ 심볼·저장). 이 개발 프로젝트에는 기록이 없다.
 - **인스턴스 참조를 클래스로 거르기(2026-10-04, 사용자 승인)**: `[DataRef(typeof(Card))]`처럼 GameData가 아닌 클래스를 적으면 종류는 InstanceData(`EditorDatabase.RefTypeOf`), 고를 수 있는 것은 값이 그 클래스인 인스턴스만(`RefClassOf`·`MatchesRef`·`RefKindLabel`), 다른 클래스를 고르면 검증 오류. ID 바꾸기·저장 ID 이어받기(`SavedIdRenames`는 InstanceData로 취급)는 그대로. `GameIds.Instance`는 바꾸지 않음(평평한 그대로).
+- **코어 1단계: 장르 공통 게임 규칙 부품(2026-10-04, 사용자 승인 로드맵 ①~⑦)**: AI가 새 프로젝트의 시스템 층을 하루 안에 세우도록 장르 공통 부품을 코어에 넣었다(메모리 `ai-driven-philosophy`). 이름은 모두 사용자 승인.
+  - ① 능력치(Attribute)·Modifier(`Attributes.cs`, 같은 칸 합·칸끼리 곱, `$modifiers`/`.meta`), 가로채기(Intercept)·의도(Intent)(`Intercepts.cs`, `Game.Intercept`, 트리거 잎 '가로채기'·결과 '의도 고치기'), 비용(`Game.Pay`·`CanPay`, `CostIntent`, 결과 '비용 내기'). 매뉴얼 28장.
+  - ② 상태 효과(`Statuses.cs` + DB › 상태 효과 `StatusData`, 효과 '상태 효과 걸기/풀기', `$statuses`)·예약(`Schedules.cs`, `Game.ScheduleAfter`·`ScheduleOn<T>`, 행동을 id만 남겨 저장 `ActionReferences.Detach`). ③ 선택 대기(`Choices.cs`, `Game.Ask`·`Answer`·`[Chosen]`, 결과 '선택 요구', 모니터 › 명령 탭 패널). 매뉴얼 29장.
+  - ④ 밸런스 값·곡선(`Balance.cs` + DB › 밸런스 값, 플레이 중 바로 반영 `BalanceLiveReload`), 가중치 표(`WeightTables.cs` + DB › 가중치 표, `Game.Roll`, 결과 '가중치 표에서 주기'), 플레이어용 실패(`Failures.cs`, `GameFailure`·`Game.Fail`·`FailureKeys`). 매뉴얼 30장.
+  - ⑤ 슬롯(`GBibleRuntime.UseSlot`·`SlotInfoOf`·`Slots`·`DeleteSlot`·`CopySlot`·`SlotSummary`, 폴더 `MomoiProject/slots/<이름>/`), 설정(DB › 설정 `SettingData` + `GameSettings`, 기기마다 `settings.json`), 입력(선택 기능 `GBible.Input`, `GameInput.Rebind`). 매뉴얼 31장.
+  - ⑥ 연출 대기열·화면 연결(`GameView.Present`·`Busy`·`Find`, `ViewList`, 컴포넌트 '데이터 연결' `DataBinding`), 씬 흐름(`GameScenes.Follow`, DB › Bootstrap), 월드 상태(`WorldState.cs`, `Game.World`·`SetWorld`, 컴포넌트 '월드 상태 연결'). 매뉴얼 32장.
+  - ⑦ 고정 틱(`SessionOptions.TickRate`, `session.Ticked`·`TickAlpha`, DB › Bootstrap), 미리보기 실행(`Game.Preview`·`CanDo`, `Journal.Mute`, 미리보기에서는 도전과제 달성 없음), DB CSV(`DataCsv`, DB 목록 'CSV' 버튼). 매뉴얼 33장.
+  - 공통 바탕: 라이브러리 키(`$modifiers`·`$statuses`·`$schedule`·`$choices`·`$world`)는 필요할 때 등록하되 판 불러오기 직후에도 보이게 `PlayerDataStore.IsPending`으로 받는다. 라이브러리 내부 id는 `$` 접두어(`$mod1`·`$status1` …)로 DB id와 겹치지 않는다. 바깥 행동이 끝나기 직전 `ActionDispatcher.Committing`에서 사라진 개체의 상태 효과·이번 판 Modifier를 정리(그 행동 안이라 같이 Undo). `[ShowIf]`는 값 여러 개 + DB 항목 안 묶음 필드에서도. `OutcomeSlot(BindTo = false)` 칸은 [BindTo]가 잠그지 않는다. enum은 `InspectorName`(Core는 `#if UNITY_2020_1_OR_NEWER`)으로 한글.
+  - 테스트: `AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`(`Tools/RunCoreTests.ps1` 목록에 있음, 코어 217 통과). Unity 쪽(슬롯·설정·입력·화면)은 `PendingChecks.md` 7절.
+  - 다음(사용자 승인 순서): Steam 모듈(라이브러리 선택은 시작할 때 묻기) → 장르 프리셋·프로젝트 관례(사용자 승인 받아 가며) → 기획 명세서 → Claude용 GBible 참조 문서 → `/think-momoi` 스킬·프로젝트 CLAUDE.md 생성·훅 → 6장르 시험(이상한 기믹 포함, 문법 밖 0개까지).
 - **행동 안의 행동(2026-10-03)**: 행동 안에서 `Game.Do`·`Game.Use`(= `session.Do`)를 부르면 예외 대신 바깥 행동의 일부로 그 자리에서 실행된다(`ActionDispatcher.Execute`가 진행 중인 트랜잭션을 보면 처리기만 부르고 기록에 남김, `ActionRecord.Nested`, `PlayerDataStore.ActiveTransactionId`; `GameSession.Do`는 중첩이면 Sync·도전과제 정리를 바깥 행동에 맡김). Undo·변경 묶음은 바깥 행동 하나, 안쪽 실패는 바깥 전체 취소. 카드 사용(비용 + 손패 이동 + 효과)처럼 한 입력이 여러 행동·능력을 묶는 경우를 위한 것.
 - **프로그래머 가이드(2026-10-03)**: `Documentation~/Guide/00-Index.md`부터 — 프로젝트 진행 순서(시작 → 설계 → 루프 → 콘텐츠 추가 → 기획자 분업 → 연출 → 장르 → 디버깅 → 습관 → 저장·출시 → 멀티 대비 → 부록, 부록에 기능 사용 표). 설명 글 + 짧은 코드, 예시 게임 '카드 던전'(턴제 덱빌딩). 글에 붙인 코드가 맞는지 확인하는 예시 코드는 저장소 밖 `Tools/GuideExample/`에 두고 `Tools/CompileGuide.ps1`로 컴파일한다(CompileOffline 결과 참조; `GuideExample/Generated/GameIds.cs`는 DB가 만들었을 GameIds의 손 사본). 기능·동작을 바꾸면 가이드 장과 그 예시 코드도 맞춘다.
 - **매뉴얼 검토에서 나온 수정(2026-10-03)**: 인스턴스 값 안의 블록 필드(사용 기능의 트리거·결과 등)를 DB와 같은 편집기로(`GsDataExplorer.BlockEditor` + `Crumb/Entry.Serialized` — 상세 패널이 SerializedProperty 경로로 `GsPropertyEditor.BuildContent`를 붙임, [BindTo] 잠금 보기도 나옴). `[BindTo]` 능력은 예전 짧은 형식(대상·효과)도 쓰지 않음. 연결 ID가 어느 항목에도 없으면 시작 때 콘솔 경고. 결과 요약(DB 상세)이 연결된 코드 이름을 보임. cs 열기는 파일 이름이 달라도 모든 스크립트에서 찾음. '로그에 기록'이 로그가 아닌 곳에서 빈 로그 칸이면 예외 대신 경고. 옛 이벤트 이름(GameSystems.…)도 실행 중 발동(`EventTrigger.ResolvedType`). 빈 NOT 필터 = 거짓(다른 NOT과 같게). 모니터: "이벤트 호출" 버튼, "받는 곳 n", 데이터 고치기 = `DeveloperEditAction`(Undo 가능). 다이얼로그 '값 바꾸기' 노드 = `DialogueSetAction`(행동 하나, 이미 행동 안이면 그 자리), `Dialogues.ResumeSaved`도 `Started`를 쏨. `selectordinal`은 순서 수 규칙(`PluralRules.Ordinal`: 영어·프랑스어). 데이터: `[field: SerializeField]` 자동 속성도 저장(DataModel), id가 속성이어도 `Find<T>`, 되감기 스냅샷은 에셋 참조를 그대로(`Export(keepReferences)`), 단순 값 키도 Undo 덮어쓰기 경고, `int?` 같은 Nullable 필드를 Mirror가 직접 다룸(`MirrorCode.RegisterNullable<T>` — 생성기가 등록), `[Serializable]` 없는 부모의 필드는 생성기가 컴파일 경고, `Game.Find(string)`은 사본 나무에서. 문서: CodingSyntax·PlayerDataStore·Audio·Dialogue의 낡은 설명, SetupSteps 키워드 단계, `StatData` 만들기 메뉴 이름("로그").
@@ -425,7 +435,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 6. **다이얼로그 시트 규격 확정** — 사용자가 정하면 `DialogueSheetRows`(다이얼로그 시스템 `ITextSheetSource`)만 바꾸면 된다.
 7. **오디오 확장(선택)** — 장면 전환 시 수명 규칙(씬별 정지 등), 덕킹(목소리 나올 때 브금 줄이기) 등은 사용자가 원하면.
 8. **UPM 패키지화** — 복사 대신 git URL 패키지 배포 여부(미결).
-9. **Modifiers(능력치 보정) 설계** — 우선순위·겹침 규칙(미결).
+9. **Modifiers(능력치 보정)** — 끝남(5.0의 코어 1단계 ①).
 10. **도움말·시작하기** — 가장 마지막(영구 보류 해제 시). 재개 시 "새 기능마다 도움말" 규칙과 `HelpCoverageTests` 복구.
 
 ---
@@ -450,7 +460,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - 유형 B 네트워크 라이브러리(Netcode for GameObjects / Fish-Net / Mirror) + Steam 전송 계층.
 - 멀티플레이 되돌리기 규칙(허용 조건·방식 기본값).
 - 유형 A 인프라 세부(리전, 인스턴스 크기, 요금 견적).
-- Modifiers 설계(우선순위·겹침), UPM 패키지화 여부.
+- UPM 패키지화 여부.
 ### 7.3 보류
 - **도움말·시작하기**: 숨김, 가장 마지막.
 - **연습 모드(샌드박스)**: 영구 보류.
