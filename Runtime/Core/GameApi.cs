@@ -349,6 +349,31 @@ namespace GBible
             return prefix + (long)next;
         }
 
+        // ── 현실 시각 ──────────────────────────────────────────
+        // 규칙에서 DateTime.Now를 쓰지 않고 이것을 쓴다: 행동 안에서는 바깥 행동이 시작한 순간 하나(행동에 기록되어 Undo·다시 돌리기·멀티에서 같다).
+        //   var waited = Game.Now - Game.Data().Profile.lastSeen;     // 꺼 둔 시간(오프라인 보상)
+        public DateTime Now => Session.Actions.Now;
+
+        // 날짜 번호: 시간대(SessionOptions.TimeZone, 비우면 이 컴퓨터)의 resetHour시에 바뀌는 하루의 번호(1970-01-01 = 0).
+        //   if (Game.Day(4) != profile.lastDailyReset) { … 일일 임무 초기화 … }   // 새벽 4시 초기화
+        public long Day(int resetHour = 0) => DayOf(Now, resetHour);
+
+        // 주 번호: start 요일 resetHour시에 바뀌는 한 주의 번호.
+        public long Week(int resetHour = 0, DayOfWeek start = DayOfWeek.Monday)
+        {
+            // 1970-01-01은 목요일: start 요일에 주가 시작되도록 날짜 번호를 민다.
+            var shift = ((int)DayOfWeek.Thursday - (int)start + 7) % 7;
+            return (long)Math.Floor((Day(resetHour) + shift) / 7.0);
+        }
+
+        long DayOf(DateTime utc, int resetHour)
+        {
+            var zone = Session.Options.TimeZone ?? TimeZoneInfo.Local;
+            var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
+            var shifted = local.AddHours(-resetHour);
+            return (long)Math.Floor((shifted - new DateTime(1970, 1, 1)).TotalDays);
+        }
+
         // 데이터 키 목록(이름순). 정의가 늘 때만 다시 만든다.
         List<string> _dataKeys;
         int _dataKeyCount = -1;

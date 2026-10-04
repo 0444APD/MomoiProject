@@ -32,6 +32,9 @@ namespace GBible
     {
         public int actorId;
         public long tick;
+        // 현실 시각(UTC, 1970-01-01부터 밀리초). 바깥 행동이 시작할 때 한 번 찍고 안쪽 행동은 같은 값을 쓴다(Game.Now).
+        // 받은 행동(멀티플레이·다시 돌리기)은 보낸 쪽 값 그대로라 어디서 돌려도 같다.
+        public long utc;
 
         // 실행 중일 때만 들어 있다: 데이터·난수·이벤트·다른 행동을 쓰는 창구.
         [NonSerialized] GameApi _game;
@@ -121,6 +124,17 @@ namespace GBible
         // 실행 직전 준비(세션이 정한다): 참조 필드를 지금 데이터의 객체로 다시 찾아 넣는다.
         public Action<GameAction> Prepare;
 
+        // 현실 시각의 출처(세션이 SessionOptions.RealClock으로 정한다). 비우면 DateTime.UtcNow.
+        public Func<DateTime> RealClock;
+        long _utc;
+
+        // 지금 현실 시각(UTC). 행동 안이면 그 행동이 시작한 순간, 밖이면 지금.
+        public DateTime Now => _utc != 0 ? FromUtcMs(_utc) : (RealClock?.Invoke() ?? DateTime.UtcNow);
+
+        static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        static long ToUtcMs(DateTime time) => (long)(time.ToUniversalTime() - Epoch).TotalMilliseconds;
+        static DateTime FromUtcMs(long ms) => Epoch.AddMilliseconds(ms);
+
         // 미리보기 중(Preview 안). 규칙 코드가 밖으로 나가는 일(분석 전송 등)을 건너뛸 때 본다.
         public bool IsPreviewing { get; private set; }
 
@@ -135,11 +149,13 @@ namespace GBible
             if (!_handlers.TryGetValue(action.GetType(), out var registered))
                 registered = SelfRun ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'을 실행할 세션이 없습니다.");
             var prepare = Prepare;
+            if (action.utc == 0) action.utc = ToUtcMs(RealClock?.Invoke() ?? DateTime.UtcNow);
             using (_journal.Mute())
             using (_state.Quiet())
             {
                 var tx = _state.Begin(0, "미리보기");
                 IsPreviewing = true;
+                _utc = action.utc;
                 TransactionStarted?.Invoke(tx.Id);
                 try
                 {
@@ -156,6 +172,7 @@ namespace GBible
                 {
                     _state.Abort();
                     IsPreviewing = false;
+                    _utc = 0;
                     TransactionAborted?.Invoke(tx.Id);
                 }
             }
@@ -175,6 +192,8 @@ namespace GBible
             };
 
             action.tick = _clock.Tick;
+            if (_state.InTransaction) action.utc = _utc;
+            else if (action.utc == 0) action.utc = ToUtcMs(RealClock?.Invoke() ?? DateTime.UtcNow);
             // 행동 안에서 부른 행동(카드 사용 안의 드로우, 행동 안의 Game.Use 등): 바깥 행동의 일부로 그 자리에서 실행한다.
             // Undo·변경 묶음은 바깥 행동 하나. 실패하면 예외가 바깥 행동으로 올라가 전체가 취소된다.
             if (_state.InTransaction)
@@ -191,6 +210,7 @@ namespace GBible
             entry.Payload = action;
             var record = new ActionRecord { JournalId = entry.Id, Action = action, Status = ActionStatus.Done };
             var tx = _state.Begin(entry.Id, action.Describe());
+            _utc = action.utc;
             record.TransactionId = tx.Id;
             entry.TransactionId = tx.Id;
             TransactionStarted?.Invoke(tx.Id);
@@ -204,9 +224,11 @@ namespace GBible
                     Committing?.Invoke();
                 }
                 _state.End();
+                _utc = 0;
             }
             catch (Exception e)
             {
+                _utc = 0;
                 _state.Abort();
                 TransactionAborted?.Invoke(tx.Id);
                 record.Status = ActionStatus.Failed;

@@ -19,7 +19,7 @@ namespace GBible.Data
 
         // 세션 옵션(DB › 시작 파일 › Bootstrap 화면에서 고친다). 게임이 켜질 때 SessionOptions에 먼저 들어가고, 코드의 Configuring이 바꾸면 그 값이 우선한다.
         [SerializeField] HistoryMode history = HistoryMode.Actions;
-        [SerializeField] int historyLimit;
+        [SerializeField] int historyLimit = 200;
         [SerializeField] double snapshotInterval = 1.0;
         [SerializeField] int snapshotLimit = 30;
         [SerializeField] bool fixSeedInDevelopment;
@@ -27,6 +27,9 @@ namespace GBible.Data
         // 판 저장(이어 하기): 언제 저장할지, 어떤 이벤트를 받으면 판이 끝난 것으로 볼지(그때 판 저장을 지우고 프로필을 바로 저장).
         [SerializeField] RunSaveMode runSave = RunSaveMode.OnQuit;
         [SerializeField] string runEndEvent = "";
+        // 'N초마다 저장'의 간격(초), '이벤트를 받을 때 저장'의 이벤트 형식 이름.
+        [SerializeField] float runSaveInterval = 30f;
+        [SerializeField] string runSaveEvent = "";
         // 프로필도 바깥 행동이 끝날 때마다 저장할지(수집형·방치형처럼 진행이 프로필에 있는 게임. 끄면 끌 때·판 끝에만).
         [SerializeField] bool saveProfileEachAction;
         // 선택: 이 이벤트를 받은 행동이 끝나면 Undo 기록을 비운다(예: 턴 끝 — 지난 턴으로는 되돌릴 수 없다).
@@ -64,6 +67,8 @@ namespace GBible.Data
         public long DevelopmentSeed => developmentSeed;
         public RunSaveMode RunSave => runSave;
         public string RunEndEvent => runEndEvent;
+        public float RunSaveInterval => runSaveInterval;
+        public string RunSaveEvent => runSaveEvent;
         public bool SaveProfileEachAction => saveProfileEachAction;
         public string UndoBoundaryEvent => undoBoundaryEvent;
         public bool ContinueOnStart => continueOnStart;
@@ -98,6 +103,12 @@ namespace GBible.Data
             runSave = mode;
             runEndEvent = endEvent ?? "";
             saveProfileEachAction = profileEachAction;
+        }
+
+        public void EditorSetSaveTiming(float interval, string saveEvent)
+        {
+            runSaveInterval = Math.Max(1f, interval);
+            runSaveEvent = saveEvent ?? "";
         }
 
         public void EditorSetFlowOptions(string undoBoundary, bool continueAtStart, string newRun)
@@ -152,6 +163,10 @@ namespace GBible.Data
         AfterEachAction,
         // 저장하지 않는다. 이어 하기가 없는 게임.
         Never,
+        // N초마다(판 데이터가 바뀌었을 때만), 그리고 끌 때. 실시간·방치형.
+        Interval,
+        // 정한 이벤트를 받은 행동이 끝나면(하루 끝·체크포인트·방 클리어), 그리고 끌 때.
+        OnEvent,
     }
 
     [Serializable]

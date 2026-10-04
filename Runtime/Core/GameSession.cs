@@ -35,6 +35,10 @@ namespace GBible
         // 고정 틱(실시간): 초당 틱 수. 0이면 프레임마다(가변 시간). 켜면 게임 시간이 1/틱 초씩 일정하게 흐르고
         // 시간 규칙(예약·상태 효과·시간 조건)과 session.Ticked가 틱마다 돈다 → 프레임 속도와 상관없이 같은 결과(재현·멀티).
         public int TickRate;
+        // 현실 시각의 출처(Game.Now). 비우면 이 컴퓨터의 시계(DateTime.UtcNow). 시험에서는 정해진 시각을, 서버·Steam 시각을 쓸 때는 그것을 준다.
+        public Func<DateTime> RealClock;
+        // 날짜 번호(Game.Day·Week)를 셀 시간대. 비우면 이 컴퓨터의 시간대.
+        public TimeZoneInfo TimeZone;
     }
 
     // 한 플레이어(또는 한 판)의 모든 시스템을 묶는 인스턴스. static 전역 상태를 두지 않는다.
@@ -120,7 +124,7 @@ namespace GBible
             };
             Events = new EventBus(Journal);
             Random = new RandomStreams(Options.Seed);
-            Actions = new ActionDispatcher(Journal, Data, Clock);
+            Actions = new ActionDispatcher(Journal, Data, Clock) { RealClock = Options.RealClock };
             Triggers = new TriggerSystem(this);
             Stats = new StatSystem(Data, Triggers, Journal);
             Achievements = new AchievementSystem(this);
@@ -218,6 +222,23 @@ namespace GBible
                 default:
                     return false;
             }
+        }
+
+        // 되돌리기 지점(행동 방식): 지금까지의 행동 이력 끝. UndoTo(지점)이 그 뒤의 행동을 모두 되돌린다.
+        //   turnStart = session.HistoryMark;          // 내 턴이 시작될 때(턴 시작 행동이 끝난 뒤)
+        //   session.UndoTo(turnStart);               // "이번 턴 처음으로" — 되감기 횟수 같은 규칙은 그 뒤 행동으로 센다
+        // 지점은 이 세션 안에서만 뜻이 있다(판 저장에 Undo 이력은 들어가지 않는다). 스냅샷 방식이면 지금의 스냅샷 수.
+        public long HistoryMark =>
+            Options.History == HistoryMode.Actions ? (Data.HistoryCount == 0 ? 0 : Data.History[Data.HistoryCount - 1].Id) :
+            Options.History == HistoryMode.Snapshots ? _snapshots.Count : 0;
+
+        // 지점 뒤의 행동(스냅샷)을 모두 되돌린다. 되돌린 횟수를 돌려준다(지점이 이력에서 잘려 나갔으면 남은 만큼만).
+        public int UndoTo(long mark)
+        {
+            if (Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 안에서는 되돌릴 수 없습니다(행동 밖에서 부르세요).");
+            var count = 0;
+            while (UndoCount > 0 && HistoryMark > mark && Undo()) count++;
+            return count;
         }
 
         // ── 스냅샷(실시간 게임) ─────────────────────────────────

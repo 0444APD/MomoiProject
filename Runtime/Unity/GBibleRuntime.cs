@@ -19,6 +19,12 @@ namespace GBible
         // 세션 준비 완료: 행동 처리기·디버그 명령 등록.
         public static event Action<GameSession> Started;
         public static event Action<GameSession> Stopped;
+        // 판을 저장하기 직전(화면 쪽 상태 — 위치 등 — 를 판 데이터에 담을 마지막 기회. 행동 밖이므로 담을 때는 Game.Do).
+        public static event Action<GameSession> Saving;
+        // 저장한 판을 불러온 뒤(이어 하기). 화면 쪽 상태를 판 데이터에서 다시 놓을 때.
+        public static event Action<GameSession> RunLoaded;
+        // 끄기 직전(저장하기 전).
+        public static event Action<GameSession> Stopping;
 
         // 지금 슬롯의 프로필 저장 파일.
         public static string SavePath => Path.Combine(SlotFolder(Slot), "profile.json");
@@ -311,7 +317,8 @@ namespace GBible
             var endEvent = FindEvent(session, database?.RunEndEvent, "판 끝 이벤트");
             var undoBoundary = FindEvent(session, database?.UndoBoundaryEvent, "Undo 끊는 이벤트");
             if (undoBoundary != null) UndoBoundary.Watch(session, undoBoundary);
-            _runSaver = new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false);
+            var saveEvent = _runSaveMode == RunSaveMode.OnEvent ? FindEvent(session, database?.RunSaveEvent, "판 저장 이벤트") : null;
+            _runSaver = new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false, database?.RunSaveInterval ?? 30f, saveEvent);
 
             session.Journal.Appended += ForwardToConsole;
             session.Debug.Register("저장", "프로필 저장", () => SaveProfile(session));
@@ -382,6 +389,8 @@ namespace GBible
         static void Stop(bool save)
         {
             if (Session == null) return;
+            try { Stopping?.Invoke(Session); }
+            catch (Exception e) { Debug.LogException(e); }
             if (save)
             {
                 SaveProfile(Session);
@@ -479,6 +488,8 @@ namespace GBible
 
         public static void SaveRun(GameSession session)
         {
+            try { Saving?.Invoke(session); }
+            catch (Exception e) { Debug.LogException(e); }
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(RunSavePath));
@@ -500,6 +511,8 @@ namespace GBible
             {
                 session.ImportRun(File.ReadAllText(RunSavePath));
                 if (session == Session) _runSaver?.Reset();
+                try { RunLoaded?.Invoke(session); }
+                catch (Exception e) { Debug.LogException(e); }
                 return true;
             }
             catch (Exception e)

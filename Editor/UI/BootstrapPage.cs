@@ -150,8 +150,29 @@ namespace GBible.EditorTools.UI
 
             Heading(root, "판 저장", "진행 중인 판(이어 하기)을 언제 저장할지. 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.");
             var saveMode = new DropdownField(RunSaveNames.ToList(), (int)runSave);
-            saveMode.RegisterValueChangedCallback(_ => { runSave = (RunSaveMode)saveMode.index; SaveRunOptions(); });
             root.Add(saveMode);
+            var saveInterval = database.RunSaveInterval;
+            var saveEvent = database.RunSaveEvent ?? "";
+            void SaveTiming()
+            {
+                Undo.RecordObject(database, "판 저장 설정 변경");
+                database.EditorSetSaveTiming(saveInterval, saveEvent);
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            }
+            var saveIntervalField = new FloatField("저장 간격(초)") { value = saveInterval, tooltip = "판 데이터가 바뀐 뒤 이만큼 지나면 저장한다(실제 시간). 1 이상." };
+            saveIntervalField.RegisterValueChangedCallback(e => { saveInterval = Math.Max(1f, e.newValue); SaveTiming(); });
+            root.Add(saveIntervalField);
+            var saveEventField = TypePicker("판 저장 이벤트", events, t => $"{EventBus.DisplayNameOf(t)} ({t.Name})", saveEvent, value => { saveEvent = value; SaveTiming(); });
+            saveEventField.tooltip = "이 이벤트를 쏜 행동이 끝나면 판을 저장한다(예: 하루 끝, 체크포인트 도착, 방 클리어).";
+            root.Add(saveEventField);
+            void ShowTiming()
+            {
+                saveIntervalField.style.display = runSave == RunSaveMode.Interval ? DisplayStyle.Flex : DisplayStyle.None;
+                saveEventField.style.display = runSave == RunSaveMode.OnEvent ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            ShowTiming();
+            saveMode.RegisterValueChangedCallback(_ => { runSave = (RunSaveMode)saveMode.index; SaveRunOptions(); ShowTiming(); });
 
             var endField = TypePicker("판 끝 이벤트", events, t => $"{EventBus.DisplayNameOf(t)} ({t.Name})", endEvent, value => { endEvent = value; SaveRunOptions(); });
             endField.tooltip = "이 이벤트를 받으면 그 행동이 끝난 뒤 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤 다른 행동이 판 데이터를 바꾸면(새 판) 다시 저장한다.";
@@ -266,7 +287,7 @@ namespace GBible.EditorTools.UI
             return field;
         }
 
-        static readonly string[] RunSaveNames = { "끌 때 저장", "행동마다 저장(턴제)", "저장하지 않음(이어 하기 없음)" };
+        static readonly string[] RunSaveNames = { "끌 때 저장", "행동마다 저장(턴제)", "저장하지 않음(이어 하기 없음)", "N초마다 저장(실시간·방치형)", "이벤트를 받을 때 저장(하루 끝·체크포인트)" };
 
         static void Heading(VisualElement root, string title, string caption)
         {
