@@ -107,7 +107,11 @@ namespace GBible
             public Dictionary<string, object> Session;
             public Dictionary<string, object> Meta;
             public Dictionary<string, ulong[]> Random;
+            // 찍을 때마다 하나씩 오르는 번호(되돌리기 지점). 보관 수가 차서 앞의 것이 빠져도 번호는 그대로다.
+            public long Serial;
         }
+
+        long _snapshotSerial;
 
         readonly List<Snapshot> _snapshots = new List<Snapshot>();
         double _lastSnapshotTime = double.NegativeInfinity;
@@ -229,10 +233,10 @@ namespace GBible
         // 되돌리기 지점(행동 방식): 지금까지의 행동 이력 끝. UndoTo(지점)이 그 뒤의 행동을 모두 되돌린다.
         //   turnStart = session.HistoryMark;          // 내 턴이 시작될 때(턴 시작 행동이 끝난 뒤)
         //   session.UndoTo(turnStart);               // "이번 턴 처음으로" — 되감기 횟수 같은 규칙은 그 뒤 행동으로 센다
-        // 지점은 이 세션 안에서만 뜻이 있다(판 저장에 Undo 이력은 들어가지 않는다). 스냅샷 방식이면 지금의 스냅샷 수.
+        // 지점은 이 세션 안에서만 뜻이 있다(판 저장에 Undo 이력은 들어가지 않는다). 스냅샷 방식이면 마지막 스냅샷의 번호.
         public long HistoryMark =>
             Options.History == HistoryMode.Actions ? (Data.HistoryCount == 0 ? 0 : Data.History[Data.HistoryCount - 1].Id) :
-            Options.History == HistoryMode.Snapshots ? _snapshots.Count : 0;
+            Options.History == HistoryMode.Snapshots ? (_snapshots.Count == 0 ? 0 : _snapshots[_snapshots.Count - 1].Serial) : 0;
 
         // 지점 뒤의 행동(스냅샷)을 모두 되돌린다. 되돌린 횟수를 돌려준다(지점이 이력에서 잘려 나갔으면 남은 만큼만).
         public int UndoTo(long mark)
@@ -257,6 +261,7 @@ namespace GBible
                 Session = Data.Export(DataZone.Session, report: false, keepReferences: true),
                 Meta = Data.Export(DataZone.Meta, report: false, keepReferences: true),
                 Random = Random.ExportStates(),
+                Serial = ++_snapshotSerial,
             });
             _lastSnapshotTime = Clock.Time;
             var limit = Math.Max(1, Options.SnapshotLimit);

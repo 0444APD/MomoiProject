@@ -79,6 +79,7 @@ namespace GBible
         void OnExecuted(ActionRecord record)
         {
             if (record.Nested || record.Status != ActionStatus.Done) return; // 안쪽 행동은 바깥 행동이 끝날 때 한 번에
+            if (GBibleRuntime.IsSaving) return;                              // 저장 직전(Saving)에 담은 행동은 이번 저장에 들어간다
             _dirty = true;
         }
 

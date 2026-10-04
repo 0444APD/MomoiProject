@@ -68,6 +68,34 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 미리보기가_찍은_시각은_남지_않는다()
+        {
+            var action = new Record();
+            Game.Preview(action, g => 0);
+            Assert.AreEqual(0, action.utc);
+            _now = _now.AddMinutes(10);
+            Game.Do(action);
+            Assert.AreEqual("03:40:00", Run.seen[0], "나중에 Do하면 그때 시각");
+        }
+
+        [Test]
+        public void 스냅샷_방식의_지점은_보관_수가_차도_맞다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1, History = HistoryMode.Snapshots, SnapshotLimit = 2 });
+            session.Data.Define("run", DataZone.Session, new RtRun(), "판");
+            session.Game.Do(new NextTurn());
+            session.CaptureSnapshot();                    // turn 1
+            var mark = session.HistoryMark;
+            session.Game.Do(new NextTurn());
+            session.CaptureSnapshot();                    // turn 2
+            session.Game.Do(new NextTurn());
+            session.CaptureSnapshot();                    // turn 3 (turn 1 스냅샷은 보관 수 때문에 빠짐)
+            Assert.IsTrue(session.HistoryMark > mark);
+            session.UndoTo(mark + 1);
+            Assert.AreEqual(2, session.Data.Get<RtRun>("run").turn, "지점 번호까지(turn 2 스냅샷)로 되감는다");
+        }
+
+        [Test]
         public void 되돌리기_지점까지_한_번에_되돌린다()
         {
             Game.Do(new NextTurn());

@@ -149,7 +149,9 @@ namespace GBible
             if (!_handlers.TryGetValue(action.GetType(), out var registered))
                 registered = SelfRun ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'을 실행할 세션이 없습니다.");
             var prepare = Prepare;
-            if (action.utc == 0) action.utc = ToUtcMs(RealClock?.Invoke() ?? DateTime.UtcNow);
+            // 미리보기가 찍은 시각은 끝나면 지운다(같은 객체를 나중에 Do하면 그때 시각으로).
+            var stamped = action.utc == 0;
+            if (stamped) action.utc = ToUtcMs(RealClock?.Invoke() ?? DateTime.UtcNow);
             using (_journal.Mute())
             using (_state.Quiet())
             {
@@ -173,6 +175,7 @@ namespace GBible
                     _state.Abort();
                     IsPreviewing = false;
                     _utc = 0;
+                    if (stamped) action.utc = 0;
                     TransactionAborted?.Invoke(tx.Id);
                 }
             }

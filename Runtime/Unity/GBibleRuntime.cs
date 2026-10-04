@@ -20,7 +20,10 @@ namespace GBible
         public static event Action<GameSession> Started;
         public static event Action<GameSession> Stopped;
         // 판을 저장하기 직전(화면 쪽 상태 — 위치 등 — 를 판 데이터에 담을 마지막 기회. 행동 밖이므로 담을 때는 Game.Do).
+        // 이 안에서 한 행동은 '저장할 것 있음'으로 세지 않는다(저장이 되풀이되지 않게).
         public static event Action<GameSession> Saving;
+        // Saving을 부르는 동안 참.
+        internal static bool IsSaving { get; private set; }
         // 저장한 판을 불러온 뒤(이어 하기). 화면 쪽 상태를 판 데이터에서 다시 놓을 때.
         public static event Action<GameSession> RunLoaded;
         // 끄기 직전(저장하기 전).
@@ -188,6 +191,10 @@ namespace GBible
             Configuring = null;
             Started = null;
             Stopped = null;
+            Saving = null;
+            RunLoaded = null;
+            Stopping = null;
+            IsSaving = false;
             _autoSaveRun = null;
             _runSaveMode = RunSaveMode.OnQuit;
             _runSaver = null;
@@ -489,8 +496,10 @@ namespace GBible
 
         public static void SaveRun(GameSession session)
         {
+            IsSaving = true;
             try { Saving?.Invoke(session); }
             catch (Exception e) { Debug.LogException(e); }
+            finally { IsSaving = false; }
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(RunSavePath));
