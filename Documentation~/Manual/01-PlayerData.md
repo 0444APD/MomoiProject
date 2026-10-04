@@ -234,6 +234,7 @@ public static class BattleSetup
 | `Synced` (이벤트 `Action<ChangeSet>`) | Sync가 만든 ChangeSet을 쏜다. 행동 안의 변경은 행동이 끝날 때 차례대로 한꺼번에 쏜다(멀티플레이 전송용) |
 | `Identity.IdOf(객체)` | 컬렉션 요소에 시스템이 붙인 내부 번호(기록의 `items[#12]`) |
 | `Permanent()` | 이 안의 변경은 Undo 이력에 넣지 않는다([02-Actions-Undo.md](02-Actions-Undo.md)) |
+| `Mark()` / `RollbackTo(point)` | 행동 안의 저장점을 만든다 / 그 뒤의 변경만 되돌린다(행동은 계속). `Mark()`는 Sync를 한 번 하므로 자주 부르지 않는다([02-Actions-Undo.md](02-Actions-Undo.md) 2.7) |
 | `DescribeChanges` | 바뀐 곳마다 사람이 읽는 기록을 만들지(기본 `true`). 끄면 Sync가 가벼워지지만 기록·`DataChanged`의 목록이 비고, 행동 밖 변경을 덮는 Undo 경고도 나오지 않는다 |
 
 ---

@@ -359,7 +359,7 @@ Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필�
 
 | 멤버 | 뜻 |
 |---|---|
-| `Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire)` | 감시를 시작한다. 발동하면 `fire`(결과 실행은 부르는 쪽이 `RunOutcomes`로). `repeat`가 아니면 한 번 발동한 뒤 감시를 그만둔다. `when`이 `null`이면 아무것도 하지 않는다. |
+| `Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null)` | 감시를 시작한다. 발동하면 `fire`(결과 실행은 부르는 쪽이 `RunOutcomes`로). `repeat`가 아니면 한 번 발동한 뒤 감시를 그만둔다. `when`이 `null`이면 아무것도 하지 않는다. `holders`를 주면 순간마다 그 목록의 객체마다 컨텍스트의 `User`를 그 객체로 두고 트리거 전체(조건 포함)를 따로 검사해, 참인 객체마다 `fire`를 부른다(상태 효과의 가진 쪽마다 검사, `29-Statuses-Schedules-Choices.md` 2-3). |
 | `Unregister(string owner)` / `IsRegistered(owner)` | 그 owner의 감시를 모두 그만둔다 / 감시 중인지 |
 | `RunOutcomes(IEnumerable<Outcome>, TriggerContext, string source)` | 결과를 차례로 실행한다. `source`는 Journal의 출처 글자 |
 | `CanUse(owner, when, user, picked, out TriggerContext)` | 사용하는 순간으로 검사(아무것도 바꾸지 않는다) |

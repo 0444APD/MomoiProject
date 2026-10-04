@@ -147,21 +147,33 @@ namespace GBible.EditorTools
             return instance && column.StartsWith(InstanceRoot + ".", StringComparison.Ordinal) ? column.Substring(InstanceRoot.Length + 1) : column;
         }
 
-        // 칸 순서: 필드가 처음 나온 순서, 같은 필드의 목록 줄은 번호 순서(항목마다 목록 길이가 달라도 한데 모인다).
+        // 칸 순서: 필드가 처음 나온 순서. 목록은 그 목록이 처음 나온 자리에 줄 번호 순서로 모이고, 한 줄 안에서는 필드 순서
+        // (entries[0].item, entries[0].weight, entries[1].item …). 항목마다 목록 길이가 달라도 한데 모인다.
         static List<string> Order(IEnumerable<string> columns)
         {
+            var roots = new Dictionary<string, int>(StringComparer.Ordinal);
             var patterns = new Dictionary<string, int>(StringComparer.Ordinal);
             var all = new List<string>();
             foreach (var column in columns)
             {
                 if (all.Contains(column)) continue;
                 all.Add(column);
+                var root = RootOf(column);
+                if (!roots.ContainsKey(root)) roots[root] = roots.Count;
                 var pattern = Index.Replace(column, "[]");
                 if (!patterns.ContainsKey(pattern)) patterns[pattern] = patterns.Count;
             }
-            return all.OrderBy(c => patterns[Index.Replace(c, "[]")])
+            return all.OrderBy(c => roots[RootOf(c)])
                       .ThenBy(c => string.Join(".", Index.Matches(c).Cast<Match>().Select(m => int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture).ToString("D6", CultureInfo.InvariantCulture))), StringComparer.Ordinal)
+                      .ThenBy(c => patterns[Index.Replace(c, "[]")])
                       .ToList();
+        }
+
+        // 목록 칸이면 첫 목록까지의 앞부분(entries[0].weight → entries), 아니면 칸 이름 그대로.
+        static string RootOf(string column)
+        {
+            var at = column.IndexOf('[');
+            return at < 0 ? column : column.Substring(0, at);
         }
 
         static IEnumerable<string> Columns(GameData item, bool instance)

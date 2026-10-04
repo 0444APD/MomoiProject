@@ -290,6 +290,20 @@ try { Game.Do(new Buy { wallet = myWallet, price = 50 }); }
 catch (InvalidOperationException e) { /* "골드 부족" 안내 */ }
 ```
 
+**행동 안의 저장점: `Data.Mark()` · `Data.RollbackTo(point)`** — 행동 전체가 아니라 그 안의 한 부분만 실패 처리할 때 쓴다. `Mark()`는 지금까지의 변경을 굳혀 두고 저장점(`Savepoint`)을 돌려준다. `RollbackTo(저장점)`은 그 저장점 **뒤의 변경만** 되돌린다. 그 앞의 변경은 남고 행동은 계속되며, 되돌린 변경은 그 행동의 Undo 기록에서도 빠진다. 이벤트 예약이 실패할 때 그 예약이 바꾼 것만 되돌리는 것도 이 방식이다(`29-Statuses-Schedules-Choices.md` 2-5).
+
+```csharp
+// 행동의 Run 안
+var data = Game.Session.Data;
+var point = data.Mark();
+try { GiveBonus(); }                                                  // 실패할 수 있는 덤(예외를 던질 수 있다)
+catch (InvalidOperationException) { data.RollbackTo(point); }         // 덤이 바꾼 것만 되돌리고 행동은 계속
+```
+
+- 행동 밖에서는 `Mark()`가 `null`이다. `RollbackTo`는 `null`이나 다른 행동의 저장점을 받으면 아무것도 하지 않는다.
+- `Mark()`는 그 순간 Sync를 한 번 한다(모든 플레이어 데이터 비교). 반복문 안처럼 자주 부르지 않는다.
+- 되돌리는 것은 플레이어 데이터뿐이다. 난수 스트림은 되돌리지 않는다.
+
 ### 2.8 되돌리기: `session.Undo()`
 
 ```csharp

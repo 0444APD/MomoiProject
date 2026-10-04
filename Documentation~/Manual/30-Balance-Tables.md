@@ -112,10 +112,10 @@
 | `NotACandidate` | `momoi.fail.notACandidate` | `{item}` | "{item}은(는) 고를 수 있는 후보가 아닙니다." | `Game.Answer` |
 | `ChosenTwice` | `momoi.fail.chosenTwice` | — | "같은 것을 두 번 골랐습니다." | `Game.Answer` |
 | `ChoiceGone` | `momoi.fail.choiceGone` | — | "이미 답했거나 취소된 선택입니다." | `Game.Answer` |
-| `CannotUse` | `momoi.fail.cannotUse` | `{ability}` `{condition}` | "{ability}: 사용 조건을 만족하지 않습니다({condition})." | `Game.Use`(사용 조건이 거짓, 16장) |
+| `CannotUse` | `momoi.fail.cannotUse` | `{ability}` `{condition}` | "{ability}: 사용 조건을 만족하지 않습니다({condition})." | `Game.Use`(사용 조건이 거짓이고 그 능력·아이템의 쓸 수 없을 때 글이 비었을 때, 16장) |
 
 - `NotEnough`의 `{what}`은 낼 것의 이름이다. `Game.Pay(키, 경로, 양, what: "energy.name")`·결과 `비용 내기`의 `보일 이름`에 텍스트 키를 주면 그 키의 번역된 글, 글자를 주면 그 글자가 들어간다. 비우면 "플레이어 데이터의 이름 › 필드 경로"(예: "판 › battle.energy")라서 DB의 이름과 코드 경로가 플레이어에게 보인다 → 플레이어가 보는 비용에는 늘 이름을 준다(5-8). `{have}`·`{need}`는 이미 글자로 바꾼 숫자(소수 둘째 자리까지)다.
-- `CannotUse`의 `{ability}`는 능력·아이템의 ID다. 틀이 그 ID를 지금 언어의 이름(텍스트 표의 `<ID>.name`, 없으면 ID)으로 바꾼다. `{condition}`은 사용 조건(Trigger)의 문장(DB의 자연어 요약, 한국어)이라, 플레이어에게 보일 때는 틀에서 `{condition}`을 빼는 편이 낫다.
+- `CannotUse`의 `{ability}`는 능력·아이템의 ID다. 틀이 그 ID를 지금 언어의 이름(텍스트 표의 `<ID>.name`, 없으면 ID)으로 바꾼다. `{condition}`은 사용 조건(Trigger)의 문장(DB의 자연어 요약, 한국어)이라 번역되지 않는다. 그래서 플레이어에게 보일 글은 능력·아이템마다 **쓸 수 없을 때 글**(DB › 능력 `failText`, 사용 기능 `Usable.failText`, 16장)로 정한다: "체력이 가득 차서 {ability}을(를) 쓸 수 없습니다."처럼. 텍스트 키(`fail.fullHp`)를 적으면 텍스트 표에서 번역되고, 키가 아닌 글이면 그 글을 틀로 쓴다(`{ability}`·`{condition}`을 넣을 수 있다). 정하면 `Game.Use`의 실패도 `Game.CanUse`의 이유도 그 글이고, 비우면 이 기본 글이다. 모든 능력에 같은 글을 쓰려면 `{condition}`을 뺀 틀을 `momoi.fail.cannotUse`로 원문 표에 넣는다.
 - 텍스트 키로 준 `{what}`과 `{ability}`의 이름도 틀과 함께 **읽을 때마다 지금 언어로** 바뀐다. 언어를 바꾼 뒤 같은 예외의 `Message`를 다시 읽으면 이름까지 새 언어다.
 - **프로그래머의 실수**(없는 ID·잘못된 필드 이름)는 그대로 `InvalidOperationException`("[MomoiProject] …")이다. 플레이어에게 보일 글이 아니다. `Game.Pay`에 없는 필드나 숫자가 아닌 필드를 주면 "모자랍니다"가 아니라 이것이다("[MomoiProject] 비용: 'run'에 필드 'battle.enrgy'가 없습니다(…).").
 
@@ -261,7 +261,7 @@ List<string> cards = Game.Roll(GameIds.WeightTable.CardReward, 3, unique: true);
 
 | 멤버 | 뜻 |
 |---|---|
-| `string Roll(string tableId)` | 한 번 뽑아 **첫** ID를 돌려준다. 꽝이면 `null`. 개수가 2 이상인 줄이 나와도 하나만 돌려준다 |
+| `string Roll(string tableId)` | 한 번 뽑아 **첫** ID를 돌려준다. 꽝이면 `null`. 개수가 2 이상인 줄이 나와도 하나만 돌려준다(그때 표마다 한 번 타임라인 경고, 5-4) |
 | `List<string> Roll(string tableId, int count, bool unique = false)` | `count`번 뽑은 ID 목록(꽝은 빠진다). `unique`면 서로 다른 것만(2-3) |
 
 - 행동 안에서 부른다(난수가 행동과 함께 되돌아간다).
@@ -503,7 +503,7 @@ foreach (var id in Game.Roll(GameIds.WeightTable.EliteDrop, 1))     // 물약은
 | 물약 | 3 / 10 | `healPotion` 1개 또는 2개 |
 | 꽝 | 1 / 10 | 빈 목록 |
 
-- `Game.Roll(id)`(하나)는 첫 ID만 돌려주므로 물약이 2개 나와도 하나만 받는다. 개수가 2 이상인 줄이 있는 표는 목록 형태 `Game.Roll(id, 1)`로 받는다.
+- `Game.Roll(id)`(하나)는 첫 ID만 돌려주므로 물약이 2개 나와도 하나만 받는다. 개수가 2 이상인 줄이 있는 표는 목록 형태 `Game.Roll(id, 1)`로 받는다. 하나 형태로 뽑았는데 실제로 2개 이상이 나오면 타임라인에 경고 "가중치 표 'eliteDrop'에서 개수가 2 이상인 항목이 나와 Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요."가 표마다 한 번 남는다(세션마다).
 - Undo하고 다시 이겨도 같은 드롭이다(2-3). 유물 풀에 유물을 더해도 `eliteDrop`의 "유물이냐 물약이냐"는 그대로이고, 유물 풀 안의 결과만 바뀐다.
 - 코드 없이 유물만 주려면 결과 `가중치 표에서 주기`(`table` `relicPool`, `key` `run`, `path` `relics`)를 쓴다. 예: DB › 개발 › 개발 명령 "유물 하나 받기"(22장 7절). `relics`는 글자 목록이라 유물 ID가 들어간다.
 
@@ -618,7 +618,7 @@ public class PlayCard : GameAction
 
 - `what: "energy.name"`이라 `{what}`에 "에너지"/"energy"가 들어간다. 골드를 내는 곳은 `what: "gold.name"`처럼 그 이름을 준다. 비우면 "판 › battle.energy"가 보인다(2-4).
 - 원문 표에 `momoi.fail.notEnough`를 넣지 않으면 기본 문장 "{what}이(가) 모자랍니다({have} / {need})."가 쓰인다. 조사를 맞추려면 위처럼 `{what:이}`로 넣는다.
-- 선택 대기의 실패(`momoi.fail.chooseExactly` …)와 사용 조건 실패(`momoi.fail.cannotUse`)도 같은 방식으로 번역한다.
+- 선택 대기의 실패(`momoi.fail.chooseExactly` …)와 사용 조건 실패(`momoi.fail.cannotUse`, 또는 능력의 쓸 수 없을 때 글에 적은 키)도 같은 방식으로 번역한다.
 
 **화면 쪽** — 플레이어용 실패는 그대로 보여 주고, 그 밖의 실패는 개발자에게 알린다.
 
@@ -653,7 +653,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 밸런스 값이 수십 개가 되면 시트에서 한 번에 고치는 편이 빠르다.
 
 1. DB › 밸런스 값 탭 → 맨 위 폴더 줄의 **CSV** → **CSV로 내보내기…** → 파일을 저장한다(UTF-8).
-2. 구글 시트·엑셀에서 연다. 한 줄 = 항목 하나(첫 칸 `id`), 칸 = `value` · `curve.kind` · `curve.startX` · `curve.step` · `curve.rate` · `curve.power` · `curve.rounding` · `curve.useMin` · `curve.min` · `curve.useMax` · `curve.max` · `note`. 표의 점(`curve.points`)은 목록이라 나오지 않는다.
+2. 구글 시트·엑셀에서 연다. 한 줄 = 항목 하나(첫 칸 `id`), 칸 = `value` · `curve.kind` · `curve.startX` · `curve.step` · `curve.rate` · `curve.power` · `curve.rounding` · `curve.useMin` · `curve.min` · `curve.useMax` · `curve.max` · `note`. 표의 점(`curve.points`)은 점이 있는 항목이 있으면 점마다 칸이 된다(`curve.points[0].x` · `curve.points[1].x` … · `curve.points[0].y` …). 아래 셋은 표 곡선이 아니라 점 칸이 없다.
 
 ```
 id,value,curve.kind,curve.startX,curve.step,curve.rate,curve.power,curve.rounding,curve.useMin,curve.min,curve.useMax,curve.max,note
@@ -665,7 +665,7 @@ startEnergy,3,None,1,0,1.1,1.5,None,false,0,false,0,
 3. 고친 뒤 CSV로 다시 받아 **CSV 가져오기…** → 결과 창("3개 고침, 0개 새로 만듦(적용 전 — Ctrl+S로 적용).")을 확인하고 저장(Ctrl+S)한다. 마음에 안 들면 **되돌리기**.
 
 - `curve.kind`에는 코드 이름(`Exponential`)과 DB에 보이는 이름(`비율로(×단계마다)`)을 모두 적을 수 있다. 내보낼 때는 코드 이름이다.
-- 가중치 표의 항목 줄도 목록이라 CSV에 나오지 않는다(꽝 무게만 나온다). 무게는 DB에서 고친다.
+- 가중치 표 탭도 같다. 항목 줄은 한 줄씩 나란히 `entries[0].item` · `entries[0].weight` · `entries[0].minCount` · `entries[0].maxCount` · `entries[1].item` …, 꽝 무게는 `emptyWeight` 칸이다. 줄의 조건(Block)은 나오지 않으므로 DB에서 고친다. 시트에서 번호를 늘려 항목 줄을 더하면 새 항목 줄은 무게 1, 개수 1~1에서 시작한다(`33-Tick-Preview-Csv.md` 2-3).
 - 칸 규칙·가져오기 결과·인스턴스(카드 비용 …) 내보내기는 `33-Tick-Preview-Csv.md` 3절.
 
 ---
@@ -682,7 +682,7 @@ startEnergy,3,None,1,0,1.1,1.5,None,false,0,false,0,
 | 소수가 나와 체력이 1.21 | 곡선은 `double`이다. 반올림을 고르거나 코드에서 `(int)Math.Round`. |
 | 플레이 중 고친 값이 지금 적에게 안 보임 | 반영은 다음에 읽을 때부터다. 이미 만든 적의 체력은 판 데이터에 들어 있다. |
 | 플레이 중 고친 값이 플레이를 끄니 사라짐 | DB의 작업본이다. 저장(Ctrl+S)해야 에셋에 남는다. |
-| 물약이 1~2개 나와야 하는데 늘 1개 | `Game.Roll(id)`(하나)는 첫 ID만 돌려준다. `Game.Roll(id, 1)`의 목록으로 받는다(5-4). |
+| 물약이 1~2개 나와야 하는데 늘 1개 / 경고 "…Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요." | `Game.Roll(id)`(하나)는 첫 ID만 돌려준다(2개 이상이 나오면 표마다 한 번 이 경고). `Game.Roll(id, 1)`의 목록으로 받는다(5-4). |
 | 서로 다른 3장인데 2장만 나옴 | 꽝이 나왔거나, 표 전체(조건이 맞는 줄)에 서로 다른 항목이 3개보다 적다. 꽝 무게·조건·항목 수를 본다(2-3). |
 | 서로 다른 것만인데 같은 ID가 둘 | 그 줄의 개수(최소~최대)가 2 이상이다. 개수만큼은 같은 ID가 들어간다. |
 | Undo하고 다시 해도 같은 드롭 | 정상이다. 난수가 행동과 함께 돌아간다(2-3). |

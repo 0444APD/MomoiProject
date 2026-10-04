@@ -36,7 +36,8 @@
    - `선택 요구` → 후보 중에서 플레이어가 고르게 하고, 고른 것마다 효과를 준다(→ `29-Statuses-Schedules-Choices.md` 3-3).
    - `플레이어 데이터에 주기 · …` → 필드와 값.
    - 코딩한 결과(`Reward` 클래스).
-4. 검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요."
+4. `failText`(툴팁 "쓸 수 없을 때 글 / 사용 조건이 맞지 않을 때 플레이어에게 보일 글. 텍스트 키(fail.needEnergy)면 번역된 글, 아니면 그 글 그대로({ability}·{condition} 틀). 비우면 기본 글"): 사용 조건이 거짓일 때 `Game.Use`의 실패 글이자 `Game.CanUse`의 이유(2-1·2-3). 예: `마나가 모자라 {ability}을(를) 쓸 수 없습니다.` 또는 텍스트 키 `fail.needMana`. 비우면 기본 글 "{ability}: 사용 조건을 만족하지 않습니다({condition})."이다.
+5. 검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요."
 
 결과를 코드로 쓰려면 `[BindTo("fireball")]`(→ `13-BindTo.md`). 연결되면 결과 칸이 잠긴다.
 
@@ -47,7 +48,7 @@
 1. `MomoiProject → DB` → **인스턴스** 탭 → **`+ 인스턴스`** → 제목(= 인스턴스 ID, 예: `potion`)을 짓는다.
 2. `instanceType`(툴팁 "형식")에서 아이템 클래스(`Item`)를 고른다. 값(`value`)이 새로 만들어진다.
 3. 값 탐색기 아래 **`+ 기능`**을 누르고 목록에서 `usable`(오른쪽 작은 글씨: 형식 이름)을 고른다. 사용 기능이 붙고 그 칸이 보인다. 줄의 빼기로 다시 뗀다.
-4. 사용 기능의 트리거(`when`)는 기본 `사용`이다.
+4. 사용 기능의 트리거(`when`)는 기본 `사용`이다. `failText`(툴팁 "쓸 수 없을 때 글(텍스트 키 또는 글, 비우면 기본 글)")는 능력의 `failText`와 같다(1-1).
 
 > 인스턴스 값 안의 사용 기능(`when`·`then`)은 능력 탭과 같은 트리거·결과 편집기로 그려진다. 결과를 코드로 쓰려면 `[BindTo(인스턴스 ID)]`를 붙인다(그러면 결과 칸은 잠기고 연결된 함수 이름·cs 열기가 보인다). 여러 아이템이 같은 효과를 나눠 쓰면 아이템이 **능력 ID를 가리키게** 하고 그 능력을 DB › 능력에서 조립해도 된다(3-5, 3-6).
 
@@ -79,7 +80,9 @@ void OnClickById()                          => Game.Use("fireball", "hero", "orc
 - 내부에서 `UseAbility` 행동 하나를 `Game.Do`한다. 다른 행동 안에서 부르면 그 행동의 일부로 그 자리에서 실행된다(Undo 한 단위 = 바깥 행동).
 - 실패하면 예외를 던지고 **아무것도 바뀌지 않는다**:
   - 없는 ID: `InvalidOperationException` "[MomoiProject] 능력 '…'이(가) 없습니다."(프로그래머 실수)
-  - 사용 조건 거짓: 플레이어용 실패 `GameFailure`(`InvalidOperationException`을 상속). 키 `FailureKeys.CannotUse`(`momoi.fail.cannotUse`), 값 `{ability}`(이름: 텍스트 표의 `<ID>.name`) · `{condition}`(트리거 문장), 기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition})." 텍스트 표에 키를 넣으면 번역된다(`30-Balance-Tables.md` 2-4).
+  - 사용 조건 거짓: 플레이어용 실패 `GameFailure`(`InvalidOperationException`을 상속). 값은 `{ability}`(이름: 텍스트 표의 `<ID>.name`) · `{condition}`(트리거 문장, DB의 한국어 요약).
+    - 그 능력·아이템에 **쓸 수 없을 때 글**(`failText`, 1-1)이 있으면 그 글이 키이자 기본 문장이다. 텍스트 표에 그 키가 있으면 지금 언어의 번역, 없으면 적은 글을 틀로 쓴다.
+    - 비어 있으면 키 `FailureKeys.CannotUse`(`momoi.fail.cannotUse`), 기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition})." 텍스트 표에 키를 넣으면 번역된다(`30-Balance-Tables.md` 2-4). `{condition}`은 번역되지 않으므로 플레이어에게 보일 글은 능력·아이템마다 `failText`로 정한다.
 
 ### 2-2. 실행 흐름
 
@@ -101,7 +104,7 @@ bool ok2 = Game.CanUse("fireball", caster, new object[] { target }, out var reas
 ```
 
 - Trigger(사용 조건)만 검사하고 아무것도 바꾸지 않는다. 버튼을 미리 흐리게 할 때 쓴다.
-- 이유 글자: 없는 ID면 "'…'은(는) 쓸 수 있는 능력·아이템이 아닙니다.", 조건이 거짓이면 `Game.Use`가 던지는 실패(`FailureKeys.CannotUse`)와 같은 글이다(지금 언어, 기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition})."). 텍스트 표에서 번역한 글이 툴팁에도 그대로 보인다.
+- 이유 글자: 없는 ID면 "'…'은(는) 쓸 수 있는 능력·아이템이 아닙니다.", 조건이 거짓이면 `Game.Use`가 던지는 실패와 같은 글이다(지금 언어). 쓸 수 없을 때 글(`failText`)이 있으면 그 글, 비었으면 `FailureKeys.CannotUse`의 글(기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition}).")이다(2-1). 텍스트 표에서 번역한 글이 툴팁에도 그대로 보인다.
 
 ### 2-4. `UseAbility` — 능력 사용 행동(데이터)
 
@@ -188,6 +191,7 @@ session.Abilities.Define(fireball);
 | `Id` | 필수 |
 | `DisplayName` | 표시 이름(없으면 ID) |
 | `When` | Trigger. `null`이면 언제나 쓸 수 있다 |
+| `FailText` | 쓸 수 없을 때 글(텍스트 키 또는 글, `{ability}`·`{condition}` 틀). 비우면 `FailureKeys.CannotUse`의 기본 글(2-1). DB 칸 `failText` |
 | `Outcomes` | 결과 |
 | `Targets` / `Effects` | 짧은 형태: 결과 앞에 "대상에게 효과" 하나로 실행된다 |
 
@@ -222,6 +226,7 @@ public class Item
 4. `Usable`의 칸:
    - `when`(`Trigger`, 기본 `new UseTrigger()`, 잠금 `사용 · 조건 충족`)
    - `then`(`List<Outcome>`, 잠금 `대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과`)
+   - `failText`(`string`, 기본 빈 글): 쓸 수 없을 때 글(`AbilityDefinition.FailText`가 된다, 2-1)
 5. 등록 ID = **인스턴스 ID**(DB › 인스턴스 항목의 ID). `Item.id` 필드 값과는 상관없다.
 6. 코드로 능력 정의를 만들려면 `usable.ToDefinition(id, displayName)`.
 
@@ -303,7 +308,7 @@ public class SpendMana : Effect<Unit>
   1. `대상에게 효과` → 대상 `사용자 자신` → 효과 `마나 소모`(cost 3)
   2. `대상에게 효과` → 대상 비움(고른 대상) → 효과 `피해`(amount 12)
 
-마나가 모자라면 `Game.Use`는 예외로 실패하고 아무것도 바뀌지 않는다. UI는 `Game.CanUse("fireball", caster, out var why)`로 미리 흐리게 한다.
+마나가 모자라면 `Game.Use`는 예외로 실패하고 아무것도 바뀌지 않는다. UI는 `Game.CanUse("fireball", caster, out var why)`로 미리 흐리게 한다. `failText`에 `마나가 모자라 {ability}을(를) 쓸 수 없습니다.`를 적어 두면 실패 글과 `why`가 그 글이다(언어마다 다르게 하려면 텍스트 키 `fail.needMana`를 적고 텍스트 표에 넣는다).
 
 ### 3-4. 포션(사용 기능 + `[BindTo]`)
 
@@ -441,6 +446,8 @@ DB › 능력 `chainLightning`의 트리거는 에디터에서 그대로 정하�
 - **사용 기능을 인스턴스의 `id` 필드로 부른다.** `Game.Use`의 ID는 DB › 인스턴스 항목의 ID다. 가방에는 인스턴스 ID를 담아 두는 것이 편하다.
 - **사용 기능 필드의 형식이 다르다.** `Usable`을 상속한 형식이나 `object` 필드는 찾지 않는다(필드 형식이 정확히 `Usable`이어야 한다). 인스턴스 값의 맨 위 필드만 본다.
 - **사용 조건을 결과 코드의 예외로만 둔다.** 동작은 하지만 `Game.CanUse`가 모른다. 미리 보여야 하는 조건은 Trigger에 조건 Block으로 둔다.
+- **플레이어에게 "…: 사용 조건을 만족하지 않습니다(트리거 문장)."가 보인다.** 쓸 수 없을 때 글이 비어 기본 글이 쓰였고, `{condition}`은 DB의 한국어 요약이라 언어를 바꿔도 그대로다. 능력·아이템마다 `failText`를 적는다(1-1).
+- **쓸 수 없을 때 글에 적은 키(`fail.needMana`)가 글자 그대로 보인다.** 텍스트 표에 그 키가 없어 적은 글을 틀로 썼다. 원문 표·언어 표에 키를 넣는다(`23-Text-Localization.md` 1절).
 - **`Define` 뒤에 정의를 고친다.** 능력 정의는 등록할 때 복사된다. 바꾸려면 다시 `Define`한다.
 - **사용자 없이 `사용자 자신`을 쓴다.** 사용자가 `null`이거나 찾지 못하면 `사용자 자신`은 아무도 고르지 않는다.
 - **도전과제의 결과에서 고른 대상을 기대한다.** 고른 대상(`Picked`)은 `Game.Use`로 쓸 때만 있다.
