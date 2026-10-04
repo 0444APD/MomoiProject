@@ -154,6 +154,10 @@ namespace GBible
                         }
                     }
                 }
+                // 같은 ID에 코드가 여럿: 모두 실행되고 순서가 정해지지 않으므로 알린다.
+                foreach (var pair in map)
+                    if (pair.Value.Count > 1)
+                        problems.Add($"[BindTo(\"{pair.Key}\")]가 {pair.Value.Count}곳에 붙어 있습니다({string.Join(", ", pair.Value.Select(c => c.Name))}). 모두 실행되고 순서는 정해지지 않습니다. 하나로 합치세요.");
                 _problems = problems;
                 _byId = map;
             }

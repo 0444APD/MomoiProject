@@ -75,6 +75,9 @@ namespace GBible.EditorTools
                 }
 
                 CheckSlots(data, all, context);
+                // 같은 ID에 [BindTo] 코드가 여럿이면 모두 실행되고 순서가 정해지지 않는다.
+                var bound = BoundOutcomes.For(data.Id);
+                if (bound.Count > 1) context.Warning($"이 항목에 [BindTo] 코드가 {bound.Count}개 연결되어 있습니다({string.Join(", ", bound.Select(b => b.Name))}). 모두 실행되고 순서는 정해지지 않으니 하나로 합치세요.");
             }
 
             FindCycles(all.OfType<AchievementData>().ToList(), context);
