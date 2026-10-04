@@ -178,6 +178,18 @@ namespace GBible
             return Current().Where(s => s.target == targetId).ToList();
         }
 
+        internal bool HasAny => _session.Data.IsDefined(Key) && (_session.Data.Get<StatusList>(Key)?.items.Count ?? 0) > 0;
+
+        // 가진 쪽이 데이터에서 사라진 상태 효과를 지운다(끝날 때 결과 없이). 바깥 행동이 끝나기 직전에 부른다.
+        internal void PruneMissing()
+        {
+            var list = _session.Data.IsDefined(Key) ? _session.Data.Get<StatusList>(Key)?.items : null;
+            if (list == null || list.Count == 0) return;
+            var gone = new HashSet<string>(list.Select(s => s.target).Distinct().Where(id => _session.Game.Find(id) == null), StringComparer.Ordinal);
+            if (gone.Count == 0) return;
+            foreach (var active in list.Where(s => gone.Contains(s.target)).ToList()) Drop(active);
+        }
+
         // ── 지속 ───────────────────────────────────────────────
 
         void OnEvent(object evt)

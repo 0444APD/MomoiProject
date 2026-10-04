@@ -91,6 +91,8 @@ namespace GBible
         public event Action<long> TransactionStarted;
         public event Action<long> TransactionAborted;
         public event Action<ActionRecord> StatusChanged;
+        // 바깥 행동이 끝나기 직전(아직 그 행동 안): 정리 작업이 그 행동의 일부로 들어간다(같이 Undo된다). 미리보기에서는 오지 않는다.
+        public event Action Committing;
 
         public ActionDispatcher(Journal journal, PlayerDataStore state, GameClock clock, int logCapacity = 1024)
         {
@@ -192,7 +194,11 @@ namespace GBible
             try
             {
                 // 처리 중에 꺼낸 데이터 값은 직접 고쳐도 기록된다(PlayerDataStore.Track).
-                using (_journal.Cause(entry.Id)) _state.Track(() => handler(action));
+                using (_journal.Cause(entry.Id))
+                {
+                    _state.Track(() => handler(action));
+                    Committing?.Invoke();
+                }
                 _state.End();
             }
             catch (Exception e)

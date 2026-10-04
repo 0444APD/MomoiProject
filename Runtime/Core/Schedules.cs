@@ -45,6 +45,8 @@ namespace GBible
         public string After(double seconds, GameAction action, string source = null, bool permanent = false)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
+            // 게임 시간은 판마다 0부터 다시 흐르므로 판을 넘는(영구) 시간 예약은 시각이 맞지 않는다.
+            if (permanent) throw new InvalidOperationException("[MomoiProject] 영구 예약은 이벤트 예약(ScheduleOn)만 쓸 수 있습니다(게임 시간은 판마다 0부터 다시 흐릅니다).");
             return Add(new ScheduledAction { at = _session.Clock.Time + Math.Max(0, seconds) }, action, source, permanent);
         }
 

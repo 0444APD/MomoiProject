@@ -24,9 +24,9 @@ namespace GBible.Data
          Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 대상 id → 내가 맞을 때만).")]
         public string holderField = "";
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
-        [FieldLabel("걸릴 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Event)]
+        [FieldLabel("걸릴 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Event, BindTo = false)]
         public List<Outcome> onApply = new List<Outcome>();
-        [FieldLabel("끝날 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Event)]
+        [FieldLabel("끝날 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Event, BindTo = false)]
         public List<Outcome> onExpire = new List<Outcome>();
 
         public StatusDefinition ToDefinition()

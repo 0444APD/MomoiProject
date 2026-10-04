@@ -204,8 +204,9 @@ namespace GBible.Tests
             _session.Statuses.Define(Poison());
             Do(g => g.ApplyStatus(Foe, "poison"));
             Do(g => g.Session.Data.Modify<SsParty>("party", p => p.units.RemoveAll(u => u.id == "foe")));
-            TurnEnd("hero");
-            Assert.AreEqual(0, _session.Statuses.Of("foe").Count);
+            Assert.AreEqual(0, _session.Statuses.Of("foe").Count, "없앤 행동이 끝날 때 정리된다");
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(1, _session.Statuses.Of("foe").Count, "그 행동을 Undo하면 같이 돌아온다");
         }
 
         [Test]

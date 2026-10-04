@@ -243,10 +243,15 @@ namespace GBible
         // ── 선택 대기 ───────────────────────────────────────────
         // 플레이어에게 고르기를 요구한다(행동 안에서). 고르면 then의 [Chosen] 필드에 고른 것이 들어가 실행된다. 돌려주는 값은 선택 id.
         //   Game.Ask("버릴 카드", run.hand, new DiscardChosen(), min: 1, max: 1);
-        // 후보는 id가 있는 객체. label은 모니터 등에 보일 이름(비우면 id). 고른 뒤 할 일은 모두 then에 쓴다(Ask 다음 줄은 바로 실행된다).
+        // 후보는 id가 있는 객체 또는 id 글자. label은 모니터 등에 보일 이름(비우면 텍스트 표의 'id.name', 없으면 id).
+        // 고른 뒤 할 일은 모두 then에 쓴다(Ask 다음 줄은 바로 실행된다).
         public string Ask(string prompt, IEnumerable<object> candidates, GameAction then, int min = 1, int max = 1, string source = null, string player = null, Func<object, string> label = null) =>
             Session.Choices.Ask(prompt, (candidates ?? Enumerable.Empty<object>()).Where(c => c != null)
-                .Select(c => new ChoiceCandidate(IdOf(c), label?.Invoke(c))), then, min, max, source, player);
+                .Select(c =>
+                {
+                    var id = c as string ?? IdOf(c);
+                    return new ChoiceCandidate(id, label?.Invoke(c) ?? Texts.NameOf(id));
+                }), then, min, max, source, player);
 
         // 글 선택지: Game.Ask("자세", new[] { new ChoiceCandidate("attack", "공격"), new ChoiceCandidate("guard", "방어") }, new ChooseStance());
         public string Ask(string prompt, IEnumerable<ChoiceCandidate> options, GameAction then, int min = 1, int max = 1, string source = null, string player = null) =>

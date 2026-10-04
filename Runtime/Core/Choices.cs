@@ -185,7 +185,7 @@ namespace GBible
             var use = new AbilityUse { Game = context.Game, User = context.User, Picked = context.Picked ?? Array.Empty<object>(), Context = context };
             IEnumerable<object> pool = use.Picked;
             foreach (var selector in candidates.Where(t => t != null)) pool = selector.Run(use, pool);
-            var options = pool.Where(o => o != null && GameApi.HasId(o.GetType())).Select(o => new ChoiceCandidate(GameApi.IdOf(o))).ToList();
+            var options = pool.Where(o => o != null && GameApi.HasId(o.GetType())).Select(o => GameApi.IdOf(o)).Select(id => new ChoiceCandidate(id, Texts.NameOf(id))).ToList();
             var user = context.User != null && GameApi.HasId(context.User.GetType()) ? GameApi.IdOf(context.User) : "";
             var next = new ChoiceEffectsRun
             {

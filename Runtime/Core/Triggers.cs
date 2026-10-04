@@ -64,6 +64,8 @@ namespace GBible
     {
         public OutcomeKinds Allowed { get; }
         public bool Fixed { get; set; }
+        // 이 항목 ID에 [BindTo]가 붙으면 코드가 이 칸을 대신하는가(기본 참). 대신하지 않는 칸(상태 효과의 걸릴 때·끝날 때)은 거짓.
+        public bool BindTo { get; set; } = true;
 
         public OutcomeSlotAttribute(OutcomeKinds allowed)
         {

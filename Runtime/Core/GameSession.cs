@@ -138,6 +138,15 @@ namespace GBible
             Actions.SelfRun = action => action.RunIn(Game);
             Actions.Prepare = action => ActionReferences.Resolve(action, Game);
 
+            // 행동이 끝나기 직전: 데이터에서 사라진 개체(죽은 적)에 걸린 상태 효과·이번 판 Modifier를 그 행동 안에서 정리한다.
+            Actions.Committing += () =>
+            {
+                if (!Statuses.HasAny && !Attributes.HasSessionModifiers) return;
+                Data.Sync();
+                Statuses.PruneMissing();
+                Attributes.PruneMissing();
+            };
+
             // 테스트 이벤트는 게임 행동과 같은 경로로 처리된다(Undo·기록 동일).
             Actions.Register<SimulatedEventAction>(action =>
             {

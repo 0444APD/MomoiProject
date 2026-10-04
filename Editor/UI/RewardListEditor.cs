@@ -72,13 +72,14 @@ namespace GBible.EditorTools.UI
         public static VisualElement Build(SerializedProperty list, Type elementType, Action onValue, Action onStructure)
         {
             var container = Gs.Col("gs-rewards");
+            var slot = TriggerSlots.OutcomeSlotOf(list);
             // 코드로 쓴 결과가 이 항목에 연결되어 있으면([BindTo]) 고를 수 없다: 연결된 클래스를 보이고 cs를 연다.
-            if (list.serializedObject.targetObject is GBible.Data.GameData owner && BoundOutcomes.Has(owner.Id))
+            // 코드가 대신하지 않는 칸(OutcomeSlot BindTo = false: 상태 효과의 걸릴 때·끝날 때)은 그대로 고친다.
+            if (list.serializedObject.targetObject is GBible.Data.GameData owner && BoundOutcomes.Has(owner.Id) && (slot?.BindTo ?? true))
             {
                 container.Add(BoundView(owner.Id));
                 return container;
             }
-            var slot = TriggerSlots.OutcomeSlotOf(list);
             var allowed = slot?.Allowed ?? OutcomeKinds.All;
             // 보상(Reward) 목록에는 Reward만 들어간다.
             if (elementType == typeof(Reward)) allowed &= OutcomeKinds.PlayerData | OutcomeKinds.Coded;
