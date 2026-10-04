@@ -503,6 +503,8 @@ namespace GBible
             public Action<TriggerContext> Fire;
             public TriggerKinds Kinds;
             public string WatchKey;
+            // 가진 쪽마다 검사(상태 효과처럼 여러 대상이 같은 트리거를 가질 때): 순간마다 가진 쪽 목록을 받아 User = 가진 쪽으로 하나씩 검사·발동한다.
+            public Func<TriggerContext, IEnumerable<object>> Holders;
         }
 
         readonly GameSession _session;
@@ -530,10 +532,12 @@ namespace GBible
         public int Count => _entries.Count;
 
         // owner의 트리거를 감시한다. fire: 발동했을 때(결과 실행은 부르는 쪽이 RunOutcomes로). repeat이 아니면 한 번 발동하면 감시를 그만둔다.
-        public void Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire)
+        // holders를 주면 가진 쪽마다 검사한다: 순간마다 holders(순간)의 각 객체를 컨텍스트의 사용자(User)로 넣어 트리거 전체(조건 포함)를
+        // 따로 검사하고, 참인 가진 쪽마다 fire를 부른다(조건 Block이 Context.User로 "가진 쪽의 체력" 같은 것을 본다).
+        public void Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null)
         {
             if (when == null) return;
-            var entry = new Entry { Owner = owner, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds() };
+            var entry = new Entry { Owner = owner, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds(), Holders = holders };
             _entries.Add(entry);
             foreach (var type in when.Leaves().OfType<EventTrigger>().Select(e => e.ResolvedType).Where(t => !string.IsNullOrEmpty(t)).Distinct())
             {
@@ -567,7 +571,7 @@ namespace GBible
                     if (!_entries.Contains(entry)) continue;
                     if (Intents.IsCancelled(intent)) break;
                     var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = intent, IsIntercept = true };
-                    if (Test(entry.When, moment)) Fire(entry, moment);
+                    TestAndFire(entry, moment);
                 }
             }
             finally { _depth--; }
@@ -599,7 +603,8 @@ namespace GBible
             Watcher.Watch(entry.WatchKey, probe, () =>
             {
                 entry.WatchKey = null;
-                Fire(entry, Moment(entry.Owner));
+                if (entry.Holders == null) Fire(entry, Moment(entry.Owner));
+                else TestAndFire(entry, Moment(entry.Owner));
                 if (entry.Repeat && _entries.Contains(entry)) WatchConditions(entry, armed: false);
             });
         }
@@ -625,7 +630,7 @@ namespace GBible
                 {
                     if (!_entries.Contains(entry)) continue;
                     var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = evt };
-                    if (Test(entry.When, moment)) Fire(entry, moment);
+                    TestAndFire(entry, moment);
                 }
             }
             finally { _depth--; }
@@ -645,6 +650,40 @@ namespace GBible
             try { return when.Test(moment); }
             finally { Current = previous; }
         }
+
+        // 검사해서 참이면 발동. 가진 쪽마다 검사하는 항목은 가진 쪽마다(User = 가진 쪽) 따로.
+        void TestAndFire(Entry entry, TriggerContext moment)
+        {
+            if (entry.Holders == null)
+            {
+                if (Test(entry.When, moment)) Fire(entry, moment);
+                return;
+            }
+            foreach (var holder in HoldersOf(entry, moment))
+            {
+                var each = ForHolder(moment, holder);
+                if (!Test(entry.When, each)) continue;
+                Fire(entry, each);
+                if (!_entries.Contains(entry)) break;
+                if (each.IsIntercept && Intents.IsCancelled(each.Event)) break;
+            }
+        }
+
+        List<object> HoldersOf(Entry entry, TriggerContext moment)
+        {
+            try { return entry.Holders(moment)?.Where(h => h != null).ToList() ?? new List<object>(); }
+            catch (Exception e)
+            {
+                _session.Journal.Append(JournalKind.Error, "Triggers", $"'{entry.Owner}'의 가진 쪽 목록을 만들지 못했습니다: {e.Message}");
+                return new List<object>();
+            }
+        }
+
+        static TriggerContext ForHolder(TriggerContext moment, object holder) => new TriggerContext
+        {
+            Session = moment.Session, Owner = moment.Owner, Event = moment.Event, IsIntercept = moment.IsIntercept, IsUse = moment.IsUse,
+            User = holder, Picked = new[] { holder },
+        };
 
         void Fire(Entry entry, TriggerContext moment)
         {
@@ -690,7 +729,10 @@ namespace GBible
 
             public override bool Evaluate(GameSession session)
             {
-                var result = _system.Test(_entry.When, _system.Moment(_entry.Owner));
+                var moment = _system.Moment(_entry.Owner);
+                var result = _entry.Holders == null
+                    ? _system.Test(_entry.When, moment)
+                    : _system.HoldersOf(_entry, moment).Any(h => _system.Test(_entry.When, ForHolder(moment, h)));
                 if (_armed) return result;
                 if (!result) _armed = true;
                 return false;

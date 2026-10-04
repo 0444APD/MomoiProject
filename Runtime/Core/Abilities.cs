@@ -122,6 +122,8 @@ namespace GBible
         public string DisplayName;
         // 트리거(없으면 사용할 때 언제나). 사용 조건은 AND로 조건 충족을 붙인다.
         public Trigger When;
+        // 사용 조건이 맞지 않을 때 플레이어에게 보일 글(텍스트 키 또는 글, {ability}·{condition} 틀). 비우면 라이브러리 기본 글(FailureKeys.CannotUse).
+        public string FailText;
         public readonly List<Outcome> Outcomes = new List<Outcome>();
         // 예전 형태(대상·효과를 바로): 결과 앞에 "대상에게 효과" 하나로 실행된다.
         public readonly List<TargetSelector> Targets = new List<TargetSelector>();
@@ -142,6 +144,7 @@ namespace GBible
                 Id = definition.Id,
                 DisplayName = definition.DisplayName ?? definition.Id,
                 When = definition.When == null ? null : (Trigger)DataModel.Clone(definition.When, null),
+                FailText = definition.FailText,
             };
             // 코드로 쓴 결과가 연결되어 있으면([BindTo]) 그것이 이 능력의 결과다(에디터에서 고른 결과 대신).
             if (BoundOutcomes.Has(definition.Id)) copy.Outcomes.AddRange(BoundOutcomes.Create(definition.Id));
@@ -162,10 +165,14 @@ namespace GBible
     public sealed class UseAbility : GameAction
     {
         // 사용 조건이 맞지 않을 때의 실패(Game.Use가 던지고 Game.CanUse가 이유로 쓴다). {ability}는 ID라 보일 때의 언어 이름으로 바뀐다.
-        internal static GameFailure CannotUse(AbilityDefinition definition, GameSession session) =>
-            new GameFailure(FailureKeys.CannotUse,
-                TextArgs.From(("ability", definition.Id), ("condition", definition.When?.Natural(session) ?? "")),
+        // 항목에 '쓸 수 없을 때 글'(FailText)이 있으면 그 키·글로(번역은 텍스트 표), 없으면 기본 글({condition}은 DB의 조건 문장).
+        internal static GameFailure CannotUse(AbilityDefinition definition, GameSession session)
+        {
+            var args = TextArgs.From(("ability", definition.Id), ("condition", definition.When?.Natural(session) ?? ""));
+            if (!string.IsNullOrWhiteSpace(definition.FailText)) return new GameFailure(definition.FailText.Trim(), args, definition.FailText.Trim());
+            return new GameFailure(FailureKeys.CannotUse, args,
                 "{ability}: 사용 조건을 만족하지 않습니다({condition}).");
+        }
 
         public string ability;
         public string user;

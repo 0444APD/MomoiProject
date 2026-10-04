@@ -62,6 +62,18 @@ namespace GBible
         public readonly List<ChangeSet> Mirrored = new List<ChangeSet>();
         // 이 행동이 끝난 뒤 행동 밖에서 바뀐 곳("키:경로", 변경 목록을 만들 때만). Undo가 덮어쓰면 경고한다.
         internal HashSet<string> OutsideAfter;
+        // 이 수보다 앞의 Mirror 기록에는 이어 붙이지 않는다(저장점 뒤의 변경이 저장점 앞의 기록에 섞이지 않게).
+        internal int SealedMirrored;
+    }
+
+    // 행동 안의 저장점(PlayerDataStore.Mark). RollbackTo로 그 뒤의 변경만 되돌린다.
+    public sealed class Savepoint
+    {
+        internal Transaction Tx;
+        internal int Mirrored;
+        internal int Values;
+        internal int Data;
+        internal Dictionary<string, object> LegacyAt;
     }
 
     // 모든 플레이어 데이터가 사는 곳.
@@ -623,7 +635,7 @@ namespace GBible
                 // 한 행동 안에서 같은 데이터를 잇달아 Sync하면 Undo 기록 하나로 합친다.
                 var history = _active.Mirrored;
                 var last = history.Count > 0 ? history[history.Count - 1] : null;
-                if (last == null || last.Key != key)
+                if (last == null || last.Key != key || history.Count <= _active.SealedMirrored)
                 {
                     last = new ChangeSet { Key = key };
                     history.Add(last);
@@ -980,6 +992,40 @@ namespace GBible
                 _history.RemoveAt(0);
                 TransactionForgotten?.Invoke(oldest);
             }
+        }
+
+        // 행동 안의 저장점: 지금까지의 변경을 굳혀 두고, 나중에 RollbackTo로 그 뒤의 변경만 되돌린다(행동 하나 안의 작은 실패 처리용).
+        // 행동 밖이면 null. 저장점을 만들 때 Sync를 한 번 한다(자주 만들지 않는다).
+        public Savepoint Mark()
+        {
+            if (_active == null) return null;
+            Sync();
+            var tx = _active;
+            tx.SealedMirrored = tx.Mirrored.Count;
+            var point = new Savepoint { Tx = tx, Mirrored = tx.Mirrored.Count, Values = tx.ValueChanges.Count, Data = tx.DataChanges.Count, LegacyAt = new Dictionary<string, object>(StringComparer.Ordinal) };
+            // 예전 방식 데이터는 키마다 행동 전 모습 하나만 들고 있으므로, 이미 건드린 키는 지금 모습을 따로 떠 둔다.
+            foreach (var record in tx.DataChanges)
+                if (_slots.TryGetValue(record.Key, out var slot)) point.LegacyAt[record.Key] = DataModel.Clone(slot.Value, Identity);
+            return point;
+        }
+
+        // 저장점 뒤의 변경만 되돌린다(그 앞의 변경과 행동은 그대로). 되돌린 변경은 이 행동의 Undo 기록에서도 빠진다.
+        public void RollbackTo(Savepoint point)
+        {
+            if (point == null || _active == null || _active != point.Tx) return;
+            Sync();
+            var tx = _active;
+            var tail = new Transaction { Id = tx.Id, JournalId = tx.JournalId, Label = tx.Label };
+            tail.Mirrored.AddRange(tx.Mirrored.Skip(point.Mirrored));
+            tx.Mirrored.RemoveRange(point.Mirrored, tx.Mirrored.Count - point.Mirrored);
+            tail.ValueChanges.AddRange(tx.ValueChanges.Skip(point.Values));
+            tx.ValueChanges.RemoveRange(point.Values, tx.ValueChanges.Count - point.Values);
+            tail.DataChanges.AddRange(tx.DataChanges.Skip(point.Data));
+            tx.DataChanges.RemoveRange(point.Data, tx.DataChanges.Count - point.Data);
+            foreach (var pair in point.LegacyAt)
+                if (_slots.TryGetValue(pair.Key, out var slot)) tail.DataChanges.Add(new DataRecord { Key = pair.Key, Zone = slot.Zone, Before = pair.Value });
+            Revert(tail, "부분 취소");
+            tx.SealedMirrored = tx.Mirrored.Count;
         }
 
         // 행동 실행 중 예외가 나면 진행 중이던 변화를 모두 되돌린다(원자성).

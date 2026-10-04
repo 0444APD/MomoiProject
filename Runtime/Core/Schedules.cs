@@ -9,8 +9,8 @@ namespace GBible
     //   이벤트: Game.ScheduleOn<TurnEnded>(3, new Explode { … })        — TurnEnded를 3번 받은 순간, 그 행동 안에서 실행
     // 넘긴 행동은 예약에 맡긴다: 대상 필드(id가 있는 객체)는 id만 남겨 저장하고, 실행할 때 지금 데이터의 객체로 다시 찾는다.
     // 대상이 그때 없으면(죽은 적) 실행하지 않고 지운다. 시간 예약이 실패하면 기록에 남기고 지운다(매 프레임 다시 시도하지 않게).
-    // 이벤트 예약은 그 이벤트를 쏜 행동의 일부로 돈다(같이 Undo된다). 이벤트를 받는 쪽의 오류처럼, 실패하면 타임라인에 오류로 남고
-    // 그 행동은 계속된다(실패 전까지 바꾼 것은 남는다). 그래서 예약된 행동은 실패할 일(모자란 비용 등)을 먼저 확인하고 고친다.
+    // 이벤트 예약은 그 이벤트를 쏜 행동의 일부로 돈다(같이 Undo된다). 실패하면 그 예약이 바꾼 것만 되돌리고(저장점) 타임라인에 경고를 남기며,
+    // 이벤트를 쏜 행동은 계속된다.
     // 기획자가 DB에서 쓰는 지연 효과("3턴 뒤 폭발")는 상태 효과의 '끝날 때 결과'로 만든다.
     [Serializable]
     public sealed class ScheduledAction
@@ -128,7 +128,16 @@ namespace GBible
                     }
                 });
             }
-            foreach (var item in due) Run(item);
+            foreach (var item in due)
+            {
+                var point = _session.Data.Mark();
+                try { Run(item); }
+                catch (Exception e)
+                {
+                    _session.Data.RollbackTo(point);
+                    _session.Journal.Append(JournalKind.Warning, "Schedule", $"예약 실행이 실패해 그 예약이 바꾼 것만 되돌렸습니다: {item.action?.Describe()} — {e.Message}");
+                }
+            }
         }
 
         // 프레임 끝(행동 밖): 시간이 된 예약을 하나씩 행동으로 실행한다.

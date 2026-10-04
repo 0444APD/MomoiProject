@@ -139,6 +139,38 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 하나만_뽑기는_개수가_많은_항목이면_표마다_한_번_알린다()
+        {
+            var table = new WeightTableDefinition { Id = "coins" };
+            table.Entries.Add(new WeightEntry { item = "coin", weight = 1, minCount = 3, maxCount = 3 });
+            _session.Tables.Define(table);
+            string first = null;
+            Game.Do(new Edit { run = g => { first = g.Roll("coins"); g.Roll("coins"); } });
+            Assert.AreEqual("coin", first);
+            Assert.AreEqual(1, _session.Journal.Entries.Count(e => e.Message.Contains("첫 ID만 돌려줍니다")));
+        }
+
+        public sealed class Never : SimpleCondition
+        {
+            protected override bool Check() => false;
+        }
+
+        [Test]
+        public void 쓸_수_없을_때_글은_항목마다_정한다()
+        {
+            _session.Abilities.Define(new AbilityDefinition
+            {
+                Id = "heal",
+                When = new AllTrigger { triggers = { new UseTrigger(), new ConditionTrigger { condition = new Never() } } },
+                FailText = "체력이 가득 차서 {ability}을(를) 쓸 수 없습니다.",
+            });
+            Assert.IsFalse(Game.CanUse("heal", null, out var reason));
+            Assert.AreEqual("체력이 가득 차서 heal을(를) 쓸 수 없습니다.", reason);
+            var e = Assert.Throws<GameFailure>(() => Game.Use("heal", null));
+            Assert.AreEqual(reason, e.Message);
+        }
+
+        [Test]
         public void 표끼리_돌면_알린다()
         {
             _session.Tables.Define(Table("a", 0, ("b", 1)));

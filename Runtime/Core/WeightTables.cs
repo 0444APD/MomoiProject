@@ -46,6 +46,18 @@ namespace GBible
         }
 
         public bool Has(string id) => id != null && _tables.ContainsKey(id);
+
+        readonly HashSet<string> _warnedSingle = new HashSet<string>(StringComparer.Ordinal);
+
+        // 하나만 뽑기(Game.Roll(id)): 개수가 2 이상인 항목이 나오면 첫 ID만 돌려주고, 표마다 한 번 경고한다.
+        public string RollOne(string id)
+        {
+            var rolled = Roll(id);
+            if (rolled.Count > 1 && _warnedSingle.Add(id))
+                _session.Journal.Append(JournalKind.Warning, "Tables",
+                    $"가중치 표 '{id}'에서 개수가 2 이상인 항목이 나와 Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요.");
+            return rolled.FirstOrDefault();
+        }
         public WeightTableDefinition Find(string id) => id != null && _tables.TryGetValue(id, out var t) ? t : null;
 
         // count번 뽑는다. unique면 한 번 나온 항목은 다시 후보가 되지 않는다(후보가 모자라면 있는 만큼만).

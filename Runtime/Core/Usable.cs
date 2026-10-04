@@ -26,11 +26,12 @@ namespace GBible
 #endif
         [FieldLabel("결과"), OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded)]
         public List<Outcome> then = new List<Outcome>();
+        [FieldLabel("쓸 수 없을 때 글(텍스트 키 또는 글, 비우면 기본 글)")] public string failText = "";
 
         // Game.Use로 쓰는 능력 정의(ID = 인스턴스 ID).
         public AbilityDefinition ToDefinition(string id, string displayName = null)
         {
-            var definition = new AbilityDefinition { Id = id, DisplayName = displayName ?? id, When = when };
+            var definition = new AbilityDefinition { Id = id, DisplayName = displayName ?? id, When = when, FailText = failText };
             definition.Outcomes.AddRange(then.Where(o => o != null));
             return definition;
         }

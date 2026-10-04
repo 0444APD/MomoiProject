@@ -14,13 +14,15 @@ namespace GBible.Data
         [FieldLabel("트리거"), SerializeReference, TriggerSlot(TriggerKinds.Use | TriggerKinds.Condition)] public Trigger trigger = new UseTrigger();
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded)]
         public List<Outcome> outcomes = new List<Outcome>();
+        [FieldLabel("쓸 수 없을 때 글"), Tooltip("사용 조건이 맞지 않을 때 플레이어에게 보일 글. 텍스트 키(fail.needEnergy)면 번역된 글, 아니면 그 글 그대로({ability}·{condition} 틀). 비우면 기본 글")]
+        public string failText = "";
         // 예전 저장 형식(대상·효과). DB를 열면 결과의 "대상에게 효과" 하나로 옮겨진다.
         [HideInInspector, SerializeReference] public List<TargetSelector> targets = new List<TargetSelector>();
         [HideInInspector, SerializeReference] public List<Effect> effects = new List<Effect>();
 
         public AbilityDefinition ToDefinition()
         {
-            var definition = new AbilityDefinition { Id = Id, DisplayName = DisplayName, When = trigger };
+            var definition = new AbilityDefinition { Id = Id, DisplayName = DisplayName, When = trigger, FailText = failText };
             definition.Outcomes.AddRange(outcomes.Where(o => o != null));
             foreach (var target in targets) if (target != null) definition.Targets.Add(target);
             foreach (var effect in effects) if (effect != null) definition.Effects.Add(effect);

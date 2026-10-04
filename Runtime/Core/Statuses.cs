@@ -10,6 +10,7 @@ namespace GBible
     //   지속: 영구 / 이벤트 N회(예: 턴 끝 3번) / 게임 시간 N초. 끝나면 '끝날 때 결과'(지연 효과 "3턴 뒤 폭발"도 이것으로).
     //   걸려 있는 동안: 능력치 Modifier(중첩당 값, 출처 = 걸린 것 하나의 id), 그리고 트리거(이벤트 받기·가로채기 …)로 발동하는 결과.
     //     가진 쪽 필드: 이벤트·의도의 그 필드가 가진 쪽 id일 때만 발동한다(예: DamageIntent.targetId → "내가 맞을 때만").
+    //     트리거 안의 조건도 가진 쪽마다 따로 검사한다(조건 Block의 Context.User = 가진 쪽 → "가진 쪽 체력이 절반 이하일 때").
     //   결과의 컨텍스트: User = 가진 쪽 객체, Owner = 상태 효과 ID. 중첩 수는 Game.StatusStacks(c.User, c.Owner).
     // 같은 이벤트가 결과 발동과 횟수 줄이기를 둘 다 하면 결과가 먼저다("턴 끝마다 피해 1, 3턴" = 피해 3번 뒤 끝).
     // 모두 플레이어 데이터라 Undo·저장·멀티 그대로다. 가진 쪽이 데이터에서 사라지면 그 상태 효과도 정리된다.
@@ -115,7 +116,7 @@ namespace GBible
             var owner = "status:" + definition.Id;
             _session.Triggers.Unregister(owner);
             if (definition.When != null)
-                _session.Triggers.Register(owner, definition.When, repeat: true, fire: moment => FireFor(definition, moment));
+                _session.Triggers.Register(owner, definition.When, repeat: true, fire: moment => FireFor(definition, moment), holders: moment => HoldersFor(definition, moment));
         }
 
         // ── 걸기·풀기 ─────────────────────────────────────────
@@ -243,20 +244,22 @@ namespace GBible
 
         // ── 걸려 있는 동안의 발동 ───────────────────────────────
 
-        void FireFor(StatusDefinition definition, TriggerContext moment)
+        // 트리거를 가진 쪽마다 검사한다(TriggerSystem이 User = 가진 쪽으로 트리거 전체를 검사): 걸려 있고, 가진 쪽 필드가 맞는 대상만.
+        IEnumerable<object> HoldersFor(StatusDefinition definition, TriggerContext moment)
         {
             foreach (var active in Current().Where(s => s.status == definition.Id).ToList())
             {
-                var holder = _session.Game.Find(active.target);
-                if (holder == null)
-                {
-                    Drop(active);
-                    continue;
-                }
                 if (!string.IsNullOrEmpty(definition.HolderField) && FieldText(moment.Event, definition.HolderField) != active.target) continue;
-                Run(definition, active, definition.Outcomes, holder, moment.Event, moment.IsIntercept, "Status");
-                if (moment.IsIntercept && Intents.IsCancelled(moment.Event)) break;
+                var holder = _session.Game.Find(active.target);
+                if (holder != null) yield return holder;
             }
+        }
+
+        void FireFor(StatusDefinition definition, TriggerContext moment)
+        {
+            var holderId = moment.User == null ? null : GameApi.IdOf(moment.User);
+            var active = Current().FirstOrDefault(s => s.status == definition.Id && s.target == holderId);
+            if (active != null) Run(definition, active, definition.Outcomes, moment.User, moment.Event, moment.IsIntercept, "Status");
         }
 
         void Run(StatusDefinition definition, ActiveStatus active, List<Outcome> outcomes, object holder, object evt, bool intercept, string source)

@@ -180,6 +180,28 @@ namespace GBible.Tests
             Assert.AreEqual(20, Foe.hp);
         }
 
+        // 조건: 가진 쪽(컨텍스트의 사용자) 체력이 20 미만.
+        public sealed class HolderLowHp : SimpleCondition
+        {
+            protected override bool Check() => Context?.User is SsUnit unit && unit.hp < 20;
+        }
+
+        [Test]
+        public void 트리거_안의_조건은_가진_쪽마다_검사한다()
+        {
+            var rally = new StatusDefinition
+            {
+                Id = "rally",
+                When = new AllTrigger { triggers = { new EventTrigger { eventType = typeof(SsTurnEnded).FullName }, new ConditionTrigger { condition = new HolderLowHp() } } },
+            };
+            rally.Outcomes.Add(new Hurt { amount = -5 });   // 회복 5
+            _session.Statuses.Define(rally);
+            Do(g => { g.ApplyStatus(Hero, "rally"); g.ApplyStatus(Foe, "rally"); Foe.hp = 10; });
+            TurnEnd("hero");
+            Assert.AreEqual(30, Hero.hp, "체력이 많은 쪽은 발동하지 않는다");
+            Assert.AreEqual(15, Foe.hp, "체력이 적은 쪽만");
+        }
+
         [Test]
         public void 풀면_끝날_때_결과가_돌지_않는다()
         {
@@ -250,6 +272,66 @@ namespace GBible.Tests
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(30, Hero.hp);
             Assert.AreEqual(1, _session.Schedules.All.Single().remaining, "Undo하면 예약이 남은 횟수 1로 돌아온다");
+        }
+
+        // 체력을 깎은 뒤 실패하는 행동.
+        [Serializable]
+        public sealed class SmiteThenFail : GameAction
+        {
+            public SsUnit unit;
+            protected override void Run()
+            {
+                unit.hp -= 9;
+                throw new InvalidOperationException("일부러 실패");
+            }
+        }
+
+        [Test]
+        public void 이벤트_예약이_실패하면_그_예약이_바꾼_것만_되돌린다()
+        {
+            var hero = Hero;
+            Do(g => g.ScheduleOn<SsTurnEnded>(1, new SmiteThenFail { unit = hero }));
+            Do(g =>
+            {
+                g.Find<SsUnit>("foe").hp -= 4;                              // 예약 앞의 변경
+                g.Session.Events.Publish(new SsTurnEnded { unit = "hero" }); // 예약이 돌다가 실패
+                g.Find<SsUnit>("foe").hp -= 1;                              // 예약 뒤의 변경
+            });
+            Assert.AreEqual(30, Hero.hp, "실패한 예약의 변경만 되돌아간다");
+            Assert.AreEqual(25, Foe.hp, "이벤트를 쏜 행동의 다른 변경은 남는다");
+            Assert.AreEqual(0, _session.Schedules.All.Count);
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Message.Contains("그 예약이 바꾼 것만 되돌렸습니다")));
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(30, Foe.hp, "그 행동을 Undo하면 나머지도 돌아간다");
+            Assert.AreEqual(30, Hero.hp);
+            Assert.AreEqual(1, _session.Schedules.All.Count, "예약도 돌아온다");
+        }
+
+        // 비교 코드가 없는(예전 방식) 데이터.
+        public class SsLegacyBag { public int coins = 10; }
+
+        public sealed class SpendThenFail : GameAction
+        {
+            protected override void Run()
+            {
+                Game.Session.Data.Modify<SsLegacyBag>("bag", b => b.coins -= 3);
+                throw new InvalidOperationException("일부러 실패");
+            }
+        }
+
+        [Test]
+        public void 예전_방식_데이터도_저장점까지만_되돌린다()
+        {
+            _session.Data.Define("bag", DataZone.Session, new SsLegacyBag(), "주머니");
+            Do(g => g.ScheduleOn<SsTurnEnded>(1, new SpendThenFail()));
+            Do(g =>
+            {
+                g.Session.Data.Modify<SsLegacyBag>("bag", b => b.coins -= 1);   // 저장점 앞
+                g.Session.Events.Publish(new SsTurnEnded { unit = "hero" });
+            });
+            Assert.AreEqual(9, _session.Data.Get<SsLegacyBag>("bag").coins);
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(10, _session.Data.Get<SsLegacyBag>("bag").coins);
         }
 
         [Test]

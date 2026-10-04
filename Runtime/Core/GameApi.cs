@@ -204,7 +204,7 @@ namespace GBible
         public double Balance(string id, double x) => Session.Balance.Get(id, x);
 
         // 가중치 표(DB › 가중치 표)에서 뽑는다(행동 안에서). 하나: 항목 ID(꽝이면 null). 여럿: unique면 서로 다른 것.
-        public string Roll(string tableId) => Session.Tables.Roll(tableId).FirstOrDefault();
+        public string Roll(string tableId) => Session.Tables.RollOne(tableId);
         public List<string> Roll(string tableId, int count, bool unique = false) => Session.Tables.Roll(tableId, count, unique);
 
         // ── 미리보기 ───────────────────────────────────────────
