@@ -51,6 +51,52 @@ namespace GBible
             }
         }
 
+        // 저장용(예약에 맡길 때): 참조 필드를 id만 든 같은 형식의 객체로 바꾼다 — 데이터 안의 객체를 다른 저장 칸에 끌어들이지 않게.
+        // 실행할 때 Resolve가 id로 지금 객체를 다시 찾는다.
+        public static void Detach(GameAction action)
+        {
+            if (action == null) return;
+            foreach (var field in PlanOf(action.GetType()))
+            {
+                var value = field.Access?.Get(action);
+                if (value == null) continue;
+                if (!field.Many) { field.Access.Set(action, Stub(value)); continue; }
+                if (value is Array array)
+                {
+                    var copy = Array.CreateInstance(field.ElementType, array.Length);
+                    for (int i = 0; i < array.Length; i++) copy.SetValue(array.GetValue(i) is { } item ? Stub(item) : null, i);
+                    field.Access.Set(action, copy);
+                }
+                else if (value is IList list && DataModel.Create(field.FieldType) is IList fresh)
+                {
+                    foreach (var item in list) fresh.Add(item == null ? null : Stub(item));
+                    field.Access.Set(action, fresh);
+                }
+            }
+        }
+
+        // 참조 필드가 가리키는 객체가 지금 데이터에 모두 있는가(예약을 실행해도 되는가).
+        public static bool CanResolve(GameAction action, GameApi game)
+        {
+            if (action == null || game == null) return false;
+            foreach (var field in PlanOf(action.GetType()))
+            {
+                var value = field.Access?.Get(action);
+                if (value == null) continue;
+                var items = field.Many ? ((IEnumerable)value).Cast<object>() : new[] { value };
+                foreach (var item in items)
+                    if (item != null && game.Find(field.ElementType, SafeId(item)) == null) return false;
+            }
+            return true;
+        }
+
+        static object Stub(object item)
+        {
+            var stub = DataModel.Create(item.GetType());
+            GameApi.SetId(stub, GameApi.IdOf(item));
+            return stub;
+        }
+
         // 참조 필드의 (필드 이름, id) — 타임라인 글·전송용.
         public static IEnumerable<(string field, string id)> Ids(GameAction action)
         {

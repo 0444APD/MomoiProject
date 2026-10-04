@@ -90,7 +90,7 @@ namespace GBible
             var target = Resolve(entity, out var id);
             if (target != null && !IsNumericField(target.GetType(), attribute))
                 throw new InvalidOperationException($"[MomoiProject] {target.GetType().Name}에 숫자 필드 '{attribute}'가 없어 Modifier를 붙일 수 없습니다.");
-            var modifier = new Modifier { id = _session.Game.NewId("mod"), target = id, attribute = attribute, kind = kind, value = value, source = source ?? "" };
+            var modifier = new Modifier { id = _session.Game.NewId("$mod"), target = id, attribute = attribute, kind = kind, value = value, source = source ?? "" };
             var key = Ensure(permanent);
             _session.Data.Modify<ModifierList>(key, list => list.items.Add(modifier));
             _index = null;   // 같은 행동 안에서 바로 읽어도 보이게(저장소의 Changed는 Sync 때 온다)
@@ -124,13 +124,22 @@ namespace GBible
             var removed = 0;
             foreach (var key in new[] { SessionKey, MetaKey })
             {
-                if (!_session.Data.IsDefined(key)) continue;
+                if (!Exists(key)) continue;
                 var list = _session.Data.Get<ModifierList>(key);
                 if (list == null || !list.items.Any(match)) continue;
                 _session.Data.Modify<ModifierList>(key, l => removed += l.items.RemoveAll(m => match(m)));
                 _index = null;
             }
             return removed;
+        }
+
+        // 등록돼 있거나, 불러온 저장의 값이 기다리고 있으면(지금 등록한다) 참.
+        bool Exists(string key)
+        {
+            if (_session.Data.IsDefined(key)) return true;
+            if (!_session.Data.IsPending(key)) return false;
+            Ensure(key == MetaKey);
+            return true;
         }
 
         string Ensure(bool permanent)
@@ -147,7 +156,7 @@ namespace GBible
             var index = new Dictionary<(string, string), List<Modifier>>();
             foreach (var key in new[] { SessionKey, MetaKey })
             {
-                if (!_session.Data.IsDefined(key)) continue;
+                if (!Exists(key)) continue;
                 var list = _session.Data.Get<ModifierList>(key);
                 if (list == null) continue;
                 foreach (var m in list.items)

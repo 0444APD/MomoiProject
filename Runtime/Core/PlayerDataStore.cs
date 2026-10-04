@@ -286,6 +286,10 @@ namespace GBible
 
         public bool IsDefined(string key) => key != null && _slots.ContainsKey(key);
 
+        // 불러온 저장에 값이 있는데 아직 등록되지 않은 키(등록하는 순간 그 값이 적용된다).
+        // 필요할 때 등록하는 라이브러리 키($modifiers·$statuses·$schedule)가 판을 불러온 직후에도 보이게 쓴다.
+        public bool IsPending(string key) => key != null && _preloaded.ContainsKey(key);
+
         public bool IsData(string key) => key != null && _slots.TryGetValue(key, out var slot) && slot.DataType != null;
 
         // 등록된 타입(데이터 값은 클래스·컬렉션 타입, 단순 값은 선언 타입 또는 null).

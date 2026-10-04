@@ -1,0 +1,127 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+namespace GBible.Data
+{
+    // DB › 상태 효과: 독·화상·보호막·"3턴 뒤 폭발" 같은 버프·디버프. 걸기는 효과 Block '상태 효과 걸기' 또는 Game.ApplyStatus.
+    //   중첩·다시 걸 때·지속(영구 / 이벤트 횟수 / 게임 시간)을 정하고,
+    //   걸려 있는 동안: 능력치 보정(중첩당 값) + 트리거(이벤트 받기·조건·가로채기)로 발동하는 결과.
+    //   걸릴 때 결과 / 끝날 때 결과(지속이 다 돼서 끝날 때만. 풀어서 없앨 때는 돌지 않는다).
+    // 결과의 컨텍스트: 사용자(User) = 가진 쪽, Owner = 이 항목 ID. 결과를 코드로 쓰려면 이 ID에 [BindTo](걸려 있는 동안의 결과를 대신한다).
+    [Database("상태 효과", Group = "DB", Order = 35, IdPrefix = "status")]
+    [CreateAssetMenu(menuName = "MomoiProject/상태 효과", fileName = "NewStatus")]
+    public sealed class StatusData : GameData
+    {
+        [FieldLabel("최대 중첩"), Tooltip("0이면 제한 없음")] public int maxStacks = 1;
+        [FieldLabel("다시 걸 때")] public StatusReapply reapply = StatusReapply.AddStacksAndRefresh;
+        [FieldLabel("지속")] public StatusDurationSettings duration = new StatusDurationSettings();
+        [FieldLabel("능력치 보정")] public List<StatusModifier> modifiers = new List<StatusModifier>();
+        [FieldLabel("걸려 있는 동안 트리거"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)]
+        public Trigger trigger;
+        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두"),
+         Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 대상 id → 내가 맞을 때만).")]
+        public string holderField = "";
+        [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
+        [FieldLabel("걸릴 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Event)]
+        public List<Outcome> onApply = new List<Outcome>();
+        [FieldLabel("끝날 때 결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Event)]
+        public List<Outcome> onExpire = new List<Outcome>();
+
+        public StatusDefinition ToDefinition()
+        {
+            var definition = new StatusDefinition
+            {
+                Id = Id, DisplayName = DisplayName, MaxStacks = Math.Max(0, maxStacks), Reapply = reapply,
+                Duration = duration.kind, Length = duration.length, TickEvent = duration.tickEvent, TickHolderField = duration.holderField,
+                When = trigger, HolderField = holderField,
+            };
+            definition.Modifiers.AddRange(modifiers.Where(m => m != null && !string.IsNullOrEmpty(m.attribute)));
+            definition.Outcomes.AddRange(BoundOutcomes.Has(Id) ? BoundOutcomes.Create(Id) : outcomes.Where(o => o != null));
+            definition.OnApply.AddRange(onApply.Where(o => o != null));
+            definition.OnExpire.AddRange(onExpire.Where(o => o != null));
+            return definition;
+        }
+
+        public override void ValidateData(IValidationContext context)
+        {
+            if (duration.kind == StatusDuration.Events)
+            {
+                if (string.IsNullOrEmpty(duration.tickEvent)) context.Error("지속: 횟수를 셀 이벤트를 고르세요.");
+                if (duration.length < 1) context.Error("지속: 횟수는 1 이상이어야 합니다.");
+            }
+            if (duration.kind == StatusDuration.Seconds && duration.length <= 0) context.Error("지속: 시간은 0보다 커야 합니다.");
+            if (duration.kind == StatusDuration.Permanent && onExpire.Count > 0)
+                context.Warning("지속이 영구라 끝날 때 결과가 돌지 않습니다(풀어서 없앨 때는 돌지 않습니다).");
+            foreach (var modifier in modifiers)
+                if (modifier == null || string.IsNullOrWhiteSpace(modifier.attribute)) context.Error("능력치 보정: 능력치(숫자 필드 이름)를 적으세요.");
+            var bound = BoundOutcomes.Has(Id);
+            if (trigger == null && (outcomes.Count > 0 || bound)) context.Warning("걸려 있는 동안 트리거가 없어 결과가 돌지 않습니다.");
+            if (trigger != null)
+            {
+                trigger.Validate(context);
+                if (outcomes.Count == 0 && !bound) context.Warning("트리거가 있는데 결과가 없습니다.");
+            }
+            foreach (var list in new[] { outcomes, onApply, onExpire })
+                foreach (var outcome in list)
+                {
+                    if (outcome == null) context.Error("비어 있는 결과 칸이 있습니다(스크립트가 지워졌을 수 있음).");
+                    else outcome.Validate(context);
+                }
+        }
+    }
+
+    [Serializable]
+    public sealed class StatusDurationSettings
+    {
+        [FieldLabel("방식")] public StatusDuration kind = StatusDuration.Permanent;
+        [FieldLabel("길이"), Tooltip("이벤트 횟수 또는 초")] public double length = 3;
+        [FieldLabel("셀 이벤트"), EventTypeRef, FieldPathRoot(FieldPathRootKind.EventType)] public string tickEvent = "";
+        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두"), Tooltip("이 필드가 가진 쪽 id인 이벤트만 셉니다(예: 턴 끝의 플레이어 id → 내 턴이 끝날 때만).")]
+        public string holderField = "";
+    }
+}
+
+namespace GBible
+{
+    using GBible.Data;
+
+    // 효과 '상태 효과 걸기': 고른 대상마다 상태 효과를 건다. 다시 걸면 그 상태 효과의 '다시 걸 때' 규칙을 따른다.
+    [Serializable]
+    [BlockInfo("상태 효과 걸기", Category = "상태 효과", Description = "대상에게 상태 효과를 겁니다. 이미 걸려 있으면 그 상태 효과의 '다시 걸 때' 규칙(중첩·갱신)을 따릅니다.",
+               Sentence = "{status} {stacks}중첩 걸기")]
+    public sealed class ApplyStatusEffect : Effect
+    {
+        [DataRef(typeof(StatusData)), FieldLabel("상태 효과")] public string status = "";
+        [FieldLabel("중첩")] public int stacks = 1;
+
+        protected override void Apply(object target) => Game.ApplyStatus(target, status, stacks, Use?.Context?.Owner ?? Use?.Ability?.Id);
+
+        public override string Describe() => stacks == 1 ? $"{status} 걸기" : $"{status} {stacks}중첩 걸기";
+
+        public override void Validate(IValidationContext context)
+        {
+            if (string.IsNullOrEmpty(status)) context.Error("상태 효과 걸기: 상태 효과를 고르세요.");
+            if (stacks < 1) context.Error("상태 효과 걸기: 중첩은 1 이상이어야 합니다.");
+        }
+    }
+
+    // 효과 '상태 효과 풀기': 대상의 상태 효과를 푼다(중첩을 적으면 그만큼만 줄인다). 끝날 때 결과는 돌지 않는다.
+    [Serializable]
+    [BlockInfo("상태 효과 풀기", Category = "상태 효과", Description = "대상의 상태 효과를 풉니다. 중첩을 적으면 그만큼만 줄이고, 0이면 통째로 풉니다. 끝날 때 결과는 돌지 않습니다.")]
+    public sealed class RemoveStatusEffect : Effect
+    {
+        [DataRef(typeof(StatusData)), FieldLabel("상태 효과")] public string status = "";
+        [FieldLabel("중첩(0이면 모두)")] public int stacks;
+
+        protected override void Apply(object target) => Game.RemoveStatus(target, status, stacks);
+
+        public override string Describe() => stacks <= 0 ? $"{status} 풀기" : $"{status} {stacks}중첩 풀기";
+
+        public override void Validate(IValidationContext context)
+        {
+            if (string.IsNullOrEmpty(status)) context.Error("상태 효과 풀기: 상태 효과를 고르세요.");
+        }
+    }
+}

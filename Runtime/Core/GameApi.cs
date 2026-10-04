@@ -112,6 +112,13 @@ namespace GBible
             return null;
         }
 
+        // id 필드에 값을 넣는다(id만 든 객체를 만들 때).
+        internal static void SetId(object item, string id)
+        {
+            var member = item == null ? null : IdMember(item.GetType());
+            if (member != null) FieldAccess.Find(item.GetType(), member.Name)?.Set(item, id);
+        }
+
         // 이 형식에 string id(필드·속성)가 있는가(찾거나 가리킬 수 있는 객체인가).
         public static bool HasId(Type type) => type != null && IdMember(type) != null;
 
@@ -158,6 +165,30 @@ namespace GBible
         // 의도를 가로채기 트리거들에 통과시키고 (고쳐진) 의도를 돌려준다. 규칙 함수가 일을 하기 직전에 부른다.
         //   var hit = Game.Intercept(new DamageIntent { … });  if (hit.cancelled) return;
         public T Intercept<T>(T intent) where T : class => Session.Triggers.Intercept(intent);
+
+        // ── 상태 효과 ───────────────────────────────────────────
+        // 상태 효과(DB › 상태 효과)를 건다·푼다(행동 안에서). target = 객체 또는 id. 다시 걸 때는 정의의 규칙(중첩·갱신)을 따른다.
+        //   Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3);
+        public ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null) => Session.Statuses.Apply(target, statusId, stacks, source);
+
+        // stacks를 주면 그만큼 줄이고 0이 되면 푼다. 0이면 통째로 푼다. 푼 것은 '끝날 때 결과'를 돌리지 않는다.
+        public bool RemoveStatus(object target, string statusId, int stacks = 0) => Session.Statuses.Remove(target, statusId, stacks);
+        public int StatusStacks(object target, string statusId) => Session.Statuses.Stacks(target, statusId);
+        public bool HasStatus(object target, string statusId) => Session.Statuses.Stacks(target, statusId) > 0;
+        public IReadOnlyList<ActiveStatus> Statuses(object target) => Session.Statuses.Of(target);
+
+        // ── 예약 ───────────────────────────────────────────────
+        // 행동을 나중에 실행한다(저장·Undo 그대로). 돌려주는 값은 예약 id. 넘긴 행동의 대상 필드는 실행할 때 다시 찾는다.
+        //   Game.ScheduleAfter(2.5, new Explode { target = enemy });     게임 시간 2.5초 뒤
+        //   Game.ScheduleOn<TurnEnded>(3, new Explode { target = enemy }); TurnEnded를 3번 받은 순간
+        public string ScheduleAfter(double seconds, GameAction action, string source = null, bool permanent = false) =>
+            Session.Schedules.After(seconds, action, source, permanent);
+
+        public string ScheduleOn<TEvent>(int count, GameAction action, string source = null, bool permanent = false) =>
+            Session.Schedules.On(typeof(TEvent), count, action, source, permanent);
+
+        public bool CancelSchedule(string id) => Session.Schedules.Cancel(id);
+        public int CancelSchedules(string source) => Session.Schedules.CancelBySource(source);
 
         // ── 비용 ───────────────────────────────────────────────
         // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 InvalidOperationException → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.

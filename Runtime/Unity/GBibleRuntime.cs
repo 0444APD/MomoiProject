@@ -136,7 +136,9 @@ namespace GBible
                 // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
                 options.Migrations.EveryLoad = SavedIdRenames.Build(database);
                 LoadProfile(session);
-                // Game.Use로 쓰는 것: 능력(IUsableData)과, 사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
+                // DB › 상태 효과(Game.ApplyStatus·효과 '상태 효과 걸기').
+                foreach (var status in database.All<StatusData>()) session.Statuses.Define(status.ToDefinition());
+                // Game.Use로 쓰는 것: 능력(IUsableData)과,사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
                 foreach (var usable in database.Entries.OfType<IUsableData>())
                     if (usable.ToUsable() is AbilityDefinition definition) session.Abilities.Define(definition);
                 foreach (var instance in database.All<InstanceData>())
