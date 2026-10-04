@@ -1,6 +1,6 @@
 # 11. Trigger와 조건
 
-**한 줄 요약**: Trigger는 "언제 발동하는가"를 정하는 칸이다. 잎(이벤트 받기 · 조건 충족 · 사용)을 `&& AND` · `|| OR` · `! NOT`과 괄호로 중첩해 만든다. 로그·도전과제·능력·사용 기능·프로젝트가 만든 기능(퀘스트 등)이 모두 같은 Trigger 칸을 쓰고, 기능마다 고를 수 있는 잎의 종류만 다르다.
+**한 줄 요약**: Trigger는 "언제 발동하는가"를 정하는 칸이다. 잎(이벤트 받기 · 조건 충족 · 사용 · 가로채기)을 `&& AND` · `|| OR` · `! NOT`과 괄호로 중첩해 만든다. 로그·도전과제·능력·사용 기능·프로젝트가 만든 기능(퀘스트 등)이 모두 같은 Trigger 칸을 쓰고, 기능마다 고를 수 있는 잎의 종류만 다르다.
 
 **언제 쓰는가**
 
@@ -15,7 +15,7 @@
 | Trigger | 언제 발동하는지를 담은 나무. 코드 형식 `Trigger`(추상)와 그 잎·논리 클래스. |
 | Outcome | 발동했을 때 무엇을 하는지(결과). Trigger와 짝을 이룬다(→ `12-Outcomes.md`). |
 | Block | 에디터에서 골라 조립하는 로직 단위. 조건 Block(`Condition`), 결과 Block(`Reward`), 효과 Block(`Effect`), 대상 Block(`TargetSelector`)이 있다. |
-| 순간 | Trigger를 검사하는 한 시점. 이벤트를 받은 순간, 값이 바뀐 순간, 사용하는 순간 중 하나다. |
+| 순간 | Trigger를 검사하는 한 시점. 이벤트를 받은 순간, 값이 바뀐 순간, 사용하는 순간, 가로채는 순간(의도가 지나는 순간) 중 하나다. |
 | TriggerContext (컨텍스트) | 그 순간의 정보: 이벤트, 사용자, 고른 대상, 이 Trigger를 가진 항목 ID. 조건과 결과가 읽는다. |
 | 값 조건 (ValueFilter) | 어떤 객체(이벤트, 플레이어 데이터 값, 리스트 항목)를 뿌리로 두고 필드를 비교하는 식. |
 
@@ -28,6 +28,7 @@
 | 잎 | 이벤트 받기 | `EventTrigger` | 고른 이벤트를 받은 그 순간, 값 조건(`filter`)도 참일 때 |
 | 잎 | 조건 충족 | `ConditionTrigger` | 안의 조건 Block(`condition`)이 그 순간 참일 때 |
 | 잎 | 사용 | `UseTrigger` | `Game.Use`로 쓰는 순간 |
+| 잎 | 가로채기 | `InterceptTrigger` | 고른 의도가 `Game.Intercept`를 지나는 순간(일이 일어나기 직전), 의도 조건(`filter`)도 참일 때(→ `28-Attributes-Intercepts.md`) |
 | 논리 | `&& AND` | `AllTrigger` | 안의 것(`triggers`)이 **같은 순간에** 모두 참 |
 | 논리 | `\|\| OR` | `AnyTrigger` | 안의 것 중 하나가 참 |
 | 논리 | `! NOT` | `NotTrigger` | 안의 것(`trigger`)이 거짓 |
@@ -37,6 +38,7 @@
 - 이벤트 받기는 **그 이벤트를 받은 순간에만** 참이다. 다른 순간(값이 바뀐 순간, 다른 이벤트를 받은 순간)에는 거짓이다.
 - 조건 충족은 검사하는 순간의 값으로 판정한다. 조건이 읽는 값이 바뀔 때마다 이벤트 없는 순간으로 다시 검사된다.
 - 그래서 `보스 처치 받기 AND 골드 100 이상` = "골드가 100 이상인 상태에서 보스 처치를 받은 순간"이다. 골드가 나중에 100이 되어도 그 순간에는 이벤트가 없으므로 발동하지 않는다.
+- 가로채기는 그 의도가 지나는 순간에만 참이다. 조건 충족과 `AND`로 묶으면 "그 상태일 때만 가로챈다"가 된다. 결과의 `의도 고치기`가 그 의도를 바꾸거나 막는다.
 - `OR`는 먼저 참이 되는 쪽에서 발동한다.
 - 조건만으로 된 Trigger는 거짓 → 참이 되는 순간 발동한다. 반복하는 기능(로그, `repeat: true`)이면 다시 거짓이 된 뒤에 참이 될 때 또 발동한다(참인 동안 계속 발동하지 않는다).
 - 서로 다른 이벤트 받기 둘을 `AND`로 묶으면 같은 순간에 오지 않으므로 발동하지 않는다. 검증이 경고한다.
@@ -50,7 +52,7 @@
 | 도전과제(`AchievementData.trigger`) | 이벤트 받기 · 조건 충족 |
 | 능력(`AbilityData.trigger`, 기본 `사용`) | 사용 · 조건 충족 |
 | 사용 기능(`Usable.when`, 기본 `사용`) | 사용 · 조건 충족 |
-| 프로젝트 기능 | 필드의 `[TriggerSlot]`이 정한다(5장) |
+| 프로젝트 기능 | 필드의 `[TriggerSlot]`이 정한다(5장). 가로채기는 기본 기능 칸에는 없고, 잠금에 `Intercept`를 넣은 프로젝트 기능(유물 등)에서 고른다 |
 
 ---
 
@@ -62,7 +64,7 @@ DB 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 �
 
 1. 칸이 비어 있으면 "트리거 없음 — 아래에서 블럭을 더하세요"가 보인다.
 2. **`+ 블럭`**을 누르면 목록이 뜬다. 칸의 잠금에 있는 것만 나온다.
-   - 그룹 **트리거**: `이벤트 받기`, `사용`
+   - 그룹 **트리거**: `이벤트 받기`, `사용`, `가로채기`(칸이 허락할 때)
    - 그룹 **조건 충족 · 분류**: 조건 Block들(`비교`, `플레이어 데이터 검사`, `도전과제 달성`, 프로젝트가 만든 조건 Block). 고르면 조건 충족 잎으로 감싸 넣고, 식 안에서는 조건 Block 그대로 그린다.
 3. 더한 블럭은 식 끝에 붙고, 앞 항과는 `AND`로 이어진다.
 
@@ -93,6 +95,16 @@ DB 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 �
 | (프로젝트 조건) | `[BlockInfo]`의 분류 | `SimpleCondition` 상속 | `[BlockInfo]`의 문장 | 코드로 쓴 조건(4장) |
 
 도전과제·능력은 DB 상세 위쪽 요약에 "트리거 …" 한 줄이 자연어로 보인다(로그는 "반영 …" 줄). **Alt**를 누르고 있으면 코드 형태(`on 유닛 처치 where combo >= 10 && …`)로 바뀐다. 문제가 있으면 검증 오류가 빨간 글씨로 뜨고, 오류가 있으면 빌드가 막힌다.
+
+### 2-5. 가로채기 블럭
+
+칸의 잠금에 가로채기가 있을 때만 `+ 블럭` 목록에 나온다(기본 기능 칸에는 없다).
+
+1. 블럭 문장 `{intentType} 가로채기`의 의도 칸을 눌러 의도(`[Intent]`가 붙은 클래스, 기본 제공 `비용 지불`)를 고른다.
+2. `filter`(툴팁 "의도 조건")는 이벤트 조건과 같은 식이다. 뿌리는 고른 의도다(예: `targetId` 일치 `hero`).
+3. `order`(툴팁 "순서(작을수록 먼저)"): 같은 의도에 여럿이 걸렸을 때의 차례. 같으면 등록 순서.
+
+결과에는 `의도 고치기`(필드 · 방법 · 값)를 둔다. 의도·규칙 함수 쪽 코드와 예제(받는 피해 −5, 죽음 막기, 비용 0)는 `28-Attributes-Intercepts.md` 3-3·5장.
 
 ---
 
@@ -241,7 +253,8 @@ public class KillerIsAlly : SimpleCondition
 | `Session` | 세션 |
 | `Game` | `Session.Game` |
 | `Owner` | 이 Trigger를 가진 항목의 ID(로그·도전과제·능력 …) |
-| `Event` | 이벤트를 받은 순간이면 그 이벤트, 아니면 `null` |
+| `Event` | 이벤트를 받은 순간이면 그 이벤트, 가로채기 순간이면 그 의도, 아니면 `null` |
+| `IsIntercept` | 가로채기 순간이면 `true`(→ `28-Attributes-Intercepts.md`) |
 | `IsUse` | 사용하는 순간이면 `true` |
 | `User` | 사용자(사용하는 순간) |
 | `Picked` | 플레이어가 고른 대상들(사용하는 순간, 없으면 빈 리스트) |
@@ -316,8 +329,8 @@ Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필�
 
 | 어트리뷰트 | 인자 | 뜻 |
 |---|---|---|
-| `[TriggerSlot(TriggerKinds)]` | `Event`·`Condition`·`Use`·`All`을 `\|`로 | `+ 블럭` 목록과 검증이 이 종류만 허락 |
-| `[OutcomeSlot(OutcomeKinds)]` | `Record`·`PlayerData`·`Coded`·`Targeted`·`All` | `+ 결과 추가` 목록과 검증이 이 종류만 허락 |
+| `[TriggerSlot(TriggerKinds)]` | `Event`·`Condition`·`Use`·`Intercept`(가로채기)·`All`을 `\|`로 | `+ 블럭` 목록과 검증이 이 종류만 허락 |
+| `[OutcomeSlot(OutcomeKinds)]` | `Record`·`PlayerData`·`Coded`·`Targeted`·`Event`·`Intent`(의도 고치기)·`All` | `+ 결과 추가` 목록과 검증이 이 종류만 허락 |
 | `Fixed = true` | (OutcomeSlot) | 결과가 그 종류 하나로 고정. 비어 있으면 하나를 자동으로 두고 세부 칸만 고친다(추가·삭제 없음) |
 
 - `Trigger` 필드, `List<Outcome>` 필드에 직접 붙이거나, `List<TriggerRule>` 필드에 붙이면 규칙마다의 `when`·`then`에 적용된다.
@@ -335,7 +348,7 @@ Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필�
 
 ### 6-2. 사슬 한도
 
-결과가 이벤트를 쏘고, 그 이벤트가 다시 Trigger를 발동하는 사슬은 깊이 16(`TriggerSystem.MaxDepth`)에서 끊긴다. Journal에 "트리거 사슬이 16단계를 넘어 끊었습니다(…). 결과가 자기 트리거의 이벤트를 다시 쏘는지 확인하세요." 경고가 남는다. 예외는 던지지 않는다.
+결과가 이벤트를 쏘고, 그 이벤트가 다시 Trigger를 발동하는 사슬은 깊이 16(`TriggerSystem.MaxDepth`)에서 끊긴다. Journal에 "트리거 사슬이 16단계를 넘어 끊었습니다(…). 결과가 자기 트리거의 이벤트를 다시 쏘는지 확인하세요." 경고가 남는다. 예외는 던지지 않는다. 가로채기 사슬도 같은 깊이를 센다(→ `28-Attributes-Intercepts.md` 2-3).
 
 ### 6-3. 진행도
 
@@ -350,6 +363,7 @@ Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필�
 | `RunOutcomes(IEnumerable<Outcome>, TriggerContext, string source)` | 결과를 차례로 실행한다. `source`는 Journal의 출처 글자 |
 | `CanUse(owner, when, user, picked, out TriggerContext)` | 사용하는 순간으로 검사(아무것도 바꾸지 않는다) |
 | `Test(Trigger, TriggerContext)` | 그 순간으로 검사 |
+| `Intercept<T>(T intent)` | 의도를 가로채기 잎들에 순서대로 통과시키고 돌려준다(= `Game.Intercept`, → `28-Attributes-Intercepts.md` 4-8) |
 | `Current` | 지금 검사·발동 중인 순간(밖에서는 `null`) |
 | `Watcher` / `Flush()` | 조건 감시기 / 다시 평가 |
 | `MaxDepth` | 사슬 한도(16) |

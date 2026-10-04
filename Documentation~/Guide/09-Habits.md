@@ -22,11 +22,16 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 - 데이터는 평범한 `[Serializable]` 클래스, 목록은 `List`·배열·`Dictionary`.
 - 값은 그냥 대입한다(`hero.hp -= 5;`). "바뀌었다"고 알리는 호출은 없다.
 - 여러 곳에서 쓰는 규칙은 static 함수로 두고, `GameApi game`을 매개변수로 받는다.
+- **규칙 함수에 가로채기 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 의도를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
 
 ```csharp
 public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
 {
     if (target == null || target.IsDead || amount <= 0) return;
+    // 가로채기 자리: 유물·상태 효과가 피해를 바꾸거나 막을 수 있다(기믹이 늘어도 이 함수는 그대로).
+    var intent = game.Intercept(new DamageIntent { sourceId = source?.id, targetId = target.id, amount = amount });
+    if (intent.cancelled || intent.amount <= 0) return;
+    amount = intent.amount;
     var blocked = Math.Min(target.block, amount);
     target.block -= blocked;
     var dealt = amount - blocked;
@@ -43,6 +48,25 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 > | 값을 바꾼다 | `hero.hp -= 5;` 그대로 | 값을 바꿀 때마다 "바뀌었다"고 알리는 호출 |
 > | 규칙이 여러 곳에서 쓰인다 | static 함수(카드 던전의 `Rules`)나 `GameApi` 확장 메서드 | 상태를 들고 있는 매니저 싱글턴 |
 > | 에디터 표시를 바꾼다 | 어트리뷰트(`[Hide]`·`[ShowIf]`·`[Keyword]`·`[BlockInfo]`) | 커스텀 인스펙터 |
+> | 핵심 규칙(피해·회복·죽음·비용·뽑기)을 쓴다 | 일을 하기 직전에 `Game.Intercept` 자리를 둔다 | 새 기믹이 생길 때마다 규칙 함수에 `if (hasThornArmor) …`를 더하기 |
+
+> [!note]- 왜 가로채기 자리를 미리 두나
+> 이벤트(`DamageDealt`)는 일이 일어난 **뒤**에 온다. "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0"처럼 **일을 고치는 효과**는 일이 일어나기 **직전**에 끼어들어야 한다. 자리를 미리 뚫어 두면 이런 기믹을 기획 단계에서 미리 알 필요가 없다. 기획자가 DB에 유물을 더하고(트리거 `가로채기` + 결과 `의도 고치기`), 규칙 함수는 그대로다.
+> - 의도는 프로젝트가 정하는 작은 클래스다. 막을 수 있게 하려면 `cancelled`를 둔다.
+> ```csharp
+> [Serializable, Intent("피해")]
+> public class DamageIntent
+> {
+>     public string sourceId;
+>     public string targetId;
+>     public int amount;
+>     public bool cancelled;
+> }
+> ```
+> - 가로채는 항목이 없으면 `Game.Intercept`는 바로 돌아온다. 자리를 두는 비용은 거의 없다.
+> - 행동 안에서 돌므로 Undo·저장·멀티플레이가 그대로다. 가로채는 쪽은 되도록 의도만 고친다(체력 같은 값은 규칙 함수가 바꾼다).
+> - 원래 인자가 아니라 돌려받은 의도(`intent.amount`)로 일을 한다. 원래 값을 쓰면 가로채기가 무시된다.
+> - 예: [04장](04-AddingContent.md) 9절 가시 갑옷. 자세히: 매뉴얼 [28장](../Manual/28-Attributes-Intercepts.md) 2-3·5장.
 
 > [!note]- 왜 `game`을 매개변수로 받나
 > 카드 던전의 `Rules.Damage`는 행동·Block·`[BindTo]` 함수가 모두 부른다. `game`을 받으므로 어느 세션에서 불려도 그 세션의 값만 만진다. 서버는 매치마다 세션을 만들므로, static 변수나 `GBibleRuntime.Game`에 기대면 다른 세션을 건드린다.
@@ -265,6 +289,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
+- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.

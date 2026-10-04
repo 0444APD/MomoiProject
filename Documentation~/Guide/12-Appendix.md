@@ -369,6 +369,7 @@ static void Started(GameSession session)
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
+- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
@@ -715,6 +716,18 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `[BindTo]` + `Reward` 클래스 | 13 | 12 §3-2 |
 | `BoundOutcomes.Has`·`Create` | 13 · 17 | 04 §8 |
 | `BoundOutcomes.Problems` | 13 | 12 §3-2 |
+
+### 능력치·가로채기·비용
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| 능력치(숫자 필드) + Modifier: `Game.Attribute`·`AddModifier`·`RemoveModifiers`·`Modifiers` | 28 | 02 §8(언급) |
+| 효과 '능력치 보정'·'능력치 보정 떼기' | 28 · 16 · 12 | 02 §8(언급) |
+| 효과의 문법(언제 + 누구에게 + 무엇을 + 안전장치) | 28 | 02 §8(효과의 문법 칸) |
+| 의도 `[Intent]`, 규칙 함수의 가로채기 자리 `Game.Intercept` | 28 | 02 §8, 04 §9(가시 갑옷), 09 §1 |
+| 트리거 '가로채기'(`InterceptTrigger`)·결과 '의도 고치기'(`ModifyIntentOutcome`) | 28 · 11 · 12 | 04 §9(가시 갑옷) |
+| `TriggerKinds.Intercept`·`OutcomeKinds.Intent`(기능 칸 잠금) | 28 · 11 | 04 §8 |
+| `Game.Pay`·`CanPay`·`CostIntent`·결과 '비용 내기' | 28 · 12 | 02 §8(언급) |
 
 ### DB 기능
 

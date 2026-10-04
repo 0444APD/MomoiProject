@@ -193,9 +193,9 @@ public class RelicData : GameData
 {
     [FieldLabel("설명")] public string description = "";
     [FieldLabel("아이콘")] public Sprite icon;
-    [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition)]
+    [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)]
     public Trigger trigger;
-    [FieldLabel("효과"), SerializeReference, OutcomeSlot(OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Targeted)]
+    [FieldLabel("효과"), SerializeReference, OutcomeSlot(OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Targeted | OutcomeKinds.Intent)]
     public List<Outcome> outcomes = new List<Outcome>();
 }
 ```
@@ -235,6 +235,7 @@ RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
 > - `[Database]`로 탭 이름·사이드바 그룹·순서·새 ID 접두어를 정한다. 유물 탭은 DB 사이드바 **콘텐츠** 그룹에 생긴다.
 > - `Trigger`·`Outcome`은 추상 형식이라 `[SerializeReference]`가 꼭 있어야 한다.
 > - 잠금은 기능에 맞게 고른다. 감시해서 발동하는 기능에 `사용`(`TriggerKinds.Use`)은 의미가 없다. 결과에서 `로그에 기록`(`Record`)을 뺀 것은, 유물 ID는 로그가 아니어서 로그 칸을 비운 기록이 아무것도 하지 않기 때문이다.
+> - `TriggerKinds.Intercept`·`OutcomeKinds.Intent`를 넣으면 발동에 `가로채기`, 효과에 `의도 고치기`가 나온다. "받는 피해 −5"처럼 일어나기 직전의 일을 고치는 유물에 쓴다(9절 가시 갑옷).
 > - 표시 이름 필드는 두지 않는다. ID가 이름이고, 플레이어에게 보일 이름은 텍스트로 붙인다([06장](06-Presentation.md)).
 > - `ValidateData`를 덮어써 "발동이 없다", "비어 있는 효과 칸이 있다"를 오류로 낸다([05장](05-WorkingWithDesigners.md) 7절).
 
@@ -287,6 +288,18 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 > - 유물은 `Game.Use`로 쓰는 것이 아니라 이벤트를 받아 발동하므로 사용자도, 고른 대상도 없다.
 > - 사용자가 없는 다른 유물·도전과제도 이 Block을 쓸 수 있으니 `[BindTo]`가 아니라 Block이 맞다.
 > - 대상 Block은 고르기만 하고 값을 바꾸지 않는다. 컴파일하면 **+ 대상 추가** 목록의 "대상" 분류에 `주인공`이 나온다.
+
+> [!note]- 가시 갑옷 — 받는 피해 −5(가로채기, 코드 없음)
+> 이벤트는 일이 일어난 **뒤**에 온다. "받는 피해 −5"는 피해가 들어가기 **직전**에 내용을 고쳐야 하므로 가로채기로 만든다.
+> 1. DB › 유물 → `thornArmor`.
+> 2. 발동(`trigger`): **+ 블럭** → `가로채기` → 의도 `피해`. 의도 조건(`filter`)에 `필드 검사` → `targetId` `일치` `hero`.
+> 3. 효과(`outcomes`): **+ 결과 추가** → `의도 고치기` → 필드 `amount`, 방법 `Add`, 값 `-5`.
+>
+> - `Rules.Damage`가 피해를 주기 직전에 `DamageIntent`(`sourceId`·`targetId`·`amount`·`cancelled`)를 `Game.Intercept`로 통과시킨다. 이 유물이 `amount`를 줄이고, 0 이하가 되면 피해가 들어가지 않는다. 방어도는 줄어든 뒤의 값으로 깎인다.
+> - 발동에 `가로채기`, 효과에 `의도 고치기`가 보이는 것은 `RelicData`의 잠금에 `TriggerKinds.Intercept`·`OutcomeKinds.Intent`가 있기 때문이다(8절).
+> - 시험: 모니터 **데이터** 탭에서 `run › relics`에 `thornArmor`를 넣고 턴을 끝낸다. 적 공격이 5씩 줄어 들어온다. Undo하면 함께 돌아간다.
+> - "공격한 적에게 3 되돌려 주기"는 피해가 들어간 **뒤**의 일이라 이벤트 받기(`피해` 이벤트 `DamageDealt`, 이름이 같은 의도와는 목록이 따로다)로 만든다. 가로채는 쪽은 의도만 고친다.
+> - 의도 클래스는 `Rules/Events/Intents.cs`에 있다(`[Intent("피해")]`). 순서·막기·`[BindTo]`로 쓰는 법은 매뉴얼 [28장](../Manual/28-Attributes-Intercepts.md) 5-4·5-5.
 
 ## 10. 등장시키기
 
