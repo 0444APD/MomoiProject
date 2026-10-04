@@ -43,6 +43,9 @@
 >     Texts/Texts_ko.asset …                             ← 언어별 텍스트 표
 >     (플레이어 데이터 폴더)/run.asset  profile.asset      ← DB › 플레이어 데이터 run·profile
 > ProjectSettings/MomoiProject/Features.json              ← 켠 모듈(팀이 같이 쓴다)
+> CLAUDE.md                                               ← Claude Code가 늘 읽는 규칙(관례·참조 문서를 불러온다)
+> .claude/skills/think-momoi/  .claude/hooks/compile-check.ps1  .claude/settings.json  ← 스킬 /think-momoi, 응답을 끝낼 때 컴파일 검사
+> Docs/PlanningSpec.md                                    ← 기획 명세서 양식(기획자가 채운다)
 > ```
 > 다시 열어 다시 적용해도 안전하다. 이미 있는 파일·항목은 덮어쓰지 않고 없는 것만 만든다.
 

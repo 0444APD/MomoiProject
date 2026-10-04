@@ -22,6 +22,8 @@
 - `Assets/Code/Rules·Client·Editor·Tests`와 asmdef, `Client/Bootstrap.cs`, `Rules/PlayerData.cs`, DB › 플레이어 데이터 `run`·`profile`이 생긴다. 다시 컴파일된 뒤 `GameIds.cs`에 `Game.Data().Run`·`Profile`이 생긴다(콘솔에 "식별자 코드를 만들었습니다").
 - DB 창(메뉴 `MomoiProject › DB`) 사이드바 맨 위 **시작 파일 › Bootstrap**: 칸을 고치면 바로 저장된다(Undo 방식에 따라 칸이 바뀜, 고급 접기). 새 칸 **고정 틱(초당 틱 수)**·**씬 흐름(플레이어 데이터·필드·빈 값일 때 씬)**이 보이고 값이 남는다(창을 닫았다 열어도). RunState·Profile을 누르면 cs가 열린다.
 - 시드 고정을 켜면 플레이할 때 모니터 머리의 시드가 그 값이다. `Bootstrap.cs`의 Configure에서 같은 값을 바꾸면 타임라인에 "코드(Configuring)가 … 바꿨습니다"가 남는다.
+- **Claude Code 파일**: 적용 결과 목록에 `CLAUDE.md`·`.claude/skills/think-momoi/SKILL.md`·`.claude/hooks/compile-check.ps1`·`.claude/settings.json`·`Docs/PlanningSpec.md`가 "만듦(Claude Code)"으로 나온다. 프로젝트 폴더(`D:/Unity/Projects/UnitySystemProject`)의 `CLAUDE.md`를 열면 `/com.momoi.gbible/Documentation~/AI/ProjectConventions.md` 줄이 있다. 메뉴 `MomoiProject › Claude Code 파일 › 지금 맞추기`를 다시 누르면 "이미 맞습니다".
+  - 이 프로젝트는 GBible을 만드는 곳이라, 확인한 뒤 **맞추지 않기**를 켜고 위 파일들을 `MomoiProjectBackups/`로 옮기는 것을 권한다(GBible 개발 세션에 게임 프로젝트 규칙·컴파일 훅이 들어오지 않게).
 
 ## 단계 2. 선택 기능 켜기
 

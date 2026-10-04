@@ -68,6 +68,8 @@ namespace GBible.EditorTools
             }
             // 처음 한 번: 시작 설정을 마치지 않은 프로젝트면 창을 연다(배치 실행·테스트에서는 열지 않는다).
             if (!IsDone && !Application.isBatchMode) EditorApplication.delayCall += OpenOnce;
+            // 시작 설정을 마친 프로젝트: Claude Code 파일(CLAUDE.md·스킬·컴파일 검사 훅)을 패키지 경로·템플릿에 맞춘다.
+            if (IsDone && !Application.isBatchMode) EditorApplication.delayCall += () => ClaudeFiles.Sync();
         }
 
         static void OpenOnce()
@@ -173,6 +175,8 @@ namespace GBible.EditorTools
             }
 
             SyncModuleReferences();
+            // Claude Code: CLAUDE.md(관례·참조 문서 가져오기) · 스킬 /think-momoi · 응답을 끝낼 때 컴파일 검사 훅 · Docs/PlanningSpec.md.
+            foreach (var file in ClaudeFiles.Sync()) done.Add($"{file} 만듦(Claude Code)");
             Directory.CreateDirectory(Path.GetDirectoryName(MarkerPath));
             File.WriteAllText(MarkerPath, "{\"done\":true}", new UTF8Encoding(false));
             AssetDatabase.SaveAssets();

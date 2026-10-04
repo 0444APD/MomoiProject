@@ -748,3 +748,21 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 5. 저장(Ctrl+S) → `GameIds.cs`가 만들어졌는지 본다.
 6. 사이드바 아래가 "검증 통과"인지 본다(오류가 있으면 빌드가 막힌다).
 7. 플레이하며 모니터로 확인한다(`22-Monitor-Debug.md`).
+
+---
+
+## 11. Claude Code 파일
+
+**한 줄 요약.** 시작 설정을 적용하면 프로젝트 루트에 AI(Claude Code)가 쓸 파일을 만든다. 에디터를 열 때마다 패키지 경로·템플릿이 바뀌었으면 다시 맞춘다(메뉴 `MomoiProject → Claude Code 파일 → 지금 맞추기`).
+
+| 파일 | 하는 일 | 다시 맞출 때 |
+|---|---|---|
+| `CLAUDE.md` | Claude Code가 세션마다 읽는다. 관례(`ProjectConventions.md`)·참조(`Reference.md`)를 `@가져오기`로 불러온다 | `<!-- MomoiProject:begin -->`~`end` 칸만 다시 쓴다. 칸 밖에 쓴 것은 그대로 |
+| `.claude/skills/think-momoi/SKILL.md` | 스킬 `/think-momoi`: 시스템 모드(기획 명세서 → 시스템층·화면), 콘텐츠 모드(효과 문장 → DB·Block·코드) | 통째로 |
+| `.claude/hooks/compile-check.ps1` · `.claude/settings.json` | 응답을 끝낼 때(Stop 훅) 프로젝트 코드를 컴파일한다. 오류가 있으면 Claude가 고친 뒤 다시 끝낸다 | 스크립트는 통째로, settings.json은 훅 한 줄이 없을 때만 더한다 |
+| `Docs/PlanningSpec.md` | 기획 명세서 빈 양식(기획자가 채운다) | 없을 때만 |
+
+- 템플릿은 패키지 `Documentation~/AI/Templates`, 컴파일 검사는 `Tools~/compile-check.ps1`이다. `{{GBIBLE}}` 자리에 프로젝트에서 본 패키지 경로(`Packages/com.momoi.gbible` 또는 `Library/PackageCache/com.momoi.gbible@…`)가 들어간다.
+- **컴파일 검사**: Unity가 만든 `.csproj`(Preferences › External Tools의 프로젝트 파일)의 참조·심볼을 빌려 `Assets` 아래 asmdef마다 그 폴더의 `.cs`를 직접 컴파일한다(Unity를 연 채로도, 방금 만든 파일도). 마지막으로 통과한 뒤 바뀐 파일·폴더가 없으면 바로 끝난다. Unity 설치 폴더는 `ProjectVersion.txt`의 버전으로 Hub 폴더에서 찾는다(못 찾으면 환경 변수 `MOMOI_UNITY_EDITOR_DATA`에 `…\Editor\Data`). csproj가 아직 없는 어셈블리는 건너뛰고 알린다. 같은 오류로 세 번 넘게 막지는 않는다. 손으로: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/compile-check.ps1 -Always`.
+- **맞추지 않기**: 메뉴 `MomoiProject → Claude Code 파일 → 맞추지 않기`(표시 `ProjectSettings/MomoiProject/ClaudeFiles.off`). 켜면 만들지도 고치지도 않는다. 이미 있는 파일은 그대로다.
+- `.claude/settings.json`을 읽지 못하면(손으로 쓴 JSON 오류) 건드리지 않고 콘솔에 경고한다. 그때는 `hooks.Stop`에 위 명령을 직접 넣는다.
