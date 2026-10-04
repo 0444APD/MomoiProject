@@ -5,8 +5,8 @@ using System.Linq;
 namespace GBible
 {
     // 가중치 표(DB › 가중치 표): 드롭·보상·조우처럼 "여러 후보 중 무게만큼의 확률로 뽑기".
-    //   var drop = Game.Roll(GameIds.Table.EliteDrop);                 // 항목 ID 하나(아무것도 안 나오면 null)
-    //   var cards = Game.Roll(GameIds.Table.CardReward, 3, unique: true); // 서로 다른 3개
+    //   var drop = Game.Roll(GameIds.WeightTable.EliteDrop);                 // 항목 ID 하나(아무것도 안 나오면 null)
+    //   var cards = Game.Roll(GameIds.WeightTable.CardReward, 3, unique: true); // 서로 다른 3개
     // 항목 = DB 항목 ID(인스턴스·다른 가중치 표 …) · 무게 · 개수(최소~최대) · 조건(맞을 때만 후보).
     // 다른 가중치 표를 항목으로 넣으면 그 표에서 다시 뽑는다. "꽝" 무게를 주면 그만큼 아무것도 나오지 않는다.
     // 난수는 표마다 따로인 결정론 흐름(Game.Random("table:ID"))이라 Undo하면 같은 결과, 표를 추가해도 다른 표의 결과가 바뀌지 않는다.
@@ -49,7 +49,7 @@ namespace GBible
         public WeightTableDefinition Find(string id) => id != null && _tables.TryGetValue(id, out var t) ? t : null;
 
         // count번 뽑는다. unique면 한 번 나온 항목은 다시 후보가 되지 않는다(후보가 모자라면 있는 만큼만).
-        // 안쪽 표는 계속 후보로 남고, 그 안에서 이미 나온 항목만 빠진다(등급 표 → 등급별 카드 표에서도 서로 다른 카드).
+        // 안쪽 표는 그 안에 남은 것이 있을 때만 후보다(등급 표 → 등급별 카드 표에서도 서로 다른 카드, 다 나온 등급은 건너뜀).
         // 항목의 개수(최소~최대)만큼 같은 ID가 여러 번 들어간다. 꽝은 결과에 넣지 않는다.
         public List<string> Roll(string id, int count = 1, bool unique = false)
         {
@@ -63,9 +63,7 @@ namespace GBible
         {
             var table = Find(id) ?? throw new InvalidOperationException($"[MomoiProject] 없는 가중치 표 '{id}'입니다(DB › 가중치 표).");
             if (depth >= MaxDepth) throw new InvalidOperationException($"[MomoiProject] 가중치 표 '{id}'가 {MaxDepth}단계 넘게 서로를 부릅니다(표끼리 돌고 있는지 확인하세요).");
-            var candidates = table.Entries.Where(e => e != null && e.weight > 0 && !string.IsNullOrEmpty(e.item)
-                                                      && (used == null || Has(e.item) || !used.Contains(e.item))
-                                                      && (e.condition == null || e.condition.Evaluate(_session))).ToList();
+            var candidates = Candidates(table, used, depth);
             var total = candidates.Sum(e => e.weight) + Math.Max(0, table.EmptyWeight);
             if (total <= 0) return;
             var random = _session.Random.Get("table:" + id);
@@ -94,6 +92,14 @@ namespace GBible
                 }
             }
         }
+
+        // 지금 뽑을 수 있는 항목: 무게 > 0, 조건이 맞고, unique면 아직 안 나온 것. 안쪽 표는 그 안에 뽑을 것이 남아 있을 때만.
+        List<WeightEntry> Candidates(WeightTableDefinition table, HashSet<string> used, int depth) =>
+            table.Entries.Where(e => e != null && e.weight > 0 && !string.IsNullOrEmpty(e.item)
+                                     && (e.condition == null || e.condition.Evaluate(_session))
+                                     && (Has(e.item)
+                                         ? used == null || depth + 1 >= MaxDepth || Candidates(Find(e.item), used, depth + 1).Count > 0
+                                         : used == null || !used.Contains(e.item))).ToList();
 
         // 표 하나의 항목별 확률(조건은 지금 상태로 본다). 화면의 "드롭 확률" 표시·검증용.
         public IReadOnlyList<(string item, double chance)> Chances(string id)

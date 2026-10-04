@@ -66,7 +66,7 @@ namespace GBible
     //   비율로:   기준 × 비율^(단계 − 시작)            예: 100, ×1.1/층 → 3층 121
     //   거듭제곱: 기준 × (단계 / 시작)^지수             예: 경험치 100, 지수 1.5 → 4레벨 800
     //   표:       점들 사이를 직선으로 잇는다(처음 점 앞·마지막 점 뒤는 끝 값 유지). 기준 값은 쓰지 않는다.
-    // 계산한 뒤 반올림하고 최솟값·최댓값으로 자른다(둘 다 0이면 자르지 않음).
+    // 계산한 뒤 반올림하고, 켜 둔 쪽(최솟값·최댓값)으로 자른다.
     [Serializable]
     public sealed class Curve
     {
@@ -77,8 +77,10 @@ namespace GBible
         [FieldLabel("지수"), ShowIf(nameof(kind), CurveKind.Power)] public double power = 1.5;
         [FieldLabel("점"), ShowIf(nameof(kind), CurveKind.Table)] public List<CurvePoint> points = new List<CurvePoint>();
         [FieldLabel("반올림"), ShowIf(nameof(kind), CurveKind.Linear, CurveKind.Exponential, CurveKind.Power, CurveKind.Table)] public CurveRounding rounding = CurveRounding.None;
-        [FieldLabel("최솟값(둘 다 0이면 자르지 않음)"), ShowIf(nameof(kind), CurveKind.Linear, CurveKind.Exponential, CurveKind.Power, CurveKind.Table)] public double min;
-        [FieldLabel("최댓값"), ShowIf(nameof(kind), CurveKind.Linear, CurveKind.Exponential, CurveKind.Power, CurveKind.Table)] public double max;
+        [FieldLabel("최솟값으로 자르기"), ShowIf(nameof(kind), CurveKind.Linear, CurveKind.Exponential, CurveKind.Power, CurveKind.Table)] public bool useMin;
+        [FieldLabel("최솟값"), ShowIf(nameof(useMin))] public double min;
+        [FieldLabel("최댓값으로 자르기"), ShowIf(nameof(kind), CurveKind.Linear, CurveKind.Exponential, CurveKind.Power, CurveKind.Table)] public bool useMax;
+        [FieldLabel("최댓값"), ShowIf(nameof(useMax))] public double max;
 
         public double Evaluate(double baseValue, double x)
         {
@@ -97,11 +99,8 @@ namespace GBible
                 case CurveRounding.Floor: value = Math.Floor(value); break;
                 case CurveRounding.Ceiling: value = Math.Ceiling(value); break;
             }
-            if (min != 0 || max != 0)
-            {
-                if (min > max) return value;
-                value = Math.Max(min, Math.Min(max, value));
-            }
+            if (useMin) value = Math.Max(min, value);
+            if (useMax) value = Math.Min(max, value);
             return value;
         }
 
@@ -137,7 +136,7 @@ namespace GBible
             if (kind == CurveKind.Power && startX <= 0) context.Error($"{label}: 거듭제곱은 시작 단계가 0보다 커야 합니다.");
             if (kind == CurveKind.Exponential && rate <= 0) context.Error($"{label}: 비율은 0보다 커야 합니다(1.1 = 단계마다 +10%).");
             if (kind == CurveKind.Table && points.Count == 0) context.Error($"{label}: 표에 점이 없습니다.");
-            if ((min != 0 || max != 0) && min > max) context.Error($"{label}: 최솟값이 최댓값보다 큽니다.");
+            if (useMin && useMax && min > max) context.Error($"{label}: 최솟값이 최댓값보다 큽니다.");
         }
 
         static string Format(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);

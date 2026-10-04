@@ -49,7 +49,15 @@ namespace GBible.Tests
             Assert.AreEqual(30, table.Evaluate(0, 3), 1e-9, "점 사이는 직선");
             Assert.AreEqual(50, table.Evaluate(0, 9), 1e-9, "마지막 점 뒤는 끝 값");
             Assert.AreEqual(102, new Curve { kind = CurveKind.Linear, step = 0.5, rounding = CurveRounding.Round }.Evaluate(100, 4), 1e-9, "101.5 → 반올림");
-            Assert.AreEqual(125, new Curve { kind = CurveKind.Linear, step = 15, max = 125 }.Evaluate(100, 3), 1e-9, "최댓값으로 자른다");
+            Assert.AreEqual(125, new Curve { kind = CurveKind.Linear, step = 15, useMax = true, max = 125 }.Evaluate(100, 3), 1e-9, "최댓값으로 자른다");
+        }
+
+        [Test]
+        public void 곡선은_한쪽만_자를_수_있다()
+        {
+            var floor = new Curve { kind = CurveKind.Linear, step = -30, useMin = true, min = 0 };
+            Assert.AreEqual(0, floor.Evaluate(100, 9), 1e-9, "0 아래로 내려가지 않는다");
+            Assert.AreEqual(160, new Curve { kind = CurveKind.Linear, step = 30, useMin = true, min = 0 }.Evaluate(100, 3), 1e-9, "위로는 자르지 않는다");
         }
 
         [Test]

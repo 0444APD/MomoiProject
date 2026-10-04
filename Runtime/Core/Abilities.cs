@@ -161,6 +161,12 @@ namespace GBible
     [Serializable]
     public sealed class UseAbility : GameAction
     {
+        // 사용 조건이 맞지 않을 때의 실패(Game.Use가 던지고 Game.CanUse가 이유로 쓴다). {ability}는 ID라 보일 때의 언어 이름으로 바뀐다.
+        internal static GameFailure CannotUse(AbilityDefinition definition, GameSession session) =>
+            new GameFailure(FailureKeys.CannotUse,
+                TextArgs.From(("ability", definition.Id), ("condition", definition.When?.Natural(session) ?? "")),
+                "{ability}: 사용 조건을 만족하지 않습니다({condition}).");
+
         public string ability;
         public string user;
         public List<string> targets = new List<string>();
@@ -174,9 +180,7 @@ namespace GBible
             var picked = (targets ?? new List<string>()).Select(game.Find).Where(t => t != null).ToList();
             var triggers = game.Session.Triggers;
             if (!triggers.CanUse(ability, definition.When, game.Find(user), picked, out var moment))
-                throw new GameFailure(FailureKeys.CannotUse,
-                    TextArgs.From(("ability", Texts.NameOf(definition.Id)), ("condition", definition.When.Natural(game.Session))),
-                    "{ability}: 지금은 쓸 수 없습니다({condition}).");
+                throw CannotUse(definition, game.Session);
             var final = new List<object>();
             if (definition.Targets.Count > 0 || definition.Effects.Count > 0)
             {

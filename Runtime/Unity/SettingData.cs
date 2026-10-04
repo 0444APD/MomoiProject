@@ -31,9 +31,13 @@ namespace GBible.Data
             if (spec.choices.GroupBy(c => c.value).Any(g => g.Count() > 1)) context.Error("선택지 값이 겹칩니다.");
             var expected = ExpectedKind(target);
             if (expected != null && !expected.Contains(kind))
-                context.Error($"적용 대상 '{target}'에는 종류 {string.Join(" 또는 ", expected)}만 맞습니다.");
+                context.Error($"적용 대상 '{Label(target)}'에는 종류 {string.Join(" 또는 ", expected.Select(k => $"'{Label(k)}'"))}만 맞습니다.");
             if (IsVolume(target) && (spec.min < 0 || spec.max > 1)) context.Warning("음량은 0~1 사이 값입니다.");
         }
+
+        // DB에 보이는 enum 이름(InspectorName). 검증은 에디터에서만 돌므로 형식 정보를 읽어도 된다.
+        static string Label(Enum value) =>
+            value.GetType().GetField(value.ToString())?.GetCustomAttributes(typeof(InspectorNameAttribute), false).OfType<InspectorNameAttribute>().FirstOrDefault()?.displayName ?? value.ToString();
 
         public static bool IsVolume(SettingTarget target) =>
             target == SettingTarget.MasterVolume || target == SettingTarget.BgmVolume || target == SettingTarget.VoiceVolume || target == SettingTarget.SfxVolume || target == SettingTarget.UiVolume;

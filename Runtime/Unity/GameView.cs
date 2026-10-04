@@ -132,10 +132,11 @@ namespace GBible
             });
         }
 
-        // 끝나면 done()을 부르는 연출(트윈 라이브러리의 완료 콜백 등).
-        public static void Present(Action<Action> step)
+        // 끝나면 done()을 부르는 연출(트윈 라이브러리의 완료 콜백 등). timeout(실제 초) 안에 done이 오지 않으면 경고하고 넘어간다
+        // (오브젝트가 먼저 없어져 done을 부르지 못한 경우 대기열이 멈추지 않게). 0이면 끝없이 기다린다.
+        public static void Present(Action<Action> step, float timeout = 30f)
         {
-            if (step != null) Enqueue(() => Callback(step));
+            if (step != null) Enqueue(() => Callback(step, timeout));
         }
 
         // 잠깐 쉬기(속도 반영).
@@ -216,7 +217,7 @@ namespace GBible
             }
         }
 
-        static IEnumerator Callback(Action<Action> step)
+        static IEnumerator Callback(Action<Action> step, float timeout)
         {
             var done = false;
             try { step(() => done = true); }
@@ -225,7 +226,16 @@ namespace GBible
                 Debug.LogException(e);
                 yield break;
             }
-            while (!done) yield return null;
+            var until = Time.realtimeSinceStartup + timeout;
+            while (!done)
+            {
+                if (timeout > 0f && Time.realtimeSinceStartup > until)
+                {
+                    Debug.LogWarning($"[MomoiProject] 연출이 {timeout:0.#}초 안에 끝나지 않아 넘어갑니다(done()을 부르지 않았거나 오브젝트가 먼저 없어졌는지 확인).");
+                    yield break;
+                }
+                yield return null;
+            }
         }
 
         // ── 화면 오브젝트 찾기 ──────────────────────────────────

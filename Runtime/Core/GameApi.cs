@@ -54,7 +54,7 @@ namespace GBible
             var who = user is string userId ? Find(userId) : user;
             var picked = (targets ?? Array.Empty<object>()).Select(t => t is string id ? Find(id) : t).Where(t => t != null).ToList();
             if (Session.Triggers.CanUse(ability, definition.When, who, picked, out _)) return true;
-            reason = "사용 조건을 만족하지 않습니다: " + definition.When.Natural(Session);
+            reason = UseAbility.CannotUse(definition, Session).Message;
             return false;
         }
 
@@ -281,7 +281,8 @@ namespace GBible
             var have = ReadNumber(cost.key, cost.path);
             if (have < cost.amount)
             {
-                var name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? Texts.Get(what) : what;
+                // 텍스트 키면 TextKey로 넘겨 실패 글을 볼 때의 언어로 바뀌게 한다.
+                object name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? new TextKey(what) : (object)what;
                 throw new GameFailure(FailureKeys.NotEnough,
                     TextArgs.From(("what", name), ("have", Format(have)), ("need", Format(cost.amount))),
                     "{what}이(가) 모자랍니다({have} / {need}).");

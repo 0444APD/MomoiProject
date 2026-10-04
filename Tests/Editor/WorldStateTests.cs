@@ -45,6 +45,16 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 프로필_값이_있어도_판에서_끌_수_있다()
+        {
+            Do(g => g.SetWorld("cave.torch", true, permanent: true));
+            Do(g => g.SetWorld("cave.torch", false));
+            Assert.IsFalse(Game.WorldFlag("cave.torch"), "판에서 끈 것이 앞선다");
+            _session.NewRun();
+            Assert.IsTrue(Game.WorldFlag("cave.torch"), "새 판이면 프로필 값");
+        }
+
+        [Test]
         public void 판_저장으로_이어진다()
         {
             Do(g => g.SetWorld("cave.lever", true));

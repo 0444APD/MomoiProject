@@ -61,7 +61,8 @@ namespace GBible
             slot ??= "";
             CheckSlotName(slot);
             if (Session != null && slot == Slot) return;
-            if (Session != null) Stop();
+            // 저장도 없고 행동도 한 번 없었던 세션(타이틀에서 막 켠 기본 슬롯)은 빈 저장을 남기지 않는다.
+            if (Session != null) Stop(save: Session.Actions.Log.Count > 0 || File.Exists(SavePath) || File.Exists(RunSavePath));
             _slot = slot;
             GameSettings.SetRaw(LastSlotKey, slot);
             Start();
@@ -124,6 +125,9 @@ namespace GBible
             from ??= "";
             to ??= "";
             if (from == to) return;
+            // 지금 쓰는 슬롯에 덮어쓰면 실행 중인 세션이 저장·끌 때 다시 덮는다.
+            if (Session != null && to == Slot)
+                throw new InvalidOperationException($"[MomoiProject] 지금 쓰는 슬롯 '{to}'(으)로는 복사할 수 없습니다. 다른 슬롯으로 바꾼 뒤(UseSlot) 복사하세요.");
             if (Session != null && from == Slot)
             {
                 SaveProfile(Session);

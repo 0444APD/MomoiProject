@@ -386,12 +386,12 @@ static void GetChainLightning(TriggerContext c)
 > [!note]- 보상과 수치도 DB에 — 가중치 표 · 밸런스 값
 > **가중치 표**(DB › 가중치 표): "무엇이 얼마나 자주 나오나"를 표로 둔다. 예: 전투 보상 유물 `relicDrop` — 항목 줄 `anchor` 무게 3, `thornArmor` 무게 1, 꽝 무게 4(절반은 아무것도 없음).
 > - 코드 없이 주기: 결과 칸(**+ 결과 추가**)의 **가중치 표에서 주기** → 가중치 표 `relicDrop` · 횟수 `1` · 넣을 플레이어 데이터 `run` · 필드 `relics`. `relics`는 글자 목록이라 뽑힌 ID가 들어간다(꽝이면 아무것도 넣지 않는다).
-> - 코드에서(행동 안): `var relic = Game.Roll(GameIds.Table.RelicDrop);`(하나, 꽝이면 `null`), `Game.Roll(id, 3, unique: true)`(서로 다른 셋 — 카드 보상 3장을 뽑아 `Game.Ask`로 1장 고르게 할 때).
+> - 코드에서(행동 안): `var relic = Game.Roll(GameIds.WeightTable.RelicDrop);`(하나, 꽝이면 `null`), `Game.Roll(id, 3, unique: true)`(서로 다른 셋 — 카드 보상 3장을 뽑아 `Game.Ask`로 1장 고르게 할 때).
 > - 항목 줄마다 최소·최대 개수와 조건(맞을 때만 후보)을 둘 수 있고, 항목이 다른 가중치 표면 그 표에서 다시 뽑는다. `session.Tables.Chances(id)`는 지금 상태의 확률 목록이다(확률 공개 화면).
 > - 표마다 따로인 난수 흐름이라 Undo하면 같은 결과가 나오고, 표를 더해도 다른 표의 결과는 그대로다.
 >
 > **밸런스 값**(DB › 밸런스 값): 기획자가 바꿀 숫자에 이름을 붙인다. 예: `winGold` 값 15, 곡선 "일정하게" +3/단계.
-> - 코드: `Game.Balance(GameIds.Balance.WinGold)` → 15, `Game.Balance(GameIds.Balance.WinGold, run.floor)` → 그 층의 값(3층이면 15 + 3 × 2 = 21). 곡선은 일정하게·비율로·거듭제곱·표(점 사이 직선)와 반올림·최솟값·최댓값을 고른다.
+> - 코드: `Game.Balance(GameIds.Balance.WinGold)` → 15, `Game.Balance(GameIds.Balance.WinGold, run.floor)` → 그 층의 값(3층이면 15 + 3 × 2 = 21). 곡선은 일정하게·비율로·거듭제곱·표(점 사이 직선)와 반올림, 최솟값·최댓값 자르기(쪽마다 켜고 끈다)를 고른다.
 > - 없는 ID면 `InvalidOperationException`이다(코드에는 늘 `GameIds` 상수).
 >
 > 둘 다 플레이 중에 DB에서 고치면 저장 전이라도 0.5초 안에 실행 중인 게임에 반영된다([08장](08-TestAndDebug.md) 2절). 수치가 많아지면 DB 목록 위의 **CSV** 버튼으로 표 계산기(구글 시트·엑셀)와 주고받는다. 매뉴얼 [30장](../Manual/30-Balance-Tables.md)·[33장](../Manual/33-Tick-Preview-Csv.md).

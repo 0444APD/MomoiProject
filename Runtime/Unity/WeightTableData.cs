@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace GBible.Data
 {
-    // DB › 가중치 표: 드롭·보상·조우처럼 무게만큼의 확률로 뽑는 표. 코드는 Game.Roll(GameIds.Table.X), DB는 결과 '가중치 표에서 주기'.
+    // DB › 가중치 표: 드롭·보상·조우처럼 무게만큼의 확률로 뽑는 표. 코드는 Game.Roll(GameIds.WeightTable.X), DB는 결과 '가중치 표에서 주기'.
     [Database("가중치 표", Group = "DB", Order = 45, IdPrefix = "table")]
     [CreateAssetMenu(menuName = "MomoiProject/가중치 표", fileName = "NewWeightTable")]
     public sealed class WeightTableData : GameData

@@ -39,6 +39,8 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("[MomoiProject] 월드 상태 이름이 비어 있습니다.");
             var key = permanent ? MetaKey : SessionKey;
+            // 판에서 지울 때 프로필 값이 있으면 지우는 대신 "false"를 둔다(지우면 프로필 값이 다시 보인다).
+            if (value == null && !permanent && Exists(MetaKey) && _session.Data.Get<WorldStateTable>(MetaKey)?.values.ContainsKey(id) == true) value = "false";
             Ensure(key);
             _session.Data.Modify<WorldStateTable>(key, t =>
             {

@@ -123,17 +123,18 @@ namespace GBible
 
         // ── 기기별 원시 값(모듈·라이브러리용) ────────────────────
 
+        // 파일 안에서는 '$' 접두어로 둔다(DB ID는 '$'로 시작할 수 없어 설정 ID와 겹치지 않는다).
         public static string Raw(string key)
         {
             Load();
-            return _values.TryGetValue(key, out var value) ? value as string : null;
+            return _values.TryGetValue("$" + key, out var value) ? value as string : null;
         }
 
         public static void SetRaw(string key, string value)
         {
             Load();
-            if (value == null) _values.Remove(key);
-            else _values[key] = value;
+            if (value == null) _values.Remove("$" + key);
+            else _values["$" + key] = value;
             Save();
         }
 

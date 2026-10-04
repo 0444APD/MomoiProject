@@ -91,7 +91,7 @@ namespace GBible
         public event Action<long> TransactionStarted;
         public event Action<long> TransactionAborted;
         public event Action<ActionRecord> StatusChanged;
-        // 바깥 행동이 끝나기 직전(아직 그 행동 안): 정리 작업이 그 행동의 일부로 들어간다(같이 Undo된다). 미리보기에서는 오지 않는다.
+        // 바깥 행동이 끝나기 직전(아직 그 행동 안): 정리 작업이 그 행동의 일부로 들어간다(같이 Undo된다). 미리보기에서도 읽기 전에 온다.
         public event Action Committing;
 
         public ActionDispatcher(Journal journal, PlayerDataStore state, GameClock clock, int logCapacity = 1024)
@@ -148,6 +148,8 @@ namespace GBible
                         prepare?.Invoke(action);
                         registered(action);
                     });
+                    // 실제 행동처럼 끝나기 직전 정리(사라진 개체의 상태 효과 …)까지 한 모습을 읽는다.
+                    Committing?.Invoke();
                     return read == null ? default : read();
                 }
                 finally
