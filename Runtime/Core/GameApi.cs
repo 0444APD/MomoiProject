@@ -207,6 +207,10 @@ namespace GBible
         //   var energy = Game.Balance(GameIds.Balance.StartEnergy);     var hp = Game.Balance(GameIds.Balance.EnemyHp, floor);
         public double Balance(string id) => Session.Balance.Get(id);
         public double Balance(string id, double x) => Session.Balance.Get(id, x);
+        // 단계 from부터 count개의 합("10개 사기": 가격 곡선, 단계 = 산 개수).
+        public double BalanceSum(string id, double from, int count) => Session.Balance.Sum(id, from, count);
+        // budget으로 단계 from부터 몇 개를 살 수 있나("살 수 있는 만큼").
+        public int BalanceCount(string id, double from, double budget) => Session.Balance.MaxCount(id, from, budget);
 
         // 가중치 표(DB › 가중치 표)에서 뽑는다(행동 안에서). 하나: 항목 ID(꽝이면 null). 여럿: unique면 서로 다른 것.
         public string Roll(string tableId) => Session.Tables.RollOne(tableId);

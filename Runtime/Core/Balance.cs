@@ -163,6 +163,29 @@ namespace GBible
             return curve == null ? value : curve.Evaluate(value, x);
         }
 
+        // 단계 from부터 count개(단계 1씩)의 값을 더한다. "10개 사기" = Sum(가격, 산 개수, 10).
+        public double Sum(string id, double from, int count)
+        {
+            var total = 0.0;
+            for (var i = 0; i < count; i++) total += Get(id, from + i);
+            return total;
+        }
+
+        // budget 안에서 단계 from부터 몇 개를 살 수 있나("살 수 있는 만큼"). limit개까지만 센다.
+        public int MaxCount(string id, double from, double budget, int limit = 10000)
+        {
+            var count = 0;
+            var spent = 0.0;
+            while (count < limit)
+            {
+                var next = Get(id, from + count);
+                if (spent + next > budget) break;
+                spent += next;
+                count++;
+            }
+            return count;
+        }
+
         (double value, Curve curve) Find(string id) =>
             id != null && _values.TryGetValue(id, out var found)
                 ? found
