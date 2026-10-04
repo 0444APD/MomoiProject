@@ -15,6 +15,7 @@
 > | `[BindTo]` | static 함수에 붙여 그 ID를 가진 DB 항목 하나의 결과를 코드로 바꾸는 어트리뷰트. 그 항목의 결과 칸은 잠긴다. |
 > | 컨텍스트(`TriggerContext`) | Trigger가 발동한 순간의 정보: 이벤트(`Event`), 사용자(`User`), 고른 대상(`Picked`), 항목 ID(`Owner`), `Game`. 결과·`[BindTo]` 함수가 읽는다. |
 > | DB 종류 | `GameData`를 상속한 클래스. 상속하면 DB에 탭이 생긴다. |
+> | 가중치 표 · 밸런스 값 | DB › 가중치 표(무게를 붙인 뽑기 표, `Game.Roll`)와 DB › 밸런스 값(이름 붙은 숫자·곡선, `Game.Balance`). 10절 접힌 칸. |
 
 ---
 
@@ -79,7 +80,9 @@
 1. 인스턴스 `fireball`, 형식 `Card`. `title`, `cost`, `rarity`, `element`(`fire`), `tags`(`attack`), `art`를 채운다.
 2. **+ 기능** → `usable`. 트리거(`when`)는 기본 `사용` 그대로.
 3. 결과(`then`) **+ 결과 추가** → `대상에게 효과`. 대상(`targets`)은 비워 둔다(= 플레이어가 고른 적).
-4. 효과(`effects`) **+ 효과 추가** → `피해`(amount) → `상태 걸기`(status `burn`).
+4. 효과(`effects`) **+ 효과 추가** → `피해`(amount) → `상태 효과 걸기`(상태 효과 `burn`, 중첩 `1`).
+
+화상 `burn`은 DB › **상태 효과**의 항목이다(아래 접힌 칸). `상태 효과 걸기`는 기본 제공 효과라 코드가 없다.
 
 `피해` 같은 효과 Block은 프로그래머가 만든다. 동작 하나만 한다.
 
@@ -106,7 +109,19 @@ public class DealDamage : Effect<Fighter>
 > - `[BlockInfo]`의 이름·분류·설명이 기획자가 보는 목록이 되고, `Describe`가 상세 위쪽 요약에 수치까지 보이게 한다. 한 줄 문장(`Sentence`) 등 기획자 화면 다듬기는 [05장](05-WorkingWithDesigners.md) 5절.
 > - 기획자가 넣으면 안 되는 값은 Block의 `Validate`로 막는다. 0 이하 피해를 DB 검증 오류로 만드는 예는 [05장](05-WorkingWithDesigners.md) 7절.
 
-**몇 턴 동안** 이어지는 효과(턴마다 피해를 주는 독, 3턴 동안의 보호막)는 카드 결과에 직접 쓰지 않는다. DB › **상태 효과**에 항목으로 만들고, 카드 효과에는 기본 제공 `상태 효과 걸기`를 둔다.
+**몇 턴 동안** 이어지는 효과(턴마다 피해를 주는 화상·독, 3턴 동안의 보호막)는 카드 결과에 직접 쓰지 않는다. DB › **상태 효과**에 항목으로 만들고, 카드 효과에는 기본 제공 `상태 효과 걸기`를 둔다.
+
+> [!note]- 화상 — 턴 끝마다 피해 2, 2턴(상태 효과, 코드 없음)
+> 1. DB › **상태 효과** → **+ 새로 만들기** → ID `burn`.
+> 2. `duration`: `kind` `이벤트 횟수`, `length` `2`, `tickEvent` `턴 끝`.
+> 3. `trigger`: **+ 블럭** → `이벤트 받기` → `턴 끝`.
+> 4. `outcomes`: **+ 결과 추가** → `대상에게 효과` → 대상은 비워 둔다 → 효과 `피해`(2).
+> 5. Ctrl+S. 플레이어에게 보일 이름은 텍스트 `burn.name`("화상").
+>
+> - 상태 효과의 결과에서는 사용자·고른 대상이 **가진 쪽**(화상이 걸린 적)이다. 그래서 대상을 비워 두면 화상이 걸린 적이 피해를 받는다.
+> - `maxStacks`(1)·`reapply`(중첩 더하고 지속 갱신)는 기본값 그대로다. 화염구를 또 맞으면 중첩은 1 그대로, 남은 횟수가 2로 돌아간다.
+> - 피해는 `피해` Block → `Rules.Damage`를 거치므로 방어도·가시 갑옷 같은 가로채기·처치 이벤트가 카드 피해와 같다. 마지막 적이 화상으로 쓰러지면 `EndTurn`이 전투 승리로 넘어간다([03장](03-GameLoop.md) 4절).
+> - 시험: 화염구를 내고 모니터 **데이터** 탭 `$statuses`에서 `burn`의 `remaining`(2)을 본 뒤 턴을 끝낸다. 적이 2 피해를 받고 `remaining`이 1이 된다. **Undo**하면 피해와 남은 횟수가 함께 돌아간다.
 
 > [!note]- 독 — 턴 끝마다 중첩만큼 피해, 3턴(상태 효과)
 > 1. DB › **상태 효과** → **+ 새로 만들기** → ID `poison`.
@@ -127,7 +142,7 @@ public class DealDamage : Effect<Fighter>
 > - 같은 턴 끝이 피해와 횟수 줄이기를 둘 다 하면 피해가 먼저다. 피해 세 번 뒤에 끝난다. 다시 걸면 중첩이 더해지고 3턴으로 돌아간다.
 > - 독 피해도 `Rules.Damage`를 거치므로 가시 갑옷 같은 가로채기를 탄다(9절).
 > - 걸린 독은 플레이어 데이터 `$statuses`에 들어 있어 Undo·판 저장이 따라온다. 시험: 독침을 내고 모니터 **데이터** 탭 `$statuses`에서 `stacks`·`remaining`을 본 뒤 턴을 끝낸다. **Undo**하면 피해와 남은 횟수가 함께 돌아간다.
-> - 화염구의 `상태 걸기`(`burn`)는 `Fighter.statuses`에 글자만 넣는 예제 Block이다. 턴마다 효과가 있는 것은 상태 효과로 만든다.
+> - 화상과 다른 점: 화상은 피해가 고정이라 결과를 Block으로 조립했고(코드 없음), 독은 중첩 수만큼이라 결과를 `[BindTo]` 함수로 쓴다.
 > - 코드에서 걸 때는 `Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3)`, 화면의 상태 아이콘은 `Game.Statuses(fighter)`·`Game.StatusStacks`로 읽는다. 상태 효과 없이 "2턴 뒤 이 행동"만 걸 때는 예약(`Game.ScheduleOn<TurnEnded>(2, 행동)`)을 쓴다.
 > - 능력치 보정(분노 +10%)·가로채기(보호막 "내가 받는 피해 반감")·끝날 때 결과("3턴 뒤 폭발")도 같은 항목의 칸이다. 매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md) 5장.
 
@@ -163,7 +178,7 @@ static void ChainLightning(TriggerContext c)
 > 물약은 가방(인벤토리)에 원본 ID와 개수로만 들어간다. 한 칸에 몇 개까지 겹칠지도 고정 값이라 가방에 넣을 때 원본의 `maxStack`을 읽는다(`Rules.PotionOf`). 마시는 행동이 개수를 줄인 뒤 원본의 사용 기능을 쓴다. 한 행동이라 Undo 한 번에 함께 돌아가고, 물약이 없으면 예외로 아무것도 바뀌지 않는다.
 > ```csharp
 > var run = Game.Data().Run;
-> if (!run.potions.TryRemove(potion)) throw new InvalidOperationException("물약이 없습니다.");
+> if (!run.potions.TryRemove(potion)) throw Game.Fail("fail.noPotion", "물약이 없습니다.");
 > if (target == null) Game.Use(potion, run.hero);
 > else Game.Use(potion, run.hero, target);
 > ```
@@ -336,7 +351,7 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 >
 > - 요약: `모든 적에서 1개 고르기: 피해 5`.
 > - 턴 시작을 쏜 행동은 답을 기다리지 않고 끝난다. 플레이어가 고르면 답하기가 행동 하나로 실행되어 피해가 들어간다. Undo 한 번이면 피해만 돌아가고 다시 고르기를 기다린다.
-> - 시험: 데이터 탭에서 `run › relics`에 `throwingKnife`를 넣고, 전투 중에 이벤트 탭에서 `턴 시작`(turn 1)을 호출한다. 모니터 **명령** 탭 맨 위 "선택 대기 · 피해를 줄 적" 패널에서 적 버튼을 누르고 **답하기**. 버튼에는 적 id(`enemy1` …)가 보인다.
+> - 시험: 데이터 탭에서 `run › relics`에 `throwingKnife`를 넣고, 전투 중에 이벤트 탭에서 `턴 시작`(turn 1)을 호출한다. 모니터 **명령** 탭 맨 위 "선택 대기 · 피해를 줄 적" 패널에서 적 버튼을 누르고 **답하기**. 버튼에는 후보의 텍스트 `<id>.name`이, 없으면 id(`enemy1` …)가 보인다.
 > - 게임 화면은 기다리는 선택(`Game.Choice`)을 그리고, 기다리는 동안(`Game.IsWaiting`) 카드 내기·턴 끝을 막는다. 시스템은 막지 않는다.
 > - 화면 코드, 코드에서 고르게 하는 `Game.Ask`(카드 1장 버리기·보상 3개 중 1개)는 매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md) 5-7~5-10.
 
@@ -367,6 +382,19 @@ static void GetChainLightning(TriggerContext c)
 ```
 
 누르면 행동 하나로 실행되어 Undo된다. 출시 빌드에는 버튼이 없다.
+
+> [!note]- 보상과 수치도 DB에 — 가중치 표 · 밸런스 값
+> **가중치 표**(DB › 가중치 표): "무엇이 얼마나 자주 나오나"를 표로 둔다. 예: 전투 보상 유물 `relicDrop` — 항목 줄 `anchor` 무게 3, `thornArmor` 무게 1, 꽝 무게 4(절반은 아무것도 없음).
+> - 코드 없이 주기: 결과 칸(**+ 결과 추가**)의 **가중치 표에서 주기** → 가중치 표 `relicDrop` · 횟수 `1` · 넣을 플레이어 데이터 `run` · 필드 `relics`. `relics`는 글자 목록이라 뽑힌 ID가 들어간다(꽝이면 아무것도 넣지 않는다).
+> - 코드에서(행동 안): `var relic = Game.Roll(GameIds.Table.RelicDrop);`(하나, 꽝이면 `null`), `Game.Roll(id, 3, unique: true)`(서로 다른 셋 — 카드 보상 3장을 뽑아 `Game.Ask`로 1장 고르게 할 때).
+> - 항목 줄마다 최소·최대 개수와 조건(맞을 때만 후보)을 둘 수 있고, 항목이 다른 가중치 표면 그 표에서 다시 뽑는다. `session.Tables.Chances(id)`는 지금 상태의 확률 목록이다(확률 공개 화면).
+> - 표마다 따로인 난수 흐름이라 Undo하면 같은 결과가 나오고, 표를 더해도 다른 표의 결과는 그대로다.
+>
+> **밸런스 값**(DB › 밸런스 값): 기획자가 바꿀 숫자에 이름을 붙인다. 예: `winGold` 값 15, 곡선 "일정하게" +3/단계.
+> - 코드: `Game.Balance(GameIds.Balance.WinGold)` → 15, `Game.Balance(GameIds.Balance.WinGold, run.floor)` → 그 층의 값(3층이면 15 + 3 × 2 = 21). 곡선은 일정하게·비율로·거듭제곱·표(점 사이 직선)와 반올림·최솟값·최댓값을 고른다.
+> - 없는 ID면 `InvalidOperationException`이다(코드에는 늘 `GameIds` 상수).
+>
+> 둘 다 플레이 중에 DB에서 고치면 저장 전이라도 0.5초 안에 실행 중인 게임에 반영된다([08장](08-TestAndDebug.md) 2절). 수치가 많아지면 DB 목록 위의 **CSV** 버튼으로 표 계산기(구글 시트·엑셀)와 주고받는다. 매뉴얼 [30장](../Manual/30-Balance-Tables.md)·[33장](../Manual/33-Tick-Preview-Csv.md).
 
 ## 11. 모니터로 시험하고 검증하기
 
@@ -415,4 +443,5 @@ static void GetChainLightning(TriggerContext c)
 > - [14. 도전과제](../Manual/14-Achievements.md) · [15. 로그](../Manual/15-Stats-Logs.md)
 > - [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md) — DB 종류 + 감시, 퀘스트 전체 예제
 > - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, 선택 요구, `Game.Ask`, 예약
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — 곡선, `Game.Roll`, 결과 '가중치 표에서 주기'
 > - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 이벤트 호출, 트리거로 달성

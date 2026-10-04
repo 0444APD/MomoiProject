@@ -60,7 +60,8 @@
 > | 매 프레임 바뀌는 값, 화면 상태(위치·애니메이션·끌고 있는 카드·열린 창) | MonoBehaviour 필드(Client) | 카드를 끄는 손 위치 |
 > | 플레이어 입력 하나, 또는 규칙이 한 걸음 나아가는 단위 | 행동(`GameAction`) | 카드 내기, 턴 끝 |
 > | "~하면 / ~할 때" 다른 기능이 반응하는 순간 | 이벤트(`[GameEvent]`) | 턴 끝, 전투 승리 |
-> | 정해진 목록에서 고르는 글자 값 | 키워드(`[KeywordGroup]` + `[Keyword]`) | 등급·속성·카드 종류·상태 |
+> | 정해진 목록에서 고르는 글자 값 | 키워드(`[KeywordGroup]` + `[Keyword]`) | 등급·속성·카드 종류 |
+> | 대상에게 걸려 몇 턴 동안 효과를 내는 것(버프·디버프) | 상태 효과(DB › 상태 효과, 코드 없음) | 화상, 독 |
 > | 한 번 이루면 끝나는 목표 | 도전과제(DB, 코드 없음 또는 `[BindTo]`) | 첫 승리, 한 턴 30 피해 |
 > | 이벤트를 받을 때마다 쌓는 숫자 | 로그(DB) | 처치 수, 한 턴 최대 피해 |
 > | 쓰는 순간 효과가 나는 원본 | 클래스에 사용 기능 필드(`Usable`) | 카드·물약 |
@@ -124,12 +125,12 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > [!note]- 카드 던전의 명사 나누기
 > | 게임 중에 바뀐다(플레이어 데이터) | 기획자가 채우는 원본(인스턴스) | 화면만의 것(MonoBehaviour) |
 > |---|---|---|
-> | 주인공의 체력·방어도·상태, 적의 체력·공격 차례, 층, 골드, 덱(어느 카드가 몇 장, 강화 여부), 손패·뽑을 더미·버린 더미, 에너지, 턴, 가진 유물, 물약 칸, 최고 층, 누적 골드, 해금 카드 | 카드(이름·비용·등급·그림·효과), 몬스터(이름·최대 체력·공격 순서·초상화), 물약(이름·겹치는 수·효과) | 카드를 끄는 위치, 공격 애니메이션 |
+> | 주인공의 체력·방어도, 걸린 상태 효과(라이브러리가 `$statuses`에 둔다), 적의 체력·공격 차례, 층, 골드, 덱(어느 카드가 몇 장, 강화 여부), 손패·뽑을 더미·버린 더미, 에너지, 턴, 가진 유물, 물약 칸, 최고 층, 누적 골드, 해금 카드 | 카드(이름·비용·등급·그림·효과), 몬스터(이름·최대 체력·공격 순서·초상화), 물약(이름·겹치는 수·효과) | 카드를 끄는 위치, 공격 애니메이션 |
 >
 > 원본 클래스에는 `id` 필드가 없다. 원본은 DB 항목 ID로 부르고, 게임 중에 `Find`로 찾을 일이 없다. 몬스터(`MonsterOf`)·물약(`PotionOf`)도 `CardData`와 같은 모양으로 읽는다. 돌려받은 원본은 읽기만 한다.
 
 > [!note]- 판 데이터 클래스(주인공·적·전투)
-> 주인공과 적은 체력·방어도·상태를 함께 가지므로 공통 부분 `Fighter`를 둔다.
+> 주인공과 적은 체력·방어도를 함께 가지므로 공통 부분 `Fighter`를 둔다.
 > ```csharp
 > [Serializable]
 > public class Fighter
@@ -139,7 +140,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 >     public int hp;
 >     public int maxHp;
 >     public int block;                 // 이번 턴 방어도
->     [Keyword(typeof(Status))] public List<string> statuses = new List<string>();
+>     // 화상 같은 상태 효과는 여기 두지 않는다: 걸린 것은 라이브러리가 플레이어 데이터 $statuses에 id로 둔다(DB › 상태 효과).
 >
 >     public bool IsDead => hp <= 0;
 > }
@@ -171,6 +172,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > }
 > ```
 > - `IsDead`는 체력에서 계산되므로 필드가 아니라 속성이다.
+> - 걸린 상태 효과(화상 2턴 남음 …)는 `Fighter`의 필드가 아니다. 상태 효과 걸기가 플레이어 데이터 `$statuses`에 "누구에게·무엇이·몇 중첩·몇 번 남음"을 id로 적고, 화면은 `Game.Statuses(fighter)`로 읽는다([04장](04-AddingContent.md) 4절).
 > - 적은 원본 몬스터의 ID(`monster`)와 공격 순서의 지금 차례(`intentIndex`)만 더 가진다. 공격 순서 자체는 원본에서 읽는다. 체력은 전투를 시작할 때 원본의 최대 체력으로 채운다.
 > - 전투 중에만 있는 값은 `Battle`로 묶어 `RunState.battle`에 둔다(01장 3절). 전투 밖이면 `null`이다. 손패·더미는 카드 id 리스트다.
 > - `damageThisTurn`은 기획 12번(한 턴 최대 피해)을 위한 값이다. 턴 끝 이벤트에 실어 보내려면 턴 동안 모아 둘 곳이 필요하다.
@@ -178,7 +180,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > [!note]- 클래스 하나 = 개념 하나, 기능은 필드
 > - 카드를 "공격 카드 / 스킬 카드" 자식 클래스로 나누지 않는다. 종류는 키워드 필드(`tags`), 쓰는 효과는 사용 기능 필드(`usable`)가 맡는다. 새 종류가 생겨도 클래스가 늘지 않고, 기획자는 DB에서 값만 고른다.
 > - 붙었다 떨어지는 기능은 비어 있을 수 있는 `[SerializeReference]` 필드 하나로 둔다. `null`이면 그 기능이 없다.
-> - 상속은 "서로 다른 개념이 같은 부분을 나누고, 그 부분에 같은 규칙(Block)이 돌아야 할 때"만 쓴다. `Hero`와 `Enemy`는 다른 개념이지만 둘 다 피해·방어도·상태를 받으므로 `Fighter`를 두고, 효과 Block은 `Effect<Fighter>` 하나로 둘 다에 쓴다.
+> - 상속은 "서로 다른 개념이 같은 부분을 나누고, 그 부분에 같은 규칙(Block)이 돌아야 할 때"만 쓴다. `Hero`와 `Enemy`는 다른 개념이지만 둘 다 피해·방어도를 받으므로 `Fighter`를 두고, 효과 Block은 `Effect<Fighter>` 하나로 둘 다에 쓴다.
 > - 다른 값에서 계산되는 값은 필드로 두지 않는다. 두 값이 어긋날 수 있고 Sync할 것이 는다.
 
 > [!note]- 원본 필드 꾸미기
@@ -301,7 +303,7 @@ public class TurnEnded
 
 ## 6. 키워드: 고르는 값
 
-등급·속성·카드 종류·상태처럼 목록에서 고르는 값은 키워드다. 그룹 하나 = static class 하나, 키워드 하나 = `const string` 하나.
+등급·속성·카드 종류처럼 목록에서 고르는 값은 키워드다. 그룹 하나 = static class 하나, 키워드 하나 = `const string` 하나.
 
 ```csharp
 [KeywordGroup("등급")]
@@ -319,6 +321,7 @@ public static class Rarity
 > - 코드가 곧 키워드 목록이다. DB › 키워드 탭에서 더해도 이 파일이 고쳐진다.
 > - enum 대신 키워드를 쓰는 이유: 기획자가 목록을 늘리고 이름을 고를 수 있고, 저장 값이 글자라 목록 순서가 바뀌어도 저장이 깨지지 않는다.
 > - 카드 종류는 여러 개일 수 있으므로 `tags`는 리스트다.
+> - 화상·빙결 같은 "상태"는 이름만 고르는 값이 아니라 중첩·지속·턴마다 효과가 있으므로 키워드가 아니라 DB › 상태 효과의 항목으로 둔다(8절).
 
 ## 7. 기획자가 계속 더할 것
 
@@ -346,16 +349,17 @@ public static class Rarity
 - **여럿이 같이 쓰는 계산** → 평범한 static 함수(`Rules.Damage`, `Rules.Shuffle`).
 - **핵심 규칙 함수**(피해·회복·죽음·비용·뽑기)는 일을 하기 직전에 가로채기 자리(`Game.Intercept`)를 둔다. "받는 피해 −5" 같은 효과를 고치는 효과는 나중에 DB 항목으로 더하고, 규칙 함수는 고치지 않는다.
 - **캐릭터 능력치**(공격력·방어력)는 숫자 필드 + Modifier다. 장비·버프는 효과 `능력치 보정`이나 `Game.AddModifier`로 붙이고, 읽을 때는 `Game.Attribute`.
+- **몇 턴 동안 이어지는 효과**(화상·독·보호막)는 Block을 만들지 않는다. DB › 상태 효과에 항목으로 두고, 카드에는 기본 제공 효과 `상태 효과 걸기`를 둔다.
 
-자세히: 매뉴얼 [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md).
+자세히: 매뉴얼 [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md).
 
 | 종류  | Block                                                          | 기획        |
 | --- | -------------------------------------------------------------- | --------- |
-| 효과  | 피해 `DealDamage`, 방어도 `GainBlock`, 회복 `Heal`, 상태 걸기 `AddStatus` | 5번        |
+| 효과  | 피해 `DealDamage`, 방어도 `GainBlock`, 회복 `Heal` (화상은 기본 제공 `상태 효과 걸기`) | 5번        |
 | 대상  | 모든 적 `AllEnemies`, 무작위 적 `RandomEnemy`                         | 범위·무작위 공격 |
 
 > [!note]- 코드 없이 조립되는 카드
-> 대상을 고르지 않으면 플레이어가 고른 대상(카드를 끌어 놓은 적)이 그대로 쓰이고, 기본 제공 `사용자 자신`은 카드를 낸 주인공을 고른다. 그래서 타격(고른 적에게 피해)·수비(나에게 방어도)·화염구(고른 적에게 피해 + 화상)는 코드 없이 조립된다.
+> 대상을 고르지 않으면 플레이어가 고른 대상(카드를 끌어 놓은 적)이 그대로 쓰이고, 기본 제공 `사용자 자신`은 카드를 낸 주인공을 고른다. 그래서 타격(고른 적에게 피해)·수비(나에게 방어도)·화염구(고른 적에게 피해 + `상태 효과 걸기` 화상)는 코드 없이 조립된다. 화상 자체(턴 끝마다 피해, 2턴)도 DB › 상태 효과의 항목이라 코드가 없다([04장](04-AddingContent.md) 4절).
 
 `[BindTo(DB 항목 ID)]`를 static 함수에 붙이면, 그 항목의 결과 칸 대신 이 함수가 돈다(DB에서 결과 칸은 잠기고 함수 이름이 보인다).
 
@@ -400,13 +404,13 @@ public static class CardCode
 > |---|---|---|
 > | 언제 · 즉시 | 타격: 내면 바로 피해 | 결과 Block · `[BindTo]` |
 > | 언제 · 발동 | 닻: 전투 첫 턴에 | Trigger |
-> | 언제 · 지연 | 2턴 뒤 폭발 | 예약(곧 추가) |
-> | 언제 · 지속 | 3턴 동안 힘 +2 | Modifier · 상태 효과(곧 추가) |
+> | 언제 · 지연 | 2턴 뒤 폭발 | 상태 효과의 끝날 때 결과 · 예약(`Game.ScheduleOn`) |
+> | 언제 · 지속 | 화상: 2턴 동안 턴 끝마다 피해 | 상태 효과 · Modifier |
 > | 누구에게 | 모든 적, 무작위 적 | 대상 Block |
 > | 무엇을 · 데이터 바꾸기 | 피해, 방어도, 회복 | 효과 Block · 플레이어 데이터에 주기 |
 > | 무엇을 · 만들기·없애기·바꾸기 | 카드 강화(다른 카드가 된다) | 행동 · 효과 Block · `[BindTo]` |
 > | 무엇을 · 가로채기 | 가시 갑옷: 받는 피해 −5 | 트리거 `가로채기` + 결과 `의도 고치기` |
-> | 무엇을 · 선택 요구 | 손패 1장 버리기 | 선택 대기(곧 추가) |
+> | 무엇을 · 선택 요구 | 손패 1장 버리기 | 선택 대기(결과 `선택 요구` · `Game.Ask`) |
 > | 무엇을 · 비용 | 카드의 에너지 비용 | `Game.Pay` · 결과 `비용 내기` |
 > | 안전장치 | 유물끼리 서로 부르는 연쇄 | 사슬 16단계에서 끊기 |
 >
@@ -453,13 +457,13 @@ public static class CardCode
 
 | 폴더 · 파일 | 들어가는 것 | 기획 |
 |---|---|---|
-| `Rules/Data/Keywords.cs` | 키워드 그룹 `Rarity`·`Element`·`CardTag`·`Status` | 5 |
+| `Rules/Data/Keywords.cs` | 키워드 그룹 `Rarity`·`Element`·`CardTag` | 5 |
 | `Rules/Data/Model.cs` | 판: `Fighter`·`Hero`·`Enemy`·`DeckCard`·`Battle`·`RunState` / 프로필: `Profile` / 원본: `Card`·`MonsterData`·`Potion` | 1~11 |
 | `Rules/Events/Events.cs` | `CardPlayed`·`DamageDealt`·`EnemyKilled`·`TurnStarted`·`TurnEnded`·`BattleWon`·`GoldGained`·`RunEnded` | 5절 |
 | `Rules/Events/Intents.cs` | 의도 `DamageIntent`(`Rules.Damage`의 가로채기 자리) | 8절 |
 | `Rules/Actions/RunActions.cs` | `StartRun`·`BuyCard`·`DrinkPotion`·`EndRun` | 1, 2, 9, 11 |
 | `Rules/Actions/BattleActions.cs` | `StartBattle`·`DrawCards`·`PlayCard`·`EndTurn`·`WinBattle` | 3~8 |
-| `Rules/Cards/CardBlocks.cs` | 효과 Block 넷, 대상 Block 둘 | 5 |
+| `Rules/Cards/CardBlocks.cs` | 효과 Block 셋, 대상 Block 둘 | 5 |
 | `Rules/Cards/CardCode.cs` | `[BindTo]`: 연쇄 번개, 첫 승리 | 11 |
 | `Rules/Relics/Relics.cs` | DB 종류 `RelicData`, 감시 등록 함수 `RelicRules.Register`, `[BindTo]` 불타는 피 | 10 |
 | `Rules/Run/Rules.cs` | 규칙 함수(원본 읽기 `CardData`·`MonsterOf`·`PotionOf`, 덱 카드·적 만들기, 피해, 섞기) | 4, 6 |
@@ -470,6 +474,7 @@ public static class CardCode
 |---|---|
 | 플레이어 데이터 | `run`(Session, `RunState`), `profile`(Meta, `Profile`) — 시작 설정이 만든다 |
 | 인스턴스 | 카드 `strike`·`defend`·`fireball`·`chainLightning`, 몬스터 `goblin`·`slime`·`dragon`, 물약 `healPotion` |
+| 상태 효과 | `burn`(화상, [04장](04-AddingContent.md) 4절) |
 | 로그 | `kills`, `maxTurnDamage`, `goldEarned` |
 | 도전과제 | `firstWin`, `bigTurn` |
 | 유물 | `anchor`, `burningBlood` |

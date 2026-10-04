@@ -14,6 +14,8 @@
 > | 변환 | 예전 버전의 저장 트리를 지금 구조로 고치는 한 단계. DB › 개발 › **저장 변환** 표에 적고, 값을 계산해 고치는 것만 코드(`options.Migrations.Add`)로 쓴다. |
 > | 개발 중 / 출시됨 | 프로젝트 상태. 메뉴 `MomoiProject → 출시됨 (저장 호환 유지)`로 바꾼다. 개발 중에는 호환되지 않는 저장을 지우고, 출시됨이면 이어받는다. |
 > | Undo | 마지막 행동을 되돌리는 것. Undo 이력은 저장하지 않는다. |
+> | 슬롯 | 저장 묶음(프로필 + 진행 중인 판) 하나. 세이브 칸 "1·2·3"이 슬롯 셋이다. 슬롯마다 폴더가 따로다. |
+> | 설정 | DB › 설정의 항목(음량·언어·해상도·전투 속도 …). 값은 기기마다 하나(`settings.json`)이고 슬롯·판·Undo와 상관없다. |
 
 ---
 
@@ -23,6 +25,7 @@ DB › 플레이어 데이터에서 항목마다 구역을 본다.
 
 - 판이 끝나면 버릴 값(덱·체력·층·전투) → `Session`. 카드 던전은 `run`(`RunState`).
 - 판이 끝나도 남을 값(해금·최고 기록·누적 재화) → `Meta`. 카드 던전은 `profile`(`Profile`).
+- 기기의 설정(음량·언어·화면·키) → 플레이어 데이터가 아니라 DB › **설정**. 기기마다 하나다(아래 접힌 칸).
 
 판이 끝날 때 남길 값은 판 끝 행동(`EndRun`)이 프로필로 옮긴다.
 
@@ -51,6 +54,21 @@ protected override void Run()
 > - `floor`를 0으로 돌리는 줄이 중요하다. 판 데이터에 "진행 중인가"(`RunState.IsActive => floor > 0`)가 남아 있으므로, 끝난 판이 어떤 이유로 저장되어도 이어 하기가 그것을 열지 않는다.
 > - 결과 화면은 `RunEnded`가 실어 온 층·승리 여부로 그린다. 이벤트는 `floor`를 0으로 돌리기 전에 쏜다. 남은 판 값은 다음 판을 열 때 지운다.
 > - 첫 승리 도전과제가 연쇄 번개 카드를 해금하는 것도 `profile.unlocked`(메타)에 쓴다. 도전과제 달성과 그 결과는 Undo되지 않으므로, 해금은 판을 되돌려도 남는다.
+
+> [!note]- 설정 — DB › 설정과 `GameSettings`(기기마다 하나)
+> DB › **설정**에 항목 하나 = 설정 칸 하나다. 칸: 분류(설정 화면의 묶음: 소리·화면·게임 …) · 값(종류 켜기/끄기·숫자(슬라이더)·선택지·글과 기본값 — 종류에 맞는 칸만 보인다) · 적용 대상.
+> - **적용 대상**을 고르면 라이브러리가 바로 적용한다: 언어, 전체·브금·목소리·효과음·UI 음량, 전체 화면, 해상도, 수직 동기화, 최대 프레임. 게임이 켜질 때 모두 적용하고, 바꿀 때 그 칸을 적용한다(전체 화면·해상도는 빌드에서만). "없음(게임 코드)"이면 게임이 읽는다.
+> - 코드: `GameSettings.Number(GameIds.Setting.BattleSpeed)`·`Toggle`·`Choice`·`Text`로 읽고, `GameSettings.Set(id, 값)`으로 바꾼다(범위·단위에 맞게 고쳐 저장 → 적용 → `GameSettings.Changed(id)`). `Reset(id)`·`ResetAll(분류)`.
+> - 설정 화면은 `GameSettings.All`(DB 순서)을 분류로 묶어 종류별로 토글·슬라이더·드롭다운을 그린다. 이름은 `GameSettings.Label(id)`(텍스트 `id.name`), 선택지는 `GameSettings.ChoicesOf(id)`(언어·해상도는 선택지를 비우면 저절로 채운다).
+> - 값은 `MomoiProject/settings.json` 하나다. 슬롯을 바꿔도, Undo해도, 판을 새로 열어도 그대로다. 그래서 게임 규칙에 영향을 주는 값(난이도처럼 판마다 다를 수 있는 것)은 설정이 아니라 판 데이터에 둔다.
+> - 매뉴얼 [31장](../Manual/31-Slots-Settings-Input.md).
+
+> [!note]- 입력 — 키 바꾸기(선택 기능 '입력(키 바꾸기)')
+> DB 사이드바의 **입력(키 바꾸기)** 아래 **기능 활성화**로 켠다. Input System 패키지(`com.unity.inputsystem`)가 있어야 컴파일된다.
+> - 게임이 켜질 때 한 번 `GameInput.Use(inputActions)`(프로젝트의 `.inputactions`). 저장해 둔 키를 덮어 씌우고 켠다. Bootstrap의 `Started`에서 부르면 된다.
+> - 설정 화면: 글자는 `GameInput.BindingText(action, i)`, 누르면 `GameInput.Rebind(action, i, result => …)`(다음에 누른 키로, Esc는 취소, 같은 묶음의 다른 키와 겹치면 바꾸지 않고 `result.Conflict`). 되돌리기는 `GameInput.ResetBindings()`.
+> - 바꾼 키는 설정 파일(기기마다 하나)에 남는다.
+> - 입력을 읽는 것은 Input System 그대로다(`action.WasPressedThisFrame()`). 규칙은 입력이 아니라 행동(`Game.Do`)으로 바뀐다.
 
 ## 2. 판 저장 설정
 
@@ -137,8 +155,28 @@ public static class RunSaves
 > - 불러온 판은 난수 상태까지 저장한 순간과 같다. 이어 한 뒤의 덱 섞기·보상 골드도 끄기 전과 같은 결과가 나온다.
 > - Undo 이력은 불러온 시점부터 새로 쌓인다.
 
+세이브 칸이 여럿이면 **슬롯**을 쓴다. 슬롯 하나가 프로필 + 진행 중인 판 묶음이고, 위의 이어 하기·새 판 코드는 지금 슬롯에서 그대로 돈다.
+
+> [!note]- 슬롯 — `UseSlot` · `SlotInfoOf` · `SlotSummary`
+> 슬롯마다 폴더가 따로다: `MomoiProject/slots/<이름>/profile.json·run.json·slot.json`. 이름 `""`(기본 슬롯)은 예전 자리(`MomoiProject/` 바로 아래)다. 이름에는 글자·숫자·`-`·`_`만 쓴다.
+> ```csharp
+> // 타이틀 화면: 칸 셋을 그린다
+> foreach (var name in new[] { "1", "2", "3" })
+> {
+>     var info = GBibleRuntime.SlotInfoOf(name);   // HasProfile·HasRun·SavedAt(지역 시각)·PlayTime(초)·Summary·IsEmpty
+>     // 버튼 글: info.IsEmpty ? 빈 칸 : 요약 + 저장 시각
+> }
+> GBibleRuntime.UseSlot("2");   // 지금 슬롯을 저장하고, 그 슬롯으로 세션을 새로 시작한다(Started가 다시 온다)
+> ```
+> - `UseSlot`은 타이틀처럼 게임 화면이 없을 때 부른다. 마지막으로 쓴 슬롯을 기억해 다음 실행 때 그 슬롯으로 시작한다.
+> - 칸에 보일 한 줄은 `GBibleRuntime.SlotSummary = session => …`로 정한다. 저장할 때마다 `slot.json`에 쓴다. 카드 던전이면 `session => $"{session.Game.Data().Run.floor}층"`.
+> - `GBibleRuntime.Slots()`(저장이 있는 슬롯 목록, 기본 슬롯 제외), `DeleteSlot(이름)`(지금 슬롯이면 저장하지 않고 새로 시작), `CopySlot(원본, 대상)`, `GBibleRuntime.PlayTime`(지금 슬롯의 누적 플레이 시간).
+> - `SavePath`·`RunSavePath`·`HasSavedRun`은 지금 슬롯을 가리킨다. 설정(1절)은 슬롯과 상관없이 하나다. 하이어라키의 `[MomoiProject]` 오브젝트도 슬롯을 바꿔도 하나다.
+> - 저장 파일을 직접 다루는 서버·도구는 `session.ExportMeta()`·`ImportMeta(json)`·`ExportRun()`·`ImportRun(json)`으로 JSON 글자를 받는다.
+> - 매뉴얼 [31장](../Manual/31-Slots-Settings-Input.md).
+
 > [!note]- 다른 장르라면
-> RPG·수집형처럼 판 개념이 없는 게임은 대부분의 값이 메타 구역(프로필)이다. 세이브 슬롯이 여러 개라면 `session.ExportMeta()`·`ImportMeta(json)`로 JSON 글자를 받아 슬롯 파일 이름을 게임이 정해 쓴다. 판 쪽도 `ExportRun()`·`ImportRun(json)`이 있다.
+> RPG·수집형처럼 판 개념이 없는 게임은 대부분의 값이 메타 구역(프로필)이다. 세이브 칸은 슬롯으로 나누고, 씬에 놓인 것의 상태(연 상자·쓰러뜨린 보스)는 월드 상태(`Game.SetWorld(id, 값, permanent: true)`)로 프로필에 남긴다([07장](07-GenreRecipes.md) 6절).
 
 ## 4. 저장되지 않는 값
 
@@ -174,7 +212,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 
 > [!note]- 확인할 곳
 > - 모니터 **데이터** 탭은 **판 데이터**(세션 구역)와 **프로필 데이터**(메타 구역)를 나눠 보여 준다. 값이 어느 파일에 들어가는지 눈으로 확인한다.
-> - 저장 파일 위치는 `GBibleRuntime.SavePath`(프로필)·`RunSavePath`(판)이며 `{Application.persistentDataPath}/MomoiProject/` 아래다.
+> - 저장 파일 위치는 `GBibleRuntime.SavePath`(프로필)·`RunSavePath`(판)이며 `{Application.persistentDataPath}/MomoiProject/` 아래다(슬롯을 쓰면 `MomoiProject/slots/<이름>/`). 설정은 `MomoiProject/settings.json` 하나다.
 > - 행동마다 저장이면 행동을 할 때마다 기록에 "판 저장: …"이 남는다.
 
 ## 6. 출시 상태로 바꾸기
@@ -263,6 +301,8 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 끝난 판은 이어 하기가 열지 않는다(`RunState.IsActive`).
 - [ ] '이어 하기'는 `HasSavedRun`일 때만 켜지고, 불러오기 실패 때 새 판으로 넘어간다.
 - [ ] '새 판'은 `GBibleRuntime.NewRun(session)`을 행동 밖에서 부른다.
+- [ ] 세이브 칸이 여럿이면 슬롯(`UseSlot`·`SlotInfoOf`)을 쓰고, 칸에 보일 요약(`SlotSummary`)을 정했다.
+- [ ] 음량·언어·화면·키 같은 기기 설정은 DB › 설정(필요하면 선택 기능 입력)에 있고, 판 규칙에 영향을 주는 값은 설정에 두지 않았다.
 - [ ] 플레이어 데이터에 에셋 참조 대신 ID를 둔다.
 - [ ] 모니터 저장 명령으로 저장 → 끄기 → 불러오기를 해 보고 값·난수 결과가 이어지는 것을 봤다.
 
@@ -285,6 +325,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 
 > [!note]- 더 보기(매뉴얼)
 > - [06. 저장·불러오기](../Manual/06-SaveLoad.md) — 저장 파일 모습, 저절로 일어나는 일, 변환 API 전체, 호환 검사
+> - [31. 슬롯·설정·입력](../Manual/31-Slots-Settings-Input.md) — 슬롯 API, DB › 설정과 `GameSettings`, `GameInput`
 > - [20. 시작하기](../Manual/20-Setup.md) — 자동 시작 순서, `Configuring`·`Started`·`Stopped`, 출시 상태
 > - [21. DB](../Manual/21-Editor-Database.md) — ID 바꾸기·지우기, 검증 메시지 모음
 > - [04. 인스턴스](../Manual/04-Instances.md) — 원본(`session.Instances`)과 사본(`CopyInstance`)

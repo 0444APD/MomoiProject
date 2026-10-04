@@ -75,7 +75,7 @@ static void KillAll(TriggerContext c)
 > | 설명 | 버튼에 마우스를 올리면 보인다 |
 > | 결과 | 결과 Block 목록: 플레이어 데이터에 주기 · 이벤트 쏘기 · 로그에 기록 · 대상에게 효과 · 코딩한 결과. ID에 `[BindTo]`가 있으면 그 함수가 결과다 |
 >
-> 명령 탭에는 기본 묶음이 이미 있다. **저장**(프로필 저장·프로필 삭제·판 저장·판 불러오기·새 판), **시간**(일시정지 / 재개·1프레임 진행·배속).
+> 명령 탭에는 기본 묶음이 이미 있다. **저장**(프로필 저장·프로필 삭제·판 저장·판 불러오기·새 판), **시간**(일시정지 / 재개·1프레임 진행·배속). 선택을 기다리는 중이면 맨 위에 **선택 대기** 패널이 생긴다(5절).
 
 > [!note]- 이벤트 쏘기 Block
 > - 이벤트를 고르고, 값 줄(필드 경로 = 값)을 적고, 횟수를 정한다. 값은 숫자·글자·참거짓·enum 필드만 적는다(`a.b`로 안쪽 필드도). 적지 않은 필드는 이벤트 클래스의 기본값이다.
@@ -84,6 +84,9 @@ static void KillAll(TriggerContext c)
 
 > [!note]- 왜 행동 하나로 실행하나
 > 결과 전체를 `DeveloperEditAction` 하나 안에서 실행한다. 그래서 바꾼 값이 기록(행동 탭의 "[개발] 골드 +100", 공개 범위 "개발자")에 남고 Undo된다. 명령 안에서 값을 행동 밖에서 고치면 Undo되지 않고, 그 뒤 Undo하면 덮어쓰기 경고가 난다.
+
+> [!note]- 수치는 플레이 중에 DB에서 바로 — 밸런스 값 · 가중치 표
+> 플레이 중에 DB › 밸런스 값·가중치 표를 고치면 저장(Ctrl+S) 전이라도 0.5초 안에 실행 중인 게임에 반영된다. 보상 골드 곡선·드롭 무게를 바꿔 가며 같은 판을 바로 다시 해 본다(4절의 Undo와 함께 쓰면 같은 난수에서 비교된다). 정했으면 Ctrl+S로 저장한다. 표 계산기에서 고친 값은 DB 목록 위 **CSV** 버튼으로 가져온다([04장](04-AddingContent.md) 10절).
 
 > [!note]- 코드로 등록하기
 > DB 항목 없이 `session.Debug.Register(묶음, 이름, 실행, 설명)`으로 등록해도 된다. 세션마다 등록되므로 `GBibleRuntime.Started`에서 한다. 출시 빌드에서는 `Register`가 아무것도 하지 않으므로 `if (Debug.isDebugBuild)`로 감싸지 않는다. 값을 바꾸는 명령은 직접 `DeveloperEditAction`으로 감싼다.
@@ -116,6 +119,9 @@ static void KillAll(TriggerContext c)
 > | 도전과제가 제대로 달성되나 | 도전과제 탭 **트리거로 달성**(실제 이벤트로), 안 되면 **강제 달성** |
 > | 로그가 제대로 쌓이나 | 로그 탭 **이벤트로 더하기**·**이벤트로 기록**(실제 이벤트로) / **직접 수정**(값만) |
 > | 몇 판을 해야 나오는 상황을 지금 보고 싶다 | 명령 탭의 개발 명령(DB › 개발 › 개발 명령, 2절) |
+> | 선택을 기다리고 있나, 답해 보고 싶다 | 명령 탭 맨 위 **선택 대기** 패널(5절) |
+> | 이 카드를 내면 얼마나 들어가나(실제로 내지 않고) | 미리보기 `Game.Preview`·`Game.CanDo`([06장](06-Presentation.md) 2절). 아무 기록도 남지 않는다 |
+> | 걸린 상태 효과·예약이 무엇인가 | 데이터 탭의 `$statuses`(누구에게·`stacks`·`remaining`)·`$schedule` |
 
 > [!note]- 실패한 행동
 > 행동 안에서 예외가 나면 그 행동이 바꾼 것이 모두 취소된다. 화면에 보인 연출과 값이 다르다면 여기부터 의심한다. 에너지 부족처럼 예상된 실패는 정상이다.
@@ -146,6 +152,12 @@ static void KillAll(TriggerContext c)
 > 도전과제 하나를 트리거로 달성해 보는 일은 도전과제 탭의 **트리거로 달성** 버튼이 이미 하므로 명령으로 만들지 않는다.
 >
 > 시험 코드에서는 `session.SimulateEvents`(이벤트 목록을 행동 하나로 쏜다)와 `session.TrySimulateAchievement`(트리거로 달성)를 쓴다.
+
+> [!note]- 고르기를 시험한다 — 명령 탭의 선택 대기 패널
+> 결과 `선택 요구`나 `Game.Ask`로 선택을 기다리는 중이면 명령 탭 맨 위에 "선택 대기 · 안내 글" 패널이 생긴다. 게임 화면에 고르기 창이 아직 없어도 여기서 고른다.
+> - 후보 버튼을 누르면 ✓가 붙는다(하나만 고르는 선택은 바꿔 고른다). **답하기**를 누르면 답이 행동 하나로 실행되어 타임라인에 "선택: …"으로 남고 Undo된다.
+> - 개수가 틀리거나 후보가 아니면 알림이 뜨고 아무것도 바뀌지 않는다(선택도 그대로 기다린다).
+> - 후보 이름은 텍스트 `<id>.name`, 없으면 id다. 예: [04장](04-AddingContent.md) 9절 투척 단검.
 
 > [!note]- 시뮬레이션 자세히
 > - 쏜 이벤트는 행동 하나("[테스트] …")로 기록된다. Undo하면 로그는 돌아가고 달성은 남는다.
@@ -191,10 +203,12 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
     var battle = Game.Data().Run.battle;
     battle.energy = 0;                                   // 시험 준비(행동 밖 변경)
     var hand = new List<string>(battle.hand);
-    Assert.Throws<InvalidOperationException>(() => Game.Do(new PlayCard { card = Rules.CardOf(Game, hand[0]) }));
+    Assert.Throws<GameFailure>(() => Game.Do(new PlayCard { card = Rules.CardOf(Game, hand[0]) }));   // Game.Pay가 던지는 플레이어용 실패
     CollectionAssert.AreEqual(hand, Game.Data().Run.battle.hand);
 }
 ```
+
+`Assert.Throws<T>`는 형식이 정확히 같아야 통과한다. 플레이어용 실패(`Game.Fail`·`Game.Pay`)는 `GameFailure`, "어떤 실패든"이면 `Assert.Catch<InvalidOperationException>`이다.
 
 > [!note]- 왜 DB 없이 만드나
 > - 게임은 덱의 한 장(`DeckCard`)이 든 원본 ID로 `Rules.CardData`·`MonsterOf`·`PotionOf`를 거쳐 원본을 읽는다. 테스트에 필요한 수치만 넣어 두면 기획자가 DB 수치를 바꿔도 테스트가 흔들리지 않는다.
@@ -223,7 +237,9 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > - 전체는 예시 게임의 `CardDungeonRulesTests.cs`.
 
 > [!note]- 테스트 자세히
-> - `GBibleRuntime` 없이 만든 세션은 프레임이 흐르지 않는다. 프레임 끝 처리가 필요하면 `session.EndFrame(0.016)`을 직접 부른다.
+> - `GBibleRuntime` 없이 만든 세션은 프레임이 흐르지 않는다. 프레임 끝 처리(시간 예약·시간 지속 상태 효과·고정 틱)가 필요하면 `session.EndFrame(0.016)`을 직접 부른다.
+> - "이 행동을 하면 이렇게 된다"만 보고 상태를 그대로 두고 싶으면 `Game.Preview(행동, g => 읽기)`. 되돌릴 필요 없이 다음 줄에서 같은 상태로 다른 행동을 시험한다.
+> - 상태 효과를 쓰는 규칙을 시험하려면 DB 대신 `session.Statuses.Define(new StatusDefinition { … })`로 정의를 넣는다(매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md)).
 > - Tests asmdef(`MomoiProject.Tests`)는 Rules·`GBible.Core`·`GBible.Unity`·켠 데이터 모듈(`GBible.Inventory` 등)·Test Runner·NUnit을 참조하고, 에디터에서 테스트를 돌릴 때만 컴파일된다. 화면 코드(Client)는 부를 수 없다. 규칙이 Rules에 있어야 하는 이유다.
 > - 프로젝트 루트의 `Tools/RunCoreTests.ps1`은 라이브러리의 코어 테스트만 Unity 없이 돌린다. 라이브러리를 고쳤을 때 코어가 깨지지 않았는지 보는 용도이고, 게임 규칙 테스트는 넣지 않는다.
 
@@ -257,6 +273,12 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > | [다국어] '…'에 텍스트 '…'가 없습니다 | 그 언어(와 대체 언어)에 키가 없다. 화면에는 `[키]`가 보인다 | 원문 표에 키를 더하고, `MomoiProject → 다국어 → 번역 검사`로 빠진 것을 찾는다 |
 > | [다이얼로그] 다이얼로그 재생기가 없습니다 … | 씬에 재생기도, 설정의 프리팹도 없다 | `MomoiProject → 다이얼로그 시스템 → UI 템플릿 만들기` |
 > | GameDatabase를 찾을 수 없습니다 | DB 에셋(GameDatabase)이 없다 | 시작 설정을 적용하거나 DB 창을 한 번 연다 |
+> | 화면에 `[fail.…]`처럼 대괄호 키가 보인다 | `Game.Fail`에 기본 문장이 없고 텍스트 표에도 그 키가 없다 | 기본 문장을 넣거나 원문 표에 키를 더한다([06장](06-Presentation.md) 5절) |
+> | 비용: 없는 플레이어 데이터 '…'입니다 | `Game.Pay`의 키가 틀렸다 | `GameIds.PlayerData.X.Id`를 넘긴다 |
+> | 없는 상태 효과 '…'입니다 | `상태 효과 걸기`·`Game.ApplyStatus`의 ID가 DB에 없다(저장 전·지운 항목) | DB › 상태 효과에 만들고 Ctrl+S, 코드는 `GameIds.Status` 상수 |
+> | 행동 안에서는 미리보기를 할 수 없습니다 | 행동·Block·이벤트를 받는 규칙 코드 안에서 `Game.Preview`·`CanDo`를 불렀다 | 화면 코드(행동 밖)에서 부른다 |
+> | 씬 '…'을(를) 열 수 없습니다(Build Settings의 씬 목록에 있는지 확인) | 씬 흐름의 필드가 가리킨 씬이 Build Settings에 없다 | 씬을 Build Settings에 더하거나 필드 값을 고친다([03장](03-GameLoop.md) 9절) |
+> | 대상이 없어 예약을 실행하지 않았습니다 | 예약한 행동의 대상이 실행 전에 사라졌다(죽은 적, Undo) | 정상일 때가 많다. 아니면 예약을 거는 자리를 본다 |
 
 ## 8. 체크리스트
 
@@ -264,7 +286,8 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 - [ ] 시험 준비용 개발 명령이 DB › 개발 › 개발 명령에 있고, 누르면 행동 하나로 기록·Undo된다. 규칙을 거쳐야 하는 명령만 `[BindTo]` 코드다.
 - [ ] 버그를 보면 판을 저장하고, 저장 파일과 시드를 보고에 붙인다.
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
-- [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다.
+- [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
+- [ ] 밸런스 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
 - [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
 
@@ -280,3 +303,6 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > - [07. 난수와 시간](../Manual/07-Random-Time.md) — 시드, 같은 시드 같은 결과
 > - [06. 저장·불러오기](../Manual/06-SaveLoad.md) — 판 저장·불러오기, 개발 중 저장 초기화
 > - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — 예전 방식 비교, 주의할 점
+> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 선택 대기 패널, 테스트에서 정의 넣기
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — 플레이 중 바로 반영
+> - [33. 고정 틱·미리보기·CSV](../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`, DB CSV

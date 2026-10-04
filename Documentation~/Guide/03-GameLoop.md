@@ -12,6 +12,9 @@
 > | 이벤트를 쏜다 / 받는다 | 게임 코드가 `Game.Events.Publish`로 일어난 일을 넘기는 것이 "쏜다", 로그·도전과제·유물의 Trigger나 화면의 `Subscribe`가 그것을 처리하는 것이 "받는다". |
 > | Block | 기획자가 DB에서 조립하는 로직 단위(효과·대상·조건). 카드 효과는 효과 Block으로 실행된다. |
 > | Trigger · Outcome | DB 항목의 "언제(Trigger) → 무엇을(Outcome, 결과)". 이벤트를 받으면 Trigger를 검사하고 결과를 실행한다. |
+> | `GameFailure` | 플레이어에게 보일 실패. 텍스트 키와 기본 문장을 담는 `InvalidOperationException`이다. `Game.Fail`이 만들고, `Game.Pay`도 모자라면 이것을 던진다. |
+> | 상태 효과 | DB › 상태 효과의 항목(화상·독·보호막). 대상에게 걸려 있는 동안 중첩·지속(턴 수·초)에 따라 효과를 낸다. |
+> | 예약 | 행동 하나를 나중(이벤트를 N번 받은 순간, 게임 시간 N초 뒤)에 실행하게 맡겨 두는 것. |
 
 ---
 
@@ -24,7 +27,7 @@
 | 여러 행동이 같이 쓰는 계산이다 | 평범한 static 함수(카드 던전의 `Rules`) | Rules |
 | 입력을 받아 무엇을 할지 고른다 | 런 스크립트: 행동을 만들어 `Game.Do` | Client |
 | 값을 화면에 그린다 | 화면 코드: `Game.Data()`·`Game.Find`로 읽기만. 다시 그리기는 `GameView.Redraw` | Client |
-| 맞음·쓰러짐 연출을 튼다 | 화면 코드: 이벤트를 `SubscribeAfterAction`으로 받는다 | Client |
+| 맞음·쓰러짐 연출을 튼다 | 화면 코드: 이벤트를 `SubscribeAfterAction`으로 받아 연출 대기열(`GameView.Present`)에 넣는다 | Client |
 
 ## 2. 한 바퀴: 카드 한 장을 낼 때
 
@@ -36,16 +39,17 @@
       └ Game.Do(new PlayCard { card = 덱 카드, target = 적 })
           ① 행동 시작 — card·target을 id로 지금 데이터에서 다시 찾아 넣음
           ② PlayCard.Run()
-               에너지 − 비용, 손패 → 버린 더미
+               Game.Pay(에너지, 비용)                    ← 가로채기를 거쳐 뺀다(모자라면 실패)
+               손패 → 버린 더미
                Game.Use("fireball", 주인공, 적)           ← 행동 안의 행동
                  └ 피해 Block → Rules.Damage → DamageDealt·EnemyKilled를 쏜다
-                 └ 상태 걸기 Block → 화상
+                 └ 상태 효과 걸기 → 적에게 화상(DB › 상태 효과 burn)
                CardPlayed를 쏜다
                적이 모두 쓰러졌으면 Game.Do(new WinBattle())
                  └ TurnEnded·BattleWon·GoldGained를 쏜다
           ③ 행동 끝 — Sync → Undo 한 단위로 기록
-  └ [연출] ③ 뒤에 DamageDealt·EnemyKilled를 쏜 순서대로 받아 숫자·쓰러짐  (SubscribeAfterAction)
-     [화면] 프레임 끝에 Game.Data().Run을 읽어 한 번 다시 그림           (GameView.Redraw)
+  └ [연출] ③ 뒤에 DamageDealt·EnemyKilled를 쏜 순서대로 받아 연출 대기열에  (SubscribeAfterAction → GameView.Present)
+     [화면] 연출이 끝난 프레임 끝에 Game.Data().Run을 읽어 한 번 다시 그림    (GameView.Redraw)
 ```
 
 - **값은 ②에서만 바뀐다.** 이벤트를 받은 로그·유물의 결과도 ② 안에서 실행된다. 그래서 Undo 한 번에 에너지·손패·피해·처치 수·유물 효과가 함께 돌아간다.
@@ -54,7 +58,7 @@
 
 > [!note]- ①~③에서 일어나는 일 자세히
 > - ① 그 전까지의 행동 밖 변경을 떼어 두고, 난수 상태를 보관한다. 대상 필드(`card`·`target`)는 id로 지금 데이터의 객체를 다시 찾아 넣는다. 싱글에서 방금 고른 객체면 같은 객체가 그대로 쓰이고, 못 찾으면 행동이 실패한다(02장 4절).
-> - ② 비용 같은 고정 값은 카드 원본에서 읽는다(`Rules.CardData`). 받는 쪽: `DamageDealt` → 연출(모아 두었다가 ③ 뒤에), `EnemyKilled` → 로그 `kills`, `TurnEnded` → 로그 `maxTurnDamage`(마지막 턴도 센다), `BattleWon` → 유물 불타는 피·도전과제 첫 승리.
+> - ② 비용 같은 고정 값은 카드 원본에서 읽는다(`Rules.CardData`). 에너지는 `Game.Pay`로 낸다(6절). 받는 쪽: `DamageDealt` → 연출(모아 두었다가 ③ 뒤에), `EnemyKilled` → 로그 `kills`, `TurnEnded` → 로그 `maxTurnDamage`(마지막 턴도 센다), `BattleWon` → 유물 불타는 피·도전과제 첫 승리.
 > - ③ 모든 플레이어 데이터를 Sync해 Undo 한 단위로 기록하고, 변경 묶음을 전송용으로 내보낸다. 그다음 바뀐 값을 보는 조건(도전과제 등)을 다시 평가한다.
 > - 판 저장이 "행동마다 저장"이면 그 프레임 끝(행동 밖)에서 `run.json`을 쓴다(DB › 시작 파일 › Bootstrap, [10장](10-SaveAndRelease.md)).
 > - `EnemyKilled`를 쏜 다음 줄에서는 처치 수 로그가 이미 올라가 있다. 대기열이 없다.
@@ -104,21 +108,29 @@ public class RunDirector : MonoBehaviour
 | 전투 시작 | `StartBattle` | 몬스터 원본으로 적을 만들고, 덱을 섞어 뽑을 더미로, 카드를 뽑는다 | 턴 시작 |
 | 카드 뽑기 | `DrawCards` | 뽑을 더미가 비면 버린 더미를 섞어 다시 쓴다 | — |
 | 카드 내기 | `PlayCard` | 2절 | 카드 사용(+ 피해·적 처치) |
-| 턴 끝 | `EndTurn` | 적 공격 → 주인공이 쓰러지면 판 끝, 아니면 손패를 버리고 다음 턴 | 턴 끝, 턴 시작 |
-| 전투 승리 | `WinBattle` | 마지막 턴을 마감하고, 보상 골드, 다음 층 | 턴 끝, 전투 승리, 골드 획득 |
+| 턴 끝 | `EndTurn` | 턴 끝 효과(화상) → 적이 모두 쓰러졌으면 전투 승리, 아니면 적 공격 → 주인공이 쓰러지면 판 끝, 아니면 손패를 버리고 다음 턴 | 턴 끝, 턴 시작 |
+| 전투 승리 | `WinBattle` | 마지막 턴을 마감하고(턴 끝을 아직 쏘지 않았으면), 보상 골드, 다음 층 | 턴 끝, 전투 승리, 골드 획득 |
 | 판 끝 | `EndRun` | 남길 값을 프로필로 옮기고 층을 0으로 | 판 끝 |
 
 이벤트는 "그 일이 일어났다"를 알린다. 그 일이 일어나는 모든 자리에서 쏜다.
 
 > [!note]- 전투 승리가 턴 끝 이벤트를 쏘는 이유
 > 마지막 적은 플레이어가 턴을 끝내기 전에 카드로 쓰러지므로 `EndTurn`이 돌지 않는다. 턴 끝 이벤트를 받는 로그(한 턴 최대 피해)가 그 턴을 놓치지 않게, "턴이 끝나는 길"이 둘이면 두 길(`EndTurn`·`WinBattle`) 모두에서 쏜다.
+>
+> 반대로 턴 끝 이벤트를 받은 화상이 마지막 적을 쓰러뜨리면, 턴 끝은 이미 쏘았다. 그때 `EndTurn`은 `new WinBattle { turnEnded = true }`로 불러 같은 턴 끝을 두 번 쏘지 않는다.
 
 > [!note]- `EndTurn` 본문
-> 턴 끝 이벤트를 먼저 쏘고(이번 턴 피해 합을 실어서), 적이 차례로 공격한 뒤 판이 끝났는지 본다.
+> 턴 끝 이벤트를 먼저 쏘고(이번 턴 피해 합을 실어서), 적이 남았는지 본 뒤, 적이 차례로 공격하고 판이 끝났는지 본다.
 > ```csharp
 > var run = Game.Data().Run;
-> var battle = run.battle ?? throw new InvalidOperationException("전투 중이 아닙니다.");
+> var battle = run.battle ?? throw Game.Fail("fail.notInBattle", "전투 중이 아닙니다.");
 > Game.Events.Publish(new TurnEnded { turn = battle.turn, damage = battle.damageThisTurn });
+> // 턴 끝을 받는 효과(화상 같은 상태 효과)로 적이 모두 쓰러졌으면 전투 승리.
+> if (battle.enemies.Count == 0)
+> {
+>     Game.Do(new WinBattle { turnEnded = true });
+>     return;
+> }
 >
 > foreach (var enemy in battle.enemies.ToList())
 > {
@@ -133,7 +145,8 @@ public class RunDirector : MonoBehaviour
 > }
 > ```
 > - 적의 공격 순서는 원본 몬스터에 있고, 적은 지금 차례(`intentIndex`)만 든다. 공격 순서를 비워 둔 몬스터는 차례만 넘긴다.
-> - 피해는 `Rules.Damage` 하나가 맡는다. 방어도를 먼저 깎고, 피해 이벤트를 쏘고, 적이 쓰러지면 전투에서 빼고 처치 이벤트를 쏜다. 카드 Block·`[BindTo]`·적의 공격이 모두 이 함수를 부르므로 피해 규칙이 한곳에만 있다.
+> - 피해는 `Rules.Damage` 하나가 맡는다. 방어도를 먼저 깎고, 피해 이벤트를 쏘고, 적이 쓰러지면 전투에서 빼고 처치 이벤트를 쏜다. 카드 Block·`[BindTo]`·적의 공격·화상이 모두 이 함수를 부르므로 피해 규칙이 한곳에만 있다.
+> - 화상 피해는 `Publish(new TurnEnded …)` 한 줄 안에서 들어간다. 턴 끝을 받는 상태 효과가 그 자리에서 결과를 실행하기 때문이다(8절).
 
 > [!note]- 다음 전투 열기
 > 전투에 이긴 뒤 다음 전투를 여는 입력(지도에서 방 고르기, 상점 나가기)은 런 스크립트에 창구를 하나 더 두어 `StartBattle`을 보낸다. 예: `Game.Do(new StartBattle { monsters = { GameIds.Instance.Dragon } });`
@@ -152,7 +165,7 @@ Game.Do(new StartBattle { monsters = { GameIds.Instance.Goblin, GameIds.Instance
 | 이럴 때 | 이렇게 |
 |---|---|
 | 한 번 누른 결과로 함께 일어난다(카드 내기 → 효과 → 전투 승리) | 바깥 행동 안에서 `Game.Do`·`Game.Use`. Undo 한 번에 돌아간다 |
-| 시간이 지나 따로 일어난다(1초 뒤 폭발) | 나중에 도는 코드에서 새 행동을 `Game.Do`(8절). 각각 Undo 한 단위 |
+| 나중에 일어난다(2턴 뒤 폭발, 1초 뒤 폭발) | 상태 효과·예약에 맡긴다(8절). 행동 안에서 기다리지 않는다 |
 | 플레이어가 따로 누른다(카드 두 장) | 행동 두 번 |
 
 > [!note]- 알아 둘 점
@@ -166,21 +179,23 @@ Game.Do(new StartBattle { monsters = { GameIds.Instance.Goblin, GameIds.Instance
 
 ## 6. 실패 = 전체 취소
 
-할 수 없으면 행동 안에서 `InvalidOperationException`을 던진다. 그 행동이 바꾼 값이 모두 되돌아간다.
+할 수 없으면 행동 안에서 예외를 던진다. 그 행동이 바꾼 값이 모두 되돌아간다.
+
+- 플레이어에게 보일 실패는 `throw Game.Fail(텍스트 키, 기본 문장)`이다. 글은 텍스트 표로 번역된다([06장](06-Presentation.md) 5절).
+- 비용은 `Game.Pay(플레이어 데이터, 필드, 양)`으로 낸다. 모자라면 같은 종류의 실패를 던지고, 넉넉하면 뺀다.
 
 ```csharp
 var run = Game.Data().Run;
 var data = Rules.CardData(Game, card.card);
-var battle = run.battle ?? throw new InvalidOperationException("전투 중이 아닙니다.");
-if (!battle.hand.Contains(card.id)) throw new InvalidOperationException("손에 없는 카드입니다.");
-if (battle.energy < data.cost) throw new InvalidOperationException("에너지가 모자랍니다.");
+var battle = run.battle ?? throw Game.Fail("fail.notInBattle", "전투 중이 아닙니다.");
+if (!battle.hand.Contains(card.id)) throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.");
+Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 가로채기('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
 
-battle.energy -= data.cost;
 battle.hand.Remove(card.id);
 battle.discard.Add(card.id);
 ```
 
-런 스크립트는 그 예외만 잡아 화면에 이유를 보여 준다.
+런 스크립트는 `InvalidOperationException`만 잡아 화면에 이유를 보여 준다(`Game.Fail`·`Game.Pay`가 던지는 `GameFailure`도 그 한 종류다).
 
 ```csharp
 public bool TryPlay(DeckCard card, Fighter target, out string error)
@@ -201,7 +216,10 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 
 > [!note]- 실패 자세히
 > - 예외가 나면 바뀐 플레이어 데이터가 모두 되돌아가고, 난수도 행동 전 상태로 돌아가고, Undo 이력에 들어가지 않는다. 예외는 `Do`를 부른 쪽으로 다시 던져진다.
-> - 검사를 앞에 두는 것은 읽기 쉽게 하려는 것이지 안전을 위해서가 아니다. 에너지를 깎은 뒤에 실패해도 깎은 것까지 되돌아간다.
+> - `Game.Fail`은 예외를 만들기만 한다. 앞에 `throw`를 붙인다. 값이 들어가는 글은 `Game.Fail("fail.frozen", "얼어 있어 {turns}턴 동안 움직일 수 없습니다.", ("turns", 2))`.
+> - `Game.Pay`는 비용 의도(`CostIntent`)를 가로채기에 통과시킨 뒤 지금 값이 모자라면 실패(키 `momoi.fail.notEnough`)를 던진다. 직접 `battle.energy -= data.cost`로 빼면 "이번 턴 비용 0" 같은 가로채기가 끼어들 자리가 없다. 화면에서 미리 볼 때는 `Game.CanPay`(가로채기 전 값)나 `Game.CanDo`(06장 2절).
+> - 없는 ID 같은 프로그래머 실수는 `Game.Fail`이 아니라 그냥 `InvalidOperationException`으로 둔다(카드 던전의 `Rules.NewCard`). 플레이어에게 보일 글이 아니다.
+> - 검사를 앞에 두는 것은 읽기 쉽게 하려는 것이지 안전을 위해서가 아니다. 에너지를 낸 뒤에 실패해도 낸 것까지 되돌아간다.
 > - 행동 안의 행동에서 난 실패도 같다. 카드 효과의 사용 조건이 맞지 않아 `Game.Use`가 예외를 내면 `PlayCard` 전체가 취소된다.
 > - 코드 버그로 난 `NullReferenceException` 같은 예외도 값은 똑같이 취소되지만, 잡지 않고 콘솔에 드러나게 둔다.
 > - 실패한 행동은 모니터 **행동** 탭에 "실패" 배지로 남고, 마우스를 올리면 오류 글이 보인다.
@@ -209,7 +227,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > [!note]- 실패를 다루는 다른 방법
 > | 이럴 때 | 이렇게 |
 > |---|---|
-> | 할 수 없다는 걸 미리 보여 주고 싶다(버튼 흐리게) | 화면이 값을 읽어 판단한다. 사용 기능·능력의 사용 조건이면 `Game.CanUse`. |
+> | 할 수 없다는 걸 미리 보여 주고 싶다(버튼 흐리게) | `Game.CanDo(행동, out 이유)`: 행동을 해 보고 되돌려 성공하는지와 실패 글을 준다([06장](06-Presentation.md) 2절). 사용 기능·능력의 사용 조건만 볼 때는 `Game.CanUse`. |
 > | 그냥 `return`하고 싶다 | 하지 않는다. 아무것도 바꾸지 않은 행동도 Undo 이력에 한 칸 남는다. |
 
 ## 7. 화면과 시스템의 경계
@@ -218,7 +236,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 
 - **읽기**: `Game.Data().Run`에서 체력·에너지·손패를 읽는다.
 - **보내기**: 입력은 런 스크립트의 창구 함수로 보낸다.
-- **받기**: 연출은 `Game.Events.SubscribeAfterAction<DamageDealt>(…)`처럼 성공한 행동의 이벤트만 받아 튼다. 값을 다시 그리는 것은 `GameView.Redraw(그리는 함수, 키)`에 맡긴다. 받은 `IDisposable`은 `OnDisable`에서 `Dispose`한다.
+- **받기**: 연출은 `Game.Events.SubscribeAfterAction<DamageDealt>(…)`처럼 성공한 행동의 이벤트만 받아 연출 대기열(`GameView.Present`)에 넣는다. 값을 다시 그리는 것은 `GameView.Redraw(그리는 함수, 키)`에 맡긴다. 받은 `IDisposable`은 `OnDisable`에서 `Dispose`한다.
 
 화면에서 플레이어 데이터를 고치지 않는다. 이벤트를 받는 코드에서도 고치지 않는다.
 
@@ -237,21 +255,24 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 
 ## 8. 지연 효과
 
-행동은 한 번에 끝난다. 행동 안에서 코루틴·`await`로 기다리지 않는다.
+행동은 한 번에 끝난다. 행동 안에서 코루틴·`await`로 기다리지 않는다. "나중"은 플레이어 데이터에 적어 두고, 그때 오는 행동 안에서 돈다.
 
-- **턴제의 "나중"은 다음 행동 안이다.** "턴이 끝날 때마다 화상 피해"는 남은 횟수·상태를 플레이어 데이터(`Fighter.statuses`)에 두고 `EndTurn` 안에서 처리한다.
-- **시간이 걸리는 효과는 나중에 새 행동으로.** 코루틴·타이머에서 `GBibleRuntime.Game.Do(…)`한다. 대상 필드는 실행 직전에 다시 찾고, 대상이 사라졌으면 행동이 실패한다(바뀌는 것 없음).
+- **몇 턴 동안·몇 턴 뒤의 효과는 상태 효과다.** "턴이 끝날 때마다 화상 피해 2, 2턴"은 DB › 상태 효과에 항목(`burn`)으로 만들고 카드 효과 `상태 효과 걸기`로 건다([04장](04-AddingContent.md) 4절). `EndTurn`이 턴 끝 이벤트를 쏘는 순간, 그 행동 안에서 피해가 들어가고 남은 횟수가 준다. `EndTurn`에 화상 코드는 없다.
+- **상태 없이 "나중에 이 행동"만이면 예약이다.** 행동 안에서 `Game.ScheduleOn<TurnEnded>(2, new 행동 { … })`(턴 끝을 2번 받은 순간), `Game.ScheduleAfter(1.5, new 행동 { … })`(게임 시간 1.5초 뒤).
 
 > [!note]- 지연 효과 자세히
-> - 턴제 쪽은 Undo·저장이 따라오고 난수도 결정론을 지킨다. 카드 던전의 지금 `EndTurn`은 상태를 아직 처리하지 않는다. 화상·빙결이 효과를 내게 하려면 적 공격 앞뒤에 상태 처리를 더한다.
-> - 코루틴·타이머 콜백은 어떤 행동의 바깥이다. 행동의 `Run` 안에서 만든 람다라도 실제로 도는 시점에는 그 행동이 끝나 있고, 행동의 `Game` 속성은 `null`이다. 그래서 `GBibleRuntime.Game`을 쓴다.
-> - 지연 효과 한 번 한 번이 Undo 한 단위가 된다.
-> - 대상은 Undo·사망으로 사라졌을 수 있다. 실패 예외 대신 조용히 넘기려면 `Do` 전에 `Game.Find`로 있는지 확인한다.
-> - 시작한 행동을 Undo해도 코루틴은 멈추지 않는다. 남은 횟수를 플레이어 데이터에 두면, Undo로 횟수가 0이 되었을 때 코루틴이 스스로 멈추게 쓸 수 있다.
+> - 걸린 상태 효과(`$statuses`)와 예약(`$schedule`)은 플레이어 데이터다. Undo·판 저장·멀티가 따라오고 난수도 결정론을 지킨다.
+> - 같은 턴 끝이 피해와 남은 횟수 줄이기를 둘 다 하면 피해가 먼저다. "2턴"이면 피해 두 번 뒤에 끝난다.
+> - 턴 끝 피해로 마지막 적이 쓰러질 수 있다. 그래서 `EndTurn`은 턴 끝을 쏜 바로 뒤에 적이 남았는지 본다(4절).
+> - 이벤트 예약(`ScheduleOn`)은 그 이벤트를 쏜 행동 안에서 실행되어 함께 Undo된다. 시간 예약(`ScheduleAfter`)은 프레임 끝에 행동 하나("예약 실행")로 돌아 따로 Undo된다.
+> - 예약에 넘긴 행동의 대상 필드는 id만 남겨 저장하고 실행 직전에 다시 찾는다. 그때 대상이 없으면(죽은 적) 실행하지 않고 지운다(타임라인에 "대상이 없어 예약을 실행하지 않았습니다").
+> - 이벤트 예약이 실행 중에 실패하면 이벤트를 받는 쪽의 오류처럼 타임라인에 남고 바깥 행동은 계속된다. 실패할 일(모자란 비용 등)은 예약된 행동이 먼저 확인한다.
+> - 코루틴·타이머에서 `GBibleRuntime.Game.Do(…)`해도 돌기는 하지만, 기다리는 중인 것은 판 저장에 들어가지 않고 Undo해도 멈추지 않는다. 그래서 상태 효과·예약에 맡긴다.
 > - 카드 던전에서 시간이 걸리는 것은 연출뿐이다. 데이터는 행동 하나로 즉시 바뀌고, 화면이 이벤트를 받아 시간을 두고 보여 준다([06장](06-Presentation.md)).
+> - 자세히: 매뉴얼 [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md).
 
 > [!note]- 다른 장르라면: 실시간 액션
-> 입력이 프레임마다 들어오지만 규칙은 같다. 이동은 MonoBehaviour가 하고, 피격·스킬 사용·아이템 획득처럼 플레이어 데이터를 바꾸는 사건만 행동으로 보낸다. Undo 방식은 DB › 시작 파일 › Bootstrap에서 "스냅샷"을 고르고, 독·지속 피해는 코루틴에서 틱마다 행동을 `Game.Do`한다. 예제 전체는 [02. 행동과 Undo](../Manual/02-Actions-Undo.md).
+> 입력이 프레임마다 들어오지만 규칙은 같다. 이동은 MonoBehaviour가 하고, 피격·스킬 사용·아이템 획득처럼 플레이어 데이터를 바꾸는 사건만 행동으로 보낸다. Undo 방식은 DB › 시작 파일 › Bootstrap에서 "스냅샷"을 고른다. 독·지속 피해는 상태 효과의 지속을 "게임 시간(초)"으로, "2초 뒤 폭발"은 `Game.ScheduleAfter`로 둔다. 초당 회복처럼 일정한 간격의 규칙은 Bootstrap의 **고정 틱**을 켜고 `session.Ticked`에서 행동을 `Do`한다([07장](07-GenreRecipes.md) 6절). 예제 전체는 [02. 행동과 Undo](../Manual/02-Actions-Undo.md).
 
 ## 9. 씬 전환
 
@@ -265,6 +286,15 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > - **판을 여는 코드는 한 번만.** `RunDirector.Start`는 판을 불러오거나 새로 연다. 씬마다 `RunDirector`를 두면 씬을 옮길 때마다 저장을 다시 불러오거나 새 판을 열어 버린다. 런 스크립트는 처음 한 번 뜨는 씬(또는 씬을 옮겨도 남는 오브젝트)에 두고, 각 씬에는 그 씬의 화면 코드만 둔다.
 > - **받기를 정리한다.** 씬 오브젝트가 `SubscribeAfterAction`·`GameView.Redraw`로 받은 `IDisposable`은 `OnDisable`·`OnDestroy`에서 `Dispose`한다. 하지 않으면 사라진 오브젝트를 세션이 계속 부른다.
 > - 판을 불러온 뒤에도 같은 식(`Rules.InBattle`)으로 맞는 씬을 고른다.
+> - 씬을 떠날 때 남은 연출은 `GameView.ClearPresentation()`으로 버린다([06장](06-Presentation.md) 4절).
+
+> [!note]- 씬 흐름 — 데이터가 씬을 고르게(DB › Bootstrap, 코드 없이)
+> DB › 시작 파일 › Bootstrap의 **씬 흐름(선택)**에서 플레이어 데이터(`run`)·필드(씬 이름이 든 글자, 예: `scene`)·빈 값일 때 씬(예: `Title`)을 고르면, 그 필드가 가리키는 씬을 화면이 따라 연다. 행동은 `run.scene = "Battle";`처럼 필드만 바꾼다.
+> - 이어 하기로 판을 불러오면 그 씬이, 새 판·판 끝으로 값이 비면 빈 값일 때 씬이 열린다. Undo로 값이 돌아가면 씬도 돌아간다.
+> - 연출이 끝난 뒤에 열고, 여는 동안은 연출 대기열의 한 칸이다(그동안 `GameView.Busy`). 페이드는 `GameScenes.Transition = load => Fade(load)`(`load`를 감싸는 코루틴).
+> - Build Settings에 없는 씬이면 타임라인에 경고가 남는다. 코드로 켜려면 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)`.
+> - 카드 던전은 `RunState`에 씬 필드가 없어 위의 `SceneManager.LoadScene`을 쓴다. 맵·상점 씬이 늘면 `public string scene;`을 더하고 씬 흐름으로 옮긴다.
+> - 씬에 놓인 상자·문·쓰러뜨린 보스의 상태는 월드 상태로 기억한다: 행동 안에서 `Game.SetWorld("forest.chest3", "opened")`, 씬에는 컴포넌트 '월드 상태 연결'. 매뉴얼 [32장](../Manual/32-View-Presentation-Scenes.md).
 
 > [!note]- 다른 장르라면: 턴을 넘기면 Undo 못 하게
 > DB › 시작 파일 › Bootstrap의 **Undo 끊는 이벤트**로 턴 끝 이벤트를 고른다([07장](07-GenreRecipes.md) 2절). 카드 던전은 판 전체에서 Undo를 허락하고, 상한은 DB › 시작 파일 › Bootstrap의 Undo 보관 수(200)로 둔다.
@@ -275,14 +305,18 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 - [ ] 판을 이어 하거나 새로 여는 코드가 게임에서 한 번만 돈다.
 - [ ] 플레이어 데이터를 바꾸는 코드가 모두 행동(또는 그 안에서 불리는 Block·`[BindTo]`·규칙 함수) 안에 있다.
 - [ ] 한 입력에 따라오는 단계가 Undo 한 번에 돌아가는 것을 모니터로 확인했다.
-- [ ] 규칙상의 실패는 `InvalidOperationException`으로 던지고, 런 스크립트는 그것만 잡는다.
+- [ ] 플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`, 비용은 `Game.Pay`로 던지고, 런 스크립트는 `InvalidOperationException`만 잡는다.
 - [ ] 반응할 순간마다 행동 안에서 이벤트를 쏜다.
-- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
-- [ ] 시간이 걸리는 효과는 나중에 새 행동으로 실행한다.
-- [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다.
+- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction` → `GameView.Present`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
+- [ ] 몇 턴 동안·몇 턴 뒤의 효과는 상태 효과·예약에 맡기고, 행동 안에서 기다리지 않는다.
+- [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다(씬이 많으면 Bootstrap의 씬 흐름).
 
 > [!note]- 더 보기(매뉴얼)
 > - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — `Do` 안에서 일어나는 일, 실패, Undo, 지연 효과
+> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, `ScheduleAfter`·`ScheduleOn`
+> - [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 가로채기
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — `Game.Fail`·`GameFailure`
+> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../Manual/32-View-Presentation-Scenes.md) — 씬 흐름, 월드 상태
 > - [03. Game API](../Manual/03-GameApi.md) — `Find`·`All`·`Do`·`Use`, 씬 코드에서 쓰는 법
 > - [10. 이벤트](../Manual/10-Events.md) — 쏘기·받기, `Subscribe`와 `Dispose`
 > - [16. 능력과 사용 기능](../Manual/16-Abilities-Usable.md) — `Game.Use`의 실행 흐름, `Game.CanUse`

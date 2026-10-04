@@ -28,7 +28,7 @@ public class UpgradeCard : GameAction
     protected override void Run()
     {
         var data = Rules.CardData(Game, card.card);          // 원본: 읽기만
-        if (card.upgraded || !data.upgradable) throw new InvalidOperationException("강화할 수 없는 카드입니다.");   // 실패 = 전체 취소
+        if (card.upgraded || !data.upgradable) throw Game.Fail("fail.cannotUpgrade", "강화할 수 없는 카드입니다.");   // 실패 = 전체 취소
         var from = card.card;
         card.card = data.upgradeTo;                          // 판 데이터는 원본 ID만 바꾼다(손패·더미가 가리키는 id는 그대로)
         card.upgraded = true;
@@ -46,7 +46,7 @@ public class UpgradeCard : GameAction
 > - `public DeckCard card` — 대상은 객체 그대로 필드로 둔다. 형식에 `public string id;`가 있고 플레이어 데이터 안에 있는 클래스면 대상 필드가 된다. 시스템은 기록·전송에 id만 남기고, `Run` 직전에 그 id로 지금 데이터의 객체를 다시 찾아 넣는다(Undo·불러오기·멀티에서도 맞다). 대상이 여럿이면 필드를 더 두거나 `List<Fighter>`로 둔다. 없을 수 있으면 `null`로 둔다.
 > - `Run()` — 매개변수가 없다. 필드와 `Game`으로 규칙을 쓴다.
 > - `Rules.CardData` — 비용·강화 대상 같은 고정 값은 원본(인스턴스)에서 읽는다. 판 데이터(`DeckCard`)는 원본 ID와 바뀌는 값만 든다.
-> - `throw` — 규칙상 할 수 없으면 예외를 던진다. 이 행동이 바꾼 값·난수가 모두 되돌아가고 예외가 `Do`를 부른 쪽으로 간다.
+> - `throw Game.Fail(키, 기본 문장)` — 규칙상 할 수 없으면 플레이어용 실패(`GameFailure`)를 던진다. 이 행동이 바꾼 값·난수가 모두 되돌아가고 예외가 `Do`를 부른 쪽으로 간다. 글은 텍스트 표에 키가 있으면 번역되고, 없으면 기본 문장이다([06장](06-Presentation.md) 5절). 비용이면 `Game.Pay(키, 필드, 양)`.
 > - `Game` — 이 행동이 도는 세션의 창구. `Run`이 도는 동안만 들어 있다.
 > - `Game.Events.Publish` — 다른 기능(로그·도전과제·화면)이 반응할 순간에 이벤트를 쏜다.
 
@@ -233,7 +233,7 @@ BlessingRules.Register(session, GameDatabase.Load()?.All<BlessingData>());
 
 ### 1-9. Bootstrap
 
-설정 값(Undo 방식·보관 수·스냅샷·Undo 끊는 이벤트·시드·판 저장·판 끝 이벤트·프로필도 행동마다 저장·시작할 때 이어 하기·기록 보관 줄 수·Modify 누락 검사)은 코드가 아니라 DB › 시작 파일 › **Bootstrap** 화면에서 고른다([01장](01-StartProject.md) 4절). 코드는 시작 설정이 만든 `Client/Bootstrap.cs`(화면 위 **cs 열기**)에 있다.
+설정 값(Undo 방식·보관 수·스냅샷·Undo 끊는 이벤트·시드·판 저장·판 끝 이벤트·프로필도 행동마다 저장·시작할 때 이어 하기·고정 틱·씬 흐름·기록 보관 줄 수·Modify 누락 검사)은 코드가 아니라 DB › 시작 파일 › **Bootstrap** 화면에서 고른다([01장](01-StartProject.md) 4절). 코드는 시작 설정이 만든 `Client/Bootstrap.cs`(화면 위 **cs 열기**)에 있다.
 
 ```csharp
 [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
@@ -296,11 +296,11 @@ static void Started(GameSession session)
 - [ ] 판을 이어 하거나 새로 여는 코드가 게임에서 한 번만 돈다.
 - [ ] 플레이어 데이터를 바꾸는 코드가 모두 행동(또는 그 안에서 불리는 Block·`[BindTo]`·규칙 함수) 안에 있다.
 - [ ] 한 입력에 따라오는 단계가 Undo 한 번에 돌아가는 것을 모니터로 확인했다.
-- [ ] 규칙상의 실패는 `InvalidOperationException`으로 던지고, 런 스크립트는 그것만 잡는다.
+- [ ] 플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`, 비용은 `Game.Pay`로 던지고, 런 스크립트는 `InvalidOperationException`만 잡는다.
 - [ ] 반응할 순간마다 행동 안에서 이벤트를 쏜다.
-- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
-- [ ] 시간이 걸리는 효과는 나중에 새 행동으로 실행한다.
-- [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다.
+- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction` → `GameView.Present`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
+- [ ] 몇 턴 동안·몇 턴 뒤의 효과는 상태 효과·예약에 맡기고, 행동 안에서 기다리지 않는다.
+- [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다(씬이 많으면 Bootstrap의 씬 흐름).
 
 ### 04. 콘텐츠 더하기
 
@@ -330,12 +330,13 @@ static void Started(GameSession session)
 ### 06. 화면과 연출
 
 - [ ] 화면 코드는 Client 폴더에 있고, 플레이어 데이터를 읽기만 한다.
-- [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번 그린다.
+- [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번(연출이 끝난 뒤) 그린다. 프리팹 목록은 `ViewList`, 값 하나는 컴포넌트 데이터 연결.
 - [ ] 등록·받기는 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
-- [ ] 버튼은 행동에 넣을 값(대상 객체·원본 ID)을 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다.
-- [ ] 연출은 `SubscribeAfterAction`으로 받아, 성공한 행동의 이벤트만 튼다.
+- [ ] 버튼은 행동에 넣을 값(대상 객체·원본 ID)을 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다. `GameView.Busy`인 동안은 입력을 받지 않는다.
+- [ ] 예상 피해·버튼 막기는 화면에서 따로 계산하지 않고 `Game.Preview`·`Game.CanDo`로, 그릴 때 한 번 부른다.
+- [ ] 연출은 `SubscribeAfterAction`으로 받아 `GameView.Present`에 넣고, 기다리기는 `GameView.Wait`다.
 - [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
-- [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 언어를 바꾸면 다시 그려진다.
+- [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 행동의 실패 글은 `Game.Fail`의 키로 번역된다. 언어를 바꾸면 다시 그려진다.
 - [ ] 다이얼로그는 말·연출만, 규칙이 있는 일은 행동이 맡는다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 이름·그림은 원본에서 읽는다.
 
@@ -346,7 +347,8 @@ static void Started(GameSession session)
 - [ ] 판이 끝나면 버릴 값은 `run`, 남길 값은 `profile`에 있다.
 - [ ] 규칙의 무작위는 모두 `Game.Random(이름)`이고, 용도마다 흐름 이름이 다르다.
 - [ ] 개발 빌드는 시드를 고정한다.
-- [ ] 쿨다운·지속 시간은 게임 시계 기준 시각으로 적고, 매 프레임 바뀌는 값은 플레이어 데이터에 넣지 않았다.
+- [ ] 쿨다운·지속 시간은 게임 시계 기준 시각으로 적고(또는 상태 효과·예약에 맡기고), 매 프레임 바뀌는 값은 플레이어 데이터에 넣지 않았다.
+- [ ] 실시간이면 고정 틱을 정했고, 1절 표의 "더 쓰는 부품"에서 이 장르에 맞는 것을 골랐다.
 
 ### 08. 시험과 디버깅
 
@@ -354,7 +356,8 @@ static void Started(GameSession session)
 - [ ] 시험 준비용 개발 명령이 DB › 개발 › 개발 명령에 있고, 누르면 행동 하나로 기록·Undo된다. 규칙을 거쳐야 하는 명령만 `[BindTo]` 코드다.
 - [ ] 버그를 보면 판을 저장하고, 저장 파일과 시드를 보고에 붙인다.
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
-- [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다.
+- [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
+- [ ] 밸런스 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
 - [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
 
@@ -369,10 +372,12 @@ static void Started(GameSession session)
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
-- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있다.
+- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
+- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런스 값이다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
-- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
+- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction` → `GameView.Present`), `OnDisable`에서 `Dispose`한다.
+- [ ] 예상 값은 화면이 계산하지 않고 `Game.Preview`·`Game.CanDo`로 읽는다.
 - [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.
 - [ ] 게임 값을 담은 static 변수가 없고, Block·결과 코드는 `GBibleRuntime` 대신 받은 세션을 쓴다.
 - [ ] 텍스트 인자는 `("이름", 값)` 형태다.
@@ -392,6 +397,8 @@ static void Started(GameSession session)
 - [ ] 끝난 판은 이어 하기가 열지 않는다(`RunState.IsActive`).
 - [ ] '이어 하기'는 `HasSavedRun`일 때만 켜지고, 불러오기 실패 때 새 판으로 넘어간다.
 - [ ] '새 판'은 `GBibleRuntime.NewRun(session)`을 행동 밖에서 부른다.
+- [ ] 세이브 칸이 여럿이면 슬롯(`UseSlot`·`SlotInfoOf`)을 쓰고, 칸에 보일 요약(`SlotSummary`)을 정했다.
+- [ ] 음량·언어·화면·키 같은 기기 설정은 DB › 설정(필요하면 선택 기능 입력)에 있고, 판 규칙에 영향을 주는 값은 설정에 두지 않았다.
 - [ ] 플레이어 데이터에 에셋 참조 대신 ID를 둔다.
 - [ ] 모니터 저장 명령으로 저장 → 끄기 → 불러오기를 해 보고 값·난수 결과가 이어지는 것을 봤다.
 
@@ -626,12 +633,12 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | `UndoCount` | 02 | 12 §3-7 |
 | Undo 끊는 이벤트(Bootstrap), `session.ClearUndo()` | 02 · 20 | 03 §9(다른 장르라면), 07 §2 |
 | 시작할 때 이어 하기 + 새 판 행동(Bootstrap) | 06 · 20 | 01 §4, 03 §3, 10 §3 |
-| 지연 효과(나중에 `Game.Do`) | 02 | 03 §8 |
+| 지연 효과(상태 효과·예약에 맡기기, 코루틴에서 `Game.Do`하지 않기) | 02 · 29 | 03 §8 |
 | `actorId`·`Visibility` | 02 | 11 §4 |
 | `DeveloperEditAction` | 22 | 01 §4, 08 §2 |
 | `session.Actions.Executed`·`TransactionAborted` | 02 | 03 §2(언급) |
-| `Events.SubscribeAfterAction<T>`(성공한 행동의 이벤트만) | 10 | 06 §3, 03 §7, 11 §3 |
-| `GameView.Redraw`(값·언어가 바뀌면 프레임당 한 번 그리기) | 23 | 06 §1·§5 |
+| `Events.SubscribeAfterAction<T>`(성공한 행동의 이벤트만) | 10 | 06 §3, 03 §7, 09 §2, 11 §3 |
+| `GameView.Redraw`(값·언어가 바뀌면 프레임당 한 번 그리기, 연출이 끝난 뒤) | 23 · 32 | 06 §1·§4·§5 |
 
 ### Game API
 
@@ -727,20 +734,20 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 의도 `[Intent]`, 규칙 함수의 가로채기 자리 `Game.Intercept` | 28 | 02 §8, 04 §9(가시 갑옷), 09 §1 |
 | 트리거 '가로채기'(`InterceptTrigger`)·결과 '의도 고치기'(`ModifyIntentOutcome`) | 28 · 11 · 12 | 04 §9(가시 갑옷) |
 | `TriggerKinds.Intercept`·`OutcomeKinds.Intent`(기능 칸 잠금) | 28 · 11 | 04 §8 |
-| `Game.Pay`·`CanPay`·`CostIntent`·결과 '비용 내기' | 28 · 12 | 02 §8(언급) |
+| `Game.Pay`·`CanPay`·`CostIntent`·결과 '비용 내기' | 28 · 12 | 03 §6, 09 §1·§2, 02 §8(언급), 07 §6(방치형) |
 
 ### 상태 효과·예약·선택 대기
 
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
 |---|---|---|
-| DB › 상태 효과(중첩·다시 걸 때·지속·능력치 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과) | 29 | 04 §4(독) |
-| 효과 '상태 효과 걸기'·'상태 효과 풀기' | 29 · 16 · 12 | 04 §4(독) |
+| DB › 상태 효과(중첩·다시 걸 때·지속·능력치 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과) | 29 | 04 §4(화상·독), 03 §8, 07 §6 |
+| 효과 '상태 효과 걸기'·'상태 효과 풀기' | 29 · 16 · 12 | 04 §4(화염구·독), 02 §8 |
 | `[BindTo(상태 효과 ID)]`, 결과 안에서 중첩 수 `Game.StatusStacks(c.User, c.Owner)` | 29 · 13 | 04 §4(독) |
-| `Game.ApplyStatus`·`RemoveStatus`·`HasStatus`·`Statuses` | 29 | 04 §4(언급) |
-| 예약 `Game.ScheduleAfter`·`ScheduleOn`·`CancelSchedule`·`CancelSchedules` | 29 · 02 | 04 §4(언급), 09 §5(언급) |
+| `Game.ApplyStatus`·`RemoveStatus`·`HasStatus`·`Statuses`, 저장 키 `$statuses` | 29 | 04 §4(언급), 02 §2(언급), 08 §3 |
+| 예약 `Game.ScheduleAfter`·`ScheduleOn`·`CancelSchedule`·`CancelSchedules` | 29 · 02 | 03 §8, 07 §5·§6, 04 §4(언급), 09 §5(언급) |
 | 결과 '선택 요구'(`ChoiceOutcome`) | 29 · 12 | 04 §9(투척 단검) |
-| 모니터 명령 탭의 '선택 대기' 패널 | 29 | 04 §9(투척 단검) |
-| `Game.Choice`·`IsWaiting`(기다리는 동안 입력 막기는 화면의 일) | 29 | 04 §9(언급) |
+| 모니터 명령 탭의 '선택 대기' 패널 | 29 · 22 | 04 §9(투척 단검), 08 §5 |
+| `Game.Choice`·`IsWaiting`(기다리는 동안 입력 막기는 화면의 일) | 29 | 04 §9(언급), 06 §2(`GameView.Busy`) |
 | `Game.Ask`·`[Chosen]`·`Game.Answer`, 이벤트 `ChoiceRequested` | 29 | 04 §9(언급), 09 §2·§5(언급) |
 
 ### DB 기능
@@ -804,6 +811,44 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 인벤토리 `Inventory` 형식 | 25 | 01 §3 |
 | 인벤토리 API(`TryRemove`·`slots` …) | 25 | 04 §6, 06 §8 |
 | 오디오 `GameAudio`(`PlayBgm`·`PlaySfx`·`SetVolume`·`VolumeChanged`) | 26 | 06 §7 |
+
+### 밸런스 값·가중치 표·실패
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| DB › 밸런스 값(값·곡선), `Game.Balance(id)`·`Game.Balance(id, x)` | 30 | 04 §10, 09 §1, 07 §6(수집형·방치형) |
+| DB › 가중치 표, `Game.Roll(id)`·`Game.Roll(id, n, unique)`, `session.Tables.Chances` | 30 | 04 §10, 07 §6(수집형) |
+| 결과 '가중치 표에서 주기' | 30 · 12 | 04 §10 |
+| 플레이 중 DB 수정 바로 반영(밸런스 값·가중치 표) | 30 | 08 §2, 04 §10(언급) |
+| 플레이어용 실패 `GameFailure`·`Game.Fail`, 라이브러리 키 `FailureKeys`(텍스트 표로 번역) | 30 · 23 | 03 §6, 06 §5, 09 §1, 12 §1-1, 08 §6(테스트) |
+
+### 슬롯·설정·입력
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| 슬롯 `GBibleRuntime.UseSlot`·`SlotInfoOf`·`Slots`·`DeleteSlot`·`CopySlot`·`SlotSummary`·`PlayTime` | 31 | 10 §3, 07 §6(언급) |
+| DB › 설정(분류·값·적용 대상), `GameSettings`(`Number`·`Toggle`·`Set`·`All`·`Label`·`ChoicesOf`·`Changed`) | 31 | 10 §1, 06 §7(음량) |
+| 입력(선택 기능) `GameInput.Use`·`BindingText`·`Rebind`·`ResetBindings` | 31 | 10 §1 |
+
+### 화면 연결·연출·씬·월드 상태
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| 연출 대기열 `GameView.Present`·`Wait`·`DeltaTime`·`IsPresenting`·`SkipPresentation`·`PresentationSpeed`·`ClearPresentation`·`Presented` | 32 | 06 §3·§4, 03 §2, 09 §2 |
+| `GameView.Busy`(연출 중·선택 대기 중 입력 막기) | 32 | 06 §2 |
+| `GameView.Redraw(…, waitForPresentation: false, …)` | 32 | 06 §1·§4 |
+| `ViewList`(`OnRemove`·`OnCreate`), `GameView.Register`·`Find` | 32 | 06 §1(화면 연결) |
+| 컴포넌트 '데이터 연결'(`DataBinding`) | 32 | 06 §1(화면 연결) |
+| 씬 흐름(Bootstrap, `GameScenes.Follow`·`Transition`) | 32 | 03 §9, 07 §6(RPG) |
+| 월드 상태 `Game.World`·`WorldFlag`·`SetWorld`, 컴포넌트 '월드 상태 연결' | 32 | 07 §6(RPG), 03 §9(언급), 10 §3(언급) |
+
+### 고정 틱·미리보기·CSV
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| 고정 틱(Bootstrap, `SessionOptions.TickRate`), `session.Ticked`·`TickAlpha` | 33 | 07 §6(실시간), 07 §2·§5, 03 §8(언급) |
+| 미리보기 `Game.Preview`·`Game.CanDo`·`Game.IsPreviewing` | 33 | 06 §2, 09 §2, 03 §6(언급), 07 §6(턴제 전술), 08 §3·§6 |
+| DB CSV 내보내기·가져오기 | 33 | 04 §10(언급), 08 §2(언급) |
 
 ---
 

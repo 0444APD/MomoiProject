@@ -23,6 +23,9 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 - 값은 그냥 대입한다(`hero.hp -= 5;`). "바뀌었다"고 알리는 호출은 없다.
 - 여러 곳에서 쓰는 규칙은 static 함수로 두고, `GameApi game`을 매개변수로 받는다.
 - **규칙 함수에 가로채기 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 의도를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
+- **비용은 `Game.Pay`로 낸다.** `Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name")`는 비용 가로채기를 이미 거친다(`what`은 모자랄 때 실패 글에 들어갈 이름의 텍스트 키). 직접 빼면(`battle.energy -= data.cost`) "이번 턴 비용 0" 같은 효과가 끼어들 자리가 없다.
+- **플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`.** 글은 텍스트 표로 번역된다. 없는 ID 같은 프로그래머 실수는 그냥 `InvalidOperationException`.
+- **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런스 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전의 `StartRun`은 예시를 짧게 하려고 체력 70·골드 99를 코드에 두었다. 실제 프로젝트에서는 밸런스 값으로 옮긴다([04장](04-AddingContent.md) 10절).
 
 ```csharp
 public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
@@ -49,6 +52,10 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 > | 규칙이 여러 곳에서 쓰인다 | static 함수(카드 던전의 `Rules`)나 `GameApi` 확장 메서드 | 상태를 들고 있는 매니저 싱글턴 |
 > | 에디터 표시를 바꾼다 | 어트리뷰트(`[Hide]`·`[ShowIf]`·`[Keyword]`·`[BlockInfo]`) | 커스텀 인스펙터 |
 > | 핵심 규칙(피해·회복·죽음·비용·뽑기)을 쓴다 | 일을 하기 직전에 `Game.Intercept` 자리를 둔다 | 새 기믹이 생길 때마다 규칙 함수에 `if (hasThornArmor) …`를 더하기 |
+> | 에너지·골드 같은 비용을 낸다 | `Game.Pay(키, 필드, 양)` | `if (energy < cost) throw …; energy -= cost;`(가로채기가 비용을 고칠 수 없다) |
+> | 플레이어에게 "할 수 없다"를 알린다 | `throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.")` | 한국어 글을 그대로 던지기(번역할 수 없다) |
+> | 기획자가 바꿀 숫자 | DB › 밸런스 값 + `Game.Balance(GameIds.Balance.X)` | 코드에 `70`·`99`·`+15`를 적기(바꿀 때마다 프로그래머가 필요하다) |
+> | 몇 턴 동안·몇 턴 뒤의 효과 | DB › 상태 효과 + 효과 `상태 효과 걸기`, 또는 예약(`Game.ScheduleOn`) | 데이터 클래스에 상태 목록을 두고 `EndTurn`에서 손으로 처리하기 |
 
 > [!note]- 왜 가로채기 자리를 미리 두나
 > 이벤트(`DamageDealt`)는 일이 일어난 **뒤**에 온다. "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0"처럼 **일을 고치는 효과**는 일이 일어나기 **직전**에 끼어들어야 한다. 자리를 미리 뚫어 두면 이런 기믹을 기획 단계에서 미리 알 필요가 없다. 기획자가 DB에 유물을 더하고(트리거 `가로채기` + 결과 `의도 고치기`), 규칙 함수는 그대로다.
@@ -82,6 +89,8 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 - **규칙 난수는 `Game.Random("이름")`, 시간은 게임 시계(`session.Clock.Time`).**
 - **세션은 매개변수로 받는다**(`c.Game`·`session`). 게임 값을 static 변수에 두지 않는다.
 - **지연·지속 효과는 상태 효과로, 플레이어가 고르는 효과는 선택 대기로.** 행동을 멈추고 기다리지 말고, 나중의 일·고른 뒤의 일은 이어서 할 행동에 쓴다(매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md)).
+- **연출은 `SubscribeAfterAction`으로 받아 `GameView.Present`에 넣는다.** 성공한 행동의 이벤트만 오고, 연출은 대기열이 차례로 튼다. 받는 쪽은 값을 바꾸지 않는다.
+- **예상 값은 `Game.Preview`로 읽는다.** "이 카드를 내면 피해 얼마", "왜 못 내나"를 화면이 따로 계산하지 않는다. 행동을 해 보고 되돌리므로 결과를 정하는 곳이 규칙 한 곳뿐이다(`Game.CanDo`도 같다).
 
 ```csharp
 [Serializable, BlockInfo("카드 내기")]
@@ -94,11 +103,10 @@ public class PlayCard : GameAction
     {
         var run = Game.Data().Run;
         var data = Rules.CardData(Game, card.card);
-        var battle = run.battle ?? throw new InvalidOperationException("전투 중이 아닙니다.");
-        if (!battle.hand.Contains(card.id)) throw new InvalidOperationException("손에 없는 카드입니다.");
-        if (battle.energy < data.cost) throw new InvalidOperationException("에너지가 모자랍니다.");
+        var battle = run.battle ?? throw Game.Fail("fail.notInBattle", "전투 중이 아닙니다.");
+        if (!battle.hand.Contains(card.id)) throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.");
+        Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 가로채기('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
 
-        battle.energy -= data.cost;
         battle.hand.Remove(card.id);
         battle.discard.Add(card.id);
 
@@ -131,6 +139,7 @@ public class PlayCard : GameAction
 > | 무언가를 오래 기억한다(선택한 카드 등) | 행동에 넣을 거라면 객체 그대로 둬도 된다. 화면이 직접 읽을 때는 `Game.Data()`·`Game.Find`로 다시 꺼낸다 | 불러오기 뒤에는 쥐고 있던 객체가 옛 인스턴스일 수 있다 |
 > | 이벤트를 받아 무언가 한다 | 화면·연출만 | 받는 쪽에서 값을 바꾸면 Undo 단위와 서버 전송에서 빠진다 |
 > | 규칙에 난수가 든다 | `Game.Random("이름")` | 시드·Undo·저장·서버와 맞는 결정론 난수. 연출용 흔들림은 `UnityEngine.Random` |
+> | 화면에 예상 피해·"낼 수 없음"을 보인다 | `Game.Preview`·`Game.CanDo`(행동 밖에서, 그릴 때 한 번) | 화면이 피해 공식을 따로 가지면 규칙과 어긋나고, 멀티에서는 결과를 정하는 곳이 둘이 된다 |
 > | 시간에 따라 바뀐다(쿨다운 등) | 게임 시계(`session.Clock.Time`) 기준 시각을 플레이어 데이터에 | `Time.time`은 되감기·저장과 맞지 않는다 |
 > | 새 객체에 id가 필요하다 | `Game.NewId("접두어")` | 번호가 플레이어 데이터에 있어 Undo·저장·서버에서 같다 |
 > | 여러 세션이 돌 수 있다 | 값은 플레이어 데이터에, 세션은 매개변수(`c.Game`·`session`)로 | 서버는 매치마다 세션을 만든다. static 변수는 모든 세션이 나눠 쓴다 |
@@ -143,12 +152,12 @@ public class PlayCard : GameAction
 > [!note]- 이벤트를 받는 쪽 예
 > 전투 화면은 피해 이벤트를 받아 숫자만 띄운다. 체력 바 값은 이벤트가 아니라 플레이어 데이터에서 읽는다(`GameView.Redraw`, [06장](06-Presentation.md) 1절).
 > ```csharp
-> _onDamage = GBibleRuntime.Session.Events.SubscribeAfterAction<DamageDealt>(e => ShowDamageNumber(e.targetId, e.amount));
-> // OnDisable에서 _onDamage.Dispose();
+> _subscriptions.Add(session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(ShowDamage(e))));
+> // OnDisable에서 Dispose
 > ```
-> 연출은 `SubscribeAfterAction`으로 받는다. 행동이 성공한 뒤에만 오므로, 실패해 취소된 행동의 피해 숫자가 뜨지 않는다([06장](06-Presentation.md) 3절).
+> 연출은 `SubscribeAfterAction`으로 받는다. 행동이 성공한 뒤에만 오므로, 실패해 취소된 행동의 피해 숫자가 뜨지 않는다. 받은 것은 연출 대기열에 넣어 차례로 튼다([06장](06-Presentation.md) 3·4절).
 >
-> `ShowDamageNumber` 안에서 `hp`를 고치면 안 된다. 행동이 끝난 뒤의 변경이라 Undo 단위에서 빠지고, 서버가 모르는 변경이 된다.
+> `ShowDamage` 안에서 `hp`를 고치면 안 된다. 행동이 끝난 뒤의 변경이라 Undo 단위에서 빠지고, 서버가 모르는 변경이 된다.
 
 > [!note]- 개발 명령도 행동으로
 > 개발용 "골드 +100"도 값을 직접 바꾸지 않는다. DB › 개발 › 개발 명령의 결과 Block(플레이어 데이터에 주기)으로 조립하면, 누를 때 행동 하나(`DeveloperEditAction`)로 실행되어 모니터에서 Undo되고 덮어쓰기 경고도 없다. 규칙을 거쳐야 하는 명령(적 모두 처치)만 그 ID에 `[BindTo]` 코드를 붙인다([08장](08-TestAndDebug.md) 2절).
@@ -241,7 +250,8 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - MonoBehaviour 필드에 게임 값(골드·체력·덱)을 둔다 → 플레이어 데이터에 둔다.
 - 씬 코드·코루틴·이벤트를 받는 함수에서 플레이어 데이터를 고친다 → 행동을 만들어 `Game.Do`.
 - 행동 안에서 기다린다(코루틴·`await`) → 결과를 이벤트로 쏘고 연출은 따로.
-- 실패를 조용한 `return`으로 처리한다 → 예외를 던진다.
+- 실패를 조용한 `return`으로 처리한다 → 예외를 던진다(플레이어에게 보일 실패는 `throw Game.Fail(…)`).
+- 비용을 직접 뺀다 → `Game.Pay`.
 - Block·결과·`Started` 코드에서 `GBibleRuntime.Game`을 쓴다 → 받은 세션을 쓴다.
 
 > [!note]- 하지 말 것 전체와 이유
@@ -260,6 +270,8 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > | 매 프레임 바뀌는 위치·속도를 플레이어 데이터에 | 매 프레임 기록·ChangeSet이 쌓인다 | MonoBehaviour 쪽에 두고, 규칙에 필요한 칸 좌표만 데이터로 |
 > | 원본(인스턴스)을 통째로 복사해 판 데이터에 넣는다 | Sync·저장·전송이 커지고, 스프라이트는 저장되지 않으며, 원본을 고쳐도 반영되지 않는다 | 판 데이터에는 원본 ID와 바뀌는 값만(4절) |
 > | 다른 값으로 계산되는 값(합산 공격력)을 저장 | 두 값이 어긋날 수 있고 데이터가 커진다 | 읽을 때 계산(속성·함수) |
+> | 비용을 직접 뺀다(`energy -= cost`) | 비용을 고치는 가로채기(유물·상태 효과)가 무시된다 | `Game.Pay` |
+> | 연출을 손으로 만든 대기열·`WaitForSeconds`로 튼다 | `Redraw`가 연출을 기다리지 못하고, 연출 속도·건너뛰기·`Busy`가 먹지 않는다 | `GameView.Present` + `GameView.Wait` |
 
 ## 6. 데이터 크기·성능 기준
 
@@ -290,10 +302,12 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
-- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있다.
+- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
+- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런스 값이다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
-- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction`), `OnDisable`에서 `Dispose`한다.
+- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction` → `GameView.Present`), `OnDisable`에서 `Dispose`한다.
+- [ ] 예상 값은 화면이 계산하지 않고 `Game.Preview`·`Game.CanDo`로 읽는다.
 - [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.
 - [ ] 게임 값을 담은 static 변수가 없고, Block·결과 코드는 `GBibleRuntime` 대신 받은 세션을 쓴다.
 - [ ] 텍스트 인자는 `("이름", 값)` 형태다.
@@ -310,4 +324,8 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - [03. Game API](../Manual/03-GameApi.md) — `Find`·`All`의 비용, `NewId`, 확장 메서드
 > - [07. 난수와 시간](../Manual/07-Random-Time.md) — 난수 흐름, 게임 시계, Undo·저장과 함께 움직이는 방식
 > - [10. 이벤트](../Manual/10-Events.md) — 쏘기·받기 규칙
+> - [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md) — 가로채기 자리, `Game.Pay`
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — `Game.Balance`, `Game.Fail`
+> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`
+> - [33. 고정 틱·미리보기·CSV](../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`
 > - [../Coding.md](../Coding.md) — 게임 코드 규칙과 Mirror 비용
