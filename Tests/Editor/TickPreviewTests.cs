@@ -71,6 +71,8 @@ namespace GBible.Tests
         {
             var seen = new List<TpHit>();
             _session.Events.SubscribeAfterAction<TpHit>(seen.Add);
+            var changes = 0;
+            _session.Data.Changed += _ => changes++;
             var journal = _session.Journal.LastId;
             var undo = _session.UndoCount;
 
@@ -81,6 +83,7 @@ namespace GBible.Tests
             Assert.AreEqual(journal, _session.Journal.LastId, "기록이 남지 않는다");
             Assert.AreEqual(undo, _session.UndoCount, "Undo 이력이 늘지 않는다");
             Assert.AreEqual(0, seen.Count, "행동 뒤에 받는 쪽은 받지 않는다");
+            Assert.AreEqual(0, changes, "데이터 변경 알림도 보내지 않는다(화면이 다시 그려지지 않음)");
 
             Game.Do(new Strike { unit = Hero, amount = 10 });
             Assert.AreEqual(predicted, Hero.hp, "난수도 돌아가서 실제로 하면 미리본 값과 같다");

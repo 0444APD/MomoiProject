@@ -147,7 +147,7 @@ namespace GBible.Tests
             Assert.AreEqual(3, _session.Data.GetNumber("gold"));
 
             game.Find<TbUnit>("hero").hp = 0;
-            Assert.Throws<InvalidOperationException>(() => game.Use("strike", game.Find<TbUnit>("hero"), game.Find<TbUnit>("orc")), "사용 조건 거짓");
+            Assert.Throws<GameFailure>(() => game.Use("strike", game.Find<TbUnit>("hero"), game.Find<TbUnit>("orc")), "사용 조건 거짓");
             Assert.AreEqual(26, game.Find<TbUnit>("orc").hp, "실패한 사용은 아무것도 바꾸지 않는다");
         }
 

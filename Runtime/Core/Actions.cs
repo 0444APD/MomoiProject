@@ -126,6 +126,7 @@ namespace GBible
 
         // 미리보기: 행동을 실행해 보고 read로 결과를 읽은 뒤 모두 되돌린다.
         // 기록·Undo·행동 로그·행동 뒤에 받는 쪽(SubscribeAfterAction)·도전과제 달성이 남지 않고, 난수도 돌아간다.
+        // 데이터 변경 알림(Changed·DataChanged·Synced)도 보내지 않는다 → 화면이 다시 그려지지 않고 전송에도 실리지 않는다.
         // 행동이 실패하면 바꾼 것을 되돌린 뒤 그 예외를 그대로 던진다. 행동 밖(화면 코드)에서 부른다.
         public T Preview<T>(GameAction action, Func<T> read)
         {
@@ -135,6 +136,7 @@ namespace GBible
                 registered = SelfRun ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'을 실행할 세션이 없습니다.");
             var prepare = Prepare;
             using (_journal.Mute())
+            using (_state.Quiet())
             {
                 var tx = _state.Begin(0, "미리보기");
                 IsPreviewing = true;

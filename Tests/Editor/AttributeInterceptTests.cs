@@ -148,12 +148,20 @@ namespace GBible.Tests
         public void 비용이_모자라면_행동_전체가_취소된다()
         {
             var party = _session.Data.Get<AiParty>("party");
-            var e = Assert.Throws<InvalidOperationException>(() => Game.Do(new Spend { gold = 5, energy = 9 }));
+            var e = Assert.Throws<GameFailure>(() => Game.Do(new Spend { gold = 5, energy = 9 }));
             StringAssert.Contains("모자랍니다", e.Message);
             Assert.AreEqual(10, party.gold, "먼저 낸 골드도 돌아온다");
             Game.Do(new Spend { gold = 5, energy = 2 });
             Assert.AreEqual(5, party.gold);
             Assert.AreEqual(1, party.energy);
+        }
+
+        [Test]
+        public void 없는_필드로_내면_프로그래머_실수로_알린다()
+        {
+            var e = Assert.Throws<InvalidOperationException>(() => Do(g => g.Pay("party", "gems", 1)));
+            StringAssert.Contains("gems", e.Message);
+            Assert.IsFalse(e is GameFailure, "플레이어에게 보일 \"모자랍니다\"가 아니다");
         }
 
         [Test]

@@ -174,7 +174,9 @@ namespace GBible
             var picked = (targets ?? new List<string>()).Select(game.Find).Where(t => t != null).ToList();
             var triggers = game.Session.Triggers;
             if (!triggers.CanUse(ability, definition.When, game.Find(user), picked, out var moment))
-                throw new InvalidOperationException($"[MomoiProject] 능력 '{definition.DisplayName}'의 사용 조건을 만족하지 않습니다: {definition.When.Natural(game.Session)}");
+                throw new GameFailure(FailureKeys.CannotUse,
+                    TextArgs.From(("ability", Texts.NameOf(definition.Id)), ("condition", definition.When.Natural(game.Session))),
+                    "{ability}: 지금은 쓸 수 없습니다({condition}).");
             var final = new List<object>();
             if (definition.Targets.Count > 0 || definition.Effects.Count > 0)
             {

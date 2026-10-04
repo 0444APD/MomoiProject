@@ -271,17 +271,21 @@ namespace GBible
         public bool CancelChoice(string choiceId) => Session.Choices.Cancel(choiceId);
 
         // ── 비용 ───────────────────────────────────────────────
-        // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 InvalidOperationException → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.
-        //   Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", 2);
-        public void Pay(string key, string path, double amount)
+        // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 GameFailure(FailureKeys.NotEnough) → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.
+        //   Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", 2, what: "energy.name");
+        // what: 실패 글의 {what}에 들어갈 이름(텍스트 키면 번역된 글, 비우면 플레이어 데이터 › 필드). 없는 필드·숫자가 아닌 필드는 프로그래머 실수로 예외.
+        public void Pay(string key, string path, double amount, string what = null)
         {
             var cost = Intercept(new CostIntent { key = key, path = path ?? "", amount = amount });
             if (cost.cancelled || cost.amount <= 0) return;
             var have = ReadNumber(cost.key, cost.path);
             if (have < cost.amount)
+            {
+                var name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? Texts.Get(what) : what;
                 throw new GameFailure(FailureKeys.NotEnough,
-                    TextArgs.From(("what", PathText(cost.key, cost.path)), ("have", Format(have)), ("need", Format(cost.amount))),
+                    TextArgs.From(("what", name), ("have", Format(have)), ("need", Format(cost.amount))),
                     "{what}이(가) 모자랍니다({have} / {need}).");
+            }
             WriteNumber(cost.key, cost.path, have - cost.amount);
         }
 
@@ -292,6 +296,11 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(key) || !Session.Data.IsDefined(key)) throw new InvalidOperationException($"[MomoiProject] 비용: 없는 플레이어 데이터 '{key}'입니다.");
             if (string.IsNullOrEmpty(path)) return Session.Data.GetNumber(key);
+            var type = FieldPaths.TypeAt(Session.Data.TypeOf(key), path, out var error);
+            if (type == null) throw new InvalidOperationException($"[MomoiProject] 비용: '{key}'에 필드 '{path}'가 없습니다({error}).");
+            var underlying = Nullable.GetUnderlyingType(type) ?? type;
+            if (!(underlying.IsPrimitive && underlying != typeof(bool) && underlying != typeof(char)) && underlying != typeof(decimal))
+                throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'는 숫자 필드가 아닙니다({type.Name}).");
             var value = FieldPaths.Resolve(Session.Data.Get(key), path).FirstOrDefault();
             return value == null ? 0 : Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
         }

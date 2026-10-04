@@ -57,10 +57,11 @@ namespace GBible
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key = "";
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(비우면 값 전체)")] public string path = "";
         [FieldLabel("양")] public double amount = 1;
+        [FieldLabel("보일 이름(모자랄 때 실패 글에, 텍스트 키 또는 글, 비우면 플레이어 데이터 › 필드)")] public string what = "";
 
         public override OutcomeKinds Kind => OutcomeKinds.PlayerData;
 
-        public override void Run(TriggerContext context) => context.Game.Pay(key, path, amount);
+        public override void Run(TriggerContext context) => context.Game.Pay(key, path, amount, string.IsNullOrEmpty(what) ? null : what);
 
         public override string Describe(INameResolver names) => $"비용 {(string.IsNullOrEmpty(path) ? key : key + " › " + path)} {amount}";
 

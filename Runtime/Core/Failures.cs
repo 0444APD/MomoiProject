@@ -46,5 +46,7 @@ namespace GBible
         public const string NotACandidate = "momoi.fail.notACandidate";
         public const string ChosenTwice = "momoi.fail.chosenTwice";
         public const string ChoiceGone = "momoi.fail.choiceGone";
+        // {ability}: 능력·아이템 이름, {condition}: 사용 조건 글 — Game.Use
+        public const string CannotUse = "momoi.fail.cannotUse";
     }
 }

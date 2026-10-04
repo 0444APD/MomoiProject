@@ -62,6 +62,8 @@ namespace GBible
         internal AttributeSystem(GameSession session)
         {
             _session = session;
+            // 행동이 중단·미리보기로 되돌아가면 색인을 다시 만든다(미리보기는 변경 알림을 보내지 않는다).
+            session.Actions.TransactionAborted += _ => _index = null;
             session.Data.Changed += key =>
             {
                 if (key == SessionKey || key == MetaKey) _index = null;

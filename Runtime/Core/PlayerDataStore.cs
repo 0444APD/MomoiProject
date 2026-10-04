@@ -286,6 +286,37 @@ namespace GBible
 
         public bool IsDefined(string key) => key != null && _slots.ContainsKey(key);
 
+        // 이 안에서는 Changed·DataChanged·Synced를 알리지 않는다(미리보기: 바뀌었다가 그대로 돌아오는 변경이라 화면·전송이 알 필요가 없다).
+        // 안에서 새로 붙인 받는 쪽은 그대로 남는다. 캐시를 가진 쪽은 되돌림(TransactionAborted)으로 비운다.
+        public IDisposable Quiet()
+        {
+            var changed = Changed;
+            var dataChanged = DataChanged;
+            var synced = Synced;
+            Changed = null;
+            DataChanged = null;
+            Synced = null;
+            return new QuietScope(() =>
+            {
+                Changed = changed + Changed;
+                DataChanged = dataChanged + DataChanged;
+                Synced = synced + Synced;
+            });
+        }
+
+        sealed class QuietScope : IDisposable
+        {
+            Action _restore;
+
+            public QuietScope(Action restore) => _restore = restore;
+
+            public void Dispose()
+            {
+                _restore?.Invoke();
+                _restore = null;
+            }
+        }
+
         // 불러온 저장에 값이 있는데 아직 등록되지 않은 키(등록하는 순간 그 값이 적용된다).
         // 필요할 때 등록하는 라이브러리 키($modifiers·$statuses·$schedule)가 판을 불러온 직후에도 보이게 쓴다.
         public bool IsPending(string key) => key != null && _preloaded.ContainsKey(key);

@@ -129,9 +129,9 @@ namespace GBible.Tests
         {
             Game.Do(new AskDiscard { count = 2 });
             var id = Game.Choice.id;
-            Assert.Throws<InvalidOperationException>(() => Game.Answer(id, "c1"));
-            Assert.Throws<InvalidOperationException>(() => Game.Answer(id, "c1", "zz"));
-            Assert.Throws<InvalidOperationException>(() => Game.Answer(id, "c1", "c1"));
+            Assert.Throws<GameFailure>(() => Game.Answer(id, "c1"));
+            Assert.Throws<GameFailure>(() => Game.Answer(id, "c1", "zz"));
+            Assert.Throws<GameFailure>(() => Game.Answer(id, "c1", "c1"));
             Assert.IsTrue(Game.IsWaiting, "실패한 답은 선택을 꺼내지 않는다");
             Game.Answer(id, "c1", "c3");
             Assert.AreEqual(2, Run.discard.Count);
