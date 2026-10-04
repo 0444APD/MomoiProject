@@ -35,12 +35,7 @@ namespace GBible.EditorTools.UI
             }
 
             if (property.propertyType == SerializedPropertyType.Generic && property.hasVisibleChildren)
-            {
-                var group = Gs.Col();
-                foreach (var child in PropertyUtil.Children(property))
-                    group.Add(BuildProperty(child, onValue, onStructure));
-                return Section(label, group);
-            }
+                return Section(label, Group(property, onValue, onStructure));
 
             return FieldRow(label, property, onValue);
         }
@@ -63,16 +58,55 @@ namespace GBible.EditorTools.UI
             }
 
             if (property.propertyType == SerializedPropertyType.Generic && property.hasVisibleChildren)
-            {
-                var group = Gs.Col();
-                foreach (var child in PropertyUtil.Children(property))
-                    group.Add(BuildProperty(child, onValue, onStructure));
-                return group;
-            }
+                return Group(property, onValue, onStructure);
 
             var inline = new GsInlineProperty(property);
             inline.Changed += () => onValue?.Invoke();
             return inline;
+        }
+
+        // 묶음 필드(곡선·지속 설정 …)의 칸들. [ShowIf]가 붙은 칸은 형제 칸의 값에 따라 보이고 숨는다(값을 바꾸면 바로).
+        static VisualElement Group(SerializedProperty property, Action onValue, Action onStructure)
+        {
+            var group = Gs.Col();
+            var owner = property.Copy();
+            var conditional = new List<(VisualElement view, ShowIfAttribute condition)>();
+            void Refresh()
+            {
+                owner.serializedObject.Update();
+                foreach (var (view, condition) in conditional)
+                    view.style.display = condition.Matches(SiblingValue(owner.FindPropertyRelative(condition.Field))) ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            Action changed = () =>
+            {
+                if (conditional.Count > 0) Refresh();
+                onValue?.Invoke();
+            };
+            foreach (var child in PropertyUtil.Children(property))
+            {
+                var view = BuildProperty(child, changed, onStructure);
+                var condition = PropertyUtil.GetField(child, out _)?.GetCustomAttribute<ShowIfAttribute>(true);
+                if (condition != null) conditional.Add((view, condition));
+                group.Add(view);
+            }
+            if (conditional.Count > 0) Refresh();
+            return group;
+        }
+
+        static object SiblingValue(SerializedProperty sibling)
+        {
+            if (sibling == null) return null;
+            switch (sibling.propertyType)
+            {
+                case SerializedPropertyType.Boolean: return sibling.boolValue;
+                case SerializedPropertyType.Enum:
+                    return sibling.enumValueIndex >= 0 && sibling.enumValueIndex < sibling.enumNames.Length ? sibling.enumNames[sibling.enumValueIndex] : null;
+                case SerializedPropertyType.String: return sibling.stringValue;
+                case SerializedPropertyType.Integer: return sibling.longValue;
+                case SerializedPropertyType.Float: return sibling.doubleValue;
+                case SerializedPropertyType.ManagedReference: return sibling.managedReferenceValue;
+                default: return null;
+            }
         }
 
         // 칸 이름표 = 코드의 변수 이름(항목·필드는 코드 이름으로 식별한다). 목록 요소는 [번호].

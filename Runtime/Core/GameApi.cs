@@ -190,6 +190,23 @@ namespace GBible
         public bool CancelSchedule(string id) => Session.Schedules.Cancel(id);
         public int CancelSchedules(string source) => Session.Schedules.CancelBySource(source);
 
+        // ── 실패(플레이어에게 보일 글) ──────────────────────────
+        // 행동 안에서 던지면 행동 전체가 취소되고 Message는 지금 언어의 글이다. 텍스트 표에 키가 없으면 fallback 문장(같은 {값} 틀).
+        //   if (target.frozen) throw Game.Fail("fail.frozen", "얼어 있어 움직일 수 없습니다.");
+        //   throw Game.Fail("fail.tooFar", "{range}칸 안의 대상만 고를 수 있습니다.", ("range", 3));
+        public GameFailure Fail(string key, params (string name, object value)[] args) => new GameFailure(key, TextArgs.From(args));
+        public GameFailure Fail(string key, string fallback, params (string name, object value)[] args) => new GameFailure(key, TextArgs.From(args), fallback);
+
+        // ── 밸런스 값·가중치 표 ─────────────────────────────────
+        // 이름 붙은 숫자(DB › 밸런스 값). x를 주면 곡선으로 그 단계의 값.
+        //   var energy = Game.Balance(GameIds.Balance.StartEnergy);     var hp = Game.Balance(GameIds.Balance.EnemyHp, floor);
+        public double Balance(string id) => Session.Balance.Get(id);
+        public double Balance(string id, double x) => Session.Balance.Get(id, x);
+
+        // 가중치 표(DB › 가중치 표)에서 뽑는다(행동 안에서). 하나: 항목 ID(꽝이면 null). 여럿: unique면 서로 다른 것.
+        public string Roll(string tableId) => Session.Tables.Roll(tableId).FirstOrDefault();
+        public List<string> Roll(string tableId, int count, bool unique = false) => Session.Tables.Roll(tableId, count, unique);
+
         // ── 선택 대기 ───────────────────────────────────────────
         // 플레이어에게 고르기를 요구한다(행동 안에서). 고르면 then의 [Chosen] 필드에 고른 것이 들어가 실행된다. 돌려주는 값은 선택 id.
         //   Game.Ask("버릴 카드", run.hand, new DiscardChosen(), min: 1, max: 1);
@@ -224,7 +241,9 @@ namespace GBible
             if (cost.cancelled || cost.amount <= 0) return;
             var have = ReadNumber(cost.key, cost.path);
             if (have < cost.amount)
-                throw new InvalidOperationException($"{PathText(cost.key, cost.path)}이(가) 모자랍니다({Format(have)} / {Format(cost.amount)}).");
+                throw new GameFailure(FailureKeys.NotEnough,
+                    TextArgs.From(("what", PathText(cost.key, cost.path)), ("have", Format(have)), ("need", Format(cost.amount))),
+                    "{what}이(가) 모자랍니다({have} / {need}).");
             WriteNumber(cost.key, cost.path, have - cost.amount);
         }
 

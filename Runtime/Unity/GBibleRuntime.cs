@@ -138,6 +138,9 @@ namespace GBible
                 LoadProfile(session);
                 // DB › 상태 효과(Game.ApplyStatus·효과 '상태 효과 걸기').
                 foreach (var status in database.All<StatusData>()) session.Statuses.Define(status.ToDefinition());
+                // DB › 밸런스 값(Game.Balance)·가중치 표(Game.Roll).
+                foreach (var balance in database.All<BalanceData>()) balance.Define(session.Balance);
+                foreach (var table in database.All<WeightTableData>()) session.Tables.Define(table.ToDefinition());
                 // Game.Use로 쓰는 것: 능력(IUsableData)과,사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
                 foreach (var usable in database.Entries.OfType<IUsableData>())
                     if (usable.ToUsable() is AbilityDefinition definition) session.Abilities.Define(definition);

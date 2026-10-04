@@ -30,14 +30,7 @@ namespace GBible.EditorTools
             if (condition == null || owner == null) return true;
             var other = FindField(owner.GetType(), condition.Field);
             if (other == null) return true;
-            var value = other.GetValue(owner);
-            if (condition.Value == null)
-            {
-                if (value is bool flag) return flag;
-                if (value is string text) return text.Length > 0;
-                return value != null;
-            }
-            return string.Equals(Convert.ToString(value, CultureInfo.InvariantCulture), Convert.ToString(condition.Value, CultureInfo.InvariantCulture), StringComparison.Ordinal);
+            return condition.Matches(other.GetValue(owner));
         }
 
         static FieldInfo FindField(Type type, string name)

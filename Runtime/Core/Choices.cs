@@ -142,16 +142,16 @@ namespace GBible
         protected override void Run()
         {
             var pending = Game.Session.Choices.Take(choice)
-                ?? throw new InvalidOperationException($"[MomoiProject] 기다리는 선택 '{choice}'이(가) 없습니다(이미 답했거나 취소됨).");
+                ?? throw new GameFailure(FailureKeys.ChoiceGone, null, "이미 답했거나 취소된 선택입니다.");
             var ids = (picked ?? new List<string>()).Where(id => !string.IsNullOrEmpty(id)).ToList();
             if (ids.Distinct(StringComparer.Ordinal).Count() != ids.Count)
-                throw new InvalidOperationException("[MomoiProject] 같은 것을 두 번 골랐습니다.");
+                throw new GameFailure(FailureKeys.ChosenTwice, null, "같은 것을 두 번 골랐습니다.");
             var unknown = ids.FirstOrDefault(id => pending.options.All(o => o.id != id));
-            if (unknown != null) throw new InvalidOperationException($"[MomoiProject] '{unknown}'은(는) 이 선택의 후보가 아닙니다.");
+            if (unknown != null) throw new GameFailure(FailureKeys.NotACandidate, TextArgs.From(("item", unknown)), "{item}은(는) 고를 수 있는 후보가 아닙니다.");
             if (ids.Count < pending.min || ids.Count > pending.max)
-                throw new InvalidOperationException(pending.min == pending.max
-                    ? $"[MomoiProject] {pending.min}개를 골라야 합니다(고른 것 {ids.Count}개)."
-                    : $"[MomoiProject] {pending.min}~{pending.max}개를 골라야 합니다(고른 것 {ids.Count}개).");
+                throw pending.min == pending.max
+                    ? new GameFailure(FailureKeys.ChooseExactly, TextArgs.From(("count", pending.min), ("picked", ids.Count)), "{count}개를 골라야 합니다(고른 것 {picked}개).")
+                    : new GameFailure(FailureKeys.ChooseBetween, TextArgs.From(("min", pending.min), ("max", pending.max), ("picked", ids.Count)), "{min}~{max}개를 골라야 합니다(고른 것 {picked}개).");
             ActionReferences.SetChosen(pending.then, ids);
             Game.Do(pending.then);
         }

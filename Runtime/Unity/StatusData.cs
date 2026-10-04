@@ -76,9 +76,10 @@ namespace GBible.Data
     public sealed class StatusDurationSettings
     {
         [FieldLabel("방식")] public StatusDuration kind = StatusDuration.Permanent;
-        [FieldLabel("길이"), Tooltip("이벤트 횟수 또는 초")] public double length = 3;
-        [FieldLabel("셀 이벤트"), EventTypeRef, FieldPathRoot(FieldPathRootKind.EventType)] public string tickEvent = "";
-        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두"), Tooltip("이 필드가 가진 쪽 id인 이벤트만 셉니다(예: 턴 끝의 플레이어 id → 내 턴이 끝날 때만).")]
+        [FieldLabel("길이"), Tooltip("이벤트 횟수 또는 초"), ShowIf(nameof(kind), StatusDuration.Events, StatusDuration.Seconds)] public double length = 3;
+        [FieldLabel("셀 이벤트"), EventTypeRef, FieldPathRoot(FieldPathRootKind.EventType), ShowIf(nameof(kind), StatusDuration.Events)] public string tickEvent = "";
+        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두"), ShowIf(nameof(kind), StatusDuration.Events),
+         Tooltip("이 필드가 가진 쪽 id인 이벤트만 셉니다(예: 턴 끝의 플레이어 id → 내 턴이 끝날 때만).")]
         public string holderField = "";
     }
 }

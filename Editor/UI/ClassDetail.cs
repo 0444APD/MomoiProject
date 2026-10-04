@@ -166,7 +166,7 @@ namespace GBible.EditorTools.UI
                 row.Add(hidden);
                 var showIf = info.GetCustomAttribute<ShowIfAttribute>(true);
                 if (showIf != null)
-                    row.Add(Caption(showIf.Value == null ? $"'{showIf.Field}'이(가) 있거나 참일 때만 보임  [ShowIf]" : $"'{showIf.Field}'이(가) '{showIf.Value}'일 때만 보임  [ShowIf]"));
+                    row.Add(Caption(showIf.Describe() + "  [ShowIf]"));
                 if (InstanceFields.IsFeature(info))
                     row.Add(Caption("기능 필드: 비어 있으면 그 기능이 없습니다. 인스턴스에서 '+ 기능'으로 붙입니다."));
             }

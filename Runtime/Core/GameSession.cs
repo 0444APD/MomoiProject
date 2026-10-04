@@ -60,6 +60,9 @@ namespace GBible
         public ScheduleSystem Schedules { get; }
         // 선택 대기(Game.Ask·Answer).
         public ChoiceSystem Choices { get; }
+        // 밸런스 값(Game.Balance)·가중치 표(Game.Roll). 런타임이 DB로 채운다.
+        public BalanceSystem Balance { get; }
+        public WeightTableSystem Tables { get; }
         // 게임 코드의 창구(All·Find·Random·Do·Use). Block 안에서는 Game 속성으로 쓴다.
         public GameApi Game { get; }
         public DebugCommands Debug { get; }
@@ -123,6 +126,8 @@ namespace GBible
             Statuses = new StatusSystem(this);
             Schedules = new ScheduleSystem(this);
             Choices = new ChoiceSystem(this);
+            Balance = new BalanceSystem();
+            Tables = new WeightTableSystem(this);
             // 처리를 클래스 안에 쓴 행동(Run)은 등록 없이 실행한다. 실행 직전에 참조 필드(id가 있는 객체)를 지금 데이터의 객체로 다시 찾는다.
             Actions.SelfRun = action => action.RunIn(Game);
             Actions.Prepare = action => ActionReferences.Resolve(action, Game);
