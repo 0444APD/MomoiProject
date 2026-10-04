@@ -121,7 +121,7 @@ public class RunDirector : MonoBehaviour
 > | `winGold` | 15 | 일정하게, 단계마다 +3 | `WinBattle`: 그 층 값의 ⅔~4⁄3(1층 10~20, 3층 14~28) |
 >
 > - 코드는 `Game.Balance(GameIds.Balance.StartHp)`, 층마다 커지는 값은 `Game.Balance(GameIds.Balance.WinGold, run.floor)`.
-> - 손으로 만들어도 되고, 메뉴 **MomoiProject › 씨앗 › 카드 던전 밸런스 값**을 누르면 세 항목이 적용 전으로 생긴다(예시의 `Editor/SeedBalance.cs`). DB에서 확인하고 Ctrl+S.
+> - 손으로 만들어도 되고, 메뉴 **MomoiProject › DB 추가 › 카드 던전 밸런스 값**을 누르면 세 항목이 적용 전으로 생긴다(예시의 `Editor/AddBalanceValues.cs`). DB에서 확인하고 Ctrl+S.
 > - 항목이 없으면 `StartRun`이 "없는 밸런스 값"으로 실패한다(새 판이 시작되지 않는다). DB에 만들고 Ctrl+S.
 > - 플레이 중에 DB에서 값을 고치면 저장 전이라도 다음 판·다음 보상부터 바로 반영된다. 테스트는 DB 대신 `session.Balance.Define`으로 넣는다([08장](08-TestAndDebug.md) 6절).
 | 판 끝 | `EndRun` | 남길 값을 프로필로 옮기고 층을 0으로 | 판 끝 |

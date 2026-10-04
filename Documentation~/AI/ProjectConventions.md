@@ -145,14 +145,14 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 AI는 Unity 창을 누를 수 없으므로, DB 항목은 사람이 확인하고 저장하는 형태로 만든다. 어느 쪽이든 만든 항목은 DB에 **적용 전**으로 들어가고, 사람이 DB에서 보고 Ctrl+S로 적용한다.
 
 - **단순 값이 많은 것**(밸런스 값·카드 수치·몬스터 수치처럼 숫자·글자·enum 칸만): CSV 파일을 써 두고, 사람이 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`처럼). 인스턴스는 값의 클래스마다 한 파일.
-- **트리거·조건·결과 Block이 든 것**(도전과제·능력·상태 효과·로그·가중치 표의 조건 …): `Assets/Code/Editor`에 메뉴 하나짜리 씨앗 스크립트를 쓴다. 사람이 메뉴를 한 번 누르면 항목이 적용 전으로 생긴다.
+- **트리거·조건·결과 Block이 든 것**(도전과제·능력·상태 효과·로그·가중치 표의 조건 …): `Assets/Code/Editor`에 메뉴 하나짜리 DB 추가 메뉴 스크립트를 쓴다. 사람이 메뉴를 한 번 누르면 항목이 적용 전으로 생긴다.
   ```csharp
-  // Assets/Code/Editor/SeedAchievements.cs — 메뉴: MomoiProject › 씨앗 › 도전과제(예: 가이드 예시의 Editor/SeedBalance.cs)
+  // Assets/Code/Editor/AddAchievements.cs — 메뉴: MomoiProject › DB 추가 › 도전과제(예: 가이드 예시의 Editor/AddBalanceValues.cs)
   using GBible; using GBible.Data; using GBible.EditorTools; using UnityEditor;
 
-  static class SeedAchievements
+  static class AddAchievements
   {
-      [MenuItem("MomoiProject/씨앗/도전과제")]
+      [MenuItem("MomoiProject/DB 추가/도전과제")]
       static void Run()
       {
           var db = EditorDatabase.Instance;
@@ -177,7 +177,7 @@ AI는 Unity 창을 누를 수 없으므로, DB 항목은 사람이 확인하고 
 3. 규칙 함수(핵심 동사마다 의도·가로채기 자리·이벤트)와 의도·이벤트 클래스.
 4. 행동(진행 흐름: 판 시작·전투 시작·턴 끝·판 끝 …)과 재사용 Block(효과·대상·조건).
 5. 프로젝트 고유 기능(유물·축복처럼 DB에서 조립할 종류)이 필요하면 DB 종류 클래스 + 감시 등록.
-6. DB 항목(15절: 씨앗 메뉴·CSV)과 밸런스 값 이름.
+6. DB 항목(15절: DB 추가 메뉴·CSV)과 밸런스 값 이름.
 7. 테스트(12절) — 흐름 하나(판 시작부터 전투 승리까지)가 행동만으로 끝까지 도는지.
 8. 화면(Client): 데이터를 그리는 화면 → 입력 → 연출. 처음에는 모니터(명령 탭·데이터 탭)로 시험하고 화면은 나중에.
 9. 보고(12절).
