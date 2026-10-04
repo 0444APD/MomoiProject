@@ -345,18 +345,44 @@ public static class Rarity
 - **그 항목 하나에만 있는 예외** → `[BindTo]` 함수로 그 항목의 결과를 쓴다.
 - **여럿이 같이 쓰는 계산** → 평범한 static 함수(`Rules.Damage`, `Rules.Shuffle`).
 
-| 종류 | Block | 기획 |
-|---|---|---|
-| 효과 | 피해 `DealDamage`, 방어도 `GainBlock`, 회복 `Heal`, 상태 걸기 `AddStatus` | 5번 |
-| 대상 | 모든 적 `AllEnemies`, 무작위 적 `RandomEnemy` | 범위·무작위 공격 |
+| 종류  | Block                                                          | 기획        |
+| --- | -------------------------------------------------------------- | --------- |
+| 효과  | 피해 `DealDamage`, 방어도 `GainBlock`, 회복 `Heal`, 상태 걸기 `AddStatus` | 5번        |
+| 대상  | 모든 적 `AllEnemies`, 무작위 적 `RandomEnemy`                         | 범위·무작위 공격 |
 
 > [!note]- 코드 없이 조립되는 카드
 > 대상을 고르지 않으면 플레이어가 고른 대상(카드를 끌어 놓은 적)이 그대로 쓰이고, 기본 제공 `사용자 자신`은 카드를 낸 주인공을 고른다. 그래서 타격(고른 적에게 피해)·수비(나에게 방어도)·화염구(고른 적에게 피해 + 화상)는 코드 없이 조립된다.
 
+`[BindTo(DB 항목 ID)]`를 static 함수에 붙이면, 그 항목의 결과 칸 대신 이 함수가 돈다(DB에서 결과 칸은 잠기고 함수 이름이 보인다).
+
+```csharp
+public static class CardCode
+{
+    // 연쇄 번개: 적마다 차례로 3, 4, 5 … 피해
+    [BindTo(GameIds.Instance.ChainLightning)]
+    static void ChainLightning(TriggerContext c)
+    {
+        var hero = c.User as Fighter;                 // 컨텍스트: 카드를 쓴 쪽
+        var damage = 3;
+        foreach (var enemy in Rules.LivingEnemies(c.Game).ToList()) Rules.Damage(c.Game, hero, enemy, damage++);
+    }
+
+    // 첫 승리 도전과제: 연쇄 번개 해금. 첫 매개변수로 받을 이벤트 형식을 적으면 그 이벤트 값을 바로 쓴다.
+    [BindTo(GameIds.Achievement.FirstWin)]
+    static void FirstWin(BattleWon e, TriggerContext c)
+    {
+        var profile = c.Game.Data().Profile;
+        if (!profile.unlocked.Contains(GameIds.Instance.ChainLightning)) profile.unlocked.Add(GameIds.Instance.ChainLightning);
+    }
+}
+```
+
 > [!note]- `[BindTo]`로 쓰는 것
 > - 연쇄 번개(11번) "적마다 차례로 3, 4, 5 … 피해": 대상마다 수치가 달라지는 동작은 그 카드에만 있으므로 Block을 만들지 않는다.
 > - 첫 승리 도전과제의 결과 "연쇄 번개 해금"(11번).
-> - 유물 불타는 피.
+> - 유물 불타는 피([04장](04-AddingContent.md) 9절).
+> - 함수 모양은 넷 중 하나: `()`, `(이벤트)`, `(TriggerContext)`, `(이벤트, TriggerContext)`. 컨텍스트(`TriggerContext`)에는 발동한 순간의 정보(쓴 쪽 `User`, 고른 대상 `Picked`, 받은 이벤트 `Event`, `Game`)가 들어 있다.
+> - ID가 DB의 어느 항목에도 없으면(오타·지운 항목) 게임을 켤 때 콘솔에 경고가 뜬다. 자세한 내용은 [04장](04-AddingContent.md) 5절, 매뉴얼 [13. BindTo](../Manual/13-BindTo.md).
 
 > [!note]- 규칙 함수
 > 피해 계산(방어도가 먼저 깎임, 적이 쓰러지면 빼고 이벤트를 쏨)과 덱 섞기는 행동·Block·`[BindTo]` 함수가 모두 쓰므로 한곳에 모은다. 래퍼나 특별한 문법 없이 그냥 C#이다.
