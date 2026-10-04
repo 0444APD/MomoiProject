@@ -167,12 +167,17 @@ namespace GBible.EditorTools.UI
             if ((allowed & OutcomeKinds.Record) != 0)
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(RecordOutcome)), () => Insert(new RecordOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(RecordOutcome)) });
             if ((allowed & OutcomeKinds.Targeted) != 0)
+            {
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(TargetedOutcome)), () => Insert(new TargetedOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(TargetedOutcome)) });
+                items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(ChoiceOutcome)), () => Insert(new ChoiceOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(ChoiceOutcome)) });
+            }
             if ((allowed & OutcomeKinds.Intent) != 0)
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(ModifyIntentOutcome)), () => Insert(new ModifyIntentOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(ModifyIntentOutcome)) });
             if ((allowed & OutcomeKinds.Event) != 0)
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(PublishEventOutcome)), () => Insert(new PublishEventOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(PublishEventOutcome)) });
 
+            if ((allowed & OutcomeKinds.PlayerData) != 0)
+                items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(PayOutcome)), () => Insert(new PayOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(PayOutcome)) });
             if ((allowed & OutcomeKinds.PlayerData) != 0)
             {
                 var keys = EditorDatabase.Instance.OfType<PlayerDataEntry>().OrderBy(k => k.Id).ToList();

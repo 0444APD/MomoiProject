@@ -58,6 +58,8 @@ namespace GBible
         // 상태 효과(Game.ApplyStatus)와 예약(Game.ScheduleAfter·ScheduleOn).
         public StatusSystem Statuses { get; }
         public ScheduleSystem Schedules { get; }
+        // 선택 대기(Game.Ask·Answer).
+        public ChoiceSystem Choices { get; }
         // 게임 코드의 창구(All·Find·Random·Do·Use). Block 안에서는 Game 속성으로 쓴다.
         public GameApi Game { get; }
         public DebugCommands Debug { get; }
@@ -120,6 +122,7 @@ namespace GBible
             Attributes = new AttributeSystem(this);
             Statuses = new StatusSystem(this);
             Schedules = new ScheduleSystem(this);
+            Choices = new ChoiceSystem(this);
             // 처리를 클래스 안에 쓴 행동(Run)은 등록 없이 실행한다. 실행 직전에 참조 필드(id가 있는 객체)를 지금 데이터의 객체로 다시 찾는다.
             Actions.SelfRun = action => action.RunIn(Game);
             Actions.Prepare = action => ActionReferences.Resolve(action, Game);

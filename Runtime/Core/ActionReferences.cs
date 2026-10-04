@@ -22,6 +22,19 @@ namespace GBible
 
         static readonly Dictionary<Type, Field[]> Plans = new Dictionary<Type, Field[]>();
 
+        // [Chosen] 필드(선택 대기의 답을 받는 칸). Ids면 string(들), 아니면 id가 있는 클래스(들).
+        sealed class ChosenField
+        {
+            public string Name;
+            public Type ElementType;
+            public Type FieldType;
+            public bool Many;
+            public bool Ids;
+            public MemberAccess Access;
+        }
+
+        static readonly Dictionary<Type, ChosenField> Chosen = new Dictionary<Type, ChosenField>();
+
         // 실행 직전: 참조 필드를 지금 데이터의 객체로 바꿔 넣는다. 없으면 행동 실패(변경 없음).
         public static void Resolve(GameAction action, GameApi game)
         {
@@ -90,6 +103,74 @@ namespace GBible
             return true;
         }
 
+        public static bool HasChosen(Type type) => ChosenOf(type) != null;
+
+        // 고른 id들을 [Chosen] 필드에 넣는다. 객체 칸이면 id만 든 객체를 넣고, 실행 직전에 Resolve가 지금 객체로 바꾼다.
+        public static void SetChosen(GameAction action, IReadOnlyList<string> ids)
+        {
+            var field = ChosenOf(action.GetType())
+                ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'에 [Chosen] 필드가 없습니다.");
+            ids ??= Array.Empty<string>();
+            object Item(string id) => field.Ids ? id : StubOf(field.ElementType, id);
+            if (!field.Many)
+            {
+                field.Access.Set(action, ids.Count == 0 ? null : Item(ids[0]));
+                return;
+            }
+            if (field.FieldType.IsArray)
+            {
+                var array = Array.CreateInstance(field.ElementType, ids.Count);
+                for (int i = 0; i < ids.Count; i++) array.SetValue(Item(ids[i]), i);
+                field.Access.Set(action, array);
+            }
+            else if (DataModel.Create(field.FieldType) is IList list)
+            {
+                foreach (var id in ids) list.Add(Item(id));
+                field.Access.Set(action, list);
+            }
+        }
+
+        static ChosenField ChosenOf(Type type)
+        {
+            lock (Chosen)
+            {
+                if (Chosen.TryGetValue(type, out var known)) return known;
+                ChosenField found = null;
+                foreach (var field in DataModel.Of(type).Fields)
+                {
+                    if (!IsChosen(type, field.Name)) continue;
+                    var fieldType = field.Type;
+                    var info = DataModel.Of(fieldType);
+                    var many = info.Kind == DataKind.List || info.Kind == DataKind.Array;
+                    var element = many ? info.ElementType : fieldType;
+                    if (element != typeof(string) && !IsReferenceType(element))
+                        throw new InvalidOperationException($"[MomoiProject] '{type.Name}.{field.Name}': [Chosen] 필드는 string, id가 있는 클래스, 그 리스트·배열이어야 합니다.");
+                    found = new ChosenField { Name = field.Name, ElementType = element, FieldType = fieldType, Many = many, Ids = element == typeof(string), Access = FieldAccess.Find(type, field.Name) };
+                    break;
+                }
+                Chosen[type] = found;
+                return found;
+            }
+        }
+
+        // 형식마다 한 번(게임이 켜질 때 PrepareAll) 어트리뷰트를 본다.
+        static bool IsChosen(Type type, string name)
+        {
+            for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+            {
+                var info = t.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly);
+                if (info != null) return info.IsDefined(typeof(ChosenAttribute), false);
+            }
+            return false;
+        }
+
+        static object StubOf(Type type, string id)
+        {
+            var stub = DataModel.Create(type);
+            GameApi.SetId(stub, id);
+            return stub;
+        }
+
         static object Stub(object item)
         {
             var stub = DataModel.Create(item.GetType());
@@ -133,7 +214,12 @@ namespace GBible
                 try { types = assembly.GetTypes(); }
                 catch (System.Reflection.ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
                 foreach (var type in types)
-                    if (!type.IsAbstract && typeof(GameAction).IsAssignableFrom(type)) PlanOf(type);
+                    if (!type.IsAbstract && typeof(GameAction).IsAssignableFrom(type))
+                    {
+                        PlanOf(type);
+                        try { ChosenOf(type); }
+                        catch (InvalidOperationException) { }   // 잘못된 [Chosen] 필드는 그 행동으로 Ask할 때 알린다
+                    }
             }
         }
 

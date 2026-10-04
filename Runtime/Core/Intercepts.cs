@@ -123,9 +123,21 @@ namespace GBible
 
     public enum IntentOp
     {
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("값으로 바꾸기")]
+#endif
         Set,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("더하기")]
+#endif
         Add,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("곱하기")]
+#endif
         Multiply,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("막기")]
+#endif
         Cancel,
     }
 

@@ -17,10 +17,19 @@ namespace GBible
     public enum ModifierKind
     {
         // 기본값에 더한다(+30).
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("플랫(+값)")]
+#endif
         Flat,
         // 같은 칸끼리 더한 뒤 한 번 곱한다(0.2 = +20%).
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("퍼센트(0.2 = +20%)")]
+#endif
         Percent,
         // 하나하나 따로 곱한다(0.5 = ×1.5). 드물게 쓰는 강한 효과용.
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("독립 곱(0.5 = ×1.5)")]
+#endif
         Multiply,
     }
 

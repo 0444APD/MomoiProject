@@ -190,6 +190,31 @@ namespace GBible
         public bool CancelSchedule(string id) => Session.Schedules.Cancel(id);
         public int CancelSchedules(string source) => Session.Schedules.CancelBySource(source);
 
+        // ── 선택 대기 ───────────────────────────────────────────
+        // 플레이어에게 고르기를 요구한다(행동 안에서). 고르면 then의 [Chosen] 필드에 고른 것이 들어가 실행된다. 돌려주는 값은 선택 id.
+        //   Game.Ask("버릴 카드", run.hand, new DiscardChosen(), min: 1, max: 1);
+        // 후보는 id가 있는 객체. label은 모니터 등에 보일 이름(비우면 id). 고른 뒤 할 일은 모두 then에 쓴다(Ask 다음 줄은 바로 실행된다).
+        public string Ask(string prompt, IEnumerable<object> candidates, GameAction then, int min = 1, int max = 1, string source = null, string player = null, Func<object, string> label = null) =>
+            Session.Choices.Ask(prompt, (candidates ?? Enumerable.Empty<object>()).Where(c => c != null)
+                .Select(c => new ChoiceCandidate(IdOf(c), label?.Invoke(c))), then, min, max, source, player);
+
+        // 글 선택지: Game.Ask("자세", new[] { new ChoiceCandidate("attack", "공격"), new ChoiceCandidate("guard", "방어") }, new ChooseStance());
+        public string Ask(string prompt, IEnumerable<ChoiceCandidate> options, GameAction then, int min = 1, int max = 1, string source = null, string player = null) =>
+            Session.Choices.Ask(prompt, options, then, min, max, source, player);
+
+        // 지금 답을 기다리는 선택(먼저 요구한 것). 없으면 null. 화면은 이것을 보여 주고, 있는 동안 다른 입력을 막는다.
+        public PendingChoice Choice => Session.Choices.Current;
+        public IReadOnlyList<PendingChoice> Choices => Session.Choices.All;
+        public bool IsWaiting => Session.Choices.Current != null;
+
+        // 답하기(행동 밖, 플레이어 입력에서). 고른 것은 객체 또는 id. 개수·후보가 맞지 않으면 실패하고 아무것도 바뀌지 않는다.
+        public ActionRecord Answer(string choiceId, IEnumerable<object> picked) =>
+            Do(new ChoiceAnswer { choice = choiceId, picked = (picked ?? Enumerable.Empty<object>()).Where(p => p != null).Select(p => p as string ?? IdOf(p)).ToList() });
+
+        public ActionRecord Answer(string choiceId, params object[] picked) => Answer(choiceId, (IEnumerable<object>)picked);
+
+        public bool CancelChoice(string choiceId) => Session.Choices.Cancel(choiceId);
+
         // ── 비용 ───────────────────────────────────────────────
         // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 InvalidOperationException → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.
         //   Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", 2);

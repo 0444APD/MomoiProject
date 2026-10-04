@@ -56,6 +56,7 @@ namespace GBible.EditorTools
         Label _sessionInfo;
         GameSession _session;
         long _lastJournalId = -1;
+        string _lastChoices = "";
         int _lastUndoCount = -1;
         bool _paused;
         long _selectedEntry;
@@ -218,6 +219,8 @@ namespace GBible.EditorTools
             // 데이터 탭은 들어가 있는 폴더를 유지한 채 값만 다시 그린다.
             else if (_tab == Tab.Data) _dataExplorer?.Refresh();
             else if (_tab != Tab.Commands) BuildTab();
+            // 명령 탭은 기다리는 선택이 바뀔 때만 다시 그린다(누르는 중인 버튼이 사라지지 않게).
+            else if (ChoiceKey() != _lastChoices) BuildTab();
         }
 
         void UpdateInfo()
@@ -1319,6 +1322,7 @@ namespace GBible.EditorTools
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
             _body.Add(scroll);
+            BuildChoices(scroll);
             foreach (var group in _session.Debug.All.GroupBy(c => c.Group))
             {
                 var panel = Gs.Panel(group.Key, null, out _, out var body);
@@ -1339,6 +1343,54 @@ namespace GBible.EditorTools
                     row.Add(button);
                 }
                 body.Add(row);
+                scroll.Add(panel);
+            }
+        }
+
+        string ChoiceKey() => string.Join(",", _session.Choices.All.Select(c => c.id));
+
+        // 선택 대기(Game.Ask): 게임 화면이 아직 없어도 여기서 고르고 답할 수 있다. 답하기도 게임 행동이라 타임라인에 남고 Undo된다.
+        void BuildChoices(VisualElement scroll)
+        {
+            _lastChoices = ChoiceKey();
+            foreach (var choice in _session.Choices.All)
+            {
+                var pending = choice;
+                var count = pending.min == pending.max ? $"{pending.min}개 고르기" : $"{pending.min}~{pending.max}개 고르기";
+                var panel = Gs.Panel("선택 대기 · " + (string.IsNullOrEmpty(pending.prompt) ? pending.id : pending.prompt), count, out _, out var body);
+                panel.style.marginBottom = 16;
+                var picked = new List<string>();
+                var row = Gs.Row("gs-wrap");
+                foreach (var candidate in pending.options)
+                {
+                    var id = candidate.id;
+                    var label = string.IsNullOrEmpty(candidate.label) ? id : candidate.label;
+                    GsButton button = null;
+                    button = new GsButton(label, () =>
+                    {
+                        if (!picked.Remove(id))
+                        {
+                            // 하나만 고르는 선택은 누르면 바꿔 고른다.
+                            if (pending.max == 1) picked.Clear();
+                            picked.Add(id);
+                        }
+                        foreach (var child in row.Children().OfType<GsButton>())
+                            child.Text = picked.Contains((string)child.userData) ? "✓ " + child.tooltip : child.tooltip;
+                    });
+                    button.userData = id;
+                    button.tooltip = label;
+                    button.style.marginRight = 8;
+                    button.style.marginBottom = 8;
+                    row.Add(button);
+                }
+                body.Add(row);
+                var answer = new GsButton("답하기", () =>
+                {
+                    try { _session.Game.Answer(pending.id, picked.Cast<object>().ToList()); }
+                    catch (Exception e) { ShowFeedback(e.Message, GsNoticeKind.Warning); }
+                }, GsButtonKind.Primary);
+                answer.style.alignSelf = Align.FlexStart;
+                body.Add(answer);
                 scroll.Add(panel);
             }
         }
