@@ -14,7 +14,7 @@
 
 Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목표는 **기획자가 에디터에서 모든 설정(명세·이름·연결)을 하고, 프로그래머는 클래스와 로직만 쓰는 것**이다.
 
-저장소 루트는 `Assets/Code/System`이며 어셈블리는 다음과 같다.
+저장소 루트는 `Packages/com.momoi.gbible`(embedded 패키지, 2026-10-03 이전에는 `Assets/Code/System`)이며 어셈블리는 다음과 같다.
 
 | 폴더 | 어셈블리 | 내용 |
 |---|---|---|
@@ -48,7 +48,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 ### 1.3 Unity 런타임 (Runtime/Unity)
 
 - **`GameData`**: DB 항목의 바탕(ScriptableObject). **ID로만 식별**(표시 이름 필드 없음, `DisplayName` = ID). 상속하면 코드 추가 없이 DB에 나타난다. `[Database(표시 이름, Group, Order, IdPrefix, Hidden, Page)]`. 참조 필드는 `[DataRef(typeof(X))]`(ID 문자열, 이름을 바꾸면 따라 바뀜).
-- **기본 DB 종류**: 플레이어 데이터(`PlayerDataEntry`, 에디터 명칭 "플레이어 데이터"), 로그(`StatData`), 도전과제(`AchievementData`), 키워드 그룹(`KeywordGroupData`, 키워드 탭 안에 숨김)·키워드(`KeywordData`, 용어 스타일·아이콘 포함), 필드 규칙(`FieldRuleData`), 템플릿(`TemplateData`: 아무 클래스의 미리 채운 인스턴스, `CreateInstance<T>()`로 사본), 프리팹(`PrefabData`: 프리팹 컴포넌트 필드를 탐색기로 편집), 스프라이트 규격 그룹·규격(`SpritePresetGroupData`·`SpritePresetData`).
+- **기본 DB 종류**: 플레이어 데이터(`PlayerDataEntry`, 에디터 명칭 "플레이어 데이터"), 로그(`StatData`), 도전과제(`AchievementData`), 키워드 그룹(`KeywordGroupData`, 키워드 탭 안에 숨김)·키워드(`KeywordData`, 용어 스타일·아이콘 포함), 필드 규칙(`FieldRuleData`), 인스턴스(`InstanceData`, 예전 이름 템플릿·`TemplateData`: 아무 클래스의 미리 채운 인스턴스, `CreateInstance<T>()`로 사본), 프리팹(`PrefabData`: 프리팹 컴포넌트 필드를 탐색기로 편집), 스프라이트 규격 그룹·규격(`SpritePresetGroupData`·`SpritePresetData`).
 - **`GameDatabase`**: 모든 GameData 목록(Resources/MomoiProject/GameDatabase). 이름 바꾸기 기록(저장 파일 호환).
 - **`GBibleRuntime`**: 게임 시작 시 세션 자동 생성, 이벤트(Configuring/Started/Stopped), 프로필 저장(`profile.json`, 메타 구역)·판 저장(`run.json`, 세션 구역·난수·시간), 종료 시 자동 저장, `LoadRun`.
 - **`GameTime`**: `Pause/Resume`(이유별로 겹침), `SetSpeed`(배속), `StepFrame`. `Time.timeScale` 기반.
@@ -219,7 +219,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **새 기능·개념의 이름은 임의로 짓지 말고 사용자에게 확인받는다.**
 
 ### 3.2 Git
-- 저장소: `Assets/Code/System`, 원격 `https://github.com/0444APD/UnitySystem`. 작업 브랜치 `rebuild`.
+- 저장소: `Packages/com.momoi.gbible`(예전 `Assets/Code/System`), 원격 `https://github.com/0444APD/UnitySystem`. 작업 브랜치 `rebuild`.
 - **푸시는 사용자가 요청할 때만.** 평소에는 로컬 커밋만.
 - 커밋 작성자 `0444APD`, 메시지 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. 여러 줄 메시지는 파일로(`git commit -F`).
 - 브랜치: `master`(원격, 이 문서 업로드로 rebuild와 같아짐), `legacy`(로컬, 옛 시스템 참고용: 타임라인 기반 다이얼로그 등).
@@ -317,7 +317,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **입력 칸 밑줄**: `GsField`의 '편집 중'은 깃발 없이 실제 상태에서만 계산한다(칸 안에 글자 편집기가 떠 있음 · 칸 안 글자 입력에 포커스 · 이 칸이 연 목록이 아직 화면에 있음). 값 칸에 남은 포커스는 세지 않는다. 밑줄 색은 전환 없이 바로 바뀐다. 목록은 `TrackMenu(menu)`로 알린다(옛 MenuOpened/MenuClosed 삭제).
 - **기능 활성화는 탭이 아니라 사이드바의 토글 버튼**이다(기능 그룹의 첫 줄, 오른쪽 끝에 스위치 `GsSwitch`). 누르면 확인 뒤 켜고 끈다. `FeaturePage`는 삭제.
 - **인벤토리 시스템**(`Optional/Inventory`, 심볼 `GBIBLE_INVENTORY`, 기본 꺼짐): 뼈대만 있다. `Inventory`·`InventorySlot`(칸의 리스트, 칸 = 인스턴스 ID + 개수, `Add`·`Remove`·`TryRemove`·`CountOf`·`Has`·`RoomFor`, 플레이어 데이터의 값 형식으로 쓰고 꺼내 그냥 고친다). 아이템은 프로젝트가 코드로 정의한 클래스의 인스턴스(2026-10-02에 `ItemData` DB 종류는 지움). 기능의 데이터 클래스는 `GameFeature.DataClasses`에 이름을 적으면 클래스 탭의 기능 그룹과 값 형식 목록에 나온다. 슬롯 UI·장비 칸·드래그 규칙·아이템 기능 기본 제공분은 아직 없다(사양 필요).
-- **샘플 아이템(`SampleItem`)과 필드 시험(`SampleFieldTestData`, 메뉴, 데이터 에셋)은 삭제했다.** 기능 조립의 실제 예는 인벤토리 시스템의 `ItemData`다. 상세 패널 점검은 테스트 전용 `WideTestData`(`WideDetailTests`)가 맡는다.
+- **샘플 아이템(`SampleItem`)과 필드 시험(`SampleFieldTestData`, 메뉴, 데이터 에셋)은 삭제했다.** (당시 기능 조립의 예였던 인벤토리 `ItemData`도 2026-10-02에 지웠다. 지금 아이템은 프로젝트 클래스의 인스턴스 `InstanceData`다.) 상세 패널 점검은 테스트 전용 `WideTestData`(`WideDetailTests`)가 맡는다.
 - **조건식 편집기**(`GsExpressionEditor`): 조건(Condition)·값 조건(ValueFilter) 필드는 그룹 블록을 들여 쓰던 옛 모양 대신 **한 줄 식**으로 편집한다. 요소는 셋뿐: 조건 블럭 · 논리 연산자(AND·OR·NOT) · 괄호. 아래의 `+ 블럭` · `+ 논리 연산자` · `+ 괄호`로 더하고, 연산자를 누르면 AND↔OR, NOT을 누르면 떼어진다. 연산자만 먼저 더하면 빈칸('조건 선택')이 생긴다. 항 왼쪽의 손잡이(⠿)를 끌어 순서를 바꾸거나 괄호 안으로 넣고 밖으로 뺀다(괄호로 묶기 = 빈 괄호를 만들고 블럭을 끌어 넣기). 항마다 ⋯ 메뉴(NOT·앞뒤로·괄호로 감싸기/풀기·바꾸기·삭제). AND가 OR보다 먼저 묶인다. 저장 형식(AND·OR·NOT 블럭의 트리)은 그대로이고, 편집기가 트리 ↔ 한 줄 식을 오간다(OR 안의 AND는 괄호 없이 이어 보인다). 보상 리스트는 옛 `BlockEditor` 그대로.
 - **값이 안 바뀌던 문제**: 입력 칸 밑줄을 고친 뒤, 편집을 끝낼 때 칸이 '빈 값인지' 다시 읽으면서(`serializedObject.Update`) 아직 적용하지 않은 새 값을 버리고 있었다(모든 글자·숫자 칸). 값을 먼저 적용한 뒤 칸에 알리도록 순서를 바꾸고, 적용 전 값이 있으면 다시 읽지 않게 했다.
 - 로그의 `multiplier`(배수): 이벤트에서 읽은 값에 곱해 반영하는 수(기본 1). 예: 보스 처치를 2로 세기, 단위 바꾸기, 음수로 빼기.
