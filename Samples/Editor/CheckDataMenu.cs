@@ -51,6 +51,7 @@ namespace GBible.Samples
                 var d = CheckDefaults.Loot();
                 t.emptyWeight = d.EmptyWeight;
                 t.entries.AddRange(d.Entries.Select(e => new WeightTableEntry { item = e.item, weight = e.weight, minCount = e.minCount, maxCount = e.maxCount }));
+                t.exclude.AddRange(d.Exclude.Select(x => new PlayerDataListRef { key = x.key, path = x.path }));
             });
             made += Add<SettingData>("checkMasterVolume", s =>
             {
@@ -84,6 +85,14 @@ namespace GBible.Samples
                 choice.candidates.Add(new CheckAllUnits());
                 choice.effects.Add(new CheckHurt { amount = 3 });
                 c.outcomes.Add(choice);
+            });
+
+            made += Add<DebugCommandData>("checkPickLoot", c =>
+            {
+                c.label = "가중치 표에서 고르기 시험";
+                c.category = "확인용";
+                c.description = "checkLoot에서 셋을 보이고, 고른 것을 checkRun › kept에 넣는다(가진 것은 다시 안 나온다).";
+                c.outcomes.Add(new ChooseFromTableOutcome { prompt = "가질 전리품", table = CheckIds.Loot, count = 3, unique = true, min = 0, max = 1, key = CheckIds.Run, path = "kept" });
             });
 
             EditorDatabase.Staging.Touch();

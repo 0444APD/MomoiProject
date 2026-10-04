@@ -819,6 +819,8 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | DB › 밸런스 값(값·곡선), `Game.Balance(id)`·`Game.Balance(id, x)` | 30 | 04 §10, 09 §1, 07 §6(수집형·방치형) |
 | DB › 가중치 표, `Game.Roll(id)`·`Game.Roll(id, n, unique)`, `session.Tables.Chances` | 30 | 04 §10, 07 §6(수집형) |
 | 결과 '가중치 표에서 주기' | 30 · 12 | 04 §10 |
+| 결과 '가중치 표에서 고르기'(`ChooseFromTableOutcome`) | 30 · 29 · 12 | 04 §10 |
+| 풀: 줄 종류 '플레이어 데이터 목록'·뺄 목록·코드 풀 `Game.Roll(풀, …)` | 30 | 04 §10 |
 | 플레이 중 DB 수정 바로 반영(밸런스 값·가중치 표) | 30 | 08 §2, 04 §10(언급) |
 | 플레이어용 실패 `GameFailure`·`Game.Fail`, 라이브러리 키 `FailureKeys`(텍스트 표로 번역) | 30 · 23 | 03 §6, 06 §5, 09 §1, 12 §1-1, 08 §6(테스트) |
 

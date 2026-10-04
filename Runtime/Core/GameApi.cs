@@ -206,6 +206,11 @@ namespace GBible
         // 가중치 표(DB › 가중치 표)에서 뽑는다(행동 안에서). 하나: 항목 ID(꽝이면 null). 여럿: unique면 서로 다른 것.
         public string Roll(string tableId) => Session.Tables.RollOne(tableId);
         public List<string> Roll(string tableId, int count, bool unique = false) => Session.Tables.Roll(tableId, count, unique);
+        // 코드에서 만든 풀에서 무게만큼 뽑는다(가중치 표 없이). stream은 쓰는 곳마다 다른 이름(난수 흐름 "pool:" + stream).
+        //   Game.Roll(new[] { ("gold", 7.0), ("relic", 3.0) }, 1, stream: "chest");
+        public List<string> Roll(IEnumerable<(string item, double weight)> pool, int count = 1, bool unique = false, string stream = "pool") => Session.Tables.Roll(pool, count, unique, stream);
+        // 무게가 모두 같은 풀(ID 목록).  Game.Roll(run.unlocked, 3, unique: true, stream: "shop");
+        public List<string> Roll(IEnumerable<string> pool, int count = 1, bool unique = false, string stream = "pool") => Session.Tables.Roll((pool ?? Enumerable.Empty<string>()).Select(id => (id, 1.0)), count, unique, stream);
 
         // ── 미리보기 ───────────────────────────────────────────
         // 행동을 해 보고 결과만 읽는다(아무것도 남지 않음). 화면의 예상 피해·버튼을 막는 이유에 쓴다. 행동 밖에서 부른다.

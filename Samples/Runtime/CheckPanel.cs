@@ -44,6 +44,7 @@ namespace GBible.Samples
         public int turn = 1;
         public int energy = 3;
         public List<string> loot = new List<string>();
+        public List<string> kept = new List<string>();   // 가중치 표에서 고르기로 가진 것(checkLoot의 뺄 목록)
         public string picked = "";
 
         public CheckUnit Hero => units.FirstOrDefault(u => u.id == "checkHero");
@@ -158,6 +159,15 @@ namespace GBible.Samples
         }
     }
 
+    // 결과 '가중치 표에서 고르기'를 그대로 돌린다(셋을 보이고 고른 것을 kept에, 최소 0 = 건너뛰기).
+    [Serializable, BlockInfo("확인용: 전리품 셋 중 하나 고르기")]
+    public sealed class CheckPickLoot : GameAction
+    {
+        protected override void Run() =>
+            new ChooseFromTableOutcome { prompt = "가질 전리품", table = CheckIds.Loot, count = 3, unique = true, min = 0, max = 1, key = CheckIds.Run, path = "kept" }
+                .Run(new TriggerContext { Session = Game.Session, Owner = "checkPanel" });
+    }
+
     [Serializable, BlockInfo("확인용: 상자 열기/닫기")]
     public sealed class CheckToggleChest : GameAction
     {
@@ -224,6 +234,7 @@ namespace GBible.Samples
             table.Entries.Add(new WeightEntry { item = "checkShield", weight = 2 });
             table.Entries.Add(new WeightEntry { item = "checkPotion", weight = 2, minCount = 1, maxCount = 2 });
             table.Entries.Add(new WeightEntry { item = "checkGem", weight = 1 });
+            table.Exclude.Add(new PlayerDataListRef { key = CheckIds.Run, path = "kept" });   // 가진 것은 다시 안 나온다
             return table;
         }
 
@@ -381,6 +392,8 @@ namespace GBible.Samples
             GUILayout.Space(8);
             if (GUILayout.Button("전리품 3개 뽑기(서로 다른 것)")) Do(new CheckRollLoot());
             GUILayout.Label($"전리품: {(run.loot.Count == 0 ? "없음" : string.Join(", ", run.loot))}");
+            if (GUILayout.Button("전리품 셋 중 하나 고르기(가중치 표에서 고르기)")) Do(new CheckPickLoot());
+            GUILayout.Label($"가진 것: {(run.kept.Count == 0 ? "없음" : string.Join(", ", run.kept))} — checkLoot의 뺄 목록이라 다시 나오지 않는다");
             var chances = GBibleRuntime.Session.Tables.Chances(CheckIds.Loot);
             GUILayout.Label("확률: " + string.Join(" · ", chances.Select(c => $"{c.item} {c.chance * 100:0.#}%")) + " (나머지는 꽝)");
             GUILayout.Space(8);

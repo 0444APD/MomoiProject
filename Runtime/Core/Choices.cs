@@ -10,6 +10,7 @@ namespace GBible
     // 행동은 멈추지 않는다: Ask 다음 줄은 바로 실행된다. 고른 뒤에 할 일은 모두 이어서 할 행동에 쓴다.
     // 이어서 할 행동은 예약처럼 맡긴다(대상 필드는 id만 저장, 실행할 때 다시 찾는다). 답하기(ChoiceAnswer)는 플레이어 행동이라 타임라인에 남고 Undo된다.
     // 기다리는 선택은 플레이어 데이터라 Undo·저장·멀티 그대로다. 여럿이면 먼저 요구한 것이 Game.Choice(맨 앞)다.
+    // DB 원본(아직 판에 없는 카드·유물)에서 고르는 것은 결과 '가중치 표에서 고르기'(표에서 뽑아 보이고, 고른 원본 id를 목록에 넣는다).
     // 후보가 없으면 기다리지 않고 바로 이어서 할 행동을 실행한다(고른 것 없음).
     // 기다리는 동안 다른 입력을 막는 것은 화면의 일이다(Game.IsWaiting).
 
@@ -216,7 +217,7 @@ namespace GBible
         }
     }
 
-    // '선택 요구'의 이어서 할 행동: 고른 것마다 효과, 이어서 '고른 뒤 결과'(사용자·Owner는 요구한 순간 그대로).
+    // '선택 요구'·'가중치 표에서 고르기'의 이어서 할 행동: 고른 것마다 효과, 고른 원본 id를 플레이어 데이터에, 이어서 '고른 뒤 결과'(사용자·Owner는 요구한 순간 그대로).
     [Serializable]
     public sealed class ChoiceEffectsRun : GameAction
     {
@@ -225,20 +226,27 @@ namespace GBible
         [Chosen] public List<string> picked = new List<string>();
         public List<Effect> effects = new List<Effect>();
         public List<Outcome> then = new List<Outcome>();
+        // 참이면 후보가 원본 id(판 데이터 객체가 아님): 고른 것을 id 글자 그대로 '고른 뒤 결과'의 Picked로 넘기고, key가 있으면 그 목록에 넣는다.
+        public bool ids;
+        public string key = "";
+        public string path = "";
 
         public override ActionVisibility Visibility => ActionVisibility.Developer;
-        public override string Describe() => "고른 것에 효과";
+        public override string Describe() => ids ? "고른 것 넣기" : "고른 것에 효과";
 
         protected override void Run()
         {
             var session = Game.Session;
             var holder = string.IsNullOrEmpty(user) ? null : Game.Find(user);
-            var picks = picked.Select(id => Game.Find(id)).Where(o => o != null).ToList();
+            var picks = ids ? picked.Where(id => !string.IsNullOrEmpty(id)).Cast<object>().ToList()
+                            : picked.Select(id => Game.Find(id)).Where(o => o != null).ToList();
             var context = new TriggerContext { Session = session, Owner = owner, User = holder, Picked = picks };
             var use = new AbilityUse { Game = Game, User = holder, Picked = picks, Context = context };
             foreach (var target in picks)
                 foreach (var effect in effects.Where(e => e != null))
                     if (effect.TargetType.IsInstanceOfType(target)) effect.Run(use, target);
+            if (ids && !string.IsNullOrEmpty(key) && picks.Count > 0)
+                new PlayerDataReward { key = key, path = path ?? "", items = picks.Cast<string>().ToList() }.Grant(session);
             if (then.Count > 0) session.Triggers.RunOutcomes(then, context, "Choice");
         }
     }

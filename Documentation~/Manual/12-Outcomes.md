@@ -42,6 +42,7 @@
 | 의도 고치기 | 의도 고치기 | `ModifyIntentOutcome` | `Intent` |
 | 비용 내기 | 비용 내기 | `PayOutcome` | `PlayerData` |
 | 가중치 표에서 주기 | 가중치 표에서 주기 | `RollTableOutcome` | `PlayerData` |
+| 가중치 표에서 고르기 | 가중치 표에서 고르기 | `ChooseFromTableOutcome` | `PlayerData` |
 
 | 기능 | 고를 수 있는 결과 |
 |---|---|

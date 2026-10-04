@@ -190,7 +190,7 @@ for (var i = pile.Count - 1; i > 0; i--)
 > [!note]- RPG·어드벤처
 > - **월드 상태**: 열어 본 상자·연 문·쓰러뜨린 보스처럼 씬에 놓인 것의 상태를 이름으로 기억한다. 행동 안에서 `Game.SetWorld("forest.chest3", "opened", permanent: true)`, 읽기는 `Game.World(id)`·`Game.WorldFlag(id)`. 씬에는 컴포넌트 '월드 상태 연결'을 붙여 맞을 때 켤 것·끌 것을 고른다(코드 없음). 판 값(`$world`)이 프로필 값(`$world.meta`)보다 앞서고, Undo·저장이 따라온다. 이름은 "씬 이름.오브젝트 이름"으로 짓는다.
 > - **씬 흐름**: 지금 있는 곳을 판 데이터의 글자 필드(`run.scene`)에 두고 Bootstrap의 **씬 흐름**에 고르면, 이어 하기·Undo에도 맞는 씬이 열린다. 행동은 필드만 바꾼다([03장](03-GameLoop.md) 9절).
-> - **선택 대기**: 대화가 아니라 규칙이 묻는 고르기(보상 셋 중 하나, 동료 고르기)는 `Game.Ask`나 결과 `선택 요구`. 대사·선택지 연출은 다이얼로그가 맡는다([06장](06-Presentation.md) 6절).
+> - **선택 대기**: 대화가 아니라 규칙이 묻는 고르기(보상 셋 중 하나, 동료 고르기)는 `Game.Ask`나 결과 `선택 요구`(판에 있는 것에서)·`가중치 표에서 고르기`(DB 원본에서). 대사·선택지 연출은 다이얼로그가 맡는다([06장](06-Presentation.md) 6절).
 > - **슬롯**: 세이브 칸 여럿은 `GBibleRuntime.UseSlot`·`SlotInfoOf`([10장](10-SaveAndRelease.md) 3절).
 > - 매뉴얼 [32장](../Manual/32-View-Presentation-Scenes.md)·[31장](../Manual/31-Slots-Settings-Input.md).
 

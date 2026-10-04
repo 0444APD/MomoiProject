@@ -181,6 +181,7 @@ namespace GBible.EditorTools.UI
             {
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(PayOutcome)), () => Insert(new PayOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(PayOutcome)) });
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(RollTableOutcome)), () => Insert(new RollTableOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(RollTableOutcome)) });
+                items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(ChooseFromTableOutcome)), () => Insert(new ChooseFromTableOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(ChooseFromTableOutcome)) });
             }
             if ((allowed & OutcomeKinds.PlayerData) != 0)
             {

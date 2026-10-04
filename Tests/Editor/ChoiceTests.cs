@@ -10,7 +10,7 @@ namespace GBible.Tests
     {
         [Serializable] public class CtCard { public string id; public int cost; }
         [Serializable] public class CtUnit { public string id; public int hp = 30; }
-        [Serializable] public class CtRun { public List<CtCard> hand = new List<CtCard>(); public List<CtCard> discard = new List<CtCard>(); public CtUnit hero = new CtUnit { id = "hero" }; public string stance = ""; }
+        [Serializable] public class CtRun { public List<CtCard> hand = new List<CtCard>(); public List<CtCard> discard = new List<CtCard>(); public CtUnit hero = new CtUnit { id = "hero" }; public string stance = ""; public List<string> relics = new List<string>(); }
 
         // 손패에서 고르게 하고, 고른 카드를 버린다.
         public sealed class AskDiscard : GameAction
@@ -83,6 +83,27 @@ namespace GBible.Tests
             public override OutcomeKinds Kind => OutcomeKinds.Coded;
             public override void Run(TriggerContext context) => context.Game.Get<CtRun>("run").hero.hp += 5;
             public override string Describe(INameResolver names) => "회복";
+        }
+
+        // 결과: 고른 것(Picked)을 stance에 적는다(고른 원본 id가 넘어오는지 보기).
+        [Serializable]
+        public sealed class RecordPicked : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context) => context.Game.Get<CtRun>("run").stance = string.Join(",", context.Picked.Cast<string>());
+            public override string Describe(INameResolver names) => "고른 것 적기";
+        }
+
+        // 결과 '가중치 표에서 고르기'(Unity 쪽)가 하는 일: 표에서 뽑아 원본 id를 후보로 요구한다.
+        static void AskFromTable(GameApi g, int min = 1) =>
+            g.Session.Choices.Ask("유물", g.Roll("relicPool", 3, unique: true).Select(id => new ChoiceCandidate(id)),
+                new ChoiceEffectsRun { ids = true, key = "run", path = "relics", then = { new RecordPicked() } }, min, 1, source: "event1");
+
+        void DefineRelicPool()
+        {
+            var table = new WeightTableDefinition { Id = "relicPool" };
+            foreach (var id in new[] { "anchor", "blood", "lantern", "bell" }) table.Entries.Add(new WeightEntry { item = id, weight = 1 });
+            _session.Tables.Define(table);
         }
 
         GameSession _session;
@@ -185,6 +206,52 @@ namespace GBible.Tests
             Assert.AreEqual(0, Run.hand[2].cost);
             Assert.AreEqual(2, Run.hand[1].cost, "고르지 않은 카드는 그대로");
             Assert.AreEqual(35, Run.hero.hp);
+        }
+
+        [Test]
+        public void 원본_id에서_고르면_목록에_넣고_고른_뒤_결과가_id를_읽는다()
+        {
+            DefineRelicPool();
+            Game.Do(new Edit { run = g => AskFromTable(g) });
+            var options = Game.Choice.options.Select(o => o.id).ToList();
+            Assert.AreEqual(3, options.Distinct().Count());
+            Assert.AreEqual(0, Run.relics.Count, "고르기 전에는 넣지 않는다");
+
+            var id = Game.Choice.id;
+            Game.Answer(id, options[1]);
+            CollectionAssert.AreEqual(new[] { options[1] }, Run.relics);
+            Assert.AreEqual(options[1], Run.stance);
+            Assert.Throws<GameFailure>(() => Game.Answer(id, options[0]), "답한 선택은 다시 답할 수 없다");
+        }
+
+        [Test]
+        public void 원본_id_고르기를_Undo하면_같은_후보로_다시_기다린다()
+        {
+            DefineRelicPool();
+            Game.Do(new Edit { run = g => AskFromTable(g) });
+            var options = Game.Choice.options.Select(o => o.id).ToList();
+            Game.Answer(Game.Choice.id, options[0]);
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(0, Run.relics.Count);
+            CollectionAssert.AreEqual(options, Game.Choice.options.Select(o => o.id).ToList());
+
+            var json = _session.ExportRun();
+            var loaded = NewSession();
+            loaded.ImportRun(json);
+            CollectionAssert.AreEqual(options, loaded.Game.Choice.options.Select(o => o.id).ToList(), "후보는 저장에 남아 다시 뽑지 않는다");
+            loaded.Game.Answer(loaded.Game.Choice.id, options[2]);
+            CollectionAssert.AreEqual(new[] { options[2] }, loaded.Data.Get<CtRun>("run").relics);
+        }
+
+        [Test]
+        public void 원본_id_고르기에서_최소_0이면_건너뛸_수_있다()
+        {
+            DefineRelicPool();
+            Game.Do(new Edit { run = g => AskFromTable(g, min: 0) });
+            Game.Answer(Game.Choice.id);
+            Assert.IsFalse(Game.IsWaiting);
+            Assert.AreEqual(0, Run.relics.Count);
+            Assert.AreEqual("", Run.stance, "고른 뒤 결과는 고른 것 없이 돈다");
         }
 
         [Test]

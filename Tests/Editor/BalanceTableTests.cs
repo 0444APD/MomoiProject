@@ -8,7 +8,8 @@ namespace GBible.Tests
     // 밸런스 값·곡선, 가중치 표, 플레이어용 실패(다국어).
     public class BalanceTableTests
     {
-        [Serializable] public class BtRun { public int floor = 1; public int energy = 3; }
+        [Serializable] public class BtCard { public string id; }
+        [Serializable] public class BtRun { public int floor = 1; public int energy = 3; public List<BtCard> hand = new List<BtCard>(); public List<string> unlocked = new List<string>(); public List<string> relics = new List<string>(); }
 
         // 조건: 3층 이상.
         public sealed class DeepFloor : SimpleCondition
@@ -136,6 +137,59 @@ namespace GBible.Tests
             table.Entries.Add(new WeightEntry { item = "coin", weight = 1, minCount = 2, maxCount = 4 });
             _session.Tables.Define(table);
             for (int i = 0; i < 30; i++) { var n = RollIn("gold", 1).Count; Assert.IsTrue(n >= 2 && n <= 4); }
+        }
+
+        [Test]
+        public void 목록_줄은_뽑는_순간의_플레이어_데이터_목록에서_뽑는다()
+        {
+            var table = new WeightTableDefinition { Id = "handPick" };
+            table.Entries.Add(new WeightEntry { listKey = "run", listPath = "hand" });
+            table.Entries.Add(new WeightEntry { listKey = "run", listPath = "unlocked", weight = 2 });
+            _session.Tables.Define(table);
+            Assert.AreEqual(0, RollIn("handPick", 1).Count, "목록이 비어 있으면 아무것도 나오지 않는다");
+
+            Game.Do(new Edit { run = g => { var run = g.Get<BtRun>("run"); run.hand.Add(new BtCard { id = "card1" }); run.hand.Add(new BtCard { id = "card2" }); run.unlocked.Add("bolt"); } });
+            var seen = Enumerable.Range(0, 200).SelectMany(_ => RollIn("handPick", 1)).ToList();
+            CollectionAssert.AreEquivalent(new[] { "bolt", "card1", "card2" }, seen.Distinct().ToList(), "객체는 id, 글자는 그대로");
+            var chances = _session.Tables.Chances("handPick").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(0.5, chances["bolt"], 1e-9, "무게는 요소마다(1 + 1 + 2)");
+        }
+
+        [Test]
+        public void 뺄_목록에_있는_것은_안쪽_표에서도_나오지_않는다()
+        {
+            var relics = Table("relicPool", 0, ("anchor", 1), ("blood", 1), ("rareRelics", 1));
+            relics.Exclude.Add(new PlayerDataListRef { key = "run", path = "relics" });
+            _session.Tables.Define(relics);
+            _session.Tables.Define(Table("rareRelics", 0, ("crown", 1), ("bell", 1)));
+            Game.Do(new Edit { run = g => g.Get<BtRun>("run").relics.AddRange(new[] { "anchor", "crown" }) });
+
+            for (int i = 0; i < 30; i++)
+                CollectionAssert.AreEquivalent(new[] { "blood", "bell" }, RollIn("relicPool", 4, unique: true), "가진 것을 빼면 둘만 남는다");
+            Game.Do(new Edit { run = g => g.Get<BtRun>("run").relics.Add("bell") });
+            Assert.IsTrue(Enumerable.Range(0, 30).All(_ => RollIn("relicPool", 1).Single() == "blood"), "안쪽 표가 다 빠지면 그 줄도 후보가 아니다");
+
+            var cards = Table("cardPool", 0, ("card1", 1), ("card2", 1), ("card3", 1));
+            cards.Exclude.Add(new PlayerDataListRef { key = "run", path = "hand[].id" });
+            _session.Tables.Define(cards);
+            Game.Do(new Edit { run = g => g.Get<BtRun>("run").hand.AddRange(new[] { new BtCard { id = "card1" }, new BtCard { id = "card3" } }) });
+            Assert.IsTrue(Enumerable.Range(0, 20).All(_ => RollIn("cardPool", 1).Single() == "card2"), "요소 안의 필드 경로(hand[].id)로도 뺀다");
+        }
+
+        [Test]
+        public void 코드로_만든_풀에서_뽑고_Undo하면_같은_결과()
+        {
+            List<string> first = null;
+            Game.Do(new Edit { run = g => first = g.Roll(new[] { ("x", 1.0), ("y", 0.0), ("z", 1.0) }, 6, stream: "test") });
+            Assert.IsTrue(first.All(i => i == "x" || i == "z"), "무게 0은 나오지 않는다");
+            Assert.IsTrue(_session.Undo());
+            List<string> again = null;
+            Game.Do(new Edit { run = g => again = g.Roll(new[] { ("x", 1.0), ("y", 0.0), ("z", 1.0) }, 6, stream: "test") });
+            CollectionAssert.AreEqual(first, again);
+
+            List<string> picks = null;
+            Game.Do(new Edit { run = g => picks = g.Roll(new List<string> { "a", "b", "c", "d" }, 3, unique: true, stream: "shop") });
+            Assert.AreEqual(3, picks.Distinct().Count());
         }
 
         [Test]

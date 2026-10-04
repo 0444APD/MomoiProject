@@ -1,12 +1,13 @@
 # 30. 밸런스 값·곡선·가중치 표·플레이어용 실패
 
-**한 줄 요약**: 기획자가 고치는 숫자(시작 에너지 3, 층마다 체력 +10%)는 코드에 적지 않고 **DB › 밸런스 값**에 이름을 붙여 두고 `Game.Balance(ID)`로 읽는다. **곡선**을 붙이면 층·레벨·웨이브(**단계**)에 따라 값이 변한다(`Game.Balance(ID, 단계)`). 드롭·보상·상자처럼 "후보 중에서 무게만큼의 확률로 뽑기"는 **DB › 가중치 표**에서 정하고 `Game.Roll` 또는 결과 `가중치 표에서 주기`로 뽑는다. 난수는 표마다 따로인 결정론 흐름이라 Undo해도 같은 결과다. 플레이어에게 보일 실패("얼어 있어 움직일 수 없습니다")는 `throw Game.Fail(키, 기본 문장, 값…)`로 던진다. 행동 전체가 취소되고, 메시지는 텍스트 표에서 지금 언어로 만든다.
+**한 줄 요약**: 기획자가 고치는 숫자(시작 에너지 3, 층마다 체력 +10%)는 코드에 적지 않고 **DB › 밸런스 값**에 이름을 붙여 두고 `Game.Balance(ID)`로 읽는다. **곡선**을 붙이면 층·레벨·웨이브(**단계**)에 따라 값이 변한다(`Game.Balance(ID, 단계)`). 드롭·보상·상자처럼 "풀(후보들)에서 무게만큼의 확률로 뽑기"는 **DB › 가중치 표**에서 정하고 `Game.Roll` 또는 결과 `가중치 표에서 주기`·`가중치 표에서 고르기`(보이고 고르게 하기)로 뽑는다. 풀은 뽑는 순간에 만든다: 미리 정한 항목 + 조건(진행·도전과제) + 플레이어 데이터 목록(판에서 만들어진 것) − 뺄 목록(가진 것). 표 없이 코드에서 만든 풀은 `Game.Roll(풀, …)`. 난수는 표마다 따로인 결정론 흐름이라 Undo해도 같은 결과다. 플레이어에게 보일 실패("얼어 있어 움직일 수 없습니다")는 `throw Game.Fail(키, 기본 문장, 값…)`로 던진다. 행동 전체가 취소되고, 메시지는 텍스트 표에서 지금 언어로 만든다.
 
 **언제 쓰는가**
 
 - 시작 에너지·상점 가격·엘리트 확률처럼 플레이해 보며 자주 고치는 숫자(밸런스 값).
 - "층마다 적 체력 +10%", "레벨 n에 필요한 경험치 = 100 × n^1.5"처럼 단계에 따라 변하는 값(곡선).
 - "엘리트를 잡으면 60% 유물, 30% 물약 1~2개, 10% 꽝", "카드 보상 3장(서로 다른 카드)"(가중치 표).
+- "가진 유물은 다시 안 나온다", "해금한 카드만 상점에 나온다", "손패에서 무작위 1장"처럼 풀이 진행·판에 따라 바뀔 때(조건·목록 줄·뺄 목록).
 - "에너지가 모자랍니다", "이미 연 상자입니다"를 언어마다 다르게 보여 줄 때(플레이어용 실패).
 
 이 문서에서 쓰는 용어:
@@ -17,7 +18,10 @@
 | 단계 | 곡선이 따라가는 수. 층·레벨·웨이브. `Game.Balance(ID, 단계)`의 두 번째 인자. |
 | 기준 값 | 밸런스 값의 `value`. 곡선이 시작 단계에서 내는 값이다. |
 | 곡선 (`Curve`) | 단계에 따라 값이 변하는 규칙: 방식 · 시작 단계 · 방식별 칸 · 반올림 · 최솟값·최댓값. |
-| 가중치 표 | DB › 가중치 표의 항목 하나: 항목 줄(항목 · 무게 · 개수 · 조건) + 꽝 무게. 코드 형식은 `WeightTableData`(DB), `WeightTableDefinition`(실행 중). ID 상수는 `GameIds.WeightTable.X`. |
+| 가중치 표 | DB › 가중치 표의 항목 하나: 항목 줄(항목 · 무게 · 개수 · 조건) + 꽝 무게 + 뺄 목록. 코드 형식은 `WeightTableData`(DB), `WeightTableDefinition`(실행 중). ID 상수는 `GameIds.WeightTable.X`. |
+| 풀 | 한 번 뽑을 때의 후보 전체. 뽑는 순간에 표에서 만든다(저장하지 않는다). |
+| 목록 줄 | 줄 종류가 `플레이어 데이터 목록`인 항목 줄. 그 목록의 요소마다 후보 하나(판에서 만들어진 풀). |
+| 뺄 목록 | 표에 붙이는 플레이어 데이터 목록. 거기 있는 ID는 후보가 아니다(가진 유물·본 이벤트). |
 | 무게 (weight) | 뽑힐 몫. 확률 = 무게 ÷ (후보 무게 합 + 꽝 무게). 합이 1일 필요는 없다. |
 | 꽝 | 아무것도 나오지 않는 몫(`emptyWeight`). |
 | 안쪽 표 | 항목으로 넣은 다른 가중치 표. 뽑히면 그 표에서 다시 뽑는다(등급 표 → 등급별 카드 표). |
@@ -36,6 +40,9 @@
 | "상점 카드 가격: 1층 50, 5층 75, 10층 150" | 곡선 `표`(5-3) |
 | "엘리트: 60% 유물, 30% 물약 1~2개, 10% 꽝" | 가중치 표 + 안쪽 표 + 개수 + 꽝(5-4) |
 | "카드 보상 3장(서로 다른 카드) 중 하나" | `Game.Roll(ID, 3, unique: true)` + 선택 대기(5-5) |
+| "유물 셋 중 하나를 골라 가진다"(코드 없이) | 결과 `가중치 표에서 고르기`(3-3, 5-5) |
+| "가진 유물은 다시 안 나온다" · "손패에서 무작위 1장" · "해금한 카드만" | 뺄 목록 · 목록 줄 · 항목 줄의 조건(5-10) |
+| 표 없이 코드에서 만든 후보에서 뽑기 | `Game.Roll(풀, 개수, unique, stream)`(4-4) |
 | "3층부터 드래곤 비늘이 나온다" | 항목 줄의 조건(5-6) |
 | "드롭 확률을 화면에 보인다" | `session.Tables.Chances`(5-7) |
 | "얼어 있어 2턴 동안 움직일 수 없습니다"(언어별) | `throw Game.Fail` + 텍스트 표(5-8) |
@@ -85,7 +92,7 @@
 
 한 번 뽑기는 다음 순서로 돈다.
 
-1. **후보**를 모은다: 항목이 있고 무게가 0보다 큰 줄 중, 조건이 비었거나 **지금** 참인 줄. 서로 다른 것만(`unique`)이면 이번 뽑기에서 이미 나온 항목은 빼고, 안쪽 표의 줄은 그 표에 아직 나올 것이 남아 있을 때만 후보다.
+1. **후보(풀)**를 모은다: 무게가 0보다 크고, 조건이 비었거나 **지금** 참인 줄. 목록 줄은 그 순간의 목록 요소마다 한 후보로 펼친다(요소가 글자면 그대로, id가 있는 객체면 그 id, 같은 ID는 한 번. 무게·개수는 그 줄의 값). 뺄 목록에 있는 ID는 뺀다(바깥 표의 뺄 목록은 안쪽 표에도 적용된다). 서로 다른 것만(`unique`)이면 이번 뽑기에서 이미 나온 항목도 뺀다. 안쪽 표의 줄은 서로 다른 것만이거나 뺄 목록이 있을 때, 그 표에 아직 나올 것이 남아 있을 때만 후보다.
 2. 합 = 후보의 무게 합 + 꽝 무게. 합이 0 이하면 아무것도 나오지 않는다.
 3. 0~합의 난수로 하나를 고른다. 꽝 몫에 떨어지면 끝(아무것도 넣지 않는다).
 4. 고른 줄의 **개수**를 정한다: 최소와 최대가 같으면 그 수, 다르면 최소~최대 중 하나. 그 개수만큼 되풀이한다: 항목이 다른 가중치 표면 그 표에서 1~4를 다시 하고, 아니면 결과에 그 ID를 넣는다.
@@ -95,6 +102,7 @@
 - **행동 안에서 뽑는다.** 행동 밖에서 뽑으면 그 난수가 Undo·판 저장·멀티플레이와 어긋난다.
 - **서로 다른 것만**: 한 번의 `Roll` 안에서 한 번 나온 항목은 다시 후보가 되지 않는다. 안쪽 표는 그 안에 아직 나올 것이 남아 있는 동안 후보로 남고, 그 안에서 이미 나온 항목만 빠진다(등급 표 → 등급별 카드 표에서도 서로 다른 카드). 다 나온 안쪽 표는 후보에서 빠지므로, 표 전체에 서로 다른 항목이 충분하면 늘 요청한 개수가 나온다(꽝 몫은 따로). 모자라면 있는 만큼만 나온다. 개수가 2 이상인 줄은 그 개수만큼 같은 ID가 들어간다.
 - 표끼리 8단계 넘게 서로를 부르면 예외(`InvalidOperationException`, "가중치 표 'a'가 8단계 넘게 서로를 부릅니다(표끼리 돌고 있는지 확인하세요).")로 그 행동이 취소된다. DB 검증은 자기 자신을 넣은 표만 잡는다.
+- **풀은 저장하지 않는다.** 뽑을 때마다 표·조건·목록에서 다시 만든다. 업데이트로 DB에 항목이나 조건을 더하면 이미 진행 중인 저장에도 바로 적용되고, 저장을 변환할 일이 없다. "해금하면 풀에 들어간다"는 해금 목록을 풀로 저장하지 말고 항목 줄의 조건(도전과제 달성·`profile.unlocked`에 있음)이나 목록 줄로 둔다.
 - **확률**(`session.Tables.Chances`, 5-7): 지금 상태로 본 후보마다 무게 ÷ (후보 무게 합 + 꽝 무게). 꽝 확률은 1 − (그 합)이다. 안쪽 표는 한 줄(그 표 ID)로 나온다. 서로 다른 것만·개수는 반영하지 않는다(한 번 뽑기의 확률).
 
 ### 2-4. 플레이어용 실패
@@ -152,16 +160,19 @@
 | 칸 | 툴팁 | 값 |
 |---|---|---|
 | `entries` | 항목 | 항목 줄 목록(아래) |
-| `entries` › `item` | 항목 / DB 항목(인스턴스·다른 가중치 표 …). 다른 가중치 표면 그 표에서 다시 뽑는다 | DB의 모든 종류의 항목에서 고른다(인스턴스·유물·능력·상태 효과·가중치 표 …) |
+| `entries` › `source` | 줄 종류 | `항목 하나`(기본) / `플레이어 데이터 목록`. 고른 쪽의 칸만 보인다 |
+| `entries` › `item` | 항목 / DB 항목(인스턴스·다른 가중치 표 …). 다른 가중치 표면 그 표에서 다시 뽑는다 | DB의 모든 종류의 항목에서 고른다(인스턴스·유물·능력·상태 효과·가중치 표 …). 항목 하나일 때 |
+| `entries` › `listKey` · `listPath` | 플레이어 데이터 · 필드(목록) | 목록 줄일 때. 요소가 ID 글자거나 id가 있는 객체인 목록(`run › relics`, `run › battle.hand`) |
 | `entries` › `weight` | 무게 | 0 이상(기본 1). 0이면 후보가 아니다 |
 | `entries` › `minCount` · `maxCount` | 최소 개수 · 최대 개수 | 기본 1 · 1. 뽑히면 그 사이의 개수만큼 같은 ID가 들어간다(안쪽 표면 그만큼 다시 뽑는다) |
 | `entries` › `condition` | 조건(맞을 때만 후보) | 조건 Block(`플레이어 데이터 검사` 등, `11-Triggers-Conditions.md`). 비우면 늘 후보 |
 | `emptyWeight` | 꽝 무게 / 이 무게만큼 아무것도 나오지 않습니다(0이면 꽝 없음) | 0 이상 |
+| `exclude` | 뺄 목록 / 이 플레이어 데이터 목록에 있는 ID는 뽑히지 않습니다 | 줄마다 플레이어 데이터 · 필드(목록). 안쪽 표에도 적용된다 |
 
-- 검증 오류: "항목이 없습니다." / "항목을 고르지 않은 줄이 있습니다." / "표가 자기 자신을 항목으로 가지고 있습니다." / "'healPotion': 무게는 0 이상이어야 합니다." / "'healPotion': 개수는 0 ≤ 최소 ≤ 최대여야 합니다." / "꽝 무게는 0 이상이어야 합니다." / "무게가 모두 0이라 아무것도 나오지 않습니다."
+- 검증 오류: "항목이 없습니다." / "항목을 고르지 않은 줄이 있습니다." / "목록 줄의 플레이어 데이터를 고르지 않았습니다." / "뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다." / "표가 자기 자신을 항목으로 가지고 있습니다." / "'healPotion': 무게는 0 이상이어야 합니다." / "'healPotion': 개수는 0 ≤ 최소 ≤ 최대여야 합니다." / "꽝 무게는 0 이상이어야 합니다." / "무게가 모두 0이라 아무것도 나오지 않습니다."
 - 조건은 그 항목 줄을 후보로 볼지만 정한다. 조건이 거짓인 줄은 확률 계산(분모)에서도 빠진다.
 
-### 3-3. 결과 `가중치 표에서 주기`
+### 3-3. 결과 `가중치 표에서 주기` · `가중치 표에서 고르기`
 
 `+ 결과 추가` → 그룹 **결과** → `가중치 표에서 주기`. 결과 종류가 플레이어 데이터(`OutcomeKinds.PlayerData`)라서, `플레이어 데이터에 주기`를 고를 수 있는 칸(도전과제·능력·사용 기능·상태 효과·개발 명령 …)이면 나온다.
 
@@ -177,6 +188,24 @@
 - 요약: `relicPool에서 뽑아 run › relics에 넣기`, 횟수가 2 이상이면 `cardReward에서 3개 뽑아 …`.
 - 검증 오류: "가중치 표에서 주기: 표를 고르세요." / "가중치 표에서 주기: 넣을 플레이어 데이터를 고르세요." / "가중치 표에서 주기: 횟수는 1 이상이어야 합니다."
 - 목록의 요소 형식이 표의 항목과 맞아야 한다. 카드 던전의 덱(`run.deck`, `List<DeckCard>`)에는 카드 원본(`Card` 인스턴스)이 들어가지 않는다(타임라인 경고 "인스턴스 'strike'의 형식(Card)이 DeckCard과(와) 다릅니다"). 덱에 넣는 일은 코드로 한다(5-5).
+
+**`가중치 표에서 고르기`** — 표에서 뽑은 것을 후보로 **보이고**, 플레이어가 고른 것을 넣는다("유물 셋 중 하나"). 같은 자리(결과 종류 플레이어 데이터)에 나온다.
+
+| 칸 | 툴팁 | 값 |
+|---|---|---|
+| `prompt` | 안내 글 | 고르기 창 제목(텍스트 키 또는 글) |
+| `table` | 가중치 표 | DB › 가중치 표 |
+| `count` | 후보 수 | 1 이상(기본 3). 이만큼 뽑아 후보로 보인다 |
+| `unique` | 서로 다른 것만 | 기본 켬 |
+| `min` · `max` | 최소 개수 · 최대 개수 | 기본 1 · 1. 최소 0이면 건너뛰기 |
+| `key` · `path` | 고른 것을 넣을 플레이어 데이터 · 필드(목록) | 고른 원본 ID를 넣는다(`가중치 표에서 주기`와 같은 규칙). 비우면 넣지 않는다 |
+| `then` | 고른 뒤 결과 | 고른 다음에 도는 결과. 컨텍스트의 `Picked`가 고른 원본 ID(글자)들 |
+
+- 뽑기는 요구하는 순간(그 행동 안)에 끝나고 후보는 선택 대기(`$choices`)에 남는다. 그래서 끄고 켜거나 답하기를 Undo해도 후보가 바뀌지 않는다(29장 2-6).
+- 후보 이름은 텍스트 표의 `<ID>.name`(없으면 ID). 꽝이 나와 후보가 줄면 그만큼만 보이고, 후보가 하나도 없으면 기다리지 않고 고른 뒤 결과만 돈다.
+- 덱처럼 원본 ID가 바로 들어가지 않는 목록은 `key`를 비우고 **고른 뒤 결과**에 프로젝트 결과 Block 하나(`Context.Picked`의 ID로 `DeckCard`를 만들어 넣는 `Reward`)를 둔다(5-5).
+- 요약: `relicPool에서 3개 보여 1개 고르기 run › relics에 넣기`.
+- 검증 오류: "가중치 표에서 고르기: 표를 고르세요." / "…후보 수는 1 이상이어야 합니다." / "…개수는 최소 ≤ 최대, 최대 1 이상이어야 합니다." / "…고른 것을 넣을 플레이어 데이터나 고른 뒤 결과가 있어야 합니다."
 
 ### 3-4. 실패 메시지 번역 — 텍스트 표
 
@@ -263,8 +292,16 @@ List<string> cards = Game.Roll(GameIds.WeightTable.CardReward, 3, unique: true);
 |---|---|
 | `string Roll(string tableId)` | 한 번 뽑아 **첫** ID를 돌려준다. 꽝이면 `null`. 개수가 2 이상인 줄이 나와도 하나만 돌려준다(그때 표마다 한 번 타임라인 경고, 5-4) |
 | `List<string> Roll(string tableId, int count, bool unique = false)` | `count`번 뽑은 ID 목록(꽝은 빠진다). `unique`면 서로 다른 것만(2-3) |
+| `List<string> Roll(IEnumerable<(string item, double weight)> pool, int count = 1, bool unique = false, string stream = "pool")` | 표 없이 **코드에서 만든 풀**에서 뽑는다. 항목이 가중치 표 ID면 그 표에서 다시 뽑는다. 난수 흐름은 `"pool:" + stream` |
+| `List<string> Roll(IEnumerable<string> pool, int count = 1, bool unique = false, string stream = "pool")` | 무게가 모두 1인 풀(ID 목록) |
+
+```csharp
+// 판에서 규칙으로 만든 풀: 이번 층에 나온 적 종류 중 하나, 무게는 남은 체력
+var pick = Game.Roll(battle.enemies.Select(e => (e.id, (double)e.hp)), 1, stream: "curseTarget");
+```
 
 - 행동 안에서 부른다(난수가 행동과 함께 되돌아간다).
+- 코드 풀의 `stream`은 쓰는 곳마다 다른 이름으로 준다. 같은 이름을 두 곳에서 쓰면 한쪽에 뽑기를 더할 때 다른 쪽 결과가 바뀐다.
 - 없는 표면 `InvalidOperationException`("[MomoiProject] 없는 가중치 표 'eliteDorp'입니다(DB › 가중치 표).").
 
 ### 4-5. `session.Tables` — `WeightTableSystem` · `WeightTableDefinition` · `WeightEntry`
@@ -281,6 +318,7 @@ List<string> cards = Game.Roll(GameIds.WeightTable.CardReward, 3, unique: true);
 | `Id` | 표 ID | 항목 ID |
 | `EmptyWeight` | 꽝 무게 | `emptyWeight` |
 | `Entries` (`List<WeightEntry>`) | 항목 줄 | `entries` |
+| `Exclude` (`List<PlayerDataListRef>`, `key` · `path`) | 뺄 목록 | `exclude` |
 
 | `WeightEntry` 필드 | 뜻 |
 |---|---|
@@ -288,6 +326,7 @@ List<string> cards = Game.Roll(GameIds.WeightTable.CardReward, 3, unique: true);
 | `weight` | 무게(기본 1) |
 | `minCount` · `maxCount` | 개수(기본 1 · 1) |
 | `condition` (`Condition`) | 맞을 때만 후보(`null`이면 늘) |
+| `listKey` · `listPath` | 비어 있지 않으면 목록 줄(그 목록의 요소마다 후보, `item`은 쓰지 않음) |
 
 ```csharp
 foreach (var table in GameDatabase.Load().All<WeightTableData>()) session.Tables.Define(table.ToDefinition());
@@ -297,9 +336,16 @@ var drop = new WeightTableDefinition { Id = "eliteDrop", EmptyWeight = 1 };
 drop.Entries.Add(new WeightEntry { item = "relicPool", weight = 6 });
 drop.Entries.Add(new WeightEntry { item = "healPotion", weight = 3, minCount = 1, maxCount = 2 });
 session.Tables.Define(drop);
+
+// 판에서 만들어지는 풀 + 가진 것 빼기
+var shop = new WeightTableDefinition { Id = "shopCards" };
+shop.Entries.Add(new WeightEntry { item = "commonCards", weight = 3 });
+shop.Entries.Add(new WeightEntry { listKey = "profile", listPath = "unlocked", weight = 1 });   // 해금한 카드마다 무게 1
+shop.Exclude.Add(new PlayerDataListRef { key = "run", path = "deck[].card" });                 // 덱에 있는 카드는 빼기
+session.Tables.Define(shop);
 ```
 
-`WeightTableData.ToDefinition()`은 DB 항목을 정의로 바꾼다(항목을 고르지 않은 줄은 빼고, 꽝 무게는 0 이상으로).
+`WeightTableData.ToDefinition()`은 DB 항목을 정의로 바꾼다(항목·목록을 고르지 않은 줄은 빼고, 꽝 무게는 0 이상으로).
 
 ### 4-6. `RollTableOutcome` — 결과 '가중치 표에서 주기'를 코드로
 
@@ -314,6 +360,21 @@ var reward = new RollTableOutcome { table = "relicPool", count = 1, key = "run",
 | `unique` | 서로 다른 것만 |
 | `key` · `path` | 넣을 플레이어 데이터 · 목록 필드 경로 |
 | `Kind` | `OutcomeKinds.PlayerData` |
+
+**`ChooseFromTableOutcome`** — 결과 '가중치 표에서 고르기'.
+
+```csharp
+var pick = new ChooseFromTableOutcome { prompt = "유물 하나", table = "relicPool", count = 3, unique = true, key = "run", path = "relics" };
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `prompt` · `table` · `count` · `unique` | 안내 글 · 표 · 후보 수 · 서로 다른 것만 |
+| `min` · `max` | 고를 개수 |
+| `key` · `path` | 고른 원본 ID를 넣을 목록(비우면 넣지 않음) |
+| `then` (`List<Outcome>`) | 고른 뒤 결과. 컨텍스트의 `Picked`가 고른 ID(글자) |
+
+안에서는 `Game.Roll(table, count, unique)`로 뽑아 `Choices.Ask`에 넘기고, 이어서 할 행동은 라이브러리의 `ChoiceEffectsRun`(`ids = true`, 개발자 행동 "고른 것 넣기")이다.
 
 ### 4-7. `Game.Fail` · `GameFailure` · `FailureKeys`
 
@@ -540,6 +601,26 @@ public class TakeCardReward : GameAction
 - `rareCards`에 카드가 2장뿐이어도 3장이 나온다. 두 장이 다 나오면 `rareCards`는 후보에서 빠지고 세 번째는 `commonCards`에서 나온다(2-3).
 - 판을 저장하고 끄면 고르기 화면에서 이어진다(선택 대기는 플레이어 데이터, 29장 2-6).
 
+**코드 없이(DB만)** — 원본 ID가 그대로 들어가는 목록이면 결과 `가중치 표에서 고르기` 하나로 끝난다. 예: 엘리트를 잡으면 유물 셋 중 하나.
+
+1. 도전과제·유물·개발 명령 등의 결과에 `가중치 표에서 고르기`: `table` `relicPool`, `count` `3`, `unique` 켬, `key` `run`, `path` `relics`.
+2. 요약: `relicPool에서 3개 보여 1개 고르기 run › relics에 넣기`.
+
+덱(`List<DeckCard>`)처럼 넣을 때 만들어야 하는 목록은 `key`를 비우고 고른 뒤 결과에 프로젝트 결과 Block을 하나 둔다. 그 뒤로는 기획자가 표·후보 수만 바꾼다.
+
+```csharp
+[Serializable, BlockInfo("고른 카드 덱에 넣기", Category = "결과", Description = "가중치 표에서 고르기로 고른 카드 원본을 덱에 넣습니다.")]
+public class AddPickedCards : Reward
+{
+    public override RewardEffect Effect => RewardEffect.Reversible;
+    public override void Grant(GameSession session)
+    {
+        foreach (var id in Context.Picked.OfType<string>())
+            session.Game.Data().Run.deck.Add(Rules.NewCard(session.Game, id));
+    }
+}
+```
+
 ### 5-6. 조건 붙은 항목 — 3층 이상
 
 "드래곤 비늘(유물)은 3층부터 엘리트 드롭에 나온다."
@@ -648,6 +729,20 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 - 알림 창이 떠 있는 동안 언어를 바꾸면 글자도 바뀌게 하려면, 글자 대신 `GameFailure`를 들고 있다가 다시 그릴 때 `f.Message`를 다시 읽는다.
 - 버튼을 미리 흐리게 하고 이유를 툴팁으로 보이려면 `Game.CanDo`(`33-Tick-Preview-Csv.md` 2-2).
 
+### 5-10. 풀이 바뀌는 세 가지 — 진행 · 판 · 가진 것
+
+| 풀이 바뀌는 이유 | 만드는 것 | 예 |
+|---|---|---|
+| 진행·도전과제(판이 끝나도 남음) | 항목 줄의 조건 | 연쇄 번개 줄의 조건 = 도전과제 `firstWin` 달성 / `profile.unlocked`에 `chainLightning` 있음 |
+| 판에서 만들어진 것 | 목록 줄 | "손패에서 무작위 1장" = 목록 줄 `run › battle.hand`. "이번 판에 만난 몬스터 중 하나" = 목록 줄 `run › metMonsters` |
+| 이미 가진 것·이미 본 것 | 뺄 목록 | 유물 풀의 뺄 목록 `run › relics`, 이벤트 풀의 뺄 목록 `run › seenEvents` |
+| 규칙이 계산한 후보·무게 | 코드 `Game.Roll(풀, …)` | 남은 체력이 많은 적일수록 잘 걸리는 저주 |
+
+- 셋 다 **뽑는 순간**에 다시 본다. 풀을 플레이어 데이터에 따로 만들어 두지 않는다(업데이트로 항목이 늘어도 저장을 고칠 일이 없다, 2-3).
+- 해금처럼 "프로필에 남는 진행"은 조건으로 두는 것이 기본이다. 목록 줄(`profile.unlocked`)은 해금한 것 전부를 같은 무게로 섞을 때 쓴다.
+- "한 판에 한 번만 나오는 이벤트"는 뺄 목록 `run › seenEvents` + 이벤트를 시작하는 행동이 그 ID를 목록에 넣는다. Undo하면 목록도 돌아가므로 풀도 돌아간다.
+- 확률 표시(`Chances`)도 지금의 목록·뺄 목록으로 계산한다(5-7).
+
 ### 5-9. CSV로 밸런스 값 한꺼번에 조정
 
 밸런스 값이 수십 개가 되면 시트에서 한 번에 고치는 편이 빠르다.
@@ -691,6 +786,9 @@ startEnergy,3,None,1,0,1.1,1.5,None,false,0,false,0,
 | 3층이 됐는데 조건 줄이 안 나옴 | 조건의 플레이어 데이터·필드가 틀렸거나, 층을 올리는 행동보다 먼저 뽑았다. 조건은 뽑는 순간의 상태다. |
 | `가중치 표에서 주기`로 덱에 카드가 안 들어감(경고 "인스턴스 'strike'의 형식(Card)이 DeckCard과(와) 다릅니다") | 덱은 `DeckCard` 목록이라 원본 사본이 들어가지 않는다. `Game.Roll`로 뽑아 코드에서 `Rules.NewCard`로 넣는다(5-5). |
 | 드롭이 Undo·이어하기 뒤 달라짐 | 행동 밖(화면 코드)에서 `Game.Roll`을 불렀다. 행동 안에서 부른다. |
+| 뺄 목록에 넣었는데 계속 나옴 | 목록의 요소가 표의 항목 ID와 다르다(덱 카드 id `card3` ≠ 카드 원본 `strike`). 원본 ID가 든 경로를 고른다(`run › deck[].card`). |
+| 목록 줄에서 아무것도 안 나옴 | 그 순간 목록이 비었거나, 요소가 글자도 id 있는 객체도 아니다(숫자 목록 등). |
+| 코드 풀 결과가 다른 뽑기를 더한 뒤 바뀜 | 두 곳이 같은 `stream`을 쓴다. 쓰는 곳마다 이름을 다르게 준다(4-4). |
 | 실패 메시지가 `[fail.frozen]` | 기본 문장 없이 `Game.Fail(키, 값…)`을 썼고 표에도 키가 없다. 기본 문장을 함께 적거나 원문 표에 키를 넣는다. |
 | 언어를 바꿨는데 실패 메시지가 그대로 | 그 언어 표에 키가 없다(기본 문장이 쓰인다). 또는 `Message`를 글자로 저장해 두었다. `GameFailure`를 들고 다시 읽는다(5-8). |
 | "판 › battle.energy이(가) 모자랍니다" | 이름을 주지 않았다. `Game.Pay(…, what: "energy.name")` 또는 결과 `비용 내기`의 `보일 이름`에 텍스트 키·글을 적는다(2-4, 5-8). |
