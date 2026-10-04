@@ -686,6 +686,41 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ---
 
+## 10. 처음 상태로 되돌리기
+
+**한 줄 요약.** 메뉴 `MomoiProject → 처음 상태로 되돌리기…`는 프로젝트를 "막 만들고 Momoi Project와 필요한 에셋만 설치한" 상태로 되돌린다. 개발자가 더하고 바꾼 것은 모두 백업 폴더로 옮겨지고, Unity가 다시 열린다.
+
+**언제.** 시험 삼아 이것저것 만들어 본 프로젝트를 깨끗하게 다시 시작할 때.
+
+### 처음 상태 기록
+- 프로젝트 폴더 바로 아래 `MomoiProjectBaseline/`에 Assets·ProjectSettings·Packages(GBible 자신은 빼고)의 사본을 둔다. Assets 밖이라 Unity가 읽지 않는다.
+- **저절로 남는 때:** 시스템이 아직 아무것도 만들지 않은 깨끗한 프로젝트(`Assets/Code`·DB 데이터·시작 설정 표시가 없음)를 처음 열 때, 시작 설정 창이 뜨기 전에 남긴다. 콘솔에 "처음 상태를 기록했습니다"가 나온다.
+- **직접 남기기:** 메뉴 `MomoiProject → 지금 상태를 처음 상태로 기록`. 이미 있으면 덮어쓴다. 프로젝트를 막 만든 깨끗한 때에만 한다(예: Odin 같은 필수 에셋까지 설치한 직후).
+
+### 되돌리기가 하는 일
+| 대상 | 처리 |
+|---|---|
+| 기록에 없는 파일(새로 만든 스크립트·에셋·씬·패키지 폴더) | 치운다 |
+| 기록과 내용이 다른 파일(바꾼 설정·씬) | 기록의 것으로 되돌린다 |
+| 기록에는 있는데 지운 파일 | 다시 만든다 |
+| 저장 파일(`persistentDataPath/MomoiProject`의 profile·run) | 치운다 |
+| PlayerPrefs | 모두 지운다 |
+| 그대로 두는 것 | `Packages/com.momoi.gbible`(시스템 자신), `ProjectSettings/ProjectVersion.txt`, `Library`·`UserSettings` |
+
+- 확인 창이 두 번 뜬다. 첫 창에 치울·되돌릴·다시 만들 파일 수와 일부 경로가 보인다.
+- 치우거나 덮어쓴 것은 지우지 않고 모두 `MomoiProjectBackups/<시각>/`에 옮긴다. 되돌리기를 되돌리려면 Unity를 닫고 그 폴더의 Assets·ProjectSettings·Packages를 프로젝트 폴더에 덮어쓴다(`_saves`는 저장 파일).
+- 열린 씬은 빈 씬으로 바뀌고(저장하지 않음), DB의 저장 안 된 변경은 버린다.
+- 끝나면 Unity를 다시 연다(ProjectSettings·패키지를 깨끗이 다시 읽도록). 처음 상태에는 시작 설정을 하기 전이라 시작 설정 창이 다시 뜬다.
+- 플레이 중에는 할 수 없다.
+
+### 기록이 없을 때
+처음 상태 기록이 없으면 **시스템이 만든 것만** 치울지 묻는다: `Assets/Code`, `Assets/MomoiProjectData`(DB 데이터), `Assets/MomoiProjectGenerated`(생성 코드), `ProjectSettings/MomoiProject`, 모듈 심볼(`GBIBLE_…`), 저장 파일, PlayerPrefs. 그 밖에 개발자가 더한 에셋·패키지·설정은 남는다. 치운 것은 마찬가지로 백업 폴더에 옮긴다.
+
+### 주의할 점
+- 처음 기록하기 전에 바꾼 것은 "처음 상태"에 들어가 버린다. 깨끗할 때 기록됐는지 `MomoiProjectBaseline/baseline.json`의 시각으로 확인한다.
+- 큰 에셋이 많으면 옮기는 데 시간이 걸린다(같은 드라이브 안에서 옮기기라 복사보다는 빠르다).
+- 버전 관리(git 등)를 쓰면 `MomoiProjectBaseline/`은 팀이 같이 쓰도록 올리고, `MomoiProjectBackups/`는 올리지 않는 편이 낫다.
+
 ## 9. 시작하기 단계 (현재 숨김)
 
 에디터 코드에는 새 프로젝트의 설정 단계를 순서대로 안내하는 "시작하기" 탭과 도움말 창이 있다(`Editor/Help/SetupSteps.cs`: 프로젝트 상태 확인 → 키워드 → 플레이어 데이터 → 스프라이트 규격 → 로그 → 도전과제 → 인스턴스·프리팹 → 식별자 코드 → 검증 오류 → 플레이하며 확인). 지금은 `HelpFeature.Enabled = false`라 DB 사이드바에 나오지 않는다. 그 안의 글 일부는 예전 구조(키워드 연결 창)를 설명하므로, 다시 켤 때까지는 이 설명서를 따른다.
