@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace GBible
 {
@@ -23,6 +24,7 @@ namespace GBible
     //
     // 3) 화면 오브젝트 찾기: 데이터 객체(id) ↔ 화면 오브젝트. ViewList가 자동으로 등록한다.
     //      var enemyView = GameView.Find<EnemyView>(e.targetId);
+    //    UI Toolkit 화면의 요소는 ElementList가 등록한다: GameView.FindElement(e.targetId)(피해 숫자를 그 칸 위에).
     public static class GameView
     {
         sealed class Watch : IDisposable
@@ -43,6 +45,7 @@ namespace GBible
         static readonly List<Watch> Watches = new List<Watch>();
         static readonly Queue<Func<IEnumerator>> Steps = new Queue<Func<IEnumerator>>();
         static readonly Dictionary<string, GameObject> Views = new Dictionary<string, GameObject>(StringComparer.Ordinal);
+        static readonly Dictionary<string, VisualElement> Elements = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
         static GameSession _session;
         static bool _running;
         static Coroutine _runner;
@@ -266,6 +269,27 @@ namespace GBible
             return view == null ? null : view.GetComponent<T>();
         }
 
+        // UI Toolkit 요소(화면의 칸) — ElementList가 항목 id로 등록한다.
+        public static void RegisterElement(string id, VisualElement element)
+        {
+            if (!string.IsNullOrEmpty(id) && element != null) Elements[id] = element;
+        }
+
+        public static void UnregisterElement(string id, VisualElement element = null)
+        {
+            if (string.IsNullOrEmpty(id) || !Elements.TryGetValue(id, out var current)) return;
+            if (element == null || current == element) Elements.Remove(id);
+        }
+
+        // 화면에 붙어 있는 요소만(닫힌 화면의 요소는 null).
+        public static VisualElement FindElement(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !Elements.TryGetValue(id, out var element)) return null;
+            if (element.panel != null) return element;
+            Elements.Remove(id);
+            return null;
+        }
+
         // 플레이를 다시 시작할 때(도메인 리로드를 끈 설정) 이전 등록을 지운다.
         internal static void Reset()
         {
@@ -274,6 +298,7 @@ namespace GBible
             Watches.Clear();
             Steps.Clear();
             Views.Clear();
+            Elements.Clear();
             _running = false;
             _runner = null;
             _skipping = false;

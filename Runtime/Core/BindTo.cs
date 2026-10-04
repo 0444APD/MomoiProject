@@ -18,6 +18,9 @@ namespace GBible
     // 클래스(Reward를 상속)에 붙여도 된다(필드에 설정값을 두고 싶을 때):
     //   [BindTo("first_blood")] public class FirstBloodReward : Reward { public override void Grant(GameSession s) { … Context … } }
     //
+    // 화면(DB › 화면)의 코드도 같은 방법으로 잇는다: [BindTo(GameIds.Screen.BattleHud)] public class BattleHud : GameScreen { … }
+    //   결과가 아닌 클래스는 매개변수 없는 생성자만 있으면 모인다. 결과 칸에는 결과(Outcome)만 들어간다(BoundOutcomes.Create).
+    //
     // 로그에 연결하면 그 로그의 모든 규칙에서 '로그에 기록' 대신 이 결과가 돈다(기록은 c.Session.Stats.Report(c.Owner, 값)).
     // 한 코드를 여러 항목에 연결할 수 있다([BindTo]를 여러 개).
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
@@ -43,6 +46,9 @@ namespace GBible
         internal Action<TriggerContext> Call;
 
         public string Name => Method == null ? Type.Name : $"{Type.Name}.{Method.Name}";
+
+        // 결과로 쓸 수 있나(함수이거나 Outcome을 상속한 클래스).
+        public bool IsOutcome => Method != null || typeof(Outcome).IsAssignableFrom(Type);
 
         public Outcome Create() => Method == null ? (Outcome)Activator.CreateInstance(Type) : new BoundMethodOutcome(this);
     }
@@ -75,7 +81,7 @@ namespace GBible
             return id != null && _byId.TryGetValue(id, out var codes) ? codes : (IReadOnlyList<BoundCode>)Array.Empty<BoundCode>();
         }
 
-        public static bool Has(string id) => For(id).Count > 0;
+        public static bool Has(string id) => For(id).Any(c => c.IsOutcome);   // 결과로 연결됐나(화면 코드는 세지 않는다)
 
         public static IEnumerable<string> Ids
         {
@@ -97,7 +103,11 @@ namespace GBible
         }
 
         // 연결된 결과의 새 인스턴스들(정의마다 따로).
-        public static List<Outcome> Create(string id) => For(id).Select(c => c.Create()).ToList();
+        public static List<Outcome> Create(string id) => For(id).Where(c => c.IsOutcome).Select(c => c.Create()).ToList();
+
+        // 결과가 아닌 연결 클래스 중 baseType을 상속한 첫 형식(화면 코드 등). 없으면 null.
+        public static Type ClassFor(string id, Type baseType) =>
+            For(id).Where(c => c.Method == null && baseType.IsAssignableFrom(c.Type)).Select(c => c.Type).FirstOrDefault();
 
         public static void Reset()
         {
@@ -135,8 +145,8 @@ namespace GBible
                         var binds = type.GetCustomAttributes<BindToAttribute>(false).ToList();
                         if (binds.Count > 0)
                         {
-                            if (type.IsAbstract || !typeof(Outcome).IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null)
-                                problems.Add($"[BindTo] '{type.FullName}': 클래스에 붙일 때는 Reward(Outcome)를 상속하고 매개변수 없는 생성자가 있어야 합니다.");
+                            if (type.IsAbstract || type.GetConstructor(Type.EmptyTypes) == null)
+                                problems.Add($"[BindTo] '{type.FullName}': 클래스에 붙일 때는 abstract가 아니고 매개변수 없는 생성자가 있어야 합니다(결과는 Reward, 화면은 GameScreen을 상속).");
                             else
                                 foreach (var bind in binds) Add(bind.Id, new BoundCode { Type = type });
                         }

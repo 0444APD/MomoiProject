@@ -95,6 +95,17 @@ namespace GBible.Samples
                 c.outcomes.Add(new ChooseFromTableOutcome { prompt = "가질 전리품", table = CheckIds.Loot, count = 3, unique = true, min = 0, max = 1, key = CheckIds.Run, path = "kept" });
             });
 
+            // 화면: Panel Settings·테마(Assets/UI)와 화면 설정, 확인용 HUD(Samples/Screens의 UXML).
+            ScreenSetup.Ensure();
+            made += Add<ScreenData>(CheckIds.Hud, s =>
+            {
+                s.layout = AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.VisualTreeAsset>("Packages/com.momoi.gbible/Samples/Screens/CheckHud.uxml");
+                var item = AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.VisualTreeAsset>("Packages/com.momoi.gbible/Samples/Screens/CheckUnitItem.uxml");
+                if (item != null) s.items.Add(item);
+                s.layer = ScreenLayer.Base;
+                s.closeOnBack = false;
+            });
+
             EditorDatabase.Staging.Touch();
             DatabaseWindow.Open();
             EditorUtility.DisplayDialog("확인용 항목",

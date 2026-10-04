@@ -1,0 +1,166 @@
+/* MomoiProject 화면 기본 모양. 프로젝트는 DB › 화면 설정의 테마 USS에서 아래 변수와 클래스를 덮어쓴다(이 파일은 고치지 않는다). */
+
+:root {
+    --momoi-text: rgb(236, 238, 244);
+    --momoi-dim: rgb(150, 156, 172);
+    --momoi-panel: rgb(30, 34, 46);
+    --momoi-button: rgb(52, 58, 78);
+    --momoi-button-hover: rgb(70, 78, 104);
+    --momoi-accent: rgb(255, 176, 64);
+    --momoi-accent-text: rgb(24, 22, 20);
+    --momoi-backdrop: rgba(0, 0, 0, 0.55);
+    --momoi-radius: 10px;
+    --momoi-font-size: 22px;
+}
+
+.momoi-root {
+    color: var(--momoi-text);
+    font-size: var(--momoi-font-size);
+}
+
+.momoi-backdrop {
+    background-color: var(--momoi-backdrop);
+}
+
+.momoi-backdrop--clear {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.momoi-center {
+    flex-grow: 1;
+    justify-content: center;
+    align-items: center;
+}
+
+.momoi-panel {
+    background-color: var(--momoi-panel);
+    border-top-left-radius: var(--momoi-radius);
+    border-top-right-radius: var(--momoi-radius);
+    border-bottom-left-radius: var(--momoi-radius);
+    border-bottom-right-radius: var(--momoi-radius);
+    padding: 28px;
+    min-width: 520px;
+    max-width: 1100px;
+    max-height: 90%;
+}
+
+.momoi-title {
+    font-size: 32px;
+    -unity-font-style: bold;
+    margin-bottom: 16px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.momoi-hint,
+.momoi-section {
+    color: var(--momoi-dim);
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.momoi-section {
+    margin-top: 16px;
+}
+
+.momoi-message {
+    white-space: normal;
+    margin-bottom: 20px;
+    -unity-text-align: middle-center;
+}
+
+.momoi-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.momoi-button {
+    min-height: 52px;
+    min-width: 160px;
+    margin: 6px;
+    padding: 6px 18px;
+    border-width: 0;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    background-color: var(--momoi-button);
+    color: var(--momoi-text);
+    font-size: var(--momoi-font-size);
+}
+
+.momoi-button:hover {
+    background-color: var(--momoi-button-hover);
+}
+
+.momoi-button:disabled {
+    opacity: 0.45;
+}
+
+.momoi-button--primary {
+    background-color: var(--momoi-accent);
+    color: var(--momoi-accent-text);
+}
+
+.momoi-button--primary:hover {
+    background-color: var(--momoi-accent);
+    opacity: 0.9;
+}
+
+.momoi-options {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.momoi-option {
+    min-width: 220px;
+    min-height: 120px;
+    white-space: normal;
+    border-width: 3px;
+    border-color: rgba(0, 0, 0, 0);
+}
+
+.momoi-option--selected {
+    border-color: var(--momoi-accent);
+}
+
+.momoi-scroll {
+    max-height: 640px;
+    min-width: 640px;
+}
+
+.momoi-setting {
+    margin: 6px 0;
+}
+
+.momoi-value {
+    min-width: 72px;
+    -unity-text-align: middle-right;
+}
+
+.momoi-slot .momoi-button {
+    -unity-text-align: middle-left;
+}
+
+.momoi-toasts {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 80px;
+    align-items: center;
+}
+
+.momoi-toast {
+    background-color: rgba(18, 20, 28, 0.92);
+    color: var(--momoi-text);
+    padding: 10px 20px;
+    margin-top: 6px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    font-size: 20px;
+}

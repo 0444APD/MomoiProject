@@ -21,6 +21,7 @@ namespace GBible.Samples
         public const string EnemyHp = "checkEnemyHp";
         public const string Loot = "checkLoot";
         public const string Chest = "check.chest";
+        public const string Hud = "checkHud";
     }
 
     [Serializable]
@@ -246,7 +247,7 @@ namespace GBible.Samples
     [AddComponentMenu("")]
     public sealed class CheckPanel : MonoBehaviour
     {
-        static readonly string[] Tabs = { "규칙", "선택·뽑기", "연출", "슬롯·설정", "월드" };
+        static readonly string[] Tabs = { "규칙", "선택·뽑기", "연출", "슬롯·설정", "월드", "화면" };
 
         bool _open = true;
         int _tab;
@@ -317,7 +318,8 @@ namespace GBible.Samples
                     case 1: DrawChoice(); break;
                     case 2: DrawPresentation(); break;
                     case 3: DrawSlotsAndSettings(); break;
-                    default: DrawWorld(); break;
+                    case 4: DrawWorld(); break;
+                    default: DrawScreens(); break;
                 }
             }
             catch (Exception e)
@@ -425,6 +427,35 @@ namespace GBible.Samples
         }
 
         // ── 슬롯·설정 ──
+        // ── 화면(UI Toolkit): DB › 화면 checkHud와 기본 화면 ──
+        void DrawScreens()
+        {
+            GUILayout.Label("먼저 메뉴 MomoiProject › DB 추가 › 확인용 항목(화면 준비도 함께 한다) → Ctrl+S. 열린 화면: " +
+                            string.Join(", ", GameScreens.All.Select(s => s.Id).DefaultIfEmpty("없음")));
+            if (GUILayout.Button(GameScreens.IsOpen(CheckIds.Hud) ? "확인용 HUD 닫기" : "확인용 HUD 열기(DB › 화면 checkHud)"))
+            {
+                if (GameScreens.IsOpen(CheckIds.Hud)) GameScreens.Close(CheckIds.Hud);
+                else Try(() => GameScreens.Open(CheckIds.Hud));
+            }
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("설정 화면")) Try(() => GameScreens.Open(GameScreens.Settings));
+            if (GUILayout.Button("슬롯 화면")) Try(() => GameScreens.Open(GameScreens.Slots, new SlotsRequest { picked = slot => GameScreens.Toast($"슬롯 {slot}을(를) 골랐습니다") }));
+            if (GUILayout.Button("일시정지 메뉴")) Try(() => GameScreens.Open(GameScreens.Pause));
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("확인 팝업")) GameScreens.Confirm("정말 할까요?", () => GameScreens.Toast("예를 골랐습니다"), () => GameScreens.Toast("아니오를 골랐습니다"));
+            if (GUILayout.Button("알림 한 줄")) GameScreens.Toast("알림입니다(2.5초 뒤 사라짐)");
+            if (GUILayout.Button("뒤로(Esc와 같음)")) GameScreens.Back();
+            GUILayout.EndHorizontal();
+            GUILayout.Label("확인할 것: HUD의 턴·에너지·가진 전리품은 코드 없이(binding-path) 바뀐다. '에너지 2로 때리기'를 에너지가 모자랄 때 누르면 알림. '고르기 요구'를 누르면 기본 고르기 창. Esc는 맨 위 창부터 닫는다.");
+        }
+
+        void Try(Action action)
+        {
+            try { action(); }
+            catch (Exception e) { _message = e.Message; }
+        }
+
         void DrawSlotsAndSettings()
         {
             GUILayout.Label($"지금 슬롯: '{(GBibleRuntime.Slot.Length == 0 ? "기본" : GBibleRuntime.Slot)}' · 플레이 시간 {GBibleRuntime.PlayTime:0}초");

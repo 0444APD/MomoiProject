@@ -336,6 +336,8 @@ namespace GBible
 
             // DB › 시작 파일 › Bootstrap의 씬 흐름(정해 두었으면).
             if (database != null && !string.IsNullOrEmpty(database.SceneKey)) GameScenes.Follow(database.SceneKey, database.ScenePath, database.EmptyScene);
+            // DB › 화면·화면 설정(UI Toolkit). 슬롯을 바꿔 다시 시작해도 한 번만 준비한다.
+            GameScreens.Initialize(database);
             Started?.Invoke(session);
             if (database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
             return session;
@@ -560,6 +562,7 @@ namespace GBible
                 GBibleRuntime.FrameEndSave();
                 GameView.FrameEnd();
                 GameView.Pump();
+                GameScreens.Pump();
             }
             GameTime.OnFrameEnd();
         }

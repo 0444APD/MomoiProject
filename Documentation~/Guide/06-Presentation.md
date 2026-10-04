@@ -19,6 +19,17 @@
 
 ## 1. 화면 갱신
 
+> [!note]- 새 프로젝트의 화면은 DB › 화면으로(UXML + 화면 코드)
+> 카드 던전의 전투 화면은 씬의 UIDocument에 MonoBehaviour를 붙여 만들었다(아래). 새 프로젝트는 매뉴얼 [35장](../Manual/35-Screens.md)의 **화면**으로 만든다. 인스펙터에서 연결할 것이 없어 AI가 파일만으로 끝낸다.
+> 1. 메뉴 `MomoiProject › 화면 › 화면 준비`(한 번) → Ctrl+S.
+> 2. `Assets/UI/Screens/BattleHud.uxml`: 값 칸은 `binding-path`만 적는다 — `<ui:Label binding-path="run:gold@hud.gold" />`(텍스트 `hud.gold` = "골드 {value}"). 코드 없이 바뀐다.
+> 3. DB › 화면 `battleHud`: UXML · 층 `바탕(HUD)` · 열 씬 `Battle`.
+> 4. 버튼·손패만 코드로: `[BindTo(GameIds.Screen.BattleHud)] class BattleHud : GameScreen` 안에서 `OnClick("end-turn", () => new EndTurn())`(연출·선택 중이면 무시, "에너지가 모자랍니다"는 알림으로 저절로).
+> 5. 고르기 창·설정·슬롯·일시정지·"정말 할까요?"·알림은 **기본 화면**이 있어 만들지 않는다. 색은 `Assets/UI/Theme.uss`의 변수로.
+>
+> 아래 1~4절의 규칙(읽기만·입력은 행동·연출 뒤에 그리기)은 두 방식 모두 같다.
+
+
 - 화면에 보일 값(체력·골드·손패·물약 칸)이 모두 플레이어 데이터나 원본 인스턴스에 있는지 본다. 없으면 [02장](02-DesignToCode.md)으로 돌아가 필드를 더한다.
 - 그리는 함수 하나(`Redraw`)를 만들고 `GameView.Redraw(Redraw, 키)`에 등록한다. 그 플레이어 데이터가 바뀌거나 **언어가 바뀐** 프레임 끝에 한 번 불러 준다. 연출이 재생 중이면 끝난 뒤에 부른다(4절).
 - 등록은 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.

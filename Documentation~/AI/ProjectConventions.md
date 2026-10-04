@@ -80,12 +80,18 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 
 ## 6. 화면·연출
 
-- 화면은 데이터를 그린다: `GameView.Redraw(그리기, 키…)`, 목록은 `ViewList`, 단순한 값 하나는 컴포넌트 '데이터 연결'. 값이 바뀔 때마다 그리지 말고 이 도구가 프레임 끝에 한 번 그리게 한다.
+- **UI(HUD·메뉴·팝업)는 UI Toolkit 화면**(매뉴얼 35장): 화면 하나 = `Assets/UI/Screens/<이름>.uxml`(+ `.uss`) + DB › 화면 항목(층·뒤로로 닫기·열 씬) + 필요하면 `Assets/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`). UXML·USS·화면 코드는 AI가 쓰고, 프리팹·인스펙터 연결은 쓰지 않는다.
+  - 값을 보이기만 하는 칸은 UXML의 `binding-path`(`run:gold`, `run:gold@hud.gold`, `@hud.endTurn`). 화면 코드에 같은 일을 쓰지 않는다.
+  - 버튼 → 행동은 `OnClick("이름", () => new 행동())`(Busy면 무시, 플레이어용 실패는 알림). 화면을 여는 버튼은 `OnClick("이름", () => GameScreens.Open(…))`.
+  - 데이터 목록은 `List<T>("컨테이너", Item("칸 UXML"), …)`(목록 칸 UXML은 `Assets/UI/Items/`, 화면 UXML에 `<ui:Template>`로 적는다).
+  - 고르기 창·확인·설정·슬롯·일시정지·알림은 **기본 화면**을 쓰고 새로 만들지 않는다. 모양은 `Assets/UI/Theme.uss`의 `--momoi-…` 변수로 맞추고, 프로젝트 화면의 USS도 그 변수를 쓴다.
+  - 1920×1080 기준 px. 그림(스프라이트·아이콘)·글꼴은 사람이 넣는다: 그 자리는 색 상자로 두고 보고에 "넣을 에셋(경로·크기·쓰는 곳)"을 적는다.
+- 씬에 놓이는 것(캐릭터·카드 오브젝트)은 `GameView.Redraw(그리기, 키…)`·`ViewList`·컴포넌트 '데이터 연결'. 값이 바뀔 때마다 그리지 말고 이 도구가 프레임 끝에 한 번 그리게 한다.
 - 연출(피해 숫자·카드 이동·쓰러짐)은 규칙이 끝난 뒤의 일이다: `session.Events.SubscribeAfterAction<이벤트>(e => GameView.Present(연출(e)))`. 실패한 행동의 이벤트는 오지 않는다. 연출 코드는 데이터를 바꾸지 않는다.
 - 연출 안의 시간은 `GameView.Wait`·`GameView.DeltaTime`(속도·건너뛰기를 따른다). `done()` 콜백 연출은 반드시 `done`을 부른다.
 - 입력은 `GameView.Busy`(연출 중이거나 선택을 기다림)일 때 막는다.
 - 예상 값(예상 피해·"낼 수 없음" 이유)은 화면에서 따로 계산하지 않고 `Game.Preview(행동, g => 읽기)`·`Game.CanDo(행동, out 이유)`.
-- 화면 오브젝트를 데이터 id로 찾을 때는 `GameView.Find<T>(id)`(ViewList가 등록한다).
+- 화면 오브젝트를 데이터 id로 찾을 때는 `GameView.Find<T>(id)`(ViewList가 등록한다), UI Toolkit 칸은 `GameView.FindElement(id)`(ElementList가 등록한다). 화면 위에 잠깐 띄우는 요소(피해 숫자)는 `GameScreens.Overlay`에.
 - 씬 전환은 화면이 직접 하지 않는다: 판 데이터의 씬 필드를 행동이 바꾸고 씬 흐름(DB › Bootstrap)이 연다.
 
 ## 7. 글·다국어
@@ -170,7 +176,7 @@ AI는 Unity 창을 누를 수 없으므로, DB 항목은 사람이 확인하고 
   ```
   이미 있는 ID는 건너뛴다(사람이 고친 값을 덮지 않는다). 고쳐야 하면 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 고친다.
 - 사람에게 보고할 때: 누를 메뉴, 넣을 CSV 파일과 그 탭, 만들어질 항목 목록, 적용(Ctrl+S) 뒤 확인할 것(DB 아래 "검증 통과").
-- 플레이어 데이터 키·필드처럼 시작 설정이 만드는 것은 시작 설정에, 화면 에셋(프리팹·스프라이트·UXML)은 사람이 Unity에서 만들거나 지정한다(AI는 필요한 목록과 연결할 필드를 적는다).
+- 플레이어 데이터 키·필드처럼 시작 설정이 만드는 것은 시작 설정에. 화면은 DB 추가 메뉴에서 `ScreenSetup.Ensure()`(Panel Settings·테마·DB › 화면 설정)를 먼저 부르고, 화면 항목의 `layout`을 `AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screens/….uxml")`로 넣는다(매뉴얼 35장 5-6). 그림·글꼴·소리 에셋은 사람이 Unity에서 넣는다(AI는 필요한 목록과 넣을 칸을 적는다).
 
 ## 16. 기본 진행 순서(시스템층)
 
@@ -181,7 +187,7 @@ AI는 Unity 창을 누를 수 없으므로, DB 항목은 사람이 확인하고 
 5. 프로젝트 고유 기능(유물·축복처럼 DB에서 조립할 종류)이 필요하면 DB 종류 클래스 + 감시 등록.
 6. DB 항목(15절: DB 추가 메뉴·CSV)과 밸런스 값 이름.
 7. 테스트(12절) — 흐름 하나(판 시작부터 전투 승리까지)가 행동만으로 끝까지 도는지.
-8. 화면(Client): 데이터를 그리는 화면 → 입력 → 연출. 처음에는 모니터(명령 탭·데이터 탭)로 시험하고 화면은 나중에.
+8. 화면(Client): 화면 목록에서 기본 화면으로 되는 것을 빼고, 화면마다 UXML·USS → DB 항목(DB 추가 메뉴) → 화면 코드(버튼·목록) → 연출. 규칙은 먼저 모니터(명령 탭·데이터 탭)로 시험하고 화면은 그 뒤에.
 9. 보고(12절).
 
 레벨 디자인(개별 카드·몬스터·기믹·수치)은 이 단계의 범위가 아니다. 시스템층은 그것을 0절 순서로 쉽게 더할 수 있게 해 두는 데까지다.
