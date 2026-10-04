@@ -54,6 +54,7 @@ namespace GBible
             {
                 case null: return 0;
                 case bool flag: return flag ? 1 : 0;
+                case BigNumber big: return big.ToDouble();
                 case string text: return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
                 case IConvertible _:
                     try { return Convert.ToDouble(value, CultureInfo.InvariantCulture); }

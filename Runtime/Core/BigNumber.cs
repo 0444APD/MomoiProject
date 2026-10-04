@@ -113,6 +113,7 @@ namespace GBible
         static readonly string[] Korean = { "", "만", "억", "조", "경", "해", "자", "양", "구", "간", "정", "재", "극" };
 
         public override string ToString() => ToString(null, CultureInfo.InvariantCulture);
+        public string ToString(string format) => ToString(format, CultureInfo.InvariantCulture);
 
         // 형식: 비우면 "short"(1.23K … 4.56Dc, 그 위는 지수) · "sci"(1.23e45) · "ko"(1.23억 … 그 위는 지수) · "full"(double로 되면 자릿수 그대로).
         public string ToString(string format, IFormatProvider provider)
