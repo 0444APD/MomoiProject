@@ -51,6 +51,12 @@ namespace GBible
         {
         }
 
+        // 열려 있는 동안 매 프레임(실제 시간 초, 게임 일시정지와 상관없이). 남은 쿨다운 원·타이머처럼 데이터가 아니라 시간에 따라 바뀌는 칸.
+        // 여기서 데이터를 바꾸지 않는다(바꾸려면 행동).
+        protected internal virtual void Tick(float deltaTime)
+        {
+        }
+
         public void Close() => GameScreens.Close(this);
 
         // 이름으로 찾는다. 없으면 어느 화면의 어느 이름인지 알리는 예외(UXML과 코드의 이름이 어긋났을 때).

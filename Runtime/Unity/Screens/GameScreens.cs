@@ -266,6 +266,15 @@ namespace GBible
         internal static void Pump()
         {
             if (!_initialized) return;
+            if (OpenEntries.Count > 0)
+            {
+                var dt = Time.unscaledDeltaTime;
+                foreach (var entry in OpenEntries.ToList())
+                {
+                    try { if (entry.Screen.IsOpen) entry.Screen.Tick(dt); }
+                    catch (Exception e) { Debug.LogException(e); }
+                }
+            }
             for (int i = Toasts.Count - 1; i >= 0; i--)
                 if (Time.unscaledTime >= Toasts[i].until)
                 {
@@ -468,7 +477,7 @@ namespace GBible
         {
             switch (id)
             {
-                case Choice: return (ScreenLayer.Popup, false, false, true);
+                case Choice: return (ScreenLayer.Popup, false, _settings != null && _settings.pauseWhileChoosing, true);
                 case Confirmation: return (ScreenLayer.Popup, true, false, true);
                 case Settings: return (ScreenLayer.Window, true, false, true);
                 case Slots: return (ScreenLayer.Window, true, false, true);

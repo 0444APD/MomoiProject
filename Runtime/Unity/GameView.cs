@@ -145,6 +145,22 @@ namespace GBible
         // 잠깐 쉬기(속도 반영).
         public static void Present(float seconds) => Enqueue(() => Wait(seconds));
 
+        // 대기열 밖에서 바로 튼다(실시간 게임의 맞는 효과·피해 숫자·방치형 클릭 숫자). 여럿이 동시에 돌고,
+        // IsPresenting·Busy·다시 그리기 미루기와 상관없다(입력을 막지 않는다). 시간은 DeltaTime·Wait로(속도·건너뛰기 반영).
+        public static void Play(IEnumerator routine)
+        {
+            if (routine == null) return;
+            var host = GBibleHost.Instance;
+            if (host == null) { Debug.LogWarning("[MomoiProject] GameView.Play: 게임이 시작되지 않아 연출을 틀 수 없습니다."); return; }
+            host.StartCoroutine(routine);
+        }
+
+        // 끝나면 done()을 부르는 연출을 대기열 밖에서 바로(timeout 실제 초 안에 done이 없으면 경고).
+        public static void Play(Action<Action> step, float timeout = 30f)
+        {
+            if (step != null) Play(Callback(step, timeout));
+        }
+
         // 연출 코드 안에서 쓰는 기다리기(속도·건너뛰기 반영). WaitForSeconds 대신 이것을 쓴다.
         public static IEnumerator Wait(float seconds)
         {

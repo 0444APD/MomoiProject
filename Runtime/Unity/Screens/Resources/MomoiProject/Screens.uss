@@ -123,6 +123,13 @@
     border-color: rgba(0, 0, 0, 0);
 }
 
+.momoi-option__desc {
+    font-size: 16px;
+    color: var(--momoi-dim);
+    white-space: normal;
+    margin-top: 8px;
+}
+
 .momoi-option--selected {
     border-color: var(--momoi-accent);
 }

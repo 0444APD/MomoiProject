@@ -115,6 +115,13 @@ namespace GBible
                 var id = option.id;
                 var button = ScreenUi.Button(_options, ScreenUi.Text(option.label ?? id), () => Pick(id));
                 button.AddToClassList("momoi-option");
+                // 설명 글: 텍스트 표의 '<id>.desc'(있을 때만).
+                if (Texts.Has(id + ".desc"))
+                {
+                    var description = new Label(Texts.Get(id + ".desc"));
+                    description.AddToClassList("momoi-option__desc");
+                    button.Add(description);
+                }
                 if (_picked.Contains(id)) button.AddToClassList("momoi-option--selected");
             }
             _skip.style.display = choice.min == 0 ? DisplayStyle.Flex : DisplayStyle.None;
