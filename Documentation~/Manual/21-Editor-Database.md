@@ -53,6 +53,7 @@
 | 다이얼로그 시스템 | 기능 활성화 · 스탠딩 프로필 · 장소 | 선택 기능 | DB |
 | 인벤토리 시스템 | 기능 활성화 | 선택 기능 | — |
 | 입력(키 바꾸기) | 기능 활성화 | 선택 기능(Input System 패키지 필요, [31장](31-Slots-Settings-Input.md)) | — |
+| Steam | 기능 활성화 · Steam(그룹 개발) | 선택 기능(Steamworks.NET 패키지 필요). `SteamData` — Steam 연동 설정 항목 하나([34장](34-Steam.md)) | DB |
 
 숨겨진 종류: 필드 규칙(`FieldRuleData`, 클래스 상세에서 정한다, `27-Field-Rules-Sprites.md`), 다이얼로그·연출 프리셋(그래프 창에서 편집, `24-Dialogue.md`).
 

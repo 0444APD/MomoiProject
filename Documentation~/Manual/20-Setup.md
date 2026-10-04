@@ -502,6 +502,7 @@ var copy = potion.CreateInstance();   // 깊은 사본
 | 다이얼로그 시스템 | `GBIBLE_DIALOGUE` | `GBible.Dialogue` (+ `.Editor`) | 스탠딩 프로필, 장소, 메뉴 `MomoiProject → 다이얼로그 시스템 → …` |
 | 인벤토리 시스템 | `GBIBLE_INVENTORY` | `GBible.Inventory` | 없음(플레이어 데이터의 값 형식에 `Inventory`·`InventorySlot`이 나온다) |
 | 입력(키 바꾸기) | `GBIBLE_INPUT` | `GBible.Input`(Input System 패키지 `com.unity.inputsystem`이 있을 때만 컴파일) | 없음(`GameInput`: 키 바꾸기·되돌리기·저장, `31-Slots-Settings-Input.md`) |
+| Steam | `GBIBLE_STEAM` | `GBible.Steam`(Steamworks.NET 패키지 `com.rlabrecque.steamworks.net`이 있을 때만 컴파일) | Steam(그룹 개발, `34-Steam.md`) |
 
 스크립팅 심볼은 `#if`로 코드를 켜고 끄는 컴파일 표시다. 모듈의 asmdef는 이 심볼이 있을 때만 컴파일된다(asmdef의 defineConstraints).
 
@@ -668,6 +669,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 | `GBible.Dialogue` · `.Editor` | `Optional/Dialogue` | 선택 모듈(`GBIBLE_DIALOGUE`) | 예 |
 | `GBible.Inventory` | `Optional/Inventory` | 선택 모듈(`GBIBLE_INVENTORY`) | 예 |
 | `GBible.Input` | `Optional/Input` | 선택 모듈(`GBIBLE_INPUT`, Input System 패키지가 있을 때만). 참조: `Unity.InputSystem` | 예 |
+| `GBible.Steam` | `Optional/Steam` | 선택 모듈(`GBIBLE_STEAM`, Steamworks.NET 패키지가 있을 때만, PC·에디터). 참조: `com.rlabrecque.steamworks.net` | 예 |
 | `Unity.GBible.CodeGen` | `CodeGen` | 컴파일할 때 Mirror 비교 코드를 만든다(에디터 전용, `com.unity.nuget.mono-cecil`이 있을 때만) | 아니오 |
 | `GBible.Samples` · `.Samples.Editor` | `Samples` | `GBIBLE_SAMPLES` 심볼이 있을 때만 | 아니오 |
 

@@ -92,3 +92,9 @@
 - 슬롯: `GBibleRuntime.UseSlot("1")` → `persistentDataPath/MomoiProject/slots/1/`에 profile.json·run.json·slot.json이 생기는지, 다시 실행하면 마지막 슬롯으로 시작하는지, 하이어라키의 `[MomoiProject]` 오브젝트가 하나뿐인지, 모니터가 새 세션으로 바뀌는지. `DeleteSlot`·`CopySlot`, slot.json의 플레이 시간·요약(SlotSummary).
 - DB › 설정(선언 그룹): 종류를 바꾸면 칸이 바뀌는지, 적용 대상과 종류가 안 맞으면 검증 오류. 플레이 중 `GameSettings.Set`으로 음량·언어가 바로 바뀌고 `settings.json`에 남는지, 다시 실행하면 그 값으로 시작하는지. 전체 화면·해상도는 빌드에서만 적용(에디터에서는 바뀌지 않는 것이 정상).
 - 입력(선택 기능 '입력(키 바꾸기)'): 켜면 GBIBLE_INPUT 심볼이 들어가고 컴파일되는지. `GameInput.Use(asset)` 뒤 `Rebind`로 키를 바꾸면 다음 실행에도 남는지, 같은 맵의 다른 키와 겹치면 `Conflict`가 오고 바뀌지 않는지, Esc 취소, `ResetBindings`.
+
+## 8. Steam (선택 기능 'Steam')
+- Unity를 열면 Steamworks.NET(2025.164.1)이 받아지고 콘솔 오류 없이 컴파일되는지. 선택 기능 Steam을 켜면 `GBIBLE_STEAM` 심볼이 들어가고 DB › 개발에 'Steam' 탭이 생기는지(이 모듈은 패키지가 없어서 아직 컴파일 확인 전 — 받은 뒤 `Tools/CompileOffline.ps1`도 `GBible.Steam`을 검사한다).
+- DB › Steam 항목을 만들고 App ID를 바꾸면 프로젝트 폴더의 `steam_appid.txt`가 따라 바뀌는지.
+- Steam 클라이언트를 켠 채 플레이: 경고 없이 붙고 친구 목록에 Spacewar(480) 플레이 중으로 보이는지, Shift+Tab 오버레이를 열면 게임이 멈추고 닫으면 이어지는지. Steam을 끄고 플레이하면 경고 하나만 남고 게임이 그대로 도는지.
+- 실제 App ID에서: 도전과제 강제 달성 → Steam 알림, 로그 값 → Steam 통계(2초 안), 명령 탭 'Steam 통계·도전과제 모두 지우기'. 출시 빌드를 exe로 켜면 Steam으로 다시 켜지는지.

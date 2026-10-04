@@ -225,6 +225,14 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - DB에서 ID를 바꾸면 "예전 ID → 새 ID" 이력이 남고, 런타임이 예전 저장을 새 ID로 이어받는다.
 - 그 밖의 구조 변경은 변환으로 이어받는다(7절).
 
+> [!note]- Steam — 도전과제·통계·Steam Cloud(선택 기능 'Steam')
+> Steam으로 내는 게임은 선택 기능 **Steam**을 켜고 DB › Steam에 항목을 하나 만든다(Steamworks.NET 패키지 필요). 게임이 켜지면 저절로 Steam에 붙는다.
+> - App ID: 출시 전 시험은 480(Valve의 Spacewar). 실제 App ID로 바꾸면 프로젝트 폴더의 `steam_appid.txt`도 같이 바뀐다.
+> - 도전과제: Steamworks의 API Name을 GBible 도전과제 ID와 같게 만들면 달성하는 순간 Steam에도 달성된다(다르면 DB › Steam 표에 적는다). 카드 던전의 도전과제 ID를 그대로 API Name으로 쓴다.
+> - 통계: 로그 → Steam 통계 표에 (로그 · Steam 이름 · 정수)를 적는다.
+> - 저장 동기화: 코드 없이 Steamworks › Steam Cloud의 Auto-Cloud에 `WinAppDataLocalLow` › `<회사>/<제품>/MomoiProject`, 패턴 `*.json`, 하위 폴더까지, 제외 `settings.json`(매뉴얼 [34장](../Manual/34-Steam.md) 5-5).
+> - 출시 빌드를 exe로 바로 켜면 Steam이 다시 켜 준다(DB › Steam의 '다시 시작'). Steam이 꺼져 있으면 경고 하나를 남기고 Steam 없이 돈다.
+
 > [!note]- 출시 상태는 어디에 남나
 > 런타임 데이터 목록(`GameDatabase`)에 저장되어 빌드에 따라간다. 개발 중에 바꾼 ID는 이력이 없으므로, 출시 전의 저장(개발자 PC의 저장)은 이어받지 않는다. 플레이어에게 나간 저장만 지키면 되므로 문제 없다.
 
@@ -313,6 +321,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 저장 값 안의 DB 항목 ID 필드에 `[DataRef(종류)]`가 붙어 있다.
 - [ ] `MomoiProject → 출시됨 (저장 호환 유지)`에 체크가 있다.
 - [ ] 출시 뒤 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(값 계산이 필요하면 `Configure`에 `Migrations.Add`)는 것을 팀이 안다.
+- [ ] Steam으로 낸다면 DB › Steam의 App ID가 실제 앱이고, 도전과제·통계 API Name이 Steamworks에 게시되어 있고, Auto-Cloud 경로를 정했다.
 
 > [!note]- 출시 전 더 볼 것
 > - 검증 오류가 있으면 빌드가 "데이터 검증 오류 n건으로 빌드를 중단합니다"로 막힌다.
@@ -326,6 +335,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > [!note]- 더 보기(매뉴얼)
 > - [06. 저장·불러오기](../Manual/06-SaveLoad.md) — 저장 파일 모습, 저절로 일어나는 일, 변환 API 전체, 호환 검사
 > - [31. 슬롯·설정·입력](../Manual/31-Slots-Settings-Input.md) — 슬롯 API, DB › 설정과 `GameSettings`, `GameInput`
+> - [34. Steam](../Manual/34-Steam.md) — DB › Steam, 도전과제·통계·리치 프레즌스, Steam Cloud 설정
 > - [20. 시작하기](../Manual/20-Setup.md) — 자동 시작 순서, `Configuring`·`Started`·`Stopped`, 출시 상태
 > - [21. DB](../Manual/21-Editor-Database.md) — ID 바꾸기·지우기, 검증 메시지 모음
 > - [04. 인스턴스](../Manual/04-Instances.md) — 원본(`session.Instances`)과 사본(`CopyInstance`)

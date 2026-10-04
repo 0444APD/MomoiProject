@@ -829,6 +829,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 슬롯 `GBibleRuntime.UseSlot`·`SlotInfoOf`·`Slots`·`DeleteSlot`·`CopySlot`·`SlotSummary`·`PlayTime` | 31 | 10 §3, 07 §6(언급) |
 | DB › 설정(분류·값·적용 대상), `GameSettings`(`Number`·`Toggle`·`Set`·`All`·`Label`·`ChoicesOf`·`Changed`) | 31 | 10 §1, 06 §7(음량) |
 | 입력(선택 기능) `GameInput.Use`·`BindingText`·`Rebind`·`ResetBindings` | 31 | 10 §1 |
+| Steam(선택 기능) DB › Steam·`GameSteam.SetPresence`·도전과제·로그 → Steam 통계·Steam Cloud | 34 | 10 §6 |
 
 ### 화면 연결·연출·씬·월드 상태
 
