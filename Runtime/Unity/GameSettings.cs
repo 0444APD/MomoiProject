@@ -101,6 +101,16 @@ namespace GBible
             foreach (var setting in All.Where(s => category == null || s.category == category).ToList()) Reset(setting.Id);
         }
 
+        // 이 설정에 저장된 값이 있는가(플레이어가 바꾼 적이 있는가). 없으면 기본값을 쓰는 중이다.
+        public static bool IsSaved(string id)
+        {
+            Load();
+            return id != null && _values.ContainsKey(id);
+        }
+
+        // 언어 설정(적용 대상 = 언어)을 플레이어가 고른 적이 있는가.
+        public static bool HasSavedLanguage => All.Any(s => s.target == SettingTarget.Language && IsSaved(s.Id));
+
         // 설정 화면의 칸 이름: 텍스트 표의 'id.name'(없으면 ID).
         public static string Label(string id) => Texts.NameOf(id);
 

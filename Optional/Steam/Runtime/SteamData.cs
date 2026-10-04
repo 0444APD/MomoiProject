@@ -1,0 +1,80 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEngine;
+
+namespace GBible.Data
+{
+    // DB › Steam(선택 기능 'Steam'): Steam 연동 설정. 항목은 하나만 둔다(여럿이면 첫 항목).
+    //   App ID · Steam 밖에서 켜면 Steam으로 다시 시작 · 오버레이 일시정지 · 처음 언어 · 도전과제 올리기(이름이 다르면 표) · 로그 → Steam 통계.
+    // 에디터에서 App ID를 고치면 프로젝트 폴더의 steam_appid.txt도 같이 고친다(에디터·개발 빌드가 Steam에 그 앱으로 붙는다).
+    [Database("Steam", Group = "개발", Order = 40, IdPrefix = "steam")]
+    [CreateAssetMenu(menuName = "MomoiProject/Steam", fileName = "Steam")]
+    public sealed class SteamData : GameData
+    {
+        [FieldLabel("App ID"), Tooltip("Steamworks의 앱 ID. 480은 Valve의 시험용 앱(Spacewar)")] public uint appId = 480;
+        [FieldLabel("Steam 밖에서 켜면 Steam으로 다시 시작"), Tooltip("출시 빌드에서만. Steam이 게임을 다시 켜고 지금 실행은 끝난다")] public bool restartThroughSteam = true;
+        [FieldLabel("오버레이가 열리면 일시정지")] public bool pauseOnOverlay = true;
+        [FieldLabel("처음 실행 언어는 Steam 언어"), Tooltip("플레이어가 언어를 고른 적이 없을 때만 Steam 클라이언트의 언어로 시작한다")] public bool languageFromSteam = true;
+        [FieldLabel("도전과제를 Steam에 올리기"), Tooltip("도전과제를 달성하면 같은 이름(아래 표에 없으면 ID)의 Steam 도전과제를 달성한다")] public bool achievements = true;
+        [FieldLabel("도전과제 이름(ID와 다를 때)")] public List<SteamAchievementName> achievementNames = new List<SteamAchievementName>();
+        [FieldLabel("로그 → Steam 통계")] public List<SteamStatLink> stats = new List<SteamStatLink>();
+
+        // 이 도전과제의 Steam 이름(API Name): 표에 있으면 그 이름, 없으면 ID.
+        public string SteamNameOf(string achievementId)
+        {
+            var named = achievementNames.FirstOrDefault(n => n != null && n.achievement == achievementId)?.steamName;
+            return string.IsNullOrWhiteSpace(named) ? achievementId : named.Trim();
+        }
+
+        public override void ValidateData(IValidationContext context)
+        {
+            if (appId == 0) context.Error("App ID가 0입니다(시험은 480).");
+            foreach (var group in achievementNames.Where(n => n != null && !string.IsNullOrEmpty(n.achievement)).GroupBy(n => n.achievement))
+                if (group.Count() > 1) context.Error($"도전과제 '{group.Key}'의 Steam 이름이 두 번 적혀 있습니다.");
+            if (achievementNames.Any(n => n != null && string.IsNullOrEmpty(n.achievement))) context.Error("도전과제를 고르지 않은 이름 줄이 있습니다.");
+            foreach (var link in stats)
+            {
+                if (link == null) continue;
+                if (string.IsNullOrEmpty(link.stat)) context.Error("로그를 고르지 않은 통계 줄이 있습니다.");
+                if (string.IsNullOrWhiteSpace(link.steamName)) context.Error($"로그 '{link.stat}': Steam 통계 이름(API Name)을 적으세요.");
+            }
+            foreach (var group in stats.Where(s => s != null && !string.IsNullOrWhiteSpace(s.steamName)).GroupBy(s => s.steamName.Trim()))
+                if (group.Count() > 1) context.Error($"Steam 통계 '{group.Key}'에 로그가 둘 이상 연결되어 있습니다.");
+        }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            if (appId == 0) return;
+            try
+            {
+                var path = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "steam_appid.txt");
+                var text = appId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (File.Exists(path) && File.ReadAllText(path).Trim() == text) return;
+                File.WriteAllText(path, text, new System.Text.UTF8Encoding(false));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[MomoiProject] steam_appid.txt를 쓰지 못했습니다: " + e.Message);
+            }
+        }
+#endif
+    }
+
+    [Serializable]
+    public sealed class SteamAchievementName
+    {
+        [AchievementRef, FieldLabel("도전과제")] public string achievement = "";
+        [FieldLabel("Steam 이름(API Name)")] public string steamName = "";
+    }
+
+    [Serializable]
+    public sealed class SteamStatLink
+    {
+        [StatRef, FieldLabel("로그")] public string stat = "";
+        [FieldLabel("Steam 통계 이름(API Name)")] public string steamName = "";
+        [FieldLabel("정수(INT)"), Tooltip("Steamworks에서 INT 통계면 켜고, FLOAT면 끈다")] public bool integer = true;
+    }
+}

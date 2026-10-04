@@ -88,6 +88,15 @@ namespace GBible.EditorTools
                 Symbol = "GBIBLE_INPUT",
                 Assemblies = new[] { "GBible.Input" },
             },
+            new GameFeature
+            {
+                Id = "steam",
+                Name = "Steam",
+                Description = "Steamworks.NET 위의 Steam 연동: 초기화·콜백·종료, Steam으로 다시 시작, 오버레이 일시정지, 처음 언어, 도전과제 올리기, 로그 → Steam 통계, 리치 프레즌스(GameSteam). 설정은 DB › Steam. Steamworks.NET 패키지가 있어야 컴파일된다.",
+                Symbol = "GBIBLE_STEAM",
+                Assemblies = new[] { "GBible.Steam" },
+                TabNames = new[] { "Steam" },
+            },
         };
 
         const string LegacySymbolPrefix = "GAME_SYSTEMS_";

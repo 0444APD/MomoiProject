@@ -102,6 +102,9 @@ namespace GBible
             Texts.Language = chosen;
         }
 
+        // 플레이어가 언어를 고른 적이 있는가(Set(remember: true)로 남긴 값). 없으면 기기·Steam 언어를 따라도 된다.
+        public static bool HasSavedChoice => !string.IsNullOrEmpty(PlayerPrefs.GetString(PrefsKey, ""));
+
         static string StartLanguage()
         {
             var source = Texts.Catalog.SourceLanguage;

@@ -1,0 +1,33 @@
+{
+    "name": "GBible.Steam",
+    "rootNamespace": "GBible",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity",
+        "com.rlabrecque.steamworks.net"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GBIBLE_STEAM",
+        "GBIBLE_STEAMWORKS"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.rlabrecque.steamworks.net",
+            "expression": "0.0.1",
+            "define": "GBIBLE_STEAMWORKS"
+        }
+    ],
+    "noEngineReferences": false
+}
