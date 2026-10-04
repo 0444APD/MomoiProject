@@ -1,0 +1,27 @@
+{
+    "name": "GBible.Input",
+    "rootNamespace": "GBible",
+    "references": [
+        "GBible.Core",
+        "GBible.Unity",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GBIBLE_INPUT",
+        "GBIBLE_INPUT_SYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "GBIBLE_INPUT_SYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

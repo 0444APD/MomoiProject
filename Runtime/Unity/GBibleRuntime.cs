@@ -20,10 +20,144 @@ namespace GBible
         public static event Action<GameSession> Started;
         public static event Action<GameSession> Stopped;
 
-        public static string SavePath => Path.Combine(Application.persistentDataPath, "MomoiProject", "profile.json");
+        // 지금 슬롯의 프로필 저장 파일.
+        public static string SavePath => Path.Combine(SlotFolder(Slot), "profile.json");
         // 진행 중인 판(런) 저장 파일. 이어하기용.
-        public static string RunSavePath => Path.Combine(Application.persistentDataPath, "MomoiProject", "run.json");
+        public static string RunSavePath => Path.Combine(SlotFolder(Slot), "run.json");
         public static bool HasSavedRun => File.Exists(RunSavePath);
+
+        // ── 슬롯 ───────────────────────────────────────────────
+        // 저장 묶음(프로필 + 진행 중인 판) 하나. 슬롯마다 폴더가 따로다: MomoiProject/slots/<이름>/. 이름이 ""(기본)이면 MomoiProject/ 바로 아래.
+        // 설정(GameSettings)은 슬롯과 상관없이 하나다. 마지막으로 쓴 슬롯을 기억해 다음 실행 때 그 슬롯으로 시작한다.
+        //   타이틀: foreach (var name in new[] { "1", "2", "3" }) { var info = GBibleRuntime.SlotInfoOf(name); … }  → GBibleRuntime.UseSlot("2");
+        // UseSlot은 지금 슬롯을 저장하고 세션을 새로 시작한다(Started가 다시 온다). 타이틀처럼 게임 화면이 없을 때 부른다.
+        public static string Slot => _slot ?? "";
+
+        // 슬롯 목록·요약에 남길 한 줄(예: "3층 · 전사"). 저장할 때마다 slot.json에 같이 쓴다.
+        public static Func<GameSession, string> SlotSummary;
+
+        // 지금 슬롯의 누적 플레이 시간(초, 실제 시간). 저장할 때 slot.json에 남는다.
+        public static double PlayTime => _playTime;
+
+        const string LastSlotKey = "momoi.slot";
+        static string _slot;
+        static double _playTime;
+        static GameObject _host;
+
+        public static string SlotFolder(string slot) =>
+            string.IsNullOrEmpty(slot)
+                ? Path.Combine(Application.persistentDataPath, "MomoiProject")
+                : Path.Combine(Application.persistentDataPath, "MomoiProject", "slots", CheckSlotName(slot));
+
+        static string CheckSlotName(string slot)
+        {
+            if (slot.Any(c => !(char.IsLetterOrDigit(c) || c == '-' || c == '_')))
+                throw new ArgumentException($"[MomoiProject] 슬롯 이름 '{slot}'에는 글자·숫자·-·_만 쓸 수 있습니다.");
+            return slot;
+        }
+
+        public static void UseSlot(string slot)
+        {
+            slot ??= "";
+            CheckSlotName(slot);
+            if (Session != null && slot == Slot) return;
+            if (Session != null) Stop();
+            _slot = slot;
+            GameSettings.SetRaw(LastSlotKey, slot);
+            Start();
+        }
+
+        public static SlotInfo SlotInfoOf(string slot)
+        {
+            var folder = SlotFolder(slot ?? "");
+            var info = new SlotInfo
+            {
+                Name = slot ?? "",
+                HasProfile = File.Exists(Path.Combine(folder, "profile.json")),
+                HasRun = File.Exists(Path.Combine(folder, "run.json")),
+            };
+            var meta = Path.Combine(folder, "slot.json");
+            if (!File.Exists(meta)) return info;
+            try
+            {
+                if (MiniJson.Deserialize(File.ReadAllText(meta)) is System.Collections.Generic.Dictionary<string, object> root)
+                {
+                    if (root.TryGetValue("savedAt", out var saved) && saved is string text && DateTime.TryParse(text, null, System.Globalization.DateTimeStyles.RoundtripKind, out var time)) info.SavedAt = time;
+                    if (root.TryGetValue("playTime", out var play) && play is double seconds) info.PlayTime = seconds;
+                    if (root.TryGetValue("summary", out var summary)) info.Summary = summary as string ?? "";
+                }
+            }
+            catch (Exception)
+            {
+                // 요약이 깨졌어도 저장 자체는 쓸 수 있다.
+            }
+            return info;
+        }
+
+        // 저장이 있는 슬롯들(기본 슬롯 제외, 이름순).
+        public static System.Collections.Generic.IReadOnlyList<SlotInfo> Slots()
+        {
+            var root = Path.Combine(Application.persistentDataPath, "MomoiProject", "slots");
+            if (!Directory.Exists(root)) return Array.Empty<SlotInfo>();
+            return Directory.GetDirectories(root).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal)
+                .Select(SlotInfoOf).Where(i => !i.IsEmpty).ToList();
+        }
+
+        // 슬롯을 지운다. 지금 쓰는 슬롯이면 저장하지 않고 세션을 새로 시작한다(빈 프로필·새 판, Started가 다시 온다).
+        public static void DeleteSlot(string slot)
+        {
+            slot ??= "";
+            var current = Session != null && slot == Slot;
+            if (current) Stop(save: false);
+            var folder = SlotFolder(slot);
+            foreach (var file in new[] { "profile.json", "run.json", "slot.json" })
+            {
+                var path = Path.Combine(folder, file);
+                if (File.Exists(path)) File.Delete(path);
+            }
+            if (current) Start();
+        }
+
+        // 슬롯을 통째로 복사한다(덮어씀). 지금 슬롯을 복사하면 먼저 저장한다.
+        public static void CopySlot(string from, string to)
+        {
+            from ??= "";
+            to ??= "";
+            if (from == to) return;
+            if (Session != null && from == Slot)
+            {
+                SaveProfile(Session);
+                if (!(_runSaver?.Ended ?? false)) SaveRun(Session);
+            }
+            var source = SlotFolder(from);
+            var target = SlotFolder(to);
+            Directory.CreateDirectory(target);
+            foreach (var file in new[] { "profile.json", "run.json", "slot.json" })
+            {
+                var path = Path.Combine(source, file);
+                var copy = Path.Combine(target, file);
+                if (File.Exists(path)) File.Copy(path, copy, true);
+                else if (File.Exists(copy)) File.Delete(copy);
+            }
+        }
+
+        internal static void AddPlayTime(double seconds) => _playTime += seconds;
+
+        static void WriteSlotInfo(GameSession session)
+        {
+            string summary = null;
+            try { summary = SlotSummary?.Invoke(session); }
+            catch (Exception e) { session.Journal.Append(JournalKind.Warning, "Save", "슬롯 요약(SlotSummary)이 실패했습니다: " + e.Message); }
+            var root = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["savedAt"] = DateTime.Now.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+                ["playTime"] = _playTime,
+                ["summary"] = summary ?? "",
+            };
+            var folder = SlotFolder(Slot);
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder, "slot.json"), MiniJson.Serialize(root));
+        }
         // 종료할 때 진행 중인 판을 자동으로 저장할지(불러오기는 게임이 LoadRun으로 직접 한다: 타이틀의 '이어하기' 등).
         // 기본은 DB › 시작 파일 › Bootstrap의 '판 저장'(저장하지 않음이면 거짓). 코드에서 값을 넣으면 그 값이 우선한다.
         public static bool AutoSaveRun
@@ -47,6 +181,10 @@ namespace GBible
             _autoSaveRun = null;
             _runSaveMode = RunSaveMode.OnQuit;
             _runSaver = null;
+            _slot = null;
+            _playTime = 0;
+            _host = null;
+            SlotSummary = null;
             GameView.Reset();
         }
 
@@ -75,6 +213,13 @@ namespace GBible
         public static GameSession Start()
         {
             if (Session != null) return Session;
+
+            // 설정(슬롯과 상관없이 하나)을 먼저 읽고, 마지막으로 쓴 슬롯으로 시작한다.
+            GameSettings.Load();
+            _slot ??= GameSettings.Raw(LastSlotKey) ?? "";
+            try { CheckSlotName(_slot); }
+            catch (ArgumentException) { _slot = ""; }
+            _playTime = SlotInfoOf(_slot).PlayTime;
 
             // Mirror 비교 코드를 모은다(리플렉션은 게임이 켜질 때 여기서 한 번만).
             Mirror.Warning -= LogMirrorWarning;
@@ -177,10 +322,13 @@ namespace GBible
             session.Debug.Register("시간", "배속 2", () => GameTime.SetSpeed(2f));
 
             Session = session;
-            // 숨기지 않는다: 하이어라키의 DontDestroyOnLoad 아래에서 보이는 편이 상태 확인에 낫다.
-            var host = new GameObject("[MomoiProject]");
-            UnityEngine.Object.DontDestroyOnLoad(host);
-            host.AddComponent<GBibleHost>();
+            // 숨기지 않는다: 하이어라키의 DontDestroyOnLoad 아래에서 보이는 편이 상태 확인에 낫다. 슬롯을 바꿔 다시 시작해도 하나만 둔다.
+            if (_host == null)
+            {
+                _host = new GameObject("[MomoiProject]");
+                UnityEngine.Object.DontDestroyOnLoad(_host);
+                _host.AddComponent<GBibleHost>();
+            }
 
             Started?.Invoke(session);
             if (database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
@@ -221,11 +369,16 @@ namespace GBible
             }
         }
 
-        internal static void Stop()
+        internal static void Stop() => Stop(save: true);
+
+        static void Stop(bool save)
         {
             if (Session == null) return;
-            SaveProfile(Session);
-            if (AutoSaveRun && !(_runSaver?.Ended ?? false)) SaveRun(Session);
+            if (save)
+            {
+                SaveProfile(Session);
+                if (AutoSaveRun && !(_runSaver?.Ended ?? false)) SaveRun(Session);
+            }
             Stopped?.Invoke(Session);
             Session = null;
             _runSaver = null;
@@ -256,6 +409,7 @@ namespace GBible
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(SavePath));
                 File.WriteAllText(SavePath, session.ExportMeta());
+                WriteSlotInfo(session);
                 session.Journal.Append(JournalKind.System, "Save", "프로필 저장: " + SavePath);
             }
             catch (Exception e)
@@ -321,6 +475,7 @@ namespace GBible
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(RunSavePath));
                 File.WriteAllText(RunSavePath, session.ExportRun());
+                WriteSlotInfo(session);
                 session.Journal.Append(JournalKind.System, "Save", "판 저장: " + RunSavePath);
             }
             catch (Exception e)
@@ -379,6 +534,7 @@ namespace GBible
             // 일시정지 중(시간이 흐르지 않음)에는 시계를 멈추고, Sync와 조건 평가만 한다.
             if (session != null)
             {
+                GBibleRuntime.AddPlayTime(Time.unscaledDeltaTime);
                 if (Time.deltaTime > 0f) session.EndFrame(Time.deltaTime);
                 else if (!session.Data.InTransaction)
                 {

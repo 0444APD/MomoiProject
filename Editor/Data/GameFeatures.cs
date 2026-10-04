@@ -80,6 +80,14 @@ namespace GBible.EditorTools
                 Assemblies = new[] { "GBible.Inventory" },
                 DataClasses = new[] { "GBible.InventorySystem.Inventory", "GBible.InventorySystem.InventorySlot" },
             },
+            new GameFeature
+            {
+                Id = "input",
+                Name = "입력(키 바꾸기)",
+                Description = "Input System의 키 바꾸기·되돌리기와 저장(설정 파일, 기기마다 하나). 같은 묶음의 다른 키와 겹치면 바꾸지 않고 알린다. Input System 패키지가 있어야 컴파일된다.",
+                Symbol = "GBIBLE_INPUT",
+                Assemblies = new[] { "GBible.Input" },
+            },
         };
 
         const string LegacySymbolPrefix = "GAME_SYSTEMS_";
