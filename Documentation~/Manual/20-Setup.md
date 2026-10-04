@@ -64,7 +64,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 9. Bootstrap 화면의 씬 흐름을 정해 두었으면 그 필드를 따라가기 시작한다(`GameScenes.Follow`, `32-View-Presentation-Scenes.md`).
 10. `Started` 이벤트를 쏜다(4절). 시작할 때 이어 하기를 켰으면 그 뒤에 판을 불러오거나 새 판 행동을 실행한다.
 
-게임을 끝내면(`OnApplicationQuit`) 프로필을 저장하고, `AutoSaveRun`이 참이면 진행 중인 판도 저장한 뒤 `Stopped`를 쏜다.
+게임을 끝내면(`OnApplicationQuit`) `Stopping`을 쏘고, 프로필을 저장하고, `AutoSaveRun`이 참이면 진행 중인 판도 저장한 뒤 `Stopped`를 쏜다(4절).
 
 ### 코드로 쓰는 법
 
@@ -100,7 +100,7 @@ public sealed class HudView : MonoBehaviour
 
 **`GBibleRuntime.DeleteRun()`** — 판 저장 파일만 지운다.
 
-**`GBibleRuntime.AutoSaveRun`** — 끝낼 때 판을 자동 저장할지. 기본은 DB › 시작 파일 › Bootstrap의 **판 저장**을 따른다("저장하지 않음"이면 `false`). 코드에서 값을 넣으면 그 값이 우선한다. 행동마다 저장·판 끝 이벤트도 같은 화면에서 정한다(`06-SaveLoad.md` 2.2).
+**`GBibleRuntime.AutoSaveRun`** — 끝낼 때 판을 자동 저장할지. 기본은 DB › 시작 파일 › Bootstrap의 **판 저장**을 따른다("저장하지 않음"이면 `false`). 코드에서 값을 넣으면 그 값이 우선한다. 끄기 전의 저장(행동마다·N초마다·이벤트를 받을 때)과 판 끝 이벤트도 같은 화면에서 정한다(3절 표, `06-SaveLoad.md` 2.2).
 
 저장 파일의 내용·구역·호환 규칙은 `06-SaveLoad.md`에서 자세히 다룬다.
 
@@ -130,7 +130,7 @@ public sealed class TitleMenu : MonoBehaviour
 }
 ```
 
-**중요한 순간에 바로 저장(자동 저장 지점).**
+**중요한 순간에 바로 저장(자동 저장 지점).** 체크포인트·하루 끝처럼 이벤트로 정해지는 순간이면 보통은 Bootstrap 화면의 **판 저장**을 "이벤트를 받을 때 저장"으로 고르고 **판 저장 이벤트**를 정한다(코드 없음, `06-SaveLoad.md` 3.3). 코드로 하면 이렇다(행동 밖에서 부른다).
 
 ```csharp
 using GBible;
@@ -169,7 +169,7 @@ public static class RoguelikeBoot
 
 ## 3. 세션 옵션 — `Configuring`과 `SessionOptions`
 
-**한 줄 요약.** Undo 방식·보관 수·시드는 DB › 시작 파일 › Bootstrap 화면에서 정한다. 화면에 없는 옵션(저장 버전 …)이나 조건에 따른 변경은 세션을 만들기 직전의 `Configuring` 이벤트에서 코드로 바꾼다. 코드가 이긴다.
+**한 줄 요약.** Undo 방식·보관 수·시드·판 저장 시점은 DB › 시작 파일 › Bootstrap 화면에서 정한다. 화면에 없는 옵션(저장 버전 …)이나 조건에 따른 변경은 세션을 만들기 직전의 `Configuring` 이벤트에서 코드로 바꾼다. 코드가 이긴다.
 
 **언제.** 실시간 게임이라 스냅샷 되감기를 쓸 때, 재현 가능한 고정 시드가 필요할 때, 출시 후 저장 구조를 바꿀 때.
 
@@ -180,10 +180,15 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 칸 | 같은 뜻의 `SessionOptions` | 기본 |
 |---|---|---|
 | Undo 방식(행동 단위·스냅샷·쓰지 않음) | `History` | 행동 단위 |
-| Undo 보관 수(행동 단위일 때) | `HistoryLimit` | 0(제한 없음) |
+| Undo 보관 수(행동 단위일 때) | `HistoryLimit` | 200(새 DB. 전에 만든 DB는 저장된 값 그대로, 0 = 제한 없음) |
 | 스냅샷 간격(초)·스냅샷 보관 수(스냅샷일 때) | `SnapshotInterval`·`SnapshotLimit` | 1초·30개 |
 | 개발 빌드에서 시드 고정 + 시드 | 개발 빌드에서만 `Seed` | 끔(지금 시각) |
 | Undo 끊는 이벤트(선택) | 그 이벤트를 쏜 바깥 행동이 끝나면 `session.ClearUndo()` | 없음 |
+| 판 저장 | 끌 때 저장 / 행동마다 저장(턴제) / 저장하지 않음(이어 하기 없음) / N초마다 저장(실시간·방치형) / 이벤트를 받을 때 저장(하루 끝·체크포인트). 끌 때 저장 여부는 `GBibleRuntime.AutoSaveRun` | 끌 때 저장 |
+| 저장 간격(초)(N초마다일 때) | 마지막 저장에서 이만큼 지났고 그사이 행동이 있었으면 판을 저장(실제 시간, 1 이상) | 30 |
+| 판 저장 이벤트(이벤트를 받을 때일 때) | 이 이벤트를 쏜 행동이 끝난 프레임 끝에 판을 저장(행동이 실패하면 저장하지 않음) | 없음 |
+| 판 끝 이벤트 | 받은 행동이 끝나면 판 저장을 지우고 프로필을 바로 저장 | 없음 |
+| 프로필도 행동마다 저장 | 바깥 행동이 끝날 때마다 프로필도 저장(N초마다면 그 간격으로). 끄더라도 판을 저장할 때 프로필이 바뀌었으면 함께 저장한다 | 끔 |
 | 시작할 때 이어 하기 + 새 판 행동(선택) | `Started` 뒤 `LoadRun`, 없으면 `session.Do(new 새 판 행동())` | 끔 |
 | 고정 틱(실시간) › 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
 | 씬 흐름(선택) › 플레이어 데이터 · 필드(씬 이름이 든 글자) · 빈 값일 때 씬 | `Started` 직전 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)` | 쓰지 않음 |
@@ -223,7 +228,7 @@ public static class GameOptions
 options.History = HistoryMode.Snapshots;
 ```
 
-**`HistoryLimit`** — `Actions` 방식에서 Undo할 수 있는 최대 행동 수. `0`이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 는다).
+**`HistoryLimit`** — `Actions` 방식에서 Undo할 수 있는 최대 행동 수. `0`이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 는다). `GBibleRuntime`은 Bootstrap 화면의 **Undo 보관 수**(새 DB 기본 200)를 넣는다. 세션을 직접 만들면 기본이 `0`이다.
 
 ```csharp
 options.HistoryLimit = 100;
@@ -329,11 +334,11 @@ var session = new GameSession(new SessionOptions { Seed = 7, History = HistoryMo
 
 ---
 
-## 4. 시작·끝 알림 — `Started` / `Stopped`
+## 4. 시작·끝 알림 — `Started` / `Stopping` / `Stopped`
 
-**한 줄 요약.** 세션 준비가 끝나면 `Started`, 게임을 끝낼 때 `Stopped`를 쏜다. 둘 다 `Action<GameSession>`이다.
+**한 줄 요약.** 세션 준비가 끝나면 `Started`, 게임을 끝낼 때 저장하기 전에 `Stopping`, 저장한 뒤에 `Stopped`를 쏜다. 모두 `Action<GameSession>`이다. 판 저장 직전·판 불러온 뒤의 알림(`Saving`·`RunLoaded`)은 `06-SaveLoad.md` 2.10.
 
-**언제.** 행동 처리기·프로젝트 기능의 감시·코드로만 정의하는 플레이어 데이터를 등록할 때(`Started`), 끝낼 때 외부 서비스에 알릴 때(`Stopped`).
+**언제.** 행동 처리기·프로젝트 기능의 감시·코드로만 정의하는 플레이어 데이터를 등록할 때(`Started`), 끄기 전에 마지막 값을 행동으로 남길 때(`Stopping`), 끝낼 때 외부 서비스에 알릴 때(`Stopped`).
 
 ### 코드로 쓰는 법
 
@@ -361,6 +366,12 @@ public static class GameBoot
 
 ```csharp
 session.Data.Define("sample:combo", DataZone.Session, 0, "현재 콤보");
+```
+
+**`Stopping`** — 끄기 직전, 저장보다 먼저 불린다(슬롯을 바꾸거나 지워 세션을 다시 만들 때도). 여기서 `session.Do`로 바꾼 값은 이어지는 저장에 들어간다. 오프라인 보상의 마지막 시각을 남기는 곳이다(`07-Random-Time.md` 4.7).
+
+```csharp
+GBibleRuntime.Stopping += session => session.Do(new Settle());   // Settle은 게임이 만든 정산 행동
 ```
 
 **`Stopped`** — 프로필·판 저장이 끝난 뒤 불린다.
@@ -415,7 +426,7 @@ public sealed class QuestTracker : MonoBehaviour
 ### 주의할 점
 
 - `Started`에서 쏜 이벤트·바꾼 값도 기록에 남는다. 처음 값은 DB의 기본값으로 정하는 편이 낫다.
-- `Stopped`는 `OnApplicationQuit`에서 불린다. 에디터에서 플레이를 멈출 때도 불린다.
+- `Stopping`·`Stopped`는 `OnApplicationQuit`에서 불린다. 에디터에서 플레이를 멈출 때도 불린다. 모바일에서 앱을 강제로 끄면 오지 않을 수 있으므로, 꼭 남아야 하는 값은 그때그때 행동으로 남기고 저장한다(**프로필도 행동마다 저장**).
 
 ---
 

@@ -29,21 +29,22 @@
 
 1. `MomoiProject → DB` → 사이드바 **DB** 그룹의 **능력** 탭 → 목록 줄의 **`+ 능력`**. 제목(= ID)을 짓는다(예: `fireball`).
 2. `trigger`(툴팁 "트리거"): 기본으로 `사용` 하나가 들어 있다(요약 "사용할 때").
-   - 사용 조건을 붙이려면 `+ 블럭` → **조건 충족** 그룹의 조건 Block(예: 프로젝트가 만든 `사용자 체력 있음`)을 더한다. `사용`과 `AND`로 이어진다.
+   - 사용 조건을 붙이려면 `+ 블럭` → **조건 충족** 그룹의 조건 Block(예: 프로젝트가 만든 `사용자 체력 있음`, 기본 제공 `상태 효과 검사` — 쿨다운 3-12)을 더한다. `사용`과 `AND`로 이어진다.
    - 이 칸에서 고를 수 있는 것은 `사용`과 조건 충족뿐이다.
 3. `outcomes`(툴팁 "결과"): `+ 결과 추가` →
-   - `대상에게 효과` → `+ 대상 추가`(비우면 고른 대상 그대로) → `+ 효과 추가`. 기본 제공 효과 `능력치 보정`·`능력치 보정 떼기`(분류 "능력치")로 버프를 코드 없이 만든다(3-10). 독·보호막처럼 몇 턴 동안 이어지는 효과는 `상태 효과 걸기`·`상태 효과 풀기`(분류 "상태 효과", → `29-Statuses-Schedules-Choices.md`).
+   - `대상에게 효과` → `+ 대상 추가`(비우면 고른 대상 그대로) → `+ 효과 추가`. 기본 제공 대상 Block(`사용자 자신`, 그리고 `플레이어 데이터 목록`·`이벤트의 개체`·`조건으로 거르기`·`무작위 n개`·`정렬해서 n개`, 2-6)으로 "체력이 가장 낮은 적", "불 속성 적 중 무작위 2"를 코드 없이 고른다(3-11). 기본 제공 효과 `능력치 보정`·`능력치 보정 떼기`(분류 "능력치")로 버프를 코드 없이 만든다(3-10). 독·보호막처럼 몇 턴 동안 이어지는 효과와 쿨다운은 `상태 효과 걸기`·`상태 효과 풀기`·`상태 효과 줄이기`(분류 "상태 효과", → `29-Statuses-Schedules-Choices.md`, 쿨다운은 3-12).
    - `선택 요구` → 후보 중에서 플레이어가 고르게 하고, 고른 것마다 효과를 준다(→ `29-Statuses-Schedules-Choices.md` 3-3).
    - `플레이어 데이터에 주기 · …` → 필드와 값.
    - 코딩한 결과(`Reward` 클래스).
 4. `failText`(툴팁 "쓸 수 없을 때 글 / 사용 조건이 맞지 않을 때 플레이어에게 보일 글. 텍스트 키(fail.needEnergy)면 번역된 글, 아니면 그 글 그대로({ability}·{condition} 틀). 비우면 기본 글"): 사용 조건이 거짓일 때 `Game.Use`의 실패 글이자 `Game.CanUse`의 이유(2-1·2-3). 예: `마나가 모자라 {ability}을(를) 쓸 수 없습니다.` 또는 텍스트 키 `fail.needMana`. 비우면 기본 글 "{ability}: 사용 조건을 만족하지 않습니다({condition})."이다.
-5. 검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요."
+5. `icon`(툴팁 "아이콘"): 스킬 버튼에 그릴 `Sprite`. 규칙은 쓰지 않고 화면 코드가 읽는다(3-7).
+6. 검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요."
 
 결과를 코드로 쓰려면 `[BindTo("fireball")]`(→ `13-BindTo.md`). 연결되면 결과 칸이 잠긴다.
 
 ### 1-2. 인스턴스에 사용 기능 붙이기(DB › 인스턴스)
 
-먼저 코드에서 아이템 클래스에 사용 기능 필드를 둔다(2-7).
+먼저 코드에서 아이템 클래스에 사용 기능 필드를 둔다(2-8).
 
 1. `MomoiProject → DB` → **인스턴스** 탭 → **`+ 인스턴스`** → 제목(= 인스턴스 ID, 예: `potion`)을 짓는다.
 2. `instanceType`(툴팁 "형식")에서 아이템 클래스(`Item`)를 고른다. 값(`value`)이 새로 만들어진다.
@@ -158,7 +159,7 @@ public class AddEnemiesAround : TargetSelector<Unit>
 | `Select(IEnumerable<T> targets, T user)` | 앞 대상들과 사용자를 받아 다음 대상들을 돌려준다(고르기만) |
 | `Game`, `Use` | 효과 Block과 같다 |
 
-기본 제공 `SelfTarget`(`사용자 자신`): 고른 대상을 버리고 사용자 하나를 낸다.
+기본 제공 `SelfTarget`(`사용자 자신`): 고른 대상을 버리고 사용자 하나를 낸다. 장르 공통의 나머지 기본 대상 Block은 2-6.
 
 기본 제공 효과 Block(→ `28-Attributes-Intercepts.md` 3-1·3-2, `29-Statuses-Schedules-Choices.md` 3-2):
 
@@ -166,10 +167,45 @@ public class AddEnemiesAround : TargetSelector<Unit>
 |---|---|---|
 | 능력치 보정 | `AttributeModifierEffect` | 대상의 숫자 필드에 Modifier를 붙인다(`attribute`·`kind`·`value`·`permanent`). 출처 = 이 능력 ID(인스턴스면 인스턴스 ID) |
 | 능력치 보정 떼기 | `RemoveModifiersEffect` | 대상에서 그 출처의 Modifier를 모두 뗀다(`source`, 비우면 이 능력 ID) |
-| 상태 효과 걸기 | `ApplyStatusEffect` | 대상에게 상태 효과(DB › 상태 효과)를 건다(`status`·`stacks`). 이미 걸려 있으면 그 상태 효과의 다시 걸 때 규칙(중첩·갱신)을 따른다 |
+| 상태 효과 걸기 | `ApplyStatusEffect` | 대상에게 상태 효과(DB › 상태 효과)를 건다(`status`·`stacks`·`length`). 이미 걸려 있으면 그 상태 효과의 다시 걸 때 규칙(중첩·갱신)을 따른다 |
 | 상태 효과 풀기 | `RemoveStatusEffect` | 대상의 상태 효과를 푼다(`status`·`stacks`, 0이면 모두). 끝날 때 결과는 돌지 않는다 |
+| 상태 효과 줄이기 | `ShortenStatusEffect` | 대상의 상태 효과의 남은 지속을 줄인다(`status`·`amount`). 다 되면 끝난다. 쿨다운 −1(3-12) |
 
-### 2-6. `AbilityDefinition` · `session.Abilities` — 코드로 정의하기
+### 2-6. 기본 대상 Block — 목록 · 이벤트 · 거르기 · 무작위 · 정렬
+
+"누구에게"의 흔한 모양은 기본 제공 대상 Block(분류 "대상")을 이어 붙여 코드 없이 만든다. 위에서부터 차례로 돌고, 앞 Block이 낸 대상이 다음 Block의 입력이다(비어 있으면 고른 대상에서 출발). 프로젝트만의 대상("옆 칸의 적", "주인공")은 그대로 `TargetSelector<T>`를 상속해 더한다(2-5).
+
+| 화면 이름 | 코드 형식 | 칸 | 하는 일 |
+|---|---|---|---|
+| 사용자 자신 | `SelfTarget` | — | 앞 대상을 버리고 사용자(상태 효과·패시브면 가진 쪽) 하나 |
+| 플레이어 데이터 목록 | `DataListTarget` | `key`(플레이어 데이터) · `path`(필드(목록), 비우면 값 전체) | **앞 대상을 버리고** 그 목록의 요소 모두. 요소가 id 글자면 그 id의 개체를 찾는다(손패 `battle.hand` 같은 id 목록). 경로 끝이 목록이 아니라 id 글자 하나(`battle.targetId`)면 그 개체 하나 |
+| 이벤트의 개체 | `EventFieldTarget` | `field`(이벤트 필드(id 또는 개체)) | 받은 이벤트(가로채기면 의도)의 그 필드가 가리키는 개체. 글자면 그 id의 개체, 객체면 그대로(id가 있는 것만), 목록이면 요소마다. 예: 피해 이벤트의 `sourceId` = 때린 쪽(반사), `targetId` = 맞은 쪽 |
+| 조건으로 거르기 | `FilterTarget` | `path`(필드) · `op`(비교, `FieldOp`) · `value`(값) | 앞 대상 중 필드 검사가 참인 것만. 비교는 값 조건과 같다(`hp 이하 10`, `element 일치 fire`, `tags 포함 boss`, 11장 3-2) |
+| 무작위 n개 | `RandomTarget` | `count`(개수, 기본 1) · `stream`(난수 흐름, 기본 `target`) | 앞 대상 중 서로 다른 n개. 결정론 난수 흐름 `Game.Random(stream)`이라 Undo하고 다시 해도 같은 결과다. 모자라면 있는 만큼 |
+| 정렬해서 n개 | `SortTarget` | `path`(숫자 필드) · `descending`(큰 것부터) · `count`(개수(0 = 모두), 기본 1) | 앞 대상을 숫자로 정렬해 앞에서 n개. 기본은 작은 것부터. 값이 같으면 원래 순서. 필드 이름이 하나(`hp`)이고 대상에 id가 있으면 **능력치**(Modifier까지 반영한 `Game.Attribute`)로 재고, 경로(`stats.speed`)면 그 값으로 잰다 |
+
+- 요약은 이어 붙인 Block이 화살표로 보인다(아래 코드의 조립이면 `battle › units → team enemy 일치 → hp 0 초과 → hp 작은 것부터 1개: 피해`).
+- `플레이어 데이터 목록`은 앞을 버리고 새로 고르므로 보통 맨 앞에 둔다. `조건으로 거르기`·`무작위 n개`·`정렬해서 n개`는 앞 대상을 받아 줄인다.
+- `이벤트의 개체`는 이벤트를 받아 발동한 결과(상태 효과·패시브·도전과제의 이벤트 받기·가로채기)에서만 뜻이 있다. 능력·사용 기능은 사용하는 순간이라 이벤트가 없어 아무도 고르지 않는다.
+- 쓰러진 적처럼 남아 있으면 안 되는 대상은 `조건으로 거르기`(`hp 초과 0`)로 뺀다. 목록에서 이미 빠진 개체는 처음부터 나오지 않는다.
+- 무작위의 난수 흐름은 쓰는 곳마다 이름을 다르게 주면, 한 곳에 뽑기를 더해도 다른 곳의 결과가 바뀌지 않는다(07장).
+
+```csharp
+// "체력이 가장 낮은 적에게 20" — 코드로 조립하면
+var finisher = new TargetedOutcome
+{
+    targets =
+    {
+        new DataListTarget { key = "battle", path = "units" },
+        new FilterTarget { path = "team", op = FieldOp.Equal, value = "enemy" },
+        new FilterTarget { path = "hp", op = FieldOp.Greater, value = "0" },
+        new SortTarget { path = "hp", count = 1 },
+    },
+    effects = { new Damage { amount = 20 } },
+};
+```
+
+### 2-7. `AbilityDefinition` · `session.Abilities` — 코드로 정의하기
 
 ```csharp
 var fireball = new AbilityDefinition
@@ -202,7 +238,7 @@ session.Abilities.Define(fireball);
 
 게임에서는 런타임이 시작할 때 DB의 능력 전부와, 사용 기능이 붙은 인스턴스 전부를 등록한다.
 
-### 2-7. `Usable` — 클래스에 붙이는 사용 기능
+### 2-8. `Usable` — 클래스에 붙이는 사용 기능
 
 ```csharp
 using System;
@@ -232,7 +268,7 @@ public class Item
 
 개수 줄이기 같은 뒤처리는 게임 코드가 한다(결과 안에서 하면 같은 Undo 단위가 된다. 3-4).
 
-### 2-8. 사용 조건 Block
+### 2-9. 사용 조건 Block
 
 ```csharp
 [Serializable, BlockInfo("사용자 체력 있음", Category = "사용")]
@@ -400,6 +436,14 @@ public class SkillButton : MonoBehaviour
 
 (사용자는 오래 들고 있지 말고 id로 들고 있는다. Undo·불러오기 뒤에는 다른 인스턴스일 수 있다.)
 
+버튼 그림은 DB › 능력의 `icon`이다. 능력 정의(`AbilityDefinition`)에는 그림이 없으므로 DB 항목(`GBible.Data.AbilityData`)에서 읽는다.
+
+```csharp
+// Start 등에서 한 번
+var data = GameDatabase.Load().All<AbilityData>().FirstOrDefault(a => a.Id == abilityId);
+if (data != null) iconImage.sprite = data.icon;      // iconImage: UnityEngine.UI.Image
+```
+
 ### 3-8. 능력 사용 연출
 
 ```csharp
@@ -437,6 +481,52 @@ DB › 능력 `chainLightning`의 트리거는 에디터에서 그대로 정하�
 - 사용이 행동이라 Undo 한 번에 Modifier도 돌아간다. 계산 규칙·영구 보정·코드 API는 `28-Attributes-Intercepts.md`.
 - "3턴 동안 +20%"처럼 저절로 끝나야 하거나 "최대 3중첩"이 있으면 DB › 상태 효과에 능력치 보정을 두고, 능력에서는 `상태 효과 걸기`만 한다(→ `29-Statuses-Schedules-Choices.md` 5-2).
 
+### 3-11. 기본 대상 Block으로 고르기(코드 없음)
+
+`Unit`에 `public string element;`(속성)가 있다고 본다. 세 가지 모두 대상 Block만 이어 붙인다(2-6).
+
+**체력이 가장 낮은 적에게 20** — 능력 `finisher`: `대상에게 효과` →
+
+1. `+ 대상 추가` → `플레이어 데이터 목록`(`key` `battle`, `path` `units`)
+2. `조건으로 거르기`(`team` `일치` `enemy`)
+3. `조건으로 거르기`(`hp` `초과` `0`)
+4. `정렬해서 n개`(`path` `hp`, 큰 것부터 끔, `count` `1`)
+5. 효과 `피해`(amount 20)
+
+`hp`는 필드 이름 하나라 Modifier까지 반영한 값으로 잰다. 체력이 같으면 목록에서 앞의 적이다. "공격력이 가장 높은 적 2명"은 `정렬해서 n개`(`attack`, 큰 것부터 켬, `2`).
+
+**불 속성 적 중 무작위 2에게 화상** — 능력 `wildfire`: `플레이어 데이터 목록`(`battle` › `units`) → `조건으로 거르기`(`team` `일치` `enemy`) → `조건으로 거르기`(`element` `일치` `fire`) → `무작위 n개`(`count` `2`, `stream` `wildfire`) → 효과 `상태 효과 걸기`(`burn`).
+
+- 불 속성 적이 하나뿐이면 하나만, 없으면 아무 일도 없다.
+- 결정론 난수라 Undo하고 다시 써도 같은 두 적이 걸린다. `stream`을 능력마다 다르게 주면 다른 능력의 무작위와 섞이지 않는다.
+
+**때린 쪽에게 반사 3** — 받은 피해 이벤트가 있어야 하므로 능력이 아니라 상태 효과(또는 패시브)의 결과에 둔다. 피해 규칙이 `[GameEvent("피해")] DamageDealt { sourceId, targetId, amount }`를 쏜다고 본다(28장 5-3).
+
+1. DB › 상태 효과 `thorns`(가시): `trigger` = `이벤트 받기` → `피해`, `holderField` `targetId`(내가 맞을 때만).
+2. `outcomes`: `대상에게 효과` → 대상 `이벤트의 개체`(`field` `sourceId`) → 효과 `피해`(3).
+3. 능력 `thornShield`: `대상에게 효과` → `사용자 자신` → `상태 효과 걸기`(`thorns`).
+
+- 때린 쪽이 없는 피해(독처럼 `sourceId`가 비어 있는 것)는 아무도 고르지 않는다.
+- 반사 피해가 다시 피해 규칙(이벤트를 쏘는 것)을 거치면, 서로 가시를 가진 둘이 주고받다 사슬 한도(16단계)에서 끊긴다. 반사 피해는 출처 없이(`sourceId` 비움) 주거나 피해 이벤트를 쏘지 않는 효과로 준다.
+- 가진 목록(유물·특성)에 있는 동안 늘 반사하려면 같은 트리거·결과를 DB › 패시브에 둔다(→ `17-Custom-Features.md` 0절).
+
+### 3-12. 쿨다운 3턴 · 쿨다운 −1(코드 없음)
+
+"화염구: 쓰면 3턴 동안 다시 쓸 수 없다." 턴 끝 이벤트 `[GameEvent("턴 끝")] TurnEnded { turn }`을 턴을 끝내는 행동이 쏜다고 본다.
+
+1. DB › 상태 효과 `fireballCd`: `maxStacks` `1`, `reapply` `지속 갱신`, `duration` › `kind` `이벤트 횟수` · `length` `3` · `tickEvent` `턴 끝`, `hidden`(화면에 숨김) 켬. 트리거·결과는 비운다.
+2. DB › 능력 `fireball`:
+   - `trigger`: `사용` AND `상태 효과 검사`(`who` `사용자·가진 쪽`, `status` `fireballCd`, `op` `<=`, `stacks` `0`).
+   - `outcomes`: ① `대상에게 효과` → 대상 비움 → `피해`(12) ② `대상에게 효과` → `사용자 자신` → `상태 효과 걸기`(`fireballCd`).
+   - `failText`: `{ability}은(는) 아직 쓸 수 없습니다.`
+3. "쿨다운 −1" 능력 `recharge`: `대상에게 효과` → `사용자 자신` → `상태 효과 줄이기`(`fireballCd`, `1`).
+
+- 턴 1에 쓰면 남은 횟수 3 → 턴 1·2·3 끝에 줄어 턴 4부터 다시 쓴다. 중간에 `recharge`를 쓰면 한 턴 일찍.
+- 사용 조건이라 `Game.CanUse("fireball", hero, out var why)`가 쿨다운을 알고 `why`가 `failText`다(3-7의 버튼이 저절로 흐려진다).
+- 남은 턴 표시: `Game.Statuses(hero).FirstOrDefault(s => s.status == "fireballCd")?.remaining`.
+- 사용자마다 따로이고, Undo·판 저장이 그대로 따라온다. 쿨다운 필드·턴 끝마다 줄이는 코드가 필요 없다.
+- 실시간 쿨다운은 지속을 `게임 시간(초)`로 둔다. 숫자로 따라가기·남은 초 계산·아이콘 줄에서 숨기기는 `29-Statuses-Schedules-Choices.md` 5-12·5-13.
+
 ---
 
 ## 4. 주의할 점 / 자주 하는 실수
@@ -450,4 +540,7 @@ DB › 능력 `chainLightning`의 트리거는 에디터에서 그대로 정하�
 - **쓸 수 없을 때 글에 적은 키(`fail.needMana`)가 글자 그대로 보인다.** 텍스트 표에 그 키가 없어 적은 글을 틀로 썼다. 원문 표·언어 표에 키를 넣는다(`23-Text-Localization.md` 1절).
 - **`Define` 뒤에 정의를 고친다.** 능력 정의는 등록할 때 복사된다. 바꾸려면 다시 `Define`한다.
 - **사용자 없이 `사용자 자신`을 쓴다.** 사용자가 `null`이거나 찾지 못하면 `사용자 자신`은 아무도 고르지 않는다.
+- **능력에 `이벤트의 개체`를 둔다.** 사용하는 순간에는 받은 이벤트가 없어 아무도 고르지 않는다. 반사·반격은 상태 효과·패시브의 이벤트 받기로 만든다(3-11).
+- **`플레이어 데이터 목록`을 중간에 둔다.** 앞 대상을 버리고 새로 고르므로, 앞에서 거른 것이 사라진다. 맨 앞에 둔다(2-6).
+- **쿨다운을 필드와 결과 코드의 예외로 만든다.** 동작은 하지만 `Game.CanUse`가 모르고 턴마다 줄이는 코드가 생긴다. 숨긴 상태 효과 + 사용 조건 `상태 효과 검사`로 만든다(3-12).
 - **도전과제의 결과에서 고른 대상을 기대한다.** 고른 대상(`Picked`)은 `Game.Use`로 쓸 때만 있다.

@@ -164,7 +164,7 @@ namespace GBible
             var expanded = Token.Replace(text, m =>
             {
                 var name = m.Groups[1].Value;
-                if (name == "user") return context.User == null ? "" : GameApi.IdOf(context.User) ?? "";
+                if (name == "user") return context.User == null || !GameApi.HasId(context.User.GetType()) ? "" : GameApi.IdOf(context.User) ?? "";
                 if (name == "owner") return context.Owner ?? "";
                 if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
                 return context.Game.Balance(name.Substring("balance:".Length)).ToString("R", CultureInfo.InvariantCulture);

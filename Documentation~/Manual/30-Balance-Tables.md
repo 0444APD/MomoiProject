@@ -8,6 +8,8 @@
 - "층마다 적 체력 +10%", "레벨 n에 필요한 경험치 = 100 × n^1.5"처럼 단계에 따라 변하는 값(곡선).
 - "엘리트를 잡으면 60% 유물, 30% 물약 1~2개, 10% 꽝", "카드 보상 3장(서로 다른 카드)"(가중치 표).
 - "가진 유물은 다시 안 나온다", "해금한 카드만 상점에 나온다", "손패에서 무작위 1장"처럼 풀이 진행·판에 따라 바뀔 때(조건·목록 줄·뺄 목록).
+- "뽑을수록 5성 확률이 오른다(천장)"처럼 무게가 진행에 따라 바뀔 때(줄의 무게를 밸런스 값의 곡선에서).
+- "10개 사기", "살 수 있는 만큼"처럼 단계마다 오르는 가격을 한꺼번에 셀 때(`Game.BalanceSum`·`BalanceCount`).
 - "에너지가 모자랍니다", "이미 연 상자입니다"를 언어마다 다르게 보여 줄 때(플레이어용 실패).
 
 이 문서에서 쓰는 용어:
@@ -43,6 +45,10 @@
 | "유물 셋 중 하나를 골라 가진다"(코드 없이) | 결과 `가중치 표에서 고르기`(3-3, 5-5) |
 | "가진 유물은 다시 안 나온다" · "손패에서 무작위 1장" · "해금한 카드만" | 뺄 목록 · 목록 줄 · 항목 줄의 조건(5-10) |
 | 표 없이 코드에서 만든 후보에서 뽑기 | `Game.Roll(풀, 개수, unique, stream)`(4-4) |
+| "천장: 뽑을수록 5성 확률이 오르고 90번째는 확정" | 가중치 표 줄의 `무게를 밸런스 값에서`(표 곡선, 단계 = `profile.pity`)(5-11) |
+| "레벨업 보상 셋 중 하나 — 고른 패시브의 레벨 +1" | 결과 `가중치 표에서 고르기`, 넣을 곳이 ID → 레벨 딕셔너리(3-3) |
+| "10개 사기" · "살 수 있는 만큼 사기"(가격이 산 개수에 따라 오름) | `Game.BalanceSum` · `Game.BalanceCount`(4-1, 5-12) |
+| double(약 1e308)을 넘는 큰 수(방치형의 생산량·가격) | `BigNumber`(→ `36-Grid-BigNumber.md`) |
 | "3층부터 드래곤 비늘이 나온다" | 항목 줄의 조건(5-6) |
 | "드롭 확률을 화면에 보인다" | `session.Tables.Chances`(5-7) |
 | "얼어 있어 2턴 동안 움직일 수 없습니다"(언어별) | `throw Game.Fail` + 텍스트 표(5-8) |
@@ -92,7 +98,7 @@
 
 한 번 뽑기는 다음 순서로 돈다.
 
-1. **후보(풀)**를 모은다: 무게가 0보다 크고, 조건이 비었거나 **지금** 참인 줄. 목록 줄은 그 순간의 목록 요소마다 한 후보로 펼친다(요소가 글자면 그대로, id가 있는 객체면 그 id, 같은 ID는 한 번. 무게·개수는 그 줄의 값). 뺄 목록에 있는 ID는 뺀다(바깥 표의 뺄 목록은 안쪽 표에도 적용된다). 서로 다른 것만(`unique`)이면 이번 뽑기에서 이미 나온 항목도 뺀다. 안쪽 표의 줄은 서로 다른 것만이거나 뺄 목록이 있을 때, 그 표에 아직 나올 것이 남아 있을 때만 후보다.
+1. **후보(풀)**를 모은다: 무게가 0보다 크고, 조건이 비었거나 **지금** 참인 줄. 줄의 `무게를 밸런스 값에서`를 고른 줄은 무게가 그 밸런스 값의 **지금 단계** 값이다(단계 = 고른 플레이어 데이터의 숫자, 비우면 기준 값. 천장·운·레벨에 따라 바뀌는 확률, 5-11). 목록 줄은 그 순간의 목록 요소마다 한 후보로 펼친다(요소가 글자면 그대로, id가 있는 객체면 그 id, 같은 ID는 한 번. 무게·개수는 그 줄의 값). 뺄 목록에 있는 ID는 뺀다(바깥 표의 뺄 목록은 안쪽 표에도 적용된다). 서로 다른 것만(`unique`)이면 이번 뽑기에서 이미 나온 항목도 뺀다. 안쪽 표의 줄은 서로 다른 것만이거나 뺄 목록이 있을 때, 그 표에 아직 나올 것이 남아 있을 때만 후보다.
 2. 합 = 후보의 무게 합 + 꽝 무게. 합이 0 이하면 아무것도 나오지 않는다.
 3. 0~합의 난수로 하나를 고른다. 꽝 몫에 떨어지면 끝(아무것도 넣지 않는다).
 4. 고른 줄의 **개수**를 정한다: 최소와 최대가 같으면 그 수, 다르면 최소~최대 중 하나. 그 개수만큼 되풀이한다: 항목이 다른 가중치 표면 그 표에서 1~4를 다시 하고, 아니면 결과에 그 ID를 넣는다.
@@ -164,6 +170,8 @@
 | `entries` › `item` | 항목 / DB 항목(인스턴스·다른 가중치 표 …). 다른 가중치 표면 그 표에서 다시 뽑는다 | DB의 모든 종류의 항목에서 고른다(인스턴스·유물·능력·상태 효과·가중치 표 …). 항목 하나일 때 |
 | `entries` › `listKey` · `listPath` | 플레이어 데이터 · 필드(목록) | 목록 줄일 때. 요소가 ID 글자거나 id가 있는 객체인 목록(`run › relics`, `run › battle.hand`) |
 | `entries` › `weight` | 무게 | 0 이상(기본 1). 0이면 후보가 아니다 |
+| `entries` › `weightBalance` | 무게를 밸런스 값에서 / 고르면 무게 = 이 밸런스 값(곡선)의 단계 값. 천장·운·레벨에 따라 바뀌는 확률 | DB › 밸런스 값. 고르면 `weight`는 쓰지 않는다 |
+| `entries` › `weightStepKey` · `weightStepPath` | 단계(플레이어 데이터) / 곡선의 단계로 쓸 숫자. 비우면 기준값 · 단계 필드 | `weightBalance`를 골랐을 때만 보인다. 예: `profile` › `pity`. 뽑는 순간의 값을 읽는다 |
 | `entries` › `minCount` · `maxCount` | 최소 개수 · 최대 개수 | 기본 1 · 1. 뽑히면 그 사이의 개수만큼 같은 ID가 들어간다(안쪽 표면 그만큼 다시 뽑는다) |
 | `entries` › `condition` | 조건(맞을 때만 후보) | 조건 Block(`플레이어 데이터 검사` 등, `11-Triggers-Conditions.md`). 비우면 늘 후보 |
 | `emptyWeight` | 꽝 무게 / 이 무게만큼 아무것도 나오지 않습니다(0이면 꽝 없음) | 0 이상 |
@@ -171,6 +179,7 @@
 
 - 검증 오류: "항목이 없습니다." / "항목을 고르지 않은 줄이 있습니다." / "목록 줄의 플레이어 데이터를 고르지 않았습니다." / "뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다." / "표가 자기 자신을 항목으로 가지고 있습니다." / "'healPotion': 무게는 0 이상이어야 합니다." / "'healPotion': 개수는 0 ≤ 최소 ≤ 최대여야 합니다." / "꽝 무게는 0 이상이어야 합니다." / "무게가 모두 0이라 아무것도 나오지 않습니다."
 - 조건은 그 항목 줄을 후보로 볼지만 정한다. 조건이 거짓인 줄은 확률 계산(분모)에서도 빠진다.
+- 밸런스 값에서 읽은 무게가 0 이하인 단계에서는 그 줄이 후보가 아니다. 무게 검증("무게는 0 이상이어야 합니다", "무게가 모두 0이라 …")은 `weight` 칸만 본다. 그래서 밸런스 값을 쓰는 줄의 `weight`는 기본 1 그대로 둔다(0으로 두면 모든 줄이 그럴 때 검증 오류가 난다).
 
 ### 3-3. 결과 `가중치 표에서 주기` · `가중치 표에서 고르기`
 
@@ -184,7 +193,16 @@
 | `key` | 넣을 플레이어 데이터 | 플레이어 데이터 |
 | `path` | 필드(목록) | 그 안의 목록 필드(`relics`). 비우면 "값 전체" |
 
-- 뽑은 ID들을 그 목록에 넣는다. 인스턴스 목록이면 그 인스턴스의 사본을, 글자 목록이면 ID를 넣는다(`플레이어 데이터에 주기`의 요소 넣기와 같다, 12장 2-2). 꽝이면 아무것도 넣지 않는다.
+- 뽑은 ID들을 넣을 곳의 형식에 따라 넣는다(**원본 ID 넣기**, `가중치 표에서 고르기`도 같다). 꽝이면 아무것도 넣지 않는다.
+
+| 넣을 곳(`key` › `path`)의 형식 | 넣는 방법 | 예 |
+|---|---|---|
+| 목록(글자) | ID를 요소로 넣는다 | `run › relics`에 `anchor` |
+| 목록(인스턴스 형식) | 그 인스턴스의 사본을 넣는다(`플레이어 데이터에 주기`의 요소 넣기와 같다, 12장 2-2) | `run › potions`에 `healPotion` 사본 |
+| 딕셔너리(ID → 숫자) | 그 키의 개수를 나온 만큼 더한다(없던 키는 0에서) | `run › perks`의 `bloodlust` 1 → 2(레벨업), `profile › materials`의 `iron` +2 |
+| 숫자 하나 | 나온 개수만큼 더한다(어떤 ID인지는 버린다) | `run › keysFound` +1 |
+
+- 딕셔너리는 같은 ID가 두 번 나오면 +2다(개수가 2 이상인 줄, 횟수 2 이상). 가진 목록이 ID → 레벨 딕셔너리인 패시브(17장 0-1)는 이 결과로 레벨이 오른다.
 - 요약: `relicPool에서 뽑아 run › relics에 넣기`, 횟수가 2 이상이면 `cardReward에서 3개 뽑아 …`.
 - 검증 오류: "가중치 표에서 주기: 표를 고르세요." / "가중치 표에서 주기: 넣을 플레이어 데이터를 고르세요." / "가중치 표에서 주기: 횟수는 1 이상이어야 합니다."
 - 목록의 요소 형식이 표의 항목과 맞아야 한다. 카드 던전의 덱(`run.deck`, `List<DeckCard>`)에는 카드 원본(`Card` 인스턴스)이 들어가지 않는다(타임라인 경고 "인스턴스 'strike'의 형식(Card)이 DeckCard과(와) 다릅니다"). 덱에 넣는 일은 코드로 한다(5-5).
@@ -198,7 +216,7 @@
 | `count` | 후보 수 | 1 이상(기본 3). 이만큼 뽑아 후보로 보인다 |
 | `unique` | 서로 다른 것만 | 기본 켬 |
 | `min` · `max` | 최소 개수 · 최대 개수 | 기본 1 · 1. 최소 0이면 건너뛰기 |
-| `key` · `path` | 고른 것을 넣을 플레이어 데이터 · 필드(목록) | 고른 원본 ID를 넣는다(`가중치 표에서 주기`와 같은 규칙). 비우면 넣지 않는다 |
+| `key` · `path` | 고른 것을 넣을 플레이어 데이터 · 필드(목록) | 고른 원본 ID를 넣는다(`가중치 표에서 주기`와 같은 원본 ID 넣기 — 목록이면 요소, 딕셔너리면 그 키 +1, 숫자면 +개수). 비우면 넣지 않는다 |
 | `then` | 고른 뒤 결과 | 고른 다음에 도는 결과. 컨텍스트의 `Picked`가 고른 원본 ID(글자)들 |
 
 - 뽑기는 요구하는 순간(그 행동 안)에 끝나고 후보는 선택 대기(`$choices`)에 남는다. 그래서 끄고 켜거나 답하기를 Undo해도 후보가 바뀌지 않는다(29장 2-6).
@@ -228,14 +246,20 @@
 ```csharp
 var energy = (int)Game.Balance(GameIds.Balance.StartEnergy);              // 값
 var scale = Game.Balance(GameIds.Balance.EnemyHpScale, run.floor);        // 곡선으로 그 층의 값
+var ten = Game.BalanceSum(GameIds.Balance.CursorPrice, run.cursors, 10);  // 지금부터 10개를 살 때의 합
+var max = Game.BalanceCount(GameIds.Balance.CursorPrice, run.cursors, run.gold);   // 가진 골드로 살 수 있는 개수
 ```
 
 | 멤버 | 뜻 |
 |---|---|
 | `double Balance(string id)` | 값(`value`). 곡선은 보지 않는다 |
 | `double Balance(string id, double x)` | 곡선이 있으면 단계 `x`의 값, 없으면 값 |
+| `double BalanceSum(string id, double from, int count)` | 단계 `from`부터 1씩 `count`개의 값을 더한다("10개 사기": 가격 곡선, 단계 = 이미 산 개수). 단계마다 곡선의 반올림·자르기를 한 값의 합이다 |
+| `int BalanceCount(string id, double from, double budget)` | `budget`으로 단계 `from`부터 몇 개를 살 수 있나("살 수 있는 만큼"). 앞에서부터 더해 `budget`을 넘기 직전까지(최대 10000개까지 센다) |
 
 - 돌려주는 값은 `double`이다. 정수가 필요하면 곡선의 반올림을 고르거나 `(int)`·`Math.Round`로 바꾼다.
+- `BalanceSum`·`BalanceCount`는 단계마다 곡선을 한 번씩 계산해 더한다(개수만큼 돈다). `BalanceCount`는 10000개에서 세기를 멈춘다.
+- 숫자가 double의 끝(약 1e308)을 넘을 만큼 커지는 게임은 그 값만 `BigNumber`로 둔다(→ `36-Grid-BigNumber.md`). 밸런스 값·`Game.Pay`·DB 숫자 칸은 double만 알므로, 그때의 가격 계산과 비용 검사는 코드로 한다.
 - 값을 바꾸지 않으므로 행동 밖(화면 코드)에서 읽어도 된다. 없는 ID면 `InvalidOperationException`(2-1).
 
 ### 4-2. `session.Balance` — `BalanceSystem`
@@ -245,6 +269,7 @@ var scale = Game.Balance(GameIds.Balance.EnemyHpScale, run.floor);        // 곡
 | `Define(string id, double value, Curve curve = null)` | 등록(같은 ID면 바꾼다). ID가 비면 무시 |
 | `Has(id)` · `Ids` | 등록되어 있는지 · 등록된 ID 전부 |
 | `Get(id)` · `Get(id, x)` | = `Game.Balance` |
+| `Sum(id, from, count)` · `MaxCount(id, from, budget, limit = 10000)` | = `Game.BalanceSum` · `Game.BalanceCount`(`limit`개까지만 센다) |
 
 게임(Unity)에서는 런타임이 DB의 밸런스 값 전부를 등록한다. 서버·테스트처럼 세션을 직접 만들면 직접 등록한다.
 
@@ -327,6 +352,8 @@ var pick = Game.Roll(battle.enemies.Select(e => (e.id, (double)e.hp)), 1, stream
 | `minCount` · `maxCount` | 개수(기본 1 · 1) |
 | `condition` (`Condition`) | 맞을 때만 후보(`null`이면 늘) |
 | `listKey` · `listPath` | 비어 있지 않으면 목록 줄(그 목록의 요소마다 후보, `item`은 쓰지 않음) |
+| `weightBalance` | 비어 있지 않으면 무게 = 이 밸런스 값의 단계 값(`weight`는 쓰지 않음) |
+| `weightStepKey` · `weightStepPath` | 단계로 쓸 플레이어 데이터 · 그 안의 숫자 경로(비우면 기준 값). 경로는 필드 경로라 `pity[limited]`(딕셔너리의 키, 11장 3-1)도 된다 |
 
 ```csharp
 foreach (var table in GameDatabase.Load().All<WeightTableData>()) session.Tables.Define(table.ToDefinition());
@@ -358,8 +385,10 @@ var reward = new RollTableOutcome { table = "relicPool", count = 1, key = "run",
 | `table` | 가중치 표 ID |
 | `count` | 횟수(1보다 작으면 1) |
 | `unique` | 서로 다른 것만 |
-| `key` · `path` | 넣을 플레이어 데이터 · 목록 필드 경로 |
+| `key` · `path` | 넣을 플레이어 데이터 · 필드 경로(목록·딕셔너리·숫자, 원본 ID 넣기 3-3) |
 | `Kind` | `OutcomeKinds.PlayerData` |
+
+넣는 규칙은 `GrantIds.Into(session, key, path, ids)` 하나다(두 결과가 함께 쓴다). 프로젝트의 결과 Block이 뽑은 ID를 같은 규칙으로 넣을 때도 부른다.
 
 **`ChooseFromTableOutcome`** — 결과 '가중치 표에서 고르기'.
 
@@ -763,6 +792,83 @@ startEnergy,3,None,1,0,1.1,1.5,None,false,0,false,0,
 - 가중치 표 탭도 같다. 항목 줄은 한 줄씩 나란히 `entries[0].item` · `entries[0].weight` · `entries[0].minCount` · `entries[0].maxCount` · `entries[1].item` …, 꽝 무게는 `emptyWeight` 칸이다. 줄의 조건(Block)은 나오지 않으므로 DB에서 고친다. 시트에서 번호를 늘려 항목 줄을 더하면 새 항목 줄은 무게 1, 개수 1~1에서 시작한다(`33-Tick-Preview-Csv.md` 2-3).
 - 칸 규칙·가져오기 결과·인스턴스(카드 비용 …) 내보내기는 `33-Tick-Preview-Csv.md` 3절.
 
+### 5-11. 천장 — 뽑을수록 오르는 확률(무게를 밸런스 값에서)
+
+수집형 뽑기: "5성 0.6%. 74번째부터 오르고, 90번째는 사실상 확정. 5성이 나오면 처음부터." `Profile`에 `public int pity;`(지난 5성 뒤로 뽑은 횟수) · `public Dictionary<string, int> stock`(재화) · `public List<string> owned`(가진 캐릭터)가 있다고 본다. `Rules.RarityOf(game, id)`는 원본의 등급을 읽는 프로젝트 함수다.
+
+**에디터**:
+
+1. DB › 밸런스 값 `pityFiveWeight`: `value` `0.6`, `curve` › `kind` `표(점 사이를 잇기)`, `points` (0, 0.6) · (73, 0.6) · (88, 60) · (89, 100000).
+2. DB › 가중치 표 `banner`(안쪽 표 `fiveStar`·`fourStar`·`threeStar`는 등급별 캐릭터 표):
+
+| `item` | `weight` | `weightBalance` | `weightStepKey` · `weightStepPath` |
+|---|---|---|---|
+| `fiveStar` | 1(쓰지 않음) | `pityFiveWeight` | `profile` · `pity` |
+| `fourStar` | 5.1 | — | — |
+| `threeStar` | 94.3 | — | — |
+
+**코드** — 뽑는 행동. 뽑는 순간의 `pity`가 단계이고, 뽑은 뒤에 고친다.
+
+```csharp
+[Serializable, BlockInfo("뽑기")]
+public class Pull : GameAction
+{
+    protected override void Run()
+    {
+        var profile = Game.Data().Profile;
+        Game.Pay(GameIds.PlayerData.Profile.Id, "stock[gem]", 160, what: "gem.name");   // 딕셔너리의 키 하나(28장 2-4)
+        var id = Game.Roll(GameIds.WeightTable.Banner);                                  // 5성 줄의 무게 = pityFiveWeight(pity)
+        if (Rules.RarityOf(Game, id) == 5) profile.pity = 0; else profile.pity++;
+        profile.owned.Add(id);
+    }
+}
+```
+
+| `pity`(이번이 몇 번째 − 1) | 5성 무게 | 5성 확률 |
+|---|---|---|
+| 0 ~ 73 | 0.6 | 0.6 / 100 = 0.6% |
+| 80 | 0.6 + 59.4 × 7/15 ≈ 28.3 | 28.3 / 127.7 ≈ 22% |
+| 88 | 60 | 60 / 159.4 ≈ 38% |
+| 89(90번째) | 100000 | ≈ 99.9% |
+
+- 무게는 뽑는 **순간**에 단계(`profile › pity`)를 읽는다. 그래서 `pity`를 고치는 줄은 `Game.Roll` 뒤에 둔다.
+- 완전히 확정하려면 다른 두 줄도 89에서 0이 되는 밸런스 값으로 둔다(4성 점 (88, 5.1) · (89, 0), 3성 점 (88, 94.3) · (89, 0) — 무게 0인 줄은 후보가 아니다). 또는 코드에서 `pity >= 89`이면 `Game.Roll(GameIds.WeightTable.FiveStar)`로 바로 뽑는다.
+- 확률 공개 화면(`session.Tables.Chances`, 5-7)도 지금 `pity`로 계산된다.
+- 배너마다 천장을 따로 세려면 단계 경로를 `pity[limited]`처럼 딕셔너리의 키로 둔다(`Dictionary<string, int> pity`, 11장 3-1).
+- 곡선의 수치는 기획자가 DB에서 고치고, 플레이 중에도 0.5초 안에 반영된다(2-1).
+
+### 5-12. 10개 사기 · 살 수 있는 만큼 — `BalanceSum` · `BalanceCount`
+
+방치형: "커서 가격 15, 살 때마다 ×1.15(올림)." `RunState`에 `public int cursors;`(가진 개수)가 있다고 본다.
+
+**에디터**(DB › 밸런스 값 `cursorPrice`): `value` `15`, `kind` `비율로(×단계마다)`, `startX` `0`(단계 = 이미 가진 개수, 0부터), `rate` `1.15`, `rounding` `올림`.
+
+```csharp
+[Serializable, BlockInfo("커서 사기")]
+public class BuyCursors : GameAction
+{
+    public int count = 1;         // 0이면 살 수 있는 만큼
+
+    protected override void Run()
+    {
+        var run = Game.Data().Run;
+        var n = count > 0 ? count : Game.BalanceCount(GameIds.Balance.CursorPrice, run.cursors, run.gold);
+        if (n <= 0) throw Game.Fail("fail.noGold", "골드가 모자랍니다.");
+        Game.Pay(GameIds.PlayerData.Run.Id, "gold", Game.BalanceSum(GameIds.Balance.CursorPrice, run.cursors, n), what: "gold.name");
+        run.cursors += n;
+    }
+}
+```
+
+| 가진 개수(단계) | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 가격(올림) | 15 | 18 | 20 | 23 | 27 | 31 | 35 | 40 | 46 | 53 |
+
+- 0개에서 10개 사기 = `BalanceSum(cursorPrice, 0, 10)` = 308.
+- 골드 100으로 살 수 있는 만큼 = `BalanceCount(cursorPrice, 0, 100)` = 4(15 + 18 + 20 + 23 = 76, 다섯 번째까지면 103).
+- 버튼 글("10개 — 308")은 화면이 같은 `BalanceSum`으로 그린다. 가격은 행동 안에서 다시 계산한다(5-3과 같은 이유).
+- 가격이 double의 끝(약 1e308)을 넘을 만큼 오르는 게임은 `BigNumber`(→ `36-Grid-BigNumber.md`)와 코드의 비용 검사로 간다(4-1).
+
 ---
 
 ## 6. 주의할 점 · 자주 하는 실수
@@ -775,6 +881,8 @@ startEnergy,3,None,1,0,1.1,1.5,None,false,0,false,0,
 | 표 곡선에 적은 기준 값이 무시됨 | 표는 기준 값을 쓰지 않는다. 점의 값이 곧 값이다. |
 | 최솟값·최댓값을 적었는데 자르지 않음 | `최솟값으로 자르기`·`최댓값으로 자르기`를 켜지 않았다. 자를 쪽을 켠다(2-2). |
 | 소수가 나와 체력이 1.21 | 곡선은 `double`이다. 반올림을 고르거나 코드에서 `(int)Math.Round`. |
+| 방치형 후반에 값이 `∞`가 되거나 큰 수의 끝자리가 안 맞음 | DB 숫자 칸·밸런스 값·`Game.Pay`는 `double`이다. 약 1e308을 넘으면 ∞이고, 15~16자리를 넘는 정수는 끝자리가 정확하지 않다. 그 값은 `BigNumber`로 두고 계산·비용 검사는 코드로 한다(→ `36-Grid-BigNumber.md`). |
+| 천장을 걸었는데 확률이 그대로 | 줄의 `단계(플레이어 데이터)`를 비워 늘 기준 값이다. 또는 단계 값(`pity`)을 올리는 코드가 없거나 `Game.Roll` 앞에서 0으로 돌린다. 밸런스 값의 곡선 방식이 `없음`이어도 그대로다(5-11). |
 | 플레이 중 고친 값이 지금 적에게 안 보임 | 반영은 다음에 읽을 때부터다. 이미 만든 적의 체력은 판 데이터에 들어 있다. |
 | 플레이 중 고친 값이 플레이를 끄니 사라짐 | DB의 작업본이다. 저장(Ctrl+S)해야 에셋에 남는다. |
 | 물약이 1~2개 나와야 하는데 늘 1개 / 경고 "…Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요." | `Game.Roll(id)`(하나)는 첫 ID만 돌려준다(2개 이상이 나오면 표마다 한 번 이 경고). `Game.Roll(id, 1)`의 목록으로 받는다(5-4). |

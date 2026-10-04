@@ -1,11 +1,13 @@
 # 06. 저장·불러오기
 
-**한 줄 요약**: 플레이어 데이터는 구역별로 두 파일에 저장된다. **프로필**(메타 구역: 재화·해금·도전과제·누적 로그)과 **판**(세션 구역: 이번 판 내용 + 난수 상태 + 게임 시간)이다. 싱글 게임은 `GBibleRuntime`이 시작할 때 프로필을 불러오고, 끌 때 둘 다 저장한다. 판 이어하기는 게임이 원하는 때 `LoadRun`을 부른다.
+**한 줄 요약**: 플레이어 데이터는 구역별로 두 파일에 저장된다. **프로필**(메타 구역: 재화·해금·도전과제·누적 로그)과 **판**(세션 구역: 이번 판 내용 + 난수 상태 + 게임 시간)이다. 싱글 게임은 `GBibleRuntime`이 시작할 때 프로필을 불러오고, 끌 때 둘 다 저장한다. 판을 끄기 전에도 저장할 때(행동마다·N초마다·이벤트를 받을 때)는 DB › Bootstrap에서 고른다. 판 이어하기는 게임이 원하는 때 `LoadRun`을 부른다.
 
 **언제 쓰는가**
 
 - 타이틀 화면의 "이어하기"·"새 게임"
 - 판이 끝났을 때 프로필은 남기고 판만 지우기
+- 실시간·방치형의 주기 저장, 하루 끝·체크포인트 저장
+- 화면 쪽 상태(플레이어 위치 등)를 저장 직전에 판 데이터에 담기
 - 출시 후 데이터 구조를 바꿀 때 예전 저장을 이어받기(버전 변환)
 - 서버·테스트에서 세션 상태를 JSON 글자로 주고받기
 
@@ -110,13 +112,27 @@ bool canContinue = GBibleRuntime.HasSavedRun;     // run.json이 있는가
 |---|---|
 | 게임 시작(씬을 불러오기 전) | 세션을 만들고, 개발 중이면 호환되지 않는 저장을 지운 뒤, `profile.json`을 불러온다(`ImportMeta`) |
 | 바깥 행동이 끝날 때·Undo 뒤(판 저장 "행동마다 저장"일 때) | 그 프레임 끝(행동 밖)에서 판을 저장한다 |
-| 바깥 행동이 끝날 때·Undo 뒤("프로필도 행동마다 저장"을 켰을 때) | 그 프레임 끝에서 프로필을 저장한다 |
+| 마지막 저장에서 N초(실제 시간)가 지난 프레임 끝(판 저장 "N초마다 저장"일 때) | 그사이 행동·Undo가 있었으면 판을 저장한다. 아무 일도 없었으면 쓰지 않는다 |
+| 정한 이벤트를 쏜 행동이 끝날 때(판 저장 "이벤트를 받을 때 저장"일 때) | 그 프레임 끝에서 판을 저장한다. 그 행동이 실패해 취소되면 저장하지 않는다 |
+| 위 셋에서 판을 저장할 때, 그사이 프로필(메타 구역) 값이 바뀌었으면 | 프로필도 함께 저장한다. 판 파일만 앞서 있다가 강제 종료되면 쓴 스태미나·새 id 번호(`NewId`)가 프로필에서 되돌아가 둘이 어긋나기 때문이다 |
+| 바깥 행동이 끝날 때·Undo 뒤("프로필도 행동마다 저장"을 켰을 때) | 그 프레임 끝에서 프로필을 저장한다. 판 저장이 "N초마다 저장"이면 프로필도 그 간격으로 판과 함께 저장한다 |
 | 판 끝 이벤트를 받은 행동이 끝날 때(설정했을 때) | 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤 다른 행동이 세션 구역 값을 바꿀 때(새 판)까지 판을 저장하지 않는다 |
-| 게임 종료(`OnApplicationQuit`) | 프로필을 저장하고, `AutoSaveRun`이 참이면(판 저장이 "저장하지 않음"이 아니면) 판도 저장한다. 판 끝 이벤트 뒤 아직 새 판이 아니면 저장하지 않는다 |
+| 판을 저장하기 직전 · 판을 불러온 뒤 · 끄기 직전 | `Saving` · `RunLoaded` · `Stopping`을 쏜다(2.10) |
+| 게임 종료(`OnApplicationQuit`) | `Stopping`을 쏜 뒤 프로필을 저장하고, `AutoSaveRun`이 참이면(판 저장이 "저장하지 않음"이 아니면) 판도 저장한다. 판 끝 이벤트 뒤 아직 새 판이 아니면 저장하지 않는다 |
 
 판은 **자동으로 불러오지 않는다.** 타이틀의 "이어하기"처럼 게임이 원하는 때 `LoadRun`을 부른다.
 
-판 저장 시점은 DB › 시작 파일 › **Bootstrap**의 **판 저장**(끌 때 저장 / 행동마다 저장 / 저장하지 않음)과 **판 끝 이벤트**에서 정한다. 코드로 덮어쓸 수도 있다(코드 값이 우선).
+판 저장 시점은 DB › 시작 파일 › **Bootstrap**의 **판 저장**과 **판 끝 이벤트**에서 정한다.
+
+| 판 저장 | 저장하는 때 | 함께 고르는 칸 | 맞는 게임 |
+|---|---|---|---|
+| 끌 때 저장(기본) | 끌 때만 | — | 이어 하기는 있지만 자주 쓸 필요는 없는 게임 |
+| 행동마다 저장(턴제) | 바깥 행동이 끝날 때·Undo 뒤, 그리고 끌 때 | — | 턴제·카드 |
+| 저장하지 않음(이어 하기 없음) | 저장하지 않는다 | — | 아케이드·퍼즐 |
+| N초마다 저장(실시간·방치형) | 마지막 저장에서 N초가 지났고 그사이 행동이 있었을 때, 그리고 끌 때 | **저장 간격(초)**(기본 30, 1 이상) | 실시간·방치형. 행동이 잦아 매번 쓰기는 낭비인 게임 |
+| 이벤트를 받을 때 저장(하루 끝·체크포인트) | 정한 이벤트를 쏜 행동이 끝날 때, 그리고 끌 때 | **판 저장 이벤트** | 생활 시뮬(하루 끝)·체크포인트·방 클리어 |
+
+끌 때 판을 저장할지는 코드로 덮어쓸 수도 있다(코드 값이 우선). 끄기 전의 저장(행동마다·N초마다·이벤트)은 이 값과 상관없이 칸대로 돈다.
 
 ```csharp
 GBibleRuntime.AutoSaveRun = false;    // 끌 때 판을 저장하지 않는다(설정보다 우선)
@@ -139,7 +155,7 @@ GBibleRuntime.DeleteRun();                   // run.json만 지우기
 
 1. 메모리의 판 값(세션 구역)을 처음 값으로 되돌리고 Undo 기록을 비운다(`session.NewRun()`). 프로필은 그대로.
 2. 판 저장 파일 `run.json`을 지운다.
-3. 판 끝 상태(판 끝 이벤트 뒤 "새 판까지 판을 저장하지 않음")를 푼다.
+3. 판 끝 상태(판 끝 이벤트 뒤 "새 판까지 판을 저장하지 않음")를 푼다. 판 끝 이벤트 뒤 아직 하지 않은 프로필 저장이 남아 있으면 먼저 한다. 그래서 판을 끝낸 행동 바로 뒤, 같은 프레임에 `NewRun`을 불러도 그 판의 보상이 프로필에 저장된다.
 
 메모리와 파일을 함께 지워야 "화면은 새 판인데 이어하기는 예전 판"이 생기지 않는다. **행동 밖**(버튼 등)에서 부른다. 행동 안에서 부르면 `InvalidOperationException`("행동 실행 중에는 새 판을 시작할 수 없습니다"). 새 판의 첫 내용(덱·맵)을 만드는 것은 그 뒤에 행동으로 한다.
 
@@ -286,6 +302,34 @@ bool ok = GameSession.IsSaveCompatible(json, session.SaveSchema, out string reas
 
 `session.SaveSchema`는 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식)다. `GBibleRuntime`이 DB로 채운다. 이 검사가 개발 중 저장 초기화의 판단 기준이다. 구조 정보가 없는 파일은 호환으로 본다.
 
+### 2.10 저장 알림: `GBibleRuntime.Saving` · `RunLoaded` · `Stopping`
+
+```csharp
+using GBible;
+using UnityEngine;
+
+public static class SaveHooks
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+    static void Hook()
+    {
+        GBibleRuntime.Saving += session => { /* 판을 저장하기 직전 */ };
+        GBibleRuntime.RunLoaded += session => { /* 판을 불러온 뒤 */ };
+        GBibleRuntime.Stopping += session => { /* 끄기 직전, 저장 전 */ };
+    }
+}
+```
+
+| 이벤트(`Action<GameSession>`) | 오는 때 | 쓰는 곳 |
+|---|---|---|
+| `Saving` | 판을 저장하기 직전. `SaveRun`마다 온다(행동마다·N초마다·이벤트를 받을 때·끌 때·모니터 명령·직접 부름) | 화면 쪽에만 있는 상태(플레이어 위치 등)를 판 데이터에 담는 마지막 기회. 행동 밖이므로 담을 때는 `Game.Do`로 |
+| `RunLoaded` | 저장한 판을 불러온 뒤(`LoadRun` 성공, 시작할 때 이어 하기 포함) | 화면 쪽 상태를 판 데이터에서 다시 놓는다. Undo 지점(`HistoryMark`)을 다시 받는다 |
+| `Stopping` | 게임을 끄기 직전, 슬롯을 바꾸거나 지워 세션을 다시 만들기 직전. 저장한다면 저장보다 먼저 | 마지막 정산(오프라인 보상의 마지막 시각 등)을 `Game.Do`로 남긴다. 그 변경도 이어서 저장된다(지금 슬롯을 지울 때는 저장하지 않는다) |
+
+- 받는 함수가 예외를 던지면 콘솔에 남기고 저장은 계속한다.
+- `Saving`에서 실행한 행동도 행동이라 "저장할 것 있음"이 다시 켜진다. 값이 그대로면 `Game.Do`를 건너뛴다. 그러지 않으면 "행동마다 저장"에서는 매 프레임, "N초마다 저장"에서는 간격마다 늘 저장한다.
+- 화면 쪽 상태를 판 데이터에 늘 넣어 두지 않는다(위치는 프레임마다 바뀐다). 저장 직전에 한 번 담고, 불러온 뒤 한 번 놓는다(3.3).
+
 ---
 
 ## 3. 상황별 예제
@@ -347,22 +391,72 @@ public static class RunFlow
 
 `meta.shards`는 메타 구역 정수 플레이어 데이터로 정의되어 있어야 한다. `NewRun`은 행동 밖에서 부르므로 `EndRun` 행동이 끝난 뒤에 둔다. 판 끝을 이벤트로 알리는 게임이라면 DB › Bootstrap의 **판 끝 이벤트**가 판 저장 삭제·프로필 저장을 대신한다(2.2).
 
-### 3.3 체크포인트 저장(판 중간)
+### 3.3 체크포인트에서 판 저장(이벤트를 받을 때)
+
+DB › 시작 파일 › Bootstrap: **판 저장** "이벤트를 받을 때 저장(하루 끝·체크포인트)", **판 저장 이벤트** `CheckpointReached`. 게임 코드는 이벤트를 쏘는 행동과, 화면 쪽 위치를 담고 놓는 일뿐이다.
 
 ```csharp
+using System;
 using GBible;
 using UnityEngine;
 
+[GameEvent("체크포인트 도착")]
+public class CheckpointReached { public string checkpoint; }
+
+[Serializable]
+public class Explorer { public string id = "hero"; public string checkpoint; public float x, y; }
+
+[Serializable, BlockInfo("체크포인트 도착")]
+public class ReachCheckpoint : GameAction
+{
+    public Explorer explorer;
+    public string checkpoint;
+    protected override void Run()
+    {
+        explorer.checkpoint = checkpoint;
+        Game.Events.Publish(new CheckpointReached { checkpoint = checkpoint });   // 이 행동이 끝난 프레임 끝에 판을 저장한다
+    }
+}
+
+[Serializable, BlockInfo("위치 기록")]
+public class RecordPosition : GameAction
+{
+    public Explorer explorer;
+    public float x, y;
+    protected override void Run() { explorer.x = x; explorer.y = y; }
+}
+
 public class Checkpoint : MonoBehaviour
 {
-    void OnTriggerEnter(Collider other)
+    public string id;
+    void OnTriggerEnter(Collider other) =>                                  // 판정은 화면, 결과는 행동
+        GBibleRuntime.Game.Do(new ReachCheckpoint { explorer = GBibleRuntime.Game.Find<Explorer>("hero"), checkpoint = id });
+}
+
+public class HeroBody : MonoBehaviour
+{
+    void OnEnable()  { GBibleRuntime.Saving += OnSaving; GBibleRuntime.RunLoaded += OnLoaded; }
+    void OnDisable() { GBibleRuntime.Saving -= OnSaving; GBibleRuntime.RunLoaded -= OnLoaded; }
+
+    void OnSaving(GameSession session)                                      // 저장 직전: 위치를 판 데이터에
     {
-        var session = GBibleRuntime.Session;
-        if (session.Data.InTransaction) return;      // 행동 실행 중에는 판을 저장할 수 없다
-        GBibleRuntime.SaveRun(session);
+        var hero = session.Game.Find<Explorer>("hero");
+        var p = transform.position;
+        if (hero == null || (hero.x == p.x && hero.y == p.y)) return;       // 그대로면 행동을 만들지 않는다
+        session.Do(new RecordPosition { explorer = hero, x = p.x, y = p.y });
+    }
+
+    void OnLoaded(GameSession session)                                      // 불러온 뒤: 위치를 화면에
+    {
+        var hero = session.Game.Find<Explorer>("hero");
+        if (hero != null) transform.position = new Vector3(hero.x, hero.y, 0);
     }
 }
 ```
+
+- 판 저장은 `ReachCheckpoint`가 끝난 프레임 끝(행동 밖)에서 한다. 그 행동이 실패해 취소되면 저장하지 않는다.
+- 하루 끝에 저장하는 생활 시뮬도 같다. 판 저장 이벤트로 "하루 넘김" 이벤트를 고른다.
+- 직접 저장하려면 행동 밖에서 `GBibleRuntime.SaveRun(session)`을 부른다(`session.Data.InTransaction`이 거짓인 곳). 이때도 `Saving`이 온다.
 
 ### 3.4 서버·테스트: 글자로 왕복
 
@@ -440,3 +534,8 @@ public static class InventoryMigration
 | 저장 변환 표를 적었는데 적용되지 않음 | 버전이 저장 파일의 버전보다 크지 않다(이미 그 버전으로 저장된 파일에는 돌지 않는다). 또는 키가 저장 파일의 예전 이름과 다르다. |
 | 저장 파일이 `MomoiProject/` 바로 아래에 없음 | 다른 슬롯을 쓰고 있다(`slots/<이름>/`). `GBibleRuntime.Slot`·`SavePath`로 확인한다(2.1). |
 | 판을 지웠는데(새 판) 음량·언어가 그대로 | 정상이다. 설정은 슬롯·판과 상관없는 `settings.json`에 있다(2.1). |
+| "이벤트를 받을 때 저장"인데 저장되지 않음 | 그 이벤트를 쏜 행동이 실패해 취소됐거나, **판 저장 이벤트** 칸이 비어 있거나(그러면 끌 때만 저장한다), 이벤트 클래스 이름이 바뀌어 찾지 못했다(기록에 "판 저장 이벤트 '…'를 찾을 수 없습니다" 경고). 칸을 다시 고른다. |
+| "N초마다 저장"인데 "판 저장" 기록이 없음 | 그사이 행동이 없었다. 바뀐 것이 없으면 쓰지 않는다. |
+| 판을 매 프레임(또는 간격마다 늘) 저장함 | `Saving`에서 값이 그대로여도 `Game.Do`를 했다. 그 행동이 다시 저장을 부른다. 값이 같으면 건너뛴다(2.10). |
+| 이어 한 뒤 플레이어가 처음 자리에 있음 | 위치가 화면 쪽에만 있었다. `Saving`에서 판 데이터에 담고 `RunLoaded`에서 놓는다(3.3). |
+| 판 밖(로비) 뽑기를 껐다 켜서 다시 뽑음 | 프로필에는 난수 상태가 없다(`07-Random-Time.md` 3절). 끌 때만 저장하면 강제 종료로 뽑기 전으로 돌아가고, 다음 실행은 다른 시드라 다른 결과가 나온다. **프로필도 행동마다 저장**을 켜 결과를 바로 저장한다. 판 저장이 "N초마다"면 프로필도 그 간격이므로 뽑기 뒤 `GBibleRuntime.SaveProfile`을 직접 부른다. |

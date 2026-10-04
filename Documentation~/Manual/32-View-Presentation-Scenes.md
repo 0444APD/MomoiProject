@@ -1,6 +1,6 @@
 # 32. 화면 연결·연출 대기열·씬 흐름·월드 상태
 
-**한 줄 요약**: 규칙(행동)은 즉시 끝나고 화면은 그 결과를 따라간다. **다시 그리기**(`GameView.Redraw`)는 플레이어 데이터나 언어가 바뀌면 프레임 끝에 한 번 그린다. **ViewList**는 데이터 목록(적·손패)을 프리팹 목록에, 컴포넌트 **데이터 연결**은 필드 하나(에너지)를 글자·숫자에 코드 없이 잇는다. 피해 숫자·죽는 모습 같은 연출은 **연출 대기열**(`GameView.Present`)에서 차례로 하나씩 돌고, 다시 그리기는 연출이 끝날 때까지 기다린다. 그래서 죽는 연출 전에 적이 화면에서 사라지지 않는다. **씬 흐름**은 판 데이터의 필드(`run.scene`)가 가리키는 씬을 화면이 따라 연다. **월드 상태**(`Game.SetWorld`)는 씬에 놓인 것(열린 상자·쓰러뜨린 보스·켜 둔 스위치)의 상태를 이름으로 기억하고, 컴포넌트 **월드 상태 연결**이 그 값대로 오브젝트를 켜고 끈다. 화면 쪽은 데이터를 읽기만 하고, 바꾸는 일은 모두 행동이다.
+**한 줄 요약**: 규칙(행동)은 즉시 끝나고 화면은 그 결과를 따라간다. **다시 그리기**(`GameView.Redraw`)는 플레이어 데이터나 언어가 바뀌면 프레임 끝에 한 번 그린다. **ViewList**는 데이터 목록(적·손패)을 프리팹 목록에, 컴포넌트 **데이터 연결**은 필드 하나(에너지)를 글자·숫자에 코드 없이 잇는다. 피해 숫자·죽는 모습 같은 연출은 **연출 대기열**(`GameView.Present`)에서 차례로 하나씩 돌고, 다시 그리기는 연출이 끝날 때까지 기다린다. 그래서 죽는 연출 전에 적이 화면에서 사라지지 않는다. 실시간 게임의 맞는 효과·피해 숫자는 대기열 밖(`GameView.Play`)에서 바로 튼다(줄 서지 않고 입력을 막지 않는다). **씬 흐름**은 판 데이터의 필드(`run.scene`)가 가리키는 씬을 화면이 따라 연다. **월드 상태**(`Game.SetWorld`)는 씬에 놓인 것(열린 상자·쓰러뜨린 보스·켜 둔 스위치)의 상태를 이름으로 기억하고, 컴포넌트 **월드 상태 연결**이 그 값대로 오브젝트를 켜고 끈다. 화면 쪽은 데이터를 읽기만 하고, 바꾸는 일은 모두 행동이다.
 
 > UI Toolkit 화면(HUD·메뉴·팝업)은 [35장](35-Screens.md)의 DB › 화면 · `GameScreen` · binding-path로 만든다(인스펙터 연결 없음). 이 장의 `ViewList`·'데이터 연결'은 씬에 놓이는 오브젝트(캐릭터·카드 오브젝트)와 UGUI용이고, 다시 그리기·연출 대기열은 두 쪽이 함께 쓴다.
 
@@ -9,6 +9,7 @@
 - 체력·골드·에너지 표시, 적 목록·손패처럼 데이터를 그대로 그리는 화면(다시 그리기 · ViewList · 데이터 연결).
 - 피해 숫자, 카드가 날아가는 모습, 적이 쓰러지는 모습처럼 시간을 두고 차례로 보여 줄 것(연출 대기열).
 - 연출 중에 입력을 막고, 클릭하면 빨리 넘기고, 설정에서 연출 속도를 바꿀 때(`Busy` · `SkipPresentation` · `PresentationSpeed`).
+- 실시간 게임의 맞는 효과·피해 숫자, 방치형의 클릭 숫자처럼 줄 서지 않고 바로·여럿이 겹쳐 뜨고 입력을 막지 않을 것(대기열 밖 연출, `GameView.Play`).
 - 맵 → 전투 → 맵, 판이 끝나면 타이틀처럼 판 진행에 따라 씬이 바뀔 때(씬 흐름).
 - 열린 상자는 다시 열려 있고, 잡은 보스는 다시 나오지 않고, 마을 문은 다음 판에도 열려 있을 때(월드 상태).
 
@@ -20,6 +21,7 @@
 | 키 | 플레이어 데이터 ID(`run`). 다시 그리기가 "이 값이 바뀌면"을 정하는 단위다. |
 | 연출 대기열 | 연출을 차례로 하나씩 재생하는 줄(`GameView.Present`). 하나가 끝나야 다음이 시작한다. |
 | 연출 하나 | 대기열의 한 칸: 코루틴(`IEnumerator`) · 완료 콜백(`done`을 부르면 끝) · 쉬기(초). |
+| 대기열 밖 연출 (`GameView.Play`) | 대기열에 넣지 않고 바로 트는 연출. 여럿이 동시에 돌고 `Busy`·다시 그리기와 상관없다(입력을 막지 않는다). 실시간 게임용. |
 | `Busy` | 연출이 남아 있거나 선택을 기다리는 중. 이때 입력을 막는다. |
 | 화면 오브젝트 등록 | 데이터 개체의 id ↔ 화면의 GameObject(`GameView.Register`·`Find`). 연출이 "그 적의 그림"을 찾을 때 쓴다. |
 | ViewList | 데이터 목록 ↔ 화면 오브젝트 목록. 항목(id)마다 프리팹 하나를 만들고·없애고·순서를 맞추고·다시 그린다. |
@@ -81,6 +83,25 @@
 - **연출 하나가 예외를 내면** 콘솔에 찍히고 그 연출만 끝난다. 대기열은 계속 돈다(안쪽 코루틴의 예외도 같다).
 - 연출은 `[MomoiProject]` 오브젝트가 돌린다(씬이 바뀌어도 계속 돈다). 일시정지(`Time.timeScale` 0) 중에는 `DeltaTime`이 0이라 시간을 재는 연출이 멈춘다.
 - 행동은 연출을 기다리지 않는다. 연출이 도는 동안에도 `Game.Do`는 그대로 실행된다(입력을 막는 것은 화면의 일).
+
+**대기열 밖 연출 — `GameView.Play`**
+
+대기열은 턴제에 맞춘 것이다. 실시간 게임에서 맞을 때마다 `Present`로 넣으면 피해 숫자가 줄을 서서 하나씩 늦게 뜨고, 그동안 `IsPresenting`·`Busy`가 참이라 입력 창구(`Busy`로 막는 버튼·`GameScreens.Do`)가 **입력을 계속 막는다**. 다시 그리기도 연출이 끝날 때까지 미뤄진다. 실시간 게임의 연출은 `Play`로 튼다.
+
+| | `Present`(대기열) | `Play`(대기열 밖) |
+|---|---|---|
+| 도는 순서 | 넣은 순서대로 하나씩 | 부른 즉시, 여럿이 동시에 |
+| `IsPresenting` · `Busy` | 남아 있는 동안 참 → 입력을 막는다 | 상관없다(입력을 막지 않는다) |
+| 다시 그리기(연출 기다리기) | 끝날 때까지 미룬다 | 미루지 않는다 |
+| `Presented` · `SkipPresentation` · `ClearPresentation` | 따른다 | 상관없다(`ClearPresentation`도 멈추지 않는다) |
+| 시간(`GameView.DeltaTime` · `Wait`) | 속도·건너뛰기 반영 | 같다(대기열을 건너뛰는 동안이면 함께 ×10) |
+| 쓰는 곳 | 턴제의 피해 숫자·카드 이동·죽는 모습 | 실시간의 맞는 효과·피해 숫자, 방치형의 클릭 숫자 |
+
+- `Play(코루틴)` · `Play(done => …, timeout)` 두 가지다. 완료 콜백 쪽은 `Present`와 같이 제한 시간(기본 실제 30초) 안에 `done()`이 없으면 경고한다.
+- 연출은 `[MomoiProject]` 오브젝트가 돌린다. 씬이 바뀌어도 계속 돌므로, 오브젝트가 먼저 없어질 수 있는 연출은 돌면서 `null`인지 본다. 예외가 나면 그 연출만 멈춘다(콘솔에 찍힌다).
+- 게임이 시작되기 전(호스트가 없을 때) 부르면 틀지 않고 경고 "[MomoiProject] GameView.Play: 게임이 시작되지 않아 연출을 틀 수 없습니다."를 남긴다(`Present`는 넣어 두었다가 호스트가 생기면 튼다).
+- 받는 쪽은 같다: `SubscribeAfterAction` → `Play`. 실패한 행동·미리보기의 이벤트는 오지 않는다.
+- ViewList의 `OnRemove`(죽는 모습)는 대기열에 들어간다(2-4). 실시간에서 적이 쓰러질 때마다 `Busy`가 되므로, 실시간 적 목록은 `OnRemove`를 비워 그림을 바로 없애고, 죽는 모습은 그림의 자리를 먼저 읽어 두었다가 `Play`로 그 자리에 따로 튼다(5-9).
 
 ### 2-3. 화면 오브젝트 찾기
 
@@ -212,12 +233,13 @@ void OnDisable() => _view?.Dispose();
 
 키는 `GameIds.PlayerData.X.Id`(또는 ID 글자)다. 라이브러리의 키(`ChoiceSystem.Key`, `WorldStateSystem.SessionKey` …)도 쓴다.
 
-### 4-2. `GameView.Present` — 연출 대기열
+### 4-2. `GameView.Present` · `Play` — 연출 대기열 · 대기열 밖 연출
 
 ```csharp
 GameView.Present(ShowDamage(e));                          // 코루틴
 GameView.Present(done => cardView.FlyTo(slot, done));     // 끝나면 done()
 GameView.Present(0.3f);                                   // 0.3초 쉬기
+GameView.Play(ShowHit(e));                                // 대기열 밖: 바로, 여럿이 동시에, 입력을 막지 않는다(실시간)
 ```
 
 | 멤버 | 뜻 |
@@ -225,14 +247,16 @@ GameView.Present(0.3f);                                   // 0.3초 쉬기
 | `void Present(IEnumerator routine)` | 코루틴 하나를 넣는다(`null`이면 무시). 부를 때마다 새 코루틴(`Show(e)`)을 넘긴다 |
 | `void Present(Action<Action> step, float timeout = 30f)` | 완료 콜백 연출. `step(done)`을 부르고 `done()`까지 기다린다. `timeout`(실제 시간 초) 안에 오지 않으면 경고("[MomoiProject] 연출이 30초 안에 끝나지 않아 넘어갑니다(done()을 부르지 않았거나 오브젝트가 먼저 없어졌는지 확인).")하고 넘어간다. 0이면 끝없이 기다린다 |
 | `void Present(float seconds)` | 쉬기(속도 반영) |
-| `bool IsPresenting` | 남은 연출이 있다(재생 중 포함) |
+| `void Play(IEnumerator routine)` | 대기열 밖에서 바로 튼다(`null`이면 무시). `IsPresenting`·`Busy`·다시 그리기와 상관없다(2-2). 게임이 시작되기 전이면 경고하고 틀지 않는다 |
+| `void Play(Action<Action> step, float timeout = 30f)` | 완료 콜백 연출을 대기열 밖에서. `timeout`은 `Present`와 같다 |
+| `bool IsPresenting` | 남은 연출이 있다(재생 중 포함). `Play`로 튼 것은 세지 않는다 |
 | `bool Busy` | `IsPresenting` 또는 `Game.IsWaiting`. 입력을 막을 때 |
 | `event Action Presented` | 대기열이 비었을 때 |
 | `float PresentationSpeed` | 연출 속도(기본 1). 매 플레이 시작 때 1로 돌아간다 |
 | `float DeltaTime` | 이번 프레임의 연출 시간(속도·건너뛰기 반영) |
 | `IEnumerator Wait(float seconds)` | 연출 안에서 쓰는 기다리기(`yield return GameView.Wait(0.5f)`). `WaitForSeconds` 대신 |
 | `void SkipPresentation()` | 남은 연출을 ×10으로. 대기열이 비면 원래대로 |
-| `void ClearPresentation()` | 남은 연출을 버린다. 재생 중인 것은 멈춘다 |
+| `void ClearPresentation()` | 남은 연출을 버린다. 재생 중인 것은 멈춘다(`Play`로 튼 것은 그대로 돈다) |
 
 ### 4-3. `GameView.Register` · `Find` — 화면 오브젝트
 
@@ -433,6 +457,7 @@ public class DamagePopups : MonoBehaviour
 - 마지막 적을 쓰러뜨리는 카드도 피해 숫자가 그 적의 그림 위에 뜬다. 적은 데이터에서 이미 빠졌지만, 적 목록의 다시 그리기가 연출을 기다리므로 그림은 아직 있다(5-2).
 - 독 피해처럼 턴 끝에 여러 번 들어오는 피해도 차례로 하나씩 뜬다. 사이를 띄우려면 `GameView.Present(0.1f)`를 함께 넣는다.
 - 게임 규칙의 난수(`Game.Random`)를 연출에 쓰지 않는다. 연출의 무작위는 `UnityEngine.Random`(07장).
+- 턴제의 모양이다. 실시간 게임이면 `Present` 대신 `Play`로 튼다(5-9). 대기열에 쌓이면 숫자가 줄을 서서 늦게 뜨고 그동안 입력이 막힌다(2-2).
 
 ### 5-2. 적 목록 — ViewList + 죽는 연출(`OnRemove`)
 
@@ -677,13 +702,79 @@ public class ChestClick : MonoBehaviour
 - 레버를 끄면(`SetWorld(이름, false)`) 판 값이 지워진다. 같은 이름에 프로필 값(`permanent`)이 있으면 대신 `"false"`가 들어가 이번 판에서는 꺼진 채다(2-7).
 - 새 판이면 상자·보스·레버는 처음 모습으로 돌아오고, 마을 문은 열린 채다.
 
+### 5-9. 실시간 — 대기열 밖 연출(`GameView.Play`)
+
+실시간 아레나(33장 5-1·5-7)에서 적이 맞을 때마다 숫자가 뜨고, 쓰러진 적의 자리에 연기가 남는다. 입력은 한 번도 막히지 않는다. 이벤트 `FoeHit { foeId, amount }`·`FoeKilled { foeId }`는 33장 5-7의 것이다.
+
+```csharp
+// 적 목록: 기다리지 않는 다시 그리기 + OnRemove 없음 → 쓰러진 적은 그 프레임 끝에 바로 없어진다(대기열·Busy 없음)
+_foes = new ViewList<ArenaFoe, FoeView>(foePrefab, foeRoot,
+    () => GBibleRuntime.Session.Data.Get<ArenaState>("arena").foes,
+    (view, foe) => view.Show(foe),
+    waitForPresentation: false, "arena");
+_foes.OnCreate = (view, foe) => view.Id = foe.id;                  // 히트박스가 판정 보고에 쓴다(33장 5-7)
+
+public class RealtimeHits : MonoBehaviour
+{
+    [SerializeField] TMP_Text numberPrefab;      // 떠오르는 숫자(월드 공간 TMP)
+    [SerializeField] GameObject smokePrefab;     // 쓰러진 자리에 남는 연기
+    IDisposable _onHit, _onKill;
+
+    void OnEnable()
+    {
+        var events = GBibleRuntime.Session.Events;
+        _onHit = events.SubscribeAfterAction<FoeHit>(e => GameView.Play(ShowNumber(e)));
+        _onKill = events.SubscribeAfterAction<FoeKilled>(e =>
+        {
+            var view = GameView.Find(e.foeId);                              // 행동 직후라 그림은 아직 있다(없애는 것은 프레임 끝)
+            if (view != null) GameView.Play(Smoke(view.transform.position));  // 자리를 먼저 읽어 둔다
+        });
+    }
+
+    void OnDisable()
+    {
+        _onHit?.Dispose();
+        _onKill?.Dispose();
+    }
+
+    IEnumerator ShowNumber(FoeHit e)
+    {
+        var target = GameView.Find(e.foeId);                  // Play는 부른 즉시 첫 yield까지 돈다 → 지금 자리
+        if (target == null) yield break;
+        var number = Instantiate(numberPrefab, target.transform.position, Quaternion.identity);   // 적의 자식이 아니다(적이 먼저 없어져도 남는다)
+        number.text = e.amount.ToString();
+        for (float t = 0; t < 0.4f; t += GameView.DeltaTime)
+        {
+            if (number == null) yield break;                  // 씬이 바뀌어 없어졌다
+            number.transform.position += Vector3.up * (GameView.DeltaTime * 2f);
+            yield return null;
+        }
+        if (number != null) Destroy(number.gameObject);
+    }
+
+    IEnumerator Smoke(Vector3 at)
+    {
+        var smoke = Instantiate(smokePrefab, at, Quaternion.identity);
+        yield return GameView.Wait(0.8f);
+        if (smoke != null) Destroy(smoke);
+    }
+}
+```
+
+- 한 틱에 적 열 마리를 맞혀도 숫자 열 개가 한꺼번에 뜬다(`Strike { hits }` 하나가 `FoeHit`을 열 번 쏜다, 33장 5-7).
+- 숫자를 적의 자식으로 만들면 적이 쓰러진 프레임 끝에 함께 없어진다. 따로 만들고 자리만 읽는다.
+- 레벨업 고르기 창처럼 입력을 정말 막아야 하는 것은 선택 대기다(`Game.IsWaiting` → `Busy`, 29장·35장).
+
 ---
 
 ## 6. 주의할 점 · 자주 하는 실수
 
 | 증상 | 원인과 해결 |
 |---|---|
-| 적이 죽는 연출 전에 화면에서 사라짐 | 적 목록을 기다리지 않는 다시 그리기(`waitForPresentation: false`)로 그렸거나, 연출이 대기열 밖에서 돈다(직접 `StartCoroutine`). 연출은 `GameView.Present`로 넣는다. |
+| 적이 죽는 연출 전에 화면에서 사라짐 | 적 목록을 기다리지 않는 다시 그리기(`waitForPresentation: false`)로 그렸거나, 연출이 대기열 밖에서 돈다(직접 `StartCoroutine`·`GameView.Play`). 턴제의 연출은 `GameView.Present`로 넣는다. 실시간이면 사라지는 것이 맞고, 죽는 모습은 자리를 읽어 두고 따로 튼다(5-9). |
+| 실시간 게임에서 버튼·스킬 입력이 자꾸 안 먹음, 피해 숫자가 줄을 서서 늦게 뜸 | 맞을 때마다 `Present`로 넣었다. 대기열은 차례로 하나씩 돌고, 그동안 `IsPresenting`·`Busy`가 참이라 입력 창구가 입력을 막는다. 실시간 연출은 `GameView.Play`(2-2, 5-9). ViewList의 `OnRemove`도 대기열이다 → 실시간 적 목록은 비운다. |
+| `Play`로 튼 숫자가 씬을 바꾼 뒤 `MissingReferenceException` | 대기열 밖 연출도 `[MomoiProject]` 오브젝트가 돌려 씬이 바뀌어도 계속 돈다. 돌면서 오브젝트가 `null`인지 본다(5-9). |
+| "GameView.Play: 게임이 시작되지 않아 연출을 틀 수 없습니다" | 게임(호스트)이 시작되기 전에 불렀다(씬의 `Awake` 등). `GBibleRuntime.Started` 뒤에 부른다. |
 | 골드·에너지가 연출이 끝나야 바뀜 | 기본은 연출을 기다린다. 늘 지금 값이어야 하는 표시는 `waitForPresentation: false`(데이터 연결은 칸을 끈다). |
 | 실패한 카드의 피해 숫자가 뜸 | 연출을 `Events.Subscribe`(바로 받는 쪽)로 받았다. `SubscribeAfterAction`으로 받는다. |
 | 마우스를 올려 예상 피해를 볼 때 피해 숫자가 뜸 | 같은 원인. 미리보기 실행(33장)에서도 바로 받는 쪽은 불린다. |

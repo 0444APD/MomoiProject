@@ -1,6 +1,6 @@
 # 03. Game API
 
-**한 줄 요약**: `Game`(`GameApi`)은 게임 코드가 시스템을 쓰는 창구다. 플레이어 데이터 안의 객체를 찾고(`Find`·`All`), 행동을 실행하고(`Do`), 능력·아이템을 쓰고(`Use`), 결정론 난수(`Random`)와 새 id(`NewId`)를 얻는다.
+**한 줄 요약**: `Game`(`GameApi`)은 게임 코드가 시스템을 쓰는 창구다. 플레이어 데이터 안의 객체를 찾고(`Find`·`All`), 행동을 실행하고(`Do`), 능력·아이템을 쓰고(`Use`), 결정론 난수(`Random`)와 새 id(`NewId`·`NewIds`)를 얻는다. 현실 시각·상태 효과·밸런스 값처럼 다른 장에서 다루는 멤버는 2.16에 모았다.
 
 **언제 쓰는가**
 
@@ -86,7 +86,7 @@ Unit hero = Game.Find<Unit>("hero");      // 없으면 null
 - `T` 객체 중 **`id` 필드**가 같은 첫 객체를 돌려준다. 없으면 `null`.
 - `id`가 비어 있으면 `null`.
 - `T`에 `string` 형식의 `id`(또는 `Id`) 필드가 없으면 "id 필드가 없어 Find로 찾을 수 없습니다. 'public string id;'를 더하세요." 예외다.
-- 같은 id가 여러 개면 `All`과 같은 순서에서 처음 만난 것이다. id는 겹치지 않게 만든다(`NewId`).
+- 같은 id가 여러 개면 `All`과 같은 순서에서 처음 만난 것이다. id는 형식이 달라도 플레이어 데이터 전체에서 겹치지 않게 만든다(`NewId`, [02-Actions-Undo.md](02-Actions-Undo.md) 2.2).
 
 형식을 실행 중에 정해야 할 때는 `Game.Find(Type, id)`를 쓴다. 규칙은 `Find<T>`와 같고 `object`를 돌려준다. 행동의 참조 필드를 실행 직전에 다시 찾을 때 시스템이 쓰는 찾기가 이것이다.
 
@@ -158,13 +158,16 @@ int damage = 10 + Game.Random("damage").Range(0, 5);   // 0 이상 5 미만
 
 이름별로 따로 흐르는 난수 스트림(`RandomStream`)을 준다. 행동을 Undo하면 함께 되돌아간다. 자세히는 [07-Random-Time.md](07-Random-Time.md).
 
-### 2.12 `Game.NewId(prefix)` — 새 id
+### 2.12 `Game.NewId(prefix)` · `Game.NewIds(prefix, count)` — 새 id
 
 ```csharp
-string id = Game.NewId("unit");    // "unit1", "unit2", …
+string id = Game.NewId("unit");               // "unit1", "unit2", …
+List<string> wave = Game.NewIds("slime", 30);  // "slime1" … "slime30"(번호를 한 번만 쓴다)
 ```
 
 소환·드롭처럼 객체를 새로 만들 때 겹치지 않는 id를 준다. 번호는 플레이어 데이터(메타 구역의 `$id.접두어` 키)에 있어서, 행동 안에서 만들면 Undo하면 번호도 돌아가고, 저장·멀티플레이에서도 같다. 메타 구역이므로 판이 바뀌어도(`NewRun`) 번호는 이어서 늘어난다.
+
+적 수십 마리처럼 한 번에 많이 만들 때는 `NewIds`를 쓴다. `NewId`를 반복하면 그만큼 번호를 읽고 쓰지만, `NewIds`는 한 번에 끝낸다. `count`가 0 이하면 빈 목록이다.
 
 ### 2.13 `Game.Events` — 이벤트
 
@@ -196,17 +199,52 @@ using System.Collections.Generic;
 using System.Linq;
 using GBible;
 
-public static class Grid
+[Serializable]
+public class Terrain
 {
-    public static int Distance(Unit a, Unit b) => Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
+    public Dictionary<string, string> cells = new Dictionary<string, string>();   // Grid.Key(x, y) → "grass" · "water" · "wall"
+}
+
+public static class TacticsQueries
+{
+    public static Cell CellOf(Unit u) => new Cell(u.x, u.y);
 
     public static IEnumerable<Unit> Around(this GameApi game, Unit center, int range) =>
-        game.All<Unit>().Where(u => u != center && Distance(center, u) <= range);
+        game.All<Unit>().Where(u => u != center && Grid.Distance(CellOf(center), CellOf(u)) <= range);
 
-    public static Unit At(this GameApi game, int x, int y) =>
-        game.All<Unit>().FirstOrDefault(u => u.x == x && u.y == y);
+    // 갈 수 있는 칸 → 남은 이동력. All은 한 번만 부르고, 칸마다는 사전에서 찾는다.
+    public static Dictionary<Cell, int> MoveRange(this GameApi game, Unit unit, int move)
+    {
+        var terrain = game.All<Terrain>()[0].cells;
+        var occupied = new HashSet<Cell>(game.All<Unit>().Where(u => u != unit).Select(CellOf));
+        return Grid.Reachable(CellOf(unit), move, c =>
+            occupied.Contains(c) || !terrain.TryGetValue(Grid.Key(c), out var t) || t == "wall" ? -1   // 음수 = 못 감
+            : t == "water" ? 2 : 1);
+    }
 }
 ```
+
+- 거리·이웃·이동 범위·길·시야 같은 칸 계산은 라이브러리의 `Grid`·`Cell`([36-Grid-BigNumber.md](36-Grid-BigNumber.md))을 쓴다. 이름이 `Grid`인 클래스를 직접 만들지 않는다(`using GBible;`의 `Grid`와 겹친다).
+- **칸마다 `Game.All`·`Find`를 부르지 않는다.** 부를 때마다 그 형식이 들어 있을 수 있는 키를 Sync하고 사본을 훑는다(3절). "이 칸에 누가 있나"를 칸마다 `All`로 찾으면 이동 범위 하나에 수십 번 돈다. 한 번 모아 사전(칸 → 유닛, 칸 → 지형)을 만들고 칸마다는 사전에서 찾는다.
+- 맵이 판 중에 바뀌지 않으면 지형은 원본 인스턴스(예: 한 줄이 글자 하나인 `rows` 목록 `"..#.."`)에 두고 읽기만 해도 된다. 유닛의 칸은 플레이어 데이터의 `x`·`y`다.
+
+### 2.16 다른 장에서 다루는 멤버
+
+| 멤버 | 하는 일 | 장 |
+|---|---|---|
+| `Now` · `Day(resetHour)` · `Week(resetHour, start)` | 현실 시각(UTC, 행동 안이면 그 행동이 시작한 순간), 날짜·주 번호. 규칙은 `DateTime.Now` 대신 이것 | [07](07-Random-Time.md) 2.11~2.13 |
+| `Attribute` · `AddModifier` · `RemoveModifiers` · `Modifiers` | 능력치 최종값, Modifier 붙이기·떼기 | [28](28-Attributes-Intercepts.md) |
+| `Intercept` · `Pay` · `CanPay` | 가로채기, 비용 내기 | [28](28-Attributes-Intercepts.md) |
+| `ApplyStatus(대상, id, 중첩, 출처, 길이)` · `RemoveStatus` · `StatusStacks` · `HasStatus` · `Statuses` | 상태 효과 걸기(길이를 비우면 상태 효과의 길이)·풀기·읽기 | [29](29-Statuses-Schedules-Choices.md) |
+| `ShortenStatus(대상, id, 양)` | 남은 횟수·초를 줄인다. 다 되면 지속이 끝난 것으로 끝낸다. 영구거나 없으면 `false` | [29](29-Statuses-Schedules-Choices.md) |
+| `Owned(패시브 id, 가진 쪽 = null)` | 그 패시브를 몇 개(레벨) 가졌나. 가진 쪽을 비우면 모두의 합 | [29](29-Statuses-Schedules-Choices.md) · [17](17-Custom-Features.md) |
+| `ScheduleAfter` · `ScheduleOn<T>` · `CancelSchedule` · `CancelSchedules` | 예약 | [29](29-Statuses-Schedules-Choices.md) |
+| `Ask` · `Answer` · `Choice` · `CancelChoice` | 선택 대기 | [29](29-Statuses-Schedules-Choices.md) |
+| `Balance(id)` · `Balance(id, x)` | 밸런스 값, 곡선의 그 단계 값 | [30](30-Balance-Tables.md) |
+| `BalanceSum(id, from, count)` · `BalanceCount(id, from, budget)` | 단계 `from`부터 `count`개의 합("10개 사기"), 예산으로 단계 `from`부터 살 수 있는 개수 | [30](30-Balance-Tables.md) |
+| `Roll` · `Fail` | 가중치 표 뽑기, 플레이어용 실패 | [30](30-Balance-Tables.md) |
+| `World` · `WorldFlag` · `SetWorld` · `ClearWorld` | 월드 상태 | [32](32-View-Presentation-Scenes.md) |
+| `Preview` · `CanDo` · `IsPreviewing` | 행동을 해 보고 되돌리는 미리보기 | [33](33-Tick-Preview-Csv.md) |
 
 ---
 
@@ -419,3 +457,6 @@ session.Undo();                        // 다시 30
 | 오래 쥔 객체가 엉뚱한 값 | 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 값을 읽을 때는 id로 들고 있다가 `Find`한다. 행동에 넣는 것은 그 객체 그대로도 된다(실행 직전에 같은 id의 지금 객체로 바뀐다). |
 | 행동 클래스 밖에서 `Game` 속성이 `null` | 행동·Block의 `Game` 속성은 그 코드가 실행되는 동안만 있다. 씬 코드는 `GBibleRuntime.Game`. |
 | 프레임이 느려짐 | `Find`를 객체마다 반복했다. `All`을 한 번 불러 쓰거나 id → 객체 사전을 프레임마다 한 번 만든다. |
+| 이동 범위·AI 계산이 느림 | 칸마다(후보마다) `All`·`Find`를 불렀다. 한 번 모아 칸 → 유닛, 칸 → 지형 사전을 만들고 칸 계산은 `Grid`로 한다(2.15). |
+| 행동이 느림 | 한 행동 안에서 같은 객체를 여러 번 `Find`했다. 찾을 때마다 데이터를 훑고 Sync한다. 한 번 찾아 변수로 들고, 대상은 행동 필드에 객체로 넣는다(실행 직전 한 번만 찾는다). 많이 만들 때 id는 `NewIds`로. |
+| `Grid`가 모호하다는 컴파일 오류·엉뚱한 `Grid` | 게임 코드에 이름이 `Grid`인 클래스가 있다. 라이브러리의 `GBible.Grid`를 쓰고 직접 만든 것은 이름을 바꾼다. |

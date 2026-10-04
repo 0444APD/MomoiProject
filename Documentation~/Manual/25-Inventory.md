@@ -189,22 +189,28 @@ public sealed class BuyItem : GameAction
 
     protected override void Run()
     {
-        var data = Game.Session.Data;
-        var info = Game.Session.Instances?.Invoke(item) as Item;
-        if (info == null) return;
-        var inventory = data.Get<Inventory>("player.inventory");
-        var cost = info.price * count;
-        var gold = data.Get<int>("player.gold");
-        if (gold < cost || inventory.RoomFor(item, info.maxStack) < count) return;   // 살 수 없으면 아무것도 안 바꾼다
+        var info = Game.Session.Instances?.Invoke(item) as Item
+                   ?? throw new InvalidOperationException($"[상점] 없는 아이템 '{item}'입니다.");   // 화면이 막았어야 하는 일(프로그래머 실수)
+        var inventory = Game.Get<Inventory>("player.inventory");
+        if (inventory.RoomFor(item, info.maxStack) < count)
+            throw Game.Fail("fail.bagFull", "가방에 자리가 없습니다.");                              // 플레이어에게 보일 실패
+        Game.Pay("player.gold", null, info.price * count, what: "gold.name");                       // 모자라면 "골드이(가) 모자랍니다(30 / 50)."
         inventory.Add(item, count, info.maxStack);
-        data.Set("player.gold", gold - cost);
     }
 
     public override string Describe() => $"{item} ×{count} 사기";
 }
 
-// 씬 코드(버튼):  GBibleRuntime.Game.Do(new BuyItem { item = "instance.potion", count = 3 });
+// 씬 코드(버튼). UI Toolkit 화면이면 OnClick("buy", () => new BuyItem { … })만으로 실패 글이 알림으로 뜬다(35장 2-4).
+public void OnBuyClicked()
+{
+    try { GBibleRuntime.Game.Do(new BuyItem { item = "instance.potion", count = 3 }); }
+    catch (GameFailure f) { toast.text = f.Message; }     // toast: 알림 글자(TMP_Text). 지금 언어의 실패 글
+}
 ```
+
+- 안 될 때 조용히 `return`하지 않고 던진다. 행동이 실패하면 그때까지 바꾼 것이 모두 취소되므로(가방에 넣은 뒤 골드가 모자라도 가방이 돌아간다) 검사 순서를 맞출 필요가 없고, 플레이어는 이유를 본다. 조용히 끝내면 행동이 "성공"으로 남아 Undo 한 칸을 차지하고 아무 글도 뜨지 않는다.
+- 골드는 직접 빼지 않고 `Game.Pay(키, 경로, 양, what: 이름)`. 모자라면 플레이어용 실패를 던지고, 비용을 고치는 가로채기("상점 가격 −20%")가 이 자리에 붙는다(28장 2-4). 단순 값 플레이어 데이터(`player.gold`)면 경로는 `null`이다. `what`에는 텍스트 키(`gold.name` = "골드")를 준다(30장 2-4).
 
 ### 4.2 전리품: 가방이 차면 남은 것을 바닥에
 
@@ -309,11 +315,15 @@ public sealed class DeliverQuestItems : GameAction
 
     protected override void Run()
     {
-        if (!Game.Get<Inventory>("player.inventory").TryRemove(item, count)) return;
+        if (!Game.Get<Inventory>("player.inventory").TryRemove(item, count))
+            throw Game.Fail("fail.questItems", "{item}이(가) {count}개 있어야 합니다.", ("item", item), ("count", count));
         Game.Set("player.gold", Game.Get<int>("player.gold") + rewardGold);
     }
 }
 ```
+
+- 모자라면 던진다. `TryRemove`가 거짓이면 아무것도 바뀌지 않았고, 던지면 행동이 실패로 끝나 화면이 이유를 보인다. 값 `{item}`에 인스턴스 ID를 넣으면 틀이 지금 언어의 이름(`<ID>.name`)으로 바꾼다(23장).
+- 재료가 한 아이템이 아니라 여럿이면 하나씩 `TryRemove`하고 모자란 곳에서 던진다. 앞에서 뺀 재료는 행동 실패로 함께 돌아간다.
 
 ### 4.5 가방 화면 그리기 (읽기만)
 
@@ -366,3 +376,5 @@ public class PlayerBags
 - **잘못된 값**: 빈 ID나 0 이하 개수로 `Add`하면 아무것도 바꾸지 않고 넘긴 개수를 그대로 돌려준다(0 이하면 0). 0 이하로 `Remove`하면 0.
 - **인스턴스 ID 바꾸기**: 칸은 인스턴스 ID 글자를 담는다. DB에서 인스턴스 ID를 바꾸면 에셋 안의 `[DataRef]` 참조는 따라가지만, 저장된 판·프로필(`run.json`·`profile.json`)의 칸 값은 출시됨 상태에서 바꾼 경우에만 불러올 때 새 ID로 바뀐다(런타임이 ID 이름 변경 이력으로 `[DataRef]` 필드를 고친다). 개발 중에 바꿨다면 모니터의 **새 판**으로 판을 지우고 시험한다.
 - **보상 블록 "플레이어 데이터에 주기"로 칸 더하기**: 겹치기 규칙(`Add`)을 거치지 않는다. 겹쳐 넣으려면 `Add`를 부르는 코딩한 결과를 만든다(4.3의 방식).
+- **안 될 때 조용히 `return`**: 행동이 성공으로 남고 플레이어는 이유를 모른다. 플레이어용이면 `throw Game.Fail(…)`, 비용이면 `Game.Pay(…, what: …)`(4.1·4.4).
+- **이 인벤토리의 한계**: 칸은 앞에서부터 채우고 빈 칸은 없애는 목록이라 **고정 칸**(3번 칸에 두기)·**칸 옮기기**(드래그로 자리 바꾸기)·**칸마다의 정보**(품질·내구도·강화 수치)가 없다. 필요하면 프로젝트 클래스에 목록 필드로 직접 둔다(`[Serializable] class BagSlot { public string item; public int count; public int quality; }`의 `List<BagSlot>` 또는 칸 번호 → 칸 딕셔너리).

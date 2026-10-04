@@ -1,6 +1,6 @@
 # 33. 고정 틱·미리보기 실행·CSV
 
-**한 줄 요약**: 실시간 게임은 DB › Bootstrap의 **고정 틱**(초당 틱 수)을 켠다. 그러면 게임 시간이 1/틱 초씩 일정하게 흐르고, 시간 규칙(시간 예약·상태 효과의 시간 지속·시간 조건)과 `session.Ticked`가 틱마다 돌아 프레임 속도와 상관없이 같은 결과가 난다. **미리보기 실행**(`Game.Preview`)은 행동을 실제로 해 보고 결과만 읽은 뒤 모두 되돌린다. 기록·Undo·연출 이벤트·도전과제가 남지 않고 난수도 돌아가므로, 실제로 하면 미리본 값과 같다(카드에 마우스를 올리면 예상 피해). `Game.CanDo`는 지금 하면 되는지와 안 되는 이유다. **CSV**는 DB 목록을 CSV로 내보내고 가져와 구글 시트·엑셀에서 수치를 한꺼번에 고친다. 가져온 것은 DB의 다른 변경처럼 적용 전이다.
+**한 줄 요약**: 실시간 게임은 DB › Bootstrap의 **고정 틱**(초당 틱 수)을 켠다. 그러면 게임 시간이 1/틱 초씩 일정하게 흐르고, 시간 규칙(시간 예약·상태 효과의 시간 지속·시간 조건)과 `session.Ticked`가 틱마다 돌아 프레임 속도와 상관없이 같은 결과가 난다. **미리보기 실행**(`Game.Preview`)은 행동을 실제로 해 보고 결과만 읽은 뒤 모두 되돌린다. 기록·Undo·연출 이벤트·도전과제가 남지 않고 난수도 돌아가므로, 실제로 하면 미리본 값과 같다(카드에 마우스를 올리면 예상 피해). `Game.CanDo`는 지금 하면 되는지와 안 되는 이유다. **CSV**는 DB 목록을 CSV로 내보내고 가져와 구글 시트·엑셀에서 수치를 한꺼번에 고친다. 가져온 것은 DB의 다른 변경처럼 적용 전이다. 실시간 게임에는 **예산**이 있다: 충돌·투사체 같은 판정은 화면이 하고 결과만 틱마다 묶어 행동 하나로 보내고(판정 보고 행동 `Strike { hits }`), 판 저장은 '행동마다' 대신 'N초마다', 연출은 대기열 밖(`GameView.Play`), 개체 수백은 화면 쪽 오브젝트 풀이다(5-7).
 
 **언제 쓰는가**
 
@@ -8,6 +8,7 @@
 - 카드·스킬에 마우스를 올리면 "예상 피해 12", "처치"를 보일 때(미리보기 실행).
 - 버튼을 흐리게 하고 "에너지가 모자랍니다"처럼 안 되는 이유를 보일 때(`CanDo`).
 - 밸런스 값·카드 비용·몬스터 체력 수십 줄을 시트에서 고칠 때(CSV).
+- 휘두르기 한 번에 적 수십 마리, 투사체 수백 발, 1초에 맞음 수십 번인 실시간 액션을 느려지지 않게 만들 때(실시간 예산).
 
 이 문서에서 쓰는 용어:
 
@@ -21,6 +22,8 @@
 | `CanDo` | 지금 그 행동을 하면 성공하는지(미리보기로 해 본다)와 실패 이유. |
 | CSV | 쉼표로 나눈 표 글자 파일. 구글 시트·엑셀이 그대로 연다. |
 | 작업본 | DB에서 고친 내용을 저장(Ctrl+S) 전까지 모아 두는 사본(21장 3절). CSV 가져오기도 여기에 들어간다. |
+| 판정 보고 행동 | 화면(MonoBehaviour)이 정한 판정(누가 누구를 맞혔나·성공했나)을 규칙에 알리는 행동. 규칙은 그 결과로만 데이터를 바꾼다. |
+| 실시간 예산 | 실시간 게임에서 행동 수·Sync·저장·연출이 프레임을 넘지 않게 지키는 규칙들(5-7). |
 
 ---
 
@@ -34,8 +37,11 @@
 | "낼 수 없는 카드는 흐리게, 이유를 툴팁으로" | `Game.CanDo`(5-4) |
 | "분석 전송은 실제로 했을 때만" | `Game.IsPreviewing`(5-5) |
 | "몬스터 체력·카드 비용을 시트에서 한꺼번에" | DB 목록의 CSV(5-6) |
+| "휘두르면 닿은 적 모두 피해, 등 뒤면 두 배" | 판정 보고 행동 — 틱마다 묶은 `Strike { hits }`(5-7) |
+| "투사체 수백 발·경험치 보석 수백 개" | 화면 쪽 오브젝트 풀 + 규칙에는 수와 결과만(5-7) |
+| "실시간이라 판을 자주 저장하면 끊긴다" | 판 저장 'N초마다 저장(실시간·방치형)'(5-7) |
 
-> **규칙: 실시간 물리·이동은 화면 코드, 규칙에 필요한 결과만 행동.** 적이 다가오는 움직임은 `Update`·물리 엔진이 한다. "맞았다", "쓰러졌다", "주웠다"처럼 규칙에 필요한 결과만 행동(`Game.Do`)으로 보낸다(28장 1절의 "문법 밖").
+> **규칙: 실시간 물리·이동은 화면 코드, 규칙에 필요한 결과만 행동.** 적이 다가오는 움직임은 `Update`·물리 엔진이 한다. "맞았다", "쓰러졌다", "주웠다"처럼 규칙에 필요한 결과만 행동(`Game.Do`)으로 보낸다. 물리 자체는 문법 밖이고(28장 1절), 결과를 알리는 **판정 보고 행동**은 문법 안이다(5-7).
 
 > **규칙: 틱 규칙은 가볍게.** 30틱이면 1초에 30번 돈다. 틱마다 읽기만 하고, 바꿀 때만 행동을 실행한다(5-1).
 
@@ -140,7 +146,7 @@
 | 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
 
 - 예: 30이면 1/30초마다 한 틱. 0보다 작은 값은 0이 된다.
-- 실시간 게임은 보통 Undo 방식도 "스냅샷"으로 고른다(같은 화면, 20장 3절).
+- 실시간 게임은 보통 Undo 방식도 "스냅샷"으로, 판 저장은 "N초마다 저장(실시간·방치형)"으로 고른다(같은 화면, 20장 3절·06장, 5-7).
 
 ### 3-2. CSV 내보내기 · 가져오기
 
@@ -191,7 +197,7 @@ var smooth = session.Clock.Time + session.TickAlpha / session.Options.TickRate; 
 | `const int GameSession.MaxTicksPerFrame` | 한 프레임에 따라잡는 최대 틱 수(8) |
 | `void GameSession.EndFrame(double deltaTime)` | 호스트가 매 프레임 부른다. 세션을 직접 만들면 직접 부른다(서버·테스트) |
 
-- `Ticked`는 세션의 이벤트다. 슬롯을 바꾸면 세션이 새로 만들어지므로(31장) `GBibleRuntime.Started`에서 연결한다.
+- `Ticked`는 세션의 이벤트다. 슬롯을 바꾸면 세션이 새로 만들어지므로(31장) 새 세션마다 다시 건다. 틱 규칙은 Rules의 등록 함수(`ArenaRules.Register(session)`)에 두고, 연결은 `Client/Bootstrap.cs`의 `Started` 한 곳에서 그 함수를 부른다(17장 2-6, 5-1). `Started`는 새 세션마다 불린다.
 
 ### 4-2. `Game.Preview` · `Game.CanDo` · `Game.IsPreviewing`
 
@@ -241,16 +247,21 @@ static class BalanceExport
 
 ### 5-1. 실시간 아레나 — 30틱 + `Ticked`에서 가벼운 규칙
 
-카드 던전의 실시간 변형(가이드 `Genres/RealtimeVariant.cs`). 10초마다 적 웨이브가 나온다.
+카드 던전을 실시간 아레나로 바꾼 모양이다. 10초마다 적 웨이브가 나온다. 필요한 것은 모두 아래에 있다(가이드 예제 저장소의 `Genres/RealtimeVariant.cs`는 패키지 밖이라 새 프로젝트에는 없다).
 
-**에디터**: DB › Bootstrap: Undo 방식 "스냅샷", 고정 틱 초당 틱 수 `30`. DB › 밸런스 값 `waveInterval` `10`, `waveSize` `3`(곡선 `일정하게` +1/웨이브, 30장).
+**에디터**
+
+- DB › 시작 파일 › Bootstrap: Undo 방식 "스냅샷"(간격 `0.5`초, 보관 수 `20` = 최근 10초), 고정 틱 초당 틱 수 `30`, 판 저장 "N초마다 저장(실시간·방치형)"(5-7).
+- DB › 플레이어 데이터 `arena`: 구역 `Session`, 값 형식 `ArenaState`(아래 클래스).
+- DB › 밸런스 값 `waveInterval` `10`, `waveSize` `3`(곡선 `일정하게` +1/웨이브, 30장).
+
+**규칙** — `Assets/Code/Rules/Arena.cs`. 순수 C#이다(`UnityEngine`도 Unity 시작 방식도 쓰지 않는다 → 서버·테스트에서 그대로 돈다).
 
 ```csharp
 using System;
 using System.Collections.Generic;
 using GBible;
 using GBible.Ids;
-using UnityEngine;
 
 [Serializable] public class ArenaFoe { public string id; public int hp = 10; }
 [Serializable]
@@ -269,15 +280,15 @@ public class SpawnWave : GameAction
         var arena = Game.Get<ArenaState>("arena");
         arena.wave++;
         var count = (int)Game.Balance(GameIds.Balance.WaveSize, arena.wave);
-        for (var i = 0; i < count; i++) arena.foes.Add(new ArenaFoe { id = Game.NewId("foe") });
+        foreach (var id in Game.NewIds("foe", count)) arena.foes.Add(new ArenaFoe { id = id });   // 번호를 한 번만 쓴다
         arena.nextWaveAt = Game.Session.Clock.Time + Game.Balance(GameIds.Balance.WaveInterval);
     }
 }
 
+// 등록 함수: 세션을 받아 틱 규칙을 건다. Unity가 언제 켜지는지는 모른다(연결은 Client).
 public static class ArenaRules
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += session => session.Ticked += _ => Tick(session);
+    public static void Register(GameSession session) => session.Ticked += _ => Tick(session);
 
     static void Tick(GameSession session)
     {
@@ -288,9 +299,19 @@ public static class ArenaRules
 }
 ```
 
+**연결** — `Assets/Code/Client/Bootstrap.cs`의 `Started`에 한 줄(17장 2-6).
+
+```csharp
+static void Started(GameSession session)
+{
+    ArenaRules.Register(session);      // 새 세션마다 불린다(슬롯을 바꿔도 새 세션에 다시 걸린다)
+}
+```
+
+- 규칙 파일에 `[RuntimeInitializeOnLoadMethod]`와 `GBibleRuntime.Started +=`를 따로 두지 않는다. 연결이 파일마다 흩어지고, 서버·테스트는 세션을 직접 만든 뒤 `ArenaRules.Register(session)`을 부를 길이 없어진다.
 - 웨이브는 30fps 기기와 144fps 기기에서 같은 틱에 나온다. 되감기(스냅샷)·판 저장도 시계와 `nextWaveAt`이 함께 돌아가 맞는다.
 - 같은 일은 시간 예약으로도 된다: `SpawnWave.Run` 끝에 `Game.ScheduleAfter(간격, new SpawnWave())`(29장 2-5). 시간 예약도 틱마다 확인되므로 결과가 같다. 틱 받는 쪽은 "체력이 절반 이하면 분노"처럼 조건을 매 틱 보는 규칙에 맞다.
-- 적의 움직임은 화면 코드가 `Update`에서 한다. 적이 주인공에게 닿으면 `Game.Do(new HitHero { foe = foe, amount = 3 })`처럼 결과만 행동으로 보낸다.
+- 적의 움직임은 화면 코드가 `Update`에서 한다. 적이 주인공에게 닿으면 `Game.Do(new HitHero { foeId = foe.Id })`처럼 누가 닿았는지만 행동으로 보낸다. 피해 양은 행동이 밸런스 값에서 읽는다(판정 보고 행동, 5-7).
 - 틱마다 행동을 실행하면(재생 +1을 매 틱) 행동이 1초에 30개씩 쌓인다. "1초마다 1 회복"은 시각을 적어 두고 그 시각이 됐을 때만 행동을 실행한다(위와 같은 모양).
 
 ### 5-2. 남은 시간 막대 — `TickAlpha` 보간
@@ -439,6 +460,113 @@ slime,슬라임,14,4,4,,neutral
 - 키워드 칸(`element`)은 글자 칸이라 아무 글자나 들어간다. 키워드 그룹에 없는 값은 가져온 뒤 검증 오류로 보인다(21장 6.1).
 - 드래곤의 공격 패턴을 두 개로 줄이려면 `attackPattern[2]` 칸만 비운다. 공격 패턴 칸 셋을 모두 비우면 그 몬스터의 공격 패턴이 빈 목록이 된다(2-3).
 
+### 5-7. 실시간 예산 — 판정 보고 행동 · 틱 묶음 · 저장 · 오브젝트 풀
+
+행동 하나에는 일이 따라온다: 실행 직전에 참조 필드를 지금 객체로 다시 찾고, 끝날 때 바뀐 키를 Sync하고, 기록·Undo 단위·이벤트 받는 쪽이 돌고, 판 저장이 '행동마다'면 그 프레임 끝에 파일을 쓴다. 턴제는 1초에 행동 몇 개라 상관없다. 실시간 액션은 1초에 맞음이 수십 번이고 투사체가 수백 개다. 아래가 예산 안에 드는 모양이다.
+
+| 무엇 | 예산 안에서 |
+|---|---|
+| 충돌·투사체·히트박스·미니게임 판정 | 화면(MonoBehaviour)이 판정하고 결과(누가 누구를 맞혔나·성공했나)만 행동으로 보낸다 = **판정 보고 행동**. 규칙은 결과로만 데이터를 바꾼다 |
+| 한 틱에 맞음 여러 번 | 틱마다 묶어 행동 하나(`Strike { hits }`, 아래). 적 40마리를 한 번에 맞혀도 행동 하나 |
+| 위치·속도 | 화면 쪽이다(판 데이터에 넣지 않는다). 한 번 정해지는 위치(던진 폭탄이 터질 자리)만 행동 필드로 넘긴다 |
+| `Game.Find` · `Game.All` | 플레이어 데이터를 훑고 행동 안에서 그 키를 한 번 Sync한다. 한 행동에서 같은 객체를 여러 번 찾지 말고 한 번 꺼내 변수로. 행동 필드는 객체로 둔다(실행 직전에 한 번 찾는다) |
+| 개체 여럿 만들기 | `Game.NewIds(접두어, n)`(번호를 한 번만 쓴다, 5-1) |
+| 개체 수백(투사체·경험치 보석·탄막) | 플레이어 데이터에 넣지 않는다. 화면 쪽 **오브젝트 풀**로 두고, 규칙에는 수(모은 보석 수·남은 탄)와 결과(맞음·주움)만 |
+| 시간에 따라 바뀌는 값 | 틱마다 행동하지 않는다. 시각을 적어 두고 그때만(5-1) |
+| 판 저장 | DB › Bootstrap 판 저장을 '행동마다 저장(턴제)' 대신 **'N초마다 저장(실시간·방치형)'**. '저장 간격(초)'(기본 30, 실제 시간)이 지났고 판 데이터가 바뀌었을 때만 저장하고, 끌 때도 저장한다(06장) |
+| 연출 | `GameView.Present`는 차례로 하나씩 돌고 그동안 `Busy`라 입력이 막힌다. 실시간은 `GameView.Play`(32장 2-2·5-9) |
+| Undo | 스냅샷 방식(5-1) |
+
+**에디터**: DB › 밸런스 값 `heroAttack` `5`.
+
+**규칙** — 5-1의 `Rules/Arena.cs`에 더한다.
+
+```csharp
+[Serializable] public class Hit { public string foeId; public bool backstab; }      // 맞은 적 하나(화면이 판정)
+
+[Serializable, GameEvent("적 맞음")] public class FoeHit { public string foeId; public int amount; }
+[Serializable, GameEvent("적 쓰러짐")] public class FoeKilled { public string foeId; }
+
+// 판정 보고 행동: 이번 틱에 히트박스가 닿은 적들. 피해 양은 규칙이 정한다(화면은 누구를 맞혔나만 보낸다).
+[Serializable, BlockInfo("휘두르기 판정")]
+public class Strike : GameAction
+{
+    public List<Hit> hits = new List<Hit>();
+
+    protected override void Run()
+    {
+        var arena = Game.Get<ArenaState>("arena");                       // 한 번 꺼내 변수로
+        var power = (int)Game.Balance(GameIds.Balance.HeroAttack);
+        foreach (var hit in hits)
+        {
+            var foe = arena.foes.Find(f => f.id == hit.foeId);          // 목록에서 직접(맞은 수만큼 Game.Find를 부르지 않는다)
+            if (foe == null) continue;                                   // 같은 틱에 먼저 쓰러졌다
+            ArenaRules.Damage(Game, arena, foe, hit.backstab ? power * 2 : power);
+        }
+    }
+}
+
+// ArenaRules에 더한다: 피해 규칙 함수. 실제 게임은 여기에 가로채기 자리를 둔다(28장 5-3).
+public static void Damage(GameApi game, ArenaState arena, ArenaFoe foe, int amount)
+{
+    foe.hp -= amount;
+    game.Events.Publish(new FoeHit { foeId = foe.id, amount = amount });
+    if (foe.hp > 0) return;
+    arena.foes.Remove(foe);
+    game.Events.Publish(new FoeKilled { foeId = foe.id });
+}
+```
+
+**화면** — 히트박스는 닿은 적을 모으기만 하고, 틱마다 한 번 행동으로 보낸다.
+
+```csharp
+// Client/StrikeReporter.cs
+public static class StrikeReporter
+{
+    static readonly List<Hit> Pending = new List<Hit>();
+
+    public static void Report(string foeId, bool backstab) => Pending.Add(new Hit { foeId = foeId, backstab = backstab });
+
+    public static void Flush(GameSession session)
+    {
+        if (Pending.Count == 0) return;                                  // 거의 늘 여기서 끝난다
+        var strike = new Strike { hits = new List<Hit>(Pending) };
+        Pending.Clear();
+        session.Do(strike);
+    }
+}
+
+// Client/Bootstrap.cs의 Started
+static void Started(GameSession session)
+{
+    ArenaRules.Register(session);
+    session.Ticked += _ => StrikeReporter.Flush(session);              // 틱마다 한 번(초당 30틱이면 1초에 많아야 30개)
+}
+
+// 휘두를 때 잠깐 켜지는 히트박스(콜라이더 + 이 컴포넌트)
+public class HeroHitbox : MonoBehaviour
+{
+    readonly HashSet<string> _hitThisSwing = new HashSet<string>();     // 한 번 휘두를 때 같은 적은 한 번
+
+    void OnEnable() => _hitThisSwing.Clear();
+
+    void OnTriggerEnter(Collider other)
+    {
+        var foe = other.GetComponentInParent<FoeView>();                // 적 그림(ViewList의 OnCreate에서 Id = 적 id)
+        if (foe == null || !_hitThisSwing.Add(foe.Id)) return;
+        var behind = Vector3.Dot(foe.transform.forward, (foe.transform.position - transform.position).normalized) > 0.5f;
+        StrikeReporter.Report(foe.Id, behind);                          // 판정은 화면, 결과만 모은다
+    }
+}
+```
+
+- 적 40마리를 한 번에 맞혀도 행동 하나·Sync 한 번·타임라인 한 줄이다. 충돌마다 `Game.Do`를 부르면 같은 장면이 행동 40개다.
+- 피해 양·등 뒤 배율은 규칙이 정한다. 화면은 판정(누구를·등 뒤였나)만 보낸다. 그래서 멀티플레이에서 화면이 값을 속일 수 없고, 가로채기·유물·상태 효과가 피해 규칙 함수의 자리에 그대로 붙는다.
+- 맞은 숫자·쓰러지는 모습은 `FoeHit`·`FoeKilled`를 `SubscribeAfterAction`으로 받아 `GameView.Play`로 튼다(32장 5-9).
+- 투사체는 화면 쪽 오브젝트 풀에서 꺼내고 돌려놓는다. 맞으면 같은 `StrikeReporter.Report`로 보고한다. 경험치 보석도 떨어지는 것은 화면(풀), 줍는 것은 판정 보고(`Collect { count }`)다. 규칙에는 모은 수만 있다.
+- 이어 하기에 화면 쪽 위치가 필요하면 판 저장 직전 `GBibleRuntime.Saving`(행동 밖이라 담을 때는 `Game.Do`)에서 판 데이터에 담고, 불러온 뒤 `GBibleRuntime.RunLoaded`에서 다시 놓는다. 매 프레임 담지 않는다.
+- `StrikeReporter`의 static 목록은 화면 쪽(Client)이다. 규칙에는 static 상태를 두지 않는다(관례 3절).
+
 ---
 
 ## 6. 주의할 점 · 자주 하는 실수
@@ -449,7 +577,13 @@ slime,슬라임,14,4,4,,neutral
 | `Ticked`에서 값을 바꿨더니 Undo·저장에서 빠짐 | `Ticked`는 행동 밖이다. `session.Do(행동)`으로 바꾼다. |
 | 실시간 게임에서 Undo 이력이 금방 차고 느려짐 | 틱마다 행동을 실행했다. 시각을 적어 두고 그때만 실행한다(5-1). 실시간 게임은 Undo 방식을 스냅샷으로. |
 | 프레임이 크게 끊긴 뒤 게임이 잠깐 느려짐 | 한 프레임에 8틱까지만 따라잡고 남은 시간은 버린다(2-1). 의도된 동작이다. |
-| 슬롯을 바꾼 뒤 틱 규칙이 안 돎 | 예전 세션의 `Ticked`에 연결했다. `GBibleRuntime.Started`에서 연결한다(새 세션마다 다시 온다). |
+| 슬롯을 바꾼 뒤 틱 규칙이 안 돎 | 예전 세션의 `Ticked`에 연결했다. `Client/Bootstrap.cs`의 `Started`에서 등록 함수를 부른다(새 세션마다 다시 온다, 5-1). |
+| 서버·테스트에서 틱 규칙이 안 돎 | 규칙 파일이 `[RuntimeInitializeOnLoadMethod]`·`GBibleRuntime.Started +=`로 스스로 걸었다(Unity 클라이언트에서만 돈다). 등록 함수(`ArenaRules.Register(session)`)로 바꾸고, 세션을 만든 쪽이 부른다(5-1). |
+| 휘두를 때마다 프레임이 떨어지고 타임라인이 금방 참 | 충돌마다 `Game.Do`를 불렀다. 닿은 적을 모았다가 틱마다 행동 하나로 보낸다(`Strike { hits }`, 5-7). |
+| 실시간 게임이 행동이 많은 순간마다 끊김 | 판 저장이 '행동마다 저장'이라 행동이 끝난 프레임마다 파일을 쓴다. 'N초마다 저장(실시간·방치형)'으로(5-7). |
+| 투사체·보석이 많아지면 느려짐 | 투사체·보석을 판 데이터의 목록에 넣었다(Sync·저장이 개수만큼). 화면 쪽 오브젝트 풀로 옮기고 규칙에는 수와 결과만(5-7). |
+| 실시간인데 입력이 자꾸 막힘 | 연출을 `GameView.Present`로 넣었다. 대기열이 차례로 도는 동안 `Busy`라 입력 창구가 막는다. `GameView.Play`로(32장 2-2). |
+| 화면이 보낸 피해 양이 그대로 들어감 | 판정 보고 행동에 양(`amount`)을 넣었다. 화면은 누구를 맞혔나만 보내고 양은 규칙이 밸런스 값에서 정한다(5-7). |
 | 일시정지했는데 웨이브 시간이 흐름 | 시각을 `Time.time`으로 쟀다. 게임 시계(`session.Clock.Time`)로 적는다(07장). |
 | 막대가 계단처럼 움직임 | 틱마다 뛰는 게임 시계를 그대로 그렸다. `TickAlpha`로 보간한다(5-2). |
 | `Game.Preview`가 "행동 안에서는 미리보기를 할 수 없습니다" | 행동·`[BindTo]`·Block 안에서 불렀다. 화면 코드에서 부른다. |

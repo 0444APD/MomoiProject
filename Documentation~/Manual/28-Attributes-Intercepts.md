@@ -41,15 +41,19 @@
 | | 발동("~하면") | Trigger(이벤트 받기 · 조건 충족 · 사용 · 가로채기) | 있음 |
 | | 지연("2턴 뒤") | 상태 효과의 끝날 때 결과 · 예약(`Game.ScheduleAfter`·`ScheduleOn`) | 있음(→ `29-Statuses-Schedules-Choices.md`) |
 | | 지속("3턴 동안") | Modifier · 상태 효과 | 있음(상태 효과 → 29장) |
-| 누구에게 | 대상 고르기 | 대상 Block(`TargetSelector`) | 있음 |
+| 누구에게 | 대상 고르기 | 대상 Block(`TargetSelector`, 기본 제공 목록·이벤트의 개체·거르기·무작위·정렬 → `16-Abilities-Usable.md` 2-6) | 있음 |
+| | 화면이 판정한 대상(충돌·투사체·미니게임) | **판정 보고 행동**: 화면이 판정하고 결과(누가 누구를 맞혔나·성공 여부)를 행동 하나로 보낸다 | 있음(→ `33-Tick-Preview-Csv.md`) |
 | 무엇을 | 데이터 바꾸기 | 플레이어 데이터에 주기 · 효과 Block · 능력치 보정 | 있음 |
-| | 만들기 · 없애기 · 바꾸기(소환·제거·변신) | 효과 Block · `[BindTo]`(새 개체의 id는 `Game.NewId`) | 있음 |
-| | 가로채기("대신", "막는다", "−5") | 가로채기 + 의도 고치기 | 있음 |
+| | 만들기 · 없애기 · 바꾸기(소환·제거·변신) | 효과 Block · `[BindTo]`(새 개체의 id는 `Game.NewId`·여럿이면 `Game.NewIds`) | 있음 |
+| | 가로채기("대신", "막는다", "−5") | 가로채기 + 의도 고치기(값 틀 `{user}`·`{stacks}` …, 3-4) | 있음 |
 | | 선택 요구("카드 1장을 고른다") | 선택 대기(`Game.Ask` · 결과 `선택 요구`) | 있음(→ 29장) |
 | | 비용 | `Game.Pay` · 비용 내기 | 있음 |
+| | 되감기("이번 턴 처음으로", "한 전투에 3번 되감기") | `session.HistoryMark` · `session.UndoTo(지점)` | 있음(→ `02-Actions-Undo.md`) |
 | 안전장치 | 연쇄 제한 | 사슬 16단계에서 끊기(`TriggerSystem.MaxDepth`) | 있음 |
 
-**문법 밖**: 실시간 물리·이동(화면 코드의 자유 영역. 규칙에 필요한 결과만 행동으로 보낸다), 게임 상태를 통째로 되감는 효과("3턴 전으로 시간 되돌리기").
+**문법 밖**은 둘뿐이다: **저장을 넘는 되감기**("어제 저장한 판으로 돌아가기", 되감기 지점은 세션 안에서만 있고 판 저장에 Undo 이력은 들어가지 않는다)와 **난수를 다시 굴리는 되감기**(되감으면 난수 상태도 돌아가므로, 같은 행동을 다시 하면 결정론 난수라 같은 결과가 나온다 — 07장). 같은 세션 안의 되감기는 `UndoTo`(02장)로 문법 안이다.
+
+실시간 물리·이동 자체는 화면 코드의 자유 영역이다. 물리 충돌·투사체·반사·미니게임처럼 화면이 정하는 판정은 **판정 보고 행동** 모양이면 문법 안이다: 화면(MonoBehaviour)이 판정하고 그 결과를 행동 하나로 보낸다(실시간이면 틱마다 묶어서 `Strike { hits }`). 규칙은 결과만 받아 피해·가로채기·이벤트를 그대로 탄다. 위치·속도는 화면 쪽에 두고(판 데이터에 넣지 않는다), 한 번 정해지는 위치(폭발 지점)만 행동 필드로 넘긴다(→ `33-Tick-Preview-Csv.md`).
 
 쪼개 보기:
 
@@ -59,6 +63,8 @@
 | "착용하는 동안 공격력 +30" | 지속 | 착용한 유닛 | 데이터 바꾸기(Modifier) |
 | "주인공이 받는 피해 −5" | 발동(피해 직전) | 그 피해 | 가로채기 |
 | "에너지 2를 내고 모든 적에게 8 피해" | 즉시 | 모든 적 | 비용 + 데이터 바꾸기 |
+| "도발: 적의 공격이 나에게 온다" | 발동(공격 직전) | 그 공격 | 가로채기(대상을 `{user}`로, 5-8) |
+| "화살이 닿은 적에게 10 피해"(실시간) | 즉시(판정을 받은 행동) | 화면이 판정한 적 | 데이터 바꾸기(판정 보고 행동) |
 
 ---
 
@@ -119,6 +125,8 @@
 
 없는 플레이어 데이터·없는 필드·숫자가 아닌 필드는 "모자랍니다"가 아니라 프로그래머 실수(`InvalidOperationException`)다.
 
+경로는 딕셔너리의 키 하나를 집을 수 있다: `stock[gold]` = `stock`(`Dictionary<string, int>`)의 `gold` 키(필드 경로 `name[키]`, 11장 3-1). 재화·재료를 딕셔너리 하나에 모아 두는 게임이 그대로 쓴다. 없는 키는 0으로 보므로 양이 0보다 크면 "모자랍니다"로 실패한다(프로그래머 실수가 아니다). 목록에서 id로 고른 요소의 필드(`units[hero].mana`)도 된다.
+
 `Game.CanPay`는 지금 값만 본다(가로채기 전). 버튼을 미리 흐리게 하는 화면용이다.
 
 ---
@@ -173,12 +181,23 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `가로채기`. 칸의 잠�
 |---|---|---|
 | `path` | 필드 | 의도의 필드(같은 Trigger의 가로채기 잎이 고른 의도에서 고른다) |
 | `op` | 방법 | `값으로 바꾸기`(`Set`) / `더하기`(`Add`, 기본) / `곱하기`(`Multiply`) / `막기`(`Cancel`) |
-| `value` | 값 | 값으로 바꾸기는 그 필드 형식의 값, 더하기·곱하기는 숫자. 막기는 비운다 |
+| `value` | 값(숫자·글자, 틀 {user} {stacks} {balance:ID}) | 값으로 바꾸기는 그 필드 형식의 값, 더하기·곱하기는 숫자. 아래 틀을 쓸 수 있다. 막기는 비운다 |
 
+**값 틀** — 값 칸의 `{…}`는 발동한 순간의 값으로 바뀐 뒤 쓰인다.
+
+| 틀 | 바뀌는 값 | 쓰는 예 |
+|---|---|---|
+| `{user}` | 컨텍스트의 사용자 id. 상태 효과·패시브의 가로채기에서는 가진 쪽의 id. 가진 쪽에 `id`가 없으면(`run › relics`의 `run`) 예외로 그 행동이 실패하므로 쓰지 않는다 | 도발·대신 맞기: `targetId` `값으로 바꾸기` `{user}`(5-8, 5-9) |
+| `{owner}` | 이 결과를 가진 항목의 ID(상태 효과·패시브·유물 ID) | 막은 쪽을 의도에 남길 때: `blockedBy` `값으로 바꾸기` `{owner}`(의도에 그런 글자 필드가 있을 때) |
+| `{stacks}` | 가진 쪽에 걸린 **이 상태 효과**의 중첩(상태 효과의 결과에서만. 그 밖에서는 0) | 중첩만큼 피해 감소: `amount` `더하기` `-{stacks}`(5-10) |
+| `{balance:ID}` | 밸런스 값 ID의 값(30장, 곡선은 보지 않는다) | `amount` `곱하기` `{balance:shieldRatio}` — 수치를 기획자가 한곳에서 고친다 |
+
+- 앞에 붙은 `-`는 틀과 함께 숫자 하나로 읽힌다(`-{stacks}`가 중첩 3이면 `-3`). 틀의 값이 음수면 부호가 바뀐다(`-{balance:x}`에서 x가 −2면 `2`).
+- 패시브의 레벨은 틀이 없다. 레벨만큼 고치려면 결과를 코드로 쓴다(`Game.Owned(c.Owner, c.User)`, 17장 0-4).
 - 정수 필드는 더하기·곱하기 뒤 반올림한다.
 - 막기는 의도의 `cancelled` 필드를 참으로 만든다. 그 뒤 가로채기는 건너뛰고, 규칙 함수가 일을 하지 않는다.
-- 요약: `의도 amount -5`, `의도 amount ×0.5`, `의도 amount = 0`, `의도 막기`.
-- 검증 오류: "의도 고치기: 필드를 고르세요." / "의도 고치기: 더하기·곱하기에는 숫자를 적으세요."
+- 요약: `의도 amount -5`, `의도 amount ×0.5`, `의도 amount = 0`, `의도 targetId = {user}`, `의도 막기`.
+- 검증 오류: "의도 고치기: 필드를 고르세요." / "의도 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{balance:ID} 틀)를 적으세요."
 - 실행 경고(Journal, 출처 `Intercept`): "의도 고치기: 가로채기로 발동한 것이 아니라 고칠 의도가 없습니다." / "의도 고치기: (형식)에 cancelled 필드가 없어 막을 수 없습니다."
 
 ### 3-5. 결과 `비용 내기`
@@ -188,7 +207,7 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `가로채기`. 칸의 잠�
 | 칸 | 툴팁 | 값 |
 |---|---|---|
 | `key` | 플레이어 데이터 | 낼 값이 든 플레이어 데이터 |
-| `path` | 필드(비우면 값 전체) | 그 안의 숫자 필드(`energy`, `wallet.gold`) |
+| `path` | 필드(비우면 값 전체) | 그 안의 숫자 필드(`energy`, `wallet.gold`). 딕셔너리의 키 하나(`stock[gold]`, 2-4)는 필드 고르기 창에서 고르지 못하므로 코드(`Game.Pay`·`PayOutcome.path`)에 적는다 |
 | `amount` | 양 | 0 이상 |
 | `what` | 보일 이름(모자랄 때 실패 글에, 텍스트 키 또는 글, 비우면 플레이어 데이터 › 필드) | `energy.name`(텍스트 키) 또는 "에너지". 실패 글의 `{what}` 자리. 기본 문장이면 "에너지이(가) 모자랍니다(1 / 2).", 조사는 텍스트 표의 틀 `{what:이}`로 맞춘다(30장 5-8) |
 
@@ -202,7 +221,7 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `가로채기`. 칸의 잠�
 | Block | 쓸 수 있는 칸 |
 |---|---|
 | 능력치 보정 · 능력치 보정 떼기 | `대상에게 효과`를 고를 수 있는 칸 전부(능력·사용 기능·도전과제·개발 명령·프로젝트 기능) |
-| 가로채기 | `[TriggerSlot]`에 `TriggerKinds.Intercept`가 있는 칸. 로그·도전과제·능력·사용 기능의 칸에는 없다 → DB › 상태 효과의 '걸려 있는 동안 트리거'(29장), 프로젝트 기능(유물 등, 17장) |
+| 가로채기 | `[TriggerSlot]`에 `TriggerKinds.Intercept`가 있는 칸. 로그·도전과제·능력·사용 기능의 칸에는 없다 → DB › 상태 효과의 '걸려 있는 동안 트리거'(29장), DB › 패시브의 '발동'(유물·특성, 17장 0절), 잠금을 연 프로젝트 기능(17장) |
 | 의도 고치기 | `[OutcomeSlot]`에 `OutcomeKinds.Intent`가 있는 칸. 가로채기 잎과 같은 항목에서 쓴다 |
 | 비용 내기 | `[OutcomeSlot]`에 `OutcomeKinds.PlayerData`가 있는 칸 |
 
@@ -382,6 +401,8 @@ var when = new InterceptTrigger
 };
 var minus5 = new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-5" };
 var block  = new ModifyIntentOutcome { op = IntentOp.Cancel };
+var taunt  = new ModifyIntentOutcome { path = "targetId", op = IntentOp.Set, value = "{user}" };     // 가진 쪽에게로
+var soak   = new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{stacks}" };   // 중첩만큼 감소
 ```
 
 | `InterceptTrigger` | 뜻 |
@@ -395,7 +416,8 @@ var block  = new ModifyIntentOutcome { op = IntentOp.Cancel };
 |---|---|
 | `path` | 의도의 필드 경로(점으로 내려간다) |
 | `op` (`IntentOp`) | `Set` · `Add` · `Multiply` · `Cancel` |
-| `value` | 글자로 적은 값(숫자도 `"-5"`) |
+| `value` | 글자로 적은 값(숫자도 `"-5"`). 틀 `{user}` · `{owner}` · `{stacks}` · `{balance:ID}`(3-4) |
+| `static string Expand(string text, TriggerContext context)` | 틀을 그 순간의 값으로 바꾼 글자. 프로젝트의 결과 Block이 같은 틀을 쓰고 싶을 때 부른다 |
 | `Kind` | `OutcomeKinds.Intent` |
 
 ### 4-10. `[BindTo]`로 가로채기
@@ -437,6 +459,7 @@ session.Triggers.Register("rule.halfDamage",
 Game.Pay("battle", "energy", 2, what: "energy.name");     // 행동 안에서. 모자라면 "에너지이(가) 모자랍니다(1 / 2)."(energy.name = "에너지")
 bool canPay = Game.CanPay("battle", "energy", 2);         // 화면 미리보기(가로채기 전)
 var pay = new PayOutcome { key = "battle", path = "energy", amount = 2, what = "energy.name" };   // 결과 '비용 내기'
+Game.Pay("party", "stock[gold]", 100, what: "gold.name"); // 딕셔너리의 키 하나(Party.stock: Dictionary<string, int>)
 ```
 
 | 멤버 | 뜻 |
@@ -447,6 +470,7 @@ var pay = new PayOutcome { key = "battle", path = "energy", amount = 2, what = "
 | `PayOutcome` | 결과 '비용 내기'(`key`·`path`·`amount`·`what`). `Run`이 `Game.Pay`를 부른다 |
 
 - `path`를 비우면 값 전체(숫자 플레이어 데이터)를 낸다.
+- `path`는 필드 경로라 `stock[gold]`(딕셔너리의 키)·`units[hero].mana`(목록에서 id로 고른 요소의 필드)도 된다(11장 3-1). 없는 키는 0이라 "모자랍니다"로 실패한다. 의도 `CostIntent.path`에도 그 글자 그대로 실리므로, "골드 비용 0"을 가로채는 의도 조건은 `path 일치 stock[gold]`다.
 - 프로그래머 실수는 `InvalidOperationException`: 없는 플레이어 데이터("[MomoiProject] 비용: 없는 플레이어 데이터 '…'입니다."), 없는 필드("[MomoiProject] 비용: 'battle'에 필드 'enrgy'가 없습니다(…)."), 숫자가 아닌 필드("[MomoiProject] 비용: 'battle › name'는 숫자 필드가 아닙니다(String).").
 - 실패가 행동 단위로 취소되므로 행동 안에서 부른다.
 - 플레이어에게 보일 실패의 번역·`{what}` 이름은 `30-Balance-Tables.md` 2-4·5-8.
@@ -512,6 +536,8 @@ public class RelicData : GameData
 }
 // 등록 함수 RelicRules.Register는 17장·가이드 04장 8절과 같다(발동 순간 party.relics에 있을 때만 결과를 실행).
 ```
+
+- 유물은 기본 종류 **패시브**(DB › 패시브, 가진 목록 `party › relics`, 17장 0절)로 만들면 `RelicData`·등록 함수가 필요 없다. 아래 `DB › 유물` 예(5-4·5-5)는 DB › 패시브에 그대로 옮겨도 칸이 같다(발동 = `trigger`, 효과 = `outcomes`).
 
 ### 5-1. 장비 착용·해제 — Modifier를 출처로 붙이고 뗀다
 
@@ -672,7 +698,7 @@ public class SkillDamageEffect : Effect<Unit>
 
 ### 5-4. 가시 갑옷 — 받는 피해 −5(코드 없음)
 
-**에디터**(DB › 유물 `thornArmor`):
+**에디터**(DB › 유물 `thornArmor` — DB › 패시브로 만들면 등록 코드 없이 같은 칸이다, 17장 0-3):
 
 1. `trigger`: `+ 블럭` → `가로채기` → 의도 `피해`. `filter`(의도 조건) `+ 블럭` → `필드 검사` → `targetId` `일치` `hero`.
 2. `outcomes`: `+ 결과 추가` → `의도 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
@@ -686,7 +712,7 @@ public class SkillDamageEffect : Effect<Unit>
 | 가시 갑옷 1, 반감 2 | 20 − 5 = 15 → × 0.5 = 7.5 → 8 |
 | 반감 1, 가시 갑옷 2 | 20 × 0.5 = 10 → − 5 = 5 |
 
-**되받아치기는 가로채기가 아니다.** "공격한 쪽에 3 피해"는 피해가 들어온 **뒤**의 일이라 이벤트 받기(`피해`, `targetId` 일치 `hero`)로 만들고, 결과에서 피해 규칙을 부른다(가로채는 쪽은 의도만 고친다).
+**되받아치기는 가로채기가 아니다.** "공격한 쪽에 3 피해"는 피해가 들어온 **뒤**의 일이라 이벤트 받기(`피해`, `targetId` 일치 `hero`)로 만들고, 결과에서 피해 규칙을 부른다(가로채는 쪽은 의도만 고친다). 때린 쪽은 기본 대상 Block `이벤트의 개체`(`sourceId`)로 고른다(`16-Abilities-Usable.md` 3-11).
 
 ### 5-5. 불사 — 죽음 막기(`[BindTo]`)
 
@@ -828,6 +854,89 @@ session.Triggers.Register("rule.echo",
 - 충전을 쓰는 것은 의도 밖의 값을 바꾸는 일이다. 순서를 크게(100) 두어 다른 가로채기가 먼저 돌게 한다. 앞에서 침묵이 시전을 막으면(`cancelled`) 메아리는 건너뛰어 충전이 남는다.
 - 두 번의 `Game.Use`가 `CastSkill` 행동 하나 안에서 돈다. Undo 한 번에 두 번 모두, 충전까지 돌아간다.
 
+### 5-8. 도발 — 적의 공격을 나에게(값 틀 `{user}`)
+
+"도발: 2턴 동안 적의 공격이 모두 나에게 온다." 공격 대상을 정하는 규칙 함수에 가로채기 자리를 둔다.
+
+```csharp
+[Serializable, Intent("공격")]
+public class AttackIntent
+{
+    public string attackerId;
+    public string attackerTeam;       // 의도 조건으로 "적의 공격만" 거르려고 싣는다
+    public string targetId;
+    public bool cancelled;
+}
+
+public static class Rules             // 5-3의 Rules에 더한다
+{
+    public static void Attack(GameApi game, Unit attacker, Unit target)
+    {
+        var attack = game.Intercept(new AttackIntent { attackerId = attacker.id, attackerTeam = attacker.team, targetId = target.id });
+        if (attack.cancelled) return;
+        var finalTarget = attack.targetId == target.id ? target : game.Find<Unit>(attack.targetId) ?? target;   // 고쳐진 대상으로 다시 찾는다
+        SkillDamage(game, attacker, finalTarget, 0, 1, 0);
+    }
+}
+```
+
+**에디터**(DB › 상태 효과 `taunt`, 29장 3-1):
+
+1. `maxStacks` `1`, `reapply` `지속 갱신`, 지속은 게임에 맞게(예: `이벤트 횟수` 2, 셀 이벤트 턴 끝).
+2. `trigger`: `가로채기` → 의도 `공격`, 의도 조건 `attackerTeam` `일치` `enemy`. `holderField`는 비운다(누구를 노린 공격이든).
+3. `outcomes`: `의도 고치기` → 필드 `targetId`, 방법 `값으로 바꾸기`, 값 `{user}`.
+
+능력 `provoke`: `대상에게 효과` → `사용자 자신` → `상태 효과 걸기`(`taunt`).
+
+- `{user}`는 가진 쪽(도발을 건 기사)의 id다. 적 AI가 누구를 고르든 `Rules.Attack`을 지나면 기사에게 간다.
+- **규칙 함수가 고쳐진 `targetId`로 대상을 다시 찾아야 한다.** 원래 인자(`target`)를 그대로 쓰면 도발이 무시된다.
+- 도발한 쪽이 둘이면 둘 다 차례로 고쳐 마지막에 고친 쪽이 남는다(걸린 순서). 하나만 남기려면 도발을 걸 때 다른 도발을 푼다(`상태 효과 풀기`).
+- 아군끼리의 공격(혼란)은 `attackerTeam`이 `ally`라 걸리지 않는다.
+
+### 5-9. 대신 맞기 — 아군이 받는 피해를 내가
+
+"수호: 이번 턴 아군이 받는 피해를 내가 대신 받는다." 피해 의도의 대상을 바꾼다. 의도에 맞는 쪽의 팀을 실어 보낸다.
+
+```csharp
+[Serializable, Intent("피해")]
+public class DamageIntent
+{
+    public string sourceId;
+    public string targetId;
+    public string targetTeam;         // 더한 칸: 의도 조건 "아군이 맞을 때"
+    public int amount;
+    public bool cancelled;
+}
+
+// 5-3의 Rules.Damage에서 가로채기 다음 줄을 바꾼다
+var hit = game.Intercept(new DamageIntent { sourceId = source?.id, targetId = target.id, targetTeam = target.team, amount = amount });
+if (hit.cancelled || hit.amount <= 0) return;
+if (hit.targetId != target.id) target = game.Find<Unit>(hit.targetId) ?? target;   // 대신 맞는 쪽
+target.hp -= hit.amount;
+```
+
+**에디터**(DB › 상태 효과 `cover`): 지속 `이벤트 횟수` 1(셀 이벤트 턴 끝). `trigger` = `가로채기` → `피해`, 의도 조건 `targetTeam` `일치` `ally`, **순서 `-10`**. `outcomes` = `의도 고치기` `targetId` `값으로 바꾸기` `{user}`. 능력 `guardian`: `사용자 자신` → `상태 효과 걸기`(`cover`).
+
+- 순서를 작게 두어 다른 가로채기보다 먼저 돌게 한다. 그러면 뒤의 가로채기(가시 갑옷의 `targetId 일치 hero`, 29장 5-3 보호막의 가진 쪽 필드 `targetId`)가 **바뀐 대상**을 기준으로 본다. 대신 맞는 기사에게 보호막이 있으면 그 피해가 반감된다.
+- 기사 자신이 맞는 피해는 `targetId`가 이미 기사라 바뀌지 않는다.
+- "옆 칸의 아군만", "체력이 절반 이하인 아군만"처럼 거르기가 계산이면 결과를 `[BindTo]`로 쓴다(4-10): `i.targetId = GameApi.IdOf(c.User);`.
+
+### 5-10. 중첩만큼 받는 피해 감소(값 틀 `{stacks}`)
+
+"철피: 중첩마다 받는 피해 −1(쓸 때마다 1중첩)."
+
+**에디터**(DB › 상태 효과 `ironSkin`): `maxStacks` `0`(제한 없음), `reapply` `중첩 더하기`, 지속 `영구(풀 때까지)`. `trigger` = `가로채기` → `피해`, `holderField` `targetId`. `outcomes` = `의도 고치기` `amount` `더하기` `-{stacks}`. 능력 `harden`: `사용자 자신` → `상태 효과 걸기`(`ironSkin`, 중첩 1).
+
+| 중첩 | 피해 10이 들어올 때 |
+|---|---|
+| 1 | 9 |
+| 3 | 7 |
+| 12 | −2 → 들어오지 않는다(규칙 함수의 `hit.amount <= 0`) |
+
+- `{stacks}`는 가진 쪽에 걸린 **이 상태 효과**의 중첩이다(결과를 실행하는 순간의 값). 상태 효과가 아닌 곳(패시브·프로젝트 기능)에서는 0이다.
+- 중첩당 감소량을 기획자가 고치게 하려면 감소량을 밸런스 값으로 두고 결과를 코드로 쓴다: `i.amount -= (int)(c.Game.Balance(GameIds.Balance.IronSkinPerStack) * c.Game.StatusStacks(c.User, c.Owner));`(값 틀은 곱한 값을 만들지 못한다).
+- 고정 비율이면 틀 하나로 된다: `amount` `곱하기` `{balance:shieldRatio}`.
+
 ---
 
 ## 6. 주의할 점 · 자주 하는 실수
@@ -843,7 +952,7 @@ session.Triggers.Register("rule.echo",
 | 피해 증폭 둘이 곱해짐 | 증폭 능력치(기본 0)에 퍼센트를 썼다. 증폭은 플랫(0.1 = 10%)으로 쌓아야 합이 된다(5-3). |
 | 영구 강화가 다음 판에 안 보임 | 영구 Modifier는 대상 id로 붙는다. 판마다 id가 바뀌는 개체(`Game.NewId`로 만든 적 등)에 붙였다. 판마다 같은 id(`"hero"`)에 붙인다. |
 | 이벤트를 받아 피해를 줄였는데 체력이 이미 깎여 있음 | 이벤트는 일어난 뒤에 온다. 줄이거나 막는 효과는 가로채기로. |
-| `+ 블럭`에 `가로채기`가 없음 | 그 칸의 `[TriggerSlot]`에 `TriggerKinds.Intercept`가 없다. 도전과제·능력·로그 칸에는 없다. 걸려 있는 동안만 가로채려면 상태 효과(29장)로, 늘 가로채려면 프로젝트 기능의 잠금에 더한다(3-6). |
+| `+ 블럭`에 `가로채기`가 없음 | 그 칸의 `[TriggerSlot]`에 `TriggerKinds.Intercept`가 없다. 도전과제·능력·로그 칸에는 없다. 걸려 있는 동안만 가로채려면 상태 효과(29장)로, 가지고 있는 동안 가로채려면 DB › 패시브(17장 0절)로, 그 밖의 늘 켜진 규칙은 프로젝트 기능의 잠금에 더한다(3-6). |
 | 의도 목록이 비어 있음 | 의도 클래스에 `[Intent]`가 없다. |
 | 가로채기가 걸리지 않음 | 규칙 함수가 `Game.Intercept`를 부르지 않거나, 다른 형식(상속한 형식)을 통과시켰다. 형식이 정확히 같아야 한다. 규칙 함수를 거치지 않고 `hp`를 직접 깎는 곳이 있으면 그곳은 가로채기를 건너뛴다. |
 | 의도 고치기가 아무 일도 하지 않음 | 규칙 함수가 돌려받은 의도가 아니라 원래 인자를 썼다(`var hit = Game.Intercept(…)` 뒤 `hit.amount`). 또는 가로채기가 아닌 Trigger의 결과에 넣었다(Journal 경고 "고칠 의도가 없습니다"). |
@@ -855,3 +964,9 @@ session.Triggers.Register("rule.echo",
 | 비용 0인데 `CanPay`가 거짓 | `CanPay`는 가로채기 전 값이다. 화면이 비용 0 상태를 함께 본다(5-6). |
 | `Game.Pay`가 실패했는데 앞의 변경이 남음 | 행동 밖에서 불렀다. 취소는 행동 단위다. 행동 안에서 부른다. |
 | 얻는 것을 비용 내기 음수로 | 검증 오류다. 얻는 것은 `플레이어 데이터에 주기`. |
+| 도발·대신 맞기를 걸었는데 원래 대상이 맞음 | 규칙 함수가 고쳐진 `targetId`로 대상을 다시 찾지 않고 원래 인자를 썼다(5-8, 5-9). |
+| 대신 맞았는데 가시 갑옷·보호막이 원래 대상을 기준으로 적용됨 | 대신 맞기가 그것들보다 뒤에 돌았다. 대신 맞기의 순서(`order`)를 작게 둔다(5-9). |
+| 값 `-{stacks}`가 늘 0 | 상태 효과의 결과가 아니다(패시브·프로젝트 기능). `{stacks}`는 가진 쪽에 걸린 그 상태 효과의 중첩이다. 패시브 레벨은 코드에서 `Game.Owned`(3-4). |
+| `{user}`를 썼더니 "…에 string id 필드가 없어…" | 가진 쪽에 id가 없다(`party › relics`의 `party`). 가진 목록을 id가 있는 개체 안에 두거나 값을 직접 적는다. |
+| 경로 `stock[gold]`로 냈는데 골드가 있는데도 "모자랍니다" | 그 키가 없다(없는 키는 0, 2-4). 키 이름이 대소문자까지 같은지 본다. |
+| 물리 충돌을 규칙에서 판정하려다 막힘 | 판정은 화면이 하고 결과만 행동으로 보낸다(판정 보고 행동, 1절). 위치·속도는 판 데이터에 넣지 않는다. |

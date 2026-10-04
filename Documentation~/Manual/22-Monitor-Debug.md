@@ -233,6 +233,8 @@ public sealed class KillPopup : MonoBehaviour
 ```csharp
 var session = GBibleRuntime.Session;
 if (session.UndoCount > 0) session.Undo();   // 성공하면 true
+long mark = session.HistoryMark;             // 지점
+session.UndoTo(mark);                        // 지점 뒤를 모두 되돌린다(02-Actions-Undo.md 2.8)
 ```
 
 ### Undo 관련 경고 (타임라인 · 콘솔)
@@ -248,6 +250,8 @@ if (session.UndoCount > 0) session.Undo();   // 성공하면 true
 
 - 행동 안에서 다른 행동을 `Do`하면 바깥 행동의 일부로 실행된다(행동 탭에는 둘 다 보이지만 Undo는 바깥 행동 하나).
 - 스냅샷 방식에서는 찍은 뒤 아무 일도 없었으면 한 칸 더 뒤로 되감는다.
+- 행동 본문에는 문제가 없는데 **실패**로 보이면, 그 행동 안에서 쏜 이벤트를 받는 쪽(`Subscribe`·트리거 결과)이 예외를 던진 것이다. 마우스를 올려 오류를 보고, 타임라인의 "행동 실패, 변경 취소: …" 오류 줄 앞의 이벤트를 본다(`10-Events.md` 2-7).
+- Undo 보관 수(DB › Bootstrap, 새 DB 기본 200)를 넘은 행동은 머리의 "Undo할 수 있는 행동 n"에서 빠지고 되돌릴 수 없다.
 
 ---
 

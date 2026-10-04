@@ -6,6 +6,7 @@
 
 - 플레이어가 버튼·클릭으로 일으키는 모든 규칙 변화
 - 되돌리기(Undo)가 필요한 턴제·퍼즐·카드 게임
+- "이번 턴 처음으로"·"전투 처음으로 3번"처럼 여러 행동을 한 번에 되돌리기
 - 실시간 게임의 입력(되돌리기는 스냅샷 방식으로)
 - 실패하면 아무것도 바뀌지 않아야 하는 처리(구매·제작)
 
@@ -21,6 +22,7 @@
 | Transaction | 행동 하나가 일으킨 변경 전체. Undo는 Transaction 단위로 되돌린다(코드 형식 `Transaction`). |
 | Sync · ChangeSet | 시스템이 플레이어 데이터의 사본(Mirror)과 실제 값을 비교해 바뀐 곳을 찾는 동작이 Sync, 찾아낸 변경 묶음이 ChangeSet이다. 자세히는 [01-PlayerData.md](01-PlayerData.md). |
 | Undo | 마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌리는 것. `session.Undo()`. |
+| 지점 | 행동 이력의 한 자리(`session.HistoryMark`). `session.UndoTo(지점)`이 그 뒤의 행동을 모두 되돌린다(2.8). |
 | 행동 밖 변경 | 행동 실행 중이 아닐 때 바뀐 플레이어 데이터. 기록은 되지만 Undo되지 않는다. |
 | 스냅샷 | 일정 간격으로 찍어 두는 플레이어 데이터 전체 모습. 실시간 게임의 되감기에 쓴다. |
 
@@ -156,7 +158,7 @@ Game.Do(new ChainLightning { caster = hero, targets = new List<Unit> { orc1, orc
 
 - `public string id;` 필드(또는 `Id` 속성)가 있다.
 - 플레이어 데이터 안에 객체로 들어 있다(깊이는 상관없다. 리스트 안의 리스트도 된다).
-- 같은 형식 안에서 id가 겹치지 않는다. 필드 형식이 부모 클래스(예: `Fighter`, 그 자식 `Hero`·`Enemy`)면 그 부모를 공유하는 형식끼리도 겹치지 않아야 한다. 새 객체의 id는 `Game.NewId(접두어)`로 만든다.
+- id는 **플레이어 데이터 전체에서 하나**다. 형식이 달라도 겹치지 않게 둔다. `Game.Use`의 사용자·대상, 상태 효과의 가진 쪽, Modifier의 대상, 선택 대기의 후보는 형식 없이 id로 찾는다(`Game.Find(id)`). 형식이 다른 두 객체가 같은 id면 먼저 찾은 것(플레이어 데이터 키 이름순)이 쓰인다. 예: 프로필의 동료 `lea`와 전투에 넣은 사본 `lea` → `Game.Use(skill, "lea")`가 프로필의 동료를 잡는다. 사본·새 객체의 id는 `Game.NewId(접두어)`로 만든다.
 
 Unity 객체(`MonoBehaviour`·`ScriptableObject`)·델리게이트·플레이어 데이터 밖의 객체는 대상으로 넣지 않는다.
 
@@ -180,7 +182,7 @@ public class Heal : GameAction
 
 `Describe`는 참조 필드를 다시 찾기 **전**에도 불린다. 참조 필드에서는 id만 읽고, 체력 같은 값은 읽지 않는다(옛 객체의 값일 수 있다).
 
-### 2.4 공통 멤버: `actorId` · `tick` · `Visibility`
+### 2.4 공통 멤버: `actorId` · `tick` · `utc` · `Visibility`
 
 ```csharp
 [Serializable, BlockInfo("상자 열기")]
@@ -197,7 +199,10 @@ Game.Do(new OpenChest { actorId = 2 });
 |---|---|
 | `actorId` (`int`) | 행동한 플레이어 번호. 게임 코드가 채운다. |
 | `tick` (`long`) | 실행할 때 시스템이 게임 시계의 틱(`session.Clock.Tick`)을 적는다. |
+| `utc` (`long`) | 현실 시각(1970-01-01부터 UTC 밀리초). 바깥 행동이 시작할 때 시스템이 한 번 적고, 안쪽 행동은 같은 값이다. 이미 값이 있으면(멀티플레이로 받은 행동·다시 돌리는 행동) 그대로 둔다. 규칙에서는 `Game.Now`로 읽는다([07-Random-Time.md](07-Random-Time.md) 2.11). |
 | `Visibility` | `Public`(모두) · `Private`(본인만) · `Developer`(개발자 모니터만). 지금은 모니터 행동 탭에 표시된다. |
+
+`utc`가 이미 있으면 그대로 쓰므로, 같은 행동 객체를 다시 `Do`하면 처음 시각이 남는다. 행동은 `Do`할 때마다 `new`로 만든다.
 
 ### 2.5 처리기를 따로 등록하는 행동: `Actions.Register`
 
@@ -250,7 +255,7 @@ ActionRecord record = Game.Do(new MoveUnit { unit = hero, x = 1, y = 0 });
 `Do` 안에서 시스템이 하는 일:
 
 1. 처리 방법을 찾는다(등록한 처리기 → 클래스 안의 `Run`).
-2. `tick`을 적고 기록(Journal)에 행동 한 줄을 남긴다.
+2. `tick`·`utc`를 적고 기록(Journal)에 행동 한 줄을 남긴다.
 3. **행동 시작**: 지금까지의 행동 밖 변경을 먼저 Sync해 따로 떼어 두고, Transaction을 연다. 모든 난수 스트림의 상태를 보관한다.
 4. 참조 필드를 id로 지금 데이터에서 다시 찾아 넣는다(못 찾으면 여기서 실패).
 5. `Run`(또는 처리기)을 실행한다. 이 안에서 `Game.Find`·`Game.All`이 중간에 Sync해도 모두 같은 Transaction에 들어간다.
@@ -277,7 +282,7 @@ public class Buy : GameAction
 }
 ```
 
-행동 안에서 예외가 나면(참조 필드를 찾지 못한 경우도 같다):
+행동 안에서 예외가 나면(참조 필드를 찾지 못한 경우도, 행동 안에서 쏜 이벤트를 받는 `Subscribe`·트리거 결과가 던진 경우도 같다. [10-Events.md](10-Events.md) 2-7):
 
 - 그 행동이 바꾼 플레이어 데이터를 모두 되돌린다(Transaction 단위 원자성).
 - 난수 스트림도 행동 전 상태로 돌린다.
@@ -317,6 +322,26 @@ int left = Game.Session.UndoCount;   // 되돌릴 수 있는 횟수
 - **도전과제 달성과 보상은 되돌리지 않는다.** 행동이 바꾼 값(주운 골드 등)만 돌아가므로, Undo하고 다시 해도 보상이 두 번 나오지 않고 값이 쌓이지 않는다.
 - 행동 실행 중에는 Undo할 수 없다(예외).
 
+**지점까지 되돌리기: `session.HistoryMark` · `session.UndoTo(mark)`** — "이번 턴 처음으로"처럼 여러 행동을 한 번에 되돌린다. 되돌릴 자리에서 지점을 받아 두고, 나중에 그 지점 뒤를 모두 되돌린다.
+
+```csharp
+long turnStart = Game.Session.HistoryMark;     // 내 턴이 시작될 때(턴 시작 행동이 끝난 뒤)
+// … 이동·공격 …
+int undone = Game.Session.UndoTo(turnStart);   // 그 뒤의 행동을 모두 되돌린다. 되돌린 횟수
+```
+
+| 멤버 | 뜻 |
+|---|---|
+| `HistoryMark` (`long`) | 지금까지의 행동 이력 끝. 행동 단위 방식이면 마지막 행동의 Transaction 번호(이력이 비면 0), 스냅샷 방식이면 지금의 스냅샷 수, 되돌리기 없음이면 0 |
+| `UndoTo(mark)` (`int`) | 지점 뒤의 행동(스냅샷)을 뒤에서부터 하나씩 `Undo()`한다. 되돌린 횟수를 돌려준다. 행동 안에서 부르면 예외 |
+
+- Undo 한 번 한 번과 같다. 난수도 돌아가고, 도전과제 달성·보상은 남는다. 기록에는 Undo가 되돌린 횟수만큼 남는다.
+- 지점이 Undo 보관 수(`HistoryLimit`) 밖으로 밀려났으면 남은 만큼만 되돌린다. 돌려받은 횟수로 확인한다.
+- **지점은 이 세션 안에서만 뜻이 있다.** 판 저장에는 Undo 이력이 없다. 판을 불러오면(`GBibleRuntime.RunLoaded`) 지점을 다시 받는다.
+- 되감기 횟수 같은 규칙은 되돌린 **뒤에** 행동으로 센다. 되돌리기 전에 센 값(지점 뒤의 행동이 바꾼 값)은 되돌리면 함께 돌아간다(4.6).
+- 앞 지점으로 되돌린 뒤에는 그보다 뒤에 받아 둔 지점을 다시 받는다. 번호는 계속 오르므로, 옛 지점으로 되돌리면 되돌린 뒤의 새 행동까지 되돌아간다.
+- 스냅샷 방식의 지점은 스냅샷 수라서, 보관 수가 차 오래된 스냅샷이 밀려나기 시작하면 받아 둔 시점과 어긋난다. 지점은 주로 행동 단위 방식에서 쓴다.
+
 ### 2.9 되돌리지 않을 변경: `Permanent()`
 
 ```csharp
@@ -348,7 +373,7 @@ public static class UndoSetup
 | 옵션 | 기본값 | 뜻 |
 |---|---|---|
 | `History` | `HistoryMode.Actions` | 되돌리기 방식(아래 표) |
-| `HistoryLimit` | `0` | 행동 단위 방식에서 Undo할 수 있는 최대 행동 수. 0은 무제한. 넘으면 가장 오래된 행동부터 Undo할 수 없게 된다 |
+| `HistoryLimit` | `0`(세션을 직접 만들 때). `GBibleRuntime`은 DB › Bootstrap의 **Undo 보관 수**를 넣고, 새 DB의 기본은 `200` | 행동 단위 방식에서 Undo할 수 있는 최대 행동 수. 0은 무제한. 넘으면 가장 오래된 행동부터 Undo할 수 없게 된다 |
 | `SnapshotInterval` | `1.0` | 스냅샷 방식의 간격(게임 시간 초) |
 | `SnapshotLimit` | `30` | 보관할 스냅샷 수 |
 
@@ -769,6 +794,85 @@ public class EnterBossRoom : GameAction
 
 두 키 모두 정의되어 있어야 한다(DB 또는 `Define`).
 
+### 4.6 전술: "이번 턴 처음으로"와 "전투 처음으로 3번"
+
+```csharp
+using System;
+using GBible;
+using UnityEngine;
+
+[GameEvent("턴 시작")]
+public class TurnStarted { public int turn; }
+
+[Serializable]
+public class Skirmish
+{
+    public int turn;
+    public int rewindsLeft = 3;           // 이번 전투에서 남은 되감기
+}
+
+[Serializable, BlockInfo("턴 시작")]
+public class BeginTurn : GameAction
+{
+    protected override void Run()
+    {
+        var battle = Game.All<Skirmish>()[0];
+        battle.turn++;
+        Game.Events.Publish(new TurnStarted { turn = battle.turn });
+    }
+}
+
+[Serializable, BlockInfo("되감기 쓰기")]
+public class SpendRewind : GameAction
+{
+    protected override void Run()
+    {
+        var battle = Game.All<Skirmish>()[0];
+        if (battle.rewindsLeft <= 0) throw Game.Fail("fail.noRewind", "되감기를 다 썼습니다.");
+        battle.rewindsLeft--;
+    }
+}
+
+public class RewindButtons : MonoBehaviour
+{
+    GameApi Game => GBibleRuntime.Game;
+    long _turnStart, _battleStart;
+    IDisposable _sub;
+
+    void OnEnable()
+    {
+        _sub = Game.Events.SubscribeAfterAction<TurnStarted>(e =>
+        {
+            _turnStart = Game.Session.HistoryMark;            // 턴 시작 행동이 끝난 뒤
+            if (e.turn == 1) _battleStart = _turnStart;       // 첫 턴 시작 = 전투 처음
+        });
+        GBibleRuntime.RunLoaded += OnRunLoaded;
+    }
+
+    void OnDisable()
+    {
+        _sub?.Dispose();
+        GBibleRuntime.RunLoaded -= OnRunLoaded;
+    }
+
+    void OnRunLoaded(GameSession session) => _turnStart = _battleStart = session.HistoryMark;   // 불러온 판에는 Undo 이력이 없다
+
+    public void OnClickTurnStart() => Game.Session.UndoTo(_turnStart);
+
+    public void OnClickBattleStart()
+    {
+        if (Game.All<Skirmish>()[0].rewindsLeft <= 0) return;
+        Game.Session.UndoTo(_battleStart);                    // 전투 처음 모습으로
+        Game.Do(new SpendRewind());                           // 횟수는 되돌린 뒤의 행동으로 센다
+        _turnStart = _battleStart = Game.Session.HistoryMark; // 지점을 '횟수를 쓴 뒤'로 옮긴다
+    }
+}
+```
+
+- `SubscribeAfterAction`은 턴 시작 행동이 성공해 이력에 들어간 뒤에 불리므로, 그때 받은 지점은 "턴 시작 행동까지 한 모습"이다.
+- 되감은 뒤 지점을 `SpendRewind` 뒤로 옮겨야, 다음 되감기가 줄인 횟수를 되살리지 않는다. 턴 지점도 함께 옮긴다(옛 턴 지점으로 되돌리면 `SpendRewind`까지 되돌아간다).
+- 턴 안에서만 되돌리게 하려면 DB › Bootstrap의 **Undo 끊는 이벤트**를 쓴다(4.2). 전투 처음으로 가려면 전투 동안 이력이 남아야 하므로 이 예에서는 비워 두고, 보관 수(`HistoryLimit`)는 한 전투의 행동 수보다 크게 둔다.
+
 ---
 
 ## 5. 주의할 점 · 자주 하는 실수
@@ -781,10 +885,15 @@ public class EnterBossRoom : GameAction
 | "X 'id'을(를) 찾을 수 없습니다(행동 'A'의 '필드')" | 참조 필드에 넣은 객체의 id가 지금 데이터에 없다(쓰러져 빠짐·Undo로 사라짐). 지연 실행이면 `Find`로 먼저 확인한다. DB 원본 객체를 넣었다면 `[DataRef]` 글자 필드로 바꾼다. |
 | "… id가 비어 있는 X입니다" | 방금 `new`로 만든 객체(데이터 밖)를 넣었다. 새 객체는 행동 안에서 만들고 id는 `Game.NewId(접두어)`로 정한다. |
 | Undo·불러오기 뒤 행동이 화면에 안 보이는 옛 객체를 고침 | 대상 클래스에 `public string id;`가 없어 참조가 아니라 값으로 다뤄졌다. id를 더한다. |
-| 엉뚱한 객체가 고쳐짐 | 같은 형식(또는 같은 부모를 가진 형식)끼리 id가 겹친다. 새 객체의 id는 `Game.NewId`로 만든다. |
+| 엉뚱한 객체가 고쳐짐 | 플레이어 데이터 안에서 id가 겹친다. 형식이 달라도 겹치면 안 된다(사용·상태 효과·Modifier·선택은 형식 없이 id로 찾는다, 2.2). 사본·새 객체의 id는 `Game.NewId`로 만든다. |
+| `UndoTo`가 지점까지 가지 못함 | 지점이 Undo 보관 수(`HistoryLimit`, 새 DB 기본 200) 밖으로 밀려났거나, Undo 끊는 이벤트가 이력을 비웠다. 보관 수를 늘리거나 끊는 이벤트를 다시 고른다. |
+| 판을 불러온 뒤 `UndoTo`가 엉뚱하게 되돌림 | 불러오기 전에 받은 지점을 썼다. Undo 이력은 저장되지 않는다. `GBibleRuntime.RunLoaded`에서 지점을 다시 받는다. |
+| 되감기 횟수가 되감으면 되살아남 | 되돌리기 전에 횟수를 줄였거나, 줄인 뒤 지점을 옮기지 않았다. 되돌린 뒤의 행동으로 줄이고 지점을 그 뒤로 옮긴다(4.6). |
+| `Game.Now`가 옛 시각 | 같은 행동 객체를 다시 `Do`했다. `utc`는 이미 값이 있으면 그대로다. `Do`할 때마다 `new`로 만든다(2.4). |
 | `Describe`에 이상한 값이 보임 | `Describe`는 참조 필드를 다시 찾기 전에도 불린다. 참조 필드에서는 id만 읽는다. |
 | Unity 객체·델리게이트를 필드에 넣음 | 행동은 데이터라서 기록·전송·리플레이가 안 된다. 플레이어 데이터 안의 객체, DB 원본은 `[DataRef]` 글자, 그 밖은 값으로 넣는다. |
 | Undo 뒤 "행동 밖에서 바뀐 값을 덮었습니다" 경고 | 행동이 바꾼 곳을 행동 밖에서 다시 고쳤다. 그 변경도 행동으로 만든다. |
 | 행동 안에서 기다리기(코루틴·`await`) | 행동은 한 번에 끝나야 한다. 연출은 끝난 결과(이벤트·기록)를 보고 따로 재생하고, 시간이 걸리는 효과는 3장처럼 나눈다. |
 | Undo로 좋은 난수를 다시 뽑으려 함 | Undo하면 난수 상태도 돌아가 같은 행동은 같은 결과를 낸다. |
 | 실패한 행동의 예외가 게임을 멈춤 | `Do`는 행동이 실패하면 변경을 취소한 뒤 예외를 다시 던진다. 예상되는 실패는 부르는 쪽에서 잡는다. |
+| 행동 본문은 맞는데 행동이 실패함 | 행동 안에서 쏜 이벤트를 받는 쪽(`Subscribe`·트리거 결과)이 예외를 던졌다. 그 행동 전체가 취소된다. 모니터 행동 탭의 실패 줄에 마우스를 올려 오류를 본다([10-Events.md](10-Events.md) 2-7). |

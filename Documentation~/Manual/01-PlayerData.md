@@ -307,9 +307,10 @@ public class Hero
 ```csharp
 using System;
 using System.Collections.Generic;
+using GBible;
 using UnityEngine;
 
-[Serializable] public struct Cell { public int x, y; }
+// 구조체 예: GBible.Cell(격자 칸, 36장)도 이렇게 들어간다. 직접 만든 [Serializable] struct도 된다.
 
 [Serializable] public abstract class Buff { public int turns; }
 [Serializable] public class Poison : Buff { public int damage; }
@@ -320,7 +321,7 @@ public class Unit
 {
     public string id;
     public int hp = 30;
-    public Cell cell;                                          // 구조체
+    public Cell cell;                                          // 구조체(GBible.Cell)
     public Vector3 lastSeen;                                   // Unity 구조체
     public List<Buff> buffs = new List<Buff>();                // 다형성 리스트
     public Dictionary<string, int> cooldowns = new Dictionary<string, int>();

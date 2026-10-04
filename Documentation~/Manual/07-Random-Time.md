@@ -1,12 +1,13 @@
 # 07. 난수와 시간
 
-**한 줄 요약**: 게임 로직의 난수는 `Game.Random("이름")`(결정론 난수 스트림), 게임 로직의 시간은 `session.Clock`(게임 시계)을 쓴다. 둘 다 Undo·스냅샷 되감기·판 저장에 함께 따라간다. 일시정지·배속은 `GameTime`이 `Time.timeScale`로 한꺼번에 조절한다.
+**한 줄 요약**: 게임 로직의 난수는 `Game.Random("이름")`(결정론 난수 스트림), 게임 로직의 시간은 `session.Clock`(게임 시계)을 쓴다. 둘 다 Undo·스냅샷 되감기·판 저장에 함께 따라간다. 일시정지·배속은 `GameTime`이 `Time.timeScale`로 한꺼번에 조절한다. 꺼 둔 동안에도 흐르는 현실 시각(오프라인 보상·일일 초기화)은 `Game.Now`·`Game.Day`를 쓴다. 행동에 찍혀 다시 돌려도 같다.
 
 **언제 쓰는가**
 
 - 명중·치명타·드롭·맵 생성 같은 규칙의 무작위
 - 쿨다운·지속 시간처럼 게임 시간 기준의 값
 - 메뉴·대화창이 열렸을 때 게임 멈추기, 슬로우 모션, 개발 중 프레임 단위 진행
+- 오프라인 보상·스태미나 회복·일일·주간 초기화처럼 현실 시각 기준의 규칙
 
 ---
 
@@ -19,6 +20,9 @@
 | 스트림 (`RandomStream`) | 이름 하나("damage", "loot" …)에 붙은 난수 흐름. 스트림끼리 독립이라 한 곳에서 더 뽑아도 다른 곳의 결과가 바뀌지 않는다. |
 | 게임 시계 (`GameClock`) | 세션의 시간. `Tick`(프레임 수)과 `Time`(초). 프레임 끝마다 흐른다. |
 | `GameTime` | Unity 쪽 시간 조절(일시정지·배속·프레임 넘기기). `Time.timeScale`을 바꾼다. |
+| UTC | 협정 세계시. 시간대와 상관없는 기준 시각. |
+| 현실 시각 (`Game.Now`) | 실제 세계의 시각(UTC). 게임을 꺼 둔 동안·일시정지 중에도 흐른다. 바깥 행동이 시작할 때 한 번 찍혀 행동의 `utc`에 남는다. |
+| 날짜 번호 (`Game.Day` · `Week`) | 정한 시간대·초기화 시각에 하루(한 주)마다 1씩 오르는 정수. 지난번 번호와 다르면 날(주)이 바뀐 것이다. |
 | 행동 · Undo · 스냅샷 | [02-Actions-Undo.md](02-Actions-Undo.md) 참고. |
 
 ---
@@ -31,6 +35,8 @@
 - 위쪽 시간 조절: **일시정지**/**재개** 버튼(멈춘 이유가 툴팁에 보인다), **1프레임**(일시정지 중 한 프레임만 진행), 배속 선택 **0.25× · 0.5× · 1× · 2× · 4×**.
 - **명령** 탭의 **시간** 묶음: **일시정지 / 재개**, **1프레임 진행**(일시정지 중에만 동작), **배속 0.25**, **배속 1**, **배속 2**.
 - 모니터의 일시정지는 "개발 도구"라는 이유로 멈춘다. 게임 코드가 건 일시정지와 겹치며, 각자 풀어야 재개된다.
+- **행동** 탭에서 행동 줄을 누르면 탐색기에 `tick`(게임 시계)과 `utc`(현실 시각, UTC 밀리초)가 보인다.
+- 현실 시각의 출처·시간대(2.13)는 화면 칸이 없다. 코드(`Configuring`)로 정한다.
 
 ---
 
@@ -159,19 +165,89 @@ GameTime.Changed += () => pausePanel.SetActive(GameTime.IsPaused);
 
 메뉴·일시정지 화면처럼 멈추면 안 되는 연출만 오른쪽 방식으로 만든다.
 
+### 2.11 현실 시각: `Game.Now`
+
+```csharp
+DateTime now = Game.Now;                                   // UTC. 행동 안이면 그 행동이 시작한 순간
+TimeSpan away = Game.Now - profile.lastSeen;               // 꺼 둔 시간(오프라인 보상)
+```
+
+- 바깥 행동이 시작할 때 시스템이 현실 시각을 한 번 찍어 행동의 `utc`(`long`, 1970-01-01부터 UTC 밀리초)에 적는다. 그 행동 안에서는 `Game.Now`가 늘 그 값이다. 안쪽 행동·트리거 결과·Block도 같은 값을 본다. 행동 하나 = 한 순간이다.
+- 이미 `utc`가 있는 행동(멀티플레이로 받은 행동, 기록에서 다시 돌리는 행동)은 그 값을 그대로 쓴다. 그래서 어디서 언제 다시 돌려도 결과가 같다.
+- 미리보기(`Game.Preview`·`CanDo`)도 시각을 찍는다.
+- 행동 밖(씬 코드)에서는 부를 때의 지금 시각이다. 화면의 "남은 시간" 표시에 쓴다.
+- 규칙(행동·Block·트리거 결과)에서는 `DateTime.Now`·`DateTime.UtcNow`를 쓰지 않는다. `Game.Now`를 쓴다.
+- 플레이어 데이터에 시각을 적을 때는 `DateTime` 필드(또는 `long` 밀리초)에 `Game.Now`를 넣는다. 저장·Undo가 그대로 따라간다.
+
+### 2.12 날짜 번호: `Game.Day` · `Game.Week`
+
+```csharp
+long today = Game.Day();                          // 자정에 바뀐다
+long resetDay = Game.Day(4);                      // 새벽 4시에 바뀐다(4시 전은 어제)
+long week = Game.Week(4);                         // 월요일 새벽 4시에 바뀐다
+long sundayWeek = Game.Week(0, DayOfWeek.Sunday); // 일요일 자정에 바뀐다
+```
+
+| 멤버 | 뜻 |
+|---|---|
+| `Day(resetHour = 0)` | `Game.Now`를 시간대(2.13)의 시각으로 바꿔, `resetHour`시에 바뀌는 날짜 번호. 1970-01-01이 0 |
+| `Week(resetHour = 0, start = DayOfWeek.Monday)` | `start` 요일 `resetHour`시에 바뀌는 주 번호 |
+
+- 번호 자체에는 뜻이 없다. 플레이어 데이터에 마지막 번호를 두고, 지금 번호와 다른지만 본다.
+- 두 번호의 차가 지난 날 수다. 연속 출석은 `today - lastDay == 1`.
+- `Game.Now`를 쓰므로 행동 안에서는 행동이 시작한 순간 기준이다.
+
+### 2.13 시각의 출처와 시간대: `SessionOptions.RealClock` · `TimeZone`
+
+```csharp
+using System;
+using GBible;
+using UnityEngine;
+
+public static class ClockSetup
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+    static void Hook() => GBibleRuntime.Configuring += options =>
+    {
+        options.RealClock = () => ServerClock.UtcNow;   // 서버 시각(게임 코드). 비우면 DateTime.UtcNow
+        options.TimeZone = TimeZoneInfo.CreateCustomTimeZone("KST", TimeSpan.FromHours(9), "KST", "KST");   // 모두 한국 시각으로
+    };
+}
+```
+
+| 옵션 | 기본 | 뜻 |
+|---|---|---|
+| `RealClock` (`Func<DateTime>`) | 비움 = 이 컴퓨터의 시계(`DateTime.UtcNow`) | 현실 시각의 출처. UTC(`DateTimeKind.Utc`)를 돌려준다. 시험에서는 고정 시각(4.9), 서버·Steam 시각을 쓸 때는 그것 |
+| `TimeZone` (`TimeZoneInfo`) | 비움 = 이 컴퓨터의 시간대 | `Day`·`Week`를 셀 시간대 |
+
+- 시간대를 비우면 플레이어마다 자기 지역 시각으로 날이 바뀐다. 싱글 게임은 보통 이대로 둔다.
+- 모든 플레이어가 같은 순간에 초기화돼야 하면(서버 이벤트·랭킹) 시간대를 정한다. 시간대 이름(`FindSystemTimeZoneById`)은 Windows·모바일이 달라서, 위처럼 고정 차이로 만드는 편이 안전하다.
+- DB › Bootstrap에 칸은 없다. `Configuring`에서, 세션을 직접 만들면 `new SessionOptions { … }`에서 정한다.
+
+### 2.14 게임 시계와 현실 시각 고르기
+
+| | 게임 시계 `session.Clock` | 현실 시각 `Game.Now` |
+|---|---|---|
+| 흐르는 때 | 게임이 켜져 있고 멈추지 않았을 때. 배속을 따른다 | 늘. 꺼 둔 동안·일시정지 중에도 |
+| 값 | `Time`(초)·`Tick` | `DateTime`(UTC) |
+| 행동에 적히는 것 | `tick` | `utc` |
+| 스냅샷 되감기 | 시계가 함께 돌아간다 | 돌아가지 않는다(규칙이 플레이어 데이터에 적은 시각만 돌아간다) |
+| 판 저장 | 판에 저장, 불러오면 이어서 흐른다 | 저장하지 않는다(적어 둔 시각만 플레이어 데이터로 저장) |
+| 맞는 곳 | 쿨다운·버프 지속·예약·상태 효과 | 오프라인 보상·스태미나 회복·일일·주간 초기화·기간 한정 이벤트 |
+
 ---
 
 ## 3. Undo·스냅샷·저장과 함께 움직이는 방식
 
-| 사건 | 난수 | 게임 시계 |
-|---|---|---|
-| 행동 실행 | 행동 직전에 **모든 스트림 상태**를 보관한다 | 행동에 `tick`을 적는다 |
-| 행동 실패(예외) | 보관한 상태로 되돌린다 | — |
-| Undo (행동 단위 방식) | 그 행동 직전 상태로 되돌린다(그 뒤에 처음 만든 스트림은 처음 상태로) → 같은 행동을 다시 하면 같은 결과 | 되돌리지 않는다(시간은 계속 흐른다) |
-| Undo (스냅샷 방식) | 스냅샷 때 상태로. 그 뒤에 처음 만든 스트림은 처음 상태로 | 스냅샷 때의 `Tick`·`Time`으로 되감는다 |
-| 판 저장(`ExportRun`) | 마스터 시드와 모든 스트림 상태를 저장 | `Tick`·`Time`을 저장 |
-| 판 불러오기(`ImportRun`) | 마스터 시드·스트림 상태를 되살린다 → 다음 결과까지 같다 | 저장한 시각으로 |
-| 프로필(`ExportMeta`) | 저장하지 않는다 | 저장하지 않는다 |
+| 사건 | 난수 | 게임 시계 | 현실 시각 |
+|---|---|---|---|
+| 행동 실행 | 행동 직전에 **모든 스트림 상태**를 보관한다 | 행동에 `tick`을 적는다 | 행동에 `utc`를 적는다(이미 있으면 그대로, 안쪽 행동은 바깥 행동의 값) |
+| 행동 실패(예외) | 보관한 상태로 되돌린다 | — | — |
+| Undo (행동 단위 방식) | 그 행동 직전 상태로 되돌린다(그 뒤에 처음 만든 스트림은 처음 상태로) → 같은 행동을 다시 하면 같은 결과 | 되돌리지 않는다(시간은 계속 흐른다) | 되돌리지 않는다. 그 행동이 플레이어 데이터에 적은 시각은 돌아간다 |
+| Undo (스냅샷 방식) | 스냅샷 때 상태로. 그 뒤에 처음 만든 스트림은 처음 상태로 | 스냅샷 때의 `Tick`·`Time`으로 되감는다 | 되돌리지 않는다 |
+| 판 저장(`ExportRun`) | 마스터 시드와 모든 스트림 상태를 저장 | `Tick`·`Time`을 저장 | 저장하지 않는다 |
+| 판 불러오기(`ImportRun`) | 마스터 시드·스트림 상태를 되살린다 → 다음 결과까지 같다 | 저장한 시각으로 | — (불러온 뒤의 행동은 그때의 시각) |
+| 프로필(`ExportMeta`) | 저장하지 않는다 | 저장하지 않는다 | 저장하지 않는다 |
 
 **주의 — Undo는 "모든 스트림"을 행동 직전으로 되돌린다.** 그 행동 뒤에 행동 밖에서 같은 세션의 난수를 뽑았다면(씬 코드의 연출 등) 그 소비도 함께 되돌아간다. 연출용 무작위(파티클 흔들림, 대사 고르기 등)는 `UnityEngine.Random`을 쓰고, `Game.Random`은 규칙 계산에만 쓴다.
 
@@ -383,6 +459,107 @@ public static class SeedCheck
 }
 ```
 
+### 4.7 방치형: 오프라인 보상
+
+```csharp
+using System;
+using GBible;
+using UnityEngine;
+
+[Serializable]
+public class IdleProfile
+{
+    public double cookies;
+    public double perSecond = 1;
+    public DateTime lastSeen;                 // 마지막으로 정산한 현실 시각(UTC)
+}
+
+[Serializable, BlockInfo("정산")]
+public class Settle : GameAction
+{
+    public const double MaxSeconds = 8 * 3600;   // 오프라인은 최대 8시간까지
+
+    protected override void Run()
+    {
+        var profile = Game.All<IdleProfile>()[0];
+        var now = Game.Now;
+        if (profile.lastSeen == default) { profile.lastSeen = now; return; }        // 처음 켠 날: 시각만
+        var seconds = Math.Max(0, Math.Min((now - profile.lastSeen).TotalSeconds, MaxSeconds));   // 시계를 뒤로 돌렸으면 0
+        profile.cookies += seconds * profile.perSecond;
+        profile.lastSeen = now;
+    }
+}
+
+public static class IdleBoot
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+    static void Hook()
+    {
+        GBibleRuntime.Started += session => session.Do(new Settle());    // 켤 때: 꺼 둔 시간만큼
+        GBibleRuntime.Stopping += session => session.Do(new Settle());   // 끌 때: 저장 전에 마지막 시각을 남긴다
+    }
+}
+```
+
+`IdleProfile`은 메타 구역 플레이어 데이터다. 켜 둔 동안의 생산도 같은 행동을 1초마다 실행해 더한다(쿠키를 쓰는 행동은 먼저 정산한다). 강제 종료되면 `Stopping`이 오지 않으므로, 마지막으로 **저장된** 정산 시각부터 다시 센다. 진행을 자주 남기려면 DB › Bootstrap의 **프로필도 행동마다 저장**을 켠다(`06-SaveLoad.md` 2.2).
+
+### 4.8 일일·주간 초기화(새벽 4시)
+
+```csharp
+using System;
+using GBible;
+
+[Serializable]
+public class DailyProfile
+{
+    public long lastDay = -1;          // 마지막으로 초기화한 날짜 번호
+    public long lastWeek = -1;
+    public int questsDone;
+    public int weeklyBossTries;
+}
+
+[Serializable, BlockInfo("날짜 확인")]
+public class CheckReset : GameAction
+{
+    public const int ResetHour = 4;
+
+    protected override void Run()
+    {
+        var p = Game.All<DailyProfile>()[0];
+        var today = Game.Day(ResetHour);
+        if (p.lastDay != today) { p.questsDone = 0; p.lastDay = today; }
+        var week = Game.Week(ResetHour);                       // 월요일 새벽 4시
+        if (p.lastWeek != week) { p.weeklyBossTries = 3; p.lastWeek = week; }
+    }
+}
+```
+
+켤 때(`Started`)와 일일 임무를 쓰는 행동 안에서 먼저 `Game.Do(new CheckReset())`을 부른다. 켜 둔 채 4시를 넘겨도 다음 행동에서 초기화된다. 행동 안에서 부르면 바깥 행동의 일부라 시각도 같다.
+
+### 4.9 시험: 시각을 정해 두고 날 넘기기
+
+```csharp
+using System;
+using GBible;
+
+public static class ResetCheck
+{
+    public static bool ResetsAtFour()
+    {
+        var clock = new DateTime(2026, 10, 4, 3, 59, 0, DateTimeKind.Utc);
+        var session = new GameSession(new SessionOptions { RealClock = () => clock, TimeZone = TimeZoneInfo.Utc });
+        session.Data.Define("daily", DataZone.Meta, new DailyProfile());
+        session.Do(new CheckReset());                 // 3시 59분: 어제 날짜로 센다
+        var before = session.Data.Get<DailyProfile>("daily").lastDay;
+        clock = clock.AddMinutes(2);                  // 4시 1분
+        session.Do(new CheckReset());
+        return session.Data.Get<DailyProfile>("daily").lastDay == before + 1;   // 새 날
+    }
+}
+```
+
+`RealClock`이 늘 정한 시각을 돌려주므로 날짜·시간대에 걸린 규칙을 기다리지 않고 시험한다.
+
 ---
 
 ## 5. 주의할 점 · 자주 하는 실수
@@ -398,3 +575,11 @@ public static class SeedCheck
 | 대화창을 닫았는데 게임이 안 움직임 | 다른 이유(메뉴 등)의 일시정지가 남아 있다. `GameTime.PausedBy`로 확인한다. 모니터의 일시정지 버튼 툴팁에도 멈춘 이유가 보인다. |
 | `StepFrame`이 아무 일도 안 함 | 일시정지 상태가 아니다. |
 | `Range(5, 5)`에서 예외 | 최댓값은 포함하지 않는다. `max > min`이어야 한다. |
+| 다시 돌리기·멀티에서 시각에 걸린 결과가 어긋남 | 규칙에서 `DateTime.Now`·`DateTime.UtcNow`를 썼다. 부를 때마다 값이 달라 행동에 남지 않는다. 규칙은 `Game.Now`를 쓴다. |
+| 오프라인 보상이 늘 0 | 게임 시계(`session.Clock`)로 쟀다. 게임 시계는 켜져 있을 때만 흐른다. 꺼 둔 시간은 `Game.Now`로 잰다(2.14). |
+| 일시정지 중에도 쿨다운이 줄어듦 | 게임 안의 쿨다운을 `Game.Now`로 쟀다. 게임 안의 시간은 `session.Clock`, 현실 시간 규칙(스태미나·일일)만 `Game.Now`. |
+| 기기 시계를 앞으로 돌려 보상을 더 받음 | 기기 시계는 플레이어가 바꿀 수 있다. 서버·Steam 시각이 있으면 `RealClock`으로 넘긴다. 없으면 상한을 두고 뒤로 간 시간은 0으로 센다(4.7). |
+| 일일 초기화 시각이 플레이어마다 다름 | `TimeZone`을 비워 각자 지역 시각으로 센다. 모두 같은 순간이어야 하면 `TimeZone`을 정한다(2.13). |
+| `Game.Now`가 옛 시각 | 같은 행동 객체를 두 번 `Do`했거나, 미리보기한 객체를 그대로 `Do`했다. `utc`는 이미 값이 있으면 그대로 쓴다. `Do`할 때마다 `new`로 만든다. |
+| 행동 안에서 `Game.Now`가 흐르지 않음 | 의도된 동작이다. 행동 하나는 한 순간이다. |
+| 처음 켰더니 오프라인 보상이 엄청남 | `DateTime` 필드의 처음 값(`default`, 0001년)부터 쟀다. 처음이면 시각만 적는다(4.7). |

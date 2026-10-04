@@ -386,7 +386,7 @@ static void Started(GameSession session)
 
 > [!note]- 다른 장르라면
 > - **실시간 액션**: 위치·속도는 매 프레임 MonoBehaviour에서 움직이고, 규칙에 필요한 값(체력·쿨다운 시각·현재 칸)만 플레이어 데이터에 둔다. 입력은 여전히 행동이지만 Undo는 스냅샷 되감기(Bootstrap의 Undo 방식 "스냅샷")다. 쿨다운은 `Time.time`이 아니라 `session.Clock.Time` 기준 시각으로 적어야 되감을 때 함께 돌아간다.
-> - **시뮬레이션·방치형(유닛 수천 개)**: 객체 수가 성능을 정한다. 계산으로 얻을 수 있는 값(누적 생산량 등)은 저장하지 않고, 자주 바뀌는 묶음을 별도 플레이어 데이터로 나눈다.
+> - **시뮬레이션·방치형(유닛 수천 개)**: 객체 수가 성능을 정한다. 지금 데이터에서 다시 계산할 수 있는 값(지금 초당 생산량 등)은 저장하지 않고, 자주 바뀌는 묶음을 별도 플레이어 데이터로 나눈다. 다시 계산할 수 없는 값(환생의 근거인 누적 생산량)은 저장한다.
 
 ### 10. 저장과 출시
 
@@ -844,6 +844,25 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 컴포넌트 '데이터 연결'(`DataBinding`) | 32 | 06 §1(화면 연결) |
 | 씬 흐름(Bootstrap, `GameScenes.Follow`·`Transition`) | 32 | 03 §9, 07 §6(RPG) |
 | 월드 상태 `Game.World`·`WorldFlag`·`SetWorld`, 컴포넌트 '월드 상태 연결' | 32 | 07 §6(RPG), 03 §9(언급), 10 §3(언급) |
+| 대기열 밖 연출 `GameView.Play` | 32 | 07 §6(실시간·방치형) |
+| 화면(UI Toolkit) DB › 화면·`GameScreen`(`Tick`)·binding-path·기본 화면 | 35 | 06 §1(접힌 칸) |
+
+### 2026-10-04 보강(6장르 시험)
+
+| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
+|---|---|---|
+| 현실 시각 `Game.Now`·`Day`·`Week`, `SessionOptions.RealClock` | 07 | 07 §6(수집형·방치형) |
+| 판 저장 N초마다·이벤트를 받을 때, `GBibleRuntime.Saving`·`RunLoaded`·`Stopping` | 06 · 20 | 07 §1·§6, 10 |
+| 되돌리기 지점 `session.HistoryMark`·`UndoTo` | 02 | 07 §6(턴제 전술) |
+| 필드 경로 `name[키]`(딕셔너리 항목·목록의 id 요소) | 11 · 12 · 28 | 07 §6(수집형) |
+| 상태 효과 주기·걸 때 길이·`ShortenStatus`·효과 '상태 효과 줄이기'·조건 '상태 효과 검사'(쿨다운)·`StatusApplied`·`StatusEnded` | 29 · 16 | 07 §6(실시간) |
+| DB › 패시브(가지고 있으면 발동), `Game.Owned` | 17 · 29 | 04 §9(접힌 칸), 07 §6 |
+| 기본 대상 Block(플레이어 데이터 목록·이벤트의 개체·조건으로 거르기·무작위 n개·정렬해서 n개) | 16 | — |
+| 의도 고치기 값 틀 `{user}`·`{stacks}`·`{balance:ID}`(도발·대신 맞기) | 28 | — |
+| 가중치 표 줄 무게를 밸런스 값에서(천장) | 30 | 07 §6(수집형) |
+| `Game.BalanceSum`·`BalanceCount`, `BigNumber` | 30 · 36 | 07 §6(방치형) |
+| 격자 `Grid`·`Cell` | 36 | 07 §1·§6(턴제 전술·생활 시뮬) |
+| 판정 보고 행동(화면이 판정, 결과를 행동으로) · 실시간 예산 | 33 | 07 §6(실시간·대량 실시간) |
 
 ### 고정 틱·미리보기·CSV
 

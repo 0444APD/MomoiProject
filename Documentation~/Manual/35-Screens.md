@@ -16,7 +16,7 @@
 | 용어 | 뜻 |
 |---|---|
 | 화면 | DB › 화면의 항목 하나(`ScreenData`): UXML · 더할 USS · 목록 칸 UXML · 층 · 아래 입력 막기 · 뒤로로 닫기 · 시간 멈춤 · 열 씬 · 게임이 켜지면 열기. ID 상수는 `GameIds.Screen.X`. |
-| 화면 코드 (`GameScreen`) | 화면 하나의 C# 코드. `[BindTo(GameIds.Screen.X)]`로 잇는다. 열 때 `OnOpen`, 데이터·언어가 바뀌면 `Draw`, 닫을 때 `OnClose`. 없어도 된다(`PlainScreen`). |
+| 화면 코드 (`GameScreen`) | 화면 하나의 C# 코드. `[BindTo(GameIds.Screen.X)]`로 잇는다. 열 때 `OnOpen`, 데이터·언어가 바뀌면 `Draw`, 열려 있는 동안 매 프레임 `Tick`, 닫을 때 `OnClose`. 없어도 된다(`PlainScreen`). |
 | 층 (`ScreenLayer`) | 화면이 뜨는 자리: 바탕(HUD) · 창(메뉴) · 팝업(위에 뜨는 창) · 알림. 위의 층이 아래를 덮는다. 같은 층에서는 나중에 연 것이 위. |
 | 연결 글 (binding-path) | UXML 칸의 `binding-path` 속성에 적는 글. `키:경로`(플레이어 데이터의 값) · `@텍스트키`(번역된 글) · 둘 다(`키:경로@텍스트키`, 값을 틀에 넣어서). `ScreenBinding`이 읽는다. |
 | 목록 칸 | 데이터 목록의 항목마다 하나씩 만드는 칸(목록 칸 UXML 하나를 복제). `ElementList`가 만들고 없애고 순서를 맞춘다. |
@@ -93,11 +93,25 @@ public class ShopScreen : GameScreen
 {
     protected override void OnOpen() { … }   // 버튼·목록 잇기(열 때마다)
     protected override void Draw() { … }     // binding-path로 안 되는 칸(데이터·언어가 바뀔 때)
+    protected override void Tick(float deltaTime) { … }   // 시간에 따라 바뀌는 칸(열려 있는 동안 매 프레임)
     protected override void OnClose() { … }  // 정리할 것이 있으면
 }
 ```
 
 - `Root`(이 화면의 트리), `Id`, `Argument`(`Open(id, 값)`으로 넘긴 것), `Data`(DB 항목), `Game`.
+- **`Draw`와 `Tick`**: `Draw`는 값이 바뀔 때(프레임 끝에 한 번), `Tick`은 시간이 흐를 때(열려 있는 동안 매 프레임 끝)다. 쿨다운 원·남은 시간 타이머·버프 남은 초처럼 데이터는 그대로인데 시간에 따라 바뀌는 칸은 `Tick`에서 그린다. `deltaTime`은 실제 시간(초, `Time.unscaledDeltaTime`)이라 게임 일시정지·배속과 상관없다. 게임 시간으로 남은 시간을 보이려면 `deltaTime`을 쌓지 말고 그때마다 게임 시계(`Game.Session.Clock.Time`)를 읽는다. **`Tick`에서 데이터를 바꾸지 않는다**(바꾸려면 행동). 예외가 나면 콘솔에 찍히고 다른 화면은 계속 돈다.
+
+```csharp
+Label _dash;
+protected override void OnOpen() => _dash = Q<Label>("dash-cooldown");      // 매 프레임 찾지 않게 열 때 한 번
+
+protected override void Tick(float deltaTime)
+{
+    var hero = Game.Data().Run.hero;
+    var left = hero.dashReadyAt - Game.Session.Clock.Time;                 // 게임 시간으로 남은 초(일시정지 중이면 멈춘다)
+    _dash.text = left > 0 ? left.ToString("0.0") : "";
+}
+```
 - `Q<Label>("name")`: 이름으로 찾는다. 없으면 예외 "[MomoiProject] 화면 'shop'의 UXML에 이름(name)이 'price'인 Label이(가) 없습니다." — UXML과 코드의 이름이 어긋난 것을 바로 알린다.
 - `OnClick("buy", () => new BuyCard { … })`: 버튼 → 행동(2-4). `OnClick("close", Close)`·`OnClick("settings", () => GameScreens.Open(GameScreens.Settings))`: 버튼 → 화면 일(Busy여도 돈다).
 - `List<T>("container", Item("CardItem"), () => 목록, (칸, 항목) => …, 키…)`: 목록 칸(2-6). 닫으면 저절로 정리된다.
@@ -121,15 +135,18 @@ public class ShopScreen : GameScreen
 
 | ID (`GameScreens.…`) | 층 · 뒤로 | 하는 일 | 여는 법 |
 |---|---|---|---|
-| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. 틀린 답은 알림 | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로') |
+| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 후보 버튼 안에 텍스트 `<후보 id>.desc`가 있으면 설명 글(`.momoi-option__desc`). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. 틀린 답은 알림 | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로') |
 | `Confirmation` (`momoi.confirm`) | 팝업 · 아니오 | 글 + 예/아니오 | `GameScreens.Confirm(글, 예, 아니오)` |
 | `Settings` (`momoi.settings`) | 창 · 닫기 | DB › 설정 항목을 분류마다: 켜기/끄기 → 토글, 숫자 → 슬라이더(0~1이면 %), 선택지 → 드롭다운(언어·해상도는 자동 목록), 글 → 입력칸. 바꾸면 바로 `GameSettings.Set`(저장·적용). '기본값으로'(확인 후 `ResetAll`) | `GameScreens.Open(GameScreens.Settings)` |
 | `Slots` (`momoi.slots`) | 창 · 닫기 | 슬롯마다 요약(`GBibleRuntime.SlotSummary`)·플레이 시간. 고르면 `UseSlot` 후 `picked`. 지우기(확인 후, 지금 슬롯은 못 지움) | `GameScreens.Open(GameScreens.Slots, new SlotsRequest { count = 3, picked = … })` |
 | `Pause` (`momoi.pause`) | 창 · 닫기 · 시간 멈춤 | 계속하기 · 설정 · 타이틀로(`GameScreens.QuitToTitle`이 있을 때) · 게임 종료 | `Open(GameScreens.Pause)` 또는 Esc('Esc로 일시정지 메뉴') |
 | (알림) | 알림 | 아래쪽 한 줄, 2.5초. 최대 4줄 | `GameScreens.Toast(글)` |
 
-- 모양은 테마 USS의 변수(2-7)와 클래스로 바꾼다: `.momoi-panel`(가운데 판) · `.momoi-title` · `.momoi-hint` · `.momoi-section` · `.momoi-message` · `.momoi-row` · `.momoi-button` · `.momoi-button--primary` · `.momoi-option` · `.momoi-option--selected` · `.momoi-setting` · `.momoi-value` · `.momoi-slot` · `.momoi-toast` · `.momoi-backdrop`. 화면마다 판에 `.momoi-choice` · `.momoi-confirm` · `.momoi-settings` · `.momoi-slots` · `.momoi-pause`가 붙는다.
-- **바꾸기**: 같은 ID로 DB › 화면 항목을 만들면 그 항목이 쓰인다. `[BindTo("momoi.settings")]` 클래스가 없으면 기본 코드가 그 UXML 위에 그린다(USS만 바꾸고 싶을 때). 통째로 바꾸려면 `[BindTo]`로 코드도 잇는다. 고르기 창을 따로 만들었으면 '고르기 창 저절로'를 끈다.
+- 모양은 테마 USS의 변수(2-7)와 클래스로 바꾼다: `.momoi-panel`(가운데 판) · `.momoi-title` · `.momoi-hint` · `.momoi-section` · `.momoi-message` · `.momoi-row` · `.momoi-button` · `.momoi-button--primary` · `.momoi-options` · `.momoi-option` · `.momoi-option--selected` · `.momoi-option__desc` · `.momoi-setting` · `.momoi-value` · `.momoi-slot` · `.momoi-toast` · `.momoi-backdrop`. 화면마다 판에 `.momoi-choice` · `.momoi-confirm` · `.momoi-settings` · `.momoi-slots` · `.momoi-pause`가 붙는다.
+- **고르기 창의 설명 글**: 후보마다 텍스트 표에 `<후보 id>.desc`를 넣으면 버튼 안 이름 아래에 보인다(레벨업 특성 "불꽃 칼날" + "공격에 화상 1"). 키가 없으면 이름만 보인다. 이름은 선택 대기의 보일 글이다(비우면 `<id>.name`, 29장).
+- **고르는 동안 게임 시간 멈춤**(DB › 화면 설정, 기본 끔): 켜면 기본 고르기 창이 떠 있는 동안 `GameTime.Pause`로 게임 시간을 멈춘다. 실시간 게임의 레벨업 선택에서 켠다(고르는 동안 적이 움직이지 않는다). `Time.timeScale`이라 시간 예약·초 지속·고정 틱과 함께 **연출도 멈춘다** → 턴제는 끈다. 화면 코드의 `Tick`(실제 시간)은 계속 돈다.
+- **바꾸기**: 같은 ID로 DB › 화면 항목을 만들면 그 항목이 쓰인다. `[BindTo("momoi.settings")]` 클래스가 없으면 기본 코드가 그 UXML 위에 그린다(USS만 바꾸고 싶을 때). 통째로 바꾸려면 `[BindTo]`로 코드도 잇는다.
+- **고르기 창을 바꿨을 때 '고르기 창 저절로'**: 같은 ID(`momoi.choice`)로 바꿨으면 **켜 둔다** — 저절로 여는 것이 이 ID라, 끄면 열리지 않는다. 다른 ID로 따로 만들어 직접 열 때만 끈다(켜 두면 기본 창과 둘 다 뜬다). 같은 ID의 DB 항목에서는 그 항목의 칸이 쓰인다: 층은 `팝업`, '뒤로(Esc)로 닫기'는 끈다(켜 두면 Esc로 닫혀도 선택 대기가 남아 다음 프레임에 다시 열린다), 시간 멈춤은 '고르는 동안 게임 시간 멈춤' 대신 그 항목의 '열린 동안 게임 시간 멈춤'이다.
 - **글**: 텍스트 키가 있으면 그 번역, 없으면 한국어 기본 글. 출시 언어마다 텍스트 표에 넣는다.
 
 | 텍스트 키 | 기본 글 |
@@ -180,7 +197,8 @@ public class ShopScreen : GameScreen
 | `panelSettings` | Panel Settings | `Assets/UI/PanelSettings.asset` |
 | `theme` | 테마 USS | 모든 화면에 붙는 USS 목록 |
 | `font` | 글꼴 | 한글이 든 TTF·OTF |
-| `choiceWindow` | 고르기 창 저절로 | 기본 켬 |
+| `choiceWindow` | 고르기 창 저절로 | 기본 켬. 고르기 창을 같은 ID(`momoi.choice`)로 바꿨으면 켜 둔다. 다른 ID로 따로 만들었을 때만 끈다(2-5) |
+| `pauseWhileChoosing` | 고르는 동안 게임 시간 멈춤 | 기본 끔. 실시간 게임의 레벨업 선택에서 켠다. `Time.timeScale`이라 연출도 멈춘다 → 턴제는 끈다(2-5) |
 | `failureToast` | 실패를 알림으로 | 기본 켬 |
 | `pauseMenu` | Esc로 일시정지 메뉴 | 기본 끔 |
 
@@ -241,6 +259,7 @@ public class ShopScreen : GameScreen
 | `virtual string[] Watch` | 다시 그릴 키(기본 null = binding-path의 키들) |
 | `virtual bool WaitForPresentation` | 연출이 끝난 뒤에 그리나(기본 참) |
 | `virtual OnOpen()` · `Draw()` · `OnClose()` | 열 때 · 그릴 때 · 닫을 때 |
+| `virtual Tick(float deltaTime)` | 열려 있는 동안 매 프레임 끝. `deltaTime`은 실제 시간(초, 일시정지와 상관없이). 쿨다운 원·타이머처럼 시간에 따라 바뀌는 칸. 데이터는 바꾸지 않는다(2-3) |
 | `Close()` | 이 화면 닫기 |
 | `T Q<T>(name)` · `VisualElement Q(name)` | 이름으로 찾기(없으면 예외) |
 | `OnClick(name 또는 Button, Func<GameAction>)` | 버튼 → 행동 |
@@ -348,16 +367,36 @@ public class ShopScreen : GameScreen
         var goods = List<ShopItem>("goods", Item("GoodsItem"), () => Game.Data().Run.shop, (element, item) =>
         {
             element.Q<Label>("title").text = Texts.NameOf(item.card);
-            element.Q<Label>("price").text = item.price.ToString();
+            element.Q<Label>("price").text = Price().ToString();                // 표시만: 행동과 같은 밸런스 값을 읽는다
             element.EnableInClassList("goods--sold", item.sold);
         }, GameIds.PlayerData.Run.Id);
         goods.OnCreate = (element, item) => element.Q<Button>("buy").clicked +=
-            () => GameScreens.Do(() => new BuyCard { source = item.card, price = item.price });
+            () => GameScreens.Do(() => new BuyCard { source = item.card });     // 무엇을 살지만 보낸다. 가격은 규칙이
+    }
+
+    int Price() => (int)Game.Balance(GameIds.Balance.ShopCardPrice, Game.Data().Run.floor);
+}
+
+// 규칙 쪽(30장 5-3): 가격은 행동이 밸런스 값에서 읽는다
+[Serializable, BlockInfo("카드 사기")]
+public class BuyCard : GameAction
+{
+    public string source;     // 살 카드 원본 ID
+
+    protected override void Run()
+    {
+        var run = Game.Data().Run;
+        var price = (int)Game.Balance(GameIds.Balance.ShopCardPrice, run.floor);
+        Game.Pay(GameIds.PlayerData.Run.Id, "gold", price, what: "gold.name");   // 모자라면 플레이어용 실패 → 알림
+        run.deck.Add(Rules.NewCard(Game, source));
     }
 }
 ```
 
 DB › 화면 `shop`: 층 `창(메뉴)` · 아래 입력 막기 · 뒤로로 닫기. 골드가 모자라면 `BuyCard`의 `Game.Pay`가 알림을 띄운다.
+
+- **화면이 가격을 행동에 넣지 않는다**(`new BuyCard { source, price = … }`). 행동 필드는 보내는 쪽이 정하는 값이라 멀티플레이에서 상대가 가격 0을 보낼 수 있고, 가격 규칙이 화면 코드에 복사된다. 행동은 무엇을 할지(살 카드)만 받고, 가격은 원본·밸런스 값에서 규칙이 읽는다. 화면은 같은 값을 읽어 **보이기만** 한다(30장 5-3).
+- 물건마다 가격이 다르면 원본에 가격을 두고(`Rules.CardData(Game, source).price`) 행동이 그것을 읽는다. 상점이 열릴 때 정해지는 가격(무작위 할인)이면 상점을 여는 행동이 판 데이터(`run.shop[i].price`)에 적고, `BuyCard`가 판 데이터에서 그 물건을 찾아 읽는다.
 
 ### 5-3. 타이틀 — 이어 하기 · 새 게임 · 슬롯 · 설정 · 종료
 
@@ -368,17 +407,26 @@ public class TitleScreen : GameScreen
     protected override void OnOpen()
     {
         OnClick("continue", () => GBibleRuntime.LoadRun(GBibleRuntime.Session));
-        OnClick("new", () => new StartRun());
+        OnClick("new", NewGame);
         OnClick("slots", () => GameScreens.Open(GameScreens.Slots, new SlotsRequest { count = 3 }));
         OnClick("settings", () => GameScreens.Open(GameScreens.Settings));
         OnClick("quit", GameScreens.Quit);
     }
 
     protected override void Draw() => Q<Button>("continue").SetEnabled(GBibleRuntime.HasSavedRun);
+
+    void NewGame()
+    {
+        GBibleRuntime.NewRun(Game.Session);      // 1) 행동 밖에서: 판 값을 처음 값으로, Undo 기록과 판 저장 파일(run.json)을 지운다
+        Game.Do(new StartRun());                 // 2) 그다음 새 판을 여는 행동(주인공·시작 덱·첫 전투)
+    }
 }
 ```
 
 DB › 화면 `title`: 층 `창(메뉴)` · 뒤로로 닫기 끔 · 열 씬 `Title`. `GBibleRuntime.LoadRun`은 행동이 아니므로 `Action` 쪽 `OnClick`이다(bool을 돌려주지만 버린다).
+
+- **'새 게임'은 `NewRun` 다음 `StartRun`이다.** `OnClick("new", () => new StartRun())`만 하면 `StartRun`이 다시 채우지 않는 지난 판의 값(세션 구역의 다른 플레이어 데이터 — 월드 상태 등)과 Undo 기록, `run.json`이 남는다(`NewRun`은 세션 구역 전체를 처음 값으로 되돌린다). 화면은 새 판인데 '이어 하기'는 예전 판이 된다. `GBibleRuntime.NewRun`은 행동 안에서 부르면 예외("[MomoiProject] 행동 실행 중에는 새 판을 시작할 수 없습니다. 행동 밖(버튼 등)에서 부르세요.")라 `StartRun` 안에 넣지 않는다 → 화면 일(`Action` 쪽 `OnClick`)로 둘을 차례로 부른다.
+- `NewGame`은 `Action` 쪽이라 `Busy`를 보지 않고 실패 알림도 없다. `StartRun`이 플레이어용 실패를 던질 수 있으면 `GameScreens.Do(() => new StartRun())`로 부른다(2-4).
 
 ### 5-4. 피해 숫자를 적 칸 위에 — `FindElement` · `Overlay`
 
@@ -464,6 +512,16 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 | 버튼이 두 번 돈다 | `OnOpen` 밖(생성자)이나 `Draw`에서 `clicked +=`를 했다. 버튼 잇기는 `OnOpen`(열 때마다 새 트리)이나 `OnCreate`(칸마다 한 번)에서. |
 | HUD 아래의 월드를 클릭할 수 없다 | 화면 전체를 덮는 요소에 배경이 있거나 `picking-mode`가 Position이다. 빈 컨테이너에는 `picking-mode="Ignore"`. |
 | Esc가 HUD를 닫는다 | HUD의 '뒤로로 닫기'가 켜져 있다(기본 켬). HUD는 끈다. |
-| 고르기 창이 두 개 뜬다(프로젝트 것과 기본 것) | 프로젝트가 고르기 화면을 만들었으면 '고르기 창 저절로'를 끈다. |
+| 고르기 창이 두 개 뜬다(프로젝트 것과 기본 것) | 프로젝트가 **다른 ID**로 고르기 화면을 만들었다. 그때만 '고르기 창 저절로'를 끈다. 같은 ID(`momoi.choice`)로 바꾸면 하나만 뜬다(2-5). |
+| 고르기 창을 같은 ID로 바꿨더니 열리지 않는다 | '고르기 창 저절로'를 껐다. 저절로 여는 것이 `momoi.choice`라 켜 둔다(2-5). |
+| 바꾼 고르기 창이 Esc로 닫혔다가 바로 다시 뜬다 | 같은 ID의 DB 항목에서 '뒤로(Esc)로 닫기'가 켜져 있다(기본 켬). 선택 대기가 남아 있어 다음 프레임에 다시 열린다. 끈다. |
+| 실시간 레벨업 고르기 중에 적이 계속 움직인다 | DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다(같은 ID로 바꾼 창이면 그 항목의 '열린 동안 게임 시간 멈춤'). |
+| 턴제에서 고르기 창이 뜨면 피해 숫자·카드 연출이 멈춘다 | '고르는 동안 게임 시간 멈춤'이 켜져 있다(`Time.timeScale`이라 연출도 멈춘다). 턴제는 끈다. |
+| 고르기 창 후보에 설명이 없다 | 텍스트 표에 `<후보 id>.desc`가 없다. 키를 넣는다(2-5). |
+| 쿨다운 원이 데이터가 바뀔 때만 움직인다 | `Draw`에서 그렸다. `Draw`는 값이 바뀔 때만 돈다. 시간에 따라 바뀌는 칸은 `Tick`(2-3). |
+| 일시정지했는데 쿨다운 숫자가 계속 준다 | `Tick`의 `deltaTime`(실제 시간)을 쌓았다. 게임 시간 쿨다운은 그때마다 게임 시계(`Game.Session.Clock.Time`)에서 남은 시간을 계산한다. |
+| 타이틀 '새 게임' 뒤 '이어 하기'가 예전 판을 연다 | `StartRun`만 보냈다. `GBibleRuntime.NewRun(session)` 다음 `Game.Do(new StartRun())`(행동 밖, 5-3). |
+| "행동 실행 중에는 새 판을 시작할 수 없습니다" | `NewRun`을 행동(`StartRun.Run`) 안에서 불렀다. 화면 일로 행동 밖에서 부른다(5-3). |
+| 상점 가격이 화면마다 다르게 들어간다 | 화면이 가격을 행동 필드에 넣었다. 행동은 살 것만 받고 가격은 규칙이 읽는다(5-2). |
 | 설정 화면에서 슬라이더를 끌면 값이 띄엄띄엄 | 설정의 '단위'가 0보다 크다(31장). 의도한 것이다. |
 | 화면이 씬을 바꾸면 사라진다 | '열 씬'에 다른 씬이 적혀 있다. 비우면 씬과 상관없다. |

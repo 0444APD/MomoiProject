@@ -1,11 +1,12 @@
 # 17. 프로젝트 고유 기능 만들기(퀘스트 예)
 
-**한 줄 요약**: 로그·도전과제·능력처럼 "Trigger → 결과" 구조를 가진 기능을 프로젝트가 직접 만들 수 있다. DB 종류 클래스에 `Trigger` 필드와 `List<Outcome>` 필드를 두고 `[TriggerSlot]`·`[OutcomeSlot]` 표시만 붙이면 같은 편집 화면·검증이 붙고, 런타임에서는 `session.Triggers.Register`로 감시하고 `RunOutcomes`로 결과를 실행한다.
+**한 줄 요약**: 먼저 기본 종류 **패시브**(DB › 패시브)로 되는지 본다. 유물·특성·패시브 스킬처럼 "가지고 있으면 발동"하는 것은 코드 없이 패시브로 만든다(0절). 그 밖에 로그·도전과제·능력처럼 "Trigger → 결과" 구조를 가진 기능(퀘스트·일일 미션·튜토리얼 단계)은 프로젝트가 직접 만들 수 있다. DB 종류 클래스에 `Trigger` 필드와 `List<Outcome>` 필드를 두고 `[TriggerSlot]`·`[OutcomeSlot]` 표시만 붙이면 같은 편집 화면·검증이 붙고, 런타임에서는 `session.Triggers.Register`로 감시하고 `RunOutcomes`로 결과를 실행한다.
 
 **언제 쓰는가**
 
-- 퀘스트, 일일 미션, 튜토리얼 단계, 이벤트 기간 보상처럼 "언제(조건) → 무엇을(보상)"을 기획자가 DB에서 항목마다 조립해야 하는 기능.
-- 기본 기능(도전과제 = 한 번, 로그 = 숫자 기록)과 진행·저장·반복 규칙이 달라서 직접 다뤄야 할 때.
+- 유물·특성·장비 효과·축복처럼 가진 목록에 있는 동안 발동하는 것 → 기본 종류 패시브(0절). 새 DB 종류를 만들지 않는다.
+- 퀘스트, 일일 미션, 튜토리얼 단계, 이벤트 기간 보상처럼 "언제(조건) → 무엇을(보상)"을 기획자가 DB에서 항목마다 조립해야 하는 기능(1절부터).
+- 기본 기능(도전과제 = 한 번, 로그 = 숫자 기록, 패시브 = 가진 동안 매번)과 진행·저장·반복 규칙이 달라서 직접 다뤄야 할 때.
 
 이 문서에서 쓰는 용어:
 
@@ -17,6 +18,139 @@
 | 감시 | `session.Triggers`가 Trigger를 지켜보다가 참이 되는 순간 등록한 함수를 부르는 것(`Register`). |
 | TriggerContext (컨텍스트) | 발동한 순간의 정보(`Owner`·`Event` …). |
 | Permanent | `session.Data.Permanent()` 안의 변경은 Undo 이력에 들어가지 않는다(도전과제 달성이 쓰는 방식). |
+| 패시브 | DB › 패시브의 항목 하나: 가진 목록 · 발동(Trigger) · 가진 쪽 필드 · 결과 · 아이콘. 코드 형식 `PassiveData`(DB), `PassiveDefinition`(실행 중). ID 상수는 `GameIds.Passive.X`. |
+| 가진 목록 | 플레이어 데이터 안의 ID 목록·ID → 레벨 딕셔너리(`run › relics`, `run › perks`). 패시브 ID가 들어 있으면 가진 것이다. |
+| 가진 쪽 | 가진 목록을 품은 객체(`run`, `hero`, 동료마다). 패시브의 결과가 그 쪽을 사용자로 돈다. |
+
+---
+
+## 0. 무엇으로 만드나 — 먼저 기본 종류 '패시브'로 되는지 본다
+
+| 기획 문장 | 만드는 것 |
+|---|---|
+| "유물 닻: 전투 첫 턴에 방어도 8" · "가시 갑옷: 받는 피해 −5" | DB › 패시브(0-3), 코드 없음 |
+| "특성 '중갑': 받는 피해 −2"(동료마다 다른 특성) | DB › 패시브, 가진 목록 `party[].traits`(가진 쪽 = 그 동료) |
+| "패시브 스킬 레벨 n: 처치마다 체력 +n" | DB › 패시브, 가진 목록 = ID → 레벨 딕셔너리(`Game.Owned`) |
+| "버프 3턴" · "독" · "쿨다운" | 상태 효과(29장). 걸고 풀고 끝나는 것 |
+| "슬라임 5마리를 잡으면 보상(한 번)" · "일일 미션(하루 3번)" · "튜토리얼 단계" | 이 장의 프로젝트 고유 기능(1절부터) |
+
+> **규칙: "가지고 있으면 발동"은 DB › 패시브로 만든다.** 유물·특성·패시브 스킬·장비 효과·축복이 모두 이것이다. 새 DB 종류(1절부터)는 완료 기록·한도·단계·선행처럼 패시브에 없는 규칙이 있을 때만 만든다. 영구 상태 효과로 걸어 두는 우회도 하지 않는다(29장 1절).
+
+### 0-1. 동작 규칙
+
+- 정의(DB › 패시브의 항목)는 게임이 켜질 때 모두 등록된다. 순간마다(이벤트를 받을 때·의도를 가로챌 때·조건 값이 바뀔 때) **가진 목록에 그 ID가 있는 쪽(가진 쪽)마다** 발동을 따로 검사하고, 참인 가진 쪽마다 결과를 낸다(상태 효과의 "가진 쪽마다 검사"와 같다, 29장 2-3).
+- **가진 목록**: 플레이어 데이터 하나 + 그 안의 필드. 담는 모양에 따라 "몇 개 가졌나"(레벨)가 정해진다.
+
+| 가진 목록의 모양 | 예 | 몇 개(레벨) |
+|---|---|---|
+| ID 목록(`List<string>`) | `run › relics` | 그 ID가 든 횟수 |
+| ID → 레벨 딕셔너리(`Dictionary<string, int>`) | `run › perks` | 그 키의 숫자(없으면 0 = 가지지 않음) |
+| 글자 필드 하나 | `run › hero.weaponPassive` | 같으면 1 |
+
+요소의 `id`가 패시브 ID인 객체 목록도 센다(그 id인 요소 수).
+
+- **가진 쪽** = 그 목록을 품은 객체. `run › relics`면 `run`(판 하나에 하나), `run › hero.perks`면 `hero`, 앞마디에 `[]`를 쓴 `run › party[].traits`면 그 목록을 가진 동료마다다.
+- **결과의 컨텍스트**: `User` = 가진 쪽, `Picked` = 가진 쪽 하나, `Owner` = 패시브 ID, `Event` = 받은 이벤트(가로채기면 의도), `IsIntercept`. 결과 `대상에게 효과`의 대상을 비우거나 `사용자 자신`이면 가진 쪽이다. 가진 쪽이 `run`처럼 싸우는 개체가 아니면 대상 Block으로 고른다(기본 대상 Block 16장 2-6, 또는 프로젝트의 `주인공` Block — 가이드 04장 9절).
+- **가진 쪽 필드**: 이벤트·의도의 그 필드가 가진 쪽 id일 때만 발동한다("내가 맞을 때만" = 피해 의도의 `targetId`). 가진 쪽에 `id`가 있어야 한다. `run`처럼 id가 없는 가진 쪽이면 이 칸을 채운 패시브는 발동하지 않으므로 의도 조건(`targetId 일치 hero`)으로 거른다.
+- **얻기·잃기**는 가진 목록에 ID를 넣고 빼는 것이다(결과 `플레이어 데이터에 주기`·`가중치 표에서 주기`·`가중치 표에서 고르기`, 코드 `run.relics.Add(id)`). 가진 목록이 딕셔너리면 가중치 표에서 같은 ID를 다시 고를 때 그 키가 +1 된다(레벨업, 30장 3-3). 등록을 바꿀 일이 없고, 가진 것이 플레이어 데이터라 Undo·저장·멀티플레이가 따라온다.
+- 상태 효과와 다른 점: 지속·중첩·만료가 없고, 가진 것이 게임의 데이터(유물 목록·특성 목록)에 그대로 있다.
+- 이벤트 받기·가로채기로 발동한 결과는 그 행동 안에서 돈다. 조건 충족만으로 된 발동은 값이 바뀐 행동이 끝난 뒤의 평가에서 돈다(행동 밖, 29장 2-3과 같다). 판 값을 바꾸는 패시브는 이벤트 받기·가로채기로 발동시킨다.
+
+### 0-2. 에디터에서 — DB › 패시브
+
+`MomoiProject → DB` → 사이드바 **DB** 그룹의 **패시브** 탭 → **+ 새로 만들기** → ID(접두어 `passive`, 예: `thornArmor`). 저장하면 `GameIds.Passive.ThornArmor`가 생긴다.
+
+| 칸 | 툴팁 | 값 |
+|---|---|---|
+| `ownerKey` | 가진 목록(플레이어 데이터) / 이 ID가 들어 있으면 가진 것 | 기본 `run` |
+| `ownerPath` | 필드(목록·딕셔너리) / ID 목록·id가 있는 객체 목록·ID → 레벨 딕셔너리. 앞마디에 []를 쓰면 가진 쪽이 여럿(party[].traits) | 기본 `relics`. 비우면 값 전체 |
+| `trigger` | 발동 | `+ 블럭`: 이벤트 받기 · 조건 충족 · 가로채기 |
+| `holderField` | 가진 쪽 필드 / 이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 targetId → 가진 쪽이 맞을 때만) | 트리거가 고른 이벤트·의도의 필드. 비우면 "가진 쪽 모두" |
+| `outcomes` | 결과 | 결과 종류 전부(의도 고치기 포함) |
+| `icon` | 아이콘 | `Sprite`. 규칙은 보지 않는다. 화면 코드가 유물 줄·특성 창에 그린다 |
+
+- 결과를 코드로 쓰려면 그 ID에 `[BindTo]`(결과 칸이 잠긴다, 13장). 패시브는 기본 종류라 라이브러리가 연결을 스스로 확인한다(2-8의 `BoundOutcomes` 확인이 필요 없다).
+- 검증 오류: "가진 목록의 플레이어 데이터를 고르세요." / "발동(트리거)이 없습니다." / "비어 있는 결과 칸이 있습니다(스크립트가 지워졌을 수 있음)." 경고: "결과가 없습니다."
+- 모니터: 결과가 돌면 타임라인에 "결과: …"(출처 `Passive`)가 남는다. **데이터** 탭에서 가진 목록(`run › relics`)에 ID를 넣고 빼며 시험한다.
+
+### 0-3. 예제 — 닻 · 가시 갑옷 · 동료 특성 · 레벨이 있는 패시브
+
+가이드의 카드 던전 형식을 쓴다: 판 데이터 `run`(`RunState`)에 `hero`(id `hero`) · `relics`(`List<string>`)가 있고, 효과 Block `방어도`·`피해`, 의도 `피해`(`DamageIntent { sourceId, targetId, amount, cancelled }`)가 있다.
+
+**닻 — 전투 첫 턴에 방어도 8**
+
+1. DB › 패시브 `anchor`: `ownerKey` `run`, `ownerPath` `relics`.
+2. `trigger`: `이벤트 받기` → `턴 시작`, 이벤트 조건 `turn` `일치` `1`.
+3. `outcomes`: `대상에게 효과` → 대상 `주인공`(가이드의 프로젝트 대상 Block) → 효과 `방어도`(8).
+
+가진 쪽이 `run`이라 대상을 비우면 주인공이 아니다(방어도 Block이 `Fighter`만 받아 `run`을 건너뛴다). 그래서 주인공을 고르는 대상 Block을 둔다. 가진 목록을 주인공 안에 두면(`run › hero.relics`) 가진 쪽이 주인공이 되어 대상을 비워도 된다.
+
+**가시 갑옷 — 주인공이 받는 피해 −5**
+
+1. DB › 패시브 `thornArmor`: 가진 목록 `run › relics`.
+2. `trigger`: `가로채기` → 의도 `피해`, 의도 조건 `targetId` `일치` `hero`.
+3. `outcomes`: `의도 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
+
+가진 쪽(`run`)에 id가 없으므로 "주인공이 맞을 때만"은 가진 쪽 필드가 아니라 의도 조건으로 정한다. 등록 코드는 없다. `run.relics`에 `thornArmor`를 넣으면 그때부터 줄어든다.
+
+**동료 특성 — '중갑': 그 동료가 받는 피해 −2** — 동료가 있는 게임이라고 본다: `run › party`(`List<Unit>`, 동료마다 `id`), 동료마다 `traits`(`List<string>`).
+
+1. DB › 패시브 `heavyArmor`: `ownerKey` `run`, `ownerPath` `party[].traits`.
+2. `trigger`: `가로채기` → `피해`. `holderField` `targetId`.
+3. `outcomes`: `의도 고치기` `amount` `더하기` `-2`.
+
+`traits`에 `heavyArmor`가 든 동료마다 따로 검사하고, 가진 쪽 필드 덕에 그 동료가 맞을 때만 줄인다. 같은 특성을 가진 동료가 둘이어도 맞은 쪽 하나만 발동한다.
+
+**레벨이 있는 패시브 — 적을 처치할 때마다 체력 + 레벨** — `run › perks`(`Dictionary<string, int>`, ID → 레벨), 처치 이벤트 `EnemyKilled`.
+
+1. DB › 패시브 `bloodlust`: 가진 목록 `run › perks`, `trigger` `이벤트 받기` → `적 처치`. 결과는 레벨을 읽는 계산이라 코드로 쓴다.
+
+```csharp
+[BindTo(GameIds.Passive.Bloodlust)]
+static void Bloodlust(EnemyKilled e, TriggerContext c)
+{
+    var level = c.Game.Owned(c.Owner, c.User);                 // 이 가진 쪽의 레벨(perks의 값)
+    var hero = c.Game.Data().Run.hero;
+    hero.hp = Math.Min(hero.maxHp, hero.hp + level);
+}
+```
+
+2. 레벨업 보상: 결과 `가중치 표에서 고르기`(`table` `perkPool`, `count` `3`, `key` `run`, `path` `perks`). 고른 ID의 레벨이 1 오른다(없던 키면 1, 30장 3-3).
+
+### 0-4. 코드로 — `Game.Owned` · `PassiveDefinition` · `session.Passives`
+
+```csharp
+int relics = Game.Owned(GameIds.Passive.Anchor);                       // 모든 가진 쪽의 합
+int level  = Game.Owned(GameIds.Passive.Bloodlust, run);               // 그 가진 쪽만(객체 또는 id)
+bool has   = Game.Owned(GameIds.Passive.ThornArmor) > 0;
+```
+
+| 멤버 | 뜻 |
+|---|---|
+| `int Owned(string passiveId, object holder = null)` | 몇 개 가졌나(레벨, 0-1의 표). `holder`를 비우면 모든 가진 쪽의 합. 없는 패시브 ID면 0. 값을 바꾸지 않으므로 화면 코드에서도 읽는다 |
+
+| `PassiveDefinition` | 뜻 | DB 칸 |
+|---|---|---|
+| `Id` · `DisplayName` | ID · 표시 이름 | 항목 ID |
+| `OwnerKey` · `OwnerPath` | 가진 목록(플레이어 데이터 · 필드) | `ownerKey` · `ownerPath` |
+| `When` · `HolderField` | 발동 · 가진 쪽 필드 | `trigger` · `holderField` |
+| `Outcomes` | 결과 | `outcomes` |
+
+`session.Passives`(`PassiveSystem`): `Define(definition)`(등록, 같은 ID면 바꾼다. 발동도 이때 등록한다) · `Find(id)` · `Definitions` · `Owned(id, holder)`. 게임(Unity)에서는 런타임이 DB의 패시브 전부를 등록한다. 서버·테스트처럼 세션을 직접 만들면 직접 등록한다.
+
+```csharp
+foreach (var passive in GameDatabase.Load().All<PassiveData>()) session.Passives.Define(passive.ToDefinition());
+```
+
+- `PassiveData.ToDefinition()`은 그 ID에 `[BindTo]`가 있으면 `Outcomes`를 그 코드로 바꾼다.
+- 의도 고치기의 값 틀 `{stacks}`(28장 3-4)는 상태 효과의 중첩이다. 패시브의 레벨은 코드에서 `Game.Owned(c.Owner, c.User)`로 읽는다.
+- 아이콘은 DB 항목에만 있다: `GameDatabase.Load().All<PassiveData>()`에서 ID로 찾아 `icon`을 읽는다.
+
+### 0-5. 패시브로 안 되는 것 — 이 장의 고유 기능으로
+
+- **한 번만** 발동하고 완료를 저장한다(퀘스트·튜토리얼). 패시브는 가진 동안 매번 발동한다.
+- 하루·한 판에 **N번까지**, **단계**를 차례로 넘어간다, **선행** 항목이 있다(4절).
+- 같은 항목에 칸(가격·등급·설명)을 더해야 한다. `PassiveData`에는 칸을 더할 수 없다. 이름·설명은 텍스트 표(`<ID>.name`·`<ID>.desc`), 수치는 밸런스 값(의도 고치기의 값 틀 `{balance:ID}`, 28장 3-4)에 두면 패시브로 충분하다. 꼭 한 항목에 있어야 하면 DB 종류를 만든다(1절부터).
 
 ---
 
@@ -129,6 +263,8 @@ static void Started(GameSession session)
 `Bootstrap.Started`는 `GBibleRuntime.Started`에 연결된 함수다(`20-Setup.md` 4절). 세션이 준비된 뒤(플레이어 데이터·로그·능력·도전과제 정의와 프로필 불러오기가 끝난 뒤) 불린다. 기능마다 자기 `[RuntimeInitializeOnLoadMethod]`와 `Started +=`를 따로 두지 않는다. 그러면 연결이 여러 파일에 흩어지고, 서버에서 같은 등록을 부를 길이 없다.
 
 > [!note]- 예: 카드 던전의 유물
+> 유물은 기본 종류 패시브(0절)로 등록 코드 없이 만들 수 있다. 아래는 프로젝트 기능의 등록 함수 모양을 보이는 예다(패시브에 없는 규칙을 더할 때 이 모양에서 시작한다).
+>
 > ```csharp
 > // Rules/Relics/Relics.cs
 > public static class RelicRules
@@ -340,7 +476,9 @@ DB › 로그 `questsDone`: 반영 규칙 `퀘스트 완료 받기`(반영할 �
 
 ## 4. 변형
 
-### 4-1. 반복 미션(`repeat: true`)
+### 4-1. 반복 미션(`repeat: true`) — 판마다 한도 · 하루마다 한도(일일 미션)
+
+`repeat: true`로 등록하면 발동할 때마다 결과가 돈다. 한도는 **횟수를 담는 플레이어 데이터가 언제 비워지느냐**로 정해진다. 세션 구역에 두면 새 판에서 비워지므로 "판마다 N번"이다. **하루**에 N번(일일 미션)은 날짜가 바뀌었는지를 현실 시각으로 보고 직접 비운다. 날짜 번호는 `Game.Day(초기화 시각)`(07장)다.
 
 ```csharp
 [Database("일일 미션", Group = "진행", IdPrefix = "daily")]
@@ -348,27 +486,40 @@ public class DailyMissionData : GameData
 {
     [SerializeReference, TriggerSlot(TriggerKinds.Event)] public Trigger trigger;
     [SerializeReference, OutcomeSlot(OutcomeKinds.PlayerData | OutcomeKinds.Coded)] public List<Outcome> outcomes = new List<Outcome>();
-    public int maxPerRun = 3;
+    public int maxPerDay = 3;
 }
 
 [Serializable]
-public class DailyLog { public Dictionary<string, int> counts = new Dictionary<string, int>(); }   // 플레이어 데이터 "daily.log"(세션 구역)
+public class DailyLog
+{
+    public long day = -1;                                                  // 마지막으로 센 날짜 번호(Game.Day)
+    public Dictionary<string, int> counts = new Dictionary<string, int>();
+}   // 플레이어 데이터 "daily.log"(메타 구역 — 판이 바뀌어도 그날 센 횟수가 남는다)
+
+const int ResetHour = 4;                                                   // 새벽 4시에 하루가 바뀐다
 
 static void WatchDaily(GameSession session, DailyMissionData mission)
 {
     var id = mission.Id;
+    IEnumerable<Outcome> outcomes = BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : mission.outcomes;
     session.Triggers.Register(id, mission.trigger, repeat: true, fire: moment =>
     {
         var log = session.Data.Get<DailyLog>("daily.log");
+        var today = session.Game.Day(ResetHour);                           // 행동 안이면 그 행동의 시각(Undo·멀티에서 같다)
+        if (log.day != today) { log.day = today; log.counts.Clear(); }     // 날이 바뀌었으면 처음부터
         log.counts.TryGetValue(id, out var n);
-        if (n >= mission.maxPerRun) return;              // 한도
+        if (n >= mission.maxPerDay) return;              // 오늘의 한도
         log.counts[id] = n + 1;                          // 결과와 함께 기록된다
-        session.Triggers.RunOutcomes(mission.outcomes, moment, "Daily");
+        session.Triggers.RunOutcomes(outcomes, moment, "Daily");
     });
 }
 ```
 
-`Permanent()` 없이 실행하면, 이벤트를 쏜 행동 안에서 발동한 미션의 횟수·보상은 그 행동의 Undo 단위가 된다(Undo하면 함께 돌아간다).
+- **판마다 한도**면 `daily.log`를 세션 구역에 두고 날짜 칸과 날짜 비교를 뺀다(새 판이면 비워진다). 이름도 '판마다 미션'처럼 짓는다.
+- 날짜는 `DateTime.Now`가 아니라 `Game.Day`로 본다. 행동 안에서는 그 행동이 시작한 시각 하나라서 Undo·다시 돌리기·멀티플레이에서 같은 날로 읽힌다. 시간대는 `SessionOptions.TimeZone`(비우면 이 컴퓨터, 07장).
+- 화면의 "오늘 남은 횟수"도 같은 비교로 읽는다: `log.day != Game.Day(4)`이면 오늘은 아직 0번이다(행동 밖의 `Game.Day`는 지금 시각).
+- 주마다 초기화는 `Game.Week(초기화 시각)`로 같은 모양이다.
+- `Permanent()` 없이 실행하면, 이벤트를 쏜 행동 안에서 발동한 미션의 횟수·보상은 그 행동의 Undo 단위가 된다(Undo하면 함께 돌아간다).
 
 ### 4-2. 단계 퀘스트(`List<TriggerRule>`)
 
@@ -422,6 +573,9 @@ session.Triggers.Register("bonus", when, repeat: true, fire: m => session.Trigge
 
 ## 5. 주의할 점 / 자주 하는 실수
 
+- **"가지고 있으면 발동"을 새 DB 종류로 만든다.** 유물·특성·장비 효과는 기본 종류 패시브(0절)로 등록 코드 없이 된다. 이 장의 방식은 패시브에 없는 규칙(한 번만·한도·단계·선행)이 있을 때만.
+- **패시브의 가진 쪽 필드를 `run › relics`에 쓴다.** 가진 쪽(`run`)에 id가 없어 발동하지 않는다. 의도 조건(`targetId 일치 hero`)으로 거르거나, 가진 목록을 id가 있는 객체 안에 둔다(0-1).
+- **일일 미션의 횟수를 세션 구역에 둔다.** 새 판이면 비워져 하루가 아니라 판마다 한도가 된다. 메타 구역 + `Game.Day`로 날짜가 바뀔 때 비운다(4-1).
 - **`[BindTo]`를 확인하지 않는다.** 에디터는 연결된 항목의 결과 칸을 잠그지만, 런타임에서 그 코드를 쓰는 것은 기능 코드의 몫이다. `BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : 결과` 한 줄을 넣는다.
 - **완료를 저장하지 않는다.** `repeat: false` 감시는 세션 안에서만 한 번이다. 저장하지 않으면 다음 실행에서 다시 발동한다.
 - **시작할 때 이미 참인 조건.** 등록만으로는 발동하지 않는다. 등록 뒤 `session.Triggers.Watcher.EvaluateAll()`.
