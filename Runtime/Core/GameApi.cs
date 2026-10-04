@@ -140,6 +140,77 @@ namespace GBible
         public T Get<T>(string key) => Session.Data.Get<T>(key);
         public void Set(string key, object value) => Session.Data.Set(key, value);
 
+        // ── 능력치·Modifier ─────────────────────────────────────
+        // 능력치 = id가 있는 객체의 숫자 필드. 최종값 = (기본 + 플랫 합) × (1 + 퍼센트 합) × Π(1 + 독립 곱).
+        //   var attack = Game.Attribute(hero, nameof(Hero.attack));
+        public double Attribute(object entity, string attribute) => Session.Attributes.Get(entity, attribute);
+
+        // Modifier를 붙인다(행동 안에서). source = 붙인 쪽 ID(장비·상태 효과·유물). permanent면 프로필에 남는다. 돌려주는 값은 Modifier id.
+        public string AddModifier(object entity, string attribute, ModifierKind kind, double value, string source, bool permanent = false) =>
+            Session.Attributes.Add(entity, attribute, kind, value, source, permanent);
+
+        // 그 출처의 Modifier를 뗀다(entity를 주면 그 대상 것만). 뗀 개수.
+        public int RemoveModifiers(string source, object entity = null) => Session.Attributes.RemoveBySource(source, entity);
+
+        public IReadOnlyList<Modifier> Modifiers(object entity, string attribute = null) => Session.Attributes.Of(entity, attribute);
+
+        // ── 가로채기 ───────────────────────────────────────────
+        // 의도를 가로채기 트리거들에 통과시키고 (고쳐진) 의도를 돌려준다. 규칙 함수가 일을 하기 직전에 부른다.
+        //   var hit = Game.Intercept(new DamageIntent { … });  if (hit.cancelled) return;
+        public T Intercept<T>(T intent) where T : class => Session.Triggers.Intercept(intent);
+
+        // ── 비용 ───────────────────────────────────────────────
+        // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 InvalidOperationException → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.
+        //   Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", 2);
+        public void Pay(string key, string path, double amount)
+        {
+            var cost = Intercept(new CostIntent { key = key, path = path ?? "", amount = amount });
+            if (cost.cancelled || cost.amount <= 0) return;
+            var have = ReadNumber(cost.key, cost.path);
+            if (have < cost.amount)
+                throw new InvalidOperationException($"{PathText(cost.key, cost.path)}이(가) 모자랍니다({Format(have)} / {Format(cost.amount)}).");
+            WriteNumber(cost.key, cost.path, have - cost.amount);
+        }
+
+        // 낼 수 있는지(지금 값 기준, 가로채기 전 — 화면 미리보기용). 실제 지불은 Pay가 가로채기까지 거쳐 다시 판정한다.
+        public bool CanPay(string key, string path, double amount) => ReadNumber(key, path ?? "") >= amount;
+
+        double ReadNumber(string key, string path)
+        {
+            if (string.IsNullOrEmpty(key) || !Session.Data.IsDefined(key)) throw new InvalidOperationException($"[MomoiProject] 비용: 없는 플레이어 데이터 '{key}'입니다.");
+            if (string.IsNullOrEmpty(path)) return Session.Data.GetNumber(key);
+            var value = FieldPaths.Resolve(Session.Data.Get(key), path).FirstOrDefault();
+            return value == null ? 0 : Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        void WriteNumber(string key, string path, double value)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                Session.Data.Set(key, value);
+                return;
+            }
+            var cut = path.LastIndexOf('.');
+            var parentPath = cut < 0 ? "" : path.Substring(0, cut);
+            var member = cut < 0 ? path : path.Substring(cut + 1);
+            Session.Data.Modify<object>(key, root =>
+            {
+                foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
+                {
+                    if (parent == null) continue;
+                    var access = FieldAccess.Find(parent.GetType(), member);
+                    var type = FieldPaths.TypeAt(parent.GetType(), member, out _);
+                    if (access == null || type == null) continue;
+                    var underlying = Nullable.GetUnderlyingType(type) ?? type;
+                    access.Set(parent, Convert.ChangeType(value, underlying, System.Globalization.CultureInfo.InvariantCulture));
+                }
+            });
+        }
+
+        string PathText(string key, string path) => string.IsNullOrEmpty(path) ? Session.Data.LabelOf(key) : $"{Session.Data.LabelOf(key)} › {path}";
+
+        static string Format(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
         // 새 개체의 id(소환 등). 접두어별 번호를 플레이어 데이터 저장소에 두므로 Undo·저장·멀티플레이에서도 같다.
         public string NewId(string prefix)
         {

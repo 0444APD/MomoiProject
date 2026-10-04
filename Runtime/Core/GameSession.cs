@@ -53,6 +53,8 @@ namespace GBible
         public AchievementSystem Achievements { get; }
         // 능력(DB › 능력): 아이템 사용 효과·스킬 등. Game.Use로 쓴다.
         public AbilitySystem Abilities { get; }
+        // 능력치 Modifier(Game.Attribute·AddModifier의 저장소).
+        public AttributeSystem Attributes { get; }
         // 게임 코드의 창구(All·Find·Random·Do·Use). Block 안에서는 Game 속성으로 쓴다.
         public GameApi Game { get; }
         public DebugCommands Debug { get; }
@@ -112,6 +114,7 @@ namespace GBible
             Debug = new DebugCommands();
             Abilities = new AbilitySystem();
             Game = new GameApi(this);
+            Attributes = new AttributeSystem(this);
             // 처리를 클래스 안에 쓴 행동(Run)은 등록 없이 실행한다. 실행 직전에 참조 필드(id가 있는 객체)를 지금 데이터의 객체로 다시 찾는다.
             Actions.SelfRun = action => action.RunIn(Game);
             Actions.Prepare = action => ActionReferences.Resolve(action, Game);

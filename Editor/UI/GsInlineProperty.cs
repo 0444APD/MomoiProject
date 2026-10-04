@@ -87,6 +87,7 @@ namespace GBible.EditorTools.UI
         bool IsStatRef => _field != null && _field.IsDefined(typeof(StatRefAttribute), false);
         bool IsAchievementRef => _field != null && _field.IsDefined(typeof(AchievementRefAttribute), false);
         bool IsEventTypeRef => _field != null && _field.IsDefined(typeof(EventTypeRefAttribute), false);
+        bool IsIntentTypeRef => _field != null && _field.IsDefined(typeof(IntentTypeRefAttribute), false);
         EventFieldRefAttribute EventFieldRef => _field?.GetCustomAttribute<EventFieldRefAttribute>();
         // [DataRef] 또는 DB의 필드 규칙으로 정해진 참조 종류.
         Type DataRefType => EditorDatabase.RefTypeOf(_field);
@@ -233,6 +234,12 @@ namespace GBible.EditorTools.UI
                     var type = TypeResolver.Find(id);
                     return type != null ? (EventBus.DisplayNameOf(type), false, false) : ($"없는 이벤트: {id}", false, true);
                 }
+                if (field != null && field.IsDefined(typeof(IntentTypeRefAttribute), false))
+                {
+                    if (string.IsNullOrEmpty(id)) return ("의도 선택", true, false);
+                    var type = TypeResolver.Find(id);
+                    return type != null ? (Intents.DisplayNameOf(type), false, false) : ($"없는 의도: {id}", false, true);
+                }
                 var fieldRef = field?.GetCustomAttribute<EventFieldRefAttribute>();
                 if (fieldRef != null)
                 {
@@ -351,6 +358,9 @@ namespace GBible.EditorTools.UI
                 case SerializedPropertyType.String when IsEventTypeRef:
                     ShowEventTypeMenu();
                     return;
+                case SerializedPropertyType.String when IsIntentTypeRef:
+                    ShowIntentTypeMenu();
+                    return;
                 case SerializedPropertyType.String when EventFieldRef != null:
                     ShowEventFieldMenu();
                     return;
@@ -442,6 +452,17 @@ namespace GBible.EditorTools.UI
             }).ToList();
             if (items.Count == 0) items.Add(new GsDropdownItem("[GameEvent]가 붙은 이벤트 타입이 없습니다") { Disabled = true });
             OpenMenu(items, placeholder: "이벤트 검색");
+        }
+
+        void ShowIntentTypeMenu()
+        {
+            var items = ProjectCode.Intents().OrderBy(Intents.DisplayNameOf).Select(type =>
+            {
+                var name = type.FullName;
+                return new GsDropdownItem(Intents.DisplayNameOf(type), () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name };
+            }).ToList();
+            if (items.Count == 0) items.Add(new GsDropdownItem("[Intent]가 붙은 의도 형식이 없습니다") { Disabled = true });
+            OpenMenu(items, placeholder: "의도 검색");
         }
 
         void ShowEventFieldMenu()

@@ -623,6 +623,8 @@ namespace GBible.EditorTools.UI
                     items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(EventTrigger)), () => onPick(new EventTrigger())) { Group = "트리거", Detail = BlockTypes.Description(typeof(EventTrigger)) });
                 if ((allowed & TriggerKinds.Use) != 0)
                     items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(UseTrigger)), () => onPick(new UseTrigger())) { Group = "트리거", Detail = BlockTypes.Description(typeof(UseTrigger)) });
+                if ((allowed & TriggerKinds.Intercept) != 0)
+                    items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(InterceptTrigger)), () => onPick(new InterceptTrigger())) { Group = "트리거", Detail = BlockTypes.Description(typeof(InterceptTrigger)) });
                 if ((allowed & TriggerKinds.Condition) != 0)
                     foreach (var type in BlockTypes.ConcreteTypes(typeof(Condition)).Where(t => t != typeof(AllOfCondition) && t != typeof(AnyOfCondition) && t != typeof(NotCondition)))
                     {

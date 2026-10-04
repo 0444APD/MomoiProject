@@ -20,7 +20,7 @@ namespace GBible.CodeGen
     //   모두(추상 클래스 포함): __gb_get(object o, int i) → object · __gb_set(object o, int i, object v)
     //     이 형식에 선언된 읽을 수 있는 멤버(저장 필드 + readonly 공개 필드 + 공개 읽기 속성)를 번호로 읽고 쓴다(필드 경로·저장·이벤트 값 읽기).
     //     부모 형식의 멤버는 부모의 것으로(FieldAccess가 부모를 따라 올라간다). 쓰기는 readonly가 아닌 필드만.
-    // 대상: [Serializable]·[PlayerData]·[GameEvent] 형식.
+    // 대상: [Serializable]·[PlayerData]·[GameEvent]·[Intent] 형식.
     //
     // 필드 = Unity가 저장하는 필드(public 또는 [SerializeField]·[SerializeReference], static·readonly·const·[NonSerialized] 제외).
     // 필드 번호는 부모 클래스의 필드가 먼저다(부모도 생성 대상이면 부모의 메서드를 먼저 부른다).
@@ -68,7 +68,7 @@ namespace GBible.CodeGen
             for (var outer = type.DeclaringType; outer != null; outer = outer.DeclaringType)
                 if (outer.HasGenericParameters) return false;
             if (type.IsAbstract && type.IsSealed) return false; // static class
-            if (!type.IsSerializable && !type.CustomAttributes.Any(a => a.AttributeType.FullName == "GBible.PlayerDataAttribute" || a.AttributeType.FullName == "GBible.GameEventAttribute")) return false;
+            if (!type.IsSerializable && !type.CustomAttributes.Any(a => a.AttributeType.FullName == "GBible.PlayerDataAttribute" || a.AttributeType.FullName == "GBible.GameEventAttribute" || a.AttributeType.FullName == "GBible.IntentAttribute")) return false;
             for (var current = type.BaseType; current != null;)
             {
                 var name = current.FullName;

@@ -22,7 +22,9 @@ namespace GBible
         Condition = 2,
         // 아이템·능력을 쓰는 순간(Game.Use).
         Use = 4,
-        All = Event | Condition | Use,
+        // 어떤 일이 일어나기 직전(Game.Intercept로 의도를 통과시킬 때).
+        Intercept = 8,
+        All = Event | Condition | Use | Intercept,
     }
 
     [Flags]
@@ -39,7 +41,9 @@ namespace GBible
         Targeted = 8,
         // 이벤트 쏘기(PublishEventOutcome).
         Event = 16,
-        All = Record | PlayerData | Coded | Targeted | Event,
+        // 가로챈 의도 고치기(ModifyIntentOutcome).
+        Intent = 32,
+        All = Record | PlayerData | Coded | Targeted | Event | Intent,
     }
 
     // 트리거 칸의 잠금: 고를 수 있는 트리거 종류.
@@ -75,6 +79,8 @@ namespace GBible
         public string Owner;
         // 이벤트를 받은 순간이면 그 이벤트.
         public object Event;
+        // 가로채기로 발동했는가(이때 Event는 의도 객체 — 결과가 고치면 일에 반영된다).
+        public bool IsIntercept;
         // 사용하는 순간이면 true, 사용자와 플레이어가 고른 대상.
         public bool IsUse;
         public object User;
@@ -115,7 +121,9 @@ namespace GBible
 
         // 이벤트 받기 잎들이 보는 이벤트 형식(결과의 "이벤트 값"이 어느 이벤트의 필드인지 정할 때).
         public IEnumerable<Type> EventTypes() =>
-            Leaves().OfType<EventTrigger>().Select(e => TypeResolver.Find(e.eventType)).Where(t => t != null).Distinct();
+            Leaves().OfType<EventTrigger>().Select(e => TypeResolver.Find(e.eventType))
+                .Concat(Leaves().OfType<InterceptTrigger>().Select(i => TypeResolver.Find(i.intentType)))
+                .Where(t => t != null).Distinct();
 
         // 조건 충족 잎들의 조건.
         public IEnumerable<Condition> Conditions() =>
@@ -498,6 +506,8 @@ namespace GBible
         readonly GameSession _session;
         readonly List<Entry> _entries = new List<Entry>();
         readonly Dictionary<string, List<Entry>> _byEvent = new Dictionary<string, List<Entry>>(StringComparer.Ordinal);
+        // 가로채기 잎: 의도 형식 → (순서, 항목).
+        readonly Dictionary<string, List<(int order, Entry entry)>> _byIntent = new Dictionary<string, List<(int, Entry)>>(StringComparer.Ordinal);
         int _watchSerial;
         // 결과가 이벤트를 쏴서 트리거가 다시 발동하는 사슬의 깊이. 한도를 넘으면 끊는다(같은 트리거가 자기를 부르는 무한 반복 방지).
         int _depth;
@@ -528,7 +538,38 @@ namespace GBible
                 if (!_byEvent.TryGetValue(type, out var list)) _byEvent[type] = list = new List<Entry>();
                 list.Add(entry);
             }
+            foreach (var group in when.Leaves().OfType<InterceptTrigger>().Where(i => !string.IsNullOrEmpty(i.ResolvedType)).GroupBy(i => i.ResolvedType))
+            {
+                if (!_byIntent.TryGetValue(group.Key, out var list)) _byIntent[group.Key] = list = new List<(int, Entry)>();
+                list.Add((group.Min(i => i.order), entry));
+            }
             if ((entry.Kinds & TriggerKinds.Condition) != 0) WatchConditions(entry, armed: true);
+        }
+
+        // 가로채기: 의도를 이 의도 형식을 가로채는 트리거들에 차례로(순서가 작은 것부터) 통과시키고 돌려준다.
+        // 결과('의도 고치기'·[BindTo] 코드)가 의도를 고친다. 막혔으면(cancelled) 그 뒤 것은 건너뛴다.
+        public T Intercept<T>(T intent) where T : class
+        {
+            if (intent == null || !_byIntent.TryGetValue(intent.GetType().FullName, out var list) || list.Count == 0) return intent;
+            if (_depth >= MaxDepth)
+            {
+                _session.Journal.Append(JournalKind.Warning, "Triggers",
+                    $"가로채기 사슬이 {MaxDepth}단계를 넘어 끊었습니다({Intents.DisplayNameOf(intent.GetType())}). 가로채는 결과가 같은 의도를 다시 만드는지 확인하세요.");
+                return intent;
+            }
+            _depth++;
+            try
+            {
+                foreach (var (_, entry) in list.OrderBy(p => p.order).ToList())
+                {
+                    if (!_entries.Contains(entry)) continue;
+                    if (Intents.IsCancelled(intent)) break;
+                    var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = intent, IsIntercept = true };
+                    if (Test(entry.When, moment)) Fire(entry, moment);
+                }
+            }
+            finally { _depth--; }
+            return intent;
         }
 
         public void Unregister(string owner)
@@ -542,6 +583,7 @@ namespace GBible
         {
             _entries.Remove(entry);
             foreach (var list in _byEvent.Values) list.Remove(entry);
+            foreach (var list in _byIntent.Values) list.RemoveAll(p => p.entry == entry);
             if (entry.WatchKey != null) Watcher.Unwatch(entry.WatchKey);
             entry.WatchKey = null;
         }

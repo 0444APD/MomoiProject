@@ -33,6 +33,9 @@ namespace GBible.EditorTools
                 if (member.IsDefined(typeof(EventTypeRefAttribute), false))
                     return ProjectCode.Events().OrderBy(EventBus.DisplayNameOf)
                         .Select(t => new Choice { Label = EventBus.DisplayNameOf(t), Caption = t.Name, Value = t.FullName }).ToList();
+                if (member.IsDefined(typeof(IntentTypeRefAttribute), false))
+                    return ProjectCode.Intents().OrderBy(Intents.DisplayNameOf)
+                        .Select(t => new Choice { Label = Intents.DisplayNameOf(t), Caption = t.Name, Value = t.FullName }).ToList();
                 if (member.IsDefined(typeof(DataTypeRefAttribute), false))
                     return StorableTypes.All().Select(t => new Choice { Label = StorableTypes.Label(t), Caption = t.Namespace, Group = StorableTypes.GroupOf(t), Value = t.FullName }).ToList();
             }
