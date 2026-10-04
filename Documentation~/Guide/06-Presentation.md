@@ -140,7 +140,7 @@ void Drink(string potion)
 > - 연출을 빨리 넘기는 버튼은 `GameView.SkipPresentation()`(4절).
 
 > [!note]- 미리보기 — 예상 피해 · 낼 수 없는 이유(`Game.Preview`·`Game.CanDo`)
-> 화면이 규칙을 따로 계산하지 않는다. 행동을 실제로 해 보고 결과만 읽은 뒤 모두 되돌린다. 기록(타임라인)·Undo·행동 로그·`SubscribeAfterAction` 연출·도전과제 달성이 남지 않고 난수도 돌아가므로, 실제로 내면 미리본 값과 같다. `BattleHud.Hint`는 카드 위에 마우스를 올린 순간 한 번 부르는 함수다.
+> 화면이 규칙을 따로 계산하지 않는다. 행동을 실제로 해 보고 결과만 읽은 뒤 모두 되돌린다. 기록(타임라인)·Undo·행동 로그·`SubscribeAfterAction` 연출·도전과제 달성이 남지 않고 난수도 돌아가므로, 실제로 내면 미리본 값과 같다. `BattleHud.Hint`는 손패를 그릴 때(`DrawHand`) 카드마다 한 번 불러 버튼의 tooltip(마우스를 올리면 보이는 글)에 넣는다: `new Button(…) { text = …, tooltip = Hint(picked) }`.
 > ```csharp
 > public string Hint(DeckCard card)
 > {

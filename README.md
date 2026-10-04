@@ -24,9 +24,12 @@
 | `Runtime/Core` | `GBible.Core` | 게임 로직. **UnityEngine을 쓰지 않는다**(.NET 서버에서도 그대로 동작). |
 | `Runtime/Unity` | `GBible.Unity` | 데이터 에셋(`GameData`), 런타임 시작, 저장 |
 | `Editor` | `GBible.Editor` | 디자인 시스템(UI Toolkit), 데이터베이스·모니터·UI 샘플 창, 검증기 |
-| `Samples` | `GBible.Samples` | 샘플. `GBIBLE_SAMPLES` 심볼이 있을 때만 컴파일 |
+| `Samples` | `GBible.Samples` | 확인용 패널·샘플. DB의 선택 기능 '확인용 패널·샘플'을 켤 때만 컴파일(`GBIBLE_SAMPLES`) |
 | `Tests` | `GBible.Tests.*` | EditMode·PlayMode 테스트 |
 | `Optional/Dialogue` | `GBible.Dialogue` · `.Editor` · `.Tests` | 선택 모듈: 다이얼로그 그래프·연출·UI. 쓰지 않으면 폴더째 지운다. |
+| `Optional/Inventory` | `GBible.Inventory` | 선택 모듈: 인벤토리(칸의 리스트). |
+| `Optional/Input` | `GBible.Input` | 선택 모듈: 키 바꾸기·저장(Input System 패키지 필요). |
+| `Optional/Steam` | `GBible.Steam` | 선택 모듈: Steam 연동(Steamworks.NET 패키지 필요). |
 
 ## 에디터 메뉴
 

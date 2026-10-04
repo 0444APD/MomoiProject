@@ -503,6 +503,7 @@ var copy = potion.CreateInstance();   // 깊은 사본
 | 인벤토리 시스템 | `GBIBLE_INVENTORY` | `GBible.Inventory` | 없음(플레이어 데이터의 값 형식에 `Inventory`·`InventorySlot`이 나온다) |
 | 입력(키 바꾸기) | `GBIBLE_INPUT` | `GBible.Input`(Input System 패키지 `com.unity.inputsystem`이 있을 때만 컴파일) | 없음(`GameInput`: 키 바꾸기·되돌리기·저장, `31-Slots-Settings-Input.md`) |
 | Steam | `GBIBLE_STEAM` | `GBible.Steam`(Steamworks.NET 패키지 `com.rlabrecque.steamworks.net`이 있을 때만 컴파일) | Steam(그룹 개발, `34-Steam.md`) |
+| 확인용 패널·샘플 | `GBIBLE_SAMPLES` | `GBible.Samples` (+ `.Editor`), PlayMode 샘플 테스트 | 없음(플레이하면 'GBible 확인용 패널'이 뜬다. 메뉴 `MomoiProject → DB 추가 → 확인용 항목`, `Tests → 샘플 → …`). 라이브러리를 확인할 때만 켜고, 게임에는 쓰지 않는다. |
 
 스크립팅 심볼은 `#if`로 코드를 켜고 끄는 컴파일 표시다. 모듈의 asmdef는 이 심볼이 있을 때만 컴파일된다(asmdef의 defineConstraints).
 
@@ -694,7 +695,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ### 주의할 점
 
-- 테스트·샘플 어셈블리는 자동 참조가 아니다. 샘플은 `GBIBLE_SAMPLES` 심볼을 직접 넣어야 컴파일된다.
+- 테스트·샘플 어셈블리는 자동 참조가 아니다. 샘플은 선택 기능 **확인용 패널·샘플**을 켜야 컴파일된다(심볼 `GBIBLE_SAMPLES`를 기능 활성화가 넣고 뺀다).
 - Unity 버전을 올린 뒤에는 Mirror 생성 코드가 정상인지 코어 테스트(`MirrorTests`)로 확인한다.
 
 ---

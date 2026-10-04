@@ -24,7 +24,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 - `Assets/Code/Rules`(어셈블리 `MomoiProject.Rules`): 게임 규칙 전부 — 데이터 클래스(RunState·Profile·원본 클래스), 행동, 규칙 함수(`Rules`), 이벤트·의도, Block, `[BindTo]` 함수. **화면 API(MonoBehaviour·GameObject·씬·입력)를 쓰지 않는다.** 서버·테스트에서도 같은 코드가 돈다.
 - `Assets/Code/Client`: 화면·입력·연출·사운드. 규칙은 바꾸지 않고 행동만 보낸다.
 - `Assets/Code/Editor`: 에디터 도구만. `Assets/Code/Tests`: 규칙 테스트(Rules만 참조).
-- `Generated/`(GameIds 등)는 손대지 않는다(DB를 저장하면 다시 만들어진다).
+- `Assets/MomoiProjectGenerated/`(`GameIds.cs`)는 손대지 않는다(DB를 저장하면 다시 만들어진다).
 - 파일 하나에 주제 하나: `Actions/BattleActions.cs`, `Rules/Rules.cs`, `Events/Events.cs`, `Events/Intents.cs`, `Cards/CardBlocks.cs` …
 - **데이터는 DB, 동작은 코드.**
   - 같은 모양의 원본(카드·몬스터·아이템·스킬)은 코드에 클래스만 두고, 하나하나는 DB › 인스턴스(또는 능력·상태 효과 같은 전용 종류)에서 만든다.
@@ -76,6 +76,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 - 실패:
   - 플레이어에게 보일 것(모자람·조건 안 맞음·지금 못 함) → `throw Game.Fail("fail.키", "기본 문장 {값}", ("값", x))`. 텍스트 표에 키를 넣으면 번역된다.
   - 프로그래머 실수(없는 ID·잘못된 상태) → `throw new InvalidOperationException("…")`. 플레이어에게 보이지 않는다.
+  - 능력·아이템의 사용 조건이 안 맞을 때 플레이어에게 보일 글은 그 항목의 **쓸 수 없을 때 글**(DB 칸 `failText`, 텍스트 키)에 둔다. 비우면 라이브러리 기본 글({condition}이 DB 조건 문장 그대로)이 보인다.
 
 ## 6. 화면·연출
 
@@ -135,7 +136,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 ## 14. 하지 않는 것
 
 - GBible 라이브러리(`Packages/com.momoi.gbible`) 코드를 고치지 않는다.
-- 생성 파일(`Generated/`)을 고치지 않는다.
+- 생성 파일(`Assets/MomoiProjectGenerated/`)을 고치지 않는다.
 - DB 에셋 파일(.asset)을 텍스트로 직접 쓰지 않는다(15절의 방법으로 만든다).
 - 행동 밖에서 플레이어 데이터를 바꾸지 않는다(개발용 명령도 DB › 개발 명령이나 행동으로).
 - 화면 코드에 규칙 계산을 복사하지 않는다(미리보기를 쓴다).
@@ -144,7 +145,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 
 AI는 Unity 창을 누를 수 없으므로, DB 항목은 사람이 확인하고 저장하는 형태로 만든다. 어느 쪽이든 만든 항목은 DB에 **적용 전**으로 들어가고, 사람이 DB에서 보고 Ctrl+S로 적용한다.
 
-- **단순 값이 많은 것**(밸런스 값·카드 수치·몬스터 수치처럼 숫자·글자·enum 칸만): CSV 파일을 써 두고, 사람이 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`처럼). 인스턴스는 값의 클래스마다 한 파일.
+- **값이 많은 것**(밸런스 값·카드 수치·몬스터 수치·가중치 표의 항목 줄처럼 숫자·글자·enum과 그 목록): CSV 파일을 써 두고, 사람이 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`, 목록은 `entries[0].weight`처럼). 인스턴스는 값의 클래스마다 한 파일. Block 칸(트리거·조건·결과)은 CSV에 없다.
 - **트리거·조건·결과 Block이 든 것**(도전과제·능력·상태 효과·로그·가중치 표의 조건 …): `Assets/Code/Editor`에 메뉴 하나짜리 DB 추가 메뉴 스크립트를 쓴다. 사람이 메뉴를 한 번 누르면 항목이 적용 전으로 생긴다.
   ```csharp
   // Assets/Code/Editor/AddAchievements.cs — 메뉴: MomoiProject › DB 추가 › 도전과제(예: 가이드 예시의 Editor/AddBalanceValues.cs)

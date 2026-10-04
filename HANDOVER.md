@@ -22,7 +22,8 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 | `Runtime/Unity` | `GBible.Unity` | 데이터 에셋(`GameData`), 런타임 시작·저장, 게임 시간, 다국어의 Unity 쪽, 오디오 |
 | `Editor` | `GBible.Editor` | 디자인 시스템(UI Toolkit, `Gs*`), DB·상세·모니터·키워드 연결·오디오·내 코드 범위 창, 검증기, 생성 코드 |
 | `Optional/Dialogue` | `GBible.Dialogue` · `.Editor` · `.Tests` · `.Tests.PlayMode` | **선택 모듈**: 다이얼로그 그래프·연출·UI. 쓰지 않으면 폴더째 지운다. 코어는 이 모듈을 참조하지 않는다. |
-| `Samples` | `GBible.Samples` · `.Samples.Editor` | 예시. `GBIBLE_SAMPLES` 심볼이 있을 때만 컴파일(이 프로젝트에는 정의됨). |
+| `Optional/Inventory` · `Optional/Input` · `Optional/Steam` | `GBible.Inventory` · `GBible.Input` · `GBible.Steam` | **선택 모듈**: 인벤토리, 키 바꾸기(Input System 패키지 필요), Steam 연동(Steamworks.NET 패키지 필요). DB의 선택 기능으로 켠다. |
+| `Samples` | `GBible.Samples` · `.Samples.Editor` | 확인용 패널·예전 샘플. 선택 기능 '확인용 패널·샘플'(`GBIBLE_SAMPLES`)을 켤 때만 컴파일(지금은 꺼짐 — 2026-10-04 정리). |
 | `Tests` | `GBible.Tests.Editor` · `.Tests.PlayMode` | EditMode·PlayMode 테스트 |
 
 프로젝트 루트(`D:/Unity/Projects/UnitySystemProject`)의 `Tools/`에 검증 스크립트가 있다(저장소 밖): `CompileOffline.ps1`(에디터를 연 채로 모든 어셈블리 오프라인 컴파일), `RunCoreTests.ps1`(Unity 없이 코어 테스트 실행, 자체 NUnit 대역 `Tools/CoreTestHarness/Shim.cs`), `VerifyServerCore.ps1`(코어를 서버 조건으로 컴파일), `Verify.ps1`(배치모드로 EditMode·PlayMode 테스트, 에디터가 이 프로젝트를 열고 있으면 못 돌린다).
@@ -44,6 +45,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **식별자 규칙(`IdRules`)**: ID는 **lowerCamelCase**와 점(`playerGold`, `player.inventory`, `item.ironSword`). 대소문자만 다른 ID 금지. `Normalize`로 변환.
 - **다국어(`TextFormat`, `Texts`, `TextCatalog`, `KoreanParticles`, `PluralRules`, `Csv`, `TextSheet`)**: 1.6 참고.
 - **기능 = 필드**: 1.9 참고.
+- **장르 공통 게임 규칙 부품(2026-10-04)**: 능력치·Modifier·가로채기·비용·상태 효과·예약·선택 대기·밸런스 값·곡선·가중치 표·플레이어용 실패·월드 상태·고정 틱·미리보기 실행·저장점 — 5.0의 "코어 1단계" 줄과 매뉴얼 28~33장.
 
 ### 1.3 Unity 런타임 (Runtime/Unity)
 
@@ -54,6 +56,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **`GameTime`**: `Pause/Resume`(이유별로 겹침), `SetSpeed`(배속), `StepFrame`. `Time.timeScale` 기반.
 - **스프라이트 규격(`SpriteSpecs`)**: 필드에 원본을 넣으면 맞춤 창(중심·배율 한 번)으로 그룹의 모든 규격을 GPU 베이크. 예외 촬영 기록. `SpriteSpecs.Get(원본, GameIds.SpritePreset.X)`.
 - **오디오(`GameAudio`)**: 1.8 참고.
+- **화면·기기 쪽(2026-10-04)**: DB 종류 상태 효과·밸런스 값·가중치 표·설정, 슬롯(`GBibleRuntime.UseSlot`)·설정(`GameSettings`), 연출 대기열·화면 연결(`GameView`·`ViewList`·컴포넌트 '데이터 연결'·'월드 상태 연결'), 씬 흐름(`GameScenes`) — 매뉴얼 29~32장.
 - **다국어 Unity 쪽(`GameLanguage`, `LocalizationSettings`, `TextTable`, `LocalizedText`)**: 1.6 참고.
 
 ### 1.4 식별자·키워드·필드 규칙
@@ -387,7 +390,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
   - 테스트 요소 정리(2026-10-04, 사용자 지시): 이 개발 프로젝트의 Assets/Code·Assets/MomoiProjectData·Assets/MomoiProjectGenerated·테스트 러너 씬·ProjectSettings/MomoiProject·_RemovedAssets·저장 파일·`GBIBLE_` 심볼을 프로젝트 폴더 `MomoiProjectBackups/2026-10-04 1851 테스트 요소 정리/`로 옮김(영구 삭제 아님, README에 되돌리는 법). 다음에 Unity를 열면 깨끗한 처음 상태가 기록되고 시작 설정 창이 뜬다.
   - 확인 흐름: `Documentation~/PendingChecks.md`를 Unity를 여는 순간부터의 단계별 흐름(단계 0~6)으로 다시 씀. 확인용 패널 = 선택 기능 '확인용 패널·샘플'(GBIBLE_SAMPLES): `Samples/Runtime/CheckPanel.cs`(IMGUI 창, 데이터는 코드로 `checkRun`) + 메뉴 `MomoiProject › DB 추가 › 확인용 항목`(`Samples/Editor/CheckDataMenu.cs`).
   - 남겨 둔 한계를 고침(사용자: "3요소를 거스르지 않으면 다 바꿔"): CSV 목록 칸(`entries[0].weight`), 상태 효과 트리거를 가진 쪽마다 검사(`TriggerSystem.Register(…, holders)`), 이벤트 예약 실패는 저장점까지만 되돌림(`PlayerDataStore.Mark`·`RollbackTo` — 이벤트를 받는 쪽 전부에 쓰면 받는 쪽마다 Sync가 생겨 성능 원칙과 맞지 않아 예약에만), `Game.Roll(id)` 개수 경고, 능력·사용 기능의 '쓸 수 없을 때 글'(`failText`).
-  - 다음(사용자 승인 순서): 기획 명세서 → Claude용 GBible 참조 문서 → `/think-momoi` 스킬·프로젝트 CLAUDE.md 생성·훅 → 6장르 시험(이상한 기믹 포함, 문법 밖 0개까지).
+  - 다음(사용자 승인 순서): 기획 명세서(장르 프리셋 대신 Bootstrap 옵션·선택 기능·데이터 뼈대·규칙 함수 뼈대(가로채기 자리)·이벤트·DB 기본 항목을 여기서, 효과 문법 페이지, "문법에 안 맞는 기믹" 칸, 빈 칸은 AI가 추천값을 붙여 한 번에 묻기) → Claude용 GBible 참조 문서(관례의 "있는 기능부터 찾는다"가 가리킴) → `/think-momoi` 스킬(레벨 디자인 단계용 콘텐츠 모드 포함)·시작 설정이 프로젝트 CLAUDE.md 생성(관례 불러오기)·훅(컴파일 검사 가능한지) → 6장르 시험(이상한 기믹 포함, 문법 밖 0개·질문 20개 이하까지).
 - **행동 안의 행동(2026-10-03)**: 행동 안에서 `Game.Do`·`Game.Use`(= `session.Do`)를 부르면 예외 대신 바깥 행동의 일부로 그 자리에서 실행된다(`ActionDispatcher.Execute`가 진행 중인 트랜잭션을 보면 처리기만 부르고 기록에 남김, `ActionRecord.Nested`, `PlayerDataStore.ActiveTransactionId`; `GameSession.Do`는 중첩이면 Sync·도전과제 정리를 바깥 행동에 맡김). Undo·변경 묶음은 바깥 행동 하나, 안쪽 실패는 바깥 전체 취소. 카드 사용(비용 + 손패 이동 + 효과)처럼 한 입력이 여러 행동·능력을 묶는 경우를 위한 것.
 - **프로그래머 가이드(2026-10-03)**: `Documentation~/Guide/00-Index.md`부터 — 프로젝트 진행 순서(시작 → 설계 → 루프 → 콘텐츠 추가 → 기획자 분업 → 연출 → 장르 → 디버깅 → 습관 → 저장·출시 → 멀티 대비 → 부록, 부록에 기능 사용 표). 설명 글 + 짧은 코드, 예시 게임 '카드 던전'(턴제 덱빌딩). 글에 붙인 코드가 맞는지 확인하는 예시 코드는 저장소 밖 `Tools/GuideExample/`에 두고 `Tools/CompileGuide.ps1`로 컴파일한다(CompileOffline 결과 참조; `GuideExample/Generated/GameIds.cs`는 DB가 만들었을 GameIds의 손 사본). 기능·동작을 바꾸면 가이드 장과 그 예시 코드도 맞춘다.
 - **매뉴얼 검토에서 나온 수정(2026-10-03)**: 인스턴스 값 안의 블록 필드(사용 기능의 트리거·결과 등)를 DB와 같은 편집기로(`GsDataExplorer.BlockEditor` + `Crumb/Entry.Serialized` — 상세 패널이 SerializedProperty 경로로 `GsPropertyEditor.BuildContent`를 붙임, [BindTo] 잠금 보기도 나옴). `[BindTo]` 능력은 예전 짧은 형식(대상·효과)도 쓰지 않음. 연결 ID가 어느 항목에도 없으면 시작 때 콘솔 경고. 결과 요약(DB 상세)이 연결된 코드 이름을 보임. cs 열기는 파일 이름이 달라도 모든 스크립트에서 찾음. '로그에 기록'이 로그가 아닌 곳에서 빈 로그 칸이면 예외 대신 경고. 옛 이벤트 이름(GameSystems.…)도 실행 중 발동(`EventTrigger.ResolvedType`). 빈 NOT 필터 = 거짓(다른 NOT과 같게). 모니터: "이벤트 호출" 버튼, "받는 곳 n", 데이터 고치기 = `DeveloperEditAction`(Undo 가능). 다이얼로그 '값 바꾸기' 노드 = `DialogueSetAction`(행동 하나, 이미 행동 안이면 그 자리), `Dialogues.ResumeSaved`도 `Started`를 쏨. `selectordinal`은 순서 수 규칙(`PluralRules.Ordinal`: 영어·프랑스어). 데이터: `[field: SerializeField]` 자동 속성도 저장(DataModel), id가 속성이어도 `Find<T>`, 되감기 스냅샷은 에셋 참조를 그대로(`Export(keepReferences)`), 단순 값 키도 Undo 덮어쓰기 경고, `int?` 같은 Nullable 필드를 Mirror가 직접 다룸(`MirrorCode.RegisterNullable<T>` — 생성기가 등록), `[Serializable]` 없는 부모의 필드는 생성기가 컴파일 경고, `Game.Find(string)`은 사본 나무에서. 문서: CodingSyntax·PlayerDataStore·Audio·Dialogue의 낡은 설명, SetupSteps 키워드 단계, `StatData` 만들기 메뉴 이름("로그").
