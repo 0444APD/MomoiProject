@@ -207,6 +207,30 @@ namespace GBible
         public string Roll(string tableId) => Session.Tables.Roll(tableId).FirstOrDefault();
         public List<string> Roll(string tableId, int count, bool unique = false) => Session.Tables.Roll(tableId, count, unique);
 
+        // ── 미리보기 ───────────────────────────────────────────
+        // 행동을 해 보고 결과만 읽는다(아무것도 남지 않음). 화면의 예상 피해·버튼을 막는 이유에 쓴다. 행동 밖에서 부른다.
+        //   var hpAfter = Game.Preview(new PlayCard { card = c, target = enemy }, g => g.Find<Fighter>(enemy.id).hp);
+        //   if (!Game.CanDo(new PlayCard { card = c, target = enemy }, out var why)) button.Disable(why);
+        public T Preview<T>(GameAction action, Func<GameApi, T> read) => Session.Actions.Preview(action, () => read(this));
+
+        // 지금 하면 성공하는가(해 보고 되돌린다). 실패하면 reason = 실패 글(GameFailure면 지금 언어).
+        public bool CanDo(GameAction action, out string reason)
+        {
+            try
+            {
+                Session.Actions.Preview<object>(action, null);
+                reason = null;
+                return true;
+            }
+            catch (Exception e)
+            {
+                reason = e.Message;
+                return false;
+            }
+        }
+
+        public bool IsPreviewing => Session.Actions.IsPreviewing;
+
         // ── 월드 상태 ───────────────────────────────────────────
         // 씬에 놓인 것들의 상태를 이름으로 기억한다(행동 안에서 바꾼다). 판 값이 프로필 값보다 앞선다.
         //   Game.SetWorld("forest.chest3", "opened");   Game.WorldFlag("forest.boss")

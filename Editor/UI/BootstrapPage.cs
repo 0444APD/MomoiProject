@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using GBible.Data;
@@ -172,6 +173,48 @@ namespace GBible.EditorTools.UI
             newRunField.SetEnabled(continueAtStart);
             root.Add(newRunField);
             continueField.RegisterValueChangedCallback(e => { continueAtStart = e.newValue; newRunField.SetEnabled(continueAtStart); SaveFlow(); });
+
+            // ── 시간(실시간) ──
+            Heading(root, "고정 틱(실시간)", "초당 틱 수. 0이면 프레임마다(턴제·카드). 켜면 게임 시간이 일정한 간격으로 흐르고 예약·상태 효과·시간 조건·session.Ticked가 틱마다 돌아 프레임 속도와 상관없이 같은 결과가 난다.");
+            var tickField = new IntegerField("초당 틱 수") { value = database.TickRate };
+            tickField.tooltip = "예: 30이면 1/30초마다 한 틱. 0이면 끈다.";
+            tickField.RegisterValueChangedCallback(e =>
+            {
+                Undo.RecordObject(database, "고정 틱 변경");
+                database.EditorSetTickRate(Math.Max(0, e.newValue));
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            });
+            root.Add(tickField);
+
+            // ── 씬 흐름(선택) ──
+            var sceneKey = database.SceneKey ?? "";
+            var scenePath = database.ScenePath ?? "";
+            var emptyScene = database.EmptyScene ?? "";
+            void SaveScenes()
+            {
+                Undo.RecordObject(database, "씬 흐름 변경");
+                database.EditorSetSceneFlow(sceneKey, scenePath, emptyScene);
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            }
+            Heading(root, "씬 흐름(선택)", "판 데이터의 필드(예: run › scene)가 가리키는 씬을 화면이 따라 연다. 규칙은 행동 안에서 그 필드만 바꾼다. 이어 하기로 판을 불러오면 그 씬이, 값이 비면 '빈 값일 때 씬'이 열린다.");
+            var keys = new List<string> { "" };
+            keys.AddRange(EditorDatabase.Instance.OfType<PlayerDataEntry>().Select(k => k.Id).OrderBy(k => k, StringComparer.Ordinal));
+            var keyField = new DropdownField("플레이어 데이터", keys, Math.Max(0, keys.IndexOf(sceneKey)), k => string.IsNullOrEmpty(k) ? "(쓰지 않음)" : k, k => string.IsNullOrEmpty(k) ? "(쓰지 않음)" : k);
+            keyField.RegisterValueChangedCallback(e => { sceneKey = e.newValue ?? ""; SaveScenes(); });
+            root.Add(keyField);
+            var pathField = new TextField("필드(씬 이름이 든 글자)") { value = scenePath };
+            pathField.tooltip = "예: scene 또는 map.scene. 비우면 값 전체(글자 플레이어 데이터).";
+            pathField.RegisterCallback<FocusOutEvent>(_ => { scenePath = pathField.value?.Trim() ?? ""; SaveScenes(); });
+            root.Add(pathField);
+            var scenes = new List<string> { "" };
+            scenes.AddRange(EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => Path.GetFileNameWithoutExtension(s.path)));
+            if (!scenes.Contains(emptyScene)) scenes.Add(emptyScene);
+            var emptyField = new DropdownField("빈 값일 때 씬", scenes, Math.Max(0, scenes.IndexOf(emptyScene)), s => string.IsNullOrEmpty(s) ? "(그대로)" : s, s => string.IsNullOrEmpty(s) ? "(그대로)" : s);
+            emptyField.tooltip = "새 판·판 끝으로 값이 비었을 때 열 씬(보통 타이틀). Build Settings의 씬 목록에서 고른다.";
+            emptyField.RegisterValueChangedCallback(e => { emptyScene = e.newValue ?? ""; SaveScenes(); });
+            root.Add(emptyField);
 
             // ── 고급(보통 그대로) ──
             var advanced = new Foldout { text = "고급", value = false };

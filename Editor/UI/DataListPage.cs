@@ -87,6 +87,26 @@ namespace GBible.EditorTools.UI
             tree.Build(list, context.Host, context.Group);
         }
 
+        // CSV 메뉴: 인스턴스 탭은 값의 클래스마다, 다른 탭은 종류 하나.
+        List<GsDropdownItem> CsvMenu()
+        {
+            var items = new List<GsDropdownItem>();
+            if (_type == typeof(InstanceData))
+            {
+                foreach (var cls in DataCsv.InstanceClasses())
+                {
+                    var picked = cls;
+                    items.Add(new GsDropdownItem($"{picked.Name} 내보내기…", () => DataCsv.ExportToFile(_type, picked)) { Group = "내보내기" });
+                    items.Add(new GsDropdownItem($"{picked.Name} 가져오기…", () => DataCsv.ImportFromFile(_type, picked)) { Group = "가져오기", Detail = "없는 id는 이 클래스의 새 인스턴스로 만듭니다" });
+                }
+                if (items.Count == 0) items.Add(new GsDropdownItem("인스턴스가 아직 없습니다") { Disabled = true });
+                return items;
+            }
+            items.Add(new GsDropdownItem("CSV로 내보내기…", () => DataCsv.ExportToFile(_type)));
+            items.Add(new GsDropdownItem("CSV 가져오기…", () => DataCsv.ImportFromFile(_type)) { Detail = "id로 맞춰 고치고, 없는 id는 새 항목으로 만듭니다(적용 전)" });
+            return items;
+        }
+
         static bool HasError(CodexPageContext context, GameData item) =>
             context.Issues.Any(i => i.Asset == item && i.Severity == ValidationSeverity.Error);
 
@@ -108,7 +128,14 @@ namespace GBible.EditorTools.UI
                         open.tooltip = "새 창에서 열기";
                         tools.Add(open);
                     }
-                    if (path == "") return;
+                    if (path == "")
+                    {
+                        GsButton csv = null;
+                        csv = new GsButton("CSV", () => GsDropdown.Show(csv, CsvMenu(), searchable: false), GsButtonKind.Ghost);
+                        csv.tooltip = "CSV로 내보내기·가져오기(구글 시트·엑셀에서 수치를 한꺼번에 고칠 때). 가져온 것은 적용 전으로 들어간다";
+                        tools.Add(csv);
+                        return;
+                    }
                     var menu = new List<GsDropdownItem>
                     {
                         new GsDropdownItem("이름 바꾸기", () => RenameFolder(context, path, folders)),

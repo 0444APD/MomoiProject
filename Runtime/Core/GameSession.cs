@@ -32,6 +32,9 @@ namespace GBible
         public SaveMigrations Migrations = new SaveMigrations();
         // Modify를 거치지 않은 데이터 수정 검사(행동마다·프레임마다 값 전체 비교). 출시 빌드에서는 끈다.
         public bool DetectUntrackedChanges = true;
+        // 고정 틱(실시간): 초당 틱 수. 0이면 프레임마다(가변 시간). 켜면 게임 시간이 1/틱 초씩 일정하게 흐르고
+        // 시간 규칙(예약·상태 효과·시간 조건)과 session.Ticked가 틱마다 돈다 → 프레임 속도와 상관없이 같은 결과(재현·멀티).
+        public int TickRate;
     }
 
     // 한 플레이어(또는 한 판)의 모든 시스템을 묶는 인스턴스. static 전역 상태를 두지 않는다.
@@ -304,14 +307,51 @@ namespace GBible
             _randomBefore.Remove(transactionId);
         }
 
+        // 시간이 흐를 때(고정 틱이면 틱마다 1/틱 초, 아니면 프레임마다 그 프레임 시간). 행동 밖이다: 규칙은 행동(Do)으로 바꾼다.
+        public event Action<double> Ticked;
+
+        // 고정 틱: 다음 틱까지 지난 비율(0~1). 화면이 두 틱 사이를 부드럽게 그릴 때(보간).
+        public double TickAlpha { get; private set; }
+
+        // 한 프레임에 따라잡는 최대 틱 수(느린 프레임에서 따라잡느라 멈추지 않게). 넘으면 남은 시간은 버린다.
+        public const int MaxTicksPerFrame = 8;
+
+        double _tickCarry;
+
         // 호스트(Unity 등)가 매 프레임 호출한다.
         public void EndFrame(double deltaTime)
         {
-            Clock.Advance(deltaTime);
-            Achievements.Poll(Clock.Time);
-            if (Data.InTransaction) return;
-            Statuses.Tick();
-            Schedules.Tick();
+            if (Options.TickRate > 0)
+            {
+                var step = 1.0 / Options.TickRate;
+                _tickCarry += Math.Max(0, deltaTime);
+                var steps = 0;
+                // 프레임 시간을 더해 가며 생기는 아주 작은 오차로 틱이 하나 밀리지 않게(60fps와 20fps가 같은 틱을 내도록).
+                var tolerance = step * 1e-6;
+                while (_tickCarry + tolerance >= step && steps < MaxTicksPerFrame)
+                {
+                    _tickCarry = Math.Max(0, _tickCarry - step);
+                    steps++;
+                    Clock.Advance(step);
+                    Achievements.Poll(Clock.Time);
+                    if (Data.InTransaction) continue;
+                    Statuses.Tick();
+                    Schedules.Tick();
+                    Ticked?.Invoke(step);
+                }
+                if (steps == MaxTicksPerFrame && _tickCarry + tolerance >= step) _tickCarry = 0;
+                TickAlpha = _tickCarry / step;
+                if (Data.InTransaction) return;
+            }
+            else
+            {
+                Clock.Advance(deltaTime);
+                Achievements.Poll(Clock.Time);
+                if (Data.InTransaction) return;
+                Statuses.Tick();
+                Schedules.Tick();
+                Ticked?.Invoke(deltaTime);
+            }
             Data.Sync();
             Achievements.Flush();
             if (Options.History == HistoryMode.Snapshots && Clock.Time - _lastSnapshotTime >= Options.SnapshotInterval)

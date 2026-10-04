@@ -34,6 +34,12 @@ namespace GBible.Data
         // 선택: 게임이 켜질 때 저장된 판이 있으면 이어 하고, 없으면 새 판 행동을 실행한다(타이틀 화면이 없는 게임).
         [SerializeField] bool continueOnStart;
         [SerializeField] string newRunAction = "";
+        // 고정 틱(실시간): 초당 틱 수. 0이면 프레임마다.
+        [SerializeField] int tickRate;
+        // 씬 흐름(선택): 이 플레이어 데이터 필드가 가리키는 씬을 연다(GameScenes.Follow). 키를 비우면 쓰지 않는다.
+        [SerializeField] string sceneKey = "";
+        [SerializeField] string scenePath = "";
+        [SerializeField] string emptyScene = "";
         // 고급: 기록(Journal) 보관 줄 수, 개발 빌드의 Modify 누락 검사(예전 방식 데이터).
         [SerializeField] int journalCapacity = 4096;
         [SerializeField] bool detectUntrackedChanges = true;
@@ -61,6 +67,10 @@ namespace GBible.Data
         public bool SaveProfileEachAction => saveProfileEachAction;
         public string UndoBoundaryEvent => undoBoundaryEvent;
         public bool ContinueOnStart => continueOnStart;
+        public int TickRate => tickRate;
+        public string SceneKey => sceneKey;
+        public string ScenePath => scenePath;
+        public string EmptyScene => emptyScene;
         public string NewRunAction => newRunAction;
         public int JournalCapacity => journalCapacity;
         public bool DetectUntrackedChanges => detectUntrackedChanges;
@@ -75,6 +85,7 @@ namespace GBible.Data
             if (developmentBuild && fixSeedInDevelopment) options.Seed = (ulong)Math.Max(0, developmentSeed);
             options.JournalCapacity = journalCapacity > 0 ? journalCapacity : 4096;
             options.DetectUntrackedChanges = developmentBuild && detectUntrackedChanges;
+            options.TickRate = Math.Max(0, tickRate);
         }
 
 #if UNITY_EDITOR
@@ -94,6 +105,15 @@ namespace GBible.Data
             undoBoundaryEvent = undoBoundary ?? "";
             continueOnStart = continueAtStart;
             newRunAction = newRun ?? "";
+        }
+
+        public void EditorSetTickRate(int value) => tickRate = Math.Max(0, value);
+
+        public void EditorSetSceneFlow(string key, string path, string empty)
+        {
+            sceneKey = key ?? "";
+            scenePath = path ?? "";
+            emptyScene = empty ?? "";
         }
 
         public void EditorSetAdvanced(int journalCapacity, bool detectUntrackedChanges)

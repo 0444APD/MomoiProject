@@ -330,6 +330,8 @@ namespace GBible
                 _host.AddComponent<GBibleHost>();
             }
 
+            // DB › 시작 파일 › Bootstrap의 씬 흐름(정해 두었으면).
+            if (database != null && !string.IsNullOrEmpty(database.SceneKey)) GameScenes.Follow(database.SceneKey, database.ScenePath, database.EmptyScene);
             Started?.Invoke(session);
             if (database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
             return session;

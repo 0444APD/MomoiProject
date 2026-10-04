@@ -60,10 +60,36 @@ namespace GBible
         public long LastId => _nextId - 1;
         public long CurrentCause => _causes.Count > 0 ? _causes.Peek() : 0;
 
+        int _muted;
+
+        // 이 안에서는 기록하지 않는다(미리보기 실행). 돌려주는 줄은 보관되지 않고 Appended도 오지 않는다(Id = 0).
+        public IDisposable Mute() => new MuteScope(this);
+
+        public bool IsMuted => _muted > 0;
+
+        sealed class MuteScope : IDisposable
+        {
+            Journal _journal;
+
+            public MuteScope(Journal journal)
+            {
+                _journal = journal;
+                journal._muted++;
+            }
+
+            public void Dispose()
+            {
+                if (_journal == null) return;
+                _journal._muted--;
+                _journal = null;
+            }
+        }
+
         public JournalEntry Append(JournalKind kind, string system, string message,
                                    string key = null, object oldValue = null, object newValue = null,
                                    long transactionId = 0)
         {
+            if (_muted > 0) return new JournalEntry { Kind = kind, System = system, Key = key, Message = message, Old = oldValue, New = newValue, TransactionId = transactionId };
             var entry = new JournalEntry
             {
                 Id = _nextId++,

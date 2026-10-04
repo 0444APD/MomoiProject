@@ -119,6 +119,42 @@ namespace GBible
         // 실행 직전 준비(세션이 정한다): 참조 필드를 지금 데이터의 객체로 다시 찾아 넣는다.
         public Action<GameAction> Prepare;
 
+        // 미리보기 중(Preview 안). 규칙 코드가 밖으로 나가는 일(분석 전송 등)을 건너뛸 때 본다.
+        public bool IsPreviewing { get; private set; }
+
+        // 미리보기: 행동을 실행해 보고 read로 결과를 읽은 뒤 모두 되돌린다.
+        // 기록·Undo·행동 로그·행동 뒤에 받는 쪽(SubscribeAfterAction)·도전과제 달성이 남지 않고, 난수도 돌아간다.
+        // 행동이 실패하면 바꾼 것을 되돌린 뒤 그 예외를 그대로 던진다. 행동 밖(화면 코드)에서 부른다.
+        public T Preview<T>(GameAction action, Func<T> read)
+        {
+            if (action == null) throw new ArgumentNullException(nameof(action));
+            if (_state.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 안에서는 미리보기를 할 수 없습니다(행동 밖, 화면 코드에서 부르세요).");
+            if (!_handlers.TryGetValue(action.GetType(), out var registered))
+                registered = SelfRun ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'을 실행할 세션이 없습니다.");
+            var prepare = Prepare;
+            using (_journal.Mute())
+            {
+                var tx = _state.Begin(0, "미리보기");
+                IsPreviewing = true;
+                TransactionStarted?.Invoke(tx.Id);
+                try
+                {
+                    _state.Track(() =>
+                    {
+                        prepare?.Invoke(action);
+                        registered(action);
+                    });
+                    return read == null ? default : read();
+                }
+                finally
+                {
+                    _state.Abort();
+                    IsPreviewing = false;
+                    TransactionAborted?.Invoke(tx.Id);
+                }
+            }
+        }
+
         public ActionRecord Execute(GameAction action)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));

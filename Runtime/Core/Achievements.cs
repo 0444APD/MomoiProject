@@ -103,6 +103,8 @@ namespace GBible
         {
             var definition = Find(id) ?? throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 도전과제 '{id}'입니다.");
             if (IsUnlocked(id)) return;
+            // 미리보기(해 보기만 하는 실행)에서는 달성하지 않는다(달성은 되돌리지 않는 변경이라 미리보기 뒤에도 남는다).
+            if (_session.Actions.IsPreviewing) return;
 
             _session.Triggers.Unregister(id);
             var entry = _session.Journal.Append(JournalKind.Achievement, "Achievements",
