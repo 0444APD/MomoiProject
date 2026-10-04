@@ -15,14 +15,44 @@ namespace GBible
 
     // 플레이어 행동은 메서드 호출이 아니라 데이터다.
     // 이 한 경로가 행동 로그·되돌리기·리플레이·멀티플레이(서버 검증)를 함께 담당한다.
+    //
+    // 행동 하나 = 이 클래스를 상속하고, 필요한 정보를 필드로 두고, Run을 쓴다.
+    //   [Serializable] public class PlayCard : GameAction
+    //   {
+    //       public DeckCard card;     // 대상(string id가 있는 클래스) — 몇 개든
+    //       public Fighter target;    // 없으면 null
+    //       public int times = 1;     // 그냥 값
+    //       protected override void Run() { … card·target은 지금 데이터 안의 실제 객체 … }
+    //   }
+    //   Game.Do(new PlayCard { card = deckCard, target = enemy });
+    // string id가 있는 클래스 형식의 필드(와 그 리스트·배열)는 참조로 다룬다: 기록·전송에는 id만 남고, 실행 직전에
+    // 그 id로 지금 데이터에서 다시 찾아 넣는다(ActionReferences). 그래서 Undo·불러오기 뒤의 옛 객체나 다른 컴퓨터의 객체를 넣어도 맞다.
     [Serializable]
     public abstract class GameAction
     {
         public int actorId;
         public long tick;
 
+        // 실행 중일 때만 들어 있다: 데이터·난수·이벤트·다른 행동을 쓰는 창구.
+        [NonSerialized] GameApi _game;
+        protected GameApi Game => _game;
+
         public virtual ActionVisibility Visibility => ActionVisibility.Public;
-        public abstract string Describe();
+
+        // 타임라인에 보일 글. 기본: Block 이름 + 대상 id들.
+        public virtual string Describe() => ActionReferences.Describe(this);
+
+        // 처리 내용. Actions.Register로 처리기를 따로 등록한 행동은 쓰지 않는다.
+        protected virtual void Run() =>
+            throw new InvalidOperationException($"[MomoiProject] 행동 '{GetType().Name}'의 처리기가 없습니다. 행동 클래스에 Run을 쓰거나 Actions.Register로 처리기를 등록하세요.");
+
+        internal void RunIn(GameApi game)
+        {
+            var previous = _game;
+            _game = game;
+            try { Run(); }
+            finally { _game = previous; }
+        }
     }
 
     public enum ActionStatus
@@ -84,18 +114,23 @@ namespace GBible
 
         public bool IsRegistered(Type actionType) => _handlers.ContainsKey(actionType);
 
-        // 처리를 클래스 안에 쓴 행동의 실행 방법(세션이 정한다).
+        // 처리를 클래스 안에 쓴 행동(Run)의 실행 방법(세션이 정한다).
         public Action<GameAction> SelfRun;
+        // 실행 직전 준비(세션이 정한다): 참조 필드를 지금 데이터의 객체로 다시 찾아 넣는다.
+        public Action<GameAction> Prepare;
 
         public ActionRecord Execute(GameAction action)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
-            if (!_handlers.TryGetValue(action.GetType(), out var handler))
+            // 등록한 처리기가 없으면 클래스 안의 Run을 쓴다. 어느 쪽이든 실행 직전에 참조 필드를 다시 찾는다(행동 안이라 실패하면 전체 취소).
+            if (!_handlers.TryGetValue(action.GetType(), out var registered))
+                registered = SelfRun ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'을 실행할 세션이 없습니다.");
+            var prepare = Prepare;
+            Action<GameAction> handler = a =>
             {
-                // 처리를 클래스 안에 쓴 행동(GameAction<T>·SimpleAction)은 등록 없이 실행한다.
-                if (action is ISelfRunningAction && SelfRun != null) handler = SelfRun;
-                else throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'의 처리기가 없습니다. Actions.Register로 등록하거나 GameAction<T>·SimpleAction을 상속해 Run을 쓰세요.");
-            }
+                prepare?.Invoke(a);
+                registered(a);
+            };
 
             action.tick = _clock.Tick;
             // 행동 안에서 부른 행동(카드 사용 안의 드로우, 행동 안의 Game.Use 등): 바깥 행동의 일부로 그 자리에서 실행한다.

@@ -112,8 +112,9 @@ namespace GBible
             Debug = new DebugCommands();
             Abilities = new AbilitySystem();
             Game = new GameApi(this);
-            // 처리를 클래스 안에 쓴 행동(GameAction<T>·SimpleAction·UseAbility)은 등록 없이 실행한다.
-            Actions.SelfRun = action => ((ISelfRunningAction)action).Run(Game);
+            // 처리를 클래스 안에 쓴 행동(Run)은 등록 없이 실행한다. 실행 직전에 참조 필드(id가 있는 객체)를 지금 데이터의 객체로 다시 찾는다.
+            Actions.SelfRun = action => action.RunIn(Game);
+            Actions.Prepare = action => ActionReferences.Resolve(action, Game);
 
             // 테스트 이벤트는 게임 행동과 같은 경로로 처리된다(Undo·기록 동일).
             Actions.Register<SimulatedEventAction>(action =>

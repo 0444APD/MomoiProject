@@ -87,22 +87,33 @@ namespace GBible
             else Collect(Session.Data.Get(key), into, 0);
         }
 
-        public T Find<T>(string id) where T : class
+        public T Find<T>(string id) where T : class => (T)Find(typeof(T), id);
+
+        // 형식을 런타임에 정할 때(행동의 참조 필드 등).
+        public object Find(Type type, string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
-            RequireId(typeof(T));
+            RequireId(type);
             foreach (var key in DataKeys())
             {
-                if (!CanContain(Session.Data.TypeOf(key), typeof(T))) continue;
+                if (!CanContain(Session.Data.TypeOf(key), type)) continue;
                 var mirror = Session.Data.SyncedMirror(key);
                 Session.Data.Get(key);
-                var found = mirror != null
-                    ? Mirror.FindById<T>(mirror, id)
-                    : All<T>(key).FirstOrDefault(item => IdOf(item) == id);
+                if (mirror != null)
+                {
+                    if (Mirror.FindById(mirror, type, id) is { } hit) return hit;
+                    continue;
+                }
+                var all = new List<object>();
+                Collect(Session.Data.Get(key), all, 0);
+                var found = all.FirstOrDefault(item => type.IsInstanceOfType(item) && IdOf(item) == id);
                 if (found != null) return found;
             }
             return null;
         }
+
+        // 이 형식에 string id(필드·속성)가 있는가(찾거나 가리킬 수 있는 객체인가).
+        public static bool HasId(Type type) => type != null && IdMember(type) != null;
 
         // 형식을 모를 때: id 필드가 있는 모든 객체에서 찾는다.
         public object Find(string id)
@@ -243,61 +254,6 @@ namespace GBible
         }
     }
 
-    // ── 행동: 처리를 클래스 안에 쓴다(등록 없이 Game.Do로 실행) ──────────
-
-    public interface ISelfRunningAction
-    {
-        void Run(GameApi game);
-    }
-
-    // 대상 하나에 대한 행동. 대상은 id로 저장되고(데이터라 서버 전송·리플레이 가능), Run에서는 객체로 받는다.
-    //   [Serializable] public class MoveUnit : GameAction<Unit> { public int x, y; protected override void Run(Unit u) { u.x = x; u.y = y; } }
-    //   Game.Do(new MoveUnit { target = unit.id, x = 3, y = 4 });
-    [Serializable]
-    public abstract class GameAction<T> : GameAction, ISelfRunningAction where T : class
-    {
-        public string target;
-
-        [NonSerialized] GameApi _game;
-        protected GameApi Game => _game;
-
-        protected abstract void Run(T target);
-
-        void ISelfRunningAction.Run(GameApi game)
-        {
-            _game = game;
-            try
-            {
-                var found = game.Find<T>(target) ?? throw new InvalidOperationException($"[MomoiProject] {typeof(T).Name} '{target}'을(를) 찾을 수 없습니다.");
-                Run(found);
-            }
-            finally
-            {
-                _game = null;
-            }
-        }
-
-        public override string Describe() => $"{BlockNames.Of(GetType())} ({target})";
-    }
-
-    // 대상 없는 행동(턴 넘기기 등).
-    [Serializable]
-    public abstract class SimpleAction : GameAction, ISelfRunningAction
-    {
-        [NonSerialized] GameApi _game;
-        protected GameApi Game => _game;
-
-        protected abstract void Run();
-
-        void ISelfRunningAction.Run(GameApi game)
-        {
-            _game = game;
-            try { Run(); }
-            finally { _game = null; }
-        }
-
-        public override string Describe() => BlockNames.Of(GetType());
-    }
 
     // ── 조건: Check만 쓴다. 무엇을 읽는지는 시스템이 기록한다(CollectDependencies 불필요) ──
     [Serializable]
@@ -325,6 +281,7 @@ namespace GBible
 
         public override string Describe(INameResolver names) => BlockNames.Of(GetType());
     }
+
 
     static class BlockNames
     {

@@ -9,7 +9,7 @@ namespace GBible
     // 개발 도구(모니터 등)에서 값을 고치는 일을 행동 하나로 실행한다: Undo·기록이 게임 행동과 같다.
     // 고치는 일은 코드(대리자)라 네트워크·저장으로 보내지 않는다(개발용).
     [Serializable]
-    public sealed class DeveloperEditAction : GameAction, ISelfRunningAction
+    public sealed class DeveloperEditAction : GameAction
     {
         public string label;
         [NonSerialized] public Action Edit;
@@ -17,7 +17,7 @@ namespace GBible
         public override ActionVisibility Visibility => ActionVisibility.Developer;
         public override string Describe() => "[개발] " + (string.IsNullOrEmpty(label) ? "값 고침" : label);
 
-        void ISelfRunningAction.Run(GameApi game) => Edit?.Invoke();
+        protected override void Run() => Edit?.Invoke();
     }
 
     // 테스트용 이벤트 받기. 값을 덮어쓰지 않고 게임과 똑같은 경로(행동 → 이벤트 → 수치 규칙 → 확정 → 도전과제 → 보상)를 탄다.

@@ -32,18 +32,22 @@ namespace GBible.Tests
     }
 
     [Serializable]
-    public class GsHit : GameAction<GsUnit>
+    public class GsHit : GameAction
     {
+        public GsUnit unit;
         public int damage;
-        protected override void Run(GsUnit u)
+        protected override void Run()
         {
-            u.hp -= damage;
-            u.weapon.power += 1;
+            unit.hp -= damage;
+            unit.weapon.power += 1;
         }
+
+        // 시험용: id만 든 객체(실행 직전에 id로 지금 객체를 찾는다).
+        public static GsUnit Ref(string id) => new GsUnit { id = id };
     }
 
     [Serializable]
-    public class GsShuffle : SimpleAction
+    public class GsShuffle : GameAction
     {
         protected override void Run()
         {
@@ -58,7 +62,7 @@ namespace GBible.Tests
 
     // 행동 중간에 Game.All(Sync가 일어남)을 끼운 행동.
     [Serializable]
-    public class GsFindBetween : SimpleAction
+    public class GsFindBetween : GameAction
     {
         protected override void Run()
         {
@@ -72,7 +76,7 @@ namespace GBible.Tests
     }
 
     [Serializable]
-    public class GsBroken : SimpleAction
+    public class GsBroken : GameAction
     {
         protected override void Run()
         {
@@ -111,7 +115,7 @@ namespace GBible.Tests
         public void 필드를_고치면_행동이_끝날_때_기록되고_Undo된다(bool detect)
         {
             Create(detect);
-            _session.Do(new GsHit { target = "hero", damage = 7 });
+            _session.Do(new GsHit { unit = GsHit.Ref("hero"), damage = 7 });
             Assert.AreEqual(23, Hero.hp);
             Assert.AreEqual(6, Hero.weapon.power, "깊은 필드도");
             var entries = _session.Journal.Entries.Where(e => e.Kind == JournalKind.Data && e.Key == "party").ToList();
@@ -140,7 +144,7 @@ namespace GBible.Tests
             Assert.IsFalse(HasWarning);
 
             // 갈아 끼운 새 무기도 이어서 기록되고, 빠진 옛 무기를 고친 것은 데이터가 아니라 무시된다.
-            _session.Do(new GsHit { target = "hero", damage = 0 });
+            _session.Do(new GsHit { unit = GsHit.Ref("hero"), damage = 0 });
             Assert.AreEqual(2, Hero.weapon.power);
             oldWeapon.power = 99;
             _session.EndFrame(0.016);
@@ -163,7 +167,7 @@ namespace GBible.Tests
             Hero.hp = 12;
             _session.EndFrame(0.016);
             Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Data && e.Code != null && e.Code.Contains("hp")));
-            _session.Do(new GsHit { target = "hero", damage = 2 });
+            _session.Do(new GsHit { unit = GsHit.Ref("hero"), damage = 2 });
             Assert.IsFalse(HasWarning);
             Assert.AreEqual(10, Hero.hp);
             Assert.IsTrue(_session.Undo());
@@ -196,7 +200,7 @@ namespace GBible.Tests
             Create(false);
             _session.Data.Set("party", new GsParty { units = { new GsUnit { id = "hero", hp = 50 } } });
             Assert.AreEqual(50, Hero.hp);
-            _session.Do(new GsHit { target = "hero", damage = 5 });
+            _session.Do(new GsHit { unit = GsHit.Ref("hero"), damage = 5 });
             Assert.AreEqual(45, Hero.hp);
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(50, Hero.hp);
@@ -237,7 +241,7 @@ namespace GBible.Tests
             _session.Data.Define("party", DataZone.Session, party, "파티");
             var watch = System.Diagnostics.Stopwatch.StartNew();
             const int runs = 200;
-            for (int i = 0; i < runs; i++) _session.Do(new GsHit { target = "u" + (i % 500), damage = 1 });
+            for (int i = 0; i < runs; i++) _session.Do(new GsHit { unit = GsHit.Ref("u" + (i % 500)), damage = 1 });
             var ms = watch.Elapsed.TotalMilliseconds / runs;
             Console.WriteLine($"Mirror 유닛 500개, 누락 검사 {(detect ? "켬" : "끔")}: 행동 한 번 평균 {ms:0.00}ms");
             Assert.IsTrue(_session.Undo());
@@ -316,7 +320,7 @@ namespace GBible.Tests
 
     // 생성 코드가 닿지 않는 쓰기(리플렉션)를 Modify 안에서.
     [Serializable]
-    public class GsReflect : SimpleAction
+    public class GsReflect : GameAction
     {
         protected override void Run() =>
             Game.Session.Data.Modify<GsParty>("party", party => typeof(GsUnit).GetField("hp").SetValue(party.units[0], 1));

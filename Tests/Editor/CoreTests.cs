@@ -599,7 +599,7 @@ namespace GBible.Tests
     {
         public sealed class Ping { public int n; }
 
-        sealed class Fire : SimpleAction
+        sealed class Fire : GameAction
         {
             public int n;
             public bool fail;
@@ -611,7 +611,7 @@ namespace GBible.Tests
             }
         }
 
-        sealed class Outer : SimpleAction
+        sealed class Outer : GameAction
         {
             public override string Describe() => "바깥";
             protected override void Run()

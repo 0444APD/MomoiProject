@@ -80,6 +80,8 @@ namespace GBible
             Mirror.Warning -= LogMirrorWarning;
             Mirror.Warning += LogMirrorWarning;
             Mirror.Initialize();
+            // 행동의 참조 필드(id가 있는 객체)도 여기서 한 번 정해 둔다.
+            ActionReferences.PrepareAll();
             // [BindTo] 코드 결과도 여기서 한 번 모은다(형식이 맞지 않는 함수는 알린다).
             foreach (var problem in BoundOutcomes.Problems) Debug.LogWarning("[MomoiProject] " + problem);
 

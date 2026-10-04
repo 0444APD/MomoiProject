@@ -159,7 +159,7 @@ namespace GBible
 
     // 능력 사용 = 행동 하나(데이터: 능력 ID·사용자 id·대상 id들 → 서버 전송·리플레이 가능).
     [Serializable]
-    public sealed class UseAbility : GameAction, ISelfRunningAction
+    public sealed class UseAbility : GameAction
     {
         public string ability;
         public string user;
@@ -167,8 +167,9 @@ namespace GBible
 
         public override string Describe() => $"능력 사용: {ability}" + (string.IsNullOrEmpty(user) ? "" : $" ({user})");
 
-        void ISelfRunningAction.Run(GameApi game)
+        protected override void Run()
         {
+            var game = Game;
             var definition = game.Session.Abilities.Get(ability) ?? throw new InvalidOperationException($"[MomoiProject] 능력 '{ability}'이(가) 없습니다.");
             var picked = (targets ?? new List<string>()).Select(game.Find).Where(t => t != null).ToList();
             var triggers = game.Session.Triggers;

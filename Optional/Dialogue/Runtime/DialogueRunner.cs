@@ -891,7 +891,7 @@ namespace GBible.Dialogue
     }
     // 다이얼로그의 '값 바꾸기' 노드 실행 = 행동 하나(Undo 한 단위). 바꿀 값(보상 블록)은 노드의 것을 그대로 쓴다.
     [Serializable]
-    public sealed class DialogueSetAction : GameAction, ISelfRunningAction
+    public sealed class DialogueSetAction : GameAction
     {
         public string dialogue;
         public string node;
@@ -899,11 +899,11 @@ namespace GBible.Dialogue
 
         public override string Describe() => $"다이얼로그 값 바꾸기 ({dialogue})";
 
-        void ISelfRunningAction.Run(GameApi game)
+        protected override void Run()
         {
             if (Rewards == null) return;
             foreach (var reward in Rewards)
-                reward?.Grant(game.Session);
+                reward?.Grant(Game.Session);
         }
     }
 }

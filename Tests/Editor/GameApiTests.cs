@@ -26,14 +26,29 @@ namespace GBible.Tests
     }
 
     [Serializable]
-    public class TbMove : GameAction<TbUnit>
+    public class TbMove : GameAction
     {
+        public TbUnit unit;
         public int x, y;
-        protected override void Run(TbUnit u) { u.x = x; u.y = y; }
+        protected override void Run() { unit.x = x; unit.y = y; }
+    }
+
+    // 참조 필드 여러 개·리스트(대상 수가 정해지지 않은 행동).
+    [Serializable]
+    public class TbSwap : GameAction
+    {
+        public TbUnit a;
+        public TbUnit b;
+        public List<TbUnit> others = new List<TbUnit>();
+        protected override void Run()
+        {
+            (a.x, b.x) = (b.x, a.x);
+            foreach (var other in others) other.hp -= 1;
+        }
     }
 
     [Serializable]
-    public class TbUseInside : SimpleAction
+    public class TbUseInside : GameAction
     {
         protected override void Run()
         {
@@ -43,13 +58,13 @@ namespace GBible.Tests
     }
 
     [Serializable]
-    public class TbEndTurn : SimpleAction
+    public class TbEndTurn : GameAction
     {
         protected override void Run() => Game.All<TbBoard>()[0].turn++;
     }
 
     [Serializable]
-    public class TbBroken : SimpleAction
+    public class TbBroken : GameAction
     {
         protected override void Run()
         {
@@ -113,9 +128,44 @@ namespace GBible.Tests
         int Hp(string id) => Game.Find<TbUnit>(id).hp;
 
         [Test]
+        public void 행동의_참조_필드는_실행_직전에_지금_객체로_바뀐다()
+        {
+            var hero = Game.Find<TbUnit>("hero");
+            var old = new TbUnit { id = "hero" };   // Undo·불러오기 뒤의 옛 객체처럼 데이터 밖의 객체
+            Game.Do(new TbMove { unit = old, x = 5, y = 1 });
+            Assert.AreEqual(5, hero.x, "id로 지금 데이터의 객체를 찾아 고친다");
+            Assert.AreEqual(0, old.x, "넣은 옛 객체는 건드리지 않는다");
+        }
+
+        [Test]
+        public void 참조_필드_여러_개와_리스트를_모두_찾는다()
+        {
+            var all = Game.All<TbUnit>();
+            var a = all[0];
+            var b = all[1];
+            var ax = a.x;
+            var bx = b.x;
+            var hp = all[2].hp;
+            Game.Do(new TbSwap { a = a, b = b, others = { new TbUnit { id = all[2].id } } });
+            Assert.AreEqual(bx, a.x);
+            Assert.AreEqual(ax, b.x);
+            Assert.AreEqual(hp - 1, all[2].hp);
+        }
+
+        [Test]
+        public void 찾지_못한_참조는_행동_실패로_변경이_없다()
+        {
+            var hero = Game.Find<TbUnit>("hero");
+            var x = hero.x;
+            var e = Assert.Throws<InvalidOperationException>(() => Game.Do(new TbMove { unit = new TbUnit { id = "nobody" }, x = 9 }));
+            StringAssert.Contains("nobody", e.Message);
+            Assert.AreEqual(x, hero.x);
+        }
+
+        [Test]
         public void 행동은_등록_없이_실행되고_직접_고친_값도_Undo된다()
         {
-            Game.Do(new TbMove { target = "hero", x = 2, y = 0 });
+            Game.Do(new TbMove { unit = Game.Find<TbUnit>("hero"), x = 2, y = 0 });
             Assert.AreEqual(2, Game.Find<TbUnit>("hero").x);
             Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Data && e.Key == "board"), "바뀐 곳이 기록된다");
             Assert.IsFalse(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning), "추적된 변경은 경고가 없다");

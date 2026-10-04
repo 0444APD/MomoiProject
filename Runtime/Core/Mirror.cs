@@ -686,7 +686,9 @@ namespace GBible
         }
 
         // root 안에서 id가 같은 T 하나.
-        public static T FindById<T>(MirrorNode root, string id) where T : class
+        public static T FindById<T>(MirrorNode root, string id) where T : class => (T)FindById(root, typeof(T), id);
+
+        public static object FindById(MirrorNode root, Type type, string id)
         {
             var walk = System.Threading.Interlocked.Increment(ref _walk);
             var stack = new List<MirrorNode> { root };
@@ -696,7 +698,7 @@ namespace GBible
                 stack.RemoveAt(stack.Count - 1);
                 if (node.Walk == walk) continue;
                 node.Walk = walk;
-                if (node.Origin is T found)
+                if (node.Origin is { } found && type.IsInstanceOfType(found))
                 {
                     // id 필드(사본의 값), 없으면 id 속성(생성 코드로 읽기).
                     var field = node.Type.FindIdField();
