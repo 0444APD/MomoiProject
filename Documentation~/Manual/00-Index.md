@@ -62,8 +62,8 @@ Momoi Project(코드 이름 `GBible`)의 기능별 사용법이다. 각 장은 �
 | [31. 슬롯·설정·입력](31-Slots-Settings-Input.md) | 저장 슬롯(`GBibleRuntime.UseSlot`·`SlotInfoOf`), 기기별 설정(DB › 설정·`GameSettings`, 언어·음량·화면 적용 대상), 키 바꾸기(선택 기능 `GameInput`). |
 | [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](32-View-Presentation-Scenes.md) | `GameView.Redraw`·`ViewList`·컴포넌트 '데이터 연결', 연출 대기열(`GameView.Present`·`Busy`·속도·건너뛰기), 판 데이터를 따라 씬 열기(`GameScenes`), 씬 오브젝트의 상태(`Game.SetWorld`·'월드 상태 연결'). |
 | [33. 고정 틱·미리보기 실행·CSV](33-Tick-Preview-Csv.md) | 실시간 게임의 고정 틱(`TickRate`·`Ticked`·`TickAlpha`), 행동을 해 보고 되돌리는 미리보기(`Game.Preview`·`CanDo`·`IsPreviewing`), DB 목록의 CSV 내보내기·가져오기. |
-| [35. 화면(UI Toolkit)](35-Screens.md) | DB › 화면(UXML·층·뒤로 닫기·열 씬)과 화면 코드(`[BindTo]` `GameScreen`), 코드 없이 값 보이기(binding-path), 버튼 → 행동(`OnClick`, 실패는 알림), 목록 칸(`ElementList`), 기본 화면(고르기 창·확인·설정·슬롯·일시정지·알림), 테마 USS·화면 준비. |
 | [34. Steam](34-Steam.md) | 선택 기능 Steam(Steamworks.NET): DB › Steam 설정, 자동 초기화·Steam으로 다시 시작·오버레이 일시정지·처음 언어, 도전과제·로그 → Steam, 리치 프레즌스(`GameSteam`), Steam Cloud(Auto-Cloud) 설정. |
+| [35. 화면(UI Toolkit)](35-Screens.md) | DB › 화면(UXML·층·뒤로 닫기·열 씬)과 화면 코드(`[BindTo]` `GameScreen`), 코드 없이 값 보이기(binding-path), 버튼 → 행동(`OnClick`, 실패는 알림), 목록 칸(`ElementList`), 기본 화면(고르기 창·확인·설정·슬롯·일시정지·알림), 테마 USS·화면 준비. |
 
 ---
 

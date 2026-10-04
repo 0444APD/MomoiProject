@@ -16,7 +16,7 @@ namespace GBible.Data
     // DB › 화면: UI Toolkit 화면 하나 — UXML, 뜨는 층, 아래 입력을 막나, 뒤로(Esc)로 닫히나, 어느 씬에서 저절로 열리나.
     // 코드는 [BindTo(GameIds.Screen.X)] class X : GameScreen. 값을 보이기만 하는 칸은 코드 없이 UXML의 binding-path로(ScreenBinding).
     // 여는 법: GameScreens.Open(GameIds.Screen.X) · 열 씬 · 게임이 켜지면 열기.
-    [Database("화면", Group = "DB", Order = 50, IdPrefix = "screen")]
+    [Database("화면", Group = "DB", Order = 48, IdPrefix = "screen")]
     [CreateAssetMenu(menuName = "MomoiProject/화면", fileName = "NewScreen")]
     public sealed class ScreenData : GameData
     {

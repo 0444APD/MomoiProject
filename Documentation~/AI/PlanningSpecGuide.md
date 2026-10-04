@@ -1,6 +1,6 @@
 # 기획 명세서를 읽는 법 (AI용)
 
-기획 명세서(`PlanningSpec.md` 양식, 채운 예시 `PlanningSpec-CardDungeon.md`)를 받아 시스템층을 만들 때 AI가 따르는 절차다. 목표는 **질문 20개 이하**로 정할 것을 다 정하고, 새 프로젝트의 기반을 하루(약 12시간) 안에 닦는 것이다. 어떻게 쓰나는 `ProjectConventions.md`(프로젝트 관례), 무엇이 있나는 GBible 참조 문서를 따른다.
+기획 명세서(`PlanningSpec.md` 양식, 채운 예시 `PlanningSpec-CardDungeon.md`)를 받아 시스템층을 만들 때 AI가 따르는 절차다. 목표는 **질문 20개 이하**로 정할 것을 다 정하고, 새 프로젝트의 기반을 하루(약 12시간) 안에 닦는 것이다. 어떻게 쓰나는 `ProjectConventions.md`(프로젝트 관례), 무엇이 있나는 `Reference.md`(GBible 참조 문서)를 따른다.
 
 ---
 
