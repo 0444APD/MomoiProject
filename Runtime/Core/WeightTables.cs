@@ -27,6 +27,11 @@ namespace GBible
         // 요소 = ID 글자 또는 id가 있는 객체(그 id). 무게·개수·조건은 요소마다 같다. 같은 ID는 한 번만.
         public string listKey = "";
         public string listPath = "";
+        // 비어 있지 않으면 무게 = 밸런스 값(weightBalance)의 단계 값. 단계 = 플레이어 데이터 weightStepKey › weightStepPath의 숫자
+        // (비우면 기준값). 천장(뽑은 횟수가 늘수록 확률이 오름)·운·레벨에 따라 바뀌는 무게.
+        public string weightBalance = "";
+        public string weightStepKey = "";
+        public string weightStepPath = "";
     }
 
     // 플레이어 데이터 안의 목록 하나(키 › 필드 경로).
@@ -141,9 +146,12 @@ namespace GBible
         List<WeightEntry> Candidates(WeightTableDefinition table, HashSet<string> used, HashSet<string> blocked, int depth)
         {
             var list = new List<WeightEntry>();
-            foreach (var e in table.Entries)
+            foreach (var source in table.Entries)
             {
-                if (e == null || e.weight <= 0) continue;
+                if (source == null) continue;
+                var w = WeightOf(source);
+                if (w <= 0) continue;
+                var e = w == source.weight ? source : new WeightEntry { item = source.item, weight = w, minCount = source.minCount, maxCount = source.maxCount, condition = source.condition, listKey = source.listKey, listPath = source.listPath };
                 if (e.condition != null && !e.condition.Evaluate(_session)) continue;
                 if (!string.IsNullOrEmpty(e.listKey))
                 {
@@ -161,6 +169,15 @@ namespace GBible
                 else if (Open(e.item, used, blocked)) list.Add(e);
             }
             return list;
+        }
+
+        // 줄의 무게: 밸런스 값이 있으면 그 단계 값(단계 = 플레이어 데이터의 숫자), 없으면 적은 무게.
+        double WeightOf(WeightEntry entry)
+        {
+            if (string.IsNullOrEmpty(entry.weightBalance)) return entry.weight;
+            if (string.IsNullOrEmpty(entry.weightStepKey) || !_session.Data.IsDefined(entry.weightStepKey)) return _session.Balance.Get(entry.weightBalance);
+            var step = ScreenBinding.Number(FieldPaths.Resolve(_session.Data.Get(entry.weightStepKey), entry.weightStepPath ?? "").FirstOrDefault());
+            return _session.Balance.Get(entry.weightBalance, step);
         }
 
         static bool Open(string id, HashSet<string> used, HashSet<string> blocked) =>

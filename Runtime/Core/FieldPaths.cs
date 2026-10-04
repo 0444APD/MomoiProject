@@ -12,6 +12,8 @@ namespace GBible
     //   "weapon.power"     중첩 클래스의 필드
     //   "tags"             컬렉션 자체(포함·개수 검사용)
     //   "items[].level"    컬렉션의 각 요소의 필드(하나라도 만족하면 참)
+    //   "materials[book]"  딕셔너리의 키 하나(키는 글자로, 없으면 비어 있음 — 쓰면 그 키가 생긴다)
+    //   "units[hero].hp"   목록에서 id가 hero인 요소(글자 목록이면 그 글자) 하나
     // 딕셔너리는 값들을 요소로 본다. 필드 외에 읽을 수 있는 공개 속성도 따라간다(이벤트 클래스용).
     public static class FieldPaths
     {
@@ -93,10 +95,11 @@ namespace GBible
             error = null;
             var type = root;
             if (string.IsNullOrEmpty(path)) return root;
-            foreach (var raw in path.Split('.'))
+            foreach (var raw in Split(path))
             {
-                var many = raw.EndsWith(Each, StringComparison.Ordinal);
-                var name = many ? raw.Substring(0, raw.Length - Each.Length) : raw;
+                var step = ToStep(raw);
+                var many = step.Many || step.Select != null;
+                var name = step.Name;
                 if (name.Length > 0)
                 {
                     var found = MembersOf(type).FirstOrDefault(m => m.Name == name);
@@ -113,7 +116,7 @@ namespace GBible
                     var element = ElementTypeOf(type);
                     if (element == null)
                     {
-                        error = $"'{name}'는 컬렉션이 아니라 [] 를 쓸 수 없습니다.";
+                        error = step.Select != null ? $"'{name}'는 컬렉션이 아니라 [{step.Select}]를 쓸 수 없습니다." : $"'{name}'는 컬렉션이 아니라 [] 를 쓸 수 없습니다.";
                         return null;
                     }
                     type = element;
@@ -129,6 +132,8 @@ namespace GBible
         {
             public string Name;
             public bool Many;
+            // name[키]: 딕셔너리의 그 키 · 목록에서 id가 그 키인 요소(없으면 null).
+            public string Select;
         }
 
         static readonly Dictionary<string, Step[]> Parsed = new Dictionary<string, Step[]>(StringComparer.Ordinal);
@@ -138,15 +143,110 @@ namespace GBible
             lock (Parsed)
             {
                 if (Parsed.TryGetValue(path, out var steps)) return steps;
-                var parts = path.Split('.');
-                steps = new Step[parts.Length];
-                for (var i = 0; i < parts.Length; i++)
-                {
-                    var many = parts[i].EndsWith(Each, StringComparison.Ordinal);
-                    steps[i] = new Step { Name = many ? parts[i].Substring(0, parts[i].Length - Each.Length) : parts[i], Many = many };
-                }
+                steps = Split(path).Select(ToStep).ToArray();
                 Parsed[path] = steps;
                 return steps;
+            }
+        }
+
+        static Step ToStep(string raw)
+        {
+            if (raw.EndsWith(Each, StringComparison.Ordinal)) return new Step { Name = raw.Substring(0, raw.Length - Each.Length), Many = true };
+            var open = raw.IndexOf('[');
+            if (open >= 0 && raw.EndsWith("]", StringComparison.Ordinal)) return new Step { Name = raw.Substring(0, open), Select = raw.Substring(open + 1, raw.Length - open - 2) };
+            return new Step { Name = raw };
+        }
+
+        // 경로를 마디로 나눈다(점으로. [ ] 안의 점은 나누지 않는다 — 키 "forest.chest3").
+        public static List<string> Split(string path)
+        {
+            var parts = new List<string>();
+            if (string.IsNullOrEmpty(path)) return parts;
+            var depth = 0;
+            var start = 0;
+            for (var i = 0; i < path.Length; i++)
+            {
+                if (path[i] == '[') depth++;
+                else if (path[i] == ']') depth = Math.Max(0, depth - 1);
+                else if (path[i] == '.' && depth == 0)
+                {
+                    parts.Add(path.Substring(start, i - start));
+                    start = i + 1;
+                }
+            }
+            parts.Add(path.Substring(start));
+            return parts;
+        }
+
+        // 마지막 마디와 그 앞(부모 경로). "hero.stats[atk]" → "hero", "stats[atk]".
+        public static void SplitLast(string path, out string parent, out string last)
+        {
+            var parts = Split(path ?? "");
+            last = parts.Count == 0 ? "" : parts[parts.Count - 1];
+            parent = parts.Count <= 1 ? "" : string.Join(".", parts.Take(parts.Count - 1));
+        }
+
+        public static bool IsSelect(string step) => ToStep(step ?? "").Select != null;
+
+        // 마지막 마디 하나에 쓴다: 필드(생성 코드)나 딕셔너리의 키(name[키], 없던 키면 만든다). next(지금 값, 형식)이 null이면 쓰지 않는다. 썼으면 참.
+        public static bool Assign(object parent, string last, Func<object, Type, object> next)
+        {
+            if (parent == null || string.IsNullOrEmpty(last)) return false;
+            var step = ToStep(last);
+            if (step.Many) return false;
+            if (step.Select == null)
+            {
+                var access = FieldAccess.Find(parent.GetType(), step.Name);
+                var type = TypeAt(parent.GetType(), step.Name, out _);
+                if (access == null || type == null) return false;
+                var value = next(access.Get(parent), type);
+                if (value == null) return false;
+                access.Set(parent, value);
+                return true;
+            }
+            var collection = step.Name.Length == 0 ? parent : Read(parent, step.Name);
+            if (!(collection is IDictionary map)) return false;
+            var info = DataModel.Of(collection.GetType());
+            if (!TryKey(info.KeyType, step.Select, out var key)) return false;
+            var nextValue = next(map.Contains(key) ? map[key] : null, info.ElementType);
+            if (nextValue == null) return false;
+            map[key] = nextValue;
+            return true;
+        }
+
+        static bool TryKey(Type type, string text, out object key)
+        {
+            key = null;
+            if (type == null || type == typeof(string)) { key = text; return true; }
+            try
+            {
+                if (type.IsEnum) { key = Enum.Parse(type, text); return true; }
+                key = Convert.ChangeType(text, type, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception) { return false; }
+        }
+
+        // name[키]로 고르기: 딕셔너리면 그 키의 값, 목록이면 id(글자 목록이면 그 글자)가 키인 첫 요소.
+        static object Pick(object collection, string key)
+        {
+            switch (collection)
+            {
+                case string _:
+                    return null;
+                case IDictionary map:
+                    foreach (DictionaryEntry entry in map)
+                        if (string.Equals(Convert.ToString(entry.Key, CultureInfo.InvariantCulture), key, StringComparison.Ordinal)) return entry.Value;
+                    return null;
+                case IEnumerable list:
+                    foreach (var item in list)
+                    {
+                        if (item is string text) { if (text == key) return item; continue; }
+                        if (item != null && GameApi.HasId(item.GetType()) && GameApi.IdOf(item) == key) return item;
+                    }
+                    return null;
+                default:
+                    return null;
             }
         }
 
@@ -164,7 +264,12 @@ namespace GBible
                 {
                     var value = step.Name.Length == 0 ? node : Read(node, step.Name);
                     if (value == null) continue;
-                    if (!step.Many) next.Add(value);
+                    if (step.Select != null)
+                    {
+                        var picked = Pick(value, step.Select);
+                        if (picked != null) next.Add(picked);
+                    }
+                    else if (!step.Many) next.Add(value);
                     else AddItems(value, next);
                 }
                 (current, next) = (next, current);

@@ -26,6 +26,7 @@ namespace GBible.Data
                 {
                     item = list ? "" : entry.item, weight = entry.weight, minCount = entry.minCount, maxCount = entry.maxCount, condition = entry.condition,
                     listKey = list ? entry.listKey : "", listPath = list ? entry.listPath ?? "" : "",
+                    weightBalance = entry.weightBalance ?? "", weightStepKey = entry.weightStepKey ?? "", weightStepPath = entry.weightStepPath ?? "",
                 });
             }
             foreach (var list in exclude.Where(l => l != null && !string.IsNullOrEmpty(l.key)))
@@ -70,6 +71,9 @@ namespace GBible.Data
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터"), ShowIf(nameof(source), WeightEntrySource.List)] public string listKey = "";
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(목록)"), ShowIf(nameof(source), WeightEntrySource.List), Tooltip("요소가 ID 글자거나 id가 있는 객체인 목록")] public string listPath = "";
         [FieldLabel("무게")] public double weight = 1;
+        [FieldLabel("무게를 밸런스 값에서"), DataRef(typeof(BalanceData)), Tooltip("고르면 무게 = 이 밸런스 값(곡선)의 단계 값. 천장·운·레벨에 따라 바뀌는 확률")] public string weightBalance = "";
+        [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("단계(플레이어 데이터)"), ShowIf(nameof(weightBalance)), Tooltip("곡선의 단계로 쓸 숫자. 비우면 기준값")] public string weightStepKey = "";
+        [FieldPath(EmptyLabel = "값 전체"), FieldLabel("단계 필드"), ShowIf(nameof(weightBalance))] public string weightStepPath = "";
         [FieldLabel("최소 개수")] public int minCount = 1;
         [FieldLabel("최대 개수")] public int maxCount = 1;
         [FieldLabel("조건(맞을 때만 후보)"), SerializeReference] public Condition condition;
@@ -97,7 +101,7 @@ namespace GBible
         {
             var rolled = context.Game.Roll(table, Math.Max(1, count), unique);
             if (rolled.Count == 0) return;
-            new PlayerDataReward { key = key, path = path, items = rolled }.Grant(context.Session);
+            GrantIds.Into(context.Session, key, path, rolled);
         }
 
         public override string Describe(INameResolver names) =>

@@ -293,6 +293,7 @@ namespace GBible
                 LoadProfile(session);
                 // DB › 상태 효과(Game.ApplyStatus·효과 '상태 효과 걸기').
                 foreach (var status in database.All<StatusData>()) session.Statuses.Define(status.ToDefinition());
+                foreach (var passive in database.All<PassiveData>()) session.Passives.Define(passive.ToDefinition());
                 // DB › 밸런스 값(Game.Balance)·가중치 표(Game.Roll).
                 foreach (var balance in database.All<BalanceData>()) balance.Define(session.Balance);
                 foreach (var table in database.All<WeightTableData>()) session.Tables.Define(table.ToDefinition());

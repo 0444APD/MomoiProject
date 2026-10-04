@@ -132,6 +132,24 @@ namespace GBible
             (string.IsNullOrEmpty(key) ? "(플레이어 데이터 없음)" : key) + (string.IsNullOrEmpty(path) ? "" : " › " + FieldFilter.PathLabel(path));
     }
 
+    // 뽑은·고른 원본 ID들을 플레이어 데이터에 넣는 공통 규칙(가중치 표에서 주기·고르기): 목록이면 요소로, 딕셔너리면 그 키의 개수 +1, 숫자 하나면 개수만큼 +.
+    public static class GrantIds
+    {
+        public static void Into(GameSession session, string key, string path, IReadOnlyList<string> ids)
+        {
+            if (ids == null || ids.Count == 0 || string.IsNullOrEmpty(key)) return;
+            var target = session.Data.IsDefined(key) ? FieldPaths.TypeAt(session.Data.TypeOf(key), path ?? "", out _) : null;
+            var kind = PlayerDataGrants.KindOf(target);
+            if (kind == GrantKind.Dictionary)
+            {
+                var counts = ids.GroupBy(id => id, StringComparer.Ordinal).ToList();
+                new PlayerDataReward { key = key, path = path ?? "", keys = counts.Select(g => g.Key).ToList(), items = counts.Select(g => g.Count().ToString(CultureInfo.InvariantCulture)).ToList() }.Grant(session);
+            }
+            else if (kind == GrantKind.Number) new PlayerDataReward { key = key, path = path ?? "", amount = ids.Count }.Grant(session);
+            else new PlayerDataReward { key = key, path = path ?? "", items = ids.ToList() }.Grant(session);
+        }
+    }
+
     // 보상: 플레이어 데이터 필드 하나에 준다. 필드 형식에 따라
     //   숫자 → amount만큼 증감 / 글자·참거짓·enum → value로 정하기 / 클래스 → value(인스턴스 ID)의 사본으로 정하기 /
     //   컬렉션 → items의 요소마다(숫자·값·인스턴스 ID) 넣기 / 딕셔너리 → keys[i]에 items[i](숫자면 증감, 아니면 값·인스턴스로 덮어쓰기).
@@ -189,14 +207,19 @@ namespace GBible
                 }
             }
 
-            var cut = path.LastIndexOf('.');
-            var parentPath = cut < 0 ? "" : path.Substring(0, cut);
-            var member = cut < 0 ? path : path.Substring(cut + 1);
+            FieldPaths.SplitLast(path, out var parentPath, out var member);
             store.Modify<object>(key, root =>
             {
                 foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
                 {
                     if (parent == null) continue;
+                    // 딕셔너리의 키 하나(stock[potion]): 숫자는 증감, 값·인스턴스는 그 키에 넣는다.
+                    if (FieldPaths.IsSelect(member))
+                    {
+                        if (kind == GrantKind.List || kind == GrantKind.Dictionary) Warn(session, $"'{path}': 키 하나에는 목록을 넣을 수 없습니다.");
+                        else FieldPaths.Assign(parent, member, (current, type) => kind == GrantKind.Instance ? Make(session, type, value, GrantKind.Instance) : NewValue(session, current, type, kind));
+                        continue;
+                    }
                     if (parent.GetType().IsValueType)
                     {
                         Warn(session, $"'{path}'의 부모가 구조체라 바꿀 수 없습니다(클래스로 바꾸세요).");

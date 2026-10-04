@@ -137,7 +137,9 @@ namespace GBible
             }
             catch (Exception e)
             {
-                // 한 구독자의 오류가 다른 구독자를 막지 않게 하되, 조용히 삼키지 않고 기록한다.
+                // 행동 안이면 그 행동이 실패한다(바꾼 것이 모두 취소된다 — 반쯤 바뀐 데이터가 남지 않게). 플레이어용 실패(GameFailure)도 그대로 올라간다.
+                if (InAction?.Invoke() ?? false) throw;
+                // 행동 밖: 한 구독자의 오류가 다른 구독자를 막지 않게 하되, 조용히 삼키지 않고 기록한다.
                 _journal.Append(JournalKind.Error, "Events", $"구독자 오류 ({target.Method.DeclaringType?.Name}.{target.Method.Name}): {e.Message}");
             }
         }

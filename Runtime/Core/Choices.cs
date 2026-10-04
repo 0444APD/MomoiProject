@@ -246,7 +246,7 @@ namespace GBible
                 foreach (var effect in effects.Where(e => e != null))
                     if (effect.TargetType.IsInstanceOfType(target)) effect.Run(use, target);
             if (ids && !string.IsNullOrEmpty(key) && picks.Count > 0)
-                new PlayerDataReward { key = key, path = path ?? "", items = picks.Cast<string>().ToList() }.Grant(session);
+                GrantIds.Into(session, key, path, picks.Cast<string>().ToList());
             if (then.Count > 0) session.Triggers.RunOutcomes(then, context, "Choice");
         }
     }

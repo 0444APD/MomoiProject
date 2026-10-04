@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace GBible
 {
@@ -142,15 +143,34 @@ namespace GBible
     }
 
     // 결과 Block '의도 고치기': 가로챈 의도의 필드를 바꾸거나 의도를 막는다. 가로채기 트리거의 결과로만 의미가 있다.
+    // 값에 틀을 쓸 수 있다: {user}(사용자·가진 쪽의 id) · {owner}(이 결과를 가진 항목 ID) · {stacks}(가진 쪽의 이 상태 효과 중첩) · {balance:ID}(밸런스 값).
+    //   대신 맞기: targetId 값으로 바꾸기 {user}   도발: 공격 의도의 targetId 값으로 바꾸기 {user}   중첩만큼 피해 감소: amount 더하기 -{stacks}
     [Serializable]
     [BlockInfo("의도 고치기", Category = "결과", Description = "가로챈 의도의 값을 바꾸거나(설정·더하기·곱하기) 막습니다(취소).")]
     public sealed class ModifyIntentOutcome : Outcome
     {
         [FieldPath, FieldLabel("필드")] public string path = "";
         [FieldLabel("방법")] public IntentOp op = IntentOp.Add;
-        [FieldLabel("값")] public string value = "";
+        [FieldLabel("값(숫자·글자, 틀 {user} {stacks} {balance:ID})")] public string value = "";
 
         public override OutcomeKinds Kind => OutcomeKinds.Intent;
+
+        static readonly Regex Token = new Regex(@"\{(user|owner|stacks|balance:[^}]+)\}", RegexOptions.Compiled);
+
+        // 틀을 이 순간의 값으로 바꾼다. 앞에 붙은 '-'와 겹치면(-{stacks}가 -3) 숫자 하나로 읽힌다.
+        public static string Expand(string text, TriggerContext context)
+        {
+            if (string.IsNullOrEmpty(text) || text.IndexOf('{') < 0 || context == null) return text ?? "";
+            var expanded = Token.Replace(text, m =>
+            {
+                var name = m.Groups[1].Value;
+                if (name == "user") return context.User == null ? "" : GameApi.IdOf(context.User) ?? "";
+                if (name == "owner") return context.Owner ?? "";
+                if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
+                return context.Game.Balance(name.Substring("balance:".Length)).ToString("R", CultureInfo.InvariantCulture);
+            });
+            return expanded.Replace("--", "");
+        }
 
         public override void Run(TriggerContext context)
         {
@@ -181,16 +201,16 @@ namespace GBible
                 if (parent == null || parent.GetType().IsValueType) continue;
                 var access = FieldAccess.Find(parent.GetType(), member);
                 if (access == null) continue;
-                var next = Compute(access.Get(parent), type);
+                var next = Compute(access.Get(parent), type, Expand(value, context));
                 if (next != null) access.Set(parent, next);
             }
         }
 
-        object Compute(object current, Type type)
+        object Compute(object current, Type type, string text)
         {
             var underlying = Nullable.GetUnderlyingType(type) ?? type;
-            if (op == IntentOp.Set) return PublishEventOutcome.TryParse(type, value, out var set) ? set : null;
-            if (!TypeResolver.IsNumeric(underlying) || !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) return null;
+            if (op == IntentOp.Set) return PublishEventOutcome.TryParse(type, text, out var set) ? set : null;
+            if (!TypeResolver.IsNumeric(underlying) || !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) return null;
             var before = current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture);
             var after = op == IntentOp.Add ? before + number : before * number;
             return Convert.ChangeType(underlying == typeof(int) || underlying == typeof(long) || underlying == typeof(short) ? Math.Round(after) : after, underlying, CultureInfo.InvariantCulture);
@@ -211,7 +231,7 @@ namespace GBible
         {
             if (op == IntentOp.Cancel) return;
             if (string.IsNullOrEmpty(path)) context.Error("의도 고치기: 필드를 고르세요.");
-            if (op != IntentOp.Set && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) context.Error("의도 고치기: 더하기·곱하기에는 숫자를 적으세요.");
+            if (op != IntentOp.Set && value.IndexOf('{') < 0 && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) context.Error("의도 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{balance:ID} 틀)를 적으세요.");
         }
     }
 }

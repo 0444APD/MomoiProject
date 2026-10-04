@@ -169,13 +169,18 @@ namespace GBible
         // ── 상태 효과 ───────────────────────────────────────────
         // 상태 효과(DB › 상태 효과)를 건다·푼다(행동 안에서). target = 객체 또는 id. 다시 걸 때는 정의의 규칙(중첩·갱신)을 따른다.
         //   Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3);
-        public ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null) => Session.Statuses.Apply(target, statusId, stacks, source);
+        public ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null, double? length = null) => Session.Statuses.Apply(target, statusId, stacks, source, length);
+        // 남은 지속 줄이기(쿨다운 −1초 · 남은 턴 −1). 다 되면 지속이 끝난 것으로 끝낸다.
+        public bool ShortenStatus(object target, string statusId, double amount) => Session.Statuses.Shorten(target, statusId, amount);
 
         // stacks를 주면 그만큼 줄이고 0이 되면 푼다. 0이면 통째로 푼다. 푼 것은 '끝날 때 결과'를 돌리지 않는다.
         public bool RemoveStatus(object target, string statusId, int stacks = 0) => Session.Statuses.Remove(target, statusId, stacks);
         public int StatusStacks(object target, string statusId) => Session.Statuses.Stacks(target, statusId);
         public bool HasStatus(object target, string statusId) => Session.Statuses.Stacks(target, statusId) > 0;
         public IReadOnlyList<ActiveStatus> Statuses(object target) => Session.Statuses.Of(target);
+
+        // 패시브(DB › 패시브)를 몇 개 가졌나(레벨). holder를 비우면 모든 가진 쪽의 합.
+        public int Owned(string passiveId, object holder = null) => Session.Passives.Owned(passiveId, holder);
 
         // ── 예약 ───────────────────────────────────────────────
         // 행동을 나중에 실행한다(저장·Undo 그대로). 돌려주는 값은 예약 id. 넘긴 행동의 대상 필드는 실행할 때 다시 찾는다.
@@ -318,20 +323,15 @@ namespace GBible
                 Session.Data.Set(key, value);
                 return;
             }
-            var cut = path.LastIndexOf('.');
-            var parentPath = cut < 0 ? "" : path.Substring(0, cut);
-            var member = cut < 0 ? path : path.Substring(cut + 1);
+            FieldPaths.SplitLast(path, out var parentPath, out var member);
             Session.Data.Modify<object>(key, root =>
             {
                 foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
-                {
-                    if (parent == null) continue;
-                    var access = FieldAccess.Find(parent.GetType(), member);
-                    var type = FieldPaths.TypeAt(parent.GetType(), member, out _);
-                    if (access == null || type == null) continue;
-                    var underlying = Nullable.GetUnderlyingType(type) ?? type;
-                    access.Set(parent, Convert.ChangeType(value, underlying, System.Globalization.CultureInfo.InvariantCulture));
-                }
+                    FieldPaths.Assign(parent, member, (_, type) =>
+                    {
+                        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+                        return Convert.ChangeType(value, underlying, System.Globalization.CultureInfo.InvariantCulture);
+                    });
             });
         }
 
@@ -372,6 +372,18 @@ namespace GBible
             var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
             var shifted = local.AddHours(-resetHour);
             return (long)Math.Floor((shifted - new DateTime(1970, 1, 1)).TotalDays);
+        }
+
+        // 새 id 여럿을 한 번에(적 수십 마리 소환 — 번호를 한 번만 쓴다).
+        public List<string> NewIds(string prefix, int count)
+        {
+            var key = "$id." + prefix;
+            if (!Session.Data.IsDefined(key)) Session.Data.Define(key, DataZone.Meta, 0.0, $"{prefix} 번호");
+            var first = (long)Session.Data.GetNumber(key);
+            var result = new List<string>(Math.Max(0, count));
+            for (var i = 1; i <= count; i++) result.Add(prefix + (first + i));
+            if (count > 0) Session.Data.Set(key, (double)(first + count));
+            return result;
         }
 
         // 데이터 키 목록(이름순). 정의가 늘 때만 다시 만든다.

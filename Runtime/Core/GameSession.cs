@@ -64,6 +64,7 @@ namespace GBible
         public AttributeSystem Attributes { get; }
         // 상태 효과(Game.ApplyStatus)와 예약(Game.ScheduleAfter·ScheduleOn).
         public StatusSystem Statuses { get; }
+        public PassiveSystem Passives { get; }
         public ScheduleSystem Schedules { get; }
         // 선택 대기(Game.Ask·Answer).
         public ChoiceSystem Choices { get; }
@@ -133,6 +134,7 @@ namespace GBible
             Game = new GameApi(this);
             Attributes = new AttributeSystem(this);
             Statuses = new StatusSystem(this);
+            Passives = new PassiveSystem(this);
             Schedules = new ScheduleSystem(this);
             Choices = new ChoiceSystem(this);
             Balance = new BalanceSystem();
