@@ -25,7 +25,7 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 - **규칙 함수에 가로채기 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 의도를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
 - **비용은 `Game.Pay`로 낸다.** `Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name")`는 비용 가로채기를 이미 거친다(`what`은 모자랄 때 실패 글에 들어갈 이름의 텍스트 키). 직접 빼면(`battle.energy -= data.cost`) "이번 턴 비용 0" 같은 효과가 끼어들 자리가 없다.
 - **플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`.** 글은 텍스트 표로 번역된다. 없는 ID 같은 프로그래머 실수는 그냥 `InvalidOperationException`.
-- **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런스 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전의 `StartRun`은 예시를 짧게 하려고 체력 70·골드 99를 코드에 두었다. 실제 프로젝트에서는 밸런스 값으로 옮긴다([04장](04-AddingContent.md) 10절).
+- **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런스 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전은 시작 체력·시작 골드·보상 골드를 밸런스 값 `startHp`·`startGold`·`winGold`로 읽는다([03장](03-GameLoop.md) 4절, [04장](04-AddingContent.md) 10절).
 
 ```csharp
 public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
@@ -167,7 +167,8 @@ public class PlayCard : GameAction
 > [!note]- 난수 흐름 나누기
 > 카드 던전은 난수 흐름을 쓰임마다 나눈다: 덱 섞기 `"deck"`, 무작위 대상 `"cardTarget"`, 보상 골드 `"loot"`. 한쪽에서 뽑는 횟수가 바뀌어도(카드 효과를 고쳐 대상 뽑기가 한 번 늘어도) 다른 쪽 결과는 그대로라서, 고정 시드 재현이 덜 흔들린다.
 > ```csharp
-> var gold = Game.Random("loot").Range(10, 21);   // 10 이상 21 미만
+> var center = (int)Game.Balance(GameIds.Balance.WinGold, run.floor);   // 1층 15
+> var gold = Game.Random("loot").Range(center * 2 / 3, center * 4 / 3 + 1);   // 1층이면 10 이상 21 미만
 > ```
 
 ## 3. 리플렉션 금지 — 생성 코드가 생기는 형식만 쓴다

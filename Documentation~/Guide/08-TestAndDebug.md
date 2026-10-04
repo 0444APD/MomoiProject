@@ -172,7 +172,7 @@ static void KillAll(TriggerContext c)
 - `Assets/Code/Tests`에 테스트 파일을 둔다. asmdef는 시작 설정이 이미 만들었다.
 - Unity의 Test Runner 창(`Window › General › Test Runner` › EditMode)에서 돈다.
 
-테스트는 DB 없이 세션을 손으로 만든다. 플레이어 데이터는 `Define`으로, 카드·몬스터 원본은 `session.Instances`에 함수로 넣는다.
+테스트는 DB 없이 세션을 손으로 만든다. 플레이어 데이터는 `Define`으로, 밸런스 값은 `session.Balance.Define`으로, 카드·몬스터 원본은 `session.Instances`에 함수로 넣는다.
 
 ```csharp
 [SetUp]
@@ -181,6 +181,11 @@ public void SetUp()
     _session = new GameSession(new SessionOptions { Seed = 7 });
     _session.Data.Define(GameIds.PlayerData.Run.Id, DataZone.Session, new RunState(), "판");
     _session.Data.Define(GameIds.PlayerData.Profile.Id, DataZone.Meta, new Profile(), "프로필");
+
+    // DB › 밸런스 값 대신 코드로 넣는다.
+    _session.Balance.Define(GameIds.Balance.StartHp, 70);
+    _session.Balance.Define(GameIds.Balance.StartGold, 99);
+    _session.Balance.Define(GameIds.Balance.WinGold, 15, new Curve { kind = CurveKind.Linear, step = 3 });
 
     // DB › 인스턴스 대신 원본을 코드로 넣는다(시험에 필요한 수치만).
     var originals = new Dictionary<string, object>

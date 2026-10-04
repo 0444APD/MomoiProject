@@ -110,6 +110,19 @@ public class RunDirector : MonoBehaviour
 | 카드 내기 | `PlayCard` | 2절 | 카드 사용(+ 피해·적 처치) |
 | 턴 끝 | `EndTurn` | 턴 끝 효과(화상) → 적이 모두 쓰러졌으면 전투 승리, 아니면 적 공격 → 주인공이 쓰러지면 판 끝, 아니면 손패를 버리고 다음 턴 | 턴 끝, 턴 시작 |
 | 전투 승리 | `WinBattle` | 마지막 턴을 마감하고(턴 끝을 아직 쏘지 않았으면), 보상 골드, 다음 층 | 턴 끝, 전투 승리, 골드 획득 |
+
+> [!note]- 시작 체력·골드·보상 골드는 밸런스 값 — DB에 세 항목
+> 기획자가 바꿀 숫자는 코드에 적지 않고 DB › 밸런스 값에 둔다. 카드 던전은 세 항목을 만든다.
+>
+> | ID | 값 | 곡선 | 읽는 곳 |
+> |---|---|---|---|
+> | `startHp` | 70 | 없음 | `StartRun`: 주인공 체력·최대 체력 |
+> | `startGold` | 99 | 없음 | `StartRun`: 시작 골드 |
+> | `winGold` | 15 | 일정하게, 단계마다 +3 | `WinBattle`: 그 층 값의 ⅔~4⁄3(1층 10~20, 3층 14~28) |
+>
+> - 코드는 `Game.Balance(GameIds.Balance.StartHp)`, 층마다 커지는 값은 `Game.Balance(GameIds.Balance.WinGold, run.floor)`.
+> - 항목이 없으면 `StartRun`이 "없는 밸런스 값"으로 실패한다(새 판이 시작되지 않는다). DB에 만들고 Ctrl+S.
+> - 플레이 중에 DB에서 값을 고치면 저장 전이라도 다음 판·다음 보상부터 바로 반영된다. 테스트는 DB 대신 `session.Balance.Define`으로 넣는다([08장](08-TestAndDebug.md) 6절).
 | 판 끝 | `EndRun` | 남길 값을 프로필로 옮기고 층을 0으로 | 판 끝 |
 
 이벤트는 "그 일이 일어났다"를 알린다. 그 일이 일어나는 모든 자리에서 쏜다.
