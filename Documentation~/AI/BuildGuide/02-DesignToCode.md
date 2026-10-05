@@ -219,7 +219,7 @@ profile.totalGold += run.gold;
 > 로그는 범위(이번 판 / 누적)를 DB에서 따로 고르고, 도전과제 달성은 늘 메타 구역이다. 이 둘은 클래스로 만들지 않는다.
 
 > [!note]- 다른 장르라면: 수집형
-> 메타 구역이 주인공이다. 보유 캐릭터·재화·강화 단계가 프로필(Meta)이고, 한 번의 전투가 세션 구역이다. 퀘스트·일일 미션처럼 "언제 → 보상"을 기획자가 계속 더하는 것은 유물처럼 DB 종류로 만든다(7절, [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md)).
+> 메타 구역이 주인공이다. 보유 캐릭터·재화·강화 단계가 프로필(Meta)이고, 한 번의 전투가 세션 구역이다. 퀘스트·일일 미션처럼 "언제 → 보상"을 기획자가 계속 더하는 것은 유물처럼 DB 종류로 만든다(7절, [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md)).
 
 ## 4. 행동: 동사
 
@@ -354,7 +354,7 @@ public static class Rarity
 - **캐릭터 능력치**(공격력·방어력)는 숫자 필드 + Modifier다. 장비·버프는 효과 `능력치 보정`이나 `Game.AddModifier`로 붙이고, 읽을 때는 `Game.Attribute`.
 - **몇 턴 동안 이어지는 효과**(화상·독·보호막)는 Block을 만들지 않는다. DB › 상태 효과에 항목으로 두고, 카드에는 기본 제공 효과 `상태 효과 걸기`를 둔다.
 
-자세히: 매뉴얼 [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md).
+자세히: 매뉴얼 [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md).
 
 | 종류  | Block                                                          | 기획        |
 | --- | -------------------------------------------------------------- | --------- |
@@ -393,7 +393,7 @@ public static class CardCode
 > - 첫 승리 도전과제의 결과 "연쇄 번개 해금"(11번).
 > - 유물 불타는 피([04장](04-AddingContent.md) 9절).
 > - 함수 모양은 넷 중 하나: `()`, `(이벤트)`, `(TriggerContext)`, `(이벤트, TriggerContext)`. 컨텍스트(`TriggerContext`)에는 발동한 순간의 정보(쓴 쪽 `User`, 고른 대상 `Picked`, 받은 이벤트 `Event`, `Game`)가 들어 있다.
-> - ID가 DB의 어느 항목에도 없으면(오타·지운 항목) 게임을 켤 때 콘솔에 경고가 뜬다. 자세한 내용은 [04장](04-AddingContent.md) 5절, 매뉴얼 [13. BindTo](../Manual/13-BindTo.md).
+> - ID가 DB의 어느 항목에도 없으면(오타·지운 항목) 게임을 켤 때 콘솔에 경고가 뜬다. 자세한 내용은 [04장](04-AddingContent.md) 5절, 매뉴얼 [13. BindTo](../../Manual/13-BindTo.md).
 
 > [!note]- 규칙 함수
 > 피해 계산(방어도가 먼저 깎임, 적이 쓰러지면 빼고 이벤트를 쏨)과 덱 섞기는 행동·Block·`[BindTo]` 함수가 모두 쓰므로 한곳에 모은다. 래퍼나 특별한 문법 없이 그냥 C#이다.
@@ -499,12 +499,12 @@ public static class CardCode
 - [ ] 클래스 목록과 DB 항목 목록을 팀과 맞췄다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — 무엇을 넣고 넣지 않는가, 기록되는 필드, 지원 형식
-> - [04. 인스턴스](../Manual/04-Instances.md) — 원본과 사본, `[Hide]`·`[ShowIf]`, 기능 필드
-> - [05. 키워드](../Manual/05-Keywords.md)
-> - [10. 이벤트](../Manual/10-Events.md) — 필드 설계, 상속한 이벤트
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — 행동 클래스, 대상 필드
-> - [16. 능력과 사용 기능](../Manual/16-Abilities-Usable.md) — `Usable`
-> - [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md) — DB 종류 + Trigger 감시
-> - [03. Game API](../Manual/03-GameApi.md) — `Find`·`NewId`
-> - [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md) — 능력치 계산, 가로채기 자리, 효과의 문법
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — 무엇을 넣고 넣지 않는가, 기록되는 필드, 지원 형식
+> - [04. 인스턴스](../../Manual/04-Instances.md) — 원본과 사본, `[Hide]`·`[ShowIf]`, 기능 필드
+> - [05. 키워드](../../Manual/05-Keywords.md)
+> - [10. 이벤트](../../Manual/10-Events.md) — 필드 설계, 상속한 이벤트
+> - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — 행동 클래스, 대상 필드
+> - [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md) — `Usable`
+> - [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md) — DB 종류 + Trigger 감시
+> - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`NewId`
+> - [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md) — 능력치 계산, 가로채기 자리, 효과의 문법

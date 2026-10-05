@@ -151,7 +151,7 @@ public class InBattle : SimpleCondition
 > - `SimpleCondition` — `Check()`만 쓴다. 무엇을 보는지 따로 선언하지 않아도 된다(평가할 때 읽은 값을 시스템이 기록해, 그 값이 바뀌면 다시 평가한다).
 > - Trigger 안에서 검사 중이면 `Context`(컨텍스트)로 그 순간의 사용자·이벤트를 볼 수 있다: `Context?.User as Hero`.
 > - 값에 따라 "이 값이면 안 된다"를 검증하려면 `Validate(IValidationContext)`를 덮어쓴다([05장](05-WorkingWithDesigners.md) 7절).
-> - 무엇을 보는지(`CollectDependencies`)와 평가(`Evaluate`)를 직접 쓰는 `Condition` 상속형도 있지만, 시간으로 바뀌는 조건처럼 특별한 경우에만 쓴다(매뉴얼 [11장](../Manual/11-Triggers-Conditions.md) 4-3).
+> - 무엇을 보는지(`CollectDependencies`)와 평가(`Evaluate`)를 직접 쓰는 `Condition` 상속형도 있지만, 시간으로 바뀌는 조건처럼 특별한 경우에만 쓴다(매뉴얼 [11장](../../Manual/11-Triggers-Conditions.md) 4-3).
 
 ### 1-7. `[BindTo]` 함수
 
@@ -228,7 +228,7 @@ BlessingRules.Register(session, GameDatabase.Load()?.All<BlessingData>());
 > - `BoundOutcomes.Has/Create` — 기본 기능과 달리 프로젝트 기능은 `[BindTo]` 연결을 스스로 확인해야 한다. 빼먹으면 에디터는 결과 칸을 잠가 보이는데 실제로는 숨은 예전 결과가 돈다.
 > - `session.Triggers.Register(owner, when, repeat, fire)` — Trigger를 감시하다 참이 되는 순간 `fire`를 부른다. `repeat: false`면 한 번 발동하고 끝난다.
 > - `RunOutcomes(결과들, 컨텍스트, 출처)` — 결과를 차례로 실행하고 기록(Journal)에 남긴다. `outcome.Run`을 직접 부르지 않는다.
-> - 완료 여부처럼 남겨야 할 것은 플레이어 데이터에 둔다. 한 번 일어나면 되돌리지 않을 일이면 `session.Data.Permanent()`로 감싼다([04장](04-AddingContent.md) 8절, [07장](07-GenreRecipes.md) 2절, 매뉴얼 [17장](../Manual/17-Custom-Features.md) 2-9).
+> - 완료 여부처럼 남겨야 할 것은 플레이어 데이터에 둔다. 한 번 일어나면 되돌리지 않을 일이면 `session.Data.Permanent()`로 감싼다([04장](04-AddingContent.md) 8절, [07장](07-GenreRecipes.md) 2절, 매뉴얼 [17장](../../Manual/17-Custom-Features.md) 2-9).
 > - 시작할 때 이미 조건을 넘은 항목은 등록 뒤 `session.Triggers.Watcher.EvaluateAll()`로 소급한다.
 
 ### 1-9. Bootstrap
@@ -450,7 +450,7 @@ public sealed class SkipFloor : GameAction
 }
 ```
 
-`Run`을 쓰지 않고, 처리기를 `Started`에서 한 번 등록한다: `session.Actions.Register<SkipFloor>(action => session.Game.Data().Run.floor += action.floors);`. 한 형식에 처리기는 하나다. 이때도 대상 필드는 처리기가 불리기 직전에 id로 다시 찾아 넣는다. `Run`도 처리기도 없으면 "행동 'SkipFloor'의 처리기가 없습니다"로 실패한다. 대부분은 행동 클래스에 `Run`을 쓰는 것(1-1)으로 충분하다. → [02. 행동과 Undo](../Manual/02-Actions-Undo.md) 2.5
+`Run`을 쓰지 않고, 처리기를 `Started`에서 한 번 등록한다: `session.Actions.Register<SkipFloor>(action => session.Game.Data().Run.floor += action.floors);`. 한 형식에 처리기는 하나다. 이때도 대상 필드는 처리기가 불리기 직전에 id로 다시 찾아 넣는다. `Run`도 처리기도 없으면 "행동 'SkipFloor'의 처리기가 없습니다"로 실패한다. 대부분은 행동 클래스에 `Run`을 쓰는 것(1-1)으로 충분하다. → [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) 2.5
 
 ### 3-2. 코딩한 결과 Block — `Reward`
 
@@ -475,7 +475,7 @@ public class AddTotalGold : Reward
 > - `Reward` 클래스에 `[BindTo(ID)]`를 붙이면 그 항목의 결과가 이 클래스로 바뀐다(필드 값은 초기값 그대로 쓰인다).
 > - `[BindTo]` 함수·클래스의 모양이 틀렸으면 게임이 켜질 때 콘솔에 경고가 난다. 서버·테스트에서는 `BoundOutcomes.Problems`(글자 리스트)를 직접 읽는다.
 
-→ [12. 결과](../Manual/12-Outcomes.md) 3-2, [13. `[BindTo]`](../Manual/13-BindTo.md) 2-7·2-8
+→ [12. 결과](../../Manual/12-Outcomes.md) 3-2, [13. `[BindTo]`](../../Manual/13-BindTo.md) 2-7·2-8
 
 ### 3-3. 달성·진행도·로그를 코드로 읽기
 
@@ -492,7 +492,7 @@ return session.Achievements.TryGetProgress(achievementId, out var now, out var g
 > - 프로젝트 기능의 Trigger도 `trigger.TryGetProgress(session, out now, out goal)`로 같은 진행도를 준다.
 > - 도전과제가 달성되는 순간 기본 이벤트 `AchievementUnlocked`(필드 `Id`·`DisplayName`)를 쏘므로, 달성 알림 화면은 그것을 받는다.
 
-→ [14. 도전과제](../Manual/14-Achievements.md), [15. 로그](../Manual/15-Stats-Logs.md)
+→ [14. 도전과제](../../Manual/14-Achievements.md), [15. 로그](../../Manual/15-Stats-Logs.md)
 
 ### 3-4. 기록 용량과 원인 묶기 — `Journal`
 
@@ -507,11 +507,11 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 > - `Cause` 범위 안에서 남긴 줄은 타임라인 묶어 보기에서 원인 줄 아래로 들어간다.
 > - 기록은 고리 버퍼라 보관 줄 수(기본 4096줄)를 넘으면 오래된 줄부터 밀려난다. 긴 세션에서 앞부분이 사라지면 DB › 시작 파일 › Bootstrap › 고급의 **기록 보관 줄 수**를 늘린다(코드 값은 `SessionOptions.JournalCapacity`).
 
-→ [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) 2장
+→ [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) 2장
 
 ### 3-5. 키워드를 실행 중에 읽기 · 하위 그룹
 
-화면에 키워드 그룹의 표시 이름이나 목록이 필요하면 `Keywords`로 읽는다: `Keywords.GroupOf(typeof(Rarity)).DisplayName`("등급"), `Keywords.Find("legendary")`. 목록은 처음 쓸 때 한 번 모은다. 그룹 static class 안에 static class를 하나 더 두면 하위 그룹이 된다(키워드 탭에서 폴더로 보인다). 키워드 ID는 모든 그룹에서 하나뿐이어야 한다. → [05. 키워드](../Manual/05-Keywords.md) 2.2·2.5
+화면에 키워드 그룹의 표시 이름이나 목록이 필요하면 `Keywords`로 읽는다: `Keywords.GroupOf(typeof(Rarity)).DisplayName`("등급"), `Keywords.Find("legendary")`. 목록은 처음 쓸 때 한 번 모은다. 그룹 static class 안에 static class를 하나 더 두면 하위 그룹이 된다(키워드 탭에서 폴더로 보인다). 키워드 ID는 모든 그룹에서 하나뿐이어야 한다. → [05. 키워드](../../Manual/05-Keywords.md) 2.2·2.5
 
 ### 3-6. 이벤트 도구용 멤버
 
@@ -520,7 +520,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 - `session.Events.PublishObject(evt)` — 형식을 실행 중에만 알 때 쏜다. 콘솔 명령 같은 도구에서만 쓴다.
 - `Game.Use`가 끝나면 기본 이벤트 `AbilityUsed`("능력 사용", 필드 `Ability`·`User`·`Targets`·`Times`)를 쏜다. 카드·물약 사용 연출을 한곳에서 받을 때 쓸 수 있다.
 
-→ [10. 이벤트](../Manual/10-Events.md) 2-5~2-10
+→ [10. 이벤트](../../Manual/10-Events.md) 2-5~2-10
 
 ### 3-7. 찾기·저장소 보조 멤버
 
@@ -533,14 +533,14 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 - `[PlayerData]` — "플레이어 데이터로 쓰는 클래스"라는 표시. 생성 코드에는 `[Serializable]`과 같은 뜻이고, 늘 `[Serializable]`과 함께 쓴다.
 - **Modify 누락 검사**(DB › 시작 파일 › Bootstrap › 고급, 코드 값 `SessionOptions.DetectUntrackedChanges`) — 예전 방식 데이터를 `Modify` 밖에서 고친 것을 찾는 검사. 개발 빌드에서만 켜진다.
 
-→ [01. 플레이어 데이터](../Manual/01-PlayerData.md) 2장, [03. Game API](../Manual/03-GameApi.md) 2장
+→ [01. 플레이어 데이터](../../Manual/01-PlayerData.md) 2장, [03. Game API](../../Manual/03-GameApi.md) 2장
 
 ### 3-8. 저장 보조 멤버
 
 - `GameSession.IsSaveCompatible(json, session.SaveSchema, out reason)` — 저장 JSON이 지금 데이터 구조와 맞는지. 개발 중 저장 초기화의 판단 기준이다. 세이브 슬롯을 여럿 둘 때 "이 버전에서 못 읽는 저장"을 미리 표시하는 데 쓸 수 있다.
 - `GBibleRuntime.Stopped` — 게임을 끝낼 때 프로필·판 저장이 끝난 뒤 불린다(외부 서비스에 끝을 알릴 때).
 
-→ [06. 저장·불러오기](../Manual/06-SaveLoad.md) 2.9, [20. 시작하기](../Manual/20-Setup.md) 4절
+→ [06. 저장·불러오기](../../Manual/06-SaveLoad.md) 2.9, [20. 시작하기](../../Manual/20-Setup.md) 4절
 
 ### 3-9. 인스턴스를 에셋으로 다루기 · 코드로 인스턴스 주기
 
@@ -550,7 +550,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 > [!note]- `PlayerDataReward`를 코드로 쓸 때
 > 클래스 필드나 클래스 리스트 필드에 인스턴스 ID를 주면 그 인스턴스의 **사본**이 들어간다(`GrantKind.Instance`·`List`). 카드 던전의 덱은 원본 사본이 아니라 원본 ID만 든 `DeckCard`라서 이 방법을 쓰지 않고 규칙 함수(`Rules.NewCard`)로 넣는다. 원본 사본을 판 데이터에 그대로 두는 게임(아이템마다 강화 수치가 다른 RPG 장비 등)에서 쓴다.
 
-→ [04. 인스턴스](../Manual/04-Instances.md) 2.9·2.10
+→ [04. 인스턴스](../../Manual/04-Instances.md) 2.9·2.10
 
 ### 3-10. 에디터 설정과 도구
 
@@ -560,7 +560,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 - **`TextCatalog`** — 테스트·도구에서 텍스트 표를 따로 만들어 문장 틀을 시험한다: `new TextCatalog { SourceLanguage = "ko", Language = "ko" }` → `SetTable` → `Get`.
 - **결과 '다이얼로그 재생'** — 코드 없이 도전과제·유물 같은 항목의 결과로 다이얼로그를 연다. 카드 던전은 상점 층에서 코드(`Dialogues.Play`)로 열었다([06장](06-Presentation.md) 6절).
 
-→ [21. DB](../Manual/21-Editor-Database.md) 6.9·8, [20. 시작하기](../Manual/20-Setup.md) 6절, [23. 텍스트와 현지화](../Manual/23-Text-Localization.md) 7절, [24. 다이얼로그](../Manual/24-Dialogue.md) 5.5
+→ [21. DB](../../Manual/21-Editor-Database.md) 6.9·8, [20. 시작하기](../../Manual/20-Setup.md) 6절, [23. 텍스트와 현지화](../../Manual/23-Text-Localization.md) 7절, [24. 다이얼로그](../../Manual/24-Dialogue.md) 5.5
 
 ### 3-11. 난수 뽑기의 나머지 · 로그 시험 API
 
@@ -568,11 +568,11 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 - `session.TrySimulateStat(로그 ID, 양, out 설명, out 오류)` — 모니터 로그 탭의 "이벤트로 더하기"와 같다. 반영 규칙을 거꾸로 따라가 실제 이벤트를 쏜다(행동 하나, Undo 가능). 테스트·개발 명령에서 "처치 100회"를 만들 때 쓴다.
 - `EventSimulator.Create(형식, 이름→값)` — 이벤트 객체를 필드 이름으로 만든다(도구용).
 
-→ [07. 난수와 시간](../Manual/07-Random-Time.md) 2.2, [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) 4절
+→ [07. 난수와 시간](../../Manual/07-Random-Time.md) 2.2, [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) 4절
 
 ### 3-12. 기믹 부품 — 사용·확률·상태 효과·자리·다시 뽑기
 
-카드 던전에는 없지만 조커 칸·보드·가방 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../AI/GimmickCatalog.md)에 갈래별로 있다. 패시브 쪽(놓인 것마다·가진 동안 능력치 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
+카드 던전에는 없지만 조커 칸·보드·가방 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../GimmickCatalog.md)에 갈래별로 있다. 패시브 쪽(놓인 것마다·가진 동안 능력치 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
 
 - **되는 조각만 쓰기**: `Game.TryUse(id, 사용자, 대상…)`. 쓸 수 있으면 쓰고 참, 사용 조건이 안 맞으면 아무것도 하지 않고 거짓이다(실패를 던지지 않는다). 보드의 유닛을 차례로 돌며 부를 때 쓴다.
 - **기본 의도 다섯**: GBible이 가로채기 자리를 미리 둔 동작이다. 트리거 `가로채기` + 결과 `의도 고치기`로 고친다.
@@ -599,7 +599,7 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 > - **후보 +1·다시 뽑기**: 결과 '가중치 표에서 고르기'의 '후보 수에 더할 숫자'(플레이어 데이터의 숫자)가 후보 수에 더해진다. 행동 안에서 `Game.RerollChoice(선택 id)`를 부르면 같은 표·같은 후보 수로 새로 뽑고 `ChoiceRequested`를 다시 쏜다. 비용·남은 횟수는 부르는 행동이 맡는다(`Game.Pay`). Undo하면 원래 후보로 돌아간다.
 > - **시드로 새 판**: `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))`([07장](07-GenreRecipes.md) 4절).
 
-→ [16. 능력과 사용 기능](../Manual/16-Abilities-Usable.md), [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md), [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md), [36. 격자·큰 수](../Manual/36-Grid-BigNumber.md)
+→ [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md), [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md), [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md), [36. 격자·큰 수](../../Manual/36-Grid-BigNumber.md)
 
 ---
 
@@ -934,6 +934,6 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 
 ## 더 보기
 
-- [매뉴얼 목차](../Manual/00-Index.md) — 기능별 사전
-- [../Coding.md](../Coding.md) — 게임 코드 규칙
-- [../TestMultiplayer.md](../TestMultiplayer.md) — 테스트용 멀티플레이 설계(보류 중)
+- [매뉴얼 목차](../../Manual/00-Index.md) — 기능별 사전
+- [../Coding.md](../../Coding.md) — 게임 코드 규칙
+- [../TestMultiplayer.md](../../TestMultiplayer.md) — 테스트용 멀티플레이 설계(보류 중)

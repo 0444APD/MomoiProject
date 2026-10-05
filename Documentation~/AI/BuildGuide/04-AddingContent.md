@@ -147,7 +147,7 @@ public class DealDamage : Effect<Fighter>
 > - 걸린 독은 플레이어 데이터 `$statuses`에 들어 있어 Undo·판 저장이 따라온다. 시험: 독침을 내고 모니터 **데이터** 탭 `$statuses`에서 `stacks`·`remaining`을 본 뒤 턴을 끝낸다. **Undo**하면 피해와 남은 횟수가 함께 돌아간다.
 > - 화상과 다른 점: 화상은 피해가 고정이라 결과를 Block으로 조립했고(코드 없음), 독은 중첩 수만큼이라 결과를 `[BindTo]` 함수로 쓴다.
 > - 코드에서 걸 때는 `Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3)`, 화면의 상태 아이콘은 `Game.Statuses(fighter)`·`Game.StatusStacks`로 읽는다. 상태 효과 없이 "2턴 뒤 이 행동"만 걸 때는 예약(`Game.ScheduleOn<TurnEnded>(2, 행동)`)을 쓴다.
-> - 능력치 보정(분노 +10%)·가로채기(보호막 "내가 받는 피해 반감")·끝날 때 결과("3턴 뒤 폭발")도 같은 항목의 칸이다. 매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md) 5장.
+> - 능력치 보정(분노 +10%)·가로채기(보호막 "내가 받는 피해 반감")·끝날 때 결과("3턴 뒤 폭발")도 같은 항목의 칸이다. 매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md) 5장.
 
 ## 5. 카드 — 연쇄 번개 (`[BindTo]`)
 
@@ -187,7 +187,7 @@ static void ChainLightning(TriggerContext c)
 > ```
 
 > [!note]- 다른 장르라면
-> - **RPG의 장비·소모품**: 아이템 클래스 하나에 기능 필드(`[SerializeReference] public Equip equip;`, `public Usable usable;`)를 두고 인스턴스로 더한다. 칸·개수는 인벤토리 시스템([25. 인벤토리](../Manual/25-Inventory.md)). 여러 아이템이 같은 효과를 나누면 아이템이 능력 ID를 가리키게 하고(`[DataRef(typeof(AbilityData))]`) 효과는 DB › 능력에서 한 번 조립한다.
+> - **RPG의 장비·소모품**: 아이템 클래스 하나에 기능 필드(`[SerializeReference] public Equip equip;`, `public Usable usable;`)를 두고 인스턴스로 더한다. 칸·개수는 인벤토리 시스템([25. 인벤토리](../../Manual/25-Inventory.md)). 여러 아이템이 같은 효과를 나누면 아이템이 능력 ID를 가리키게 하고(`[DataRef(typeof(AbilityData))]`) 효과는 DB › 능력에서 한 번 조립한다.
 > - **스킬**처럼 아이템이 아닌 "쓰는 것"은 DB › 능력에서 만든다. 게임 코드는 똑같이 `Game.Use(능력 ID, 사용자, 대상들)`이다.
 
 ## 7. 로그와 도전과제
@@ -238,12 +238,12 @@ static void FirstWin(BattleWon e, TriggerContext c)
 > 4. Ctrl+S. `GameIds.Passive.Anchor`가 생긴다. 결과를 코드로 쓰려면 `[BindTo(GameIds.Passive.Anchor)]` — 등록과 `BoundOutcomes` 확인은 라이브러리가 한다.
 >
 > - 결과의 사용자(가진 쪽)는 목록을 품은 `run`이다('놓인 것마다'를 켜면 목록의 요소 하나, 아래 접힌 칸). 주인공에게 줄 효과는 대상에 `주인공` Block(9절)을 둔다.
-> - 몇 개 가졌나는 `Game.Owned(GameIds.Passive.Anchor)`. 동료마다 다른 특성(`party[].traits`), 레벨이 있는 패시브(ID → 레벨 딕셔너리)도 같은 종류다(매뉴얼 [17장](../Manual/17-Custom-Features.md) 0절).
+> - 몇 개 가졌나는 `Game.Owned(GameIds.Passive.Anchor)`. 동료마다 다른 특성(`party[].traits`), 레벨이 있는 패시브(ID → 레벨 딕셔너리)도 같은 종류다(매뉴얼 [17장](../../Manual/17-Custom-Features.md) 0절).
 > - 가진 목록 칸의 `[DataRef(typeof(RelicData))]`는 `typeof(PassiveData)`로 바꾼다. 유물 DB 종류와 패시브를 섞어 쓰는 동안은 `typeof(GameData)`(모든 DB 항목)로 둔다.
 > - 아이콘은 패시브 항목의 `icon`이다. 설명은 텍스트 `<ID>.desc`로 둔다.
 
 > [!note]- 패시브 더 — 놓인 것마다 · 일치 필드 · 가진 동안 능력치 보정 · 필드 바꾸기 · 빌려 쓰기
-> 카드 던전의 유물은 ID 목록 하나라 위 칸으로 충분하다. 조커 칸·보드처럼 **놓인 자리와 순서**가 효과를 바꾸는 조각, 가진 동안 능력치를 올리는 조각은 아래 칸을 더 쓴다. 기믹 갈래 전체는 AI 문서 [기믹 목록](../AI/GimmickCatalog.md).
+> 카드 던전의 유물은 ID 목록 하나라 위 칸으로 충분하다. 조커 칸·보드처럼 **놓인 자리와 순서**가 효과를 바꾸는 조각, 가진 동안 능력치를 올리는 조각은 아래 칸을 더 쓴다. 기믹 갈래 전체는 AI 문서 [기믹 목록](../GimmickCatalog.md).
 >
 > | 칸(툴팁) | 뜻 | 예 |
 > |---|---|---|
@@ -253,7 +253,7 @@ static void FirstWin(BattleWon e, TriggerContext c)
 > | `modifiers`(가진 동안 능력치 보정) | 줄마다 능력치 · 칸(플랫·퍼센트·독립 곱) · 값 · 레벨마다 · 레벨별 값 | 힘의 부적: `attack` 플랫, 레벨별 값 2/3/4/6 |
 > | `modifierTarget`(보정 받을 대상) | 가진 목록 플레이어 데이터 안의 객체 경로. 비우면 가진 쪽 | `hero` |
 >
-> 칸이 더 있다: `matchVia`(원본에서 읽기 — 원본 인스턴스의 필드에서 패시브 ID 찾기) · `rules`(발동 더(다른 순간) — 순간마다 다른 결과, Green Joker) · `pulse`(주기(초) — N초마다 결과) · `modifierWhen`(보정 조건 — 참일 때만 보정, Fury) · `stacking`(여럿일 때 — 레벨 합·값 합·가장 높은 것 하나). 매뉴얼 [17장](../Manual/17-Custom-Features.md) 0절.
+> 칸이 더 있다: `matchVia`(원본에서 읽기 — 원본 인스턴스의 필드에서 패시브 ID 찾기) · `rules`(발동 더(다른 순간) — 순간마다 다른 결과, Green Joker) · `pulse`(주기(초) — N초마다 결과) · `modifierWhen`(보정 조건 — 참일 때만 보정, Fury) · `stacking`(여럿일 때 — 레벨 합·값 합·가장 높은 것 하나). 매뉴얼 [17장](../../Manual/17-Custom-Features.md) 0절.
 >
 > **놓인 것마다 — 목록 순서대로 발동**
 > - 같은 목록을 보는 '놓인 것마다' 패시브끼리는 패시브 등록 순서가 아니라 목록 순서(자리)대로 섞여 발동한다. 조커 칸 왼쪽부터다.
@@ -350,7 +350,7 @@ RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
 > - **이벤트 받기로 발동시킨다** — 이벤트 받기로 발동한 유물은 이벤트를 쏜 행동 안에서 실행되므로 그 행동의 일부다. 조건 충족만으로 된 발동은 값이 바뀐 행동이 끝난 뒤의 평가에서 실행되어 행동 밖 변경이 된다. 판 값을 바꾸는 유물은 이벤트 받기로 만든다.
 
 > [!note]- 다른 장르라면 — 퀘스트·일일 미션·튜토리얼 단계
-> "언제 → 보상"을 기획자가 계속 더하는 것은 유물과 같은 방식의 DB 종류다. 한 번 완료하는 기능은 `repeat: false`, 완료 기록은 메타 구역 플레이어 데이터, 완료와 보상은 `Permanent()` 안에서. 시작할 때 이미 조건을 넘은 항목은 등록 뒤 `session.Triggers.Watcher.EvaluateAll()`로 소급한다. 전체 예제는 [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md).
+> "언제 → 보상"을 기획자가 계속 더하는 것은 유물과 같은 방식의 DB 종류다. 한 번 완료하는 기능은 `repeat: false`, 완료 기록은 메타 구역 플레이어 데이터, 완료와 보상은 `Permanent()` 안에서. 시작할 때 이미 조건을 넘은 항목은 등록 뒤 `session.Triggers.Watcher.EvaluateAll()`로 소급한다. 전체 예제는 [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md).
 
 ## 9. 유물 — 닻 · 불타는 피
 
@@ -402,7 +402,7 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 > - 패시브의 발동·결과 칸은 가로채기·의도 고치기를 처음부터 허락한다. 직접 만든 `RelicData`로 할 때만 잠금에 `TriggerKinds.Intercept`·`OutcomeKinds.Intent`를 넣는다(8절).
 > - 시험: 모니터 **데이터** 탭에서 `run › relics`에 `thornArmor`를 넣고 턴을 끝낸다. 적 공격이 5씩 줄어 들어온다. 빼면 그때부터 그대로 들어온다. Undo하면 함께 돌아간다. 가진 목록 칸의 `[DataRef]`는 8절 첫 접힌 칸처럼 패시브 ID도 받게 둔다.
 > - "공격한 적에게 3 되돌려 주기"는 피해가 들어간 **뒤**의 일이라 이벤트 받기(`피해` 이벤트 `DamageDealt`, 이름이 같은 의도와는 목록이 따로다)로 만든다. 가로채는 쪽은 의도만 고친다.
-> - 의도 클래스는 `Rules/Events/Intents.cs`에 있다(`[Intent("피해")]`). 순서·막기·`[BindTo]`로 쓰는 법은 매뉴얼 [28장](../Manual/28-Attributes-Intercepts.md) 5-4·5-5.
+> - 의도 클래스는 `Rules/Events/Intents.cs`에 있다(`[Intent("피해")]`). 순서·막기·`[BindTo]`로 쓰는 법은 매뉴얼 [28장](../../Manual/28-Attributes-Intercepts.md) 5-4·5-5.
 
 > [!note]- 투척 단검 — 적 하나를 골라 피해(선택 요구, 코드 없음)
 > 유물에는 사용자도 고른 대상도 없다. "전투 첫 턴에 적 하나를 골라 피해 5"처럼 플레이어가 고르게 하려면 결과 `선택 요구`를 쓴다.
@@ -414,7 +414,7 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 > - 턴 시작을 쏜 행동은 답을 기다리지 않고 끝난다. 플레이어가 고르면 답하기가 행동 하나로 실행되어 피해가 들어간다. Undo 한 번이면 피해만 돌아가고 다시 고르기를 기다린다.
 > - 시험: 데이터 탭에서 `run › relics`에 `throwingKnife`를 넣고, 전투 중에 이벤트 탭에서 `턴 시작`(turn 1)을 호출한다. 모니터 **명령** 탭 맨 위 "선택 대기 · 피해를 줄 적" 패널에서 적 버튼을 누르고 **답하기**. 버튼에는 후보의 텍스트 `<id>.name`이, 없으면 id(`enemy1` …)가 보인다.
 > - 게임 화면은 기다리는 선택(`Game.Choice`)을 그리고, 기다리는 동안(`Game.IsWaiting`) 카드 내기·턴 끝을 막는다. 시스템은 막지 않는다.
-> - 화면 코드, 코드에서 고르게 하는 `Game.Ask`(카드 1장 버리기·보상 3개 중 1개)는 매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md) 5-7~5-10.
+> - 화면 코드, 코드에서 고르게 하는 `Game.Ask`(카드 1장 버리기·보상 3개 중 1개)는 매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md) 5-7~5-10.
 
 ## 10. 등장시키기
 
@@ -457,7 +457,7 @@ static void GetChainLightning(TriggerContext c)
 > - 코드: `Game.Balance(GameIds.Balance.WinGold)` → 15, `Game.Balance(GameIds.Balance.WinGold, run.floor)` → 그 층의 값(3층이면 15 + 3 × 2 = 21). 곡선은 일정하게·비율로·거듭제곱·표(점 사이 직선)와 반올림, 최솟값·최댓값 자르기(쪽마다 켜고 끈다)를 고른다.
 > - 없는 ID면 `InvalidOperationException`이다(코드에는 늘 `GameIds` 상수).
 >
-> 둘 다 플레이 중에 DB에서 고치면 저장 전이라도 0.5초 안에 실행 중인 게임에 반영된다([08장](08-TestAndDebug.md) 2절). 수치가 많아지면 DB 목록 위의 **CSV** 버튼으로 표 계산기(구글 시트·엑셀)와 주고받는다. 매뉴얼 [30장](../Manual/30-Balance-Tables.md)·[33장](../Manual/33-Tick-Preview-Csv.md).
+> 둘 다 플레이 중에 DB에서 고치면 저장 전이라도 0.5초 안에 실행 중인 게임에 반영된다([08장](08-TestAndDebug.md) 2절). 수치가 많아지면 DB 목록 위의 **CSV** 버튼으로 표 계산기(구글 시트·엑셀)와 주고받는다. 매뉴얼 [30장](../../Manual/30-Balance-Tables.md)·[33장](../../Manual/33-Tick-Preview-Csv.md).
 
 ## 11. 모니터로 시험하고 검증하기
 
@@ -499,14 +499,14 @@ static void GetChainLightning(TriggerContext c)
 - [ ] 모니터에서 반응과 Undo를 확인했고, DB 사이드바가 "검증 통과"다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [04. 인스턴스](../Manual/04-Instances.md) — 만들기, 기능 필드, 사본
-> - [16. 능력과 사용 기능](../Manual/16-Abilities-Usable.md) — `Usable`, `Effect<T>`·`TargetSelector<T>`, `Game.Use`의 흐름
-> - [11. Trigger와 조건](../Manual/11-Triggers-Conditions.md) — 이벤트 받기·값 조건, 코드로 쓰는 조건 Block
-> - [12. 결과(Outcome)](../Manual/12-Outcomes.md) — 결과 종류, 대상에게 효과, `Reward`
-> - [13. `[BindTo]`](../Manual/13-BindTo.md) — 함수 모양, 연결 실패 알림
-> - [14. 도전과제](../Manual/14-Achievements.md) · [15. 로그](../Manual/15-Stats-Logs.md)
-> - [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md) — 패시브(놓인 것마다·가진 동안 능력치 보정·빌려 쓰기), DB 종류 + 감시, 퀘스트 전체 예제
-> - [36. 격자와 BigNumber](../Manual/36-Grid-BigNumber.md) — 자리(`Placement`), 대상 '자리로 고르기'·조건 '자리 검사'
-> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, 선택 요구, `Game.Ask`, 예약
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — 곡선, `Game.Roll`, 결과 '가중치 표에서 주기'
-> - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 이벤트 호출, 트리거로 달성
+> - [04. 인스턴스](../../Manual/04-Instances.md) — 만들기, 기능 필드, 사본
+> - [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md) — `Usable`, `Effect<T>`·`TargetSelector<T>`, `Game.Use`의 흐름
+> - [11. Trigger와 조건](../../Manual/11-Triggers-Conditions.md) — 이벤트 받기·값 조건, 코드로 쓰는 조건 Block
+> - [12. 결과(Outcome)](../../Manual/12-Outcomes.md) — 결과 종류, 대상에게 효과, `Reward`
+> - [13. `[BindTo]`](../../Manual/13-BindTo.md) — 함수 모양, 연결 실패 알림
+> - [14. 도전과제](../../Manual/14-Achievements.md) · [15. 로그](../../Manual/15-Stats-Logs.md)
+> - [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md) — 패시브(놓인 것마다·가진 동안 능력치 보정·빌려 쓰기), DB 종류 + 감시, 퀘스트 전체 예제
+> - [36. 격자와 BigNumber](../../Manual/36-Grid-BigNumber.md) — 자리(`Placement`), 대상 '자리로 고르기'·조건 '자리 검사'
+> - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, 선택 요구, `Game.Ask`, 예약
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — 곡선, `Game.Roll`, 결과 '가중치 표에서 주기'
+> - [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) — 이벤트 호출, 트리거로 달성

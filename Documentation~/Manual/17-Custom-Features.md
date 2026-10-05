@@ -172,13 +172,13 @@
 
 ### 0-3. 예제 — 닻 · 가시 갑옷 · 동료 특성 · 레벨이 있는 패시브 · 조커 · 힘의 부적 · Blueprint · Green Joker · Loyalty Card · Fury · 같은 아티팩트 둘 · 주기 · 원본에서 읽기
 
-가이드의 카드 던전 형식을 쓴다: 판 데이터 `run`(`RunState`)에 `hero`(id `hero`) · `relics`(`List<string>`)가 있고, 효과 Block `방어도`·`피해`, 의도 `피해`(`DamageIntent { sourceId, targetId, amount, cancelled }`)가 있다.
+구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다: 판 데이터 `run`(`RunState`)에 `hero`(id `hero`) · `relics`(`List<string>`)가 있고, 효과 Block `방어도`·`피해`, 의도 `피해`(`DamageIntent { sourceId, targetId, amount, cancelled }`)가 있다.
 
 **닻 — 전투 첫 턴에 방어도 8**
 
 1. DB › 패시브 `anchor`: `ownerKey` `run`, `ownerPath` `relics`.
 2. `trigger`: `이벤트 받기` → `턴 시작`, 이벤트 조건 `turn` `일치` `1`.
-3. `outcomes`: `대상에게 효과` → 대상 `주인공`(가이드의 프로젝트 대상 Block) → 효과 `방어도`(8).
+3. `outcomes`: `대상에게 효과` → 대상 `주인공`(구현 가이드의 프로젝트 대상 Block) → 효과 `방어도`(8).
 
 가진 쪽이 `run`이라 대상을 비우면 주인공이 아니다(방어도 Block이 `Fighter`만 받아 `run`을 건너뛴다). 그래서 주인공을 고르는 대상 Block을 둔다. 가진 목록을 주인공 안에 두면(`run › hero.relics`) 가진 쪽이 주인공이 되어 대상을 비워도 된다.
 

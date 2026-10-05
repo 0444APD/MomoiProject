@@ -240,9 +240,9 @@ public override void Validate(IValidationContext context)
 - [ ] DB 사이드바가 "검증 통과"다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [21. DB](../Manual/21-Editor-Database.md) — 탭·저장 흐름·ID 바꾸기·삭제·검증 메시지 모음
-> - [04. 인스턴스](../Manual/04-Instances.md) — `[Hide]`·`[ShowIf]`·기능 필드
-> - [05. 키워드](../Manual/05-Keywords.md) — 그룹·하위 그룹·연결
-> - [27. 필드 규칙과 스프라이트 규격](../Manual/27-Field-Rules-Sprites.md) — 필수·맞춤·베이크
-> - [11. Trigger와 조건](../Manual/11-Triggers-Conditions.md) · [12. 결과(Outcome)](../Manual/12-Outcomes.md) — `[BlockInfo]`·`Validate`
-> - [17. 프로젝트 고유 기능](../Manual/17-Custom-Features.md) — `ValidateData`
+> - [21. DB](../../Manual/21-Editor-Database.md) — 탭·저장 흐름·ID 바꾸기·삭제·검증 메시지 모음
+> - [04. 인스턴스](../../Manual/04-Instances.md) — `[Hide]`·`[ShowIf]`·기능 필드
+> - [05. 키워드](../../Manual/05-Keywords.md) — 그룹·하위 그룹·연결
+> - [27. 필드 규칙과 스프라이트 규격](../../Manual/27-Field-Rules-Sprites.md) — 필수·맞춤·베이크
+> - [11. Trigger와 조건](../../Manual/11-Triggers-Conditions.md) · [12. 결과(Outcome)](../../Manual/12-Outcomes.md) — `[BlockInfo]`·`Validate`
+> - [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md) — `ValidateData`

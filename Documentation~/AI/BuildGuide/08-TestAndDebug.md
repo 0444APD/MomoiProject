@@ -244,7 +244,7 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > [!note]- 테스트 자세히
 > - `GBibleRuntime` 없이 만든 세션은 프레임이 흐르지 않는다. 프레임 끝 처리(시간 예약·시간 지속 상태 효과·고정 틱)가 필요하면 `session.EndFrame(0.016)`을 직접 부른다.
 > - "이 행동을 하면 이렇게 된다"만 보고 상태를 그대로 두고 싶으면 `Game.Preview(행동, g => 읽기)`. 되돌릴 필요 없이 다음 줄에서 같은 상태로 다른 행동을 시험한다.
-> - 상태 효과를 쓰는 규칙을 시험하려면 DB 대신 `session.Statuses.Define(new StatusDefinition { … })`로 정의를 넣는다(매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md)).
+> - 상태 효과를 쓰는 규칙을 시험하려면 DB 대신 `session.Statuses.Define(new StatusDefinition { … })`로 정의를 넣는다(매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md)).
 > - Tests asmdef(`MomoiProject.Tests`)는 Rules·`GBible.Core`·`GBible.Unity`·켠 데이터 모듈(`GBible.Inventory` 등)·Test Runner·NUnit을 참조하고, 에디터에서 테스트를 돌릴 때만 컴파일된다. 화면 코드(Client)는 부를 수 없다. 규칙이 Rules에 있어야 하는 이유다.
 > - 프로젝트 루트의 `Tools/RunCoreTests.ps1`은 라이브러리의 코어 테스트만 Unity 없이 돌린다. 라이브러리를 고쳤을 때 코어가 깨지지 않았는지 보는 용도이고, 게임 규칙 테스트는 넣지 않는다.
 
@@ -302,12 +302,12 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > - **수집형·방치형**: 프로필이 오래 쌓이므로 명령 › 저장 › **프로필 삭제**(다음 플레이부터)와 **새 판**으로 처음 상태를 자주 시험한다. 오래된 프로필 파일을 몇 개 보관해 두었다가 출시 전 저장 변환을 시험한다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 탭별 조작, 개발 명령, 시뮬레이션 API
-> - [10. 이벤트](../Manual/10-Events.md) — 이벤트 호출
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — 실패와 취소, Undo 경고
-> - [07. 난수와 시간](../Manual/07-Random-Time.md) — 시드, 같은 시드 같은 결과
-> - [06. 저장·불러오기](../Manual/06-SaveLoad.md) — 판 저장·불러오기, 개발 중 저장 초기화
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — 예전 방식 비교, 주의할 점
-> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 선택 대기 패널, 테스트에서 정의 넣기
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — 플레이 중 바로 반영
-> - [33. 고정 틱·미리보기·CSV](../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`, DB CSV
+> - [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) — 탭별 조작, 개발 명령, 시뮬레이션 API
+> - [10. 이벤트](../../Manual/10-Events.md) — 이벤트 호출
+> - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — 실패와 취소, Undo 경고
+> - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 시드, 같은 시드 같은 결과
+> - [06. 저장·불러오기](../../Manual/06-SaveLoad.md) — 판 저장·불러오기, 개발 중 저장 초기화
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — 예전 방식 비교, 주의할 점
+> - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 선택 대기 패널, 테스트에서 정의 넣기
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — 플레이 중 바로 반영
+> - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`, DB CSV

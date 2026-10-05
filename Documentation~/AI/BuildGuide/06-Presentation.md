@@ -20,7 +20,7 @@
 ## 1. 화면 갱신
 
 > [!note]- 새 프로젝트의 화면은 DB › 화면으로(UXML + 화면 코드)
-> 카드 던전의 전투 화면은 씬의 UIDocument에 MonoBehaviour를 붙여 만들었다(아래). 새 프로젝트는 매뉴얼 [35장](../Manual/35-Screens.md)의 **화면**으로 만든다. 인스펙터에서 연결할 것이 없어 AI가 파일만으로 끝낸다.
+> 카드 던전의 전투 화면은 씬의 UIDocument에 MonoBehaviour를 붙여 만들었다(아래). 새 프로젝트는 매뉴얼 [35장](../../Manual/35-Screens.md)의 **화면**으로 만든다. 인스펙터에서 연결할 것이 없어 AI가 파일만으로 끝낸다.
 > 1. 메뉴 `MomoiProject › 화면 › 화면 준비`(한 번) → Ctrl+S.
 > 2. `Assets/UI/Screens/BattleHud.uxml`: 값 칸은 `binding-path`만 적는다 — `<ui:Label binding-path="run:gold@hud.gold" />`(텍스트 `hud.gold` = "골드 {value}"). 코드 없이 바뀐다.
 > 3. DB › 화면 `battleHud`: UXML · 층 `바탕(HUD)` · 열 씬 `Battle`.
@@ -81,7 +81,7 @@ void Redraw()   // Game.Data().Run을 읽어 글자·손패·물약 칸을 다�
 > - `ViewList`가 만든 오브젝트는 항목 id로 등록된다. 연출이 `GameView.Find<EnemyView>(e.targetId)`로 맞은 적의 오브젝트를 찾는다. 직접 등록은 `GameView.Register(id, gameObject)`.
 > - 값 하나를 글자·슬라이더에 잇기만 하면 코드도 없다: 컴포넌트 **데이터 연결**(`MomoiProject/데이터 연결`)을 붙이고 키 `run`, 필드 경로 `battle.energy`, 글자 틀 `에너지 {value}`(`{value}`가 값. 텍스트 키를 적으면 번역된 틀)를 적은 뒤 `onText`를 TMP 글자에, `onNumber`를 슬라이더에 잇는다. 이것도 연출이 끝난 뒤에 바뀐다.
 > - UI Toolkit의 `Label`은 컴포넌트가 아니라 데이터 연결의 대상이 될 수 없다. 카드 던전처럼 `Redraw`에서 넣는다.
-> - 매뉴얼 [32장](../Manual/32-View-Presentation-Scenes.md).
+> - 매뉴얼 [32장](../../Manual/32-View-Presentation-Scenes.md).
 
 > [!note]- 어떤 알림을 받나
 > | 이럴 때 | 이것 |
@@ -249,7 +249,7 @@ IEnumerator ShowDamage(DamageDealt hit)
 > | 씬을 떠날 때 남은 연출 버리기 | `GameView.ClearPresentation()` |
 > | 대기열이 빈 순간 | 이벤트 `GameView.Presented` |
 >
-> 연출 하나가 예외를 내도 그 연출만 끝나고 대기열은 계속된다(안쪽 코루틴까지). 받기는 `SubscribeAfterAction` → `Present`가 기본 모양이다. 매뉴얼 [32장](../Manual/32-View-Presentation-Scenes.md).
+> 연출 하나가 예외를 내도 그 연출만 끝나고 대기열은 계속된다(안쪽 코루틴까지). 받기는 `SubscribeAfterAction` → `Present`가 기본 모양이다. 매뉴얼 [32장](../../Manual/32-View-Presentation-Scenes.md).
 
 > [!note]- 게임 시간과 멈추지 않는 시간
 > `GameView.Wait`·`DeltaTime`은 `Time.deltaTime`(게임 시간)에 연출 속도를 곱한 값이라, 모니터·메뉴·다이얼로그가 `GameTime.Pause`로 게임을 멈추면 연출도 멈춘다. 일시정지 메뉴처럼 멈추면 안 되는 연출은 대기열 밖에서 `Time.unscaledDeltaTime`을 쓴다.
@@ -360,7 +360,7 @@ public void Buy(string source, int price)   // 상점 화면의 카드 버튼
 > - 그래프의 조건에는 트리거 순간이 없어 '확률'은 늘 거짓이고 사용자를 보는 조건은 쓰지 못한다. 무작위 분기는 값 바꾸기의 프로젝트 `Reward`가 행동 안에서 뽑아 플레이어 데이터에 적는다.
 > - 값 바꾸기에는 `Reward`만 고른다('플레이어 데이터에 주기'·'다이얼로그 재생'·프로젝트 `Reward`). 상태 효과 걸기·이벤트 쏘기는 신호 → 행동으로 한다.
 > - `Reward`는 Rules에, `Dialogues`를 부르는 코드는 Client에 둔다. Rules 어셈블리는 다이얼로그 모듈을 참조하지 않는다.
-> - 자세히는 매뉴얼 [24장](../Manual/24-Dialogue.md) 2절(기믹 걸기)·8절(현재 동작).
+> - 자세히는 매뉴얼 [24장](../../Manual/24-Dialogue.md) 2절(기믹 걸기)·8절(현재 동작).
 
 > [!note]- 다른 장르라면
 > 대사가 이야기의 중심인 게임은 다이얼로그 화면(UXML·USS)을 프로젝트에 맞게 고치고, 필요한 동작은 `DialogueUIExtension`을 붙여 더한다. 코드는 요소를 이름(`dialogue-root`·`dialogue-text` …)으로만 찾으므로 모양은 자유롭게 바꿔도 된다.
@@ -415,13 +415,13 @@ for (var i = run.potions.slots.Count; i < run.potions.capacity; i++)
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 이름·그림은 원본에서 읽는다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — `Changed`·`DataChanged`·`Synced`, Sync가 일어나는 때
-> - [10. 이벤트](../Manual/10-Events.md) — `Subscribe`·`SubscribeAfterAction`·`Dispose`, 받는 쪽 규칙
-> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`·`Busy`·`Find`, `ViewList`, 데이터 연결
-> - [33. 고정 틱·미리보기·CSV](../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`·`CanDo`·`IsPreviewing`
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — `GameFailure`·`Game.Fail`·`FailureKeys`
-> - [07. 난수와 시간](../Manual/07-Random-Time.md) — `GameTime`, 게임 시계
-> - [23. 텍스트와 현지화](../Manual/23-Text-Localization.md) — `Texts`, 문장 틀, `GameLanguage`
-> - [24. 다이얼로그](../Manual/24-Dialogue.md) — 그래프·신호·저장 이어 가기
-> - [26. 오디오](../Manual/26-Audio.md) — 채널·음량
-> - [25. 인벤토리](../Manual/25-Inventory.md) — 칸·더하기·빼기
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — `Changed`·`DataChanged`·`Synced`, Sync가 일어나는 때
+> - [10. 이벤트](../../Manual/10-Events.md) — `Subscribe`·`SubscribeAfterAction`·`Dispose`, 받는 쪽 규칙
+> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`·`Busy`·`Find`, `ViewList`, 데이터 연결
+> - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`·`CanDo`·`IsPreviewing`
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `GameFailure`·`Game.Fail`·`FailureKeys`
+> - [07. 난수와 시간](../../Manual/07-Random-Time.md) — `GameTime`, 게임 시계
+> - [23. 텍스트와 현지화](../../Manual/23-Text-Localization.md) — `Texts`, 문장 틀, `GameLanguage`
+> - [24. 다이얼로그](../../Manual/24-Dialogue.md) — 그래프·신호·저장 이어 가기
+> - [26. 오디오](../../Manual/26-Audio.md) — 채널·음량
+> - [25. 인벤토리](../../Manual/25-Inventory.md) — 칸·더하기·빼기

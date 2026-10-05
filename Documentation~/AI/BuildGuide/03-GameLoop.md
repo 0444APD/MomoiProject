@@ -283,10 +283,10 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > - 이벤트 예약이 실행 중에 실패하면 이벤트를 받는 쪽의 오류처럼 타임라인에 남고 바깥 행동은 계속된다. 실패할 일(모자란 비용 등)은 예약된 행동이 먼저 확인한다.
 > - 코루틴·타이머에서 `GBibleRuntime.Game.Do(…)`해도 돌기는 하지만, 기다리는 중인 것은 판 저장에 들어가지 않고 Undo해도 멈추지 않는다. 그래서 상태 효과·예약에 맡긴다.
 > - 카드 던전에서 시간이 걸리는 것은 연출뿐이다. 데이터는 행동 하나로 즉시 바뀌고, 화면이 이벤트를 받아 시간을 두고 보여 준다([06장](06-Presentation.md)).
-> - 자세히: 매뉴얼 [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md).
+> - 자세히: 매뉴얼 [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md).
 
 > [!note]- 다른 장르라면: 실시간 액션
-> 입력이 프레임마다 들어오지만 규칙은 같다. 이동은 MonoBehaviour가 하고, 피격·스킬 사용·아이템 획득처럼 플레이어 데이터를 바꾸는 사건만 행동으로 보낸다. Undo 방식은 DB › 시작 파일 › Bootstrap에서 "스냅샷"을 고른다. 독·지속 피해는 상태 효과의 지속을 "게임 시간(초)"으로, "2초 뒤 폭발"은 `Game.ScheduleAfter`로 둔다. 초당 회복처럼 일정한 간격의 규칙은 Bootstrap의 **고정 틱**을 켜고 `session.Ticked`에서 행동을 `Do`한다([07장](07-GenreRecipes.md) 6절). 예제 전체는 [02. 행동과 Undo](../Manual/02-Actions-Undo.md).
+> 입력이 프레임마다 들어오지만 규칙은 같다. 이동은 MonoBehaviour가 하고, 피격·스킬 사용·아이템 획득처럼 플레이어 데이터를 바꾸는 사건만 행동으로 보낸다. Undo 방식은 DB › 시작 파일 › Bootstrap에서 "스냅샷"을 고른다. 독·지속 피해는 상태 효과의 지속을 "게임 시간(초)"으로, "2초 뒤 폭발"은 `Game.ScheduleAfter`로 둔다. 초당 회복처럼 일정한 간격의 규칙은 Bootstrap의 **고정 틱**을 켜고 `session.Ticked`에서 행동을 `Do`한다([07장](07-GenreRecipes.md) 6절). 예제 전체는 [02. 행동과 Undo](../../Manual/02-Actions-Undo.md).
 
 ## 9. 씬 전환
 
@@ -308,7 +308,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > - 연출이 끝난 뒤에 열고, 여는 동안은 연출 대기열의 한 칸이다(그동안 `GameView.Busy`). 페이드는 `GameScenes.Transition = load => Fade(load)`(`load`를 감싸는 코루틴).
 > - Build Settings에 없는 씬이면 타임라인에 경고가 남는다. 코드로 켜려면 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)`.
 > - 카드 던전은 `RunState`에 씬 필드가 없어 위의 `SceneManager.LoadScene`을 쓴다. 맵·상점 씬이 늘면 `public string scene;`을 더하고 씬 흐름으로 옮긴다.
-> - 씬에 놓인 상자·문·쓰러뜨린 보스의 상태는 월드 상태로 기억한다: 행동 안에서 `Game.SetWorld("forest.chest3", "opened")`, 씬에는 컴포넌트 '월드 상태 연결'. 매뉴얼 [32장](../Manual/32-View-Presentation-Scenes.md).
+> - 씬에 놓인 상자·문·쓰러뜨린 보스의 상태는 월드 상태로 기억한다: 행동 안에서 `Game.SetWorld("forest.chest3", "opened")`, 씬에는 컴포넌트 '월드 상태 연결'. 매뉴얼 [32장](../../Manual/32-View-Presentation-Scenes.md).
 
 > [!note]- 다른 장르라면: 턴을 넘기면 Undo 못 하게
 > DB › 시작 파일 › Bootstrap의 **Undo 끊는 이벤트**로 턴 끝 이벤트를 고른다([07장](07-GenreRecipes.md) 2절). 카드 던전은 판 전체에서 Undo를 허락하고, 상한은 DB › 시작 파일 › Bootstrap의 Undo 보관 수(200)로 둔다.
@@ -326,13 +326,13 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 - [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다(씬이 많으면 Bootstrap의 씬 흐름).
 
 > [!note]- 더 보기(매뉴얼)
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — `Do` 안에서 일어나는 일, 실패, Undo, 지연 효과
-> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, `ScheduleAfter`·`ScheduleOn`
-> - [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 가로채기
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — `Game.Fail`·`GameFailure`
-> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../Manual/32-View-Presentation-Scenes.md) — 씬 흐름, 월드 상태
-> - [03. Game API](../Manual/03-GameApi.md) — `Find`·`All`·`Do`·`Use`, 씬 코드에서 쓰는 법
-> - [10. 이벤트](../Manual/10-Events.md) — 쏘기·받기, `Subscribe`와 `Dispose`
-> - [16. 능력과 사용 기능](../Manual/16-Abilities-Usable.md) — `Game.Use`의 실행 흐름, `Game.CanUse`
-> - [20. 시작하기](../Manual/20-Setup.md) — `GBibleRuntime`, 판 저장·불러오기
-> - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 행동 탭, 타임라인 묶어 보기
+> - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — `Do` 안에서 일어나는 일, 실패, Undo, 지연 효과
+> - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, `ScheduleAfter`·`ScheduleOn`
+> - [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 가로채기
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Fail`·`GameFailure`
+> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — 씬 흐름, 월드 상태
+> - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`All`·`Do`·`Use`, 씬 코드에서 쓰는 법
+> - [10. 이벤트](../../Manual/10-Events.md) — 쏘기·받기, `Subscribe`와 `Dispose`
+> - [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md) — `Game.Use`의 실행 흐름, `Game.CanUse`
+> - [20. 시작하기](../../Manual/20-Setup.md) — `GBibleRuntime`, 판 저장·불러오기
+> - [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) — 행동 탭, 타임라인 묶어 보기

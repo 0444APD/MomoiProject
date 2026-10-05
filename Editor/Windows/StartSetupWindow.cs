@@ -119,7 +119,7 @@ namespace GBible.EditorTools
             Build();
             Section("적용함", null);
             Paragraph(done.Count == 0 ? "바꿀 것이 없었습니다." : string.Join("\n", done));
-            Paragraph("다음: Rules/PlayerData.cs의 RunState·Profile에 필드를 채운다. 코드에서는 Game.Data().Run으로 쓴다. DB 사이드바 맨 위 '시작 파일'에서 Bootstrap·RunState·Profile로 바로 간다. 자세한 순서는 Documentation~/Guide/01-StartProject.md.");
+            Paragraph("다음: 기획서·콘텐츠 목록 같은 자료를 Docs/Source에 넣고, 이 프로젝트 폴더에서 Claude Code를 열어 \"/think-momoi Docs/Source의 자료로 새 프로젝트를 시작해 줘\"라고 말한다. AI가 기획 명세서(Docs/PlanningSpec.md)를 채우고 질문한 뒤 시스템을 만든다. 순서는 GBible 패키지의 운영 가이드 Documentation~/Guide/01-Start.md.");
         }
 
         void Section(string title, string caption)

@@ -276,7 +276,7 @@ GameInput.Rebind(endTurn, 0, result => { if (result.Conflict != null) … });
 
 ## 5. 상황별 예제
 
-예제는 가이드의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 화면은 UI Toolkit(`UIDocument`)으로 그린다.
+예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 화면은 UI Toolkit(`UIDocument`)으로 그린다.
 
 ```csharp
 // 플레이어 데이터 "run"(RunState, 세션 구역): floor · gold · hero · deck · battle …  IsActive = floor > 0(진행 중인 판)

@@ -73,7 +73,7 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 > - 가로채는 항목이 없으면 `Game.Intercept`는 바로 돌아온다. 자리를 두는 비용은 거의 없다.
 > - 행동 안에서 돌므로 Undo·저장·멀티플레이가 그대로다. 가로채는 쪽은 되도록 의도만 고친다(체력 같은 값은 규칙 함수가 바꾼다).
 > - 원래 인자가 아니라 돌려받은 의도(`intent.amount`)로 일을 한다. 원래 값을 쓰면 가로채기가 무시된다.
-> - 예: [04장](04-AddingContent.md) 9절 가시 갑옷. 자세히: 매뉴얼 [28장](../Manual/28-Attributes-Intercepts.md) 2-3·5장.
+> - 예: [04장](04-AddingContent.md) 9절 가시 갑옷. 자세히: 매뉴얼 [28장](../../Manual/28-Attributes-Intercepts.md) 2-3·5장.
 
 > [!note]- 왜 `game`을 매개변수로 받나
 > 카드 던전의 `Rules.Damage`는 행동·Block·`[BindTo]` 함수가 모두 부른다. `game`을 받으므로 어느 세션에서 불려도 그 세션의 값만 만진다. 서버는 매치마다 세션을 만들므로, static 변수나 `GBibleRuntime.Game`에 기대면 다른 세션을 건드린다.
@@ -88,7 +88,7 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 - **이벤트를 받는 쪽은 화면·연출만 한다.** 값을 고치지 않는다.
 - **규칙 난수는 `Game.Random("이름")`, 시간은 게임 시계(`session.Clock.Time`).**
 - **세션은 매개변수로 받는다**(`c.Game`·`session`). 게임 값을 static 변수에 두지 않는다.
-- **지연·지속 효과는 상태 효과로, 플레이어가 고르는 효과는 선택 대기로.** 행동을 멈추고 기다리지 말고, 나중의 일·고른 뒤의 일은 이어서 할 행동에 쓴다(매뉴얼 [29장](../Manual/29-Statuses-Schedules-Choices.md)).
+- **지연·지속 효과는 상태 효과로, 플레이어가 고르는 효과는 선택 대기로.** 행동을 멈추고 기다리지 말고, 나중의 일·고른 뒤의 일은 이어서 할 행동에 쓴다(매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md)).
 - **연출은 `SubscribeAfterAction`으로 받아 `GameView.Present`에 넣는다.** 성공한 행동의 이벤트만 오고, 연출은 대기열이 차례로 튼다. 받는 쪽은 값을 바꾸지 않는다.
 - **예상 값은 `Game.Preview`로 읽는다.** "이 카드를 내면 피해 얼마", "왜 못 내나"를 화면이 따로 계산하지 않는다. 행동을 해 보고 되돌리므로 결과를 정하는 곳이 규칙 한 곳뿐이다(`Game.CanDo`도 같다).
 
@@ -320,13 +320,13 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - **시뮬레이션·방치형(유닛 수천 개)**: 객체 수가 성능을 정한다. 지금 데이터에서 다시 계산할 수 있는 값(지금 초당 생산량 등)은 저장하지 않고, 자주 바뀌는 묶음을 별도 플레이어 데이터로 나눈다. 다시 계산할 수 없는 값(환생의 근거인 누적 생산량)은 저장한다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — 기록되는 필드, 지원 형식, Sync 시점, 예전 방식
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — 행동 밖 변경, 지연 효과, 실패와 취소
-> - [03. Game API](../Manual/03-GameApi.md) — `Find`·`All`의 비용, `NewId`, 확장 메서드
-> - [07. 난수와 시간](../Manual/07-Random-Time.md) — 난수 흐름, 게임 시계, Undo·저장과 함께 움직이는 방식
-> - [10. 이벤트](../Manual/10-Events.md) — 쏘기·받기 규칙
-> - [28. 능력치·Modifier·가로채기·비용](../Manual/28-Attributes-Intercepts.md) — 가로채기 자리, `Game.Pay`
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — `Game.Balance`, `Game.Fail`
-> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`
-> - [33. 고정 틱·미리보기·CSV](../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`
-> - [../Coding.md](../Coding.md) — 게임 코드 규칙과 Mirror 비용
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — 기록되는 필드, 지원 형식, Sync 시점, 예전 방식
+> - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — 행동 밖 변경, 지연 효과, 실패와 취소
+> - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`All`의 비용, `NewId`, 확장 메서드
+> - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 난수 흐름, 게임 시계, Undo·저장과 함께 움직이는 방식
+> - [10. 이벤트](../../Manual/10-Events.md) — 쏘기·받기 규칙
+> - [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md) — 가로채기 자리, `Game.Pay`
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Balance`, `Game.Fail`
+> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`
+> - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`
+> - [../Coding.md](../../Coding.md) — 게임 코드 규칙과 Mirror 비용

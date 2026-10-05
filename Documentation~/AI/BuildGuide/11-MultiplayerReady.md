@@ -64,7 +64,7 @@
 
 > [!note]- 테스트 모드와 테스트용 멀티(계획, 보류 중)
 > - **테스트 모드**(계획): 네 블록을 네트워크 없이 한 프로세스에서 모두 돌린다. 서버 중개·클라이언트 중개를 거치는 길을 에디터 안에서 바로 시험하려는 것이다.
-> - **테스트용 멀티**(설계): 인터넷으로 떨어진 두 컴퓨터에서 시험한다. AWS용 서버와 같은 서버 프로그램을 테스터의 컴퓨터에서 돌리고, 클라이언트는 주소·포트·이름만 넣고 접속한다. 바뀌는 것은 접속 방식(테스트: 주소 직접 입력 / AWS: 매칭)뿐이고 설정으로 고른다. 설계는 [../TestMultiplayer.md](../TestMultiplayer.md)에 있고, 문서 속 코드 이름은 모두 가칭이다.
+> - **테스트용 멀티**(설계): 인터넷으로 떨어진 두 컴퓨터에서 시험한다. AWS용 서버와 같은 서버 프로그램을 테스터의 컴퓨터에서 돌리고, 클라이언트는 주소·포트·이름만 넣고 접속한다. 바뀌는 것은 접속 방식(테스트: 주소 직접 입력 / AWS: 매칭)뿐이고 설정으로 고른다. 설계는 [../TestMultiplayer.md](../../TestMultiplayer.md)에 있고, 문서 속 코드 이름은 모두 가칭이다.
 > - 서버는 Unity 없이 코어(`GBible.Core`)만으로 돈다. 그래서 기능 로직은 UnityEngine 없이 컴파일되는 쪽이 서버로 옮기기 쉽다.
 
 ## 2. 기능 로직(Rules)이 지킬 것
@@ -178,9 +178,9 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 - [ ] 게임 밖에 영향을 주는 결과는 `RewardEffect.Irreversible`이다.
 
 > [!note]- 더 보기
-> - [../Coding.md](../Coding.md) — "받는 쪽 (네트워크)": Snapshot·Synced·MirrorReceiver
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — Sync 시점, 같은 객체를 두 곳에서 가리키기, `Synced`
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — `actorId`·`Visibility`, 행동 하나 = 한 묶음
-> - [10. 이벤트](../Manual/10-Events.md) — 쏘기·받기, `SubscribeAll`(이벤트 중계)
-> - [12. 결과(Outcome)](../Manual/12-Outcomes.md) — `Reward`·`RewardEffect`
-> - [../TestMultiplayer.md](../TestMultiplayer.md) — 테스트용 멀티플레이 설계(보류 중)
+> - [../Coding.md](../../Coding.md) — "받는 쪽 (네트워크)": Snapshot·Synced·MirrorReceiver
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — Sync 시점, 같은 객체를 두 곳에서 가리키기, `Synced`
+> - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — `actorId`·`Visibility`, 행동 하나 = 한 묶음
+> - [10. 이벤트](../../Manual/10-Events.md) — 쏘기·받기, `SubscribeAll`(이벤트 중계)
+> - [12. 결과(Outcome)](../../Manual/12-Outcomes.md) — `Reward`·`RewardEffect`
+> - [../TestMultiplayer.md](../../TestMultiplayer.md) — 테스트용 멀티플레이 설계(보류 중)

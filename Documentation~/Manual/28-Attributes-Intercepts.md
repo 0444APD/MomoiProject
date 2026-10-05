@@ -627,7 +627,7 @@ public class Battle
 [GameEvent("피해")] public class DamageDealt { public string sourceId, targetId; public int amount; }
 [GameEvent("유닛 처치")] public class UnitKilled { public string killerId, victimId; }
 
-// 유물: 프로젝트 기능(17장, 가이드 04장 8절). 가로채기를 쓰도록 두 칸의 잠금을 열었다.
+// 유물: 프로젝트 기능(17장, 구현 가이드 04장 8절). 가로채기를 쓰도록 두 칸의 잠금을 열었다.
 [Database("유물", Group = "콘텐츠", Order = 40, IdPrefix = "relic")]
 public class RelicData : GameData
 {
@@ -636,7 +636,7 @@ public class RelicData : GameData
     [FieldLabel("효과"), SerializeReference, OutcomeSlot(OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Targeted | OutcomeKinds.Intent)]
     public List<Outcome> outcomes = new List<Outcome>();
 }
-// 등록 함수 RelicRules.Register는 17장·가이드 04장 8절과 같다(발동 순간 party.relics에 있을 때만 결과를 실행).
+// 등록 함수 RelicRules.Register는 17장·구현 가이드 04장 8절과 같다(발동 순간 party.relics에 있을 때만 결과를 실행).
 ```
 
 - 유물은 기본 종류 **패시브**(DB › 패시브, 가진 목록 `party › relics`, 17장 0절)로 만들면 `RelicData`·등록 함수가 필요 없다. 아래 `DB › 유물` 예(5-4·5-5)는 DB › 패시브에 그대로 옮겨도 칸이 같다(발동 = `trigger`, 효과 = `outcomes`).

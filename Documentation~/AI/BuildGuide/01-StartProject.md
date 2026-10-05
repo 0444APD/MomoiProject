@@ -72,7 +72,7 @@
 > | Undo 방식 | DB › 시작 파일 › **Bootstrap**(아래 4절) |
 > | 언어 | 시작 설정 또는 다국어 설정 |
 >
-> 처음부터 다시 하고 싶으면 메뉴 `MomoiProject → 처음 상태로 되돌리기…`. 깨끗한 프로젝트를 처음 열 때 남긴 기록으로 되돌리고, 개발자가 더하고 바꾼 것은 모두 `MomoiProjectBackups/`에 옮겨 둔다(매뉴얼 [20장](../Manual/20-Setup.md) 10절).
+> 처음부터 다시 하고 싶으면 메뉴 `MomoiProject → 처음 상태로 되돌리기…`. 깨끗한 프로젝트를 처음 열 때 남긴 기록으로 되돌리고, 개발자가 더하고 바꾼 것은 모두 `MomoiProjectBackups/`에 옮겨 둔다(매뉴얼 [20장](../../Manual/20-Setup.md) 10절).
 
 > [!note]- 선택 모듈을 켤까
 > | 이럴 때 | 이렇게 |
@@ -289,7 +289,7 @@ static void Started(GameSession session)
 - [ ] DB › 개발 › 개발 명령에 명령을 만들었고, 모니터에 고정 시드가 보이고, 그 명령 → Undo가 된다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [20. 시작하기](../Manual/20-Setup.md) — 자동 시작 순서, `SessionOptions`, 선택 기능, `GameIds` 규칙
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — DB에서 만들기, `Game.Data()`, `Define`
-> - [21. DB](../Manual/21-Editor-Database.md) — 사이드바, 저장 흐름(작업본)
-> - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 탭 구성, 명령
+> - [20. 시작하기](../../Manual/20-Setup.md) — 자동 시작 순서, `SessionOptions`, 선택 기능, `GameIds` 규칙
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — DB에서 만들기, `Game.Data()`, `Define`
+> - [21. DB](../../Manual/21-Editor-Database.md) — 사이드바, 저장 흐름(작업본)
+> - [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) — 탭 구성, 명령

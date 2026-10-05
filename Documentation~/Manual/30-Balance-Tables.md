@@ -467,7 +467,7 @@ throw Game.Fail("fail.tooFar", ("range", 3));                                   
 
 ## 5. 상황별 예제
 
-예제는 가이드의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 이 장에 필요한 부분만 옮긴다.
+예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 이 장에 필요한 부분만 옮긴다.
 
 ```csharp
 using System;

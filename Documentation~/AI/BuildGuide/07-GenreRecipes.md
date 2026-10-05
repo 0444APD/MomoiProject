@@ -2,7 +2,7 @@
 
 장르에 맞게 셋을 정한다. **Undo 방식**, **저장 구역**, **난수 흐름**이다. Undo 방식·판 저장·시드는 DB › 시작 파일 › **Bootstrap** 화면에서 고른다. 게임 코드는 장르와 상관없이 `Game.Do`·`session.Undo()`·`Game.Random(이름)`으로 같다.
 
-장르는 자유다. 기믹(조각의 효과 규칙)의 범위는 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아)의 다양성으로 보고, 갈래마다 만드는 법은 AI 문서 [기믹 목록](../AI/GimmickCatalog.md)에 있다. 이 장은 그 위에 얹는 장르 설정만 다룬다.
+장르는 자유다. 기믹(조각의 효과 규칙)의 범위는 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아)의 다양성으로 보고, 갈래마다 만드는 법은 AI 문서 [기믹 목록](../GimmickCatalog.md)에 있다. 이 장은 그 위에 얹는 장르 설정만 다룬다.
 
 > [!note]- 이 장에서 쓰는 말
 > | 말 | 뜻 |
@@ -28,7 +28,7 @@
 | 수집형(메타 성장) | 쓰지 않음(개발 빌드만 행동 단위도) | 전투가 판이면 행동마다 저장, 로비는 프로필도 행동마다 저장 | 캐릭터·재화 = `Meta`, 진행 중 전투 = `Session` | `table:<뽑기 표>`(표마다 자동) | 현실 시각(`Game.Now`·`Day` — 스태미나·일일 초기화)·가중치 표(천장 = 밸런스 무게)·밸런스 곡선·패시브 |
 | 방치형 | 쓰지 않음 | N초마다 저장(+ 프로필도 행동마다) | 환생 한 주기 = `Session`(건물·화폐), 영구 배율·누적 = `Meta` | `golden` | 현실 시각(오프라인 정산)·`BigNumber`·밸런스 곡선 + `BalanceSum`·`BalanceCount`·`GameView.Play`(클릭 숫자) |
 | 생활 시뮬(농장) | 쓰지 않음 | 이벤트를 받을 때(하루 끝) | 세이브 전체 = `Session`(작물·날짜·인벤토리), 슬롯 | `weather`·`forage` | 게임 안 달력(날짜·시각을 판 데이터에, 하루 넘김 행동이 이벤트를 쏜다)·격자(밭 = `Dictionary<string, 작물>`, 키 `Grid.Key`)·다이얼로그·인벤토리·월드 상태·씬 흐름 |
-| 비주얼 노벨 | 쓰지 않음(대사 진행은 행동 밖이라 Undo로 대사가 돌아가지 않는다) | 끌 때 저장(대사만 넘긴 진행은 다음 저장에 함께 들어간다) | 진행·호감도·플래그·가진 패시브 = `Session`(다이얼로그 진행 `dialogue.progress` 포함), CG·엔딩 해금 = `Meta` | 거의 없음(무작위 분기면 `branch`) | 다이얼로그(대사·선택지·연출) + 플레이어 데이터(호감도·플래그) + 패시브·상태 효과(기믹, [06장](06-Presentation.md) 6절). 주의: 대기열·이전 대사로 되감기·세이브 칸 여럿이 없다([24장](../Manual/24-Dialogue.md) 8절 현재 동작) |
+| 비주얼 노벨 | 쓰지 않음(대사 진행은 행동 밖이라 Undo로 대사가 돌아가지 않는다) | 끌 때 저장(대사만 넘긴 진행은 다음 저장에 함께 들어간다) | 진행·호감도·플래그·가진 패시브 = `Session`(다이얼로그 진행 `dialogue.progress` 포함), CG·엔딩 해금 = `Meta` | 거의 없음(무작위 분기면 `branch`) | 다이얼로그(대사·선택지·연출) + 플레이어 데이터(호감도·플래그) + 패시브·상태 효과(기믹, [06장](06-Presentation.md) 6절). 주의: 대기열·이전 대사로 되감기·세이브 칸 여럿이 없다([24장](../../Manual/24-Dialogue.md) 8절 현재 동작) |
 
 카드 던전(덱빌딩)으로 2~5절을 보고, 다른 장르는 6절을 본다. "더 쓰는 부품"은 장르마다 먼저 꺼내 쓸 기능이다(어느 장르에서든 쓸 수 있다). RPG·어드벤처는 6절 접힌 칸: 월드 상태·씬 흐름·선택 대기·슬롯.
 
@@ -167,7 +167,7 @@ for (var i = pile.Count - 1; i > 0; i--)
 > - 소환된 유닛은 `Game.NewId("unit")`으로 id를 받으므로 Undo·저장·멀티플레이에서도 같은 id다.
 > - 아군 턴 전체를 되돌리게 할지, 유닛 하나의 행동만 되돌리게 할지는 Undo 끊는 이벤트로 어느 이벤트를 고르는지로 정한다(유닛 행동 끝 이벤트 / 아군 턴 끝 이벤트).
 > - 공격 전에 보이는 예상 피해(난수 없는 부분)는 미리보기(`Game.Preview(new Attack { … }, g => …)`)로 실제 규칙을 해 보고 되돌린다. **명중률·치명타율처럼 난수가 걸린 것은 Preview로 보이지 않는다**(실제 난수를 굴려 "이번 공격이 맞는지"가 새어 나간다) — 규칙 함수에 확률을 돌려주는 함수(`Rules.HitChance`)를 두고 화면이 그것을 읽는다.
-> - 칸·이동 범위·길·사거리·시야는 `Grid`(매뉴얼 [36장](../Manual/36-Grid-BigNumber.md)). 맵은 원본 인스턴스의 rows 글자 목록, 유닛의 칸은 `x`·`y` 필드.
+> - 칸·이동 범위·길·사거리·시야는 `Grid`(매뉴얼 [36장](../../Manual/36-Grid-BigNumber.md)). 맵은 원본 인스턴스의 rows 글자 목록, 유닛의 칸은 `x`·`y` 필드.
 > - "이번 턴 처음으로"·"한 전투 3번 되감기"는 턴 시작에 `session.HistoryMark`를 남기고 `session.UndoTo(지점)`(횟수는 그 뒤 행동으로 센다, 매뉴얼 02장).
 > - 진영 차례(아군 전체 → 적 전체)에서 "유닛 턴 끝 N회" 지속은 유닛마다 턴 끝 이벤트를 쏘아야 센다(`UnitTurnEnded { unit }` + 상태 효과의 가진 쪽 필드 `unit`).
 > - 반격·협동 공격·밀치기는 규칙 함수 안에서(피해 동사의 의도·이벤트), 특성은 DB › 패시브(가진 목록 `units[].traits`).
@@ -217,7 +217,7 @@ for (var i = pile.Count - 1; i > 0; i--)
 > - 진행이 거의 모두 프로필(`Meta`)에 있고 되돌리기가 없으므로 Undo 방식 **쓰지 않음**.
 > - 마지막으로 정산한 현실 시각을 프로필에 둔다(`long lastSeenUtc` 또는 `DateTime` 필드). 규칙은 `DateTime.Now`가 아니라 `Game.Now`(행동에 기록되는 시각)로 잰다: 켤 때와 1초마다 "정산" 행동이 `Game.Now − lastSeen`만큼 생산을 더하고 시각을 옮긴다(오프라인은 최대 8시간·50% 같은 규칙을 그 행동에). 쿠키를 쓰는 행동은 먼저 정산한다.
 > - 게임 시계(`session.Clock`)는 켜져 있는 동안만 흐르므로 오프라인 시간에는 쓰지 않는다. 고정 틱도 끈다(0).
-> - 생산량·가격처럼 단계마다 커지는 숫자는 밸런스 값의 곡선(비율로 ×1.15/단계), "10개 사기"는 `Game.BalanceSum(가격, 산 개수, 10)`, "살 수 있는 만큼"은 `Game.BalanceCount`. double(1e308)을 넘는 값은 그 필드만 `BigNumber`(매뉴얼 [36장](../Manual/36-Grid-BigNumber.md)) — 그때 비용 검사는 코드(`if (run.cookies < price) throw Game.Fail(…)`).
+> - 생산량·가격처럼 단계마다 커지는 숫자는 밸런스 값의 곡선(비율로 ×1.15/단계), "10개 사기"는 `Game.BalanceSum(가격, 산 개수, 10)`, "살 수 있는 만큼"은 `Game.BalanceCount`. double(1e308)을 넘는 값은 그 필드만 `BigNumber`(매뉴얼 [36장](../../Manual/36-Grid-BigNumber.md)) — 그때 비용 검사는 코드(`if (run.cookies < price) throw Game.Fail(…)`).
 > - 환생: 한 주기(건물·화폐)는 판(`Session`), 천상칩·누적 생산은 프로필(`Meta`) — 천상칩의 근거인 누적 생산은 다시 계산할 수 없으므로 저장한다. 환생은 판 끝 이벤트 + `GBibleRuntime.NewRun`.
 > - 판 저장 **N초마다**(30초) + **프로필도 행동마다 저장**. 클릭·황금 쿠키 숫자는 `GameView.Play`(입력을 막지 않음).
 
@@ -240,12 +240,12 @@ for (var i = pile.Count - 1; i > 0; i--)
 > - **씬 흐름**: 지금 있는 곳을 판 데이터의 글자 필드(`run.scene`)에 두고 Bootstrap의 **씬 흐름**에 고르면, 이어 하기·Undo에도 맞는 씬이 열린다. 행동은 필드만 바꾼다([03장](03-GameLoop.md) 9절).
 > - **선택 대기**: 대화가 아니라 규칙이 묻는 고르기(보상 셋 중 하나, 동료 고르기)는 `Game.Ask`나 결과 `선택 요구`(판에 있는 것에서)·`가중치 표에서 고르기`(DB 원본에서). 대사·선택지 연출은 다이얼로그가 맡는다([06장](06-Presentation.md) 6절).
 > - **슬롯**: 세이브 칸 여럿은 `GBibleRuntime.UseSlot`·`SlotInfoOf`([10장](10-SaveAndRelease.md) 3절).
-> - 매뉴얼 [32장](../Manual/32-View-Presentation-Scenes.md)·[31장](../Manual/31-Slots-Settings-Input.md).
+> - 매뉴얼 [32장](../../Manual/32-View-Presentation-Scenes.md)·[31장](../../Manual/31-Slots-Settings-Input.md).
 
 > [!note]- 비주얼 노벨
 > - 대사·선택지·연출은 다이얼로그, 호감도·플래그는 판 데이터, 기믹은 패시브·상태 효과다. 그래프의 값 바꾸기·신호 보내기·조건 분기가 그 사이를 잇는다([06장](06-Presentation.md) 6절).
 > - 대사만 넘긴 진행은 행동마다 저장·N초마다 저장의 계기가 되지 않는다(다음 행동 뒤나 끌 때 함께 저장).
-> - 세이브 30칸(프로필 하나에 판 저장 여러 칸)은 슬롯으로 하면 프로필까지 칸마다 나뉜다. 판만 칸마다 두려면 `session.ExportRun()`·`ImportRun`(매뉴얼 06장 2.4). 그 밖의 현재 동작은 매뉴얼 [24장](../Manual/24-Dialogue.md) 8절.
+> - 세이브 30칸(프로필 하나에 판 저장 여러 칸)은 슬롯으로 하면 프로필까지 칸마다 나뉜다. 판만 칸마다 두려면 `session.ExportRun()`·`ImportRun`(매뉴얼 06장 2.4). 그 밖의 현재 동작은 매뉴얼 [24장](../../Manual/24-Dialogue.md) 8절.
 
 > [!note]- 프로필 저장 시점(수집형·방치형)
 > 프로필은 판 저장 설정과 상관없이 끌 때 저장되고, 판 끝 이벤트를 받으면 바로 저장된다. 진행이 거의 프로필에 있으면 DB › 시작 파일 › Bootstrap의 **프로필도 행동마다 저장**을 켠다. 정산·뽑기 같은 행동이 끝날 때마다 프로필이 저장된다([10장](10-SaveAndRelease.md)).
@@ -261,14 +261,14 @@ for (var i = pile.Count - 1; i > 0; i--)
 - [ ] 실시간이면 고정 틱을 정했고, 1절 표의 "더 쓰는 부품"에서 이 장르에 맞는 것을 골랐다.
 
 > [!note]- 더 보기(매뉴얼)
-> - [29. 상태 효과·예약·선택 대기](../Manual/29-Statuses-Schedules-Choices.md) — 턴·시간 지속, 예약, `Game.Ask`
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../Manual/30-Balance-Tables.md) — 곡선, 뽑기 표
-> - [31. 슬롯·설정·입력](../Manual/31-Slots-Settings-Input.md) — 세이브 칸 여럿
-> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../Manual/32-View-Presentation-Scenes.md) — 월드 상태, 씬 흐름
-> - [33. 고정 틱·미리보기·CSV](../Manual/33-Tick-Preview-Csv.md) — `TickRate`·`Ticked`·`TickAlpha`
-> - [02. 행동과 Undo](../Manual/02-Actions-Undo.md) — `HistoryMode`·`HistoryLimit`·스냅샷·`Permanent()`·턴 안에서만 되돌리기
-> - [07. 난수와 시간](../Manual/07-Random-Time.md) — 난수 흐름·시드·게임 시계·`GameTime`
-> - [06. 저장·불러오기](../Manual/06-SaveLoad.md) — 구역별 저장, `NewRun`
-> - [01. 플레이어 데이터](../Manual/01-PlayerData.md) — 구역, 넣지 않는 값
-> - [14. 도전과제](../Manual/14-Achievements.md) — 되돌리지 않는 달성·보상
-> - [20. 시작하기](../Manual/20-Setup.md) — `SessionOptions`, Bootstrap 화면
+> - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 턴·시간 지속, 예약, `Game.Ask`
+> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — 곡선, 뽑기 표
+> - [31. 슬롯·설정·입력](../../Manual/31-Slots-Settings-Input.md) — 세이브 칸 여럿
+> - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — 월드 상태, 씬 흐름
+> - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `TickRate`·`Ticked`·`TickAlpha`
+> - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — `HistoryMode`·`HistoryLimit`·스냅샷·`Permanent()`·턴 안에서만 되돌리기
+> - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 난수 흐름·시드·게임 시계·`GameTime`
+> - [06. 저장·불러오기](../../Manual/06-SaveLoad.md) — 구역별 저장, `NewRun`
+> - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — 구역, 넣지 않는 값
+> - [14. 도전과제](../../Manual/14-Achievements.md) — 되돌리지 않는 달성·보상
+> - [20. 시작하기](../../Manual/20-Setup.md) — `SessionOptions`, Bootstrap 화면

@@ -1,10 +1,11 @@
 # GBible 참조 (AI용)
 
-새 프로젝트에서 AI가 **무엇이 있고 무엇을 부르면 되는지** 찾는 문서다. 세 문서를 함께 읽는다.
+새 프로젝트에서 AI가 **무엇이 있고 무엇을 부르면 되는지** 찾는 문서다. 아래 문서를 함께 읽는다. 코드·DB 항목은 AI가 만들고, 개발자는 에디터에서 읽고·값을 바꾸고·테스트한다(관례 첫머리).
 
 | 문서 | 맡는 것 |
 |---|---|
-| `ProjectConventions.md`(프로젝트 관례) | **어떻게** 쓰나: 폴더·이름·규칙과 화면의 경계·가로채기 자리·테스트·보고 |
+| `ProjectFlow.md`(진행 매뉴얼) | **언제** 무엇을 하나: 단계 0 흡수 ~ 6 출시 준비, 질문 규칙, 예외 사냥, 결정 기록(`Docs/Decisions.md`) |
+| `ProjectConventions.md`(프로젝트 관례) | **어떻게** 쓰나: 폴더·이름·규칙과 화면의 경계·가로채기 자리·테스트·보고·DB 반영 스크립트·개발자가 읽고 바꿀 모양·테스트 씬 |
 | `PlanningSpecGuide.md`(기획 명세서 읽는 법) | 기획 명세서의 칸 → 무엇을 만들지, 질문 규칙, 진행 순서 |
 | `GimmickCatalog.md`(기믹 목록) | 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아) 범위의 기믹 갈래 → GBible 부품, 메인 룰의 모양과 미리 둘 자리 |
 | 이 문서 | **무엇이** 있나: 하고 싶은 일 → 기능·API·DB 종류·Block, 매뉴얼 장 |
@@ -28,11 +29,12 @@ GBible.Unity
   GBibleRuntime(시작·슬롯·저장) · DB(GameData 종류들) · GameView(다시 그리기·연출 대기열)
   GameScreens(UI Toolkit 화면) · ViewList·DataBinding(씬 오브젝트) · GameSettings · GameScenes · GameTime · GameAudio · Texts·GameLanguage
 선택 모듈(DB 사이드바의 '기능 활성화'): 다이얼로그 · 인벤토리 · 입력(키 바꾸기) · Steam · 확인용 패널·샘플
-에디터: DB 창(MomoiProject › DB) · 모니터(플레이 중 기록·값·명령) · 시작 설정 · DB 추가 메뉴 · CSV
+에디터: DB 창(MomoiProject › DB, 구조 잠금 — EditorPolicy) · 모니터(플레이 중 기록·값·명령·테스트 상황) · 에셋 관리 · 시작 설정 · DB 반영 스크립트([DbSeed]) · CSV
+테스트: 테스트 씬(TestScene) · 테스트 상황(TestScenarios) · 테스트 명령(DB › 개발 명령) · 자동 시뮬레이션
 ```
 
 - **한 판의 흐름**: 게임이 켜지면 `GBibleRuntime.Start`가 DB를 읽어 세션을 만들고(Bootstrap 옵션 → `Configuring` → 세션 → DB의 정의 등록 → `Started`), 프로필을 불러온다. 입력은 행동(`Game.Do`), 행동이 데이터를 바꾸고 이벤트를 쏜다. 화면은 프레임 끝에 데이터를 읽어 그린다.
-- **프로젝트 폴더**(관례 1절): `Assets/Code/Rules`(규칙, Unity API 없음) · `Assets/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/Code/Editor`(DB 추가 메뉴) · `Assets/Code/Tests` · `Assets/UI`(UXML·USS·Panel Settings) · `Assets/MomoiProjectGenerated`(GameIds, 손대지 않음).
+- **프로젝트 폴더**(관례 1절): `Assets/Code/Rules`(규칙, Unity API 없음) · `Assets/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/Code/Tests` · `Assets/UI`(UXML·USS·Panel Settings) · `Assets/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProjectData/Tests`(테스트 상황) · `Assets/MomoiProjectGenerated`(GameIds, 손대지 않음) · `Docs/`(명세서·결정 기록·`Source`).
 
 ---
 
@@ -116,7 +118,7 @@ GBible.Unity
 | 쌓는 숫자(처치 수·최대 콤보) | DB › 로그(이벤트 받기 → 기록 규칙: 더하기·최대·마지막), `session.Stats.Get(id)` | 15 |
 | 필수 값·스프라이트 규격 | 필드 규칙(클래스 상세)·DB › 스프라이트 규격 | 27 |
 | 수치 수십 개 한꺼번에 | DB 목록의 CSV(목록 칸 `entries[0].weight`) | 33 |
-| AI가 DB 항목 만들기 | DB 추가 메뉴(`Assets/Code/Editor`, `EditorDatabase.Staging.Add(typeof(X), id)` → 적용 전 → 사람이 Ctrl+S) 또는 CSV | 관례 15절 |
+| AI가 DB 항목 만들기 | DB 반영 스크립트(`Assets/Code/Editor/Seeds`, `[DbSeed("버전")]` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)` → 컴파일 뒤 저절로 적용 전 → 개발자가 Ctrl+S) 또는 CSV | 관례 15절 |
 
 ### 2-4. 화면 · 연출 · 소리 · 글
 
@@ -144,6 +146,14 @@ GBible.Unity
 |---|---|---|
 | 설정(음량·언어·화면·전투 속도) | DB › 설정(종류: 켜기/끄기·숫자·선택지·글, 적용 대상: 언어·음량·전체 화면·해상도·수직 동기화·최대 프레임) → `GameSettings.Number(id)`·`Toggle`·`Choice`·`Set`·`Changed`. 화면은 기본 설정 화면 | 31·35 |
 | 플레이 중 값·기록 보기, 이벤트 쏴 보기, 버튼 하나로 시험 | 모니터(타임라인·데이터·행동·명령·이벤트 호출), DB › 개발 명령(결과 Block 조립 → 명령 탭 버튼) | 22 |
+| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/Code/Editor`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add·Work·Remove` → 컴파일 뒤 저절로 '적용 전', 개발자가 Ctrl+S. 이미 있는 항목은 건너뛴다 | 관례 15, 21 |
+| 개발자가 에디터에서 바꾸게(밸런싱) | 숫자 = 밸런스 값·DB 칸·인스턴스 필드, 가리키는 것 = `[DataRef(typeof(…))]` 드롭다운, 효과 = Block 문장(`[BlockInfo(Sentence = "…{필드}…")]`). DB는 구조를 잠그고 값만 연다(`EditorPolicy`) | 관례 18, 21 |
+| 개발자가 추가·삭제하는 DB 종류(레벨 배치·대사) | `[Database("층", DeveloperAuthored = true)]` — 이 종류만 DB에서 추가·삭제·ID 바꾸기가 열린다. 인스턴스(DB › 인스턴스)는 잠겨 있으니 개발자가 배치할 레벨 데이터에 쓰지 않는다 | 관례 18, 21 |
+| 테스트 씬·패널·상황 | `TestSceneSetup.Ensure(copyFrom:, scenario:)`(반영 스크립트에서) · 컴포넌트 `TestScene`(test 슬롯·시작 상황·패널 F1) · `TestScenarios.Save·Load(session, 이름, seed)` | 관례 19, 38 |
+| 테스트 명령(주입·발동) | DB › 개발 명령(결과 Block, `category`로 묶음) — 반영 스크립트로 만든다. 코드면 `session.Debug.Register` | 22, 38 |
+| 승률·평균 턴(자동 시뮬레이션) | `TestScenarios.Simulate(session, 상황, runs, step, measure)` → `TestReport`(`ToText`·`ToCsv`·`SaveReport`) | 38 |
+| 그림·소리 자리와 넣을 것 목록 | `AssetRequests.Sprite(path, w, h, 쓰는 곳)`·`Audio(path, 쓰는 곳, seconds)`·`Request(path, 쓰는 곳)`(반영 스크립트에서) → 개발자가 에셋 관리 › 넣을 것에서 진짜 파일을 넣는다(같은 자리·GUID 유지) | 관례 18, 39 |
+| 결정 기록 | `Docs/Decisions.md`(세션마다 먼저 읽기, 답·추천값을 `D-n`으로) | 진행 매뉴얼 2 |
 | 규칙 테스트(Unity 없이) | `new GameSession(new SessionOptions { Seed = 1 })` → `Data.Define` → `Game.Do` → 단언. 플레이어용 실패는 `Assert.Throws<GameFailure>` | 관례 12절 |
 
 ### 2-6. 부가 기능(명세서 6절 — 켜면 붙는 것)
@@ -154,7 +164,7 @@ GBible.Unity
 |---|---|---|
 | 대사·컷신 | 선택 기능 다이얼로그: 그래프 창, `Dialogues.Play(id)`·`Signaled`·`ResumeSaved`. 대화가 중심인 게임이면 24장의 지금 동작(대사 진행은 행동 밖·되감기 없음 등)을 먼저 본다 | 24 |
 | 겹치는 가방 | 선택 기능 인벤토리: 필드 `Inventory { capacity }` → `Add`·`Remove`·`CountOf`·`Has`. 고정 칸·칸 정보가 필요하면 자리(`List<T>` + `Placement`) | 25 |
-| 게임 안 달력·시각 | 판 데이터에 날짜·시각, 하루 넘김 행동이 이벤트를 쏜다 | 가이드 07 |
+| 게임 안 달력·시각 | 판 데이터에 날짜·시각, 하루 넘김 행동이 이벤트를 쏜다 | 구현 가이드 07 |
 | 현실 시각(오프라인 보상·스태미나·일일 초기화) | `Game.Now`(UTC, 행동에 기록되어 Undo·멀티에서 같다) · `Game.Day(초기화 시각)` · `Game.Week()`. 규칙에서 `DateTime.Now`를 쓰지 않는다. 꺼 둔 시간 = `Game.Now − profile.lastSeen` | 07 |
 | 시드 입력·일일 도전 | `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))`(같은 글자 = 같은 판, 일일은 날짜 글자) | 07 |
 | 칸 단위 맵(전술·던전·농장) | `Grid`: `Distance`·`Neighbors`·`Reachable`(이동 범위)·`Path`(길찾기)·`Line`·`Visible`(시야)·`Area`·`Ray`·`Cone`·`Rotate`, `Cell`·`Grid.Key(x, y)`. 맵은 원본 인스턴스(rows 글자 목록) 또는 `Dictionary<string, …>`(키 "x,y") | 36 |
@@ -265,6 +275,8 @@ public class PlayCard : GameAction
 | `GameTime` | `Pause(이유)`·`Resume(이유)`·`ResumeAll`·`TogglePause` · `SetSpeed` · `StepFrame` · `IsPaused`·`Speed` |
 | `GameAudio` | `PlayBgm(clip, volume, fade, loop)`·`StopBgm` · `PlaySfx`·`PlaySfxAt` · `PlayUi` · `PlayVoice`·`StopVoice` · `Stop(채널)`·`StopAll` · `Volume(채널)` |
 | `Texts` · `GameLanguage` | `Texts.Get(키, (이름, 값)…)` · `NameOf(id)` · `Has(키)` · `Language` / `GameLanguage.Set(code)` · `Available` |
+| `TestScenarios` · `TestScene` · `TestReport` | `Save(session, 이름)`·`Load(session, 이름, seed)`·`Delete`·`Names()`·`Simulate(session, 상황, runs, step, measure, maxSteps, firstSeed)`·`SaveReport` · 컴포넌트 `TestScene`(scenario·seed·separateSlot·speed·showPanel·panelKey) · `TestReport.Average·Min·Max·ToText·ToCsv` |
+| 에디터(GBible.EditorTools) | `[DbSeed("버전")]`·`DbSeeds.RunPending` · `EditorDatabase.Staging.Add·Work·Remove` · `EditorPolicy.CanEditStructure·CanAddRemove(형식)` · `TestSceneSetup.Ensure(path, copyFrom, scenario)` · `AssetRequests.Sprite·Audio·Request·MarkDone` · `AssetTools.Import·Replace·UsedBy·Unused·MoveToUnused·Misplaced·Tidy·FolderFor` |
 
 ### 3-9. 선택 모듈
 
@@ -361,3 +373,10 @@ public class PlayCard : GameAction
 28. 같은 패시브의 다른 순간(쌓기·빼기·내기)을 패시브 둘이나 `[BindTo]`로 → 패시브 `rules`(발동 더) 한 패시브에.
 29. 붙이는 순간 한 번 바꾸는 것(와일드프로스트 참·종)을 가진 동안 보정으로 → 붙인 순서·다시 계산이 원작과 달라진다. 능력(대상 = 덱 카드) + '필드 바꾸기'.
 30. 턴 순서가 열 우선인 보드를 줄 우선으로 담았다 → '놓인 것마다' 차례가 원작과 다르다. 열 우선으로 담고 방향·자리는 '같은 열 …'.
+31. DB 항목을 사람이 누르는 메뉴(`[MenuItem("…/DB 추가/…")]`)로 → 개발자 손이 한 번 더 간다. `[DbSeed("버전")]` 반영 스크립트(컴파일 뒤 저절로).
+32. 반영 스크립트가 이미 있는 항목의 숫자를 다시 덮음 → 개발자가 밸런싱한 값이 사라진다. 없을 때만 만들고, 구조를 고칠 때만 버전을 올려 그 칸만 `Work`.
+33. 개발자가 바꿀 숫자를 코드에·참조를 글자 ID 칸에 → 에디터에서 못 바꾼다. 밸런스 값·DB 칸, `[DataRef(typeof(…))]` 드롭다운.
+34. 개발자가 배치할 레벨 데이터를 인스턴스로 → DB에서 추가·삭제가 잠겨 배치할 수 없다. `[Database(…, DeveloperAuthored = true)]` 종류나 씬.
+35. 시스템층을 테스트 도구 없이 끝냄 → 개발자가 시험할 수 없다. 테스트 씬·기본 테스트 명령·첫 테스트 상황(관례 19절).
+36. 결정 기록을 읽지 않고 질문 → 같은 것을 다시 묻는다. 세션마다 `Docs/Decisions.md`부터.
+37. 그림·소리가 필요한 곳에 에셋 없이 화면만 → 개발자가 무엇을 넣을지 모른다. `AssetRequests.Sprite·Audio·Request`로 임시 자리와 넣을 것 목록.

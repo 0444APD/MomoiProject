@@ -62,7 +62,7 @@ protected override void Run()
 > - 코드: `GameSettings.Number(GameIds.Setting.BattleSpeed)`·`Toggle`·`Choice`·`Text`로 읽고, `GameSettings.Set(id, 값)`으로 바꾼다(범위·단위에 맞게 고쳐 저장 → 적용 → `GameSettings.Changed(id)`). `Reset(id)`·`ResetAll(분류)`.
 > - 설정 화면은 `GameSettings.All`(DB 순서)을 분류로 묶어 종류별로 토글·슬라이더·드롭다운을 그린다. 이름은 `GameSettings.Label(id)`(텍스트 `id.name`), 선택지는 `GameSettings.ChoicesOf(id)`(언어·해상도는 선택지를 비우면 저절로 채운다).
 > - 값은 `MomoiProject/settings.json` 하나다. 슬롯을 바꿔도, Undo해도, 판을 새로 열어도 그대로다. 그래서 게임 규칙에 영향을 주는 값(난이도처럼 판마다 다를 수 있는 것)은 설정이 아니라 판 데이터에 둔다.
-> - 매뉴얼 [31장](../Manual/31-Slots-Settings-Input.md).
+> - 매뉴얼 [31장](../../Manual/31-Slots-Settings-Input.md).
 
 > [!note]- 입력 — 키 바꾸기(선택 기능 '입력(키 바꾸기)')
 > DB 사이드바의 **입력(키 바꾸기)** 아래 **기능 활성화**로 켠다. Input System 패키지(`com.unity.inputsystem`)가 있어야 컴파일된다.
@@ -129,11 +129,11 @@ DB › 시작 파일 › **Bootstrap**의 판 저장 칸을 고른다. 코드는
 >
 > - `Saving`에서 값이 그대로면 `Game.Do`를 건너뛴다. 그 행동도 행동이라 "행동마다 저장"이면 다음 프레임에 또 저장한다.
 > - 강제 종료되면 `Stopping`이 오지 않는다. 꼭 남을 값은 그때그때 행동으로 남긴다.
-> - 매뉴얼 [06장](../Manual/06-SaveLoad.md) 2.10 · 3.3.
+> - 매뉴얼 [06장](../../Manual/06-SaveLoad.md) 2.10 · 3.3.
 
 > [!note]- 다른 장르라면
 > - **실시간 액션**: 판 저장 **N초마다**(방 안에서 오래 머무는 게임) 또는 **이벤트를 받을 때**(판 저장 이벤트 = 체크포인트 도착·방 클리어). 행동이 잦아 매번 쓰기는 낭비다. 체크포인트는 화면이 판정하고(충돌) 결과를 행동 하나로 보내며, 그 행동이 이벤트를 쏜다. 위치는 `Saving`에서 담는다(위 접힌 칸).
-> - **방치형**: 판 저장 **N초마다**(30초) + **프로필도 행동마다 저장**(프로필도 그 간격으로). 꺼 둔 시간은 현실 시각(`Game.Now`)으로 재고, 마지막 시각은 `Stopping`에서도 남긴다(매뉴얼 [07장](../Manual/07-Random-Time.md) 4.7).
+> - **방치형**: 판 저장 **N초마다**(30초) + **프로필도 행동마다 저장**(프로필도 그 간격으로). 꺼 둔 시간은 현실 시각(`Game.Now`)으로 재고, 마지막 시각은 `Stopping`에서도 남긴다(매뉴얼 [07장](../../Manual/07-Random-Time.md) 4.7).
 > - **생활 시뮬**: 판 저장 **이벤트를 받을 때**(판 저장 이벤트 = 하루 넘김). 끌 때도 저장하므로, 하루 끝에만 저장하려면 `GBibleRuntime.AutoSaveRun = false`를 더한다. 그러면 하루 중간에 끄면 그날 아침으로 돌아간다.
 
 ## 3. 이어 하기와 새 판
@@ -198,7 +198,7 @@ public static class RunSaves
 > - `GBibleRuntime.Slots()`(저장이 있는 슬롯 목록, 기본 슬롯 제외), `DeleteSlot(이름)`(지금 슬롯이면 저장하지 않고 새로 시작), `CopySlot(원본, 대상)`, `GBibleRuntime.PlayTime`(지금 슬롯의 누적 플레이 시간).
 > - `SavePath`·`RunSavePath`·`HasSavedRun`은 지금 슬롯을 가리킨다. 설정(1절)은 슬롯과 상관없이 하나다. 하이어라키의 `[MomoiProject]` 오브젝트도 슬롯을 바꿔도 하나다.
 > - 저장 파일을 직접 다루는 서버·도구는 `session.ExportMeta()`·`ImportMeta(json)`·`ExportRun()`·`ImportRun(json)`으로 JSON 글자를 받는다.
-> - 매뉴얼 [31장](../Manual/31-Slots-Settings-Input.md).
+> - 매뉴얼 [31장](../../Manual/31-Slots-Settings-Input.md).
 
 > [!note]- 다른 장르라면
 > RPG·수집형처럼 판 개념이 없는 게임은 대부분의 값이 메타 구역(프로필)이다. 세이브 칸은 슬롯으로 나누고, 씬에 놓인 것의 상태(연 상자·쓰러뜨린 보스)는 월드 상태(`Game.SetWorld(id, 값, permanent: true)`)로 프로필에 남긴다([07장](07-GenreRecipes.md) 6절).
@@ -255,9 +255,9 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - App ID: 출시 전 시험은 480(Valve의 Spacewar). 실제 App ID로 바꾸면 프로젝트 폴더의 `steam_appid.txt`도 같이 바뀐다.
 > - 도전과제: Steamworks의 API Name을 GBible 도전과제 ID와 같게 만들면 달성하는 순간 Steam에도 달성된다(다르면 DB › Steam 표에 적는다). 카드 던전의 도전과제 ID를 그대로 API Name으로 쓴다.
 > - 통계: 로그 → Steam 통계 표에 (로그 · Steam 이름 · 정수)를 적는다.
-> - 저장 동기화: 코드 없이 Steamworks › Steam Cloud의 Auto-Cloud에 `WinAppDataLocalLow` › `<회사>/<제품>/MomoiProject`, 패턴 `*.json`, 하위 폴더까지, 제외 `settings.json`(매뉴얼 [34장](../Manual/34-Steam.md) 5-5).
+> - 저장 동기화: 코드 없이 Steamworks › Steam Cloud의 Auto-Cloud에 `WinAppDataLocalLow` › `<회사>/<제품>/MomoiProject`, 패턴 `*.json`, 하위 폴더까지, 제외 `settings.json`(매뉴얼 [34장](../../Manual/34-Steam.md) 5-5).
 > - 출시 빌드를 exe로 바로 켜면 Steam이 다시 켜 준다(DB › Steam의 '다시 시작'). Steam이 꺼져 있으면 경고 하나를 남기고 Steam 없이 돈다.
-> - 리더보드·친구 초대(로비 초대)·멀티플레이 네트워킹은 아직 없다(매뉴얼 [34장](../Manual/34-Steam.md) 4절).
+> - 리더보드·친구 초대(로비 초대)·멀티플레이 네트워킹은 아직 없다(매뉴얼 [34장](../../Manual/34-Steam.md) 4절).
 
 > [!note]- 출시 상태는 어디에 남나
 > 런타임 데이터 목록(`GameDatabase`)에 저장되어 빌드에 따라간다. 개발 중에 바꾼 ID는 이력이 없으므로, 출시 전의 저장(개발자 PC의 저장)은 이어받지 않는다. 플레이어에게 나간 저장만 지키면 되므로 문제 없다.
@@ -361,11 +361,11 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - `GameIds.cs`가 최신이다(DB를 저장하고 컴파일까지 끝났다).
 
 > [!note]- 더 보기(매뉴얼)
-> - [06. 저장·불러오기](../Manual/06-SaveLoad.md) — 저장 파일 모습, 저절로 일어나는 일, 판 저장 시점 전체, `Saving`·`RunLoaded`·`Stopping`, 변환 API 전체, 호환 검사
-> - [31. 슬롯·설정·입력](../Manual/31-Slots-Settings-Input.md) — 슬롯 API, DB › 설정과 `GameSettings`, `GameInput`
-> - [34. Steam](../Manual/34-Steam.md) — DB › Steam, 도전과제·통계·리치 프레즌스, Steam Cloud 설정
-> - [20. 시작하기](../Manual/20-Setup.md) — 자동 시작 순서, `Configuring`·`Started`·`Stopping`·`Stopped`, Bootstrap 화면 칸, 출시 상태
-> - [07. 난수와 시간](../Manual/07-Random-Time.md) — 판·프로필에 들어가는 난수 상태, 현실 시각(`Game.Now`)과 오프라인 보상
-> - [21. DB](../Manual/21-Editor-Database.md) — ID 바꾸기·지우기, 검증 메시지 모음
-> - [04. 인스턴스](../Manual/04-Instances.md) — 원본(`session.Instances`)과 사본(`CopyInstance`)
-> - [22. 모니터와 디버깅](../Manual/22-Monitor-Debug.md) — 데이터 탭, 저장 명령
+> - [06. 저장·불러오기](../../Manual/06-SaveLoad.md) — 저장 파일 모습, 저절로 일어나는 일, 판 저장 시점 전체, `Saving`·`RunLoaded`·`Stopping`, 변환 API 전체, 호환 검사
+> - [31. 슬롯·설정·입력](../../Manual/31-Slots-Settings-Input.md) — 슬롯 API, DB › 설정과 `GameSettings`, `GameInput`
+> - [34. Steam](../../Manual/34-Steam.md) — DB › Steam, 도전과제·통계·리치 프레즌스, Steam Cloud 설정
+> - [20. 시작하기](../../Manual/20-Setup.md) — 자동 시작 순서, `Configuring`·`Started`·`Stopping`·`Stopped`, Bootstrap 화면 칸, 출시 상태
+> - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 판·프로필에 들어가는 난수 상태, 현실 시각(`Game.Now`)과 오프라인 보상
+> - [21. DB](../../Manual/21-Editor-Database.md) — ID 바꾸기·지우기, 검증 메시지 모음
+> - [04. 인스턴스](../../Manual/04-Instances.md) — 원본(`session.Instances`)과 사본(`CopyInstance`)
+> - [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) — 데이터 탭, 저장 명령

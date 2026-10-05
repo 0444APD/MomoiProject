@@ -364,7 +364,7 @@ Game.ClearWorld("Map.chest3");                           // 판·프로필 둘 �
 
 ## 5. 상황별 예제
 
-예제는 가이드의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 전투 화면 중 ViewList를 쓰는 부분은 UGUI 프리팹(`MonoBehaviour`)으로 그린다.
+예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 전투 화면 중 ViewList를 쓰는 부분은 UGUI 프리팹(`MonoBehaviour`)으로 그린다.
 
 ```csharp
 using System;
