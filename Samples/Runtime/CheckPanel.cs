@@ -47,6 +47,15 @@ namespace GBible.Samples
         public List<string> loot = new List<string>();
         public List<string> kept = new List<string>();   // 가중치 표에서 고르기로 가진 것(checkLoot의 뺄 목록)
         public string picked = "";
+        // 기믹 탭: 조커 칸(객체 목록, 원본 ID = joker), 점수 배수, 유물(ID → 레벨), 확률 결과.
+        public List<CheckJoker> jokers = new List<CheckJoker>
+        {
+            new CheckJoker { id = "checkJ1", joker = CheckGimmickIds.JokerPlus },
+            new CheckJoker { id = "checkJ2", joker = CheckGimmickIds.JokerTimes },
+        };
+        public int mult = 1;
+        public Dictionary<string, int> relics = new Dictionary<string, int>();
+        public int gems;
 
         public CheckUnit Hero => units.FirstOrDefault(u => u.id == "checkHero");
         public CheckUnit Foe => units.FirstOrDefault(u => u.id == "checkFoe");
@@ -247,7 +256,7 @@ namespace GBible.Samples
     [AddComponentMenu("")]
     public sealed class CheckPanel : MonoBehaviour
     {
-        static readonly string[] Tabs = { "규칙", "선택·뽑기", "연출", "슬롯·설정", "월드", "화면" };
+        static readonly string[] Tabs = { "규칙", "선택·뽑기", "연출", "슬롯·설정", "월드", "화면", "기믹" };
 
         bool _open = true;
         int _tab;
@@ -270,6 +279,7 @@ namespace GBible.Samples
             if (session.Statuses.Find(CheckIds.Guard) == null) session.Statuses.Define(CheckDefaults.Guard());
             if (!session.Balance.Has(CheckIds.EnemyHp)) session.Balance.Define(CheckIds.EnemyHp, 20, CheckDefaults.EnemyHp());
             if (!session.Tables.Has(CheckIds.Loot)) session.Tables.Define(CheckDefaults.Loot());
+            CheckGimmickDefaults.DefineMissing(session);
             if (FindAnyObjectByType<CheckPanel>() != null) return;
             var host = new GameObject("[MomoiProject 확인용 패널]");
             DontDestroyOnLoad(host);
@@ -319,7 +329,8 @@ namespace GBible.Samples
                     case 2: DrawPresentation(); break;
                     case 3: DrawSlotsAndSettings(); break;
                     case 4: DrawWorld(); break;
-                    default: DrawScreens(); break;
+                    case 5: DrawScreens(); break;
+                    default: DrawGimmicks(); break;
                 }
             }
             catch (Exception e)
@@ -510,6 +521,44 @@ namespace GBible.Samples
         }
 
         // ── 월드 상태 ──
+        void DrawGimmicks()
+        {
+            var run = CheckRules.Run(Game);
+            if (run == null) return;
+            GUILayout.Label("조커 칸(왼쪽부터 발동): " + string.Join("  ·  ", run.jokers.Select(j => j.joker.Replace("checkJoker", "").Replace("check", ""))));
+            GUILayout.Label($"배수: {run.mult}   (Plus = +4, Times = ×2, Blueprint = 오른쪽을 한 번 더)");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("점수 내기")) Do(new CheckScore());
+            if (GUILayout.Button("조커 자리 뒤집기")) Do(new CheckSwapJokers());
+            if (GUILayout.Button("Blueprint 맨 왼쪽에 넣기·빼기")) Do(new CheckToggleBlueprint());
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8);
+            var hero = run.Hero;
+            run.relics.TryGetValue(CheckGimmickIds.Amulet, out var amulet);
+            GUILayout.Label($"힘의 부적 레벨 {amulet} → 영웅 공격력 {Game.Attribute(hero, nameof(CheckUnit.attack)):0.##} (레벨별 +2/+3/+4/+6, 가진 동안만)");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("부적 레벨 +1")) Do(new CheckSetRelic { relic = CheckGimmickIds.Amulet, level = amulet + 1 });
+            if (GUILayout.Button("부적 버리기")) Do(new CheckSetRelic { relic = CheckGimmickIds.Amulet, level = 0 });
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8);
+            var tejas = run.relics.ContainsKey(CheckGimmickIds.Tejas);
+            GUILayout.Label("적 상태 효과: " + string.Join(", ", Game.Statuses(run.Foe).Select(s => $"{s.status}×{s.stacks}")) + $"   디버프 {Game.StatusCount(run.Foe, StatusKind.Debuff)}가지");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(tejas ? "테자스 버리기" : "테자스 얻기(화상 → 푸른 화상)")) Do(new CheckSetRelic { relic = CheckGimmickIds.Tejas, level = tejas ? 0 : 1 });
+            if (GUILayout.Button("적에게 화상")) Do(new CheckApply { target = run.Foe, status = CheckGimmickIds.Burn });
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8);
+            var oops = run.relics.ContainsKey(CheckGimmickIds.Oops);
+            GUILayout.Label($"25% 확률 20번 → 성공 {run.gems}번" + (oops ? "  (확률 2배 중)" : ""));
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("20번 굴리기")) Do(new CheckRollGems());
+            if (GUILayout.Button(oops ? "확률 2배 버리기" : "확률 2배 얻기")) Do(new CheckSetRelic { relic = CheckGimmickIds.Oops, level = oops ? 0 : 1 });
+            GUILayout.EndHorizontal();
+        }
+
         void DrawWorld()
         {
             GUILayout.Label($"월드 상태 '{CheckIds.Chest}': {(Game.World(CheckIds.Chest) ?? "(없음)")} · 열림: {(Game.WorldFlag(CheckIds.Chest) ? "예" : "아니오")}");

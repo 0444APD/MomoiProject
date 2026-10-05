@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace GBible.Samples
 {
-    // DB 추가 메뉴: 확인용 패널이 쓰는 DB 항목을 만든다(상태 효과 2·밸런스 값·가중치 표·인스턴스 4·설정 4·개발 명령 1).
+    // DB 추가 메뉴: 확인용 패널이 쓰는 DB 항목을 만든다(상태 효과 4·밸런스 값·가중치 표·인스턴스 4·설정 4·개발 명령 2·화면 1·패시브 6).
     // 항목은 DB에 '적용 전'으로 들어간다. DB에서 확인하고 Ctrl+S로 적용한다. 이미 있는 ID는 건너뛴다.
     public static class CheckDataMenu
     {
@@ -94,6 +94,29 @@ namespace GBible.Samples
                 c.description = "checkLoot에서 셋을 보이고, 고른 것을 checkRun › kept에 넣는다(가진 것은 다시 안 나온다).";
                 c.outcomes.Add(new ChooseFromTableOutcome { prompt = "가질 전리품", table = CheckIds.Loot, count = 3, unique = true, min = 0, max = 1, key = CheckIds.Run, path = "kept" });
             });
+
+            // 기믹 탭: 패시브(조커·Blueprint·힘의 부적·테자스·확률 2배)와 화상·푸른 화상.
+            foreach (var passive in CheckGimmickDefaults.Passives())
+                made += Add<PassiveData>(passive.Id, p =>
+                {
+                    p.ownerKey = passive.OwnerKey;
+                    p.ownerPath = passive.OwnerPath;
+                    p.matchField = passive.MatchField ?? "";
+                    p.perElement = passive.PerElement;
+                    p.levelField = passive.LevelField ?? "";
+                    p.trigger = passive.When;
+                    p.outcomes.AddRange(passive.Outcomes);
+                    p.modifiers.AddRange(passive.Modifiers);
+                    p.modifierTarget = passive.ModifierTarget ?? "";
+                });
+            foreach (var (id, turns) in new[] { (CheckGimmickIds.Burn, 2), (CheckGimmickIds.BlueBurn, 3) })
+                made += Add<StatusData>(id, s =>
+                {
+                    var d = CheckGimmickDefaults.Burn(id, turns);
+                    s.kind = d.Kind;
+                    s.maxStacks = d.MaxStacks;
+                    s.duration = new StatusDurationSettings { kind = d.Duration, length = d.Length, tickEvent = d.TickEvent };
+                });
 
             // 화면: Panel Settings·테마(Assets/UI)와 화면 설정, 확인용 HUD(Samples/Screens의 UXML).
             ScreenSetup.Ensure();
