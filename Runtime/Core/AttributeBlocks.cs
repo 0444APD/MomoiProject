@@ -17,7 +17,7 @@ namespace GBible
         [FieldLabel("영구(프로필에 남김)")] public bool permanent;
 
         protected override void Apply(object target) =>
-            Game.AddModifier(target, attribute, kind, value, Source(Use), permanent);
+            Game.AddModifier(target, attribute, kind, value * (Use?.Context?.Power ?? 1), Source(Use), permanent);
 
         internal static string Source(AbilityUse use) => use?.Context?.Owner ?? use?.Ability?.Id ?? "";
 
@@ -62,7 +62,8 @@ namespace GBible
 
         public override OutcomeKinds Kind => OutcomeKinds.PlayerData;
 
-        public override void Run(TriggerContext context) => context.Game.Pay(key, path, amount, string.IsNullOrEmpty(what) ? null : what);
+        // 무엇을 위한 비용 = 이 결과를 가진 항목(forId), 내는 쪽 = 사용자.
+        public override void Run(TriggerContext context) => context.Game.Pay(key, path, amount, string.IsNullOrEmpty(what) ? null : what, context.Owner, context.User);
 
         public override string Describe(INameResolver names) => $"비용 {(string.IsNullOrEmpty(path) ? key : key + " › " + path)} {amount}";
 
@@ -99,7 +100,7 @@ namespace GBible
     {
         [FieldLabel("필드(대상의 숫자 필드·경로)")] public string field = "";
         [FieldLabel("방법")] public FieldChange change = FieldChange.Add;
-        [FieldLabel("값(틀 {level} {level:2/4/7} {stacks} {balance:ID})")] public string value = "1";
+        [FieldLabel("값(틀 {level} {level:2/4/7} {stacks} {user:경로} {event:경로} {data:키.경로} {count:키.경로} {balance:ID})")] public string value = "1";
         [FieldLabel("0 아래로 내리지 않음")] public bool clampZero;
 
         protected override void Apply(object target)
@@ -124,7 +125,8 @@ namespace GBible
                     var underlying = Nullable.GetUnderlyingType(type) ?? type;
                     if (!TypeResolver.IsNumeric(underlying)) return null;
                     var now = current == null ? 0 : Convert.ToDouble(current, System.Globalization.CultureInfo.InvariantCulture);
-                    var next = change == FieldChange.Add ? now + amount : change == FieldChange.Multiply ? now * amount : amount;
+                    var power = Use?.Context?.Power ?? 1;
+                    var next = change == FieldChange.Add ? now + amount * power : change == FieldChange.Multiply ? now * amount : amount;
                     if (clampZero && next < 0) next = 0;
                     return IsInteger(underlying)
                         ? Convert.ChangeType(Math.Round(next, MidpointRounding.AwayFromZero), underlying, System.Globalization.CultureInfo.InvariantCulture)

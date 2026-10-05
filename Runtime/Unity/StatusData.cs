@@ -15,6 +15,7 @@ namespace GBible.Data
     public sealed class StatusData : GameData
     {
         [FieldLabel("종류"), Tooltip("버프·디버프. 디버프만 풀기(정화)·디버프 개수·'상태 효과 걸기' 가로채기의 종류 조건에 쓰입니다")] public StatusKind kind;
+        [FieldLabel("걸린 쪽의 패시브를 끔"), Tooltip("켜면 이 상태 효과가 걸린 쪽(조커·유닛·조각)의 패시브가 발동·가진 동안 보정·레벨 모두 꺼집니다(Ink·디버프된 조커·봉인)")] public bool silencesPassives;
         [FieldLabel("최대 중첩"), Tooltip("0이면 제한 없음")] public int maxStacks = 1;
         [FieldLabel("다시 걸 때")] public StatusReapply reapply = StatusReapply.AddStacksAndRefresh;
         [FieldLabel("지속")] public StatusDurationSettings duration = new StatusDurationSettings();
@@ -39,7 +40,7 @@ namespace GBible.Data
             {
                 Id = Id, DisplayName = DisplayName, MaxStacks = Math.Max(0, maxStacks), Reapply = reapply,
                 Duration = duration.kind, Length = duration.length, TickEvent = duration.tickEvent, TickHolderField = duration.holderField,
-                When = trigger, HolderField = holderField, Pulse = Math.Max(0, pulse), Hidden = hidden, Kind = kind,
+                When = trigger, HolderField = holderField, Pulse = Math.Max(0, pulse), Hidden = hidden, Kind = kind, Silences = silencesPassives,
             };
             definition.Modifiers.AddRange(modifiers.Where(m => m != null && !string.IsNullOrEmpty(m.attribute)));
             definition.Outcomes.AddRange(BoundOutcomes.Has(Id) ? BoundOutcomes.Create(Id) : outcomes.Where(o => o != null));
@@ -104,7 +105,10 @@ namespace GBible
         [FieldLabel("중첩")] public int stacks = 1;
         [FieldLabel("길이(0이면 상태 효과의 길이)"), Tooltip("이번에만 쓸 지속(이벤트 횟수 또는 초)")] public double length;
 
-        protected override void Apply(object target) => Game.ApplyStatus(target, status, stacks, Use?.Context?.Owner ?? Use?.Ability?.Id, length > 0 ? length : (double?)null);
+        // 중첩은 효과 배율(Use.Context.Power)을 곱한다. 건 개체(by) = 사용자(처치 기여).
+        protected override void Apply(object target) =>
+            Game.ApplyStatus(target, status, Math.Max(1, (int)Math.Round(stacks * (Use?.Context?.Power ?? 1), MidpointRounding.AwayFromZero)), Use?.Context?.Owner ?? Use?.Ability?.Id,
+                length > 0 ? length : (double?)null, Use?.User);
 
         public override string Describe() => stacks == 1 ? $"{status} 걸기" : $"{status} {stacks}중첩 걸기";
 
@@ -214,6 +218,39 @@ namespace GBible
         public override void Validate(IValidationContext context)
         {
             if (string.IsNullOrEmpty(status) && kind == StatusKind.None) context.Error("상태 효과 풀기: 상태 효과나 종류를 고르세요.");
+        }
+    }
+
+    // 대상 '상태 효과로 거르기': 앞의 대상 중 상태 효과가 걸린(비교가 참인) 것만 — "독에 걸린 적 모두"·"디버프가 없는 아군".
+    [Serializable]
+    [BlockInfo("상태 효과로 거르기", Category = "대상", Description = "앞의 대상 중 상태 효과 중첩 비교가 참인 것만 남깁니다. 없는 것만 = '<= 0'. 상태 효과를 비우고 종류를 고르면 그 종류의 가짓수로 비교합니다.")]
+    public sealed class StatusFilterTarget : TargetSelector
+    {
+        [DataRef(typeof(StatusData)), FieldLabel("상태 효과"), Tooltip("비우고 종류를 고르면 그 종류가 몇 가지 걸려 있나")] public string status = "";
+        [FieldLabel("종류(상태 효과를 비웠을 때)")] public StatusKind kind;
+        [FieldLabel("비교")] public CompareOp op = CompareOp.AtLeast;
+        [FieldLabel("중첩(종류면 가짓수)")] public int stacks = 1;
+
+        protected override IEnumerable<object> Select(IEnumerable<object> targets) => targets.Where(t => t != null && Holds(t)).ToList();
+
+        bool Holds(object target)
+        {
+            var have = !string.IsNullOrEmpty(status) ? Game.StatusStacks(target, status) : kind != StatusKind.None ? Game.StatusCount(target, kind) : 0;
+            switch (op)
+            {
+                case CompareOp.AtLeast: return have >= stacks;
+                case CompareOp.AtMost: return have <= stacks;
+                case CompareOp.GreaterThan: return have > stacks;
+                case CompareOp.LessThan: return have < stacks;
+                default: return have == stacks;
+            }
+        }
+
+        public override string Describe() => $"{(string.IsNullOrEmpty(status) ? StatusCondition.KindName(kind) : status)} {(op == CompareOp.AtLeast ? ">=" : op == CompareOp.AtMost ? "<=" : op == CompareOp.GreaterThan ? ">" : op == CompareOp.LessThan ? "<" : "==")} {stacks}";
+
+        public override void Validate(IValidationContext context)
+        {
+            if (string.IsNullOrEmpty(status) && kind == StatusKind.None) context.Error("상태 효과로 거르기: 상태 효과나 종류를 고르세요.");
         }
     }
 }

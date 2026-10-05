@@ -30,21 +30,23 @@ namespace GBible
             {
                 var evt = DataModel.Create(type);
                 foreach (var value in values)
-                    if (!TryApply(evt, type, value, out var error))
+                    if (!TryApply(evt, type, value, context, out var error))
                         context.Session.Journal.Append(JournalKind.Warning, "Events", $"이벤트 쏘기({EventBus.DisplayNameOf(type)}): {error}");
                 context.Session.Events.PublishObject(evt);
             }
         }
 
-        static bool TryApply(object evt, Type type, EventFieldValue value, out string error)
+        // 값에 의도 고치기와 같은 틀을 쓸 수 있다: {user}·{user:경로}·{event:경로}·{data:키.경로}·{count:키.경로}·{level}·{stacks}·{balance:ID}.
+        static bool TryApply(object evt, Type type, EventFieldValue value, TriggerContext context, out string error)
         {
             error = null;
             if (string.IsNullOrEmpty(value?.path)) return true;
             var target = FieldPaths.TypeAt(type, value.path, out error);
             if (target == null) return false;
-            if (!TryParse(target, value.value, out var parsed))
+            var text = ModifyIntentOutcome.Expand(value.value, context);
+            if (!TryParse(target, text, out var parsed))
             {
-                error = $"'{value.path}'에 '{value.value}'를 넣을 수 없습니다({target.Name}).";
+                error = $"'{value.path}'에 '{text}'를 넣을 수 없습니다({target.Name}).";
                 return false;
             }
             var cut = value.path.LastIndexOf('.');

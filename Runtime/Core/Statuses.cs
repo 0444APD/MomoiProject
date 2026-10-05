@@ -80,8 +80,11 @@ namespace GBible
         public string statusId;    // 상태 효과 ID(바꾸면 그 상태 효과가 걸린다)
         public int stacks;         // 걸 중첩
         public double length;      // 지속 길이(이벤트 횟수·초, 처음에는 그 상태 효과의 길이)
-        public string sourceId;    // 건 쪽(항목 ID·개체 id)
+        public string sourceId;    // 건 항목(능력·패시브·상태 효과 ID)
+        public string byId;        // 건 개체 id(사용자 — 처치 기여: "마지막에 건 쪽")
         public StatusKind kind;    // 그 상태 효과의 종류(버프·디버프)
+        public int maxStacks;      // 최대 중첩(처음 = 정의의 최대 중첩, 0 = 제한 없음) — "화상 중첩 +1"
+        public double pulse;       // 주기(초, 처음 = 정의의 주기) — "화상 틱 속도 +50%"는 곱하기 1/1.5
         public bool cancelled;     // 참이면 걸지 않는다
     }
 
@@ -112,6 +115,7 @@ namespace GBible
         public double Pulse;                        // 0보다 크면 걸려 있는 동안 이 초(게임 시간)마다 Outcomes를 낸다
         public bool Hidden;                         // 화면에 보이지 않는 상태 효과(쿨다운·표시용 아닌 규칙)
         public StatusKind Kind;                     // 버프·디버프(묶어서 풀기·세기·가로채기 조건)
+        public bool Silences;                       // 걸린 쪽의 패시브를 끈다(발동·보정 없음 — Ink·디버프된 조커)
     }
 
     // 상태 효과가 걸렸을 때(처음·다시 걸 때 모두, stacks = 걸린 뒤의 중첩).
@@ -122,6 +126,7 @@ namespace GBible
         public string status;
         public int stacks;
         public string source;
+        public string by;      // 건 개체 id(사용자)
     }
 
     // 상태 효과가 끝났을 때(expired: 지속이 다 됨 / 거짓이면 풀림).
@@ -143,6 +148,9 @@ namespace GBible
         public double remaining;  // 이벤트 지속: 남은 횟수 / 시간 지속: 끝나는 게임 시각
         public string source;
         public double nextPulse;  // 주기가 있으면 다음 결과를 낼 게임 시각
+        public double pulse;      // 이 걸린 것의 주기(초, 0이면 정의의 주기)
+        public int maxStacks;     // 이 걸린 것의 최대 중첩(0이면 정의의 최대 중첩)
+        public string by = "";   // 마지막에 건 개체 id(다시 걸면 바뀐다)
     }
 
     [Serializable]
@@ -157,6 +165,7 @@ namespace GBible
 
         readonly GameSession _session;
         readonly Dictionary<string, StatusDefinition> _definitions = new Dictionary<string, StatusDefinition>(StringComparer.Ordinal);
+        bool _anySilences;   // 패시브를 끄는 상태 효과가 하나라도 정의돼 있나(없으면 침묵 검사를 건너뛴다)
         // 이번 행동에서 새로 걸린 것 → 걸 때의 기록 원인(그 이벤트를 받는 도중에 걸렸는지 가린다).
         readonly Dictionary<string, long> _appliedUnder = new Dictionary<string, long>(StringComparer.Ordinal);
 
@@ -174,6 +183,7 @@ namespace GBible
         {
             if (definition == null || string.IsNullOrEmpty(definition.Id)) return;
             _definitions[definition.Id] = definition;
+            _anySilences = _definitions.Values.Any(d => d.Silences);
             var owner = "status:" + definition.Id;
             _session.Triggers.Unregister(owner);
             if (definition.When != null)
@@ -183,7 +193,8 @@ namespace GBible
         // ── 걸기·풀기 ─────────────────────────────────────────
 
         // length: 이번에만 쓸 지속 길이(이벤트 횟수 또는 초). 비우면 정의의 길이.
-        public ActiveStatus Apply(object target, string statusId, int stacks = 1, string source = null, double? length = null)
+        // by: 건 개체(사용자) — 처치 기여·"마지막에 건 쪽". 효과 '상태 효과 걸기'는 사용자를 넣는다.
+        public ActiveStatus Apply(object target, string statusId, int stacks = 1, string source = null, double? length = null, object by = null)
         {
             var definition = Find(statusId) ?? throw new InvalidOperationException($"[MomoiProject] 없는 상태 효과 '{statusId}'입니다.");
             var holder = Resolve(target, out var targetId);
@@ -192,7 +203,7 @@ namespace GBible
             var intent = _session.Game.Intercept(new StatusIntent
             {
                 targetId = targetId, statusId = statusId, stacks = Math.Max(1, stacks), length = length ?? definition.Length,
-                sourceId = source ?? "", kind = definition.Kind,
+                sourceId = source ?? "", byId = ByIdOf(by), kind = definition.Kind, maxStacks = definition.MaxStacks, pulse = definition.Pulse,
             });
             if (intent.cancelled || intent.stacks <= 0) return null;
             if (intent.statusId != statusId)
@@ -200,6 +211,8 @@ namespace GBible
                 var changed = Find(intent.statusId) ?? throw new InvalidOperationException($"[MomoiProject] 가로채기가 바꾼 상태 효과 '{intent.statusId}'가 없습니다.");
                 // 길이를 따로 정하지 않았으면 바뀐 상태 효과의 길이로.
                 if (!length.HasValue && intent.length == definition.Length) intent.length = changed.Length;
+                if (intent.maxStacks == definition.MaxStacks) intent.maxStacks = changed.MaxStacks;
+                if (intent.pulse == definition.Pulse) intent.pulse = changed.Pulse;
                 definition = changed;
                 statusId = changed.Id;
             }
@@ -217,6 +230,9 @@ namespace GBible
             length = intent.length;
             source = intent.sourceId;
             stacks = Math.Max(1, stacks);
+            var cap = Math.Max(0, intent.maxStacks);
+            var pulse = Math.Max(0, intent.pulse);
+            var byId = intent.byId ?? "";
             var list = Ensure();
             var existing = list.items.FirstOrDefault(s => s.target == targetId && s.status == statusId);
             if (existing != null)
@@ -224,24 +240,28 @@ namespace GBible
                 if (definition.Reapply == StatusReapply.Ignore) return existing;
                 _session.Data.Modify<StatusList>(Key, _ =>
                 {
-                    if (definition.Reapply != StatusReapply.Refresh) existing.stacks = Cap(definition, existing.stacks + stacks);
+                    existing.maxStacks = cap;
+                    if (definition.Reapply != StatusReapply.Refresh) existing.stacks = Cap(cap, existing.stacks + stacks);
                     if (definition.Reapply != StatusReapply.AddStacks) existing.remaining = Initial(definition, length);
+                    if (!string.IsNullOrEmpty(byId)) existing.by = byId;
+                    if (pulse != definition.Pulse) existing.pulse = pulse;
                 });
                 RefreshModifiers(definition, existing);
-                _session.Events.Publish(new StatusApplied { holder = targetId, status = statusId, stacks = existing.stacks, source = source ?? "" });
+                _session.Events.Publish(new StatusApplied { holder = targetId, status = statusId, stacks = existing.stacks, source = source ?? "", by = byId });
                 return existing;
             }
             var active = new ActiveStatus
             {
                 id = _session.Game.NewId("$status"), status = statusId, target = targetId,
-                stacks = Cap(definition, stacks), remaining = Initial(definition, length), source = source ?? "",
-                nextPulse = definition.Pulse > 0 ? _session.Clock.Time + definition.Pulse : 0,
+                stacks = Cap(cap, stacks), remaining = Initial(definition, length), source = source ?? "", by = byId, maxStacks = cap,
+                pulse = pulse != definition.Pulse ? pulse : 0,
+                nextPulse = pulse > 0 ? _session.Clock.Time + pulse : 0,
             };
             _session.Data.Modify<StatusList>(Key, l => l.items.Add(active));
             if (_session.Data.InTransaction) _appliedUnder[active.id] = _session.Journal.CurrentCause;
             RefreshModifiers(definition, active);
             Run(definition, active, definition.OnApply, holder, null, false, "Status");
-            _session.Events.Publish(new StatusApplied { holder = targetId, status = statusId, stacks = active.stacks, source = source ?? "" });
+            _session.Events.Publish(new StatusApplied { holder = targetId, status = statusId, stacks = active.stacks, source = source ?? "", by = byId });
             return active;
         }
 
@@ -354,7 +374,7 @@ namespace GBible
         {
             if (_session.Data.InTransaction || !Exists()) return;
             var now = _session.Clock.Time;
-            var pulsing = Current().Where(s => s.nextPulse > 0 && s.nextPulse <= now && (Find(s.status)?.Pulse ?? 0) > 0).Select(s => s.id).ToList();
+            var pulsing = Current().Where(s => s.nextPulse > 0 && s.nextPulse <= now && Find(s.status) is StatusDefinition d && PulseOf(d, s) > 0).Select(s => s.id).ToList();
             if (pulsing.Count > 0) _session.Do(new StatusPulseRun { statuses = pulsing });
             var due = Current().Where(s => Find(s.status)?.Duration == StatusDuration.Seconds && s.remaining <= now).Select(s => s.id).ToList();
             if (due.Count > 0) _session.Do(new StatusExpireRun { statuses = due });
@@ -365,18 +385,19 @@ namespace GBible
         {
             var active = Current().FirstOrDefault(s => s.id == id);
             var definition = active == null ? null : Find(active.status);
-            if (definition == null || definition.Pulse <= 0) return;
+            var interval = definition == null ? 0 : PulseOf(definition, active);
+            if (interval <= 0) return;
             var holder = _session.Game.Find(active.target);
             var now = _session.Clock.Time;
             // 시간 지속이면 끝나는 시각 뒤의 주기는 내지 않는다(같은 프레임에 끝남과 겹칠 때).
             var until = definition.Duration == StatusDuration.Seconds ? Math.Min(now, active.remaining) : now;
             for (var i = 0; i < 8 && active.nextPulse > 0 && active.nextPulse <= until; i++)
             {
-                _session.Data.Modify<StatusList>(Key, _ => active.nextPulse += definition.Pulse);
+                _session.Data.Modify<StatusList>(Key, _ => active.nextPulse += interval);
                 if (holder != null) Run(definition, active, definition.Outcomes, holder, null, false, "Status");
                 if (!Current().Contains(active)) return;   // 결과가 그 상태 효과를 풀었다
             }
-            if (active.nextPulse <= now) _session.Data.Modify<StatusList>(Key, _ => active.nextPulse = now + definition.Pulse);
+            if (active.nextPulse <= now) _session.Data.Modify<StatusList>(Key, _ => active.nextPulse = now + interval);
         }
 
         internal void ExpireById(string id)
@@ -452,7 +473,21 @@ namespace GBible
             }
         }
 
-        static int Cap(StatusDefinition definition, int stacks) => definition.MaxStacks > 0 ? Math.Min(definition.MaxStacks, stacks) : stacks;
+        static int Cap(int max, int stacks) => max > 0 ? Math.Min(max, stacks) : stacks;
+
+        static string ByIdOf(object by) => by == null ? "" : by as string ?? (GameApi.HasId(by.GetType()) ? GameApi.IdOf(by) ?? "" : "");
+
+        // 걸린 것의 주기(초): 걸 때 의도가 바꾼 값, 없으면 정의의 주기.
+        static double PulseOf(StatusDefinition definition, ActiveStatus active) => active.pulse > 0 ? active.pulse : definition.Pulse;
+
+        // 그 가진 쪽에 '걸린 쪽의 패시브를 끔' 상태 효과가 걸려 있나(Ink·디버프).
+        public bool Silences(object target)
+        {
+            if (!_anySilences || !Exists()) return false;
+            Resolve(target, out var targetId);
+            if (string.IsNullOrEmpty(targetId)) return false;
+            return Current().Any(s => s.target == targetId && s.stacks > 0 && (Find(s.status)?.Silences ?? false));
+        }
 
         StatusList Ensure()
         {

@@ -70,6 +70,14 @@ namespace GBible
         [UnityEngine.InspectorName("나를 뺀 모두")]
 #endif
         Others,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("같은 열 맨 앞(차 있는 첫 칸, 위부터)")]
+#endif
+        ColumnFirst,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("같은 열 맨 뒤(차 있는 끝 칸)")]
+#endif
+        ColumnLast,
     }
 
     public enum PlaceSpot
@@ -183,6 +191,17 @@ namespace GBible
         //   includeSelf를 참으로(같은 줄·같은 열·모두가 기준과 같은 번호의 칸 = 바로 맞은편도 낸다).
         public static IEnumerable<int> Indices(int index, int count, int columns, PlaceDirection direction, int distance = 1, IList list = null, bool includeSelf = false)
         {
+            // 기준이 없으면(−1) 목록 전체 기준의 방향만(맨 처음·맨 끝·모두).
+            if (index < 0)
+            {
+                switch (direction)
+                {
+                    case PlaceDirection.First: return Enumerable.Range(0, count).Where(i => list == null || (i < list.Count && list[i] != null)).Take(1);
+                    case PlaceDirection.Last: return Enumerable.Range(0, count).Reverse().Where(i => list == null || (i < list.Count && list[i] != null)).Take(1);
+                    case PlaceDirection.Others: return Enumerable.Range(0, count);
+                    default: return Array.Empty<int>();
+                }
+            }
             var origin = CellOf(index, columns);
             var rows = columns <= 0 ? 1 : (count + columns - 1) / columns;
             var width = columns <= 0 ? count : columns;
@@ -202,6 +221,10 @@ namespace GBible
                     return Filled(Enumerable.Range(0, width).Select(x => IndexOf(new Cell(x, origin.y), count, columns))).Take(1);
                 case PlaceDirection.RowLast:
                     return Filled(Enumerable.Range(0, width).Reverse().Select(x => IndexOf(new Cell(x, origin.y), count, columns))).Take(1);
+                case PlaceDirection.ColumnFirst:
+                    return Filled(Enumerable.Range(0, rows).Select(y => IndexOf(new Cell(origin.x, y), count, columns))).Take(1);
+                case PlaceDirection.ColumnLast:
+                    return Filled(Enumerable.Range(0, rows).Reverse().Select(y => IndexOf(new Cell(origin.x, y), count, columns))).Take(1);
                 case PlaceDirection.First: return Filled(Enumerable.Range(0, count)).Take(1);
                 case PlaceDirection.Last: return Filled(Enumerable.Range(0, count).Reverse()).Take(1);
                 case PlaceDirection.Same: return One(origin);
@@ -276,6 +299,8 @@ namespace GBible
                 case PlaceDirection.First: return "목록 맨 처음";
                 case PlaceDirection.Last: return "목록 맨 끝";
                 case PlaceDirection.Same: return "같은 칸";
+                case PlaceDirection.ColumnFirst: return "같은 열 맨 앞";
+                case PlaceDirection.ColumnLast: return "같은 열 맨 뒤";
                 default: return "나를 뺀 모두";
             }
         }

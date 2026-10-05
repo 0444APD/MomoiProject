@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -65,6 +66,8 @@ namespace GBible
         public string path;     // 그 값 안의 숫자 필드 경로(비우면 값 전체)
         public double amount;   // 낼 양
         public double floor;    // 내고 남은 값이 이보다 작으면 실패(기본 0. 빚을 허용하면 음수 — "−20까지 빚": 값으로 바꾸기 −20)
+        public string forId;    // 무엇을 위한 비용(사는 카드·쓰는 주문 ID, 비우면 모름) — "행성 카드는 공짜"가 거른다
+        public string userId;   // 내는 쪽(지팡이·플레이어 id)
         public bool cancelled;  // 참이면 내지 않는다(공짜)
     }
 
@@ -144,7 +147,7 @@ namespace GBible
     }
 
     // 결과 Block '의도 고치기': 가로챈 의도의 필드를 바꾸거나 의도를 막는다. 가로채기 트리거의 결과로만 의미가 있다.
-    // 값에 틀을 쓸 수 있다: {user}(사용자·가진 쪽의 id) · {owner}(이 결과를 가진 항목 ID) · {stacks}(가진 쪽의 이 상태 효과 중첩) · {level}(가진 쪽의 이 패시브 레벨) · {level:2/4/7}(레벨별 값, 1레벨부터) · {balance:ID}(밸런스 값).
+    // 값에 틀을 쓸 수 있다: {user}(사용자·가진 쪽의 id) · {user:경로}(사용자의 필드) · {event:경로}(받은 이벤트·의도의 필드) · {data:키.경로}(플레이어 데이터) · {count:키.경로}(목록의 개수) · {owner}(이 결과를 가진 항목 ID) · {stacks}(가진 쪽의 이 상태 효과 중첩) · {level}(가진 쪽의 이 패시브 레벨) · {level:2/4/7}(레벨별 값, 1레벨부터) · {balance:ID}(밸런스 값).
     //   대신 맞기: targetId 값으로 바꾸기 {user}   도발: 공격 의도의 targetId 값으로 바꾸기 {user}   중첩만큼 피해 감소: amount 더하기 -{stacks}
     [Serializable]
     [BlockInfo("의도 고치기", Category = "결과", Description = "가로챈 의도의 값을 바꾸거나(설정·더하기·곱하기) 막습니다(취소).")]
@@ -152,11 +155,11 @@ namespace GBible
     {
         [FieldPath, FieldLabel("필드")] public string path = "";
         [FieldLabel("방법")] public IntentOp op = IntentOp.Add;
-        [FieldLabel("값(숫자·글자, 틀 {user} {stacks} {level} {level:2/4/7} {balance:ID})")] public string value = "";
+        [FieldLabel("값(숫자·글자, 틀 {user} {user:경로} {event:경로} {data:키.경로} {count:키.경로} {stacks} {level} {level:2/4/7} {balance:ID})")] public string value = "";
 
         public override OutcomeKinds Kind => OutcomeKinds.Intent;
 
-        static readonly Regex Token = new Regex(@"\{(user|owner|stacks|level(?::[^}]+)?|balance:[^}]+)\}", RegexOptions.Compiled);
+        static readonly Regex Token = new Regex(@"\{(user(?::[^}]+)?|owner|stacks|level(?::[^}]+)?|event:[^}]+|data:[^}]+|count:[^}]+|balance:[^}]+)\}", RegexOptions.Compiled);
 
         // 틀을 이 순간의 값으로 바꾼다. 앞에 붙은 '-'와 겹치면(-{stacks}가 -3) 숫자 하나로 읽힌다.
         public static string Expand(string text, TriggerContext context)
@@ -166,6 +169,14 @@ namespace GBible
             {
                 var name = m.Groups[1].Value;
                 if (name == "user") return context.User == null || !GameApi.HasId(context.User.GetType()) ? "" : GameApi.IdOf(context.User) ?? "";
+                if (name.StartsWith("user:", StringComparison.Ordinal)) return Text(FieldPaths.Resolve(context.User, name.Substring(5)).FirstOrDefault());
+                if (name.StartsWith("event:", StringComparison.Ordinal)) return Text(FieldPaths.Resolve(context.Event, name.Substring(6)).FirstOrDefault());
+                if (name.StartsWith("data:", StringComparison.Ordinal)) return Text(DataAt(context, name.Substring(5)));
+                if (name.StartsWith("count:", StringComparison.Ordinal))
+                {
+                    var found = DataAt(context, name.Substring(6));
+                    return (found is ICollection collection ? collection.Count : found is IEnumerable items && !(found is string) ? items.Cast<object>().Count() : 0).ToString(CultureInfo.InvariantCulture);
+                }
                 if (name == "owner") return context.Owner ?? "";
                 if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
                 if (name == "level" || name.StartsWith("level:", StringComparison.Ordinal))
@@ -176,6 +187,18 @@ namespace GBible
                 return context.Game.Balance(name.Substring("balance:".Length)).ToString("R", CultureInfo.InvariantCulture);
             });
             return expanded.Replace("--", "");
+        }
+
+        static string Text(object value) => value == null ? "" : value is double d ? d.ToString("R", CultureInfo.InvariantCulture) : Convert.ToString(value, CultureInfo.InvariantCulture);
+
+        // "run.jokers" → 플레이어 데이터 run의 jokers.
+        static object DataAt(TriggerContext context, string keyAndPath)
+        {
+            var cut = keyAndPath.IndexOf('.');
+            var key = cut < 0 ? keyAndPath : keyAndPath.Substring(0, cut);
+            if (context.Session == null || !context.Session.Data.IsDefined(key)) return null;
+            var root = context.Session.Data.Get(key);
+            return cut < 0 ? root : FieldPaths.Resolve(root, keyAndPath.Substring(cut + 1)).FirstOrDefault();
         }
 
         // "2/4/7"에서 레벨 번째 값(1레벨 = 첫 값, 넘치면 마지막 값, 레벨 0이면 0).

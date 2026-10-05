@@ -373,6 +373,7 @@ namespace GBible
                     Achievements.Poll(Clock.Time);
                     if (Data.InTransaction) continue;
                     Statuses.Tick();
+                    Passives.Tick();
                     Schedules.Tick();
                     Ticked?.Invoke(step);
                 }
@@ -386,6 +387,7 @@ namespace GBible
                 Achievements.Poll(Clock.Time);
                 if (Data.InTransaction) return;
                 Statuses.Tick();
+                Passives.Tick();
                 Schedules.Tick();
                 Ticked?.Invoke(deltaTime);
             }

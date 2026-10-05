@@ -49,10 +49,15 @@ namespace GBible
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key = "";
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(숫자)")] public string path = "";
 
+        // 숫자 필드가 id 있는 객체의 필드면 능력치(보정 포함 — 패시브 '가진 동안 능력치 보정'으로 +1)로 읽는다.
         public double Read(GameSession session)
         {
             if (session == null || string.IsNullOrEmpty(key) || !session.Data.IsDefined(key)) return 0;
-            return ScreenBinding.Number(FieldPaths.Resolve(session.Data.Get(key), path ?? "").FirstOrDefault());
+            var root = session.Data.Get(key);
+            FieldPaths.SplitLast(path ?? "", out var parentPath, out var member);
+            var parent = string.IsNullOrEmpty(member) ? null : FieldPaths.Resolve(root, parentPath).FirstOrDefault();
+            if (parent != null && GameApi.HasId(parent.GetType()) && !FieldPaths.IsSelect(member)) return session.Attributes.Get(parent, member);
+            return ScreenBinding.Number(FieldPaths.Resolve(root, path ?? "").FirstOrDefault());
         }
     }
 

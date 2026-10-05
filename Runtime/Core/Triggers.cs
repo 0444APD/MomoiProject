@@ -91,6 +91,8 @@ namespace GBible
         public bool IsCheck;
         // 다른 조각의 패시브를 빌려 쓰는 순간(Blueprint). User = 빌려 준 원본 조각. '필드 바꾸기'는 이때 원본 자신의 필드를 바꾸지 않는다.
         public bool IsBorrowed;
+        // 효과 배율(의도 '효과 배율'을 거친 값, 기본 1). 기본 효과 Block이 수치에 곱하고, 프로젝트 Block은 Use.Context.Power로 읽는다.
+        public double Power = 1;
 
         public GameApi Game => Session?.Game;
     }

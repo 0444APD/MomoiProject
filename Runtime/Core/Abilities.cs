@@ -210,6 +210,8 @@ namespace GBible
             var use = game.Intercept(new UseIntent { ability = ability, userId = user ?? "", times = 1 });
             if (use.cancelled || use.times <= 0) return;
             used = true;
+            // 의도 '효과 배율': 이 사용의 수치 배율(기본 효과 Block이 곱한다).
+            moment.Power = game.Intercept(new PowerIntent { ownerId = ability, userId = user ?? "" }).multiplier;
             var final = new List<object>();
             for (int time = 0; time < use.times; time++)
             {

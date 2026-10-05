@@ -199,7 +199,7 @@ namespace GBible
         // 상태 효과(DB › 상태 효과)를 건다·푼다(행동 안에서). target = 객체 또는 id. 다시 걸 때는 정의의 규칙(중첩·갱신)을 따른다.
         //   Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3);
         // 걸기 직전에 의도 '상태 효과 걸기'(StatusIntent)를 거친다 — 가로채기가 막으면 null.
-        public ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null, double? length = null) => Session.Statuses.Apply(target, statusId, stacks, source, length);
+        public ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null, double? length = null, object by = null) => Session.Statuses.Apply(target, statusId, stacks, source, length, by);
         // 남은 지속 줄이기(쿨다운 −1초 · 남은 턴 −1). 다 되면 지속이 끝난 것으로 끝낸다.
         public bool ShortenStatus(object target, string statusId, double amount) => Session.Statuses.Shorten(target, statusId, amount);
 
@@ -326,12 +326,10 @@ namespace GBible
         // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 GameFailure(FailureKeys.NotEnough) → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.
         //   Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", 2, what: "energy.name");
         // what: 실패 글의 {what}에 들어갈 이름(텍스트 키면 번역된 글, 비우면 플레이어 데이터 › 필드). 없는 필드·숫자가 아닌 필드는 프로그래머 실수로 예외.
-        public void Pay(string key, string path, double amount, string what = null)
+        // forId: 무엇을 위한 비용(사는 카드·쓰는 주문 ID — "행성 카드 공짜"가 거른다), userId: 내는 쪽(지팡이·플레이어).
+        public void Pay(string key, string path, double amount, string what = null, string forId = null, object user = null)
         {
-            var cost = Intercept(new CostIntent { key = key, path = path ?? "", amount = amount });
-            if (cost.cancelled || cost.amount <= 0) return;
-            var have = ReadNumber(cost.key, cost.path);
-            if (have - cost.amount < cost.floor)
+            if (!TryPayCore(key, path, amount, forId, user, out var cost, out var have))
             {
                 // 텍스트 키면 TextKey로 넘겨 실패 글을 볼 때의 언어로 바뀌게 한다.
                 object name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? new TextKey(what) : (object)what;
@@ -339,7 +337,24 @@ namespace GBible
                     TextArgs.From(("what", name), ("have", Format(have)), ("need", Format(cost.amount))),
                     "{what}이(가) 모자랍니다({have} / {need}).");
             }
+        }
+
+        // 낼 수 있으면 내고 참, 모자라면 아무것도 바꾸지 않고 거짓(실패를 던지지 않는다 — 틱 묶음 행동 안에서 연계 MP처럼 "되면 한다").
+        public bool TryPay(string key, string path, double amount, string forId = null, object user = null) => TryPayCore(key, path, amount, forId, user, out _, out _);
+
+        bool TryPayCore(string key, string path, double amount, string forId, object user, out CostIntent cost, out double have)
+        {
+            cost = Intercept(new CostIntent
+            {
+                key = key, path = path ?? "", amount = amount, forId = forId ?? "",
+                userId = user == null ? "" : user as string ?? (HasId(user.GetType()) ? IdOf(user) : ""),
+            });
+            have = 0;
+            if (cost.cancelled || cost.amount <= 0) return true;
+            have = ReadNumber(cost.key, cost.path);
+            if (have - cost.amount < cost.floor) return false;
             WriteNumber(cost.key, cost.path, have - cost.amount);
+            return true;
         }
 
         // 낼 수 있는지(지금 값 기준, 가로채기 전 — 화면 미리보기용). 실제 지불은 Pay가 가로채기까지 거쳐 다시 판정한다.

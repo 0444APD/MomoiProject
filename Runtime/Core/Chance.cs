@@ -46,4 +46,29 @@ namespace GBible
             if (percent <= 0 || percent > 100) context.Warning("확률: 0보다 크고 100 이하로 적으세요.");
         }
     }
+
+    // 조건 '사용자 필드 검사': 사용자(가진 쪽·놓인 조각)의 필드를 비교한다 — "이 조커의 카운터가 6 이상"·"이 아티팩트의 처치 수 40 이상".
+    [Serializable]
+    [BlockInfo("사용자 필드 검사", Category = "조건", Description = "사용자(가진 쪽·놓인 조각·능력을 쓴 개체)의 필드를 비교합니다. 예: 이 조커의 counter 이상 6, 이 아티팩트의 kills 이상 40. 값에 틀({event:경로}·{data:키.경로}·{level} …)을 쓸 수 있습니다.",
+               Sentence = "사용자의 {path} {op} {value}")]
+    public sealed class UserFieldCondition : SimpleCondition
+    {
+        [FieldLabel("필드(사용자의)")] public string path = "";
+        [FieldLabel("비교")] public FieldOp op = FieldOp.AtLeast;
+        [FieldLabel("값(틀 가능)")] public string value = "";
+
+        protected override bool Check()
+        {
+            var user = Context?.User;
+            if (user == null || string.IsNullOrEmpty(path)) return false;
+            return FieldOps.Test(user, path, op, ModifyIntentOutcome.Expand(value, Context));
+        }
+
+        public override string Describe(INameResolver names) => "사용자의 " + FieldOps.Sentence(path, op, value);
+
+        public override void Validate(IValidationContext context)
+        {
+            if (string.IsNullOrEmpty(path)) context.Error("사용자 필드 검사: 필드를 적으세요.");
+        }
+    }
 }
