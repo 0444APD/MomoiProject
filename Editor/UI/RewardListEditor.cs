@@ -113,7 +113,9 @@ namespace GBible.EditorTools.UI
                     list.serializedObject.ApplyModifiedProperties();
                     onStructure?.Invoke();
                 }
-                var tools = isFixed ? Array.Empty<VisualElement>() : new VisualElement[] { RemoveTool(Remove) };
+                // 구조 잠금(EditorPolicy): 결과를 빼고 더하는 것은 AI가 한다. 값은 그대로 고친다.
+                var locked = isFixed || !EditorPolicy.CanEditStructure;
+                var tools = locked ? Array.Empty<VisualElement>() : new VisualElement[] { RemoveTool(Remove) };
                 switch (element.managedReferenceValue)
                 {
                     case PlayerDataReward _:
@@ -123,7 +125,7 @@ namespace GBible.EditorTools.UI
                         container.Add(RecordRow(element, onValue, isFixed, tools));
                         break;
                     default:
-                        container.Add(new BlockEditor(element, elementType, onValue, onStructure, isFixed ? null : (Action)Remove));
+                        container.Add(new BlockEditor(element, elementType, onValue, onStructure, locked ? null : (Action)Remove));
                         break;
                 }
             }
@@ -131,6 +133,11 @@ namespace GBible.EditorTools.UI
             if (isFixed)
             {
                 if (list.arraySize == 0) container.Add(Problem($"이 칸은 '{TriggerSlots.Text(allowed)}' 하나로 고정입니다."));
+                return container;
+            }
+            if (!EditorPolicy.CanEditStructure)
+            {
+                if (list.arraySize == 0) container.Add(Gs.Label("결과 없음", "gs-caption"));
                 return container;
             }
             GsButton add = null;

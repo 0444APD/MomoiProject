@@ -271,6 +271,7 @@ namespace GBible.EditorTools
         void OnEnable()
         {
             EditorDatabase.Changed += QueueRefresh;
+            EditorPolicy.Changed += QueueRefresh;
             ClassStaging.Changed += QueueRefresh;
             ClassRegistry.Changed += QueueRefresh;
             CodexFolders.Changed += QueueRefresh;
@@ -281,6 +282,7 @@ namespace GBible.EditorTools
         void OnDisable()
         {
             EditorDatabase.Changed -= QueueRefresh;
+            EditorPolicy.Changed -= QueueRefresh;
             ClassStaging.Changed -= QueueRefresh;
             ClassRegistry.Changed -= QueueRefresh;
             CodexFolders.Changed -= QueueRefresh;
@@ -638,7 +640,8 @@ namespace GBible.EditorTools
                 _views.style.display = DisplayStyle.None;
                 _viewSettingsButton.style.display = DisplayStyle.None;
                 _linkButton.style.display = DisplayStyle.None;
-                _createButton.style.display = standalone.CreateLabel != null ? DisplayStyle.Flex : DisplayStyle.None;
+                // 클래스·이벤트·키워드는 코드다 → 만들기는 구조 편집에서만(EditorPolicy).
+                _createButton.style.display = standalone.CreateLabel != null && EditorPolicy.CanEditStructure ? DisplayStyle.Flex : DisplayStyle.None;
                 _createButton.Text = standalone.CreateLabel ?? "";
                 _title.text = standalone.TabGroup == ClassesPage.DeclareGroup ? standalone.TabLabel : $"{standalone.TabGroup} · {standalone.TabLabel}";
                 var pageContext = PageContext();
@@ -664,6 +667,9 @@ namespace GBible.EditorTools
             _viewSettingsButton.style.display = page != null ? DisplayStyle.None : DisplayStyle.Flex;
             _linkButton.style.display = HasLinkableFields(type) ? DisplayStyle.Flex : DisplayStyle.None;
             _createButton.Text = page != null ? page.CreateLabel : "+ 새로 만들기";
+            // 로직 쪽 종류는 AI가 DB 반영 스크립트로 만든다 → 만들기 버튼은 개발자가 만드는 종류([Database(DeveloperAuthored = true)])에만(EditorPolicy).
+            var canAdd = EditorPolicy.CanAddRemove(type);
+            if (!canAdd) _createButton.style.display = DisplayStyle.None;
             if (page != null)
             {
                 _title.text = info.DisplayName;
@@ -676,7 +682,8 @@ namespace GBible.EditorTools
             var items = all.Where(Matches).ToList();
             var typeErrors = _issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && i.Asset.GetType() == type);
             _title.text = info.DisplayName;
-            _caption.text = (items.Count == all.Count ? $"{all.Count}개 항목" : $"{items.Count} / {all.Count}개 항목") + (typeErrors > 0 ? $"  ·  오류 {typeErrors}" : "");
+            _caption.text = (items.Count == all.Count ? $"{all.Count}개 항목" : $"{items.Count} / {all.Count}개 항목") + (typeErrors > 0 ? $"  ·  오류 {typeErrors}" : "")
+                + (canAdd ? "" : "  ·  값을 바꿉니다(추가·삭제·구조는 AI에게)");
 
             var view = ViewSettings.Resolve(type);
             _views.Select(Math.Max(0, Array.IndexOf(ViewKeys, view.Layout)));
@@ -1050,8 +1057,9 @@ namespace GBible.EditorTools
                 Subtitle = info?.DisplayName + (Staging.IsAdded(item) ? "  ·  새 항목(적용 전)" : ""),
                 ShowMedia = false,
                 // 제목(ID)을 눌러 바로 고친다. 이 ID를 가리키는 곳도 함께 바뀌고, 적용은 저장(Ctrl+S)할 때.
-                TitleValidate = id => id == target.Id ? null : EditorDatabase.Instance.CanUseId(id, target, out var error) ? null : error,
-                TitleCommit = (panel, id) =>
+                // ID는 코드(GameIds)가 쓰므로 로직 쪽 종류는 AI가 바꾼다(EditorPolicy) — 그때는 제목을 고칠 수 없다.
+                TitleValidate = !EditorPolicy.CanAddRemove(item) ? null : (Func<string, string>)(id => id == target.Id ? null : EditorDatabase.Instance.CanUseId(id, target, out var error) ? null : error),
+                TitleCommit = !EditorPolicy.CanAddRemove(item) ? null : (Action<GsDetailPanel, string>)((panel, id) =>
                 {
                     var oldId = target.Id;
                     var count = StageRename(target, id);
@@ -1060,7 +1068,7 @@ namespace GBible.EditorTools
                     _selectedId = id;
                     QueueRefresh();
                     Debug.Log($"[MomoiProject] ID를 {id}(으)로 바꿨습니다(참조 {count}곳 함께, 저장(Ctrl+S)할 때 적용).");
-                },
+                }),
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
                 HelpTopic = HelpIds.Data(item.GetType()),
@@ -1080,7 +1088,7 @@ namespace GBible.EditorTools
                 // 프리팹은 DB에서 지우지 않는다. 프로젝트 창의 프리팹으로 이동해 거기서 지운다(항목은 자동 정리).
                 options.Actions.Add(("프로젝트에서 보기", _ => ShowInProject(prefabEntry.prefab)));
             }
-            else
+            else if (EditorPolicy.CanAddRemove(item))
             {
                 options.Actions.Add(("삭제", panel => Delete(item, panel)));
             }

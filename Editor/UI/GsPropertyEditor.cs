@@ -197,6 +197,12 @@ namespace GBible.EditorTools.UI
                 }));
             }
 
+            // 구조 잠금(EditorPolicy): 블록을 더하는 것은 AI가 한다.
+            if (!EditorPolicy.CanEditStructure)
+            {
+                if (list.arraySize == 0) container.Add(Gs.Label($"{KindName(elementType)} 없음", "gs-caption"));
+                return container;
+            }
             GsButton add = null;
             add = new GsButton($"+ {KindName(elementType)} 추가", () => ShowTypeMenu(add, elementType, type =>
             {
@@ -264,6 +270,7 @@ namespace GBible.EditorTools.UI
         // 키워드 드롭다운 끝에 붙는 항목: 새 키워드 만들기, 클래스 상세에서 연결 바꾸기.
         public static IEnumerable<GsDropdownItem> KeywordMenuExtras(VisualElement anchor, FieldInfo field, Action<List<string>> created)
         {
+            if (!EditorPolicy.CanEditStructure) yield break;   // 키워드 만들기·연결 바꾸기는 코드를 고친다 → AI에게
             var group = KeywordTools.GroupOf(field);
             var host = anchor.panel?.visualTree.Q(className: "gs-root") ?? anchor;
             if (!string.IsNullOrEmpty(group))
@@ -279,6 +286,9 @@ namespace GBible.EditorTools.UI
         {
             var listField = PropertyUtil.GetField(list, out _);
             if (KeywordTools.GroupOf(listField) != null) return KeywordChips(list, listField, onStructure);
+            // 구조 잠금(EditorPolicy): 규칙 줄(TriggerRule)처럼 블록이 든 요소는 AI가 더하고 뺀다. 데이터 목록의 줄은 개발자가 더하고 뺀다.
+            var structureLocked = !EditorPolicy.CanEditStructure && EditorPolicy.IsStructural(elementType);
+            VisualElement RemoveButton(Action onClick) => structureLocked ? new VisualElement() : GsPropertyEditor.RemoveButton(onClick);
             var container = Gs.Col();
             for (int i = 0; i < list.arraySize; i++)
             {
@@ -330,6 +340,11 @@ namespace GBible.EditorTools.UI
                 container.Add(card);
             }
 
+            if (structureLocked)
+            {
+                if (list.arraySize == 0) container.Add(Gs.Label("없음", "gs-caption"));
+                return container;
+            }
             var add = new GsButton("+ 추가", () =>
             {
                 list.serializedObject.Update();
@@ -471,6 +486,15 @@ namespace GBible.EditorTools.UI
                            Action<int> onMove = null, bool canMoveUp = false, bool canMoveDown = false, Action onDuplicate = null)
         {
             var value = property.managedReferenceValue;
+            // 구조 잠금(EditorPolicy): 블록을 고르고·바꾸고·빼고·옮기는 것은 AI가 한다. 블록 안의 값은 그대로 고친다.
+            var locked = !EditorPolicy.CanEditStructure;
+            if (value == null && locked)
+            {
+                var none = Gs.Label("(없음)", "gs-caption");
+                none.tooltip = EditorPolicy.LockedTip;
+                Add(none);
+                return;
+            }
             if (value == null)
             {
                 GsButton pick = null;
@@ -514,13 +538,16 @@ namespace GBible.EditorTools.UI
             remove.AddToClassList("gs-block__action");
             remove.tooltip = "삭제";
 
-            // 줄 도구(마우스를 올리면 보임): 위로·아래로·복제·바꾸기·삭제
+            // 줄 도구(마우스를 올리면 보임): 위로·아래로·복제·바꾸기·삭제 — 구조 잠금이면 없음.
             var tools = new List<VisualElement>();
-            if (onMove != null && canMoveUp) tools.Add(Action("↑", "위로", () => onMove(-1)));
-            if (onMove != null && canMoveDown) tools.Add(Action("↓", "아래로", () => onMove(1)));
-            if (onDuplicate != null) tools.Add(Action("복제", "바로 아래에 복사", onDuplicate));
-            tools.Add(swap);
-            tools.Add(remove);
+            if (!locked)
+            {
+                if (onMove != null && canMoveUp) tools.Add(Action("↑", "위로", () => onMove(-1)));
+                if (onMove != null && canMoveDown) tools.Add(Action("↓", "아래로", () => onMove(1)));
+                if (onDuplicate != null) tools.Add(Action("복제", "바로 아래에 복사", onDuplicate));
+                tools.Add(swap);
+                tools.Add(remove);
+            }
 
             // 플레이어 데이터에 주기: 보상 목록과 같은 한 줄(왼쪽 필드, 오른쪽 형식에 맞는 값 칸).
             if (value is PlayerDataReward)

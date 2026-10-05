@@ -819,7 +819,8 @@ namespace GBible.EditorTools.UI
                 var entry = _explorer.ValueEntry(GsDataExplorer.LabelOf(member.Info, member.Name), current, member.Type, member.Info, set, null);
                 entry.Path = path;
                 entry.Serialized = serialized;
-                if (_explorer.InstanceEditing && current != null && field != null && InstanceFields.IsFeature(field) && _crumb.Apply != null)
+                // 기능 필드를 떼는 것은 구조(EditorPolicy) — AI가 한다.
+                if (_explorer.InstanceEditing && EditorPolicy.CanEditStructure && current != null && field != null && InstanceFields.IsFeature(field) && _crumb.Apply != null)
                 {
                     var apply = _crumb.Apply;
                     entry.Remove = () => apply(() => field.SetValue(target, null));
@@ -859,6 +860,7 @@ namespace GBible.EditorTools.UI
         // 비어 있는 기능 필드를 붙이는 '+ 기능'(인스턴스 편집).
         void AddFeatureTools(Crumb here)
         {
+            if (!EditorPolicy.CanEditStructure) return;   // 기능을 붙이는 것은 구조 — AI가 한다(EditorPolicy)
             var target = here.Value;
             var empty = InstanceFields.Features(target.GetType()).Where(f => f.GetValue(target) == null).ToList();
             if (empty.Count == 0) return;

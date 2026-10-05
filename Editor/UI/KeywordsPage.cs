@@ -58,8 +58,12 @@ namespace GBible.EditorTools.UI
                     },
                     Tools = tools =>
                     {
-                        tools.Add(new GsButton("+ 키워드", () => AddKeywords(context, g.Id), GsButtonKind.Ghost));
-                        tools.Add(new GsButton("+ 하위 그룹", () => NewGroup(context, g.Id), GsButtonKind.Ghost));
+                        // 키워드는 코드다 → 만들고·지우고·이름 바꾸는 것은 구조 편집에서만(EditorPolicy). 개발자는 읽고 cs를 연다.
+                        if (EditorPolicy.CanEditStructure)
+                        {
+                            tools.Add(new GsButton("+ 키워드", () => AddKeywords(context, g.Id), GsButtonKind.Ghost));
+                            tools.Add(new GsButton("+ 하위 그룹", () => NewGroup(context, g.Id), GsButtonKind.Ghost));
+                        }
                         if (g.Type != null)
                         {
                             var open = new GsButton("cs 열기", () => OpenCode(g.Type), GsButtonKind.Ghost);
@@ -70,6 +74,7 @@ namespace GBible.EditorTools.UI
                         {
                             new GsDropdownItem("그룹 지우기", () => RemoveGroup(context, g)) { Detail = "그룹 코드(하위 그룹 포함)를 지웁니다. 이 그룹을 쓰는 필드의 [Keyword]는 직접 고치세요" },
                         };
+                        if (!EditorPolicy.CanEditStructure) return;
                         GsButton more = null;
                         more = new GsButton("⋯", () => GsDropdown.Show(more, menu, searchable: false), GsButtonKind.Ghost);
                         tools.Add(more);
@@ -86,7 +91,7 @@ namespace GBible.EditorTools.UI
                         Name = k.Id,
                         SearchText = k.Name,
                         Build = () => Chip(context, g, k),
-                        Open = () => Rename(context, g, k),
+                        Open = () => { if (EditorPolicy.CanEditStructure) Rename(context, g, k); },
                         Draggable = false,
                         Payload = k,
                     });
@@ -105,11 +110,13 @@ namespace GBible.EditorTools.UI
         {
             var row = GsGroupSection.Row(keyword.Id, keyword.Name);
             if (keyword.Pending) row.Add(new GsBadge("저장 전", Gs.Warning));
+            row.tooltip = $"{group.Name}.{keyword.Name} = \"{keyword.Id}\"";
+            if (!EditorPolicy.CanEditStructure) return row;
             var remove = new GsButton("✕", () => KeywordTools.RemoveKeyword(group.Id, keyword.Name), GsButtonKind.Ghost);
             remove.tooltip = "키워드 지우기(저장할 때 코드에서 뺍니다)";
             remove.RegisterCallback<ClickEvent>(e => e.StopPropagation());
             row.Add(remove);
-            row.tooltip = $"{group.Name}.{keyword.Name} = \"{keyword.Id}\"\n눌러서 코드의 이름 바꾸기";
+            row.tooltip += "\n눌러서 코드의 이름 바꾸기";
             return row;
         }
 

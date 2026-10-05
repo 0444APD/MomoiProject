@@ -43,6 +43,9 @@ namespace GBible.Data
         public bool Hidden { get; set; }
         // 시트·카드 대신 쓸 전용 화면의 키(에디터가 같은 키의 화면을 찾는다). 예: "keywords"
         public string Page { get; set; }
+        // 개발자가 에디터에서 만드는 종류: 추가·삭제·ID 바꾸기가 열린다(다이얼로그·연출 프리셋·장소·스탠딩 프로필, 프로젝트의 레벨 배치 종류).
+        // 거짓(기본)이면 로직 쪽 종류 — 항목은 AI가 DB 반영 스크립트로 만들고, 개발자는 값(숫자·고르는 값·참조)만 바꾼다.
+        public bool DeveloperAuthored { get; set; }
 
         public DatabaseAttribute(string displayName)
         {

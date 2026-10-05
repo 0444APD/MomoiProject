@@ -5,7 +5,7 @@ using UnityEngine;
 namespace GBible.Data
 {
     // 다이얼로그 하나(노드 그래프). 편집은 MomoiProject › 다이얼로그 시스템 › 그래프 창에서 한다.
-    [Database("다이얼로그", Group = "다이얼로그 시스템", Order = 1, IdPrefix = "dialogue", Hidden = true)]
+    [Database("다이얼로그", Group = "다이얼로그 시스템", Order = 1, IdPrefix = "dialogue", Hidden = true, DeveloperAuthored = true)]
     public sealed class DialogueData : GameData
     {
         [HideInInspector] public NodeGraph graph = new NodeGraph();

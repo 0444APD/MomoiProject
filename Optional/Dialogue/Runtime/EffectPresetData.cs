@@ -6,7 +6,7 @@ using UnityEngine;
 namespace GBible.Data
 {
     // 연출 프리셋: 효과 노드 그룹. MomoiProject › 다이얼로그 시스템 › 연출 프리셋 창에서 노드로 만들고, 다이얼로그 그래프에서는 노드 하나로 쓴다.
-    [Database("연출 프리셋", Group = "다이얼로그 시스템", Order = 2, IdPrefix = "preset", Hidden = true)]
+    [Database("연출 프리셋", Group = "다이얼로그 시스템", Order = 2, IdPrefix = "preset", Hidden = true, DeveloperAuthored = true)]
     public sealed class EffectPresetData : GameData
     {
         [HideInInspector] public NodeGraph graph = new NodeGraph();

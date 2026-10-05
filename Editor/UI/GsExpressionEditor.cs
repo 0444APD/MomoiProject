@@ -262,12 +262,16 @@ namespace GBible.EditorTools.UI
 
             var line = Gs.Row("gs-expr");
             DrawSequence(line, _root);
-            if (_root.Terms.Count == 0) line.Add(Gs.Label($"{Noun} 없음 — 아래에서 블럭을 더하세요", "gs-caption", "gs-expr__empty"));
+            if (_root.Terms.Count == 0) line.Add(Gs.Label(Locked ? $"{Noun} 없음" : $"{Noun} 없음 — 아래에서 블럭을 더하세요", "gs-caption", "gs-expr__empty"));
             Add(line);
 
-            var bar = Gs.Row("gs-expr__bar");
-            AddButtons(bar, _root);
-            Add(bar);
+            // 구조 잠금(EditorPolicy): 블럭·연산자·괄호를 더하고 옮기는 것은 AI가 한다. 블럭 안의 값은 그대로 고친다.
+            if (!Locked)
+            {
+                var bar = Gs.Row("gs-expr__bar");
+                AddButtons(bar, _root);
+                Add(bar);
+            }
 
             var formula = Formula(_property.managedReferenceValue);
             if (!string.IsNullOrEmpty(formula) && _root.Terms.Count > 1)
@@ -291,6 +295,8 @@ namespace GBible.EditorTools.UI
             }
         }
 
+        static bool Locked => !EditorPolicy.CanEditStructure;
+
         void DrawSequence(VisualElement host, Sequence sequence)
         {
             var zone = new Zone { Container = host, Sequence = sequence };
@@ -301,13 +307,14 @@ namespace GBible.EditorTools.UI
                 {
                     var index = i - 1;
                     var op = Gs.Label(sequence.Or[index] ? "OR" : "AND", "gs-expr__op");
-                    op.tooltip = (sequence.Or[index] ? "또는" : "그리고") + " · 눌러서 " + (sequence.Or[index] ? "AND" : "OR") + "로 바꾸기";
-                    op.RegisterCallback<ClickEvent>(e =>
-                    {
-                        e.StopPropagation();
-                        sequence.Or[index] = !sequence.Or[index];
-                        Commit();
-                    });
+                    op.tooltip = (sequence.Or[index] ? "또는" : "그리고") + (Locked ? "" : " · 눌러서 " + (sequence.Or[index] ? "AND" : "OR") + "로 바꾸기");
+                    if (!Locked)
+                        op.RegisterCallback<ClickEvent>(e =>
+                        {
+                            e.StopPropagation();
+                            sequence.Or[index] = !sequence.Or[index];
+                            Commit();
+                        });
                     host.Add(op);
                 }
                 var element = DrawTerm(sequence, i);
@@ -446,17 +453,18 @@ namespace GBible.EditorTools.UI
         {
             var term = owner.Terms[index];
             var box = Gs.Row("gs-expr__term");
-            box.Add(Grip(owner, index, box));
+            if (!Locked) box.Add(Grip(owner, index, box));
             if (term.Not)
             {
                 var not = Gs.Label("NOT", "gs-expr__op", "gs-expr__not");
-                not.tooltip = "아님 · 눌러서 떼기";
-                not.RegisterCallback<ClickEvent>(e =>
-                {
-                    e.StopPropagation();
-                    term.Not = false;
-                    Commit();
-                });
+                not.tooltip = Locked ? "아님" : "아님 · 눌러서 떼기";
+                if (!Locked)
+                    not.RegisterCallback<ClickEvent>(e =>
+                    {
+                        e.StopPropagation();
+                        term.Not = false;
+                        Commit();
+                    });
                 box.Add(not);
             }
 
@@ -466,14 +474,23 @@ namespace GBible.EditorTools.UI
                 box.Add(Gs.Label("(", "gs-expr__paren"));
                 var inner = Gs.Row("gs-expr__group");
                 DrawSequence(inner, term.Group);
-                if (term.Group.Terms.Count == 0) inner.Add(Gs.Label("블럭을 여기로 끌어 놓기", "gs-caption", "gs-expr__drop-hint"));
-                GsButton add = null;
-                add = new GsButton("+", () => GsDropdown.Show(add, AddItems(add, term.Group), searchable: false), GsButtonKind.Ghost);
-                add.AddToClassList("gs-expr__add");
-                add.tooltip = "괄호 안에 더하기";
-                inner.Add(add);
+                if (term.Group.Terms.Count == 0) inner.Add(Gs.Label(Locked ? "(빈 괄호)" : "블럭을 여기로 끌어 놓기", "gs-caption", "gs-expr__drop-hint"));
+                if (!Locked)
+                {
+                    GsButton add = null;
+                    add = new GsButton("+", () => GsDropdown.Show(add, AddItems(add, term.Group), searchable: false), GsButtonKind.Ghost);
+                    add.AddToClassList("gs-expr__add");
+                    add.tooltip = "괄호 안에 더하기";
+                    inner.Add(add);
+                }
                 box.Add(inner);
                 box.Add(Gs.Label(")", "gs-expr__paren"));
+            }
+            else if (term.IsSlot && Locked)
+            {
+                var empty = Gs.Label("(빈칸)", "gs-caption");
+                empty.tooltip = EditorPolicy.LockedTip;
+                box.Add(empty);
             }
             else if (term.IsSlot)
             {
@@ -490,6 +507,7 @@ namespace GBible.EditorTools.UI
             }
             else box.Add(DrawBlock(term));
 
+            if (Locked) return box;
             GsButton more = null;
             more = new GsButton("⋯", () => GsDropdown.Show(more, TermMenu(more, owner, index), searchable: false), GsButtonKind.Ghost);
             more.AddToClassList("gs-expr__tool");

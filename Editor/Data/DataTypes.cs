@@ -20,6 +20,8 @@ namespace GBible.EditorTools
         public bool Hidden;
         // 시트·카드 대신 쓰는 전용 화면 키(없으면 시트·카드).
         public string Page;
+        // 개발자가 에디터에서 만드는 종류([Database(DeveloperAuthored = true)]) — 추가·삭제·ID 바꾸기가 열린다(EditorPolicy).
+        public bool DeveloperAuthored;
     }
 
     // 데이터베이스 등록 판별: GameData를 상속한 구체 클래스만(명시적 참여).
@@ -63,6 +65,7 @@ namespace GBible.EditorTools
                 IdPrefix = !string.IsNullOrEmpty(attr?.IdPrefix) ? attr.IdPrefix : DefaultPrefix(type),
                 Hidden = attr?.Hidden ?? false,
                 Page = attr?.Page,
+                DeveloperAuthored = attr?.DeveloperAuthored ?? false,
             };
         }
 

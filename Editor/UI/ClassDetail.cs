@@ -163,6 +163,9 @@ namespace GBible.EditorTools.UI
                 hidden.style.marginTop = 6;
                 hidden.tooltip = "DB › 인스턴스에서 이 필드를 보이지 않습니다(값은 그대로 저장·복사). 저장(Ctrl+S)할 때 코드에 [Hide]를 붙이거나 뗍니다.";
                 hidden.RegisterValueChangedCallback(e => ClassStaging.SetFieldAttribute(entry.FullName, info.Name, InstanceFields.Hide, e.newValue));
+                // [Hide]는 코드를 고친다 → 구조 편집에서만(EditorPolicy).
+                hidden.SetEnabled(EditorPolicy.CanEditStructure);
+                if (!EditorPolicy.CanEditStructure) hidden.tooltip += "\n" + EditorPolicy.LockedTip;
                 row.Add(hidden);
                 var showIf = info.GetCustomAttribute<ShowIfAttribute>(true);
                 if (showIf != null)
@@ -179,7 +182,12 @@ namespace GBible.EditorTools.UI
                 if (group == null) text = rule == null || rule.source == FieldRuleSource.Free || rule.source == FieldRuleSource.Keyword ? "연결 없음(자유 입력)" : rule.source == FieldRuleSource.Data ? "DB 항목에서 고름" : "플레이어 데이터에서 고름";
                 else text = KeywordTools.FindGroup(group)?.DisplayName ?? group;
                 var many = KeywordTools.IsMulti(info) ? "여러 개 고름" : "하나 고름";
-                row.Add(LinkRow("키워드 그룹", text, many, group != null, anchor => PickKeywordGroup(host, anchor, declaring, info, group)));
+                // 키워드 그룹 연결은 코드에 [Keyword]를 쓴다 → 구조 편집에서만(EditorPolicy).
+                row.Add(LinkRow("키워드 그룹", text, many, group != null, anchor =>
+                {
+                    if (EditorPolicy.CanEditStructure) PickKeywordGroup(host, anchor, declaring, info, group);
+                    else Debug.Log("[MomoiProject] 키워드 그룹 연결은 코드를 고칩니다. " + EditorPolicy.LockedTip);
+                }));
             }
             else if (KeywordTools.IsKeywordField(info) && EditorDatabase.RefTypeOf(info) is Type reference)
             {

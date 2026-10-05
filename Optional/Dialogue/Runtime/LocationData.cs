@@ -6,7 +6,7 @@ namespace GBible.Data
 {
     // 장소. 다이얼로그 그래프의 '배경'은 장소를 고른다(배경 이미지 = 장소). 이름은 텍스트 시트의 '<id>.name'.
     // 시트에는 대사마다 그때의 장소가 나간다.
-    [Database("장소", Group = "다이얼로그 시스템", Order = 1, IdPrefix = "location")]
+    [Database("장소", Group = "다이얼로그 시스템", Order = 1, IdPrefix = "location", DeveloperAuthored = true)]
     public sealed class LocationData : GameData
     {
         [FieldLabel("배경 이미지")] public Sprite background;
