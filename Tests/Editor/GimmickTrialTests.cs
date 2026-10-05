@@ -233,6 +233,22 @@ namespace GBible.Tests
             Do(g => g.ApplyStatus("enemy", "burn", 9, by: "p9"));
             Assert.AreEqual(5, Game.Statuses("enemy").Single().stacks);
             Assert.AreEqual("p9", Game.Statuses("enemy").Single().by, "다시 걸면 마지막에 건 쪽");
+            Do(g => g.Get<TrRun>("run").relics.Remove("magma"));
+            Do(g => g.ApplyStatus("enemy", "burn", 1));
+            Assert.AreEqual(0, Game.Statuses("enemy").Single().pulse, "구슬을 잃고 다시 걸면 정의의 주기로(0 = 정의의 것)");
+
+            // 주기가 없던 상태 효과에 다시 걸 때 주기가 생기면 지금부터 센다.
+            _session.Statuses.Define(new StatusDefinition { Id = "mark" });
+            Do(g => g.ApplyStatus("enemy", "mark"));
+            Assert.AreEqual(0, Game.Statuses("enemy").Single(s => s.status == "mark").nextPulse);
+            var quick = new PassiveDefinition { Id = "quick", OwnerKey = "run", OwnerPath = "relics", When = new InterceptTrigger { intentType = typeof(StatusIntent).FullName, filter = new FieldFilter { path = "statusId", op = FieldOp.Equal, value = "mark" } } };
+            quick.Outcomes.Add(new ModifyIntentOutcome { path = "pulse", op = IntentOp.Set, value = "2" });
+            _session.Passives.Define(quick);
+            Do(g => g.Get<TrRun>("run").relics["quick"] = 1);
+            Do(g => g.ApplyStatus("enemy", "mark"));
+            var mark = Game.Statuses("enemy").Single(s => s.status == "mark");
+            Assert.AreEqual(2, mark.pulse);
+            Assert.IsTrue(mark.nextPulse > 0, "주기가 생겼다");
         }
 
         [Test]
@@ -281,12 +297,12 @@ namespace GBible.Tests
         [Test]
         public void 값_틀이_사용자_이벤트_데이터_개수를_읽고_이벤트_쏘기에도_쓰인다()
         {
-            Do(g => g.Get<TrRun>("run").pieces.AddRange(new[] { new TrPiece { id = "q1", mult = 7 }, new TrPiece { id = "q2" } }));
+            Do(g => g.Get<TrRun>("run").pieces.AddRange(new[] { new TrPiece { id = "q1", mult = 7 }, new TrPiece { id = "q2" }, null }));
             var context = new TriggerContext { Session = _session, User = Run.pieces[0], Event = new TrScored { amount = 4 } };
             Assert.AreEqual("7", ModifyIntentOutcome.Expand("{user:mult}", context));
             Assert.AreEqual("4", ModifyIntentOutcome.Expand("{event:amount}", context));
             Assert.AreEqual("10", ModifyIntentOutcome.Expand("{data:run.gold}", context));
-            Assert.AreEqual("2", ModifyIntentOutcome.Expand("{count:run.pieces}", context));
+            Assert.AreEqual("2", ModifyIntentOutcome.Expand("{count:run.pieces}", context), "빈 칸은 세지 않는다");
 
             var noted = new List<TrNoted>();
             _session.Events.Subscribe<TrNoted>(e => noted.Add(e));

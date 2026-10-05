@@ -149,7 +149,7 @@ namespace GBible
         public string source;
         public double nextPulse;  // 주기가 있으면 다음 결과를 낼 게임 시각
         public double pulse;      // 이 걸린 것의 주기(초, 0이면 정의의 주기)
-        public int maxStacks;     // 이 걸린 것의 최대 중첩(0이면 정의의 최대 중첩)
+        public int maxStacks;     // 마지막에 건 의도의 최대 중첩(0 = 제한 없음, 보기용 — 상한은 걸 때마다 그때 의도의 값으로 자른다)
         public string by = "";   // 마지막에 건 개체 id(다시 걸면 바뀐다)
     }
 
@@ -244,7 +244,9 @@ namespace GBible
                     if (definition.Reapply != StatusReapply.Refresh) existing.stacks = Cap(cap, existing.stacks + stacks);
                     if (definition.Reapply != StatusReapply.AddStacks) existing.remaining = Initial(definition, length);
                     if (!string.IsNullOrEmpty(byId)) existing.by = byId;
-                    if (pulse != definition.Pulse) existing.pulse = pulse;
+                    // 주기는 이번에 건 의도의 값으로(가로채기가 빠지면 정의의 주기로 돌아온다). 주기가 없다가 생기면 지금부터 센다.
+                    existing.pulse = pulse != definition.Pulse ? pulse : 0;
+                    if (pulse > 0 && existing.nextPulse <= 0) existing.nextPulse = _session.Clock.Time + pulse;
                 });
                 RefreshModifiers(definition, existing);
                 _session.Events.Publish(new StatusApplied { holder = targetId, status = statusId, stacks = existing.stacks, source = source ?? "", by = byId });

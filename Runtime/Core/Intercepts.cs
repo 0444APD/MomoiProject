@@ -175,7 +175,8 @@ namespace GBible
                 if (name.StartsWith("count:", StringComparison.Ordinal))
                 {
                     var found = DataAt(context, name.Substring(6));
-                    return (found is ICollection collection ? collection.Count : found is IEnumerable items && !(found is string) ? items.Cast<object>().Count() : 0).ToString(CultureInfo.InvariantCulture);
+                    // 빈 칸(null)은 세지 않는다(34칸 가방에 든 것의 수).
+                    return (found is IEnumerable items && !(found is string) ? items.Cast<object>().Count(o => o != null) : 0).ToString(CultureInfo.InvariantCulture);
                 }
                 if (name == "owner") return context.Owner ?? "";
                 if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
