@@ -130,6 +130,14 @@ namespace GBible
         [UnityEngine.InspectorName("n번째 칸(0부터)")]
 #endif
         Index,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("같은 열 맨 앞(차 있는 것 중, 위부터)")]
+#endif
+        ColumnFirst,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("같은 열에 혼자")]
+#endif
+        ColumnAlone,
     }
 
     public static class Placement
@@ -275,6 +283,8 @@ namespace GBible
                 case PlaceSpot.SidesEmpty:
                     return Indices(index, count, columns, PlaceDirection.Left, 1).Concat(Indices(index, count, columns, PlaceDirection.Right, 1)).All(i => list[i] == null);
                 case PlaceSpot.RowAlone: return Indices(index, count, columns, PlaceDirection.SameRow, 1).All(i => list[i] == null);
+                case PlaceSpot.ColumnFirst: return Indices(index, count, columns, PlaceDirection.ColumnFirst, 1, list).FirstOr(-1) == index;
+                case PlaceSpot.ColumnAlone: return Indices(index, count, columns, PlaceDirection.SameColumn, 1).All(i => list[i] == null);
                 default: return index == n;
             }
         }
@@ -320,6 +330,8 @@ namespace GBible
                 case PlaceSpot.RowFirst: return "같은 줄 맨 앞";
                 case PlaceSpot.SidesEmpty: return "양옆이 빈 칸";
                 case PlaceSpot.RowAlone: return "같은 줄에 혼자";
+                case PlaceSpot.ColumnFirst: return "같은 열 맨 앞";
+                case PlaceSpot.ColumnAlone: return "같은 열에 혼자";
                 default: return "n번째 칸";
             }
         }

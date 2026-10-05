@@ -232,6 +232,12 @@ namespace GBible.Tests
             var board = new List<string> { null, "a", "b", "c" };
             CollectionAssert.AreEqual(new[] { 1 }, Placement.Indices(3, 4, 2, PlaceDirection.ColumnFirst, 1, board).ToArray(), "x = 1 열: 1(a)·3(c) 중 처음");
             CollectionAssert.AreEqual(new[] { 3 }, Placement.Indices(-1, 4, 2, PlaceDirection.Last, 1, board).ToArray(), "기준 없이 목록 맨 끝");
+            // 열 우선으로 담은 보드(와일드프로스트: 앞 칸 위·아래 → 다음 칸): 원작의 '같은 줄' = 여기의 '같은 열'.
+            var lanes = new List<string> { "u1", null, "u2", "u3", null, null };
+            Assert.IsTrue(Placement.Is(lanes, 0, 2, PlaceSpot.ColumnFirst), "위 줄(x = 0)의 맨 앞");
+            Assert.IsFalse(Placement.Is(lanes, 2, 2, PlaceSpot.ColumnFirst));
+            Assert.IsTrue(Placement.Is(lanes, 3, 2, PlaceSpot.ColumnAlone), "아래 줄(x = 1)에 u3 혼자");
+            Assert.IsFalse(Placement.Is(lanes, 0, 2, PlaceSpot.ColumnAlone), "위 줄에 u1·u2");
 
             Do(g =>
             {
