@@ -1323,6 +1323,7 @@ namespace GBible.EditorTools
             scroll.style.flexGrow = 1;
             _body.Add(scroll);
             BuildChoices(scroll);
+            BuildScenarios(scroll);
             foreach (var group in _session.Debug.All.GroupBy(c => c.Group))
             {
                 var panel = Gs.Panel(group.Key, null, out _, out var body);
@@ -1345,6 +1346,53 @@ namespace GBible.EditorTools
                 body.Add(row);
                 scroll.Add(panel);
             }
+        }
+
+        // 테스트 상황: 지금 판·프로필·난수·시각을 이름 붙여 저장하고 불러온다(Assets/MomoiProjectData/Tests, TestScenarios).
+        void BuildScenarios(VisualElement scroll)
+        {
+            var panel = Gs.Panel("테스트 상황", "지금 상황을 저장해 두고 다시 연다(테스트 씬의 시작 상황으로도 고를 수 있다)", out _, out var body);
+            panel.style.marginBottom = 16;
+            var saveRow = Gs.Row();
+            var nameField = new TextField { value = "" };
+            nameField.style.flexGrow = 1;
+            nameField.style.marginRight = 8;
+            saveRow.Add(nameField);
+            saveRow.Add(new GsButton("지금 저장", () =>
+            {
+                try
+                {
+                    TestScenarios.Save(_session, nameField.value);
+                    ShowFeedback($"테스트 상황 '{nameField.value}'를 저장했습니다.", GsNoticeKind.Ok);
+                    BuildTab();
+                }
+                catch (Exception e) { ShowFeedback(e.Message, GsNoticeKind.Warning); }
+            }, GsButtonKind.Primary));
+            body.Add(saveRow);
+            var row = Gs.Row("gs-wrap");
+            foreach (var name in TestScenarios.Names())
+            {
+                var n = name;
+                var button = new GsButton(n, () =>
+                {
+                    try
+                    {
+                        if (TestScenarios.Load(_session, n)) ShowFeedback($"테스트 상황 '{n}'를 불러왔습니다.", GsNoticeKind.Ok);
+                        else ShowFeedback($"테스트 상황 '{n}'를 불러오지 못했습니다(저널).", GsNoticeKind.Warning);
+                    }
+                    catch (Exception e) { ShowFeedback(e.Message, GsNoticeKind.Warning); }
+                });
+                button.tooltip = "불러오기(지금 판이 이 상황으로 바뀐다, Undo 이력은 비워진다)";
+                button.style.marginRight = 8;
+                button.style.marginBottom = 8;
+                row.Add(button);
+            }
+            if (row.childCount > 0)
+            {
+                row.style.marginTop = 8;
+                body.Add(row);
+            }
+            scroll.Add(panel);
         }
 
         string ChoiceKey() => string.Join(",", _session.Choices.All.Select(c => c.id));

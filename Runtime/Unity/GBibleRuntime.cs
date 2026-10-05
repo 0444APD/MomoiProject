@@ -65,7 +65,8 @@ namespace GBible
             return slot;
         }
 
-        public static void UseSlot(string slot)
+        // remember: 거짓이면 다음 실행의 시작 슬롯으로 기억하지 않는다(테스트 씬의 'test' 슬롯).
+        public static void UseSlot(string slot, bool remember = true)
         {
             slot ??= "";
             CheckSlotName(slot);
@@ -73,8 +74,17 @@ namespace GBible
             // 저장도 없고 행동도 한 번 없었던 세션(타이틀에서 막 켠 기본 슬롯)은 빈 저장을 남기지 않는다.
             if (Session != null) Stop(save: Session.Actions.Log.Count > 0 || File.Exists(SavePath) || File.Exists(RunSavePath));
             _slot = slot;
-            GameSettings.SetRaw(LastSlotKey, slot);
+            if (remember) GameSettings.SetRaw(LastSlotKey, slot);
             Start();
+        }
+
+        // 판을 파일이 아닌 곳(테스트 상황)에서 불러왔을 때: 판 저장 주기를 다시 세고 RunLoaded를 쏜다(화면이 판 데이터로 다시 맞춘다).
+        public static void NotifyRunLoaded(GameSession session)
+        {
+            if (session == null) return;
+            if (session == Session) _runSaver?.Reset();
+            try { RunLoaded?.Invoke(session); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         public static SlotInfo SlotInfoOf(string slot)
