@@ -142,6 +142,7 @@ DB › 능력의 능력, 또는 사용 기능(`Usable`)이 붙은 인스턴스�
 
 - 사용 조건이 안 맞으면 실패(`GameFailure`)를 던진다. 행동 안이면 그 행동 전체가 취소된다.
 - 결과를 내기 직전에 의도 **'사용'**(`UseIntent { ability, userId, times = 1, cancelled }`)을 거친다. 가로채기가 `times`를 늘리면 그만큼 결과를 낸다("한 번 더 발동"). 0이면 내지 않는다. 막으면 실패를 던지지 않고 아무 일 없이 끝난다(28장). 이벤트 '능력 사용'(`AbilityUsed`)의 `Times`가 낸 횟수다.
+- 그다음 의도 **'효과 배율'**(`PowerIntent { ownerId, userId, multiplier = 1 }`)을 한 번 거친다. 고친 배율이 이 사용의 수치(상태 효과 중첩·필드 바꾸기 더하기·능력치 보정 값)에 곱해진다(28장 4-14).
 
 **`Game.TryUse(ability, user, params targets)` — 쓸 수 있을 때만 쓰기**
 
@@ -255,11 +256,12 @@ public static class TacticsQueries
 |---|---|---|
 | `Now` · `Day(resetHour)` · `Week(resetHour, start)` | 현실 시각(UTC, 행동 안이면 그 행동이 시작한 순간), 날짜·주 번호. 규칙은 `DateTime.Now` 대신 이것 | [07](07-Random-Time.md) 2.11~2.13 |
 | `Attribute` · `AddModifier` · `RemoveModifiers` · `Modifiers` | 능력치 최종값, Modifier 붙이기·떼기 | [28](28-Attributes-Intercepts.md) |
-| `Intercept` · `Pay` · `CanPay` | 가로채기, 비용 내기(가로채기 '비용 지불'이 `floor`를 낮추면 빚을 낼 수 있다) | [28](28-Attributes-Intercepts.md) |
-| `ApplyStatus(대상, id, 중첩, 출처, 길이)` · `RemoveStatus` · `StatusStacks` · `HasStatus` · `Statuses` | 상태 효과 걸기(길이를 비우면 상태 효과의 길이)·풀기·읽기. 걸기 직전에 의도 '상태 효과 걸기'(`StatusIntent`)를 거친다. 가로채기가 상태 효과를 바꾸거나(화상 → 푸른 화상) 중첩·길이를 고치고, 막으면(면역) `ApplyStatus`는 `null`이다 | [29](29-Statuses-Schedules-Choices.md) |
+| `Intercept` · `Pay(key, path, 양, what, forId, user)` · `CanPay` | 가로채기, 비용 내기(가로채기 '비용 지불'이 `floor`를 낮추면 빚을 낼 수 있다). `forId`(무엇을 위한 비용 — 사는 카드·쓰는 주문 ID)·`user`(내는 쪽)는 의도에 실려 가로채기가 거른다("행성 카드는 공짜") | [28](28-Attributes-Intercepts.md) |
+| `TryPay(key, path, 양, forId, user)` | 낼 수 있으면 내고 `true`, 모자라면 아무것도 바꾸지 않고 `false`(실패를 던지지 않는다). 틱마다 도는 행동 안에서 "MP가 되면 쏜다" | [28](28-Attributes-Intercepts.md) |
+| `ApplyStatus(대상, id, 중첩, 출처, 길이, by)` · `RemoveStatus` · `StatusStacks` · `HasStatus` · `Statuses` | 상태 효과 걸기(길이를 비우면 상태 효과의 길이)·풀기·읽기. `by`(건 개체, 객체 또는 id)는 걸린 것의 `by`가 되고 다시 걸면 마지막에 건 쪽으로 바뀐다(처치 기여). 걸기 직전에 의도 '상태 효과 걸기'(`StatusIntent`)를 거친다. 가로채기가 상태 효과를 바꾸거나(화상 → 푸른 화상) 중첩·길이·최대 중첩·주기를 고치고, 막으면(면역) `ApplyStatus`는 `null`이다 | [29](29-Statuses-Schedules-Choices.md) |
 | `StatusCount(대상, 종류)` · `RemoveStatuses(대상, 종류)` | 그 종류(`StatusKind`: 버프·디버프)가 몇 가지 걸려 있나 · 그 종류를 모두 푼다(정화, 푼 가짓수) | [29](29-Statuses-Schedules-Choices.md) |
 | `ShortenStatus(대상, id, 양)` | 남은 횟수·초를 줄인다. 다 되면 지속이 끝난 것으로 끝낸다. 영구거나 없으면 `false` | [29](29-Statuses-Schedules-Choices.md) |
-| `Owned(패시브 id, 가진 쪽 = null)` | 그 패시브를 몇 개(레벨) 가졌나. 가진 쪽을 비우면 모두의 합(레벨 필드가 있으면 그 합). '놓인 것마다' 패시브면 가진 쪽 = 목록의 요소 하나 → 그 요소의 레벨 | [17](17-Custom-Features.md) · [29](29-Statuses-Schedules-Choices.md) |
+| `Owned(패시브 id, 가진 쪽 = null)` | 그 패시브를 몇 개(레벨) 가졌나. 가진 쪽을 비우면 모두의 합(레벨 필드가 있으면 그 합). '놓인 것마다' 패시브면 가진 쪽 = 목록의 요소 하나 → 그 요소의 레벨. 레벨 0 이하인 요소와 침묵한 가진 쪽(상태 효과 '걸린 쪽의 패시브를 끔')은 0으로 센다 | [17](17-Custom-Features.md) · [29](29-Statuses-Schedules-Choices.md) |
 | `BorrowPassive(패시브 id, 원본)` | 빌려 쓰기: 지금 순간(트리거 결과·`[BindTo]` 안)으로 그 패시브를 원본 조각의 것으로 한 번 더 낸다(Blueprint를 코드로). 결과 '빌려 쓰기'와 같다. 결과를 냈으면 `true` | [37](37-Placement.md) 4-3 · [17](17-Custom-Features.md) |
 | `ScheduleAfter` · `ScheduleOn<T>` · `CancelSchedule` · `CancelSchedules` | 예약 | [29](29-Statuses-Schedules-Choices.md) |
 | `Ask` · `Answer` · `Choice` · `CancelChoice` | 선택 대기 | [29](29-Statuses-Schedules-Choices.md) |
@@ -479,7 +481,7 @@ session.Undo();                        // 다시 30
 | `All<T>()`가 원하지 않는 객체까지 줌 | 같은 형식이 여러 플레이어 데이터에 있다. `All<T>("키")`로 한 곳만 본다. |
 | `All<T>()`가 준 리스트에 더했는데 반영되지 않음 | 돌려받은 리스트는 새 리스트다. 플레이어 데이터 안의 리스트(예: `board.units`)에 더한다. |
 | 오래 쥔 객체가 엉뚱한 값 | 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 값을 읽을 때는 id로 들고 있다가 `Find`한다. 행동에 넣는 것은 그 객체 그대로도 된다(실행 직전에 같은 id의 지금 객체로 바뀐다). |
-| 유닛 하나가 쓸 수 없어서 턴 전체가 취소됨 | 차례로 돌며 `Game.Use`를 불렀다. 사용 조건이 안 맞으면 실패를 던져 바깥 행동까지 취소된다. 되는 것만 발동할 때는 `Game.TryUse`(2.9). |
+| 유닛 하나가 쓸 수 없어서 턴 전체가 취소됨 | 차례로 돌며 `Game.Use`를 불렀다. 사용 조건이 안 맞으면 실패를 던져 바깥 행동까지 취소된다. 되는 것만 발동할 때는 `Game.TryUse`(2.9). 비용도 같다: 모자라면 건너뛸 때는 `Game.Pay` 대신 `Game.TryPay`(2.16). |
 | "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 의도 '확률'을 거치지 않는다. `Game.Chance`(2.11). |
 | `ApplyStatus`가 돌려준 값에서 `NullReferenceException` | 의도 '상태 효과 걸기'를 가로채기가 막았다(면역). 돌려받은 값이 `null`인지 먼저 본다. |
 | 행동 클래스 밖에서 `Game` 속성이 `null` | 행동·Block의 `Game` 속성은 그 코드가 실행되는 동안만 있다. 씬 코드는 `GBibleRuntime.Game`. |

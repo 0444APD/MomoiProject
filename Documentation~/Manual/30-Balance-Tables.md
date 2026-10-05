@@ -48,7 +48,7 @@
 | 표 없이 코드에서 만든 후보에서 뽑기 | `Game.Roll(풀, 개수, unique, stream)`(4-4) |
 | "천장: 뽑을수록 5성 확률이 오르고 90번째는 확정" | 가중치 표 줄의 `무게를 밸런스 값에서`(표 곡선, 단계 = `profile.pity`)(5-11) |
 | "레벨업 보상 셋 중 하나 — 고른 패시브의 레벨 +1" | 결과 `가중치 표에서 고르기`, 넣을 곳이 ID → 레벨 딕셔너리(3-3) |
-| "선택지 +1"(보상 후보가 하나 늘어난다) | `가중치 표에서 고르기`의 `countBonus`(후보 수에 더할 숫자, 플레이어 데이터의 숫자)(3-3, 5-13) |
+| "선택지 +1"(보상 후보가 하나 늘어난다) | `가중치 표에서 고르기`의 `countBonus`(후보 수에 더할 숫자, 플레이어 데이터의 숫자 — `id`가 있는 객체의 필드면 패시브 보정까지)(3-3, 5-13) |
 | "보상 다시 뽑기(남은 횟수 1 · 골드 5)" | 비용을 내는 행동 + `Game.RerollChoice`(4-6, 5-13) |
 | "10개 사기" · "살 수 있는 만큼 사기"(가격이 산 개수에 따라 오름) | `Game.BalanceSum` · `Game.BalanceCount`(4-1, 5-12) |
 | double(약 1e308)을 넘는 큰 수(방치형의 생산량·가격) | `BigNumber`(→ `36-Grid-BigNumber.md`) |
@@ -225,6 +225,7 @@
 
 - 뽑기는 요구하는 순간(그 행동 안)에 끝나고 후보는 선택 대기(`$choices`)에 남는다. 그래서 끄고 켜거나 답하기를 Undo해도 후보가 바뀌지 않는다(29장 2-6). 후보를 바꾸는 것은 다시 뽑기(아래)뿐이다.
 - **후보 수** = `count`(후보 수) + `countBonus`(후보 수에 더할 숫자)가 가리키는 숫자(반올림). 합이 1보다 작으면 1이다. 플레이어 데이터를 비웠거나, 그 키가 없거나, 숫자로 읽을 수 없으면 0을 더한다. 요구하는 순간의 값을 읽으므로 그 행동 안에서 앞서 바꾼 값까지 들어간다. 요약 문장에는 `count`만 보인다.
+- **보정까지 읽는다**: 그 숫자 필드가 `id`가 있는 객체의 필드면(`run` › `hero.options`의 `hero`) 필드 값이 아니라 **능력치 최종값**(`Game.Attribute`, Modifier·패시브의 가진 동안 능력치 보정 포함, 28장 2-1)으로 읽는다. 그래서 "선택지 +1" 유물을 필드를 올리는 결과 대신 패시브의 `modifiers`(가진 동안 능력치 보정) `options` +1로 만들면, 잃을 때 저절로 빠진다(5-13). 부모에 `id`가 없으면(`run` › `rewardBonus`의 `run`) 필드 값 그대로다.
 - **다시 뽑기**: 기다리는 동안 다른 행동 안에서 `Game.RerollChoice(선택 id)`를 부르면 같은 표·같은 후보 수·같은 `unique`로 후보를 새로 뽑는다(후보 수는 처음 요구할 때 더한 값 그대로). 선택 id는 같고 `ChoiceRequested`를 다시 쏜다(화면이 새로 그린다). 비용·남은 횟수는 부르는 행동이 정한다. 그 행동을 Undo하면 원래 후보다(4-6, 5-13, 29장 4-10b).
 - 후보 이름은 텍스트 표의 `<ID>.name`(없으면 ID). 꽝이 나와 후보가 줄면 그만큼만 보이고, 후보가 하나도 없으면 기다리지 않고 고른 뒤 결과만 돈다.
 - 덱처럼 원본 ID가 바로 들어가지 않는 목록은 `key`를 비우고 **고른 뒤 결과**에 프로젝트 결과 Block 하나(`Context.Picked`의 ID로 `DeckCard`를 만들어 넣는 `Reward`)를 둔다(5-5).
@@ -351,7 +352,7 @@ var pick = Game.Roll(battle.enemies.Select(e => (e.id, (double)e.hp)), 1, stream
 | `Entries` (`List<WeightEntry>`) | 항목 줄 | `entries` |
 | `Exclude` (`List<PlayerDataListRef>`, `key` · `path`) | 뺄 목록 | `exclude` |
 
-`PlayerDataNumberRef`(`key` · `path`)는 플레이어 데이터 안의 숫자 하나를 가리킨다. `Read(session)`이 그 값을 읽는다(비었거나 없으면 0). `가중치 표에서 고르기`의 `countBonus`가 이 형식이다(4-6).
+`PlayerDataNumberRef`(`key` · `path`)는 플레이어 데이터 안의 숫자 하나를 가리킨다. `Read(session)`이 그 값을 읽는다(비었거나 없으면 0). 경로의 부모가 `id`가 있는 객체면 그 필드를 능력치로 읽는다(`session.Attributes.Get`, 보정 포함 — 3-3). `가중치 표에서 고르기`의 `countBonus`가 이 형식이다(4-6).
 
 | `WeightEntry` 필드 | 뜻 |
 |---|---|
@@ -411,7 +412,7 @@ var pick = new ChooseFromTableOutcome
 | 필드 | 뜻 |
 |---|---|
 | `prompt` · `table` · `count` · `unique` | 안내 글 · 표 · 후보 수 · 서로 다른 것만 |
-| `countBonus` (`PlayerDataNumberRef`) | 후보 수에 더할 플레이어 데이터의 숫자(`key` · `path`). 비우면 0 |
+| `countBonus` (`PlayerDataNumberRef`) | 후보 수에 더할 플레이어 데이터의 숫자(`key` · `path`). 비우면 0. `id`가 있는 객체의 필드면 보정까지 읽는다(3-3) |
 | `min` · `max` | 고를 개수 |
 | `key` · `path` | 고른 원본 ID를 넣을 목록(비우면 넣지 않음) |
 | `then` (`List<Outcome>`) | 고른 뒤 결과. 컨텍스트의 `Picked`가 고른 ID(글자) |
@@ -938,6 +939,7 @@ rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
 | 한 번 더 | 그대로(플레이어용 실패 `NotEnough` — 아무것도 바뀌지 않음) | 0 | 40 |
 
 - 다시 뽑아도 후보 수는 처음 요구할 때의 4다. 그 사이 "넓은 시야"를 더 사도 지금 선택의 후보 수는 늘지 않는다.
+- "넓은 시야"가 가지고 있는 동안만 켜지는 유물이면 필드를 올리지 않고 보정으로 둔다: `RunState`의 `hero`(id `hero`)에 `public int options;`, `countBonus` `run` › `hero.options`, DB › 패시브 `wideView`(가진 목록 `run › relics`) `modifiers`(가진 동안 능력치 보정) `options` 플랫 `1` · `modifierTarget`(보정 받을 대상) `hero`. `hero`에 `id`가 있어 보정까지 읽으므로(3-3) 유물을 잃으면 후보도 저절로 줄어든다.
 - Undo한 뒤 다시 뽑으면 같은 새 후보가 나온다. 난수도 행동과 함께 돌아가기 때문이다(2-3).
 - 다시 뽑기는 앞 후보를 빼지 않는다. 앞에 보인 것을 빼려면 표의 뺄 목록에 `run › seenRewards`를 두고, `RerollReward`가 다시 뽑기 전에 `Game.Choice.options`의 id를 그 목록에 넣는다(보상을 고르면 비운다).
 - `rerolls`를 판마다 2로 두는 것은 세션 구역이라 새 판이면 기본값으로 돌아오기 때문이다. 보상마다 2번이면 보상을 요구하는 행동에서 2로 되돌린다.
@@ -979,7 +981,7 @@ rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
 | `catch (GameFailure)`가 컴파일 오류(이미 잡힌 형식) | `catch (InvalidOperationException)`를 위에 두었다. 상속한 형식(`GameFailure`)을 먼저 둔다. |
 | `Game.Fail(…)`을 썼는데 행동이 그대로 진행 | `throw`가 없다. `Game.Fail`은 예외를 만들기만 한다. |
 | 프로그래머 실수 메시지가 플레이어에게 보임 | 화면이 모든 `InvalidOperationException`의 `Message`를 보여 준다. `GameFailure`만 보여 주고 나머지는 로그로(5-8). |
-| `countBonus`(후보 수에 더할 숫자)를 골랐는데 후보가 늘지 않음 | 그 필드가 0이거나 숫자로 읽을 수 없다(0으로 본다). 표에 서로 다른 항목이 모자라거나 꽝이 나왔다. 요약 문장은 `count`만 보이니 실제 수는 고르기 창에서 본다(3-3). |
+| `countBonus`(후보 수에 더할 숫자)를 골랐는데 후보가 늘지 않음 | 그 필드가 0이거나 숫자로 읽을 수 없다(0으로 본다). 표에 서로 다른 항목이 모자라거나 꽝이 나왔다. 요약 문장은 `count`만 보이니 실제 수는 고르기 창에서 본다(3-3). 패시브 보정으로 올렸다면 그 필드의 부모 객체에 `id`가 있어야 보정까지 읽는다(`id`가 없는 `run` 바로 아래 필드는 보정을 읽지 않는다). |
 | `Game.RerollChoice`가 `false` | `가중치 표에서 고르기`로 만든 선택이 아니다(`Game.Ask`·`선택 요구`). 이미 답했다. 표에서 아무것도 나오지 않았다(모두 꽝)(4-6). |
 | 다시 뽑았더니 같은 유물이 또 나옴 | 다시 뽑기는 앞 후보를 빼지 않는다. 뺄 목록으로 뺀다(5-13). |
 | 다시 뽑기 버튼이 반응하지 않음 | 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다. `GameScreens.Do(() => 행동, whileChoosing: true)`, 기본 고르기 창이면 `GameScreens.Reroll`(29장 4-10b). |

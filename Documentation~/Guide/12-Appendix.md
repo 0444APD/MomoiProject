@@ -575,14 +575,15 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 카드 던전에는 없지만 조커 칸·보드·가방 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../AI/GimmickCatalog.md)에 갈래별로 있다. 패시브 쪽(놓인 것마다·가진 동안 능력치 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
 
 - **되는 조각만 쓰기**: `Game.TryUse(id, 사용자, 대상…)`. 쓸 수 있으면 쓰고 참, 사용 조건이 안 맞으면 아무것도 하지 않고 거짓이다(실패를 던지지 않는다). 보드의 유닛을 차례로 돌며 부를 때 쓴다.
-- **기본 의도 넷**: GBible이 가로채기 자리를 미리 둔 동작이다. 트리거 `가로채기` + 결과 `의도 고치기`로 고친다.
+- **기본 의도 다섯**: GBible이 가로채기 자리를 미리 둔 동작이다. 트리거 `가로채기` + 결과 `의도 고치기`로 고친다.
 
 | 의도 | 거치는 곳 | 고치는 예 |
 |---|---|---|
 | '사용'(`UseIntent`) | `Game.Use`·`TryUse`가 결과를 내기 직전 | `times` 더하기 1 = 한 번 더 발동, 막기 = 아무 일 없음 |
-| '상태 효과 걸기'(`StatusIntent`) | `Game.ApplyStatus`·효과 '상태 효과 걸기' | `statusId` 값으로 바꾸기(화상 → 푸른 화상), `stacks` 곱하기 2, `length` 곱하기, 막기(면역 → `ApplyStatus`가 null) |
+| '효과 배율'(`PowerIntent`) | 능력을 쓸 때·패시브가 발동할 때 | `multiplier` 곱하기 2 = 이 조각의 수치 2배(Lumin). 기본 효과 Block이 곱하고, 프로젝트 Block은 `Use.Context.Power` |
+| '상태 효과 걸기'(`StatusIntent`) | `Game.ApplyStatus`·효과 '상태 효과 걸기' | `statusId` 값으로 바꾸기(화상 → 푸른 화상), `stacks` 곱하기 2, `length` 곱하기, `maxStacks` 더하기, `pulse` 곱하기, 막기(면역 → `ApplyStatus`가 null) |
 | '확률'(`ChanceIntent`) | `Game.Chance`·조건 '확률' | `probability` 곱하기 2 = 모든 확률 2배 |
-| '비용 지불'(`CostIntent`) | `Game.Pay`·결과 '비용 내기' | `floor` 값으로 바꾸기 −20 = −20까지 빚, `key`·`path` = 다른 곳에서 내기 |
+| '비용 지불'(`CostIntent`) | `Game.Pay`·`TryPay`·결과 '비용 내기' | `floor` 값으로 바꾸기 −20 = −20까지 빚, `key`·`path` = 다른 곳에서 내기, 거르기 `forId`(행성 카드만 공짜) |
 
 ```csharp
 if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) …   // 흐름을 비우면 "chance"
