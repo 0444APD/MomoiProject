@@ -25,7 +25,7 @@ namespace GBible.Data
         [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)] public Trigger trigger;
         [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두", Root = nameof(trigger)), Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 targetId → 가진 쪽이 맞을 때만)")] public string holderField = "";
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
-        [FieldLabel("발동 더(다른 순간)"), Tooltip("같은 패시브가 다른 순간에 다른 결과를 낼 때 줄마다 트리거 + 결과(손을 낼 때 쌓기 · 버릴 때 빼기 · 점수 때 내기). 가진 쪽 필드·놓인 것마다 순서는 위와 같다")] public List<TriggerRule> rules = new List<TriggerRule>();
+        [FieldLabel("발동 더(다른 순간)"), TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept), OutcomeSlot(OutcomeKinds.All), Tooltip("같은 패시브가 다른 순간에 다른 결과를 낼 때 줄마다 트리거 + 결과(손을 낼 때 쌓기 · 버릴 때 빼기 · 점수 때 내기). 가진 쪽 필드·놓인 것마다 순서는 위와 같다")] public List<TriggerRule> rules = new List<TriggerRule>();
         [FieldLabel("주기(초)"), Tooltip("0보다 크면 가진 동안 이 초(게임 시간)마다 가진 쪽마다 결과를 냅니다(트리거 없이도). 레벨별 주기가 있으면 그것")] public double pulse;
         [FieldLabel("레벨별 주기(초, 1레벨부터)")] public List<double> pulseByLevel = new List<double>();
         [FieldLabel("가진 동안 능력치 보정"), Tooltip("가진 동안만 붙는 보정입니다(잃으면 저절로 빠짐). 받는 쪽 = 가진 쪽(놓인 것마다면 그 요소) 또는 아래 '보정 받을 대상'")] public List<PassiveModifier> modifiers = new List<PassiveModifier>();
@@ -42,7 +42,8 @@ namespace GBible.Data
                 MatchField = matchField ?? "", MatchVia = matchVia ?? "", PerElement = perElement, LevelField = levelField ?? "", ModifierTarget = modifierTarget ?? "",
                 ModifierWhen = modifierWhen, Stacking = stacking, Pulse = Math.Max(0, pulse),
             };
-            definition.PulseByLevel.AddRange(pulseByLevel.Where(p => p > 0));
+            // 0인 칸 = 그 레벨에는 주기 없음(칸을 지우면 레벨이 밀린다).
+            definition.PulseByLevel.AddRange(pulseByLevel.Select(p => Math.Max(0, p)));
             foreach (var rule in rules.Where(r => r?.when != null))
             {
                 var line = new PassiveRule { When = rule.when };
@@ -68,6 +69,7 @@ namespace GBible.Data
                 foreach (var outcome in rules[i]?.then ?? new List<Outcome>()) outcome?.Validate(context);
             }
             modifierWhen?.Validate(context);
+            if (pulse < 0 || pulseByLevel.Any(p => p < 0)) context.Error("주기(초)는 0 이상이어야 합니다(0 = 주기 없음).");
             for (int i = 0; i < modifiers.Count; i++)
                 if (modifiers[i] == null || string.IsNullOrEmpty(modifiers[i].attribute)) context.Error($"가진 동안 능력치 보정 {i + 1}번째 줄의 능력치(숫자 필드 이름)가 비어 있습니다.");
             foreach (var outcome in outcomes)

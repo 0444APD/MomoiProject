@@ -98,7 +98,8 @@ namespace GBible
                 if (string.IsNullOrEmpty(value?.path)) continue;
                 var target = FieldPaths.TypeAt(type, value.path, out var error);
                 if (target == null) context.Error($"이벤트 쏘기: {error}");
-                else if (!TryParse(target, value.value, out _)) context.Error($"이벤트 쏘기: '{value.path}'에 '{value.value}'를 넣을 수 없습니다({target.Name}).");
+                // 틀({user}·{count:…})이 든 값은 발동할 때 정해진다 → 형식은 그때 본다(맞지 않으면 경고).
+                else if ((value.value ?? "").IndexOf('{') < 0 && !TryParse(target, value.value, out _)) context.Error($"이벤트 쏘기: '{value.path}'에 '{value.value}'를 넣을 수 없습니다({target.Name}).");
             }
             if (count < 1) context.Error("이벤트 쏘기: 횟수는 1 이상이어야 합니다.");
         }
