@@ -15,6 +15,7 @@ namespace GBible.EditorTools
     //   .claude/hooks/compile-check.ps1    — 컴파일 검사(패키지 Tools~에서 복사)
     //   .claude/settings.json              — Stop 훅 한 줄(이미 있으면 그대로, 다른 설정은 건드리지 않는다)
     //   Docs/PlanningSpec.md               — 기획 명세서 양식(없을 때만)
+    //   Docs/Decisions.md                  — 결정 기록(없을 때만, 진행 매뉴얼 ProjectFlow.md 2절)
     // 템플릿: 패키지 Documentation~/AI/Templates({{GBIBLE}} = 프로젝트에서 본 패키지 경로).
     public static class ClaudeFiles
     {
@@ -131,6 +132,15 @@ namespace GBible.EditorTools
                 Directory.CreateDirectory(Path.GetDirectoryName(spec));
                 File.Copy(specTemplate, spec);
                 done.Add("Docs/PlanningSpec.md (기획 명세서 빈 양식)");
+            }
+            // 결정 기록: AI가 질문·답·추천값으로 정한 것을 쌓는다(없을 때만 — 이미 있으면 프로젝트 기록이라 건드리지 않는다).
+            var decisions = Path.Combine(ProjectRoot, "Docs", "Decisions.md");
+            var decisionsTemplate = Path.Combine(templates, "Decisions.md");
+            if (!File.Exists(decisions) && File.Exists(decisionsTemplate))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(decisions));
+                File.WriteAllText(decisions, Template("Decisions.md"));
+                done.Add("Docs/Decisions.md (결정 기록)");
             }
             return done;
         }
