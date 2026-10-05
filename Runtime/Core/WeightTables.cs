@@ -42,6 +42,20 @@ namespace GBible
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(목록)")] public string path = "";
     }
 
+    // 플레이어 데이터 안의 숫자 하나(키 › 필드 경로). 비어 있으면 0.
+    [Serializable]
+    public sealed class PlayerDataNumberRef
+    {
+        [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key = "";
+        [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(숫자)")] public string path = "";
+
+        public double Read(GameSession session)
+        {
+            if (session == null || string.IsNullOrEmpty(key) || !session.Data.IsDefined(key)) return 0;
+            return ScreenBinding.Number(FieldPaths.Resolve(session.Data.Get(key), path ?? "").FirstOrDefault());
+        }
+    }
+
     public sealed class WeightTableDefinition
     {
         public string Id;

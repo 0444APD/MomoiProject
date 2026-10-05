@@ -87,6 +87,8 @@ namespace GBible
         public bool IsUse;
         public object User;
         public IReadOnlyList<object> Picked = Array.Empty<object>();
+        // '쓸 수 있나'만 미리 보는 순간(Game.CanUse). 확률 조건이 굴리지 않는다.
+        public bool IsCheck;
 
         public GameApi Game => Session?.Game;
     }
@@ -505,6 +507,9 @@ namespace GBible
             public string WatchKey;
             // 가진 쪽마다 검사(상태 효과처럼 여러 대상이 같은 트리거를 가질 때): 순간마다 가진 쪽 목록을 받아 User = 가진 쪽으로 하나씩 검사·발동한다.
             public Func<TriggerContext, IEnumerable<object>> Holders;
+            // 자리 순서: 같은 묶음(OrderGroup)의 항목들은 등록 순서가 아니라 가진 쪽의 자리(order)대로 섞여서 발동한다(조커 칸 왼쪽부터).
+            public Func<TriggerContext, IEnumerable<(object holder, int order)>> OrderedHolders;
+            public string OrderGroup;
         }
 
         readonly GameSession _session;
@@ -534,10 +539,18 @@ namespace GBible
         // owner의 트리거를 감시한다. fire: 발동했을 때(결과 실행은 부르는 쪽이 RunOutcomes로). repeat이 아니면 한 번 발동하면 감시를 그만둔다.
         // holders를 주면 가진 쪽마다 검사한다: 순간마다 holders(순간)의 각 객체를 컨텍스트의 사용자(User)로 넣어 트리거 전체(조건 포함)를
         // 따로 검사하고, 참인 가진 쪽마다 fire를 부른다(조건 Block이 Context.User로 "가진 쪽의 체력" 같은 것을 본다).
-        public void Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null)
+        // orderedHolders + orderGroup: 가진 쪽마다 검사하되, 같은 묶음의 다른 항목들과 섞어 가진 쪽의 자리(order)가 작은 것부터 발동한다.
+        //   이벤트 하나에 '놓인 것마다' 패시브 여럿이 걸리면 패시브 등록 순서가 아니라 목록 순서대로 돈다(가로채기는 같은 '순서' 칸끼리).
+        public void Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null,
+            Func<TriggerContext, IEnumerable<(object holder, int order)>> orderedHolders = null, string orderGroup = null)
         {
             if (when == null) return;
-            var entry = new Entry { Owner = owner, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds(), Holders = holders };
+            if (orderedHolders != null) holders = moment => orderedHolders(moment).Select(p => p.holder);
+            var entry = new Entry
+            {
+                Owner = owner, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds(), Holders = holders,
+                OrderedHolders = orderedHolders, OrderGroup = orderedHolders == null ? null : orderGroup,
+            };
             _entries.Add(entry);
             foreach (var type in when.Leaves().OfType<EventTrigger>().Select(e => e.ResolvedType).Where(t => !string.IsNullOrEmpty(t)).Distinct())
             {
@@ -566,10 +579,19 @@ namespace GBible
             _depth++;
             try
             {
-                foreach (var (_, entry) in list.OrderBy(p => p.order).ToList())
+                var sorted = list.OrderBy(p => p.order).ToList();
+                var done = new HashSet<(int, string)>();
+                foreach (var (order, entry) in sorted)
                 {
                     if (!_entries.Contains(entry)) continue;
                     if (Intents.IsCancelled(intent)) break;
+                    if (entry.OrderGroup != null)
+                    {
+                        // 같은 순서 칸의 같은 묶음끼리 자리 순서로.
+                        if (!done.Add((order, entry.OrderGroup))) continue;
+                        FireInPlaceOrder(sorted.Where(p => p.order == order && p.entry.OrderGroup == entry.OrderGroup).Select(p => p.entry).ToList(), intent, true);
+                        continue;
+                    }
                     var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = intent, IsIntercept = true };
                     TestAndFire(entry, moment);
                 }
@@ -626,9 +648,18 @@ namespace GBible
             try
             {
                 var ordered = list.Where(e => (e.Kinds & TriggerKinds.Condition) == 0).Concat(list.Where(e => (e.Kinds & TriggerKinds.Condition) != 0)).ToList();
+                HashSet<string> done = null;
                 foreach (var entry in ordered)
                 {
                     if (!_entries.Contains(entry)) continue;
+                    if (entry.OrderGroup != null)
+                    {
+                        // 같은 묶음('놓인 것마다' 패시브가 보는 같은 목록)은 처음 만난 자리에서 한꺼번에, 자리 순서로.
+                        done = done ?? new HashSet<string>(StringComparer.Ordinal);
+                        if (!done.Add(entry.OrderGroup)) continue;
+                        FireInPlaceOrder(ordered.Where(e => e.OrderGroup == entry.OrderGroup).ToList(), evt, false);
+                        continue;
+                    }
                     var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = evt };
                     TestAndFire(entry, moment);
                 }
@@ -637,9 +668,10 @@ namespace GBible
         }
 
         // 사용하는 순간: owner의 트리거가 이 순간에 참인지(사용 조건). 트리거가 없으면 참.
-        public bool CanUse(string owner, Trigger when, object user, IReadOnlyList<object> picked, out TriggerContext moment)
+        // checkOnly: 미리 보기만(Game.CanUse) — 확률 조건을 굴리지 않는다.
+        public bool CanUse(string owner, Trigger when, object user, IReadOnlyList<object> picked, out TriggerContext moment, bool checkOnly = false)
         {
-            moment = new TriggerContext { Session = _session, Owner = owner, IsUse = true, User = user, Picked = picked ?? Array.Empty<object>() };
+            moment = new TriggerContext { Session = _session, Owner = owner, IsUse = true, IsCheck = checkOnly, User = user, Picked = picked ?? Array.Empty<object>() };
             return when == null || Test(when, moment);
         }
 
@@ -669,6 +701,37 @@ namespace GBible
             }
         }
 
+        // 같은 묶음 항목들의 가진 쪽을 모아 자리(order)가 작은 것부터, 같은 자리면 등록 순서로 검사·발동한다.
+        // 앞 칸의 결과가 목록을 바꾸면(옆 칸 조커를 없앰) 그 순간에도 목록에 남은 가진 쪽만 발동한다.
+        void FireInPlaceOrder(List<Entry> entries, object evt, bool intercept)
+        {
+            var queue = new List<(Entry entry, object holder, int order, int seq)>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var moment = new TriggerContext { Session = _session, Owner = entries[i].Owner, Event = evt, IsIntercept = intercept };
+                foreach (var (holder, order) in OrderedHoldersOf(entries[i], moment)) queue.Add((entries[i], holder, order, i));
+            }
+            foreach (var item in queue.OrderBy(q => q.order).ThenBy(q => q.seq).ToList())
+            {
+                if (!_entries.Contains(item.entry)) continue;
+                if (intercept && Intents.IsCancelled(evt)) break;
+                var moment = new TriggerContext { Session = _session, Owner = item.entry.Owner, Event = evt, IsIntercept = intercept };
+                if (!HoldersOf(item.entry, moment).Any(h => ReferenceEquals(h, item.holder))) continue;
+                var each = ForHolder(moment, item.holder);
+                if (Test(item.entry.When, each)) Fire(item.entry, each);
+            }
+        }
+
+        List<(object holder, int order)> OrderedHoldersOf(Entry entry, TriggerContext moment)
+        {
+            try { return entry.OrderedHolders(moment)?.Where(p => p.holder != null).ToList() ?? new List<(object, int)>(); }
+            catch (Exception e)
+            {
+                _session.Journal.Append(JournalKind.Error, "Triggers", $"'{entry.Owner}'의 가진 쪽 목록을 만들지 못했습니다: {e.Message}");
+                return new List<(object, int)>();
+            }
+        }
+
         List<object> HoldersOf(Entry entry, TriggerContext moment)
         {
             try { return entry.Holders(moment)?.Where(h => h != null).ToList() ?? new List<object>(); }
@@ -681,7 +744,7 @@ namespace GBible
 
         static TriggerContext ForHolder(TriggerContext moment, object holder) => new TriggerContext
         {
-            Session = moment.Session, Owner = moment.Owner, Event = moment.Event, IsIntercept = moment.IsIntercept, IsUse = moment.IsUse,
+            Session = moment.Session, Owner = moment.Owner, Event = moment.Event, IsIntercept = moment.IsIntercept, IsUse = moment.IsUse, IsCheck = moment.IsCheck,
             User = holder, Picked = new[] { holder },
         };
 

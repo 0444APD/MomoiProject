@@ -119,6 +119,9 @@ namespace GBible
             return SplitMix64.Next(ref mix);
         }
 
+        // 글자 시드("ABCD1234"·"2026-10-05")를 숫자 시드로. 앞뒤 빈칸을 떼고 대문자로 맞춘다(같은 글자면 같은 판).
+        public static ulong SeedOf(string text) => Fnv1a64((text ?? "").Trim().ToUpperInvariant());
+
         // string.GetHashCode는 실행마다 달라질 수 있어 쓰지 않는다.
         public static ulong Fnv1a64(string text)
         {

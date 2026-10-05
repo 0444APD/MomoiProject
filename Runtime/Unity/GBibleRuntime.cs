@@ -536,11 +536,12 @@ namespace GBible
 
         // 새 판: 이번 판 값을 처음 값으로 되돌리고(Undo 기록도 비움) 판 저장 파일(run.json)을 지운다. 프로필은 그대로다.
         // 메모리와 파일을 함께 지워야 "화면은 새 판인데 이어 하기는 예전 판"이 생기지 않는다. 행동 밖(버튼 등)에서 부른다.
-        public static void NewRun(GameSession session)
+        // seed: 시드 입력·일일 도전(같은 시드면 같은 판). 일일: GBibleRuntime.NewRun(session, RandomStreams.SeedOf(날짜 글자)).
+        public static void NewRun(GameSession session, ulong? seed = null)
         {
             if (session == null) throw new ArgumentNullException(nameof(session));
             if (session.Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 새 판을 시작할 수 없습니다. 행동 밖(버튼 등)에서 부르세요.");
-            session.NewRun();
+            session.NewRun(seed);
             DeleteRun();
             if (session == Session) _runSaver?.Reset();
         }

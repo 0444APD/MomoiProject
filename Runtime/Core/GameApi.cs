@@ -25,8 +25,23 @@ namespace GBible
 
         public RandomStream Random(string name) => Session.Random.Get(name);
 
+        // 확률 굴리기(행동 안에서). 굴리기 전에 의도 '확률'(ChanceIntent)을 거친다 — 행운·"모든 확률 2배"가 고친다.
+        //   if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) …   흐름을 비우면 "chance".
+        public bool Chance(double probability, string stream = "chance", string source = null, object user = null)
+        {
+            var intent = Intercept(new ChanceIntent
+            {
+                probability = probability, stream = string.IsNullOrEmpty(stream) ? "chance" : stream, sourceId = source ?? "",
+                userId = user == null ? "" : user as string ?? (HasId(user.GetType()) ? IdOf(user) : ""),
+            });
+            // 확률이 바뀌어도 난수는 한 번 굴린다(같은 시드면 뒤의 결과가 밀리지 않는다).
+            var roll = Random(string.IsNullOrEmpty(intent.stream) ? "chance" : intent.stream).NextDouble();
+            return !intent.cancelled && roll < intent.probability;
+        }
+
         public ActionRecord Do(GameAction action) => Session.Do(action);
 
+        // 쓰기 직전에 의도 '사용'(UseIntent)을 거친다 — 가로채기가 횟수를 바꾸거나(두 번 발동) 막는다.
         // 능력(DB › 능력)을 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열).
         public ActionRecord Use(string ability, object user, params object[] targets) =>
             Session.Do(new UseAbility
@@ -35,6 +50,20 @@ namespace GBible
                 user = user as string ?? IdOf(user),
                 targets = (targets ?? Array.Empty<object>()).Select(t => t as string ?? IdOf(t)).ToList(),
             });
+
+        // 쓸 수 있으면 쓰고 참, 사용 조건이 안 맞으면 아무것도 하지 않고 거짓(실패를 던지지 않는다).
+        // 조커·참·보드 유닛을 차례로 돌며 "되는 것만 발동"할 때. 조건을 한 번만 검사한다(확률 조건도 한 번 굴린다).
+        public bool TryUse(string ability, object user, params object[] targets)
+        {
+            var action = new UseAbility
+            {
+                ability = ability, quiet = true,
+                user = user as string ?? IdOf(user),
+                targets = (targets ?? Array.Empty<object>()).Select(t => t as string ?? IdOf(t)).ToList(),
+            };
+            Session.Do(action);
+            return action.used;
+        }
 
         // 지금 쓸 수 있는지(능력·사용 아이템의 트리거 = 사용 조건만 본다. 아무것도 바꾸지 않는다). 버튼을 미리 흐리게 할 때.
         //   if (!Game.CanUse("ability.heal", hero, out var why)) button.tooltip = why;
@@ -53,7 +82,7 @@ namespace GBible
             }
             var who = user is string userId ? Find(userId) : user;
             var picked = (targets ?? Array.Empty<object>()).Select(t => t is string id ? Find(id) : t).Where(t => t != null).ToList();
-            if (Session.Triggers.CanUse(ability, definition.When, who, picked, out _)) return true;
+            if (Session.Triggers.CanUse(ability, definition.When, who, picked, out _, checkOnly: true)) return true;
             reason = UseAbility.CannotUse(definition, Session).Message;
             return false;
         }
@@ -169,6 +198,7 @@ namespace GBible
         // ── 상태 효과 ───────────────────────────────────────────
         // 상태 효과(DB › 상태 효과)를 건다·푼다(행동 안에서). target = 객체 또는 id. 다시 걸 때는 정의의 규칙(중첩·갱신)을 따른다.
         //   Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3);
+        // 걸기 직전에 의도 '상태 효과 걸기'(StatusIntent)를 거친다 — 가로채기가 막으면 null.
         public ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null, double? length = null) => Session.Statuses.Apply(target, statusId, stacks, source, length);
         // 남은 지속 줄이기(쿨다운 −1초 · 남은 턴 −1). 다 되면 지속이 끝난 것으로 끝낸다.
         public bool ShortenStatus(object target, string statusId, double amount) => Session.Statuses.Shorten(target, statusId, amount);
@@ -178,8 +208,11 @@ namespace GBible
         public int StatusStacks(object target, string statusId) => Session.Statuses.Stacks(target, statusId);
         public bool HasStatus(object target, string statusId) => Session.Statuses.Stacks(target, statusId) > 0;
         public IReadOnlyList<ActiveStatus> Statuses(object target) => Session.Statuses.Of(target);
+        // 그 종류(버프·디버프)가 몇 가지 걸려 있나 · 그 종류를 모두 푼다(정화).
+        public int StatusCount(object target, StatusKind kind) => Session.Statuses.CountOfKind(target, kind);
+        public int RemoveStatuses(object target, StatusKind kind) => Session.Statuses.RemoveKind(target, kind);
 
-        // 패시브(DB › 패시브)를 몇 개 가졌나(레벨). holder를 비우면 모든 가진 쪽의 합.
+        // 패시브(DB › 패시브)를 몇 개 가졌나(레벨). holder를 비우면 모든 가진 쪽의 합. 놓인 것마다 패시브면 holder = 그 요소(그 요소의 레벨).
         public int Owned(string passiveId, object holder = null) => Session.Passives.Owned(passiveId, holder);
 
         // ── 예약 ───────────────────────────────────────────────
@@ -283,6 +316,9 @@ namespace GBible
         public ActionRecord Answer(string choiceId, params object[] picked) => Answer(choiceId, (IEnumerable<object>)picked);
 
         public bool CancelChoice(string choiceId) => Session.Choices.Cancel(choiceId);
+        // 다시 뽑기(행동 안에서): '가중치 표에서 고르기'로 만든 선택의 후보를 같은 표에서 새로 뽑는다. 비용·남은 횟수는 부르는 행동이 맡는다.
+        //   class RerollReward : GameAction { public string choice; protected override void Run() { Game.Pay(키, "rerolls", 1); Game.RerollChoice(choice); } }
+        public bool RerollChoice(string choiceId) => Session.Choices.Reroll(choiceId);
 
         // ── 비용 ───────────────────────────────────────────────
         // 비용 내기: 가로채기(CostIntent)를 거친 뒤 모자라면 GameFailure(FailureKeys.NotEnough) → 행동 실패, 바꾼 것 모두 취소. 행동 안에서 부른다.
@@ -293,7 +329,7 @@ namespace GBible
             var cost = Intercept(new CostIntent { key = key, path = path ?? "", amount = amount });
             if (cost.cancelled || cost.amount <= 0) return;
             var have = ReadNumber(cost.key, cost.path);
-            if (have < cost.amount)
+            if (have - cost.amount < cost.floor)
             {
                 // 텍스트 키면 TextKey로 넘겨 실패 글을 볼 때의 언어로 바뀌게 한다.
                 object name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? new TextKey(what) : (object)what;

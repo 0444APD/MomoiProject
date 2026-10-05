@@ -84,6 +84,18 @@ namespace GBible
             return Math.Abs(dx) >= Math.Abs(dy) ? new Cell(Math.Sign(dx), 0) : new Cell(0, Math.Sign(dy));
         }
 
+        // 시계 방향으로 turns번(90°씩) 돌린 상대 좌표(무늬·범위의 회전). Grid 좌표는 y가 위(+)다 — 목록 칸(Placement)은 화면 기준 y 아래(+)라 Placement.Rotate.
+        public static Cell Rotate(Cell offset, int turns)
+        {
+            switch (((turns % 4) + 4) % 4)
+            {
+                case 1: return new Cell(offset.y, -offset.x);
+                case 2: return new Cell(-offset.x, -offset.y);
+                case 3: return new Cell(-offset.y, offset.x);
+                default: return offset;
+            }
+        }
+
         // 이동 범위: 시작 칸에서 budget 이내로 갈 수 있는 칸 → 남은 이동력(시작 칸 포함). cost(칸)이 음수면 못 들어간다.
         public static Dictionary<Cell, int> Reachable(Cell start, int budget, Func<Cell, int> cost, bool diagonal = false)
         {

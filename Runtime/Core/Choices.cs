@@ -48,6 +48,10 @@ namespace GBible
         public int min = 1;
         public int max = 1;
         public GameAction then;
+        // '가중치 표에서 고르기'로 만든 선택이면 그 표·후보 수(다시 뽑기 Game.RerollChoice가 쓴다). 비어 있으면 다시 뽑을 수 없다.
+        public string table = "";
+        public int count;
+        public bool unique;
     }
 
     [Serializable]
@@ -100,6 +104,38 @@ namespace GBible
             _session.Data.Modify<ChoiceList>(Key, l => l.items.Add(choice));
             _session.Events.Publish(new ChoiceRequested { choice = choice.id, prompt = choice.prompt, player = choice.player });
             return choice.id;
+        }
+
+        // 다시 뽑기: '가중치 표에서 고르기'로 만든 선택의 후보를 같은 표에서 새로 뽑는다(행동 안에서). 비용·횟수는 부르는 행동이 정한다.
+        // 화면은 ChoiceRequested를 다시 받아 후보를 새로 그린다. 표로 만든 선택이 아니면 거짓.
+        public bool Reroll(string id)
+        {
+            var choice = Items().FirstOrDefault(c => c.id == id);
+            if (choice == null || string.IsNullOrEmpty(choice.table)) return false;
+            var options = _session.Game.Roll(choice.table, Math.Max(1, choice.count), choice.unique)
+                .Where(o => !string.IsNullOrEmpty(o)).Distinct().Select(o => new ChoiceCandidate(o, Texts.NameOf(o))).ToList();
+            if (options.Count == 0) return false;
+            _session.Data.Modify<ChoiceList>(Key, _ =>
+            {
+                choice.options = options;
+                choice.min = Math.Min(choice.min, options.Count);
+                choice.max = Math.Max(Math.Max(choice.min, 1), Math.Min(choice.max, options.Count));
+            });
+            _session.Events.Publish(new ChoiceRequested { choice = choice.id, prompt = choice.prompt, player = choice.player });
+            return true;
+        }
+
+        // 표로 만든 선택이라고 적어 둔다(다시 뽑기용).
+        public void MarkTable(string id, string table, int count, bool unique)
+        {
+            var choice = Items().FirstOrDefault(c => c.id == id);
+            if (choice == null) return;
+            _session.Data.Modify<ChoiceList>(Key, _ =>
+            {
+                choice.table = table ?? "";
+                choice.count = count;
+                choice.unique = unique;
+            });
         }
 
         public PendingChoice Current => Items().FirstOrDefault();

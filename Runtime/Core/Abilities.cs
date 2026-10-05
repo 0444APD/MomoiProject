@@ -160,6 +160,17 @@ namespace GBible
         public IEnumerable<AbilityDefinition> All => _definitions.Values;
     }
 
+    // 기본 제공 의도: 사용(Game.Use·Game.TryUse). 결과를 내기 직전에 거친다.
+    //   두 번 발동(재발동·광란·추가 발동): times 더하기 1 · 봉인·침묵: 막기. 조건은 의도 조건(ability·userId)으로 거른다.
+    [Serializable, Intent("사용")]
+    public sealed class UseIntent
+    {
+        public string ability;   // 능력·사용 아이템 ID
+        public string userId;    // 사용자 id
+        public int times = 1;    // 결과를 몇 번 내나(0이면 내지 않는다)
+        public bool cancelled;   // 참이면 쓰지 않는다
+    }
+
     // 능력 사용 = 행동 하나(데이터: 능력 ID·사용자 id·대상 id들 → 서버 전송·리플레이 가능).
     [Serializable]
     public sealed class UseAbility : GameAction
@@ -177,6 +188,10 @@ namespace GBible
         public string ability;
         public string user;
         public List<string> targets = new List<string>();
+        // 참이면 사용 조건이 안 맞을 때 실패를 던지지 않고 그냥 끝난다(Game.TryUse).
+        public bool quiet;
+        // 실제로 썼나(결과를 냈나). Game.TryUse가 읽는다.
+        [NonSerialized] public bool used;
 
         public override string Describe() => $"능력 사용: {ability}" + (string.IsNullOrEmpty(user) ? "" : $" ({user})");
 
@@ -187,19 +202,29 @@ namespace GBible
             var picked = (targets ?? new List<string>()).Select(game.Find).Where(t => t != null).ToList();
             var triggers = game.Session.Triggers;
             if (!triggers.CanUse(ability, definition.When, game.Find(user), picked, out var moment))
+            {
+                if (quiet) return;
                 throw CannotUse(definition, game.Session);
-            var final = new List<object>();
-            if (definition.Targets.Count > 0 || definition.Effects.Count > 0)
-            {
-                var legacy = new TargetedOutcome();
-                legacy.targets.AddRange(definition.Targets);
-                legacy.effects.AddRange(definition.Effects);
-                final.AddRange(legacy.Apply(moment, definition));
             }
-            foreach (var outcome in definition.Outcomes)
+            // 의도 '사용': 가로채기가 횟수를 바꾸거나 막는다(막히면 아무 일도 없이 끝난다).
+            var use = game.Intercept(new UseIntent { ability = ability, userId = user ?? "", times = 1 });
+            if (use.cancelled || use.times <= 0) return;
+            used = true;
+            var final = new List<object>();
+            for (int time = 0; time < use.times; time++)
             {
-                if (outcome is TargetedOutcome targeted) final.AddRange(targeted.Apply(moment, definition));
-                else if (outcome != null) triggers.RunOutcomes(new[] { outcome }, moment, "Abilities");
+                if (definition.Targets.Count > 0 || definition.Effects.Count > 0)
+                {
+                    var legacy = new TargetedOutcome();
+                    legacy.targets.AddRange(definition.Targets);
+                    legacy.effects.AddRange(definition.Effects);
+                    final.AddRange(legacy.Apply(moment, definition));
+                }
+                foreach (var outcome in definition.Outcomes)
+                {
+                    if (outcome is TargetedOutcome targeted) final.AddRange(targeted.Apply(moment, definition));
+                    else if (outcome != null) triggers.RunOutcomes(new[] { outcome }, moment, "Abilities");
+                }
             }
             final = final.Distinct().ToList();
             game.Events.Publish(new AbilityUsed
@@ -207,6 +232,7 @@ namespace GBible
                 Ability = ability,
                 User = user,
                 Targets = final.Select(t => GameApi.IdOf(t)).ToList(),
+                Times = use.times,
             });
         }
     }
@@ -217,6 +243,7 @@ namespace GBible
         public string Ability;
         public string User;
         public List<string> Targets = new List<string>();
+        public int Times = 1;   // 결과를 낸 횟수(의도 '사용'이 바꾼 것)
         public int TargetCount => Targets.Count;
     }
 }

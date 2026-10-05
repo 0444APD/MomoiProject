@@ -124,6 +124,7 @@ namespace GBible
         [FieldLabel("안내 글")] public string prompt = "";
         [DataRef(typeof(WeightTableData)), FieldLabel("가중치 표")] public string table = "";
         [FieldLabel("후보 수")] public int count = 3;
+        [FieldLabel("후보 수에 더할 숫자(플레이어 데이터)"), Tooltip("비우면 더하지 않습니다. 예: run › rewardBonus(유물 '선택지 +1'이 올린다)")] public PlayerDataNumberRef countBonus = new PlayerDataNumberRef();
         [FieldLabel("서로 다른 것만")] public bool unique = true;
         [FieldLabel("최소 개수"), Tooltip("0이면 고르지 않고 넘길 수 있습니다(건너뛰기)")] public int min = 1;
         [FieldLabel("최대 개수")] public int max = 1;
@@ -136,14 +137,17 @@ namespace GBible
         public override void Run(TriggerContext context)
         {
             var game = context.Game;
-            var options = game.Roll(table, Math.Max(1, count), unique).Select(id => new ChoiceCandidate(id, Texts.NameOf(id)));
+            var total = Math.Max(1, count + (int)Math.Round(countBonus?.Read(game.Session) ?? 0));
+            var options = game.Roll(table, total, unique).Select(id => new ChoiceCandidate(id, Texts.NameOf(id)));
             var user = context.User != null && GameApi.HasId(context.User.GetType()) ? GameApi.IdOf(context.User) : "";
             var next = new ChoiceEffectsRun
             {
                 owner = context.Owner ?? "", user = user, ids = true, key = key ?? "", path = path ?? "",
                 then = (List<Outcome>)DataModel.Clone(then.Where(o => o != null).ToList(), null),
             };
-            game.Session.Choices.Ask(prompt, options, next, min, max, source: context.Owner);
+            var choice = game.Session.Choices.Ask(prompt, options, next, min, max, source: context.Owner);
+            // 다시 뽑기(Game.RerollChoice)가 같은 표·후보 수로 새로 뽑게 적어 둔다.
+            if (choice != null) game.Session.Choices.MarkTable(choice, table, total, unique);
         }
 
         public override string Describe(INameResolver names)

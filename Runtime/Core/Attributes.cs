@@ -71,11 +71,15 @@ namespace GBible
         }
 
         // 최종값. entity는 객체 또는 id. 숫자 필드가 없으면 0.
+        // 패시브의 '가진 동안 능력치 보정'도 더한다(저장하지 않고 읽을 때 계산 — 얻고 잃는 순간을 따로 다루지 않는다).
         public double Get(object entity, string attribute)
         {
             var target = Resolve(entity, out var id);
             var value = BaseOf(target, attribute);
-            return Apply(value, Of(id, attribute));
+            var stored = StoredOf(id, attribute);
+            var passives = _session.Passives;
+            if (passives == null || !passives.HasModifiers(attribute)) return Apply(value, stored);
+            return Apply(value, stored.Concat(passives.ModifiersFor(target, id, attribute)));
         }
 
         // 기본값에 Modifier들을 적용한 값(같은 칸 합, 칸끼리 곱).
@@ -118,12 +122,23 @@ namespace GBible
 
         public bool Remove(string modifierId) => RemoveWhere(m => m.id == modifierId) > 0;
 
-        // 대상의 Modifier들(필드를 주면 그 필드 것만).
+        // 대상의 Modifier들(필드를 주면 그 필드 것만). 패시브의 '가진 동안 능력치 보정'도 같은 모양으로 들어 있다(source = 패시브 ID).
         public IReadOnlyList<Modifier> Of(object entity, string attribute = null)
         {
             string id;
+            object target = entity;
             if (entity is string text) id = text;
             else Resolve(entity, out id);
+            var stored = StoredOf(id, attribute);
+            var passives = _session.Passives;
+            if (passives == null || !passives.HasModifiers(attribute) || string.IsNullOrEmpty(id)) return stored;
+            if (entity is string) target = _session.Game.Find(id);
+            var extra = passives.ModifiersFor(target, id, attribute).ToList();
+            return extra.Count == 0 ? stored : stored.Concat(extra).ToList();
+        }
+
+        IReadOnlyList<Modifier> StoredOf(string id, string attribute)
+        {
             if (string.IsNullOrEmpty(id)) return Array.Empty<Modifier>();
             BuildIndex();
             if (attribute != null) return _index.TryGetValue((id, attribute), out var list) ? list : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();

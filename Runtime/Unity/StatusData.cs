@@ -14,6 +14,7 @@ namespace GBible.Data
     [CreateAssetMenu(menuName = "MomoiProject/상태 효과", fileName = "NewStatus")]
     public sealed class StatusData : GameData
     {
+        [FieldLabel("종류"), Tooltip("버프·디버프. 디버프만 풀기(정화)·디버프 개수·'상태 효과 걸기' 가로채기의 종류 조건에 쓰입니다")] public StatusKind kind;
         [FieldLabel("최대 중첩"), Tooltip("0이면 제한 없음")] public int maxStacks = 1;
         [FieldLabel("다시 걸 때")] public StatusReapply reapply = StatusReapply.AddStacksAndRefresh;
         [FieldLabel("지속")] public StatusDurationSettings duration = new StatusDurationSettings();
@@ -38,7 +39,7 @@ namespace GBible.Data
             {
                 Id = Id, DisplayName = DisplayName, MaxStacks = Math.Max(0, maxStacks), Reapply = reapply,
                 Duration = duration.kind, Length = duration.length, TickEvent = duration.tickEvent, TickHolderField = duration.holderField,
-                When = trigger, HolderField = holderField, Pulse = Math.Max(0, pulse), Hidden = hidden,
+                When = trigger, HolderField = holderField, Pulse = Math.Max(0, pulse), Hidden = hidden, Kind = kind,
             };
             definition.Modifiers.AddRange(modifiers.Where(m => m != null && !string.IsNullOrEmpty(m.attribute)));
             definition.Outcomes.AddRange(BoundOutcomes.Has(Id) ? BoundOutcomes.Create(Id) : outcomes.Where(o => o != null));
@@ -141,6 +142,7 @@ namespace GBible
     }
 
     // 조건 '상태 효과 검사': 사용자(가진 쪽)나 이벤트의 개체에 그 상태 효과가 몇 중첩 걸려 있나.
+    //   상태 효과를 비우고 종류를 고르면 그 종류(디버프 …)가 몇 가지 걸려 있나.
     //   쿨다운: 능력의 사용 조건 = '사용자·가진 쪽에게 fireballCd <= 0'(없을 때만), 결과에 '상태 효과 걸기(fireballCd, 지속 3턴)'.
     [Serializable]
     [BlockInfo("상태 효과 검사", Category = "상태 효과", Description = "사용자(가진 쪽) 또는 이벤트의 개체에 상태 효과가 몇 중첩 걸려 있는지 봅니다. 없을 때만 = '<= 0'. 쿨다운: 사용 조건에 '쿨다운 상태 효과 <= 0'.",
@@ -149,14 +151,15 @@ namespace GBible
     {
         [FieldLabel("누구")] public StatusSubject who = StatusSubject.User;
         [FieldLabel("이벤트 필드(id)"), ShowIf(nameof(who), StatusSubject.EventField)] public string eventField = "";
-        [DataRef(typeof(StatusData)), FieldLabel("상태 효과")] public string status = "";
+        [DataRef(typeof(StatusData)), FieldLabel("상태 효과"), Tooltip("비우고 종류를 고르면 그 종류가 몇 가지 걸려 있나")] public string status = "";
+        [FieldLabel("종류(상태 효과를 비웠을 때)")] public StatusKind kind;
         [FieldLabel("비교")] public CompareOp op = CompareOp.AtLeast;
-        [FieldLabel("중첩")] public int stacks = 1;
+        [FieldLabel("중첩(종류면 가짓수)")] public int stacks = 1;
 
         protected override bool Check()
         {
             var target = who == StatusSubject.User ? Context?.User : FromEvent();
-            var have = target == null || string.IsNullOrEmpty(status) ? 0 : Game.StatusStacks(target, status);
+            var have = target == null ? 0 : !string.IsNullOrEmpty(status) ? Game.StatusStacks(target, status) : kind != StatusKind.None ? Game.StatusCount(target, kind) : 0;
             switch (op)
             {
                 case CompareOp.AtLeast: return have >= stacks;
@@ -179,31 +182,38 @@ namespace GBible
         {
             var whom = who == StatusSubject.User ? "사용자" : $"이벤트의 {eventField}";
             var symbol = op == CompareOp.AtLeast ? ">=" : op == CompareOp.AtMost ? "<=" : op == CompareOp.GreaterThan ? ">" : op == CompareOp.LessThan ? "<" : "==";
-            return $"{whom}의 {status} {symbol} {stacks}";
+            return $"{whom}의 {(string.IsNullOrEmpty(status) ? KindName(kind) : status)} {symbol} {stacks}";
         }
 
         public override void Validate(IValidationContext context)
         {
-            if (string.IsNullOrEmpty(status)) context.Error("상태 효과 검사: 상태 효과를 고르세요.");
+            if (string.IsNullOrEmpty(status) && kind == StatusKind.None) context.Error("상태 효과 검사: 상태 효과나 종류를 고르세요.");
             if (who == StatusSubject.EventField && string.IsNullOrEmpty(eventField)) context.Error("상태 효과 검사: 이벤트 필드를 적으세요.");
         }
+
+        internal static string KindName(StatusKind kind) => kind == StatusKind.Buff ? "버프" : kind == StatusKind.Debuff ? "디버프" : "종류 없음";
     }
 
     // 효과 '상태 효과 풀기': 대상의 상태 효과를 푼다(중첩을 적으면 그만큼만 줄인다). 끝날 때 결과는 돌지 않는다.
     [Serializable]
-    [BlockInfo("상태 효과 풀기", Category = "상태 효과", Description = "대상의 상태 효과를 풉니다. 중첩을 적으면 그만큼만 줄이고, 0이면 통째로 풉니다. 끝날 때 결과는 돌지 않습니다.")]
+    [BlockInfo("상태 효과 풀기", Category = "상태 효과", Description = "대상의 상태 효과를 풉니다. 중첩을 적으면 그만큼만 줄이고, 0이면 통째로 풉니다. 끝날 때 결과는 돌지 않습니다. 상태 효과를 비우고 종류를 고르면 그 종류(디버프 …)를 모두 풉니다(정화).")]
     public sealed class RemoveStatusEffect : Effect
     {
         [DataRef(typeof(StatusData)), FieldLabel("상태 효과")] public string status = "";
+        [FieldLabel("종류 전부(상태 효과를 비웠을 때)")] public StatusKind kind;
         [FieldLabel("중첩(0이면 모두)")] public int stacks;
 
-        protected override void Apply(object target) => Game.RemoveStatus(target, status, stacks);
+        protected override void Apply(object target)
+        {
+            if (!string.IsNullOrEmpty(status)) Game.RemoveStatus(target, status, stacks);
+            else if (kind != StatusKind.None) Game.RemoveStatuses(target, kind);
+        }
 
-        public override string Describe() => stacks <= 0 ? $"{status} 풀기" : $"{status} {stacks}중첩 풀기";
+        public override string Describe() => string.IsNullOrEmpty(status) ? $"{StatusCondition.KindName(kind)} 모두 풀기" : stacks <= 0 ? $"{status} 풀기" : $"{status} {stacks}중첩 풀기";
 
         public override void Validate(IValidationContext context)
         {
-            if (string.IsNullOrEmpty(status)) context.Error("상태 효과 풀기: 상태 효과를 고르세요.");
+            if (string.IsNullOrEmpty(status) && kind == StatusKind.None) context.Error("상태 효과 풀기: 상태 효과나 종류를 고르세요.");
         }
     }
 }

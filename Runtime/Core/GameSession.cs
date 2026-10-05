@@ -484,9 +484,11 @@ namespace GBible
         }
 
         // 새 판: 세션 구역을 등록할 때의 값으로 되돌리고 Undo 이력을 비운다(프로필은 그대로).
-        public void NewRun()
+        // seed를 주면 난수를 그 시드로 다시 맞춘다(시드 입력·일일 도전: 같은 시드면 같은 판). 글자 시드는 RandomStreams.SeedOf.
+        public void NewRun(ulong? seed = null)
         {
             Data.ResetZone(DataZone.Session);
+            if (seed.HasValue) Random.Reseed(seed.Value);
             ClearUndo();
             Journal.Append(JournalKind.System, "Session", "새 판 시작");
         }

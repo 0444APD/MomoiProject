@@ -16,6 +16,8 @@ namespace GBible
     // 그 이벤트를 받는 도중에 새로 걸린 상태 효과는 그 이벤트를 세지 않는다(턴 끝에 건 "2턴"은 다음 턴 끝부터 센다).
     // 주기(Pulse, 초): 걸려 있는 동안 N초(게임 시간)마다 결과를 낸다(실시간 지속 피해·재생). 이벤트 트리거와 같은 결과 칸을 쓴다.
     // 걸릴 때·끝날 때 이벤트 StatusApplied·StatusEnded를 쏜다(화면 아이콘·다른 규칙이 받는다). 시간으로 끝날 때는 보정을 떼고 → 끝날 때 결과 → StatusEnded 순.
+    // 걸기 직전에 의도 '상태 효과 걸기'(StatusIntent)를 거친다: 가로채기가 상태 효과를 바꾸고(화상 → 푸른 화상)·중첩·길이를 고치고(독 ×2·디버프 지속 +)·막는다(면역).
+    // 종류(버프·디버프): 디버프만 풀기·디버프 개수·디버프 지속 늘리기처럼 묶어서 다룰 때.
     // 모두 플레이어 데이터라 Undo·저장·멀티 그대로다. 가진 쪽이 데이터에서 사라지면 그 상태 효과도 정리된다.
     public enum StatusReapply
     {
@@ -53,6 +55,36 @@ namespace GBible
         Seconds,
     }
 
+    public enum StatusKind
+    {
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("없음")]
+#endif
+        None,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("버프")]
+#endif
+        Buff,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("디버프")]
+#endif
+        Debuff,
+    }
+
+    // 기본 제공 의도: 상태 효과 걸기(Game.ApplyStatus·효과 '상태 효과 걸기'가 걸기 직전에 거친다).
+    //   화상 → 푸른 화상: statusId 값으로 바꾸기 blueBurn · 독 중첩 2배: stacks 곱하기 2 · 디버프 지속 +20%: length 곱하기 1.2 · 면역: 막기.
+    [Serializable, Intent("상태 효과 걸기")]
+    public sealed class StatusIntent
+    {
+        public string targetId;    // 걸릴 대상 id
+        public string statusId;    // 상태 효과 ID(바꾸면 그 상태 효과가 걸린다)
+        public int stacks;         // 걸 중첩
+        public double length;      // 지속 길이(이벤트 횟수·초, 처음에는 그 상태 효과의 길이)
+        public string sourceId;    // 건 쪽(항목 ID·개체 id)
+        public StatusKind kind;    // 그 상태 효과의 종류(버프·디버프)
+        public bool cancelled;     // 참이면 걸지 않는다
+    }
+
     [Serializable]
     public sealed class StatusModifier
     {
@@ -79,6 +111,7 @@ namespace GBible
         public readonly List<Outcome> OnExpire = new List<Outcome>();
         public double Pulse;                        // 0보다 크면 걸려 있는 동안 이 초(게임 시간)마다 Outcomes를 낸다
         public bool Hidden;                         // 화면에 보이지 않는 상태 효과(쿨다운·표시용 아닌 규칙)
+        public StatusKind Kind;                     // 버프·디버프(묶어서 풀기·세기·가로채기 조건)
     }
 
     // 상태 효과가 걸렸을 때(처음·다시 걸 때 모두, stacks = 걸린 뒤의 중첩).
@@ -155,6 +188,34 @@ namespace GBible
             var definition = Find(statusId) ?? throw new InvalidOperationException($"[MomoiProject] 없는 상태 효과 '{statusId}'입니다.");
             var holder = Resolve(target, out var targetId);
             if (string.IsNullOrEmpty(targetId)) throw new InvalidOperationException("[MomoiProject] 상태 효과를 걸 대상의 id가 없습니다.");
+            // 의도 '상태 효과 걸기': 가로채기가 바꾸거나 막는다. 막히면 null.
+            var intent = _session.Game.Intercept(new StatusIntent
+            {
+                targetId = targetId, statusId = statusId, stacks = Math.Max(1, stacks), length = length ?? definition.Length,
+                sourceId = source ?? "", kind = definition.Kind,
+            });
+            if (intent.cancelled || intent.stacks <= 0) return null;
+            if (intent.statusId != statusId)
+            {
+                var changed = Find(intent.statusId) ?? throw new InvalidOperationException($"[MomoiProject] 가로채기가 바꾼 상태 효과 '{intent.statusId}'가 없습니다.");
+                // 길이를 따로 정하지 않았으면 바뀐 상태 효과의 길이로.
+                if (!length.HasValue && intent.length == definition.Length) intent.length = changed.Length;
+                definition = changed;
+                statusId = changed.Id;
+            }
+            if (intent.targetId != targetId)
+            {
+                holder = _session.Game.Find(intent.targetId);
+                if (holder == null)
+                {
+                    _session.Journal.Append(JournalKind.Warning, "Status", $"상태 효과 걸기: 가로채기가 바꾼 대상 '{intent.targetId}'를 찾지 못해 걸지 않았습니다.");
+                    return null;
+                }
+                targetId = intent.targetId;
+            }
+            stacks = intent.stacks;
+            length = intent.length;
+            source = intent.sourceId;
             stacks = Math.Max(1, stacks);
             var list = Ensure();
             var existing = list.items.FirstOrDefault(s => s.target == targetId && s.status == statusId);
@@ -218,6 +279,23 @@ namespace GBible
         {
             Resolve(target, out var targetId);
             return Current().FirstOrDefault(s => s.target == targetId && s.status == statusId)?.stacks ?? 0;
+        }
+
+        // 대상에 걸린 그 종류(버프·디버프)의 상태 효과 수(중첩이 아니라 가짓수).
+        public int CountOfKind(object target, StatusKind kind)
+        {
+            Resolve(target, out var targetId);
+            return Current().Count(s => s.target == targetId && Find(s.status)?.Kind == kind);
+        }
+
+        // 대상에 걸린 그 종류의 상태 효과를 모두 푼다(정화). 푼 가짓수.
+        public int RemoveKind(object target, StatusKind kind)
+        {
+            Resolve(target, out var targetId);
+            var removed = 0;
+            foreach (var active in Current().Where(s => s.target == targetId && Find(s.status)?.Kind == kind).ToList())
+                if (Remove(target, active.status)) removed++;
+            return removed;
         }
 
         public IReadOnlyList<ActiveStatus> Of(object target)
