@@ -120,7 +120,7 @@
 ## 단계 6. 예전부터 남은 확인
 
 **에디터 기본**
-- EditMode 테스트(Window › General › Test Runner): 전체 통과. 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`, `MirrorTests`(모든 생성 코드가 실행 가능, 생성된 읽기·쓰기로 멤버를 다룸), `SavedIdRenameTests`, 새 테스트(`AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`). PlayMode 샘플 테스트 3개는 메뉴 `Tests › 샘플 › 샘플 데이터 만들기` 뒤에.
+- EditMode 테스트(Window › General › Test Runner): 전체 통과. 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`, `MirrorTests`(모든 생성 코드가 실행 가능, 생성된 읽기·쓰기로 멤버를 다룸), `SavedIdRenameTests`, 새 테스트(`AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`·`GimmickPartsTests`·`GimmickTrialTests`), 다이얼로그 `DialogueRunnerTests`(새 줄: 신호를 받은 쪽이 다른 다이얼로그를 열면 그쪽이 이어 간다 — Unity 안에서만 돈다). PlayMode 샘플 테스트 3개는 메뉴 `Tests › 샘플 › 샘플 데이터 만들기` 뒤에.
 - 저장 후 멈춤("Hold on") 재현 여부: 클래스를 만들고 필드 2개를 더한 뒤 저장.
 - Mirror: 플레이 중 플레이어 데이터(클래스)의 필드를 게임 코드에서 바꾸면 타임라인에 `경로  옛 값 → 새 값`으로 남고 Undo로 돌아간다. "예전 방식(리플렉션)으로 비교합니다" 경고가 뜨면 그 클래스에 [Serializable]이 빠진 것. "읽기 코드가 없어 리플렉션으로 읽습니다"도 같다.
 - 공유 객체: 플레이어 데이터 안에서 같은 객체를 두 곳에 넣고(장착 칸 = 인벤토리 안의 아이템) 고치면 기록이 한 번만 남고 Undo가 맞다.

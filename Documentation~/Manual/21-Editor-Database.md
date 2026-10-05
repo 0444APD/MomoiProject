@@ -467,8 +467,8 @@ public class Item
 
 | 탭 | 그룹 · ID 앞부분 | 항목 하나 | ID 상수 | 자세히 |
 |---|---|---|---|---|
-| 상태 효과 | DB · `status` | 버프·디버프 하나(중첩·지속·능력치 보정·걸려 있는 동안 트리거·**주기(초)**·결과·걸릴 때·끝날 때 결과·**아이콘**·**화면에 숨김**) | `GameIds.Status.X` | 29장 3-1 |
-| 패시브 | DB · `passive` | "가지고 있으면 발동" 하나(가진 목록(플레이어 데이터 › 필드) · 발동 · 가진 쪽 필드 · 결과 · 아이콘) | `GameIds.Passive.X` | 17장 0-2 |
+| 상태 효과 | DB · `status` | 버프·디버프 하나(`kind` 종류·중첩·지속·능력치 보정·걸려 있는 동안 트리거·**주기(초)**·결과·걸릴 때·끝날 때 결과·`silencesPassives` 걸린 쪽의 패시브를 끔·**아이콘**·**화면에 숨김**) | `GameIds.Status.X` | 29장 3-1 |
+| 패시브 | DB · `passive` | "가지고 있으면 발동" 하나(가진 목록(플레이어 데이터 › 필드) · `matchField` 일치 필드 · `matchVia` 원본에서 읽기 · `perElement` 놓인 것마다 · `levelField` 레벨 필드 · 발동 · 가진 쪽 필드 · 결과 · `rules` 발동 더 · `pulse` 주기 · `modifiers` 가진 동안 능력치 보정(`modifierTarget` 받을 대상 · `modifierWhen` 보정 조건 · `stacking` 여럿일 때) · 아이콘) | `GameIds.Passive.X` | 17장 0-2 |
 | 밸런스 값 | DB · `balance` | 이름 붙은 숫자 하나(값 · 곡선 · 메모). 플레이 중에 고치면 저장 전이라도 0.5초 안에 게임에 반영된다 | `GameIds.Balance.X` | 30장 3-1 |
 | 가중치 표 | DB · `table` | 확률로 뽑는 표 하나(항목 · 무게(또는 **무게를 밸런스 값에서** + **단계(플레이어 데이터)·단계 필드**) · 개수 · 조건 · 꽝 무게 · 뺄 목록). 플레이 중 반영도 같다 | `GameIds.WeightTable.X` | 30장 3-2 |
 | 화면 | DB · `screen` | UI Toolkit 화면 하나(UXML · 더할 USS · 목록 칸 UXML · 층 · 아래 입력 막기 · 뒤로로 닫기 · 시간 멈춤 · 열 씬 · 게임이 켜지면 열기) | `GameIds.Screen.X` | 35장 3-3 |
