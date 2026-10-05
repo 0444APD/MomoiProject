@@ -257,6 +257,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - 통계: 로그 → Steam 통계 표에 (로그 · Steam 이름 · 정수)를 적는다.
 > - 저장 동기화: 코드 없이 Steamworks › Steam Cloud의 Auto-Cloud에 `WinAppDataLocalLow` › `<회사>/<제품>/MomoiProject`, 패턴 `*.json`, 하위 폴더까지, 제외 `settings.json`(매뉴얼 [34장](../Manual/34-Steam.md) 5-5).
 > - 출시 빌드를 exe로 바로 켜면 Steam이 다시 켜 준다(DB › Steam의 '다시 시작'). Steam이 꺼져 있으면 경고 하나를 남기고 Steam 없이 돈다.
+> - 리더보드·친구 초대(로비 초대)·멀티플레이 네트워킹은 아직 없다(매뉴얼 [34장](../Manual/34-Steam.md) 4절).
 
 > [!note]- 출시 상태는 어디에 남나
 > 런타임 데이터 목록(`GameDatabase`)에 저장되어 빌드에 따라간다. 개발 중에 바꾼 ID는 이력이 없으므로, 출시 전의 저장(개발자 PC의 저장)은 이어받지 않는다. 플레이어에게 나간 저장만 지키면 되므로 문제 없다.

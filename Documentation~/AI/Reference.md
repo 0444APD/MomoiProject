@@ -162,7 +162,7 @@ GBible.Unity
 | 되감기("이번 턴 처음으로") | `session.HistoryMark`·`UndoTo(지점)`(행동 단위 Undo) | 02 |
 | 세이브 슬롯 1·2·3 | `GBibleRuntime.UseSlot(이름)`·`SlotInfoOf`·`DeleteSlot`·`CopySlot`·`SlotSummary`(한 줄 요약 함수), 기본 슬롯 화면 | 31·35 |
 | 키 바꾸기 | 선택 기능 입력: `GameInput.Use(actions)`·`Rebind`·`ResetBindings`·`BindingText` | 31 |
-| Steam | 선택 기능 Steam + DB › Steam(App ID): 자동 초기화·도전과제·로그 → 통계·`GameSteam.SetPresence`·Cloud(Auto-Cloud 안내). 리더보드·친구 초대는 없다(필요하면 프로젝트가 Steamworks.NET을 직접) | 34 |
+| Steam | 선택 기능 Steam + DB › Steam(App ID): 자동 초기화·도전과제·로그 → 통계·`GameSteam.SetPresence`·Cloud(Auto-Cloud 안내). 리더보드·친구 초대는 없다(필요하면 질문) | 34 |
 
 ---
 
