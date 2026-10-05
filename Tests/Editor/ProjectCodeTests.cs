@@ -10,12 +10,11 @@ namespace GBible.Tests
     public sealed class ProjectCodeTests
     {
         [Test]
-        public void 라이브러리_유니티_플러그인은_빠지고_샘플은_내_코드다()
+        public void 라이브러리_유니티_플러그인은_내_코드가_아니다()
         {
             var assemblies = ProjectCode.Assemblies;
             Assert.IsFalse(assemblies["GBible.Core"].included);
             Assert.IsFalse(assemblies["GBible.Unity"].included);
-            if (assemblies.TryGetValue("GBible.Samples", out var samples)) Assert.IsTrue(samples.included, "샘플은 사용자 코드의 예시");
             foreach (var pair in assemblies.Where(p => p.Key.StartsWith("Unity", StringComparison.Ordinal) || p.Key.EndsWith("-firstpass", StringComparison.Ordinal)))
                 Assert.IsFalse(pair.Value.included, pair.Key);
             Debug.Log("[내 코드 범위] " + string.Join(", ", assemblies.Select(p => $"{p.Key}={(p.Value.included ? "O" : "X:" + p.Value.reason)}")));

@@ -152,10 +152,6 @@ namespace GBible.Tests
             var monitor = ScriptableObject.CreateInstance<MonitorWindow>();
             Assert.DoesNotThrow(() => monitor.Build(new VisualElement()));
             Object.DestroyImmediate(monitor);
-
-            var showcase = ScriptableObject.CreateInstance<ShowcaseWindow>();
-            Assert.DoesNotThrow(() => showcase.Build(new VisualElement()));
-            Object.DestroyImmediate(showcase);
         }
 
         [Test]

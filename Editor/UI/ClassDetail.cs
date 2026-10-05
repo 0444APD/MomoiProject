@@ -10,7 +10,7 @@ using UnityEngine.UIElements;
 namespace GBible.EditorTools.UI
 {
     // 클래스 상세(상세 창의 탭): 코드로 정의한 클래스의 결과를 확인한다(읽기 전용, 클래스는 코드에서 고친다).
-    //  · 필드마다 이름·형식·연결된 키워드 그룹. 형식이 다른 클래스면 그 클래스로 바로 이동.
+    //  · 필드마다 이름·형식·연결된 키워드 그룹·[Hide]·[ShowIf](모두 코드가 원본, 보기만). 형식이 다른 클래스면 그 클래스로 바로 이동.
     //  · 스크립트(cs) 열기·프로젝트 창에서 보기.
     //  · 코드가 아닌 에디터 설정(스프라이트 규격 그룹, 필수 여부)은 여기서 정하고 DB 저장(Ctrl+S) 때 쓴다.
     public static class ClassDetail
@@ -59,7 +59,7 @@ namespace GBible.EditorTools.UI
             // ── 머리: 이름·종류·그룹·파일 ──
             var head = Gs.Row();
             head.Add(Gs.Label(entry.Name, "gs-title"));
-            var kind = new GsBadge(ClassStaging.KindText(entry.Kind.ToString()) + (string.IsNullOrEmpty(entry.Label) || entry.Label == entry.Name ? "" : $" · {entry.Label}"), Gs.PaletteFor("kind:" + entry.Kind));
+            var kind = new GsBadge(KindText(entry.Kind) +(string.IsNullOrEmpty(entry.Label) || entry.Label == entry.Name ? "" : $" · {entry.Label}"), Gs.PaletteFor("kind:" + entry.Kind));
             kind.style.marginLeft = 10;
             head.Add(kind);
             if (entry.Locked) head.Add(Badge("시스템", Gs.PaletteFor("locked")));
@@ -116,6 +116,9 @@ namespace GBible.EditorTools.UI
             return scroll;
         }
 
+        static string KindText(ClassKind kind) =>
+            kind == ClassKind.Codex ? "DB 종류" : kind == ClassKind.Event ? "이벤트" : "데이터 클래스";
+
         static GsBadge Badge(string text, Color color)
         {
             var badge = new GsBadge(text, color);
@@ -156,17 +159,11 @@ namespace GBible.EditorTools.UI
             }
             if (links.childCount > 0) row.Add(links);
 
-            // 인스턴스 편집에서 보이기: [Hide](여기서 바꾸면 저장할 때 코드에 쓴다)·[ShowIf](코드에서 정한 조건, 보기만).
+            // 인스턴스 편집에서 보이기: [Hide]·[ShowIf](코드에서 정한 것, 보기만).
             if (entry.Kind == ClassKind.Data && !entry.Locked && info.DeclaringType == entry.Type)
             {
-                var hidden = new Toggle("인스턴스에서 숨김  [Hide]") { value = InstanceFields.IsHidden(info) };
-                hidden.style.marginTop = 6;
-                hidden.tooltip = "DB › 인스턴스에서 이 필드를 보이지 않습니다(값은 그대로 저장·복사). 저장(Ctrl+S)할 때 코드에 [Hide]를 붙이거나 뗍니다.";
-                hidden.RegisterValueChangedCallback(e => ClassStaging.SetFieldAttribute(entry.FullName, info.Name, InstanceFields.Hide, e.newValue));
-                // [Hide]는 코드를 고친다 → 구조 편집에서만(EditorPolicy).
-                hidden.SetEnabled(EditorPolicy.CanEditStructure);
-                if (!EditorPolicy.CanEditStructure) hidden.tooltip += "\n" + EditorPolicy.LockedTip;
-                row.Add(hidden);
+                if (InstanceFields.IsHidden(info))
+                    row.Add(Caption("DB › 인스턴스에서 보이지 않는 필드입니다(값은 그대로 저장·복사).  [Hide]"));
                 var showIf = info.GetCustomAttribute<ShowIfAttribute>(true);
                 if (showIf != null)
                     row.Add(Caption(showIf.Describe() + "  [ShowIf]"));
@@ -182,12 +179,8 @@ namespace GBible.EditorTools.UI
                 if (group == null) text = rule == null || rule.source == FieldRuleSource.Free || rule.source == FieldRuleSource.Keyword ? "연결 없음(자유 입력)" : rule.source == FieldRuleSource.Data ? "DB 항목에서 고름" : "플레이어 데이터에서 고름";
                 else text = KeywordTools.FindGroup(group)?.DisplayName ?? group;
                 var many = KeywordTools.IsMulti(info) ? "여러 개 고름" : "하나 고름";
-                // 키워드 그룹 연결은 코드에 [Keyword]를 쓴다 → 구조 편집에서만(EditorPolicy).
-                row.Add(LinkRow("키워드 그룹", text, many, group != null, anchor =>
-                {
-                    if (EditorPolicy.CanEditStructure) PickKeywordGroup(host, anchor, declaring, info, group);
-                    else Debug.Log("[MomoiProject] 키워드 그룹 연결은 코드를 고칩니다. " + EditorPolicy.LockedTip);
-                }));
+                // 키워드 그룹 연결은 코드의 [Keyword(typeof(그룹))]다(보기만).
+                row.Add(LinkRow("키워드 그룹", text, many + "  ·  코드의 [Keyword]", group != null, null));
             }
             else if (KeywordTools.IsKeywordField(info) && EditorDatabase.RefTypeOf(info) is Type reference)
             {
@@ -224,7 +217,7 @@ namespace GBible.EditorTools.UI
             return caption;
         }
 
-        // "이름표   [값 ▾]   설명" 한 줄. 값을 누르면 목록이 열린다.
+        // "이름표   [값 ▾]   설명" 한 줄. 값을 누르면 목록이 열린다(pick이 null이면 보기만).
         static VisualElement LinkRow(string label, string value, string hint, bool linked, Action<VisualElement> pick)
         {
             var line = Gs.Row();
@@ -232,12 +225,12 @@ namespace GBible.EditorTools.UI
             var name = Gs.Label(label, "gs-detail__label");
             name.style.width = 130;
             line.Add(name);
-            var box = Gs.Box("gs-inline", "gs-inline--editable");
+            var box = pick != null ? Gs.Box("gs-inline", "gs-inline--editable") : Gs.Box("gs-inline");
             box.style.minWidth = 160;
             var text = Gs.Label(value, "gs-inline__value");
             if (!linked) text.AddToClassList("gs-inline__empty");
             box.Add(text);
-            box.RegisterCallback<ClickEvent>(_ => pick(box));
+            if (pick != null) box.RegisterCallback<ClickEvent>(_ => pick(box));
             line.Add(box);
             var caption = Gs.Label(hint, "gs-caption");
             caption.style.marginLeft = 10;
@@ -246,28 +239,6 @@ namespace GBible.EditorTools.UI
         }
 
         // ── 연결 고르기 ────────────────────────────────────────
-
-        // 키워드 그룹 연결: 코드에 [Keyword(typeof(그룹))]를 쓴다(저장할 때).
-        static void PickKeywordGroup(VisualElement host, VisualElement anchor, Type type, FieldInfo field, string current)
-        {
-            var items = new List<GsDropdownItem>
-            {
-                new GsDropdownItem("연결 없음", () => KeywordTools.Connect(type, field, null)) { Detail = "자유롭게 글자를 입력합니다", Selected = current == null },
-            };
-            foreach (var group in KeywordTools.Groups())
-            {
-                var id = group.Id;
-                items.Add(new GsDropdownItem(group.DisplayName, () => KeywordTools.Connect(type, field, id))
-                {
-                    Group = "키워드 그룹",
-                    Caption = string.Join(" · ", group.Keywords.Take(6).Select(k => k.Id)),
-                    Selected = current == id,
-                });
-            }
-            items.Add(new GsDropdownItem("+ 새 그룹 만들어 연결", () =>
-                KeywordsPage.NewGroup(host, null, id => KeywordTools.Connect(type, field, id))) { Group = "만들기" });
-            GsDropdown.Show(anchor, items, placeholder: "그룹 검색");
-        }
 
         static void PickSpriteGroup(VisualElement anchor, Type type, FieldInfo field, string current)
         {

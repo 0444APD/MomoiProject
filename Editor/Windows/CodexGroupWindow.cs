@@ -25,7 +25,6 @@ namespace GBible.EditorTools
         void OnEnable()
         {
             EditorDatabase.Changed += Queue;
-            ClassStaging.Changed += Queue;
             ClassRegistry.Changed += Queue;
             CodexFolders.Changed += Queue;
             EditorApplication.projectChanged += Queue;
@@ -34,7 +33,6 @@ namespace GBible.EditorTools
         void OnDisable()
         {
             EditorDatabase.Changed -= Queue;
-            ClassStaging.Changed -= Queue;
             ClassRegistry.Changed -= Queue;
             CodexFolders.Changed -= Queue;
             EditorApplication.projectChanged -= Queue;

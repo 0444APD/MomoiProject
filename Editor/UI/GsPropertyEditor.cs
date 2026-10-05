@@ -259,7 +259,7 @@ namespace GBible.EditorTools.UI
                         return new GsDropdownItem(id, () => Add(id)) { Caption = k.Name };
                     }).ToList();
                 if (items.Count == 0) items.Add(new GsDropdownItem("더 고를 키워드가 없습니다") { Disabled = true });
-                items.AddRange(KeywordMenuExtras(add, field, ids => { foreach (var id in ids) Add(id); }));
+                items.AddRange(KeywordMenuExtras(field));
                 GsDropdown.Show(add, items, placeholder: "키워드 검색");
             }, GsButtonKind.Ghost);
             add.style.marginBottom = 6;
@@ -267,18 +267,12 @@ namespace GBible.EditorTools.UI
             return row;
         }
 
-        // 키워드 드롭다운 끝에 붙는 항목: 새 키워드 만들기, 클래스 상세에서 연결 바꾸기.
-        public static IEnumerable<GsDropdownItem> KeywordMenuExtras(VisualElement anchor, FieldInfo field, Action<List<string>> created)
+        // 키워드 드롭다운 끝에 붙는 항목: 클래스 상세에서 연결 보기(키워드·연결은 코드가 원본 — 만들기·바꾸기는 AI에게).
+        public static IEnumerable<GsDropdownItem> KeywordMenuExtras(FieldInfo field)
         {
-            if (!EditorPolicy.CanEditStructure) yield break;   // 키워드 만들기·연결 바꾸기는 코드를 고친다 → AI에게
-            var group = KeywordTools.GroupOf(field);
-            var host = anchor.panel?.visualTree.Q(className: "gs-root") ?? anchor;
-            if (!string.IsNullOrEmpty(group))
-                yield return new GsDropdownItem("+ 새 키워드", () => KeywordsPage.AddKeywords(host, group, created))
-                    { Group = "관리", Detail = $"'{KeywordTools.FindGroup(group)?.DisplayName ?? group}' 그룹에 추가하고 바로 고릅니다(저장할 때 코드에 씁니다)" };
             if (field != null)
-                yield return new GsDropdownItem("연결 바꾸기(클래스 상세)", () => ClassDetail.Open(field.DeclaringType, field.Name))
-                    { Group = "관리", Detail = "이 필드가 쓸 키워드 그룹을 바꾸거나 새 그룹을 만듭니다" };
+                yield return new GsDropdownItem("연결 보기(클래스 상세)", () => ClassDetail.Open(field.DeclaringType, field.Name))
+                    { Group = "관리", Detail = "이 필드가 쓰는 키워드 그룹(코드의 [Keyword])을 봅니다. 키워드를 더하려면 AI에게" };
         }
 
         // ── 일반 목록(수치 규칙 등) ─────────────────────────────

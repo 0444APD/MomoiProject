@@ -709,77 +709,6 @@
 .gs-framing__preview { margin: 0 12px 12px 0; }
 .gs-framing__preview-image { background-color: var(--gs-surface-2); border-radius: 6px; margin-bottom: 4px; }
 .gs-framing__mode--active { border-color: var(--gs-accent); color: var(--gs-accent); }
-/* ── 도움말 ─────────────────────────────────────────────── */
-/* "?" 버튼: 작은 원. 평소엔 옅게, 올리면 포인트 컬러 */
-.gs-help-button {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: var(--gs-border-strong);
-    align-self: center;
-}
-.gs-root .gs-help-button Label { font-size: 11px; -unity-font-style: bold; color: var(--gs-text-3); }
-.gs-root .gs-help-button:hover { border-color: var(--gs-accent); }
-.gs-root .gs-help-button:hover Label { color: var(--gs-accent); }
-
-.gs-help__summary {
-    margin-top: 10px;
-    margin-bottom: 18px;
-    font-size: 14px;
-    color: var(--gs-text-2);
-    white-space: normal;
-}
-.gs-help__body { margin-top: 4px; }
-.gs-help__heading {
-    margin-top: 6px;
-    margin-bottom: 6px;
-    font-size: 13px;
-    -unity-font-style: bold;
-    color: var(--gs-text);
-}
-.gs-help__text {
-    font-size: 12px;
-    color: var(--gs-text);
-    white-space: normal;
-    margin-bottom: 3px;
-}
-.gs-help__item { align-items: flex-start; margin-left: 4px; }
-.gs-help__bullet { width: 14px; color: var(--gs-accent); -unity-font-style: bold; }
-
-/* ── 시작하기 ───────────────────────────────────────────── */
-.gs-setup__intro { white-space: normal; margin-bottom: 16px; max-width: 760px; }
-.gs-setup__step {
-    background-color: var(--gs-surface);
-    border-width: 1px;
-    border-color: var(--gs-border);
-    border-radius: 12px;
-    margin-bottom: 8px;
-    max-width: 900px;
-}
-.gs-setup__step--done { opacity: 0.72; }
-.gs-setup__head { padding: 14px 16px; align-items: center; }
-.gs-setup__head:hover { background-color: var(--gs-hover); border-radius: 12px; }
-.gs-setup__number {
-    width: 26px;
-    height: 26px;
-    margin-right: 14px;
-    border-radius: 13px;
-    background-color: var(--gs-accent-soft);
-    color: var(--gs-accent);
-    -unity-text-align: middle-center;
-    -unity-font-style: bold;
-}
-.gs-setup__number--done { background-color: rgba(113, 214, 163, 0.16); color: var(--gs-success); }
-.gs-setup__status { align-items: flex-end; margin-left: 12px; margin-right: 8px; max-width: 260px; }
-.gs-setup__detail {
-    padding: 4px 16px 14px 56px;
-    border-top-width: 1px;
-    border-color: var(--gs-border);
-    padding-top: 14px;
-}
-
 /* ── 키워드 연결 창 ─────────────────────────────────────── */
 .gs-kw__pane {
     background-color: var(--gs-surface);
@@ -1055,9 +984,8 @@
 }
 .gs-root .gs-detail__title-error { font-size: 11px; color: var(--gs-danger); margin-top: 4px; white-space: normal; }
 
-/* 오른쪽 위: 도움말 · 닫기 나란히 */
+/* 오른쪽 위: 닫기 */
 .gs-detail__corner { flex-direction: row; align-items: center; align-self: flex-start; flex-shrink: 0; margin-left: 8px; }
-.gs-detail__corner .gs-help-button { margin-right: 4px; }
 
 /* 입력 칸은 배치 편집 바로 아래부터 위에서 차례로(가운데 정렬 없음) */
 .gs-detail__body .unity-scroll-view__content-container { align-items: stretch; justify-content: flex-start; }

@@ -97,14 +97,6 @@ namespace GBible.EditorTools
                 Assemblies = new[] { "GBible.Steam" },
                 TabNames = new[] { "Steam" },
             },
-            new GameFeature
-            {
-                Id = "samples",
-                Name = "확인용 패널·샘플",
-                Description = "라이브러리 확인용: 플레이하면 'GBible 확인용 패널'이 떠서 상태 효과·가로채기·비용·예약·미리보기·선택 대기·가중치 표·밸런스 값·연출 대기열·슬롯·설정·월드 상태를 버튼으로 시험한다. 메뉴 MomoiProject › DB 추가 › 확인용 항목. 게임에는 쓰지 않는다(확인이 끝나면 끈다).",
-                Symbol = "GBIBLE_SAMPLES",
-                Assemblies = new[] { "GBible.Samples" },
-            },
         };
 
         const string LegacySymbolPrefix = "GAME_SYSTEMS_";
@@ -193,7 +185,7 @@ namespace GBible.EditorTools
                 catch (Exception) { continue; }
                 var symbols = current.Split(';').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
                 var changed = false;
-                // 옛 이름(GameSystems) 때의 심볼은 새 이름으로 바꾼다(샘플 심볼처럼 손으로 넣은 것도).
+                // 옛 이름(GameSystems) 때의 심볼은 새 이름으로 바꾼다(손으로 넣은 것도).
                 for (var i = 0; i < symbols.Count; i++)
                 {
                     if (!symbols[i].StartsWith(LegacySymbolPrefix, StringComparison.Ordinal)) continue;

@@ -1,7 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <!-- 확인용 HUD의 유닛 한 칸(ElementList가 유닛마다 하나씩 만든다). -->
-    <ui:VisualElement style="flex-direction: row; align-items: center; margin-top: 4px;">
-        <ui:Label name="name" style="width: 120px;" />
-        <ui:ProgressBar name="hp" style="flex-grow: 1;" />
-    </ui:VisualElement>
-</ui:UXML>

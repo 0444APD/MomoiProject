@@ -36,8 +36,6 @@ namespace GBible.EditorTools
         // 사이드바의 탭 버튼(탭 키 → 버튼). 탭을 옮길 때는 사이드바를 다시 짓지 않고 선택 표시만 바꾼다.
         readonly Dictionary<string, GsNavItem> _navItems = new Dictionary<string, GsNavItem>();
 
-        // 사이드바 맨 위의 "시작하기" 탭(타입 대신 이 값이 선택된다).
-        const string SetupKey = "$setup";
         // DB 종류에 딸리지 않은 독립 탭(클래스·이벤트)의 키 앞머리.
         const string PagePrefix = "$page:";
 
@@ -63,7 +61,6 @@ namespace GBible.EditorTools
                 case "진행": return 10;
                 case "DB": return 20;
                 case "이미지": return 30;
-                case "샘플": return 90;
             }
             for (int i = 0; i < GameFeatures.All.Count; i++)
                 if (GameFeatures.All[i].Name == group) return 60 + i;
@@ -96,9 +93,7 @@ namespace GBible.EditorTools
         // 지금 고른 탭이 독립 화면이면 그 화면.
         CodexPage CurrentPage =>
             _selectedType != null && _selectedType.StartsWith(PagePrefix, StringComparison.Ordinal) ? CodexPage.Find(_selectedType.Substring(PagePrefix.Length)) : null;
-        [SerializeField] string _expandedStep;
         VisualElement _typeTools;
-        VisualElement _helpSlot;
         GsButton _viewSettingsButton;
         GsButton _createButton;
         GsButton _linkButton;
@@ -135,7 +130,7 @@ namespace GBible.EditorTools
             return window;
         }
 
-        // 다른 창·시작하기 단계에서 특정 종류로 이동한다. create면 새 항목 만들기 창을 바로 연다.
+        // 다른 창에서 특정 종류로 이동한다. create면 새 항목 만들기 창을 바로 연다.
         public static void ShowType(Type type, bool create = false)
         {
             var window = OpenWindow();
@@ -155,12 +150,6 @@ namespace GBible.EditorTools
                 window._selectedId = item.Id;
                 window.OpenDetail(item);
             });
-        }
-
-        public static void ShowSetup()
-        {
-            var window = OpenWindow();
-            window.Navigate(SetupKey);
         }
 
         // 독립 탭(클래스·이벤트)으로 이동한다. key: CodexPage.Key
@@ -221,8 +210,8 @@ namespace GBible.EditorTools
         bool MarkActiveTab()
         {
             if (_root == null || _navItems.Count == 0) return false;
-            var showingSetup = ShowingSetup;
-            var active = showingSetup ? SetupKey : CurrentPage != null ? _selectedType : SelectedType?.FullName;
+            EnsureTab();
+            var active = CurrentPage != null ? _selectedType : SelectedType?.FullName;
             if (active == null || !_navItems.ContainsKey(active)) return false;
             foreach (var pair in _navItems) pair.Value.SetActive(pair.Key == active);
             return true;
@@ -232,8 +221,7 @@ namespace GBible.EditorTools
         void ShowChanges()
         {
             var rows = CodexChanges.Rows();
-            var code = ClassStaging.HasChanges ? " 클래스 코드 변경을 저장하면 스크립트 파일에 쓰고 Unity가 다시 컴파일합니다." : "";
-            GsDialog.Show(_root, "저장 안 된 변경", $"변경 {rows.Count}건. 저장(Ctrl+S)하기 전까지 에셋도 스크립트 파일도 바뀌지 않습니다.{code}", rows,
+            GsDialog.Show(_root, "저장 안 된 변경", $"변경 {rows.Count}건. 저장(Ctrl+S)하기 전까지 에셋은 바뀌지 않습니다.", rows,
                 new DialogButton("닫기", GsButtonKind.Ghost, null),
                 new DialogButton("되돌리기", GsButtonKind.Default, ConfirmDiscard),
                 new DialogButton("저장", GsButtonKind.Primary, () => CodexChanges.Save()));
@@ -251,28 +239,16 @@ namespace GBible.EditorTools
             CodexStaging.AskBeforeLeaving("DB 창을 닫기 전에");
         }
 
-        bool ShowingSetup
+        // 처음 열 때, 또는 없어진 탭(지운 종류·꺼진 기능의 탭)을 열어 두었으면 첫 탭으로.
+        void EnsureTab()
         {
-            get
-            {
-                // 처음 열 때: 필수 단계가 남아 있으면 시작하기부터.
-                if (_selectedType == null)
-                    _selectedType = HelpFeature.Enabled && (SetupRegistry.All.Any(s => !s.Optional && SetupRegistry.StateOf(s).state == SetupState.Todo) || DataTypes.All.Count == 0)
-                        ? SetupKey
-                        : FirstTabKey();
-                // 시작하기가 보류 중이면(HelpFeature) 예전에 열어 둔 시작하기 탭 대신 첫 탭을 연다.
-                if (_selectedType == SetupKey && !HelpFeature.Enabled) _selectedType = FirstTabKey();
-                // 없어진 탭(지운 종류·꺼진 기능의 탭)을 열어 두었으면 첫 탭으로.
-                else if (_selectedType != SetupKey && _selectedType != null && !Tabs().Any(t => t.Key == TabOfName(_selectedType) && t.DisabledReason == null)) _selectedType = FirstTabKey();
-                return _selectedType == SetupKey;
-            }
+            if (_selectedType == null || !Tabs().Any(t => t.Key == TabOfName(_selectedType) && t.DisabledReason == null)) _selectedType = FirstTabKey();
         }
 
         void OnEnable()
         {
             EditorDatabase.Changed += QueueRefresh;
             EditorPolicy.Changed += QueueRefresh;
-            ClassStaging.Changed += QueueRefresh;
             ClassRegistry.Changed += QueueRefresh;
             CodexFolders.Changed += QueueRefresh;
             GameFeatures.Changed += QueueRefresh;
@@ -283,7 +259,6 @@ namespace GBible.EditorTools
         {
             EditorDatabase.Changed -= QueueRefresh;
             EditorPolicy.Changed -= QueueRefresh;
-            ClassStaging.Changed -= QueueRefresh;
             ClassRegistry.Changed -= QueueRefresh;
             CodexFolders.Changed -= QueueRefresh;
             GameFeatures.Changed -= QueueRefresh;
@@ -327,12 +302,7 @@ namespace GBible.EditorTools
             _title = Gs.Label("", "gs-display");
             _caption = Gs.Label("", "gs-caption");
             _caption.style.marginTop = 4;
-            var titleRow = Gs.Row();
-            titleRow.Add(_title);
-            _helpSlot = Gs.Row();
-            _helpSlot.style.marginLeft = 10;
-            titleRow.Add(_helpSlot);
-            titles.Add(titleRow);
+            titles.Add(_title);
             titles.Add(_caption);
             header.Add(titles);
             header.Add(Gs.Spacer());
@@ -400,7 +370,8 @@ namespace GBible.EditorTools
         {
             get
             {
-                if (ShowingSetup || CurrentPage != null) return null;
+                EnsureTab();
+                if (CurrentPage != null) return null;
                 var types = DataTypes.All;
                 var info = types.FirstOrDefault(t => t.Type.FullName == TabOfName(_selectedType)) ?? types.FirstOrDefault(t => !t.Hidden);
                 return info?.Type;
@@ -454,19 +425,6 @@ namespace GBible.EditorTools
             logo.Add(Gs.Label("MomoiProject", "gs-heading"));
             brand.Add(logo);
             _sidebar.Add(brand);
-
-            if (HelpFeature.Enabled)
-            {
-                var steps = SetupRegistry.All;
-                var finished = steps.Count(s => SetupRegistry.StateOf(s).state != SetupState.Todo);
-                var setup = new GsNavItem("시작하기", Gs.Accent, () => Navigate(SetupKey));
-                setup.SetCount($"{finished}/{steps.Count}");
-                setup.SetActive(ShowingSetup);
-                _navItems[SetupKey] = setup;
-                _sidebar.Add(setup);
-                var help = new GsNavItem("도움말", Gs.PaletteFor("help"), () => HelpWindow.Show(null));
-                _sidebar.Add(help);
-            }
 
             var selected = SelectedType;
             var currentPage = CurrentPage;
@@ -626,13 +584,6 @@ namespace GBible.EditorTools
         {
             if (_content == null) return;
             _content.Clear();
-            _helpSlot.Clear();
-            _typeTools.style.display = ShowingSetup ? DisplayStyle.None : DisplayStyle.Flex;
-            if (ShowingSetup)
-            {
-                BuildSetup();
-                return;
-            }
             // 독립 화면(클래스·이벤트): 그 화면이 그린다.
             var standalone = CurrentPage;
             if (standalone != null)
@@ -651,8 +602,6 @@ namespace GBible.EditorTools
             }
             _createButton.style.display = DisplayStyle.Flex;
             var type = SelectedType;
-            if (type != null) _helpSlot.Add(HelpUI.Button(HelpIds.Data(type)));
-            else _helpSlot.Add(HelpUI.Button("guide:codex"));
             if (type == null)
             {
                 _title.text = "DB";
@@ -735,119 +684,6 @@ namespace GBible.EditorTools
         // 연결을 정할 필드가 있는 종류인지(GameData 공통 칸 id 등만 있으면 없음).
         static bool HasLinkableFields(Type type) =>
             ClassTypes.FieldsOf(type).Any(f => f.DeclaringType != typeof(GameData) && (KeywordTools.CanConnect(f) || KeywordTools.IsSpriteField(f)));
-
-        // ── 시작하기 ───────────────────────────────────────────
-        // 새 프로젝트의 설정 단계를 순서대로. 단계마다 설명·현재 상태·바로 하기 버튼·완료 표시.
-
-        void BuildSetup()
-        {
-            var steps = SetupRegistry.All;
-            var states = steps.Select(s => (step: s, status: SetupRegistry.StateOf(s))).ToList();
-            var required = states.Where(s => !s.step.Optional).ToList();
-            _title.text = "시작하기";
-            _caption.text = $"필수 {required.Count(s => s.status.state != SetupState.Todo)}/{required.Count}  ·  전체 {states.Count(s => s.status.state != SetupState.Todo)}/{states.Count} 단계 완료";
-            _helpSlot.Add(HelpUI.Button(HelpIds.Setup));
-
-            var intro = Gs.Label("위에서부터 차례로 진행하세요. 뒤 단계는 앞 단계에서 만든 항목을 목록에서 고릅니다. 각 단계의 '?'로 자세한 도움말을, 왼쪽 '도움말'로 전체 설명을 볼 수 있습니다.", "gs-caption", "gs-setup__intro");
-            _content.Add(intro);
-
-            // 펼친 단계: 사용자가 고른 것, 없으면 첫 할 일.
-            var expanded = states.Any(s => s.step.Id == _expandedStep) ? _expandedStep : states.FirstOrDefault(s => s.status.state == SetupState.Todo).step?.Id;
-            int number = 0;
-            foreach (var (step, status) in states)
-            {
-                number++;
-                var card = Gs.Col("gs-setup__step");
-                card.EnableInClassList("gs-setup__step--done", status.state == SetupState.Done || status.state == SetupState.Skipped);
-                var open = step.Id == expanded;
-
-                var head = Gs.Row("gs-setup__head");
-                var mark = Gs.Label(status.state == SetupState.Done ? "✓" : status.state == SetupState.Skipped ? "–" : number.ToString(), "gs-setup__number");
-                mark.EnableInClassList("gs-setup__number--done", status.state == SetupState.Done);
-                head.Add(mark);
-                var titles = Gs.Col("gs-grow");
-                var titleRow = Gs.Row();
-                titleRow.Add(Gs.Label(step.Title, "gs-heading"));
-                if (step.Optional)
-                {
-                    var optional = new GsBadge("선택", Gs.PaletteFor("optional"));
-                    optional.style.marginLeft = 8;
-                    titleRow.Add(optional);
-                }
-                titles.Add(titleRow);
-                var summary = Gs.Label(step.Summary, "gs-caption");
-                summary.style.marginTop = 2;
-                summary.style.whiteSpace = WhiteSpace.Normal;
-                titles.Add(summary);
-                head.Add(titles);
-                head.Add(StatusBadge(status.state, status.text));
-                if (!string.IsNullOrEmpty(step.HelpTopic)) head.Add(HelpUI.Button(step.HelpTopic));
-                var id = step.Id;
-                head.RegisterCallback<ClickEvent>(e =>
-                {
-                    if (e.target is VisualElement v && v.GetFirstAncestorOfType<GsButton>() == null && !(v is GsButton))
-                    {
-                        _expandedStep = open ? "" : id;
-                        RebuildContent();
-                    }
-                });
-                card.Add(head);
-
-                if (open)
-                {
-                    var detail = Gs.Col("gs-setup__detail");
-                    detail.Add(HelpUI.Body(step.Body));
-                    var actions = Gs.Row("gs-wrap");
-                    foreach (var action in step.Actions)
-                    {
-                        var a = action;
-                        var button = new GsButton(a.Label, () =>
-                        {
-                            a.Run?.Invoke();
-                            QueueRefresh();
-                        }, a.Primary ? GsButtonKind.Primary : GsButtonKind.Default);
-                        button.style.marginRight = 8;
-                        button.style.marginBottom = 6;
-                        actions.Add(button);
-                    }
-                    actions.Add(Gs.Spacer());
-                    // 자동 판정이 없는 단계만 직접 완료 표시. 선택 단계는 건너뛰기 가능.
-                    if (step.Check == null)
-                    {
-                        var marked = SetupRegistry.IsMarkedDone(id);
-                        actions.Add(new GsButton(marked ? "완료 해제" : "완료로 표시", () =>
-                        {
-                            SetupRegistry.Mark(id, marked ? SetupState.Todo : SetupState.Done);
-                            RefreshAll();
-                        }, marked ? GsButtonKind.Ghost : GsButtonKind.Primary));
-                    }
-                    if (step.Optional)
-                    {
-                        var skipped = SetupRegistry.IsSkipped(id);
-                        actions.Add(new GsButton(skipped ? "건너뛰기 취소" : "건너뛰기", () =>
-                        {
-                            SetupRegistry.Mark(id, skipped ? SetupState.Todo : SetupState.Skipped);
-                            RefreshAll();
-                        }, GsButtonKind.Ghost));
-                    }
-                    detail.Add(actions);
-                    card.Add(detail);
-                }
-                _content.Add(card);
-            }
-        }
-
-        static VisualElement StatusBadge(SetupState state, string text)
-        {
-            var color = state == SetupState.Done ? Gs.Success : state == SetupState.Warning ? Gs.Warning : state == SetupState.Skipped ? Gs.PaletteFor("skipped") : Gs.Accent;
-            var label = state == SetupState.Done ? "완료" : state == SetupState.Skipped ? "건너뜀" : state == SetupState.Warning ? "확인 필요" : "할 일";
-            var row = Gs.Col("gs-setup__status");
-            row.Add(new GsBadge(label, color));
-            var detail = Gs.Label(text ?? "", "gs-caption");
-            detail.style.marginTop = 4;
-            row.Add(detail);
-            return row;
-        }
 
         CodexPageContext PageContext() => new CodexPageContext
         {
@@ -1071,7 +907,6 @@ namespace GBible.EditorTools
                 }),
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,
-                HelpTopic = HelpIds.Data(item.GetType()),
                 Staged = true,
                 Summary = draft => DescribeItem((GameData)draft),
                 Validate = draft => ValidateDraft(target, (GameData)draft),

@@ -362,7 +362,7 @@ public static class GameBoot
 
 **`session.Debug.Register(분류, 이름, 동작, 설명)`** — 모니터의 명령 탭에 버튼을 코드로 더한다. 출시 빌드에서는 `session.Debug.Enabled`가 거짓이라 아무것도 하지 않으므로 `if (Debug.isDebugBuild)`로 감싸지 않는다. 결과 Block으로 조립할 수 있는 명령은 코드 대신 DB › 개발 › 개발 명령에 만든다(`22-Monitor-Debug.md` 7절).
 
-**`session.Data.Define(키, 구역, 기본값, 표시 이름)`** — DB에 없는, 코드에서만 쓰는 값을 등록한다. 샘플(`SampleGame`)이 콤보 수를 이렇게 둔다.
+**`session.Data.Define(키, 구역, 기본값, 표시 이름)`** — DB에 없는, 코드에서만 쓰는 값을 등록한다. 예: 콤보 수처럼 화면만 쓰는 값.
 
 ```csharp
 session.Data.Define("sample:combo", DataZone.Session, 0, "현재 콤보");
@@ -514,7 +514,6 @@ var copy = potion.CreateInstance();   // 깊은 사본
 | 인벤토리 시스템 | `GBIBLE_INVENTORY` | `GBible.Inventory` | 없음(플레이어 데이터의 값 형식에 `Inventory`·`InventorySlot`이 나온다) |
 | 입력(키 바꾸기) | `GBIBLE_INPUT` | `GBible.Input`(Input System 패키지 `com.unity.inputsystem`이 있을 때만 컴파일) | 없음(`GameInput`: 키 바꾸기·되돌리기·저장, `31-Slots-Settings-Input.md`) |
 | Steam | `GBIBLE_STEAM` | `GBible.Steam`(Steamworks.NET 패키지 `com.rlabrecque.steamworks.net`이 있을 때만 컴파일) | Steam(그룹 개발, `34-Steam.md`) |
-| 확인용 패널·샘플 | `GBIBLE_SAMPLES` | `GBible.Samples` (+ `.Editor`), PlayMode 샘플 테스트 | 없음(플레이하면 'GBible 확인용 패널'이 뜬다. 메뉴 `MomoiProject → DB 추가 → 확인용 항목`, `Tests → 샘플 → …`). 라이브러리를 확인할 때만 켜고, 게임에는 쓰지 않는다. |
 
 스크립팅 심볼은 `#if`로 코드를 켜고 끄는 컴파일 표시다. 모듈의 asmdef는 이 심볼이 있을 때만 컴파일된다(asmdef의 defineConstraints).
 
@@ -683,7 +682,6 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 | `GBible.Input` | `Optional/Input` | 선택 모듈(`GBIBLE_INPUT`, Input System 패키지가 있을 때만). 참조: `Unity.InputSystem` | 예 |
 | `GBible.Steam` | `Optional/Steam` | 선택 모듈(`GBIBLE_STEAM`, Steamworks.NET 패키지가 있을 때만, PC·에디터). 참조: `com.rlabrecque.steamworks.net` | 예 |
 | `Unity.GBible.CodeGen` | `CodeGen` | 컴파일할 때 Mirror 비교 코드를 만든다(에디터 전용, `com.unity.nuget.mono-cecil`이 있을 때만) | 아니오 |
-| `GBible.Samples` · `.Samples.Editor` | `Samples` | `GBIBLE_SAMPLES` 심볼이 있을 때만 | 아니오 |
 
 ### 코드로 쓰는 법
 
@@ -706,7 +704,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ### 주의할 점
 
-- 테스트·샘플 어셈블리는 자동 참조가 아니다. 샘플은 선택 기능 **확인용 패널·샘플**을 켜야 컴파일된다(심볼 `GBIBLE_SAMPLES`를 기능 활성화가 넣고 뺀다).
+- 테스트 어셈블리는 자동 참조가 아니다.
 - Unity 버전을 올린 뒤에는 Mirror 생성 코드가 정상인지 코어 테스트(`MirrorTests`)로 확인한다.
 
 ---
@@ -746,11 +744,9 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 - 큰 에셋이 많으면 옮기는 데 시간이 걸린다(같은 드라이브 안에서 옮기기라 복사보다는 빠르다).
 - 버전 관리(git 등)를 쓰면 `MomoiProjectBaseline/`은 팀이 같이 쓰도록 올리고, `MomoiProjectBackups/`는 올리지 않는 편이 낫다.
 
-## 9. 시작하기 단계 (현재 숨김)
+## 9. 설정 순서
 
-에디터 코드에는 새 프로젝트의 설정 단계를 순서대로 안내하는 "시작하기" 탭과 도움말 창이 있다(`Editor/Help/SetupSteps.cs`: 프로젝트 상태 확인 → 키워드 → 플레이어 데이터 → 스프라이트 규격 → 로그 → 도전과제 → 인스턴스·프리팹 → 식별자 코드 → 검증 오류 → 플레이하며 확인). 지금은 `HelpFeature.Enabled = false`라 DB 사이드바에 나오지 않는다. 그 안의 글 일부는 예전 구조(키워드 연결 창)를 설명하므로, 다시 켤 때까지는 이 설명서를 따른다.
-
-설정 순서만 정리하면 다음과 같다.
+새 프로젝트를 손으로 설정한다면 이 순서다(지금은 AI가 시작 설정 뒤 진행 매뉴얼의 단계 1에서 한다).
 
 1. DB를 한 번 연다(GameDatabase 생성).
 2. 키워드 그룹을 만들고 필드에 연결한다(`21-Editor-Database.md` 키워드 탭).
@@ -769,7 +765,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 | 파일 | 하는 일 | 다시 맞출 때 |
 |---|---|---|
 | `CLAUDE.md` | Claude Code가 세션마다 읽는다. 관례(`ProjectConventions.md`)·참조(`Reference.md`)를 `@가져오기`로 불러온다 | `<!-- MomoiProject:begin -->`~`end` 칸만 다시 쓴다. 칸 밖에 쓴 것은 그대로 |
-| `.claude/skills/think-momoi/SKILL.md` | 스킬 `/think-momoi`: 진행 매뉴얼(`ProjectFlow.md`)의 단계대로 — 0 흡수(자료 → 명세서·예외 사냥·질문) → 1 시스템층 → 2 콘텐츠 → 3 레벨 디자인 지원 → 4 연출 → 5 밸런싱·테스트 → 6 출시 준비, 결정 기록을 읽고 이어 간다 | 통째로 |
+| `.claude/skills/think-momoi/SKILL.md` | 스킬 `/think-momoi`: 진행 매뉴얼(`ProjectFlow.md`)의 단계대로 — 0 흡수(자료 → 명세서·예외 잡기·질문) → 1 시스템층 → 2 콘텐츠 → 3 레벨 디자인 지원 → 4 연출 → 5 밸런싱·테스트 → 6 출시 준비, 결정 기록을 읽고 이어 간다 | 통째로 |
 | `.claude/hooks/compile-check.ps1` · `.claude/settings.json` | 응답을 끝낼 때(Stop 훅) 프로젝트 코드를 컴파일한다. 오류가 있으면 Claude가 고친 뒤 다시 끝낸다 | 스크립트는 통째로, settings.json은 훅 한 줄이 없을 때만 더한다 |
 | `Docs/PlanningSpec.md` | 기획 명세서 빈 양식(AI가 자료로 채우고 질문한다, 개발자가 채워 와도 된다) | 없을 때만 |
 | `Docs/Decisions.md` | 결정 기록(AI가 질문·답·추천값으로 정한 것을 쌓는다 — `D-n`) | 없을 때만 |

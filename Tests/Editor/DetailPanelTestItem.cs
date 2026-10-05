@@ -1,9 +1,9 @@
 using UnityEngine;
 
-namespace GBible.EditorTools
+namespace GBible.Tests
 {
-    // UI 샘플 창의 시트·카드 시연용 데이터(메모리에만 존재, 에셋으로 저장하지 않음).
-    public sealed class ShowcaseItem : ScriptableObject
+    // 상세 패널 테스트용 데이터(메모리에만 존재, 에셋으로 저장하지 않음).
+    public sealed class DetailPanelTestItem : ScriptableObject
     {
         public enum Rarity
         {

@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using GBible.Data;
 using UnityEditor;
 
 namespace GBible.EditorTools
 {
     // 키워드(코드가 원본)와 필드 연결을 한곳에서. 키워드 탭·클래스 상세·드롭다운·검증이 함께 쓴다.
-    // 키워드 그룹·키워드는 코드([KeywordGroup] static class + const string)이고, DB에서 한 변경은 저장(Ctrl+S) 때 코드에 쓰인다.
-    // 이 목록은 컴파일된 코드에 저장 전 변경(ClassStaging)을 더한 모습이다.
+    // 키워드 그룹·키워드는 코드([KeywordGroup] static class + const string)이고 AI가 코드에서 만든다. DB는 읽기만 한다.
     public static class KeywordTools
     {
         static EditorDatabase Db => EditorDatabase.Instance;
@@ -21,7 +22,6 @@ namespace GBible.EditorTools
             public string Label;
             public string Parent;
             public Type Type;
-            public bool Pending;
             public readonly List<Keyword> Keywords = new List<Keyword>();
             public string DisplayName => string.IsNullOrEmpty(Label) ? Name : Label;
         }
@@ -31,7 +31,6 @@ namespace GBible.EditorTools
             public string Id;
             public string Name;
             public string Group;
-            public bool Pending;
         }
 
         // 컴파일 뒤에는 코드에서 다시 모은다.
@@ -43,31 +42,9 @@ namespace GBible.EditorTools
             var result = new List<Group>();
             foreach (var info in Keywords.Groups)
             {
-                if (ClassStaging.IsGroupRemoved(info.Id) || (info.Parent != null && ClassStaging.IsGroupRemoved(info.Parent.Id))) continue;
                 var group = new Group { Id = info.Id, Name = info.Name, Label = info.Label, Parent = info.Parent?.Id, Type = info.Type };
                 foreach (var keyword in info.Keywords) group.Keywords.Add(new Keyword { Id = keyword.Id, Name = keyword.Name, Group = info.Id });
                 result.Add(group);
-            }
-            foreach (var (id, parent, name, label) in ClassStaging.PendingGroups())
-                if (result.All(g => g.Id != id))
-                    result.Add(new Group { Id = id, Name = name, Label = label, Parent = string.IsNullOrEmpty(parent) ? null : parent, Pending = true });
-            // 저장 전 키워드 변경.
-            foreach (var op in ClassStaging.All)
-            {
-                var group = result.FirstOrDefault(g => g.Id == op.type);
-                if (group == null) continue;
-                switch (op.op)
-                {
-                    case ClassOp.KeywordAdd:
-                        group.Keywords.Add(new Keyword { Id = op.declaration, Name = op.field, Group = group.Id, Pending = true });
-                        break;
-                    case ClassOp.KeywordRemove:
-                        group.Keywords.RemoveAll(k => k.Name == op.field);
-                        break;
-                    case ClassOp.KeywordRename:
-                        foreach (var keyword in group.Keywords.Where(k => k.Name == op.field)) keyword.Name = op.newName;
-                        break;
-                }
             }
             return result.OrderBy(g => g.Id, StringComparer.Ordinal).ToList();
         }
@@ -99,15 +76,8 @@ namespace GBible.EditorTools
                 !(a is HideAttribute) && !(a is ShowIfAttribute));
         }
 
-        // 필드에 연결된 키워드 그룹 ID([Keyword(typeof(그룹))], 저장 전 연결 포함). 없으면 null.
-        public static string GroupOf(FieldInfo field)
-        {
-            if (field == null) return null;
-            var owner = field.DeclaringType?.FullName;
-            var pending = ClassStaging.All.LastOrDefault(o => (o.op == ClassOp.FieldKeyword || (o.op == ClassOp.FieldAttribute && o.declaration == "Keyword")) && o.type == owner && o.field == field.Name);
-            if (pending != null) return pending.op == ClassOp.FieldKeyword ? pending.kind : null;
-            return Keywords.GroupOf(field)?.Id;
-        }
+        // 필드에 연결된 키워드 그룹 ID([Keyword(typeof(그룹))]). 없으면 null.
+        public static string GroupOf(FieldInfo field) => field == null ? null : Keywords.GroupOf(field)?.Id;
 
         public static string GroupOf(Type type, FieldInfo field) => GroupOf(field);
 
@@ -127,63 +97,27 @@ namespace GBible.EditorTools
         public static IEnumerable<(Type type, FieldInfo field)> FieldsLinkedTo(string group) =>
             Fields().Where(f => GroupOf(f.field) == group);
 
-        // ── 코드 변경(저장 때 쓴다) ─────────────────────────────
+        // 키워드 그룹 코드가 있는 곳(관례: Assets/Code/Keywords/그룹.cs).
+        public const string Folder = "Assets/Code/Keywords";
 
-        // 새 그룹. 돌려주는 값: 그룹 ID.
-        public static string CreateGroup(string parent, string name, string label) => ClassStaging.AddKeywordGroup(parent, name, label);
-
-        // 키워드 ID들을 그룹에 더한다(상수 이름은 ID에서 만든다). 더한 ID 목록.
-        public static List<string> AddKeywords(string group, IEnumerable<string> ids)
+        // 그룹 형식이 정의된 파일(바깥 클래스 기준). 못 찾으면 null.
+        public static string FileOf(Type group)
         {
-            var added = new List<string>();
-            var names = new HashSet<string>(KeywordsOf(group).Select(k => k.Name), StringComparer.Ordinal);
-            foreach (var id in ids)
+            if (group == null) return null;
+            var outer = group;
+            while (outer.DeclaringType != null) outer = outer.DeclaringType;
+            var direct = Directory.Exists(Folder) ? Path.Combine(Folder, outer.Name + ".cs").Replace('\\', '/') : null;
+            if (direct != null && File.Exists(direct) && Regex.IsMatch(File.ReadAllText(direct), @"\bclass\s+" + outer.Name + @"\b")) return direct;
+            foreach (var guid in AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" }))
             {
-                var name = KeywordCode.ConstName(id);
-                for (var i = 2; names.Contains(name); i++) name = KeywordCode.ConstName(id) + i;
-                names.Add(name);
-                ClassStaging.AddKeyword(group, name, id);
-                added.Add(id);
-            }
-            return added;
-        }
-
-        // 새 키워드 ID 검사: 형식, 모든 그룹에서 겹치지 않음.
-        public static string CheckNewIds(IEnumerable<string> ids)
-        {
-            var existing = new HashSet<string>(AllKeywords().Select(k => k.Id), StringComparer.Ordinal);
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var id in ids)
-            {
-                if (!IdRules.IsValid(id, out var error)) return $"'{id}': {error}";
-                if (existing.Contains(id) || !seen.Add(id)) return $"'{id}' 키워드가 이미 있습니다(키워드 ID는 모든 그룹에서 하나뿐).";
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) continue;
+                string text;
+                try { text = File.ReadAllText(path); }
+                catch (IOException) { continue; }
+                if (text.Contains("KeywordGroup") && Regex.IsMatch(text, @"\bclass\s+" + Regex.Escape(outer.Name) + @"\b")) return path;
             }
             return null;
-        }
-
-        public static void RemoveKeyword(string group, string name) => ClassStaging.RemoveKeyword(group, name);
-        public static void RenameKeyword(string group, string name, string newName) => ClassStaging.RenameKeyword(group, name, newName);
-        public static void RemoveGroup(string group) => ClassStaging.RemoveKeywordGroup(group);
-
-        // 필드를 키워드 그룹에 연결한다(코드에 [Keyword(typeof(그룹))]). group이 null이면 연결을 뗀다.
-        public static void Connect(Type type, FieldInfo field, string group)
-        {
-            var owner = field.DeclaringType ?? type;
-            if (group == null)
-            {
-                ClassStaging.SetFieldAttribute(owner.FullName, field.Name, "Keyword", false);
-                return;
-            }
-            var info = FindGroup(group);
-            var ns = info?.Type?.Namespace ?? GroupNamespace(group);
-            var shortName = ns == null ? group : group.Substring(ns.Length + 1);
-            ClassStaging.SetFieldKeyword(owner.FullName, field.Name, shortName, ns, group);
-        }
-
-        static string GroupNamespace(string group)
-        {
-            var ns = ClassRegistry.Current.codeNamespace;
-            return !string.IsNullOrEmpty(ns) && group.StartsWith(ns + ".", StringComparison.Ordinal) ? ns : null;
         }
 
         // ── 필드 규칙(에디터 설정: 필수·스프라이트 규격) ─────────────

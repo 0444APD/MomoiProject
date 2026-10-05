@@ -113,12 +113,7 @@ namespace GBible.EditorTools
             var header = Gs.Row();
             header.style.marginBottom = 18;
             var titles = Gs.Col();
-            var titleRow = Gs.Row();
-            titleRow.Add(Gs.Label(TabNames[(int)_tab], "gs-display"));
-            var help = HelpUI.Button(HelpIds.Monitor(_tab.ToString()));
-            help.style.marginLeft = 10;
-            titleRow.Add(help);
-            titles.Add(titleRow);
+            titles.Add(Gs.Label(TabNames[(int)_tab], "gs-display"));
             _sessionInfo = Gs.Label("", "gs-caption");
             _sessionInfo.style.marginTop = 4;
             titles.Add(_sessionInfo);

@@ -11,13 +11,13 @@ namespace GBible.Tests
 {
     public class DetailPanelTests
     {
-        ShowcaseItem _item;
+        DetailPanelTestItem _item;
         VisualElement _host;
 
         [SetUp]
         public void SetUp()
         {
-            _item = ScriptableObject.CreateInstance<ShowcaseItem>();
+            _item = ScriptableObject.CreateInstance<DetailPanelTestItem>();
             _item.hideFlags = HideFlags.DontSave;
             _item.name = "검";
             _item.displayName = "검";

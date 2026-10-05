@@ -40,7 +40,6 @@ namespace GBible.EditorTools.UI
         public static void Apply(VisualElement root)
         {
             AddSheet(root, "GsTheme");
-            AddSheet(root, "GsExperimental");
             root.AddToClassList("gs-root");
             // 툴팁은 글 양에 맞춰 커지는 창 안의 상자로(기본 툴팁은 긴 글이 잘린다).
             GsTooltip.Attach(root);

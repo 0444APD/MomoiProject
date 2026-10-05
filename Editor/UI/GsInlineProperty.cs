@@ -439,7 +439,7 @@ namespace GBible.EditorTools.UI
             }).ToList();
             items.Insert(0, new GsDropdownItem("(비움)", () => SetString("")) { Selected = string.IsNullOrEmpty(_property.stringValue) });
             if (items.Count == 1) items.Add(new GsDropdownItem("이 그룹에 아직 키워드가 없습니다") { Disabled = true });
-            items.AddRange(GsPropertyEditor.KeywordMenuExtras(this, _field, ids => { if (ids.Count > 0) SetString(ids[0]); }));
+            items.AddRange(GsPropertyEditor.KeywordMenuExtras(_field));
             OpenMenu(items, placeholder: "키워드 검색");
         }
 

@@ -211,7 +211,7 @@ namespace GBible.EditorTools
                 if (group == null) continue;
                 if (KeywordTools.KeywordsOf(group).Any(k => k.Id == it.stringValue)) continue;
                 var name = KeywordTools.FindGroup(group)?.DisplayName ?? group;
-                context.Error($"{field.Name}: {it.stringValue}은(는) 키워드 그룹 {name}에 없는 키워드입니다. 목록에서 다시 고르거나 키워드 탭에서 더하세요.");
+                context.Error($"{field.Name}: {it.stringValue}은(는) 키워드 그룹 {name}에 없는 키워드입니다. 목록에서 다시 고르거나, 필요한 키워드면 코드에 더하세요(AI에게).");
             }
         }
 

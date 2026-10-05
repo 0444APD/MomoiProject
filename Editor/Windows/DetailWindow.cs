@@ -96,14 +96,12 @@ namespace GBible.EditorTools
         void OnEnable()
         {
             EditorDatabase.Changed += QueueRebind;
-            ClassStaging.Changed += QueueRebind;
             ClassRegistry.Changed += QueueRebind;
         }
 
         void OnDisable()
         {
             EditorDatabase.Changed -= QueueRebind;
-            ClassStaging.Changed -= QueueRebind;
             ClassRegistry.Changed -= QueueRebind;
         }
 

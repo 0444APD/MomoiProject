@@ -10,7 +10,6 @@ namespace GBible.Tests
     public class StyleSheetTests
     {
         [TestCase("GsTheme")]
-        [TestCase("GsExperimental")]
         public void 스타일시트가_경고_없이_임포트된다(string name)
         {
             var sheet = Gs.LoadSheet(name);

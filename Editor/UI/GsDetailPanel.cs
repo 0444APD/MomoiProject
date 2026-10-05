@@ -37,8 +37,6 @@ namespace GBible.EditorTools.UI
         public Func<UnityEngine.Object, IList<(string label, string text)>> Summary;
         public List<(string label, Action<GsDetailPanel> action)> Actions = new List<(string, Action<GsDetailPanel>)>();
         public Action<UnityEngine.Object> Saved;
-        // 제목 옆 "?" 버튼이 여는 도움말 항목.
-        public string HelpTopic;
         // DB처럼 변경을 모아 두는 곳: 저장 확인 없이 작업본에 바로 반영하고, Unity 적용은 저장(Ctrl+S)할 때 한다.
         public bool Staged;
     }
@@ -149,9 +147,8 @@ namespace GBible.EditorTools.UI
             titles.Add(_summary);
             top.Add(titles);
 
-            // 오른쪽 위: 도움말 · 닫기를 나란히.
+            // 오른쪽 위: 닫기.
             var corner = Gs.Row("gs-detail__corner");
-            if (!string.IsNullOrEmpty(_options.HelpTopic)) corner.Add(HelpUI.Button(_options.HelpTopic));
             var close = new GsButton("✕", RequestClose, GsButtonKind.Ghost);
             close.tooltip = "닫기 (Esc)";
             corner.Add(close);

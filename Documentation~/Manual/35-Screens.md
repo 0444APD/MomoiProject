@@ -226,7 +226,7 @@ protected override void Tick(float deltaTime)
 
 - 플레이 중 하이어라키의 `[MomoiProject] 화면` › UIDocument를 고르고 **UI Toolkit Debugger**(Window › UI Toolkit › Debugger)로 층·화면 트리(`momoi-layer-…` › 화면 ID)를 본다.
 - binding-path 칸이 바뀌지 않으면: 키 이름(DB › 플레이어 데이터 ID)·경로를 모니터 › 데이터 탭과 맞춰 본다.
-- 선택 기능 '확인용 패널·샘플'의 **화면** 탭: 확인용 HUD(DB › 화면 `checkHud`)와 기본 화면을 하나씩 연다(`PendingChecks.md`).
+- 테스트 씬(38장)의 테스트 명령으로 화면을 하나씩 열어 본다(기본 화면 포함).
 
 ---
 

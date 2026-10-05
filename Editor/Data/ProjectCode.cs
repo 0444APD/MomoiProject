@@ -11,7 +11,7 @@ namespace GBible.EditorTools
 {
     // "내 코드": 클래스를 고르는 모든 목록(데이터 클래스·값 형식·필드 규칙 …)이 프로젝트에서 직접 만든 스크립트만 보이도록 거르는 규칙 한 곳.
     // 폴더를 지정하지 않아도 자동으로 거른다:
-    //  · 어셈블리: Unity·패키지(Packages/)·이 라이브러리(GBible.*, 샘플 제외)·플러그인(Assets/Plugins, *-firstpass)은 뺀다.
+    //  · 어셈블리: Unity·패키지(Packages/)·이 라이브러리(GBible.*)·플러그인(Assets/Plugins, *-firstpass)은 뺀다.
     //  · 네임스페이스: 흔한 외부 라이브러리(DG·Sirenix·Spine·TMPro …)는 뺀다.
     //  · 종류: 컴포넌트·ScriptableObject(DB 종류 제외)·어트리뷰트·예외·정적 유틸 클래스·인터페이스는 뺀다.
     // 프로젝트마다 다르면 ProjectSettings/MomoiProject/ProjectCode.json(창: MomoiProject › 내 코드 범위)에서 폴더·네임스페이스를 더한다.
@@ -95,9 +95,7 @@ namespace GBible.EditorTools
         static (bool, string) Judge(string name, string[] sources, Settings settings)
         {
             if (name.StartsWith("Unity", StringComparison.Ordinal)) return (false, "Unity");
-            // 샘플은 라이브러리(패키지) 안에 있어도 내 코드로 본다(GBIBLE_SAMPLES로 켰을 때만 컴파일된다).
-            if (name.StartsWith("GBible.Samples", StringComparison.Ordinal)) return (true, "샘플");
-            if (name.StartsWith("GBible.", StringComparison.Ordinal) && !name.StartsWith("GBible.Samples", StringComparison.Ordinal))
+            if (name.StartsWith("GBible.", StringComparison.Ordinal))
                 return (false, "MomoiProject 라이브러리");
             if (name.EndsWith("-firstpass", StringComparison.Ordinal)) return (false, "플러그인(Plugins·Standard Assets)");
             var files = (sources ?? Array.Empty<string>()).Select(f => f.Replace('\\', '/')).ToList();

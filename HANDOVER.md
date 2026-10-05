@@ -7,10 +7,12 @@
 세부 사용법은 기능별 문서에 있다: `Documentation~/Manual/`(기능별 매뉴얼·코드 예제, 00-Index.md부터), `README.md`(개요·메뉴), `Documentation~/Architecture.md`(설계 결정 기록), `Documentation~/PlayerDataStore.md`(플레이어 데이터 저장소), `Documentation~/Localization.md`(다국어), `Documentation~/Dialogue.md`(다이얼로그), `Documentation~/Audio.md`(오디오). 이 문서와 그 문서들이 어긋나면 **가장 최근 결정**(이 문서의 5·6장, Architecture.md 끝부분)이 우선한다.
 
 > **2026-10-05 전환 — 미도리(먼저 읽기)**: GBible의 존재 의의가 바뀌었다. **로직·DB 항목·화면·테스트 도구는 AI(Claude Code)가 문서를 보고 코드로 만들고, GBible은 개발자가 그것을 에디터에서 읽고(모니터링) · 밸런싱 값(숫자·고르는 값·참조)을 바꾸고 · 테스트하는 도구다.** 개발자가 직접 하는 것은 밸런싱 값 · 다이얼로그 그래프 · 레벨 배치 · 에셋 가져오기. 대화에서 구버전은 **모모이**(백업 `D:\Unity\Projects\Momoi`, 태그 `momoi-final` = 커밋 c0923a0), 지금 작업은 **미도리**라 부른다(코드·폴더·메뉴 이름은 그대로 Momoi/GBible). 3요소 1번은 "AI가 틀리지 않고 되돌아가지 않으며 예외가 생기지 않는다(첫 단계에서 예외를 막는다)"로 바뀌었다. 코드 안 이름은 AI가 쓰기 편한 쪽으로 짓는다(화면 이름만 사용자 확인).
-> - AI 쪽: `Documentation~/AI/ProjectFlow.md`(진행 매뉴얼 — 단계 0 흡수 ~ 6 출시 준비, 질문 규칙, 예외 사냥 표, 결정 기록 `Docs/Decisions.md`), 명세서(목적·자료 0-1·개발자 몫 12·테스트 상황 13), 관례 15(DB 반영 스크립트 `[DbSeed]`)·18(개발자가 읽고 바꿀 모양)·19(테스트), 스킬·CLAUDE 틀, 참조. 예전 프로그래머 가이드 → `Documentation~/AI/BuildGuide/`(AI용 구현 가이드).
-> - 에디터: 구조 잠금 `EditorPolicy`(Block 조립·로직 항목 추가·삭제·ID·키워드 코드 잠금, 값은 열림, `[Database(DeveloperAuthored = true)]` 종류는 추가·삭제, 메뉴 '개발 › 구조 편집 열기'), DB 반영 스크립트 `DbSeeds`(컴파일 뒤 저절로, 적용했을 때만 기록), 에셋 관리 창(`AssetWindow`·`AssetTools`·`AssetRequests`).
+> - AI 쪽: `Documentation~/AI/ProjectFlow.md`(진행 매뉴얼 — 단계 0 흡수 ~ 6 출시 준비, 질문 규칙, 예외 잡기 표, 결정 기록 `Docs/Decisions.md`), 명세서(목적·자료 0-1·개발자 몫 12·테스트 상황 13), 관례 15(DB 반영 스크립트 `[DbSeed]`)·18(개발자가 읽고 바꿀 모양)·19(테스트), 스킬·CLAUDE 틀, 참조. 예전 프로그래머 가이드 → `Documentation~/AI/BuildGuide/`(AI용 구현 가이드).
+> - 에디터: 구조 잠금 `EditorPolicy`(Block 조립·로직 항목 추가·삭제·ID 잠금, 값은 열림, `[Database(DeveloperAuthored = true)]` 종류는 추가·삭제, 메뉴 '개발 › 구조 편집 열기'), DB 반영 스크립트 `DbSeeds`(컴파일 뒤 저절로, 적용했을 때만 기록), 에셋 관리 창(`AssetWindow`·`AssetTools`·`AssetRequests`).
 > - 테스트: `TestScene`(test 슬롯·시작 상황·게임 화면 위 패널 F1), `TestScenarios`(상황 저장·불러오기·`Simulate` 자동 시뮬레이션·CSV), `TestSceneSetup.Ensure`, 모니터 명령 탭의 테스트 상황. 매뉴얼 38·39장.
 > - 사람용: `Documentation~/Guide/`(운영 가이드 00~09). Unity 확인: `PendingChecks.md` 단계 7.
+> - **2026-10-06 작성 전용 코드 지움**(사용자 결정): 시작하기·도움말(`Editor/Help`·`HelpWindow`·`HelpCoverageTests`), UI 샘플 창(`ShowcaseWindow`·`GsExperimental.uss`), 확인용 패널·샘플(`Samples/`·`GBIBLE_SAMPLES`·`Tests/PlayMode` 샘플 테스트), DB가 코드에 쓰던 기능(`ClassStaging`·`KeywordCode`·`KeywordMigration`, 클래스 상세의 키워드 그룹 연결·`[Hide]` 토글, 키워드 탭의 만들기·이름 바꾸기·지우기). 키워드 탭·클래스 상세는 읽기 전용(코드가 원본, AI가 쓴다). `ClassCode`는 `TryFindBody`(클래스 찾기)만 남음. `PendingChecks` 단계 3~5는 첫 게임 프로젝트의 테스트 씬에서 확인하는 목록으로 바꿈. 지운 것은 태그 `momoi-final`·모모이 백업에 그대로 있다.
+> - **2026-10-06 질문 규칙**(사용자): 질문 개수 제한은 없다. 막는 것은 같은 것 다시 묻기·제자리걸음·질 낮은 질문(진행 매뉴얼 3-1~3-3). 이름 '예외 사냥' → '예외 잡기'.
 
 ---
 
@@ -26,11 +28,10 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 |---|---|---|
 | `Runtime/Core` | `GBible.Core` | 게임 로직. **UnityEngine을 쓰지 않는다**(.NET 서버에서도 그대로 컴파일·동작, 경고를 에러로 검사). |
 | `Runtime/Unity` | `GBible.Unity` | 데이터 에셋(`GameData`), 런타임 시작·저장, 게임 시간, 다국어의 Unity 쪽, 오디오 |
-| `Editor` | `GBible.Editor` | 디자인 시스템(UI Toolkit, `Gs*`), DB·상세·모니터·키워드 연결·오디오·내 코드 범위 창, 검증기, 생성 코드 |
+| `Editor` | `GBible.Editor` | 디자인 시스템(UI Toolkit, `Gs*`), DB·상세·모니터·에셋 관리·오디오·내 코드 범위 창, 테스트 씬 도구, DB 반영 스크립트, 검증기, 생성 코드 |
 | `Optional/Dialogue` | `GBible.Dialogue` · `.Editor` · `.Tests` · `.Tests.PlayMode` | **선택 모듈**: 다이얼로그 그래프·연출·UI. 쓰지 않으면 폴더째 지운다. 코어는 이 모듈을 참조하지 않는다. |
 | `Optional/Inventory` · `Optional/Input` · `Optional/Steam` | `GBible.Inventory` · `GBible.Input` · `GBible.Steam` | **선택 모듈**: 인벤토리, 키 바꾸기(Input System 패키지 필요), Steam 연동(Steamworks.NET 패키지 필요). DB의 선택 기능으로 켠다. |
-| `Samples` | `GBible.Samples` · `.Samples.Editor` | 확인용 패널·예전 샘플. 선택 기능 '확인용 패널·샘플'(`GBIBLE_SAMPLES`)을 켤 때만 컴파일(지금은 꺼짐 — 2026-10-04 정리). |
-| `Tests` | `GBible.Tests.Editor` · `.Tests.PlayMode` | EditMode·PlayMode 테스트 |
+| `Tests` | `GBible.Tests.Editor` | EditMode 테스트(PlayMode 샘플 테스트는 2026-10-06 지움, 다이얼로그 PlayMode 테스트는 모듈 안) |
 
 프로젝트 루트(`D:/Unity/Projects/UnitySystemProject`)의 `Tools/`에 검증 스크립트가 있다(저장소 밖): `CompileOffline.ps1`(에디터를 연 채로 모든 어셈블리 오프라인 컴파일), `RunCoreTests.ps1`(Unity 없이 코어 테스트 실행, 자체 NUnit 대역 `Tools/CoreTestHarness/Shim.cs`), `VerifyServerCore.ps1`(코어를 서버 조건으로 컴파일), `Verify.ps1`(배치모드로 EditMode·PlayMode 테스트, 에디터가 이 프로젝트를 열고 있으면 못 돌린다).
 
@@ -94,7 +95,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 | Tests › 샘플 › 샘플 데이터 만들기 · 샘플 텍스트 만들기 | 예시 데이터. |
 | (프로젝트 창 우클릭) Assets › MomoiProject › 오디오 재생 · 정지 | 1.8. |
 
-도움말·시작하기 탭은 **숨김**(`HelpFeature.Enabled = false`, 코드는 남아 있음, 계약 테스트 `HelpCoverageTests`는 `[Ignore]`).
+도움말·시작하기는 2026-10-06에 코드째 지웠다(안내는 운영 가이드 `Guide/`).
 
 확장 입구: 값 칸의 목록을 모듈이 채우는 `IInlineChoiceProvider`, 텍스트 시트에 행을 더하는 `ITextSheetSource`, DB 전용 화면 `CodexPage`, 배치 블록 `GsLayoutBlock`(`[LayoutBlock]`).
 
@@ -297,7 +298,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 **구현**
 - 기능 켜고 끄기: `Editor/Data/GameFeatures.cs`. 상태는 `ProjectSettings/MomoiProject/Features.json`(팀 공유), 스크립팅 심볼(`GBIBLE_DIALOGUE`)은 그 파일에 맞춰 자동으로 넣고 뺀다(지금 고른 플랫폼과 PC). 다이얼로그 어셈블리 4개의 asmdef에 `defineConstraints`. 새 프로젝트는 꺼진 상태로 시작하고, 이 프로젝트는 켜 두었다(Features.json). 새 선택 기능은 `GameFeatures.All`에 한 항목을 더한다(이름·심볼·어셈블리·꺼졌을 때 보일 탭 이름·데이터 클래스).
 - DB 사이드바: `DatabaseWindow.Tabs()`가 DB 종류 탭 + 독립 탭(`CodexPage.TabLabel`이 있는 화면: 클래스·이벤트) + 꺼진 기능의 흐린 탭을 그룹 순서대로 만든다. 그룹 순서는 `GroupRank`(선언 → 진행 → DB → 이미지 → 데이터 → 선택 기능 → 샘플).
-- 클래스: `ClassCode`(C# 글자 다루기, 순수 함수), `ClassCatalog`(컴파일된 클래스 + 적용 전 변경 + 그룹 + 기능 클래스를 합친 목록, 파일 찾기, 삭제 검사, 필드 형식 목록), `ClassStaging`(코드 변경을 모아 두었다가 한 번에 쓰기, SessionState 보관), `ClassRegistry`(그룹·폴더·네임스페이스, `ProjectSettings/MomoiProject/Classes.json`), 화면 `ClassesPage`·`EventsPage`·`ClassDetail`·`FeaturePage`.
+- 클래스: `ClassCode`(클래스 본문 찾기, 순수 함수 — 코드 쓰기는 2026-10-06 지움), `ClassCatalog`(컴파일된 클래스 + 적용 전 변경 + 그룹 + 기능 클래스를 합친 목록, 파일 찾기, 삭제 검사, 필드 형식 목록), `ClassRegistry`(그룹·폴더·네임스페이스, `ProjectSettings/MomoiProject/Classes.json`), 화면 `ClassesPage`·`EventsPage`·`ClassDetail`·`FeaturePage`.
   - **원본은 C# 파일 하나뿐**이다(따로 정의 파일을 두지 않는다). DB는 TypeCache·리플렉션으로 읽으므로 코드와 DB가 어긋날 수 없고, 읽는 비용은 DB를 그릴 때뿐이다.
   - DB가 쓰는 곳은 파일의 필드 구역(`// <fields>` … `// </fields>`) 안 선언 줄뿐이다. 구역 밖에 직접 쓴 필드는 '코드' 표시로 보이고 연결만 정할 수 있다(이름 바꾸기·삭제는 코드에서). 직접 쓴 클래스에 `+ 필드`를 하면 본문 끝에 구역을 만들어 넣는다.
   - 이름 바꾸기는 `[FormerlySerializedAs]`를 붙여 에셋·저장 값을 잇는다. 삭제는 DB에서 만든 파일(머리의 `// <gbible-class>` 표시)만, 쓰는 곳(다른 클래스의 필드·플레이어 데이터·템플릿·그 종류의 항목)이 없을 때만.
@@ -466,7 +467,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 7. **오디오 확장(선택)** — 장면 전환 시 수명 규칙(씬별 정지 등), 덕킹(목소리 나올 때 브금 줄이기) 등은 사용자가 원하면.
 8. **UPM 패키지화** — 복사 대신 git URL 패키지 배포 여부(미결).
 9. **Modifiers(능력치 보정)** — 끝남(5.0의 코어 1단계 ①).
-10. **도움말·시작하기** — 가장 마지막(영구 보류 해제 시). 재개 시 "새 기능마다 도움말" 규칙과 `HelpCoverageTests` 복구.
+10. ~~도움말·시작하기~~ — 2026-10-06 지움(사용자 결정). 필요하면 태그 `momoi-final`에서 되살린다.
 
 ---
 

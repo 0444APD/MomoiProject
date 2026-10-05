@@ -581,7 +581,6 @@ namespace GBible.EditorTools.UI
             var head = Gs.Row();
             var kind = Gs.Label(GsLayoutBlock.NameOf(placement.block), "gs-heading", "gs-grow");
             head.Add(kind);
-            if (block != null) head.Add(HelpUI.Button(HelpIds.Layout(placement.block)));
             head.Add(new GsButton("✕", () =>
             {
                 layout.blocks.RemoveAt(index);

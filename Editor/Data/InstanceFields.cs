@@ -8,18 +8,11 @@ using UnityEditor;
 namespace GBible.EditorTools
 {
     // 인스턴스 편집 화면의 필드 규칙: [Hide](항상 숨김)·[ShowIf](조건부 보이기)와 기능 필드(비어 있을 수 있는 [SerializeReference]).
-    // 어트리뷰트는 코드가 원본이고, 클래스 상세에서 바꾼 것(저장 전)도 함께 반영한다.
+    // 어트리뷰트는 코드가 원본이다(AI가 코드에 쓴다).
     public static class InstanceFields
     {
-        public const string Hide = "Hide";
-
-        // 저장 전 변경을 반영한 [Hide] 여부.
-        public static bool IsHidden(FieldInfo field)
-        {
-            if (field == null) return false;
-            var current = field.IsDefined(typeof(HideAttribute), true);
-            return ClassStaging.PendingAttribute(field.DeclaringType?.FullName, field.Name, Hide, current);
-        }
+        // [Hide] 여부.
+        public static bool IsHidden(FieldInfo field) => field != null && field.IsDefined(typeof(HideAttribute), true);
 
         // 이 객체에서 이 필드를 보이는가.
         public static bool Visible(object owner, FieldInfo field)
