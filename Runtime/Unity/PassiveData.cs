@@ -22,7 +22,7 @@ namespace GBible.Data
         [FieldLabel("놓인 것마다"), Tooltip("켜면 가진 쪽이 목록의 요소 하나하나입니다(결과의 사용자 = 그 요소). 같은 목록을 보는 '놓인 것마다' 패시브는 목록 순서(자리)대로 발동합니다 — 조커 칸 왼쪽부터, 보드 앞 칸부터")] public bool perElement;
         [FieldLabel("레벨 필드"), Tooltip("요소의 이 숫자 필드가 레벨입니다({level}·Game.Owned·'레벨마다' 보정). 비우면 요소 하나 = 1")] public string levelField = "";
         [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)] public Trigger trigger;
-        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두"), Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 targetId → 가진 쪽이 맞을 때만)")] public string holderField = "";
+        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두", Root = nameof(trigger)), Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 targetId → 가진 쪽이 맞을 때만)")] public string holderField = "";
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
         [FieldLabel("가진 동안 능력치 보정"), Tooltip("가진 동안만 붙는 보정입니다(잃으면 저절로 빠짐). 받는 쪽 = 가진 쪽(놓인 것마다면 그 요소) 또는 아래 '보정 받을 대상'")] public List<PassiveModifier> modifiers = new List<PassiveModifier>();
         [FieldPath(EmptyLabel = "가진 쪽"), FieldLabel("보정 받을 대상"), Tooltip("가진 목록 플레이어 데이터 안의 객체 경로(예: hero). 비우면 가진 쪽")] public string modifierTarget = "";

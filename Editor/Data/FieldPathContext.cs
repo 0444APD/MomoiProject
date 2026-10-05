@@ -17,6 +17,21 @@ namespace GBible.EditorTools
             rootLabel = null;
             var so = property.serializedObject;
             var path = property.propertyPath;
+            // 칸이 뿌리를 직접 정했으면 그 형제 칸(트리거면 받는 이벤트, 뿌리 칸이면 그 값).
+            var own = PropertyUtil.GetField(property, out _)?.GetCustomAttribute<FieldPathAttribute>();
+            if (!string.IsNullOrEmpty(own?.Root))
+            {
+                var named = so.FindProperty(Sibling(path, own.Root));
+                if (named != null && named.propertyType == SerializedPropertyType.ManagedReference && named.managedReferenceValue is Trigger chosen)
+                {
+                    var events = chosen.EventTypes().ToList();
+                    if (events.Count == 0) return null;
+                    rootLabel = string.Join(" · ", events.Select(EventBus.DisplayNameOf));
+                    return events[0];
+                }
+                var namedRoot = named == null ? null : PropertyUtil.GetField(named, out _)?.GetCustomAttribute<FieldPathRootAttribute>();
+                if (namedRoot != null && named.propertyType == SerializedPropertyType.String) return Resolve(namedRoot.Kind, named.stringValue, out rootLabel);
+            }
             while (true)
             {
                 path = Parent(path);
