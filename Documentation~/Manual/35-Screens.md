@@ -471,19 +471,17 @@ Game.Session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(done
 1. 화면 목록(기획 명세서 6절)에서 기본 화면으로 되는 것(고르기·확인·설정·슬롯·일시정지·알림)을 빼고 남은 화면마다:
 2. `Assets/UI/Screens/<이름>.uxml`(+ 필요하면 `.uss`), 목록이 있으면 `Assets/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색·크기는 테마 변수(`var(--momoi-…)`)를 쓴다. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`.
 3. 버튼·목록이 있으면 `Assets/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`).
-4. DB 추가 메뉴(관례 15절)에 화면 항목을 더한다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
-5. 그림이 필요한 곳(카드 그림·아이콘)은 지금은 색 상자(배경색)로 두고, 사람이 넣을 에셋 목록(경로·크기·어디에 쓰는지)을 보고에 적는다.
+4. DB 반영 스크립트(관례 15절)에 화면 항목을 더한다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
+5. 그림이 필요한 곳(카드 그림·아이콘)은 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳)`로 임시 그림과 넣을 것 목록을 만들고 UXML·USS가 그 경로를 쓴다 — 개발자가 에셋 관리에서 진짜 그림을 넣으면 그대로 바뀐다(39장).
 
 ```csharp
-// Assets/Code/Editor/AddScreens.cs — DB 추가 메뉴
-[MenuItem("MomoiProject/DB 추가/화면")]
-static void Run()
+// Assets/Code/Editor/Seeds/ScreenSeeds.cs — DB 반영 스크립트(컴파일 뒤 저절로 돈다, 관례 15절)
+[DbSeed("1")]
+static void Screens()
 {
     ScreenSetup.Ensure();
     Add("battleHud", "Assets/UI/Screens/BattleHud.uxml", ScreenLayer.Base, back: false, scene: "Battle");
     Add("shop", "Assets/UI/Screens/Shop.uxml", ScreenLayer.Window, back: true);
-    EditorDatabase.Staging.Touch();
-    DatabaseWindow.Open();
 }
 
 static void Add(string id, string uxml, ScreenLayer layer, bool back, string scene = null)
