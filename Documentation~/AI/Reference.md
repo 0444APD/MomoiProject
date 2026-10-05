@@ -62,28 +62,32 @@ GBible.Unity
 | 일이 일어났다고 알리기 | `[Serializable, GameEvent("이름")] class X { … }` → `Game.Events.Publish(new X { … })`. 받기 `Subscribe<X>`(규칙)·`SubscribeAfterAction<X>`(연출) | 10 |
 | 핵심 동사(피해·회복·사용·이동 …) | 규칙 함수(`Rules.Damage`) 하나 + 의도(`[Serializable, Intent("피해")] class DamageIntent { sourceId, targetId, amount, cancelled }`)를 `Game.Intercept(의도)`로 통과 + 끝난 뒤 이벤트 | 28, 관례 4절 |
 | "받는 피해 −5"·"막기"·"두 배"·"대신 맞기" | DB에서 트리거 '가로채기'(의도 형식) + 결과 '의도 고치기'(값으로 바꾸기·더하기·곱하기·막기) | 28 |
-| 도발·대신 맞기·중첩·레벨만큼 | '의도 고치기' 값 틀: `targetId` 값으로 바꾸기 `{user}`, `amount` 더하기 `-{stacks}`·`-{level}`·`-{level:2/4/7}`, `{balance:ID}` | 28 |
-| GBible이 가로채기 자리를 둔 동작 | 의도 '사용'(`times`·막기) · '비용 지불'(`amount`·`floor` = 빚 하한·`key`/`path` = 낼 곳·공짜) · '상태 효과 걸기'(`statusId` 바꾸기·`stacks`·`length`·`kind`·막기) · '확률'(`probability`) | 28·29 |
+| 도발·대신 맞기·중첩·레벨만큼·조각의 값만큼 | 값 틀('의도 고치기'·'필드 바꾸기'·'이벤트 쏘기'·'사용자 필드 검사'): `{user}`(사용자 id) · `{user:경로}`(사용자의 필드) · `{event:경로}`(받은 이벤트·의도의 필드) · `{data:키.경로}` · `{count:키.경로}`(목록 개수) · `{owner}` · `{stacks}` · `{level}` · `{level:2/4/7}` · `{balance:ID}`. 예: `targetId` 값으로 바꾸기 `{user}`, `amount` 더하기 `-{stacks}` | 28 |
+| GBible이 가로채기 자리를 둔 동작 | 의도 '사용'(`times`·막기) · '효과 배율'(`multiplier` — 능력을 쓸 때·패시브가 발동할 때, 기본 효과 Block이 곱함, 프로젝트 Block은 `Use.Context.Power`) · '비용 지불'(`amount`·`floor` = 빚 하한·`key`/`path` = 낼 곳·막기 = 공짜, 거르기 `forId` 무엇을 위한·`userId` 내는 쪽) · '상태 효과 걸기'(`statusId` 바꾸기·`stacks`·`length`·`maxStacks`·`pulse`·`kind`·`byId`·막기) · '확률'(`probability`) | 28·29 |
 | 물리·충돌·투사체·미니게임 판정 | **판정 보고 행동**: 화면(MonoBehaviour)이 판정하고 결과(누가 누구를·성공)를 행동 하나로 보낸다(실시간은 틱마다 `Strike { hits }`). 규칙은 결과만. 위치·속도는 화면 쪽 | 33 |
 | 능력치(공격력·방어)와 보정 | 숫자 필드 = 능력치. `Game.Attribute(대상, "attack")`(보정 포함 값), `Game.AddModifier(대상, "attack", ModifierKind.Percent, 0.2, 출처)`·`RemoveModifiers(출처)`. 같은 칸은 더하고 칸끼리 곱(플랫 → 퍼센트 → 독립 곱) | 28 |
-| 비용 내기 | `Game.Pay(키, "battle.energy", 2, what: "energy.name")`(모자라면 플레이어용 실패, 가로채기 '비용 지불'로 공짜·할인), `Game.CanPay`. DB 결과 '비용 내기' | 28 |
+| 비용 내기 | `Game.Pay(키, "battle.energy", 2, what: "energy.name", forId: 카드ID, user: 내는쪽)`(모자라면 플레이어용 실패, 가로채기 '비용 지불'로 공짜·할인) · `Game.TryPay(…)`(모자라면 바꾸지 않고 거짓 — 틱 묶음 안의 "되면 낸다") · `Game.CanPay`(가로채기 전, 화면 미리 보기용). DB 결과 '비용 내기' | 28 |
 | 플레이어에게 보일 실패 | `throw Game.Fail("fail.frozen", "얼어 있어 움직일 수 없습니다", ("turns", 2))`. 행동 전체 취소, 메시지는 읽을 때 지금 언어 | 30 |
-| 언제 · 누구에게 · 무엇을(효과 조립) | 트리거(이벤트 받기·조건 충족·사용·가로채기) → 결과(대상에게 효과(대상 Block → 효과 Block) · 플레이어 데이터에 주기 · 로그에 기록 · 이벤트 쏘기 · 선택 요구 …) | 11·12, 기획 명세서 읽는 법 7절 |
+| 언제 · 누구에게 · 무엇을(효과 조립) | 트리거(이벤트 받기·조건 충족·사용·가로채기) → 결과(대상에게 효과(대상 Block → 효과 Block) · 플레이어 데이터에 주기 · 로그에 기록 · 이벤트 쏘기(값 틀) · 선택 요구 …) | 11·12, 기획 명세서 읽는 법 7절 |
 | 조건("보스를 잡았고 골드 100 이상") | 조건 Block(필드 검사·플레이어 데이터 검사·배열 검사·AND/OR/NOT·로그 비교), 코드 조건은 `SimpleCondition` | 11 |
 | 그 항목만의 특별한 결과 | `[BindTo(GameIds.X.Y)] static void F(이벤트 e, TriggerContext c)` 또는 `Reward` 클래스 | 13 |
 | 스킬·아이템 쓰기 | 사용 기능 필드(`[SerializeReference] Usable usable`) 또는 DB › 능력 → `Game.Use(id, 사용자, 대상…)`·`Game.CanUse(…, out 이유)`. 조건이 안 맞을 때 글은 '쓸 수 없을 때 글' | 16 |
 | 독·화상·보호막·분노(중첩·지속) | DB › 상태 효과(종류·중첩·다시 걸 때·지속(영구/이벤트 횟수/초)·능력치 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과), 효과 '상태 효과 걸기'·`Game.ApplyStatus`·`RemoveStatus`·`StatusStacks`·`HasStatus`·`Statuses` | 29 |
-| 화상 → 푸른 화상·독 중첩 2배·면역·디버프 지속 + | 가로채기 '상태 효과 걸기' + 의도 고치기(`statusId` 값으로·`stacks` 곱하기·막기·`length` 곱하기) | 29 |
+| 화상 → 푸른 화상·독 중첩 2배·면역·디버프 지속 +·최대 중첩 +·틱 속도 + | 가로채기 '상태 효과 걸기' + 의도 고치기(`statusId` 값으로·`stacks` 곱하기·막기·`length` 곱하기·`maxStacks` 더하기·`pulse` 곱하기) | 29 |
+| 처치 기여(마지막에 건 쪽)·걸린 것으로 대상 거르기 | 걸린 것의 `by`(건 개체 id, 다시 걸면 바뀜 — 효과 '상태 효과 걸기'는 사용자, 코드 `ApplyStatus(…, by:)`) · 대상 '상태 효과로 거르기'(중첩·종류 가짓수 비교) | 29 |
+| 패시브를 끄는 디버프(Ink·봉인) | 상태 효과 `silencesPassives`(걸린 쪽의 패시브를 끔 — 발동·보정·`Owned` 모두 0) | 29·17 |
 | 버프·디버프로 묶기(정화·디버프 개수) | 상태 효과의 `kind`(종류) + 효과 '상태 효과 풀기'(종류 전부)·조건 '상태 효과 검사'(종류)·`Game.StatusCount(대상, 종류)`·`RemoveStatuses` | 29 |
 | 실시간 지속 피해·재생(0.5초마다) | 상태 효과의 '주기(초)' + 결과 | 29 |
 | 쿨다운 | 상태 효과(쿨다운, 지속 N턴·N초, 화면에 숨김) + 사용 조건 '상태 효과 검사'(<= 0) + 결과에 '상태 효과 걸기', 쿨다운 줄이기 = 효과 '상태 효과 줄이기'·`Game.ShortenStatus` | 29·16 |
 | 가지고 있으면 발동(유물·특성·패시브 스킬·장비 효과·축복) | DB › 패시브(가진 목록 · 발동 · 가진 쪽 필드 · 결과), `Game.Owned(id)` = 개수·레벨 | 17·29 |
-| 놓인 순서대로 발동(조커 칸·보드·참) | 패시브 `perElement`(놓인 것마다 — 가진 쪽 = 목록의 요소, 같은 목록끼리 목록 순서로 발동) · `matchField`(일치 필드 — 객체 목록의 원본 ID 필드) · `levelField`(레벨 필드). 조각 목록은 객체 목록(고유 id + 원본 ID) | 17 |
-| 가진 동안 +N(유물 공격 +2, 레벨마다 다름) | 패시브 `modifiers`(가진 동안 능력치 보정 — 줄마다 `attribute`·`kind`·`value`·`perLevel` 레벨마다·`byLevel` 레벨별 값 3/6/10/14) · `modifierTarget`(보정 받을 대상). 저장하지 않고 읽을 때 계산 → 잃으면 저절로 빠짐. 트리거가 없어도 된다 | 17·28 |
-| 대상의 숫자 필드를 바꾸기(이 조커 배수 +1·카운터 −1·처치 횟수 +1) | 효과 '필드 바꾸기'(더하기·곱하기·값으로, 값 틀 `{level}`·`{level:2/4/7}`·`{stacks}`, 0 아래로 내리지 않음) | 12 |
-| 다른 조각의 패시브를 빌려 쓰기(Blueprint·Brainstorm) | 결과 '빌려 쓰기'(빌릴 조각 = 대상 Block, 예: 자리로 고르기 — 오른쪽). 원본 값을 읽고, 원본 자신의 쌓이는 값은 바꾸지 않고, 고리는 끊는다. 코드 `Game.BorrowPassive(ID, 원본)` | 17 |
+| 놓인 순서대로 발동(조커 칸·보드·참) | 패시브 `perElement`(놓인 것마다 — 가진 쪽 = 목록의 요소, 같은 목록끼리 목록 순서로 발동) · `matchField`(일치 필드 — 요소의 원본 ID 필드나 글자 목록) · `matchVia`(원본에서 읽기 — 원본(인스턴스)의 패시브 ID 목록) · `levelField`(레벨 필드, 0 이하 = 꺼짐). 조각 목록은 객체 목록(고유 id + 원본 ID) | 17 |
+| 한 패시브가 순간마다 다른 결과(쌓기·빼기·내기·N번째마다) | 패시브 `rules`(발동 더 — 줄마다 트리거 + 결과) + 조건 '사용자 필드 검사'(조각의 카운터) | 17·11 |
+| 가진 동안 N초마다 | 패시브 `pulse`·`pulseByLevel`(주기, 게임 시각 기준 — 멈추기·리셋은 필드 + 틱 행동) | 17 |
+| 가진 동안 +N(유물 공격 +2, 레벨마다 다름) | 패시브 `modifiers`(가진 동안 능력치 보정 — 줄마다 `attribute`·`kind`·`value`·`perLevel` 레벨마다·`byLevel` 레벨별 값 3/6/10/14·`target` 받을 대상) · `modifierTarget`(보정 받을 대상, `party[]`면 그 모두) · `modifierWhen`(보정 조건 — 같은 줄에 혼자·체력 절반 이하) · `stacking`(여럿일 때 — 레벨 합·사본마다 값·가장 높은 하나). 저장하지 않고 읽을 때 계산 → 잃으면 저절로 빠짐. 트리거가 없어도 된다 | 17·28 |
+| 대상의 숫자 필드를 바꾸기(이 조커 배수 +1·카운터 −1·처치 횟수 +1) | 효과 '필드 바꾸기'(더하기·곱하기·값으로 바꾸기, 값 틀, 0 아래로 내리지 않음, 더하기는 × 효과 배율) | 12 |
+| 다른 조각의 패시브를 빌려 쓰기(Blueprint·Brainstorm) | 결과 '빌려 쓰기'(빌릴 조각 = 대상 Block, 예: 자리로 고르기 — 오른쪽). 원본 값을 읽고, 원본 자신의 쌓이는 값은 바꾸지 않고, 고리는 끊는다. 가진 쪽 필드는 빌리는 쪽 기준. 코드 `Game.BorrowPassive(ID, 원본)` | 17 |
 | 조각을 차례로 쓰기(되는 것만) | `Game.TryUse(id, 사용자, 대상…)`(조건이 안 맞으면 실패 없이 거짓). 한 번 더 발동은 의도 '사용'의 `times` | 16 |
-| 자리(옆 칸·같은 줄·맞은편·가장자리·석판 무늬) | 목록 + 줄 길이(0 = 한 줄, 빈 칸 = null). 코드 `Placement.Around`·`Is`·`Pattern(칸, 개수, 열, 무늬, 회전)`·`Rotate`, DB 대상 '자리로 고르기'(다른 목록 = 맞은편)·조건 '자리 검사' | 37 |
+| 자리(옆 칸·같은 줄·맞은편·가장자리·석판 무늬) | 목록 + 줄 길이(0 = 한 줄, 빈 칸 = null). 코드 `Placement.Around`·`Is`·`Pattern(칸, 개수, 열, 무늬, 회전)`·`Rotate`, DB 대상 '자리로 고르기'(다른 목록 = 맞은편, 기준 '없음' = 목록 전체의 맨 처음·맨 끝)·조건 '자리 검사'. 열 우선 순서(와일드프로스트)는 목록을 열 우선으로 담고 '같은 열 …'. 플레이어마다 칸은 `players[].charms`(기준이 든 목록) | 37 |
 | "3턴 뒤 폭발"·"2초 뒤" | 상태 효과의 끝날 때 결과(DB) / `Game.ScheduleAfter(초, 행동)`·`ScheduleOn<이벤트>(횟수, 행동)`(코드)·`CancelSchedule(s)` | 29 |
 | 플레이어가 고르기("1장 버리기") | `Game.Ask(안내, 후보, new 이어서할행동())` + 행동의 `[Chosen]` 필드 → 화면이 `Game.Answer`. DB 결과 '선택 요구'(판에 있는 것에서)·'가중치 표에서 고르기'(DB 원본에서) | 29·30 |
 | 대상 고르기(체력이 가장 낮은 적·불 속성 적 무작위 2·때린 쪽) | 기본 대상 Block: 플레이어 데이터 목록 → 정렬해서 n개 / 조건으로 거르기 → 무작위 n개 / 이벤트의 개체 | 16 |
@@ -148,7 +152,7 @@ GBible.Unity
 
 | 부가 기능 | 쓸 것 | 장 |
 |---|---|---|
-| 대사·컷신 | 선택 기능 다이얼로그: 그래프 창, `Dialogues.Play(id)`·`Signaled`·`ResumeSaved` | 24 |
+| 대사·컷신 | 선택 기능 다이얼로그: 그래프 창, `Dialogues.Play(id)`·`Signaled`·`ResumeSaved`. 대화가 중심인 게임이면 24장의 지금 동작(대사 진행은 행동 밖·되감기 없음 등)을 먼저 본다 | 24 |
 | 겹치는 가방 | 선택 기능 인벤토리: 필드 `Inventory { capacity }` → `Add`·`Remove`·`CountOf`·`Has`. 고정 칸·칸 정보가 필요하면 자리(`List<T>` + `Placement`) | 25 |
 | 게임 안 달력·시각 | 판 데이터에 날짜·시각, 하루 넘김 행동이 이벤트를 쏜다 | 가이드 07 |
 | 현실 시각(오프라인 보상·스태미나·일일 초기화) | `Game.Now`(UTC, 행동에 기록되어 Undo·멀티에서 같다) · `Game.Day(초기화 시각)` · `Game.Week()`. 규칙에서 `DateTime.Now`를 쓰지 않는다. 꺼 둔 시간 = `Game.Now − profile.lastSeen` | 07 |
@@ -158,7 +162,7 @@ GBible.Unity
 | 되감기("이번 턴 처음으로") | `session.HistoryMark`·`UndoTo(지점)`(행동 단위 Undo) | 02 |
 | 세이브 슬롯 1·2·3 | `GBibleRuntime.UseSlot(이름)`·`SlotInfoOf`·`DeleteSlot`·`CopySlot`·`SlotSummary`(한 줄 요약 함수), 기본 슬롯 화면 | 31·35 |
 | 키 바꾸기 | 선택 기능 입력: `GameInput.Use(actions)`·`Rebind`·`ResetBindings`·`BindingText` | 31 |
-| Steam | 선택 기능 Steam + DB › Steam(App ID): 자동 초기화·도전과제·로그 → 통계·`GameSteam.SetPresence`·Cloud(Auto-Cloud 안내) | 34 |
+| Steam | 선택 기능 Steam + DB › Steam(App ID): 자동 초기화·도전과제·로그 → 통계·`GameSteam.SetPresence`·Cloud(Auto-Cloud 안내). 리더보드·친구 초대는 없다(필요하면 프로젝트가 Steamworks.NET을 직접) | 34 |
 
 ---
 
@@ -172,8 +176,8 @@ GBible.Unity
 | 데이터 | `Data()`(생성 접근자: `Game.Data().Run`) · `Get<T>(키)` · `Set(키, 값)` · `Find<T>(id)` · `Find(id)` · `All<T>()` · `All<T>(키)` · `NewId(접두)` · `NewIds(접두, n)` · `static IdOf(객체)` · `static HasId(형식)` |
 | 이벤트·난수 | `Events`(`Publish`·`Subscribe`·`SubscribeAfterAction`) · `Random(흐름)` · `Chance(확률, 흐름, source, user)`(의도 '확률'을 거침) |
 | 능력치 | `Attribute(대상, 이름)` · `AddModifier(대상, 이름, 칸, 값, 출처, permanent)` · `RemoveModifiers(출처, 대상)` · `Modifiers(대상, 이름)` |
-| 가로채기·비용·실패 | `Intercept<T>(의도)` · `Pay(키, 경로, 양, what)` · `CanPay(키, 경로, 양)` · `Fail(키, [기본 문장,] (이름, 값)…)` |
-| 상태 효과·패시브 | `ApplyStatus(대상, id, 중첩 = 1, 출처, 길이 = 기본)`(의도 '상태 효과 걸기'를 거침, 막히면 null) · `RemoveStatus(대상, id, 중첩 = 0)` · `ShortenStatus(대상, id, 양)` · `StatusStacks` · `HasStatus` · `Statuses(대상)` · `StatusCount(대상, 종류)` · `RemoveStatuses(대상, 종류)` · `Owned(패시브 id, 가진 쪽)`(놓인 것마다면 가진 쪽 = 그 요소) · `BorrowPassive(패시브 id, 원본)` |
+| 가로채기·비용·실패 | `Intercept<T>(의도)` · `Pay(키, 경로, 양, what, forId, user)` · `TryPay(키, 경로, 양, forId, user)` · `CanPay(키, 경로, 양)` · `Fail(키, [기본 문장,] (이름, 값)…)` |
+| 상태 효과·패시브 | `ApplyStatus(대상, id, 중첩 = 1, 출처, 길이 = 기본, by = 건 개체)`(의도 '상태 효과 걸기'를 거침, 막히면 null) · `RemoveStatus(대상, id, 중첩 = 0)` · `ShortenStatus(대상, id, 양)` · `StatusStacks` · `HasStatus` · `Statuses(대상)` · `StatusCount(대상, 종류)` · `RemoveStatuses(대상, 종류)` · `Owned(패시브 id, 가진 쪽)`(놓인 것마다면 가진 쪽 = 그 요소) · `BorrowPassive(패시브 id, 원본)` |
 | 예약 | `ScheduleAfter(초, 행동, 출처, permanent)` · `ScheduleOn<이벤트>(횟수, 행동, 출처, permanent)` · `CancelSchedule(id)` · `CancelSchedules(출처)` |
 | 선택 대기 | `Ask(안내, 후보(객체·id 글자), 이어서, min, max, source, player, label)` · `Ask(안내, ChoiceCandidate들, …)` · `Choice` · `Choices` · `IsWaiting` · `Answer(선택 id, 고른 것…)` · `CancelChoice(id)` · `RerollChoice(id)`(표로 만든 선택을 새로 뽑기) |
 | 밸런스·뽑기 | `Balance(id[, 단계])` · `BalanceSum(id, from, n)` · `BalanceCount(id, from, 예산)` · `Roll(표 id)` · `Roll(표 id, n, unique)` · `Roll(풀 (id, 무게)…, n, unique, stream)` · `Roll(id 목록, n, unique, stream)` |
@@ -215,7 +219,7 @@ public class PlayCard : GameAction
 ### 3-5. 이벤트 · 의도 · 컨텍스트
 
 - 이벤트: `[Serializable, GameEvent("턴 끝")] public class TurnEnded { public int turn; public string playerId; }`. 필드 = 매개변수(받는 쪽·트리거 필터가 읽는다). 이름은 과거형(`EnemyKilled`). 쏘기 `Game.Events.Publish(…)`.
-- 의도: `[Serializable, Intent("피해")] public class DamageIntent { public string sourceId, targetId; public int amount; public bool cancelled; }` → 규칙 함수가 `intent = Game.Intercept(intent); if (intent.cancelled) return;`. GBible 기본 의도: `UseIntent`(사용) · `CostIntent`(비용 지불, `floor`) · `StatusIntent`(상태 효과 걸기) · `ChanceIntent`(확률).
+- 의도: `[Serializable, Intent("피해")] public class DamageIntent { public string sourceId, targetId; public int amount; public bool cancelled; }` → 규칙 함수가 `intent = Game.Intercept(intent); if (intent.cancelled) return;`. GBible 기본 의도: `UseIntent`(사용) · `PowerIntent`(효과 배율 → `TriggerContext.Power`) · `CostIntent`(비용 지불, `floor`·`forId`·`userId`) · `StatusIntent`(상태 효과 걸기, `maxStacks`·`pulse`·`byId`) · `ChanceIntent`(확률).
 - 컨텍스트(`TriggerContext`): `Session` · `Game` · `Owner`(그 결과를 가진 DB 항목 ID, 상태 효과면 상태 효과 ID) · `Event`(받은 이벤트·가로챈 의도) · `IsIntercept` · `IsUse` · `User`(사용자, 상태 효과면 가진 쪽) · `Picked`(고른 대상·고른 것).
 
 ### 3-6. Block 만들기(재사용 부품)
@@ -287,7 +291,7 @@ public class PlayCard : GameAction
 | 진행 › 도전과제 | `AchievementData` · `achievement` | 트리거 → 결과 | `GameIds.Achievement` | 14 |
 | DB › 능력 | `AbilityData` · `ability` | 쓰는 것(조건·대상·효과·쓸 수 없을 때 글) | `GameIds.Ability` | 16 |
 | DB › 상태 효과 | `StatusData` · `status` | 버프·디버프·쿨다운(`kind` 종류·중첩·지속·주기·보정·트리거·결과·아이콘·화면에 숨김) | `GameIds.Status` | 29 |
-| DB › 패시브 | `PassiveData` · `passive` | 가지고 있으면 발동(`ownerKey`·`ownerPath` 가진 목록 · `matchField` 일치 필드 · `perElement` 놓인 것마다 · `levelField` 레벨 필드 · `trigger` 발동 · `holderField` 가진 쪽 필드 · `outcomes` 결과 · `modifiers` 가진 동안 능력치 보정 · `modifierTarget` 보정 받을 대상 · `icon`) | `GameIds.Passive` | 17·29 |
+| DB › 패시브 | `PassiveData` · `passive` | 가지고 있으면 발동(`ownerKey`·`ownerPath` 가진 목록 · `matchField` 일치 필드 · `matchVia` 원본에서 읽기 · `perElement` 놓인 것마다 · `levelField` 레벨 필드 · `trigger` 발동 · `holderField` 가진 쪽 필드 · `outcomes` 결과 · `rules` 발동 더 · `pulse`·`pulseByLevel` 주기 · `modifiers` 가진 동안 능력치 보정 · `modifierTarget` 보정 받을 대상 · `modifierWhen` 보정 조건 · `stacking` 여럿일 때 · `icon`) | `GameIds.Passive` | 17·29 |
 | DB › 밸런스 값 | `BalanceData` · `balance` | 숫자 + 곡선 | `GameIds.Balance` | 30 |
 | DB › 가중치 표 | `WeightTableData` · `table` | 풀 + 무게 | `GameIds.WeightTable` | 30 |
 | DB › 화면 | `ScreenData` · `screen` | UI Toolkit 화면 | `GameIds.Screen` | 35 |
@@ -306,10 +310,10 @@ public class PlayCard : GameAction
 | 분류 | Block |
 |---|---|
 | 트리거 | 이벤트 받기(이벤트 형식 + 필드 필터) · 조건 충족 · 사용 · 가로채기(의도 형식) · AND/OR/NOT |
-| 조건 | 필드 검사(경로에 `[키]`) · 플레이어 데이터 검사 · 배열·리스트 항목 검사 · 로그 비교 · 도전과제 달성(다른 도전과제를 달성했나) · 상태 효과 검사(사용자·이벤트의 개체, 중첩 비교 — 쿨다운, 또는 종류의 가짓수) · 확률(%) · 자리 검사(맨 위 줄·맨 아래 줄·가장자리·안쪽·양옆이 빈 칸·같은 줄에 혼자·맨 처음·맨 끝·n번째) |
+| 조건 | 필드 검사(경로에 `[키]`) · 플레이어 데이터 검사 · 배열·리스트 항목 검사 · 로그 비교 · 도전과제 달성(다른 도전과제를 달성했나) · 상태 효과 검사(사용자·이벤트의 개체, 중첩 비교 — 쿨다운, 또는 종류의 가짓수) · 확률(%) · 사용자 필드 검사(조각의 카운터 이상 N, 값 틀) · 자리 검사(맨 위 줄·맨 아래 줄·가장자리·안쪽·양옆이 빈 칸·같은 줄에 혼자·같은 열 맨 앞·같은 열에 혼자·맨 처음·맨 끝·n번째) |
 | 결과 | 플레이어 데이터에 주기(숫자 증감·값·인스턴스·목록에 넣기·딕셔너리) · 로그에 기록 · 대상에게 효과 · 선택 요구 · 의도 고치기 · 이벤트 쏘기 · 비용 내기 · 가중치 표에서 주기 · 가중치 표에서 고르기(후보 수 더하기) · 빌려 쓰기(옆 조각의 패시브) · 다이얼로그 재생(다이얼로그 기능) |
-| 대상 | 사용자 자신 · 플레이어 데이터 목록 · 이벤트의 개체 · 조건으로 거르기 · 무작위 n개 · 정렬해서 n개 · 자리로 고르기(옆·같은 줄·주변 8칸·맨 처음·맞은편 같은 줄 맨 앞 …). 이어 붙이면 차례로. 주인공처럼 게임마다 다른 것은 `TargetSelector`로 |
-| 효과 | 상태 효과 걸기(길이 바꾸기) · 상태 효과 풀기(종류 전부 = 정화) · 상태 효과 줄이기 · 능력치 보정 · 능력치 보정 떼기 · 필드 바꾸기(더하기·곱하기·값으로). 피해·회복 같은 동사 효과는 프로젝트가 `Effect<T>`로 |
+| 대상 | 사용자 자신 · 플레이어 데이터 목록 · 이벤트의 개체 · 조건으로 거르기 · 상태 효과로 거르기 · 무작위 n개 · 정렬해서 n개 · 자리로 고르기(옆·같은 줄·주변 8칸·맨 처음·맞은편 같은 줄 맨 앞 …). 이어 붙이면 차례로. 주인공처럼 게임마다 다른 것은 `TargetSelector`로 |
+| 효과 | 상태 효과 걸기(길이 바꾸기, 중첩 × 효과 배율, 건 개체 = 사용자) · 상태 효과 풀기(종류 전부 = 정화) · 상태 효과 줄이기 · 능력치 보정 · 능력치 보정 떼기 · 필드 바꾸기(더하기·곱하기·값으로). 피해·회복 같은 동사 효과는 프로젝트가 `Effect<T>`로 |
 
 ## 6. 정해진 숫자
 
@@ -351,3 +355,9 @@ public class PlayCard : GameAction
 22. 조각(조커·참·아티팩트) 목록을 ID 글자 목록으로 → 같은 조각 둘·조각마다 쌓이는 값을 둘 수 없다. 객체 목록(고유 id + 원본 ID 필드) + 패시브 '일치 필드'.
 23. 놓인 순서가 결과를 바꾸는 조각을 보통 패시브로 → 패시브 등록 순서로 발동한다. '놓인 것마다'를 켠다.
 24. 가진 동안 +N을 얻을 때 보정 붙이기·잃을 때 떼기로 → 놓치면 남는다. 패시브 '가진 동안 능력치 보정'(읽을 때 계산).
+25. 켜진 조각 목록(세피리아 계산 결과)을 계산할 때마다 새로 만들었다 → 조각에 쌓인 값이 사라진다. 원래 목록을 가진 목록으로 두고, 꺼짐은 레벨 필드 0.
+26. 프로젝트 효과 Block이 수치를 그대로 썼다 → Lumin·Critical(효과 배율)이 붙지 않는다. 수치에 `Use.Context.Power`를 곱한다.
+27. 틱 묶음 행동 안에서 `Game.Pay` → 모자라면 묶음 전체가 취소된다. "되면 낸다"는 `Game.TryPay`.
+28. 같은 패시브의 다른 순간(쌓기·빼기·내기)을 패시브 둘이나 `[BindTo]`로 → 패시브 `rules`(발동 더) 한 패시브에.
+29. 붙이는 순간 한 번 바꾸는 것(와일드프로스트 참·종)을 가진 동안 보정으로 → 붙인 순서·다시 계산이 원작과 달라진다. 능력(대상 = 덱 카드) + '필드 바꾸기'.
+30. 턴 순서가 열 우선인 보드를 줄 우선으로 담았다 → '놓인 것마다' 차례가 원작과 다르다. 열 우선으로 담고 방향·자리는 '같은 열 …'.
