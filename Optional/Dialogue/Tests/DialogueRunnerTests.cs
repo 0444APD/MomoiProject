@@ -79,6 +79,31 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 신호를_받은_쪽이_다른_다이얼로그를_열면_그쪽이_이어_간다()
+        {
+            var first = Dialogue("first");
+            var start = Add(first.graph, new StartNode());
+            var signal = Add(first.graph, new SignalNode { signal = "switch" });
+            var never = Add(first.graph, new LineNode { text = "여기는 안 온다" });
+            Link(first.graph, start, StartNode.NextPort, signal, GraphNode.FlowInPort);
+            Link(first.graph, signal, SignalNode.NextPort, never, GraphNode.FlowInPort);
+            var second = Dialogue("second");
+            var start2 = Add(second.graph, new StartNode());
+            var hello = Add(second.graph, new LineNode { text = "두 번째" });
+            Link(second.graph, start2, StartNode.NextPort, hello, GraphNode.FlowInPort);
+
+            var (runner, stage) = Runner();
+            var ended = 0;
+            runner.Ended += () => ended++;
+            runner.Signaled += s => runner.Start(second);
+            Assert.IsTrue(runner.Start(first));
+            Assert.AreEqual(second, runner.Dialogue);
+            Assert.AreEqual(hello, runner.Line, "새 다이얼로그의 첫 대사에 머문다(예전에는 곧바로 끝났다)");
+            Assert.AreEqual("두 번째", stage.Line);
+            Assert.AreEqual(0, ended);
+        }
+
+        [Test]
         public void 대사를_차례로_보이고_끝난다()
         {
             var d = Dialogue("intro");

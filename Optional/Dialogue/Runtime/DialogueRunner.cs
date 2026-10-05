@@ -293,6 +293,8 @@ namespace GBible.Dialogue
             var dialogue = _dialogues(snapshot?.dialogue);
             if (!(dialogue?.graph.Find(snapshot.node) is LineNode line)) return false;
             Reset();
+            // 스냅샷에는 지나온 길(분기·선택)이 없어 진행 기록을 만들 수 없다 → 이전 재생의 기록을 이어 쓰지 않는다(판 저장의 진행 칸은 비워진다).
+            _progress = null;
             State = snapshot.state?.Clone() ?? new StageState();
             Stage?.ApplyState(State);
             Enter(dialogue);
@@ -482,13 +484,23 @@ namespace GBible.Dialogue
                         node = Dialogue.graph.Next(branch, pass ? BranchNode.TruePort : BranchNode.FalsePort);
                         break;
                     case SetNode set:
+                    {
+                        var scope = _main;
                         if (Session != null && !Replaying) GrantAsAction(set);
+                        // 값 바꾸기('다이얼로그 재생')가 다이얼로그를 새로 열었거나 끝냈으면 그쪽이 흐름을 맡는다.
+                        if (!ReferenceEquals(scope, _main) || Phase == DialoguePhase.Ended) return;
                         node = Dialogue.graph.Next(set, SetNode.NextPort);
                         break;
+                    }
                     case SignalNode signal:
+                    {
+                        var scope = _main;
                         if (!Replaying) Signaled?.Invoke(signal.signal);
+                        // 신호를 받은 쪽이 다른 다이얼로그를 열었거나 멈췄으면 여기서 끝.
+                        if (!ReferenceEquals(scope, _main) || Phase == DialoguePhase.Ended) return;
                         node = Dialogue.graph.Next(signal, SignalNode.NextPort);
                         break;
+                    }
                     case JumpNode jump:
                         var target = string.IsNullOrEmpty(jump.dialogue) ? Dialogue : _dialogues(jump.dialogue);
                         var entry = target?.Entry(jump.entryId);
@@ -890,6 +902,7 @@ namespace GBible.Dialogue
         }
     }
     // 다이얼로그의 '값 바꾸기' 노드 실행 = 행동 하나(Undo 한 단위). 바꿀 값(보상 블록)은 노드의 것을 그대로 쓴다.
+    // 기록·전송에는 다이얼로그 ID·노드만 남는다 → 받은 행동(다시 돌리기·멀티)은 DB의 그 노드에서 보상 블록을 다시 찾는다.
     [Serializable]
     public sealed class DialogueSetAction : GameAction
     {
@@ -901,9 +914,21 @@ namespace GBible.Dialogue
 
         protected override void Run()
         {
-            if (Rewards == null) return;
-            foreach (var reward in Rewards)
+            var rewards = Rewards ?? Find()?.rewards;
+            if (rewards == null)
+            {
+                Game.Session.Journal.Append(JournalKind.Warning, "Dialogue", $"다이얼로그 값 바꾸기: '{dialogue}'의 노드 '{node}'를 찾지 못해 아무것도 바꾸지 않았습니다.");
+                return;
+            }
+            foreach (var reward in rewards)
                 reward?.Grant(Game.Session);
+        }
+
+        SetNode Find()
+        {
+            if (string.IsNullOrEmpty(dialogue) || string.IsNullOrEmpty(node)) return null;
+            var data = GameDatabase.Load()?.All<DialogueData>().FirstOrDefault(d => d != null && d.Id == dialogue);
+            return data?.graph?.Find(node) as SetNode;
         }
     }
 }
