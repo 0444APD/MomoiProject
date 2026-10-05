@@ -63,6 +63,7 @@ namespace GBible
             Opened = null;
             Closed = null;
             QuitToTitle = null;
+            Reroll = null;
             Data.Clear();
             Controllers.Clear();
             OpenEntries.Clear();
@@ -231,11 +232,12 @@ namespace GBible
         }
 
         // 화면 입력 → 행동. 연출·선택 대기 중(GameView.Busy)이면 하지 않고, 플레이어용 실패는 알림('실패를 알림으로'가 꺼져 있으면 경고 로그).
+        // whileChoosing: 선택을 기다리는 동안에도 보낸다(다시 뽑기처럼 고르기 창 안의 버튼). 연출 중에는 그래도 막는다.
         // 프로그래머 실수(InvalidOperationException 등)는 그대로 던진다. 행동을 했으면 참.
-        public static bool Do(Func<GameAction> make)
+        public static bool Do(Func<GameAction> make, bool whileChoosing = false)
         {
             var game = GBibleRuntime.Game;
-            if (game == null || make == null || GameView.Busy) return false;
+            if (game == null || make == null || (whileChoosing ? GameView.IsPresenting : GameView.Busy)) return false;
             try
             {
                 game.Do(make());
@@ -248,6 +250,11 @@ namespace GBible
                 return false;
             }
         }
+
+        // 기본 고르기 창의 '다시 뽑기' 버튼: 프로젝트가 정하면 '가중치 표에서 고르기'로 만든 선택에 버튼이 보인다.
+        //   행동이 비용·남은 횟수를 내고 Game.RerollChoice(choice.id)를 부른다. null을 돌려주면 버튼을 숨긴다(다시 뽑을 수 없음).
+        //   GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;
+        public static Func<PendingChoice, GameAction> Reroll;
 
         // 화면 맨 위의 겹침 층(입력을 막지 않음): 피해 숫자처럼 화면 위에 잠깐 띄우는 연출 요소를 여기에 둔다.
         public static VisualElement Overlay => EnsureRoot() ? _layers[(int)ScreenLayer.Toast] : null;

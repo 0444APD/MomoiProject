@@ -129,13 +129,13 @@ protected override void Tick(float deltaTime)
 3. 플레이어용 실패(`GameFailure` — `Game.Fail`·`Game.Pay`가 모자람·`Game.Use` 조건, 30장 2-4)면 그 글을 **알림**으로 보인다(DB › 화면 설정 '실패를 알림으로', 끄면 경고 로그).
 4. 프로그래머 실수(`InvalidOperationException`)는 그대로 던진다(콘솔에 보인다).
 
-행동을 만드는 함수는 누를 때마다 돈다(그 순간의 데이터로 대상을 찾는다). 입력이 버튼이 아니면(드래그해서 놓기·키) 그 자리에서 `GameScreens.Do(() => …)`를 부른다.
+행동을 만드는 함수는 누를 때마다 돈다(그 순간의 데이터로 대상을 찾는다). 선택을 기다리는 동안에도 보내야 하는 버튼(고르기 창 안의 다시 뽑기)은 `GameScreens.Do(() => 행동, whileChoosing: true)` — 연출 중에는 그래도 막는다. 입력이 버튼이 아니면(드래그해서 놓기·키) 그 자리에서 `GameScreens.Do(() => …)`를 부른다.
 
 ### 2-5. 기본 화면
 
 | ID (`GameScreens.…`) | 층 · 뒤로 | 하는 일 | 여는 법 |
 |---|---|---|---|
-| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 후보 버튼 안에 텍스트 `<후보 id>.desc`가 있으면 설명 글(`.momoi-option__desc`). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. 틀린 답은 알림 | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로') |
+| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 후보 버튼 안에 텍스트 `<후보 id>.desc`가 있으면 설명 글(`.momoi-option__desc`). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. `GameScreens.Reroll`을 정하면 표로 만든 선택에 '다시 뽑기'(29장 4-10b). 틀린 답은 알림 | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로') |
 | `Confirmation` (`momoi.confirm`) | 팝업 · 아니오 | 글 + 예/아니오 | `GameScreens.Confirm(글, 예, 아니오)` |
 | `Settings` (`momoi.settings`) | 창 · 닫기 | DB › 설정 항목을 분류마다: 켜기/끄기 → 토글, 숫자 → 슬라이더(0~1이면 %), 선택지 → 드롭다운(언어·해상도는 자동 목록), 글 → 입력칸. 바꾸면 바로 `GameSettings.Set`(저장·적용). '기본값으로'(확인 후 `ResetAll`) | `GameScreens.Open(GameScreens.Settings)` |
 | `Slots` (`momoi.slots`) | 창 · 닫기 | 슬롯마다 요약(`GBibleRuntime.SlotSummary`)·플레이 시간. 고르면 `UseSlot` 후 `picked`. 지우기(확인 후, 지금 슬롯은 못 지움) | `GameScreens.Open(GameScreens.Slots, new SlotsRequest { count = 3, picked = … })` |

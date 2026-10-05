@@ -1,6 +1,6 @@
 # 29. 상태 효과·예약·선택 대기
 
-**한 줄 요약**: **상태 효과**는 대상에게 걸려 있는 동안 효과가 나는 버프·디버프다(독·분노·보호막·"3턴 뒤 폭발"·쿨다운). DB › 상태 효과에서 중첩·지속(영구 / 이벤트 횟수 / 게임 시간)·능력치 보정·트리거와 결과(또는 N초마다 내는 **주기**)를 정하고, 효과 Block `상태 효과 걸기` 또는 `Game.ApplyStatus`로 건다. 걸리고 끝날 때 이벤트 `StatusApplied`·`StatusEnded`를 쏜다. **예약**은 행동 하나를 나중에(게임 시간 N초 뒤, 또는 이벤트를 N번 받은 순간) 실행한다(코드). **선택 대기**는 행동 안에서 플레이어에게 고르기를 요구하고(`Game.Ask`·결과 `선택 요구`), 답이 오면 이어서 할 행동을 실행한다. 셋 다 플레이어 데이터에 들어 있어 Undo·판 저장·멀티플레이가 그대로 따라온다.
+**한 줄 요약**: **상태 효과**는 대상에게 걸려 있는 동안 효과가 나는 버프·디버프다(독·분노·보호막·"3턴 뒤 폭발"·쿨다운). DB › 상태 효과에서 중첩·지속(영구 / 이벤트 횟수 / 게임 시간)·능력치 보정·트리거와 결과(또는 N초마다 내는 **주기**)를 정하고, 효과 Block `상태 효과 걸기` 또는 `Game.ApplyStatus`로 건다. 걸기 직전에 의도 `상태 효과 걸기`를 거치므로 가로채기가 거는 상태 효과·중첩·길이를 바꾸거나 막는다(화상 → 푸른 화상, 면역). 상태 효과마다 **종류**(버프·디버프)를 정해 묶어서 풀거나(정화) 센다. 걸리고 끝날 때 이벤트 `StatusApplied`·`StatusEnded`를 쏜다. **예약**은 행동 하나를 나중에(게임 시간 N초 뒤, 또는 이벤트를 N번 받은 순간) 실행한다(코드). **선택 대기**는 행동 안에서 플레이어에게 고르기를 요구하고(`Game.Ask`·결과 `선택 요구`), 답이 오면 이어서 할 행동을 실행한다. 셋 다 플레이어 데이터에 들어 있어 Undo·판 저장·멀티플레이가 그대로 따라온다.
 
 **언제 쓰는가**
 
@@ -9,7 +9,9 @@
 - "3턴 뒤 폭발"처럼 **늦게 터지는 효과**(상태 효과의 끝날 때 결과. 코드라면 예약).
 - "0.5초마다 화상 피해 2, 3초"처럼 **실시간으로 N초마다** 나는 효과(상태 효과의 주기).
 - "화염구: 쓰면 3턴 동안 다시 못 쓴다"처럼 **쿨다운**(화면에 숨긴 상태 효과 + 사용 조건 `상태 효과 검사`).
-- "카드 1장을 골라 버린다", "보상 3개 중 1개"처럼 **플레이어가 고르는 효과**(선택 대기).
+- "화상 → 푸른 화상", "독 중첩 ×2", "독 면역"처럼 **다른 효과가 거는 상태 효과를 바꾸거나 막을 때**(가로채기 `상태 효과 걸기`).
+- "디버프를 모두 푼다", "디버프가 2가지 이상이면"처럼 **버프·디버프를 묶어서** 다룰 때(종류).
+- "카드 1장을 골라 버린다", "보상 3개 중 1개"처럼 **플레이어가 고르는 효과**(선택 대기). 보상 후보를 **다시 뽑기**도 여기다.
 
 이 문서에서 쓰는 용어:
 
@@ -25,10 +27,13 @@
 | 주기 (pulse) | 걸려 있는 동안 게임 시간 N초마다 결과를 내는 칸. 트리거 없이 돈다(실시간 지속 피해·재생). |
 | 줄이기 | 남은 지속을 줄이는 일(효과 `상태 효과 줄이기`·`Game.ShortenStatus`). 다 되면 지속이 다 된 것과 같다. |
 | 쿨다운 | 다시 쓰기까지 기다리는 시간. 화면에 숨긴 상태 효과 하나 + 사용 조건 `상태 효과 검사`로 만든다(5-12). |
+| 종류 (`StatusKind`) | 상태 효과의 갈래: `없음` · `버프` · `디버프`. 묶어서 풀기(정화)·세기·가로채기 조건에만 쓴다(2-1c). |
+| 의도 `상태 효과 걸기` (`StatusIntent`) | 상태 효과를 걸기 직전에 지나는 기본 제공 의도. 의도는 "일어나기 직전의 일"을 담은 객체이고, 가로채기가 그 필드를 고치거나 막는다(28장 2-3). 여기서는 상태 효과·중첩·길이·대상을 바꾸거나 막는다(2-1b). |
 | 예약 (Schedule) | 행동 하나를 나중에 실행하도록 맡겨 둔 기록. 플레이어 데이터 `$schedule`에 있다. |
 | 선택 대기 (Choice) | 플레이어의 답을 기다리는 고르기 요구 하나(`PendingChoice`). 플레이어 데이터 `$choices`에 있다. |
 | 이어서 할 행동 (then) | 고르기를 요구할 때 함께 맡기는 행동. 답이 오면 고른 것을 받아 실행된다. |
 | `[Chosen]` | 이어서 할 행동의 필드에 붙이는 어트리뷰트. 고른 것이 그 필드에 들어간다. |
+| 다시 뽑기 | 기다리는 선택의 후보를 같은 가중치 표에서 새로 뽑는 일(`Game.RerollChoice`). 결과 `가중치 표에서 고르기`로 만든 선택만 된다(4-10b). |
 | 컨텍스트 (`TriggerContext`) | 결과가 도는 순간의 정보. 상태 효과의 결과에서는 `User`가 가진 쪽, `Owner`가 상태 효과 ID다. |
 
 > **상태 효과와 키워드** — 화상·빙결 같은 상태는 키워드 목록(05장)에 글자로 두지 않고 이 장의 상태 효과(DB › 상태 효과, ID 상수는 `GameIds.Status`)로 만든다. 걸린 것은 대상의 필드가 아니라 플레이어 데이터 `$statuses`에 있다(2-4). 그래야 지속·중첩·턴마다의 효과·만료가 붙는다.
@@ -62,6 +67,11 @@
 | "화상(실시간): 0.5초마다 피해 2, 3초" | 상태 효과: 지속 게임 시간 3 + 주기 0.5 + 결과(5-11) |
 | "화염구: 쓰면 3턴 동안 다시 못 쓴다" | 숨긴 상태 효과 `fireballCd`(이벤트 횟수 3) + 능력의 사용 조건 `상태 효과 검사`(`<= 0`) + 결과 `상태 효과 걸기`(5-12) |
 | "모든 쿨다운 −1" | 효과 `상태 효과 줄이기`(5-12) |
+| "화상을 걸면 푸른 화상이 걸린다" | 패시브: 가로채기 `상태 효과 걸기`(`statusId` 일치 `burn`) + 의도 고치기 `statusId` 값으로 바꾸기 `blueBurn`(5-14) |
+| "독을 걸 때 중첩 2배" · "디버프 지속 +20%" | 가로채기 `상태 효과 걸기` + 의도 고치기 `stacks` 곱하기 2 · `length` 곱하기 1.2(5-15) |
+| "독에 걸리지 않는다(면역)" | 가로채기 `상태 효과 걸기` + 의도 고치기 `막기`(5-16) |
+| "디버프를 모두 푼다" · "디버프가 2가지 이상이면" | 상태 효과의 `kind`(종류) `디버프` + 효과 `상태 효과 풀기`(`kind`(종류 전부)) · 조건 `상태 효과 검사`(`kind`(종류))(5-17) |
+| "보상 다시 뽑기(남은 횟수 1 소모)" | 비용을 내는 행동 + `Game.RerollChoice`(4-10b, 30장 5-13) |
 | "유물·특성: 가지고 있는 동안 늘" | 상태 효과가 아니라 DB › 패시브(17장 0절) |
 
 > **규칙: 기획자가 DB에서 만드는 지연·지속 효과는 상태 효과로, 프로그래머가 코드에서 행동 하나를 나중에 돌릴 때는 예약으로.** 상태 효과는 걸린 것이 모니터에 보이고, 풀 수 있고, 중첩·갱신 규칙이 있다. 예약은 "이 행동을 그때 실행"만 한다.
@@ -76,6 +86,7 @@
 
 ### 2-1. 걸기 · 다시 걸기 · 풀기
 
+- 걸기 직전에 의도 `상태 효과 걸기`를 가로채기에 통과시킨다(2-1b). 아래 규칙은 고쳐진 의도(상태 효과·대상·중첩·길이)로 돈다. 막히면 아무것도 걸리지 않는다.
 - 처음 걸면 걸린 것 한 줄이 생긴다(id `$status1`, `$status2` …). 중첩은 건 중첩과 최대 중첩 중 작은 값, 지속은 처음 길이로 시작한다. 능력치 보정이 붙고 **걸릴 때 결과**가 한 번 돈다.
 - 같은 대상에 같은 상태 효과를 다시 걸면 새 줄이 생기지 않고 **다시 걸 때** 규칙을 따른다. 걸릴 때 결과는 다시 돌지 않는다.
 
@@ -92,6 +103,43 @@
 - **줄이기**(효과 `상태 효과 줄이기`·`Game.ShortenStatus`): 남은 지속을 그만큼 줄인다. 이벤트 횟수면 남은 횟수를(줄일 양은 반올림), 게임 시간이면 남은 초를. 다 되면 **지속이 다 된 것과 같이** 그 자리에서 끝난다(끝날 때 결과가 돈다, 2-2). 영구이거나 걸려 있지 않으면 아무 일도 없다(`false`). "쿨다운 −1"(5-12)·"폭탄 타이머 1턴 앞당기기"에 쓴다.
 - 걸 때마다 `StatusApplied`, 풀어서 없애면 `StatusEnded`(`expired` 거짓)를 쏜다(2-8).
 - 대상은 `id`가 있는 플레이어 데이터 객체 또는 그 id 글자다. 카드 한 장(`DeckCard`)처럼 싸우는 존재가 아닌 객체에도 걸 수 있다(5-9).
+
+### 2-1b. 걸기 직전 — 의도 `상태 효과 걸기`
+
+`Game.ApplyStatus`와 효과 `상태 효과 걸기`는 걸기 직전에 기본 제공 의도 `상태 효과 걸기`(`StatusIntent`)를 가로채기에 통과시킨다(28장 2-3). 그래서 "화상 → 푸른 화상", "독 중첩 ×2", "면역"을 코드 없이 패시브·상태 효과의 가로채기로 만든다(5-14~5-16).
+
+```
+Game.ApplyStatus(적, "burn")  또는  효과 '상태 효과 걸기'
+  1. 의도를 만든다      StatusIntent { targetId, statusId = burn, stacks = 1, length = 2, sourceId, kind = 디버프 }
+  2. 가로채기          패시브·상태 효과의 가로채기가 차례로 고친다(statusId = blueBurn …)
+  3. 고쳐진 의도로 건다  처음 걸기 / 다시 걸 때 규칙(2-1) → StatusApplied
+```
+
+| 의도 필드 | 처음 값 | 고치면 |
+|---|---|---|
+| `targetId` | 걸릴 대상 id | 그 id의 대상에게 건다. 데이터에서 찾지 못하면 걸지 않고 타임라인에 경고를 남긴다 |
+| `statusId` | 거는 상태 효과 ID | 그 상태 효과가 대신 걸린다(화상 → 푸른 화상). 없는 ID면 예외로 그 행동이 취소된다 |
+| `stacks` | 걸 중첩(1 이상) | 그 중첩으로 건다(독 ×2). 0 이하가 되면 걸지 않는다 |
+| `length` | 걸 때 길이. 주지 않았으면 그 상태 효과의 길이 | 그 길이로 건다(디버프 지속 +20% = 곱하기 1.2) |
+| `sourceId` | 출처(효과면 그 효과를 가진 항목 ID) | 걸린 것의 `source`와 `StatusApplied.source`가 된다 |
+| `kind` | 그 상태 효과의 종류(2-1c) | 읽기용이다. 의도 조건으로 "디버프만"을 거른다 |
+| `cancelled` | 거짓 | 참(의도 고치기 `막기`)이면 걸지 않는다(면역) |
+
+- **막히면 아무것도 바뀌지 않는다.** 막혔거나 중첩이 0 이하가 되면 걸린 것도, 걸릴 때 결과도, `StatusApplied`도 없다. `Game.ApplyStatus`는 `null`을 돌려준다.
+- **`length`는 처음부터 채워져 온다.** 걸 때 길이를 주지 않았으면 그 상태 효과의 길이다. 그래서 `곱하기`가 바로 된다. 길이 3 × 1.2 = 3.6이고, 이벤트 횟수면 반올림해 4번이다(2-2). 영구 상태 효과는 길이를 쓰지 않는다.
+- **상태 효과를 바꾸면 길이도 따라간다.** 걸 때 길이를 따로 주지 않았고 `length`도 고치지 않았으면, 바뀐 상태 효과의 길이로 건다(화상 2턴 → 푸른 화상 5턴). 걸 때 길이를 줬거나 다른 가로채기가 `length`를 고쳤으면 그 값 그대로다.
+- **다시 걸 때도 거친다.** 이미 걸려 있으면 고쳐진 의도로 다시 걸 때 규칙(2-1)을 따른다. 바뀐 상태 효과가 이미 걸려 있으면 그쪽의 규칙이다.
+- `kind`는 처음 상태 효과의 종류 그대로다. 앞의 가로채기가 `statusId`를 바꿔도 `kind`는 바뀌지 않는다.
+- 가로채기끼리의 순서는 가로채기 잎의 `order`가 작은 것부터다(28장 2-3). "화상 → 푸른 화상"과 "푸른 화상 면역"을 함께 두면 바꾸는 쪽의 `order`를 작게 둔다.
+- 가로채기는 행동 안에서 돈다. Undo하면 함께 돌아간다.
+
+### 2-1c. 종류 — 버프 · 디버프
+
+- 상태 효과마다 DB 칸 `kind`(종류)를 고른다: `없음`(기본) · `버프` · `디버프`. 걸기·지속·결과는 종류를 보지 않는다. 묶어서 다룰 때만 쓴다.
+- **세기**: `Game.StatusCount(대상, 종류)`, 조건 `상태 효과 검사`(`status`(상태 효과)를 비우고 `kind`(종류)를 고른다, 3-4). 중첩이 아니라 **가짓수**다. 독 3중첩 + 약화 1중첩 = 디버프 2.
+- **정화**: `Game.RemoveStatuses(대상, 종류)`, 효과 `상태 효과 풀기`(`status`(상태 효과)를 비우고 `kind`(종류 전부)를 고른다, 3-2). 그 종류를 하나씩 통째로 푼다. 풀기라서 끝날 때 결과는 돌지 않고, 푼 것마다 `StatusEnded`(`expired` 거짓)를 쏜다. `RemoveStatuses`가 돌려주는 값은 푼 가짓수다.
+- **거르기**: 의도 `상태 효과 걸기`의 `kind`(2-1b). "디버프 면역" = 의도 조건 `kind 일치 디버프` + `막기`. "디버프 지속 +20%" = 같은 조건 + `length` 곱하기 1.2.
+- DB Block(`상태 효과 풀기`·`상태 효과 검사`)에서 종류를 `없음`으로 두면 검증 오류다. 그래서 `없음`인 상태 효과는 묶음에 들지 않는다. 쿨다운(5-12)·시한폭탄(5-4)처럼 정화에 풀리면 안 되는 것은 `없음`으로 둔다.
 
 ### 2-2. 지속
 
@@ -181,6 +229,7 @@
 - 후보는 id로 구별한다. 같은 id가 두 번 들어오면 하나만 남는다.
 - **여러 선택은 먼저 요구한 것부터.** `Game.Choice`가 맨 앞(가장 먼저 요구한 것)이다.
 - **Undo**: 답하기를 Undo하면 다시 기다린다. 요구한 행동까지 Undo하면 선택도 사라진다.
+- **다시 뽑기**: 결과 `가중치 표에서 고르기`로 만든 선택은 기다리는 동안 다른 행동 안에서 `Game.RerollChoice(선택 id)`로 후보를 새로 뽑는다. 같은 선택 id 그대로 후보만 바뀌고, `ChoiceRequested`를 다시 쏜다. 비용·남은 횟수는 부르는 행동이 정한다. 그 행동을 Undo하면 원래 후보로 돌아간다(4-10b).
 - **판 저장**으로 이어진다. 불러온 뒤 그대로 답할 수 있다.
 - 기다리는 동안 다른 입력을 막는 것은 **화면의 일**이다(`Game.IsWaiting`). 시스템은 다른 행동을 막지 않는다. 화면(35장)의 **기본 고르기 창**은 선택 대기가 생기면 저절로 뜨고, `OnClick`·`GameScreens.Do`는 기다리는 동안 다른 행동을 보내지 않는다.
 - `player`(답할 플레이어, 멀티플레이용)는 기록만 한다. 그 플레이어만 답하게 하는 검사는 화면·서버가 한다.
@@ -193,8 +242,8 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 
 | 이벤트(표시 이름) | 필드 | 쏘는 때 |
 |---|---|---|
-| `StatusApplied`("상태 효과 걸림") | `holder`(가진 쪽 id) · `status`(상태 효과 ID) · `stacks`(걸린 뒤의 중첩) · `source`(출처) | 처음 걸 때(능력치 보정·걸릴 때 결과 다음), 다시 걸 때(다시 걸 때 규칙을 적용한 뒤). `무시` 규칙이라 아무것도 바뀌지 않은 다시 걸기에는 쏘지 않는다 |
-| `StatusEnded`("상태 효과 끝남") | `holder` · `status` · `expired` | 지속이 다 돼서 끝날 때(`expired` 참, 끝날 때 결과 다음) · 풀어서 없앨 때(`expired` 거짓) |
+| `StatusApplied`("상태 효과 걸림") | `holder`(가진 쪽 id) · `status`(상태 효과 ID) · `stacks`(걸린 뒤의 중첩) · `source`(출처) | 처음 걸 때(능력치 보정·걸릴 때 결과 다음), 다시 걸 때(다시 걸 때 규칙을 적용한 뒤). `무시` 규칙이라 아무것도 바뀌지 않은 다시 걸기와, 가로채기가 막아 걸리지 않은 때(2-1b)는 쏘지 않는다. `holder`·`status`는 가로채기가 고친 뒤의 값이다 |
+| `StatusEnded`("상태 효과 끝남") | `holder` · `status` · `expired` | 지속이 다 돼서 끝날 때(`expired` 참, 끝날 때 결과 다음) · 풀어서 없앨 때(`expired` 거짓, 정화로 푼 것마다 하나씩) |
 
 - 중첩만 줄인 풀기와, 가진 쪽이 데이터에서 사라져 정리될 때(2-3)는 쏘지 않는다.
 - 행동 안에서 쏘이므로 로그·도전과제·다른 트리거가 받는다(10장). "독에 걸릴 때마다 1 회복" = 이벤트 받기 `상태 효과 걸림`, 이벤트 조건 `status 일치 poison`.
@@ -210,6 +259,7 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
+| `kind` | 종류 / 버프·디버프. 디버프만 풀기(정화)·디버프 개수·'상태 효과 걸기' 가로채기의 종류 조건에 쓰입니다 | `없음`(기본) / `버프` / `디버프`(2-1c) |
 | `maxStacks` | 최대 중첩 / 0이면 제한 없음 | 기본 1 |
 | `reapply` | 다시 걸 때 | `중첩 더하기` / `지속 갱신` / `중첩 더하고 지속 갱신`(기본) / `무시` |
 | `duration` › `kind` | 지속 › 방식 | `영구(풀 때까지)`(기본) / `이벤트 횟수` / `게임 시간(초)` |
@@ -246,6 +296,7 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 | `stacks` | 중첩 | 1 이상(기본 1) |
 | `length` | 길이(0이면 상태 효과의 길이) / 이번에만 쓸 지속(이벤트 횟수 또는 초) | 기본 0. 0보다 크면 이번에 걸 때만 그 길이(2-1) |
 
+- 걸기 직전에 의도 `상태 효과 걸기`를 거친다. 가로채기가 막으면 그 대상에는 걸리지 않는다. 다른 상태 효과로 바꾸면 그것이 걸린다(2-1b).
 - 이미 걸려 있으면 그 상태 효과의 `reapply` 규칙을 따른다(2-1).
 - 출처(`ActiveStatus.source`)는 이 효과를 가진 항목의 ID다(컨텍스트의 `Owner`: 능력 ID, 사용 기능이 붙은 인스턴스 ID, 유물 ID, 상태 효과 ID …).
 - 요약: `poison 걸기`, `poison 3중첩 걸기`.
@@ -255,12 +306,13 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
-| `status` | 상태 효과 | DB › 상태 효과 목록에서 고른다 |
-| `stacks` | 중첩(0이면 모두) | 0이면 통째로 푼다. 숫자를 적으면 그만큼 줄이고, 남는 중첩이 없으면 푼다 |
+| `status` | 상태 효과 | DB › 상태 효과 목록에서 고른다. 비우면 `kind`를 본다 |
+| `kind` | 종류 전부(상태 효과를 비웠을 때) | `status`를 비우고 `버프`·`디버프`를 고르면 그 종류를 모두 통째로 푼다(정화, 2-1c). `status`를 고르면 쓰지 않는다 |
+| `stacks` | 중첩(0이면 모두) | 0이면 통째로 푼다. 숫자를 적으면 그만큼 줄이고, 남는 중첩이 없으면 푼다. `status`를 골랐을 때만 쓴다 |
 
-- 끝날 때 결과는 돌지 않는다.
-- 요약: `poison 풀기`, `poison 2중첩 풀기`.
-- 검증 오류: "상태 효과 풀기: 상태 효과를 고르세요."
+- 끝날 때 결과는 돌지 않는다. 종류 전부도 같다.
+- 요약: `poison 풀기`, `poison 2중첩 풀기`, `디버프 모두 풀기`.
+- 검증 오류: "상태 효과 풀기: 상태 효과나 종류를 고르세요."
 
 **상태 효과 줄이기** — 문장 `{status} 남은 지속 −{amount}`.
 
@@ -303,16 +355,18 @@ Trigger 칸 `+ 블럭` → **조건 충족 · 상태 효과** → `상태 효과
 |---|---|---|
 | `who` | 누구 | `사용자·가진 쪽`(기본) / `이벤트의 개체` |
 | `eventField` | 이벤트 필드(id) | `이벤트의 개체`일 때만 보인다. 받은 이벤트(가로채기면 의도)에서 대상 id가 든 필드(`targetId`) |
-| `status` | 상태 효과 | DB › 상태 효과 |
+| `status` | 상태 효과 / 비우고 종류를 고르면 그 종류가 몇 가지 걸려 있나 | DB › 상태 효과. 비우면 `kind`를 본다 |
+| `kind` | 종류(상태 효과를 비웠을 때) | `버프` / `디버프`. 그 종류가 몇 가지 걸려 있는지 센다(2-1c) |
 | `op` | 비교 | `>=`(기본) · `<=` · `>` · `<` · `==` |
-| `stacks` | 중첩 | 기본 1. 걸려 있지 않으면 중첩 0으로 본다 |
+| `stacks` | 중첩(종류면 가짓수) | 기본 1. 걸려 있지 않으면 중첩 0으로 본다. 종류면 중첩이 아니라 가짓수와 비교한다 |
 
 - `사용자·가진 쪽` = 컨텍스트의 `User`. 능력·사용 기능이면 쓰는 쪽, 상태 효과·패시브의 트리거면 가진 쪽이다(가진 쪽마다 따로 검사, 2-3).
 - "걸려 있을 때만" = `>= 1`(기본), "없을 때만" = `<= 0`. 쿨다운은 사용 조건 `사용자의 fireballCd <= 0`(5-12). 사용 조건이라 `Game.CanUse`도 안다.
 - `이벤트의 개체`: "맞은 쪽이 젖어 있으면 감전" = 이벤트 받기 `피해` AND `이벤트의 targetId의 wet >= 1`. 이벤트가 없는 순간(값이 바뀌어 다시 볼 때)에는 대상이 없어 중첩 0이다. 이벤트 받기와 `AND`로 묶어 쓴다(11장 4-2).
+- 종류: "디버프가 2가지 이상이면" = `status`(상태 효과) 비움, `kind`(종류) `디버프`, `op`(비교) `>=`, `stacks`(중첩) `2`. 독 3중첩 하나는 1가지다(5-17).
 - 도전과제·가중치 표 줄처럼 사용자가 없는 곳에서 `사용자·가진 쪽`을 고르면 늘 중첩 0이다.
-- 요약: `사용자의 fireballCd <= 0`, `이벤트의 targetId의 wet >= 1`.
-- 검증 오류: "상태 효과 검사: 상태 효과를 고르세요." / "상태 효과 검사: 이벤트 필드를 적으세요."
+- 요약: `사용자의 fireballCd <= 0`, `이벤트의 targetId의 wet >= 1`, `사용자의 디버프 >= 2`.
+- 검증 오류: "상태 효과 검사: 상태 효과나 종류를 고르세요." / "상태 효과 검사: 이벤트 필드를 적으세요."
 
 ### 3-5. 어느 칸에서 쓸 수 있나
 
@@ -322,12 +376,14 @@ Trigger 칸 `+ 블럭` → **조건 충족 · 상태 효과** → `상태 효과
 | 상태 효과 검사(조건) | 조건 충족을 고를 수 있는 Trigger 칸 전부, 가중치 표 줄의 조건(`condition`) |
 | 선택 요구 | `[OutcomeSlot]`에 `OutcomeKinds.Targeted`가 있는 칸(= 대상에게 효과와 같은 칸) |
 | 가로채기(상태 효과의 트리거) | DB › 상태 효과의 `trigger`에는 처음부터 열려 있다. 결과 칸에도 `의도 고치기`가 나온다 |
+| 가로채기 `상태 효과 걸기`(의도) | 가로채기를 고를 수 있는 Trigger 칸(상태 효과의 `trigger`, 패시브의 `trigger`, 잠금에 `Intercept`를 넣은 프로젝트 기능). 의도 목록에서 `상태 효과 걸기`를 고른다. 결과는 `의도 고치기` |
 
 - 상태 효과 걸기·선택 요구는 **행동 안에서 도는 결과**에 둔다(사용 기능·능력, 이벤트 받기·가로채기로 발동한 유물·상태 효과). 도전과제의 결과는 Undo 이력 밖이라(14장) 판 값인 상태 효과·선택을 두기에 맞지 않다.
 
 ### 3-6. 모니터에서 확인하기
 
 - **걸린 상태 효과**: **데이터** 탭에서 `$statuses`(상태 효과) → `items`를 펼치면 한 줄씩 보인다: `id` · `status`(정의 ID) · `target`(가진 쪽 id) · `stacks` · `remaining`(이벤트 지속이면 남은 횟수, 시간 지속이면 끝나는 게임 시각) · `source` · `nextPulse`(주기가 있으면 다음 결과를 낼 게임 시각). 능력치 보정은 `$modifiers`에 출처 `$status1`로 보인다.
+- **걸기 가로채기**: 가로채기가 의도를 고치면 그 항목의 "결과: 의도 statusId = blueBurn"·"결과: 의도 막기"(출처 `Passive`·`Status`)가 타임라인에 남는다. 바꾼 대상을 찾지 못하면 경고 "상태 효과 걸기: 가로채기가 바꾼 대상 '…'를 찾지 못해 걸지 않았습니다."(출처 `Status`)가 남는다.
 - **결과**가 돌면 타임라인에 "결과: …"(출처 `Status`)가 남는다. 시간 지속의 만료는 행동 "상태 효과 만료", 주기 결과는 행동 "상태 효과 주기"(둘 다 개발자)로 남는다.
 - **이벤트**: 걸고 끝날 때 `상태 효과 걸림`·`상태 효과 끝남`이 타임라인에 보인다. 모니터 **이벤트** 탭에서 직접 쏴 보면 그 이벤트를 받는 규칙만 반응한다(걸린 것은 바뀌지 않는다).
 - **예약**: 데이터 탭 `$schedule`(예약)·`$schedule.meta`(영구 예약)에 남은 예약이 보인다(`at` = 실행 시각, 이벤트 예약이면 `eventType`·`remaining`). 시간 예약은 행동 "예약 실행"(개발자) 안에 예약한 행동이 이어서 보인다.
@@ -347,17 +403,20 @@ Game.ApplyStatus(enemy, GameIds.Status.Stun, length: 1);               // 이번
 Game.RemoveStatus(enemy, GameIds.Status.Poison, stacks: 1);            // 1중첩만 줄이기
 Game.RemoveStatus(enemy, GameIds.Status.Poison);                       // 통째로 풀기
 Game.ShortenStatus(hero, GameIds.Status.FireballCd, 1);                // 남은 지속 −1(쿨다운 −1)
+int cleansed = Game.RemoveStatuses(hero, StatusKind.Debuff);           // 디버프 모두 풀기(정화). 푼 가짓수
+if (Game.ApplyStatus(hero, GameIds.Status.Poison) == null) { /* 가로채기가 막았다(면역) */ }
 ```
 
 | 멤버 | 뜻 |
 |---|---|
-| `ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null, double? length = null)` | 건다. 이미 걸려 있으면 다시 걸 때 규칙을 따른다. 돌려주는 값은 걸린 것(새로 생겼거나 이미 있던 것). `stacks`가 1보다 작으면 1. `length`를 주면 이번에 걸 때만 그 길이(이벤트 횟수 또는 초, 2-1) |
+| `ActiveStatus ApplyStatus(object target, string statusId, int stacks = 1, string source = null, double? length = null)` | 건다. 걸기 직전에 의도 `상태 효과 걸기`를 거친다(2-1b). 이미 걸려 있으면 다시 걸 때 규칙을 따른다. 돌려주는 값은 걸린 것(새로 생겼거나 이미 있던 것). 가로채기가 막았으면 `null`. `stacks`가 1보다 작으면 1. `length`를 주면 이번에 걸 때만 그 길이(이벤트 횟수 또는 초, 2-1) |
 | `bool RemoveStatus(object target, string statusId, int stacks = 0)` | 푼다. `stacks`를 주면 그만큼 줄이고 남는 중첩이 없으면 푼다. 0이면 통째로. 걸려 있지 않았으면 `false`. 끝날 때 결과는 돌지 않는다 |
 | `bool ShortenStatus(object target, string statusId, double amount)` | 남은 지속을 줄인다(이벤트 횟수면 반올림한 횟수, 게임 시간이면 초). 다 되면 지속이 다 된 것으로 끝난다(끝날 때 결과가 돈다). 영구·걸려 있지 않음·`amount` 0 이하면 `false` |
+| `int RemoveStatuses(object target, StatusKind kind)` | 그 종류(`StatusKind.Buff`·`Debuff`)의 상태 효과를 모두 통째로 푼다(정화, 2-1c). 푼 가짓수. 끝날 때 결과는 돌지 않는다 |
 
 - `target`은 `id`가 있는 객체 또는 id 글자, `statusId`는 상태 효과 ID(`GameIds.Status.X`), `source`는 출처로 남길 글자(비우면 빈 글자)다.
 - 행동 안에서 부른다(Undo·저장·멀티플레이 기록).
-- 없는 상태 효과면 `InvalidOperationException`("[MomoiProject] 없는 상태 효과 'poisn'입니다."), 대상에 id가 없으면 "[MomoiProject] 상태 효과를 걸 대상의 id가 없습니다." 예외로 그 행동이 취소된다.
+- 없는 상태 효과면 `InvalidOperationException`("[MomoiProject] 없는 상태 효과 'poisn'입니다."), 대상에 id가 없으면 "[MomoiProject] 상태 효과를 걸 대상의 id가 없습니다." 예외로 그 행동이 취소된다. 가로채기가 없는 상태 효과로 바꿨으면 "[MomoiProject] 가로채기가 바꾼 상태 효과 'bluBurn'가 없습니다." 예외다.
 
 ### 4-2. 읽기 — `StatusStacks` · `HasStatus` · `Statuses` · `ActiveStatus`
 
@@ -365,12 +424,14 @@ Game.ShortenStatus(hero, GameIds.Status.FireballCd, 1);                // 남은
 int stacks = Game.StatusStacks(enemy, GameIds.Status.Poison);   // 걸려 있지 않으면 0
 bool shielded = Game.HasStatus(run.hero, GameIds.Status.Shield);
 foreach (var s in Game.Statuses(run.hero)) icons.Add(s.status, s.stacks);   // 화면: 상태 아이콘 줄
+int debuffs = Game.StatusCount(enemy, StatusKind.Debuff);                     // 디버프 가짓수(중첩 아님)
 ```
 
 | 멤버 | 뜻 |
 |---|---|
 | `int StatusStacks(object target, string statusId)` | 중첩 수. 걸려 있지 않으면 0 |
 | `bool HasStatus(object target, string statusId)` | 걸려 있는지(중첩 > 0) |
+| `int StatusCount(object target, StatusKind kind)` | 그 종류가 몇 가지 걸려 있는지(2-1c) |
 | `IReadOnlyList<ActiveStatus> Statuses(object target)` | 그 대상에 걸린 것 전부(새 목록) |
 
 | `ActiveStatus` 필드 | 뜻 |
@@ -465,6 +526,7 @@ session.Statuses.Define(scorch);
 | `Pulse` | 주기(초). 0보다 크면 그 초마다 `Outcomes` | `pulse` |
 | `Outcomes` · `OnApply` · `OnExpire` | 결과 · 걸릴 때 결과 · 끝날 때 결과 | `outcomes` · `onApply` · `onExpire` |
 | `Hidden` | 화면에 숨김(규칙은 보지 않는다) | `hidden` |
+| `Kind` | 종류(`StatusKind.None` · `Buff` · `Debuff`, 코드 기본 `None`) | `kind` |
 
 아이콘(`icon`)은 DB 항목(`StatusData`)에만 있고 정의에는 없다(4-2).
 
@@ -473,6 +535,7 @@ session.Statuses.Define(scorch);
 | `Define(definition)` | 등록(같은 ID면 바꾼다). 트리거도 이때 등록한다 |
 | `Find(id)` · `Definitions` | 정의 찾기 · 전부 |
 | `Apply` · `Remove` · `Shorten` · `Stacks` · `Of` | `Game.ApplyStatus` · `RemoveStatus` · `ShortenStatus` · `StatusStacks` · `Statuses`와 같다 |
+| `CountOfKind` · `RemoveKind` | `Game.StatusCount` · `RemoveStatuses`와 같다 |
 | `Key` | `"$statuses"` |
 
 - `StatusData.ToDefinition()`은 DB 항목을 정의로 바꾼다. 그 ID에 `[BindTo]`가 있으면 `Outcomes`가 그 코드가 된다.
@@ -485,14 +548,44 @@ var dart = new TargetedOutcome { effects = { new DealDamage { amount = 4 }, new 
 var cleanse = new TargetedOutcome { targets = { new SelfTarget() }, effects = { new RemoveStatusEffect { status = "poison" } } };
 var recharge = new TargetedOutcome { targets = { new SelfTarget() }, effects = { new ShortenStatusEffect { status = "fireballCd", amount = 1 } } };
 var ready = new StatusCondition { who = StatusSubject.User, status = "fireballCd", op = CompareOp.AtMost, stacks = 0 };   // 쿨다운이 없을 때
+var purify = new TargetedOutcome { targets = { new SelfTarget() }, effects = { new RemoveStatusEffect { kind = StatusKind.Debuff } } };   // 디버프 모두 풀기
+var weakened = new StatusCondition { kind = StatusKind.Debuff, op = CompareOp.AtLeast, stacks = 2 };                                   // 디버프 2가지 이상
 ```
 
 | 형식 | 화면 이름 | 필드 |
 |---|---|---|
 | `ApplyStatusEffect` | 상태 효과 걸기 | `status`(상태 효과 ID) · `stacks`(기본 1) · `length`(0 = 정의의 길이) |
-| `RemoveStatusEffect` | 상태 효과 풀기 | `status` · `stacks`(0 = 모두) |
+| `RemoveStatusEffect` | 상태 효과 풀기 | `status` · `kind`(`StatusKind`, `status`가 비었을 때 그 종류 전부) · `stacks`(0 = 모두) |
 | `ShortenStatusEffect` | 상태 효과 줄이기 | `status` · `amount`(기본 1) |
-| `StatusCondition`(조건) | 상태 효과 검사 | `who`(`StatusSubject.User` · `EventField`) · `eventField` · `status` · `op`(`CompareOp`) · `stacks`(기본 1) |
+| `StatusCondition`(조건) | 상태 효과 검사 | `who`(`StatusSubject.User` · `EventField`) · `eventField` · `status` · `kind`(`status`가 비었을 때 그 종류의 가짓수) · `op`(`CompareOp`) · `stacks`(기본 1) |
+
+### 4-5b. 의도 `StatusIntent` — 걸기를 코드로 가로채기
+
+DB에서는 가로채기 잎 + `의도 고치기`로 만든다(5-14~5-16). 세션을 직접 만드는 테스트나, 계산이 필요한 가로채기는 코드로 쓴다.
+
+```csharp
+// 패시브 "푸른 불꽃"(화상 → 푸른 화상)을 코드로 등록할 때
+var blueFlame = new PassiveDefinition
+{
+    Id = "blueFlame", OwnerKey = "run", OwnerPath = "relics",
+    When = new InterceptTrigger { intentType = typeof(StatusIntent).FullName, filter = new FieldFilter { path = "statusId", op = FieldOp.Equal, value = "burn" } },
+};
+blueFlame.Outcomes.Add(new ModifyIntentOutcome { path = "statusId", op = IntentOp.Set, value = "blueBurn" });
+session.Passives.Define(blueFlame);
+
+// [BindTo]로: 디버프면 중첩 +1(계산이 들어가는 가로채기)
+[BindTo(GameIds.Passive.MagmaOrb)]
+static void MagmaOrb(StatusIntent i, TriggerContext c) { if (i.kind == StatusKind.Debuff) i.stacks += 1; }
+```
+
+| `StatusIntent` 필드 | 뜻 |
+|---|---|
+| `targetId` · `statusId` · `stacks` · `length` · `sourceId` | 걸릴 대상 id · 상태 효과 ID · 중첩 · 길이 · 출처. 고치면 그대로 걸린다(2-1b) |
+| `kind` (`StatusKind`) | 처음 상태 효과의 종류(읽기용) |
+| `cancelled` | 참이면 걸지 않는다 |
+
+- `[Intent("상태 효과 걸기")]`가 붙은 기본 제공 의도다. DB 가로채기 잎의 의도 목록에 `상태 효과 걸기`로 나온다.
+- `[BindTo]` 함수의 첫 매개변수가 의도다(4-3, 28장 4-10).
 
 ### 4-6. 예약 — `Game.ScheduleAfter` · `ScheduleOn` · `CancelSchedule(s)`
 
@@ -599,6 +692,7 @@ Game.Answer(choice.id, picked.Cast<object>().ToList());    // 목록으로
 | `bool IsWaiting` | 기다리는 선택이 있는지 |
 | `ActionRecord Answer(string choiceId, IEnumerable<object> picked)` · `Answer(string choiceId, params object[] picked)` | 답한다(행동 밖, 플레이어 입력에서). 고른 것은 객체 또는 id 글자. 행동 `ChoiceAnswer` 하나로 실행된다 |
 | `bool CancelChoice(string choiceId)` | 기다리는 선택을 답 없이 지운다(이어서 할 행동은 돌지 않는다). 행동 안에서 부른다 |
+| `bool RerollChoice(string choiceId)` | 표로 만든 선택의 후보를 새로 뽑는다(4-10b). 행동 안에서 부른다 |
 
 답하기가 실패하면 예외가 `Answer`를 부른 쪽으로 온다. 플레이어에게 보일 실패라 `GameFailure`(`InvalidOperationException`을 상속, `30-Balance-Tables.md` 2-4)이고, 메시지는 텍스트 표에 그 키가 있으면 번역된 글이다.
 
@@ -609,6 +703,40 @@ Game.Answer(choice.id, picked.Cast<object>().ToList());    // 목록으로
 | 후보가 아님 | "{item}은(는) 고를 수 있는 후보가 아닙니다." | `NotACandidate` |
 | 같은 것을 두 번 | "같은 것을 두 번 골랐습니다." | `ChosenTwice` |
 | 이미 답했거나 취소됨 | "이미 답했거나 취소된 선택입니다." | `ChoiceGone` |
+
+### 4-10b. 다시 뽑기 — `Game.RerollChoice`
+
+"보상 다시 뽑기(남은 횟수 1)"처럼 기다리는 선택의 후보를 새로 뽑는다. 결과 `가중치 표에서 고르기`(30장 3-3)로 만든 선택만 된다.
+
+```csharp
+[Serializable, BlockInfo("보상 다시 뽑기")]
+public class RerollReward : GameAction
+{
+    public string choice;     // 기다리는 선택 id(Game.Choice.id)
+
+    protected override void Run()
+    {
+        Game.Pay(GameIds.PlayerData.Run.Id, "rerolls", 1, what: "reroll.name");   // 남은 횟수가 없으면 실패 → 아무것도 바뀌지 않는다
+        if (!Game.RerollChoice(choice)) throw Game.Fail("fail.cannotReroll", "다시 뽑을 수 없는 선택입니다.");
+    }
+}
+
+// 화면(고르기 창의 '다시 뽑기' 버튼): 입력 창구를 거치지 않고 바로 보낸다(아래)
+Game.Do(new RerollReward { choice = Game.Choice.id });
+```
+
+| 규칙 | 뜻 |
+|---|---|
+| 같은 표 · 같은 후보 수 | 처음 요구할 때의 표·후보 수(후보 수에 더한 숫자까지 넣은 값)·서로 다른 것만으로 다시 뽑는다. 그 사이 `countBonus`(후보 수에 더할 숫자)가 가리키는 값이 바뀌어도 후보 수는 그대로다 |
+| 같은 선택 | 선택 id·안내 글·이어서 할 행동은 그대로다. 후보(`options`)만 바뀐다. 최소·최대 개수는 새 후보 수를 넘지 않게 줄인다 |
+| 다시 쏘기 | `ChoiceRequested`를 같은 선택 id로 다시 쏜다. 화면은 이것을 받아 고르는 중인 표시를 비우고 새 후보를 그린다 |
+| 비용 | `RerollChoice`는 비용·남은 횟수를 보지 않는다. 부르는 행동이 `Game.Pay` 등으로 정한다 |
+| 난수 | 그 표의 난수 흐름을 이어서 쓴다(30장 2-3). 같은 시드·같은 순서면 같은 후보가 나온다 |
+| Undo | 다시 뽑은 행동을 Undo하면 원래 후보로 돌아간다(낸 비용도) |
+| `false` | 표로 만든 선택이 아니거나(`Game.Ask`·`선택 요구`), 이미 답한 선택이거나, 표에서 아무것도 나오지 않았다(모두 꽝). 그때 후보는 그대로다 |
+
+- `false`일 때 낸 비용을 되돌리려면 위처럼 `throw Game.Fail`로 행동을 실패시킨다(바꾼 것이 모두 취소된다, 30장 2-4).
+- **화면의 다시 뽑기 버튼.** 기본 고르기 창은 `GameScreens.Reroll`(선택 → 다시 뽑기 행동, null이면 숨김)을 정하면 '가중치 표에서 고르기'로 만든 선택에 '다시 뽑기' 버튼을 보인다: `GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;`(시작 코드에서 한 번). 직접 만든 고르기 창에서는 `GameScreens.Do(() => 행동, whileChoosing: true)`로 보낸다 — 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다(35장). 다시 뽑으면 기본 고르기 창의 고른 표시는 지워진다. 다시 뽑아도 최소·최대는 처음 요구한 값을 기준으로 맞춘다(후보가 줄었다 늘어도 돌아온다).
 
 ### 4-11. `PendingChoice` · `ChoiceCandidate` · `ChoiceRequested` · `ChoiceAnswer`
 
@@ -621,11 +749,12 @@ Game.Answer(choice.id, picked.Cast<object>().ToList());    // 목록으로
 | `options` (`List<ChoiceCandidate>`) | 후보들 |
 | `min` · `max` | 고를 개수(2-6의 규칙으로 맞춘 값) |
 | `then` | 이어서 할 행동 |
+| `table` · `count` · `unique` | `가중치 표에서 고르기`로 만든 선택이면 그 표 ID · 후보 수 · 서로 다른 것만(다시 뽑기용, 4-10b). 그 밖의 선택은 `table`이 비어 있다 |
 
 - `ChoiceCandidate { id, label }` — 후보 하나. `new ChoiceCandidate(id, label)`에서 `label`을 비우면 id가 이름이다.
-- `ChoiceRequested`(`[GameEvent("선택 요구")]`: `choice` · `prompt` · `player`) — 선택을 요구한 순간 쏜다. 화면은 `SubscribeAfterAction`으로 받아 고르기 창을 연다(요구한 행동이 실패하면 오지 않는다). 답하기를 Undo해서 다시 기다리게 될 때는 다시 쏘지 않는다. 창의 내용은 `Game.Choice`로 그린다(5-10).
+- `ChoiceRequested`(`[GameEvent("선택 요구")]`: `choice` · `prompt` · `player`) — 선택을 요구한 순간 쏜다. 화면은 `SubscribeAfterAction`으로 받아 고르기 창을 연다(요구한 행동이 실패하면 오지 않는다). 다시 뽑기(`Game.RerollChoice`)도 같은 선택 id로 다시 쏜다. 답하기를 Undo해서 다시 기다리게 될 때는 다시 쏘지 않는다. 창의 내용은 `Game.Choice`로 그린다(5-10).
 - `ChoiceAnswer`(`choice` · `picked`) — 답하기 행동. 공개 행동이라 타임라인·행동 탭에 "선택: card3"(고르지 않았으면 "선택: 고르지 않음")으로 남는다. 멀티플레이에서는 이 행동이 서버로 간다.
-- `session.Choices`(`ChoiceSystem`): `Ask(prompt, options, then, min, max, source, player)`(글 선택지 형태) · `Current`(= `Game.Choice`) · `All` · `Cancel(id)` · `Key`(`"$choices"`).
+- `session.Choices`(`ChoiceSystem`): `Ask(prompt, options, then, min, max, source, player)`(글 선택지 형태) · `Current`(= `Game.Choice`) · `All` · `Cancel(id)` · `Reroll(id)`(= `Game.RerollChoice`) · `MarkTable(id, table, count, unique)`(표로 만든 선택이라고 적어 둔다. 코드로 표에서 뽑아 `Ask`한 선택도 이것을 부르면 다시 뽑을 수 있다) · `Key`(`"$choices"`).
 
 ### 4-12. `ChoiceOutcome` — 결과 '선택 요구'를 코드로
 
@@ -930,7 +1059,7 @@ public class DiscardChosen : GameAction
 
 ### 5-8. 보상 3개 중 1개 — DB 원본 ID · 글 선택지
 
-> DB에서만 만들려면 결과 `가중치 표에서 고르기`(30장 3-3·5-5): 표에서 뽑아 보이고, 고른 원본 ID를 목록에 넣거나 고른 뒤 결과로 넘긴다. 결과 `선택 요구`의 후보는 판 데이터의 객체(id가 있는 것)만이라 원본 ID는 이쪽이다.
+> DB에서만 만들려면 결과 `가중치 표에서 고르기`(30장 3-3·5-5): 표에서 뽑아 보이고, 고른 원본 ID를 목록에 넣거나 고른 뒤 결과로 넘긴다. 결과 `선택 요구`의 후보는 판 데이터의 객체(id가 있는 것)만이라 원본 ID는 이쪽이다. 이렇게 만든 선택은 다시 뽑기(4-10b)도 된다. 아래처럼 코드로 `Game.Ask`한 선택은 그대로는 다시 뽑지 못한다(표에서 뽑아 요구했다면 `session.Choices.MarkTable`, 4-11).
 
 **카드 보상**: 후보가 플레이어 데이터 객체가 아니라 DB 원본 ID이므로 글 선택지로 요구하고 `string`으로 받는다.
 
@@ -1147,6 +1276,7 @@ _hand.SetEnabled(!GBibleRuntime.Game.IsWaiting);     // Redraw 안
 - **창을 여는 신호는 `ChoiceRequested`, 창의 내용은 `Game.Choice`.** 답하기를 Undo하면 선택이 다시 기다리지만 `ChoiceRequested`는 다시 오지 않는다. 판을 불러온 직후도 같다. 그래서 내용은 `GameView.Redraw(…, ChoiceSystem.Key)`로 데이터에서 그린다.
 - 고르는 중인 체크 표시(`_picked`)는 화면 상태다. 플레이어 데이터에 두지 않는다. 답을 보낼 때만 행동이 된다.
 - Undo 버튼은 막지 않아도 된다. 기다리는 중에 Undo하면 요구한 행동이 돌아가고 선택도 사라진다.
+- **다시 뽑기 버튼**을 두려면 패널에 버튼 하나를 더하고 `GameScreens.Do(() => new RerollReward { choice = Game.Choice.id }, whileChoosing: true)`로 보낸다(4-10b). 위 `TryPlay`처럼 `Game.IsWaiting`으로 막는 창구를 거치면 보내지지 않는다. 다시 뽑으면 `ChoiceRequested`가 다시 와서 `_onAsk`가 고른 것을 비우고, `$choices`가 바뀌어 새 후보가 그려진다.
 
 ### 5-11. 실시간 화상 — 0.5초마다 피해 2, 3초(주기)
 
@@ -1264,6 +1394,87 @@ public class StatusRow : MonoBehaviour
 - 줄은 데이터(`$statuses`)에서 그린다. `StatusApplied`·`StatusEnded`는 반짝임·소리 같은 연출에만 쓴다. Undo·판 불러오기에는 이벤트가 오지 않으므로 그것으로 줄을 고치면 어긋난다.
 - 이름·설명은 텍스트 표의 `<ID>.name`·`<ID>.desc`(23장).
 
+### 5-14. 화상 → 푸른 화상 — 거는 상태 효과 바꾸기
+
+유물 "푸른 불꽃": "화상을 걸면 대신 푸른 화상(5턴)이 걸린다." 유물은 DB › 패시브다(17장 0절).
+
+**에디터**:
+
+1. DB › 상태 효과 `burn`(화상): `kind`(종류) `디버프`, `duration`(지속) › `kind`(방식) `이벤트 횟수` · `length`(길이) `2` · `tickEvent`(셀 이벤트) `턴 끝`. `blueBurn`(푸른 화상): 같은 모양에 `length`(길이) `5`. 피해 결과는 각자 둔다(5-1 모양).
+2. DB › 패시브 `blueFlame`: `ownerKey`·`ownerPath`(가진 목록) `run › relics`.
+   - `trigger`(발동): `+ 블럭` → `가로채기` → 의도 `상태 효과 걸기`, `filter`(의도 조건) `필드 검사` → `statusId` `일치` `burn`.
+   - `outcomes`(결과): `의도 고치기` → `path`(필드) `statusId`, `op`(방법) `값으로 바꾸기`, `value`(값) `blueBurn`.
+
+| 순간 | 의도 | 걸린 것 |
+|---|---|---|
+| 카드 "불씨": 고블린에게 `상태 효과 걸기`(`burn`) | `statusId` burn → blueBurn, `length` 2 → 5 | 고블린에게 `blueBurn` 5턴 |
+| 유물이 없을 때 | 고치지 않음 | 고블린에게 `burn` 2턴 |
+
+- 걸 때 길이를 주지 않았으므로 푸른 화상의 길이 5로 걸린다. 카드의 효과 `상태 효과 걸기`에서 `length`(길이)를 1로 줬다면 푸른 화상도 1턴이다(2-1b).
+- 의도 조건이 `statusId`만 보므로 적이 주인공에게 거는 화상도 바뀐다. 적에게 걸 때만이면 `filter`(의도 조건)에 `AND` `targetId` `아님` `hero`를 더한다.
+- `StatusApplied`의 `status`는 `blueBurn`이다. 화면의 반짝임·소리도 푸른 화상으로 난다.
+- 이미 `blueBurn`이 걸려 있으면 `blueBurn`의 다시 걸 때 규칙을 따른다.
+
+### 5-15. 독 중첩 ×2 · 디버프 지속 +20% — 중첩·길이 고치기
+
+유물 "사신": "독을 걸 때 중첩 2배." 유물 "모래시계": "디버프의 지속 +20%."
+
+**에디터**(DB › 패시브, `ownerKey`·`ownerPath`(가진 목록) `run › relics`. `trigger`(발동)는 `가로채기` → 의도 `상태 효과 걸기`, `outcomes`(결과)는 `의도 고치기`):
+
+| 패시브 | `filter`(의도 조건) | `의도 고치기`의 `path`(필드) · `op`(방법) · `value`(값) |
+|---|---|---|
+| `reaper` | `statusId` `일치` `poison` | `stacks` · `곱하기` · `2` |
+| `hourglass` | `kind` `일치` `디버프` | `length` · `곱하기` · `1.2` |
+
+숫자로 따라가기 — 독(이벤트 횟수 3)을 거는 독침(`poison` 3중첩, 5-1):
+
+| 가진 유물 | 걸리는 중첩 | 남은 횟수 |
+|---|---|---|
+| 없음 | 3 | 3 |
+| 사신 | 6 | 3 |
+| 사신 + 모래시계 | 6 | 3 × 1.2 = 3.6 → 4 |
+
+- `stacks`는 정수라 곱한 뒤 반올림한다(28장 3-4). "중첩 +1"이면 `stacks` `더하기` `1`.
+- 이벤트 횟수 지속은 길이를 반올림해 쓴다(3.6 → 4). 게임 시간 지속이면 3.6초 그대로다.
+- 두 유물은 서로 다른 필드를 고치므로 순서와 상관없이 결과가 같다.
+- 영구 상태 효과(분노 5-2)는 길이가 없어 모래시계가 바꾸는 것이 없다.
+
+### 5-16. 면역 — 걸기 막기
+
+유물 "장화": "주인공은 독에 걸리지 않는다." 상태 효과 "가호": "걸려 있는 동안 디버프에 걸리지 않는다, 2턴."
+
+**에디터**:
+
+1. DB › 패시브 `boots`: `ownerKey`·`ownerPath`(가진 목록) `run › relics`. `trigger`(발동): `가로채기` → `상태 효과 걸기`, `filter`(의도 조건) `statusId` `일치` `poison` `AND` `targetId` `일치` `hero`. `outcomes`(결과): `의도 고치기` → `op`(방법) `막기`.
+2. DB › 상태 효과 `ward`(가호): `kind`(종류) `버프`, `duration`(지속) `이벤트 횟수` · `length`(길이) `2` · `tickEvent`(셀 이벤트) `턴 시작`. `trigger`(걸려 있는 동안 트리거): `가로채기` → `상태 효과 걸기`, `filter`(의도 조건) `kind` `일치` `디버프`. `holderField`(가진 쪽 필드) `targetId`. `outcomes`(결과): `의도 고치기` → `막기`.
+
+- 막히면 걸린 것이 없다. `Game.ApplyStatus`는 `null`이고 `StatusApplied`도 오지 않는다. 독침의 피해(4)는 그대로 들어간다. 같은 `대상에게 효과`의 다른 효과는 막지 않는다.
+- 이미 걸려 있던 디버프는 그대로다. 가호를 걸 때 함께 풀려면 `onApply`(걸릴 때 결과)에 `대상에게 효과` → 대상 비움 → `상태 효과 풀기`(`kind`(종류 전부) `디버프`)를 둔다(5-17).
+- 장화는 의도 조건 `targetId 일치 hero`로 대상을 고정한다. 가진 목록 `run › relics`의 가진 쪽은 `run`(id 없음)이라 가진 쪽 필드를 쓰지 못하기 때문이다(17장 0절). 가호는 상태 효과라 가진 쪽 = 걸린 대상이고, `holderField`(가진 쪽 필드) `targetId`가 "내가 걸릴 때만"을 만든다.
+- 가호 자신은 버프라 가호의 가로채기에 막히지 않는다.
+- "면역!" 연출이 필요하면 같은 결과 칸에 `이벤트 쏘기`(프로젝트 이벤트)를 더하고 화면이 받는다.
+
+### 5-17. 디버프 정화 · 디버프 개수 — 종류
+
+카드 "정화": "내 디버프를 모두 푼다." 상태 효과 "맑은 물": "턴이 끝날 때 디버프가 2가지 이상이면 모두 푼다, 3턴."
+
+**에디터**:
+
+1. 디버프로 묶을 상태 효과(`poison`·`burn`·`weak` …)의 `kind`(종류)를 `디버프`로 둔다. 분노(`rage`)는 `버프`. 쿨다운(`fireballCd`)·시한폭탄(`bomb`)은 `없음` 그대로.
+2. 카드 `purify`: 결과 `대상에게 효과` → 대상 `사용자 자신` → 효과 `상태 효과 풀기`(`status`(상태 효과) 비움, `kind`(종류 전부) `디버프`). 요약 `사용자 자신: 디버프 모두 풀기`.
+3. DB › 상태 효과 `clearWater`: `kind`(종류) `버프`, `duration`(지속) `이벤트 횟수` · `length`(길이) `3` · `tickEvent`(셀 이벤트) `턴 끝`.
+   - `trigger`(걸려 있는 동안 트리거): `턴 끝 받기` AND `상태 효과 검사`(`who`(누구) `사용자·가진 쪽`, `status`(상태 효과) 비움, `kind`(종류) `디버프`, `op`(비교) `>=`, `stacks`(중첩) `2`). 요약 `턴 끝 받기 AND 사용자의 디버프 >= 2`.
+   - `outcomes`(결과): `대상에게 효과` → 대상 비움(= 가진 쪽) → `상태 효과 풀기`(`kind`(종류 전부) `디버프`).
+
+| 주인공에게 걸린 것 | 정화 뒤 |
+|---|---|
+| 독 3중첩 · 약화 1중첩 · 분노 2중첩 · 쿨다운 | 분노 2중첩 · 쿨다운 |
+
+- 독·약화가 풀리고 `StatusEnded`(`expired` 거짓)가 두 번 온다. 끝날 때 결과는 돌지 않는다.
+- 맑은 물의 조건은 가짓수다. 독 5중첩 하나만이면 1가지라 풀지 않는다.
+- 쿨다운·시한폭탄은 `없음`이라 풀리지 않는다. 시한폭탄을 디버프로 두면 정화로 해체된다(터지지 않는다, 5-4).
+- 코드에서 개수를 쓰려면 `Game.StatusCount`: "디버프 1가지당 피해 +3" = `Rules.Damage(Game, hero, enemy, 5 + 3 * Game.StatusCount(enemy, StatusKind.Debuff));`
+
 ---
 
 ## 6. 주의할 점 · 자주 하는 실수
@@ -1280,7 +1491,16 @@ public class StatusRow : MonoBehaviour
 | 주기 결과가 0.5초 간격이 아니라 몰려서 나옴 | 프레임이 길었다. 밀린 주기를 한 행동에서 낸다(최대 8번, 2-3). |
 | `상태 효과 줄이기`가 아무 일도 안 함 / `ShortenStatus`가 `false` | 영구 상태 효과이거나 그 대상에 걸려 있지 않다. 이벤트 횟수는 줄일 양을 반올림한다(0.4 → 0). |
 | 쿨다운이 상태 아이콘 줄에 보임 | `hidden`을 켜고, 화면 코드가 `hidden`을 보고 건너뛴다(5-13). 라이브러리는 아이콘 줄을 그리지 않는다. |
-| 다시 걸었는데 `StatusApplied`가 안 옴 | `reapply`가 `무시`다. 아무것도 바뀌지 않아 쏘지 않는다(2-8). |
+| 다시 걸었는데 `StatusApplied`가 안 옴 | `reapply`가 `무시`다. 아무것도 바뀌지 않아 쏘지 않는다(2-8). 또는 가로채기가 막았다. |
+| 걸었는데 아무것도 안 걸림 / `Game.ApplyStatus`가 `null` | 가로채기 `상태 효과 걸기`가 막았거나 `stacks`를 0 이하로 만들었다. 타임라인의 "결과: 의도 막기"(출처 `Passive`·`Status`)로 어느 항목인지 본다(2-1b). |
+| 걸었는데 다른 상태 효과가 걸림 | 가로채기가 `statusId`를 바꿨다(5-14). 정상이다. 의도 조건이 너무 넓으면 좁힌다. |
+| 바꾼 상태 효과가 그 상태 효과의 길이가 아니라 원래 길이로 걸림 | 걸 때 길이(효과의 `length`(길이)·코드의 `length:`)를 줬거나, 다른 가로채기가 `length`를 고쳤다. 그때는 그 길이 그대로다(2-1b). |
+| "[MomoiProject] 가로채기가 바꾼 상태 효과 '…'가 없습니다." | `의도 고치기`의 `statusId` 값이 오타이거나 그 상태 효과가 등록되지 않았다. |
+| 경고 "상태 효과 걸기: 가로채기가 바꾼 대상 '…'를 찾지 못해 걸지 않았습니다." | `targetId`를 데이터에 없는 id로 바꿨다. |
+| "디버프 면역"인데 `statusId`를 바꾼 상태 효과가 막히거나 안 막힘 | 의도의 `kind`는 처음 상태 효과의 종류다. 앞의 가로채기가 `statusId`를 바꿔도 `kind`는 그대로다(2-1b). 종류가 다른 것으로 바꾸는 가로채기는 `statusId` 조건으로 막는다. |
+| 정화했는데 남는 상태 효과가 있음 | 그 상태 효과의 `kind`(종류)가 `없음`이거나 다른 종류다(2-1c). |
+| "상태 효과 풀기: 상태 효과나 종류를 고르세요." / "상태 효과 검사: 상태 효과나 종류를 고르세요." | `status`(상태 효과)도 `kind`(종류)도 비었다. 종류로 쓰려면 `status`를 비우고 `kind`에서 `버프`·`디버프`를 고른다. |
+| 디버프 개수 조건이 중첩만큼 세지 않음 | 종류는 가짓수를 센다(독 5중첩 = 1). 중첩은 상태 효과 하나를 골라 본다(3-4). |
 | 쓰러진 적의 상태 효과가 사라졌는데 `StatusEnded`가 안 옴 | 가진 쪽이 사라져 정리될 때는 쏘지 않는다(2-8). 화면은 `$statuses`에서 다시 그린다. |
 | 유물·특성을 영구 상태 효과로 걸어 두었더니 얻기·잃기·레벨 관리가 번거로움 | "가지고 있으면 발동"은 DB › 패시브다(17장 0절). 가진 목록에 ID를 넣고 빼면 된다. |
 | "[MomoiProject] 없는 상태 효과 'poisn'입니다." | ID 오타이거나 정의가 등록되지 않았다. ID는 `GameIds.Status` 상수로 쓴다. 세션을 직접 만들면 `session.Statuses.Define`이 필요하다(4-4). |
@@ -1310,3 +1530,7 @@ public class StatusRow : MonoBehaviour
 | 선택 요구의 버튼에 id만 보임 | 후보 이름은 텍스트 표의 `<id>.name`이고 없으면 id다. DB 항목 ID면 이름 키를 채운다(23장 1절). 판 안의 개체(`card3`)는 이름 키가 없으므로 화면이 id로 객체를 찾아 이름을 그린다(5-10). 코드의 `Game.Ask`는 `label`로 이름을 줄 수 있다. |
 | 유물의 선택 요구가 기다리지 않고 지나감 | 후보가 없었다. 유물·상태 효과에는 고른 대상이 없으므로 후보 칸에 대상 Block(`모든 적` 등)을 둔다. 전투 밖이면 적이 없어 후보도 없다. |
 | 멀티플레이에서 다른 플레이어가 대신 답함 | `player`는 기록만 한다. 답할 플레이어 검사는 화면·서버가 한다. |
+| `Game.RerollChoice`가 `false`, 후보가 그대로 | `가중치 표에서 고르기`로 만든 선택이 아니다(`Game.Ask`·`선택 요구`는 다시 뽑지 못한다). 이미 답한 선택이다. 표에서 아무것도 나오지 않았다(모두 꽝)(4-10b). |
+| 다시 뽑기 버튼을 눌러도 아무 일이 없음 | 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다. `GameScreens.Do(() => 행동, whileChoosing: true)`, 기본 고르기 창이면 `GameScreens.Reroll`을 정한다(4-10b). |
+| 다시 뽑기를 했는데 남은 횟수가 줄지 않음 | `RerollChoice`는 비용을 보지 않는다. 부르는 행동이 `Game.Pay`로 낸다(4-10b). |
+| 다시 뽑았는데 후보 수에 더한 숫자가 바뀐 만큼 늘지 않음 | 다시 뽑기는 처음 요구할 때의 후보 수를 쓴다(4-10b). |

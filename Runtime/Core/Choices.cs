@@ -52,6 +52,9 @@ namespace GBible
         public string table = "";
         public int count;
         public bool unique;
+        // 처음 요구한 최소·최대(다시 뽑아 후보 수가 바뀌어도 이 값을 기준으로 맞춘다).
+        public int wantMin;
+        public int wantMax;
     }
 
     [Serializable]
@@ -118,15 +121,15 @@ namespace GBible
             _session.Data.Modify<ChoiceList>(Key, _ =>
             {
                 choice.options = options;
-                choice.min = Math.Min(choice.min, options.Count);
-                choice.max = Math.Max(Math.Max(choice.min, 1), Math.Min(choice.max, options.Count));
+                choice.min = Math.Min(choice.wantMin, options.Count);
+                choice.max = Math.Max(Math.Max(choice.min, 1), Math.Min(choice.wantMax <= 0 ? options.Count : choice.wantMax, options.Count));
             });
             _session.Events.Publish(new ChoiceRequested { choice = choice.id, prompt = choice.prompt, player = choice.player });
             return true;
         }
 
         // 표로 만든 선택이라고 적어 둔다(다시 뽑기용).
-        public void MarkTable(string id, string table, int count, bool unique)
+        public void MarkTable(string id, string table, int count, bool unique, int wantMin = -1, int wantMax = -1)
         {
             var choice = Items().FirstOrDefault(c => c.id == id);
             if (choice == null) return;
@@ -135,6 +138,8 @@ namespace GBible
                 choice.table = table ?? "";
                 choice.count = count;
                 choice.unique = unique;
+                choice.wantMin = wantMin >= 0 ? wantMin : choice.min;
+                choice.wantMax = wantMax >= 0 ? wantMax : choice.max;
             });
         }
 

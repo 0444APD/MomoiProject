@@ -114,19 +114,24 @@ namespace GBible
                 return;
             }
             FieldPaths.SplitLast(field, out var parentPath, out var member);
+            var wrote = false;
             foreach (var parent in FieldPaths.Resolve(target, parentPath).ToList())
             {
                 if (parent == null || parent.GetType().IsValueType) continue;
-                var access = FieldAccess.Find(parent.GetType(), member);
-                if (access == null || !access.CanWrite) continue;
-                var current = access.Get(parent);
-                if (!(current is IConvertible) || current is string || current is bool) continue;
-                var now = Convert.ToDouble(current, System.Globalization.CultureInfo.InvariantCulture);
-                var next = change == FieldChange.Add ? now + amount : change == FieldChange.Multiply ? now * amount : amount;
-                if (clampZero && next < 0) next = 0;
-                var underlying = current.GetType();
-                access.Set(parent, IsInteger(underlying) ? Convert.ChangeType(Math.Round(next), underlying, System.Globalization.CultureInfo.InvariantCulture) : Convert.ChangeType(next, underlying, System.Globalization.CultureInfo.InvariantCulture));
+                // 필드(생성 코드)나 딕셔너리의 키(stock[iron], 없던 키면 0에서)에 쓴다.
+                wrote |= FieldPaths.Assign(parent, member, (current, type) =>
+                {
+                    var underlying = Nullable.GetUnderlyingType(type) ?? type;
+                    if (!TypeResolver.IsNumeric(underlying)) return null;
+                    var now = current == null ? 0 : Convert.ToDouble(current, System.Globalization.CultureInfo.InvariantCulture);
+                    var next = change == FieldChange.Add ? now + amount : change == FieldChange.Multiply ? now * amount : amount;
+                    if (clampZero && next < 0) next = 0;
+                    return IsInteger(underlying)
+                        ? Convert.ChangeType(Math.Round(next, MidpointRounding.AwayFromZero), underlying, System.Globalization.CultureInfo.InvariantCulture)
+                        : Convert.ChangeType(next, underlying, System.Globalization.CultureInfo.InvariantCulture);
+                });
             }
+            if (!wrote) Game?.Session.Journal.Append(JournalKind.Warning, "Effect", $"필드 바꾸기: {target.GetType().Name}에서 숫자 필드 '{field}'를 찾지 못했습니다.");
         }
 
         static bool IsInteger(Type type) =>

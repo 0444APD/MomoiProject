@@ -68,9 +68,10 @@ namespace GBible
     {
         readonly List<string> _picked = new List<string>();
         string _choiceId;
+        string _optionsKey;
         Label _title, _hint;
         VisualElement _options;
-        Button _skip, _confirm;
+        Button _skip, _confirm, _reroll;
 
         protected internal override string[] Watch => new[] { ChoiceSystem.Key };
         protected internal override bool WaitForPresentation => false;
@@ -89,9 +90,11 @@ namespace GBible
             _options.AddToClassList("momoi-options");
             panel.Add(_options);
             var row = ScreenUi.Row(panel);
+            _reroll = ScreenUi.Button(row, ScreenUi.Text("momoi.ui.reroll", "다시 뽑기"), RerollPressed);
             _skip = ScreenUi.Button(row, ScreenUi.Text("momoi.ui.skip", "건너뛰기"), () => Answer(new List<string>()));
             _confirm = ScreenUi.Button(row, ScreenUi.Text("momoi.ui.ok", "확인"), () => Answer(_picked.ToList()), primary: true);
             _choiceId = null;
+            _optionsKey = null;
             _picked.Clear();
         }
 
@@ -99,9 +102,12 @@ namespace GBible
         {
             var choice = Game?.Choice;
             if (choice == null) return;
-            if (choice.id != _choiceId)
+            // 다른 선택이거나 후보가 바뀌면(다시 뽑기) 고른 표시를 지운다.
+            var optionsKey = string.Join("|", choice.options.Select(o => o.id));
+            if (choice.id != _choiceId || optionsKey != _optionsKey)
             {
                 _choiceId = choice.id;
+                _optionsKey = optionsKey;
                 _picked.Clear();
             }
             var single = choice.max == 1;
@@ -125,6 +131,8 @@ namespace GBible
                 if (_picked.Contains(id)) button.AddToClassList("momoi-option--selected");
             }
             _skip.style.display = choice.min == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            // 다시 뽑기: 표로 만든 선택이고 프로젝트가 GameScreens.Reroll을 정했고 그 행동이 있을 때만.
+            _reroll.style.display = !string.IsNullOrEmpty(choice.table) && GameScreens.Reroll?.Invoke(choice) != null ? DisplayStyle.Flex : DisplayStyle.None;
             _confirm.style.display = single ? DisplayStyle.None : DisplayStyle.Flex;
             _confirm.SetEnabled(_picked.Count >= choice.min && _picked.Count <= choice.max);
         }
@@ -140,6 +148,13 @@ namespace GBible
             }
             if (!_picked.Remove(id) && _picked.Count < choice.max) _picked.Add(id);
             Draw();
+        }
+
+        void RerollPressed()
+        {
+            var choice = Game?.Choice;
+            var action = choice == null ? null : GameScreens.Reroll?.Invoke(choice);
+            if (action != null) GameScreens.Do(() => action, whileChoosing: true);
         }
 
         void Answer(List<string> picked)

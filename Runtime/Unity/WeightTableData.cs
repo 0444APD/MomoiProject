@@ -147,7 +147,7 @@ namespace GBible
             };
             var choice = game.Session.Choices.Ask(prompt, options, next, min, max, source: context.Owner);
             // 다시 뽑기(Game.RerollChoice)가 같은 표·후보 수로 새로 뽑게 적어 둔다.
-            if (choice != null) game.Session.Choices.MarkTable(choice, table, total, unique);
+            if (choice != null) game.Session.Choices.MarkTable(choice, table, total, unique, min, max);
         }
 
         public override string Describe(INameResolver names)
