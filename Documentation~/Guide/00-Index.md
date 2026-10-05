@@ -4,6 +4,8 @@ Momoi Project(코드 이름 `GBible`)로 **프로젝트를 시작해서 출시�
 
 [매뉴얼](../Manual/00-Index.md)과의 관계: 매뉴얼은 기능별 사전(모든 문법과 옵션)이고, 이 가이드는 진행 순서와 판단 기준이다. 가이드에서 처음 나오는 기능은 장 끝 '더 보기'에서 매뉴얼의 해당 장으로 잇는다.
 
+기믹(조각의 효과 규칙)의 범위는 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아)의 다양성으로 본다. 장르·화면·싱글/멀티는 자유다. 기믹 갈래마다 무엇으로 만드나는 AI 문서 [기믹 목록](../AI/GimmickCatalog.md)에 있다.
+
 ---
 
 ## 예시 게임: 카드 던전
@@ -25,18 +27,18 @@ Momoi Project(코드 이름 `GBible`)로 **프로젝트를 시작해서 출시�
 
 | 장 | 이 단계에서 하는 일 |
 |---|---|
-| [01. 프로젝트 시작하기](01-StartProject.md) | 설치와 시작 설정(코드 폴더·asmdef·`Bootstrap.cs`·`PlayerData.cs`·DB·`run`/`profile` 자동 생성), 코드 폴더(Rules·Client·Editor·Tests), 판·프로필 데이터(`RunState`·`Profile` 채우기, `Game.Data()`), Bootstrap(DB › 시작 파일 › Bootstrap 화면의 Undo 방식·시드·판 저장, `Started`·`Configure`), 첫 플레이 확인 |
+| [01. 프로젝트 시작하기](01-StartProject.md) | 설치와 시작 설정(코드 폴더·asmdef·`Bootstrap.cs`·`PlayerData.cs`·DB·`run`/`profile` 자동 생성), 코드 폴더(Rules·Client·Editor·Tests), 판·프로필 데이터(`RunState`·`Profile` 채우기, `Game.Data()`), Bootstrap(DB › 시작 파일 › Bootstrap 화면의 Undo 방식·시드·판 저장, `Started`·`Configure`), 첫 플레이 확인, Claude Code 파일과 AI 문서(기믹 목록·기획 명세서) |
 | [02. 기획을 코드 구조로](02-DesignToCode.md) | 기획을 읽는 순서와 판단표, 바뀌는 값과 원본, 판과 프로필, 행동, 이벤트, 키워드, 기획자가 계속 더할 것(인스턴스·DB 종류), 효과(Block·`[BindTo]`·규칙 함수), id와 연결, 클래스 목록과 DB 항목 목록 |
 | [03. 게임 루프](03-GameLoop.md) | 코드를 둘 자리, 카드 한 장의 한 바퀴, 런 스크립트(`RunDirector`), 판·전투·턴 진행, 행동 안의 행동, 실패 = 전체 취소(`Game.Fail`·`Game.Pay`), 화면과 시스템의 경계, 지연 효과(상태 효과·예약), 씬 전환(씬 흐름) |
-| [04. 콘텐츠 더하기](04-AddingContent.md) | 표준 절차, Block과 `[BindTo]` 고르기, 몬스터·카드(화상 = 상태 효과)·물약·로그·도전과제 만들기, 새 DB 종류(유물)와 감시(등록 함수는 Rules, 연결은 Bootstrap), 등장시키기(가중치 표·밸런스 값), 모니터로 시험하고 검증하기 |
+| [04. 콘텐츠 더하기](04-AddingContent.md) | 표준 절차, Block과 `[BindTo]` 고르기, 몬스터·카드(화상 = 상태 효과)·물약·로그·도전과제 만들기, 새 DB 종류(유물)와 감시(등록 함수는 Rules, 연결은 Bootstrap), 패시브의 놓인 것마다·가진 동안 능력치 보정·필드 바꾸기·빌려 쓰기, 등장시키기(가중치 표·밸런스 값), 모니터로 시험하고 검증하기 |
 | [05. 기획자와 함께 일하기](05-WorkingWithDesigners.md) | 나눌 일, 키워드, 인스턴스 화면 정리(`[Hide]`·`[ShowIf]`), `[DataRef]`, Block 이름표(`[BlockInfo]`), 필드 규칙(필수·스프라이트 규격), 고유 검사(`Validate`·`ValidateData`), ID 바꾸기와 지우기, 기획자에게 넘기기 |
 | [06. 화면과 연출](06-Presentation.md) | 화면 갱신(`GameView.Redraw`, 화면 연결 `ViewList`·데이터 연결), 입력은 행동으로(`GameView.Busy`, 미리보기 `Game.Preview`·`CanDo`), 성공한 행동의 이벤트로 연출(`SubscribeAfterAction`), 데이터와 연출의 시간(연출 대기열 `GameView.Present`), 텍스트·현지화(실패 글 번역), 다이얼로그, 소리, 인벤토리 칸 |
-| [07. 장르별 설정](07-GenreRecipes.md) | 장르별로 고를 것(표, 장르마다 더 쓰는 부품), Undo 방식과 범위, 저장 구역, 난수 흐름과 시드, 시간 값은 게임 시계로, 다른 장르(턴제 전술·실시간 액션(고정 틱)·수집형·방치형·RPG·어드벤처) |
+| [07. 장르별 설정](07-GenreRecipes.md) | 기믹 범위와 장르, 장르별로 고를 것(표, 장르마다 더 쓰는 부품, 부가 기능), Undo 방식과 범위, 저장 구역, 난수 흐름과 시드(시드 입력·일일 도전), 시간 값은 게임 시계로, 다른 장르(턴제 전술·실시간 액션(고정 틱)·수집형·방치형·RPG·어드벤처) |
 | [08. 시험과 디버깅](08-TestAndDebug.md) | 같은 판 다시 만들기(고정 시드·판 저장), 개발 명령(DB › 개발 › 개발 명령, 밸런스 값 바로 반영), 모니터로 원인 찾기, Undo로 앞뒤 보기, 이벤트로 반응 보기(선택 대기 패널), 규칙 테스트(`Assets/Code/Tests`), 경고 메시지별 대응 |
 | [09. 3요소를 지키는 습관](09-Habits.md) | 코딩 쉬움·멀티와 패킷·리플렉션 금지 각각의 습관(비용 `Game.Pay`, 실패 `Game.Fail`, 숫자는 밸런스 값, 연출은 `Present`, 예상 값은 `Preview`), 판 데이터에는 ID와 바뀌는 값만, 하지 말 것과 이유, 데이터 크기·성능 기준 |
 | [10. 저장과 출시](10-SaveAndRelease.md) | 구역 확인(기기 설정 DB › 설정, 입력), 판 저장 설정(DB › 시작 파일 › Bootstrap), 이어 하기와 새 판(`GBibleRuntime.NewRun`, 슬롯), 저장되지 않는 값, 개발 중 저장 시험, 출시 상태로 바꾸기, 출시 후 구조 바꾸기(DB › 개발 › 저장 변환) |
 | [11. 멀티플레이 대비](11-MultiplayerReady.md) | 네 블록 구조와 통신이 붙을 때의 흐름, 기능 로직(Rules)이 지킬 것, UI(Client)가 지킬 것, 저장·Undo·여러 플레이어 |
-| [12. 부록](12-Appendix.md) | 복사해 쓰는 뼈대(행동·이벤트·Block·`[BindTo]`·고유 기능·Bootstrap), 장별 체크리스트 모음, 본문에서 쓰지 않은 기능, **기능 사용 표**(기능 → 매뉴얼 장 → 가이드 절) |
+| [12. 부록](12-Appendix.md) | 복사해 쓰는 뼈대(행동·이벤트·Block·`[BindTo]`·고유 기능·Bootstrap), 장별 체크리스트 모음, 본문에서 쓰지 않은 기능(기믹 부품 포함), **기능 사용 표**(기능 → 매뉴얼 장 → 가이드 절) |
 
 ---
 

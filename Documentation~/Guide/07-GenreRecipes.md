@@ -2,6 +2,8 @@
 
 장르에 맞게 셋을 정한다. **Undo 방식**, **저장 구역**, **난수 흐름**이다. Undo 방식·판 저장·시드는 DB › 시작 파일 › **Bootstrap** 화면에서 고른다. 게임 코드는 장르와 상관없이 `Game.Do`·`session.Undo()`·`Game.Random(이름)`으로 같다.
 
+장르는 자유다. 기믹(조각의 효과 규칙)의 범위는 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아)의 다양성으로 보고, 갈래마다 만드는 법은 AI 문서 [기믹 목록](../AI/GimmickCatalog.md)에 있다. 이 장은 그 위에 얹는 장르 설정만 다룬다.
+
 > [!note]- 이 장에서 쓰는 말
 > | 말 | 뜻 |
 > |---|---|
@@ -28,6 +30,24 @@
 | 생활 시뮬(농장) | 쓰지 않음 | 이벤트를 받을 때(하루 끝) | 세이브 전체 = `Session`(작물·날짜·인벤토리), 슬롯 | `weather`·`forage` | 게임 안 달력(날짜·시각을 판 데이터에, 하루 넘김 행동이 이벤트를 쏜다)·격자(밭 = `Dictionary<string, 작물>`, 키 `Grid.Key`)·다이얼로그·인벤토리·월드 상태·씬 흐름 |
 
 카드 던전(덱빌딩)으로 2~5절을 보고, 다른 장르는 6절을 본다. "더 쓰는 부품"은 장르마다 먼저 꺼내 쓸 기능이다(어느 장르에서든 쓸 수 있다). RPG·어드벤처는 6절 접힌 칸: 월드 상태·씬 흐름·선택 대기·슬롯.
+
+대화·게임 안 달력·현실 시간·칸 맵(`Grid`)·큰 수(`BigNumber`)는 기믹이 아니라 **부가 기능**이다. 기획 명세서 6절에서 표시하면 그 기능을 붙인다. 조각의 효과(DB)와 따로 붙이고 뗀다.
+
+> [!note]- 부가 기능 — 표시하면 붙이는 것
+> | 부가 기능(명세서 6절) | GBible에서 | 가이드 |
+> |---|---|---|
+> | 대화(다이얼로그) | 선택 모듈 다이얼로그 | [06장](06-Presentation.md) 6절 |
+> | 겹치는 가방(인벤토리) | 선택 모듈 인벤토리(`Inventory`) | [04장](04-AddingContent.md) 6절 |
+> | 게임 안 달력·시각 | 판 데이터의 날짜·시각 필드 + 하루 넘김 행동이 쏘는 이벤트 | 6절 생활 시뮬 |
+> | 현실 시간(오프라인 보상·스태미나·일일 초기화) | `Game.Now`·`Game.Day` | 6절 수집형·방치형 |
+> | 시드 입력·일일 도전 | `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))` | 4절 |
+> | 칸 단위 맵(이동 범위·길찾기·시야) | `Grid`·`Cell` | 6절 턴제 전술·생활 시뮬 |
+> | 아주 큰 수(1e308을 넘음) | `BigNumber` | 6절 방치형 |
+> | 되감기("이번 턴 처음으로"·3회) | `session.HistoryMark`·`UndoTo` | 6절 턴제 전술 |
+> | 판 밖에서 하는 일(로비·뽑기·일일 임무) | 프로필(`Meta`) + 프로필도 행동마다 저장 | 6절 수집형 |
+> | 세이브 슬롯 여러 개 | `GBibleRuntime.UseSlot`·`SlotInfoOf` | [10장](10-SaveAndRelease.md) 3절 |
+> | 키 바꾸기 | 선택 기능 입력(`GameInput`) | [10장](10-SaveAndRelease.md) 1절 |
+> | Steam(기본 켬) | 선택 기능 Steam | [10장](10-SaveAndRelease.md) 6절 |
 
 ## 2. Undo 방식과 범위
 
@@ -82,7 +102,7 @@ profile.totalGold += run.gold;
 ```
 
 > [!note]- 새 판과 이어 하기
-> - 새 판을 열면(`GBibleRuntime.NewRun(session)`) `Session` 구역만 처음 값으로 돌리고(Undo 이력도 비운다) 판 저장 파일도 지운다. 프로필은 그대로 둔다.
+> - 새 판을 열면(`GBibleRuntime.NewRun(session)`) `Session` 구역만 처음 값으로 돌리고(Undo 이력도 비운다) 판 저장 파일도 지운다. 프로필은 그대로 둔다. 시드를 주면(`NewRun(session, 시드)`) 난수도 그 시드로 다시 맞춘다(4절).
 > - 판 저장(`run.json`)에는 `Session` 구역과 난수 상태·게임 시계가 들어간다. 그래서 이어 하면 다음 카드 섞기 결과까지 저장한 순간과 같다.
 > - 판 저장 시점은 Bootstrap 화면의 **판 저장**(끌 때 저장 / 행동마다 저장 / 저장하지 않음)으로 정한다. 카드 던전은 행동마다 저장, 판 끝 이벤트 `RunEnded`([10장](10-SaveAndRelease.md)).
 
@@ -116,14 +136,17 @@ for (var i = pile.Count - 1; i > 0; i--)
 > - 맵을 만든다면 `map.1`·`map.2`처럼 층마다 흐름을 나눠, 앞 층에서 더 뽑아도 뒤 층의 맵이 바뀌지 않게 한다.
 > - 피해 숫자의 흔들림 같은 연출에는 `Game.Random`을 쓰지 않는다([06장](06-Presentation.md)).
 
-> [!note]- 일일 도전
-> 모두 같은 판을 하려면 날짜로 시드를 정한다. 화면에는 날짜 칸이 없으므로 `Configure`에서 넣는다. 코드 값이 화면 값을 이기고, 출시 빌드에서도 그대로 쓰인다.
+> [!note]- 시드 입력 · 일일 도전
+> 같은 시드로 새 판을 열면 같은 판이 나온다. 새 판을 여는 곳(행동 밖, '새 판' 버튼)에서 시드를 준다.
 > ```csharp
-> static void Configure(SessionOptions options)
-> {
->     options.Seed = (ulong)DateTime.UtcNow.Date.Ticks;   // 같은 날이면 같은 시드
-> }
+> // 시드 입력: 플레이어가 적은 글자("ABCD1234")
+> GBibleRuntime.NewRun(session, RandomStreams.SeedOf(seedText));
+> // 일일 도전: 날짜 글자. 같은 날이면 모두 같은 판
+> GBibleRuntime.NewRun(session, RandomStreams.SeedOf(DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
 > ```
+> - `RandomStreams.SeedOf`는 글자를 숫자 시드로 바꾼다. 앞뒤 빈칸을 떼고 대문자로 맞추므로 "abcd1234 "도 같은 판이다.
+> - 시드를 주지 않으면 예전과 같다. 그다음 새 판 행동(`StartRun`)을 실행한다([10장](10-SaveAndRelease.md) 3절).
+> - 게임 전체를 한 시드로 고정하려면(출시 빌드 포함) `Configure`에서 `options.Seed`를 넣는다. 코드 값이 화면 값을 이긴다.
 
 ## 5. 시간 값은 게임 시계로
 
@@ -200,7 +223,7 @@ for (var i = pile.Count - 1; i > 0; i--)
 > [!note]- 대량 실시간(서바이버라이크)
 > - 적 수백·투사체·경험치 보석은 플레이어 데이터에 두지 않는다. 화면 쪽 오브젝트 풀이 움직이고 판정하며, 규칙에는 레벨·경험치·무기·처치 수 같은 **규칙 값**만 둔다.
 > - 틱마다 판정 결과를 묶어 행동 하나로 보낸다: `Game.Do(new TickRun { kills = …, gems = …, hits = … })`(**판정 보고 행동**, 매뉴얼 33장). 행동 하나 = 그 틱의 모든 결과라 행동 수가 적다.
-> - 레벨업 셋 중 하나는 `Game.Ask`(후보는 코드 풀 `Game.Roll(풀, 3, unique: true, stream: "levelUp")` — "최대 레벨이 아닌 무기만" 같은 거르기는 코드에서), DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다. 다시 뽑기·지우기는 선택을 취소(`Game.CancelChoice`)하고 다시 묻는 행동으로.
+> - 레벨업 셋 중 하나는 `Game.Ask`(후보는 코드 풀 `Game.Roll(풀, 3, unique: true, stream: "levelUp")` — "최대 레벨이 아닌 무기만" 같은 거르기는 코드에서), DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다. 다시 뽑기·지우기는 선택을 취소(`Game.CancelChoice`)하고 다시 묻는 행동으로. 결과 '가중치 표에서 고르기'로 만든 선택이면 행동 안에서 `Game.RerollChoice(선택 id)`가 같은 표·같은 후보 수로 새로 뽑는다(비용은 그 행동이 `Game.Pay`로).
 > - 패시브(저주·자석 범위)는 DB › 패시브(가진 목록 `run.passives`, 레벨 = `Game.Owned`), 무기 진화는 상자를 여는 행동의 규칙 함수가 "최대 레벨 + 짝 패시브"를 보고 바꾼다.
 > - Undo 방식 **쓰지 않음**, 판 저장 **끌 때** 또는 **N초마다**, 연출은 `GameView.Play`.
 
