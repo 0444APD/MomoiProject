@@ -21,6 +21,7 @@ namespace GBible.Tests
             public List<TrPiece> pieces = new List<TrPiece>();
             public List<TrPiece> board = new List<TrPiece>();
             public List<TrPlayer> players = new List<TrPlayer>();
+            public List<TrUnit> party = new List<TrUnit> { new TrUnit { id = "ally1" }, new TrUnit { id = "ally2" } };
             public TrUnit hero = new TrUnit { id = "hero" };
             public Dictionary<string, int> relics = new Dictionary<string, int>();
             public List<string> log = new List<string>();
@@ -164,6 +165,15 @@ namespace GBible.Tests
             Assert.AreEqual(2 + 10, Game.Attribute(Run.hero, "attack"), "레벨 5 → 마지막 값 10");
             Assert.AreEqual(20 + 6 + 10, Game.Attribute(Run.hero, "hp"), "사본마다 값");
             Assert.AreEqual(3 + 10, Game.Attribute(Run.hero, "options"), "가장 높은 레벨");
+
+            // 모든 동료: 받을 대상 경로에 [] → 그 모두가 받는다.
+            var banner = new PassiveDefinition { Id = "banner", OwnerKey = "run", OwnerPath = "relics", ModifierTarget = "party[]" };
+            banner.Modifiers.Add(new PassiveModifier { attribute = "attack", value = 2 });
+            _session.Passives.Define(banner);
+            Do(g => g.Get<TrRun>("run").relics["banner"] = 1);
+            Assert.AreEqual(4, Game.Attribute("ally1", "attack"));
+            Assert.AreEqual(4, Game.Attribute("ally2", "attack"));
+            Assert.AreEqual(2 + 10, Game.Attribute(Run.hero, "attack"), "주인공은 그대로");
         }
 
         [Test]

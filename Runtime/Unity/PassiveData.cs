@@ -29,7 +29,7 @@ namespace GBible.Data
         [FieldLabel("주기(초)"), Tooltip("0보다 크면 가진 동안 이 초(게임 시간)마다 가진 쪽마다 결과를 냅니다(트리거 없이도). 레벨별 주기가 있으면 그것")] public double pulse;
         [FieldLabel("레벨별 주기(초, 1레벨부터)")] public List<double> pulseByLevel = new List<double>();
         [FieldLabel("가진 동안 능력치 보정"), Tooltip("가진 동안만 붙는 보정입니다(잃으면 저절로 빠짐). 받는 쪽 = 가진 쪽(놓인 것마다면 그 요소) 또는 아래 '보정 받을 대상'")] public List<PassiveModifier> modifiers = new List<PassiveModifier>();
-        [FieldPath(EmptyLabel = "가진 쪽"), FieldLabel("보정 받을 대상"), Tooltip("가진 목록 플레이어 데이터 안의 객체 경로(예: hero). 비우면 가진 쪽. 보정 줄의 받을 대상이 있으면 그 줄은 그것")] public string modifierTarget = "";
+        [FieldPath(EmptyLabel = "가진 쪽"), FieldLabel("보정 받을 대상"), Tooltip("가진 목록 플레이어 데이터 안의 객체 경로(예: hero, 모든 동료면 party[]). 비우면 가진 쪽. 보정 줄의 받을 대상이 있으면 그 줄은 그것")] public string modifierTarget = "";
         [FieldLabel("보정 조건"), SerializeReference, TriggerSlot(TriggerKinds.Condition), Tooltip("참일 때만 보정이 붙습니다(읽을 때 가진 쪽마다 검사, 사용자 = 가진 쪽). 예: 자리 검사 '같은 줄에 혼자'(Fury), 체력 절반 이하. 비우면 늘")] public Trigger modifierWhen;
         [FieldLabel("여럿일 때"), Tooltip("받는 쪽 하나에 가진 쪽이 여럿일 때: 레벨을 더해 한 번 / 가진 쪽마다 값을 더함(같은 아티팩트 둘) / 가장 높은 레벨 하나만([고유])")] public PassiveStacking stacking = PassiveStacking.SumLevels;
         [FieldLabel("아이콘")] public Sprite icon;

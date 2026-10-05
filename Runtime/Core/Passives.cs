@@ -37,7 +37,7 @@ namespace GBible
         public string MatchVia;          // 일치 필드가 원본 ID일 때 그 원본에서 읽을 필드(비우면 일치 필드를 그대로 비교)
         public bool PerElement;          // 놓인 것마다: 가진 쪽 = 요소, 같은 목록끼리 목록 순서로 발동
         public string LevelField;        // 요소의 이 숫자 필드가 레벨(비우면 1개 = 1)
-        public string ModifierTarget;    // 보정 받을 대상 경로(가진 목록의 플레이어 데이터 안, 비우면 가진 쪽)
+        public string ModifierTarget;    // 보정 받을 대상 경로(가진 목록의 플레이어 데이터 안, 비우면 가진 쪽, party[]면 그 모두)
         public Trigger ModifierWhen;     // 보정 조건(조건 충족만, 비우면 늘)
         public PassiveStacking Stacking = PassiveStacking.SumLevels;
         public double Pulse;             // 0보다 크면 가진 동안 이 초마다 결과
@@ -202,18 +202,17 @@ namespace GBible
         double? ValueOnTarget(PassiveDefinition definition, PassiveModifier m, object target, string targetId)
         {
             var path = string.IsNullOrEmpty(m.target) ? definition.ModifierTarget : m.target;
-            // 받는 쪽 = 경로의 객체(정해져 있으면, 가진 쪽 전부가 그 객체에 보탠다) 또는 가진 쪽 자신.
-            object receiver = null;
-            if (!string.IsNullOrEmpty(path))
+            // 받는 쪽 = 경로의 객체(정해져 있으면, 가진 쪽 전부가 그 객체에 보탠다 — party[]처럼 []면 그 모두가 받는다) 또는 가진 쪽 자신.
+            var toPath = !string.IsNullOrEmpty(path);
+            if (toPath)
             {
                 if (string.IsNullOrEmpty(definition.OwnerKey) || !_session.Data.IsDefined(definition.OwnerKey)) return null;
-                receiver = FieldPaths.Resolve(_session.Data.Get(definition.OwnerKey), path).FirstOrDefault();
-                if (!IsTarget(receiver, target, targetId)) return null;
+                if (!FieldPaths.Resolve(_session.Data.Get(definition.OwnerKey), path).Any(r => IsTarget(r, target, targetId))) return null;
             }
             var levels = new List<int>();
             foreach (var (holder, level) in ActiveHolders(definition))
             {
-                if (receiver == null && !IsTarget(holder, target, targetId)) continue;
+                if (!toPath && !IsTarget(holder, target, targetId)) continue;
                 if (!ModifierConditionHolds(definition, holder)) continue;
                 levels.Add(level);
             }
