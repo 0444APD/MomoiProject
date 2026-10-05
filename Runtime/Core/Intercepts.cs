@@ -144,7 +144,7 @@ namespace GBible
     }
 
     // 결과 Block '의도 고치기': 가로챈 의도의 필드를 바꾸거나 의도를 막는다. 가로채기 트리거의 결과로만 의미가 있다.
-    // 값에 틀을 쓸 수 있다: {user}(사용자·가진 쪽의 id) · {owner}(이 결과를 가진 항목 ID) · {stacks}(가진 쪽의 이 상태 효과 중첩) · {level}(가진 쪽의 이 패시브 레벨) · {balance:ID}(밸런스 값).
+    // 값에 틀을 쓸 수 있다: {user}(사용자·가진 쪽의 id) · {owner}(이 결과를 가진 항목 ID) · {stacks}(가진 쪽의 이 상태 효과 중첩) · {level}(가진 쪽의 이 패시브 레벨) · {level:2/4/7}(레벨별 값, 1레벨부터) · {balance:ID}(밸런스 값).
     //   대신 맞기: targetId 값으로 바꾸기 {user}   도발: 공격 의도의 targetId 값으로 바꾸기 {user}   중첩만큼 피해 감소: amount 더하기 -{stacks}
     [Serializable]
     [BlockInfo("의도 고치기", Category = "결과", Description = "가로챈 의도의 값을 바꾸거나(설정·더하기·곱하기) 막습니다(취소).")]
@@ -152,11 +152,11 @@ namespace GBible
     {
         [FieldPath, FieldLabel("필드")] public string path = "";
         [FieldLabel("방법")] public IntentOp op = IntentOp.Add;
-        [FieldLabel("값(숫자·글자, 틀 {user} {stacks} {level} {balance:ID})")] public string value = "";
+        [FieldLabel("값(숫자·글자, 틀 {user} {stacks} {level} {level:2/4/7} {balance:ID})")] public string value = "";
 
         public override OutcomeKinds Kind => OutcomeKinds.Intent;
 
-        static readonly Regex Token = new Regex(@"\{(user|owner|stacks|level|balance:[^}]+)\}", RegexOptions.Compiled);
+        static readonly Regex Token = new Regex(@"\{(user|owner|stacks|level(?::[^}]+)?|balance:[^}]+)\}", RegexOptions.Compiled);
 
         // 틀을 이 순간의 값으로 바꾼다. 앞에 붙은 '-'와 겹치면(-{stacks}가 -3) 숫자 하나로 읽힌다.
         public static string Expand(string text, TriggerContext context)
@@ -168,10 +168,22 @@ namespace GBible
                 if (name == "user") return context.User == null || !GameApi.HasId(context.User.GetType()) ? "" : GameApi.IdOf(context.User) ?? "";
                 if (name == "owner") return context.Owner ?? "";
                 if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
-                if (name == "level") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Session.Passives.Owned(context.Owner, context.User).ToString(CultureInfo.InvariantCulture);
+                if (name == "level" || name.StartsWith("level:", StringComparison.Ordinal))
+                {
+                    var level = context.User == null || string.IsNullOrEmpty(context.Owner) ? 0 : context.Session.Passives.Owned(context.Owner, context.User);
+                    return name == "level" ? level.ToString(CultureInfo.InvariantCulture) : PickByLevel(name.Substring("level:".Length), level);
+                }
                 return context.Game.Balance(name.Substring("balance:".Length)).ToString("R", CultureInfo.InvariantCulture);
             });
             return expanded.Replace("--", "");
+        }
+
+        // "2/4/7"에서 레벨 번째 값(1레벨 = 첫 값, 넘치면 마지막 값, 레벨 0이면 0).
+        public static string PickByLevel(string values, int level)
+        {
+            if (level <= 0) return "0";
+            var parts = (values ?? "").Split('/');
+            return parts[Math.Min(level, parts.Length) - 1].Trim();
         }
 
         public override void Run(TriggerContext context)
@@ -233,7 +245,7 @@ namespace GBible
         {
             if (op == IntentOp.Cancel) return;
             if (string.IsNullOrEmpty(path)) context.Error("의도 고치기: 필드를 고르세요.");
-            if (op != IntentOp.Set && value.IndexOf('{') < 0 && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) context.Error("의도 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{level}·{balance:ID} 틀)를 적으세요.");
+            if (op != IntentOp.Set && value.IndexOf('{') < 0 && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) context.Error("의도 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{level}·{level:2/4/7}·{balance:ID} 틀)를 적으세요.");
         }
     }
 }

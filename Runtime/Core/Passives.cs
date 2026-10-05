@@ -47,6 +47,14 @@ namespace GBible
         [FieldLabel("칸")] public ModifierKind kind = ModifierKind.Flat;
         [FieldLabel("값(퍼센트는 0.2 = +20%)")] public double value;
         [FieldLabel("레벨마다(값 × 레벨)")] public bool perLevel;
+        [FieldLabel("레벨별 값(1레벨부터, 비우면 위 값)")] public List<double> byLevel = new List<double>();
+
+        // 그 레벨의 값: 레벨별 값이 있으면 그 칸(넘치면 마지막), 아니면 값(레벨마다면 × 레벨).
+        public double At(int level)
+        {
+            if (byLevel != null && byLevel.Count > 0) return byLevel[Math.Max(0, Math.Min(level, byLevel.Count) - 1)];
+            return perLevel ? value * level : value;
+        }
     }
 
     public sealed class PassiveSystem
@@ -124,7 +132,7 @@ namespace GBible
                     yield return new Modifier
                     {
                         id = "passive:" + definition.Id, target = targetId ?? "", attribute = m.attribute, kind = m.kind,
-                        value = m.perLevel ? m.value * level : m.value, source = definition.Id,
+                        value = m.At(level), source = definition.Id,
                     };
                 }
             }

@@ -385,6 +385,42 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 레벨별_값과_필드_바꾸기로_쌓이는_조커와_레벨_표를_만든다()
+        {
+            // 레벨별 보정(3/6/10/14%) — 레벨 4를 넘으면 마지막 값.
+            var amulet = new PassiveDefinition { Id = "crit", OwnerKey = "run", OwnerPath = "relics", ModifierTarget = "hero" };
+            amulet.Modifiers.Add(new PassiveModifier { attribute = "attack", kind = ModifierKind.Flat, byLevel = { 3, 6, 10, 14 } });
+            _session.Passives.Define(amulet);
+            Do(g => g.Get<GpRun>("run").relics["crit"] = 3);
+            Assert.AreEqual(3 + 10, Game.Attribute(Run.hero, "attack"));
+            Do(g => g.Get<GpRun>("run").relics["crit"] = 9);
+            Assert.AreEqual(3 + 14, Game.Attribute(Run.hero, "attack"));
+
+            // {level:2/4/7}: 레벨 2면 4만큼 덜 맞는다.
+            var shell = new PassiveDefinition { Id = "shell", OwnerKey = "run", OwnerPath = "relics", When = new InterceptTrigger { intentType = typeof(GpDamage).FullName } };
+            shell.Outcomes.Add(new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{level:2/4/7}" });
+            _session.Passives.Define(shell);
+            Do(g => g.Get<GpRun>("run").relics["shell"] = 2);
+            Game.Do(new Hit { target = "hero", amount = 10 });
+            Assert.AreEqual(30 - 6, Run.hero.hp);
+
+            // 쌓이는 조커: 점수 단계마다 이 조커의 mult +1(레벨 필드 = level → +레벨).
+            var bus = Joker("bus", new TargetedOutcome { targets = { new SelfTarget() }, effects = { new ChangeFieldEffect { field = "mult", change = FieldChange.Add, value = "{level}" } } });
+            Do(g => g.Get<GpRun>("run").jokers.AddRange(new[] { new GpJoker { id = "j1", joker = "bus", level = 1 }, new GpJoker { id = "j2", joker = "bus", level = 3 } }));
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Assert.AreEqual(2, Run.jokers[0].mult, "조커마다 따로 쌓인다");
+            Assert.AreEqual(6, Run.jokers[1].mult);
+            Do(g => g.Get<GpRun>("run").jokers[1].mult = 1);
+            var counter = new ChangeFieldEffect { field = "mult", change = FieldChange.Add, value = "-5", clampZero = true };
+            var drain = new AbilityDefinition { Id = "drain" };
+            drain.Outcomes.Add(new TargetedOutcome { targets = { new SelfTarget() }, effects = { counter } });
+            _session.Abilities.Define(drain);
+            Game.Use("drain", "j2");
+            Assert.AreEqual(0, Run.jokers[1].mult, "0 아래로 내리지 않음");
+        }
+
+        [Test]
         public void 같은_시드로_새_판을_시작하면_같은_난수가_나온다()
         {
             var seed = RandomStreams.SeedOf(" daily-2026-10-05 ");

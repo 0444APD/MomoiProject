@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace GBible
 {
@@ -69,6 +70,73 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(key)) context.Error("비용 내기: 플레이어 데이터를 고르세요.");
             if (amount < 0) context.Error("비용 내기: 양은 0 이상이어야 합니다(얻는 것은 '플레이어 데이터에 주기').");
+        }
+    }
+
+    public enum FieldChange
+    {
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("더하기")]
+#endif
+        Add,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("곱하기")]
+#endif
+        Multiply,
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.InspectorName("값으로 바꾸기")]
+#endif
+        Set,
+    }
+
+    // 효과 '필드 바꾸기': 대상의 숫자 필드를 직접 바꾼다(저장되는 값 자체 — 보정이 아니다).
+    //   조커 "이 조커 배수 +1"(대상 = 사용자 자신) · 카운터 −1 · 처치 횟수 +1(진화) · 카드 칩 +5(영구).
+    //   값에 틀: {level}(이 항목의 레벨) · {level:2/4/7} · {stacks} · {balance:ID}. 능력치를 잠깐 올리는 것은 '능력치 보정'.
+    [Serializable]
+    [BlockInfo("필드 바꾸기", Category = "필드", Description = "대상의 숫자 필드를 더하기·곱하기·값으로 바꿉니다(저장되는 값 자체). 예: 이 조커 배수 +1(대상 = 사용자 자신), 카운터 −1, 처치 횟수 +1. 잠깐 올리는 것은 '능력치 보정'.",
+               Sentence = "{field} {change} {value}")]
+    public sealed class ChangeFieldEffect : Effect
+    {
+        [FieldLabel("필드(대상의 숫자 필드·경로)")] public string field = "";
+        [FieldLabel("방법")] public FieldChange change = FieldChange.Add;
+        [FieldLabel("값(틀 {level} {level:2/4/7} {stacks} {balance:ID})")] public string value = "1";
+        [FieldLabel("0 아래로 내리지 않음")] public bool clampZero;
+
+        protected override void Apply(object target)
+        {
+            if (target == null || string.IsNullOrEmpty(field)) return;
+            var text = ModifyIntentOutcome.Expand(value, Use?.Context);
+            if (!double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var amount))
+            {
+                Game?.Session.Journal.Append(JournalKind.Warning, "Effect", $"필드 바꾸기: 값 '{text}'을(를) 숫자로 읽지 못했습니다.");
+                return;
+            }
+            FieldPaths.SplitLast(field, out var parentPath, out var member);
+            foreach (var parent in FieldPaths.Resolve(target, parentPath).ToList())
+            {
+                if (parent == null || parent.GetType().IsValueType) continue;
+                var access = FieldAccess.Find(parent.GetType(), member);
+                if (access == null || !access.CanWrite) continue;
+                var current = access.Get(parent);
+                if (!(current is IConvertible) || current is string || current is bool) continue;
+                var now = Convert.ToDouble(current, System.Globalization.CultureInfo.InvariantCulture);
+                var next = change == FieldChange.Add ? now + amount : change == FieldChange.Multiply ? now * amount : amount;
+                if (clampZero && next < 0) next = 0;
+                var underlying = current.GetType();
+                access.Set(parent, IsInteger(underlying) ? Convert.ChangeType(Math.Round(next), underlying, System.Globalization.CultureInfo.InvariantCulture) : Convert.ChangeType(next, underlying, System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
+
+        static bool IsInteger(Type type) =>
+            type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte) || type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort) || type == typeof(sbyte);
+
+        public override string Describe() => change == FieldChange.Add ? $"{field} {(value.StartsWith("-") ? "" : "+")}{value}" : change == FieldChange.Multiply ? $"{field} ×{value}" : $"{field} = {value}";
+
+        public override void Validate(IValidationContext context)
+        {
+            if (string.IsNullOrWhiteSpace(field)) context.Error("필드 바꾸기: 필드를 적으세요.");
+            if (value.IndexOf('{') < 0 && !double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                context.Error("필드 바꾸기: 값에는 숫자(또는 {level}·{stacks}·{balance:ID} 틀)를 적으세요.");
         }
     }
 }
