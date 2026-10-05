@@ -102,7 +102,7 @@ GBible.Unity
 | 기획자가 고칠 숫자 | DB › 밸런스 값 → `Game.Balance(GameIds.Balance.X)`, 곡선이면 `Game.Balance(id, 층)`(일정하게·비율로·거듭제곱·표, 반올림, 자르기) | 30 |
 | 드롭·보상·조우(확률) | DB › 가중치 표 → `Game.Roll(id)`·`Roll(id, n, unique)`·결과 '가중치 표에서 주기'·'가중치 표에서 고르기'. 꽝 무게·안쪽 표·개수·조건 | 30 |
 | 풀이 바뀜(해금·가진 것·판에서 생긴 것) | 줄의 조건(진행·도전과제) · 줄 종류 '플레이어 데이터 목록' · 뺄 목록 · 코드 풀 `Game.Roll(풀, n, unique, stream)`. 풀은 저장하지 않는다 | 30 5-10 |
-| 보상 후보 +1·다시 뽑기 | '가중치 표에서 고르기'의 `countBonus`(후보 수에 더할 숫자, 플레이어 데이터) · `Game.RerollChoice(선택 id)`(같은 표·후보 수로 새로, 비용은 그 행동이) | 30 |
+| 보상 후보 +1·다시 뽑기 | '가중치 표에서 고르기'의 `countBonus`(후보 수에 더할 숫자, 플레이어 데이터) · `Game.RerollChoice(선택 id)`(같은 표·후보 수로 새로, 비용은 그 행동이). 기본 고르기 창의 버튼은 `GameScreens.Reroll = choice => 행동 또는 null` | 30·35 |
 | 확률 공개 | `session.Tables.Chances(id)`(표의 지금 조건·목록·뺄 목록·밸런스 무게까지. 코드 풀 `Game.Roll(풀…)`은 반영하지 않는다) | 30 |
 | 천장(뽑을수록 확률이 오름)·운 | 가중치 표 줄 '무게를 밸런스 값에서'(단계 = 플레이어 데이터의 횟수) | 30 |
 | 딕셔너리 항목·목록의 id 요소를 가리키기 | 필드 경로 `stock[potion]`·`units[hero].hp`(조건·Game.Pay·주기·binding-path) | 11 |
@@ -253,7 +253,7 @@ public class PlayCard : GameAction
 | `GBibleRuntime` | `Session` · `Game` · `Start()` · 이벤트 `Configuring`·`Started`·`Stopped`·`Saving`·`RunLoaded`·`Stopping` · `Slot`·`UseSlot`·`SlotInfoOf`·`Slots()`·`DeleteSlot`·`CopySlot`·`SlotSummary`·`PlayTime` · `SaveProfile`·`SaveRun`·`LoadRun`·`NewRun(session, 시드)`·`DeleteRun`·`HasSavedRun`·`AutoSaveRun` |
 | `GameView` | `Redraw(그리기, [waitForPresentation,] 키…)` · `Present(코루틴 / done => … / 초)` · `Play(코루틴 / done => …)`(대기열 밖) · `IsPresenting` · `Busy` · `Wait(초)` · `DeltaTime` · `PresentationSpeed` · `SkipPresentation` · `ClearPresentation` · `Register`·`Find<T>(id)`(GameObject) · `RegisterElement`·`FindElement(id)`(UI 칸) |
 | `ViewList<항목, 컴포넌트>` | `(프리팹, 부모, () => 목록, (뷰, 항목) => …, 키…)` · `OnCreate` · `OnRemove` · `ViewOf(id)` |
-| `GameScreens` | `Open(id, 값)` · `Close` · `CloseAll` · `IsOpen` · `Get` · `All` · `Back()` · `Do(() => 행동)` · `Toast` · `Confirm` · `Overlay` · `QuitToTitle` · `Quit()` · `Opened`·`Closed` · ID `Choice`·`Confirmation`·`Settings`·`Slots`·`Pause` |
+| `GameScreens` | `Open(id, 값)` · `Close` · `CloseAll` · `IsOpen` · `Get` · `All` · `Back()` · `Do(() => 행동, whileChoosing)` · `Reroll`(고르기 창의 다시 뽑기 행동) · `Toast` · `Confirm` · `Overlay` · `QuitToTitle` · `Quit()` · `Opened`·`Closed` · ID `Choice`·`Confirmation`·`Settings`·`Slots`·`Pause` |
 | `GameScreen` | `OnOpen`·`Draw`·`OnClose`·`Tick(초)` · `Watch` · `WaitForPresentation` · `Q<T>(이름)` · `OnClick(이름, () => 행동 / 할 일)` · `List<T>(…)` · `Item(이름)` · `Own(…)` · `Close()` · `Root`·`Argument`·`Data` |
 | `ElementList<항목>` | `(컨테이너, 칸 UXML, () => 목록, (칸, 항목) => …, 키…)` · `OnCreate` · `OnRemove` · `Find(id)` |
 | `GameSettings` | `Toggle`·`Number`·`Choice`·`Text`·`Get(id)` · `Set(id, 값)` · `Reset`·`ResetAll(분류)` · `All` · `Label`·`ChoicesOf` · `Changed` · `Raw`·`SetRaw`(모듈용) |

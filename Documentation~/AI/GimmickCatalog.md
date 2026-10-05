@@ -123,7 +123,7 @@ GBible 프로젝트의 기믹은 네 게임이 보여 주는 범위 안에 있�
 |---|---|---|
 | N개 중 고르기·건너뛰기 | 부스터 팩, 유물·주문 선택 | '가중치 표에서 고르기'(최소 0 = 건너뛰기) |
 | 후보 +1 | Lucky Bunny Ear, Fortune Earrings | '후보 수에 더할 숫자'(플레이어 데이터) |
-| 다시 뽑기 | Hexa-gonal Die, 상점 리롤 | `Game.RerollChoice(선택 id)` + 비용은 그 행동(`Game.Pay`) |
+| 다시 뽑기 | Hexa-gonal Die, 상점 리롤 | `Game.RerollChoice(선택 id)` + 비용은 그 행동(`Game.Pay`). 기본 고르기 창의 버튼은 `GameScreens.Reroll` |
 | 공짜·할인 | Black Mark, Astronomer, Chaos the Clown(상점마다 한 번) | 가로채기 '비용 지불' → 막기·곱하기, 한 번만이면 상태 효과(지속 = 이벤트 1번) |
 | 판매가·이자·돈 비례 | Egg, Gift Card, To the Moon, Bull, Enchanting Coin | 숫자 필드 + 이벤트(라운드 끝) + '필드 바꾸기', 비례 계산은 `[BindTo]` |
 
