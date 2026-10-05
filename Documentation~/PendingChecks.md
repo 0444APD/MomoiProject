@@ -120,7 +120,7 @@
 ## 단계 6. 예전부터 남은 확인
 
 **에디터 기본**
-- EditMode 테스트(Window › General › Test Runner): 전체 통과. 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`, `MirrorTests`(모든 생성 코드가 실행 가능, 생성된 읽기·쓰기로 멤버를 다룸), `SavedIdRenameTests`, 새 테스트(`AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`·`GimmickPartsTests`·`GimmickTrialTests`), 다이얼로그 `DialogueRunnerTests`(새 줄: 신호를 받은 쪽이 다른 다이얼로그를 열면 그쪽이 이어 간다 — Unity 안에서만 돈다). PlayMode 샘플 테스트 3개는 메뉴 `Tests › 샘플 › 샘플 데이터 만들기` 뒤에.
+- EditMode 테스트(Window › General › Test Runner): 전체 통과. 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`, `MirrorTests`(모든 생성 코드가 실행 가능, 생성된 읽기·쓰기로 멤버를 다룸), `SavedIdRenameTests`, 새 테스트(`AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`·`GimmickPartsTests`·`GimmickTrialTests`·`TestScenarioTests`(테스트 상황 저장·불러오기·시뮬레이션 — Assets/MomoiProjectData/Tests에 임시 파일을 만들었다 지운다)), 다이얼로그 `DialogueRunnerTests`(새 줄: 신호를 받은 쪽이 다른 다이얼로그를 열면 그쪽이 이어 간다 — Unity 안에서만 돈다). PlayMode 샘플 테스트 3개는 메뉴 `Tests › 샘플 › 샘플 데이터 만들기` 뒤에.
 - 저장 후 멈춤("Hold on") 재현 여부: 클래스를 만들고 필드 2개를 더한 뒤 저장.
 - Mirror: 플레이 중 플레이어 데이터(클래스)의 필드를 게임 코드에서 바꾸면 타임라인에 `경로  옛 값 → 새 값`으로 남고 Undo로 돌아간다. "예전 방식(리플렉션)으로 비교합니다" 경고가 뜨면 그 클래스에 [Serializable]이 빠진 것. "읽기 코드가 없어 리플렉션으로 읽습니다"도 같다.
 - 공유 객체: 플레이어 데이터 안에서 같은 객체를 두 곳에 넣고(장착 칸 = 인벤토리 안의 아이템) 고치면 기록이 한 번만 남고 Undo가 맞다.
@@ -148,6 +148,31 @@
 - 다이얼로그 화면: 글상자 블러(`backdrop-filter`가 게임 화면까지 흐리게 하는지), 모션, 로그 창, 장소 표시, 창 모드 스탠딩, 이미지 창, 한글 폰트(`DialogueUI.font`에 TTF), 클릭·키 입력. 그래프 창 마우스 조작(범위 선택, 그룹 상자 크기), 미리보기 막대.
 - 인벤토리: 아이템 '사용' 기능이 능력과 같은 칸.
 - 오디오 실제 소리·페이드 체감. 스파인 스탠딩(이 프로젝트에 스파인이 없어 실행 못 함). `내 코드 범위` 드롭다운 체감.
+
+## 단계 7. 미도리 — 관리·테스트 도구(2026-10-05)
+
+GBible이 '개발자가 만드는 도구'에서 'AI가 만든 것을 개발자가 읽고·바꾸고·테스트하는 도구'로 바뀌었다(구버전 백업 = `D:\Unity\Projects\Momoi`). 사람용 안내는 `Documentation~/Guide/`(운영 가이드).
+
+- **구조 잠금**(DB 창)
+  - 능력·패시브·상태 효과·도전과제 탭: 머리의 **+ 새로 만들기**가 없고, 캡션 끝에 "값을 바꿉니다(추가·삭제·구조는 AI에게)". 상세 창 아래 **삭제** 없음, 제목(ID)을 눌러도 고칠 수 없음.
+  - 결과 칸에 **+ 결과 추가**·✕가 없고, 조건·트리거 식에 + 블럭·+ 논리 연산자·+ 괄호·⋯·손잡이(⠿)가 없다. 문장 안의 숫자·드롭다운(보상 아이템·상태 효과)은 고칠 수 있다. 보상 목록·딕셔너리의 +·✕는 그대로 있다.
+  - 패시브 `rules`(발동 더) 줄에 + 추가·✕가 없다. 인스턴스 값에 '+ 기능'·기능 ✕가 없다. 키워드 탭에 + 키워드·+ 하위 그룹·⋯·✕가 없다. 클래스 상세의 '[Hide]' 토글이 꺼져(회색) 있다.
+  - 다이얼로그 그래프·DB › 장소·스탠딩 프로필·스프라이트 규격은 추가·삭제가 된다.
+  - 메뉴 **MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)** → 체크 표시가 붙고, 위의 버튼이 다시 보인다. 다시 누르면 숨는다.
+- **DB 반영 스크립트**: 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**가 있다(스크립트가 없으면 "없습니다"). 시험: `Assets/Code/Editor`에 `[DbSeed("1")] static void T() { if (EditorDatabase.Instance.FindById("seedTest") == null) EditorDatabase.Staging.Add(typeof(BalanceData), "seedTest"); }` 하나를 만들고 컴파일 → DB › 밸런스 값에 `seedTest`가 '새 항목 · 적용 전'으로, 콘솔에 "DB 반영 스크립트 1개를 돌렸습니다". Ctrl+S 뒤 `ProjectSettings/MomoiProject/DbSeeds.json`에 기록. 다시 컴파일해도 또 돌지 않는다. 확인 뒤 스크립트와 항목을 지운다(구조 편집을 열고).
+- **테스트 씬**
+  - 아무 씬을 열고 메뉴 **MomoiProject › 테스트 › 지금 씬을 복사해 테스트 씬 만들기** → `Assets/Scenes/Test.unity`, 오브젝트 '[테스트]'에 컴포넌트 '테스트 씬'. 인스펙터의 시작 상황이 드롭다운('(새 판)' + 저장된 상황).
+  - 테스트 씬 플레이 → 왼쪽 위 테스트 패널(F1로 접고 펼침): 시간 ×0.5~×4·멈춤·Undo·새 판, 테스트 상황(이름 적고 '지금 저장' → 목록에 생김 → '불러오기'), 테스트 명령(DB › 개발 명령·기본 명령이 분류별 버튼).
+  - `%USERPROFILE%\AppData\LocalLow\…\MomoiProject\slots\test\`가 생기고, 플레이를 멈춘 뒤 원래 씬을 플레이하면 기본 슬롯으로 시작한다(test가 기억되지 않음).
+  - 저장한 상황이 `Assets/MomoiProjectData/Tests/이름.json`에 보이고, 시작 상황으로 고르면 다음 플레이가 그 상황에서 시작한다.
+- **모니터 › 명령 탭**: 선택 대기 다음에 '테스트 상황' 패널(이름 칸·지금 저장·저장된 상황 버튼).
+- **에셋 관리**(메뉴 **MomoiProject › 에셋 관리**)
+  - 탭 넣을 것·목록·안 쓰는 것·폴더 정돈. 탐색기에서 png를 창에 끌어 놓으면 `Assets/Art/`로 들어온다.
+  - 목록 › 그림에서 아무 그림의 '쓰는 곳 n'을 누르면 그 그림을 쓰는 에셋이 펼쳐진다. '바꾸기…'로 다른 png를 고르면 그림이 바뀌고, 그 그림을 쓰던 프리팹·UI가 끊기지 않고 새 그림을 보인다.
+  - 안 쓰는 것 › 찾기 → 목록. 옮기면 `Assets/_Unused/` 아래로(지워지지 않음).
+  - 시험: `Assets/Code/Editor`의 반영 스크립트에서 `AssetRequests.Sprite("Assets/Art/Test/sample.png", 128, 128, "확인용")` → 넣을 것 탭에 줄, 그 경로에 단색 스프라이트. '파일 넣기…'로 다른 그림 → ✓.
+- **시작 설정**: 적용한 뒤 '다음' 문구가 "자료를 Docs/Source에 넣고 Claude Code에서 /think-momoi …"이고, `Docs/Decisions.md`가 생긴다(없을 때만).
+- **Obsidian**: `Documentation~/Guide/`가 운영 가이드(00~09)로 바뀌었다. 예전 프로그래머 가이드는 `Documentation~/AI/BuildGuide/`. 개인 파일(`.obsidian`·`01-StartProject 수정본.md`)은 그대로.
 
 ## 확인이 끝나면
 

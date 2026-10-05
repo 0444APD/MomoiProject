@@ -6,6 +6,12 @@
 
 세부 사용법은 기능별 문서에 있다: `Documentation~/Manual/`(기능별 매뉴얼·코드 예제, 00-Index.md부터), `README.md`(개요·메뉴), `Documentation~/Architecture.md`(설계 결정 기록), `Documentation~/PlayerDataStore.md`(플레이어 데이터 저장소), `Documentation~/Localization.md`(다국어), `Documentation~/Dialogue.md`(다이얼로그), `Documentation~/Audio.md`(오디오). 이 문서와 그 문서들이 어긋나면 **가장 최근 결정**(이 문서의 5·6장, Architecture.md 끝부분)이 우선한다.
 
+> **2026-10-05 전환 — 미도리(먼저 읽기)**: GBible의 존재 의의가 바뀌었다. **로직·DB 항목·화면·테스트 도구는 AI(Claude Code)가 문서를 보고 코드로 만들고, GBible은 개발자가 그것을 에디터에서 읽고(모니터링) · 밸런싱 값(숫자·고르는 값·참조)을 바꾸고 · 테스트하는 도구다.** 개발자가 직접 하는 것은 밸런싱 값 · 다이얼로그 그래프 · 레벨 배치 · 에셋 가져오기. 대화에서 구버전은 **모모이**(백업 `D:\Unity\Projects\Momoi`, 태그 `momoi-final` = 커밋 c0923a0), 지금 작업은 **미도리**라 부른다(코드·폴더·메뉴 이름은 그대로 Momoi/GBible). 3요소 1번은 "AI가 틀리지 않고 되돌아가지 않으며 예외가 생기지 않는다(첫 단계에서 예외를 막는다)"로 바뀌었다. 코드 안 이름은 AI가 쓰기 편한 쪽으로 짓는다(화면 이름만 사용자 확인).
+> - AI 쪽: `Documentation~/AI/ProjectFlow.md`(진행 매뉴얼 — 단계 0 흡수 ~ 6 출시 준비, 질문 규칙, 예외 사냥 표, 결정 기록 `Docs/Decisions.md`), 명세서(목적·자료 0-1·개발자 몫 12·테스트 상황 13), 관례 15(DB 반영 스크립트 `[DbSeed]`)·18(개발자가 읽고 바꿀 모양)·19(테스트), 스킬·CLAUDE 틀, 참조. 예전 프로그래머 가이드 → `Documentation~/AI/BuildGuide/`(AI용 구현 가이드).
+> - 에디터: 구조 잠금 `EditorPolicy`(Block 조립·로직 항목 추가·삭제·ID·키워드 코드 잠금, 값은 열림, `[Database(DeveloperAuthored = true)]` 종류는 추가·삭제, 메뉴 '개발 › 구조 편집 열기'), DB 반영 스크립트 `DbSeeds`(컴파일 뒤 저절로, 적용했을 때만 기록), 에셋 관리 창(`AssetWindow`·`AssetTools`·`AssetRequests`).
+> - 테스트: `TestScene`(test 슬롯·시작 상황·게임 화면 위 패널 F1), `TestScenarios`(상황 저장·불러오기·`Simulate` 자동 시뮬레이션·CSV), `TestSceneSetup.Ensure`, 모니터 명령 탭의 테스트 상황. 매뉴얼 38·39장.
+> - 사람용: `Documentation~/Guide/`(운영 가이드 00~09). Unity 확인: `PendingChecks.md` 단계 7.
+
 ---
 
 ## 1. 라이브러리 기능 설명
@@ -487,7 +493,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - UPM 패키지화 여부.
 ### 7.3 보류
 - **도움말·시작하기**: 숨김, 가장 마지막.
-- **연습 모드(샌드박스)**: 영구 보류.
+- **연습 모드(샌드박스)**: 2026-10-05 미도리 전환으로 풀림 → 테스트 씬·테스트 상황(매뉴얼 38장).
 - **이벤트 알림 컴포넌트**: 만들지 않기로 결정.
 - **필드 규칙 "키워드일 때만 보이기"**: 아이템이 조립식으로 결정되어 보류.
 - 아이템 샘플 이전(골드 등 자원은 플레이어 데이터로 두는 방향) — 반영됨(샘플 `player.gold`).
