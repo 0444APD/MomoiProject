@@ -161,6 +161,10 @@ namespace GBible.EditorTools
 
         // ── 적용·되돌리기 ──────────────────────────────────────
 
+        // 적용(Ctrl+S)했다·버렸다. DB 반영 스크립트가 "돌았음"을 적용했을 때만 기록하려고 받는다.
+        public static event Action AfterCommit;
+        public static event Action AfterDiscard;
+
         public int Commit()
         {
             if (IsEmpty) return 0;
@@ -219,6 +223,7 @@ namespace GBible.EditorTools
 
             db.SyncDatabaseAsset();
             EditorDatabase.MarkDirty();
+            AfterCommit?.Invoke();
             return count;
         }
 
@@ -231,6 +236,7 @@ namespace GBible.EditorTools
             _added.Clear();
             _removed.Clear();
             EditorDatabase.StagingChanged();
+            AfterDiscard?.Invoke();
         }
 
         // ── 스크립트 다시 불러오기·플레이 전후 ─────────────────────
