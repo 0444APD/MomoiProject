@@ -89,6 +89,8 @@ namespace GBible
         public IReadOnlyList<object> Picked = Array.Empty<object>();
         // '쓸 수 있나'만 미리 보는 순간(Game.CanUse). 확률 조건이 굴리지 않는다.
         public bool IsCheck;
+        // 다른 조각의 패시브를 빌려 쓰는 순간(Blueprint). User = 빌려 준 원본 조각. '필드 바꾸기'는 이때 원본 자신의 필드를 바꾸지 않는다.
+        public bool IsBorrowed;
 
         public GameApi Game => Session?.Game;
     }

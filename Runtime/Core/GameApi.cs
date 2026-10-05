@@ -212,6 +212,8 @@ namespace GBible
         public int StatusCount(object target, StatusKind kind) => Session.Statuses.CountOfKind(target, kind);
         public int RemoveStatuses(object target, StatusKind kind) => Session.Statuses.RemoveKind(target, kind);
 
+        // 빌려 쓰기: 지금 순간으로 그 패시브를 원본(lender)의 것으로 한 번 더 낸다(Blueprint를 코드로). 결과 '빌려 쓰기'와 같다.
+        public bool BorrowPassive(string passiveId, object lender) => Session.Passives.Borrow(passiveId, lender, Session.Triggers.Current);
         // 패시브(DB › 패시브)를 몇 개 가졌나(레벨). holder를 비우면 모든 가진 쪽의 합. 놓인 것마다 패시브면 holder = 그 요소(그 요소의 레벨).
         public int Owned(string passiveId, object holder = null) => Session.Passives.Owned(passiveId, holder);
 

@@ -105,6 +105,8 @@ namespace GBible
         protected override void Apply(object target)
         {
             if (target == null || string.IsNullOrEmpty(field)) return;
+            // 빌려 쓰는 중이면(Blueprint) 원본 조각 자신의 쌓이는 값은 바꾸지 않는다 — 쌓이는 것은 원본이 직접 발동할 때만.
+            if (Use?.Context?.IsBorrowed == true && ReferenceEquals(target, Use.Context.User)) return;
             var text = ModifyIntentOutcome.Expand(value, Use?.Context);
             if (!double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var amount))
             {

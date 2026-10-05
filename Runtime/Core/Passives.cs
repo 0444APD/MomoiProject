@@ -63,6 +63,8 @@ namespace GBible
         readonly Dictionary<string, PassiveDefinition> _definitions = new Dictionary<string, PassiveDefinition>(StringComparer.Ordinal);
         // 능력치 이름 → 그 능력치를 보정하는 패시브(읽을 때 빨리 건너뛰려고).
         readonly Dictionary<string, List<PassiveDefinition>> _byAttribute = new Dictionary<string, List<PassiveDefinition>>(StringComparer.Ordinal);
+        // 지금 빌려 쓰는 중인 (패시브, 원본) — 서로 빌리는 고리(Blueprint ↔ Brainstorm)를 끊는다.
+        readonly HashSet<(string, object)> _borrowing = new HashSet<(string, object)>();
 
         internal PassiveSystem(GameSession session)
         {
@@ -205,13 +207,48 @@ namespace GBible
             return holderId != null && FieldText(moment.Event, definition.HolderField) == holderId;
         }
 
+        // 빌려 쓰기(복사·흉내): 지금 순간(이벤트·의도)으로 그 패시브의 트리거를 원본(lender)을 가진 쪽으로 검사하고, 참이면 결과를 낸다.
+        //   결과의 사용자 = 원본 조각(원본의 값을 읽는다), IsBorrowed = 참 — '필드 바꾸기'는 원본 자신의 필드를 바꾸지 않는다(쌓이는 값은 원본만).
+        //   이미 빌려 쓰는 중인 (패시브, 원본)을 다시 빌리면 거짓(고리 끊기). 결과를 냈으면 참.
+        public bool Borrow(string id, object lender, TriggerContext moment)
+        {
+            var definition = Find(id);
+            if (definition == null || lender == null || moment == null) return false;
+            var key = (definition.Id, lender);
+            if (!_borrowing.Add(key)) return false;
+            try
+            {
+                var context = new TriggerContext
+                {
+                    Session = _session, Owner = definition.Id, Event = moment.Event, IsIntercept = moment.IsIntercept, IsUse = moment.IsUse,
+                    User = lender, Picked = new[] { lender }, IsBorrowed = true,
+                };
+                if (definition.When != null && !_session.Triggers.Test(definition.When, context)) return false;
+                if (!HolderFieldMatches(definition, lender, context)) return false;
+                Fire(definition, context);
+                return true;
+            }
+            finally { _borrowing.Remove(key); }
+        }
+
+        // 그 조각을 가진 것으로 보는 패시브들(그 패시브의 가진 목록에 그 조각이 들어 있고 일치하는 것).
+        public IEnumerable<PassiveDefinition> MatchingFor(object element)
+        {
+            if (element == null) yield break;
+            foreach (var definition in _definitions.Values.ToList())
+            {
+                if (!Matches(definition, element)) continue;
+                if (Collections(definition).Any(p => p.collection is IList list && list.Cast<object>().Any(e => ReferenceEquals(e, element)))) yield return definition;
+            }
+        }
+
         void Fire(PassiveDefinition definition, TriggerContext moment)
         {
             if (definition.Outcomes.Count == 0) return;
             var holder = moment.User;
             var context = new TriggerContext
             {
-                Session = _session, Owner = definition.Id, Event = moment.Event, IsIntercept = moment.IsIntercept,
+                Session = _session, Owner = definition.Id, Event = moment.Event, IsIntercept = moment.IsIntercept, IsBorrowed = moment.IsBorrowed,
                 User = holder, Picked = holder == null ? Array.Empty<object>() : new[] { holder },
             };
             _session.Triggers.RunOutcomes(definition.Outcomes, context, "Passive");
@@ -283,6 +320,41 @@ namespace GBible
             if (evt == null || string.IsNullOrEmpty(field)) return null;
             var value = FieldAccess.Read(evt, field);
             return value == null ? null : Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+    }
+
+    // 결과 '빌려 쓰기': 대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 빌려 쓴다(Blueprint·Brainstorm).
+    //   Blueprint = 패시브(놓인 것마다, 조커 칸) + 이 결과(대상: 자리로 고르기 — 오른쪽). 대상의 패시브는 '일치 필드'로 찾는다.
+    [Serializable]
+    [BlockInfo("빌려 쓰기", Category = "결과", Description = "대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 한 번 더 냅니다(복사·흉내). 결과의 사용자는 원본 조각이고, 원본 자신의 쌓이는 값('필드 바꾸기')은 바꾸지 않습니다. 서로 빌리는 고리는 끊습니다.")]
+    public sealed class BorrowOutcome : Outcome
+    {
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.SerializeReference]
+#endif
+        [FieldLabel("빌릴 조각")] public List<TargetSelector> targets = new List<TargetSelector>();
+
+        public override OutcomeKinds Kind => OutcomeKinds.Targeted;
+
+        public override void Run(TriggerContext context)
+        {
+            if (context?.Session == null) return;
+            var use = new AbilityUse { Game = context.Game, User = context.User, Picked = context.Picked ?? Array.Empty<object>(), Context = context };
+            IEnumerable<object> chosen = use.Picked;
+            foreach (var selector in targets.Where(t => t != null)) chosen = selector.Run(use, chosen);
+            foreach (var lender in chosen.Where(l => l != null && !ReferenceEquals(l, context.User)).ToList())
+                foreach (var definition in context.Session.Passives.MatchingFor(lender).ToList())
+                    context.Session.Passives.Borrow(definition.Id, lender, context);
+        }
+
+        public override string Describe(INameResolver names) =>
+            $"빌려 쓰기: {(targets.Count == 0 ? "고른 대상" : string.Join(" → ", targets.Where(t => t != null).Select(t => t.Describe())))}";
+
+        public override void Validate(IValidationContext context)
+        {
+            if (targets.Count == 0) context.Error("빌려 쓰기: 빌릴 조각을 고르는 대상 Block을 넣으세요(예: 자리로 고르기 — 오른쪽).");
+            if (targets.Contains(null)) context.Error("빌려 쓰기: 비어 있는 Block이 있습니다(스크립트가 지워졌을 수 있음).");
+            foreach (var target in targets) target?.Validate(context);
         }
     }
 }

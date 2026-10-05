@@ -420,6 +420,40 @@ namespace GBible.Tests
             Assert.AreEqual(0, Run.jokers[1].mult, "0 아래로 내리지 않음");
         }
 
+        // 결과: 사용자(조커)의 mult를 판 배수에 더한다(원본 값을 읽는지 보려고).
+        [Serializable]
+        public sealed class AddOwnMult : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context) => context.Game.Get<GpRun>("run").mult += ((GpJoker)context.User).mult;
+            public override string Describe(INameResolver names) => "자기 배수 더하기";
+        }
+
+        static PlaceTarget Neighbor(PlaceDirection direction) => new PlaceTarget { list = new PlayerDataListRef { key = "run", path = "jokers" }, direction = direction };
+
+        [Test]
+        public void 빌려_쓰기는_옆_조각의_패시브를_원본_값으로_내고_쌓이는_값은_원본만_바꾼다()
+        {
+            Joker("plus", new PlusMult { value = 4 });
+            Joker("blueprint", new BorrowOutcome { targets = { Neighbor(PlaceDirection.Right) } });
+            Do(g => g.Get<GpRun>("run").jokers.AddRange(new[] { new GpJoker { id = "j1", joker = "plus" }, new GpJoker { id = "j2", joker = "blueprint" }, new GpJoker { id = "j3", joker = "plus" } }));
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Assert.AreEqual(1 + 4 + 4 + 4, Run.mult, "Blueprint가 오른쪽 +4를 한 번 더");
+
+            Do(g => { var run = g.Get<GpRun>("run"); run.mult = 1; run.jokers.Clear(); });
+            Joker("bus", new TargetedOutcome { targets = { new SelfTarget() }, effects = { new ChangeFieldEffect { field = "mult", value = "1" } } }, new AddOwnMult());
+            Do(g => g.Get<GpRun>("run").jokers.AddRange(new[] { new GpJoker { id = "j1", joker = "blueprint" }, new GpJoker { id = "j2", joker = "bus", mult = 2 } }));
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Assert.AreEqual(3, Run.jokers[1].mult, "버스는 자기 차례에만 한 번 쌓인다");
+            Assert.AreEqual(1 + 2 + 3, Run.mult, "Blueprint는 쌓기 전 원본 값(2), 버스는 쌓은 뒤(3)");
+
+            // 서로 빌리는 고리: Blueprint(오른쪽) ↔ Brainstorm(맨 왼쪽)은 끝난다.
+            Joker("brainstorm", new BorrowOutcome { targets = { Neighbor(PlaceDirection.First) } }, new Log { text = "브레인" });
+            Do(g => { var run = g.Get<GpRun>("run"); run.mult = 1; run.jokers.Clear(); run.jokers.AddRange(new[] { new GpJoker { id = "j1", joker = "blueprint" }, new GpJoker { id = "j2", joker = "brainstorm" } }); });
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Assert.IsTrue(Run.log.Count >= 1 && Run.log.Count <= 4, "고리가 끊겨 몇 번 안에 끝난다: " + Run.log.Count);
+        }
+
         [Test]
         public void 같은_시드로_새_판을_시작하면_같은_난수가_나온다()
         {
