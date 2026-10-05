@@ -1,10 +1,12 @@
 # 07. 난수와 시간
 
-**한 줄 요약**: 게임 로직의 난수는 `Game.Random("이름")`(결정론 난수 스트림), 게임 로직의 시간은 `session.Clock`(게임 시계)을 쓴다. 둘 다 Undo·스냅샷 되감기·판 저장에 함께 따라간다. 일시정지·배속은 `GameTime`이 `Time.timeScale`로 한꺼번에 조절한다. 꺼 둔 동안에도 흐르는 현실 시각(오프라인 보상·일일 초기화)은 `Game.Now`·`Game.Day`를 쓴다. 행동에 찍혀 다시 돌려도 같다.
+**한 줄 요약**: 게임 로직의 난수는 `Game.Random("이름")`(결정론 난수 스트림), 게임 로직의 시간은 `session.Clock`(게임 시계)을 쓴다. 둘 다 Undo·스냅샷 되감기·판 저장에 함께 따라간다. 일시정지·배속은 `GameTime`이 `Time.timeScale`로 한꺼번에 조절한다. 꺼 둔 동안에도 흐르는 현실 시각(오프라인 보상·일일 초기화)은 `Game.Now`·`Game.Day`를 쓴다. 행동에 찍혀 다시 돌려도 같다. 행운·"모든 확률 2배"가 고칠 수 있는 확률은 `Game.Chance`로 굴린다. 시드 입력·일일 도전은 시드를 주고 새 판을 연다(`GBibleRuntime.NewRun(session, seed)`).
 
 **언제 쓰는가**
 
 - 명중·치명타·드롭·맵 생성 같은 규칙의 무작위
+- "25% 확률로"처럼 유물·패시브가 바꿀 수 있는 확률(`Game.Chance`, DB 조건 '확률')
+- 시드 입력("ABCD1234")·일일 도전(오늘은 모두 같은 판)
 - 쿨다운·지속 시간처럼 게임 시간 기준의 값
 - 메뉴·대화창이 열렸을 때 게임 멈추기, 슬로우 모션, 개발 중 프레임 단위 진행
 - 오프라인 보상·스태미나 회복·일일·주간 초기화처럼 현실 시각 기준의 규칙
@@ -17,7 +19,9 @@
 |---|---|
 | 결정론 난수 | 같은 시드에서 같은 순서로 부르면 기기·플랫폼과 상관없이 같은 수가 나오는 난수. 정수 연산만 쓴다(xoshiro256**). |
 | 마스터 시드 (`SessionOptions.Seed`) | 세션 전체의 씨앗. 스트림마다의 시드가 여기서 나온다. |
-| 스트림 (`RandomStream`) | 이름 하나("damage", "loot" …)에 붙은 난수 흐름. 스트림끼리 독립이라 한 곳에서 더 뽑아도 다른 곳의 결과가 바뀌지 않는다. |
+| 스트림 (`RandomStream`) | 이름 하나("damage", "loot" …)에 붙은 난수 흐름. 스트림끼리 독립이라 한 곳에서 더 뽑아도 다른 곳의 결과가 바뀌지 않는다. "난수 흐름"이라고도 쓴다. |
+| 의도 '확률' (`ChanceIntent`) | `Game.Chance`가 굴리기 직전에 가로채기에 보이는 내용(확률·흐름·굴리는 쪽). 가로채기가 확률을 바꾸거나 막는다(28장). |
+| 글자 시드 | 플레이어가 적거나 나누는 시드 글자("ABCD1234", "2026-10-05"). `RandomStreams.SeedOf`가 숫자 시드로 바꾼다. |
 | 게임 시계 (`GameClock`) | 세션의 시간. `Tick`(프레임 수)과 `Time`(초). 프레임 끝마다 흐른다. |
 | `GameTime` | Unity 쪽 시간 조절(일시정지·배속·프레임 넘기기). `Time.timeScale`을 바꾼다. |
 | UTC | 협정 세계시. 시간대와 상관없는 기준 시각. |
@@ -69,6 +73,8 @@ ulong raw = damage.NextULong();
 | `Name` | 스트림 이름 |
 | `GetState()` · `SetState(ulong[4])` · `Reseed(seed)` | 상태 꺼내기·넣기·다시 시드(도구·테스트용) |
 
+`rng.Chance(p)`는 의도를 거치지 않는다. 유물·패시브("모든 확률 2배", 행운)가 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15)로 굴린다.
+
 ### 2.3 시드 정하기: `SessionOptions.Seed`
 
 ```csharp
@@ -82,7 +88,7 @@ public static class SeedSetup
 }
 ```
 
-`GBibleRuntime`은 기본으로 현재 시각을 시드로 쓴다(플레이마다 다름). 버그 재현·리플레이·일일 도전처럼 같은 결과가 필요하면 `Configuring`에서 고정한다. 세션을 직접 만들면 `new GameSession(new SessionOptions { Seed = 7 })`.
+`GBibleRuntime`은 기본으로 현재 시각을 시드로 쓴다(플레이마다 다름). 버그 재현·리플레이처럼 게임 전체를 같은 시드로 돌리려면 `Configuring`에서 고정한다. 세션을 직접 만들면 `new GameSession(new SessionOptions { Seed = 7 })`. 판마다 시드를 정하는 시드 입력·일일 도전은 새 판을 열 때 시드를 준다(2.16).
 
 ### 2.4 스트림 묶음: `session.Random` (`RandomStreams`)
 
@@ -91,6 +97,7 @@ public static class SeedSetup
 | `Get(name)` | 스트림(없으면 만든다) |
 | `MasterSeed` | 마스터 시드 |
 | `Reseed(seed)` | 마스터 시드를 바꾸고 모든 스트림을 처음 상태로 |
+| `static SeedOf(text)` | 글자 시드 → 숫자 시드(`ulong`). 앞뒤 빈칸을 떼고 대문자로 맞춘다(2.16) |
 | `Streams` | 만들어진 스트림들 |
 | `ExportStates()` · `ImportStates(states)` · `Restore(states)` | 상태 꺼내기·넣기·되돌리기(시스템이 Undo·스냅샷·판 저장에 쓴다) |
 
@@ -235,6 +242,44 @@ public static class ClockSetup
 | 판 저장 | 판에 저장, 불러오면 이어서 흐른다 | 저장하지 않는다(적어 둔 시각만 플레이어 데이터로 저장) |
 | 맞는 곳 | 쿨다운·버프 지속·예약·상태 효과 | 오프라인 보상·스태미나 회복·일일·주간 초기화·기간 한정 이벤트 |
 
+### 2.15 고칠 수 있는 확률: `Game.Chance`
+
+```csharp
+if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) { … }   // 25%. 흐름을 비우면 "chance"
+bool lucky = Game.Chance(0.1, user: hero);                                 // 굴리는 쪽(사용자)도 의도에 실린다
+```
+
+| 매개변수 | 뜻 |
+|---|---|
+| `probability` | 0~1. 1 이상이면 반드시 성공, 0 이하면 늘 실패 |
+| `stream` | 난수 흐름 이름(기본 `"chance"`, 비워도 `"chance"`) |
+| `source` | 굴리는 쪽의 항목 ID(패시브·능력). 의도의 `sourceId` |
+| `user` | 사용자·가진 쪽(객체 또는 id). 의도의 `userId` |
+
+1. 굴리기 전에 의도 **'확률'**(`ChanceIntent { probability, stream, sourceId, userId, cancelled }`)을 가로채기에 보인다.
+2. 가로채기가 `probability`를 바꾸면 바뀐 확률로 굴린다. "모든 확률 2배" = 가로채기 '확률' → `probability` 곱하기 2. 막으면(`cancelled`) 실패다.
+3. 난수는 **늘 한 번** 굴린다. 확률이 바뀌거나 막혀도 같다. 그래서 같은 시드면 뒤의 결과가 밀리지 않는다.
+
+- 행동 안에서 부른다. 가로채기 결과가 그 행동 안에서 돈다.
+- DB에서는 조건 **'확률'**(칸: `percent`(확률(%)) · `stream`(난수 흐름(비우면 chance)))을 이벤트 받기·가로채기·사용 트리거와 `&& AND`로 쓴다. 이벤트를 받는 순간·가로채는 순간·쓰는 순간에만 굴린다. `Game.CanUse` 미리 보기에서는 굴리지 않고 참이다. 이벤트 없는 '조건 충족'만으로는 거짓이다(11장).
+- 의도 '확률'의 가로채기·의도 고치기는 28장이다.
+
+### 2.16 시드로 새 판: `NewRun(seed)` · `RandomStreams.SeedOf`
+
+```csharp
+GBibleRuntime.NewRun(session, RandomStreams.SeedOf("ABCD1234"));    // 시드 입력: 같은 글자면 같은 판(run.json도 지운다)
+session.NewRun(RandomStreams.SeedOf("2026-10-05"));                  // 세션만(테스트·서버, 파일은 모른다)
+GBibleRuntime.NewRun(session);                                       // 시드 없이: 난수는 이어서 흐른다
+```
+
+- `GBibleRuntime.NewRun(session, seed)` · `session.NewRun(seed)`: 판 값을 처음 값으로 되돌린 뒤 마스터 시드를 그 시드로 바꾸고 모든 스트림을 처음 상태로 맞춘다(`session.Random.Reseed`). 같은 시드 = 같은 판이다.
+- 시드를 주지 않으면 난수를 다시 맞추지 않는다. 스트림은 앞 판에서 이어서 흐른다.
+- `RandomStreams.SeedOf(글자)`: 글자 시드를 숫자 시드로 바꾼다. 앞뒤 빈칸을 떼고 대문자로 맞춘다. `" abcd1234 "`와 `"ABCD1234"`는 같은 판이다.
+- 일일 도전 = 날짜 글자를 시드로 쓴다. 모두 같은 날 같은 판을 받는다.
+- 같은 시드여도 판을 여는 행동이 난수를 뽑는 차례가 같아야 같은 판이다. 덱·맵은 `NewRun` 바로 뒤의 새 판 행동에서 만든다.
+- 시드로 연 판도 판 저장에 마스터 시드·스트림 상태가 들어간다. 이어 하면 그 시드 그대로다(3절).
+- 새 판 자체의 규칙(행동 밖에서 부른다, 판 저장 파일 삭제)은 06장 2.3이다.
+
 ---
 
 ## 3. Undo·스냅샷·저장과 함께 움직이는 방식
@@ -248,6 +293,7 @@ public static class ClockSetup
 | 판 저장(`ExportRun`) | 마스터 시드와 모든 스트림 상태를 저장 | `Tick`·`Time`을 저장 | 저장하지 않는다 |
 | 판 불러오기(`ImportRun`) | 마스터 시드·스트림 상태를 되살린다 → 다음 결과까지 같다 | 저장한 시각으로 | — (불러온 뒤의 행동은 그때의 시각) |
 | 프로필(`ExportMeta`) | 저장하지 않는다 | 저장하지 않는다 | 저장하지 않는다 |
+| 새 판(`NewRun(seed)`) | 시드를 주면 마스터 시드를 바꾸고 모든 스트림을 처음 상태로. 주지 않으면 그대로 이어서 | 그대로 | — |
 
 **주의 — Undo는 "모든 스트림"을 행동 직전으로 되돌린다.** 그 행동 뒤에 행동 밖에서 같은 세션의 난수를 뽑았다면(씬 코드의 연출 등) 그 소비도 함께 되돌아간다. 연출용 무작위(파티클 흔들림, 대사 고르기 등)는 `UnityEngine.Random`을 쓰고, `Game.Random`은 규칙 계산에만 쓴다.
 
@@ -560,6 +606,46 @@ public static class ResetCheck
 
 `RealClock`이 늘 정한 시각을 돌려주므로 날짜·시간대에 걸린 규칙을 기다리지 않고 시험한다.
 
+### 4.10 시드 입력 · 일일 도전
+
+```csharp
+using GBible;
+
+public static class RunStarter
+{
+    // 타이틀의 "시드로 시작" 버튼(행동 밖). 칸이 비면 시드 글자를 새로 만든다 — 판마다 나눌 수 있는 시드가 생긴다.
+    public static void Start(string seedText)
+    {
+        var session = GBibleRuntime.Session;
+        var text = string.IsNullOrWhiteSpace(seedText) ? NewSeedText() : seedText.Trim().ToUpperInvariant();
+        GBibleRuntime.NewRun(session, RandomStreams.SeedOf(text));
+        session.Do(new StartRun { seedText = text });          // 새 판 행동(게임이 만든 것): 덱·맵을 만들고 시드 글자를 판 데이터에 적는다
+    }
+
+    // "오늘의 도전": 날짜 번호가 같은 사람은 모두 같은 판
+    public static void StartDaily()
+    {
+        var session = GBibleRuntime.Session;
+        var text = "DAILY-" + session.Game.Day();              // 행동 밖이라 지금 시각. 모두 같은 순간에 바뀌게 하려면 TimeZone을 정한다(2.13)
+        GBibleRuntime.NewRun(session, RandomStreams.SeedOf(text));
+        session.Do(new StartRun { seedText = text, daily = true });
+    }
+
+    // 판을 고르는 일이라 규칙 난수가 아니다: Unity 난수로 글자만 만든다(그 뒤 판의 모든 무작위는 이 시드의 Game.Random).
+    static string NewSeedText()
+    {
+        const string letters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var chars = new char[8];
+        for (int i = 0; i < chars.Length; i++) chars[i] = letters[UnityEngine.Random.Range(0, letters.Length)];
+        return new string(chars);
+    }
+}
+```
+
+- 시드 글자는 판 데이터(`StartRun`이 적는 `run.seedText`)에 두고 화면에 보인다. 다른 사람이 그 글자를 넣으면 같은 판이 나온다.
+- 일일 도전의 점수·완료는 프로필(메타 구역)에 날짜 번호와 함께 남긴다. 판 데이터는 새 판마다 지워진다.
+- `NewRun`은 행동 안에서 부를 수 없다. 버튼·화면 코드에서 부르고, 판 내용은 그 뒤 행동으로 만든다(06장 2.3).
+
 ---
 
 ## 5. 주의할 점 · 자주 하는 실수
@@ -569,8 +655,10 @@ public static class ResetCheck
 | 리플레이·멀티에서 결과가 어긋남 | 규칙 계산에 `UnityEngine.Random`·`System.Random`을 썼다. 버전·플랫폼마다 결과가 다를 수 있다. 규칙은 `Game.Random`만 쓴다. |
 | Undo 후 연출 난수가 반복됨 | 연출에 `Game.Random`을 썼다. Undo가 모든 스트림을 되돌린다. 연출은 `UnityEngine.Random`. |
 | 전투에서 한 번 더 뽑았더니 드롭이 바뀜 | 같은 스트림을 함께 썼다. 용도별로 이름을 나눈다. |
-| 플레이마다 결과가 다름 | `GBibleRuntime`의 기본 시드는 현재 시각이다. 재현이 필요하면 `Configuring`에서 `Seed`를 고정한다. |
-| 쿨다운이 되감기·이어하기 뒤 어긋남 | `Time.time`으로 적었다. `session.Clock.Time` 기준으로 플레이어 데이터에 적는다. |
+| 플레이마다 결과가 다름 | `GBibleRuntime`의 기본 시드는 현재 시각이다. 재현이 필요하면 `Configuring`에서 `Seed`를 고정한다. 판마다 정한 시드면 `GBibleRuntime.NewRun(session, seed)`(2.16). |
+| 같은 시드로 새 판을 열었는데 판이 다름 | `NewRun`에 시드를 주지 않았다(난수가 이어서 흐른다). 또는 판을 여는 행동이 난수를 뽑는 차례가 다르다(조건에 따라 한 번 더 뽑기). 새 판 행동은 같은 차례로 뽑는다(2.16). |
+| 시드 글자의 대소문자·빈칸만 달라도 다른 판일까 걱정 | `RandomStreams.SeedOf`가 앞뒤 빈칸을 떼고 대문자로 맞춘다. 같은 판이다. |
+| "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 의도를 거치지 않는다. 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15) 또는 DB 조건 '확률'. || 쿨다운이 되감기·이어하기 뒤 어긋남 | `Time.time`으로 적었다. `session.Clock.Time` 기준으로 플레이어 데이터에 적는다. |
 | 일시정지했는데 쿨다운이 줄어듦 | `Time.unscaledTime`·`Time.realtimeSinceStartup` 같은 실제 시간을 썼다. |
 | 대화창을 닫았는데 게임이 안 움직임 | 다른 이유(메뉴 등)의 일시정지가 남아 있다. `GameTime.PausedBy`로 확인한다. 모니터의 일시정지 버튼 툴팁에도 멈춘 이유가 보인다. |
 | `StepFrame`이 아무 일도 안 함 | 일시정지 상태가 아니다. |

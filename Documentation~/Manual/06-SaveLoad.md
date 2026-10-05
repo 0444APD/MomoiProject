@@ -146,14 +146,15 @@ GBibleRuntime.SaveProfile(session);         // profile.json 쓰기
 GBibleRuntime.SaveRun(session);              // run.json 쓰기
 bool loaded = GBibleRuntime.LoadRun(session); // run.json이 있으면 불러오고 true
 GBibleRuntime.NewRun(session);               // 새 판: 이번 판 값을 처음 값으로 + run.json 지우기
+GBibleRuntime.NewRun(session, RandomStreams.SeedOf("ABCD1234"));   // 시드로 새 판(시드 입력·일일 도전: 같은 시드 = 같은 판)
 GBibleRuntime.DeleteRun();                   // run.json만 지우기
 ```
 
 실패(파일 접근 오류, 형식 오류, 게임보다 새 버전의 저장 등)는 예외를 밖으로 던지지 않고 기록에 오류("판 불러오기 실패: …" 등)로 남기며, `LoadRun`은 `false`를 돌려준다.
 
-**`GBibleRuntime.NewRun(session)`** — 새 판을 여는 한 줄. 다음을 한 번에 한다.
+**`GBibleRuntime.NewRun(session, seed = null)`** — 새 판을 여는 한 줄. 다음을 한 번에 한다.
 
-1. 메모리의 판 값(세션 구역)을 처음 값으로 되돌리고 Undo 기록을 비운다(`session.NewRun()`). 프로필은 그대로.
+1. 메모리의 판 값(세션 구역)을 처음 값으로 되돌리고 Undo 기록을 비운다(`session.NewRun(seed)`). 프로필은 그대로. `seed`를 주면 난수의 마스터 시드를 그 시드로 바꾸고 모든 스트림을 처음 상태로 맞춘다(같은 시드 = 같은 판). 주지 않으면 난수는 이어서 흐른다. 글자 시드는 `RandomStreams.SeedOf(글자)`로 바꿔 넘긴다(`07-Random-Time.md` 2.16).
 2. 판 저장 파일 `run.json`을 지운다.
 3. 판 끝 상태(판 끝 이벤트 뒤 "새 판까지 판을 저장하지 않음")를 푼다. 판 끝 이벤트 뒤 아직 하지 않은 프로필 저장이 남아 있으면 먼저 한다. 그래서 판을 끝낸 행동 바로 뒤, 같은 프레임에 `NewRun`을 불러도 그 판의 보상이 프로필에 저장된다.
 
@@ -176,6 +177,7 @@ session.ImportMeta(profileJson);             // JSON → 메타 구역
 string runJson = session.ExportRun();        // 세션 구역 + 난수 + 시간 → JSON
 session.ImportRun(runJson);                  // 이어하기
 session.NewRun();                            // 세션 구역을 정의할 때의 값으로, Undo 이력 비움(프로필은 그대로, 파일은 모른다)
+session.NewRun(RandomStreams.SeedOf("2026-10-05"));   // 위 + 난수를 그 시드로 다시 맞춘다
 ```
 
 | 메서드 | 담는 것 | 주의 |
@@ -184,7 +186,7 @@ session.NewRun();                            // 세션 구역을 정의할 때�
 | `ImportMeta(json)` | 메타 구역을 덮는다 | 빈 글자면 아무 일도 하지 않는다 |
 | `ExportRun()` | 세션 구역, 마스터 시드, 난수 스트림 상태, 틱·게임 시간 | 행동 실행 중에 부르면 예외 |
 | `ImportRun(json)` | 위를 모두 되살린다 | 불러온 시점부터 Undo 이력·스냅샷을 새로 시작한다 |
-| `NewRun()` | 세션 구역을 처음 값으로 | 파일이 없는 테스트·서버용. 판 파일은 지우지 않는다. Unity 게임은 `GBibleRuntime.NewRun(session)`(2.3) |
+| `NewRun(seed = null)` | 세션 구역을 처음 값으로. `seed`를 주면 마스터 시드·모든 스트림도 그 시드의 처음 상태로 | 파일이 없는 테스트·서버용. 판 파일은 지우지 않는다. Unity 게임은 `GBibleRuntime.NewRun(session, seed)`(2.3) |
 
 - **Undo 이력은 저장하지 않는다.** 불러온 시점부터 새로 쌓인다.
 - 아직 정의되지 않은 키의 저장 값은 보관했다가 그 키를 `Define`하는 순간 적용한다. 그래서 불러온 뒤에 코드로 정의해도 된다.

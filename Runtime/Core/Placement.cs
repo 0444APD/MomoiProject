@@ -179,8 +179,9 @@ namespace GBible
         }
 
         // 그 칸에서 방향에 있는 칸 번호들. 빈 칸(null)도 낸다(차 있는 것만 원하면 Around).
-        //   "맨 앞·맨 끝"처럼 차 있는 칸을 찾는 방향은 list가 있어야 한다. 다른 목록(맞은편 보드)의 칸을 볼 때는 그 목록의 count를 준다.
-        public static IEnumerable<int> Indices(int index, int count, int columns, PlaceDirection direction, int distance = 1, IList list = null)
+        //   "맨 앞·맨 끝"처럼 차 있는 칸을 찾는 방향은 list가 있어야 한다. 다른 목록(맞은편 보드)의 칸을 볼 때는 그 목록의 count를 주고
+        //   includeSelf를 참으로(같은 줄·같은 열·모두가 기준과 같은 번호의 칸 = 바로 맞은편도 낸다).
+        public static IEnumerable<int> Indices(int index, int count, int columns, PlaceDirection direction, int distance = 1, IList list = null, bool includeSelf = false)
         {
             var origin = CellOf(index, columns);
             var rows = columns <= 0 ? 1 : (count + columns - 1) / columns;
@@ -195,8 +196,8 @@ namespace GBible
                 case PlaceDirection.Around4: return Many(new[] { new Cell(0, -1), new Cell(1, 0), new Cell(0, 1), new Cell(-1, 0) });
                 case PlaceDirection.Around8:
                     return Many(new[] { new Cell(-1, -1), new Cell(0, -1), new Cell(1, -1), new Cell(-1, 0), new Cell(1, 0), new Cell(-1, 1), new Cell(0, 1), new Cell(1, 1) });
-                case PlaceDirection.SameRow: return Enumerable.Range(0, width).Select(x => IndexOf(new Cell(x, origin.y), count, columns)).Where(i => i >= 0 && i != index);
-                case PlaceDirection.SameColumn: return Enumerable.Range(0, rows).Select(y => IndexOf(new Cell(origin.x, y), count, columns)).Where(i => i >= 0 && i != index);
+                case PlaceDirection.SameRow: return Enumerable.Range(0, width).Select(x => IndexOf(new Cell(x, origin.y), count, columns)).Where(i => i >= 0 && (includeSelf || i != index));
+                case PlaceDirection.SameColumn: return Enumerable.Range(0, rows).Select(y => IndexOf(new Cell(origin.x, y), count, columns)).Where(i => i >= 0 && (includeSelf || i != index));
                 case PlaceDirection.RowFirst:
                     return Filled(Enumerable.Range(0, width).Select(x => IndexOf(new Cell(x, origin.y), count, columns))).Take(1);
                 case PlaceDirection.RowLast:
@@ -204,7 +205,7 @@ namespace GBible
                 case PlaceDirection.First: return Filled(Enumerable.Range(0, count)).Take(1);
                 case PlaceDirection.Last: return Filled(Enumerable.Range(0, count).Reverse()).Take(1);
                 case PlaceDirection.Same: return One(origin);
-                default: return Enumerable.Range(0, count).Where(i => i != index);
+                default: return Enumerable.Range(0, count).Where(i => includeSelf || i != index);
             }
 
             IEnumerable<int> One(Cell cell)
@@ -225,7 +226,7 @@ namespace GBible
             var index = IndexOf((IList)list, item);
             if (index < 0) yield break;
             var into = target ?? list;
-            foreach (var i in Indices(index, into.Count, columns, direction, distance, (IList)into))
+            foreach (var i in Indices(index, into.Count, columns, direction, distance, (IList)into, includeSelf: target != null))
                 if (i < into.Count && into[i] != null && !(target == null && i == index)) yield return into[i];
         }
 
@@ -256,6 +257,47 @@ namespace GBible
         }
 
         public static bool Is<T>(IList<T> list, T item, int columns, PlaceSpot spot, int n = 0) => Is((IList)list, IndexOf((IList)list, item), columns, spot, n);
+
+        // DB 요약 글에 쓰는 한글 이름(InspectorName과 같다).
+        public static string Name(PlaceDirection direction)
+        {
+            switch (direction)
+            {
+                case PlaceDirection.Left: return "왼쪽";
+                case PlaceDirection.Right: return "오른쪽";
+                case PlaceDirection.Up: return "위";
+                case PlaceDirection.Down: return "아래";
+                case PlaceDirection.Around4: return "상하좌우";
+                case PlaceDirection.Around8: return "주변 8칸";
+                case PlaceDirection.SameRow: return "같은 줄";
+                case PlaceDirection.SameColumn: return "같은 열";
+                case PlaceDirection.RowFirst: return "같은 줄 맨 앞";
+                case PlaceDirection.RowLast: return "같은 줄 맨 뒤";
+                case PlaceDirection.First: return "목록 맨 처음";
+                case PlaceDirection.Last: return "목록 맨 끝";
+                case PlaceDirection.Same: return "같은 칸";
+                default: return "나를 뺀 모두";
+            }
+        }
+
+        public static string Name(PlaceSpot spot)
+        {
+            switch (spot)
+            {
+                case PlaceSpot.TopRow: return "맨 위 줄";
+                case PlaceSpot.BottomRow: return "맨 아래 줄";
+                case PlaceSpot.LeftColumn: return "맨 왼쪽 열";
+                case PlaceSpot.RightColumn: return "맨 오른쪽 열";
+                case PlaceSpot.Edge: return "가장자리";
+                case PlaceSpot.Inner: return "안쪽";
+                case PlaceSpot.First: return "목록 맨 처음";
+                case PlaceSpot.Last: return "목록 맨 끝";
+                case PlaceSpot.RowFirst: return "같은 줄 맨 앞";
+                case PlaceSpot.SidesEmpty: return "양옆이 빈 칸";
+                case PlaceSpot.RowAlone: return "같은 줄에 혼자";
+                default: return "n번째 칸";
+            }
+        }
 
         static bool IsEdge(Cell cell, int count, int columns)
         {

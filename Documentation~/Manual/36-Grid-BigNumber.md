@@ -10,6 +10,8 @@
 - 농장: 밭 칸마다 작물이 자라고, 물뿌리개가 3×3에 물을 준다.
 - 방치형·클리커: 쿠키 1e60개, 초당 생산, 건물 가격 ×1.15씩, "10개 사기"(큰 수 + 가격 곡선).
 
+조각을 칸에 놓는 게임(조커 칸·손패·가방 격자·와일드프로스트 보드)은 이 장이 아니라 [37장 자리(Placement)](37-Placement.md)다. 개체가 좌표를 들고 걸어 다니면 `Grid`, 목록 위치가 곧 칸이면 `Placement`다.
+
 이 문서에서 쓰는 용어:
 
 | 용어 | 뜻 |
@@ -39,6 +41,8 @@
 | "창은 앞 2칸 관통, 활은 2~4칸, 화염구는 반지름 1, 브레스는 앞쪽 삼각형" | `Grid.Ray` · `Grid.Area(…, minRadius)` · `Grid.Cone`(5-2) |
 | "벽 너머는 못 쏜다" | `Grid.Visible`(5-3) |
 | "밀쳐 내기 1칸, 벽·다른 유닛에 부딪히면 피해 +2" | `Grid.Direction` + 지형·유닛 검사(5-4) |
+| "범위 모양을 바라보는 쪽으로 돌린다(90°씩)" | `Grid.Rotate`(2-1) |
+| "조커 오른쪽 칸", "가방 맨 아래 줄", "석판 무늬" | 37장 `Placement` |
 | "방향키로 한 칸, 몬스터가 다가온다, 본 칸만 밝다" | `Grid.Path`의 첫 칸 · `Grid.Area` + `Visible`(5-5) |
 | "밭 칸마다 작물, 물뿌리개 3×3" | 칸 키 딕셔너리(`Grid.Key`) · `Grid.Area(…, Chebyshev)`(5-6) |
 | "쿠키 1e60개, 초당 생산" | `BigNumber` 필드(5-7) |
@@ -59,6 +63,8 @@
 - `Cell`은 값 구조체다. `a + b`·`a - b`는 칸끼리 더하고 뺀다(`at + Grid.Right`). `==`는 x·y가 모두 같을 때 참이다. 딕셔너리 키·`HashSet`에 그대로 쓴다.
 - 방향 상수: `Grid.Up` (0, 1) · `Grid.Down` (0, −1) · `Grid.Left` (−1, 0) · `Grid.Right` (1, 0). `Up`은 "y + 1"일 뿐이다. 화면에서 어느 쪽이 위인지는 그리는 쪽이 정한다(3-1).
 - `Grid.Direction(from, to)`: 가장 가까운 4방향 하나. 가로 차이가 세로 차이보다 크거나 **같으면** 가로(`(4, 4)` → `Right`), 같은 칸이면 `(0, 0)`이다.
+- `Grid.Rotate(상대 좌표, 회전 수)`: 상대 좌표를 시계 방향으로 90°씩 돌린다. Grid 좌표는 y가 위(+)라고 보고 돈다: 회전 1이면 오른쪽 (1, 0) → 아래 (0, −1), 아래 → 왼쪽, 왼쪽 → 위. 음수는 반시계, 4는 0과 같다. 무늬(`Area`·직접 적은 상대 칸 목록)를 바라보는 쪽에 맞출 때 쓴다.
+- `rows` 맵처럼 y가 아래로 늘어나게 그리면(3-1) 화면에서는 `Grid.Rotate`가 반시계로 보인다. 그때는 회전 수에 −를 붙인다. 목록 칸(37장)은 화면 기준의 `Placement.Rotate`를 쓴다.
 - `Grid.Key(x, y)` = `"x,y"`(공백 없음, 어느 나라 설정에서도 같다). `Cell.ToString()`도 같다. `Grid.TryParse(키, out cell)`은 `"3,-2"` → (3, −2)이고, 쉼표가 없거나 정수가 아니면 거짓이다.
 
 ### 2-2. 거리 · 이웃
@@ -260,6 +266,7 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 | `int Distance(Cell a, Cell b, GridMetric metric = Manhattan)` | 거리(2-2) |
 | `IEnumerable<Cell> Neighbors(Cell cell, bool diagonal = false)` | 이웃 4칸(대각선이면 8칸). 맵 밖도 준다 |
 | `Cell Direction(Cell from, Cell to)` | 가장 가까운 4방향(같으면 가로). 같은 칸이면 (0, 0) |
+| `Cell Rotate(Cell offset, int turns)` | 상대 좌표를 시계 방향으로 90° × `turns`(y 위 + 기준, 2-1). 목록 칸은 `Placement.Rotate`(37장) |
 | `Dictionary<Cell, int> Reachable(Cell start, int budget, Func<Cell, int> cost, bool diagonal = false)` | 갈 수 있는 칸 → 남은 이동력(시작 칸 포함). `cost`가 음수면 못 들어간다(2-3) |
 | `List<Cell> Path(Cell start, Cell goal, Func<Cell, int> cost, bool diagonal = false, int maxCost = 0)` | A* 길. 시작 칸을 뺀 차례(마지막 = 목표). 없으면 빈 목록. `maxCost` 0 = 제한 없음(2-4) |
 | `List<Cell> Line(Cell a, Cell b)` | 직선의 칸들(양 끝 포함, Bresenham) |
@@ -813,6 +820,8 @@ public static int Affordable(BigNumber budget, double basePrice, double rate, in
 | 창·돌진이 벽을 뚫음 | `Ray`·`Cone`·`Area`는 모양만 준다. `TakeWhile`로 막힌 칸에서 멈춘다(5-2). |
 | 브레스 모양이 비뚤어짐 | `Cone`에 대각선 방향을 넣었다. 4방향(`Grid.Up` … 또는 `Direction`) 하나를 넣는다. |
 | 맵이 위아래가 뒤집혀 그려짐 | `rows[0]`이 y = 0이고 `Grid.Up`은 y + 1이다. Tilemap에는 `-y`로 그린다(3-1). |
+| `Grid.Rotate`로 돌린 범위가 화면에서 반대로 돎 | `Grid.Rotate`는 y 위 + 기준의 시계 방향이다. `rows`처럼 y가 아래로 늘어나게 그리면 회전 수에 −를 붙인다(2-1). |
+| 조커 칸·가방의 옆 칸을 `Grid`로 계산하다 줄 끝·빈 칸이 꼬임 | 목록 위치가 칸인 자리는 37장 `Placement`(줄 길이·빈 칸 `null`·덜 찬 마지막 줄)를 쓴다. |
 | `Grid.Reachable`·`Grid.Path`가 없다는 컴파일 오류(CS0117) | 프로젝트에 같은 이름의 `Grid` 클래스(장르 확장)가 있어 `GBible.Grid`를 가린다. 프로젝트 쪽 이름을 바꾸거나(`TacticsRules`) `GBible.Grid`로 쓴다. 칸 구조체도 `Cell`을 따로 만들지 않는다. |
 | 칸 딕셔너리에서 칸을 못 찾음 | 키를 손으로 만들었다(`"3, 4"`). 키는 `Grid.Key`로만 만든다. |
 | 작물·생산 결과가 Undo나 다시 하기 뒤에 달라짐 | 딕셔너리를 도는 차례에 기대었다(난수·소수 합). 키를 정렬해 돈다(5-6·5-7). |

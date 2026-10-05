@@ -74,7 +74,7 @@ namespace GBible
             {
                 var index = Placement.IndexOf(source, at);
                 if (index < 0) continue;
-                foreach (var i in Placement.Indices(index, into.Count, columns, direction, distance, into))
+                foreach (var i in Placement.Indices(index, into.Count, columns, direction, distance, into, includeSelf: !ReferenceEquals(into, source)))
                 {
                     if (i >= into.Count || (ReferenceEquals(into, source) && i == index)) continue;
                     var found = into[i] == null ? null : PlaceBlocks.Resolve(game, into[i]);
@@ -83,7 +83,7 @@ namespace GBible
             }
         }
 
-        public override string Describe() => $"{(string.IsNullOrEmpty(other?.key) ? "" : "맞은편 ")}{direction}";
+        public override string Describe() => $"{(string.IsNullOrEmpty(other?.key) ? "" : "맞은편 ")}{Placement.Name(direction)}{(distance > 1 && direction <= PlaceDirection.Down ? $" {distance}칸" : "")}";
 
         public override void Validate(IValidationContext context)
         {
@@ -117,7 +117,7 @@ namespace GBible
             return Placement.Is(source, at, columns, spot, index) != not;
         }
 
-        public override string Describe(INameResolver names) => $"{(who == PlaceOrigin.EventField ? "이벤트의 " + eventField : "사용자")}가 {spot}{(not ? " 아님" : "")}";
+        public override string Describe(INameResolver names) => $"{(who == PlaceOrigin.EventField ? "이벤트의 " + eventField : "사용자")}가 {(spot == PlaceSpot.Index ? index + "번째 칸" : Placement.Name(spot))}{(not ? " 아님" : "")}";
 
         public override void Validate(IValidationContext context)
         {

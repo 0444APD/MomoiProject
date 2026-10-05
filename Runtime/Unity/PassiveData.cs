@@ -46,6 +46,7 @@ namespace GBible.Data
             if (trigger == null && modifiers.Count == 0) context.Error("발동(트리거)이나 가진 동안 능력치 보정이 있어야 합니다.");
             trigger?.Validate(context);
             if (trigger != null && outcomes.Count == 0 && !BoundOutcomes.Has(Id)) context.Warning("결과가 없습니다.");
+            if (trigger == null && (outcomes.Count > 0 || BoundOutcomes.Has(Id))) context.Warning("발동(트리거)이 없어 결과가 돌지 않습니다. 가진 동안 능력치 보정만 쓰려면 결과를 비우세요.");
             for (int i = 0; i < modifiers.Count; i++)
                 if (modifiers[i] == null || string.IsNullOrEmpty(modifiers[i].attribute)) context.Error($"가진 동안 능력치 보정 {i + 1}번째 줄의 능력치(숫자 필드 이름)가 비어 있습니다.");
             foreach (var outcome in outcomes)

@@ -338,6 +338,17 @@ namespace GBible.Tests
             Game.Use("attack", "d");
             Assert.AreEqual(7, Run.enemies[3].hp, "둘째 줄의 맞은편 둘째 줄 맨 앞 = e3");
 
+            // 맞은편 줄 전체(Barrage): 기준과 같은 번호의 칸(바로 맞은편)도 들어간다.
+            var row = new PlaceTarget { list = new PlayerDataListRef { key = "run", path = "board" }, columns = 3, direction = PlaceDirection.SameRow, other = new PlayerDataListRef { key = "run", path = "enemies" } };
+            var barrage = new AbilityDefinition { Id = "barrage" };
+            barrage.Outcomes.Add(new TargetedOutcome { targets = { row }, effects = { new PokeEffect { amount = 1 } } });
+            _session.Abilities.Define(barrage);
+            Game.Use("barrage", "b");
+            Assert.AreEqual(6, Run.enemies[1].hp, "e1(첫 줄)");
+            Assert.AreEqual(9, Run.enemies[2].hp, "e2 = b의 바로 맞은편(같은 번호 2)도 맞는다");
+            Assert.AreEqual(7, Run.enemies[3].hp, "둘째 줄은 그대로");
+            Assert.AreEqual("맞은편 같은 줄", row.Describe());
+
             var alone = new PlaceCondition { list = new PlayerDataListRef { key = "run", path = "board" }, columns = 3, spot = PlaceSpot.SidesEmpty };
             var check = new AbilityDefinition { Id = "fury", When = new AllTrigger { triggers = { new UseTrigger(), new ConditionTrigger { condition = alone } } } };
             check.Outcomes.Add(new Log { text = "분노" });

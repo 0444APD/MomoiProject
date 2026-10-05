@@ -1,6 +1,6 @@
 # 03. Game API
 
-**한 줄 요약**: `Game`(`GameApi`)은 게임 코드가 시스템을 쓰는 창구다. 플레이어 데이터 안의 객체를 찾고(`Find`·`All`), 행동을 실행하고(`Do`), 능력·아이템을 쓰고(`Use`), 결정론 난수(`Random`)와 새 id(`NewId`·`NewIds`)를 얻는다. 현실 시각·상태 효과·밸런스 값처럼 다른 장에서 다루는 멤버는 2.16에 모았다.
+**한 줄 요약**: `Game`(`GameApi`)은 게임 코드가 시스템을 쓰는 창구다. 플레이어 데이터 안의 객체를 찾고(`Find`·`All`), 행동을 실행하고(`Do`), 능력·아이템을 쓰고(`Use`, 쓸 수 있을 때만 `TryUse`), 결정론 난수(`Random`)·고칠 수 있는 확률(`Chance`)과 새 id(`NewId`·`NewIds`)를 얻는다. 현실 시각·상태 효과·밸런스 값처럼 다른 장에서 다루는 멤버는 2.16에 모았다.
 
 **언제 쓰는가**
 
@@ -130,7 +130,7 @@ ActionRecord record = Game.Do(new MoveUnit { unit = hero, x = 3, y = 4 });   // 
 
 `session.Do`와 같다. 행동 하나가 Undo 한 단위다. 대상은 객체로 넣는다: `string id`가 있는 클래스 형식의 필드는 기록에 id만 남고, 실행 직전에 그 id로 지금 데이터에서 다시 찾아 넣는다(못 찾으면 행동 실패). 자세히는 [02-Actions-Undo.md](02-Actions-Undo.md).
 
-### 2.9 `Game.Use(ability, user, params targets)` — 능력·아이템 쓰기
+### 2.9 `Game.Use(ability, user, params targets)` · `Game.TryUse` — 능력·아이템 쓰기
 
 ```csharp
 Game.Use("ability.fireball", hero, orc1, orc2);      // 객체로
@@ -140,6 +140,21 @@ Game.Use("ability.selfHeal", hero);                   // 대상 없이
 
 DB › 능력의 능력, 또는 사용 기능(`Usable`)이 붙은 인스턴스를 ID로 쓴다. `user`·`targets`는 객체 또는 id 문자열이다(객체를 넘기면 그 객체의 `id` 필드를 읽어 id로 바꾼다). 내부적으로 행동 하나(`UseAbility`)라서 Undo 한 번에 통째로 되돌아간다. 행동 안에서 부르면 그 행동의 일부로 그 자리에서 실행된다. 자세히는 [16-Abilities-Usable.md](16-Abilities-Usable.md).
 
+- 사용 조건이 안 맞으면 실패(`GameFailure`)를 던진다. 행동 안이면 그 행동 전체가 취소된다.
+- 결과를 내기 직전에 의도 **'사용'**(`UseIntent { ability, userId, times = 1, cancelled }`)을 거친다. 가로채기가 `times`를 늘리면 그만큼 결과를 낸다("한 번 더 발동"). 0이면 내지 않는다. 막으면 실패를 던지지 않고 아무 일 없이 끝난다(28장). 이벤트 '능력 사용'(`AbilityUsed`)의 `Times`가 낸 횟수다.
+
+**`Game.TryUse(ability, user, params targets)` — 쓸 수 있을 때만 쓰기**
+
+```csharp
+for (int i = 0; i < board.Count; i++)                                // 칸 번호 순서로(빈 칸 = null)
+    if (board[i] != null) Game.TryUse(board[i].ability, board[i]);   // 쓸 수 없는 유닛은 건너뛴다(턴 전체가 취소되지 않는다)
+```
+
+- 쓸 수 있으면 쓰고 `true`다. 사용 조건이 안 맞으면 아무것도 하지 않고 `false`다. 실패를 던지지 않는다.
+- 의도 '사용'이 막았거나 `times`가 0이어도 결과를 내지 않으므로 `false`다.
+- 조건을 한 번만 검사한다. 확률 조건(07장 2.15)도 한 번만 굴린다. `CanUse`로 묻고 `Use`하면 검사가 두 번이고, 확률 조건이 있으면 두 번의 답이 다를 수 있다.
+- 조커·참·보드 유닛을 차례로 돌며 "되는 것만 발동"할 때 쓴다(37장 5-3).
+
 ### 2.10 `Game.CanUse(...)` — 지금 쓸 수 있는가
 
 ```csharp
@@ -148,15 +163,21 @@ bool ok2 = Game.CanUse("ability.heal", hero, out string why);              // �
 bool ok3 = Game.CanUse("ability.heal", hero, new object[] { ally }, out why);
 ```
 
-능력의 트리거(사용 조건)만 검사한다. 아무것도 바꾸지 않는다. 버튼을 미리 흐리게 하거나 이유를 툴팁으로 보일 때 쓴다. 없는 ID면 `false`와 "쓸 수 있는 능력·아이템이 아닙니다", 조건이 거짓이면 `Game.Use`가 던지는 실패와 같은 지금 언어의 글이 `reason`에 들어간다: 그 능력·아이템의 쓸 수 없을 때 글(DB › 능력 `failText`·`Usable.failText`, 텍스트 키 또는 글)이 있으면 그 글, 비었으면 `FailureKeys.CannotUse`의 글("{ability}: 사용 조건을 만족하지 않습니다({condition}).", `30-Balance-Tables.md` 2-4)이다.
+능력의 트리거(사용 조건)만 검사한다. 아무것도 바꾸지 않는다. 미리 보기라 확률 조건은 굴리지 않고 참으로 본다(난수를 쓰지 않는다). 버튼을 미리 흐리게 하거나 이유를 툴팁으로 보일 때 쓴다. 없는 ID면 `false`와 "쓸 수 있는 능력·아이템이 아닙니다", 조건이 거짓이면 `Game.Use`가 던지는 실패와 같은 지금 언어의 글이 `reason`에 들어간다: 그 능력·아이템의 쓸 수 없을 때 글(DB › 능력 `failText`·`Usable.failText`, 텍스트 키 또는 글)이 있으면 그 글, 비었으면 `FailureKeys.CannotUse`의 글("{ability}: 사용 조건을 만족하지 않습니다({condition}).", `30-Balance-Tables.md` 2-4)이다.
 
-### 2.11 `Game.Random(name)` — 결정론 난수
+### 2.11 `Game.Random(name)` · `Game.Chance` — 결정론 난수·확률
 
 ```csharp
 int damage = 10 + Game.Random("damage").Range(0, 5);   // 0 이상 5 미만
 ```
 
 이름별로 따로 흐르는 난수 스트림(`RandomStream`)을 준다. 행동을 Undo하면 함께 되돌아간다. 자세히는 [07-Random-Time.md](07-Random-Time.md).
+
+```csharp
+if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) { … }   // 25%, 흐름을 비우면 "chance"
+```
+
+`Game.Chance(확률, 흐름 = "chance", source, user)`는 굴리기 전에 의도 '확률'(`ChanceIntent`)을 거친다. 행운·"모든 확률 2배"가 확률을 바꾸고, 막으면 실패다. 확률이 바뀌어도 난수는 한 번만 굴린다(같은 시드면 뒤가 밀리지 않는다). 유물·패시브가 고칠 수 있어야 하는 확률은 `Game.Random(…).Chance(p)` 대신 이것을 쓴다(07장 2.15).
 
 ### 2.12 `Game.NewId(prefix)` · `Game.NewIds(prefix, count)` — 새 id
 
@@ -234,12 +255,15 @@ public static class TacticsQueries
 |---|---|---|
 | `Now` · `Day(resetHour)` · `Week(resetHour, start)` | 현실 시각(UTC, 행동 안이면 그 행동이 시작한 순간), 날짜·주 번호. 규칙은 `DateTime.Now` 대신 이것 | [07](07-Random-Time.md) 2.11~2.13 |
 | `Attribute` · `AddModifier` · `RemoveModifiers` · `Modifiers` | 능력치 최종값, Modifier 붙이기·떼기 | [28](28-Attributes-Intercepts.md) |
-| `Intercept` · `Pay` · `CanPay` | 가로채기, 비용 내기 | [28](28-Attributes-Intercepts.md) |
-| `ApplyStatus(대상, id, 중첩, 출처, 길이)` · `RemoveStatus` · `StatusStacks` · `HasStatus` · `Statuses` | 상태 효과 걸기(길이를 비우면 상태 효과의 길이)·풀기·읽기 | [29](29-Statuses-Schedules-Choices.md) |
+| `Intercept` · `Pay` · `CanPay` | 가로채기, 비용 내기(가로채기 '비용 지불'이 `floor`를 낮추면 빚을 낼 수 있다) | [28](28-Attributes-Intercepts.md) |
+| `ApplyStatus(대상, id, 중첩, 출처, 길이)` · `RemoveStatus` · `StatusStacks` · `HasStatus` · `Statuses` | 상태 효과 걸기(길이를 비우면 상태 효과의 길이)·풀기·읽기. 걸기 직전에 의도 '상태 효과 걸기'(`StatusIntent`)를 거친다. 가로채기가 상태 효과를 바꾸거나(화상 → 푸른 화상) 중첩·길이를 고치고, 막으면(면역) `ApplyStatus`는 `null`이다 | [29](29-Statuses-Schedules-Choices.md) |
+| `StatusCount(대상, 종류)` · `RemoveStatuses(대상, 종류)` | 그 종류(`StatusKind`: 버프·디버프)가 몇 가지 걸려 있나 · 그 종류를 모두 푼다(정화, 푼 가짓수) | [29](29-Statuses-Schedules-Choices.md) |
 | `ShortenStatus(대상, id, 양)` | 남은 횟수·초를 줄인다. 다 되면 지속이 끝난 것으로 끝낸다. 영구거나 없으면 `false` | [29](29-Statuses-Schedules-Choices.md) |
-| `Owned(패시브 id, 가진 쪽 = null)` | 그 패시브를 몇 개(레벨) 가졌나. 가진 쪽을 비우면 모두의 합 | [29](29-Statuses-Schedules-Choices.md) · [17](17-Custom-Features.md) |
+| `Owned(패시브 id, 가진 쪽 = null)` | 그 패시브를 몇 개(레벨) 가졌나. 가진 쪽을 비우면 모두의 합(레벨 필드가 있으면 그 합). '놓인 것마다' 패시브면 가진 쪽 = 목록의 요소 하나 → 그 요소의 레벨 | [17](17-Custom-Features.md) · [29](29-Statuses-Schedules-Choices.md) |
+| `BorrowPassive(패시브 id, 원본)` | 빌려 쓰기: 지금 순간(트리거 결과·`[BindTo]` 안)으로 그 패시브를 원본 조각의 것으로 한 번 더 낸다(Blueprint를 코드로). 결과 '빌려 쓰기'와 같다. 결과를 냈으면 `true` | [37](37-Placement.md) 4-3 · [17](17-Custom-Features.md) |
 | `ScheduleAfter` · `ScheduleOn<T>` · `CancelSchedule` · `CancelSchedules` | 예약 | [29](29-Statuses-Schedules-Choices.md) |
 | `Ask` · `Answer` · `Choice` · `CancelChoice` | 선택 대기 | [29](29-Statuses-Schedules-Choices.md) |
+| `RerollChoice(선택 id)` | 다시 뽑기(행동 안에서): '가중치 표에서 고르기'로 만든 선택의 후보를 같은 표·같은 후보 수로 새로 뽑는다. 표로 만든 선택이 아니면 `false`. 비용·남은 횟수는 부르는 행동이 맡는다(`Game.Pay`). Undo하면 원래 후보 | [29](29-Statuses-Schedules-Choices.md) · [30](30-Balance-Tables.md) |
 | `Balance(id)` · `Balance(id, x)` | 밸런스 값, 곡선의 그 단계 값 | [30](30-Balance-Tables.md) |
 | `BalanceSum(id, from, count)` · `BalanceCount(id, from, budget)` | 단계 `from`부터 `count`개의 합("10개 사기"), 예산으로 단계 `from`부터 살 수 있는 개수 | [30](30-Balance-Tables.md) |
 | `Roll` · `Fail` | 가중치 표 뽑기, 플레이어용 실패 | [30](30-Balance-Tables.md) |
@@ -455,6 +479,9 @@ session.Undo();                        // 다시 30
 | `All<T>()`가 원하지 않는 객체까지 줌 | 같은 형식이 여러 플레이어 데이터에 있다. `All<T>("키")`로 한 곳만 본다. |
 | `All<T>()`가 준 리스트에 더했는데 반영되지 않음 | 돌려받은 리스트는 새 리스트다. 플레이어 데이터 안의 리스트(예: `board.units`)에 더한다. |
 | 오래 쥔 객체가 엉뚱한 값 | 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 값을 읽을 때는 id로 들고 있다가 `Find`한다. 행동에 넣는 것은 그 객체 그대로도 된다(실행 직전에 같은 id의 지금 객체로 바뀐다). |
+| 유닛 하나가 쓸 수 없어서 턴 전체가 취소됨 | 차례로 돌며 `Game.Use`를 불렀다. 사용 조건이 안 맞으면 실패를 던져 바깥 행동까지 취소된다. 되는 것만 발동할 때는 `Game.TryUse`(2.9). |
+| "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 의도 '확률'을 거치지 않는다. `Game.Chance`(2.11). |
+| `ApplyStatus`가 돌려준 값에서 `NullReferenceException` | 의도 '상태 효과 걸기'를 가로채기가 막았다(면역). 돌려받은 값이 `null`인지 먼저 본다. |
 | 행동 클래스 밖에서 `Game` 속성이 `null` | 행동·Block의 `Game` 속성은 그 코드가 실행되는 동안만 있다. 씬 코드는 `GBibleRuntime.Game`. |
 | 프레임이 느려짐 | `Find`를 객체마다 반복했다. `All`을 한 번 불러 쓰거나 id → 객체 사전을 프레임마다 한 번 만든다. |
 | 이동 범위·AI 계산이 느림 | 칸마다(후보마다) `All`·`Find`를 불렀다. 한 번 모아 칸 → 유닛, 칸 → 지형 사전을 만들고 칸 계산은 `Grid`로 한다(2.15). |
