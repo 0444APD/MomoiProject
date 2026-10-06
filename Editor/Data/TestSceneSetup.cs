@@ -8,11 +8,11 @@ using UnityEngine.SceneManagement;
 namespace GBible.EditorTools
 {
     // 테스트 씬 만들기(관례 19절). AI가 DB 반영 스크립트([DbSeed])에서 부른다:
-    //   [DbSeed("1")] static void TestScene() => TestSceneSetup.Ensure(copyFrom: "Assets/Scenes/Battle.unity", scenario: "보스 직전");
+    //   [DbSeed("1")] static void TestScene() => TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/Battle.unity", scenario: "보스 직전");
     // 게임 씬을 복사하고(없으면 빈 씬) '[테스트]' 오브젝트에 TestScene 컴포넌트를 붙인다. 이미 있으면 건너뛴다(개발자가 고친 씬을 덮지 않는다).
     public static class TestSceneSetup
     {
-        public const string DefaultPath = "Assets/Scenes/Test.unity";
+        public const string DefaultPath = ProjectFolders.Scenes + "/Test.unity";
 
         public static bool Ensure(string path = DefaultPath, string copyFrom = null, string scenario = "")
         {

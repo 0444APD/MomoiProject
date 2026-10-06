@@ -27,8 +27,8 @@ namespace GBible.EditorTools
                 made.Count == 0 ? "화면 준비가 이미 되어 있습니다." : "만든 것:\n- " + string.Join("\n- ", made) + "\n\nDB › 화면 설정을 확인하고 Ctrl+S로 적용하세요.", "확인");
         }
 
-        // 만든 것의 목록을 돌려준다(없으면 빈 목록).
-        public static List<string> Ensure()
+        // 만든 것의 목록을 돌려준다(없으면 빈 목록). commit: DB 항목을 작업본이 아니라 바로 저장한다(에디터가 저절로 만들 때 — EditorDatabase.Upkeep).
+        public static List<string> Ensure(bool commit = false)
         {
             var made = new List<string>();
             EditorDatabase.EnsureFolder(Folder);
@@ -62,7 +62,16 @@ namespace GBible.EditorTools
 
             var theme = AssetDatabase.LoadAssetAtPath<StyleSheet>(ProjectThemeFile);
             var settings = EditorDatabase.Instance.OfType<ScreenSettingsData>().FirstOrDefault();
-            if (settings == null)
+            if (settings == null && commit)
+            {
+                settings = (ScreenSettingsData)EditorDatabase.Instance.Create(typeof(ScreenSettingsData), "screenSettings");
+                settings.panelSettings = panel;
+                if (theme != null) settings.theme.Add(theme);
+                EditorUtility.SetDirty(settings);
+                AssetDatabase.SaveAssetIfDirty(settings);
+                made.Add("DB › 화면 설정 'screenSettings'");
+            }
+            else if (settings == null)
             {
                 settings = (ScreenSettingsData)EditorDatabase.Staging.Add(typeof(ScreenSettingsData), "screenSettings");
                 settings.panelSettings = panel;

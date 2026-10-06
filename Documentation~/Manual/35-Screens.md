@@ -190,7 +190,7 @@ protected override void Tick(float deltaTime)
 | `Assets/MomoiProject/UI/Screens/` · `Assets/MomoiProject/UI/Items/` | 화면 UXML·USS, 목록 칸 UXML을 둘 폴더 |
 | DB › 화면 설정 `screenSettings`(적용 전) | 위 Panel Settings·테마가 연결된 항목 → Ctrl+S |
 
-### 3-2. DB › 화면 설정(사이드바 요소 그룹)
+### 3-2. DB › 화면 설정(사이드바 개발 그룹 — 항목 하나, 없으면 에디터가 '화면 준비'와 같이 저절로 만든다)
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|

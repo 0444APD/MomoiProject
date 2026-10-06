@@ -198,6 +198,8 @@ namespace GBible.EditorTools
                 done.Add($"Undo 방식: {choices.history}");
             }
 
+            // 게임 씬 폴더(Unity 기본 Assets/Scenes)를 개발자 폴더로 옮긴다(개발자가 씬에 레벨을 배치한다).
+            ProjectFolders.MoveScenes(done);
             // 개발자 폴더: 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다.
             if (!AssetDatabase.IsValidFolder(DevFolders.Root))
             {

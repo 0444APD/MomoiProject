@@ -35,7 +35,7 @@ GBible.Unity
 ```
 
 - **한 판의 흐름**: 게임이 켜지면 `GBibleRuntime.Start`가 DB를 읽어 세션을 만들고(Bootstrap 옵션 → `Configuring` → 세션 → DB의 정의 등록 → `Started`), 프로필을 불러온다. 입력은 행동(`Game.Do`), 행동이 데이터를 바꾸고 이벤트를 쏜다. 화면은 프레임 끝에 데이터를 읽어 그린다.
-- **프로젝트 폴더**(관례 1절): `Assets/MomoiProject/Code/Rules`(규칙, Unity API 없음) · `Assets/MomoiProject/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/MomoiProject/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/MomoiProject/Code/Tests` · `Assets/MomoiProject/UI`(UXML·USS·Panel Settings) · `Assets/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProject/Data/Tests`(테스트 상황) · `Assets/MomoiProject/Generated`(GameIds, 손대지 않음) · `Docs/`(명세서·결정 기록·`Source`).
+- **프로젝트 폴더**(관례 1절): `Assets/MomoiProject/Code/Rules`(규칙, Unity API 없음) · `Assets/MomoiProject/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/MomoiProject/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/MomoiProject/Code/Tests` · `Assets/MomoiProject/UI`(UXML·USS·Panel Settings) · `Assets/MomoiProject/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProject/Data/Tests`(테스트 상황) · `Assets/MomoiProject/Generated`(GameIds, 손대지 않음) · `Docs/`(명세서·결정 기록·`Source`).
 
 ---
 

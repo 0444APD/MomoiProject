@@ -49,7 +49,8 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 - 난수 흐름 이름: 쓰임 하나에 하나(`"deck"`, `"loot"`, `"ai"`).
 - 폴더·파일 이름(만드는 것 모두 — `Assets/MomoiProject/Code`·`Assets/MomoiProject/UI`·`Assets/Dev/Art` …)은 영어. 한글은 쓰지 않는다.
 - `Assets/Dev`는 개발자 폴더다(안의 폴더 = DB 'Dev' 탭). 요청받을 때만 만들거나 바꾼다. 예외: 넣을 에셋 자리(`AssetRequests`)는 `Assets/Dev/Art`·`Dev/Audio`·`Dev/Fonts` … — 개발자가 진짜 파일을 넣는 곳이다.
-- AI가 쓰는 것은 모두 `Assets/MomoiProject/` 아래: 코드 `Code/`(Rules·Client·Editor·Tests·Keywords), 화면 `UI/`. `Assets` 바로 아래에 새 폴더를 만들지 않는다.
+- AI가 쓰는 것은 모두 `Assets/MomoiProject/` 아래: 코드 `Code/`(Rules·Client·Editor·Tests·Keywords), 화면 `UI/`, 테스트 씬 `Scenes/Test.unity`. `Assets` 바로 아래에 새 폴더를 만들지 않는다.
+- 게임 씬은 `Assets/Dev/Scenes`에 둔다(개발자가 레벨을 배치한다). AI가 게임 씬을 처음 만들 때만 여기에 만들고, 그 뒤 배치는 개발자 몫이다. Unity 기본 `Assets/Scenes`는 시작 설정·에디터를 열 때 여기로 옮겨진다.
 - 기획 명세서에 없는 **새 개념**(새 DB 종류·새 시스템)의 이름만 사람에게 확인한다. 이벤트·의도·행동·Block 같은 나머지는 이 규칙대로 짓고 보고만 한다.
 
 ## 3. 규칙과 화면의 경계
@@ -242,7 +243,7 @@ static class AchievementSeeds
 
 개발자는 런타임에 원하는 상황을 만들어 기믹·밸런스·버그를 시험한다. AI는 프로젝트마다 그 환경을 만든다.
 
-- **테스트 씬**: 단계 1에서 반영 스크립트로 `TestSceneSetup.Ensure(copyFrom: "Assets/Scenes/게임씬.unity", scenario: "")`를 부른다 — 게임 씬을 복사해 `Assets/Scenes/Test.unity`를 만들고 컴포넌트 `TestScene`(시작할 테스트 상황 · 시드 · 따로 슬롯 · 시간 배속 · 테스트 패널)을 붙인다(이미 있으면 건너뛴다). 플레이하면 그 상황으로 바로 시작하고, 게임 화면 위에 테스트 패널(테스트 명령 버튼 · 상황 저장·불러오기 · 시간 · Undo)이 뜬다(개발 빌드·에디터에서만).
+- **테스트 씬**: 단계 1에서 반영 스크립트로 `TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/게임씬.unity", scenario: "")`를 부른다 — 게임 씬을 복사해 `Assets/MomoiProject/Scenes/Test.unity`를 만들고 컴포넌트 `TestScene`(시작할 테스트 상황 · 시드 · 따로 슬롯 · 시간 배속 · 테스트 패널)을 붙인다(이미 있으면 건너뛴다). 플레이하면 그 상황으로 바로 시작하고, 게임 화면 위에 테스트 패널(테스트 명령 버튼 · 상황 저장·불러오기 · 시간 · Undo)이 뜬다(개발 빌드·에디터에서만).
 - **테스트 명령** = DB › 개발 명령(`DebugCommandData`) 항목: 주입(인스턴스를 목록에 넣기 · 자원 주기 · 패시브 얻기 · 상태 효과 걸기 · 적 만들기)과 발동(이벤트 쏘기 · 행동 실행)을 결과 Block으로 조립한다. 문장 안의 값(어느 인스턴스·몇 개·어느 대상)은 개발자가 드롭다운으로 바꾼다. Block으로 안 되는 것만 `[BindTo]`. 모두 행동으로 돌아 Undo·기록이 남는다. 반영 스크립트로 만들고 분류(`category`)로 묶는다(예: "판", "조각", "적", "상황").
 - **테스트 상황** = 지금 플레이어 데이터·시드·게임 시각을 이름 붙여 저장한 파일(`TestScenarios`, `Assets/MomoiProject/Data/Tests/`). 개발자가 패널이나 모니터에서 저장하고, AI는 명세서 13절·버그 보고의 상황을 테스트 명령으로 만들어 두고 저장 방법을 알린다. 규칙 테스트는 같은 상황을 코드로 다시 만든다.
 - **단계 2의 조각마다** 얻기·쓰기·걸기 테스트 명령을 만든다. 버그 보고를 받으면 같은 상황을 테스트 상황·규칙 테스트로 재현한 뒤 고친다.

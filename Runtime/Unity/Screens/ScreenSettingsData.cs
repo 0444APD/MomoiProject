@@ -6,7 +6,7 @@ namespace GBible.Data
 {
     // DB › 화면 설정(항목 하나): 모든 화면이 함께 쓰는 Panel Settings·테마 USS·글꼴, 기본 화면을 저절로 쓸지.
     // 메뉴 MomoiProject › 화면 › 화면 준비가 Panel Settings·테마 파일과 이 항목을 만든다.
-    [Database("화면 설정", Group = "요소", Order = 7, IdPrefix = "screens")]
+    [Database("화면 설정", Group = "개발", Order = 30, IdPrefix = "screens", Single = true)]
     [CreateAssetMenu(menuName = "MomoiProject/화면 설정", fileName = "ScreenSettings")]
     public sealed class ScreenSettingsData : GameData
     {

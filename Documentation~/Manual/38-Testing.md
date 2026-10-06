@@ -13,7 +13,7 @@
 
 | 용어 | 뜻 |
 |---|---|
-| 테스트 씬 | 게임 화면과 같은 클라이언트에 `TestScene` 컴포넌트를 둔 씬(`Assets/Scenes/Test.unity`). |
+| 테스트 씬 | 게임 화면과 같은 클라이언트에 `TestScene` 컴포넌트를 둔 씬(`Assets/MomoiProject/Scenes/Test.unity`). |
 | 테스트 패널 | 테스트 씬을 플레이하면 게임 화면 위에 뜨는 개발용 창(F1). 시간 · Undo · 새 판 · 테스트 상황 · 테스트 명령. |
 | 테스트 상황 | 지금 판(세션 구역·난수·게임 시각)과 프로필(메타 구역)의 스냅숏 파일. `Assets/MomoiProject/Data/Tests/<이름>.json`. |
 | 테스트 명령 | 버튼 하나로 도는 개발용 동작. DB › 개발 › 개발 명령 항목(결과 Block) 또는 코드 등록(`session.Debug.Register`). 22장. |
@@ -76,7 +76,7 @@ for i in 0..runs-1:
 ```csharp
 // 테스트 씬 만들기(DB 반영 스크립트에서 — 관례 15·19절). 이미 있으면 건너뛴다.
 [DbSeed("1")]
-static void TestScene() => TestSceneSetup.Ensure(copyFrom: "Assets/Scenes/Battle.unity", scenario: "보스 직전");
+static void TestScene() => TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/Battle.unity", scenario: "보스 직전");
 
 // 테스트 상황
 TestScenarios.Save(session, "보스 직전");

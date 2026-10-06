@@ -38,7 +38,6 @@
 | 요소 | 이벤트 | `[GameEvent]` 클래스(같은 범위) | 코드만(읽기 전용) |
 | 요소 | 플레이어 데이터 | `PlayerDataEntry` — 마우스를 올리면 오른쪽 **cs ↗**로 판·프로필 클래스 파일(PlayerData.cs)을 연다 | DB |
 | 요소 | 설정 | `SettingData` — 설정 화면의 칸 하나(음량·언어·전체 화면 …, [31장](31-Slots-Settings-Input.md)) | DB |
-| 요소 | 화면 설정 | `ScreenSettingsData` — 모든 화면의 Panel Settings·테마 USS·글꼴, 기본 화면 켜기(항목 하나, [35장](35-Screens.md)) | DB |
 | DB | 능력 | `AbilityData` | DB |
 | DB | 상태 효과 | `StatusData` — 버프·디버프·쿨다운([29장](29-Statuses-Schedules-Choices.md)) | DB(결과를 코드로 쓰면 `[BindTo]`) |
 | DB | 패시브 | `PassiveData` — "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과, [17장](17-Custom-Features.md) 0절) | DB(결과를 코드로 쓰면 `[BindTo]`) |
@@ -51,6 +50,7 @@
 | 개발 | 도전과제 | `AchievementData` | DB |
 | 개발 | 개발 명령 | `DebugCommandData` — 모니터 › 명령 탭의 버튼 하나(결과 Block 조립, [22장](22-Monitor-Debug.md) 7절) | DB(코드가 필요하면 `[BindTo]`) |
 | 개발 | 저장 변환 | `SaveMigrationData` — 출시 후 저장 구조 변환 한 단계(필드 옮김·키 이름 바꿈·키 삭제, [06장](06-SaveLoad.md) 1.4) | DB(값을 계산하는 변환만 코드) |
+| 개발 | 화면 설정 | `ScreenSettingsData` — 모든 화면의 Panel Settings·테마 USS·글꼴, 기본 화면 켜기(항목 하나 — 없으면 저절로 생긴다, [35장](35-Screens.md)) | DB |
 | 다이얼로그 시스템 | 기능 활성화 · 스탠딩 프로필 · 장소 | 선택 기능 | DB |
 | 인벤토리 시스템 | 기능 활성화 | 선택 기능 | — |
 | 입력(키 바꾸기) | 기능 활성화 | 선택 기능(Input System 패키지 필요, [31장](31-Slots-Settings-Input.md)) | — |
@@ -495,8 +495,8 @@ public class Item
 | 밸런스 값 | DB · `balance` | 이름 붙은 숫자 하나(값 · 곡선 · 메모). 플레이 중에 고치면 저장 전이라도 0.5초 안에 게임에 반영된다 | `GameIds.Balance.X` | 30장 3-1 |
 | 가중치 표 | DB · `table` | 확률로 뽑는 표 하나(항목 · 무게(또는 **무게를 밸런스 값에서** + **단계(플레이어 데이터)·단계 필드**) · 개수 · 조건 · 꽝 무게 · 뺄 목록). 플레이 중 반영도 같다 | `GameIds.WeightTable.X` | 30장 3-2 |
 | 화면 | DB · `screen` | UI Toolkit 화면 하나(UXML · 더할 USS · 목록 칸 UXML · 층 · 아래 입력 막기 · 뒤로로 닫기 · 시간 멈춤 · 열 씬 · 게임이 켜지면 열기) | `GameIds.Screen.X` | 35장 3-3 |
-| 화면 설정 | 선언 · `screens` | 모든 화면의 Panel Settings · 테마 USS · 글꼴 · 고르기 창 저절로 · 실패를 알림으로 · Esc로 일시정지 메뉴(항목 하나) | — | 35장 3-2 |
-| 설정 | 선언 · `setting` | 설정 화면의 칸 하나(분류 · 값의 종류·기본값 · 적용 대상). 목록 순서가 설정 화면의 순서 | `GameIds.Setting.X` | 31장 3-2 |
+| 화면 설정 | 개발 · `screens`(하나, 저절로) | 모든 화면의 Panel Settings · 테마 USS · 글꼴 · 고르기 창 저절로 · 실패를 알림으로 · Esc로 일시정지 메뉴(항목 하나) | — | 35장 3-2 |
+| 설정 | 요소 · `setting` | 설정 화면의 칸 하나(분류 · 값의 종류·기본값 · 적용 대상). 목록 순서가 설정 화면의 순서 | `GameIds.Setting.X` | 31장 3-2 |
 
 - 곡선(밸런스 값)·지속(상태 효과)·값(설정)은 묶음 필드라, 방식·종류를 바꾸면 그에 맞는 칸만 보인다(5절). 가중치 표 줄의 `단계(플레이어 데이터)`·`단계 필드`는 `무게를 밸런스 값에서`를 골랐을 때만 보인다.
 - 상태 효과 ID에 `[BindTo]`를 붙이면 `outcomes`(결과) 칸만 잠긴다. 걸릴 때·끝날 때 결과는 그대로 고친다(13장 2-11). 주기(초)도 `outcomes` 칸을 내므로 그 코드가 돈다.

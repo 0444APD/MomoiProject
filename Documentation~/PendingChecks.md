@@ -52,6 +52,8 @@
 - **클래스·이벤트 탭**: 폴더 묶음(Rules·Client …)·폴더 경로·'Code 폴더 밖'이 없고, `Assets/MomoiProject/Code` 안의 클래스(이벤트)가 이름순 한 목록으로 보인다. 아래에 라이브러리 기본 묶음('자동')은 그대로.
 - **스프라이트 규격 파일**: 사이드바에 '이미지' 그룹이 없다. `Assets/Dev` 아래 폴더에서 우클릭 › Create › MomoiProject › 스프라이트 규격 → 파일 이름을 `icon`으로 → 인스펙터에 전용 화면(ID · 그룹 · 새 그룹 만들기 · 가로·세로 · ↔ · 빠른 크기 · 비율 미리보기 · 쓰임). 새 그룹 칸에 `character` → 만들기 → 같은 폴더에 그룹 파일이 생기고 그룹이 골라진다. 크기를 바꾸면 미리보기 상자가 따라 바뀐다. DB의 Dev 탭에도 두 파일이 보인다.
 - **에셋 관리**: 탐색기에서 png를 에셋 관리 창에 끌어 놓으면 `Assets/Dev/Art/`에 들어간다(예전 `Assets/Art`).
+- **씬 폴더**: 콘솔에 "씬 폴더를 옮겼습니다: Assets/Scenes → Assets/Dev/Scenes". SampleScene이 `Assets/Dev/Scenes`에 있고 File › Build Profiles의 씬 목록도 새 자리를 가리킨다(빠진 씬 없음). 테스트 씬을 만들면 `Assets/MomoiProject/Scenes/Test.unity`에 생긴다.
+- **화면 설정**: 사이드바 **개발** 그룹에 **화면 설정** 탭이 있고 항목 `screenSettings`가 저절로 있다(Panel Settings·테마 연결). `Assets/MomoiProject/UI`에 PanelSettings·Theme.uss·DefaultTheme.tss가 생긴다. 요소 그룹에는 화면 설정이 없다.
 
 ## 단계 3. DB 화면 — 첫 게임 프로젝트에서
 
@@ -141,7 +143,7 @@ GBible이 '개발자가 만드는 도구'에서 'AI가 만든 것을 개발자�
   - 메뉴 **MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)** → 체크 표시가 붙고, 위의 버튼이 다시 보인다. 다시 누르면 숨는다.
 - **DB 반영 스크립트**: 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**가 있다(스크립트가 없으면 "없습니다"). 시험: `Assets/MomoiProject/Code/Editor`에 `[DbSeed("1")] static void T() { if (EditorDatabase.Instance.FindById("seedTest") == null) EditorDatabase.Staging.Add(typeof(BalanceData), "seedTest"); }` 하나를 만들고 컴파일 → DB › 밸런스 값에 `seedTest`가 '새 항목 · 적용 전'으로, 콘솔에 "DB 반영 스크립트 1개를 돌렸습니다". Ctrl+S 뒤 `ProjectSettings/MomoiProject/DbSeeds.json`에 기록. 다시 컴파일해도 또 돌지 않는다. 확인 뒤 스크립트와 항목을 지운다(구조 편집을 열고).
 - **테스트 씬**
-  - 아무 씬을 열고 메뉴 **MomoiProject › 테스트 › 지금 씬을 복사해 테스트 씬 만들기** → `Assets/Scenes/Test.unity`, 오브젝트 '[테스트]'에 컴포넌트 '테스트 씬'. 인스펙터의 시작 상황이 드롭다운('(새 판)' + 저장된 상황).
+  - 아무 씬을 열고 메뉴 **MomoiProject › 테스트 › 지금 씬을 복사해 테스트 씬 만들기** → `Assets/MomoiProject/Scenes/Test.unity`, 오브젝트 '[테스트]'에 컴포넌트 '테스트 씬'. 인스펙터의 시작 상황이 드롭다운('(새 판)' + 저장된 상황).
   - 테스트 씬 플레이 → 왼쪽 위 테스트 패널(F1로 접고 펼침): 시간 ×0.5~×4·멈춤·Undo·새 판, 테스트 상황(이름 적고 '지금 저장' → 목록에 생김 → '불러오기'), 테스트 명령(DB › 개발 명령·기본 명령이 분류별 버튼).
   - `%USERPROFILE%\AppData\LocalLow\…\MomoiProject\slots\test\`가 생기고, 플레이를 멈춘 뒤 원래 씬을 플레이하면 기본 슬롯으로 시작한다(test가 기억되지 않음).
   - 저장한 상황이 `Assets/MomoiProject/Data/Tests/이름.json`에 보이고, 시작 상황으로 고르면 다음 플레이가 그 상황에서 시작한다.

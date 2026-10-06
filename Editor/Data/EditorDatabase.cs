@@ -414,6 +414,8 @@ namespace GBible.EditorTools
         {
             // 예전 자리(Assets/Code · Assets/MomoiProjectData · Assets/UI …)의 시스템 폴더를 Assets/MomoiProject 아래로.
             ProjectFolders.MoveLegacy();
+            // 게임 씬 폴더(Assets/Scenes)를 개발자 폴더로(테스트 씬은 시스템 쪽).
+            ProjectFolders.MoveScenes(null);
             // 스크립트가 없는 asmdef(Editor·Tests)에 자리 표시 파일(Unity의 "스크립트가 없다" 경고를 막는다).
             StartSetup.EnsurePlaceholders(null);
             foreach (var info in DataTypes.All)
@@ -441,7 +443,9 @@ namespace GBible.EditorTools
             foreach (var info in DataTypes.All.Where(i => i.Single))
             {
                 if (Instance.All.Any(d => d != null && d.GetType() == info.Type)) continue;
-                Instance.Create(info.Type, info.IdPrefix);
+                // 화면 설정은 '화면 준비'와 같이(Panel Settings·테마까지).
+                if (info.Type == typeof(ScreenSettingsData)) ScreenSetup.Ensure(commit: true);
+                else Instance.Create(info.Type, info.IdPrefix);
                 Debug.Log($"[MomoiProject] DB › {info.DisplayName} 항목을 기본값으로 만들었습니다(프로젝트에 하나만 두는 설정).");
             }
         }
