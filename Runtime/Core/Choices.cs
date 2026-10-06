@@ -259,7 +259,7 @@ namespace GBible
     }
 
     // '선택 요구'·'가중치 표에서 고르기'의 이어서 할 행동: 고른 것마다 효과, 고른 원본 id를 플레이어 데이터에, 이어서 '고른 뒤 결과'(사용자·Owner는 요구한 순간 그대로).
-    [Serializable]
+    [Serializable, SystemAction]
     public sealed class ChoiceEffectsRun : GameAction
     {
         public string owner;

@@ -58,6 +58,13 @@ namespace GBible
         }
     }
 
+    // 시스템이 스스로 실행하는 행동(예약·상태 효과 주기·패시브 주기·선택 효과·개발자 편집)에 붙인다.
+    // 멀티플레이 서버는 클라이언트가 보낸 이 행동을 실행하지 않는다(플레이어 입력이 아니다).
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class SystemActionAttribute : Attribute
+    {
+    }
+
     public enum ActionStatus
     {
         // 실행됨(행동은 실행되는 즉시 끝난다).
@@ -66,6 +73,8 @@ namespace GBible
         Undone,
         // 실행 중 오류로 변경이 모두 취소됨.
         Failed,
+        // 멀티플레이 클라이언트: 서버로 보냄(결과는 서버가 보내는 바뀐 곳·이벤트로 온다. 실패는 NetClient.ActionFailed).
+        Sent,
     }
 
     public sealed class ActionRecord

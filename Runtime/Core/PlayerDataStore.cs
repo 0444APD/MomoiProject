@@ -14,6 +14,18 @@ namespace GBible
         Meta,
     }
 
+    // 멀티플레이: 이 플레이어 데이터를 어느 클라이언트에 보내는가(서버가 판단한다). 키 단위로 정한다 —
+    // 남에게 숨길 것(손패 등)은 플레이어마다 키를 나눠 Owner로 둔다.
+    public enum DataVisibility
+    {
+        // 모든 클라이언트(세션 구역의 기본).
+        Public,
+        // 주인(플레이어 번호) 클라이언트에게만.
+        Owner,
+        // 보내지 않는다(서버만 안다. 메타 구역의 기본 — 프로필은 각자 자기 쪽 것을 쓴다).
+        Server,
+    }
+
     // 타입이 붙은 플레이어 데이터 키. DB 창에서 이름을 지은 키는 코드 생성(GameIds)으로 이 형태로 제공된다.
     // 문자열 키 대신 쓰면 값의 타입이 컴파일 단계에서 맞춰지고 오타가 날 수 없다.
     public readonly struct PlayerDataKey<T>
@@ -137,6 +149,8 @@ namespace GBible
         public event Action<Transaction> TransactionUndone;
         // 이력 한도를 넘어 가장 오래된 행동이 Undo 대상에서 빠졌을 때.
         public event Action<Transaction> TransactionForgotten;
+        // 새 키가 등록됐을 때(실행 중에 생기는 라이브러리 키 포함). 멀티플레이 서버가 클라이언트에 알린다.
+        public event Action<string> KeyDefined;
 
         public PlayerDataStore(Journal journal)
         {
@@ -218,6 +232,7 @@ namespace GBible
             }
             _slots.Add(key, slot);
             _keys = null;
+            KeyDefined?.Invoke(key);
         }
 
         void DefineData(string key, DataZone zone, object value, string label)
@@ -242,6 +257,7 @@ namespace GBible
             _slots.Add(key, slot);
             _keys = null;
             CheckRequired(key, slot);
+            KeyDefined?.Invoke(key);
         }
 
         // 비교 코드가 있는 형식이면 Mirror 사본을 만든다. 없으면 예전 방식(리플렉션 비교)이고, 이유를 한 번 남긴다.
@@ -1235,8 +1251,9 @@ namespace GBible
                 if (slot.DataType != null)
                 {
                     slot.Value = LoadData(key, slot, pair.Value);
-                    // 불러온 값이 새 출발점: 기록 없이 사본을 다시 만든다.
+                    // 불러온 값이 새 출발점: 기록 없이 사본을 다시 만든다. 받는 쪽(멀티플레이)에는 처음 모습을 통째로 보낸다.
                     ChooseMirror(key, slot);
+                    if (slot.Mirror != null && Synced != null) Synced(new ChangeSet { Key = key, Snapshot = Mirror.Snapshot(slot.Mirror) });
                     RefreshShadow(slot);
                     CheckRequired(key, slot);
                 }
@@ -1266,6 +1283,139 @@ namespace GBible
             var loaded = DataModel.FromTree(tree, slot.DataType, Identity, warnings, slot.Label);
             foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, key);
             return DataModel.ApplyInPlace(slot.Value, loaded, Identity);
+        }
+
+        // ── 멀티플레이 ─────────────────────────────────────────
+        // 서버는 키마다 보낼 곳(공개 범위)을 보고 바뀐 곳을 클라이언트에 보낸다(NetServer). 클라이언트는 받은 처음 모습·바뀐 곳을
+        // 아래 Remote 함수로 적용한다 — 행동 밖 변경으로 적용되므로 화면(Changed·DataChanged)은 싱글과 똑같이 알림을 받는다.
+
+        readonly Dictionary<string, (DataVisibility visibility, int owner)> _visibility = new Dictionary<string, (DataVisibility, int)>(StringComparer.Ordinal);
+
+        // 공개 범위를 정한다(키 단위). owner는 Owner일 때의 플레이어 번호(행동의 actorId와 같은 번호).
+        public void SetVisibility(string key, DataVisibility visibility, int owner = 0)
+        {
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
+            _visibility[key] = (visibility, owner);
+            VisibilityChanged?.Invoke(key);
+        }
+
+        // 공개 범위가 바뀌었을 때(서버가 새로 보이게 된 클라이언트에 처음 모습을 보낸다).
+        public event Action<string> VisibilityChanged;
+
+        // 정한 공개 범위. 정하지 않았으면 세션 구역은 Public, 메타 구역은 Server.
+        public DataVisibility VisibilityOf(string key, out int owner)
+        {
+            if (key != null && _visibility.TryGetValue(key, out var set))
+            {
+                owner = set.owner;
+                return set.visibility;
+            }
+            owner = 0;
+            return key != null && _slots.TryGetValue(key, out var slot) && slot.Zone == DataZone.Meta ? DataVisibility.Server : DataVisibility.Public;
+        }
+
+        // 이 플레이어(번호)의 클라이언트에 보내는가.
+        public bool IsVisibleTo(string key, int player)
+        {
+            switch (VisibilityOf(key, out var owner))
+            {
+                case DataVisibility.Public: return true;
+                case DataVisibility.Owner: return owner == player;
+                default: return false;
+            }
+        }
+
+        // 데이터 안 객체의 사본(받는 쪽에 보낸 객체 번호가 든다). 데이터 밖이면 null. 이벤트를 보낼 때 객체를 번호로 가리키는 데 쓴다.
+        internal MirrorNode NodeOf(object live)
+        {
+            if (live == null) return null;
+            foreach (var key in SlotKeys())
+            {
+                var mirror = _slots[key].Mirror;
+                if (mirror?.Tree != null && mirror.Tree.Nodes.TryGetValue(live, out var node)) return node;
+            }
+            return null;
+        }
+
+        // 키가 Mirror(생성 코드 비교)로 다뤄지는 데이터 값인지(바뀐 곳만 보낼 수 있는지).
+        internal bool IsMirroredKey(string key) => key != null && _slots.TryGetValue(key, out var slot) && slot.Mirror != null;
+
+        // 받는 쪽: 처음 모습(PlayerDataStore.Snapshot)으로 키의 값을 바꾼다. 없는 키면 그 값의 형식으로 새로 등록한다.
+        // 값은 새 인스턴스로 바뀐다(받는 쪽이 객체 번호로 이 인스턴스들을 잇는다).
+        public void LoadRemote(string key, DataZone zone, string label, byte[] snapshot, MirrorReceiver receiver)
+        {
+            var value = receiver.Load(snapshot);
+            if (value == null) return;
+            if (!_slots.TryGetValue(key, out var slot))
+            {
+                DefineData(key, zone, value, label);
+                slot = _slots[key];
+            }
+            if (slot.DataType == null) throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{key}'는 단순 값입니다(받은 것은 데이터 값).");
+            slot.DataType = value.GetType();
+            slot.Value = value;
+            ChooseMirror(key, slot);
+            RefreshShadow(slot);
+            _lastEntry[key] = _journal.Append(JournalKind.Data, "Net", $"{slot.Label}  받음(처음 모습)", key).Id;
+            Changed?.Invoke(key);
+            DataChanged?.Invoke(key, Array.Empty<DataChange>());
+            CheckRequired(key, slot);
+        }
+
+        // 받는 쪽: 보내는 쪽의 앞으로 기록(ChangeSet.Forward)을 적용한다. 행동 밖 변경으로 기록·알림된다.
+        public void ApplyRemote(string key, byte[] data, int start, int end, MirrorReceiver receiver)
+        {
+            var slot = GetSlot(key);
+            if (slot.Mirror == null || slot.Value == null)
+                throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{key}'는 바뀐 곳을 받을 수 없습니다(처음 모습을 먼저 받아야 합니다).");
+            receiver.Apply(slot.Value, data, start, end);
+            SyncSlot(key, slot);
+        }
+
+        // 받는 쪽: 단순 값을 바꾼다. 없는 키면 새로 등록한다.
+        public void SetRemote(string key, DataZone zone, string label, object value)
+        {
+            if (!_slots.TryGetValue(key, out var slot))
+            {
+                DefineValue(key, zone, null, value, label);
+                _lastEntry[key] = _journal.Append(JournalKind.Data, "Net", $"{LabelOf(key)}  받음 {Format(value)}", key).Id;
+                Changed?.Invoke(key);
+                return;
+            }
+            if (slot.DataType != null) throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{key}'는 데이터 값입니다(받은 것은 단순 값).");
+            var normalized = Normalize(key, value);
+            var old = slot.Value;
+            if (Equals(old, normalized)) return;
+            slot.Value = normalized;
+            _lastEntry[key] = _journal.Append(JournalKind.Data, "Net", Describe(key, old, normalized), key, old, normalized).Id;
+            Changed?.Invoke(key);
+        }
+
+        // 받는 쪽: Mirror로 다룰 수 없는 데이터 값(예전 방식)을 저장 트리째 받는다.
+        public void LoadRemoteTree(string key, DataZone zone, string label, Type type, object tree)
+        {
+            if (!_slots.TryGetValue(key, out var slot))
+            {
+                if (type == null) return;
+                DefineData(key, zone, DataModel.Create(type), label);
+                slot = _slots[key];
+            }
+            if (slot.DataType == null) return;
+            var before = slot.Shadow ?? DataModel.Clone(slot.Value, Identity);
+            slot.Value = LoadData(key, slot, tree);
+            RefreshShadow(slot);
+            var changes = DataModel.Diff(before, slot.Value, Identity);
+            if (changes.Count == 0) return;
+            LogChanges(key, slot, changes, JournalKind.Data, "받음: ", 0);
+            Changed?.Invoke(key);
+            DataChanged?.Invoke(key, changes);
+        }
+
+        // 보내는 쪽: 예전 방식 데이터 값의 저장 트리(받는 쪽 LoadRemoteTree).
+        internal object ExportTree(string key)
+        {
+            var slot = GetSlot(key);
+            return DataModel.ToTree(slot.Value, slot.DataType ?? slot.Value?.GetType() ?? typeof(object), Identity, new List<string>(), slot.Label);
         }
 
         public void ResetZone(DataZone zone)

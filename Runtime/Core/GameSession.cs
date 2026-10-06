@@ -41,6 +41,17 @@ namespace GBible
         public TimeZoneInfo TimeZone;
     }
 
+    // 멀티플레이에서 이 세션의 역할.
+    public enum SessionRole
+    {
+        // 싱글(또는 멀티 밖): 행동을 이 자리에서 실행한다.
+        Local,
+        // 서버·방장: 행동을 실행하고 바뀐 곳·이벤트를 클라이언트에 보낸다(NetServer).
+        Server,
+        // 클라이언트: 행동을 서버로 보내고, 서버가 보낸 바뀐 곳·이벤트만 받는다(NetClient). 규칙이 스스로 돌지 않는다.
+        Client,
+    }
+
     // 한 플레이어(또는 한 판)의 모든 시스템을 묶는 인스턴스. static 전역 상태를 두지 않는다.
     // 멀티플레이어에서는 플레이어·매치마다 세션을 만들고, 테스트에서는 독립된 세션을 만든다.
     //
@@ -78,6 +89,18 @@ namespace GBible
         public DebugCommands Debug { get; }
         public SessionOptions Options { get; }
         public SaveMigrations Migrations => Options.Migrations;
+
+        // 멀티플레이 역할(NetServer·NetClient가 정한다). Client면:
+        //   · Do는 행동을 실행하지 않고 서버로 보낸다(결과는 서버가 보내는 바뀐 곳·이벤트로 온다).
+        //   · Undo는 하지 않는다(멀티에서 되돌리기는 서버만 — 기믹·개발자 시험).
+        //   · 트리거·도전과제·시간 규칙(상태 효과·패시브 주기·예약)이 스스로 돌지 않는다. 미리보기(Game.Preview)는 이쪽 데이터로 돈다.
+        public SessionRole Role { get; internal set; }
+        public bool IsClient => Role == SessionRole.Client;
+        // Client일 때 Do가 행동을 넘기는 곳(NetClient가 정한다).
+        internal Func<GameAction, ActionRecord> RemoteDo;
+        // 이 프로그램을 쓰는 플레이어의 번호(싱글이면 0). 멀티: 클라이언트는 받은 번호, 방장은 자기 번호.
+        // 화면 코드가 "내 것"을 고를 때 쓰고, Do가 actorId를 비워 둔 행동에 채운다(서버는 받은 행동의 actorId를 보낸 사람 번호로 덮는다).
+        public int LocalPlayer { get; set; }
         // 지금 게임의 저장 버전: 옵션의 값과 등록한 변환의 가장 높은 버전 중 큰 쪽.
         public int SaveVersion => Math.Max(Options.SaveVersion, Options.Migrations.LatestVersion);
         // 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식). 불러올 때 호환 여부를 판단하는 데 쓴다.
@@ -202,6 +225,10 @@ namespace GBible
         {
             // 행동 안에서 부르면 바깥 행동의 일부로 그 자리에서 실행된다(Sync·도전과제는 바깥 행동이 끝날 때).
             var nested = Data.InTransaction;
+            if (action != null && action.actorId == 0 && !nested) action.actorId = LocalPlayer;
+            // 멀티 클라이언트: 서버로 보낸다(미리보기 안의 안쪽 행동은 이쪽에서 그대로 돈다).
+            if (Role == SessionRole.Client && !nested)
+                return RemoteDo?.Invoke(action) ?? throw new InvalidOperationException("[MomoiProject] 멀티플레이 클라이언트가 서버에 연결되어 있지 않습니다.");
             var record = Actions.Execute(action);
             if (nested) return record;
             Data.Sync();
@@ -217,6 +244,11 @@ namespace GBible
         // 마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌린다. 되돌릴 것이 없으면 false.
         public bool Undo()
         {
+            if (Role == SessionRole.Client)
+            {
+                Journal.Append(JournalKind.Warning, "Net", "멀티플레이 클라이언트는 되돌리지 않습니다(되돌리기는 서버만 — 규칙의 되감기·개발자 시험 명령).");
+                return false;
+            }
             switch (Options.History)
             {
                 case HistoryMode.Actions:
@@ -358,6 +390,12 @@ namespace GBible
         // 호스트(Unity 등)가 매 프레임 호출한다.
         public void EndFrame(double deltaTime)
         {
+            // 멀티 클라이언트: 시간·규칙은 서버가 돌린다(시계는 받은 묶음마다 서버 시각으로 맞춘다). 이쪽은 행동 밖 변경만 맞춘다.
+            if (Role == SessionRole.Client)
+            {
+                Data.Sync();
+                return;
+            }
             if (Options.TickRate > 0)
             {
                 var step = 1.0 / Options.TickRate;

@@ -127,6 +127,22 @@ namespace GBible
             Published?.Invoke(evt);
         }
 
+        // 멀티플레이 클라이언트: 서버가 보낸 이벤트를 연출 쪽(SubscribeAfterAction)에만 준다.
+        // 규칙 쪽(Subscribe·SubscribeAll — 트리거·수치·상태 효과)은 서버에서 이미 받아 값을 바꿨으므로 부르지 않는다.
+        public void PublishRemote(object evt)
+        {
+            if (evt == null) return;
+            var entry = _journal.Append(JournalKind.Event, "Events", Describe(evt));
+            entry.Payload = evt;
+            using (_journal.Cause(entry.Id))
+            {
+                if (_afterAction.TryGetValue(evt.GetType(), out var after))
+                    foreach (var handler in after.ToArray())
+                        Invoke(handler.Invoke, evt, handler.Original);
+            }
+            Published?.Invoke(evt);
+        }
+
         public int SubscriberCount(Type eventType) => _handlers.TryGetValue(eventType, out var list) ? list.Count : 0;
 
         void Invoke(Action<object> call, object evt, Delegate target)

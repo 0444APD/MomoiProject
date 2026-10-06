@@ -189,7 +189,7 @@ namespace GBible
     }
 
     // 시간 예약 하나를 꺼내 실행하는 행동(꺼내기와 실행이 한 묶음: Undo하면 예약이 돌아온다).
-    [Serializable]
+    [Serializable, SystemAction]
     public sealed class ScheduledRun : GameAction
     {
         public string schedule;

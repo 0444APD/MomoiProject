@@ -529,7 +529,7 @@ namespace GBible
     }
 
     // 주기가 된 상태 효과의 결과를 내는 행동.
-    [Serializable]
+    [Serializable, SystemAction]
     public sealed class StatusPulseRun : GameAction
     {
         public List<string> statuses = new List<string>();
@@ -544,7 +544,7 @@ namespace GBible
     }
 
     // 시간이 다 된 상태 효과를 끝내는 행동(끝날 때 결과까지 한 묶음).
-    [Serializable]
+    [Serializable, SystemAction]
     public sealed class StatusExpireRun : GameAction
     {
         public List<string> statuses = new List<string>();

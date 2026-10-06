@@ -503,7 +503,7 @@ namespace GBible
     }
 
     // 주기가 된 패시브의 결과를 내는 행동(게임 시간 from → to 사이의 경계마다).
-    [Serializable]
+    [Serializable, SystemAction]
     public sealed class PassivePulseRun : GameAction
     {
         public List<string> passives = new List<string>();

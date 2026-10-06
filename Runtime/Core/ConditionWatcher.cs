@@ -136,6 +136,12 @@ namespace GBible
         // 조건 충족 → 보상 → 다른 값 변화 → 다른 조건 충족으로 이어질 수 있으므로 더 바뀌지 않을 때까지 반복한다.
         public void Flush()
         {
+            // 멀티 클라이언트: 조건 충족(달성·트리거)은 서버가 판정한다.
+            if (_session.Role == SessionRole.Client)
+            {
+                _dirty.Clear();
+                return;
+            }
             for (int pass = 0; _dirty.Count > 0; pass++)
             {
                 if (pass >= MaxPasses)

@@ -83,6 +83,55 @@ namespace GBible
 
         internal static MirrorType FindById(int id) => id >= 0 && id < ById.Count ? ById[id] : null;
 
+        // 형식 번호표: 번호 순서의 "전체 이름|어셈블리". 네트워크 접속 때 서로 보내 받는 쪽이 자기 번호로 바꾼다(MirrorReceiver.UseTypes) —
+        // 에디터와 빌드처럼 어셈블리 구성이 달라 번호가 달라도 같은 형식으로 잇는다.
+        public static string[] TypeTable()
+        {
+            if (!_initialized) Initialize();
+            var names = new string[ById.Count];
+            for (var i = 0; i < names.Length; i++) names[i] = TableName(ById[i].Type);
+            return names;
+        }
+
+        static string TableName(Type type) => type.FullName + "|" + type.Assembly.GetName().Name;
+
+        // 받은 번호를 이쪽 형식으로(받는 쪽이 번호표를 받았으면 그 표로 바꾼다).
+        static MirrorType FindRead(int id)
+        {
+            var receiver = _receiver;
+            if (receiver?.TypeMap == null) return FindById(id) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+            if (id < 0 || id >= receiver.TypeMap.Length) throw new InvalidOperationException($"[MomoiProject] 상대가 보낸 형식 번호({id})가 번호표 밖입니다.");
+            var local = receiver.TypeMap[id];
+            if (local < 0) throw new InvalidOperationException($"[MomoiProject] 상대에게는 있고 이쪽에는 없는 형식입니다: {receiver.RemoteName(id)}. 서로 다른 버전의 게임입니다.");
+            return ById[local];
+        }
+
+        // 번호표의 이름 → 이쪽 번호(없으면 -1). 같은 전체 이름이 어셈블리만 다르면 이름만으로도 찾는다.
+        internal static int[] MapTable(string[] remote)
+        {
+            if (!_initialized) Initialize();
+            var exact = new Dictionary<string, int>(StringComparer.Ordinal);
+            var byName = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (var i = 0; i < ById.Count; i++)
+            {
+                exact[TableName(ById[i].Type)] = i;
+                var name = ById[i].Type.FullName;
+                if (name != null && !byName.ContainsKey(name)) byName[name] = i;
+            }
+            var map = new int[remote?.Length ?? 0];
+            for (var i = 0; i < map.Length; i++)
+            {
+                var entry = remote[i] ?? "";
+                if (exact.TryGetValue(entry, out var id)) map[i] = id;
+                else
+                {
+                    var bar = entry.IndexOf('|');
+                    map[i] = byName.TryGetValue(bar < 0 ? entry : entry.Substring(0, bar), out id) ? id : -1;
+                }
+            }
+            return map;
+        }
+
         // 이 형식을 뿌리로 쓸 수 있는지(모든 필드가 생성 코드로 다뤄지는지). 아니면 reason에 첫 이유.
         public static bool Supports(Type type, out string reason)
         {
@@ -334,6 +383,18 @@ namespace GBible
         [ThreadStatic] static HashSet<MirrorNode> _snapshot;
         // 받는 쪽(5·6을 읽을 때 객체 번호 → 인스턴스).
         [ThreadStatic] static MirrorReceiver _receiver;
+        // 살아 있는 값(이벤트·행동)을 네트워크로 쓰는 중: 받는 쪽이 이미 가진 데이터 안의 객체는 번호(5)로 가리킨다.
+        [ThreadStatic] static Func<object, MirrorNode> _liveNodes;
+
+        // 살아 있는 값을 네트워크로 쓴다. nodeOf가 데이터 안의 객체 사본을 찾아 주면(받는 쪽에 이미 보낸 것) 내용 대신 번호만 쓴다.
+        // 받는 쪽은 MirrorReceiver.Load로 읽는다(데이터 밖 객체·처음 보는 객체는 내용째 새로 만든다).
+        public static void WriteNetValue(MirrorWriter writer, object value, Func<object, MirrorNode> nodeOf)
+        {
+            var previous = _liveNodes;
+            _liveNodes = nodeOf;
+            try { Write(writer, value); }
+            finally { _liveNodes = previous; }
+        }
 
         // 이 범위에서 처음 쓰는 객체면 번호를 매기고 true, 이미 썼으면 7 + 번호를 쓰고 false.
         static bool First(MirrorWriter writer, object value)
@@ -371,6 +432,12 @@ namespace GBible
             if (value == null)
             {
                 writer.Byte(0);
+                return;
+            }
+            if (_liveNodes != null && _liveNodes(value) is MirrorNode known && known.Sent)
+            {
+                writer.Byte(5);
+                writer.UVar((ulong)known.NetId);
                 return;
             }
             var type = Find(value.GetType());
@@ -412,7 +479,7 @@ namespace GBible
                         return null;
                     case 1:
                     {
-                        var type = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+                        var type = FindRead((int)reader.UVar());
                         var value = type.New();
                         Remember(value);
                         type.Read(value, reader);
@@ -421,7 +488,7 @@ namespace GBible
                     case 3:
                     {
                         var original = (int)reader.UVar();
-                        var kind = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+                        var kind = FindRead((int)reader.UVar());
                         var reused = _undoOriginals != null && original + _undoOffset < _undoOriginals.Count ? _undoOriginals[original + _undoOffset] : null;
                         if (reused == null || reused.GetType() != kind.Type) reused = kind.New();
                         Remember(reused);
@@ -436,13 +503,14 @@ namespace GBible
                     case 5:
                     {
                         var id = (long)reader.UVar();
-                        return _receiver?.Find(id) ?? throw new InvalidOperationException(
-                            $"[MomoiProject] 받는 쪽에 없는 객체 번호({id})입니다. 처음 모습(Mirror.Snapshot)부터 MirrorReceiver로 받으세요.");
+                        var found = _receiver?.Find(id);
+                        if (found != null || (_receiver != null && _receiver.MissingAsNull)) return found;
+                        throw new InvalidOperationException($"[MomoiProject] 받는 쪽에 없는 객체 번호({id})입니다. 처음 모습(Mirror.Snapshot)부터 MirrorReceiver로 받으세요.");
                     }
                     case 6:
                     {
                         var id = (long)reader.UVar();
-                        var kind = FindById((int)reader.UVar()) ?? throw new InvalidOperationException("[MomoiProject] 모르는 형식 번호입니다(서로 다른 코드로 빌드됨).");
+                        var kind = FindRead((int)reader.UVar());
                         var value = _receiver?.Find(id);
                         if (value == null || value.GetType() != kind.Type) value = kind.New();
                         _receiver?.Register(id, value);
@@ -882,8 +950,29 @@ namespace GBible
     {
         readonly Dictionary<long, WeakReference> _objects = new Dictionary<long, WeakReference>();
         int _sincePrune;
+        string[] _remoteNames;
 
         public int Count => _objects.Count;
+
+        // 보내는 쪽 형식 번호 → 이쪽 번호(UseTypes로 받은 번호표). null이면 같은 번호로 본다(같은 프로세스).
+        internal int[] TypeMap { get; private set; }
+
+        // 보내는 쪽에 있고 이쪽에 없는 객체 번호를 만나면 예외 대신 null(이벤트처럼 받는 쪽이 못 본 데이터를 가리킬 수 있는 값).
+        public bool MissingAsNull;
+
+        // 보내는 쪽의 형식 번호표(Mirror.TypeTable)를 받는다. 이후 읽기는 그 번호를 이쪽 형식으로 바꿔 읽는다.
+        // 돌려주는 값: 상대에게 있고 이쪽에 없는 형식 이름(버전이 다를 때). 실제로 그 형식이 오면 그때 예외가 난다.
+        public List<string> UseTypes(string[] remoteTable)
+        {
+            _remoteNames = remoteTable ?? Array.Empty<string>();
+            TypeMap = Mirror.MapTable(_remoteNames);
+            var missing = new List<string>();
+            for (var i = 0; i < TypeMap.Length; i++)
+                if (TypeMap[i] < 0) missing.Add(_remoteNames[i]);
+            return missing;
+        }
+
+        internal string RemoteName(int id) => _remoteNames != null && id >= 0 && id < _remoteNames.Length ? _remoteNames[id] : "#" + id;
 
         public object Load(byte[] snapshot) => Load(snapshot, 0, snapshot.Length);
 
