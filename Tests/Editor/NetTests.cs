@@ -250,6 +250,44 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 직접_접속_전송으로_실제_TCP에서_주고받는다()
+        {
+            var serverSession = new GameSession();
+            serverSession.Data.Define("party", DataZone.Session, new NtParty { units = { new NtUnit { id = "a", hp = 10 } } });
+            serverSession.Data.Define("lastActor", DataZone.Session, 0.0);
+            var transport = new WebSocketServerTransport(0);
+            var server = new NetServer(serverSession, transport);
+            server.Start();
+            var client = new NetClient(new GameSession(), new WebSocketClientTransport("127.0.0.1:" + transport.Port), "철수");
+            client.Connect();
+            try
+            {
+                bool Wait(Func<bool> done)
+                {
+                    var until = DateTime.UtcNow.AddSeconds(10);
+                    while (DateTime.UtcNow < until)
+                    {
+                        server.Update(0);
+                        client.Update(0);
+                        if (done()) return true;
+                        System.Threading.Thread.Sleep(5);
+                    }
+                    return false;
+                }
+                Assert.IsTrue(Wait(() => client.IsJoined), "실제 TCP로 입장");
+                Assert.AreEqual(10, UnitOf(client.Session, "a").hp);
+                client.Session.Do(new NtStrike { unit = UnitOf(client.Session, "a"), damage = 6 });
+                Assert.IsTrue(Wait(() => UnitOf(client.Session, "a").hp == 4), "행동이 돌아온다");
+                Assert.IsTrue(Wait(() => client.RoundTrip > 0), "핑");
+            }
+            finally
+            {
+                client.Dispose();
+                server.Dispose();
+            }
+        }
+
+        [Test]
         public void 형식_번호표로_상대의_번호를_이쪽_형식으로_읽는다()
         {
             var w = new MirrorWriter();

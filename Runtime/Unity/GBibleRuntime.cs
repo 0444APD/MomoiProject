@@ -212,6 +212,8 @@ namespace GBible
             _playTime = 0;
             _host = null;
             SlotSummary = null;
+            StartAsClient = null;
+            _preparedWarnings = false;
             GameView.Reset();
         }
 
@@ -248,87 +250,12 @@ namespace GBible
             catch (ArgumentException) { _slot = ""; }
             _playTime = SlotInfoOf(_slot).PlayTime;
 
-            // Mirror 비교 코드를 모은다(리플렉션은 게임이 켜질 때 여기서 한 번만).
-            Mirror.Warning -= LogMirrorWarning;
-            Mirror.Warning += LogMirrorWarning;
-            Mirror.Initialize();
-            // 행동의 참조 필드(id가 있는 객체)도 여기서 한 번 정해 둔다.
-            ActionReferences.PrepareAll();
-            // [BindTo] 코드 결과도 여기서 한 번 모은다(형식이 맞지 않는 함수는 알린다).
-            foreach (var problem in BoundOutcomes.Problems) Debug.LogWarning("[MomoiProject] " + problem);
-
-            // 예전 방식 데이터의 Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
-            var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };
-            // DB › 시작 파일 › Bootstrap에서 정한 옵션이 먼저 들어가고, 코드(Configuring)가 바꾸면 그 값이 우선한다.
+            PrepareStatics();
             var database = GameDatabase.Load();
-            database?.ApplyTo(options, Debug.isDebugBuild);
-            // DB › 저장 변환(버전 순서, 같은 버전은 목록 순서). 코드(Configuring)가 그 뒤에 더 등록할 수 있다.
-            if (database != null)
-                foreach (var migration in database.All<SaveMigrationData>().OrderBy(m => m.version)) migration.Register(options.Migrations);
-            var fromDatabase = (options.History, options.HistoryLimit, options.SnapshotInterval, options.SnapshotLimit, options.Seed);
-            Configuring?.Invoke(options);
-            var session = new GameSession(options);
-            // 개발 명령(모니터 › 명령)은 개발 빌드에서만 등록된다. 출시 빌드에서는 Register가 아무것도 하지 않는다.
-            session.Debug.Enabled = Debug.isDebugBuild;
-            if (database != null) NoteCodeOverrides(session, database, fromDatabase, options);
-
-            // 데이터 값 안의 에셋 참조는 데이터베이스 ID로 저장·복원한다.
-            DataModel.ReferenceToId = value => value is GameData data && !string.IsNullOrEmpty(data.Id) ? data.Id : null;
-            DataModel.IdToReference = (id, type) => database == null ? null : database.Entries.FirstOrDefault(e => e != null && e.Id == id && type.IsInstanceOfType(e));
-            if (database == null)
-            {
-                session.Journal.Append(JournalKind.Warning, "Runtime", "GameDatabase를 찾을 수 없습니다. 에디터에서 DB 창을 한 번 열면 자동으로 만들어집니다.");
-            }
-            else
-            {
-                foreach (var key in database.All<PlayerDataEntry>())
-                {
-                    try { key.DefineIn(session.Data); }
-                    catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[MomoiProject] ", "")); }
-                }
-                foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
-                // 인스턴스 원본: ID → 값(게임이 켜질 때 한 번 표를 만든다 — 찾을 때마다 훑지 않게).
-                var instances = new System.Collections.Generic.Dictionary<string, object>(StringComparer.Ordinal);
-                foreach (var instance in database.All<InstanceData>())
-                    if (!string.IsNullOrEmpty(instance.Id) && !instances.ContainsKey(instance.Id)) instances.Add(instance.Id, instance.value);
-                session.Instances = id => id != null && instances.TryGetValue(id, out var found) ? found : null;
-                // 필드 규칙의 '필수': 저장소 값에서 비면 경고하고 채워질 때까지 모니터에 남긴다.
-                foreach (var rule in database.All<FieldRuleData>())
-                    if (rule.required && rule.TargetType != null) session.Data.Require(rule.TargetType, rule.field);
-                // 저장 호환: 지금 데이터 구조를 저장 파일에 남기고, 개발 중이면 호환되지 않는 저장을 지운다.
-                session.SaveSchema = BuildSchema(database);
-                if (!database.IsReleased) ResetIncompatibleSaves(session);
-                // ID 이름이 바뀐 항목은 예전 이름으로 저장된 값을 이어받는다(출시 후에만 이력이 쌓인다).
-                foreach (var rename in database.Renames)
-                {
-                    if (rename.dataType == typeof(StatData).FullName) session.Data.AddAlias(PlayerDataKeys.Stat(rename.oldId), PlayerDataKeys.Stat(rename.newId));
-                    else if (rename.dataType == typeof(AchievementData).FullName) session.Data.AddAlias(PlayerDataKeys.Achievement(rename.oldId), PlayerDataKeys.Achievement(rename.newId));
-                    else if (rename.dataType == typeof(PlayerDataEntry).FullName) session.Data.AddAlias(rename.oldId, rename.newId);
-                }
-                // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
-                options.Migrations.EveryLoad = SavedIdRenames.Build(database);
-                LoadProfile(session);
-                // DB › 상태 효과(Game.ApplyStatus·효과 '상태 효과 걸기').
-                foreach (var status in database.All<StatusData>()) session.Statuses.Define(status.ToDefinition());
-                foreach (var passive in database.All<PassiveData>()) session.Passives.Define(passive.ToDefinition());
-                // DB › 밸런스 값(Game.Balance)·가중치 표(Game.Roll).
-                foreach (var balance in database.All<BalanceData>()) balance.Define(session.Balance);
-                foreach (var table in database.All<WeightTableData>()) session.Tables.Define(table.ToDefinition());
-                // Game.Use로 쓰는 것: 능력(IUsableData)과,사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
-                foreach (var usable in database.Entries.OfType<IUsableData>())
-                    if (usable.ToUsable() is AbilityDefinition definition) session.Abilities.Define(definition);
-                foreach (var instance in database.All<InstanceData>())
-                    if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
-                foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
-                // DB › 개발 명령 → 모니터 › 명령 탭 버튼(개발 빌드에서만 등록된다).
-                foreach (var command in database.All<DebugCommandData>()) command.Register(session);
-                // [BindTo] ID가 DB의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
-                var entryIds = new System.Collections.Generic.HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
-                foreach (var id in BoundOutcomes.Ids)
-                    if (!entryIds.Contains(id))
-                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
-                session.Achievements.EvaluateAll();
-            }
+            // 멀티 클라이언트로 다시 시작하는 중이면(GameNet.Join) 판 저장·시작할 때 이어 하기를 하지 않는다 — 판은 서버가 가진다.
+            var asClient = StartAsClient;
+            StartAsClient = null;
+            var session = BuildSession(database, main: true);
 
             // 판 저장(DB › 시작 파일 › Bootstrap): 행동마다 저장·판 끝 이벤트.
             _runSaveMode = database?.RunSave ?? RunSaveMode.OnQuit;
@@ -336,7 +263,7 @@ namespace GBible
             var undoBoundary = FindEvent(session, database?.UndoBoundaryEvent, "Undo 끊는 이벤트");
             if (undoBoundary != null) UndoBoundary.Watch(session, undoBoundary);
             var saveEvent = _runSaveMode == RunSaveMode.OnEvent ? FindEvent(session, database?.RunSaveEvent, "판 저장 이벤트") : null;
-            _runSaver = new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false, database?.RunSaveInterval ?? 30f, saveEvent);
+            _runSaver = asClient == null ? new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false, database?.RunSaveInterval ?? 30f, saveEvent) : null;
 
             session.Journal.Appended += ForwardToConsole;
             session.Debug.Register("저장", "프로필 저장", () => SaveProfile(session));
@@ -363,9 +290,131 @@ namespace GBible
             if (database != null && !string.IsNullOrEmpty(database.SceneKey)) GameScenes.Follow(database.SceneKey, database.ScenePath, database.EmptyScene);
             // DB › 화면·화면 설정(UI Toolkit). 슬롯을 바꿔 다시 시작해도 한 번만 준비한다.
             GameScreens.Initialize(database);
+            asClient?.Invoke(session);
             Started?.Invoke(session);
-            if (database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
+            if (asClient == null && database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
             return session;
+        }
+
+        // 게임이 켜질 때 한 번(여러 번 불러도 같다): Mirror 비교 코드·행동 참조 필드·[BindTo]를 모은다(리플렉션은 여기서만).
+        static bool _preparedWarnings;
+
+        static void PrepareStatics()
+        {
+            // Mirror 비교 코드를 모은다(리플렉션은 게임이 켜질 때 여기서 한 번만).
+            Mirror.Warning -= LogMirrorWarning;
+            Mirror.Warning += LogMirrorWarning;
+            Mirror.Initialize();
+            // 행동의 참조 필드(id가 있는 객체)도 여기서 한 번 정해 둔다.
+            ActionReferences.PrepareAll();
+            // [BindTo] 코드 결과도 여기서 한 번 모은다(형식이 맞지 않는 함수는 알린다 — 세션을 더 만들어도 한 번만).
+            if (_preparedWarnings) return;
+            _preparedWarnings = true;
+            foreach (var problem in BoundOutcomes.Problems) Debug.LogWarning("[MomoiProject] " + problem);
+        }
+
+        // DB로 세션 하나를 만든다(옵션·플레이어 데이터·정의·인스턴스·필수 규칙·개발 명령).
+        // main = 화면이 쓰는 세션: 프로필을 불러오고, 개발 중이면 호환되지 않는 저장을 지운다.
+        static GameSession BuildSession(GameDatabase database, bool main)
+        {
+            // 예전 방식 데이터의 Modify 누락 검사는 값 전체를 비교하므로 개발 빌드에서만 켠다.
+            var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };
+            // DB › 시작 파일 › Bootstrap에서 정한 옵션이 먼저 들어가고, 코드(Configuring)가 바꾸면 그 값이 우선한다.
+            database?.ApplyTo(options, Debug.isDebugBuild);
+            // DB › 저장 변환(버전 순서, 같은 버전은 목록 순서). 코드(Configuring)가 그 뒤에 더 등록할 수 있다.
+            if (database != null)
+                foreach (var migration in database.All<SaveMigrationData>().OrderBy(m => m.version)) migration.Register(options.Migrations);
+            var fromDatabase = (options.History, options.HistoryLimit, options.SnapshotInterval, options.SnapshotLimit, options.Seed);
+            Configuring?.Invoke(options);
+            var session = new GameSession(options);
+            // 개발 명령(모니터 › 명령)은 개발 빌드에서만 등록된다. 출시 빌드에서는 Register가 아무것도 하지 않는다.
+            session.Debug.Enabled = Debug.isDebugBuild;
+            if (database != null && main) NoteCodeOverrides(session, database, fromDatabase, options);
+
+            // 데이터 값 안의 에셋 참조는 데이터베이스 ID로 저장·복원한다.
+            DataModel.ReferenceToId = value => value is GameData data && !string.IsNullOrEmpty(data.Id) ? data.Id : null;
+            DataModel.IdToReference = (id, type) => database == null ? null : database.Entries.FirstOrDefault(e => e != null && e.Id == id && type.IsInstanceOfType(e));
+            if (database == null)
+            {
+                session.Journal.Append(JournalKind.Warning, "Runtime", "GameDatabase를 찾을 수 없습니다. 에디터에서 DB 창을 한 번 열면 자동으로 만들어집니다.");
+            }
+            else
+            {
+                foreach (var key in database.All<PlayerDataEntry>())
+                {
+                    try { key.DefineIn(session.Data); }
+                    catch (Exception e) { session.Journal.Append(JournalKind.Error, "Runtime", e.Message.Replace("[MomoiProject] ", "")); }
+                }
+                foreach (var stat in database.All<StatData>()) session.Stats.Define(stat.ToDefinition());
+                // 인스턴스 원본: ID → 값(게임이 켜질 때 한 번 표를 만든다 — 찾을 때마다 훑지 않게).
+                var instances = new System.Collections.Generic.Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var instance in database.All<InstanceData>())
+                    if (!string.IsNullOrEmpty(instance.Id) && !instances.ContainsKey(instance.Id)) instances.Add(instance.Id, instance.value);
+                session.Instances = id => id != null && instances.TryGetValue(id, out var found) ? found : null;
+                // 필드 규칙의 '필수': 저장소 값에서 비면 경고하고 채워질 때까지 모니터에 남긴다.
+                foreach (var rule in database.All<FieldRuleData>())
+                    if (rule.required && rule.TargetType != null) session.Data.Require(rule.TargetType, rule.field);
+                // 저장 호환: 지금 데이터 구조를 저장 파일에 남기고, 개발 중이면 호환되지 않는 저장을 지운다.
+                session.SaveSchema = BuildSchema(database);
+                if (main && !database.IsReleased) ResetIncompatibleSaves(session);
+                // ID 이름이 바뀐 항목은 예전 이름으로 저장된 값을 이어받는다(출시 후에만 이력이 쌓인다).
+                foreach (var rename in database.Renames)
+                {
+                    if (rename.dataType == typeof(StatData).FullName) session.Data.AddAlias(PlayerDataKeys.Stat(rename.oldId), PlayerDataKeys.Stat(rename.newId));
+                    else if (rename.dataType == typeof(AchievementData).FullName) session.Data.AddAlias(PlayerDataKeys.Achievement(rename.oldId), PlayerDataKeys.Achievement(rename.newId));
+                    else if (rename.dataType == typeof(PlayerDataEntry).FullName) session.Data.AddAlias(rename.oldId, rename.newId);
+                }
+                // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
+                options.Migrations.EveryLoad = SavedIdRenames.Build(database);
+                if (main) LoadProfile(session);
+                // DB › 상태 효과(Game.ApplyStatus·효과 '상태 효과 걸기').
+                foreach (var status in database.All<StatusData>()) session.Statuses.Define(status.ToDefinition());
+                foreach (var passive in database.All<PassiveData>()) session.Passives.Define(passive.ToDefinition());
+                // DB › 밸런스 값(Game.Balance)·가중치 표(Game.Roll).
+                foreach (var balance in database.All<BalanceData>()) balance.Define(session.Balance);
+                foreach (var table in database.All<WeightTableData>()) session.Tables.Define(table.ToDefinition());
+                // Game.Use로 쓰는 것: 능력(IUsableData)과,사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
+                foreach (var usable in database.Entries.OfType<IUsableData>())
+                    if (usable.ToUsable() is AbilityDefinition definition) session.Abilities.Define(definition);
+                foreach (var instance in database.All<InstanceData>())
+                    if (UsableOf(instance.value) is Usable use) session.Abilities.Define(use.ToDefinition(instance.Id));
+                foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
+                // DB › 개발 명령 → 모니터 › 명령 탭 버튼(개발 빌드에서만 등록된다).
+                foreach (var command in database.All<DebugCommandData>()) command.Register(session);
+                // [BindTo] ID가 DB의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
+                var entryIds = new System.Collections.Generic.HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
+                foreach (var id in BoundOutcomes.Ids)
+                    if (!entryIds.Contains(id))
+                        Debug.LogWarning($"[MomoiProject] [BindTo(\"{id}\")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다({string.Join(", ", BoundOutcomes.For(id).Select(c => c.Name))}).");
+                session.Achievements.EvaluateAll();
+            }
+
+            return session;
+        }
+
+        // 화면에 묶이지 않은 세션을 하나 더 만든다(멀티 시험 모드의 서버·추가 클라이언트, 서버 빌드). 프로필은 불러오지 않는다.
+        public static GameSession CreateSession()
+        {
+            PrepareStatics();
+            return BuildSession(GameDatabase.Load(), main: false);
+        }
+
+        // 다음 Start를 멀티 클라이언트로 한다(GameNet.Join이 정한다): 판 저장·시작할 때 이어 하기를 하지 않고, Started 전에 이 함수에 세션을 넘긴다.
+        internal static Action<GameSession> StartAsClient;
+
+        // 지금 세션을 멈추고(프로필 저장) 멀티 클라이언트 세션으로 다시 시작한다(GameNet.Join). setup이 Started 전에 세션을 받는다.
+        internal static GameSession RestartAsClient(Action<GameSession> setup)
+        {
+            if (Session != null) Stop(save: true);
+            StartAsClient = setup;
+            return Start();
+        }
+
+        // 멀티를 끝내고 혼자 하기 세션으로 다시 시작한다(GameNet.Leave).
+        internal static GameSession RestartLocal()
+        {
+            if (Session != null) Stop(save: true);
+            return Start();
         }
 
         // DB 설정의 이벤트 형식 이름 → 형식(없으면 기록에 경고).
@@ -412,7 +461,8 @@ namespace GBible
             if (save)
             {
                 SaveProfile(Session);
-                if (AutoSaveRun && !(_runSaver?.Ended ?? false)) SaveRun(Session);
+                // 멀티 클라이언트의 판은 서버 것이다(받은 모습을 이쪽 판 저장으로 남기지 않는다).
+                if (AutoSaveRun && !Session.IsClient && !(_runSaver?.Ended ?? false)) SaveRun(Session);
             }
             Stopped?.Invoke(Session);
             Session = null;
@@ -580,6 +630,9 @@ namespace GBible
             if (Instance == this) Instance = null;
         }
 
+        // 멀티플레이: 받은 메시지를 먼저 처리한다(이 프레임의 화면·규칙이 받은 결과를 본다).
+        void Update() => GameNet.Update(Time.deltaTime);
+
         void LateUpdate()
         {
             var session = GBibleRuntime.Session;
@@ -598,9 +651,15 @@ namespace GBible
                 GameView.Pump();
                 GameScreens.Pump();
             }
+            // 멀티플레이: 이 프레임에 바뀐 곳(시간 규칙 포함)을 보낸다.
+            GameNet.LateUpdate(Time.deltaTime);
             GameTime.OnFrameEnd();
         }
 
-        void OnApplicationQuit() => GBibleRuntime.Stop();
+        void OnApplicationQuit()
+        {
+            GameNet.Shutdown();
+            GBibleRuntime.Stop();
+        }
     }
 }

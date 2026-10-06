@@ -245,10 +245,17 @@ namespace GBible
             }
             catch (GameFailure failure)
             {
-                if (_settings == null || _settings.failureToast) Toast(failure.Message);
-                else Debug.LogWarning("[MomoiProject] " + failure.Message);
+                ShowFailure(failure.Message);
                 return false;
             }
+        }
+
+        // 플레이어용 실패 글을 보인다('실패를 알림으로'가 켜져 있으면 알림, 아니면 경고 로그). 멀티 클라이언트는 서버가 거절한 행동도 이것으로(GameNet).
+        public static void ShowFailure(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return;
+            if (_settings == null || _settings.failureToast) Toast(message);
+            else Debug.LogWarning("[MomoiProject] " + message);
         }
 
         // 기본 고르기 창의 '다시 뽑기' 버튼: 프로젝트가 정하면 '가중치 표에서 고르기'로 만든 선택에 버튼이 보인다.
