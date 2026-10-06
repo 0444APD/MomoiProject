@@ -25,6 +25,9 @@ namespace GBible.EditorTools
 
         VisualElement _root;
         VisualElement _sidebar;
+        // 사이드바 = 탭 목록(넘치면 스크롤 — 항목 크기는 그대로) + 바닥(저장·검증, 늘 보임).
+        ScrollView _sidebarNav;
+        VisualElement _sidebarFooter;
         VisualElement _content;
         VisualElement _viewSettingsPanel;
         Label _title;
@@ -287,6 +290,11 @@ namespace GBible.EditorTools
             host.Add(_root);
 
             _sidebar = Gs.Box("gs-sidebar");
+            _sidebarNav = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            _sidebarNav.AddToClassList("gs-sidebar__scroll");
+            _sidebar.Add(_sidebarNav);
+            _sidebarFooter = Gs.Col("gs-sidebar__footer");
+            _sidebar.Add(_sidebarFooter);
             _root.Add(_sidebar);
 
             var main = Gs.Col("gs-grow");
@@ -409,7 +417,9 @@ namespace GBible.EditorTools
 
         void RebuildSidebar()
         {
-            _sidebar.Clear();
+            // 스크롤 위치는 그대로 둔다(목록만 다시 채운다).
+            _sidebarNav.Clear();
+            _sidebarFooter.Clear();
             _navItems.Clear();
             var brand = Gs.Col();
             brand.style.marginLeft = 12;
@@ -424,17 +434,17 @@ namespace GBible.EditorTools
             logo.Add(mark);
             logo.Add(Gs.Label("MomoiProject", "gs-heading"));
             brand.Add(logo);
-            _sidebar.Add(brand);
+            _sidebarNav.Add(brand);
 
             var selected = SelectedType;
             var currentPage = CurrentPage;
             var shownGroups = new HashSet<string>();
             foreach (var group in Tabs().GroupBy(t => t.Group))
             {
-                _sidebar.Add(Gs.Label(group.Key.ToUpperInvariant(), "gs-sidebar__group"));
+                _sidebarNav.Add(Gs.Label(group.Key.ToUpperInvariant(), "gs-sidebar__group"));
                 shownGroups.Add(group.Key);
                 // 선택 기능의 그룹: 맨 위에 켜고 끄는 버튼(오른쪽 끝에 켜짐 여부).
-                if (GameFeatures.All.FirstOrDefault(f => f.Name == group.Key) is GameFeature groupFeature) _sidebar.Add(FeatureToggle(groupFeature));
+                if (GameFeatures.All.FirstOrDefault(f => f.Name == group.Key) is GameFeature groupFeature) _sidebarNav.Add(FeatureToggle(groupFeature));
                 foreach (var tab in group)
                 {
                     var key = tab.Key;
@@ -444,7 +454,7 @@ namespace GBible.EditorTools
                         var off = new GsNavItem(tab.Label, Gs.WithAlpha(Gs.Text, 0.25f), null);
                         off.SetEnabled(false);
                         off.tooltip = tab.DisabledReason;
-                        _sidebar.Add(off);
+                        _sidebarNav.Add(off);
                         continue;
                     }
                     var item = new GsNavItem(tab.Label, Gs.PaletteFor(tab.Type != null ? tab.Type.Name : key), () => Navigate(key));
@@ -453,7 +463,7 @@ namespace GBible.EditorTools
                     {
                         item.SetCount(tab.Page.TabCount ?? "");
                         item.SetActive(tab.Page == currentPage);
-                        _sidebar.Add(item);
+                        _sidebarNav.Add(item);
                         continue;
                     }
                     var type = tab.Type;
@@ -464,25 +474,24 @@ namespace GBible.EditorTools
                     var errors = _issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && types.Contains(i.Asset.GetType()));
                     item.SetCount(errors > 0 ? $"{count} · 오류 {errors}" : count.ToString());
                     item.SetActive(type == selected);
-                    _sidebar.Add(item);
+                    _sidebarNav.Add(item);
                 }
                 // 시작 파일 그룹: Bootstrap 탭 아래에 판·프로필 클래스 바로가기(누르면 코드 파일을 연다).
                 if (group.Key == BootstrapPage.Group)
                     foreach (var (label, id, className) in StartFiles.DataShortcuts)
-                        _sidebar.Add(DataShortcut(label, id, className));
+                        _sidebarNav.Add(DataShortcut(label, id, className));
             }
 
             // 탭이 하나도 없는 선택 기능도 켜고 끌 수 있게 그룹을 보인다.
             foreach (var feature in GameFeatures.All.Where(f => !shownGroups.Contains(f.Name)))
             {
-                _sidebar.Add(Gs.Label(feature.Name.ToUpperInvariant(), "gs-sidebar__group"));
-                _sidebar.Add(FeatureToggle(feature));
+                _sidebarNav.Add(Gs.Label(feature.Name.ToUpperInvariant(), "gs-sidebar__group"));
+                _sidebarNav.Add(FeatureToggle(feature));
             }
 
             if (DataTypes.All.Count == 0)
-                _sidebar.Add(Gs.Label("GameData를 상속한 데이터 타입이 없습니다.", "gs-caption"));
+                _sidebarNav.Add(Gs.Label("GameData를 상속한 데이터 타입이 없습니다.", "gs-caption"));
 
-            _sidebar.Add(Gs.Spacer());
 
             if (CodexChanges.HasChanges)
             {
@@ -491,7 +500,7 @@ namespace GBible.EditorTools
                 pending.tooltip = "눌러서 변경 목록 보기. 저장(Ctrl+S)하기 전까지 에셋도 스크립트 파일도 바뀌지 않습니다.";
                 pending.style.marginBottom = 4;
                 pending.RegisterCallback<ClickEvent>(_ => ShowChanges());
-                _sidebar.Add(pending);
+                _sidebarFooter.Add(pending);
                 var buttons = Gs.Row();
                 buttons.style.marginBottom = 8;
                 var save = new GsButton("저장  Ctrl+S", () => CodexChanges.Save(), GsButtonKind.Primary);
@@ -499,12 +508,12 @@ namespace GBible.EditorTools
                 save.style.marginRight = 6;
                 buttons.Add(save);
                 buttons.Add(new GsButton("되돌리기", ConfirmDiscard, GsButtonKind.Ghost));
-                _sidebar.Add(buttons);
+                _sidebarFooter.Add(buttons);
             }
 
             var errorCount = _issues.Count(i => i.Severity == ValidationSeverity.Error);
             var warningCount = _issues.Count(i => i.Severity == ValidationSeverity.Warning);
-            _sidebar.Add(errorCount > 0
+            _sidebarFooter.Add(errorCount > 0
                 ? new GsNotice($"검증 오류 {errorCount}건 · 빌드가 막힙니다", GsNoticeKind.Error)
                 : warningCount > 0 ? new GsNotice($"경고 {warningCount}건", GsNoticeKind.Warning)
                 : new GsNotice("검증 통과", GsNoticeKind.Ok));
@@ -517,7 +526,7 @@ namespace GBible.EditorTools
                                "\n\n데이터베이스에서 다루려면 GameData를 상속하세요.";
                 hint.style.marginLeft = 12;
                 hint.style.marginTop = 4;
-                _sidebar.Add(hint);
+                _sidebarFooter.Add(hint);
             }
         }
 
