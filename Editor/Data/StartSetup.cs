@@ -56,8 +56,9 @@ namespace GBible.EditorTools
 
         static StartSetup()
         {
-            // 에디터도 게임처럼 테스트 어셈블리를 훑지 않는다(DB 창·검증에 테스트용 [BindTo]·키워드가 섞이지 않게). Unity에서 테스트를 돌릴 때는 테스트가 다시 넣는다.
-            GameAssemblies.Use(skipTests: true);
+            // 에디터도 게임처럼 테스트 어셈블리를 훑지 않는다(DB 창·검증에 테스트용 [BindTo]·키워드가 섞이지 않게).
+            // Unity Test Runner로 테스트를 돌리는 동안은 다시 넣는다(TestRuns — PlayMode 테스트가 도중에 도메인을 다시 읽어도 그대로).
+            GameAssemblies.Use(skipTests: !TestRuns.Running);
             // 깨끗한 프로젝트를 처음 열 때(시작 설정 전) 처음 상태를 기록해 둔다(메뉴 '처음 상태로 되돌리기'가 돌아올 곳).
             if (!Application.isBatchMode) ProjectReset.CaptureIfClean();
             GameFeatures.Changed -= SyncModuleReferences;
@@ -111,6 +112,8 @@ namespace GBible.EditorTools
         // 지금 상태로 채운 선택(창이 처음 보여 줄 값).
         public static Choices Current()
         {
+            // 예전 자리의 DB·언어 설정을 먼저 옮긴다(창이 프로젝트의 실제 Undo 방식·언어를 보여 주게 — 기본값을 보여 주면 적용이 그 값으로 덮는다).
+            MoveLegacyFolders();
             var choices = new Choices { productName = PlayerSettings.productName };
             foreach (var feature in GameFeatures.All)
                 if (GameFeatures.IsEnabled(feature)) choices.features.Add(feature.Id);
@@ -130,6 +133,7 @@ namespace GBible.EditorTools
         public static List<string> Apply(Choices choices)
         {
             var done = new List<string>();
+            MoveLegacyFolders();
 
             if (!string.IsNullOrWhiteSpace(choices.productName) && PlayerSettings.productName != choices.productName.Trim())
             {
@@ -155,7 +159,6 @@ namespace GBible.EditorTools
                 File.WriteAllText(AsmdefPathOf(part), AsmdefJson(part), new UTF8Encoding(false));
                 done.Add($"{AsmdefPathOf(part)} 만듦");
             }
-            EnsurePlaceholders(done);
 
             var bootstrap = FolderOf("Client") + "/Bootstrap.cs";
             if (!File.Exists(bootstrap))
@@ -169,6 +172,8 @@ namespace GBible.EditorTools
                 File.WriteAllText(playerData, PlayerDataCode, new UTF8Encoding(false));
                 done.Add($"{playerData} 만듦");
             }
+            // 시작 파일을 쓴 뒤에(Rules·Client에는 위 파일이 있으므로 자리 표시가 생기지 않는다 — 스크립트가 없는 Editor·Tests만).
+            EnsurePlaceholders(done);
 
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
             if (database == null)
@@ -217,6 +222,15 @@ namespace GBible.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return done;
+        }
+
+        // 예전 자리(2026-10-06 전 — Assets/MomoiProjectData 등)의 시스템 폴더가 남은 프로젝트: 시작 설정 표시 파일이 없어 에디터를 열 때의 정리(Upkeep)가 돌지 않았다.
+        // 새 자리에 DB 에셋·언어 설정을 새로 만들기 전에 옮긴다 — 아니면 다음에 에디터를 열 때 합치기가 새로 만든 쪽을 백업으로 빼 버린다(고른 Undo 방식·언어가 사라진다).
+        static void MoveLegacyFolders()
+        {
+            if (!ProjectFolders.AnyLegacy()) return;
+            ProjectFolders.MoveLegacy();
+            EditorDatabase.Instance.SyncDatabaseAsset();
         }
 
         static void ApplyLanguages(Choices choices, List<string> done)

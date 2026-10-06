@@ -156,13 +156,14 @@ namespace GBible.EditorTools
             return set.OrderBy(p => p, StringComparer.Ordinal).ToList();
         }
 
-        public static bool CanCreate(string tab, IEnumerable<GameData> items, string parent, string name, out string error)
+        // renaming: 이름을 바꾸는 폴더(그 폴더 자신과는 겹쳐도 된다 — 대소문자만 바꾸기 boss → Boss).
+        public static bool CanCreate(string tab, IEnumerable<GameData> items, string parent, string name, out string error, string renaming = null)
         {
             error = null;
             name = (name ?? "").Trim();
             if (name.Length == 0) error = "폴더 이름을 입력하세요.";
             else if (name.Contains("/")) error = "폴더 이름에 '/'를 쓸 수 없습니다.";
-            else if (All(tab, items).Any(p => string.Equals(p, Join(parent, name), StringComparison.OrdinalIgnoreCase))) error = $"'{name}' 폴더가 이미 있습니다.";
+            else if (All(tab, items).Any(p => p != renaming && string.Equals(p, Join(parent, name), StringComparison.OrdinalIgnoreCase))) error = $"'{name}' 폴더가 이미 있습니다.";
             return error == null;
         }
 

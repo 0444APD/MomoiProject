@@ -74,6 +74,7 @@ namespace GBible
             _toasts = null;
             _initialized = false;
             _backFrame = -1;
+            _language = null;
         }
 
         // 게임이 켜질 때(GBibleRuntime.Start) 한 번: DB의 화면을 읽고, 화면 코드를 만들고(리플렉션은 여기서만), 시작·씬 화면을 연다.
@@ -213,7 +214,7 @@ namespace GBible
                 Debug.Log("[MomoiProject] " + text);
                 return;
             }
-            var label = new Label(ScreenUi.Text(text));
+            var label = new Label(ScreenUi.Text(text)) { pickingMode = PickingMode.Ignore };
             label.AddToClassList("momoi-toast");
             _toasts.Add(label);
             Toasts.Add((label, Time.unscaledTime + Mathf.Max(0.1f, seconds)));
@@ -237,7 +238,8 @@ namespace GBible
         public static bool Do(Func<GameAction> make, bool whileChoosing = false)
         {
             var game = GBibleRuntime.Game;
-            if (game == null || make == null || (whileChoosing ? GameView.IsPresenting : GameView.Busy)) return false;
+            // 고르는 동안(whileChoosing): 시간이 멈춰 남은 연출이 끝나지 않을 수 있으므로 멈춤 중이면 연출을 기다리지 않는다.
+            if (game == null || make == null || (whileChoosing ? GameView.IsPresenting && !GameTime.IsPaused : GameView.Busy)) return false;
             try
             {
                 game.Do(make());
@@ -280,6 +282,14 @@ namespace GBible
         internal static void Pump()
         {
             if (!_initialized) return;
+            // 언어가 바뀌면 기본 화면(코드로 만든 화면)의 고정 글(제목·버튼)도 다시 만든다 — 그 글은 열 때(OnOpen) 만든다.
+            var language = Texts.Catalog?.Language;
+            if (!string.Equals(language, _language, StringComparison.Ordinal))
+            {
+                var changed = _language != null;
+                _language = language;
+                if (changed) Relocalize();
+            }
             if (OpenEntries.Count > 0)
             {
                 var dt = Time.unscaledDeltaTime;
@@ -300,11 +310,20 @@ namespace GBible
             {
                 var waiting = game.IsWaiting;
                 var open = IsOpen(Choice);
-                if (waiting && !open) Open(Choice);
+                if (waiting && !open)
+                {
+                    // 이 프레임의 그리기는 이미 지났으니 바로 그린다(빈 창이 한 프레임 보이지 않게).
+                    Open(Choice);
+                    var entry = EntryOf(Choice);
+                    if (entry != null) DrawEntry(entry);
+                }
                 else if (!waiting && open) Close(Choice);
             }
 #if ENABLE_LEGACY_INPUT_MANAGER
             if (Input.GetKeyDown(KeyCode.Escape)) Back();
+#elif GBIBLE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
+            // 새 Input System만 켠 프로젝트: 포커스된 칸이 없으면 UI Toolkit의 취소 이벤트가 오지 않으므로 키를 직접 본다.
+            if (UnityEngine.InputSystem.Keyboard.current?.escapeKey.wasPressedThisFrame == true) Back();
 #endif
         }
 
@@ -334,6 +353,23 @@ namespace GBible
             screen.Argument = null;
             screen.Data = null;
             Closed?.Invoke(screen);
+        }
+
+        static string _language;
+
+        static void Relocalize()
+        {
+            foreach (var entry in OpenEntries.ToList())
+            {
+                if (!entry.Screen.IsOpen) continue;
+                if (entry.Screen.Data == null)
+                {
+                    entry.Screen.Root.Clear();
+                    try { entry.Screen.OnOpen(); }
+                    catch (Exception e) { Debug.LogException(e); }
+                }
+                DrawEntry(entry);
+            }
         }
 
         static void DrawEntry(Entry entry)

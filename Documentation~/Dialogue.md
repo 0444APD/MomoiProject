@@ -1,6 +1,6 @@
 # 다이얼로그 시스템
 
-**켜고 끄기.** 다이얼로그 시스템은 프로젝트마다 켜고 끄는 선택 기능이다. DB 사이드바의 다이얼로그 시스템 아래 **기능 활성화** 버튼으로 켜면 스탠딩 프로필·장소 탭과 메뉴가 열리고, 기능의 클래스(DialogueData·EffectPresetData·StandingProfileData·LocationData)가 DB › 클래스의 '다이얼로그 시스템' 그룹에 자동으로 들어온다(잠김). 끄면 모두 빠지고 빌드에도 들어가지 않으며, 만든 데이터는 남는다(스크립팅 심볼 `GBIBLE_DIALOGUE`, 상태는 `ProjectSettings/MomoiProject/Features.json`).
+**켜고 끄기.** 다이얼로그 시스템은 프로젝트마다 켜고 끄는 선택 기능이다. DB 사이드바의 다이얼로그 시스템 아래 **기능 활성화** 버튼으로 켜면 스탠딩 프로필·장소 탭과 메뉴가 열린다. 기능의 클래스(DialogueData·EffectPresetData·StandingProfileData·LocationData)는 DB › 클래스 목록에 나오지 않는다(클래스 탭은 개발자가 선언한 클래스만 보인다). 스탠딩 프로필·장소의 필드는 그 탭 머리 **필드 연결**로 연다(잠김). 끄면 모두 빠지고 빌드에도 들어가지 않으며, 만든 데이터는 남는다(스크립팅 심볼 `GBIBLE_DIALOGUE`, 상태는 `ProjectSettings/MomoiProject/Features.json`).
 
 다이얼로그는 **선택 모듈**이다(`Optional/Dialogue`: 어셈블리 GBible.Dialogue · .Editor · .Tests). 쓰지 않는 프로젝트는 폴더째 지우면 되고, 코어는 다이얼로그를 참조하지 않는다. 화자·스탠딩은 다이얼로그 전용 **스탠딩 프로필**로, 게임의 캐릭터 데이터와 따로 관리한다.
 

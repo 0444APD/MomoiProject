@@ -878,6 +878,20 @@ namespace GBible.CodeGen
 
             // ── 구조체 ──
 
+            // 구조체 안의 객체·컬렉션 필드 이름(같은 어셈블리 안의 안쪽 구조체까지).
+            static List<string> ReferenceFields(TypeDefinition type, HashSet<string> seen)
+            {
+                var found = new List<string>();
+                if (!seen.Add(type.FullName)) return found;
+                foreach (var plan in Own(type))
+                {
+                    if (plan.Kind == KObject || plan.Kind == KList || plan.Kind == KArray || plan.Kind == KDict) found.Add(plan.Field.Name);
+                    else if (plan.Kind == KStruct && TryResolve(plan.Field.FieldType) is TypeDefinition inner && inner.Module == type.Module && ReferenceFields(inner, seen).Count > 0)
+                        found.Add(plan.Field.Name);
+                }
+                return found;
+            }
+
             void GenerateStruct(TypeDefinition type, List<FieldPlan> own)
             {
                 var access = GenerateAccess(type);
@@ -953,7 +967,12 @@ namespace GBible.CodeGen
                 EmitDelegate(il, eq, "MirrorEqualFn`1", type);
                 EmitDelegate(il, write, "MirrorWriteFn`1", type);
                 EmitDelegate(il, read, "MirrorValueReadFn`1", type);
-                il.Emit(OpCodes.Call, Code("RegisterStruct", type));
+                // 안쪽에 객체·컬렉션 필드가 있는 구조체: 값 복사로는 그 안의 변경을 따라가지 못한다(같은 참조를 비교) —
+                // 쓰기·읽기 코드는 그대로 두되, 이 구조체를 담은 플레이어 데이터는 예전 비교 방식으로 다루게 표시한다.
+                var shallow = ReferenceFields(type, new HashSet<string>());
+                if (shallow.Count > 0)
+                    Warn($"{type.FullName}: 구조체 안의 객체·컬렉션 필드({string.Join(", ", shallow)})는 안쪽 변경을 따라가지 못합니다. 이 구조체를 담은 플레이어 데이터는 예전 비교 방식(느림)으로 다룹니다. 구조체 대신 [Serializable] 클래스로 바꾸세요.");
+                il.Emit(OpCodes.Call, Code(shallow.Count > 0 ? "RegisterShallowStruct" : "RegisterStruct", type));
                 EmitNullables(il, own);
                 EmitAccessRegister(il, type, access);
                 il.Emit(OpCodes.Ret);

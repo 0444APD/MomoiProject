@@ -135,9 +135,9 @@ namespace GBible.EditorTools
         }
 
         // 고르는 목록의 이벤트: 내 코드의 [GameEvent] + 이 라이브러리가 기본으로 내는 이벤트(도전과제 달성 등). 테스트·플러그인의 이벤트는 뺀다.
-        // 의도 형식([Intent]): 프로젝트 것 + 라이브러리 기본(비용 지불).
+        // 의도 형식([Intent]): 프로젝트 것 + 라이브러리 기본(비용 지불). 이벤트와 같이 테스트·플러그인의 것은 뺀다.
         public static IEnumerable<Type> Intents() =>
-            UnityEditor.TypeCache.GetTypesWithAttribute<IntentAttribute>().Where(t => !t.IsAbstract);
+            UnityEditor.TypeCache.GetTypesWithAttribute<IntentAttribute>().Where(t => !t.IsAbstract && (IsProjectType(t) || IsLibraryRuntime(t.Assembly)));
 
         public static IEnumerable<Type> Events() =>
             TypeResolver.GameEventTypes().Where(t => IsProjectType(t) || IsLibraryRuntime(t.Assembly));

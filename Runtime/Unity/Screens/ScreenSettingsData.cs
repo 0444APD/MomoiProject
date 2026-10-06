@@ -22,6 +22,7 @@ namespace GBible.Data
         {
             if (panelSettings == null) context.Warning("Panel Settings가 없습니다. 게임이 켜질 때 테마 없는 임시 설정을 만듭니다(메뉴 MomoiProject › 화면 › 화면 준비).");
             if (theme.Contains(null)) context.Error("테마 USS에 빈 칸이 있습니다.");
+            if (font == null) context.Warning("글꼴이 비어 있습니다. 한글이 든 글꼴(TTF·OTF)을 넣지 않으면 기기에 따라 한글이 빈 네모로 보입니다.");
         }
     }
 }

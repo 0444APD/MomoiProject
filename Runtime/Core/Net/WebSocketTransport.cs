@@ -207,25 +207,28 @@ namespace GBible
             catch (InvalidOperationException) { }
         }
 
+        // 닫기: 보낼 목록에 남은 메시지(방이 닫혔다는 Bye 등)를 다 보낸 뒤 닫기 프레임을 보내고 끊는다(보내기 스레드가 한다).
+        // 보내기가 막혀 있으면 1초 뒤 그냥 끊는다.
         public void Close(string reason)
         {
             if (Interlocked.Exchange(ref _done, 1) != 0) return;
+            var bytes = Encoding.UTF8.GetBytes(reason ?? "");
+            var payload = new byte[2 + Math.Min(bytes.Length, 120)];
+            payload[0] = 0x03;
+            payload[1] = 0xE8;
+            Buffer.BlockCopy(bytes, 0, payload, 2, payload.Length - 2);
             try
             {
-                var bytes = Encoding.UTF8.GetBytes(reason ?? "");
-                var payload = new byte[2 + Math.Min(bytes.Length, 120)];
-                payload[0] = 0x03;
-                payload[1] = 0xE8;
-                Buffer.BlockCopy(bytes, 0, payload, 2, payload.Length - 2);
-                lock (_stream) WebSocketFrames.Write(_stream, 8, payload, 0, payload.Length, _mask, _random);
+                _outbox.Add((8, payload));
+                _outbox.CompleteAdding();
             }
-            catch (Exception) { }
-            Shutdown();
+            catch (InvalidOperationException) { }
+            System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ => Shutdown());
         }
 
         void Shutdown()
         {
-            _outbox.CompleteAdding();
+            try { _outbox.CompleteAdding(); } catch (ObjectDisposedException) { }
             try { _tcp.Close(); } catch (Exception) { }
         }
 
@@ -259,6 +262,8 @@ namespace GBible
             {
                 foreach (var (opcode, data) in _outbox.GetConsumingEnumerable())
                     lock (_stream) WebSocketFrames.Write(_stream, opcode, data, 0, data.Length, _mask, _random);
+                // 닫기(Close)로 보낼 목록이 끝났으면 다 보낸 뒤 끊는다.
+                if (_done != 0) Shutdown();
             }
             catch (Exception)
             {
@@ -394,10 +399,13 @@ namespace GBible
             return uri.IsDefaultPort || uri.Port <= 0 ? $"ws://{uri.Host}:7777{uri.PathAndQuery}" : uri.ToString();
         }
 
+        volatile bool _closedWhileConnecting;
+
         public void Connect()
         {
             if (_connecting || _link != null) return;
             _connecting = true;
+            _closedWhileConnecting = false;
             new Thread(ConnectLoop) { IsBackground = true, Name = "MomoiProject Net 연결" }.Start();
         }
 
@@ -421,9 +429,16 @@ namespace GBible
                 if (header == null || !header.StartsWith("HTTP/1.1 101", StringComparison.Ordinal) || WebSocketFrames.HeaderValue(header, "Sec-WebSocket-Accept") != WebSocketFrames.AcceptKey(key))
                     throw new IOException("WebSocket 서버가 아닙니다(주소를 확인).");
                 stream.ReadTimeout = Timeout.Infinite;
-                _link = new WebSocketLink(tcp, stream, true,
+                var link = new WebSocketLink(tcp, stream, true,
                     (data, length) => _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Data, Data = data, Length = length }),
                     reason => _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Disconnected, Reason = reason }));
+                // 연결하는 동안 닫혔으면(Dispose) 막 만든 연결도 닫는다 — 연결과 스레드가 남지 않게.
+                if (_closedWhileConnecting)
+                {
+                    link.Close("나갔습니다.");
+                    return;
+                }
+                _link = link;
                 _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Connected });
             }
             catch (Exception e)
@@ -440,6 +455,7 @@ namespace GBible
 
         public void Disconnect(string reason = null)
         {
+            if (_connecting) _closedWhileConnecting = true;
             _link?.Close(reason ?? "나갔습니다.");
             _link = null;
         }

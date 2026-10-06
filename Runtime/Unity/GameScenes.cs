@@ -28,11 +28,22 @@ namespace GBible
 
         public static string Current => SceneManager.GetActiveScene().name;
 
+        // 참이면 씬 흐름이 씬을 바꾸지 않는다(테스트 씬을 플레이하는 동안 — 판 값이 다른 씬을 가리켜도 테스트 씬에 머문다).
+        public static bool Hold;
+
+        // 판 값이 이름("Battle")이든 경로("Assets/…/Battle.unity")든 지금 씬인가.
+        static bool IsCurrent(string scene)
+        {
+            var active = SceneManager.GetActiveScene();
+            return scene == active.name || scene == active.path || System.IO.Path.GetFileNameWithoutExtension(scene) == active.name && scene.EndsWith(".unity", StringComparison.OrdinalIgnoreCase);
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
             _watch = null;
             _key = _path = _emptyScene = _loading = null;
+            Hold = false;
             Loaded = null;
             Transition = null;
         }
@@ -43,7 +54,7 @@ namespace GBible
             _key = key;
             _path = path ?? "";
             _emptyScene = emptyScene;
-            _watch = GameView.Redraw(Check, key);
+            _watch = GameView.RedrawAfterPresentation(Check, key);
         }
 
         public static void Stop()
@@ -57,11 +68,11 @@ namespace GBible
             // 연출 대기열이 비었을 때만 불린다(Redraw가 기다린다) → 앞서 연 씬은 끝났다.
             _loading = null;
             var session = GBibleRuntime.Session;
-            if (session == null || string.IsNullOrEmpty(_key) || !session.Data.IsDefined(_key)) return;
+            if (Hold || session == null || string.IsNullOrEmpty(_key) || !session.Data.IsDefined(_key)) return;
             var root = session.Data.Get(_key);
             var target = (string.IsNullOrEmpty(_path) ? root : FieldPaths.Resolve(root, _path).FirstOrDefault()) as string;
             if (string.IsNullOrEmpty(target)) target = _emptyScene;
-            if (string.IsNullOrEmpty(target) || target == Current) return;
+            if (string.IsNullOrEmpty(target) || IsCurrent(target)) return;
             if (!Application.CanStreamedLevelBeLoaded(target))
             {
                 session.Journal.Append(JournalKind.Warning, "Scenes", $"씬 '{target}'을(를) 열 수 없습니다(Build Settings의 씬 목록에 있는지 확인).");

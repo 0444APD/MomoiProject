@@ -25,6 +25,11 @@ namespace GBible.EditorTools.UI
         // 가상 폴더: 하위 항목(분류 등).
         public Func<IEnumerable<ExplorerItem>> Children;
         public Color? Color;
+        // 따로 연 탭(상세 창의 안쪽 탭)이 바깥 탐색기의 규칙을 그대로 잇는 데 쓴다:
+        //   SerializedProperty 경로(바깥 탐색기 뿌리 기준, 모르면 null) · 인스턴스 편집 규칙 · 블록 편집기.
+        public string Serialized;
+        public bool InstanceEditing;
+        public Func<string, VisualElement> BlockEditor;
     }
 
     // 폴더형 데이터 탐색기. 클래스·컬렉션은 폴더, 값은 파일처럼 한 단계씩 들어가며 본다.
@@ -86,10 +91,12 @@ namespace GBible.EditorTools.UI
         // 블록 필드(트리거·결과 …)의 편집기를 만든다(인자 = 뿌리 기준 SerializedProperty 경로). 상세 패널이 넘겨준다.
         public Func<string, VisualElement> BlockEditor;
 
-        GsDataExplorer(bool browse, Crumb root, Action<string> onPick)
+        // configure: 처음 그리기 전에 정할 것(인스턴스 편집·블록 편집기 — 첫 화면부터 그 규칙대로 그린다).
+        GsDataExplorer(bool browse, Crumb root, Action<string> onPick, Action<GsDataExplorer> configure = null)
         {
             _browse = browse;
             _onPick = onPick;
+            configure?.Invoke(this);
             AddToClassList("gs-explorer");
 
             var toolbar = Gs.Row();
@@ -143,9 +150,20 @@ namespace GBible.EditorTools.UI
         public static GsDataExplorer Browse(string rootLabel, object root, Action<Action> apply) =>
             Browse(new ExplorerItem { Label = rootLabel, Value = root, Type = root?.GetType(), Apply = apply });
 
-        // 가상 폴더(분류)나 값 하나를 뿌리로 둘러보기.
-        public static GsDataExplorer Browse(ExplorerItem root) =>
-            new GsDataExplorer(true, new Crumb { Label = root.Label, Serialized = "", Type = root.Type ?? root.Value?.GetType(), Value = root.Value, Member = root.Member, Apply = root.Apply, Children = root.Children }, null);
+        // 가상 폴더(분류)나 값 하나를 뿌리로 둘러보기. 안쪽 탭으로 연 값이면 바깥 탐색기의 인스턴스 편집 규칙·블록 편집기를 잇는다.
+        public static GsDataExplorer Browse(ExplorerItem root)
+        {
+            var crumb = new Crumb
+            {
+                Label = root.Label, Serialized = root.Serialized ?? "", Type = root.Type ?? root.Value?.GetType(), Value = root.Value, Member = root.Member,
+                Apply = root.Apply, Children = root.Children,
+            };
+            return new GsDataExplorer(true, crumb, null, explorer =>
+            {
+                explorer.InstanceEditing = root.InstanceEditing;
+                explorer.BlockEditor = root.BlockEditor;
+            });
+        }
 
         public static GsModal BrowseModal(VisualElement host, string title, object root, Action<Action> apply) =>
             GsModal.Show(host, Frame(title, apply != null ? "값을 누르면 고칠 수 있습니다." : "읽기 전용", Browse(title, root, apply)));
@@ -198,6 +216,8 @@ namespace GBible.EditorTools.UI
         void Enter(Entry entry)
         {
             var here = _trail[_trail.Count - 1];
+            // 따로 연 탭도 같은 규칙: [Hide]·[ShowIf]·'+ 기능', 값 안의 트리거·결과는 DB 편집기(결과 칸 잠금·[BindTo]·구조 잠금).
+            // 경로를 모르는 값(딕셔너리 요소 등)이면 블록 편집기를 잇지 않는다(탐색기로 그린다).
             if (_browse && OpenInTab != null && OpenInTab(new ExplorerItem
             {
                 Label = entry.Label,
@@ -207,6 +227,9 @@ namespace GBible.EditorTools.UI
                 Member = entry.Member,
                 Apply = entry.Apply ?? here.Apply,
                 Children = entry.Children,
+                Serialized = entry.Serialized,
+                InstanceEditing = InstanceEditing,
+                BlockEditor = entry.Serialized != null ? BlockEditor : null,
             }))
                 return;
             _trail.Add(new Crumb
@@ -331,31 +354,58 @@ namespace GBible.EditorTools.UI
             return card;
         }
 
-        // 목록 폴더: 맨 아래 '+ 추가'(요소 형식의 기본값으로). 딕셔너리는 키를 먼저 정한다.
+        // 구조 잠금(EditorPolicy): DB 값 편집에서 Block·규칙 줄(TriggerRule)처럼 로직이 든 요소는 AI가 더하고 뺀다.
+        // 데이터 목록의 줄은 개발자가 더하고 뺀다. 모니터처럼 실제 값을 살피는 곳(인스턴스 편집이 아님)은 잠그지 않는다.
+        bool StructureLocked(Type elementType) => InstanceEditing && !EditorPolicy.CanEditStructure && EditorPolicy.IsStructural(elementType);
+
+        // 목록 폴더: 맨 아래 '+ 추가'(요소 형식의 기본값으로, 추상 형식이면 만들 형식을 고른다). 딕셔너리는 키를 먼저 정한다.
         void AddListTools(Crumb here)
         {
             if (_browse && here.Apply != null && here.Value is IDictionary map)
             {
-                AddDictionaryTools(here, map);
+                if (!StructureLocked(FieldPaths.ElementTypeOf(map.GetType()))) AddDictionaryTools(here, map);
                 return;
             }
             if (!_browse || here.Apply == null || !(here.Value is IList list) || list.IsFixedSize) return;
             var elementType = FieldPaths.ElementTypeOf(here.Value.GetType());
-            if (elementType == null) return;
-            var add = new GsButton("+ 추가", () =>
+            if (elementType == null || StructureLocked(elementType)) return;
+
+            void AddItem(object item)
             {
+                here.Apply(() => list.Add(item));
+                Changed?.Invoke();
+                Refresh();
+            }
+
+            GsButton add = null;
+            add = new GsButton("+ 추가", () =>
+            {
+                // 추상 형식(관리 참조 목록): 빈 칸(null)을 넣지 않고 만들 형식을 고른다.
+                if (elementType.IsAbstract || elementType.IsInterface)
+                {
+                    var items = InstanceFields.Choices(elementType).Select(t =>
+                    {
+                        var picked = t;
+                        return new GsDropdownItem(BlockTypes.DisplayName(picked), () => AddItem(Activator.CreateInstance(picked)))
+                        {
+                            Caption = TypeName(picked),
+                            Detail = BlockTypes.Description(picked),
+                        };
+                    }).ToList();
+                    if (items.Count == 0) items.Add(new GsDropdownItem("만들 수 있는 형식이 없습니다") { Disabled = true });
+                    GsDropdown.Show(add, items, placeholder: "형식 검색");
+                    return;
+                }
                 object item;
                 try
                 {
-                    item = elementType == typeof(string) ? "" : elementType.IsAbstract || elementType.IsInterface ? null : DataModel.Create(elementType);
+                    item = elementType == typeof(string) ? "" : DataModel.Create(elementType);
                 }
                 catch (Exception)
                 {
                     item = null;
                 }
-                here.Apply(() => list.Add(item));
-                Changed?.Invoke();
-                Refresh();
+                AddItem(item);
             }, GsButtonKind.Ghost);
             add.style.alignSelf = Align.FlexStart;
             add.style.marginTop = 6;
@@ -413,6 +463,8 @@ namespace GBible.EditorTools.UI
             var value = here.Value;
             if (value == null || !FieldPaths.IsCollectionValue(value)) return list;
             var elementType = FieldPaths.ElementTypeOf(value.GetType());
+            // 구조 잠금: 로직이 든 요소(Block·규칙 줄)는 빼지 않는다(값은 그대로 고친다).
+            var locked = StructureLocked(elementType);
             if (value is IDictionary map)
             {
                 // 딕셔너리: 한 요소 = 한 줄([키] 값). 값은 바로 고치고, 요소는 빼거나 새 키로 더한다.
@@ -420,7 +472,7 @@ namespace GBible.EditorTools.UI
                 {
                     var key = pair.Key;
                     var entry = ValueEntry($"[{ValueChoices.Display(here.Member, key)}]", pair.Value, elementType ?? pair.Value?.GetType(), null, v => map[key] = v, null);
-                    entry.Remove = () => map.Remove(key);
+                    if (!locked) entry.Remove = () => map.Remove(key);
                     list.Add(entry);
                 }
                 return list;
@@ -432,8 +484,9 @@ namespace GBible.EditorTools.UI
                 var at = index++;
                 // 목록 요소의 선택 규칙은 목록 필드의 규칙을 따른다(예: 태그 목록 → 태그 고르기).
                 var entry = ValueEntry($"[{at}]", item, elementType ?? item?.GetType(), here.Member, ilist != null ? v => ilist[at] = v : (Action<object>)null, null);
-                if (ilist != null && here.Serialized != null) entry.Serialized = $"{here.Serialized}.Array.data[{at}]";
-                if (ilist != null && !ilist.IsFixedSize) entry.Remove = () => ilist.RemoveAt(at);
+                // 뿌리가 목록 자신이면(가중치 표의 뺄 목록 등) 경로는 "Array.data[i]"(앞에 점 없이).
+                if (ilist != null && here.Serialized != null) entry.Serialized = Join(here.Serialized, $"Array.data[{at}]");
+                if (ilist != null && !ilist.IsFixedSize && !locked) entry.Remove = () => ilist.RemoveAt(at);
                 list.Add(entry);
             }
             return list;
@@ -513,7 +566,8 @@ namespace GBible.EditorTools.UI
                 var choices = ValueChoices.For(here.Member, keyType);
                 if (choices != null)
                 {
-                    var items = choices.Where(c => !map.Contains(c.Value)).Select(c => new GsDropdownItem(c.Label, () => AddWithKey(c.Value)) { Caption = c.Caption, Group = c.Group }).ToList();
+                    var items = choices.Where(c => !map.Contains(c.Value) && !(c.Value is string text && text.Length == 0))
+                        .Select(c => new GsDropdownItem(c.Label, () => AddWithKey(c.Value)) { Caption = c.Caption, Group = c.Group }).ToList();
                     if (items.Count == 0) items.Add(new GsDropdownItem("더할 수 있는 키가 없습니다") { Disabled = true });
                     GsDropdown.Show(add, items, placeholder: "키 검색");
                     return;
@@ -793,8 +847,9 @@ namespace GBible.EditorTools.UI
             public override bool CanEdit => _crumb.Apply != null;
             // 상세 패널 안에 들어간 탐색기는 좁으므로 블록을 한 줄씩 쌓는다.
             public override bool SingleColumn => _explorer.GetFirstAncestorOfType<GsDetailPanel>() != null;
+            // 인스턴스 편집: [Hide]는 감추고 [ShowIf]는 조건대로(ShowIfRules — 값을 바꾸면 탐색기를 다시 그려 다시 판정한다).
             public override IEnumerable<string> Fields() =>
-                FieldPaths.MembersOf(Type).Where(m => !_explorer.InstanceEditing || InstanceFields.Visible(Current, m.Info as FieldInfo)).Select(m => m.Name);
+                FieldPaths.MembersOf(Type).Where(m => !_explorer.InstanceEditing || ShowIfRules.Visible(Current, m.Info as FieldInfo)).Select(m => m.Name);
 
             FieldPaths.Member MemberOf(string name) => FieldPaths.MembersOf(Type).FirstOrDefault(m => m.Name == name);
 
@@ -813,6 +868,26 @@ namespace GBible.EditorTools.UI
                     section.Add(Gs.Label(GsDataExplorer.LabelOf(member.Info, member.Name), "gs-detail__label"));
                     section.Add(editor);
                     return section;
+                }
+                // 옆 칸·위쪽 칸을 읽어 목록을 만드는 칸([FieldPath]의 뿌리 이벤트·플레이어 데이터, [Keyword] 그룹, 비교·값 …)도 DB와 같은 값 칸으로.
+                // 키워드 목록(List<string>)은 DB와 같은 칩.
+                if (serialized != null && _explorer.BlockEditor != null && NeedsProperty(field) && _explorer.BlockEditor(serialized) is { } same)
+                {
+                    if (!(same is GsInlineProperty inline))
+                    {
+                        var chips = Gs.Col("gs-explorer__block");
+                        chips.style.marginTop = 6;
+                        chips.Add(Gs.Label(GsDataExplorer.LabelOf(member.Info, member.Name), "gs-detail__label"));
+                        chips.tooltip = GsPropertyEditor.HintOf(member.Info);
+                        chips.Add(same);
+                        return chips;
+                    }
+                    var box = GsField.For(GsDataExplorer.LabelOf(member.Info, member.Name), inline);
+                    box.tooltip = GsPropertyEditor.HintOf(member.Info);
+                    // 다른 칸의 [ShowIf] 스위치면(키워드 '종류' 등) 바꾼 뒤 탐색기를 다시 그려 다시 판정한다.
+                    if (_explorer.InstanceEditing && ShowIfRules.IsSwitch(field))
+                        inline.Changed += () => _explorer.schedule.Execute(_explorer.Refresh);
+                    return box;
                 }
                 var current = field != null ? field.GetValue(target) : FieldPaths.Read(target, member.Name);
                 Action<object> set = field != null && !field.IsInitOnly ? v => field.SetValue(target, v) : (Action<object>)null;
@@ -836,12 +911,26 @@ namespace GBible.EditorTools.UI
                        typeof(ValueFilter).IsAssignableFrom(type) || typeof(Effect).IsAssignableFrom(type) || typeof(TargetSelector).IsAssignableFrom(type);
             }
 
+            // 값 칸 목록을 SerializedProperty(옆 칸·위쪽 칸)로 만드는 칸인지: 탐색기의 리플렉션 값 칸으로는 같은 목록을 만들 수 없다.
+            static bool NeedsProperty(FieldInfo field)
+            {
+                if (field == null) return false;
+                if (field.IsDefined(typeof(FieldOpRefAttribute), false)) return true;
+                if (typeof(IList).IsAssignableFrom(field.FieldType) && FieldPaths.ElementTypeOf(field.FieldType) == typeof(string)) return KeywordTools.GroupOf(field) != null;
+                if (field.FieldType != typeof(string)) return false;
+                return field.IsDefined(typeof(FieldPathAttribute), false) || field.IsDefined(typeof(FieldValueRefAttribute), false) ||
+                       field.IsDefined(typeof(EventFieldRefAttribute), false) || field.IsDefined(typeof(GBible.Data.MemberRefAttribute), false) ||
+                       KeywordTools.GroupOf(field) != null;
+            }
+
             public override VisualElement FieldValue(string path)
             {
                 var value = FieldPaths.Resolve(Current, path).FirstOrDefault();
-                return Gs.Label(value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object)
-                    ? DataModel.Summary(value)
-                    : PlayerDataStore.Format(value), "gs-nowrap");
+                if (value != null && (FieldPaths.IsCollectionValue(value) || DataModel.Of(value.GetType()).Kind == DataKind.Object))
+                    return Gs.Label(DataModel.Summary(value), "gs-nowrap");
+                // 값 하나는 값 칸과 같은 표시(ID는 이름, enum은 보이는 이름).
+                FieldPaths.TypeAt(Type, path, out var member, out _);
+                return Gs.Label(ValueChoices.Display(member, value), "gs-nowrap");
             }
 
             public override UnityEngine.Object ObjectAt(string path) => FieldPaths.Resolve(Current, path).FirstOrDefault() as UnityEngine.Object;

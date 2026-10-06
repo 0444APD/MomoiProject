@@ -135,10 +135,12 @@ namespace GBible
             foreach (var item in due)
             {
                 var point = _session.Data.Mark();
+                var events = _session.Events.MarkEvents();
                 try { Run(item); }
                 catch (Exception e)
                 {
                     _session.Data.RollbackTo(point);
+                    _session.Events.RollbackEvents(events);
                     _session.Journal.Append(JournalKind.Warning, "Schedule", $"예약 실행이 실패해 그 예약이 바꾼 것만 되돌렸습니다: {item.action?.Describe()} — {e.Message}");
                 }
             }
@@ -194,7 +196,7 @@ namespace GBible
 
     // 시간 예약 하나를 꺼내 실행하는 행동(꺼내기와 실행이 한 묶음: Undo하면 예약이 돌아온다).
     [Serializable, SystemAction]
-    public sealed class ScheduledRun : GameAction
+    public sealed class ScheduledRun : GameAction, ITimeRuleAction
     {
         public string schedule;
 

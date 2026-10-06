@@ -52,7 +52,7 @@ namespace GBible.Data
                 trigger.Validate(context);
                 if ((trigger.Kinds() & TriggerKinds.Use) == 0) context.Warning("트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다.");
             }
-            if (outcomes.Count == 0 && effects.Count == 0) context.Warning("결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요.");
+            if (outcomes.Count == 0 && effects.Count == 0 && !BoundOutcomes.Has(Id)) context.Warning("결과가 없습니다(써도 아무 일도 일어나지 않습니다).");
             foreach (var outcome in outcomes)
             {
                 if (outcome == null) context.Error("비어 있는 결과 칸이 있습니다(스크립트가 지워졌을 수 있음).");

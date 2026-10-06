@@ -32,7 +32,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 | 위치 | 내용 |
 |---|---|
-| `Assets/MomoiProject/` | 시스템·AI가 쓰는 곳(개발자는 들어가지 않는다): `Code/`(AI가 쓰는 코드 — Rules·Client·Editor·Tests·Keywords, DB 요소 탭이 여기서 읽는다) · `Data/`(아래) · `UI/`(화면 UXML·USS) · `Generated/`. 예전 자리(`Assets/Code`·`Assets/MomoiProjectData`·`Assets/UI`)는 에디터를 열 때 저절로 옮겨진다. |
+| `Assets/MomoiProject/` | 시스템·AI가 쓰는 곳(개발자는 들어가지 않는다): `Code/`(AI가 쓰는 코드 — Rules·Client·Editor·Tests·Keywords, DB 요소 탭이 여기서 읽는다) · `Data/`(아래) · `UI/`(화면 UXML·USS) · `Generated/`. 예전 자리(`Assets/Code`·`Assets/MomoiProjectData`·`Assets/UI`)는 에디터를 열 때·시작 설정 창을 열 때 저절로 옮겨진다(Unity가 읽지 않는 파일만 남은 예전 폴더는 `MomoiProjectBackups/<시각>-merge/`로). |
 | `Assets/MomoiProject/Data/` | DB 항목 에셋(종류마다 영어 폴더 — `Ability`·`PlayerData` …, 예전 한글 폴더는 열 때 저절로 옮겨진다), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
 | `Assets/Dev/` | 개발자가 노는 곳. 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다(21장 2-1). 에셋 관리의 가져오기·넣을 에셋 자리도 여기(`Dev/Art`·`Dev/Audio` …). 시스템·AI는 요청받을 때만 건드린다. |
 | `Assets/MomoiProject/Generated/GameIds.cs` | 식별자 코드(8절). 플레이어 데이터 값 형식이 asmdef 안에 있으면 그 asmdef 폴더의 `Generated/`에 생긴다. |
@@ -706,7 +706,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ### 주의할 점
 
-- 테스트 어셈블리는 자동 참조가 아니다.
+- 테스트 어셈블리는 자동 참조가 아니다. 테스트 어셈블리에는 비교 코드 생성 경고를 내지 않고, 그 형식은 Unity Test Runner로 돌릴 때만 훑는다(`38-Testing.md` 6절).
 - Unity 버전을 올린 뒤에는 Mirror 생성 코드가 정상인지 코어 테스트(`MirrorTests`)로 확인한다.
 
 ---
@@ -719,7 +719,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ### 처음 상태 기록
 - 프로젝트 폴더 바로 아래 `MomoiProjectBaseline/`에 Assets·ProjectSettings·Packages(GBible 자신은 빼고)의 사본을 둔다. Assets 밖이라 Unity가 읽지 않는다.
-- **저절로 남는 때:** 시스템이 아직 아무것도 만들지 않은 깨끗한 프로젝트(`Assets/MomoiProject/Code`·DB 데이터·시작 설정 표시가 없음)를 처음 열 때, 시작 설정 창이 뜨기 전에 남긴다. 콘솔에 "처음 상태를 기록했습니다"가 나온다.
+- **저절로 남는 때:** 시스템이 아직 아무것도 만들지 않은 깨끗한 프로젝트(`Assets/MomoiProject`·`Assets/Dev`·시작 설정 표시가 없음)를 처음 열 때, 시작 설정 창이 뜨기 전에 남긴다. 콘솔에 "처음 상태를 기록했습니다"가 나온다.
 - **직접 남기기:** 메뉴 `MomoiProject → 지금 상태를 처음 상태로 기록`. 이미 있으면 덮어쓴다. 프로젝트를 막 만든 깨끗한 때에만 한다(예: Odin 같은 필수 에셋까지 설치한 직후).
 
 ### 되돌리기가 하는 일
@@ -728,18 +728,19 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 | 기록에 없는 파일(새로 만든 스크립트·에셋·씬·패키지 폴더) | 치운다 |
 | 기록과 내용이 다른 파일(바꾼 설정·씬) | 기록의 것으로 되돌린다 |
 | 기록에는 있는데 지운 파일 | 다시 만든다 |
-| 저장 파일(`persistentDataPath/MomoiProject`의 profile·run) | 치운다 |
+| 저장 파일(`persistentDataPath/MomoiProject` 전체 — 슬롯 `slots/`·`Replays/`·`server/`·`Tests/` 포함) | 치운다 |
+| 프로젝트 폴더의 시스템 파일(`CLAUDE.md`·`.claude/`·`Docs/PlanningSpec.md`·`Docs/Decisions.md`·`steam_appid.txt`) | 치운다(AI가 예전 결정을 따르지 않게). 'Claude Code 파일 › 맞추지 않기'를 켰으면 Claude 파일은 그대로. `Docs/Source` 등 Docs의 다른 파일은 그대로 |
 | PlayerPrefs | 모두 지운다 |
 | 그대로 두는 것 | `Packages/com.momoi.gbible`(시스템 자신), `ProjectSettings/ProjectVersion.txt`, `Library`·`UserSettings` |
 
 - 확인 창이 두 번 뜬다. 첫 창에 치울·되돌릴·다시 만들 파일 수와 일부 경로가 보인다.
-- 치우거나 덮어쓴 것은 지우지 않고 모두 `MomoiProjectBackups/<시각>/`에 옮긴다. 되돌리기를 되돌리려면 Unity를 닫고 그 폴더의 Assets·ProjectSettings·Packages를 프로젝트 폴더에 덮어쓴다(`_saves`는 저장 파일).
-- 열린 씬은 빈 씬으로 바뀌고(저장하지 않음), DB의 저장 안 된 변경은 버린다.
+- 치우거나 덮어쓴 것은 지우지 않고 모두 `MomoiProjectBackups/<시각>/`에 옮긴다. 되돌리기를 되돌리려면 Unity를 닫고 그 폴더의 Assets·ProjectSettings·Packages(와 `CLAUDE.md`·`.claude`·`Docs`·`steam_appid.txt` — 있으면)를 프로젝트 폴더에 덮어쓴다(`_saves`는 저장 파일 — 하위 폴더 그대로).
+- 열린 씬·DB의 저장 안 된 변경은 먼저 묻는다(저장·버리기·취소). 그 뒤 열린 씬은 빈 씬으로 바뀐다.
 - 끝나면 Unity를 다시 연다(ProjectSettings·패키지를 깨끗이 다시 읽도록). 처음 상태에는 시작 설정을 하기 전이라 시작 설정 창이 다시 뜬다.
 - 플레이 중에는 할 수 없다.
 
 ### 기록이 없을 때
-처음 상태 기록이 없으면 **시스템이 만든 것만** 치울지 묻는다: `Assets/MomoiProject/Code`, `Assets/MomoiProject/Data`(DB 데이터), `Assets/MomoiProject/Generated`(생성 코드), `ProjectSettings/MomoiProject`, 모듈 심볼(`GBIBLE_…`), 저장 파일, PlayerPrefs. 그 밖에 개발자가 더한 에셋·패키지·설정은 남는다. 치운 것은 마찬가지로 백업 폴더에 옮긴다.
+처음 상태 기록이 없으면 **시스템이 만든 것만** 치울지 묻는다: `Assets/MomoiProject` 전체(코드·DB 데이터·생성 코드·UI·씬), `ProjectSettings/MomoiProject`, 프로젝트 폴더의 시스템 파일(위 표), 모듈 심볼(`GBIBLE_…`), 저장 파일, PlayerPrefs. 그 밖에 개발자가 더한 에셋·패키지·설정은 남는다. 치운 것은 마찬가지로 백업 폴더에 옮긴다.
 
 ### 주의할 점
 - 처음 기록하기 전에 바꾼 것은 "처음 상태"에 들어가 버린다. 깨끗할 때 기록됐는지 `MomoiProjectBaseline/baseline.json`의 시각으로 확인한다.

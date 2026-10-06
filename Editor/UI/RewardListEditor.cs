@@ -18,7 +18,7 @@ namespace GBible.EditorTools.UI
     //   컬렉션 → '+'로 요소를 더하고, 요소마다 다시 숫자·값·인스턴스 규칙.
     // 플레이어 데이터가 아닌 보상(다이얼로그 재생 등)은 같은 목록의 '다른 보상'에서 고르고 블록 편집기로 그린다.
     // 결과 칸(모든 기능 공용: 로그·도전과제·능력·아이템 사용 …). 위의 보상 규칙에 더해:
-    //   '+ 결과 추가' 목록 = 플레이어 데이터 필드(플레이어 데이터에 주기) · 로그에 기록 · 대상에게 효과 · 코딩한 결과.
+    //   '+ 결과 추가' 목록 = 플레이어 데이터 필드(플레이어 데이터에 주기) · 로그에 기록 · 대상에게 효과(선택 요구·빌려 쓰기) · 코딩한 결과.
     //   칸의 잠금([OutcomeSlot])에 없는 종류는 목록에 나오지 않는다. 고정 칸(로그 = 로그에 기록)은 하나만 두고 세부 칸만 고친다.
     public static class RewardListEditor
     {
@@ -74,8 +74,8 @@ namespace GBible.EditorTools.UI
             var container = Gs.Col("gs-rewards");
             var slot = TriggerSlots.OutcomeSlotOf(list);
             // 코드로 쓴 결과가 이 항목에 연결되어 있으면([BindTo]) 고를 수 없다: 연결된 클래스를 보이고 cs를 연다.
-            // 코드가 대신하지 않는 칸(OutcomeSlot BindTo = false: 상태 효과의 걸릴 때·끝날 때)은 그대로 고친다.
-            if (list.serializedObject.targetObject is GBible.Data.GameData owner && BoundOutcomes.Has(owner.Id) && (slot?.BindTo ?? true))
+            // 코드가 대신하지 않는 칸(OutcomeSlot BindTo = false: 상태 효과의 걸릴 때·끝날 때, 패시브의 발동 더)은 그대로 고친다.
+            if (list.serializedObject.targetObject is GBible.Data.GameData owner && BoundOutcomes.Has(owner.Id) && ReplacedByCode(list))
             {
                 container.Add(BoundView(owner.Id));
                 return container;
@@ -148,6 +148,31 @@ namespace GBible.EditorTools.UI
             return container;
         }
 
+        // [BindTo] 코드가 이 결과 목록을 대신하는가: 위로 올라가며 처음 만나는 결과 칸([OutcomeSlot])의 BindTo를 따른다(깊이 제한 없음).
+        // 결과 안의 결과(선택 요구 › 가중치 표에서 고르기의 '고른 뒤 결과' …)는 그 바깥 칸을 따른다. 결과 칸이 없으면 대신하지 않는다.
+        static bool ReplacedByCode(SerializedProperty list)
+        {
+            var so = list.serializedObject;
+            for (var path = list.propertyPath; !string.IsNullOrEmpty(path); path = ParentPath(path))
+            {
+                var current = so.FindProperty(path);
+                if (current == null) continue;
+                var slot = PropertyUtil.GetField(current, out _)?.GetCustomAttribute<OutcomeSlotAttribute>();
+                if (slot != null) return slot.BindTo;
+            }
+            return false;
+        }
+
+        // "a.b.Array.data[2].c" → "a.b.Array.data[2]" → "a.b" → "a" → null.
+        static string ParentPath(string path)
+        {
+            var index = path.LastIndexOf('.');
+            if (index < 0) return null;
+            var parent = path.Substring(0, index);
+            if (parent.EndsWith(".Array", StringComparison.Ordinal)) parent = parent.Substring(0, parent.Length - 6);
+            return parent;
+        }
+
         // 고정 칸의 기본 결과.
         static Outcome Default(OutcomeKinds allowed)
         {
@@ -178,6 +203,7 @@ namespace GBible.EditorTools.UI
             {
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(TargetedOutcome)), () => Insert(new TargetedOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(TargetedOutcome)) });
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(ChoiceOutcome)), () => Insert(new ChoiceOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(ChoiceOutcome)) });
+                items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(BorrowOutcome)), () => Insert(new BorrowOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(BorrowOutcome)) });
             }
             if ((allowed & OutcomeKinds.Intent) != 0)
                 items.Add(new GsDropdownItem(BlockTypes.DisplayName(typeof(ModifyIntentOutcome)), () => Insert(new ModifyIntentOutcome())) { Group = "결과", Detail = BlockTypes.Description(typeof(ModifyIntentOutcome)) });
@@ -437,6 +463,25 @@ namespace GBible.EditorTools.UI
                         GsDropdown.Show(anchor, items, placeholder: $"{kind} 검색");
                     });
             }
+            // 키워드가 연결된 글자([Keyword(typeof(그룹))]): 그 그룹의 키워드에서 고른다(검증도 같은 그룹으로 본다).
+            var keywordGroup = type == typeof(string) ? KeywordTools.GroupOf(leaf) : null;
+            if (keywordGroup != null)
+            {
+                var keywords = KeywordTools.KeywordsOf(keywordGroup).ToList();
+                var known = keywords.Any(k => k.Id == current);
+                return Pill(string.IsNullOrEmpty(current) ? "키워드 선택" : known ? current : $"없는 키워드: {current}", string.IsNullOrEmpty(current),
+                    !string.IsNullOrEmpty(current) && !known, anchor =>
+                    {
+                        var items = keywords.Select(k =>
+                        {
+                            var pick = k.Id;
+                            return new GsDropdownItem(pick, () => Set(property, pick, onStructure)) { Caption = k.Name, Selected = pick == current };
+                        }).ToList();
+                        if (items.Count == 0) items.Add(new GsDropdownItem("이 그룹에 아직 키워드가 없습니다") { Disabled = true });
+                        items.AddRange(GsPropertyEditor.KeywordMenuExtras(leaf));
+                        GsDropdown.Show(anchor, items, placeholder: "키워드 검색");
+                    });
+            }
             if (type == typeof(bool))
                 return Pill(current == "true" ? "참" : current == "false" ? "거짓" : "참/거짓 선택", current != "true" && current != "false", false, anchor =>
                     GsDropdown.Show(anchor, new List<GsDropdownItem>
@@ -444,9 +489,11 @@ namespace GBible.EditorTools.UI
                         new GsDropdownItem("참", () => Set(property, "true", onStructure)) { Selected = current == "true" },
                         new GsDropdownItem("거짓", () => Set(property, "false", onStructure)) { Selected = current == "false" },
                     }));
+            // enum: 보이는 이름([InspectorName])으로 보이고, 저장은 코드 이름.
             if (type.IsEnum)
-                return Pill(string.IsNullOrEmpty(current) ? "값 선택" : current, string.IsNullOrEmpty(current), !string.IsNullOrEmpty(current) && !Enum.IsDefined(type, current), anchor =>
-                    GsDropdown.Show(anchor, Enum.GetNames(type).Select(name => new GsDropdownItem(name, () => Set(property, name, onStructure)) { Selected = current == name }).ToList()));
+                return Pill(string.IsNullOrEmpty(current) ? "값 선택" : ValueChoices.EnumLabel(type, current), string.IsNullOrEmpty(current), !string.IsNullOrEmpty(current) && !Enum.IsDefined(type, current), anchor =>
+                    GsDropdown.Show(anchor, Enum.GetNames(type).Select(name => new GsDropdownItem(ValueChoices.EnumLabel(type, name), () => Set(property, name, onStructure))
+                        { Caption = name, Selected = current == name }).ToList()));
             return Inline(property, onValue);
         }
 

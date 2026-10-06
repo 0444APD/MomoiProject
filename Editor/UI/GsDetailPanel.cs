@@ -65,6 +65,8 @@ namespace GBible.EditorTools.UI
         GsButton _save;
         // 필드 경로 → 그 필드의 칸(바뀐 칸 표시·찾아가기).
         readonly Dictionary<string, VisualElement> _sections = new Dictionary<string, VisualElement>();
+        // 맨 위 칸 중 [ShowIf]가 붙은 것(조건 칸을 바꾸면 다시 판정한다).
+        readonly ShowIfViews _showIf = new ShowIfViews();
 
         public UnityEngine.Object Target => _target;
         internal SerializedObject Draft => _draftObject;
@@ -230,6 +232,7 @@ namespace GBible.EditorTools.UI
         {
             _draftObject.Update();
             _sections.Clear();
+            _showIf.Clear();
             _titleSlot.Clear();
             _body.Clear();
 
@@ -292,6 +295,8 @@ namespace GBible.EditorTools.UI
                 section.Add(content);
                 _sections[path] = section;
             }
+            // [ShowIf]: 같은 항목의 조건 칸 값에 따라 보이고 숨는다(예: 저장 데이터 이전의 '키 삭제'면 경로·새 키 칸을 숨긴다).
+            _showIf.Track(section, property);
             return section;
         }
 
@@ -341,6 +346,7 @@ namespace GBible.EditorTools.UI
                     return Gs.Label("비어 있습니다", "gs-caption");
                 }
             }
+            var basePath = property.propertyPath;
             var explorer = GsDataExplorer.Browse(new ExplorerItem
             {
                 Label = GsPropertyEditor.LabelOf(property, field),
@@ -352,19 +358,18 @@ namespace GBible.EditorTools.UI
                     _draftObject.Update();
                     OnValueChanged();
                 },
+                // DB 항목(인스턴스 등)의 값: [Hide]·[ShowIf]·기능 필드 규칙대로(첫 화면부터 — 따로 연 안쪽 탭도 잇는다).
+                InstanceEditing = true,
+                // 값 안의 트리거·결과(예: 사용 기능)와 [FieldPath]·[Keyword] 칸은 DB와 같은 편집기로. [BindTo]가 연결된 항목이면 결과 칸은 잠긴 보기.
+                BlockEditor = relative =>
+                {
+                    _draftObject.Update();
+                    var nested = _draftObject.FindProperty(basePath + "." + relative);
+                    return nested == null ? null : GsPropertyEditor.BuildContent(nested, OnValueChanged, OnStructureChanged);
+                },
             });
             explorer.AddToClassList("gs-explorer--embedded");
             explorer.OpenInTab = _options.OpenNested;
-            // DB 항목(인스턴스 등)의 값: [Hide]·[ShowIf]·기능 필드 규칙대로.
-            explorer.InstanceEditing = true;
-            // 값 안의 트리거·결과(예: 사용 기능)는 DB와 같은 편집기로. [BindTo]가 연결된 항목이면 결과 칸은 잠긴 보기.
-            var basePath = property.propertyPath;
-            explorer.BlockEditor = relative =>
-            {
-                _draftObject.Update();
-                var nested = _draftObject.FindProperty(basePath + "." + relative);
-                return nested == null ? null : GsPropertyEditor.BuildContent(nested, OnValueChanged, OnStructureChanged);
-            };
             return explorer;
         }
 
@@ -559,6 +564,7 @@ namespace GBible.EditorTools.UI
                 OnStructureChanged();
                 return;
             }
+            if (_showIf.Any) _showIf.Refresh();
             RefreshState();
             ReflectIfStaged();
         }
@@ -710,6 +716,9 @@ namespace GBible.EditorTools.UI
         }
 
         public void Close() => CloseNow();
+
+        // 창이 이 패널을 새 패널로 바꿀 때(구조 잠금이 바뀌어 다시 그리기 등): 닫기 절차 없이 사본만 지운다.
+        internal void Release() => DestroyDraft();
 
         void CloseNow()
         {

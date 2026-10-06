@@ -245,7 +245,9 @@ namespace GBible
             Options.History == HistoryMode.Snapshots ? _snapshots.Count : 0;
 
         // 마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌린다. 되돌릴 것이 없으면 false.
-        public bool Undo()
+        public bool Undo() => UndoStep(0);
+
+        bool UndoStep(long floor)
         {
             if (Role == SessionRole.Client)
             {
@@ -255,14 +257,34 @@ namespace GBible
             switch (Options.History)
             {
                 case HistoryMode.Actions:
-                    var undone = Data.UndoLast();
-                    if (undone) Achievements.Flush();
-                    return undone;
+                    return UndoActions(floor);
                 case HistoryMode.Snapshots:
                     return RewindSnapshot();
                 default:
                     return false;
             }
+        }
+
+        // 행동 방식 Undo 한 번. 시간 규칙이 낸 행동(상태 효과 주기·만료, 시간 예약, 패시브 주기)만 되돌리면 시각이 이미 지난 값이
+        // 돌아와 다음 프레임에 그대로 다시 실행된다(Undo가 막힌다). 그래서 그 앞의 행동까지 함께 되돌리고 시계도 그 행동이 시작한 때로
+        // 돌린다 — 되돌린 사이의 시간 규칙은 시간이 다시 흐르면 다시 실행된다. floor(이력 번호) 이하는 되돌리지 않는다(UndoTo의 지점).
+        bool UndoActions(long floor)
+        {
+            var undone = false;
+            Transaction earliest = null;
+            var timeRule = false;
+            while (Data.HistoryCount > 0)
+            {
+                var last = Data.History[Data.HistoryCount - 1];
+                if (last.Id <= floor || !Data.UndoLast()) break;
+                undone = true;
+                earliest = last;
+                if (!last.TimeRule) break;
+                timeRule = true;
+            }
+            if (timeRule && earliest != null && !earliest.TimeRule) Clock.Rewind(earliest.Tick, earliest.Time);
+            if (undone) Achievements.Flush();
+            return undone;
         }
 
         // 되돌리기 지점(행동 방식): 지금까지의 행동 이력 끝. UndoTo(지점)이 그 뒤의 행동을 모두 되돌린다.
@@ -278,7 +300,7 @@ namespace GBible
         {
             if (Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 안에서는 되돌릴 수 없습니다(행동 밖에서 부르세요).");
             var count = 0;
-            while (UndoCount > 0 && HistoryMark > mark && Undo()) count++;
+            while (UndoCount > 0 && HistoryMark > mark && UndoStep(mark)) count++;
             return count;
         }
 
@@ -328,6 +350,7 @@ namespace GBible
             }
             _lastSnapshotTime = snapshot.Time;
             Achievements.Flush();
+            Rewound?.Invoke(snapshot.JournalId);
             return true;
         }
 
@@ -381,6 +404,9 @@ namespace GBible
 
         // 시간이 흐를 때(고정 틱이면 틱마다 1/틱 초, 아니면 프레임마다 그 프레임 시간). 행동 밖이다: 규칙은 행동(Do)으로 바꾼다.
         public event Action<double> Ticked;
+
+        // 스냅샷으로 되감았을 때(되감은 지점의 기록 번호). 판 저장이 되감은 모습을 다시 저장하게(RunSaver).
+        public event Action<long> Rewound;
 
         // 고정 틱: 다음 틱까지 지난 비율(0~1). 화면이 두 틱 사이를 부드럽게 그릴 때(보간).
         public double TickAlpha { get; private set; }

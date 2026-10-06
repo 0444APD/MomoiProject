@@ -54,6 +54,9 @@ namespace GBible
         // 뒤로 기록에 쓴 원래 객체들(빠지거나 갈아 끼워진 객체). 되돌릴 때 새로 만들지 않고 이 인스턴스에 값을 다시 채운다
         // (게임 코드가 쥔 인스턴스가 그대로 돌아온다).
         public readonly List<object> Originals = new List<object>();
+        // 리스트 구조가 바뀐 곳(끝에 더하기·자르기·배치 바꾸기)의 경로. Describe일 때만 채운다.
+        // 번호로 적용하는 기록(되돌리기)이 그 뒤 구조가 바뀐 리스트에 닿는지 볼 때 쓴다(PlayerDataStore.UndoLast).
+        public readonly List<string> Reshaped = new List<string>();
 
         Seg[] _path = new Seg[32];
         int _depth;
@@ -67,6 +70,7 @@ namespace GBible
             BackwardStarts.Clear();
             Changes.Clear();
             Originals.Clear();
+            Reshaped.Clear();
             Count = 0;
             _depth = 0;
         }
@@ -88,6 +92,7 @@ namespace GBible
             copy.BackwardStarts.AddRange(BackwardStarts);
             copy.Changes.AddRange(Changes);
             copy.Originals.AddRange(Originals);
+            copy.Reshaped.AddRange(Reshaped);
             Clear();
             return copy;
         }
@@ -108,6 +113,7 @@ namespace GBible
             foreach (var start in next.BackwardStarts) BackwardStarts.Add(start + shift);
             Changes.AddRange(next.Changes);
             Originals.AddRange(next.Originals);
+            Reshaped.AddRange(next.Reshaped);
             Count += next.Count;
         }
 

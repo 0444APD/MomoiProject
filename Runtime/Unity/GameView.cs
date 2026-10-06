@@ -13,7 +13,8 @@ namespace GBible
     //    한 프레임에 여러 번 계산하게 되므로, 표시만 남겼다가 프레임 끝(행동 밖)에서 모아 한 번 그린다.
     //      void OnEnable()  => _view = GameView.Redraw(Redraw, GameIds.PlayerData.Run);   // 키를 비우면 어느 값이 바뀌어도
     //      void OnDisable() => _view.Dispose();
-    //    처음 한 번은 등록한 프레임 끝에 바로 그린다. 연출이 재생 중이면 끝날 때까지 기다린다(죽는 연출 전에 적이 사라지지 않게).
+    //    처음 한 번은 등록한 프레임 끝에 바로 그린다(연출 중이어도 — 새로 생긴 화면·씬 전환 뒤의 새 씬은 그 전 모습이 없다).
+    //    그 뒤로는 연출이 재생 중이면 끝날 때까지 기다린다(죽는 연출 전에 적이 사라지지 않게).
     //    기다리지 않을 화면(자원 표시 등)은 Redraw(draw, waitForPresentation: false, keys).
     //
     // 2) 연출 대기열: 연출(피해 숫자·카드 이동·죽는 모습)을 차례로 하나씩 재생한다.
@@ -34,6 +35,10 @@ namespace GBible
             public bool WaitForPresentation;
             public bool Dirty = true;
             public bool Disposed;
+            // 한 번이라도 그렸는가. 처음 그리기는 연출을 기다리지 않는다(새로 생긴 화면·씬 전환 뒤의 새 씬 — 그 전 모습이 없으니 지금 값으로).
+            public bool Drawn;
+            // 처음 그리기도 연출이 끝나기를 기다린다(씬 흐름: 앞 씬 전환이 끝난 뒤에만 다음 씬을 본다).
+            public bool WaitFirst;
 
             public void Dispose()
             {
@@ -55,13 +60,18 @@ namespace GBible
 
         public static IDisposable Redraw(Action draw, params string[] keys) => Redraw(draw, true, keys);
 
-        public static IDisposable Redraw(Action draw, bool waitForPresentation, params string[] keys)
+        public static IDisposable Redraw(Action draw, bool waitForPresentation, params string[] keys) => Watching(draw, waitForPresentation, false, keys);
+
+        // 처음 그리기도 연출이 끝나기를 기다린다(GameScenes).
+        internal static IDisposable RedrawAfterPresentation(Action draw, params string[] keys) => Watching(draw, true, true, keys);
+
+        static IDisposable Watching(Action draw, bool waitForPresentation, bool waitFirst, string[] keys)
         {
             if (draw == null) throw new ArgumentNullException(nameof(draw));
             Hook();
             var watch = new Watch
             {
-                Draw = draw, WaitForPresentation = waitForPresentation,
+                Draw = draw, WaitForPresentation = waitForPresentation, WaitFirst = waitFirst,
                 Keys = keys == null || keys.Length == 0 ? null : new HashSet<string>(keys, StringComparer.Ordinal),
             };
             Watches.Add(watch);
@@ -91,6 +101,12 @@ namespace GBible
             foreach (var watch in Watches) watch.Dirty = true;
         }
 
+        // 모든 화면을 다음 프레임 끝에 다시 그린다(밸런스 값처럼 플레이어 데이터가 아닌 것이 바뀌었을 때).
+        public static void RedrawAll()
+        {
+            foreach (var watch in Watches) watch.Dirty = true;
+        }
+
         // 프레임 끝(GBibleHost.LateUpdate)에서 부른다. 행동 중이면 다음 프레임으로 미룬다.
         internal static void FrameEnd()
         {
@@ -100,8 +116,9 @@ namespace GBible
             var presenting = IsPresenting;
             foreach (var watch in Watches.ToArray())
             {
-                if (!watch.Dirty || watch.Disposed || (presenting && watch.WaitForPresentation)) continue;
+                if (!watch.Dirty || watch.Disposed || (presenting && watch.WaitForPresentation && (watch.Drawn || watch.WaitFirst))) continue;
                 watch.Dirty = false;
+                watch.Drawn = true;
                 try { watch.Draw(); }
                 catch (Exception e) { Debug.LogException(e); }
             }
@@ -245,10 +262,12 @@ namespace GBible
                 Debug.LogException(e);
                 yield break;
             }
-            var until = Time.realtimeSinceStartup + timeout;
+            // 기다린 시간은 게임이 멈춰 있지 않은 동안만 센다(일시정지가 길어도 연출을 건너뛰지 않게).
+            var waited = 0f;
             while (!done)
             {
-                if (timeout > 0f && Time.realtimeSinceStartup > until)
+                if (!GameTime.IsPaused) waited += Time.unscaledDeltaTime;
+                if (timeout > 0f && waited > timeout)
                 {
                     Debug.LogWarning($"[MomoiProject] 연출이 {timeout:0.#}초 안에 끝나지 않아 넘어갑니다(done()을 부르지 않았거나 오브젝트가 먼저 없어졌는지 확인).");
                     yield break;

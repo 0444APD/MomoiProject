@@ -68,12 +68,19 @@ namespace GBible
         public long Id;
         public long JournalId;
         public string Label;
+        // 시작한 게임 시각(행동 방식 Undo가 시간 규칙 행동을 되돌릴 때 시계를 여기로 돌린다).
+        internal long Tick;
+        internal double Time;
+        // 게임 시각이 되어 실행된 시스템 행동(ITimeRuleAction).
+        internal bool TimeRule;
         public readonly List<PlayerDataChange> ValueChanges = new List<PlayerDataChange>();
         public readonly List<DataRecord> DataChanges = new List<DataRecord>();
         // Mirror로 비교하는 플레이어 데이터의 변경(Sync 순서). Undo는 거꾸로 되돌린다.
         public readonly List<ChangeSet> Mirrored = new List<ChangeSet>();
         // 이 행동이 끝난 뒤 행동 밖에서 바뀐 곳("키:경로", 변경 목록을 만들 때만). Undo가 덮어쓰면 경고한다.
         internal HashSet<string> OutsideAfter;
+        // 이 행동이 끝난 뒤 행동 밖에서 구조가 바뀐 리스트("키:경로"). 이 행동의 기록이 그 리스트의 요소에 닿으면 Undo를 거부한다(번호가 밀려 엉뚱한 요소가 바뀐다).
+        internal HashSet<string> ReshapedAfter;
         // 이 수보다 앞의 Mirror 기록에는 이어 붙이지 않는다(저장점 뒤의 변경이 저장점 앞의 기록에 섞이지 않게).
         internal int SealedMirrored;
     }
@@ -124,6 +131,8 @@ namespace GBible
 
         readonly Dictionary<string, Slot> _slots = new Dictionary<string, Slot>(StringComparer.Ordinal);
         readonly Dictionary<string, object> _preloaded = new Dictionary<string, object>(StringComparer.Ordinal);
+        // 미리 불러 둔 값의 구역(그 구역을 저장할 때 함께 쓰고, 그 구역을 비우거나 다시 불러오면 버린다).
+        readonly Dictionary<string, DataZone> _preloadedZone = new Dictionary<string, DataZone>(StringComparer.Ordinal);
         readonly Dictionary<string, string> _aliases = new Dictionary<string, string>(StringComparer.Ordinal);
         readonly List<Transaction> _history = new List<Transaction>();
         // 키별로 마지막으로 적용된 변화의 기록 id. 그 변화로 일어난 일(조건 충족 등)의 원인으로 쓴다.
@@ -289,7 +298,13 @@ namespace GBible
             if (_preloaded.TryGetValue(oldKey, out var value))
             {
                 _preloaded.Remove(oldKey);
-                if (!_preloaded.ContainsKey(newKey)) _preloaded[newKey] = value;
+                var hasZone = _preloadedZone.TryGetValue(oldKey, out var zone);
+                _preloadedZone.Remove(oldKey);
+                if (!_preloaded.ContainsKey(newKey))
+                {
+                    _preloaded[newKey] = value;
+                    if (hasZone) _preloadedZone[newKey] = zone;
+                }
             }
         }
 
@@ -297,6 +312,7 @@ namespace GBible
         {
             if (!_preloaded.TryGetValue(key, out value)) return false;
             _preloaded.Remove(key);
+            _preloadedZone.Remove(key);
             return true;
         }
 
@@ -324,8 +340,11 @@ namespace GBible
             Changed = null;
             DataChanged = null;
             Synced = null;
+            // 받는 쪽은 이 안의 변경을 받지 않는다: 빠졌다가 돌아온 객체는 예전 객체 번호를 그대로 쓴다(Mirror.KeepIds).
+            foreach (var slot in _slots.Values) Mirror.KeepIds(slot.Mirror, true);
             return new QuietScope(() =>
             {
+                foreach (var slot in _slots.Values) Mirror.KeepIds(slot.Mirror, false);
                 Changed = changed + Changed;
                 DataChanged = dataChanged + DataChanged;
                 Synced = synced + Synced;
@@ -678,6 +697,7 @@ namespace GBible
             var last = _history[_history.Count - 1];
             last.OutsideAfter ??= new HashSet<string>(StringComparer.Ordinal);
             foreach (var change in changes.Changes) last.OutsideAfter.Add(key + ":" + change.Path);
+            foreach (var path in changes.Reshaped) (last.ReshapedAfter ??= new HashSet<string>(StringComparer.Ordinal)).Add(key + ":" + path);
         }
 
         // 되돌리는 행동이 바꾼 곳 중 그 뒤 행동 밖에서 다시 바뀐 곳("키:경로").
@@ -693,6 +713,21 @@ namespace GBible
                     if (Overlaps(mine, outside) && !found.Contains(outside)) found.Add(outside);
             }
             return found;
+        }
+
+        // 되돌리는 행동의 기록이 그 뒤 행동 밖에서 구조가 바뀐 리스트(또는 그 요소)에 닿으면 그 리스트("키:경로"), 아니면 null.
+        static string Reshaped(Transaction tx)
+        {
+            if (tx.ReshapedAfter == null) return null;
+            foreach (var changes in tx.Mirrored)
+            foreach (var change in changes.Changes)
+            {
+                var mine = changes.Key + ":" + change.Path;
+                foreach (var list in tx.ReshapedAfter)
+                    if (mine.Length > list.Length ? mine.StartsWith(list, StringComparison.Ordinal) && mine[list.Length] == '[' : mine == list)
+                        return list;
+            }
+            return null;
         }
 
         // 같은 곳이거나 한쪽이 다른 쪽을 품는다(예: units[#3] 와 units[#3].hp).
@@ -1090,13 +1125,30 @@ namespace GBible
             Sync();
 
             var tx = _history[_history.Count - 1];
+            var reshaped = Reshaped(tx);
+            if (reshaped != null)
+            {
+                _journal.Append(JournalKind.Warning, "Data",
+                    $"Undo '{tx.Label}'를 할 수 없습니다: 그 뒤 행동 밖에서 리스트 구조가 바뀌었습니다({reshaped.Replace(":", ".")}). " +
+                    "되돌리면 번호가 밀려 엉뚱한 요소가 바뀝니다. 리스트에 더하기·빼기·순서 바꾸기는 행동 안에서 하세요.");
+                return false;
+            }
             _history.RemoveAt(_history.Count - 1);
 
             var entry = _journal.Append(JournalKind.Undo, "Data", $"Undo: {tx.Label}", transactionId: tx.Id);
             using (_journal.Cause(entry.Id))
             {
                 var overwritten = Overwritten(tx);
-                Revert(tx, "Undo");
+                try
+                {
+                    Revert(tx, "Undo");
+                }
+                catch (Exception e)
+                {
+                    // 끝까지 되돌리지 못했다(예상하지 못한 구조 변화). 지금 모습을 기준으로 다시 맞추고 알린다(이력에는 다시 넣지 않는다 — 일부는 이미 되돌렸다).
+                    _journal.Append(JournalKind.Warning, "Data", $"Undo '{tx.Label}'를 끝까지 되돌리지 못해 일부만 되돌렸습니다: {e.Message}");
+                    Sync();
+                }
                 if (overwritten.Count > 0)
                     _journal.Append(JournalKind.Warning, "Data",
                         $"Undo '{tx.Label}'가 행동 밖에서 바뀐 값을 덮었습니다: {string.Join(", ", overwritten.Take(5).Select(p => p.Replace(":", ".")))}" +
@@ -1109,6 +1161,8 @@ namespace GBible
                 previous.OutsideAfter ??= new HashSet<string>(StringComparer.Ordinal);
                 previous.OutsideAfter.UnionWith(tx.OutsideAfter);
             }
+            if (tx.ReshapedAfter != null && _history.Count > 0)
+                (_history[_history.Count - 1].ReshapedAfter ??= new HashSet<string>(StringComparer.Ordinal)).UnionWith(tx.ReshapedAfter);
             TransactionUndone?.Invoke(tx);
             return true;
         }
@@ -1189,6 +1243,11 @@ namespace GBible
                         : DataModel.ToTree(slot.Value, slot.DataType, Identity, warnings, slot.Label);
                     if (report) foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, pair.Key);
                 }
+                // 불러왔지만 아직 정의되지 않은 키(라이브러리가 처음 쓸 때 정의하는 $id.… · $modifiers · $world …)도 그대로 다시 쓴다 —
+                // 이번 실행에서 그 기능을 쓰지 않았다고 저장에서 빠지면 다음 실행에서 번호가 겹치거나 값이 사라진다.
+                foreach (var pair in _preloaded)
+                    if (_preloadedZone.TryGetValue(pair.Key, out var preloadedZone) && preloadedZone == zone && !result.ContainsKey(pair.Key))
+                        result[pair.Key] = pair.Value;
             }
             finally
             {
@@ -1207,7 +1266,9 @@ namespace GBible
             {
                 var key = pair.Key;
                 var slot = pair.Value;
-                if (slot.Zone != zone || !tree.TryGetValue(key, out var saved)) continue;
+                if (slot.Zone != zone) continue;
+                // 그 시점에 없던 키(뒤에 처음 생긴 상태 효과·예약 …)는 처음 값으로.
+                if (!tree.TryGetValue(key, out var saved)) saved = DefaultTree(slot);
                 if (slot.DataType != null && slot.Mirror != null)
                 {
                     SyncSlot(key, slot);
@@ -1239,12 +1300,21 @@ namespace GBible
         // 아직 정의되지 않은 키는 보관했다가 Define 시점에 적용한다. 이름이 바뀐 키는 새 이름으로 옮긴다.
         public void Import(Dictionary<string, object> values, DataZone zone)
         {
+            // 이 구역의 앞 저장에서 미리 불러 둔 값은 버린다(새 저장이 대신한다).
+            foreach (var stale in _preloadedZone.Where(p => p.Value == zone).Select(p => p.Key).ToList())
+            {
+                _preloaded.Remove(stale);
+                _preloadedZone.Remove(stale);
+            }
+            var present = new HashSet<string>(StringComparer.Ordinal);
             foreach (var pair in values)
             {
                 var key = _aliases.TryGetValue(pair.Key, out var renamed) && !values.ContainsKey(renamed) ? renamed : pair.Key;
+                present.Add(key);
                 if (!_slots.TryGetValue(key, out var slot))
                 {
                     _preloaded[key] = pair.Value;
+                    _preloadedZone[key] = zone;
                     continue;
                 }
                 if (slot.Zone != zone) continue;
@@ -1268,6 +1338,35 @@ namespace GBible
                 }
                 Changed?.Invoke(key);
             }
+            // 저장에 없는 이 구역의 키(저장한 뒤에 처음 생긴 상태 효과·월드 상태·기다리는 선택·예약 …)는 처음 값으로 — 불러온 모습에 섞이지 않게.
+            foreach (var pair in _slots.ToList())
+            {
+                var key = pair.Key;
+                var slot = pair.Value;
+                if (slot.Zone != zone || present.Contains(key)) continue;
+                if (slot.DataType != null)
+                {
+                    if (DataModel.Diff(slot.Value, slot.Default, Identity).Count == 0) continue;
+                    slot.Value = DataModel.ApplyInPlace(slot.Value, DataModel.Clone(slot.Default, Identity), Identity);
+                    ChooseMirror(key, slot);
+                    if (slot.Mirror != null && Synced != null) Synced(new ChangeSet { Key = key, Snapshot = Mirror.Snapshot(slot.Mirror) });
+                    RefreshShadow(slot);
+                    CheckRequired(key, slot);
+                }
+                else
+                {
+                    if (Equals(slot.Value, slot.Default)) continue;
+                    slot.Value = slot.Default;
+                }
+                Changed?.Invoke(key);
+            }
+        }
+
+        // 처음 값의 저장 트리(되감기에서 그 시점에 없던 키를 되돌릴 때).
+        object DefaultTree(Slot slot)
+        {
+            if (slot.DataType == null) return slot.Default;
+            return DataModel.ToTree(slot.Default, slot.DataType, Identity, new List<string>(), slot.Label);
         }
 
         static object ReadScalar(Slot slot, object tree)
@@ -1457,6 +1556,12 @@ namespace GBible
 
         public void ResetZone(DataZone zone)
         {
+            // 이 구역을 처음부터: 미리 불러 둔(아직 정의되지 않은) 옛 값이 새 판에 들어오지 않게 버린다.
+            foreach (var stale in _preloadedZone.Where(p => p.Value == zone).Select(p => p.Key).ToList())
+            {
+                _preloaded.Remove(stale);
+                _preloadedZone.Remove(stale);
+            }
             foreach (var pair in _slots.ToList())
             {
                 var slot = pair.Value;

@@ -36,6 +36,8 @@ namespace GBible
         static NetServer _hookedServer;
 
         readonly List<Sample> _samples = new List<Sample>();
+        // 등록할 때 쓴 이름(AddComponent 뒤에 entityId를 넣으면 이름이 바뀐다 — 그때 다시 등록한다).
+        string _registeredId;
 
         public string Id => string.IsNullOrEmpty(entityId) ? name : entityId;
 
@@ -62,18 +64,29 @@ namespace GBible
 
         void OnEnable()
         {
-            ById[Id] = this;
+            Register();
             Owned.Add(this);
         }
 
         void OnDisable()
         {
-            if (ById.TryGetValue(Id, out var self) && self == this) ById.Remove(Id);
+            if (_registeredId != null && ById.TryGetValue(_registeredId, out var self) && self == this) ById.Remove(_registeredId);
+            _registeredId = null;
             Owned.Remove(this);
+        }
+
+        void Register()
+        {
+            var id = Id;
+            if (id == _registeredId) return;
+            if (_registeredId != null && ById.TryGetValue(_registeredId, out var self) && self == this) ById.Remove(_registeredId);
+            ById[id] = this;
+            _registeredId = id;
         }
 
         void Update()
         {
+            Register();
             if (!GameNet.IsOnline || IsMine || _samples.Count == 0) return;
             var renderTime = Time.unscaledTime - delay;
             // 그릴 시각을 감싸는 두 표본 사이를 보간한다(없으면 가장 가까운 것).
@@ -160,7 +173,20 @@ namespace GBible
                 var id = r.Str();
                 var position = new Vector3(r.Float(), r.Float(), r.Float());
                 var rotation = new Quaternion(r.Float(), r.Float(), r.Float(), r.Float());
-                if (id != null && ById.TryGetValue(id, out var sync)) sync.Receive(position, rotation);
+                if (id == null) continue;
+                if (ById.TryGetValue(id, out var sync))
+                {
+                    sync.Receive(position, rotation);
+                    continue;
+                }
+                // 막 이름을 바꾼 물체(아직 다시 등록 전)도 찾는다.
+                foreach (var candidate in Owned)
+                    if (candidate.Id == id)
+                    {
+                        candidate.Register();
+                        candidate.Receive(position, rotation);
+                        break;
+                    }
             }
         }
     }

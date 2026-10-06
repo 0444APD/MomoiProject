@@ -27,6 +27,8 @@ namespace GBible.EditorTools
             EditorDatabase.Changed += Queue;
             ClassRegistry.Changed += Queue;
             CodexFolders.Changed += Queue;
+            // 구조 잠금이 바뀌면 '+ 항목'·만들기 버튼이 보이고 숨는다(DB 창과 같은 규칙).
+            EditorPolicy.Changed += Queue;
             EditorApplication.projectChanged += Queue;
         }
 
@@ -35,6 +37,7 @@ namespace GBible.EditorTools
             EditorDatabase.Changed -= Queue;
             ClassRegistry.Changed -= Queue;
             CodexFolders.Changed -= Queue;
+            EditorPolicy.Changed -= Queue;
             EditorApplication.projectChanged -= Queue;
         }
 

@@ -190,6 +190,52 @@ namespace GBible.Tests
             for (var i = 1; i < replay.Count; i++) Assert.IsTrue(replay.Entries[i].Time >= replay.Entries[i - 1].Time, "시각은 앞으로만");
         }
 
+
+        [Test]
+        public void 같은_계정이_다시_오면_옛_연결이_조용할_때만_이어받는다()
+        {
+            var net = new MemoryNetwork { Manual = true, Latency = 0.01 };
+            var server = new NetServer(ServerSession(), net.Server(), new NetServerOptions { TimeoutSeconds = 30 }) { Clock = () => net.Now };
+            server.Start();
+            var first = new NetClient(new GameSession(), net.Client(), "철수") { Clock = () => net.Now, TimeoutSeconds = 30 };
+            first.Connect();
+            var clients = new List<NetClient> { first };
+            void Pump(double seconds, bool firstAlive = true)
+            {
+                for (var t = 0.0; t < seconds; t += 0.05)
+                {
+                    net.Advance(0.05);
+                    server.Update(0.05);
+                    foreach (var c in clients)
+                        if (c != first || firstAlive) c.Update(0.05);
+                }
+            }
+            Pump(1);
+            Assert.IsTrue(first.IsJoined);
+            var id = first.PlayerId;
+
+            // 옛 연결이 살아 있으면 새 연결만 끊는다(거절이 아니다 — 잠시 뒤 다시 시도할 수 있다).
+            var second = new NetClient(new GameSession(), net.Client(), "철수") { Clock = () => net.Now, TimeoutSeconds = 30 };
+            clients.Add(second);
+            second.Connect();
+            Pump(1);
+            Assert.IsTrue(first.IsJoined, "옛 연결은 그대로");
+            Assert.IsFalse(second.IsJoined);
+            Assert.AreEqual(1, server.Players.Count);
+            Assert.IsTrue(server.Players.Single().Connected);
+
+            // 옛 연결이 3초 넘게 조용하면(네트워크가 끊겼는데 서버는 아직 모름) 새 연결이 같은 자리를 이어받는다.
+            Pump(4, firstAlive: false);
+            var third = new NetClient(new GameSession(), net.Client(), "철수") { Clock = () => net.Now, TimeoutSeconds = 30 };
+            clients.Add(third);
+            third.Connect();
+            Pump(1, firstAlive: false);
+            Assert.IsTrue(third.IsJoined, "이어받는다");
+            Assert.AreEqual(id, third.PlayerId, "같은 자리");
+            Assert.AreEqual(1, server.Players.Count);
+            Assert.IsTrue(server.Players.Single().Connected);
+        }
+
         [Test]
         public void 방장이_방을_닫으면_다시_접속하지_않는다()
         {

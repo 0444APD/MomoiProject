@@ -52,6 +52,18 @@ namespace GBible
         string _saveName = "";
         string _message = "";
         Rect _window = new Rect(12, 12, 340, 560);
+        // 디스크 목록(테스트 상황·리플레이 파일)은 1초에 한 번만 다시 읽는다(OnGUI는 한 프레임에 여러 번 불린다).
+        float _listsAt = -1;
+        string[] _scenarioNames = Array.Empty<string>();
+        string[] _replayFiles = Array.Empty<string>();
+
+        void RefreshLists()
+        {
+            if (Time.unscaledTime < _listsAt) return;
+            _listsAt = Time.unscaledTime + 1f;
+            _scenarioNames = TestScenarios.Names().ToArray();
+            _replayFiles = GameNet.ReplayFiles().Take(5).ToArray();
+        }
 
         void Awake()
         {
@@ -61,6 +73,8 @@ namespace GBible
                 return;
             }
             _open = showPanel;
+            // 테스트 씬에 머문다: 판 값이 다른 씬을 가리켜도 씬 흐름이 씬을 바꾸지 않는다.
+            GameScenes.Hold = true;
             if (separateSlot) GBibleRuntime.UseSlot(Slot, remember: false);
             var session = GBibleRuntime.Session;
             if (session == null) return;
@@ -69,7 +83,7 @@ namespace GBible
             {
                 if (!TestScenarios.Load(session, scenario, fixedSeed)) Debug.LogWarning($"[MomoiProject] 테스트 씬: 테스트 상황 '{scenario}'를 불러오지 못했습니다(콘솔·모니터 저널).");
             }
-            else GBibleRuntime.NewRun(session, fixedSeed);
+            else GBibleRuntime.StartNewRun(session, fixedSeed);
             GameTime.SetSpeed(speed);
             StartNet(fixedSeed);
         }
@@ -82,9 +96,9 @@ namespace GBible
             {
                 case TestNetMode.TestMode:
                     var start = scenario;
-                    // 서버 세션의 판: 시작 상황이 있으면 그것을, 없으면 DB의 새 판 행동.
+                    // 서버 세션의 판: 시작 상황이 있으면 그것을, 없으면 새 판(시드 + 새 판 행동).
                     GameNet.StartTestMode(latency, jitter, extraClients, NameOrDefault(),
-                        string.IsNullOrWhiteSpace(start) ? (Action<GameSession>)null : server => TestScenarios.Load(server, start, fixedSeed));
+                        string.IsNullOrWhiteSpace(start) ? (Action<GameSession>)(server => GBibleRuntime.StartNewRun(server, fixedSeed)) : server => TestScenarios.Load(server, start, fixedSeed));
                     break;
                 case TestNetMode.Host:
                     GameNet.HostDirect(port, NameOrDefault());
@@ -118,6 +132,7 @@ namespace GBible
         void DrawWindow(int id)
         {
             var session = GBibleRuntime.Session;
+            RefreshLists();
             GUILayout.BeginHorizontal();
             GUILayout.Label($"슬롯 '{GBibleRuntime.Slot}' · 시각 {session.Clock.Time:0.0}초");
             if (GUILayout.Button("접기", GUILayout.Width(48))) _open = false;
@@ -142,8 +157,7 @@ namespace GBible
                 GUI.enabled = true;
                 if (GUILayout.Button("새 판")) Run(() =>
                 {
-                    if (authority == GBibleRuntime.Session) GBibleRuntime.NewRun(authority);
-                    else authority.NewRun();
+                    GBibleRuntime.StartNewRun(authority);
                 });
             }
             else if (client != null)
@@ -168,7 +182,7 @@ namespace GBible
                 if (GUILayout.Button("지금 저장", GUILayout.Width(80))) Run(() => TestScenarios.Save(authority, _saveName), $"저장: {_saveName}");
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
-                foreach (var name in TestScenarios.Names())
+                foreach (var name in _scenarioNames)
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Label(name);
@@ -219,7 +233,7 @@ namespace GBible
             if (GameNet.Hub is NetHub hub)
             {
                 GUILayout.Label($"매칭큐 서버 · 로비 {hub.LobbyCount}명 · 방 {hub.Rooms.Count}개");
-                GUILayout.Label("접속 주소: " + hub.Address);
+                GUILayout.Label("접속 주소: " + GameNet.Address);
                 foreach (var room in hub.Rooms)
                     GUILayout.Label($"  방 {room.MatchId}{(room.Ready ? "" : " (기다리는 중)")}: {string.Join(", ", room.Server.Players.Select(p => p.Name + (p.Connected ? "" : "(나감)")))}");
                 if (GUILayout.Button("서버 닫기")) Run(GameNet.Leave, "닫았습니다");
@@ -253,7 +267,7 @@ namespace GBible
             var role = GameNet.IsTestMode ? "시험 모드" : GameNet.IsHost ? "방장" : "클라이언트";
             var state = client == null ? "" : client.IsJoined ? $" · 핑 {client.RoundTrip * 1000:0}ms" : $" · {client.State}";
             GUILayout.Label($"{role} · 내 번호 #{session.LocalPlayer}{state}");
-            if (GameNet.IsHost) GUILayout.Label("접속 주소: " + GameNet.Server.Address);
+            if (GameNet.IsHost) GUILayout.Label("접속 주소: " + GameNet.Address);
             if (GameNet.Server != null)
                 foreach (var player in GameNet.Server.Players) GUILayout.Label($"  #{player.Id} {player.Name}{(player.Connected ? "" : " (나감)")}");
             else if (client != null)
@@ -297,24 +311,31 @@ namespace GBible
                 return;
             }
             GameNet.RecordReplays = GUILayout.Toggle(GameNet.RecordReplays, GameNet.Recording is NetReplay recording ? $"녹화 중 · {recording.Duration:0}초" : "녹화(혼자·방장 = 모두, 클라이언트 = 들어갈 때부터)");
-            GUILayout.BeginHorizontal();
-            GUI.enabled = GameNet.Recording != null || GameNet.LastReplay != null;
-            if (GUILayout.Button("저장"))
-            {
-                string path = null;
-                Run(() => path = GameNet.SaveReplay());
-                if (path != null) _message = "저장: " + path;
-            }
-            if (GUILayout.Button("틀기")) Run(() => GameNet.PlayReplay(GameNet.Recording ?? GameNet.LastReplay), "리플레이");
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
-            foreach (var file in GameNet.ReplayFiles().Take(5))
+            // 지금 녹화와 지난 녹화(나가거나 세션이 다시 시작되며 끝난 것)를 따로 — 나가자마자 새 녹화가 시작돼도 방금 녹화를 틀 수 있게.
+            ReplayRow("지금", GameNet.Recording);
+            ReplayRow("지난", GameNet.LastReplay);
+            foreach (var file in _replayFiles)
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(System.IO.Path.GetFileNameWithoutExtension(file));
                 if (GUILayout.Button("틀기", GUILayout.Width(60))) Run(() => GameNet.PlayReplay(file), "리플레이");
                 GUILayout.EndHorizontal();
             }
+        }
+
+        void ReplayRow(string label, NetReplay replay)
+        {
+            if (replay == null) return;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{label} 녹화 · {replay.Duration:0}초", GUILayout.Width(120));
+            if (GUILayout.Button("저장"))
+            {
+                string path = null;
+                Run(() => path = GameNet.SaveReplay(replay));
+                if (path != null) _message = "저장: " + path;
+            }
+            if (GUILayout.Button("틀기")) Run(() => GameNet.PlayReplay(replay), "리플레이");
+            GUILayout.EndHorizontal();
         }
 
         void Run(Action action, string done = null)

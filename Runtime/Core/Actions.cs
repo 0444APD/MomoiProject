@@ -65,6 +65,12 @@ namespace GBible
     {
     }
 
+    // 게임 시각이 되어 시스템이 실행하는 행동(상태 효과 주기·만료, 시간 예약, 패시브 주기).
+    // 행동 방식 Undo가 이것만 되돌리면 시각이 이미 지난 값이 돌아와 다음 프레임에 그대로 다시 실행된다 → 앞의 행동과 함께 되돌린다(GameSession.Undo).
+    internal interface ITimeRuleAction
+    {
+    }
+
     public enum ActionStatus
     {
         // 실행됨(행동은 실행되는 즉시 끝난다).
@@ -161,6 +167,8 @@ namespace GBible
             // 미리보기가 찍은 시각은 끝나면 지운다(같은 객체를 나중에 Do하면 그때 시각으로).
             var stamped = action.utc == 0;
             if (stamped) action.utc = ToUtcMs(RealClock?.Invoke() ?? DateTime.UtcNow);
+            // 행동 밖에서 바뀐 값은 미리보기 전에 기록·알림으로 남긴다(조용한 미리보기 안에서 흡수되어 사라지지 않게).
+            _state.Sync();
             using (_journal.Mute())
             using (_state.Quiet())
             {
@@ -222,6 +230,9 @@ namespace GBible
             entry.Payload = action;
             var record = new ActionRecord { JournalId = entry.Id, Action = action, Status = ActionStatus.Done };
             var tx = _state.Begin(entry.Id, action.Describe());
+            tx.Tick = _clock.Tick;
+            tx.Time = _clock.Time;
+            tx.TimeRule = action is ITimeRuleAction;
             _utc = action.utc;
             record.TransactionId = tx.Id;
             entry.TransactionId = tx.Id;

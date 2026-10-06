@@ -17,7 +17,7 @@ namespace GBible.EditorTools.UI
         public override string TabLabel => "클래스";
         public override string TabGroup => DeclareGroup;
         public override int TabOrder => 1;
-        public override string TabCount => ClassCatalog.All(Tab).Count(c => !c.AutoGroup && c.Group != null && c.Group != ClassFolders.Outside).ToString();
+        public override string TabCount => Shown().Count(c => !c.AutoGroup).ToString();
 
         protected virtual string Tab => ClassRegistry.ClassTab;
         protected virtual string Noun => "클래스";
@@ -29,11 +29,13 @@ namespace GBible.EditorTools.UI
         // 만들기는 코드에서.
         public override string CreateLabel => null;
 
-        public override string Caption(CodexPageContext context)
-        {
-            var classes = ClassCatalog.All(Tab);
-            return $"{Noun} {classes.Count(c => !c.AutoGroup)}개  ·  AI가 코드로 만들고 고칩니다 · 눌러서 필드 보기";
-        }
+        // 목록에 보이는 것: AI 코드 폴더 안의 것(밖의 스크립트·플러그인은 보이지 않는다) + 이 라이브러리의 기본 묶음.
+        // 탭 개수·제목 아래 개수·목록이 모두 이것을 센다.
+        System.Collections.Generic.List<ClassEntry> Shown() =>
+            ClassCatalog.All(Tab).Where(c => c.AutoGroup || (c.Group != null && c.Group != ClassFolders.Outside)).ToList();
+
+        public override string Caption(CodexPageContext context) =>
+            $"{Noun} {Shown().Count(c => !c.AutoGroup)}개  ·  AI가 코드로 만들고 고칩니다 · 눌러서 필드 보기";
 
         public override void Create(CodexPageContext context)
         {
@@ -43,8 +45,7 @@ namespace GBible.EditorTools.UI
         {
             var list = Gs.Col("gs-grouped__list");
             context.Content.Add(list);
-            // AI 코드 폴더 안의 것만(밖의 스크립트·플러그인은 보이지 않는다) + 이 라이브러리의 기본 묶음.
-            var classes = ClassCatalog.All(Tab).Where(c => c.AutoGroup || (c.Group != null && c.Group != ClassFolders.Outside)).ToList();
+            var classes = Shown();
             var tree = new CodexTree { Key = Key, ItemNoun = Noun, Query = (context.Search ?? "").Trim() };
 
             tree.Folders.Add(new CodexTree.Folder

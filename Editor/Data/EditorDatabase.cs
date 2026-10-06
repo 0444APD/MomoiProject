@@ -371,10 +371,22 @@ namespace GBible.EditorTools
             MarkDirty();
         }
 
+        static bool _legacyWarned;
+
         public void SyncDatabaseAsset()
         {
             // 예전 자리의 데이터 폴더가 아직 있으면(옮기기 전) 새 자리에 GameDatabase를 따로 만들지 않는다 — 옮긴 뒤(Upkeep) 맞춘다.
-            if (ProjectFolders.AnyLegacy()) return;
+            if (ProjectFolders.AnyLegacy())
+            {
+                // 옮기기를 해 봤는데도 남았으면(옮기지 못한 파일) 알린다 — 조용히 멈추면 새 항목이 게임에 안 보이는 까닭을 모른다. 도메인마다 한 번.
+                if (ProjectFolders.MoveTried && !_legacyWarned)
+                {
+                    _legacyWarned = true;
+                    Debug.LogWarning($"[MomoiProject] 예전 폴더 {string.Join(", ", ProjectFolders.LegacyLeft())}가 남아 DB 목록(GameDatabase)을 맞추지 못했습니다 — " +
+                                     "그 안의 에셋을 Assets/MomoiProject 아래 같은 자리로 옮기면(Unity Project 창에서 끌어 옮기기) 다시 맞춥니다. 위에 '옮기지 못해' 경고가 있으면 그 파일부터.");
+                }
+                return;
+            }
             var entries = Committed.ToList();
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
             if (database == null)

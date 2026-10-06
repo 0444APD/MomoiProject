@@ -97,13 +97,24 @@ namespace GBible.EditorTools
         {
             EditorDatabase.Changed += QueueRebind;
             ClassRegistry.Changed += QueueRebind;
+            EditorPolicy.Changed += QueueRebuildAll;
         }
 
         void OnDisable()
         {
             EditorDatabase.Changed -= QueueRebind;
             ClassRegistry.Changed -= QueueRebind;
+            EditorPolicy.Changed -= QueueRebuildAll;
         }
+
+        // 구조 잠금(EditorPolicy)이 바뀌면 열린 탭을 모두 다시 그린다(블록 도구·'+ 추가'·ID 바꾸기가 보이고 숨는다).
+        void QueueRebuildAll()
+        {
+            _rebuildAll = true;
+            QueueRebind();
+        }
+
+        bool _rebuildAll;
 
         void CreateGUI() => EnsureRoot();
 
@@ -171,6 +182,7 @@ namespace GBible.EditorTools
             head.Add(Gs.Label(Path(tab), "gs-title", "gs-grow"));
             head.Add(Gs.Label(tab.Caption ?? "", "gs-caption"));
             content.Add(head);
+            // 바깥 탐색기의 규칙을 잇는다(value에 담겨 온다): 인스턴스 편집([Hide]·[ShowIf]·'+ 기능')과 블록 편집기(결과 칸 잠금·[BindTo]·구조 잠금).
             var explorer = GsDataExplorer.Browse(value);
             explorer.AddToClassList("gs-explorer--embedded");
             explorer.OpenInTab = inner => OpenNested(tab, inner);
@@ -313,6 +325,8 @@ namespace GBible.EditorTools
         void Rebind()
         {
             var changed = false;
+            var all = _rebuildAll;
+            _rebuildAll = false;
             // 직접 그리는 탭은 내용을 다시 만든다(연결·적용 전 변경이 바뀌었을 수 있다). 지금 보이는 탭이 그것일 때만 화면을 바꾼다
             // (항목 탭을 보고 있는데 다시 붙이면 편집 중인 칸이 포커스를 잃는다).
             foreach (var tab in _tabs.Where(t => t.Build != null))
@@ -322,7 +336,9 @@ namespace GBible.EditorTools
             }
             foreach (var tab in _tabs.Where(t => t.Parent == null && t.Build == null).ToList())
             {
-                if (tab.Panel != null && tab.Panel.Target != null) continue;
+                // 구조 잠금이 바뀌었으면 살아 있는 항목 탭도 다시 연다(바꾼 값은 이미 작업본에 반영되어 있다).
+                if (tab.Panel != null && tab.Panel.Target != null && !all) continue;
+                tab.Panel?.Release();
                 var item = EditorDatabase.Instance.All.FirstOrDefault(d => d.GetType() == tab.ItemType && d.Id == tab.ItemId);
                 foreach (var child in _tabs.Where(t => IsDescendant(t, tab)).ToList()) _tabs.Remove(child);
                 if (item == null)

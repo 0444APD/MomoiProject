@@ -57,6 +57,13 @@ namespace GBible
         public static void RegisterStruct<T>(MirrorEqualFn<T> equal, MirrorWriteFn<T> write, MirrorValueReadFn<T> read) where T : struct =>
             ValueOps<T>.Register(equal, write, read);
 
+        // 안쪽에 객체·컬렉션 필드가 있는 구조체: 쓰기·읽기는 하되 변경 추적은 하지 않는다(Supports가 거짓 → 예전 비교 방식).
+        public static void RegisterShallowStruct<T>(MirrorEqualFn<T> equal, MirrorWriteFn<T> write, MirrorValueReadFn<T> read) where T : struct
+        {
+            ValueOps<T>.Register(equal, write, read);
+            MirrorValues.MarkShallow(typeof(T));
+        }
+
         static Type FieldType(Type type, string name)
         {
             for (var t = type; t != null; t = t.BaseType)
@@ -219,6 +226,7 @@ namespace GBible
                 ReplaceList(now, old, n, i, cs);
                 return;
             }
+            if (!ReferenceEquals(old.Origin, now)) Mirror.Track(old, now, n, i);
             cs?.PushField(i, n.Type.Names[i]);
             if (Elem<T>.IsValue) SyncValues(now, old.Values, cs);
             else SyncObjects(now, old.Items, cs);
@@ -234,6 +242,7 @@ namespace GBible
                 ReplaceArray(now, old, n, i, cs);
                 return;
             }
+            if (!ReferenceEquals(old.Origin, now)) Mirror.Track(old, now, n, i);
             cs?.PushField(i, n.Type.Names[i]);
             if (Elem<T>.IsValue)
             {
@@ -264,6 +273,7 @@ namespace GBible
                 ReplaceDict(now, old, n, i, cs);
                 return;
             }
+            if (!ReferenceEquals(old.Origin, now)) Mirror.Track(old, now, n, i);
             cs?.PushField(i, n.Type.Names[i]);
             if (Elem<TValue>.IsValue) SyncValueDict(now, old.Values, cs);
             else SyncObjectDict(now, old.Items, cs);
@@ -282,6 +292,7 @@ namespace GBible
             }
             n.R[i] = made;
             Mirror.Release(old);
+            if (made != null) Mirror.Track(made, now, n, i);
             if (made?.Items == null) return;
             cs?.PushField(i, n.Type.Names[i]);
             SyncObjects(now, made.Items, cs);
@@ -299,6 +310,7 @@ namespace GBible
             }
             n.R[i] = made;
             Mirror.Release(old);
+            if (made != null) Mirror.Track(made, now, n, i);
             if (made?.Items == null) return;
             cs?.PushField(i, n.Type.Names[i]);
             for (var k = 0; k < now.Length; k++) SyncElement(now[k], made.Items, k, cs);
@@ -316,6 +328,7 @@ namespace GBible
             }
             n.R[i] = made;
             Mirror.Release(old);
+            if (made != null) Mirror.Track(made, now, n, i);
             if (made?.Items == null) return;
             cs?.PushField(i, n.Type.Names[i]);
             SyncObjectDict(now, made.Items, cs);
@@ -363,6 +376,7 @@ namespace GBible
                 if (cs != null)
                 {
                     cs.Begin(MirrorOp.ListAdd, MirrorOp.ListCut);
+                    if (cs.Describe) cs.Reshaped.Add(cs.PathText());
                     cs.Forward.UVar((ulong)(a.Count - b.Count));
                     for (var k = b.Count; k < a.Count; k++) ValueOps<T>.Write(cs.Forward, a[k]);
                     cs.Backward.UVar((ulong)b.Count);
@@ -376,6 +390,7 @@ namespace GBible
                 if (cs != null)
                 {
                     cs.Begin(MirrorOp.ListCut, MirrorOp.ListAdd);
+                    if (cs.Describe) cs.Reshaped.Add(cs.PathText());
                     cs.Forward.UVar((ulong)a.Count);
                     cs.Backward.UVar((ulong)(b.Count - a.Count));
                     for (var k = a.Count; k < b.Count; k++) ValueOps<T>.Write(cs.Backward, b[k]);
@@ -469,6 +484,7 @@ namespace GBible
                 WriteRuns(cs.Backward, dst, b.Count, k => Mirror.WriteShadow(cs.Backward, b[k], cs.Originals));
                 if (cs.Describe)
                 {
+                    cs.Reshaped.Add(cs.PathText());
                     for (var j = 0; j < b.Count; j++)
                         if (dst[j] < 0) cs.Note(DataChangeKind.Remove, Mirror.Rebuild(b[j], typeof(T)), null, cs.ElementText(j, Mirror.OriginOf(b[j])));
                     for (var i = 0; i < a.Count; i++)
@@ -848,12 +864,12 @@ namespace GBible
         public static bool EqRef(object a, object b) => ReferenceEquals(a, b);
     }
 
-    sealed class ListShadow<T> : IMirrorShadow
+    sealed class ListShadow<T> : MirrorCollection
     {
         public List<T> Values;
         public List<object> Items;
 
-        public void AddNodes(List<MirrorNode> into)
+        public override void AddNodes(List<MirrorNode> into)
         {
             if (Items == null) return;
             foreach (var item in Items)
@@ -872,7 +888,7 @@ namespace GBible
             return shadow;
         }
 
-        public void WriteShadow(MirrorWriter w, List<object> originals)
+        public override void WriteShadow(MirrorWriter w, List<object> originals)
         {
             if (Values != null)
             {
@@ -885,13 +901,13 @@ namespace GBible
         }
     }
 
-    sealed class ArrayShadow<T> : IMirrorShadow
+    sealed class ArrayShadow<T> : MirrorCollection
     {
         public T[] Values;
         public List<object> Items;
         public int Length;
 
-        public void AddNodes(List<MirrorNode> into)
+        public override void AddNodes(List<MirrorNode> into)
         {
             if (Items == null) return;
             foreach (var item in Items)
@@ -906,7 +922,7 @@ namespace GBible
             return shadow;
         }
 
-        public void WriteShadow(MirrorWriter w, List<object> originals)
+        public override void WriteShadow(MirrorWriter w, List<object> originals)
         {
             w.UVar((ulong)Length + 1);
             if (Values != null)
@@ -916,12 +932,12 @@ namespace GBible
         }
     }
 
-    sealed class DictShadow<TKey, TValue> : IMirrorShadow
+    sealed class DictShadow<TKey, TValue> : MirrorCollection
     {
         public Dictionary<TKey, TValue> Values;
         public Dictionary<TKey, object> Items;
 
-        public void AddNodes(List<MirrorNode> into)
+        public override void AddNodes(List<MirrorNode> into)
         {
             if (Items == null) return;
             foreach (var item in Items.Values)
@@ -940,7 +956,7 @@ namespace GBible
             return shadow;
         }
 
-        public void WriteShadow(MirrorWriter w, List<object> originals)
+        public override void WriteShadow(MirrorWriter w, List<object> originals)
         {
             if (Values != null)
             {

@@ -66,7 +66,7 @@ namespace GBible
     //   비율로:   기준 × 비율^(단계 − 시작)            예: 100, ×1.1/층 → 3층 121
     //   거듭제곱: 기준 × (단계 / 시작)^지수             예: 경험치 100, 지수 1.5 → 4레벨 800
     //   표:       점들 사이를 직선으로 잇는다(처음 점 앞·마지막 점 뒤는 끝 값 유지). 기준 값은 쓰지 않는다.
-    // 계산한 뒤 반올림하고, 켜 둔 쪽(최솟값·최댓값)으로 자른다.
+    // 계산한 뒤 반올림하고, 켜 둔 쪽(최솟값·최댓값)으로 자른다. 방식이 없음이면 기준 값 그대로.
     [Serializable]
     public sealed class Curve
     {
@@ -91,7 +91,8 @@ namespace GBible
                 case CurveKind.Exponential: value = baseValue * Math.Pow(rate, x - startX); break;
                 case CurveKind.Power: value = startX > 0 ? baseValue * Math.Pow(Math.Max(0, x) / startX, power) : baseValue; break;
                 case CurveKind.Table: value = Interpolate(x, baseValue); break;
-                default: value = baseValue; break;
+                // 방식 없음: 기준 값 그대로(반올림·자르기 칸은 화면에서 숨으므로 적용하지 않는다).
+                default: return baseValue;
             }
             switch (rounding)
             {

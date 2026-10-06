@@ -97,6 +97,7 @@ namespace GBible
             session.Data.KeyDefined += OnKeyChanged;
             session.Data.VisibilityChanged += OnKeyChanged;
             session.Events.Published += OnPublished;
+            session.Events.Retracted += OnRetracted;
             session.Actions.Executed += OnExecuted;
             session.Actions.TransactionAborted += OnAborted;
         }
@@ -265,6 +266,7 @@ namespace GBible
             _session.Data.KeyDefined -= OnKeyChanged;
             _session.Data.VisibilityChanged -= OnKeyChanged;
             _session.Events.Published -= OnPublished;
+            _session.Events.Retracted -= OnRetracted;
             _session.Actions.Executed -= OnExecuted;
             _session.Actions.TransactionAborted -= OnAborted;
             foreach (var peer in _peers.Values.ToList())
@@ -317,6 +319,9 @@ namespace GBible
             }
         }
 
+        // 같은 계정의 옛 연결이 이만큼(초) 조용하면 끊긴 것으로 보고 새 연결이 이어받는다(핑 간격 2초 + 여유).
+        const double TakeoverSilence = 3;
+
         void OnHello(Peer peer, MirrorReader r)
         {
             if (peer.Joined) return;
@@ -335,7 +340,25 @@ namespace GBible
             var account = !string.IsNullOrEmpty(admission.Account) ? admission.Account : name;
             // 같은 계정이 다시 오면 같은 플레이어(번호·데이터)로 잇는다.
             var player = _players.FirstOrDefault(p => p.Account == account);
-            if (player != null && player.Connected) { Refuse(peer, "같은 계정이 이미 들어와 있습니다."); return; }
+            if (player != null && player.Connected)
+            {
+                if (player.IsLocal) { Refuse(peer, "같은 계정이 이미 들어와 있습니다."); return; }
+                // 다시 접속: 옛 연결이 한동안 조용하면(네트워크가 끊겼는데 서버는 아직 모름) 새 연결이 그 자리를 이어받는다.
+                // 옛 연결이 아직 살아 있으면 거절하지 않고 끊기만 한다 — 클라이언트가 잠시 뒤 다시 시도한다(거절은 다시 접속을 멈추게 한다).
+                var old = _peers.Values.FirstOrDefault(p => p != peer && p.Player == player && p.Recorder == null);
+                if (old != null && Now - old.LastHeard < TakeoverSilence)
+                {
+                    _peers.Remove(peer.Connection);
+                    _transport.Disconnect(peer.Connection, "같은 계정이 아직 연결되어 있습니다 — 잠시 뒤 다시 접속합니다.");
+                    return;
+                }
+                if (old != null)
+                {
+                    _peers.Remove(old.Connection);
+                    _transport.Disconnect(old.Connection, "같은 계정이 다시 접속했습니다.");
+                }
+                player.Connected = false;
+            }
             if (player == null)
             {
                 if (_players.Count(p => p.Connected) >= Options.MaxPlayers) { Refuse(peer, $"방이 찼습니다(최대 {Options.MaxPlayers}명)."); return; }
@@ -529,6 +552,13 @@ namespace GBible
         }
 
         void OnAborted(long transaction) => _pendingEvents.Clear();
+
+        // 행동 안에서 일부만 되돌린 이벤트(실패한 이벤트 예약)는 보내지 않는다.
+        void OnRetracted(object evt)
+        {
+            var i = _pendingEvents.LastIndexOf(evt);
+            if (i >= 0) _pendingEvents.RemoveAt(i);
+        }
 
         // ── 보내기 ─────────────────────────────────────────────
 

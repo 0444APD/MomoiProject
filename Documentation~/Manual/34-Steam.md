@@ -66,7 +66,7 @@
 
 | 칸 | 기본 | 뜻 |
 |---|---|---|
-| `appId` App ID | 480 | Steamworks 앱 ID. 고치면 프로젝트 폴더의 `steam_appid.txt`도 같이 고친다(에디터·개발 빌드가 그 앱에 붙음). |
+| `appId` App ID | 480 | Steamworks 앱 ID. 고쳐 저장하면(DB Ctrl+S 포함) 프로젝트 폴더의 `steam_appid.txt`도 같이 고친다(에디터·개발 빌드가 그 앱에 붙음). |
 | `restartThroughSteam` Steam 밖에서 켜면 Steam으로 다시 시작 | 켬 | 출시 빌드에서만(2-1). |
 | `pauseOnOverlay` 오버레이가 열리면 일시정지 | 켬 | 2-2. |
 | `languageFromSteam` 처음 실행 언어는 Steam 언어 | 켬 | 2-2. |

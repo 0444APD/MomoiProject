@@ -535,9 +535,12 @@ namespace GBible.EditorTools.UI
             block.tooltip = Explain(term.Block);
             var used = new HashSet<string>();
             var sentence = BlockTypes.Sentence(type);
+            // 블럭 안의 [ShowIf] 칸(상태 효과 검사의 이벤트 필드 …)은 단어·칸을 바꾸면 바로 보이고 숨는다.
+            var conditional = new ShowIfViews();
+            var onValue = conditional.Wrap(_onValue);
             if (!string.IsNullOrEmpty(sentence) && sentence.Contains("{"))
             {
-                block.Add(GsPropertyEditor.Sentence(property, sentence, used, _onValue));
+                block.Add(GsPropertyEditor.Sentence(property, sentence, used, onValue));
             }
             else
             {
@@ -551,8 +554,10 @@ namespace GBible.EditorTools.UI
                     used.Add(child.name);
                     var token = new GsInlineProperty(child);
                     token.AddToClassList("gs-token");
-                    token.tooltip = GsPropertyEditor.LabelOf(child, PropertyUtil.GetField(child, out _));
-                    token.Changed += () => _onValue?.Invoke();
+                    var tokenField = PropertyUtil.GetField(child, out _);
+                    token.tooltip = GsPropertyEditor.HintOf(tokenField) ?? GsPropertyEditor.LabelOf(child, tokenField);
+                    token.Changed += () => onValue();
+                    conditional.Track(token, child);
                     row.Add(token);
                 }
                 block.Add(row);
@@ -561,15 +566,18 @@ namespace GBible.EditorTools.UI
             {
                 if (used.Contains(child.name)) continue;
                 var field = PropertyUtil.GetField(child, out _);
+                VisualElement view;
                 if (child.propertyType == SerializedPropertyType.ManagedReference && field != null && Handles(field.FieldType))
                 {
                     // 블럭 안의 조건식(예: 배열·리스트의 각 항목에 적용할 조건).
                     var nested = Gs.Col("gs-expr__nested");
                     nested.Add(Gs.Label(GsPropertyEditor.HintOf(field) ?? field.Name, "gs-caption"));
-                    nested.Add(new GsExpressionEditor(child, field.FieldType, _onValue, _onStructure));
-                    block.Add(nested);
+                    nested.Add(new GsExpressionEditor(child, field.FieldType, onValue, _onStructure));
+                    view = nested;
                 }
-                else block.Add(GsPropertyEditor.BuildProperty(child, _onValue, _onStructure));
+                else view = GsPropertyEditor.BuildProperty(child, onValue, _onStructure);
+                conditional.Track(view, child);
+                block.Add(view);
             }
             return block;
         }

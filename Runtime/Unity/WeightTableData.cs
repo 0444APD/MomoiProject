@@ -52,7 +52,10 @@ namespace GBible.Data
             }
             if (exclude.Any(l => l == null || string.IsNullOrEmpty(l.key))) context.Error("뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다.");
             if (emptyWeight < 0) context.Error("꽝 무게는 0 이상이어야 합니다.");
-            if (entries.Count > 0 && entries.Where(e => e != null).Sum(e => Math.Max(0, e.weight)) <= 0) context.Error("무게가 모두 0이라 아무것도 나오지 않습니다.");
+            // 무게를 밸런스 값에서 읽는 줄은 뽑는 순간에 무게가 정해지므로(천장·레벨) 고정 무게 0으로 보지 않는다.
+            var rows = entries.Where(e => e != null).ToList();
+            if (entries.Count > 0 && !rows.Any(e => !string.IsNullOrEmpty(e.weightBalance)) && rows.Sum(e => Math.Max(0, e.weight)) <= 0)
+                context.Error("무게가 모두 0이라 아무것도 나오지 않습니다.");
         }
     }
 
@@ -69,11 +72,12 @@ namespace GBible.Data
         public WeightEntrySource source = WeightEntrySource.Item;
         [FieldLabel("항목"), DataRef(typeof(GameData)), ShowIf(nameof(source), WeightEntrySource.Item), Tooltip("DB 항목(인스턴스·다른 가중치 표 …). 다른 가중치 표면 그 표에서 다시 뽑는다")] public string item = "";
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터"), ShowIf(nameof(source), WeightEntrySource.List)] public string listKey = "";
-        [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(목록)"), ShowIf(nameof(source), WeightEntrySource.List), Tooltip("요소가 ID 글자거나 id가 있는 객체인 목록")] public string listPath = "";
+        [FieldPath(EmptyLabel = "값 전체", Root = nameof(listKey)), FieldLabel("필드(목록)"), ShowIf(nameof(source), WeightEntrySource.List), Tooltip("요소가 ID 글자거나 id가 있는 객체인 목록")] public string listPath = "";
         [FieldLabel("무게")] public double weight = 1;
         [FieldLabel("무게를 밸런스 값에서"), DataRef(typeof(BalanceData)), Tooltip("고르면 무게 = 이 밸런스 값(곡선)의 단계 값. 천장·운·레벨에 따라 바뀌는 확률")] public string weightBalance = "";
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("단계(플레이어 데이터)"), ShowIf(nameof(weightBalance)), Tooltip("곡선의 단계로 쓸 숫자. 비우면 기준값")] public string weightStepKey = "";
-        [FieldPath(EmptyLabel = "값 전체"), FieldLabel("단계 필드"), ShowIf(nameof(weightBalance))] public string weightStepPath = "";
+        // 뿌리 = 바로 위 '단계(플레이어 데이터)'(Root를 정하지 않으면 줄에서 처음 만나는 뿌리 칸인 '플레이어 데이터'(listKey)를 본다).
+        [FieldPath(EmptyLabel = "값 전체", Root = nameof(weightStepKey)), FieldLabel("단계 필드"), ShowIf(nameof(weightBalance))] public string weightStepPath = "";
         [FieldLabel("최소 개수")] public int minCount = 1;
         [FieldLabel("최대 개수")] public int maxCount = 1;
         [FieldLabel("조건(맞을 때만 후보)"), SerializeReference] public Condition condition;
@@ -154,7 +158,9 @@ namespace GBible
         {
             var amount = min == max ? $"{min}개" : $"{min}~{max}개";
             var into = string.IsNullOrEmpty(key) ? "" : $" {(string.IsNullOrEmpty(path) ? key : key + " › " + path)}에 넣기";
-            return $"{table}에서 {count}개 보여 {amount} 고르기{into}";
+            // 후보 수에 더할 숫자(유물 '선택지 +1' 등)가 있으면 함께 보인다.
+            var bonus = string.IsNullOrEmpty(countBonus?.key) ? "" : $"(+{(string.IsNullOrEmpty(countBonus.path) ? countBonus.key : countBonus.key + " › " + countBonus.path)})";
+            return $"{table}에서 {count}개{bonus} 보여 {amount} 고르기{into}";
         }
 
         public override void Validate(IValidationContext context)

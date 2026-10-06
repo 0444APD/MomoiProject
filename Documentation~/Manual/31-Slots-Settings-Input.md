@@ -82,13 +82,13 @@
 
 - **기기마다 하나**(`settings.json`). 플레이어 데이터가 아니라서 슬롯·Undo·판 저장·멀티플레이와 상관없다. 행동 밖(화면 코드)에서 그냥 부른다.
 - **읽기**: 저장된 값이 있으면 그 값(종류에 맞게 고친 것), 없으면 기본값.
-- **바꾸기**(`GameSettings.Set(ID, 값)`): ① 종류에 맞게 고친다 ② 지금 값과 같으면 끝(아무 일도 없다) ③ 파일에 저장 ④ 적용 대상이면 적용(2-4) ⑤ `Changed(ID)`를 쏜다.
+- **바꾸기**(`GameSettings.Set(ID, 값)`): ① 종류에 맞게 고친다 ② 지금 값과 같으면 끝(아무 일도 없다) ③ 파일에 저장 ④ 적용 대상이면 적용(2-4) ⑤ `Changed(ID)`를 쏜다. `Set(ID, 값, save: false)`면 ③을 미룬다(슬라이더를 끄는 동안 — 적용·`Changed`는 그대로). 미룬 값은 `GameSettings.Flush()`가 파일에 쓴다(놓을 때·포커스를 잃을 때·창을 닫을 때).
 
 | 종류 (`SettingKind`) | 값을 고치는 규칙 | 기본값 |
 |---|---|---|
 | 켜기/끄기 (`Toggle`) | `bool`. 글자 `"true"`/`"false"`도 읽는다. 숫자는 0이 아니면 참. 그 밖은 기본값 | `defaultToggle` |
 | 숫자(슬라이더) (`Slider`) | 최솟값~최댓값으로 자른다(최댓값 > 최솟값일 때). 단위가 0보다 크면 최솟값부터 단위의 배수로 맞춘다(최솟값 0 · 단위 0.5면 0.7 → 0.5) | `defaultNumber`(같은 규칙으로 맞춘 값) |
-| 선택지 (`Choice`) | 선택지의 값 중 하나여야 한다(아니면 기본값). 선택지를 비운 언어·해상도는 아무 글자나 받는다 | `defaultChoice`. 비우면 첫 선택지. 선택지도 없으면 언어는 지금 언어, 해상도는 지금 해상도 |
+| 선택지 (`Choice`) | 선택지의 값 중 하나여야 한다(아니면 기본값). 선택지를 비운 언어·해상도는 아무 글자나 받는다 | `defaultChoice`. 비우면 첫 선택지(언어는 기기 언어가 선택지에 있으면 그것, 없으면 같은 언어 계열, 그것도 없으면 첫 선택지). 선택지도 없으면 언어는 지금 언어, 해상도는 지금 해상도 |
 | 글 (`Text`) | 글자로 바꾼다 | `defaultText` |
 
 - `Reset(ID)`: 저장된 값을 지운다(기본값으로). 저장된 값이 없었으면 아무 일도 없다(`Changed`도 오지 않는다).
@@ -112,7 +112,7 @@
 - 전체 화면·해상도는 에디터 창을 건드리지 않도록 빌드에서만 적용한다.
 - 적용이 실패하면 콘솔에 경고("[MomoiProject] 설정 'resolution'를 적용하지 못했습니다: …")를 남긴다.
 - 언어·음량의 값은 설정 파일에 남으므로 `GameLanguage`·`GameAudio`의 PlayerPrefs 저장은 쓰지 않는다(`remember`·`save`가 거짓). 그래서 **음량 설정을 둔 채널은 게임이 켜질 때 설정 값으로 맞춰진다.** 같은 채널을 다른 곳에서 `GameAudio.SetVolume`으로 바꾸면 다음 실행 때 설정 값으로 돌아간다. 음량은 설정으로만 바꾼다(26장).
-- 언어도 같다. 설정에 저장된 언어가 있으면 켤 때 그 언어가 이긴다. 저장된 값이 없으면 `GameLanguage`가 고른 언어(저장된 언어 → 기기 언어 → 원문 언어, 23장 4절)가 그대로다.
+- 언어도 같다. 설정에 저장된 언어가 있으면 켤 때 그 언어가 이긴다. 저장된 값이 없으면: 선택지를 비웠으면 `GameLanguage`가 고른 언어(저장된 언어 → 기기 언어 → 원문 언어, 23장 4절)가 그대로다. 선택지를 적고 기본값을 비웠으면 첫 실행은 기기 언어(선택지에 있으면 — 없으면 같은 언어 계열, 그것도 없으면 첫 선택지)다.
 
 ### 2-5. 입력(키 바꾸기)
 
@@ -147,7 +147,7 @@
 | `spec` › `kind` | 값 › 종류 | `켜기/끄기`(기본) / `숫자(슬라이더)` / `선택지` / `글` |
 | `spec` › `defaultToggle` | 기본값 | 켜기/끄기일 때만 보인다 |
 | `spec` › `defaultNumber` · `min` · `max` · `step` | 기본값 · 최솟값 · 최댓값 · 단위(0이면 연속) | 숫자일 때만. 최댓값 기본 1 |
-| `spec` › `defaultChoice` | 기본값(선택지의 값, 비우면 첫 선택지) | 선택지일 때만 |
+| `spec` › `defaultChoice` | 기본값(선택지의 값, 비우면 첫 선택지) | 선택지일 때만. 언어를 비우면 첫 실행은 기기 언어(2-3) |
 | `spec` › `choices` | 선택지(언어·해상도는 비우면 자동) | 줄마다 `value`(값) · `label`(보일 글(텍스트 키 또는 글)). 선택지일 때만 |
 | `spec` › `defaultText` | 기본값 | 글일 때만 |
 | `target` | 적용 대상 / 라이브러리가 바로 적용하는 것. 없음이면 게임 코드가 GameSettings.Changed로 받아 적용한다 | `없음(게임 코드)`(기본) / `언어` / `전체 음량` / `브금 음량` / `목소리 음량` / `효과음 음량` / `UI 음량` / `전체 화면` / `해상도` / `수직 동기화` / `최대 프레임(0 = 제한 없음)` |
@@ -221,7 +221,8 @@ GameSettings.Changed += id => { if (id == GameIds.Setting.BattleSpeed) … };
 | `string Choice(string id)` | 선택지의 값 |
 | `string Text(string id)` | 글 값 |
 | `object Get(string id)` | 종류와 상관없이 지금 값 |
-| `void Set(string id, object value)` | 바꾼다(2-3) |
+| `void Set(string id, object value, bool save = true)` | 바꾼다(2-3). `save: false`면 파일 쓰기만 미룬다 |
+| `void Flush()` | 미룬 값(`save: false`)을 파일에 쓴다. 없으면 아무것도 하지 않는다 |
 | `void Reset(string id)` | 기본값으로 |
 | `void ResetAll(string category = null)` | 그 분류(비우면 전부)를 기본값으로 |
 | `IReadOnlyList<SettingData> All` | 설정 전부(DB 순서) |
@@ -436,7 +437,9 @@ public class SettingsScreen : MonoBehaviour
                 return toggle;
             case SettingKind.Slider:
                 var slider = new Slider(label, (float)setting.spec.min, (float)setting.spec.max) { value = (float)GameSettings.Number(id) };
-                slider.RegisterValueChangedCallback(e => GameSettings.Set(id, e.newValue));     // 범위·단위는 Set이 맞춘다
+                slider.RegisterValueChangedCallback(e => GameSettings.Set(id, e.newValue, save: false));     // 범위·단위는 Set이 맞춘다. 끄는 동안은 적용만
+                slider.RegisterCallback<PointerCaptureOutEvent>(_ => GameSettings.Flush());                  // 놓을 때 파일에 쓴다
+                slider.RegisterCallback<FocusOutEvent>(_ => GameSettings.Flush());
                 return slider;
             case SettingKind.Choice:
                 var choices = GameSettings.ChoicesOf(id);

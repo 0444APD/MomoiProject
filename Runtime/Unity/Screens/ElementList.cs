@@ -54,7 +54,8 @@ namespace GBible
             for (int i = 0; i < items.Count; i++)
             {
                 var item = items[i];
-                var id = KeyOf(item);
+                // id가 없는 항목(단순 클래스 목록)은 자리 번호로 잇는다 — 하나 때문에 목록 전체가 그려지지 않는 일이 없게.
+                var id = KeyOf(item) ?? "$" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 counts[id] = counts.TryGetValue(id, out var n) ? n + 1 : 1;
                 var key = counts[id] == 1 ? id : $"{id}#{counts[id]}";
                 if (!_elements.TryGetValue(key, out var element))
@@ -84,11 +85,16 @@ namespace GBible
                 _elements.Remove(key);
                 GameView.UnregisterElement(key, element);
                 if (OnRemove == null) element.RemoveFromHierarchy();
-                else GameView.Present(done => OnRemove(element, () =>
+                else
                 {
-                    element.RemoveFromHierarchy();
-                    done();
-                }));
+                    // 사라지는 연출이 done을 부르지 않아도(연출 시간 초과) 요소가 영영 남지 않게 잠시 뒤 치운다.
+                    element.schedule.Execute(element.RemoveFromHierarchy).StartingIn(31000);
+                    GameView.Present(done => OnRemove(element, () =>
+                    {
+                        element.RemoveFromHierarchy();
+                        done();
+                    }));
+                }
             }
         }
 

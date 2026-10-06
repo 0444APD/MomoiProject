@@ -19,7 +19,7 @@ namespace GBible
         {
             get
             {
-#if UNITY_SERVER
+#if UNITY_SERVER && !UNITY_EDITOR
                 return true;
 #else
                 return Application.isBatchMode && !Application.isEditor;
@@ -41,6 +41,8 @@ namespace GBible
         public static event Action<GameSession> RunLoaded;
         // 끄기 직전(저장하기 전).
         public static event Action<GameSession> Stopping;
+        // 게임을 끌 때: 멀티를 닫고 판·프로필을 저장한 뒤(외부 연동을 마지막에 닫는 곳 — Steam 통계 올리기·SteamAPI 종료).
+        public static event Action Quitting;
 
         // 지금 슬롯의 프로필 저장 파일.
         public static string SavePath => Path.Combine(SlotFolder(Slot), "profile.json");
@@ -83,13 +85,16 @@ namespace GBible
         {
             slot ??= "";
             CheckSlotName(slot);
-            if (Session != null && slot == Slot) return;
+            if (Session != null && SameSlot(slot, Slot)) return;
             // 저장도 없고 행동도 한 번 없었던 세션(타이틀에서 막 켠 기본 슬롯)은 빈 저장을 남기지 않는다.
             if (Session != null) Stop(save: Session.Actions.Log.Count > 0 || File.Exists(SavePath) || File.Exists(RunSavePath));
             _slot = slot;
             if (remember) GameSettings.SetRaw(LastSlotKey, slot);
             Start();
         }
+
+        // 슬롯 이름은 대소문자를 가리지 않는다(Windows에서 "A"와 "a"는 같은 폴더).
+        static bool SameSlot(string a, string b) => string.Equals(a ?? "", b ?? "", StringComparison.OrdinalIgnoreCase);
 
         // 판을 파일이 아닌 곳(테스트 상황)에서 불러왔을 때: 판 저장 주기를 다시 세고 RunLoaded를 쏜다(화면이 판 데이터로 다시 맞춘다).
         public static void NotifyRunLoaded(GameSession session)
@@ -140,7 +145,7 @@ namespace GBible
         public static void DeleteSlot(string slot)
         {
             slot ??= "";
-            var current = Session != null && slot == Slot;
+            var current = Session != null && SameSlot(slot, Slot);
             if (current) Stop(save: false);
             var folder = SlotFolder(slot);
             foreach (var file in new[] { "profile.json", "run.json", "slot.json" })
@@ -156,14 +161,15 @@ namespace GBible
         {
             from ??= "";
             to ??= "";
-            if (from == to) return;
+            if (SameSlot(from, to)) return;
             // 지금 쓰는 슬롯에 덮어쓰면 실행 중인 세션이 저장·끌 때 다시 덮는다.
-            if (Session != null && to == Slot)
+            if (Session != null && SameSlot(to, Slot))
                 throw new InvalidOperationException($"[MomoiProject] 지금 쓰는 슬롯 '{to}'(으)로는 복사할 수 없습니다. 다른 슬롯으로 바꾼 뒤(UseSlot) 복사하세요.");
-            if (Session != null && from == Slot)
+            if (Session != null && SameSlot(from, Slot))
             {
+                _runSaver?.FlushEnd();
                 SaveProfile(Session);
-                if (!(_runSaver?.Ended ?? false)) SaveRun(Session);
+                if (RunIsLive) SaveRun(Session);
             }
             var source = SlotFolder(from);
             var target = SlotFolder(to);
@@ -226,7 +232,9 @@ namespace GBible
             _host = null;
             SlotSummary = null;
             StartAsClient = null;
+            Quitting = null;
             _preparedWarnings = false;
+            Mirror.ResetWarnings();
             GameView.Reset();
         }
 
@@ -283,7 +291,7 @@ namespace GBible
             session.Debug.Register("저장", "프로필 삭제", DeleteProfile, "저장 파일을 지웁니다. 다음 플레이부터 적용됩니다.");
             session.Debug.Register("저장", "판 저장", () => SaveRun(session), "진행 중인 판(세션 구역·난수·시간)을 저장합니다.");
             session.Debug.Register("저장", "판 불러오기", () => LoadRun(session), "저장한 판을 이어서 진행합니다.");
-            session.Debug.Register("저장", "새 판", () => NewRun(session), "이번 판 내용을 처음 값으로 되돌리고 판 저장을 지웁니다.");
+            session.Debug.Register("저장", "새 판", () => StartNewRun(session), "이번 판 내용을 처음 값으로 되돌리고(판 저장을 지움) DB › Bootstrap의 '새 판 행동'을 돌립니다.");
             session.Debug.Register("시간", "일시정지 / 재개", () => GameTime.TogglePause("개발 도구"));
             session.Debug.Register("시간", "1프레임 진행", () => GameTime.StepFrame(), "일시정지 중에만 동작합니다.");
             session.Debug.Register("시간", "배속 0.25", () => GameTime.SetSpeed(0.25f));
@@ -450,10 +458,18 @@ namespace GBible
                 session.Journal.Append(JournalKind.System, "Runtime", "시작할 때 이어 하기: 저장된 판을 불러왔습니다.");
                 return;
             }
-            var type = string.IsNullOrEmpty(database.NewRunAction) ? null : TypeResolver.Find(database.NewRunAction);
+            RunNewRunAction(session, database);
+        }
+
+        // DB › 시작 파일 › Bootstrap의 '새 판 행동'(있으면)을 그 세션에서 돌린다. 형식 이름 → 객체 만들기는 새 판마다 한 번뿐이다(실행 중 리플렉션 아님).
+        internal static void RunNewRunAction(GameSession session, GameDatabase database = null)
+        {
+            database ??= GameDatabase.Load();
+            if (session == null || database == null || string.IsNullOrEmpty(database.NewRunAction)) return;
+            var type = TypeResolver.Find(database.NewRunAction);
             if (type == null || type.IsAbstract || !typeof(GameAction).IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null)
             {
-                session.Journal.Append(JournalKind.Warning, "Runtime", $"시작할 때 이어 하기: 새 판 행동 '{database.NewRunAction}'을(를) 만들 수 없습니다(매개변수 없는 생성자가 있는 행동 클래스를 고르세요).");
+                session.Journal.Append(JournalKind.Warning, "Runtime", $"새 판 행동 '{database.NewRunAction}'을(를) 만들 수 없습니다(매개변수 없는 생성자가 있는 행동 클래스를 고르세요).");
                 return;
             }
             try
@@ -462,8 +478,15 @@ namespace GBible
             }
             catch (Exception e)
             {
-                session.Journal.Append(JournalKind.Error, "Runtime", $"시작할 때 이어 하기: 새 판 행동이 실패했습니다 — {e.Message}");
+                session.Journal.Append(JournalKind.Error, "Runtime", $"새 판 행동이 실패했습니다 — {e.Message}");
             }
+        }
+
+        // 새 판 = 처음 값으로 되돌리기(NewRun) + DB › Bootstrap의 '새 판 행동'. 테스트 패널·개발 명령·시험 모드 서버가 같은 뜻으로 쓴다.
+        public static void StartNewRun(GameSession session, ulong? seed = null)
+        {
+            NewRun(session, seed);
+            RunNewRunAction(session);
         }
 
         internal static void Stop() => Stop(save: true);
@@ -475,9 +498,11 @@ namespace GBible
             catch (Exception e) { Debug.LogException(e); }
             if (save)
             {
+                // 판 끝과 같은 프레임에 끄면: 판 끝 마무리(판 저장 지우기·프로필 저장)를 먼저.
+                _runSaver?.FlushEnd();
                 SaveProfile(Session);
-                // 멀티 클라이언트의 판은 서버 것이다(받은 모습을 이쪽 판 저장으로 남기지 않는다).
-                if (AutoSaveRun && !Session.IsClient && !(_runSaver?.Ended ?? false)) SaveRun(Session);
+                // 살아 있는 판만 저장한다. 멀티 클라이언트·리플레이 세션(판 저장기가 없음)의 판은 서버·녹화의 것이라 남기지 않는다.
+                if (AutoSaveRun && RunIsLive) SaveRun(Session);
             }
             Stopped?.Invoke(Session);
             Session = null;
@@ -527,7 +552,7 @@ namespace GBible
             }
             catch (Exception e)
             {
-                session.Journal.Append(JournalKind.Error, "Save", "프로필 불러오기 실패: " + e.Message);
+                session.Journal.Append(JournalKind.Error, "Save", "프로필 불러오기 실패: " + e.Message + " — 원본은 " + KeepBroken(SavePath) + "에 남겨 둡니다.");
             }
         }
 
@@ -602,12 +627,36 @@ namespace GBible
             }
             catch (Exception e)
             {
-                session.Journal.Append(JournalKind.Error, "Save", "판 불러오기 실패: " + e.Message);
+                session.Journal.Append(JournalKind.Error, "Save", "판 불러오기 실패: " + e.Message + " — 원본은 " + KeepBroken(RunSavePath) + "에 남겨 둡니다.");
                 return false;
             }
         }
 
+        // 읽지 못한 저장 파일을 옆에 복사해 둔다(다음 저장이 빈 값으로 덮어도 원본이 남게). 돌려주는 값: 복사본 경로.
+        static string KeepBroken(string path)
+        {
+            try
+            {
+                var copy = Path.Combine(Path.GetDirectoryName(path) ?? ".", Path.GetFileNameWithoutExtension(path) + ".broken-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture) + Path.GetExtension(path));
+                File.Copy(path, copy, true);
+                return copy;
+            }
+            catch (Exception)
+            {
+                return "(복사 실패)";
+            }
+        }
+
         internal static void FrameEndSave() => _runSaver?.FrameEnd();
+
+        internal static void NotifyQuitting()
+        {
+            try { Quitting?.Invoke(); }
+            catch (Exception e) { Debug.LogException(e); }
+        }
+
+        // 이 실행의 판이 살아 있다(불러왔거나 새로 시작했거나 행동이 판 데이터를 바꿨고, 끝나지 않았다). 아니면 끌 때·슬롯을 바꿀 때 판을 저장하지 않는다.
+        static bool RunIsLive => _runSaver != null && _runSaver.Live && !_runSaver.Ended;
 
         // 새 판: 이번 판 값을 처음 값으로 되돌리고(Undo 기록도 비움) 판 저장 파일(run.json)을 지운다. 프로필은 그대로다.
         // 메모리와 파일을 함께 지워야 "화면은 새 판인데 이어 하기는 예전 판"이 생기지 않는다. 행동 밖(버튼 등)에서 부른다.
@@ -617,8 +666,10 @@ namespace GBible
             if (session == null) throw new ArgumentNullException(nameof(session));
             if (session.Data.InTransaction) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 새 판을 시작할 수 없습니다. 행동 밖(버튼 등)에서 부르세요.");
             session.NewRun(seed);
+            // 판 저장 파일은 화면 세션(이 슬롯)의 것만 지운다(시험 모드 서버 등 다른 세션의 새 판이 이 슬롯의 저장을 지우지 않게).
+            if (session != Session) return;
             DeleteRun();
-            if (session == Session) _runSaver?.Reset();
+            _runSaver?.Reset();
         }
 
         public static void DeleteRun()
@@ -671,10 +722,14 @@ namespace GBible
             GameTime.OnFrameEnd();
         }
 
+        // 끄는 순서를 정해 둔다: 멀티 닫기 → 저장 → 외부 연동(Steam) 닫기. 앞 단계가 실패해도 저장은 한다.
         void OnApplicationQuit()
         {
-            GameNet.Shutdown();
-            GBibleRuntime.Stop();
+            try { GameNet.Shutdown(); }
+            catch (Exception e) { Debug.LogException(e); }
+            try { GBibleRuntime.Stop(); }
+            catch (Exception e) { Debug.LogException(e); }
+            GBibleRuntime.NotifyQuitting();
         }
     }
 }

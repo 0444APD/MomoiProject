@@ -256,7 +256,7 @@ namespace GBible.EditorTools.UI
                     Selected = current == id,
                 });
             }
-            if (items.Count == 1) items.Add(new GsDropdownItem("DB › 스프라이트 규격에서 그룹을 먼저 만드세요") { Disabled = true });
+            if (items.Count == 1) items.Add(new GsDropdownItem("그룹이 없습니다 — Project 창에서 Create › MomoiProject › 스프라이트 규격 그룹(또는 규격 파일 인스펙터의 '새 그룹')으로 먼저 만드세요") { Disabled = true });
             GsDropdown.Show(anchor, items, placeholder: "폴더 검색");
         }
 

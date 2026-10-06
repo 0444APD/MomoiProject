@@ -132,6 +132,50 @@ namespace GBible.Tests
         public MtLoop next;
     }
 
+    // 새로 만든 객체가 이미 있던 객체를 가리킬 때(앞쪽 필드에서 먼저 만난다): 그 객체의 변경이 기록에서 빠지지 않는지.
+    [Serializable]
+    public class MtUnit
+    {
+        public int hp = 10;
+    }
+
+    [Serializable]
+    public class MtHitLog
+    {
+        public MtUnit target;
+        public List<MtUnit> also = new List<MtUnit>();
+    }
+
+    [Serializable]
+    public class MtBattle
+    {
+        public MtHitLog last;
+        public List<MtHitLog> log = new List<MtHitLog>();
+        public Dictionary<string, MtHitLog> byKey = new Dictionary<string, MtHitLog>();
+        public List<MtUnit> units = new List<MtUnit>();
+    }
+
+    // 안쪽에 컬렉션이 있는 구조체: 값 복사로는 안쪽 변경을 따라가지 못한다 → 예전 비교 방식.
+    [Serializable]
+    public struct MtBag
+    {
+        public int count;
+        public List<int> items;
+    }
+
+    [Serializable]
+    public class MtHolder
+    {
+        public MtBag bag = new MtBag { items = new List<int>() };
+    }
+
+    [Serializable]
+    public class MtTwoLists
+    {
+        public List<MtUnit> all = new List<MtUnit>();
+        public List<MtUnit> chosen = new List<MtUnit>();
+    }
+
     // [BindTo] 함수: 매개변수 형식으로 받을 이벤트를 정한다.
     public sealed class MtOtherEvent
     {
@@ -523,6 +567,146 @@ namespace GBible.Tests
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Assert.IsTrue(changes.IsEmpty);
             Assert.AreEqual(0, allocated, "비교만 할 때는 할당이 없다");
+        }
+
+        // 바뀐 것 → 받는 쪽에 적용 → 같다 / 되돌리기 → 처음과 같다(MtBattle용).
+        static void CheckBattle(Action<MtBattle> change)
+        {
+            var live = new MtBattle();
+            live.units.Add(new MtUnit());
+            live.units.Add(new MtUnit { hp = 20 });
+            var node = Mirror.Make(live);
+            var receiver = new MirrorReceiver();
+            var client = (MtBattle)receiver.Load(Mirror.Snapshot(node));
+            var before = Bytes(live);
+            change(live);
+            var changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            receiver.Apply(client, changes);
+            CollectionAssert.AreEqual(Bytes(live), Bytes(client), "받는 쪽이 같아진다");
+            Assert.AreSame(client.units[0], client.log.Count > 0 ? client.log[0].target : client.last?.target ?? client.byKey["k"].target, "같은 인스턴스");
+            Mirror.Undo(live, changes);
+            CollectionAssert.AreEqual(before, Bytes(live), "되돌리면 처음과 같다");
+            Assert.AreEqual(10, live.units[0].hp, "되돌리면 hp도 돌아온다");
+            var redo = new ChangeSet();
+            Mirror.Sync(live, node, redo);
+            receiver.Apply(client, redo);
+            CollectionAssert.AreEqual(before, Bytes(client), "되돌린 것도 받는 쪽에 전해진다");
+        }
+
+        [Test]
+        public void 새_객체가_가리키는_기존_객체의_변경도_기록된다_리스트() => CheckBattle(b =>
+        {
+            b.units[0].hp -= 5;
+            b.log.Add(new MtHitLog { target = b.units[0] });
+        });
+
+        [Test]
+        public void 새_객체가_가리키는_기존_객체의_변경도_기록된다_필드() => CheckBattle(b =>
+        {
+            b.units[0].hp -= 5;
+            b.last = new MtHitLog { target = b.units[0] };
+        });
+
+        [Test]
+        public void 새_객체가_가리키는_기존_객체의_변경도_기록된다_딕셔너리와_안쪽_리스트() => CheckBattle(b =>
+        {
+            b.units[0].hp -= 5;
+            b.units[1].hp += 1;
+            var hit = new MtHitLog { target = b.units[0] };
+            hit.also.Add(b.units[1]);
+            b.byKey["k"] = hit;
+        });
+
+
+        [Test]
+        public void 안쪽에_컬렉션이_있는_구조체는_예전_비교_방식으로_다룬다()
+        {
+            Mirror.Initialize();
+            Assert.IsFalse(Mirror.Supports(typeof(MtHolder), out var reason));
+            Assert.IsTrue(reason.Contains("구조체"), reason);
+
+            // 예전 방식: Modify로 바꾸면 안쪽 변경도 Undo된다(Modify 없이 바꾸면 경고).
+            var session = new GameSession();
+            var holder = new MtHolder();
+            session.Data.Define("holder", DataZone.Session, holder);
+            session.Game.Do(new MtEdit { run = () => session.Data.Modify<MtHolder>("holder", h => h.bag.items.Add(3)) });
+            Assert.AreEqual(1, holder.bag.items.Count);
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(0, session.Data.Get<MtHolder>("holder").bag.items.Count);
+        }
+
+        sealed class MtEdit : GameAction
+        {
+            public Action run;
+            protected override void Run() => run();
+        }
+
+
+        // 같은 리스트 인스턴스를 두 필드가 가리키면 알린다(변경이 두 번 기록되어 Undo가 데이터를 깬다).
+        [Test]
+        public void 같은_컬렉션을_두_곳에서_가리키면_알린다()
+        {
+            var warnings = new List<string>();
+            Action<string> listen = warnings.Add;
+            Mirror.Warning += listen;
+            try
+            {
+                Mirror.ResetWarnings();
+                var live = new MtTwoLists();
+                var node = Mirror.Make(live);
+                Mirror.Sync(live, node, new ChangeSet());
+                Assert.AreEqual(0, warnings.Count, "따로면 알리지 않는다");
+                live.chosen = live.all;
+                Mirror.Sync(live, node, new ChangeSet());
+                Assert.AreEqual(1, warnings.Count, "같은 인스턴스를 가리키면 알린다");
+                Assert.IsTrue(warnings[0].Contains("chosen"), warnings[0]);
+                live.chosen = new List<MtUnit>();
+                Mirror.ResetWarnings();
+                Mirror.Sync(live, node, new ChangeSet());
+                Mirror.Sync(live, node, new ChangeSet());
+                Assert.AreEqual(1, warnings.Count, "다시 따로면 더 알리지 않는다");
+            }
+            finally
+            {
+                Mirror.Warning -= listen;
+            }
+        }
+
+        // 미리보기(받는 쪽에 보내지 않음)에서 빠졌다가 되돌려진 객체: 번호가 그대로라 받는 쪽에서 계속 같은 인스턴스로 이어진다.
+        [Test]
+        public void 보내지_않은_변경에서_빠졌다_돌아온_객체는_번호를_지킨다()
+        {
+            var b = new MtBattle();
+            var u = new MtUnit();
+            b.units.Add(u);
+            b.last = new MtHitLog { target = u };
+            var node = Mirror.Make(b);
+            var receiver = new MirrorReceiver();
+            var client = (MtBattle)receiver.Load(Mirror.Snapshot(node));
+
+            Mirror.KeepIds(node, true);
+            b.units.Clear();
+            b.last = null;
+            var quiet = new ChangeSet();
+            Mirror.Sync(b, node, quiet);
+            Mirror.Undo(b, quiet);
+            Mirror.Sync(b, node, new ChangeSet());
+            Mirror.KeepIds(node, false);
+
+            b.log.Add(new MtHitLog { target = u });
+            u.hp = 3;
+            var changes = new ChangeSet();
+            Mirror.Sync(b, node, changes);
+            receiver.Apply(client, changes);
+            Assert.AreSame(client.units[0], client.log[0].target, "새로 가리킨 곳도 같은 인스턴스");
+            Assert.AreSame(client.units[0], client.last.target);
+            u.hp = 1;
+            changes = new ChangeSet();
+            Mirror.Sync(b, node, changes);
+            receiver.Apply(client, changes);
+            Assert.AreEqual(1, client.log[0].target.hp);
+            CollectionAssert.AreEqual(Bytes(b), Bytes(client));
         }
     }
 }

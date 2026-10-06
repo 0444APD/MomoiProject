@@ -71,6 +71,8 @@ namespace GBible.EditorTools.UI
         public Action<Folder, Folder> MoveFolder;
 
         Dictionary<string, Folder> _byPath;
+        // 접은 상태의 이름 앞머리(Key, 새 창이면 따로).
+        string _foldKey = "";
         Dictionary<string, List<Folder>> _children;
         Dictionary<string, List<Item>> _items;
         readonly List<(GsGroupSection section, Folder folder, int depth)> _sections = new List<(GsGroupSection, Folder, int)>();
@@ -96,6 +98,8 @@ namespace GBible.EditorTools.UI
         {
             Index();
             _sections.Clear();
+            // 새 창(그룹 하나만)은 DB 창과 접은 상태를 따로 기억한다(한쪽에서 접어도 다른 쪽은 그대로).
+            _foldKey = only == null ? Key : Key + "@window";
             _drag = new Drag { Host = host, Scroll = list.GetFirstAncestorOfType<ScrollView>() };
 
             if (only != null)
@@ -180,7 +184,7 @@ namespace GBible.EditorTools.UI
             }
             if (Searching && !nameHit && shown.Count == 0 && children.Count == 0) return null;
 
-            var section = new GsGroupSection(Key + ":" + folder.Path);
+            var section = new GsGroupSection(_foldKey + ":" + folder.Path);
             section.AddToClassList("gs-tree__folder");
             if (depth > 0) section.AddToClassList("gs-tree__folder--nested");
             section.Head.AddToClassList("gs-group__head--toggle");

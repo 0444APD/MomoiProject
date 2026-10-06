@@ -16,7 +16,6 @@
 - 데이터는 DB, 동작은 코드. 플레이어 데이터를 바꾸는 일은 모두 행동(`GameAction`) 안에서.
 - **개발자가 바꿀 것은 에디터에**: 숫자는 밸런스 값·DB 칸·인스턴스 필드, 참조는 드롭다운(`[DataRef]`). 코드에 숫자를 적지 않는다(관례 18절).
 - **테스트할 수 있게**: 테스트 씬·테스트 명령·테스트 상황을 함께 만든다(관례 19절).
-- **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안 · 플레이어별 칸 · 숨길 것은 Owner 키 · 서버 규칙(Validate) · 연출은 SubscribeAfterAction · 실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
 - **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
 - 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".

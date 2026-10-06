@@ -17,10 +17,16 @@ namespace GBible
 
         public static bool SkipTests { get; private set; }
 
+        // 테스트 실행 동안 참(GBible.Editor의 TestRuns가 켜고 끈다): 그동안 Use(true)를 무시한다.
+        //   테스트가 게임 세션을 만들어도(GBibleRuntime이 Use(true)를 부른다) 도중에 테스트 어셈블리가 빠지지 않게.
+        public static bool KeepTests { get; set; }
+
         // 테스트 어셈블리를 빼거나 다시 넣는다. 값이 바뀌면 훑어 둔 결과([BindTo]·키워드)를 다시 만들고, 다시 넣을 때는 Mirror가 빠진 어셈블리를 더 훑는다.
-        //   게임 플레이·에디터: Use(true) — 테스트용 형식이 게임·DB 창에 섞이지 않는다. Unity에서 테스트를 돌릴 때: Use(false)(테스트의 SetUpFixture).
+        //   게임 플레이·에디터: Use(true) — 테스트용 형식이 게임·DB 창에 섞이지 않는다.
+        //   Unity에서 테스트를 돌릴 때: Use(false)(GBible.Editor의 TestRuns — Test Runner 실행의 시작·끝).
         public static void Use(bool skipTests)
         {
+            if (skipTests && KeepTests) return;
             if (SkipTests == skipTests) return;
             SkipTests = skipTests;
             BoundOutcomes.Reset();

@@ -48,7 +48,7 @@ namespace GBible.Data
         static string AppIdPath => Path.Combine(Directory.GetParent(Application.dataPath).FullName, "steam_appid.txt");
 
         // Steam 기능을 켜면(이 어셈블리가 컴파일되면) steam_appid.txt가 없을 때 바로 만든다 — 에디터 플레이가 그 앱으로 Steam에 붙는다.
-        // DB › Steam 항목이 있으면 그 App ID, 없으면 480. 이미 있으면 그대로 둔다(App ID를 고치면 OnValidate가 고친다).
+        // DB › Steam 항목이 있으면 그 App ID, 없으면 480. 이미 있으면 그대로 둔다(App ID를 고치면 OnValidate·SteamAppIdPostprocessor가 고친다).
         [UnityEditor.InitializeOnLoadMethod]
         static void EnsureAppIdFile()
         {
@@ -70,7 +70,7 @@ namespace GBible.Data
             };
         }
 
-        static void WriteAppId(uint id)
+        internal static void WriteAppId(uint id)
         {
             try
             {
@@ -92,6 +92,25 @@ namespace GBible.Data
         }
 #endif
     }
+
+#if UNITY_EDITOR
+    // DB의 저장(Ctrl+S)은 작업본을 원본에 복사하므로(EditorUtility.CopySerialized) OnValidate가 불리지 않을 수 있다.
+    // 저장된 Steam 항목 에셋이 다시 읽히면(저장·가져오기) 그 App ID로 steam_appid.txt를 맞춘다(같으면 쓰지 않는다).
+    sealed class SteamAppIdPostprocessor : UnityEditor.AssetPostprocessor
+    {
+        static void OnPostprocessAllAssets(string[] imported, string[] deleted, string[] moved, string[] movedFrom)
+        {
+            foreach (var path in imported)
+            {
+                if (!path.EndsWith(".asset", StringComparison.OrdinalIgnoreCase) || UnityEditor.AssetDatabase.GetMainAssetTypeAtPath(path) != typeof(SteamData)) continue;
+                var item = UnityEditor.AssetDatabase.LoadAssetAtPath<SteamData>(path);
+                if (item == null || item.appId == 0 || !UnityEditor.EditorUtility.IsPersistent(item)) continue;
+                SteamData.WriteAppId(item.appId);
+                return;
+            }
+        }
+    }
+#endif
 
     [Serializable]
     public sealed class SteamAchievementName

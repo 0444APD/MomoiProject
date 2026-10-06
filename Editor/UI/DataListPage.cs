@@ -34,12 +34,16 @@ namespace GBible.EditorTools.UI
 
         List<GameData> AllItems() => Db.OfType(_type).ToList();
 
+        // 로직 쪽 종류는 AI가 DB 반영 스크립트로 만든다(EditorPolicy): 항목 추가·삭제는 개발자가 만드는 종류나 구조 편집에서만.
+        bool CanAdd => EditorPolicy.CanAddRemove(_type);
+
         public override string Caption(CodexPageContext context)
         {
             var items = AllItems();
             var errors = context.Issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && i.Asset.GetType() == _type);
             return $"{items.Count}개 항목 · 폴더 {CodexFolders.All(Tab, items).Count}개" + (errors > 0 ? $" · 오류 {errors}" : "") +
-                   "  ·  줄을 눌러 열고, 끌어서 다른 폴더에 놓아 옮깁니다 · 폴더는 정리용입니다(게임 동작과 상관없음)";
+                   "  ·  줄을 눌러 열고, 끌어서 다른 폴더에 놓아 옮깁니다 · 폴더는 정리용입니다(게임 동작과 상관없음)" +
+                   (CanAdd ? "" : "  ·  값을 바꿉니다(추가·삭제·구조는 AI에게)");
         }
 
         public override void Create(CodexPageContext context) => NewItem(context, "");
@@ -97,13 +101,15 @@ namespace GBible.EditorTools.UI
                 {
                     var picked = cls;
                     items.Add(new GsDropdownItem($"{picked.Name} 내보내기…", () => DataCsv.ExportToFile(_type, picked)) { Group = "내보내기" });
-                    items.Add(new GsDropdownItem($"{picked.Name} 가져오기…", () => DataCsv.ImportFromFile(_type, picked)) { Group = "가져오기", Detail = "없는 id는 이 클래스의 새 인스턴스로 만듭니다" });
+                    items.Add(new GsDropdownItem($"{picked.Name} 가져오기…", () => DataCsv.ImportFromFile(_type, picked))
+                        { Group = "가져오기", Detail = CanAdd ? "없는 id는 이 클래스의 새 인스턴스로 만듭니다" : "id로 맞춰 고칩니다. 없는 id는 건너뜁니다(새 항목은 AI가 만든다)" });
                 }
                 if (items.Count == 0) items.Add(new GsDropdownItem("인스턴스가 아직 없습니다") { Disabled = true });
                 return items;
             }
             items.Add(new GsDropdownItem("CSV로 내보내기…", () => DataCsv.ExportToFile(_type)));
-            items.Add(new GsDropdownItem("CSV 가져오기…", () => DataCsv.ImportFromFile(_type)) { Detail = "id로 맞춰 고치고, 없는 id는 새 항목으로 만듭니다(적용 전)" });
+            items.Add(new GsDropdownItem("CSV 가져오기…", () => DataCsv.ImportFromFile(_type))
+                { Detail = CanAdd ? "id로 맞춰 고치고, 없는 id는 새 항목으로 만듭니다(적용 전)" : "id로 맞춰 고칩니다(적용 전). 없는 id는 건너뜁니다(새 항목은 AI가 만든다)" });
             return items;
         }
 
@@ -117,10 +123,12 @@ namespace GBible.EditorTools.UI
                 Parent = parent,
                 Name = path == "" ? Noun : CodexFolders.Name(path),
                 Draggable = path != "",
-                Hint = path == "" ? $"'+ {Noun}'로 항목을, '+ 하위 폴더'로 폴더를 만듭니다. 항목·폴더를 끌어 폴더에 놓아 정리합니다." : null,
+                Hint = path != "" ? null
+                    : CanAdd ? $"'+ {Noun}'로 항목을, '+ 하위 폴더'로 폴더를 만듭니다. 항목·폴더를 끌어 폴더에 놓아 정리합니다."
+                    : $"{Noun} 항목은 AI가 만듭니다. '+ 하위 폴더'로 폴더를 만들고, 항목·폴더를 끌어 폴더에 놓아 정리합니다.",
                 Tools = tools =>
                 {
-                    tools.Add(new GsButton($"+ {Noun}", () => NewItem(context, path), GsButtonKind.Ghost));
+                    if (CanAdd) tools.Add(new GsButton($"+ {Noun}", () => NewItem(context, path), GsButtonKind.Ghost));
                     tools.Add(new GsButton("+ 하위 폴더", () => NewFolder(context, path, items), GsButtonKind.Ghost));
                     if (context.Group != path)
                     {
@@ -173,7 +181,7 @@ namespace GBible.EditorTools.UI
         void NewItem(CodexPageContext context, string folder)
         {
             var info = DataTypes.Find(_type);
-            if (info == null) return;
+            if (info == null || !CanAdd) return;
             // 이름(ID)은 여기서 한 번 짓는다. 이후 모든 곳에서는 목록에서 고른다.
             GsDialog.Form(context.Host, $"새 {info.DisplayName}" + (folder == "" ? "" : $" · {folder}"),
                 "ID는 저장 파일·코드(GameIds)·조건이 함께 쓰는 식별자입니다. 나중에 바꿔도 참조가 모두 따라갑니다.",
@@ -212,7 +220,8 @@ namespace GBible.EditorTools.UI
         {
             if (from == to) return;
             var items = AllItems();
-            if (CodexFolders.All(Tab, items).Any(p => string.Equals(p, to, StringComparison.OrdinalIgnoreCase)))
+            // 대소문자만 바꾸는 이름 바꾸기(boss → Boss)는 자기 자신과 겹치는 것이라 막지 않는다.
+            if (CodexFolders.All(Tab, items).Any(p => p != from && string.Equals(p, to, StringComparison.OrdinalIgnoreCase)))
             {
                 GsDialog.Show(context.Host, "옮길 수 없습니다", $"'{to}' 폴더가 이미 있습니다.", null, new DialogButton("확인", GsButtonKind.Primary, null));
                 return;
@@ -233,7 +242,7 @@ namespace GBible.EditorTools.UI
                 {
                     var name = (values["name"] ?? "").Trim();
                     if (name == CodexFolders.Name(path)) return null;
-                    return CodexFolders.CanCreate(Tab, AllItems(), parent, name, out var error) ? null : error;
+                    return CodexFolders.CanCreate(Tab, AllItems(), parent, name, out var error, renaming: path) ? null : error;
                 },
                 values => Move(context, path, CodexFolders.Join(parent, values["name"].Trim())));
         }

@@ -66,6 +66,9 @@ namespace GBible
         {
             GBibleRuntime.Started -= OnStarted;
             GBibleRuntime.Started += OnStarted;
+            // 끌 때는 멀티를 닫고 저장한 뒤에 Steam을 닫는다(GBibleHost가 순서를 정한다).
+            GBibleRuntime.Quitting -= Shutdown;
+            GBibleRuntime.Quitting += Shutdown;
         }
 
         // ── 게임 코드가 쓰는 것 ─────────────────────────────────
@@ -339,7 +342,5 @@ namespace GBible
     sealed class GameSteamHost : MonoBehaviour
     {
         void Update() => GameSteam.Tick();
-
-        void OnApplicationQuit() => GameSteam.Shutdown();
     }
 }

@@ -31,6 +31,7 @@ namespace GBible
             _values = null;
             _definitions = null;
             _ordered = null;
+            _unsaved = false;
         }
 
         // 게임이 켜질 때(GBibleRuntime.Start) 한 번: 파일과 DB를 읽고 적용 대상을 적용한다. 다시 불러도 한 번만 한다.
@@ -75,13 +76,15 @@ namespace GBible
         public static object Get(string id) => Current(Require(id));
 
         // 값을 바꾼다: 종류에 맞게 고치고(숫자는 범위·단위, 선택지는 있는 것만) 저장한 뒤 적용 대상이면 적용하고 Changed를 쏜다.
-        public static void Set(string id, object value)
+        // save가 거짓이면 파일에는 아직 쓰지 않는다(슬라이더를 끄는 동안 — 놓을 때 Flush).
+        public static void Set(string id, object value, bool save = true)
         {
             var setting = Require(id);
             var next = Coerce(setting, value);
             if (Equals(next, Current(setting))) return;
             _values[id] = next;
-            Save();
+            if (save) Save();
+            else _unsaved = true;
             Apply(setting, next);
             Changed?.Invoke(id);
         }
@@ -165,6 +168,15 @@ namespace GBible
                 case SettingKind.Slider: return Snap(spec, spec.defaultNumber);
                 case SettingKind.Choice:
                     if (!string.IsNullOrEmpty(spec.defaultChoice)) return spec.defaultChoice;
+                    // 언어: 첫 실행은 기기 언어(선택지에 있으면 — 없으면 같은 언어 계열, 그것도 없으면 첫 선택지).
+                    if (setting.target == SettingTarget.Language && spec.choices.Count > 0)
+                    {
+                        var device = GameLanguage.SystemCode(Application.systemLanguage) ?? "";
+                        var family = device.Split('-')[0];
+                        var match = spec.choices.FirstOrDefault(c => string.Equals(c.value, device, StringComparison.OrdinalIgnoreCase))
+                                    ?? spec.choices.FirstOrDefault(c => c.value != null && string.Equals(c.value.Split('-')[0], family, StringComparison.OrdinalIgnoreCase));
+                        if (match != null) return match.value;
+                    }
                     if (spec.choices.Count > 0) return spec.choices[0].value;
                     if (setting.target == SettingTarget.Language) return GameLanguage.Current;
                     if (setting.target == SettingTarget.Resolution) return $"{Screen.currentResolution.width}x{Screen.currentResolution.height}";
@@ -203,10 +215,19 @@ namespace GBible
             return value;
         }
 
+        // 아직 파일에 쓰지 않은 값(Set(…, save: false))을 쓴다.
+        public static void Flush()
+        {
+            if (_unsaved) Save();
+        }
+
+        static bool _unsaved;
+
         static void Save()
         {
             try
             {
+                _unsaved = false;
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
                 File.WriteAllText(FilePath, MiniJson.Serialize(_values));
             }

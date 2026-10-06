@@ -31,6 +31,8 @@ namespace GBible
             _settings = null;
             _volumesLoaded = false;
             VolumeChanged = null;
+            // 도메인 다시 불러오기를 끈 설정에서도 앞 플레이의 음소거가 남지 않게.
+            for (var i = 0; i < Muted.Length; i++) Muted[i] = false;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

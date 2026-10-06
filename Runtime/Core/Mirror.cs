@@ -177,6 +177,8 @@ namespace GBible
                         break;
                     case MirrorKind.Struct:
                         ok = MirrorValues.IsSupported(field);
+                        if (!ok && field != null && MirrorValues.IsShallow(field))
+                            reason = $"{DataModel.FriendlyName(field)}는 안쪽에 객체·컬렉션 필드가 있는 구조체라 안쪽 변경을 따라가지 못합니다([Serializable] 클래스로 바꾸세요)";
                         break;
                     case MirrorKind.Object:
                         ok = CheckReference(field, seen, ref reason);
@@ -238,6 +240,8 @@ namespace GBible
 
         [ThreadStatic] static MirrorTree _tree;
         [ThreadStatic] static bool _building;
+        // 새 사본을 만드는 깊이(MakeAny 안). 만드는 동안에는 이미 있던 사본에 들어가지 않는다(Enter 참고).
+        [ThreadStatic] static int _making;
         static long _nextNetId;
 
         internal static long NextNetId() => System.Threading.Interlocked.Increment(ref _nextNetId);
@@ -252,8 +256,10 @@ namespace GBible
             tree.Nodes[live] = node;
             var previousTree = _tree;
             var previousBuilding = _building;
+            var previousMaking = _making;
             _tree = tree;
             _building = true;
+            _making = 0;
             try
             {
                 node.Pass = tree.Pass;
@@ -263,6 +269,7 @@ namespace GBible
             {
                 _tree = previousTree;
                 _building = previousBuilding;
+                _making = previousMaking;
             }
             return node;
         }
@@ -285,8 +292,10 @@ namespace GBible
             }
             var previousTree = _tree;
             var previousBuilding = _building;
+            var previousMaking = _making;
             _tree = tree;
             _building = false;
+            _making = 0;
             try
             {
                 tree.Pass++;
@@ -297,6 +306,7 @@ namespace GBible
             {
                 _tree = previousTree;
                 _building = previousBuilding;
+                _making = previousMaking;
             }
         }
 
@@ -319,20 +329,50 @@ namespace GBible
                 return live;
             }
             var node = new MirrorNode(type, live) { NetId = NextNetId(), Refs = 1, Sent = _building || tree == null, Tree = tree };
+            // 번호를 지키는 동안(KeepIds) 빠졌다가 돌아온 객체: 받는 쪽은 빠진 것을 받지 않았으니 예전 번호·보낸 표시를 그대로 쓴다.
+            if (tree?.Retired != null && tree.Retired.TryGetValue(live, out var retired))
+            {
+                tree.Retired.Remove(live);
+                node.NetId = retired.NetId;
+                node.Sent = retired.Sent;
+            }
             if (tree != null)
             {
                 tree.Nodes[live] = node;
-                node.Pass = tree.Pass;
+                // 이번 회차에 한 번 더 들어갈 수 있게 둔다: 다 만든 뒤 부른 쪽이 Visit로 기록과 함께 다시 훑는다.
+                node.Pass = tree.Pass - 1;
             }
-            type.Sync(live, node, null);
+            _making++;
+            try
+            {
+                type.Sync(live, node, null);
+            }
+            finally
+            {
+                _making--;
+            }
             return node;
         }
 
+        // 받는 쪽에 보내지 않는 변경(미리보기: 바뀌었다가 그대로 돌아온다) 동안 켠다. 그동안 나무에서 빠진 객체가 다시 들어오면
+        // 새 번호 대신 예전 번호를 쓴다 — 받는 쪽은 빠진 것을 받지 않아 예전 인스턴스를 그 번호로 들고 있다.
+        // 끄면 기억한 것을 버린다(돌아오지 않은 객체를 붙잡지 않는다).
+        public static void KeepIds(MirrorNode root, bool keep)
+        {
+            var tree = root?.Tree;
+            if (tree == null) return;
+            tree.Retired = keep ? tree.Retired ?? new Dictionary<object, MirrorNode>(RefEq.Instance) : null;
+        }
+
         // 이번 회차에 이 사본을 처음 비교하는지(처음이면 표시하고 true). 나무 밖(Sync 중이 아님)이면 언제나 true.
+        // 새 사본을 만드는 동안(기록 없음)에는 false: 새 객체가 이미 있던 객체를 가리킬 때 그 객체의 바뀐 곳을 기록 없이 맞춰 버리면
+        // 이번 변경이 기록에서 빠진다(예: u.hp -= 5; log.Add(new Hit { target = u })). 다 만든 뒤 부른 쪽이 Visit로 새 사본을
+        // 기록과 함께 다시 훑으면서 그때 들어간다(새 사본은 Pass를 한 칸 뒤로 두어 한 번 더 들어갈 수 있다).
         internal static bool Enter(MirrorNode node)
         {
             var tree = node.Tree;
             if (tree == null) return true;
+            if (_making > 0 || _building) return false;
             if (node.Pass == tree.Pass) return false;
             node.Pass = tree.Pass;
             return true;
@@ -347,7 +387,11 @@ namespace GBible
                 var tree = node.Tree;
                 if (tree == null) return;
                 if (--node.Refs > 0) return;
-                if (node.Origin != null && tree.Nodes.TryGetValue(node.Origin, out var found) && found == node) tree.Nodes.Remove(node.Origin);
+                if (node.Origin != null && tree.Nodes.TryGetValue(node.Origin, out var found) && found == node)
+                {
+                    tree.Nodes.Remove(node.Origin);
+                    if (tree.Retired != null) tree.Retired[node.Origin] = node;
+                }
                 for (var i = 0; i < node.Type.FieldCount; i++)
                 {
                     var child = node.R[i];
@@ -357,10 +401,34 @@ namespace GBible
             }
             if (shadow is IMirrorShadow collection)
             {
+                if (collection is MirrorCollection tracked) Untrack(tracked);
                 var nodes = new List<MirrorNode>();
                 collection.AddNodes(nodes);
                 foreach (var item in nodes) Release(item);
             }
+        }
+
+        // 컬렉션 사본이 따라가는 실제 컬렉션을 정한다. 같은 인스턴스를 다른 곳의 사본도 따라가면 알린다:
+        // 사본이 곳마다 따로라 한 번의 변경이 두 번 기록되고, 되돌리기는 같은 리스트에 두 번 적용되어 데이터가 깨진다.
+        internal static void Track(MirrorCollection shadow, object live, MirrorNode owner, int field)
+        {
+            var tree = _tree;
+            if (tree == null) return;
+            Untrack(shadow);
+            if (live == null) return;
+            shadow.Origin = live;
+            var map = tree.Collections ??= new Dictionary<object, MirrorCollection>(RefEq.Instance);
+            if (!map.TryGetValue(live, out var other)) map[live] = shadow;
+            else if (other != shadow)
+                Warn($"{DataModel.FriendlyName(owner.Type.Type)}.{owner.Type.Names[field]}: 다른 곳과 같은 컬렉션 인스턴스를 가리킵니다. 변경이 두 번 기록되어 Undo·멀티에서 데이터가 깨질 수 있습니다. " +
+                     "컬렉션은 한 곳에서만 가리키게 하세요(필요하면 new List<T>(원본)처럼 복사).");
+        }
+
+        static void Untrack(MirrorCollection shadow)
+        {
+            var map = _tree?.Collections;
+            if (map != null && shadow.Origin != null && map.TryGetValue(shadow.Origin, out var found) && found == shadow) map.Remove(shadow.Origin);
+            shadow.Origin = null;
         }
 
         static void WarnOpaque(Type type)
@@ -380,6 +448,16 @@ namespace GBible
         }
 
         static readonly HashSet<string> WarnedText = new HashSet<string>();
+
+        // 알린 기록을 지운다(도메인 리로드를 끈 설정에서도 플레이마다 다시 알린다).
+        public static void ResetWarnings()
+        {
+            lock (Warned)
+            {
+                Warned.Clear();
+                WarnedText.Clear();
+            }
+        }
 
         internal static object OriginOf(object shadow) => shadow is MirrorNode node ? node.Origin : shadow;
 
@@ -956,6 +1034,10 @@ namespace GBible
     {
         public readonly Dictionary<object, MirrorNode> Nodes = new Dictionary<object, MirrorNode>(RefEq.Instance);
         public int Pass;
+        // 실제 컬렉션 → 그것을 따라가는 사본(같은 인스턴스를 두 곳에서 가리키는지 볼 때).
+        public Dictionary<object, MirrorCollection> Collections;
+        // KeepIds 동안 나무에서 빠진 사본(원래 객체 → 사본). 다시 들어오면 그 번호를 쓴다.
+        public Dictionary<object, MirrorNode> Retired;
     }
 
     // 받는 쪽: 보내는 쪽의 객체 번호 → 이쪽 인스턴스. 같은 객체를 두 곳에서 가리키면 이쪽도 같은 인스턴스를 가리킨다.
@@ -1025,6 +1107,14 @@ namespace GBible
         void AddNodes(List<MirrorNode> into);
     }
 
+    // 컬렉션 사본의 공통 부분: 지금 따라가는 실제 컬렉션(같은 인스턴스를 두 곳에서 가리키는지 볼 때 — Mirror.Track).
+    abstract class MirrorCollection : IMirrorShadow
+    {
+        public object Origin;
+        public abstract void WriteShadow(MirrorWriter writer, List<object> originals);
+        public abstract void AddNodes(List<MirrorNode> into);
+    }
+
     // 요소가 값(숫자·글자·enum·구조체)인지 객체인지.
     static class Elem<T>
     {
@@ -1073,10 +1163,24 @@ namespace GBible
             lock (Boxed) Boxed[type] = (write, read);
         }
 
+        // 안쪽에 객체·컬렉션 필드가 있는 구조체(쓰기·읽기만 — 변경 추적은 못 한다).
+        static readonly HashSet<Type> Shallow = new HashSet<Type>();
+
+        internal static void MarkShallow(Type type)
+        {
+            lock (Boxed) Shallow.Add(type);
+        }
+
+        internal static bool IsShallow(Type type)
+        {
+            lock (Boxed) return Shallow.Contains(type);
+        }
+
+        // 변경을 따라갈 수 있는 값 형식인가.
         public static bool IsSupported(Type type)
         {
             if (type.IsPrimitive || type.IsEnum || type == typeof(string) || BuiltinTypes.Contains(type)) return true;
-            lock (Boxed) return Boxed.ContainsKey(type);
+            lock (Boxed) return Boxed.ContainsKey(type) && !Shallow.Contains(type);
         }
 
         internal static void WriteBoxed(Type type, MirrorWriter writer, object value)

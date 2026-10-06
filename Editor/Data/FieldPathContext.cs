@@ -17,20 +17,25 @@ namespace GBible.EditorTools
             rootLabel = null;
             var so = property.serializedObject;
             var path = property.propertyPath;
-            // 칸이 뿌리를 직접 정했으면 그 형제 칸(트리거면 받는 이벤트, 뿌리 칸이면 그 값).
+            // 칸이 뿌리를 직접 정했으면 그 형제 칸(트리거면 받는 이벤트, 뿌리 칸이면 그 값). 그 칸이 비었으면 뿌리 없음 —
+            // 위쪽의 다른 뿌리 칸으로 넘어가지 않는다(패시브의 '가진 쪽 필드'가 발동이 없을 때 가진 목록의 필드를 보이지 않게).
             var own = PropertyUtil.GetField(property, out _)?.GetCustomAttribute<FieldPathAttribute>();
             if (!string.IsNullOrEmpty(own?.Root))
             {
                 var named = so.FindProperty(Sibling(path, own.Root));
-                if (named != null && named.propertyType == SerializedPropertyType.ManagedReference && named.managedReferenceValue is Trigger chosen)
+                if (named != null)
                 {
-                    var events = chosen.EventTypes().ToList();
-                    if (events.Count == 0) return null;
-                    rootLabel = string.Join(" · ", events.Select(EventBus.DisplayNameOf));
-                    return events[0];
+                    if (named.propertyType == SerializedPropertyType.ManagedReference)
+                    {
+                        if (!(named.managedReferenceValue is Trigger chosen)) return null;
+                        var events = chosen.EventTypes().ToList();
+                        if (events.Count == 0) return null;
+                        rootLabel = string.Join(" · ", events.Select(EventBus.DisplayNameOf));
+                        return events[0];
+                    }
+                    var namedRoot = PropertyUtil.GetField(named, out _)?.GetCustomAttribute<FieldPathRootAttribute>();
+                    return namedRoot != null && named.propertyType == SerializedPropertyType.String ? Resolve(namedRoot.Kind, named.stringValue, out rootLabel) : null;
                 }
-                var namedRoot = named == null ? null : PropertyUtil.GetField(named, out _)?.GetCustomAttribute<FieldPathRootAttribute>();
-                if (namedRoot != null && named.propertyType == SerializedPropertyType.String) return Resolve(namedRoot.Kind, named.stringValue, out rootLabel);
             }
             while (true)
             {

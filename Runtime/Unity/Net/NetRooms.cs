@@ -55,7 +55,7 @@ namespace GBible
 
         public void Leave() => GameNet.Leave();
 
-        public string InviteText => GameNet.IsHost ? GameNet.Server.Address : null;
+        public string InviteText => GameNet.IsHost ? GameNet.Address : null;
 
         static string NameOr(string playerName) => string.IsNullOrWhiteSpace(playerName) ? Environment.UserName : playerName.Trim();
     }

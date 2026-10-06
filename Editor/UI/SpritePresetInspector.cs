@@ -130,16 +130,32 @@ namespace GBible.EditorTools.UI
                 box.style.height = Mathf.Max(8, h * scale);
                 sizeLabel.text = $"{w}×{h}";
             }
-            UpdatePreview();
-            widthField.RegisterValueChangedCallback(_ => UpdatePreview());
-            heightField.RegisterValueChangedCallback(_ => UpdatePreview());
+            // 검사: 크기를 바꿀 때마다 다시 본다(입력·빠른 크기·가로세로 바꾸기).
+            var checks = new VisualElement();
+            _root.Add(checks);
+            void UpdateChecks()
+            {
+                checks.Clear();
+                // 칸의 지금 값(바인딩이 속성에 쓰기 전에 불릴 수 있다).
+                var w = widthField.value;
+                var h = heightField.value;
+                if (string.IsNullOrEmpty(groupProperty.stringValue)) checks.Add(new HelpBox("그룹을 정하세요.", HelpBoxMessageType.Error));
+                if (w < SpritePresetsPage.MinSize || h < SpritePresetsPage.MinSize || w > SpritePresetsPage.MaxSize || h > SpritePresetsPage.MaxSize)
+                    checks.Add(new HelpBox($"크기는 {SpritePresetsPage.MinSize}~{SpritePresetsPage.MaxSize}px 사이여야 합니다.", HelpBoxMessageType.Error));
+            }
 
-            // 검사
-            var problems = new System.Collections.Generic.List<string>();
-            if (string.IsNullOrEmpty(preset.group)) problems.Add("그룹을 정하세요.");
-            if (preset.width < SpritePresetsPage.MinSize || preset.height < SpritePresetsPage.MinSize || preset.width > SpritePresetsPage.MaxSize || preset.height > SpritePresetsPage.MaxSize)
-                problems.Add($"크기는 {SpritePresetsPage.MinSize}~{SpritePresetsPage.MaxSize}px 사이여야 합니다.");
-            foreach (var problem in problems) _root.Add(new HelpBox(problem, HelpBoxMessageType.Error));
+            UpdatePreview();
+            UpdateChecks();
+            widthField.RegisterValueChangedCallback(_ =>
+            {
+                UpdatePreview();
+                UpdateChecks();
+            });
+            heightField.RegisterValueChangedCallback(_ =>
+            {
+                UpdatePreview();
+                UpdateChecks();
+            });
 
             // 쓰는 필드 · 구운 이미지
             _root.Add(Heading("쓰임"));

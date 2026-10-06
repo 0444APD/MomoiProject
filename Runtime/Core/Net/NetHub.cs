@@ -259,12 +259,28 @@ namespace GBible
             }
         }
 
+        // 같은 계정의 옛 연결이 이만큼(초) 조용하면 끊긴 것으로 본다(핑 간격 2초 + 여유).
+        const double TakeoverSilence = 3;
+
         void Admitted(int connection, NetAdmission admission)
         {
             if (!_lobby.TryGetValue(connection, out var who) || who.State != LobbyState.Authenticating) return;
             if (!admission.Accepted) { Refuse(who, admission.Reason ?? "입장이 거절됐습니다."); return; }
             var id = string.IsNullOrEmpty(admission.Account) ? "name:" + who.Hello.Name : admission.Account;
-            if (_lobby.Values.Any(l => l != who && l.Account?.id == id)) { Refuse(who, "같은 계정이 이미 들어와 있습니다."); return; }
+            // 다시 접속: 옛 연결이 한동안 조용하면 끊긴 것으로 보고 새 연결이 이어받는다(진행 중인 매치면 그 자리로).
+            // 옛 연결이 아직 살아 있으면 거절하지 않고 끊기만 한다 — 클라이언트가 잠시 뒤 다시 시도한다.
+            var old = _lobby.Values.FirstOrDefault(l => l != who && l.Account?.id == id);
+            if (old != null)
+            {
+                if (Now - old.LastHeard < TakeoverSilence)
+                {
+                    _lobby.Remove(who.Connection);
+                    _transport.Disconnect(who.Connection, "같은 계정이 아직 연결되어 있습니다 — 잠시 뒤 다시 접속합니다.");
+                    return;
+                }
+                _transport.Disconnect(old.Connection, "같은 계정이 다시 접속했습니다.");
+                Lost(old.Connection, "같은 계정이 다시 접속했습니다.");
+            }
             var account = _store?.Load(id) ?? new NetAccount { id = id };
             account.name = !string.IsNullOrEmpty(admission.Name) ? admission.Name : string.IsNullOrEmpty(who.Hello.Name) ? account.name ?? "플레이어" : who.Hello.Name;
             _store?.Save(account);

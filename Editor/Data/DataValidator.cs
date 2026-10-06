@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using GBible.Data;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -167,6 +168,7 @@ namespace GBible.EditorTools
             var problems = new List<string>();
             change.Validate(key.ValueType, problems);
             foreach (var problem in problems) context.Error($"{label}: {problem}");
+            CheckRewardKeywords(change, key.ValueType, label, context);
             foreach (var (id, type) in change.InstanceRefs(key.ValueType))
             {
                 var template = all.OfType<InstanceData>().FirstOrDefault(t => t.Id == id);
@@ -174,6 +176,27 @@ namespace GBible.EditorTools
                 else if (template.value != null && !type.IsInstanceOfType(template.value))
                     context.Error($"{label}: 인스턴스 '{id}'({template.value.GetType().Name})는 {DataModel.FriendlyName(type)}이(가) 아닙니다.");
             }
+        }
+
+        // 키워드가 연결된 필드([Keyword(typeof(그룹))])에 주는 값이 그 그룹의 키워드인지(값 하나·목록 요소·딕셔너리 키). 편집 칸은 목록에서만 고른다.
+        static void CheckRewardKeywords(PlayerDataReward change, Type root, string label, Context context)
+        {
+            if (root == null) return;
+            var target = FieldPaths.TypeAt(root, change.path, out var member, out _);
+            var group = KeywordTools.GroupOf(member as FieldInfo);
+            if (target == null || group == null) return;
+            IEnumerable<string> values;
+            switch (PlayerDataGrants.KindOf(target))
+            {
+                case GrantKind.Value: values = new[] { change.value }; break;
+                case GrantKind.List: values = change.items; break;
+                case GrantKind.Dictionary: values = change.keys; break;
+                default: return;
+            }
+            var keywords = new HashSet<string>(KeywordTools.KeywordsOf(group).Select(k => k.Id), StringComparer.Ordinal);
+            var name = KeywordTools.FindGroup(group)?.DisplayName ?? group;
+            foreach (var value in (values ?? Enumerable.Empty<string>()).Where(v => !string.IsNullOrEmpty(v) && !keywords.Contains(v)).Distinct())
+                context.Error($"{label}: {value}은(는) 키워드 그룹 {name}에 없는 키워드입니다. 목록에서 다시 고르거나, 필요한 키워드면 코드에 더하세요(AI에게).");
         }
 
         // 필드 규칙의 '필수': 비어 있으면(빈 글자·빈 참조·빈 목록) 오류. 인스턴스 값 같은 안쪽 클래스까지 본다.
@@ -225,29 +248,71 @@ namespace GBible.EditorTools
                     if (refType == typeof(StatData) || refType == typeof(AchievementData)) return;
                     var id = property.stringValue;
                     var kind = DataTypes.Find(refType)?.DisplayName ?? refType.Name;
+                    var field = PropertyUtil.GetField(property, out _);
+                    var name = LabelOf(field, property);
                     if (string.IsNullOrEmpty(id))
                     {
-                        // 상위 그룹은 비어 있으면 맨 위(정상).
-                        if (data is INestedData && property.propertyPath == "parent") return;
-                        context.Warning($"{property.displayName}: {kind}이(가) 선택되지 않은 칸이 있습니다.");
+                        if (!WarnWhenEmpty(data, property, field)) return;
+                        context.Warning($"{name}: {kind}이(가) 선택되지 않았습니다.");
                         return;
                     }
                     var target = all.FirstOrDefault(d => d != null && d.Id == id);
                     if (target == null || !refType.IsInstanceOfType(target))
                     {
-                        context.Error($"{property.displayName}: 없는 {kind} '{id}'를 가리킵니다. 목록에서 다시 고르거나 {kind}을(를) 먼저 만드세요.");
+                        context.Error($"{name}: 없는 {kind} '{id}'를 가리킵니다. 목록에서 다시 고르거나 {kind}을(를) 먼저 만드세요.");
                         return;
                     }
                     // [DataRef(typeof(Card))]: 값이 그 클래스인 인스턴스여야 한다(카드 칸에 몬스터를 고른 경우).
-                    var field = PropertyUtil.GetField(property, out _);
                     if (!EditorDatabase.MatchesRef(field, target))
-                        context.Error($"{property.displayName}: '{id}'은(는) {EditorDatabase.RefKindLabel(field)} 인스턴스가 아닙니다. 이 칸에는 {EditorDatabase.RefKindLabel(field)}만 고를 수 있습니다.");
+                        context.Error($"{name}: '{id}'은(는) {EditorDatabase.RefKindLabel(field)} 인스턴스가 아닙니다. 이 칸에는 {EditorDatabase.RefKindLabel(field)}만 고를 수 있습니다.");
                 });
             }
             catch (Exception e)
             {
                 context.Error($"참조 검사 중 오류: {e.Message}");
             }
+        }
+
+        // 빈 참조 칸을 경고할지. 비어도 되는 칸은 넘어간다:
+        //   · [ShowIf]로 숨은 칸(가중치 표 줄의 종류가 '플레이어 데이터 목록'이면 '항목')
+        //   · Block 안의 칸 — 고르지 않으면 안 되는 칸은 그 Block의 검증이 오류로 알린다(상태 효과 검사는 종류만 골라도 된다)
+        //   · 다른 칸의 [ShowIf] 스위치 — 비어 있으면 '끔'(무게를 밸런스 값에서)
+        //   · 필수(필드 규칙) — 필수 검사가 오류로 알린다
+        //   · 상위 그룹 — 비어 있으면 맨 위
+        static bool WarnWhenEmpty(GameData data, UnityEditor.SerializedProperty property, FieldInfo field)
+        {
+            if (data is INestedData && property.propertyPath == "parent") return false;
+            if (field == null || EditorDatabase.IsRequired(field)) return false;
+            if (InsideBlock(property) || UI.ShowIfRules.IsSwitch(field)) return false;
+            // 목록 칸(List<string>)의 요소는 그 목록 칸의 [ShowIf]를 따른다.
+            return UI.ShowIfRules.Visible(property);
+        }
+
+        // 칸이 Block(트리거·조건·결과·효과·대상·값 조건) 안에 있는지: 위쪽 칸 중 Block 값을 가진 관리 참조가 있으면.
+        static bool InsideBlock(UnityEditor.SerializedProperty property)
+        {
+            var so = property.serializedObject;
+            var path = property.propertyPath;
+            while (true)
+            {
+                var cut = path.LastIndexOf('.');
+                if (cut < 0) return false;
+                path = path.Substring(0, cut);
+                if (path.EndsWith(".Array", StringComparison.Ordinal) || path == "Array") continue;
+                var holder = so.FindProperty(path);
+                if (holder != null && holder.propertyType == UnityEditor.SerializedPropertyType.ManagedReference && IsBlock(holder.managedReferenceValue)) return true;
+            }
+        }
+
+        static bool IsBlock(object value) =>
+            value is Trigger || value is Condition || value is Outcome || value is Effect || value is TargetSelector || value is ValueFilter;
+
+        // 메시지에 쓰는 칸 이름: 보이는 이름([FieldLabel])과 변수 이름(입력 칸의 이름표 — 오류면 그 칸이 빨갛게 보인다).
+        static string LabelOf(FieldInfo field, UnityEditor.SerializedProperty property)
+        {
+            if (field == null) return property.displayName;
+            var shown = field.GetCustomAttribute<FieldLabelAttribute>()?.Text;
+            return string.IsNullOrEmpty(shown) ? field.Name : $"{shown}({field.Name})";
         }
 
         // 규격이 바뀌어 다시 확인해야 하는 예외 촬영(규격 항목의 경고로).

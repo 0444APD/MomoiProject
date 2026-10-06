@@ -55,8 +55,15 @@ namespace GBible.CodeGen
                 });
                 return new ILPostProcessResult(null, diagnostics);
             }
-            foreach (var warning in warnings)
-                diagnostics.Add(new DiagnosticMessage { DiagnosticType = DiagnosticType.Warning, MessageData = "[MomoiProject] " + warning });
+            // 테스트 어셈블리는 일부러 다루지 못하는 형식을 담기도 하므로(그 경우를 시험) 경고를 내지 않는다 — 콘솔에는 게임 코드의 경고만.
+            var isTest = compiledAssembly.References.Any(r =>
+            {
+                var name = Path.GetFileNameWithoutExtension(r);
+                return name == "nunit.framework" || name == "UnityEngine.TestRunner";
+            });
+            if (!isTest)
+                foreach (var warning in warnings)
+                    diagnostics.Add(new DiagnosticMessage { DiagnosticType = DiagnosticType.Warning, MessageData = "[MomoiProject] " + warning });
             if (!changed) return new ILPostProcessResult(null, diagnostics);
 
             // 자기 자신을 가리키는 참조가 생겼으면 뺀다(Cecil이 같은 어셈블리를 참조로 더하는 경우).

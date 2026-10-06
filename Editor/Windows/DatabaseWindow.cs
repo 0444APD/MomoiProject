@@ -625,7 +625,7 @@ namespace GBible.EditorTools
             var enable = !GameFeatures.IsEnabled(feature);
             string message;
             if (enable)
-                message = $"'{feature.Name}'을(를) 켭니다. Unity가 다시 컴파일한 뒤 이 기능의 탭·메뉴가 열리고, 기능의 클래스가 DB › 클래스의 '{feature.Name}' 그룹에 자동으로 들어옵니다.\n\n{feature.Description}";
+                message = $"'{feature.Name}'을(를) 켭니다. Unity가 다시 컴파일한 뒤 이 기능의 탭·메뉴가 열립니다. 기능의 클래스는 그 탭에서 다루고(DB › 클래스에는 개발자가 만든 클래스만 보입니다), 기능이 쏘는 이벤트가 있으면 DB › 이벤트의 '{feature.Name}' 묶음에 들어옵니다.\n\n{feature.Description}";
             else
             {
                 var types = GameFeatures.ClassTypes(feature).ToList();

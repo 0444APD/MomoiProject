@@ -161,6 +161,24 @@ namespace GBible
             return options;
         }
 
+        // 접속할 사람에게 알려 줄 주소(방을 열 때 한 번 정해 둔다 — 화면이 매 프레임 네트워크 카드를 읽지 않게).
+        public static string Address { get; private set; }
+
+        // 서버를 연다. 포트가 이미 쓰이는 중 등으로 실패하면 반쯤 열린 서버를 남기지 않고 닫은 뒤 그 예외를 던진다.
+        static void StartServer()
+        {
+            try { Server.Start(); }
+            catch (Exception)
+            {
+                Server.Dispose();
+                Server = null;
+                IsTestMode = false;
+                _testNet = null;
+                throw;
+            }
+            Address = Server.Address;
+        }
+
         // ── 사설 호스트 방(화면은 이것만 부른다) ──────────────────
         // 방을 만든다(이 프로그램 = 방장. 방장이 나가면 판이 끝난다 — 방장 이어받기는 하지 않는다).
         public static void CreateRoom(int maxPlayers = 4, string playerName = null) => Rooms.Create(maxPlayers, playerName);
@@ -177,7 +195,7 @@ namespace GBible
             var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
             Server = new NetServer(session, transport, options ?? ServerOptions());
             WireServer(Server);
-            Server.Start();
+            StartServer();
             Server.AddLocalPlayer(string.IsNullOrEmpty(playerName) ? "방장" : playerName);
             ServerStarted?.Invoke(Server);
             return Server;
@@ -197,8 +215,8 @@ namespace GBible
             var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
             Server = new NetServer(session, new WebSocketServerTransport(port), options ?? ServerOptions());
             WireServer(Server);
-            Server.Start();
-            Debug.Log($"[MomoiProject] 서버를 열었습니다 — 접속 주소: {Server.Address}");
+            StartServer();
+            Debug.Log($"[MomoiProject] 서버를 열었습니다 — 접속 주소: {Address}");
             ServerStarted?.Invoke(Server);
             return Server;
         }
@@ -240,13 +258,21 @@ namespace GBible
             Hub = new NetHub(new WebSocketServerTransport(port), room =>
             {
                 var session = GBibleRuntime.CreateSession();
-                StartRun(session);
+                GBibleRuntime.RunNewRunAction(session);
                 return session;
             }, auth, matchmaker, store, options ?? new NetHubOptions { AllowDeveloperCommands = Debug.isDebugBuild, GameVersion = Application.version });
             Hub.Log += Debug.Log;
             Hub.RoomStarting += room => RoomStarting?.Invoke(room);
             Hub.RoomReady += room => RoomReady?.Invoke(room);
-            Hub.Start();
+            try { Hub.Start(); }
+            catch (Exception)
+            {
+                // 포트가 이미 쓰이는 중 등: 반쯤 열린 서버를 남기지 않는다.
+                Hub.Dispose();
+                Hub = null;
+                throw;
+            }
+            Address = Hub.Address;
             var resumed = Hub.ResumeOpenMatches();
             if (resumed > 0) Debug.Log($"[MomoiProject] 진행 중이던 매치 {resumed}개를 다시 열었습니다.");
             return Hub;
@@ -267,17 +293,18 @@ namespace GBible
             var serverSession = GBibleRuntime.CreateSession();
             Server = new NetServer(serverSession, net.Server(), new NetServerOptions { AllowDeveloperCommands = true, GameVersion = Application.version });
             WireServer(Server);
-            Server.Start();
+            StartServer();
             if (prepareServer != null) prepareServer(serverSession);
-            else StartRun(serverSession);
+            else GBibleRuntime.RunNewRunAction(serverSession);
             ServerStarted?.Invoke(Server);
+            // 화면 클라이언트가 먼저 들어간다(내 번호 #1). 화면 없는 클라이언트는 그 뒤.
+            JoinCore(net.Client(), net.Client, playerName, null, null);
             for (var i = 0; i < Math.Max(0, extraClients); i++)
             {
                 var extra = new NetClient(GBibleRuntime.CreateSession(), net.Client(), $"봇{i + 1}");
                 extra.Connect();
                 Extras.Add(extra);
             }
-            JoinCore(net.Client(), net.Client, playerName, null, null);
         }
 
         // 다시 접속 시험: 이 화면의 연결을 네트워크가 끊긴 것처럼 끊는다(AutoReconnect면 곧 다시 접속한다).
@@ -319,6 +346,7 @@ namespace GBible
             }
             IsTestMode = false;
             _testNet = null;
+            Address = null;
         }
 
         // ── 클라이언트 · 입장 표 · 다시 접속 ────────────────────
@@ -335,6 +363,8 @@ namespace GBible
             NetClient created = null;
             GBibleRuntime.RestartAsClient(session => created = CreateClient(session, first, link, resume: false));
             Client = created;
+            // Started에서 등록된 개발 명령도 서버에서 돌게 한 번 더 맞춘다(위의 맞추기는 Started 전에 돈다).
+            if (created != null) RemapDeveloperCommands(created.Session);
             if (created != null) Connect(created, link);
             return created;
         }
@@ -342,7 +372,8 @@ namespace GBible
         static NetClient CreateClient(GameSession session, INetClientTransport transport, Link link, bool resume)
         {
             var client = new NetClient(session, transport, link.Name, null, link.Version) { ClearOnJoin = resume };
-            if (RecordReplays) client.StartRecording(resume ? _recording : null);
+            // 시험 모드는 서버 쪽 녹화가 맡는다(같은 녹화에 두 번 쌓이지 않게).
+            if (RecordReplays && !IsTestMode) client.StartRecording(resume ? _recording : null);
             if (!resume) RemapDeveloperCommands(session);
             client.ActionFailed += failure => GameScreens.ShowFailure(failure.Message);
             client.Joined += () =>
@@ -442,7 +473,8 @@ namespace GBible
             }
             var link = _link;
             if (link == null || Client == null) return;
-            if (link.Attempt > 0 && Client.Reached)
+            // 새 연결이 실제로 닿았을 때만(기다리는 동안의 Client는 끊긴 옛 연결이라 Reached가 참이다).
+            if (link.Attempt > 0 && link.RetryAt < 0 && Client.State != NetClientState.Closed && Client.Reached)
             {
                 link.Attempt = 0;
                 GameScreens.Toast("다시 접속했습니다.", 2.5f);
@@ -538,7 +570,8 @@ namespace GBible
             {
                 Debug.LogException(e);
             }
-            if (_recording != null && _recording.Count > 0) LastReplay = _recording;
+            // 형식 번호표 하나뿐인(바뀐 것이 없는) 녹화는 지난 녹화를 덮지 않는다.
+            if (_recording != null && _recording.Count >= 2) LastReplay = _recording;
             _recording = null;
             _localRecorder = null;
             _recordedServer = null;
@@ -552,25 +585,18 @@ namespace GBible
         }
 
         // 클라이언트의 개발 명령(모니터 › 명령·테스트 패널)은 서버에서 돈다(다시 접속해도 지금 연결로). 화면·시간·프로필 명령은 이쪽 그대로.
+        const string RemoteSuffix = " — 서버에서 실행";
+
         static void RemapDeveloperCommands(GameSession session)
         {
             foreach (var command in session.Debug.All.ToList())
             {
                 if (command.Group == "시간" || command.Name.StartsWith("프로필", StringComparison.Ordinal)) continue;
+                if ((command.Description ?? "").EndsWith(RemoteSuffix, StringComparison.Ordinal)) continue;
                 var group = command.Group;
                 var name = command.Name;
-                session.Debug.Register(group, name, () => Client?.RunDeveloperCommand(group, name), (command.Description ?? "") + " — 서버에서 실행");
+                session.Debug.Register(group, name, () => Client?.RunDeveloperCommand(group, name), (command.Description ?? "") + RemoteSuffix);
             }
-        }
-
-        // 시험 모드 서버의 판: DB › 시작 파일 › Bootstrap의 '새 판 행동'(있으면). 실행 중 리플렉션이 아니라 시작할 때 한 번.
-        static void StartRun(GameSession session)
-        {
-            var database = GameDatabase.Load();
-            var type = database == null || string.IsNullOrEmpty(database.NewRunAction) ? null : TypeResolver.Find(database.NewRunAction);
-            if (type == null || type.IsAbstract || !typeof(GameAction).IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null) return;
-            try { session.Do((GameAction)Activator.CreateInstance(type)); }
-            catch (Exception e) { session.Journal.Append(JournalKind.Error, "Net", $"시험 모드 서버의 새 판 행동이 실패했습니다 — {e.Message}"); }
         }
 
         // 명령줄로 시작(빌드 여러 개를 띄워 시험할 때·서버 빌드):

@@ -225,9 +225,17 @@ namespace GBible.EditorTools.UI
             var keyField = new DropdownField("플레이어 데이터", keys, Math.Max(0, keys.IndexOf(sceneKey)), k => string.IsNullOrEmpty(k) ? "(쓰지 않음)" : k, k => string.IsNullOrEmpty(k) ? "(쓰지 않음)" : k);
             keyField.RegisterValueChangedCallback(e => { sceneKey = e.newValue ?? ""; SaveScenes(); });
             root.Add(keyField);
-            var pathField = new TextField("필드(씬 이름이 든 글자)") { value = scenePath };
+            // isDelayed: 글자마다가 아니라 Enter·포커스를 잃을 때 한 번 저장한다.
+            var pathField = new TextField("필드(씬 이름이 든 글자)") { value = scenePath, isDelayed = true };
             pathField.tooltip = "예: scene 또는 map.scene. 비우면 값 전체(글자 플레이어 데이터).";
-            pathField.RegisterCallback<FocusOutEvent>(_ => { scenePath = pathField.value?.Trim() ?? ""; SaveScenes(); });
+            pathField.RegisterValueChangedCallback(e =>
+            {
+                var next = e.newValue?.Trim() ?? "";
+                if (next != e.newValue) pathField.SetValueWithoutNotify(next);
+                if (next == scenePath) return;
+                scenePath = next;
+                SaveScenes();
+            });
             root.Add(pathField);
             var scenes = new List<string> { "" };
             scenes.AddRange(EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => Path.GetFileNameWithoutExtension(s.path)));

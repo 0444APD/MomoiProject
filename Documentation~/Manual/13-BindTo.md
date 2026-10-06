@@ -40,7 +40,9 @@
 
 사용 기능이 붙은 인스턴스도 같다: 인스턴스 값 안의 사용 기능(`then`) 자리에 이 잠긴 보기가 나온다.
 
-**잠기는 것은 코드가 대신하는 칸뿐이다.** 상태 효과는 `outcomes`(걸려 있는 동안의 결과)만 잠기고, `onApply`(걸릴 때 결과)·`onExpire`(끝날 때 결과)는 그대로 고친다. 그 두 칸은 `[OutcomeSlot(…, BindTo = false)]`라서 코드가 대신하지 않는다(2-11).
+**잠기는 것은 코드가 대신하는 칸뿐이다.** 상태 효과는 `outcomes`(걸려 있는 동안의 결과)만 잠기고, `onApply`(걸릴 때 결과)·`onExpire`(끝날 때 결과)는 그대로 고친다. 그 두 칸은 `[OutcomeSlot(…, BindTo = false)]`라서 코드가 대신하지 않는다(2-11). 패시브는 `outcomes`(결과)만 잠기고 `rules`(발동 더)의 줄마다 결과는 그대로 고친다.
+
+결과 안의 결과(선택 요구 › 가중치 표에서 고르기의 '고른 뒤 결과' …)는 위로 가장 가까운 결과 칸을 따른다. 그 칸이 잠기면 같이 잠기고, 위에 결과 칸이 없으면 잠기지 않는다.
 
 연결하기 전에 에디터에서 골라 둔 결과는 지워지지 않고 숨겨질 뿐이다. `[BindTo]`를 빼면 다시 보이고 다시 쓰인다.
 
@@ -212,9 +214,10 @@ public class DragonSlayerReward : Reward
 | 사용 기능이 붙은 인스턴스 | 인스턴스 ID | 사용 기능의 결과 대신 연결된 코드(`Game.Use(인스턴스 ID, …)`) |
 | 개발 명령(DB › 개발 › 개발 명령) | 명령 ID | 에디터에서 조립한 결과 대신 연결된 코드(→ `22-Monitor-Debug.md` 7절) |
 | 상태 효과(DB › 상태 효과) | 상태 효과 ID | `outcomes`(걸려 있는 동안의 결과) 대신 연결된 코드. `onApply`(걸릴 때 결과)·`onExpire`(끝날 때 결과)는 대신하지 않고 DB에서 고친 그대로 돈다(→ `29-Statuses-Schedules-Choices.md` 3-1·4-3) |
+| 패시브(DB › 패시브) | 패시브 ID | `outcomes`(결과) 대신 연결된 코드. `rules`(발동 더)의 줄마다 결과는 대신하지 않고 DB에서 고친 그대로 돈다 |
 | 프로젝트 기능(퀘스트 등) | 항목 ID | 런타임 등록 코드가 `BoundOutcomes`를 확인할 때만(→ `17-Custom-Features.md`) |
 
-**코드가 대신하지 않는 칸 — `[OutcomeSlot(…, BindTo = false)]`.** 한 항목에 결과 칸이 여럿이고 그중 일부만 코드가 대신한다면, 대신하지 않는 칸의 `[OutcomeSlot]`에 `BindTo = false`를 준다. 에디터는 그 ID에 `[BindTo]`가 있어도 그 칸을 잠그지 않고 그대로 고치게 한다. 상태 효과의 걸릴 때·끝날 때 결과가 이 칸이다.
+**코드가 대신하지 않는 칸 — `[OutcomeSlot(…, BindTo = false)]`.** 한 항목에 결과 칸이 여럿이고 그중 일부만 코드가 대신한다면, 대신하지 않는 칸의 `[OutcomeSlot]`에 `BindTo = false`를 준다. 에디터는 그 ID에 `[BindTo]`가 있어도 그 칸을 잠그지 않고 그대로 고치게 한다. 상태 효과의 걸릴 때·끝날 때 결과와 패시브의 발동 더(`rules`)가 이 칸이다. 결과 안에 든 결과 목록은 위로 가장 가까운 결과 칸의 `BindTo`를 따르고, 위에 결과 칸이 없으면 잠기지 않는다.
 
 ```csharp
 [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();          // [BindTo]가 대신한다(잠김)

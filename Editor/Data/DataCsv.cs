@@ -15,12 +15,18 @@ namespace GBible.EditorTools
     // 한 줄 = 항목 하나(첫 칸 id), 칸 = 단순 필드(숫자·글자·참거짓·enum). 묶음 필드 안쪽은 "curve.step", 목록은 줄마다 "entries[0].weight"·"tags[1]"처럼.
     // Block 칸([SerializeReference]: 트리거·조건·결과 …)은 빠진다.
     // 인스턴스 탭은 값의 클래스마다 따로 내보낸다(칸 = 그 클래스의 필드).
-    // 가져오기는 DB의 다른 변경처럼 '적용 전'으로 들어간다(Ctrl+S로 적용, 되돌리기 가능). 없는 id는 새 항목으로 만든다.
-    // 목록의 길이는 값이 있는 마지막 줄 번호까지다(뒤쪽 줄을 모두 비우면 그만큼 줄어든다). 새로 생긴 줄은 그 클래스의 기본값에서 시작한다.
+    // 가져오기는 DB의 다른 변경처럼 '적용 전'으로 들어간다(Ctrl+S로 적용, 되돌리기 가능).
+    // 없는 id: 개발자가 만드는 종류([Database(DeveloperAuthored = true)])나 구조 편집이면 새 항목으로 만들고, 로직 쪽 종류면 건너뛴다(새 항목은 AI가 만든다, EditorPolicy).
+    // 목록 줄(가중치 표의 항목 등)을 더하고 빼는 것은 어느 종류든 된다.
+    // 목록의 길이는 값이 있는 마지막 줄 번호까지다(뒤쪽 줄을 모두 비우면 그만큼 줄어든다). 새로 생긴 줄은 그 클래스·형식의 기본값에서 시작한다.
+    // 목록 안의 빈 글자는 ""로 적는다(빈 칸은 '값 없음'이라 맨 뒤 빈 글자 줄이 사라지지 않게 — 내보낼 때 필요한 곳에 적는다).
     // enum 칸은 코드 이름(Flat)과 DB에 보이는 이름(플랫(+값)) 모두 읽는다. 내보낼 때는 코드 이름.
+    // 파일은 UTF-8로 읽는다(Excel은 'CSV UTF-8'로 저장). 다른 인코딩이면 읽지 않고 알린다(한글이 깨진 채 들어가지 않게).
     public static class DataCsv
     {
         const string InstanceRoot = "value";
+        // 목록 안의 빈 글자 표시(가져올 때 빈 글자로 읽는다).
+        const string EmptyText = "\"\"";
         static readonly Regex Index = new Regex(@"\[(\d+)\]", RegexOptions.CultureInvariant);
 
         public static string Export(Type kind, Type valueClass = null)
@@ -32,9 +38,29 @@ namespace GBible.EditorTools
             foreach (var item in items)
             {
                 var so = new SerializedObject(item);
-                rows.Add(new[] { item.Id }.Concat(columns.Select(c => Format(so.FindProperty(Full(c, instance))))).ToList());
+                var cells = columns.Select(c => Format(so.FindProperty(Full(c, instance)))).ToArray();
+                KeepTrailing(so, columns, cells, instance);
+                rows.Add(new[] { item.Id }.Concat(cells).ToList());
             }
             return Csv.Write(rows);
+        }
+
+        // 목록의 마지막 줄 칸이 모두 비면(빈 글자 요소 등) 가져올 때 그 줄이 사라진다 → 그 줄의 첫 글자 칸에 "" 표시를 적는다.
+        static void KeepTrailing(SerializedObject so, List<string> columns, string[] cells, bool instance)
+        {
+            var lists = columns.SelectMany(c => Index.Matches(c).Cast<Match>().Select(m => c.Substring(0, m.Index))).Distinct().ToList();
+            foreach (var list in lists)
+            {
+                var property = so.FindProperty(Full(list, instance));
+                if (property == null || !IsList(property) || property.arraySize == 0) continue;
+                var last = $"{list}[{property.arraySize - 1}]";
+                var own = Enumerable.Range(0, columns.Count)
+                    .Where(i => columns[i] == last || columns[i].StartsWith(last + ".", StringComparison.Ordinal) || columns[i].StartsWith(last + "[", StringComparison.Ordinal))
+                    .ToList();
+                if (own.Count == 0 || own.Any(i => cells[i].Trim().Length > 0)) continue;
+                var marker = own.Where(i => so.FindProperty(Full(columns[i], instance))?.propertyType == SerializedPropertyType.String).DefaultIfEmpty(-1).First();
+                if (marker >= 0) cells[marker] = EmptyText;
+            }
         }
 
         // 결과 보고(몇 줄 고침·새로 만듦·모르는 칸).
@@ -48,7 +74,9 @@ namespace GBible.EditorTools
             var instance = valueClass != null;
             var db = EditorDatabase.Instance;
             var staging = EditorDatabase.Staging;
-            int changed = 0, created = 0;
+            // 로직 쪽 종류의 새 항목은 AI가 DB 반영 스크립트로 만든다(EditorPolicy) — 없는 id는 건너뛴다.
+            var canCreate = EditorPolicy.CanAddRemove(kind);
+            int changed = 0, created = 0, skipped = 0;
             var unknown = new HashSet<string>(StringComparer.Ordinal);
             var problems = new List<string>();
             foreach (var row in rows.Skip(1))
@@ -58,6 +86,11 @@ namespace GBible.EditorTools
                 var existing = db.All.FirstOrDefault(d => d != null && d.Id == id && d.GetType() == kind);
                 GameData target;
                 if (existing != null) target = staging.Work(existing);
+                else if (!canCreate)
+                {
+                    skipped++;
+                    continue;
+                }
                 else
                 {
                     try { target = staging.Add(kind, id); }
@@ -73,6 +106,8 @@ namespace GBible.EditorTools
                     }
                     created++;
                 }
+                // 고친 개수는 값이 실제로 바뀐 항목만 센다(목록 길이가 바뀐 것 포함). 같은 값을 다시 넣은 줄은 세지 않는다.
+                var before = existing != null ? EditorJsonUtility.ToJson(target) : null;
                 var so = new SerializedObject(target);
                 // 목록 길이부터 맞춘다(바깥 목록 먼저 → 안쪽 목록).
                 foreach (var (list, size) in ListSizes(header, row, idColumn, instance))
@@ -80,7 +115,6 @@ namespace GBible.EditorTools
                     var property = so.FindProperty(list);
                     if (property != null && IsList(property)) Resize(property, size);
                 }
-                var any = false;
                 for (int c = 0; c < header.Length; c++)
                 {
                     if (c == idColumn || header[c].Length == 0) continue;
@@ -93,14 +127,14 @@ namespace GBible.EditorTools
                         unknown.Add(header[c]);
                         continue;
                     }
-                    if (Parse(property, cell, out var error)) any = true;
-                    else problems.Add($"{id}.{header[c]}: {error}");
+                    if (!Parse(property, cell, out var error)) problems.Add($"{id}.{header[c]}: {error}");
                 }
                 so.ApplyModifiedPropertiesWithoutUndo();
-                if (any && existing != null) changed++;
+                if (before != null && EditorJsonUtility.ToJson(target) != before) changed++;
             }
             staging.Touch();
             var report = new StringBuilder($"{changed}개 고침, {created}개 새로 만듦(적용 전 — Ctrl+S로 적용).");
+            if (skipped > 0) report.Append($"\n없는 id {skipped}개는 건너뜀 — 새 항목은 AI가 만든다.");
             if (unknown.Count > 0) report.Append($"\n모르는 칸(건너뜀): {string.Join(", ", unknown)}");
             foreach (var problem in problems.Take(20)) report.Append("\n" + problem);
             if (problems.Count > 20) report.Append($"\n… 외 {problems.Count - 20}개");
@@ -121,7 +155,18 @@ namespace GBible.EditorTools
         {
             var path = EditorUtility.OpenFilePanel("CSV 가져오기", "", "csv");
             if (string.IsNullOrEmpty(path)) return;
-            var report = Import(kind, valueClass, File.ReadAllText(path));
+            string text;
+            try
+            {
+                // UTF-8만(잘못된 바이트면 예외). Excel의 기본 'CSV'(한국어 Windows = CP949)는 한글이 깨진 채 들어가므로 멈춘다.
+                text = File.ReadAllText(path, new UTF8Encoding(false, true));
+            }
+            catch (DecoderFallbackException)
+            {
+                EditorUtility.DisplayDialog("CSV 가져오기", "CSV를 UTF-8로 저장해 주세요(Excel: CSV UTF-8).\n아무것도 바꾸지 않았습니다.", "확인");
+                return;
+            }
+            var report = Import(kind, valueClass, text);
             EditorUtility.DisplayDialog("CSV 가져오기", report, "확인");
         }
 
@@ -247,7 +292,7 @@ namespace GBible.EditorTools
             return sizes.OrderBy(p => p.Key.Length).Select(p => (p.Key, p.Value));
         }
 
-        // 목록 길이를 맞춘다. 새로 생긴 줄은 그 클래스의 기본값(복사된 앞 줄 값·Block 참조를 남기지 않는다).
+        // 목록 길이를 맞춘다. 새로 생긴 줄은 그 클래스·형식의 기본값(Unity가 늘릴 때 복사한 앞 줄 값·Block 참조를 남기지 않는다).
         static void Resize(SerializedProperty list, int size)
         {
             var before = list.arraySize;
@@ -258,6 +303,17 @@ namespace GBible.EditorTools
 
         static void Reset(SerializedProperty element)
         {
+            // 단순 값 요소(글자·숫자 목록): 앞 줄 값이 복사되지 않게 빈 값으로(tags ["a"]에 tags[2]만 적으면 ["a", "", "c"]).
+            switch (element.propertyType)
+            {
+                case SerializedPropertyType.String: element.stringValue = ""; return;
+                case SerializedPropertyType.Integer: element.longValue = 0; return;
+                case SerializedPropertyType.Float: element.doubleValue = 0; return;
+                case SerializedPropertyType.Boolean: element.boolValue = false; return;
+                case SerializedPropertyType.Enum: element.intValue = 0; return;
+                case SerializedPropertyType.ObjectReference: element.objectReferenceValue = null; return;
+                case SerializedPropertyType.ManagedReference: element.managedReferenceValue = null; return;
+            }
             try
             {
                 var field = PropertyUtil.GetField(element, out _);
@@ -303,7 +359,9 @@ namespace GBible.EditorTools
             switch (property.propertyType)
             {
                 case SerializedPropertyType.Integer: return property.longValue.ToString(CultureInfo.InvariantCulture);
-                case SerializedPropertyType.Float: return property.doubleValue.ToString("R", CultureInfo.InvariantCulture);
+                // float 칸은 float로 적는다(double로 바꾸면 0.1이 0.10000000149011612로 나온다).
+                case SerializedPropertyType.Float:
+                    return property.type == "float" ? property.floatValue.ToString("R", CultureInfo.InvariantCulture) : property.doubleValue.ToString("R", CultureInfo.InvariantCulture);
                 case SerializedPropertyType.Boolean: return property.boolValue ? "true" : "false";
                 case SerializedPropertyType.Enum:
                     return property.enumValueIndex >= 0 && property.enumValueIndex < property.enumNames.Length ? property.enumNames[property.enumValueIndex] : "";
@@ -344,7 +402,8 @@ namespace GBible.EditorTools
                     return false;
                 }
                 case SerializedPropertyType.String:
-                    property.stringValue = cell ?? "";
+                    // "" 표시 = 빈 글자(목록 맨 뒤의 빈 글자 줄을 남길 때 내보내기가 적는다).
+                    property.stringValue = text == EmptyText ? "" : cell ?? "";
                     return true;
                 default:
                     error = "고칠 수 없는 칸입니다";

@@ -1369,26 +1369,53 @@ namespace GBible.EditorTools
             }
         }
 
+        // 테스트 상황을 저장·불러올 세션: 권한이 있는 쪽만. 이 프로그램이 서버(방장·시험 모드)면 서버 세션,
+        // 아니면 클라이언트가 아닐 때의 이 화면 세션. 멀티 클라이언트·리플레이면 null(서버 값을 클라이언트가 덮지 않게).
+        GameSession ScenarioSession()
+        {
+            if (GameNet.IsReplaying) return null;
+            if (GameNet.Server != null) return GameNet.Server.Session;
+            if (GameNet.Client != null) return null;
+            return GameNet.IsOnline ? GBibleRuntime.Session : _session;
+        }
+
         // 테스트 상황: 지금 판·프로필·난수·시각을 이름 붙여 저장하고 불러온다(Assets/MomoiProject/Data/Tests, TestScenarios).
         void BuildScenarios(VisualElement scroll)
         {
             var panel = Gs.Panel("테스트 상황", "지금 상황을 저장해 두고 다시 연다(테스트 씬의 시작 상황으로도 고를 수 있다)", out _, out var body);
             panel.style.marginBottom = 16;
+            var target = ScenarioSession();
+            if (target == null)
+            {
+                var note = Gs.Label("멀티 클라이언트(또는 리플레이)에서는 테스트 상황을 저장·불러올 수 없습니다. 서버(방장)나 혼자 할 때 씁니다.", "gs-caption");
+                note.style.whiteSpace = WhiteSpace.Normal;
+                note.style.marginBottom = 8;
+                body.Add(note);
+            }
+            else if (target != _session)
+            {
+                var note = Gs.Label("서버 세션에 저장하고 불러옵니다(위에서 고른 세션과 다름).", "gs-caption");
+                note.style.marginBottom = 8;
+                body.Add(note);
+            }
             var saveRow = Gs.Row();
             var nameField = new TextField { value = "" };
             nameField.style.flexGrow = 1;
             nameField.style.marginRight = 8;
             saveRow.Add(nameField);
-            saveRow.Add(new GsButton("지금 저장", () =>
+            var save = new GsButton("지금 저장", () =>
             {
                 try
                 {
-                    TestScenarios.Save(_session, nameField.value);
+                    TestScenarios.Save(target, nameField.value);
                     ShowFeedback($"테스트 상황 '{nameField.value}'를 저장했습니다.", GsNoticeKind.Ok);
                     BuildTab();
                 }
                 catch (Exception e) { ShowFeedback(e.Message, GsNoticeKind.Warning); }
-            }, GsButtonKind.Primary));
+            }, GsButtonKind.Primary);
+            save.SetEnabled(target != null);
+            nameField.SetEnabled(target != null);
+            saveRow.Add(save);
             body.Add(saveRow);
             var row = Gs.Row("gs-wrap");
             foreach (var name in TestScenarios.Names())
@@ -1398,7 +1425,7 @@ namespace GBible.EditorTools
                 {
                     try
                     {
-                        if (TestScenarios.Load(_session, n)) ShowFeedback($"테스트 상황 '{n}'를 불러왔습니다.", GsNoticeKind.Ok);
+                        if (TestScenarios.Load(target, n)) ShowFeedback($"테스트 상황 '{n}'를 불러왔습니다.", GsNoticeKind.Ok);
                         else ShowFeedback($"테스트 상황 '{n}'를 불러오지 못했습니다(저널).", GsNoticeKind.Warning);
                     }
                     catch (Exception e) { ShowFeedback(e.Message, GsNoticeKind.Warning); }
@@ -1406,6 +1433,7 @@ namespace GBible.EditorTools
                 button.tooltip = "불러오기(지금 판이 이 상황으로 바뀐다, Undo 이력은 비워진다)";
                 button.style.marginRight = 8;
                 button.style.marginBottom = 8;
+                button.SetEnabled(target != null);
                 row.Add(button);
             }
             if (row.childCount > 0)

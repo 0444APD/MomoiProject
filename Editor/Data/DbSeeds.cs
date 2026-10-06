@@ -11,6 +11,7 @@ namespace GBible.EditorTools
     // DB 반영 스크립트: AI가 쓴 static 함수(매개변수 없음)에 [DbSeed("버전")]을 붙이면 컴파일이 끝난 뒤 저절로 한 번 돈다.
     //   함수 안에서 EditorDatabase.Staging.Add·Work·Remove로 항목을 만들고·고치고·지운다 → DB에 '적용 전'으로 보이고,
     //   개발자가 읽어 본 뒤 Ctrl+S로 적용한다. 적용했을 때만 "이 버전은 돌았다"로 기록한다(버리면 다음 컴파일 뒤 다시 돈다).
+    //   돌린 뒤 바뀐 것이 없으면(이미 있는 항목뿐 · 같은 값으로 Work만 함) 바로 기록한다.
     //   내용을 바꾸면 버전을 올린다("1" → "2"). 이미 있는 항목은 건너뛰고(개발자가 맞춘 값을 덮지 않는다), 고쳐야 할 때만 Work.
     //
     //   [DbSeed("1")]
@@ -90,7 +91,8 @@ namespace GBible.EditorTools
             if (ran.Count == 0) return 0;
             SessionState.SetString(PendingKey, string.Join("\n", pending.Concat(ran).Distinct()));
             EditorDatabase.Staging.Touch();
-            if (EditorDatabase.Staging.IsEmpty) RecordPending();   // 바뀐 것이 없으면(이미 있는 항목뿐) 바로 기록
+            // 바뀐 것이 없으면(이미 있는 항목뿐 · 같은 값으로 Work만 함) 바로 기록 — 적용할 것이 없어 Ctrl+S의 적용이 돌지 않으므로 기다리면 매번 다시 돈다.
+            if (!EditorDatabase.Staging.HasChanges) RecordPending();
             else Debug.Log($"[MomoiProject] DB 반영 스크립트 {ran.Count}개를 돌렸습니다({string.Join(", ", ran)}). DB에서 '적용 전' 항목을 보고 Ctrl+S로 적용하세요.");
             return ran.Count;
         }

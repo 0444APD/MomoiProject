@@ -180,6 +180,33 @@ namespace GBible.Tests
             }
         }
 
+
+        [Test]
+        public void 로비에서_같은_계정이_다시_오면_옛_연결이_조용할_때만_이어받는다()
+        {
+            using (var rig = new Rig())
+            {
+                var a = rig.Connect("철수");
+                Assert.AreEqual(NetClientState.Lobby, a.State);
+
+                // 옛 연결이 살아 있으면 새 연결만 끊는다(거절이 아니다 — 잠시 뒤 다시 시도할 수 있다).
+                var b = rig.Connect("철수");
+                rig.Pump();
+                Assert.AreEqual(NetClientState.Lobby, a.State, "옛 연결은 그대로");
+                Assert.AreNotEqual(NetClientState.Lobby, b.State);
+                Assert.AreEqual(1, rig.Hub.LobbyCount);
+
+                // 옛 연결이 3초 넘게 조용하면(네트워크가 끊겼는데 서버는 아직 모름) 새 연결이 이어받는다.
+                rig.Clients.Remove(a);
+                rig.Pump(400);
+                var c = rig.Connect("철수");
+                rig.Pump();
+                Assert.AreEqual(NetClientState.Lobby, c.State, "이어받는다");
+                Assert.AreEqual(1, rig.Hub.LobbyCount);
+                a.Dispose();
+            }
+        }
+
         [Test]
         public void 서버를_다시_켜면_진행_중인_매치를_이어_연다()
         {

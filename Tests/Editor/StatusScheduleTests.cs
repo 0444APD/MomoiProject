@@ -153,14 +153,22 @@ namespace GBible.Tests
             Do(g => g.ApplyStatus(Hero, "shield"));
             _session.EndFrame(1);
             Assert.AreEqual(15, Game.Attribute(Hero, nameof(SsUnit.attack)), 1e-9);
+            Do(g => Hero.hp -= 1);
             _session.EndFrame(1.5);
             Assert.IsFalse(Game.HasStatus(Hero, "shield"));
             Assert.AreEqual(10, Game.Attribute(Hero, nameof(SsUnit.attack)), 1e-9);
             Assert.AreEqual(1, expire.log.Count);
 
+            // 만료(시간 규칙)는 앞의 행동과 함께 되돌리고 시계도 그 행동이 시작한 때(1초)로 돌린다 — 다음 프레임에 바로 다시 끝나지 않는다.
             Assert.IsTrue(_session.Undo());
-            Assert.IsTrue(Game.HasStatus(Hero, "shield"), "만료도 행동 하나라 Undo된다");
+            Assert.IsTrue(Game.HasStatus(Hero, "shield"), "만료가 되돌려진다");
+            Assert.AreEqual(30, Hero.hp, "앞의 행동도 함께");
+            Assert.AreEqual(1, _session.Clock.Time, 1e-9, "시계도 그 행동 전으로");
+            _session.EndFrame(0.5);
+            Assert.IsTrue(Game.HasStatus(Hero, "shield"), "시각이 되기 전에는 다시 끝나지 않는다");
             Assert.AreEqual(15, Game.Attribute(Hero, nameof(SsUnit.attack)), 1e-9);
+            _session.EndFrame(1);
+            Assert.IsFalse(Game.HasStatus(Hero, "shield"), "시각이 되면 다시 끝난다");
         }
 
         [Test]
@@ -284,6 +292,34 @@ namespace GBible.Tests
                 unit.hp -= 9;
                 throw new InvalidOperationException("일부러 실패");
             }
+        }
+
+
+        [Serializable, GameEvent("시험 외침")] public class SsShout { public string text; }
+
+        // 연출 이벤트를 쏜 뒤 실패하는 행동.
+        [Serializable]
+        public sealed class ShoutThenFail : GameAction
+        {
+            protected override void Run()
+            {
+                Game.Session.Events.Publish(new SsShout { text = "inner" });
+                throw new InvalidOperationException("일부러 실패");
+            }
+        }
+
+        [Test]
+        public void 이벤트_예약이_실패하면_그_예약이_쏜_연출도_빠진다()
+        {
+            var seen = new List<string>();
+            _session.Events.SubscribeAfterAction<SsShout>(s => seen.Add(s.text));
+            Do(g => g.ScheduleOn<SsTurnEnded>(1, new ShoutThenFail()));
+            Do(g =>
+            {
+                g.Session.Events.Publish(new SsTurnEnded { unit = "hero" });
+                g.Session.Events.Publish(new SsShout { text = "outer" });
+            });
+            CollectionAssert.AreEqual(new[] { "outer" }, seen, "실패한 예약이 쏜 연출은 재생하지 않는다");
         }
 
         [Test]

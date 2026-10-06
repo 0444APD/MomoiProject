@@ -135,10 +135,10 @@ protected override void Tick(float deltaTime)
 
 | ID (`GameScreens.…`) | 층 · 뒤로 | 하는 일 | 여는 법 |
 |---|---|---|---|
-| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 후보 버튼 안에 텍스트 `<후보 id>.desc`가 있으면 설명 글(`.momoi-option__desc`). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. `GameScreens.Reroll`을 정하면 표로 만든 선택에 '다시 뽑기'(29장 4-10b). 틀린 답은 알림 | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로') |
+| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 후보 버튼 안에 텍스트 `<후보 id>.desc`가 있으면 설명 글(`.momoi-option__desc`). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. `GameScreens.Reroll`을 정하면 표로 만든 선택에 '다시 뽑기'(29장 4-10b). 틀린 답(답하기 실패)은 '실패를 알림으로'를 따른다(켜면 알림, 끄면 경고 로그) | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로'). 연 프레임에 바로 그린다(빈 창이 한 프레임 보이지 않는다) |
 | `Confirmation` (`momoi.confirm`) | 팝업 · 아니오 | 글 + 예/아니오 | `GameScreens.Confirm(글, 예, 아니오)` |
-| `Settings` (`momoi.settings`) | 창 · 닫기 | DB › 설정 항목을 분류마다: 켜기/끄기 → 토글, 숫자 → 슬라이더(0~1이면 %), 선택지 → 드롭다운(언어·해상도는 자동 목록), 글 → 입력칸. 바꾸면 바로 `GameSettings.Set`(저장·적용). '기본값으로'(확인 후 `ResetAll`) | `GameScreens.Open(GameScreens.Settings)` |
-| `Slots` (`momoi.slots`) | 창 · 닫기 | 슬롯마다 요약(`GBibleRuntime.SlotSummary`)·플레이 시간. 고르면 `UseSlot` 후 `picked`. 지우기(확인 후, 지금 슬롯은 못 지움) | `GameScreens.Open(GameScreens.Slots, new SlotsRequest { count = 3, picked = … })` |
+| `Settings` (`momoi.settings`) | 창 · 닫기 | DB › 설정 항목을 분류마다: 켜기/끄기 → 토글, 숫자 → 슬라이더(0~1이면 %), 선택지 → 드롭다운(언어·해상도는 자동 목록), 글 → 입력칸. 바꾸면 바로 `GameSettings.Set`(저장·적용). 슬라이더는 끄는 동안 적용만 하고(`Set(id, 값, save: false)`) 놓을 때·포커스를 잃을 때·창을 닫을 때 `settings.json`에 쓴다(`GameSettings.Flush()`). '기본값으로'(확인 후 `ResetAll`) | `GameScreens.Open(GameScreens.Settings)` |
+| `Slots` (`momoi.slots`) | 창 · 닫기 | 슬롯마다 요약(`GBibleRuntime.SlotSummary`)·플레이 시간(지금 슬롯은 저장 뒤 흐른 시간까지)·저장 시각(`yyyy-MM-dd HH:mm`). 고르면 `UseSlot` 후 `picked`. 지우기(확인 후, 지금 슬롯은 못 지움) | `GameScreens.Open(GameScreens.Slots, new SlotsRequest { count = 3, picked = … })` |
 | `Pause` (`momoi.pause`) | 창 · 닫기 · 시간 멈춤 | 계속하기 · 설정 · 타이틀로(`GameScreens.QuitToTitle`이 있을 때) · 게임 종료 | `Open(GameScreens.Pause)` 또는 Esc('Esc로 일시정지 메뉴') |
 | (알림) | 알림 | 아래쪽 한 줄, 2.5초. 최대 4줄 | `GameScreens.Toast(글)` |
 
@@ -147,14 +147,14 @@ protected override void Tick(float deltaTime)
 - **고르는 동안 게임 시간 멈춤**(DB › 화면 설정, 기본 끔): 켜면 기본 고르기 창이 떠 있는 동안 `GameTime.Pause`로 게임 시간을 멈춘다. 실시간 게임의 레벨업 선택에서 켠다(고르는 동안 적이 움직이지 않는다). `Time.timeScale`이라 시간 예약·초 지속·고정 틱과 함께 **연출도 멈춘다** → 턴제는 끈다. 화면 코드의 `Tick`(실제 시간)은 계속 돈다.
 - **바꾸기**: 같은 ID로 DB › 화면 항목을 만들면 그 항목이 쓰인다. `[BindTo("momoi.settings")]` 클래스가 없으면 기본 코드가 그 UXML 위에 그린다(USS만 바꾸고 싶을 때). 통째로 바꾸려면 `[BindTo]`로 코드도 잇는다.
 - **고르기 창을 바꿨을 때 '고르기 창 저절로'**: 같은 ID(`momoi.choice`)로 바꿨으면 **켜 둔다** — 저절로 여는 것이 이 ID라, 끄면 열리지 않는다. 다른 ID로 따로 만들어 직접 열 때만 끈다(켜 두면 기본 창과 둘 다 뜬다). 같은 ID의 DB 항목에서는 그 항목의 칸이 쓰인다: 층은 `팝업`, '뒤로(Esc)로 닫기'는 끈다(켜 두면 Esc로 닫혀도 선택 대기가 남아 다음 프레임에 다시 열린다), 시간 멈춤은 '고르는 동안 게임 시간 멈춤' 대신 그 항목의 '열린 동안 게임 시간 멈춤'이다.
-- **글**: 텍스트 키가 있으면 그 번역, 없으면 한국어 기본 글. 출시 언어마다 텍스트 표에 넣는다.
+- **글**: 텍스트 키가 있으면 그 번역, 없으면 한국어 기본 글. 출시 언어마다 텍스트 표에 넣는다. 언어가 바뀌면 열린 기본 화면은 고정 글(제목·버튼)까지 다시 만든다.
 
 | 텍스트 키 | 기본 글 |
 |---|---|
 | `momoi.ui.ok` · `momoi.ui.yes` · `momoi.ui.no` · `momoi.ui.close` · `momoi.ui.skip` | 확인 · 예 · 아니오 · 닫기 · 건너뛰기 |
 | `momoi.ui.choose` · `momoi.ui.chooseCount` · `momoi.ui.chooseRange` | 고르기 · {count}개를 고르세요 · {min}~{max}개를 고르세요 |
 | `momoi.ui.settings` · `momoi.ui.resetAll` · `momoi.ui.resetAllAsk` · `momoi.ui.noSettings` | 설정 · 기본값으로 · 모든 설정을 기본값으로 되돌릴까요? · 설정 항목이 없습니다(DB › 설정). |
-| `momoi.ui.slots` · `momoi.ui.emptySlot` · `momoi.ui.slotLine` · `momoi.ui.delete` · `momoi.ui.deleteSlotAsk` | 슬롯 · {slot} — 빈 슬롯 · {slot} — {summary} ({time}) · 지우기 · 슬롯 {slot}을(를) 지울까요? |
+| `momoi.ui.slots` · `momoi.ui.emptySlot` · `momoi.ui.slotLine` · `momoi.ui.delete` · `momoi.ui.deleteSlotAsk` | 슬롯 · {slot} — 빈 슬롯 · {slot} — {summary} ({time}) {saved} · 지우기 · 슬롯 {slot}을(를) 지울까요? (`{saved}` = 저장 시각 `yyyy-MM-dd HH:mm`) |
 | `momoi.ui.pause` · `momoi.ui.resume` · `momoi.ui.toTitle` · `momoi.ui.quit` | 일시정지 · 계속하기 · 타이틀로 · 게임 종료 |
 
 - 설정 항목의 이름은 텍스트 `<설정 ID>.name`, 분류 이름은 분류 글자(텍스트 키면 번역), 선택지의 '보일 글'은 텍스트 키 또는 글(31장).
@@ -202,7 +202,7 @@ protected override void Tick(float deltaTime)
 | `failureToast` | 실패를 알림으로 | 기본 켬 |
 | `pauseMenu` | Esc로 일시정지 메뉴 | 기본 끔 |
 
-- 항목은 하나만 둔다(둘 이상이면 첫 항목). 검증: Panel Settings가 비면 경고, 테마 USS에 빈 칸이 있으면 오류.
+- 항목은 하나만 둔다(둘 이상이면 첫 항목). 검증: Panel Settings가 비면 경고, 글꼴이 비면 경고("글꼴이 비어 있습니다. 한글이 든 글꼴(TTF·OTF)을 넣지 않으면 기기에 따라 한글이 빈 네모로 보입니다."), 테마 USS에 빈 칸이 있으면 오류.
 
 ### 3-3. DB › 화면(사이드바 DB 그룹)
 

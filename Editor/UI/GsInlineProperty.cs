@@ -369,7 +369,7 @@ namespace GBible.EditorTools.UI
                     return;
                 case SerializedPropertyType.String when KeywordTools.GroupOf(_field) != null:
                     ShowKeywordMenu();
-                    break;
+                    return;
                 case SerializedPropertyType.String when DataRefType != null:
                     ShowIdMenu(EditorDatabase.Instance.RefCandidates(_field), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
                     return;
@@ -620,12 +620,14 @@ namespace GBible.EditorTools.UI
 
         void ShowStorableTypeMenu()
         {
-            var items = StorableTypes.All().Select(type =>
+            var instanceField = _field.GetCustomAttribute<DataTypeRefAttribute>()?.InstanceField;
+            // 형식을 고르면 옆 칸([SerializeReference])에 새 인스턴스를 넣는 칸이면 클래스만 보인다(기본 형식·enum은 넣을 수 없다).
+            var types = string.IsNullOrEmpty(instanceField) ? StorableTypes.All() : StorableTypes.All().Where(t => !t.IsValueType && t != typeof(string));
+            var items = types.Select(type =>
             {
                 var name = type.FullName;
                 return new GsDropdownItem(StorableTypes.Label(type), () =>
                 {
-                    var instanceField = _field.GetCustomAttribute<DataTypeRefAttribute>()?.InstanceField;
                     if (string.IsNullOrEmpty(instanceField))
                     {
                         SetString(name);
@@ -646,6 +648,7 @@ namespace GBible.EditorTools.UI
                     Selected = _property.stringValue == name,
                 };
             }).ToList();
+            if (items.Count == 0) items.Add(new GsDropdownItem("고를 수 있는 데이터 클래스가 없습니다(AI가 코드로 만듭니다)") { Disabled = true });
             OpenMenu(items, placeholder: "형식 검색");
         }
 

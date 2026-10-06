@@ -47,7 +47,12 @@ namespace GBible.EditorTools
         // 모아 둔 변경을 모두 저장한다. 돌려주는 값: 저장한 변경 수.
         public static int Save()
         {
-            if (!HasChanges) return 0;
+            if (!HasChanges)
+            {
+                // 바뀐 것은 없지만 원본과 같은 작업본만 남았으면(같은 값으로 Work만 한 DB 반영 스크립트 등) 치우고 '적용했다'로 친다 — 돌려 둔 스크립트가 기록된다.
+                if (!EditorDatabase.Staging.IsEmpty) EditorDatabase.Staging.Commit();
+                return 0;
+            }
             var items = EditorDatabase.Staging.Commit();
             var registry = ClassRegistry.IsDirty;
             if (ClassRegistry.IsDirty) ClassRegistry.Commit();

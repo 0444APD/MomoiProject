@@ -89,6 +89,7 @@ namespace GBible
         // 바깥 행동이 성공했을 때(세션이 부른다): 모아 둔 이벤트를 쏜 순서대로 준다.
         internal void FlushAfterAction()
         {
+            _inAction.Clear();
             if (_pending.Count == 0) return;
             var ready = _pending.ToArray();
             _pending.Clear();
@@ -96,7 +97,26 @@ namespace GBible
         }
 
         // 행동이 실패해 취소됐을 때: 모아 둔 이벤트를 버린다.
-        internal void DropAfterAction() => _pending.Clear();
+        internal void DropAfterAction()
+        {
+            _pending.Clear();
+            _inAction.Clear();
+        }
+
+        // 행동 안에서 일부만 되돌릴 때(실패한 이벤트 예약 — Schedules): 저장점 뒤에 쏜 이벤트를 연출(SubscribeAfterAction)과
+        // 전송(Retracted를 받는 NetServer)에서 뺀다. 규칙 쪽(Subscribe)이 바꾼 값은 데이터 저장점이 되돌린다.
+        public event Action<object> Retracted;
+
+        readonly List<object> _inAction = new List<object>();
+
+        internal (int pending, int published) MarkEvents() => (_pending.Count, _inAction.Count);
+
+        internal void RollbackEvents((int pending, int published) mark)
+        {
+            if (_pending.Count > mark.pending) _pending.RemoveRange(mark.pending, _pending.Count - mark.pending);
+            for (var i = _inAction.Count - 1; i >= mark.published; i--) Retracted?.Invoke(_inAction[i]);
+            if (_inAction.Count > mark.published) _inAction.RemoveRange(mark.published, _inAction.Count - mark.published);
+        }
 
         // 타입 무관하게 모든 이벤트를 받는다(수치 규칙 등).
         public IDisposable SubscribeAll(Action<object> listener)
@@ -114,6 +134,8 @@ namespace GBible
             if (evt == null) throw new ArgumentNullException(nameof(evt));
             var entry = _journal.Append(JournalKind.Event, "Events", Describe(evt));
             entry.Payload = evt;
+            var inAction = InAction?.Invoke() ?? false;
+            if (inAction) _inAction.Add(evt);
 
             using (_journal.Cause(entry.Id))
             {
@@ -126,7 +148,6 @@ namespace GBible
                     Invoke(listener, evt, listener);
                 if (_afterAction.TryGetValue(evt.GetType(), out var after) && after.Count > 0)
                 {
-                    var inAction = InAction?.Invoke() ?? false;
                     foreach (var handler in after.ToArray())
                     {
                         if (inAction) _pending.Add((handler, evt));

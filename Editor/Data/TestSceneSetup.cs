@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -85,13 +86,25 @@ namespace GBible.EditorTools
         {
             serializedObject.Update();
             var scenario = serializedObject.FindProperty(nameof(TestScene.scenario));
-            var names = TestScenarios.Names();
-            var options = new[] { "(새 판)" }.Concat(names).ToArray();
-            var index = names.IndexOf(scenario.stringValue) + 1;
-            var picked = EditorGUILayout.Popup(new GUIContent("시작 상황", "플레이하면 이 테스트 상황으로 시작한다(Assets/MomoiProject/Data/Tests). 테스트 패널·모니터 › 명령에서 저장한다"), Mathf.Max(0, index), options);
-            scenario.stringValue = picked == 0 ? "" : names[picked - 1];
-            if (index == 0 && !string.IsNullOrEmpty(scenario.stringValue))
-                EditorGUILayout.HelpBox($"테스트 상황 '{scenario.stringValue}' 파일이 없습니다.", MessageType.Warning);
+            var names = TestScenarios.Names().ToList();
+            var current = scenario.stringValue;
+            // 파일이 없는 이름(지웠거나 아직 저장 전)은 '(없음) 이름'으로 목록에 남긴다 — 그리기만 해서는 이름을 지우지 않는다.
+            var missing = !string.IsNullOrEmpty(current) && !names.Contains(current);
+            var options = new List<string> { "(새 판)" };
+            if (missing) options.Add($"(없음) {current}");
+            options.AddRange(names);
+            var offset = missing ? 2 : 1;
+            var index = string.IsNullOrEmpty(current) ? 0 : missing ? 1 : names.IndexOf(current) + offset;
+            EditorGUI.BeginChangeCheck();
+            var picked = EditorGUILayout.Popup(new GUIContent("시작 상황", "플레이하면 이 테스트 상황으로 시작한다(Assets/MomoiProject/Data/Tests). 테스트 패널·모니터 › 명령에서 저장한다"), index, options.ToArray());
+            // 바꾼 것은 사용자가 고를 때만 적는다.
+            if (EditorGUI.EndChangeCheck() && picked != index)
+            {
+                if (picked == 0) scenario.stringValue = "";
+                else if (picked >= offset) scenario.stringValue = names[picked - offset];
+            }
+            if (missing && scenario.stringValue == current)
+                EditorGUILayout.HelpBox($"테스트 상황 '{current}' 파일이 없습니다. 같은 이름으로 저장하거나 다른 상황을 고르세요.", MessageType.Warning);
             DrawPropertiesExcluding(serializedObject, "m_Script", nameof(TestScene.scenario));
             serializedObject.ApplyModifiedProperties();
             EditorGUILayout.HelpBox("플레이하면 'test' 슬롯에서 시작 상황으로 열리고, 게임 화면 위에 테스트 패널(테스트 명령 · 상황 저장·불러오기 · 시간 · Undo)이 뜬다. 출시 빌드에서는 아무것도 하지 않는다.", MessageType.Info);

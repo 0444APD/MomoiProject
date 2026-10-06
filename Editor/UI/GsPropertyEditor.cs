@@ -65,48 +65,19 @@ namespace GBible.EditorTools.UI
             return inline;
         }
 
-        // 묶음 필드(곡선·지속 설정 …)의 칸들. [ShowIf]가 붙은 칸은 형제 칸의 값에 따라 보이고 숨는다(값을 바꾸면 바로).
+        // 묶음 필드(곡선·지속 설정 …)의 칸들. [ShowIf]가 붙은 칸은 형제 칸의 값에 따라 보이고 숨는다(값을 바꾸면 바로, ShowIfRules).
         static VisualElement Group(SerializedProperty property, Action onValue, Action onStructure)
         {
             var group = Gs.Col();
-            var owner = property.Copy();
-            var conditional = new List<(VisualElement view, ShowIfAttribute condition)>();
-            void Refresh()
-            {
-                owner.serializedObject.Update();
-                foreach (var (view, condition) in conditional)
-                    view.style.display = condition.Matches(SiblingValue(owner.FindPropertyRelative(condition.Field))) ? DisplayStyle.Flex : DisplayStyle.None;
-            }
-            Action changed = () =>
-            {
-                if (conditional.Count > 0) Refresh();
-                onValue?.Invoke();
-            };
+            var conditional = new ShowIfViews();
+            var changed = conditional.Wrap(onValue);
             foreach (var child in PropertyUtil.Children(property))
             {
                 var view = BuildProperty(child, changed, onStructure);
-                var condition = PropertyUtil.GetField(child, out _)?.GetCustomAttribute<ShowIfAttribute>(true);
-                if (condition != null) conditional.Add((view, condition));
+                conditional.Track(view, child);
                 group.Add(view);
             }
-            if (conditional.Count > 0) Refresh();
             return group;
-        }
-
-        static object SiblingValue(SerializedProperty sibling)
-        {
-            if (sibling == null) return null;
-            switch (sibling.propertyType)
-            {
-                case SerializedPropertyType.Boolean: return sibling.boolValue;
-                case SerializedPropertyType.Enum:
-                    return sibling.enumValueIndex >= 0 && sibling.enumValueIndex < sibling.enumNames.Length ? sibling.enumNames[sibling.enumValueIndex] : null;
-                case SerializedPropertyType.String: return sibling.stringValue;
-                case SerializedPropertyType.Integer: return sibling.longValue;
-                case SerializedPropertyType.Float: return sibling.doubleValue;
-                case SerializedPropertyType.ManagedReference: return sibling.managedReferenceValue;
-                default: return null;
-            }
         }
 
         // 칸 이름표 = 코드의 변수 이름(항목·필드는 코드 이름으로 식별한다). 목록 요소는 [번호].
@@ -312,12 +283,19 @@ namespace GBible.EditorTools.UI
                     header.Add(preview);
                     header.Add(RemoveButton(() => Remove(list, index, onStructure)));
                     card.Add(header);
+                    // 줄 안의 [ShowIf] 칸(가중치 표 줄의 항목·목록, 밸런스 단계 …)은 같은 줄의 조건 칸을 바꾸면 바로 보이고 숨는다.
+                    var conditional = new ShowIfViews();
+                    var changed = conditional.Wrap(() =>
+                    {
+                        preview.text = Preview(element);
+                        onValue?.Invoke();
+                    });
                     foreach (var child in PropertyUtil.Children(element))
-                        card.Add(BuildProperty(child, () =>
-                        {
-                            preview.text = Preview(element);
-                            onValue?.Invoke();
-                        }, onStructure));
+                    {
+                        var view = BuildProperty(child, changed, onStructure);
+                        conditional.Track(view, child);
+                        card.Add(view);
+                    }
                 }
                 else
                 {
@@ -423,8 +401,9 @@ namespace GBible.EditorTools.UI
                         onValue?.Invoke();
                     };
                     tokens.Add(token);
+                    // 마우스를 올리면 칸의 설명([FieldLabel]·[Tooltip] — 글 틀의 {user:…}·{event:…} 같은 안내 포함), 없으면 변수 이름.
                     var field = PropertyUtil.GetField(child, out _);
-                    token.tooltip = LabelOf(child, field);
+                    token.tooltip = HintOf(field) ?? LabelOf(child, field);
                     row.Add(token);
                 }
                 index = close + 1;
@@ -506,6 +485,9 @@ namespace GBible.EditorTools.UI
 
             var type = value.GetType();
             tooltip = BlockTypes.Description(type) ?? "";
+            // 블록 안의 [ShowIf] 칸(자리 검사의 이벤트 필드·n번째 칸 …)은 문장의 단어나 다른 칸을 바꾸면 바로 보이고 숨는다.
+            var conditional = new ShowIfViews();
+            onValue = conditional.Wrap(onValue);
 
             GsButton swap = null;
             swap = new GsButton("바꾸기", () => GsPropertyEditor.ShowTypeMenu(swap, baseType, newType =>
@@ -599,6 +581,8 @@ namespace GBible.EditorTools.UI
                     summary.text = now ? Summary(property.managedReferenceValue) : "";
                     summary.style.display = now ? DisplayStyle.Flex : DisplayStyle.None;
                     foreach (var child in Children().Where(c => c.ClassListContains("gs-block__children"))) child.style.display = now ? DisplayStyle.None : DisplayStyle.Flex;
+                    // 펼치면 [ShowIf]로 숨은 칸은 다시 숨긴다.
+                    if (!now) conditional.Refresh();
                 });
                 header.tooltip = "클릭해서 접기·펼치기";
                 Add(header);
@@ -607,18 +591,21 @@ namespace GBible.EditorTools.UI
             foreach (var child in PropertyUtil.Children(property))
             {
                 if (used.Contains(child.name)) continue;
-                // 하위 조건 목록은 제목 없이 내용만, 들여쓴 줄로 묶는다.
-                if (child.isArray || child.propertyType == SerializedPropertyType.ManagedReference)
+                // 하위 조건 목록은 제목 없이 내용만, 들여쓴 줄로 묶는다. 글자 칸(isArray가 참)은 목록이 아니라 이름표가 붙은 값 칸.
+                if ((child.isArray && child.propertyType == SerializedPropertyType.Generic) || child.propertyType == SerializedPropertyType.ManagedReference)
                 {
                     var nested = Gs.Box("gs-block__children");
                     nested.Add(GsPropertyEditor.BuildContent(child, onValue, onStructure));
+                    conditional.Track(nested, child);
                     if (ClassListContains("gs-block-group") && Collapsed.Contains(property.serializedObject.targetObject.GetHashCode() + ":" + property.propertyPath))
                         nested.style.display = DisplayStyle.None;
                     Add(nested);
                 }
                 else
                 {
-                    Add(GsPropertyEditor.BuildProperty(child, onValue, onStructure));
+                    var view = GsPropertyEditor.BuildProperty(child, onValue, onStructure);
+                    conditional.Track(view, child);
+                    Add(view);
                 }
             }
         }

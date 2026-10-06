@@ -220,7 +220,8 @@ namespace GBible.EditorTools
 
         void BuildListRows()
         {
-            if (_rows != null) _body.Remove(_rows);
+            // 창을 다시 그리면(Rebuild) 예전 줄 묶음은 예전 본문에 붙어 있다 — 어디에 붙어 있든 떼어 낸다.
+            _rows?.RemoveFromHierarchy();
             _rows = Gs.Col();
             _rows.style.marginTop = 6;
             _body.Add(_rows);

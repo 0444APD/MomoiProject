@@ -61,6 +61,7 @@
 - 등록하면(`GameView.Redraw(draw, 키…)`) **그 프레임 끝에 처음 한 번** 그린다. 그 뒤로는 보는 키의 값이 바뀌었거나 언어가 바뀐 프레임의 끝(`LateUpdate`, 행동 밖)에 **한 번만** 그린다. 키를 비우면 어느 값이 바뀌어도 그린다.
 - 알림은 한 행동에도 여러 번 온다(중간 Sync·실패한 행동의 되돌림·Undo). 다시 그리기는 표시만 해 두었다가 프레임 끝에 모아 한 번 그린다(23장 4절). 행동이 실행 중이면 다음 프레임으로 미룬다.
 - **연출을 기다린다(기본).** 연출이 남아 있으면 그 연출이 다 끝난 뒤의 프레임 끝까지 미룬다. 기다리지 않을 화면(골드·에너지처럼 늘 지금 값이어야 하는 것)은 `Redraw(draw, waitForPresentation: false, 키…)`.
+- **처음 한 번은 기다리지 않는다.** 연출 중이어도 등록한 프레임 끝에 지금 값으로 그린다(새로 연 화면·씬 전환 뒤의 새 씬은 그 전 모습이 없다). 기다리기는 그 뒤의 다시 그리기부터다. 씬 흐름(2-6)은 처음 열기도 연출을 기다린다.
 - **세션이 바뀌면**(슬롯 바꾸기·다시 시작, 31장) 새 세션에 다시 연결하고 모두 다시 그린다.
 - 그리는 함수가 예외를 내면 콘솔에 찍히고 다른 화면은 계속 그린다.
 - `Dispose`하면 그만 그린다(`OnDisable`에서).
@@ -228,7 +229,7 @@ void OnDisable() => _view?.Dispose();
 
 | 멤버 | 뜻 |
 |---|---|
-| `IDisposable Redraw(Action draw, params string[] keys)` | 키(비우면 아무 키나)·언어가 바뀌면 프레임 끝에 `draw`를 한 번. 연출을 기다린다 |
+| `IDisposable Redraw(Action draw, params string[] keys)` | 키(비우면 아무 키나)·언어가 바뀌면 프레임 끝에 `draw`를 한 번. 연출을 기다린다(처음 한 번은 기다리지 않는다) |
 | `IDisposable Redraw(Action draw, bool waitForPresentation, params string[] keys)` | 기다릴지 정한다 |
 
 키는 `GameIds.PlayerData.X.Id`(또는 ID 글자)다. 라이브러리의 키(`ChoiceSystem.Key`, `WorldStateSystem.SessionKey` …)도 쓴다.

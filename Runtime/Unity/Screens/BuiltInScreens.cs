@@ -162,7 +162,7 @@ namespace GBible
             var choice = Game?.Choice;
             if (choice == null) return;
             try { Game.Answer(choice.id, picked.Cast<object>()); }
-            catch (GameFailure failure) { GameScreens.Toast(failure.Message); }
+            catch (GameFailure failure) { GameScreens.ShowFailure(failure.Message); }
         }
     }
 
@@ -240,6 +240,8 @@ namespace GBible
             ScreenUi.Button(row, ScreenUi.Text("momoi.ui.close", "닫기"), Close, primary: true);
         }
 
+        protected internal override void OnClose() => GameSettings.Flush();
+
         protected internal override void Draw()
         {
             if (_body == null) return;
@@ -285,11 +287,14 @@ namespace GBible
                     slider.style.flexGrow = 1;
                     var shown = new Label(Shown(setting, GameSettings.Number(id)));
                     shown.AddToClassList("momoi-value");
+                    // 끄는 동안은 적용만 하고(음량이 바로 바뀐다) 파일에는 놓을 때·포커스를 잃을 때·창을 닫을 때 쓴다.
                     slider.RegisterValueChangedCallback(e =>
                     {
-                        GameSettings.Set(id, (double)e.newValue);
+                        GameSettings.Set(id, (double)e.newValue, save: false);
                         shown.text = Shown(setting, GameSettings.Number(id));
                     });
+                    slider.RegisterCallback<PointerCaptureOutEvent>(_ => GameSettings.Flush(), TrickleDown.TrickleDown);
+                    slider.RegisterCallback<FocusOutEvent>(_ => GameSettings.Flush());
                     row.Add(slider);
                     row.Add(shown);
                     control = row;
@@ -365,9 +370,13 @@ namespace GBible
                 var info = GBibleRuntime.SlotInfoOf(name);
                 var row = ScreenUi.Row(_body);
                 row.AddToClassList("momoi-slot");
+                // 지금 슬롯의 플레이 시간은 저장된 값이 아니라 지금까지(저장 뒤에 흐른 시간 포함).
+                var current = name == GBibleRuntime.Slot;
+                var playTime = current ? Math.Max(info.PlayTime, GBibleRuntime.PlayTime) : info.PlayTime;
+                var saved = info.SavedAt == default ? "" : info.SavedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
                 var text = info.IsEmpty
                     ? ScreenUi.Text("momoi.ui.emptySlot", "{slot} — 빈 슬롯", ("slot", name))
-                    : ScreenUi.Text("momoi.ui.slotLine", "{slot} — {summary} ({time})", ("slot", name), ("summary", info.Summary), ("time", ScreenUi.Duration(info.PlayTime)));
+                    : ScreenUi.Text("momoi.ui.slotLine", "{slot} — {summary} ({time}) {saved}", ("slot", name), ("summary", info.Summary), ("time", ScreenUi.Duration(playTime)), ("saved", saved));
                 var pick = ScreenUi.Button(row, text, () => Pick(name), primary: name == GBibleRuntime.Slot);
                 pick.style.flexGrow = 1;
                 if (_request.allowDelete && !info.IsEmpty && name != GBibleRuntime.Slot)

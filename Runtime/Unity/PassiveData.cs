@@ -25,7 +25,8 @@ namespace GBible.Data
         [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)] public Trigger trigger;
         [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두", Root = nameof(trigger)), Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 targetId → 가진 쪽이 맞을 때만)")] public string holderField = "";
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
-        [FieldLabel("발동 더(다른 순간)"), TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept), OutcomeSlot(OutcomeKinds.All), Tooltip("같은 패시브가 다른 순간에 다른 결과를 낼 때 줄마다 트리거 + 결과(손을 낼 때 쌓기 · 버릴 때 빼기 · 점수 때 내기). 가진 쪽 필드·놓인 것마다 순서는 위와 같다")] public List<TriggerRule> rules = new List<TriggerRule>();
+        // [BindTo] 코드는 '결과'만 대신한다(ToDefinition) — 줄마다의 결과는 그대로 돌므로 BindTo = false(편집 화면에서 잠그지 않는다).
+        [FieldLabel("발동 더(다른 순간)"), TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept), OutcomeSlot(OutcomeKinds.All, BindTo = false), Tooltip("같은 패시브가 다른 순간에 다른 결과를 낼 때 줄마다 트리거 + 결과(손을 낼 때 쌓기 · 버릴 때 빼기 · 점수 때 내기). 가진 쪽 필드·놓인 것마다 순서는 위와 같다")] public List<TriggerRule> rules = new List<TriggerRule>();
         [FieldLabel("주기(초)"), Tooltip("0보다 크면 가진 동안 이 초(게임 시간)마다 가진 쪽마다 결과를 냅니다(트리거 없이도). 레벨별 주기가 있으면 그것")] public double pulse;
         [FieldLabel("레벨별 주기(초, 1레벨부터)")] public List<double> pulseByLevel = new List<double>();
         [FieldLabel("가진 동안 능력치 보정"), Tooltip("가진 동안만 붙는 보정입니다(잃으면 저절로 빠짐). 받는 쪽 = 가진 쪽(놓인 것마다면 그 요소) 또는 아래 '보정 받을 대상'")] public List<PassiveModifier> modifiers = new List<PassiveModifier>();
@@ -61,7 +62,10 @@ namespace GBible.Data
             // 발동·보정·주기가 모두 없어도 된다: 가지고 있는지만 보는 스위치(Game.Owned — Four Fingers 같은 판정 스위치).
             trigger?.Validate(context);
             if (trigger != null && outcomes.Count == 0 && !BoundOutcomes.Has(Id)) context.Warning("결과가 없습니다.");
-            if (trigger == null && pulse <= 0 && pulseByLevel.Count == 0 && (outcomes.Count > 0 || BoundOutcomes.Has(Id))) context.Warning("발동(트리거)도 주기도 없어 결과가 돌지 않습니다. 가진 동안 능력치 보정만 쓰려면 결과를 비우세요.");
+            // 레벨별 주기가 있으면 '주기(초)' 대신 그것을 쓴다(0 = 그 레벨에는 주기 없음).
+            var pulses = pulseByLevel.Count > 0 ? pulseByLevel.Any(p => p > 0) : pulse > 0;
+            if (trigger == null && !pulses && (outcomes.Count > 0 || BoundOutcomes.Has(Id))) context.Warning("발동(트리거)도 주기도 없어 결과가 돌지 않습니다. 가진 동안 능력치 보정만 쓰려면 결과를 비우세요.");
+            else if (pulseByLevel.Count > 0 && !pulses) context.Warning("레벨별 주기(초)가 모두 0이라 어느 레벨에서도 주기 결과가 돌지 않습니다(레벨별 주기가 있으면 '주기(초)'는 쓰지 않습니다).");
             for (int i = 0; i < rules.Count; i++)
             {
                 if (rules[i]?.when == null) context.Error($"발동 더 {i + 1}번째 줄에 트리거가 없습니다.");
