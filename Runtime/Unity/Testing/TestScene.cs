@@ -9,13 +9,13 @@ namespace GBible
     public enum TestNetMode
     {
         // 혼자 하기.
-        Off,
+        [InspectorName("혼자")] Off,
         // 시험 모드: 한 프로그램 안에 서버(화면 없음) + 이 화면은 그 클라이언트(메모리 전송, 일부러 지연).
-        TestMode,
-        // 직접 접속으로 방을 연다(이 화면 = 방장).
-        Host,
-        // 직접 접속으로 들어간다.
-        Join,
+        [InspectorName("시험 모드")] TestMode,
+        // 방 생성: 직접 접속으로 방을 만든다(이 화면 = 방장).
+        [InspectorName("방 생성")] Host,
+        // 방 참가: 직접 접속으로 들어간다.
+        [InspectorName("방 참가")] Join,
     }
 
     // 테스트 씬: 프로젝트마다 AI가 만드는 씬(Assets/Scenes/Test.unity)에 이 컴포넌트를 하나 둔다.
@@ -34,12 +34,12 @@ namespace GBible
         [Tooltip("테스트 패널을 펼치고 접는 키")] public KeyCode panelKey = KeyCode.F1;
 
         [Header("멀티플레이")]
-        [Tooltip("플레이할 때 멀티로 시작: 시험 모드(한 프로그램) · 방장 · 들어가기(직접 접속)")] public TestNetMode multiplayer = TestNetMode.Off;
+        [Tooltip("플레이할 때 멀티로 시작: 시험 모드(한 프로그램) · 방 생성 · 방 참가(직접 접속)")] public TestNetMode multiplayer = TestNetMode.Off;
         [Tooltip("시험 모드: 한쪽 방향 지연(초)"), Range(0f, 1f)] public float latency = 0.08f;
         [Tooltip("시험 모드: 지연 흔들림(±초)"), Range(0f, 0.5f)] public float jitter = 0.02f;
         [Tooltip("시험 모드: 화면 없는 클라이언트 수(명단·공개 범위 시험)"), Range(0, 7)] public int extraClients;
-        [Tooltip("방장: 열 포트")] public int port = GameNet.DefaultPort;
-        [Tooltip("들어가기: 주소(IP:포트)")] public string address = "127.0.0.1:7777";
+        [Tooltip("방 생성: 열 포트")] public int port = GameNet.DefaultPort;
+        [Tooltip("방 참가: 주소(IP:포트)")] public string address = "127.0.0.1:7777";
         [Tooltip("멀티에서 보일 이름(비우면 컴퓨터 사용자 이름)")] public string playerName = "";
 
         public const string Slot = "test";
@@ -203,11 +203,11 @@ namespace GBible
             {
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("시험 모드")) Run(() => GameNet.StartTestMode(latency, jitter, extraClients, NameOrDefault()), "시험 모드");
-                if (GUILayout.Button($"방 열기 :{port}")) Run(() => GameNet.HostDirect(port, NameOrDefault()), "방을 열었습니다");
+                if (GUILayout.Button($"방 생성 :{port}")) Run(() => GameNet.HostDirect(port, NameOrDefault()), "방을 만들었습니다");
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
                 address = GUILayout.TextField(address);
-                if (GUILayout.Button("들어가기", GUILayout.Width(80))) Run(() => GameNet.JoinDirect(address, NameOrDefault()), "들어가는 중…");
+                if (GUILayout.Button("방 참가", GUILayout.Width(80))) Run(() => GameNet.JoinDirect(address, NameOrDefault()), "참가하는 중…");
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button($"매칭큐 서버 :{port}")) Run(() => GameNet.StartMatchServer(port), "매칭큐 서버를 열었습니다");

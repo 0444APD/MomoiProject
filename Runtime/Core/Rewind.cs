@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace GBible
 {
-    // 되감기 지점 하나: 그때의 세션 구역 플레이어 데이터(키 → 저장 트리, JSON).
+    // Undo 지점 하나: 그때의 세션 구역 플레이어 데이터(키 → 저장 트리, JSON).
     [Serializable]
     public sealed class RewindMark
     {
@@ -145,7 +145,7 @@ namespace GBible
         void Ensure()
         {
             if (_session.Data.IsDefined(Key)) return;
-            _session.Data.Define(Key, DataZone.Session, new RewindMarks(), "되감기 지점");
+            _session.Data.Define(Key, DataZone.Session, new RewindMarks(), "Undo 지점");
             _session.Data.SetVisibility(Key, DataVisibility.Server);
         }
 

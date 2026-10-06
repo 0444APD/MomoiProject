@@ -138,7 +138,7 @@ namespace GBible.Tests
             client.Session.Do(new RwHit { unit = Unit(client.Session, "a"), damage = 4 });
             Pump();
             Assert.AreEqual(6, Unit(client.Session, "a").hp);
-            Assert.IsFalse(client.Session.Data.IsDefined(RewindSystem.Key), "되감기 지점은 클라이언트에 보내지 않는다");
+            Assert.IsFalse(client.Session.Data.IsDefined(RewindSystem.Key), "Undo 지점은 클라이언트에 보내지 않는다");
 
             client.Session.Do(new RwBack());
             Pump();

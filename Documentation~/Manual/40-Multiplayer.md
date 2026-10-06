@@ -55,7 +55,7 @@
 |---|---|
 | 세션 구역 키 | `Public` |
 | 메타 구역 키(프로필) | `Server` — 프로필은 각자 자기 쪽 것을 쓴다(매칭큐의 계정 값은 서버 저장소) |
-| `$schedule`(예약) · `$rewind`(되감기 지점) | `Server` |
+| `$schedule`(예약) · `$rewind`(Undo 지점) | `Server` |
 
 - 정하기: `session.Data.SetVisibility("hand:2", DataVisibility.Owner, owner: 2)`. **키 단위**다 — 남에게 숨길 것은 플레이어마다 키를 나눈다(`hand:1`·`hand:2`).
 - 이벤트에는 숨길 정보를 넣지 않는다(모두에게 간다). 숨길 결과는 Owner 키의 값으로 보낸다.
@@ -97,8 +97,8 @@
 | 창구 | 가짜(지금) | 진짜(출시, 계정 준비 뒤) |
 |---|---|---|
 | 인증 `INetAuthenticator` | `FakeAuthenticator`(이름·입장 표를 믿음) | `SteamWebAuthenticator`(Steam 인증 티켓 → Web API, 퍼블리셔 키는 서버만) |
-| 매칭 `INetMatchmaker` | `LocalMatchmaker`(실력 폭 `BaseWindow` + 초당 `WidenPerSecond`, `MaxWaitSeconds`를 넘기면 아무나와) | AWS GameLift FlexMatch 어댑터(아직 — 서버를 무엇으로 돌릴지 정한 뒤) |
-| 저장 `INetPlayerStore` | `FilePlayerStore`(폴더의 accounts/·matches/ JSON) | PostgreSQL·Redis 어댑터(아직) |
+| 매칭 `INetMatchmaker` | `LocalMatchmaker`(실력 폭 `BaseWindow` + 초당 `WidenPerSecond`, `MaxWaitSeconds`를 넘기면 아무나와) | AWS GameLift FlexMatch 어댑터(아직 — AWS 계정 준비 뒤) |
+| 저장 `INetPlayerStore` | `FilePlayerStore`(폴더의 accounts/·matches/ JSON) | PostgreSQL·Redis 어댑터(아직 — 계정 준비 뒤) |
 
 ### 1-7. 사설 호스트(Steam)
 
@@ -117,10 +117,20 @@
 
 인터넷으로 닿게 하는 법(직접 접속): 가상 랜 도구(Tailscale 등, 권장 — 공유기 설정 없음) · 공유기 포트 포워딩 · 작은 서버 임대.
 
+### 1-9. 서버 빌드(매칭큐·화면 없는 서버)
+
+서버는 **게임과 같은 Unity 프로젝트의 서버 빌드**다(2026-10-06 결정 — 게임 규칙 코드·DB를 그대로 쓴다. 따로 만드는 .NET 서버 프로그램은 없다).
+
+- 만들기: Build Profiles에서 플랫폼 **Dedicated Server**(Linux 또는 Windows)로 빌드한다. 화면을 그리지 않는 빌드라 가볍다.
+- 켜기: `게임.x86_64 -batchmode -nographics -momoi-matchserver 7777 -momoi-players 2`(매칭큐) 또는 `-momoi-server 7777`(방 하나). 서버는 초당 30프레임으로 돈다.
+- 클라우드(AWS 등)에는 이 Linux 서버 빌드를 컨테이너로 올린다. 서버 한 대가 여러 매치(방)를 맡는다 — 방마다 세션 하나.
+- 클라이언트와 서버는 **같은 게임 버전**으로 빌드한다(`Application.version`이 다르면 입장을 거절한다).
+- 서버 코드(`NetServer`·`NetHub`)는 엔진 없는 코어라, 테스트(Unity 없이)에서도 같은 코드가 돈다.
+
 ## 2. 에디터에서 쓰는 법
 
-- **테스트 씬 › 컴포넌트 '테스트 씬' › 멀티플레이**: 플레이할 때 멀티로 시작(시험 모드 · 방장 · 들어가기), 시험 모드 지연·흔들림·화면 없는 클라이언트 수, 포트·주소·이름.
-- **테스트 패널(F1) › 멀티**: 시험 모드 · 방 열기 · 들어가기 · 매칭큐 서버 · 매칭 찾기. 들어가 있으면 내 번호·명단·핑, 시험 모드 지연 조절, 로비(점수·줄 서기·수락·거절), 나가기.
+- **테스트 씬 › 컴포넌트 '테스트 씬' › 멀티플레이**: 플레이할 때 멀티로 시작(혼자 · 시험 모드 · 방 생성 · 방 참가), 시험 모드 지연·흔들림·화면 없는 클라이언트 수, 포트·주소·이름.
+- **테스트 패널(F1) › 멀티**: 시험 모드 · 방 생성 · 방 참가 · 매칭큐 서버 · 매칭 찾기. 들어가 있으면 내 번호·명단·핑, 시험 모드 지연 조절, 로비(점수·줄 서기·수락·거절), 나가기.
   - 클라이언트일 때 Undo·새 판·테스트 상황은 판을 가진 쪽(서버)에서 한다(시험 모드는 이 프로그램 안의 서버, 남의 서버면 개발 명령으로).
 - **모니터 머리**: 멀티(시험 모드·방장·매칭큐 서버)이면 세션을 고른다 — 서버 · 이 화면(클라이언트) · 화면 없는 클라이언트 · 방마다.
 - 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(entityId) · 주인(플레이어 번호) · 초당 보내는 횟수 · 늦게 그리기 · 회전.
@@ -131,8 +141,8 @@
 
 ```csharp
 GameNet.StartTestMode(latency: 0.1);                        // 시험 모드(한 프로그램)
-GameNet.HostDirect(7777, "방장");                           // 직접 접속으로 방 열기(이 화면 = 방장)
-GameNet.JoinDirect("100.64.1.2:7777", "철수");              // 직접 접속으로 들어가기
+GameNet.HostDirect(7777, "방장");                           // 직접 접속으로 방 생성(이 화면 = 방장)
+GameNet.JoinDirect("100.64.1.2:7777", "철수");              // 직접 접속으로 방 참가
 GameNet.StartDedicated(7777);                               // 화면 없는 서버(방장 없음)
 GameNet.StartMatchServer(7777, playersPerMatch: 2);         // 매칭큐 서버(가짜 인증·로컬 매칭·파일 저장)
 GameNet.FindMatch("100.64.1.2:7777", "철수");               // 매칭큐 로비 → GameNet.Client.Queue() → Client.AnswerMatch(true)

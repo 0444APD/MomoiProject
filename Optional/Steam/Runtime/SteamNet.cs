@@ -12,8 +12,8 @@ using Steamworks;
 namespace GBible
 {
     // 사설 호스트 멀티(친구 방): Steam 로비(친구 초대) + Steam Datagram Relay(NAT 통과, 서버 비용 없음). 방장 권한.
-    //   방 만들기:   SteamLobby.Create(4);            — 로비를 만들고 이 프로그램이 방장(GameNet.Host)이 된다. 친구 초대 창: SteamLobby.Invite()
-    //   들어가기:    친구의 초대를 받거나(Steam 친구 목록 › 게임 참가) SteamLobby.Join(로비 번호) — 방장에게 접속(GameNet.Join)
+    //   방 생성:     SteamLobby.Create(4);            — 로비를 만들고 이 프로그램이 방장(GameNet.Host)이 된다. 친구 초대 창: SteamLobby.Invite()
+    //   방 참가:     친구의 초대를 받거나(Steam 친구 목록 › 게임 참가) SteamLobby.Join(로비 번호) — 방장에게 접속(GameNet.Join)
     //   나가기:      SteamLobby.Leave();              — 방장이 나가면 판이 끝난다(모두 연결이 끊긴다).
     // 게임 코드는 4블록 그대로다(Game.Do·SubscribeAfterAction). 전송만 Steam 릴레이로 바뀐다. 시험은 직접 접속(GameNet.HostDirect·JoinDirect)으로 해도 같다.
     public static class SteamLobby

@@ -7,8 +7,8 @@ using UnityEngine;
 namespace GBible
 {
     // 멀티플레이 창구(Unity). 4블록 중 [서버 중개]·[클라이언트 중개]를 이 게임 프로그램에 붙이고 매 프레임 돌린다(GBibleHost).
-    //   방장(사설 호스트·테스트):  GameNet.Host(전송, "방장");          — 이 화면은 서버 세션을 그대로 쓴다
-    //   들어가기:                   GameNet.Join(전송, "철수");          — 이 화면의 세션이 '받는 쪽'으로 다시 시작한다
+    //   방 생성(사설 호스트·테스트): GameNet.Host(전송, "방장");          — 이 화면은 서버 세션을 그대로 쓴다
+    //   방 참가:                    GameNet.Join(전송, "철수");          — 이 화면의 세션이 '받는 쪽'으로 다시 시작한다
     //   시험 모드(한 프로그램):     GameNet.StartTestMode(latency: 0.1); — 서버를 이 안에 띄우고 이 화면은 클라이언트(메모리 전송·일부러 지연)
     //   끝내기:                     GameNet.Leave();                     — 혼자 하기로 돌아간다
     // 화면 코드는 싱글과 같다(Game.Do·Data·SubscribeAfterAction). 내 번호는 Game.Session.LocalPlayer.
@@ -77,7 +77,7 @@ namespace GBible
         {
             Leave();
             var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
-            Server = new NetServer(session, transport, options ?? new NetServerOptions { AllowDeveloperCommands = Debug.isDebugBuild });
+            Server = new NetServer(session, transport, options ?? new NetServerOptions { AllowDeveloperCommands = Debug.isDebugBuild, GameVersion = Application.version });
             WireServer(Server);
             Server.Start();
             Server.AddLocalPlayer(string.IsNullOrEmpty(playerName) ? "방장" : playerName);
@@ -96,7 +96,7 @@ namespace GBible
         {
             Leave();
             var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
-            Server = new NetServer(session, new WebSocketServerTransport(port), options ?? new NetServerOptions { AllowDeveloperCommands = Debug.isDebugBuild });
+            Server = new NetServer(session, new WebSocketServerTransport(port), options ?? new NetServerOptions { AllowDeveloperCommands = Debug.isDebugBuild, GameVersion = Application.version });
             WireServer(Server);
             Server.Start();
             Debug.Log($"[MomoiProject] 서버를 열었습니다 — 접속 주소: {Server.Address}");
@@ -104,6 +104,7 @@ namespace GBible
             return Server;
         }
 
+        // 게임 버전(Application.version)이 서버와 다르면 입장이 거절된다(서버 쪽 기본 옵션도 같은 값).
         // 서버에 들어간다: 이 화면의 세션을 멈추고(프로필은 저장) '받는 쪽' 세션으로 다시 시작한다.
         public static NetClient Join(INetClientTransport transport, string playerName, string token = null, string gameVersion = null)
         {
@@ -133,7 +134,7 @@ namespace GBible
                 var session = GBibleRuntime.CreateSession();
                 StartRun(session);
                 return session;
-            }, auth, matchmaker, store, options ?? new NetHubOptions { AllowDeveloperCommands = Debug.isDebugBuild });
+            }, auth, matchmaker, store, options ?? new NetHubOptions { AllowDeveloperCommands = Debug.isDebugBuild, GameVersion = Application.version });
             Hub.Log += Debug.Log;
             Hub.RoomStarting += room => RoomStarting?.Invoke(room);
             Hub.RoomReady += room => RoomReady?.Invoke(room);
@@ -153,7 +154,7 @@ namespace GBible
             _testNet = new MemoryNetwork { Latency = Math.Max(0, latency), Jitter = Math.Max(0, jitter) };
             IsTestMode = true;
             var serverSession = GBibleRuntime.CreateSession();
-            Server = new NetServer(serverSession, _testNet.Server(), new NetServerOptions { AllowDeveloperCommands = true });
+            Server = new NetServer(serverSession, _testNet.Server(), new NetServerOptions { AllowDeveloperCommands = true, GameVersion = Application.version });
             WireServer(Server);
             Server.Start();
             if (prepareServer != null) prepareServer(serverSession);
@@ -207,7 +208,7 @@ namespace GBible
             NetClient created = null;
             GBibleRuntime.RestartAsClient(session =>
             {
-                created = new NetClient(session, transport, string.IsNullOrEmpty(playerName) ? "플레이어" : playerName, token, gameVersion ?? "");
+                created = new NetClient(session, transport, string.IsNullOrEmpty(playerName) ? "플레이어" : playerName, token, gameVersion ?? Application.version);
                 RemapDeveloperCommands(session, created);
                 created.ActionFailed += failure => GameScreens.ShowFailure(failure.Message);
                 created.Joined += () => Joined?.Invoke();
