@@ -27,6 +27,15 @@ namespace GBible
         Bye = 10,
         Stream = 11,
         Dev = 12,
+        // 매칭큐(NetHub): 로비 · 줄 서기 · 매치 성사 · 수락 · 취소 · 끝.
+        Lobby = 13,
+        Queue = 14,
+        Queued = 15,
+        MatchFound = 16,
+        MatchAnswer = 17,
+        MatchCancelled = 18,
+        MatchEnded = 19,
+        CancelQueue = 20,
     }
 
     // Batch 안의 기록 종류.
@@ -166,7 +175,8 @@ namespace GBible
         // 게임 코드가 붙여 두는 값(팀·준비 여부 등).
         public object Tag;
 
-        public bool IsLocal => Connection < 0;
+        // 서버와 같은 프로그램의 플레이어(방장).
+        public bool IsLocal;
         public override string ToString() => $"{Name}(#{Id})";
     }
 
@@ -182,6 +192,8 @@ namespace GBible
     public sealed class NetHello
     {
         public string Name;
+        // 보낸 연결 번호(서버가 채운다 — 입장 확인이 연결로 계정을 찾을 때).
+        public int Connection;
         // 입장 표(가짜 인증이면 비어도 된다. Steam 인증이면 인증 티켓 등).
         public string Token;
         public string GameVersion;
@@ -199,6 +211,38 @@ namespace GBible
 
         public static NetAdmission Accept(string account = null, string name = null) => new NetAdmission { Accepted = true, Account = account, Name = name };
         public static NetAdmission Refuse(string reason) => new NetAdmission { Accepted = false, Reason = reason };
+    }
+
+    // 매칭큐 로비의 내 계정(서버 저장소의 값).
+    public sealed class NetLobbyInfo
+    {
+        public string Name;
+        public double Rating;
+        public int Wins;
+        public int Losses;
+        public int Draws;
+    }
+
+    // 성사된 매치(수락 전).
+    public sealed class NetMatchFound
+    {
+        public string MatchId;
+        public string Mode;
+        public string[] Players;
+        // 수락할 시간(초).
+        public double Seconds;
+    }
+
+    // 끝난 매치의 내 결과.
+    public sealed class NetMatchEnd
+    {
+        public string MatchId;
+        // false면 취소(정원이 들어오지 않음 등 — 점수 변화 없음).
+        public bool Finished;
+        public string Reason;
+        public int Place;
+        public double Rating;
+        public double RatingDelta;
     }
 
     // 서버가 거절한 행동(클라이언트 쪽 알림). Key가 있으면 플레이어용 실패(GameFailure)의 텍스트 키.

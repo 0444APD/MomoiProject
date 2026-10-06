@@ -8,6 +8,12 @@ namespace GBible
     {
         Idle,
         Connecting,
+        // 매칭큐 서버의 로비(줄을 서지 않음).
+        Lobby,
+        // 매칭을 기다린다.
+        Queued,
+        // 매치가 성사돼 수락을 기다린다(AnswerMatch).
+        MatchFound,
         // Welcome을 받았고 처음 모습을 기다린다.
         Joining,
         Joined,
@@ -34,6 +40,7 @@ namespace GBible
         readonly Stopwatch _watch = Stopwatch.StartNew();
         long _nextRequest = 1;
         double _nextPing;
+        bool _hadRoom;
 
         public NetClient(GameSession session, INetClientTransport transport, string name, string token = null, string gameVersion = "")
         {
@@ -62,6 +69,18 @@ namespace GBible
         public int PendingActions => _pending.Count;
         // 핑 간격(초).
         public double PingInterval = 2;
+
+        // 매칭큐: 내 계정(로비에 들어오면) · 기다리는 매칭 종류 · 성사된 매치(수락 전).
+        public NetLobbyInfo Account { get; private set; }
+        public string QueueMode { get; private set; }
+        public NetMatchFound Match { get; private set; }
+        // 매칭큐 상태가 바뀌었을 때(로비·줄·성사·취소).
+        public event Action LobbyChanged;
+        public event Action<NetMatchFound> MatchFound;
+        // 성사된 매치가 취소됐을 때(이유, 다시 줄을 섰는가).
+        public event Action<string, bool> MatchCancelled;
+        // 매치가 끝났을 때(등수·점수 변화). 이어서 로비로 돌아온다.
+        public event Action<NetMatchEnd> MatchEnded;
 
         // 처음 모습까지 받아 화면이 데이터를 읽을 수 있을 때.
         public event Action Joined;
@@ -231,11 +250,85 @@ namespace GBible
                 case NetMessage.Bye:
                     Close(r.AtEnd ? "서버가 연결을 끊었습니다." : r.Str());
                     break;
+                case NetMessage.Lobby:
+                    OnLobby(r);
+                    break;
+                case NetMessage.Queued:
+                    State = NetClientState.Queued;
+                    QueueMode = r.AtEnd ? "" : r.Str();
+                    LobbyChanged?.Invoke();
+                    break;
+                case NetMessage.MatchFound:
+                {
+                    var found = new NetMatchFound { MatchId = r.Str(), Mode = r.Str(), Players = NetProtocol.ReadStrings(r), Seconds = r.Double() };
+                    Match = found;
+                    State = NetClientState.MatchFound;
+                    MatchFound?.Invoke(found);
+                    LobbyChanged?.Invoke();
+                    break;
+                }
+                case NetMessage.MatchCancelled:
+                {
+                    var reason = r.Str();
+                    var requeued = r.Bool();
+                    Match = null;
+                    if (requeued) State = NetClientState.Queued;
+                    MatchCancelled?.Invoke(reason, requeued);
+                    LobbyChanged?.Invoke();
+                    break;
+                }
+                case NetMessage.MatchEnded:
+                {
+                    var ended = new NetMatchEnd { MatchId = r.Str(), Finished = r.Bool(), Reason = r.Str(), Place = (int)r.UVar(), Rating = r.Double(), RatingDelta = r.Double() };
+                    Match = null;
+                    _session.Journal.Append(JournalKind.System, "Net", ended.Finished ? $"매치 끝: {ended.Place}등, 점수 {ended.Rating:0} ({ended.RatingDelta:+0;-0;0})" : "매치 취소: " + ended.Reason);
+                    MatchEnded?.Invoke(ended);
+                    break;
+                }
             }
+        }
+
+        void OnLobby(MirrorReader r)
+        {
+            Account = new NetLobbyInfo { Name = r.Str(), Rating = r.Double(), Wins = (int)r.UVar(), Losses = (int)r.UVar(), Draws = (int)r.UVar() };
+            State = NetClientState.Lobby;
+            PlayerId = 0;
+            Match = null;
+            _session.LocalPlayer = 0;
+            LobbyChanged?.Invoke();
+        }
+
+        // 매칭큐: 줄을 선다(mode = 매칭 종류, 비우면 기본).
+        public void Queue(string mode = "")
+        {
+            if (State != NetClientState.Lobby) return;
+            var w = NetProtocol.Begin(NetMessage.Queue);
+            w.Str(mode ?? "");
+            _transport.Send(w.Data, w.Length);
+        }
+
+        public void CancelQueue()
+        {
+            if (State != NetClientState.Queued) return;
+            var w = NetProtocol.Begin(NetMessage.CancelQueue);
+            _transport.Send(w.Data, w.Length);
+        }
+
+        // 성사된 매치에 답한다(모두 수락하면 방으로 들어간다).
+        public void AnswerMatch(bool accept)
+        {
+            if (State != NetClientState.MatchFound || Match == null) return;
+            var w = NetProtocol.Begin(NetMessage.MatchAnswer);
+            w.Str(Match.MatchId);
+            w.Bool(accept);
+            _transport.Send(w.Data, w.Length);
         }
 
         void OnWelcome(MirrorReader r)
         {
+            // 매칭큐에서 새 매치에 들어가면 지난 매치의 판 데이터를 비운다(이어서 처음 모습이 온다).
+            if (_hadRoom) _session.Data.ResetZone(DataZone.Session);
+            _hadRoom = true;
             PlayerId = (int)r.UVar();
             var missing = _receiver.UseTypes(NetProtocol.ReadStrings(r));
             if (missing.Count > 0)

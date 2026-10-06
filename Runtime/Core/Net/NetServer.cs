@@ -111,7 +111,7 @@ namespace GBible
         // 서버와 같은 프로그램의 플레이어(방장). 이 프로그램의 화면은 서버 세션을 그대로 쓴다(session.LocalPlayer = 그 번호).
         public NetPlayer AddLocalPlayer(string name)
         {
-            var player = new NetPlayer { Id = _nextPlayerId++, Name = string.IsNullOrEmpty(name) ? "방장" : name, Account = "local:" + name, Connection = -1, Connected = true };
+            var player = new NetPlayer { Id = _nextPlayerId++, Name = string.IsNullOrEmpty(name) ? "방장" : name, Account = "local:" + name, Connection = -1, Connected = true, IsLocal = true };
             _players.Add(player);
             _session.LocalPlayer = player.Id;
             PlayerJoined?.Invoke(player);
@@ -120,6 +120,19 @@ namespace GBible
         }
 
         public NetPlayer FindPlayer(int id) => _players.FirstOrDefault(p => p.Id == id);
+
+        public NetPlayer FindAccount(string account) => _players.FirstOrDefault(p => p.Account == account);
+
+        // 들어올 사람의 자리를 미리 만든다(매칭큐: 묶인 차례대로 번호 1, 2 …). 그 계정이 들어오면 이 자리(번호·데이터)를 쓴다.
+        public NetPlayer Reserve(string account, string name)
+        {
+            if (string.IsNullOrEmpty(account)) throw new ArgumentException("[MomoiProject] 계정 키가 비어 있습니다.", nameof(account));
+            var existing = FindAccount(account);
+            if (existing != null) return existing;
+            var player = new NetPlayer { Id = _nextPlayerId++, Name = string.IsNullOrEmpty(name) ? "플레이어" : name, Account = account, Connection = -1, Connected = false };
+            _players.Add(player);
+            return player;
+        }
 
         // 받은 것을 처리하고(행동 실행 포함), 필요하면 시간을 흘리고, 바뀐 곳을 보낸다.
         public void Update(double deltaTime)
@@ -222,7 +235,7 @@ namespace GBible
         {
             if (peer.Joined) return;
             var version = (int)r.UVar();
-            var hello = new NetHello { Name = r.Str(), Token = r.Str(), GameVersion = r.Str() };
+            var hello = new NetHello { Name = r.Str(), Token = r.Str(), GameVersion = r.Str(), Connection = peer.Connection };
             var table = NetProtocol.ReadStrings(r);
             if (version != NetProtocol.Version) { Refuse(peer, $"멀티플레이 규격 버전이 다릅니다(서버 {NetProtocol.Version}, 클라이언트 {version})."); return; }
             if (!string.IsNullOrEmpty(Options.GameVersion) && hello.GameVersion != Options.GameVersion) { Refuse(peer, $"게임 버전이 다릅니다(서버 {Options.GameVersion}, 클라이언트 {hello.GameVersion})."); return; }
