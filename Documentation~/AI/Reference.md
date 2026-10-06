@@ -31,6 +31,7 @@ GBible.Unity
 선택 모듈(DB 사이드바의 '기능 활성화'): 다이얼로그 · 인벤토리 · 입력(키 바꾸기) · Steam
 에디터: DB 창(MomoiProject › DB, 구조 잠금 — EditorPolicy) · 모니터(플레이 중 기록·값·명령·테스트 상황) · 에셋 관리 · 시작 설정 · DB 반영 스크립트([DbSeed]) · CSV
 테스트: 테스트 씬(TestScene) · 테스트 상황(TestScenarios) · 테스트 명령(DB › 개발 명령) · 자동 시뮬레이션
+멀티(4블록): NetServer(서버 중개) · NetClient(클라이언트 중개) · NetHub(매칭큐 서버) · 전송(메모리·WebSocket·Steam 릴레이) · GameNet(Unity 창구) · NetTransformSync(실시간 위치)
 ```
 
 - **한 판의 흐름**: 게임이 켜지면 `GBibleRuntime.Start`가 DB를 읽어 세션을 만들고(Bootstrap 옵션 → `Configuring` → 세션 → DB의 정의 등록 → `Started`), 프로필을 불러온다. 입력은 행동(`Game.Do`), 행동이 데이터를 바꾸고 이벤트를 쏜다. 화면은 프레임 끝에 데이터를 읽어 그린다.
@@ -155,6 +156,10 @@ GBible.Unity
 | 그림·소리 자리와 넣을 것 목록 | `AssetRequests.Sprite(path, w, h, 쓰는 곳)`·`Audio(path, 쓰는 곳, seconds)`·`Request(path, 쓰는 곳)`(반영 스크립트에서) → 개발자가 에셋 관리 › 넣을 것에서 진짜 파일을 넣는다(같은 자리·GUID 유지) | 관례 18, 39 |
 | 결정 기록 | `Docs/Decisions.md`(세션마다 먼저 읽기, 답·추천값을 `D-n`으로) | 진행 매뉴얼 2 |
 | 규칙 테스트(Unity 없이) | `new GameSession(new SessionOptions { Seed = 1 })` → `Data.Define` → `Game.Do` → 단언. 플레이어용 실패는 `Assert.Throws<GameFailure>` | 관례 12절 |
+| 멀티 시작(혼자 시험·직접 접속·친구 방·매칭큐) | 시험 모드 `GameNet.StartTestMode(latency)` · 직접 접속 `GameNet.HostDirect(포트)`·`JoinDirect(주소)` · 친구 방 `SteamLobby.Create(4)`·`Invite()` · 매칭큐 서버 `GameNet.StartMatchServer(포트, 인원)` + `FindMatch(주소)` → `Client.Queue()`·`AnswerMatch(true)` · 화면 없는 서버 `StartDedicated`(명령줄 `-momoi-server`·`-momoi-matchserver`) · 테스트 씬 › 멀티플레이 | 관례 20, 40 |
+| 멀티 서버 규칙(차례·숨김·결과) | `GameNet.ServerStarted`·`RoomStarting`에서 `server.Validate = (player, action) => 거절 글 또는 null` · 플레이어별 키 + `Data.SetVisibility(키, DataVisibility.Owner, 번호)` · `RoomReady`에서 첫 턴 · 끝나면 `GameNet.Hub.EndMatch(room, NetMatchResult[])`(Elo·전적 저장) · 내 번호 `session.LocalPlayer` | 관례 20, 40 |
+| 실시간 협동의 움직임 | 컴포넌트 `NetTransformSync`(entityId·owner) — 내 것은 보내고 남의 것은 보간, 판정은 방장 규칙(클라이언트는 판정 보고 행동) | 40 |
+| n턴 되돌리기 기믹 | 턴 시작 행동에서 `Game.MarkRewind()` → 기믹 행동에서 `Game.Rewind(n)`·`RewindKey(키, n)`·`RewindEntity(객체, n)`(하나의 행동 — Undo·멀티·저장에 남음) | 40 |
 
 ### 2-6. 부가 기능(명세서 6절 — 켜면 붙는 것)
 
@@ -276,6 +281,7 @@ public class PlayCard : GameAction
 | `GameAudio` | `PlayBgm(clip, volume, fade, loop)`·`StopBgm` · `PlaySfx`·`PlaySfxAt` · `PlayUi` · `PlayVoice`·`StopVoice` · `Stop(채널)`·`StopAll` · `Volume(채널)` |
 | `Texts` · `GameLanguage` | `Texts.Get(키, (이름, 값)…)` · `NameOf(id)` · `Has(키)` · `Language` / `GameLanguage.Set(code)` · `Available` |
 | `TestScenarios` · `TestScene` · `TestReport` | `Save(session, 이름)`·`Load(session, 이름, seed)`·`Delete`·`Names()`·`Simulate(session, 상황, runs, step, measure, maxSteps, firstSeed)`·`SaveReport` · 컴포넌트 `TestScene`(scenario·seed·separateSlot·speed·showPanel·panelKey) · `TestReport.Average·Min·Max·ToText·ToCsv` |
+| `GameNet` · `NetTransformSync` | `StartTestMode(latency, jitter, extraClients, 이름, prepareServer)` · `Host(전송, 이름)`·`HostDirect(포트, 이름)` · `Join(전송, 이름)`·`JoinDirect(주소, 이름)` · `StartDedicated(포트)` · `StartMatchServer(포트, 인원, auth, matchmaker, store)` · `FindMatch(주소, 이름)` · `Leave()` · `Server`·`Client`·`Hub`·`IsHost`·`IsClient`·`IsTestMode`·`TestNetwork`·`Sessions` · 이벤트 `ServerStarted`·`RoomStarting`·`RoomReady`·`Joined`·`Closed`·`PlayersChanged` · 컴포넌트 `NetTransformSync`(entityId·owner·sendRate·delay·syncRotation) |
 | 에디터(GBible.EditorTools) | `[DbSeed("버전")]`·`DbSeeds.RunPending` · `EditorDatabase.Staging.Add·Work·Remove` · `EditorPolicy.CanEditStructure·CanAddRemove(형식)` · `TestSceneSetup.Ensure(path, copyFrom, scenario)` · `AssetRequests.Sprite·Audio·Request·MarkDone` · `AssetTools.Import·Replace·UsedBy·Unused·MoveToUnused·Misplaced·Tidy·FolderFor` |
 
 ### 3-9. 선택 모듈
@@ -285,7 +291,7 @@ public class PlayCard : GameAction
 | 다이얼로그 | 그래프 창(`MomoiProject → 다이얼로그 시스템 → 그래프`), DB › 스탠딩 프로필·장소, `Dialogues.Play(id, 시작 ID)` · `Advance` · `Choose(i)` · `Stop` · `IsPlaying` · `ResumeSaved()` · 이벤트 `Started`·`Ended`·`Signaled`(그래프의 신호 보내기), 결과 '다이얼로그 재생' |
 | 인벤토리 | `Inventory { capacity, slots }` 필드 · `Add(id, 개수, 최대 겹침)` · `Remove` · `TryRemove` · `CountOf` · `Has` · `RoomFor` |
 | 입력(키 바꾸기) | `GameInput.Use(InputActionAsset)` · `Find(이름)` · `Rebind(동작, i, done)` · `CancelRebind` · `ResetBindings` · `BindingText` (설정 파일에 저장) |
-| Steam | DB › Steam · `GameSteam.IsReady` · `SetPresence(키, 값)` · `ClearPresence` · `StoreNow` (도전과제·통계는 저절로) |
+| Steam | DB › Steam · `GameSteam.IsReady` · `SetPresence(키, 값)` · `ClearPresence` · `StoreNow` (도전과제·통계는 저절로) · 친구 방 `SteamLobby.Create(인원)`·`Invite()`·`Join(로비)`·`Leave()`·`Current`·`IsHost` · 전송 `SteamServerTransport`·`SteamClientTransport` |
 
 ---
 
@@ -380,3 +386,8 @@ public class PlayCard : GameAction
 35. 시스템층을 테스트 도구 없이 끝냄 → 개발자가 시험할 수 없다. 테스트 씬·기본 테스트 명령·첫 테스트 상황(관례 19절).
 36. 결정 기록을 읽지 않고 질문 → 같은 것을 다시 묻는다. 세션마다 `Docs/Decisions.md`부터.
 37. 그림·소리가 필요한 곳에 에셋 없이 화면만 → 개발자가 무엇을 넣을지 모른다. `AssetRequests.Sprite·Audio·Request`로 임시 자리와 넣을 것 목록.
+38. 멀티 화면에서 `Do` 직후 결과를 읽음 → 클라이언트에서는 결과가 나중에 온다. 바뀐 곳 알림(`Data.Changed`·binding-path)이나 `SubscribeAfterAction`으로 그린다(시험 모드의 지연으로 확인).
+39. 연출을 `Subscribe`로 받음 → 멀티 클라이언트에는 오지 않는다(규칙 쪽은 서버에서 돈다). 연출은 `SubscribeAfterAction`.
+40. 숨길 정보(손패)를 모두가 보는 키나 이벤트에 → 상대에게 간다. 플레이어마다 키를 나누고 `SetVisibility(키, DataVisibility.Owner, 번호)`, 이벤트에는 넣지 않는다.
+41. 서버에서 차례·주인을 검사하지 않음 → 클라이언트가 아무 행동이나 보낸다. `server.Validate`(내 차례·내 유닛), `actorId`는 서버가 보낸 사람 번호로 덮는다.
+42. 주고받는 클래스에 `#if UNITY_EDITOR` 필드 → 에디터와 빌드의 필드 차례가 달라 읽기가 어긋난다. 이벤트는 `[GameEvent]` 클래스(구조체는 보낼 수 없다).

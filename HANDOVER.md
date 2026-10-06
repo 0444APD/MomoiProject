@@ -13,7 +13,7 @@
 > - 사람용: `Documentation~/Guide/`(운영 가이드 00~09). Unity 확인: `PendingChecks.md` 단계 7.
 > - **2026-10-06 작성 전용 코드 지움**(사용자 결정): 시작하기·도움말(`Editor/Help`·`HelpWindow`·`HelpCoverageTests`), UI 샘플 창(`ShowcaseWindow`·`GsExperimental.uss`), 확인용 패널·샘플(`Samples/`·`GBIBLE_SAMPLES`·`Tests/PlayMode` 샘플 테스트), DB가 코드에 쓰던 기능(`ClassStaging`·`KeywordCode`·`KeywordMigration`, 클래스 상세의 키워드 그룹 연결·`[Hide]` 토글, 키워드 탭의 만들기·이름 바꾸기·지우기). 키워드 탭·클래스 상세는 읽기 전용(코드가 원본, AI가 쓴다). `ClassCode`는 `TryFindBody`(클래스 찾기)만 남음. `PendingChecks` 단계 3~5는 첫 게임 프로젝트의 테스트 씬에서 확인하는 목록으로 바꿈. 지운 것은 태그 `momoi-final`·모모이 백업에 그대로 있다.
 > - **2026-10-06 질문 규칙**(사용자): 질문 개수 제한은 없다. 막는 것은 같은 것 다시 묻기·제자리걸음·질 낮은 질문(진행 매뉴얼 3-1~3-3). 이름 '예외 사냥' → '예외 잡기'.
-> - **2026-10-06 멀티 착수**(사용자가 추천안 전부 승인): 매칭큐 멀티(= 유형 A, 턴제·자체 .NET 서버) · 사설 호스트 멀티(= 유형 B, 실시간 친구 방·방장 권한·Steam) · 테스트용 멀티(A와 같은 서버 프로그램을 직접 접속). ① 셋 다 GBible 방식 4블록(행동만 올리고 바뀐 곳·이벤트를 내림, 전송만 갈아 끼움 — NGO 등 안 씀) ② 사설 호스트는 내 캐릭터 이동은 각자·판정은 방장 ③ 2~4명, 방장이 나가면 판 끝 ④ 매칭큐는 턴제(+느린 실시간 서버 틱)만 ⑤ 매칭큐는 가짜 매칭·가짜 인증·파일 저장으로 로컬에서 끝까지, AWS·Steam 인증은 같은 창구의 어댑터(계정 준비 뒤), 부분유료화는 나중 ⑥ 순서 공통 → 테스트용 → 매칭큐 → 사설 호스트 ⑦ 멀티에서 플레이어 일반 무르기 없음(Undo는 기믹·개발자 테스트·리플레이), 기믹 '누군가만 되돌리기' = 부분 되감기(그 사람·유닛 데이터만 n턴 전으로, 하나의 행동). 효과 배율은 음수 '필드 바꾸기'에도 곱함(그대로).
+> - **2026-10-06 멀티 착수 → 같은 날 구현(1.11·매뉴얼 40장·PendingChecks 단계 8, 결정 대기: 매칭큐 서버를 Unity 서버 빌드로 돌릴지)**(사용자가 추천안 전부 승인): 매칭큐 멀티(= 유형 A, 턴제·자체 .NET 서버) · 사설 호스트 멀티(= 유형 B, 실시간 친구 방·방장 권한·Steam) · 테스트용 멀티(A와 같은 서버 프로그램을 직접 접속). ① 셋 다 GBible 방식 4블록(행동만 올리고 바뀐 곳·이벤트를 내림, 전송만 갈아 끼움 — NGO 등 안 씀) ② 사설 호스트는 내 캐릭터 이동은 각자·판정은 방장 ③ 2~4명, 방장이 나가면 판 끝 ④ 매칭큐는 턴제(+느린 실시간 서버 틱)만 ⑤ 매칭큐는 가짜 매칭·가짜 인증·파일 저장으로 로컬에서 끝까지, AWS·Steam 인증은 같은 창구의 어댑터(계정 준비 뒤), 부분유료화는 나중 ⑥ 순서 공통 → 테스트용 → 매칭큐 → 사설 호스트 ⑦ 멀티에서 플레이어 일반 무르기 없음(Undo는 기믹·개발자 테스트·리플레이), 기믹 '누군가만 되돌리기' = 부분 되감기(그 사람·유닛 데이터만 n턴 전으로, 하나의 행동). 효과 배율은 음수 '필드 바꾸기'에도 곱함(그대로).
 
 ---
 
@@ -138,7 +138,9 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 
 클래스를 고르는 모든 목록(플레이어 데이터 값 형식, 템플릿 형식, 필드 규칙, 키워드 연결, 이벤트)은 **프로젝트에서 직접 만든 데이터 클래스만** 보인다(`ProjectCode`). 폴더 지정 없이 자동: Unity·패키지·이 라이브러리(샘플 제외)·Plugins/firstpass·플러그인 asmdef·외부 네임스페이스(DG, Sirenix, Spine, TMPro …) 제외, 컴포넌트·ScriptableObject(DB 종류 제외)·어트리뷰트·예외·정적 클래스·인터페이스 제외. 이벤트는 내 코드 + 라이브러리 기본 이벤트(테스트 제외). 필요할 때만 `MomoiProject → 내 코드 범위`에서 쓸 폴더·뺄 폴더·뺄 네임스페이스를 더한다(`ProjectSettings/MomoiProject/ProjectCode.json`). 현재 프로젝트 결과: `Assembly-CSharp`와 샘플만 내 코드.
 
-### 1.11 멀티플레이어 설계 (방향 확정, 네트워크 구현은 아직)
+### 1.11 멀티플레이어 설계 (2026-10-06 구현 — 매뉴얼 40장)
+
+> **2026-10-06 구현**: 4블록(`Runtime/Core/Net` — `NetServer`·`NetClient`·`NetHub`·메시지 규격·`MemoryNetwork`·`WebSocket*Transport`, 엔진 없음) + Unity 창구(`Runtime/Unity/Net` — `GameNet`·`NetTransformSync`) + Steam(`Optional/Steam/Runtime/SteamNet.cs` — `SteamLobby`·`Steam*Transport`). 코어 데이터 쪽: `PlayerDataStore`의 공개 범위(`SetVisibility`)·받는 쪽 적용(`LoadRemote`·`ApplyRemote`·`SetRemote`·`LoadRemoteTree`)·`KeyDefined`, `SessionRole`(클라이언트는 Undo·조건 판정·시간 규칙 안 함, `Do`는 `RemoteDo`로), `EventBus.PublishRemote`(AfterAction에만), `Mirror.TypeTable`·`MirrorReceiver.UseTypes`(형식 번호표)·`WriteNetValue`(이벤트 안 객체는 번호로)·`MissingAsNull`, `[SystemAction]`, `GameSession.LocalPlayer`, 되감기 `RewindSystem`(`$rewind`). 코어 테스트 `NetTests`·`RewindTests`·`HubTests`(실제 TCP 포함). **결정 대기**: 매칭큐 서버를 Unity 서버 빌드로 돌릴지(.NET 서버 대신 — 게임 규칙 코드·DB가 Unity 자산이라 .NET만으로는 못 읽음) — 아래 '설계'의 .NET 서버·정의 JSON 내보내기·FlexMatch·PostgreSQL 어댑터는 이 결정 뒤. 지금 매칭큐 서버는 Unity(`GameNet.StartMatchServer`·`-momoi-matchserver`)에서 돈다(코어라 .NET으로 옮겨도 같은 코드).
 
 자세히: `Documentation~/Architecture.md` §8(멀티플레이어), §9A(행동 기록과 되돌리기). **지금까지 구현된 것은 기반뿐이다**: 엔진 무관 코어(서버에서 그대로 컴파일·실행 검증), 인스턴스 기반 세션(static 없음, 플레이어·매치마다 세션), 행동 = 데이터(클라이언트는 행동만 보내고 서버가 실행하는 구조에 맞음), 시드 난수·행동 기록·스냅샷(리플레이·세션 공유), 이벤트의 발생 주체. 네트워크 연결·서버·매칭·인증·결제는 **아직 없다**.
 

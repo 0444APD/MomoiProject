@@ -93,7 +93,9 @@
 
 게임 규칙은 Steam을 모른다: 도전과제·통계는 GBible의 도전과제·로그로 만들고, Steam은 그것을 따라 올라간다.
 
-**아직 없는 것**: 리더보드(Leaderboard — Steam이 보관하는 점수 순위표), 친구 초대(로비 초대 — 오버레이에서 친구를 불러 같은 판에 들이기), 멀티플레이 네트워킹(로비·P2P). `GameSteam`에 해당 멤버가 없다.
+**친구 방(멀티)**: `SteamLobby.Create(인원)`·`Invite()`·`Join(로비)`·`Leave()` — Steam 로비 + Steam Datagram Relay로 방장에게 접속한다(사설 호스트 멀티, 40장).
+
+**아직 없는 것**: 리더보드(Leaderboard — Steam이 보관하는 점수 순위표). `GameSteam`에 해당 멤버가 없다.
 
 ## 5. 상황별 예제
 

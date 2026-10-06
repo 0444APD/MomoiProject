@@ -35,6 +35,7 @@ namespace GBible
         internal NetHub.RoomTransport Transport;
         internal double CreatedAt;
         internal bool Ending;
+        internal List<NetMatchResult> PendingEnd;
     }
 
     // 매칭큐 서버: 전송 하나로 로비(입장 확인·줄 서기·수락)와 여러 방(매치)을 돌린다. 엔진 없는 코어라 어떤 서버 프로그램에서도 같다.
@@ -164,6 +165,7 @@ namespace GBible
             while (_matchmaker.TryTake(out var match)) Propose(match, now);
             foreach (var proposal in _proposals.Values.Where(p => now >= p.Deadline).ToList()) Cancel(proposal, "수락 시간이 지났습니다.");
             foreach (var room in _rooms.ToList()) UpdateRoom(room, deltaTime, now);
+            foreach (var room in _rooms.Where(r => r.PendingEnd != null).ToList()) CloseRoom(room, room.PendingEnd, null);
         }
 
         void Route(NetEvent e)
@@ -422,11 +424,11 @@ namespace GBible
         // ── 매치 끝 ────────────────────────────────────────────
 
         // 규칙이 판정한 결과로 매치를 끝낸다: 점수(Elo)·전적을 저장하고, 결과를 알리고, 플레이어를 로비로 돌려보낸다.
+        // 다음 Update에서 처리한다 — 규칙의 이벤트 처리(행동 안·뒤) 어디서 불러도 그 행동이 다 끝나고 마지막 바뀐 곳이 간 뒤에 닫힌다.
         public void EndMatch(NetRoom room, IEnumerable<NetMatchResult> results)
         {
-            if (room == null || room.Ended || room.Ending) return;
-            var list = (results ?? Enumerable.Empty<NetMatchResult>()).ToList();
-            CloseRoom(room, list, null);
+            if (room == null || room.Ended || room.Ending || room.PendingEnd != null) return;
+            room.PendingEnd = (results ?? Enumerable.Empty<NetMatchResult>()).ToList();
         }
 
         void CloseRoom(NetRoom room, List<NetMatchResult> results, string cancelReason)

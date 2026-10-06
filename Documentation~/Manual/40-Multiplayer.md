@@ -1,0 +1,232 @@
+# 40. 멀티플레이 — 4블록 · 테스트용 · 매칭큐 · 사설 호스트
+
+**한 줄 요약**: 멀티는 세 가지다. **테스트용 멀티**(직접 접속, 인터넷 두 컴퓨터), **매칭큐 멀티**(턴제 경쟁 — 서버가 판정, 로비·줄·매치·점수), **사설 호스트 멀티**(친구 방 — 방장이 판정, Steam 로비·릴레이). 셋 다 같은 구조(4블록)다. 클라이언트는 **행동만 보내고**, 판정하는 쪽(서버·방장)이 실행해 **바뀐 곳과 이벤트를 돌려준다**. 전송만 갈아 끼우므로 게임 코드(`Game.Do`·`Data`·`SubscribeAfterAction`)는 싱글과 같다.
+
+```
+싱글:  [기능 로직] ─ [로컬 중개(GameSession)] ─ [UI]
+멀티:  [기능 로직] ─ [서버 중개(NetServer)] ~~전송~~ [클라이언트 중개(NetClient)] ─ [UI]
+```
+
+**언제 쓰는가**
+
+- 친구 넷이 같이 하는 실시간 협동(매지크래프트·세피리아 같은) → 사설 호스트.
+- 랭크 매칭으로 둘이 겨루는 턴제(카드 대전) → 매칭큐.
+- 개발 중 다른 컴퓨터의 팀원과 시험 → 테스트용(직접 접속), 혼자 시험 → 시험 모드(한 프로그램 안).
+
+이 문서에서 쓰는 용어:
+
+| 용어 | 뜻 |
+|---|---|
+| 서버 중개(`NetServer`) | 판정하는 세션(서버·방장)에 붙어 행동을 받아 실행하고, 바뀐 곳·이벤트를 클라이언트에 보낸다. |
+| 클라이언트 중개(`NetClient`) | 이 세션을 '받는 쪽'(`SessionRole.Client`)으로 바꾼다. `Do`는 서버로 보내고, 받은 것을 적용한다. |
+| 묶음(Batch) | 서버에서 일어난 한 묶음(행동 하나 또는 틱 하나)의 바뀐 곳(Mirror 앞으로 기록·단순 값)과 이벤트. |
+| 공개 범위(`DataVisibility`) | 플레이어 데이터 키를 누구에게 보내는가: `Public`(모두) · `Owner`(주인만) · `Server`(보내지 않음). |
+| 형식 번호표 | 접속할 때 서로 보내는 '번호 → 형식 이름' 표. 에디터와 빌드처럼 번호가 달라도 같은 형식으로 잇는다. |
+| 시험 모드 | 서버를 이 프로그램 안에 띄우고 이 화면은 그 클라이언트가 되는 모드(메모리 전송, 일부러 지연). |
+| 매칭큐 서버(`NetHub`) | 전송 하나로 로비·줄·여러 방(매치)을 돌리는 서버. 방 하나 = 서버 중개 하나 + 세션 하나. |
+| 방(`NetRoom`) | 매치 하나. `room.Server`(서버 중개)·`room.Session`·`room.Accounts`. |
+| 실시간 위치 맞추기(`NetTransformSync`) | 매 순간 움직이는 것(내 캐릭터·탄환)을 규칙 데이터 대신 위치만 보내 맞추는 컴포넌트. |
+
+---
+
+## 1. 동작 규칙
+
+### 1-1. 4블록
+
+- **클라이언트**(`SessionRole.Client`)
+  - `Game.Do(행동)` → 서버로 보낸다(대상 객체는 id만, `ActionReferences.Detach`). 돌려주는 기록의 상태는 `ActionStatus.Sent`. 결과는 묶음으로 온다.
+  - 서버가 거절하면 `NetClient.ActionFailed`(예외가 아니다). Unity에서는 `GameScreens.ShowFailure`로 알림이 뜬다.
+  - 받은 바뀐 곳은 **행동 밖 변경**으로 적용된다 → `Data.Changed`·`DataChanged`·화면 연결(binding-path)이 싱글과 똑같이 알림을 받는다.
+  - 받은 이벤트는 **`SubscribeAfterAction`으로 받는 쪽에만** 온다(`EventBus.PublishRemote`). `Subscribe`·`SubscribeAll`(규칙 쪽)에는 오지 않는다 — 규칙은 서버에서 이미 돌았다.
+  - 하지 않는 것: Undo(경고만), 조건 판정(트리거·도전과제), 시간 규칙(상태 효과·패시브 주기·예약). 시계는 받은 묶음의 서버 시각으로 맞춘다.
+  - `Game.Preview`(미리보기)는 이쪽 데이터로 돈다(난수 시드가 서버와 달라 확률은 어긋날 수 있다).
+  - 이벤트 안의 객체 필드는 **이쪽 데이터의 같은 객체**를 가리킨다(서버가 객체 번호로 보낸다). 이쪽이 받지 못한 데이터(숨긴 키)의 객체면 `null`.
+- **서버·방장**(`SessionRole.Server`)
+  - 받은 행동의 `actorId`를 **보낸 사람 번호로 덮고** `utc`·`tick`을 지운다(속일 수 없게).
+  - `[SystemAction]`이 붙은 행동(예약·주기·선택 효과·개발자 편집)은 클라이언트가 보내도 실행하지 않는다.
+  - `NetServer.Validate(플레이어, 행동)`이 거절 글을 돌려주면 실행하지 않는다(내 차례가 아님 등).
+  - 묶음: 마지막으로 보낸 뒤의 바뀐 곳·이벤트를 키의 공개 범위대로 사람마다 골라 보낸다. 미리보기·실패한 행동의 이벤트는 보내지 않는다.
+  - 늦게 들어왔거나 새로 보이게 된 키는 그 사람에게만 처음 모습(통째)을 보낸다.
+- **내 번호**: `session.LocalPlayer`(싱글 0). 클라이언트는 서버가 준 번호, 방장은 자기 번호. `Do`가 `actorId`를 비워 둔 행동에 채운다.
+
+### 1-2. 공개 범위
+
+| 정하지 않았을 때 | 공개 범위 |
+|---|---|
+| 세션 구역 키 | `Public` |
+| 메타 구역 키(프로필) | `Server` — 프로필은 각자 자기 쪽 것을 쓴다(매칭큐의 계정 값은 서버 저장소) |
+| `$schedule`(예약) · `$rewind`(되감기 지점) | `Server` |
+
+- 정하기: `session.Data.SetVisibility("hand:2", DataVisibility.Owner, owner: 2)`. **키 단위**다 — 남에게 숨길 것은 플레이어마다 키를 나눈다(`hand:1`·`hand:2`).
+- 이벤트에는 숨길 정보를 넣지 않는다(모두에게 간다). 숨길 결과는 Owner 키의 값으로 보낸다.
+
+### 1-3. 되돌리기와 되감기
+
+- 멀티에서 플레이어가 누르는 일반 '무르기'는 없다(클라이언트 `Undo`는 경고만).
+- 되돌리기를 쓰는 곳: ① 규칙의 기믹(되감기 — `Game.Rewind`·`RewindKey`·`RewindEntity`, 1-4) ② 개발자 시험(서버의 개발 명령 '세션 › Undo', 테스트 패널의 Undo) ③ 판 밖 리플레이(받은 묶음을 녹화해 다시 트는 것 — 서버 없이).
+- 서버의 Undo·되감기는 바뀐 곳으로 모두에게 간다.
+
+### 1-4. 되감기(기믹)
+
+- 턴이 시작될 때(턴 시작 행동 안): `Game.MarkRewind("3턴")` — 그때의 세션 구역을 지점으로 남긴다(`$rewind`, 판 저장에 들어감, 클라이언트에 보내지 않음, 기본 10개 — `session.Rewind.Keep`).
+- 기믹 행동 안에서:
+  - `Game.Rewind(2)` — 세션 구역 전체를 2지점 전 모습으로(그 뒤 생긴 키는 기본값).
+  - `Game.RewindKey("hand:2", 1)` — 키 하나만.
+  - `Game.RewindEntity(unit, 2)` — 객체 하나만(id로 찾는다). 그 객체에 남이 한 일(피해)은 함께 돌아가고, 그 객체가 남에게 한 일은 남는다.
+- 되감기도 그 행동의 변경이다 → Undo·판 저장·멀티 동기화·리플레이에 그대로 남는다. 난수는 되감지 않는다.
+- 지점보다 멀리 가면 플레이어용 실패 `momoi.fail.rewindTooFar`.
+
+### 1-5. 형식 번호표
+
+- 접속할 때 서로 `Mirror.TypeTable()`을 보내고, 받는 쪽은 `MirrorReceiver.UseTypes`로 상대 번호를 자기 형식으로 바꿔 읽는다.
+- 상대에게만 있는 형식이 실제로 오면 "서로 다른 버전의 게임입니다" 예외(그 형식 이름이 나온다). 게임 버전 글자(`NetServerOptions.GameVersion`·`Application.version`)가 다르면 입장부터 거절한다.
+
+### 1-6. 매칭큐 서버(`NetHub`)
+
+```
+접속 → 입장 확인(INetAuthenticator) → 로비(점수·전적) → 줄(INetMatchmaker) → 성사 → 전원 수락 → 방(NetRoom) → RoomReady → … → EndMatch(결과) → 점수(Elo)·전적 저장(INetPlayerStore) → 로비
+```
+
+- 한 계정은 한 줄·한 매치에만. 같은 계정이 이미 들어와 있으면 거절.
+- 전원이 수락해야 방을 만든다. 수락하지 않으면(거절·시간 넘김 `AcceptSeconds`) 그 사람은 로비로, 수락한 사람은 **기다린 시간 그대로** 다시 줄.
+- 방이 만들어지면 묶인 차례대로 플레이어 번호 1, 2 …(`NetServer.Reserve`). `RoomStarting`에서 서버 규칙을 걸고, 정원이 다 들어오면 `RoomReady`(첫 턴 시작). `ReadySeconds` 안에 다 안 들어오면 매치를 없던 것으로(점수 변화 없음).
+- 매치 중에 끊겼다 다시 접속하면 로비를 거치지 않고 그 매치의 같은 자리로 들어가 지금 모습을 받는다.
+- 행동마다 진행 중인 매치를 저장(`SaveMatchEachAction`) → 서버를 다시 켜면 `ResumeOpenMatches`로 다시 열고, 플레이어가 다시 접속하면 이어 간다.
+- 점수: Elo(K=32, 여럿이면 둘씩 짝지어 나눔). 같은 등수 = 무승부.
+
+| 창구 | 가짜(지금) | 진짜(출시, 계정 준비 뒤) |
+|---|---|---|
+| 인증 `INetAuthenticator` | `FakeAuthenticator`(이름·입장 표를 믿음) | `SteamWebAuthenticator`(Steam 인증 티켓 → Web API, 퍼블리셔 키는 서버만) |
+| 매칭 `INetMatchmaker` | `LocalMatchmaker`(실력 폭 `BaseWindow` + 초당 `WidenPerSecond`, `MaxWaitSeconds`를 넘기면 아무나와) | AWS GameLift FlexMatch 어댑터(아직 — 서버를 무엇으로 돌릴지 정한 뒤) |
+| 저장 `INetPlayerStore` | `FilePlayerStore`(폴더의 accounts/·matches/ JSON) | PostgreSQL·Redis 어댑터(아직) |
+
+### 1-7. 사설 호스트(Steam)
+
+- `SteamLobby.Create(4)` → Steam 로비(친구만)를 만들고 이 프로그램이 방장(`GameNet.Host` + `SteamServerTransport`). `SteamLobby.Invite()` = 친구 초대 창.
+- 친구가 초대를 받거나(게임 참가) `+connect_lobby`로 게임을 켜면 그 로비에 들어가 방장에게 접속(`SteamClientTransport` — Steam Datagram Relay, NAT 통과).
+- 방장이 나가면 판이 끝난다(모두 연결이 끊기고 `GameNet.Closed`).
+- 매 순간 움직이는 것: `NetTransformSync`(주인이 보내고 나머지는 보간, 방장이 중계). 판정(피해·드롭·상태 효과)은 방장의 규칙이 한다 — 위치는 그 재료다.
+
+### 1-8. 전송
+
+| 전송 | 쓰는 곳 | 비고 |
+|---|---|---|
+| `MemoryNetwork` | 시험 모드·테스트 | `Latency`·`Jitter`(믿는 메시지는 차례가 안 바뀜)·`Loss`(Stream만)·`Manual`(시간을 손으로) |
+| `WebSocketServerTransport`·`WebSocketClientTransport` | 테스트용 멀티·매칭큐(로컬)·사설 호스트 시험 | TCP 위 직접 구현 — 관리자 권한 없이 포트 하나(방화벽 허용만) |
+| `SteamServerTransport`·`SteamClientTransport` | 사설 호스트 | Steam Datagram Relay(선택 기능 Steam) |
+
+인터넷으로 닿게 하는 법(직접 접속): 가상 랜 도구(Tailscale 등, 권장 — 공유기 설정 없음) · 공유기 포트 포워딩 · 작은 서버 임대.
+
+## 2. 에디터에서 쓰는 법
+
+- **테스트 씬 › 컴포넌트 '테스트 씬' › 멀티플레이**: 플레이할 때 멀티로 시작(시험 모드 · 방장 · 들어가기), 시험 모드 지연·흔들림·화면 없는 클라이언트 수, 포트·주소·이름.
+- **테스트 패널(F1) › 멀티**: 시험 모드 · 방 열기 · 들어가기 · 매칭큐 서버 · 매칭 찾기. 들어가 있으면 내 번호·명단·핑, 시험 모드 지연 조절, 로비(점수·줄 서기·수락·거절), 나가기.
+  - 클라이언트일 때 Undo·새 판·테스트 상황은 판을 가진 쪽(서버)에서 한다(시험 모드는 이 프로그램 안의 서버, 남의 서버면 개발 명령으로).
+- **모니터 머리**: 멀티(시험 모드·방장·매칭큐 서버)이면 세션을 고른다 — 서버 · 이 화면(클라이언트) · 화면 없는 클라이언트 · 방마다.
+- 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(entityId) · 주인(플레이어 번호) · 초당 보내는 횟수 · 늦게 그리기 · 회전.
+
+## 3. 코드로 쓰는 법
+
+### 3-1. Unity 창구(`GameNet`)
+
+```csharp
+GameNet.StartTestMode(latency: 0.1);                        // 시험 모드(한 프로그램)
+GameNet.HostDirect(7777, "방장");                           // 직접 접속으로 방 열기(이 화면 = 방장)
+GameNet.JoinDirect("100.64.1.2:7777", "철수");              // 직접 접속으로 들어가기
+GameNet.StartDedicated(7777);                               // 화면 없는 서버(방장 없음)
+GameNet.StartMatchServer(7777, playersPerMatch: 2);         // 매칭큐 서버(가짜 인증·로컬 매칭·파일 저장)
+GameNet.FindMatch("100.64.1.2:7777", "철수");               // 매칭큐 로비 → GameNet.Client.Queue() → Client.AnswerMatch(true)
+GameNet.Leave();                                             // 혼자 하기로
+
+GameNet.ServerStarted += server => server.Validate = (player, action) => IsMyTurn(server.Session, player.Id, action) ? null : "내 차례가 아닙니다.";
+GameNet.RoomStarting += room => SetupPlayers(room.Session, room.Server.Players);
+GameNet.RoomReady += room => room.Session.Do(new StartFirstTurn());
+GameNet.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 2, Place = 1 }, new NetMatchResult { Player = 1, Place = 2 } });
+```
+
+명령줄(빌드 여러 개를 띄워 시험·서버 빌드): `-momoi-server [포트]` · `-momoi-matchserver [포트] -momoi-players 인원` · `-momoi-host [포트] -momoi-name 이름` · `-momoi-join 주소 -momoi-name 이름`. 서버 빌드는 `-batchmode -nographics`와 함께.
+
+### 3-2. 코어(엔진 없음 — 어떤 서버 프로그램에서도 같다)
+
+```csharp
+var server = new NetServer(session, new WebSocketServerTransport(7777), new NetServerOptions { DriveClock = true, MaxPlayers = 4 });
+server.Start();
+// 매 틱: server.Update(deltaTime);
+
+var client = new NetClient(new GameSession(), new WebSocketClientTransport("127.0.0.1:7777"), "철수");
+client.Connect();
+// 매 프레임: client.Update(deltaTime);
+
+var hub = new NetHub(new WebSocketServerTransport(7777), room => NewSession(), new FakeAuthenticator(),
+                     new LocalMatchmaker { PlayersPerMatch = 2 }, new FilePlayerStore(folder));
+hub.Start();
+hub.ResumeOpenMatches();
+// 매 틱: hub.Update(deltaTime);
+```
+
+| 멤버 | 하는 일 |
+|---|---|
+| `NetServer.Start` · `Update(dt)` · `Receive` · `Flush` | 열기 · 받기+시간+보내기 · 받기만 · 보내기만 |
+| `NetServer.AddLocalPlayer(이름)` · `Reserve(계정, 이름)` · `FindPlayer` · `FindAccount` · `Kick` · `Players` | 방장 · 자리 예약 · 찾기 · 강퇴 |
+| `NetServer.Admit` · `Validate` · `PlayerJoined` · `PlayerLeft` · `StreamReceived` · `SendStream` | 입장 확인 · 행동 검사 · 알림 · 실시간 바이트 |
+| `NetServerOptions` | `MaxPlayers` · `GameVersion` · `DriveClock` · `TimeSyncInterval` · `AllowDeveloperCommands` · `RelayStreams` |
+| `NetClient.Connect` · `Update` · `Disconnect` · `State` · `PlayerId` · `Players` · `RoundTrip` · `PendingActions` | 접속 · 상태 |
+| `NetClient.Joined` · `Closed` · `ActionFailed` · `PlayersChanged` · `RunDeveloperCommand` · `SendStream` · `StreamReceived` | 알림 · 서버 개발 명령 · 실시간 바이트 |
+| `NetClient.Queue(종류)` · `CancelQueue` · `AnswerMatch(수락)` · `Account` · `Match` · `LobbyChanged` · `MatchFound` · `MatchCancelled` · `MatchEnded` | 매칭큐 |
+| `NetHub.RoomStarting` · `RoomReady` · `RoomEnded` · `EndMatch(방, 결과)` · `ResumeOpenMatches` · `Rooms` · `Log` · `Options` | 매칭큐 서버 |
+| `session.Data.SetVisibility(키, 범위, 주인)` · `VisibilityOf` · `IsVisibleTo` | 공개 범위 |
+| `session.Role` · `IsClient` · `LocalPlayer` | 역할·내 번호 |
+| `Game.MarkRewind` · `Rewind` · `RewindKey` · `RewindEntity` · `RewindMarks` | 되감기 |
+| `[SystemAction]` | 클라이언트가 보낼 수 없는 시스템 행동 |
+
+## 4. 상황별 예제
+
+### 4-1. 턴제 대전(매칭큐) — 차례 검사·손패 숨기기·결과
+
+```csharp
+GameNet.RoomStarting += room =>
+{
+    var data = room.Session.Data;
+    foreach (var player in room.Server.Players)
+    {
+        data.Define("hand:" + player.Id, DataZone.Session, new Hand(), $"{player.Name}의 손패");
+        data.SetVisibility("hand:" + player.Id, DataVisibility.Owner, player.Id);   // 남의 손패는 오지 않는다
+    }
+    room.Server.Validate = (player, action) => room.Session.Game.Data().Run.turnPlayer == player.Id ? null : "내 차례가 아닙니다.";
+};
+GameNet.RoomReady += room => room.Session.Do(new StartMatch());
+// 규칙이 승패를 정하면(서버의 행동 안이 아니라 행동 뒤에 — 예: 이벤트를 SubscribeAfterAction으로 받아):
+room.Session.Events.SubscribeAfterAction<MatchDecided>(e => GameNet.Hub.EndMatch(room, e.results));
+```
+
+화면(클라이언트)은 싱글과 같다: 내 손패 = `Game.Data().Get<Hand>("hand:" + Game.Session.LocalPlayer)`, 카드 내기 = `GameScreens.Do(() => new PlayCard { card = c })`.
+
+### 4-2. 친구 협동(사설 호스트) — 내 캐릭터는 각자, 판정은 방장
+
+```csharp
+// 메뉴: 방 만들기 / 초대
+SteamLobby.Create(4);  SteamLobby.Invite();
+// 캐릭터를 만들 때(모든 프로그램에서 같은 이름으로):
+var sync = hero.AddComponent<NetTransformSync>();
+sync.entityId = "hero:" + playerId;
+sync.owner = playerId;
+// 맞혔다는 판정은 방장이: 클라이언트는 '판정 보고 행동'을 보내고 방장의 규칙이 확인해 피해를 준다.
+GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
+```
+
+### 4-3. 혼자 시험(시험 모드)
+
+테스트 씬 › 멀티플레이 = 시험 모드, 지연 0.15. 플레이하면 이 화면은 클라이언트다. 행동을 하고 0.15초 뒤에 결과가 오는지, 기다리는 동안 화면이 이상하지 않은지 본다. 모니터 머리에서 '서버'를 고르면 서버 쪽 데이터·타임라인이 보인다.
+
+## 5. 주의할 점 · 자주 하는 실수
+
+- **화면 코드에서 플레이어 데이터를 직접 바꾸지 않는다**(싱글에서도 같은 규칙). 클라이언트에서 바꾸면 서버와 어긋난다.
+- **`Do` 직후 결과를 읽지 않는다.** 멀티에서는 결과가 나중에 온다 — 바뀐 곳 알림(`Data.Changed`·화면 연결)이나 `SubscribeAfterAction`으로 그린다. 시험 모드의 지연으로 미리 잡는다.
+- **연출은 `SubscribeAfterAction`으로 받는다.** `Subscribe`로 받는 연출은 클라이언트에서 불리지 않는다.
+- **실패는 예외가 아니라 알림으로.** 클라이언트의 거절은 `ActionFailed`로 온다(`GameScreens.Do`는 싱글 실패와 같은 알림을 띄운다).
+- **이벤트는 `[GameEvent]` 클래스로.** 구조체 이벤트는 보낼 수 없다(서버 기록에 경고).
+- **주고받는 클래스에 `#if UNITY_EDITOR` 필드를 두지 않는다**(에디터와 빌드의 필드 차례가 달라진다).
+- **숨길 정보는 플레이어마다 키를 나누고 Owner로.** 키 하나 안의 일부만 숨길 수는 없다.
+- 매칭큐 서버의 계정 값(재화·점수)은 서버 저장소에만 있다. 클라이언트가 보낸 값을 믿지 않는다 — 바꾸는 것은 서버의 규칙(행동)이다.
+- 방장이 서버 세션을 그대로 쓰므로 방장 화면은 모든 데이터를 본다(친구 방 — 숨김이 필요 없는 게임에 쓴다).
+- 직접 접속이 안 될 때: 주소·포트(기본 7777)·Windows 방화벽 허용, 같은 가상 랜에 들어와 있는지, 게임 버전이 같은지.
