@@ -300,6 +300,7 @@ namespace GBible
             }
             Client?.Update(deltaTime);
             foreach (var extra in Extras) extra.Update(deltaTime);
+            NetTransformSync.Pump();
         }
 
         // GBibleHost.LateUpdate(이 화면 세션의 EndFrame 다음): 시험 모드 서버의 시간을 흘리고, 바뀐 곳을 보낸다.
