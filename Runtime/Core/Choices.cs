@@ -185,6 +185,9 @@ namespace GBible
         {
             var pending = Game.Session.Choices.Take(choice)
                 ?? throw new GameFailure(FailureKeys.ChoiceGone, null, "이미 답했거나 취소된 선택입니다.");
+            // 멀티플레이 서버: 답할 플레이어가 정해진 선택이면 그 사람만(actorId는 서버가 보낸 사람 번호로 채운다).
+            if (Game.Session.Role == SessionRole.Server && !string.IsNullOrEmpty(pending.player) && pending.player != actorId.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                throw new GameFailure(FailureKeys.NotYourChoice, null, "다른 플레이어에게 온 선택입니다.");
             var ids = (picked ?? new List<string>()).Where(id => !string.IsNullOrEmpty(id)).ToList();
             if (ids.Distinct(StringComparer.Ordinal).Count() != ids.Count)
                 throw new GameFailure(FailureKeys.ChosenTwice, null, "같은 것을 두 번 골랐습니다.");

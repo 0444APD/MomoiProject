@@ -78,7 +78,11 @@ namespace GBible
         {
             var key = permanent ? MetaKey : SessionKey;
             if (!_session.Data.IsDefined(key))
+            {
                 _session.Data.Define(key, permanent ? DataZone.Meta : DataZone.Session, new ScheduleList(), permanent ? "영구 예약" : "예약");
+                // 예약(맡겨 둔 행동)은 서버만 안다 — 멀티 클라이언트에 보내지 않는다.
+                _session.Data.SetVisibility(key, DataVisibility.Server);
+            }
             return key;
         }
 

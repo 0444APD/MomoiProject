@@ -289,6 +289,15 @@ namespace GBible
         public void SetWorld(string id, bool flag, bool permanent = false) => Session.World.Set(id, flag ? "true" : null, permanent);
         public void ClearWorld(string id) => Session.World.Clear(id);
 
+        // ── 되감기(기믹) ─────────────────────────────────────────
+        // 지점을 남기고(턴 시작 행동 안에서), 기믹 행동 안에서 그 모습으로 되돌린다. 되감기도 그 행동의 변경이라 Undo·저장·멀티·리플레이에 남는다.
+        //   Game.MarkRewind();  …  Game.Rewind(2);  Game.RewindKey("hand:2");  Game.RewindEntity(unit, 2);
+        public long MarkRewind(string label = null) => Session.Rewind.Mark(label);
+        public void Rewind(int marksBack = 1) => Session.Rewind.Rewind(marksBack);
+        public void RewindKey(string key, int marksBack = 1) => Session.Rewind.RewindKey(key, marksBack);
+        public bool RewindEntity(object entity, int marksBack = 1) => Session.Rewind.RewindEntity(entity, marksBack);
+        public int RewindMarks => Session.Rewind.Count;
+
         // ── 선택 대기 ───────────────────────────────────────────
         // 플레이어에게 고르기를 요구한다(행동 안에서). 고르면 then의 [Chosen] 필드에 고른 것이 들어가 실행된다. 돌려주는 값은 선택 id.
         //   Game.Ask("버릴 카드", run.hand, new DiscardChosen(), min: 1, max: 1);

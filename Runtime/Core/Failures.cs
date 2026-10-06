@@ -48,5 +48,9 @@ namespace GBible
         public const string ChoiceGone = "momoi.fail.choiceGone";
         // {ability}: 능력·아이템 이름, {condition}: 사용 조건 글 — Game.Use
         public const string CannotUse = "momoi.fail.cannotUse";
+        // {steps}: 되감으려는 지점 수, {marks}: 남은 지점 수 — Game.Rewind
+        public const string RewindTooFar = "momoi.fail.rewindTooFar";
+        // 다른 플레이어에게 온 선택에 답하려 함(멀티플레이)
+        public const string NotYourChoice = "momoi.fail.notYourChoice";
     }
 }

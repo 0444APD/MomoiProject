@@ -1411,6 +1411,43 @@ namespace GBible
             DataChanged?.Invoke(key, changes);
         }
 
+        // 키 하나를 기본값으로(행동 안이면 그 행동의 변경).
+        public void ResetKey(string key)
+        {
+            var slot = GetSlot(key);
+            if (slot.DataType != null || !Equals(slot.Value, slot.Default)) Set(key, slot.Default);
+        }
+
+        // 이 객체가 들어 있는 플레이어 데이터(Mirror 데이터만). 없으면 null.
+        internal string KeyOf(object live)
+        {
+            if (live == null) return null;
+            foreach (var key in SlotKeys())
+            {
+                var mirror = _slots[key].Mirror;
+                if (mirror?.Tree != null && mirror.Tree.Nodes.ContainsKey(live)) return key;
+            }
+            return null;
+        }
+
+        // 저장 트리 → 이 키 형식의 새 객체(지금 값에 적용하지 않는다).
+        internal object FromTree(string key, object tree)
+        {
+            var slot = GetSlot(key);
+            if (slot.DataType == null) return null;
+            var warnings = new List<string>();
+            var value = DataModel.FromTree(tree, slot.DataType, Identity, warnings, slot.Label);
+            foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Data", warning, key);
+            return value;
+        }
+
+        // 저장 트리 → 이 단순 값 키의 값.
+        internal object ScalarFromTree(string key, object tree)
+        {
+            var slot = GetSlot(key);
+            return TryNormalize(ReadScalar(slot, tree), out var value) ? value : slot.Default;
+        }
+
         // 보내는 쪽: 예전 방식 데이터 값의 저장 트리(받는 쪽 LoadRemoteTree).
         internal object ExportTree(string key)
         {
