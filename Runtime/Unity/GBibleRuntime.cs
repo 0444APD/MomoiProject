@@ -14,6 +14,19 @@ namespace GBible
         // 클라이언트(씬) 코드의 창구: GBibleRuntime.Game.All<Unit>() 등. 서버·시뮬레이션은 세션마다 session.Game을 쓴다.
         public static GameApi Game => Session?.Game;
 
+        // 화면 없는 실행(Dedicated Server 빌드 · -batchmode로 켠 빌드): 화면(UI)을 만들지 않는다. 에디터는 화면이 있는 것으로 본다.
+        public static bool IsHeadless
+        {
+            get
+            {
+#if UNITY_SERVER
+                return true;
+#else
+                return Application.isBatchMode && !Application.isEditor;
+#endif
+            }
+        }
+
         // 세션 생성 직전: 옵션 조정(되돌리기 방식, 시드, 저장 버전 변환 등).
         public static event Action<SessionOptions> Configuring;
         // 세션 준비 완료: 행동 처리기·디버그 명령 등록.
@@ -288,8 +301,8 @@ namespace GBible
 
             // DB › 시작 파일 › Bootstrap의 씬 흐름(정해 두었으면).
             if (database != null && !string.IsNullOrEmpty(database.SceneKey)) GameScenes.Follow(database.SceneKey, database.ScenePath, database.EmptyScene);
-            // DB › 화면·화면 설정(UI Toolkit). 슬롯을 바꿔 다시 시작해도 한 번만 준비한다.
-            GameScreens.Initialize(database);
+            // DB › 화면·화면 설정(UI Toolkit). 슬롯을 바꿔 다시 시작해도 한 번만 준비한다. 화면 없는 실행(서버 빌드)은 만들지 않는다.
+            if (!IsHeadless) GameScreens.Initialize(database);
             asClient?.Invoke(session);
             Started?.Invoke(session);
             if (asClient == null && database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);

@@ -31,29 +31,35 @@ namespace GBible
         void Authenticate(NetHello hello, Action<NetAdmission> done);
     }
 
-    // 가짜 인증(테스트용 멀티·로컬 매칭큐): 이름(또는 입장 표)을 그대로 계정 키로 믿는다. 보안 없음.
+    // 가짜 인증(테스트용 멀티·로컬 매칭큐): 이름을 그대로 계정 키로 믿는다. 보안 없음.
     public sealed class FakeAuthenticator : INetAuthenticator
     {
         public void Authenticate(NetHello hello, Action<NetAdmission> done)
         {
+            // 입장 표는 보지 않는다 — Steam 티켓처럼 접속마다 바뀌는 표가 와도 같은 이름이면 같은 계정(다시 접속하면 같은 자리).
             var name = string.IsNullOrWhiteSpace(hello.Name) ? "플레이어" : hello.Name.Trim();
-            var account = string.IsNullOrWhiteSpace(hello.Token) ? "name:" + name : "token:" + hello.Token.Trim();
-            done(NetAdmission.Accept(account, name));
+            done(NetAdmission.Accept("name:" + name, name));
         }
     }
 
     // Steam 인증(매칭큐 출시): 클라이언트가 보낸 인증 티켓(입장 표 = 16진 글자)을 Steam Web API로 확인한다 → 계정 키 "steam:<SteamID>".
+    // 클라이언트 쪽 티켓은 Steam 모듈이 GameNet.TokenSource로 채운다(GetAuthTicketForWebApi(DefaultIdentity)).
     // 퍼블리셔 웹 API 키는 서버에만 둔다(클라이언트 빌드에 넣지 않는다). Steamworks 계정·앱이 준비되면 붙인다(그 전에는 확인하지 못함).
     public sealed class SteamWebAuthenticator : INetAuthenticator
     {
+        // 티켓을 만들 때와 확인할 때 같은 글이어야 한다(이 서버용 티켓이라는 표시).
+        public const string DefaultIdentity = "momoi";
+
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         readonly string _publisherKey;
         readonly uint _appId;
+        readonly string _identity;
 
-        public SteamWebAuthenticator(string publisherKey, uint appId)
+        public SteamWebAuthenticator(string publisherKey, uint appId, string identity = DefaultIdentity)
         {
             _publisherKey = publisherKey ?? throw new ArgumentNullException(nameof(publisherKey));
             _appId = appId;
+            _identity = identity ?? "";
         }
 
         public void Authenticate(NetHello hello, Action<NetAdmission> done)
@@ -64,7 +70,8 @@ namespace GBible
                 return;
             }
             var url = "https://partner.steam-api.com/ISteamUserAuth/AuthenticateUserTicket/v1/?key=" + Uri.EscapeDataString(_publisherKey) +
-                      "&appid=" + _appId.ToString(CultureInfo.InvariantCulture) + "&ticket=" + Uri.EscapeDataString(hello.Token.Trim());
+                      "&appid=" + _appId.ToString(CultureInfo.InvariantCulture) + "&ticket=" + Uri.EscapeDataString(hello.Token.Trim()) +
+                      (_identity.Length > 0 ? "&identity=" + Uri.EscapeDataString(_identity) : "");
             Task.Run(async () =>
             {
                 try

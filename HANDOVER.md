@@ -14,6 +14,7 @@
 > - **2026-10-06 작성 전용 코드 지움**(사용자 결정): 시작하기·도움말(`Editor/Help`·`HelpWindow`·`HelpCoverageTests`), UI 샘플 창(`ShowcaseWindow`·`GsExperimental.uss`), 확인용 패널·샘플(`Samples/`·`GBIBLE_SAMPLES`·`Tests/PlayMode` 샘플 테스트), DB가 코드에 쓰던 기능(`ClassStaging`·`KeywordCode`·`KeywordMigration`, 클래스 상세의 키워드 그룹 연결·`[Hide]` 토글, 키워드 탭의 만들기·이름 바꾸기·지우기). 키워드 탭·클래스 상세는 읽기 전용(코드가 원본, AI가 쓴다). `ClassCode`는 `TryFindBody`(클래스 찾기)만 남음. `PendingChecks` 단계 3~5는 첫 게임 프로젝트의 테스트 씬에서 확인하는 목록으로 바꿈. 지운 것은 태그 `momoi-final`·모모이 백업에 그대로 있다.
 > - **2026-10-06 질문 규칙**(사용자): 질문 개수 제한은 없다. 막는 것은 같은 것 다시 묻기·제자리걸음·질 낮은 질문(진행 매뉴얼 3-1~3-3). 이름 '예외 사냥' → '예외 잡기'.
 > - **2026-10-06 멀티 착수 → 같은 날 구현(1.11·매뉴얼 40장·PendingChecks 단계 8, 서버 = Unity 서버 빌드로 확정)**(사용자가 추천안 전부 승인): 매칭큐 멀티(= 유형 A, 턴제·자체 .NET 서버) · 사설 호스트 멀티(= 유형 B, 실시간 친구 방·방장 권한·Steam) · 테스트용 멀티(A와 같은 서버 프로그램을 직접 접속). ① 셋 다 GBible 방식 4블록(행동만 올리고 바뀐 곳·이벤트를 내림, 전송만 갈아 끼움 — NGO 등 안 씀) ② 사설 호스트는 내 캐릭터 이동은 각자·판정은 방장 ③ 2~4명, 방장이 나가면 판 끝 ④ 매칭큐는 턴제(+느린 실시간 서버 틱)만 ⑤ 매칭큐는 가짜 매칭·가짜 인증·파일 저장으로 로컬에서 끝까지, AWS·Steam 인증은 같은 창구의 어댑터(계정 준비 뒤), 부분유료화는 나중 ⑥ 순서 공통 → 테스트용 → 매칭큐 → 사설 호스트 ⑦ 멀티에서 플레이어 일반 무르기 없음(Undo는 기믹·개발자 테스트·리플레이), 기믹 '누군가만 되돌리기' = 부분 되감기(그 사람·유닛 데이터만 n턴 전으로, 하나의 행동). 효과 배율은 음수 '필드 바꾸기'에도 곱함(그대로).
+> - **2026-10-06 멀티 보강**(1.11 보강 문단): 응답 확인·다시 접속·리플레이·이벤트 공개 범위·서버 빌드 화면 끔·부하 시험, 실제 서비스 자리(`GameNet.TokenSource`·`GameNet.Rooms` — 지금 사설, Steam 모듈이 스스로 바꿈). 방장 이어받기 안 함, 부분 유료화는 상품이 생길 때까지 없음.
 
 ---
 
@@ -141,6 +142,8 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 ### 1.11 멀티플레이어 설계 (2026-10-06 구현 — 매뉴얼 40장)
 
 > **2026-10-06 구현**: 4블록(`Runtime/Core/Net` — `NetServer`·`NetClient`·`NetHub`·메시지 규격·`MemoryNetwork`·`WebSocket*Transport`, 엔진 없음) + Unity 창구(`Runtime/Unity/Net` — `GameNet`·`NetTransformSync`) + Steam(`Optional/Steam/Runtime/SteamNet.cs` — `SteamLobby`·`Steam*Transport`). 코어 데이터 쪽: `PlayerDataStore`의 공개 범위(`SetVisibility`)·받는 쪽 적용(`LoadRemote`·`ApplyRemote`·`SetRemote`·`LoadRemoteTree`)·`KeyDefined`, `SessionRole`(클라이언트는 Undo·조건 판정·시간 규칙 안 함, `Do`는 `RemoteDo`로), `EventBus.PublishRemote`(AfterAction에만), `Mirror.TypeTable`·`MirrorReceiver.UseTypes`(형식 번호표)·`WriteNetValue`(이벤트 안 객체는 번호로)·`MissingAsNull`, `[SystemAction]`, `GameSession.LocalPlayer`, 되감기 `RewindSystem`(`$rewind`). 코어 테스트 `NetTests`·`RewindTests`·`HubTests`(실제 TCP 포함). **결정(2026-10-06, 사용자 "추천대로")**: 서버 = **Unity 서버 빌드**(Dedicated Server — 게임 규칙 코드·DB를 그대로 쓴다). 아래 '설계'의 .NET 전용 서버·정의 JSON 내보내기는 하지 않는다. 매칭큐 서버는 `GameNet.StartMatchServer`·`-momoi-matchserver`, 방 하나 서버는 `-momoi-server`(매뉴얼 40장 1-9). FlexMatch·PostgreSQL 어댑터는 AWS 계정 준비 뒤(창구 `INetMatchmaker`·`INetPlayerStore`).
+
+> **2026-10-06 보강(사용자 "나머진 다 진행해")**: ① 응답 확인 — 서버·로비·클라이언트 모두 15초 무응답이면 끊음(`TimeoutSeconds`), 방장이 닫으면 "방이 닫혔습니다"(`ByeOnClose`, 매칭큐 방은 끔) ② 다시 접속 — `GameNet.AutoReconnect`(1·2·4·8·15·15초, 서버가 끊은 것이 아니고 한 번 들어갔을 때만, 같은 세션에 새 `NetClient` + `ClearOnJoin`) ③ 리플레이 — `NetReplay`·`NetReplayPlayer`·`NetReplica`(받는 쪽 적용 공통), 서버 쪽 `AddRecorder`·혼자 `StartLocalRecording`(세션은 Local 그대로), `GameNet.RecordReplays`·`PlayReplay`·`SaveReplay`, 테스트 패널 '리플레이' ④ 이벤트 공개 범위 — `IOwnedEvent`(주인만)·`[GameEvent(ServerOnly = true)]` ⑤ 서버 빌드에서 화면 안 만듦(`GBibleRuntime.IsHeadless`) ⑥ 부하 시험(무작위 줄·취소·거절·이탈·재접속 + 불변식) ⑦ **실제 서비스 자리**(사용자: 'Steam·AWS와 닿는 부분만 가로채 지금은 사설로') — `GameNet.TokenSource`(입장 표, Steam 모듈이 `SteamTickets.Request`로 채움)·`GameNet.Rooms`(`INetRoomProvider`: `DirectRoomProvider` ↔ `SteamRoomProvider`), 서버 쪽은 기존 `INetAuthenticator`·`INetMatchmaker`·`INetPlayerStore`. 가짜 인증은 입장 표를 보지 않는다(이름 = 계정). 코어 테스트 `NetExtraTests`. **결정**: 방장 이어받기는 하지 않는다(한 번 만든 방은 끝까지 그 방장). 부분 유료화는 팔 상품이 정해진 프로젝트가 생길 때까지 없음.
 
 자세히: `Documentation~/Architecture.md` §8(멀티플레이어), §9A(행동 기록과 되돌리기). **지금까지 구현된 것은 기반뿐이다**: 엔진 무관 코어(서버에서 그대로 컴파일·실행 검증), 인스턴스 기반 세션(static 없음, 플레이어·매치마다 세션), 행동 = 데이터(클라이언트는 행동만 보내고 서버가 실행하는 구조에 맞음), 시드 난수·행동 기록·스냅샷(리플레이·세션 공유), 이벤트의 발생 주체. 네트워크 연결·서버·매칭·인증·결제는 **아직 없다**.
 
@@ -491,8 +494,8 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - 2D/3D 유틸 결정 3가지.
 - 인벤토리 UI 사양.
 - 다이얼로그 시트 규격.
-- 유형 B 네트워크 라이브러리(Netcode for GameObjects / Fish-Net / Mirror) + Steam 전송 계층.
-- 멀티플레이 되돌리기 규칙(허용 조건·방식 기본값).
+- ~~유형 B 네트워크 라이브러리~~ → 2026-10-06 해결: 라이브러리 없이 4블록 + Steam 전송.
+- ~~멀티플레이 되돌리기 규칙~~ → 2026-10-06 해결: 플레이어 일반 무르기 없음, 기믹은 부분 되감기.
 - 유형 A 인프라 세부(리전, 인스턴스 크기, 요금 견적).
 - UPM 패키지화 여부.
 ### 7.3 보류
@@ -507,6 +510,6 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - 다이얼로그 UI의 템플릿 글("로그", "대사 로그")은 UXML에 한국어로 박혀 있다(프로젝트가 바꾸거나 텍스트 키로 대체 필요).
 - 창 모드 스탠딩은 스프라이트 스탠딩만 지원.
 - 대본 워커(시트)는 시간을 보지 않고 효과의 끝 모습만 적용한다.
-- 멀티플레이는 기반(엔진 무관 코어·인스턴스 세션·행동 기록)만 있고 네트워크·서버·정의 JSON 내보내기는 없다.
+- 멀티플레이: Steam 모듈(`SteamNet.cs`)은 Steamworks.NET이 없어 컴파일해 보지 못했다(PendingChecks 단계 8). FlexMatch·PostgreSQL·Steam 결제 어댑터는 없다(계정 준비 뒤). 방장 이어받기는 하지 않는다.
 - Architecture.md §13의 옛 미결 항목 중 "ID 형식"은 lowerCamelCase로 해결됨, "asmdef 전환"은 어셈블리 분리로 대부분 해결(심볼 게이트 `GBIBLE_READY`는 옛 시스템 기준), "손상 파일 원본(24개 한글 복구)"은 옛 시스템 관련 기록.
 - 로컬 `legacy` 브랜치는 원격에 없다(옛 시스템은 `master` 이력의 첫 커밋들에 남아 있음).

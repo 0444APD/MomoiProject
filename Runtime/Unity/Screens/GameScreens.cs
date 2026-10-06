@@ -388,7 +388,7 @@ namespace GBible
         static bool EnsureRoot()
         {
             if (_document != null && _layers != null && _document.rootVisualElement != null) return true;
-            if (!Application.isPlaying) return false;
+            if (!Application.isPlaying || GBibleRuntime.IsHeadless) return false;
             var go = new GameObject("[MomoiProject] 화면");
             go.SetActive(false);
             UnityEngine.Object.DontDestroyOnLoad(go);

@@ -95,8 +95,8 @@ namespace GBible
             }
         }
 
-        // 판을 바꾸는 쪽(Undo·새 판·테스트 상황): 서버 세션이 이 프로그램에 있으면 그것(시험 모드·방장·혼자), 남의 서버에 들어갔으면 null.
-        static GameSession Authority => GameNet.Server?.Session ?? (GameNet.Client == null ? GBibleRuntime.Session : null);
+        // 판을 바꾸는 쪽(Undo·새 판·테스트 상황): 서버 세션이 이 프로그램에 있으면 그것(시험 모드·방장·혼자), 남의 서버에 들어갔거나 리플레이 중이면 null.
+        static GameSession Authority => GameNet.Server?.Session ?? (GameNet.Client == null && !GameNet.IsReplaying ? GBibleRuntime.Session : null);
 
         void OnGUI()
         {
@@ -154,6 +154,7 @@ namespace GBible
             GUILayout.EndHorizontal();
 
             DrawNet(session);
+            DrawReplay();
 
             // 테스트 상황
             GUILayout.Space(6);
@@ -268,7 +269,52 @@ namespace GBible
                 net.Jitter = GUILayout.HorizontalSlider((float)net.Jitter, 0f, 0.2f);
                 GUILayout.EndHorizontal();
             }
+            if (client != null && GUILayout.Button(GameNet.IsReconnecting ? "다시 접속하는 중…" : "끊김 시험(다시 접속)")) Run(GameNet.SimulateDrop, "연결을 끊었습니다");
             if (GUILayout.Button("나가기(혼자 하기)")) Run(GameNet.Leave, "혼자 하기로 돌아왔습니다");
+        }
+
+        // 리플레이: 녹화 켜기·저장·틀기(지난 녹화·파일)·재생 조작.
+        void DrawReplay()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("리플레이");
+            if (GameNet.Replay is NetReplayPlayer player)
+            {
+                GUILayout.Label($"{player.Replay.Source} · {player.Time:0.0} / {player.Duration:0.0}초");
+                var seek = GUILayout.HorizontalSlider((float)player.Time, 0f, (float)Math.Max(0.01, player.Duration));
+                if (Math.Abs(seek - player.Time) > 0.05) player.Seek(seek);
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(player.Playing ? "멈춤" : "재생"))
+                {
+                    if (player.AtEnd) player.Seek(0);
+                    player.Playing = !player.Playing;
+                }
+                if (GUILayout.Button("한 칸")) player.Step();
+                foreach (var s in new[] { 0.5, 1, 2, 4 })
+                    if (GUILayout.Toggle(Math.Abs(player.Speed - s) < 0.001, $"×{s}", "Button")) player.Speed = s;
+                GUILayout.EndHorizontal();
+                if (GUILayout.Button("그만 보기(혼자 하기)")) Run(GameNet.StopReplay, "혼자 하기로 돌아왔습니다");
+                return;
+            }
+            GameNet.RecordReplays = GUILayout.Toggle(GameNet.RecordReplays, GameNet.Recording is NetReplay recording ? $"녹화 중 · {recording.Duration:0}초" : "녹화(혼자·방장 = 모두, 클라이언트 = 들어갈 때부터)");
+            GUILayout.BeginHorizontal();
+            GUI.enabled = GameNet.Recording != null || GameNet.LastReplay != null;
+            if (GUILayout.Button("저장"))
+            {
+                string path = null;
+                Run(() => path = GameNet.SaveReplay());
+                if (path != null) _message = "저장: " + path;
+            }
+            if (GUILayout.Button("틀기")) Run(() => GameNet.PlayReplay(GameNet.Recording ?? GameNet.LastReplay), "리플레이");
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            foreach (var file in GameNet.ReplayFiles().Take(5))
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(System.IO.Path.GetFileNameWithoutExtension(file));
+                if (GUILayout.Button("틀기", GUILayout.Width(60))) Run(() => GameNet.PlayReplay(file), "리플레이");
+                GUILayout.EndHorizontal();
+            }
         }
 
         void Run(Action action, string done = null)

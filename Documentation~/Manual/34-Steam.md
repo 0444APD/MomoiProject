@@ -93,7 +93,9 @@
 
 게임 규칙은 Steam을 모른다: 도전과제·통계는 GBible의 도전과제·로그로 만들고, Steam은 그것을 따라 올라간다.
 
-**친구 방(멀티)**: `SteamLobby.Create(인원)`·`Invite()`·`Join(로비)`·`Leave()` — Steam 로비 + Steam Datagram Relay로 방장에게 접속한다(사설 호스트 멀티, 40장).
+**친구 방(멀티)**: `SteamLobby.Create(인원)`·`Invite()`·`Join(로비)`·`Leave()` — Steam 로비 + Steam Datagram Relay로 방장에게 접속한다(사설 호스트 멀티, 40장). Steam이 준비되면 `GameNet.Rooms`가 Steam 로비로 바뀌므로 화면은 `GameNet.CreateRoom`·`InviteToRoom`만 불러도 된다.
+
+**인증 티켓(매칭큐)**: Steam이 준비되면 접속할 때마다 Steam 웹 API용 인증 티켓을 받아 입장 표로 보낸다(`SteamTickets.Request` → `GameNet.TokenSource`). 매칭큐 서버가 `SteamWebAuthenticator(퍼블리셔 키, App ID)`로 확인한다 — 퍼블리셔 키는 자기 앱(Steam Direct)이 있어야 나온다. 시험 앱 480으로는 로비·릴레이까지만 시험할 수 있다.
 
 **아직 없는 것**: 리더보드(Leaderboard — Steam이 보관하는 점수 순위표). `GameSteam`에 해당 멤버가 없다.
 

@@ -34,12 +34,15 @@ namespace GBible
     {
         readonly GameSession _session;
         readonly INetClientTransport _transport;
-        readonly MirrorReceiver _receiver = new MirrorReceiver();
+        readonly NetReplica _replica;
         readonly Dictionary<long, GameAction> _pending = new Dictionary<long, GameAction>();
         readonly List<NetPlayerInfo> _players = new List<NetPlayerInfo>();
         readonly Stopwatch _watch = Stopwatch.StartNew();
         long _nextRequest = 1;
         double _nextPing;
+        double _lastHeard;
+        double _recordStart;
+        double _recordOffset;
         bool _hadRoom;
 
         public NetClient(GameSession session, INetClientTransport transport, string name, string token = null, string gameVersion = "")
@@ -52,12 +55,41 @@ namespace GBible
             GameVersion = gameVersion ?? "";
             session.Role = SessionRole.Client;
             session.RemoteDo = Send;
+            _replica = new NetReplica(session);
         }
 
         public GameSession Session => _session;
         public string Name { get; }
-        public string Token { get; }
+        // 입장 표(가짜 인증이면 비어도 된다 — Steam이면 인증 티켓). 접속 전에 바꿔도 된다(Hello를 보낼 때 읽는다).
+        public string Token { get; set; }
         public string GameVersion { get; }
+        // 서버가 거절했거나 서버가 끊었다(다시 접속해도 소용없다). 거짓인데 끊겼으면 네트워크 문제 — 다시 접속해 볼 만하다.
+        public bool ServerClosed { get; private set; }
+        // 서버에 닿은 적이 있다(로비나 방에 들어갔다).
+        public bool Reached { get; private set; }
+        // 이만큼(초) 서버에서 아무것도 오지 않으면 끊긴 것으로 본다(서버는 핑에 답하므로 살아 있으면 2초마다 온다).
+        public double TimeoutSeconds = 15;
+        // 들어갈 때부터 받은 것을 녹화한다(리플레이). 접속 전에 켜야 처음 모습부터 담긴다 — 들어간 뒤 켜면 다음 입장부터.
+        public NetReplay Recording { get; private set; }
+        // 들어갈 때(Welcome) 판 데이터를 먼저 비운다 — 다시 접속: 떨어져 있던 사이 서버에서 지워진 키가 남지 않게(이어서 처음 모습이 온다).
+        public bool ClearOnJoin { get; set; }
+
+        // 녹화를 켠다(이미 들어가 있으면 다음 Welcome부터). continueInto: 다시 접속할 때 앞 연결의 녹화에 이어 쌓는다.
+        // 돌려주는 값: 녹화(계속 쌓인다).
+        public NetReplay StartRecording(NetReplay continueInto = null)
+        {
+            Recording = continueInto ?? new NetReplay { Source = "클라이언트 " + Name };
+            _recordOffset = continueInto?.Duration ?? 0;
+            _recordStart = -1;
+            return Recording;
+        }
+
+        public NetReplay StopRecording()
+        {
+            var done = Recording;
+            Recording = null;
+            return done;
+        }
         public NetClientState State { get; private set; }
         public bool IsJoined => State == NetClientState.Joined;
         // 서버가 준 플레이어 번호(행동의 actorId). 들어가기 전에는 0.
@@ -106,12 +138,15 @@ namespace GBible
                 switch (e.Kind)
                 {
                     case NetEventKind.Connected:
+                        _lastHeard = Now;
                         SendHello();
                         break;
                     case NetEventKind.Disconnected:
                         Close(e.Reason ?? "연결이 끊겼습니다.");
                         break;
                     case NetEventKind.Data:
+                        _lastHeard = Now;
+                        Record(e.Data, e.Length);
                         try { Handle(e.Data, e.Length); }
                         catch (Exception ex)
                         {
@@ -120,13 +155,37 @@ namespace GBible
                         break;
                 }
             }
-            if (State == NetClientState.Joined && Now >= _nextPing)
+            if (!Connected) return;
+            // 핑: 로비·줄·방 어디서든 보낸다(서버가 끊긴 연결을 알아채고, 이쪽도 서버가 살아 있는지 안다).
+            if (Now >= _nextPing)
             {
                 _nextPing = Now + Math.Max(0.2, PingInterval);
                 var w = NetProtocol.Begin(NetMessage.Ping);
                 w.Double(Now);
                 _transport.Send(w.Data, w.Length);
             }
+            if (TimeoutSeconds > 0 && Now - _lastHeard > TimeoutSeconds)
+            {
+                _transport.Disconnect("서버 응답이 없습니다.");
+                Close($"서버가 {TimeoutSeconds:0}초 동안 응답하지 않았습니다.");
+            }
+        }
+
+        // 서버에 닿아 있는 상태(입장 확인 중 이후).
+        bool Connected => State == NetClientState.Lobby || State == NetClientState.Queued || State == NetClientState.MatchFound ||
+                          State == NetClientState.Joining || State == NetClientState.Joined || (State == NetClientState.Connecting && _lastHeard > 0);
+
+        // 녹화: 형식 번호표(Welcome)와 묶음(Batch)만. 첫 Welcome부터 쌓는다.
+        void Record(byte[] data, int length)
+        {
+            if (Recording == null || length == 0) return;
+            var kind = (NetMessage)data[0];
+            if (_recordStart < 0)
+            {
+                if (kind != NetMessage.Welcome) return;
+                _recordStart = Now;
+            }
+            if (kind == NetMessage.Welcome || kind == NetMessage.Batch) Recording.Add(_recordOffset + Now - _recordStart, data, length);
         }
 
         // 서버의 개발 명령을 실행해 달라고 한다(서버가 AllowDeveloperCommands일 때만 돈다).
@@ -159,6 +218,14 @@ namespace GBible
             Close("나갔습니다.");
         }
 
+        // 네트워크가 끊긴 것처럼 닫는다(나간다고 알리지 않는다 — 서버는 끊김으로 안다). 다시 접속 시험용.
+        public void Drop(string reason = "연결이 끊겼습니다(시험).")
+        {
+            if (State == NetClientState.Closed || State == NetClientState.Idle) return;
+            _transport.Disconnect(reason);
+            Close(reason);
+        }
+
         public void Dispose()
         {
             Disconnect();
@@ -170,7 +237,9 @@ namespace GBible
             }
         }
 
-        double Now => _watch.Elapsed.TotalSeconds;
+        // 시계(초). 비우면 실제 시계(테스트가 정한다).
+        public Func<double> Clock;
+        double Now => Clock?.Invoke() ?? _watch.Elapsed.TotalSeconds;
 
         // ── 보내기 ─────────────────────────────────────────────
 
@@ -225,6 +294,7 @@ namespace GBible
                     OnWelcome(r);
                     break;
                 case NetMessage.Reject:
+                    ServerClosed = true;
                     Close("입장 거절: " + r.Str());
                     break;
                 case NetMessage.Batch:
@@ -248,6 +318,7 @@ namespace GBible
                     break;
                 }
                 case NetMessage.Bye:
+                    ServerClosed = true;
                     Close(r.AtEnd ? "서버가 연결을 끊었습니다." : r.Str());
                     break;
                 case NetMessage.Lobby:
@@ -292,6 +363,7 @@ namespace GBible
         {
             Account = new NetLobbyInfo { Name = r.Str(), Rating = r.Double(), Wins = (int)r.UVar(), Losses = (int)r.UVar(), Draws = (int)r.UVar() };
             State = NetClientState.Lobby;
+            Reached = true;
             PlayerId = 0;
             Match = null;
             _session.LocalPlayer = 0;
@@ -327,10 +399,12 @@ namespace GBible
         void OnWelcome(MirrorReader r)
         {
             // 매칭큐에서 새 매치에 들어가면 지난 매치의 판 데이터를 비운다(이어서 처음 모습이 온다).
-            if (_hadRoom) _session.Data.ResetZone(DataZone.Session);
+            if (_hadRoom || ClearOnJoin) _session.Data.ResetZone(DataZone.Session);
             _hadRoom = true;
+            Reached = true;
             PlayerId = (int)r.UVar();
-            var missing = _receiver.UseTypes(NetProtocol.ReadStrings(r));
+            _replica.Reset();
+            var missing = _replica.UseTypes(NetProtocol.ReadStrings(r));
             if (missing.Count > 0)
                 _session.Journal.Append(JournalKind.Warning, "Net", $"서버에는 있고 이 게임에는 없는 형식 {missing.Count}개: {string.Join(", ", missing.GetRange(0, Math.Min(3, missing.Count)))}{(missing.Count > 3 ? " …" : "")} — 버전이 다를 수 있습니다.");
             ReadPlayers(r);
@@ -342,66 +416,7 @@ namespace GBible
 
         void OnBatch(MirrorReader r)
         {
-            var tick = r.Long();
-            var time = r.Double();
-            _session.Clock.Rewind(tick, time);
-            var data = _session.Data;
-            while (!r.AtEnd)
-            {
-                var kind = (NetRecord)r.Byte();
-                if (kind == 0) break;
-                switch (kind)
-                {
-                    case NetRecord.Reset:
-                    {
-                        var key = r.Str();
-                        var zone = (DataZone)r.Byte();
-                        var label = r.Str();
-                        var snapshot = NetProtocol.ReadBlockCopy(r);
-                        data.LoadRemote(key, zone, label, snapshot, _receiver);
-                        break;
-                    }
-                    case NetRecord.Delta:
-                    {
-                        var key = r.Str();
-                        NetProtocol.ReadBlock(r, out var start, out var end);
-                        data.ApplyRemote(key, r.Data, start, end, _receiver);
-                        break;
-                    }
-                    case NetRecord.Value:
-                    {
-                        var key = r.Str();
-                        var zone = (DataZone)r.Byte();
-                        var label = r.Str();
-                        data.SetRemote(key, zone, label, NetProtocol.ReadScalar(r));
-                        break;
-                    }
-                    case NetRecord.Tree:
-                    {
-                        var key = r.Str();
-                        var zone = (DataZone)r.Byte();
-                        var label = r.Str();
-                        var type = TypeResolver.Find(r.Str());
-                        data.LoadRemoteTree(key, zone, label, type, MiniJson.Deserialize(r.Str()));
-                        break;
-                    }
-                    case NetRecord.Hide:
-                        r.Str();
-                        break;
-                    case NetRecord.Event:
-                    {
-                        NetProtocol.ReadBlock(r, out var start, out var end);
-                        object evt;
-                        _receiver.MissingAsNull = true;
-                        try { evt = _receiver.Load(r.Data, start, end); }
-                        finally { _receiver.MissingAsNull = false; }
-                        _session.Events.PublishRemote(evt);
-                        break;
-                    }
-                    default:
-                        throw new FormatException($"[MomoiProject] 모르는 묶음 기록({(byte)kind})입니다.");
-                }
-            }
+            _replica.ApplyBatch(r);
             if (State == NetClientState.Joining)
             {
                 State = NetClientState.Joined;

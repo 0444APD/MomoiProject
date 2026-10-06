@@ -12,10 +12,20 @@ namespace GBible
     {
         public string DisplayName { get; }
 
+        // 멀티플레이: 클라이언트에 보내지 않는다(서버 규칙끼리만 주고받는 이벤트).
+        public bool ServerOnly { get; set; }
+
         public GameEventAttribute(string displayName = null)
         {
             DisplayName = displayName;
         }
+    }
+
+    // 멀티플레이: 이 이벤트는 주인(플레이어 번호) 클라이언트에만 보낸다(카드를 뽑음처럼 남에게 숨길 이벤트). Owner가 0이면 모두에게.
+    //   [GameEvent("카드 뽑음")] public class CardDrawn : IOwnedEvent { public int player; public DeckCard card; public int Owner => player; }
+    public interface IOwnedEvent
+    {
+        int Owner { get; }
     }
 
     // 이벤트가 스스로 기록 문장을 정하고 싶을 때 구현한다.

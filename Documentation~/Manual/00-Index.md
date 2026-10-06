@@ -60,7 +60,7 @@ Momoi Project(코드 이름 `GBible`)의 기능별 사용법이다. 각 장은 �
 | [36. 격자·큰 수](36-Grid-BigNumber.md) | 칸 좌표·거리·이웃·이동 범위·길찾기·직선·시야·범위·회전(`Grid`·`Cell`), double을 넘는 큰 수(`BigNumber`, "1.23K"·만·억 표기). |
 | [37. 자리(Placement)](37-Placement.md) | 조커 칸·손패·가방·보드처럼 조각이 놓이는 칸 = 판 데이터의 목록 하나(줄 길이, 빈 칸 `null`). 옆 칸·같은 줄·맞은편·가장자리·석판 무늬(`Placement`), 대상 '자리로 고르기'·조건 '자리 검사', 놓인 순서대로 발동('놓인 것마다'), 결과 '빌려 쓰기'(Blueprint). |
 | [38. 테스트](38-Testing.md) | 테스트 씬(`TestScene` — test 슬롯·시작 상황·게임 화면 위 테스트 패널), 테스트 상황(`TestScenarios` — 판·프로필·난수·시각 저장·불러오기), 테스트 명령(DB › 개발 명령), 자동 시뮬레이션(같은 상황을 시드만 바꿔 N번 → 승률 표). |
-| [40. 멀티플레이](40-Multiplayer.md) | 4블록(행동만 올리고 바뀐 곳·이벤트를 내림 — 화면 코드는 싱글과 같음): `GameNet`(시험 모드·직접 접속·화면 없는 서버·매칭큐 서버·매칭 찾기), 공개 범위(`DataVisibility`), 서버 규칙(`Validate`), 매칭큐(`NetHub` — 로비·줄·수락·방·Elo·재접속·이어 하기), 친구 방(`SteamLobby` + Steam 릴레이), 실시간 위치(`NetTransformSync`), 되감기 기믹(`Game.Rewind`). |
+| [40. 멀티플레이](40-Multiplayer.md) | 4블록(행동만 올리고 바뀐 곳·이벤트를 내림 — 화면 코드는 싱글과 같음): `GameNet`(시험 모드·직접 접속·화면 없는 서버·매칭큐 서버·매칭 찾기), 공개 범위(`DataVisibility`), 서버 규칙(`Validate`), 매칭큐(`NetHub` — 로비·줄·수락·방·Elo·재접속·이어 하기), 친구 방(`GameNet.CreateRoom` — 직접 접속 또는 Steam 로비 + 릴레이), 다시 접속, 리플레이(녹화·틀기·찾아가기), 숨길 이벤트(`IOwnedEvent`), 실제 서비스 자리(`TokenSource`·`Rooms`), 실시간 위치(`NetTransformSync`), 되감기 기믹(`Game.Rewind`). |
 | [39. 에셋 관리](39-Assets.md) | 메뉴 에셋 관리: 넣을 것(AI가 만든 임시 자리에 진짜 파일 — `AssetRequests`), 가져오기, 바꾸기(같은 자리·GUID 유지), 쓰는 곳, 안 쓰는 것(`Assets/_Unused`로 옮김), 폴더 정돈(`AssetTools`). |
 
 ### 화면·기기·실시간

@@ -47,6 +47,21 @@ namespace GBible
         bool Poll(out NetEvent e);
     }
 
+    // 연결 없는 서버 전송: 혼자 하는 게임을 녹화할 때(NetServer.StartLocalRecording) — 받는 사람 없이 녹화 관람자만.
+    public sealed class NullServerTransport : INetServerTransport
+    {
+        public string Address => null;
+        public void Start() { }
+        public void Send(int connection, byte[] data, int length, bool reliable = true) { }
+        public void Disconnect(int connection, string reason = null) { }
+        public bool Poll(out NetEvent e)
+        {
+            e = default;
+            return false;
+        }
+        public void Dispose() { }
+    }
+
     // ── 메모리 전송(시험 모드) ─────────────────────────────────
     // 서버와 클라이언트를 한 프로그램에 띄우고 메시지를 메모리로 나른다. 일부러 지연·흔들림·유실을 넣어
     // 싱글에서 숨는 문제(Do 직후 결과를 읽는 화면 등)를 드러낸다. 시간은 실제 시계, 또는 Manual이면 Advance로만 흐른다(테스트).

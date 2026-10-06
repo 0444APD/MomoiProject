@@ -18,6 +18,11 @@ namespace GBible
         public bool AllowDeveloperCommands;
         // 클라이언트가 보낸 Stream(실시간 위치 등)을 다른 클라이언트에 그대로 전하는가.
         public bool RelayStreams = true;
+        // 이만큼(초) 아무것도 오지 않는 연결은 끊는다(클라이언트는 2초마다 핑을 보낸다). 0이면 끊지 않는다.
+        public double TimeoutSeconds = 15;
+        // 닫을 때(Dispose) 들어와 있는 사람에게 "방이 닫혔다"고 알린다 — 클라이언트가 다시 접속을 시도하지 않는다(방장이 나가면 판이 끝난다).
+        // 매칭큐의 방은 끄고 연결을 로비로 돌린다(NetHub가 정한다).
+        public bool ByeOnClose = true;
     }
 
     // 서버 중개(4블록의 [서버 중개]): 이 세션(서버 권한)의 행동을 받아 실행하고, 바뀐 곳·이벤트를 클라이언트에 보낸다.
@@ -41,7 +46,20 @@ namespace GBible
             public readonly HashSet<string> Known = new HashSet<string>(StringComparer.Ordinal);
             public bool Joined;
             public bool NeedsScan = true;
+            // 마지막으로 무언가 받은 시각(초) — 끊긴 연결을 알아챈다.
+            public double LastHeard;
+            // 녹화 관람자(전송 대신 리플레이에 쓴다). SeeAll = 주인만 보는 키·이벤트도 모두(서버만 아는 것은 빼고).
+            public NetReplay Recorder;
+            public bool SeeAll;
+            public double RecordStart;
         }
+
+        readonly System.Diagnostics.Stopwatch _watch = System.Diagnostics.Stopwatch.StartNew();
+        int _nextRecorder = -1000;
+
+        // 시계(초). 비우면 실제 시계(테스트·매칭큐 서버가 정한다).
+        public Func<double> Clock;
+        double Now => Clock?.Invoke() ?? _watch.Elapsed.TotalSeconds;
 
         struct Record
         {
@@ -151,7 +169,7 @@ namespace GBible
                 switch (e.Kind)
                 {
                     case NetEventKind.Connected:
-                        _peers[e.Connection] = new Peer { Connection = e.Connection };
+                        _peers[e.Connection] = new Peer { Connection = e.Connection, LastHeard = Now };
                         break;
                     case NetEventKind.Disconnected:
                         Drop(e.Connection, e.Reason);
@@ -159,6 +177,7 @@ namespace GBible
                     case NetEventKind.Data:
                         if (_peers.TryGetValue(e.Connection, out var peer))
                         {
+                            peer.LastHeard = Now;
                             try { Handle(peer, e.Data, e.Length); }
                             catch (Exception ex)
                             {
@@ -168,6 +187,63 @@ namespace GBible
                         break;
                 }
             }
+            DropSilent();
+        }
+
+        // 아무것도 오지 않은 지 오래된 연결을 끊는다(갑자기 꺼진 컴퓨터 — 전송이 알아채지 못한 끊김).
+        void DropSilent()
+        {
+            if (Options.TimeoutSeconds <= 0) return;
+            var now = Now;
+            foreach (var peer in _peers.Values.Where(p => p.Recorder == null && now - p.LastHeard > Options.TimeoutSeconds).ToList())
+            {
+                _transport.Disconnect(peer.Connection, "응답이 없어 끊었습니다.");
+                Drop(peer.Connection, $"{Options.TimeoutSeconds:0}초 동안 응답이 없었습니다");
+            }
+        }
+
+        // ── 녹화(리플레이) ─────────────────────────────────────
+        // 관람자처럼 묶음을 받아 리플레이에 쓴다. asPlayer = 0이면 모두 보는 눈(주인만 보는 키·이벤트 포함, 서버만 아는 것 제외),
+        // 아니면 그 플레이어의 눈. 혼자 하는 게임도 녹화할 수 있다(전송 없이 이 서버만 — StartLocalRecording).
+        public NetReplay AddRecorder(NetReplay replay = null, int asPlayer = 0)
+        {
+            replay ??= new NetReplay { Source = asPlayer == 0 ? "서버(모두)" : "플레이어 #" + asPlayer };
+            var peer = new Peer
+            {
+                Connection = _nextRecorder--, Joined = true, Recorder = replay, SeeAll = asPlayer == 0, RecordStart = Now,
+                Player = new NetPlayer { Id = asPlayer, Name = "녹화", Connected = true },
+            };
+            _peers[peer.Connection] = peer;
+            var w = NetProtocol.Begin(NetMessage.Welcome);
+            w.UVar((ulong)asPlayer);
+            NetProtocol.WriteStrings(w, Mirror.TypeTable());
+            WritePlayers(w);
+            Deliver(peer, w);
+            return replay;
+        }
+
+        // 혼자 하는 게임(또는 서버가 아닌 세션)을 녹화한다: 전송 없는 서버를 붙이고 모두 보는 녹화를 시작한다.
+        // 매 프레임(행동 뒤) server.Flush()를 불러야 쌓인다. 끝나면 server.Dispose()(세션은 다시 혼자 하기로).
+        public static NetServer StartLocalRecording(GameSession session, out NetReplay replay)
+        {
+            var server = new NetServer(session, new NullServerTransport(), new NetServerOptions { TimeoutSeconds = 0, TimeSyncInterval = 0 });
+            // 녹화만 한다: 세션은 혼자 하기 그대로(서버 역할의 검사 — 선택지 주인 확인 등 — 를 켜지 않는다).
+            session.Role = SessionRole.Local;
+            server.Start();
+            replay = server.AddRecorder(new NetReplay { Source = "혼자" });
+            return server;
+        }
+
+        public void RemoveRecorder(NetReplay replay)
+        {
+            foreach (var pair in _peers.Where(p => p.Value.Recorder == replay).ToList()) _peers.Remove(pair.Key);
+        }
+
+        // 연결 하나에 메시지를 보낸다(녹화 관람자면 리플레이에 쓴다).
+        void Deliver(Peer peer, MirrorWriter w, bool reliable = true)
+        {
+            if (peer.Recorder != null) peer.Recorder.Add(Now - peer.RecordStart, w.Data, w.Length);
+            else _transport.Send(peer.Connection, w.Data, w.Length, reliable);
         }
 
         public void Kick(NetPlayer player, string reason)
@@ -191,7 +267,17 @@ namespace GBible
             _session.Events.Published -= OnPublished;
             _session.Actions.Executed -= OnExecuted;
             _session.Actions.TransactionAborted -= OnAborted;
-            foreach (var peer in _peers.Values.ToList()) _transport.Disconnect(peer.Connection, "서버가 닫혔습니다.");
+            foreach (var peer in _peers.Values.ToList())
+            {
+                if (peer.Recorder != null) continue;
+                if (Options.ByeOnClose && peer.Joined)
+                    Send(peer.Connection, w =>
+                    {
+                        NetProtocol.Begin(NetMessage.Bye, w);
+                        w.Str("방이 닫혔습니다.");
+                    });
+                _transport.Disconnect(peer.Connection, "서버가 닫혔습니다.");
+            }
             _peers.Clear();
             _transport.Dispose();
             _started = false;
@@ -385,7 +471,7 @@ namespace GBible
             w.Byte(channel);
             w.Bytes(data, 2, length - 2);
             foreach (var other in _peers.Values)
-                if (other.Joined && other != peer) _transport.Send(other.Connection, w.Data, w.Length, reliable: false);
+                if (other.Joined && other != peer && other.Recorder == null) _transport.Send(other.Connection, w.Data, w.Length, reliable: false);
         }
 
         // 서버에서 실시간 바이트를 모두에게(또는 한 사람에게) 보낸다(보낸 사람 번호 0 = 서버).
@@ -396,7 +482,7 @@ namespace GBible
             w.Byte(channel);
             w.Bytes(data, 0, length);
             foreach (var peer in _peers.Values)
-                if (peer.Joined && (to == null || peer.Player == to)) _transport.Send(peer.Connection, w.Data, w.Length, reliable: false);
+                if (peer.Joined && peer.Recorder == null && (to == null || peer.Player == to)) _transport.Send(peer.Connection, w.Data, w.Length, reliable: false);
         }
 
         void Drop(int connection, string reason)
@@ -506,14 +592,15 @@ namespace GBible
                     WriteTree(w, key);
                     count++;
                 }
-                foreach (var evt in events)
+                foreach (var (evt, owner) in events)
                 {
+                    if (owner != 0 && !peer.SeeAll && peer.Player.Id != owner) continue;
                     w.Byte((byte)NetRecord.Event);
                     NetProtocol.WriteBlock(w, evt, 0, evt.Length);
                     count++;
                 }
                 w.Byte(0);
-                if (count > 0 || timeSync) _transport.Send(peer.Connection, w.Data, w.Length);
+                if (count > 0 || timeSync) Deliver(peer, w);
             }
             if (timeSync || records.Length > 0 || values.Length > 0 || events.Count > 0)
             {
@@ -537,7 +624,7 @@ namespace GBible
             var count = 0;
             foreach (var key in data.Keys.ToArray())
             {
-                var visible = data.IsVisibleTo(key, peer.Player.Id);
+                var visible = peer.SeeAll ? data.VisibilityOf(key, out _) != DataVisibility.Server : data.IsVisibleTo(key, peer.Player.Id);
                 if (visible && !peer.Known.Contains(key))
                 {
                     if (!WriteInitial(w, key, snapshots)) continue;
@@ -602,14 +689,16 @@ namespace GBible
             w.Str(MiniJson.Serialize(data.ExportTree(key)));
         }
 
-        List<byte[]> EncodeEvents()
+        // 보낼 이벤트(바이트, 주인 — 0이면 모두). [GameEvent(ServerOnly = true)]는 빼고, IOwnedEvent는 주인만.
+        List<(byte[] data, int owner)> EncodeEvents()
         {
-            var encoded = new List<byte[]>(_events.Count);
+            var encoded = new List<(byte[], int)>(_events.Count);
             if (_events.Count == 0) return encoded;
             var w = new MirrorWriter();
             foreach (var evt in _events)
             {
                 var type = evt.GetType();
+                if (IsServerOnly(type)) continue;
                 if (type.IsValueType || Mirror.Find(type) == null)
                 {
                     if (_warnedEvents.Add(type))
@@ -618,9 +707,22 @@ namespace GBible
                 }
                 w.Clear();
                 Mirror.WriteNetValue(w, evt, _session.Data.NodeOf);
-                encoded.Add(w.ToArray());
+                encoded.Add((w.ToArray(), evt is IOwnedEvent owned ? owned.Owner : 0));
             }
             return encoded;
+        }
+
+        // [GameEvent(ServerOnly = true)]인가(형식마다 처음 한 번 찾아 둔다).
+        static readonly Dictionary<Type, bool> ServerOnlyEvents = new Dictionary<Type, bool>();
+
+        static bool IsServerOnly(Type type)
+        {
+            lock (ServerOnlyEvents)
+            {
+                if (ServerOnlyEvents.TryGetValue(type, out var found)) return found;
+                var attribute = (GameEventAttribute)Attribute.GetCustomAttribute(type, typeof(GameEventAttribute));
+                return ServerOnlyEvents[type] = attribute != null && attribute.ServerOnly;
+            }
         }
 
         void WritePlayers(MirrorWriter w)
@@ -638,7 +740,7 @@ namespace GBible
         {
             foreach (var peer in _peers.Values)
             {
-                if (!peer.Joined) continue;
+                if (!peer.Joined || peer.Recorder != null) continue;
                 Send(peer.Connection, w =>
                 {
                     NetProtocol.Begin(NetMessage.Players, w);

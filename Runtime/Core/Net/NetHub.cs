@@ -16,6 +16,8 @@ namespace GBible
         public bool SaveMatchEachAction = true;
         // 방에 정원이 다 들어오지 않을 때 기다리는 시간(초). 넘기면 매치를 없던 것으로 하고(아무도 점수를 잃지 않는다) 로비로 돌려보낸다.
         public double ReadySeconds = 30;
+        // 이만큼(초) 아무것도 오지 않는 연결은 끊는다(로비·줄·방 모두 — 클라이언트는 2초마다 핑). 0이면 끊지 않는다.
+        public double TimeoutSeconds = 15;
     }
 
     // 방 하나 = 매치 하나(서버 중개 하나 + 세션 하나).
@@ -66,6 +68,7 @@ namespace GBible
             public LobbyState State;
             public NetRoom Room;
             public string ProposalId;
+            public double LastHeard;
         }
 
         sealed class Proposal
@@ -161,6 +164,7 @@ namespace GBible
             while (_transport.Poll(out var e)) Route(e);
             while (_admissions.TryDequeue(out var done)) Admitted(done.connection, done.admission);
             var now = Now;
+            DropSilent(now);
             _matchmaker.Tick(now);
             while (_matchmaker.TryTake(out var match)) Propose(match, now);
             foreach (var proposal in _proposals.Values.Where(p => now >= p.Deadline).ToList()) Cancel(proposal, "수락 시간이 지났습니다.");
@@ -173,13 +177,14 @@ namespace GBible
             switch (e.Kind)
             {
                 case NetEventKind.Connected:
-                    _lobby[e.Connection] = new Lobbyist { Connection = e.Connection, State = LobbyState.Authenticating };
+                    _lobby[e.Connection] = new Lobbyist { Connection = e.Connection, State = LobbyState.Authenticating, LastHeard = Now };
                     break;
                 case NetEventKind.Disconnected:
                     Lost(e.Connection, e.Reason);
                     break;
                 case NetEventKind.Data:
                     if (!_lobby.TryGetValue(e.Connection, out var who)) return;
+                    who.LastHeard = Now;
                     if (who.State == LobbyState.InRoom && who.Room?.Transport != null)
                     {
                         who.Room.Transport.Enqueue(e);
@@ -188,6 +193,17 @@ namespace GBible
                     try { HandleLobby(who, e.Data, e.Length); }
                     catch (Exception ex) { Say($"로비 메시지를 처리하지 못했습니다(#{e.Connection}): {ex.Message}"); }
                     break;
+            }
+        }
+
+        // 로비·줄·수락 대기 중에 아무것도 오지 않은 지 오래된 연결을 끊는다(대기표도 함께 없어진다). 방 안은 방의 서버 중개가 끊는다.
+        void DropSilent(double now)
+        {
+            if (Options.TimeoutSeconds <= 0) return;
+            foreach (var who in _lobby.Values.Where(l => l.State != LobbyState.InRoom && now - l.LastHeard > Options.TimeoutSeconds).ToList())
+            {
+                _transport.Disconnect(who.Connection, "응답이 없어 끊었습니다.");
+                Lost(who.Connection, "응답 없음");
             }
         }
 
@@ -367,7 +383,9 @@ namespace GBible
             room.Server = new NetServer(session, room.Transport, new NetServerOptions
             {
                 MaxPlayers = players.Count, GameVersion = Options.GameVersion, DriveClock = true, AllowDeveloperCommands = Options.AllowDeveloperCommands,
+                TimeoutSeconds = Options.TimeoutSeconds, ByeOnClose = false,
             });
+            room.Server.Clock = () => Now;
             room.Server.Admit = hello =>
             {
                 var who = _lobby.TryGetValue(hello.Connection, out var l) ? l : null;

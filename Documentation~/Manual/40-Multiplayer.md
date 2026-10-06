@@ -26,6 +26,8 @@
 | 매칭큐 서버(`NetHub`) | 전송 하나로 로비·줄·여러 방(매치)을 돌리는 서버. 방 하나 = 서버 중개 하나 + 세션 하나. |
 | 방(`NetRoom`) | 매치 하나. `room.Server`(서버 중개)·`room.Session`·`room.Accounts`. |
 | 실시간 위치 맞추기(`NetTransformSync`) | 매 순간 움직이는 것(내 캐릭터·탄환)을 규칙 데이터 대신 위치만 보내 맞추는 컴포넌트. |
+| 리플레이(`NetReplay`) | 받은 묶음을 시각과 함께 녹화한 것. 계산을 다시 하지 않고 그대로 다시 적용해 튼다. |
+| 바꿔 끼우는 곳 | 실제 서비스(Steam·AWS)와 닿는 자리. 지금은 사설(가짜)로 대신하고, 계정이 준비되면 그 자리만 바꾼다(1-12). |
 
 ---
 
@@ -58,7 +60,9 @@
 | `$schedule`(예약) · `$rewind`(Undo 지점) | `Server` |
 
 - 정하기: `session.Data.SetVisibility("hand:2", DataVisibility.Owner, owner: 2)`. **키 단위**다 — 남에게 숨길 것은 플레이어마다 키를 나눈다(`hand:1`·`hand:2`).
-- 이벤트에는 숨길 정보를 넣지 않는다(모두에게 간다). 숨길 결과는 Owner 키의 값으로 보낸다.
+- 이벤트는 기본으로 모두에게 간다. 숨길 이벤트는 둘 중 하나로:
+  - 주인만: 이벤트 클래스가 `IOwnedEvent`를 구현한다(`int Owner => player;`) — 그 플레이어(와 모두 보는 녹화)에게만 간다. `Owner`가 0이면 모두에게.
+  - 서버만: `[GameEvent("…", ServerOnly = true)]` — 클라이언트에 보내지 않는다(서버 규칙끼리 주고받는 이벤트).
 
 ### 1-3. 되돌리기와 되감기
 
@@ -96,15 +100,17 @@
 
 | 창구 | 가짜(지금) | 진짜(출시, 계정 준비 뒤) |
 |---|---|---|
-| 인증 `INetAuthenticator` | `FakeAuthenticator`(이름·입장 표를 믿음) | `SteamWebAuthenticator`(Steam 인증 티켓 → Web API, 퍼블리셔 키는 서버만) |
+| 인증 `INetAuthenticator` | `FakeAuthenticator`(이름을 믿음 — 입장 표는 보지 않는다) | `SteamWebAuthenticator`(Steam 인증 티켓 → Web API, 퍼블리셔 키는 서버만) |
 | 매칭 `INetMatchmaker` | `LocalMatchmaker`(실력 폭 `BaseWindow` + 초당 `WidenPerSecond`, `MaxWaitSeconds`를 넘기면 아무나와) | AWS GameLift FlexMatch 어댑터(아직 — AWS 계정 준비 뒤) |
 | 저장 `INetPlayerStore` | `FilePlayerStore`(폴더의 accounts/·matches/ JSON) | PostgreSQL·Redis 어댑터(아직 — 계정 준비 뒤) |
 
 ### 1-7. 사설 호스트(Steam)
 
+- 화면은 `GameNet.CreateRoom(4)`·`InviteToRoom()`·`JoinRoom(대상)`·`LeaveRoom()`을 부른다. Steam이 준비되면 아래 Steam 로비로, 아니면 직접 접속(주소 복사)으로 간다(`GameNet.Rooms`).
 - `SteamLobby.Create(4)` → Steam 로비(친구만)를 만들고 이 프로그램이 방장(`GameNet.Host` + `SteamServerTransport`). `SteamLobby.Invite()` = 친구 초대 창.
 - 친구가 초대를 받거나(게임 참가) `+connect_lobby`로 게임을 켜면 그 로비에 들어가 방장에게 접속(`SteamClientTransport` — Steam Datagram Relay, NAT 통과).
-- 방장이 나가면 판이 끝난다(모두 연결이 끊기고 `GameNet.Closed`).
+- 방장이 나가면 판이 끝난다(모두 연결이 끊기고 `GameNet.Closed`). **방장 이어받기는 하지 않는다** — 한 번 만든 방은 끝까지 그 방장이 맡는다(2026-10-06 결정).
+- 방장은 접속한 사람을 SteamID로 알아본다(계정 키 `steam:<SteamID>`) — 이름이 바뀌어도 다시 접속하면 같은 자리.
 - 매 순간 움직이는 것: `NetTransformSync`(주인이 보내고 나머지는 보간, 방장이 중계). 판정(피해·드롭·상태 효과)은 방장의 규칙이 한다 — 위치는 그 재료다.
 
 ### 1-8. 전송
@@ -127,10 +133,45 @@
 - 클라이언트와 서버는 **같은 게임 버전**으로 빌드한다(`Application.version`이 다르면 입장을 거절한다).
 - 서버 코드(`NetServer`·`NetHub`)는 엔진 없는 코어라, 테스트(Unity 없이)에서도 같은 코드가 돈다.
 
+### 1-10. 끊김 · 다시 접속
+
+- 응답 확인: 클라이언트는 2초마다 핑을 보내고 서버는 답한다. 서버는 `NetServerOptions.TimeoutSeconds`(15초) 동안 아무것도 오지 않은 연결을 끊고(매칭큐 로비도 같다), 클라이언트도 `NetClient.TimeoutSeconds`(15초) 동안 서버에서 아무것도 오지 않으면 끊긴 것으로 본다.
+- 끊긴 이유: `NetClient.ServerClosed`가 참이면 서버가 거절했거나 끊었다(다시 접속해도 소용없다). 거짓이면 네트워크 문제다. 방장이 방을 닫으면(나가기·게임 끄기) 들어온 사람에게 "방이 닫혔습니다"를 보내므로 다시 접속하지 않는다(`NetServerOptions.ByeOnClose`). 방장 프로그램이 갑자기 죽으면 다시 접속을 시도하다 끝난다.
+- 다시 접속(`GameNet.AutoReconnect`, 기본 켬): 네트워크 문제로 끊겼고 한 번은 들어갔었으면 1·2·4·8·15·15초 뒤에 같은 곳으로 다시 접속한다(`ReconnectDelays`). 같은 계정이면 같은 자리(번호·데이터)로 잇고, 떨어져 있던 사이 바뀐 것은 처음 모습으로 다시 받는다. 다 실패하면 `GameNet.Closed`.
+  - 알림: `GameNet.Reconnecting(몇 번째)`·`Reconnected`. 화면에는 알림 글이 뜬다. `Joined`는 처음 한 번만 온다.
+  - 다시 접속하려면 전송을 만드는 함수로 들어간다(`GameNet.Join(() => 전송, 이름)`). `JoinDirect`·`FindMatch`·Steam 로비·시험 모드는 이미 그렇다. 전송 하나만 넘긴 `Join(전송, 이름)`은 다시 접속하지 않는다.
+  - 매칭큐: 다시 접속하면 로비를 거치지 않고 그 매치의 같은 자리로 들어간다(1-6).
+
+### 1-11. 리플레이
+
+- 녹화: 받은 메시지(형식 번호표·묶음)를 시각과 함께 쌓는다. 계산을 다시 하지 않으므로 어느 기기에서 틀어도 같다.
+  - 혼자·방장·화면 없는 서버: 모두 보는 눈(주인만 보는 키·이벤트 포함, 서버만 아는 것 제외). 시험 모드는 이 화면의 눈.
+  - 클라이언트: 내가 본 것만. 들어갈 때부터 녹화한다(들어간 뒤 켜면 다음 입장부터). 다시 접속해도 한 녹화로 이어진다.
+  - 매칭큐 서버의 방: `GameNet.RoomStarting`에서 `room.Server.AddRecorder()`.
+- Unity: `GameNet.RecordReplays = true` → 녹화가 끝나면(나가기·세션 다시 시작·끄기) `GameNet.LastReplay`. 파일: `GameNet.SaveReplay()`(`<persistentDataPath>/MomoiProject/Replays/<시각>.gbreplay`). 틀기: `GameNet.PlayReplay(리플레이 또는 경로)` → 조작은 `GameNet.Replay`(`Playing`·`Speed`·`Seek(초)`·`Step()`), 끝내기 `StopReplay()`.
+- 틀 때 이 화면의 세션은 '보는 쪽'이 된다 — 화면 코드는 그대로 돌고, 연출 이벤트(`SubscribeAfterAction`)도 온다. 행동은 하지 않는다. 뒤로 찾아가면 처음부터 다시 적용한다(이벤트 없이 데이터만).
+- 게임 버전이 다르면 형식이 어긋날 수 있다(형식 번호표로 이름이 같은 형식은 읽는다).
+
+### 1-12. 바꿔 끼우는 곳(실제 서비스)
+
+실제 서비스와 닿는 곳만 인터페이스로 떼어 두고, 지금은 사설(가짜)로 대신한다. 계정(Steamworks 앱·AWS)이 준비되면 **그 자리만** 바꾸고 나머지 코드는 그대로 간다.
+
+| 자리 | 지금(사설) | 실제 | 바꾸는 법 |
+|---|---|---|---|
+| 입장 표 `GameNet.TokenSource` | 없음(이름 = 계정) | Steam 웹 API용 인증 티켓(`SteamTickets.Request`) | Steam 모듈이 Steam이 준비되면 스스로 넣는다 |
+| 방 창구 `GameNet.Rooms`(`INetRoomProvider`) | `DirectRoomProvider`(직접 접속 · 주소 복사) | `SteamRoomProvider`(로비 · 릴레이 · 친구 초대) | Steam 모듈이 스스로 바꾼다 |
+| 인증 확인 `INetAuthenticator` | `FakeAuthenticator` | `SteamWebAuthenticator(퍼블리셔 키, App ID)` | 서버 빌드의 `StartMatchServer(auth: …)` |
+| 매칭 `INetMatchmaker` | `LocalMatchmaker` | AWS GameLift FlexMatch 어댑터(아직) | `StartMatchServer(matchmaker: …)` |
+| 저장 `INetPlayerStore` | `FilePlayerStore` | PostgreSQL·Redis 어댑터(아직) | `StartMatchServer(store: …)` |
+| 전송 | `WebSocket` · `Memory` | `Steam` 릴레이(사설 호스트) · 클라우드의 같은 `WebSocket`(매칭큐) | 이미 있다 |
+
+- 부분 유료화(결제·상품)는 아직 없다 — 팔 상품이 정해진 프로젝트가 생기면 이 표에 한 줄(결제 확인 자리)로 더한다.
+
 ## 2. 에디터에서 쓰는 법
 
 - **테스트 씬 › 컴포넌트 '테스트 씬' › 멀티플레이**: 플레이할 때 멀티로 시작(혼자 · 시험 모드 · 방 생성 · 방 참가), 시험 모드 지연·흔들림·화면 없는 클라이언트 수, 포트·주소·이름.
-- **테스트 패널(F1) › 멀티**: 시험 모드 · 방 생성 · 방 참가 · 매칭큐 서버 · 매칭 찾기. 들어가 있으면 내 번호·명단·핑, 시험 모드 지연 조절, 로비(점수·줄 서기·수락·거절), 나가기.
+- **테스트 패널(F1) › 멀티**: 시험 모드 · 방 생성 · 방 참가 · 매칭큐 서버 · 매칭 찾기. 들어가 있으면 내 번호·명단·핑, 시험 모드 지연 조절, 로비(점수·줄 서기·수락·거절), 끊김 시험(네트워크가 끊긴 것처럼 끊어 다시 접속을 본다), 나가기.
+- **테스트 패널(F1) › 리플레이**: 녹화 켜기 · 저장 · 틀기(지금·지난 녹화, 저장한 파일 5개). 트는 중에는 위치 막대 · 재생·멈춤 · 한 칸 · 배속 · 그만 보기.
   - 클라이언트일 때 Undo·새 판·테스트 상황은 판을 가진 쪽(서버)에서 한다(시험 모드는 이 프로그램 안의 서버, 남의 서버면 개발 명령으로).
 - **모니터 머리**: 멀티(시험 모드·방장·매칭큐 서버)이면 세션을 고른다 — 서버 · 이 화면(클라이언트) · 화면 없는 클라이언트 · 방마다.
 - 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(entityId) · 주인(플레이어 번호) · 초당 보내는 횟수 · 늦게 그리기 · 회전.
@@ -147,6 +188,12 @@ GameNet.StartDedicated(7777);                               // 화면 없는 서
 GameNet.StartMatchServer(7777, playersPerMatch: 2);         // 매칭큐 서버(가짜 인증·로컬 매칭·파일 저장)
 GameNet.FindMatch("100.64.1.2:7777", "철수");               // 매칭큐 로비 → GameNet.Client.Queue() → Client.AnswerMatch(true)
 GameNet.Leave();                                             // 혼자 하기로
+
+GameNet.CreateRoom(4);  GameNet.InviteToRoom();              // 사설 호스트 방(직접 접속 또는 Steam — GameNet.Rooms)
+GameNet.JoinRoom("100.64.1.2:7777");                       // Steam이면 로비 번호(보통은 친구 초대로 들어온다)
+GameNet.Reconnecting += n => ShowSpinner();                  // 다시 접속(AutoReconnect)
+GameNet.RecordReplays = true;                                // 리플레이 녹화 → LastReplay · SaveReplay()
+GameNet.PlayReplay(GameNet.LastReplay);                      // 틀기 → GameNet.Replay.Seek(30) · StopReplay()
 
 GameNet.ServerStarted += server => server.Validate = (player, action) => IsMyTurn(server.Session, player.Id, action) ? null : "내 차례가 아닙니다.";
 GameNet.RoomStarting += room => SetupPlayers(room.Session, room.Server.Players);
@@ -179,9 +226,14 @@ hub.ResumeOpenMatches();
 | `NetServer.Start` · `Update(dt)` · `Receive` · `Flush` | 열기 · 받기+시간+보내기 · 받기만 · 보내기만 |
 | `NetServer.AddLocalPlayer(이름)` · `Reserve(계정, 이름)` · `FindPlayer` · `FindAccount` · `Kick` · `Players` | 방장 · 자리 예약 · 찾기 · 강퇴 |
 | `NetServer.Admit` · `Validate` · `PlayerJoined` · `PlayerLeft` · `StreamReceived` · `SendStream` | 입장 확인 · 행동 검사 · 알림 · 실시간 바이트 |
-| `NetServerOptions` | `MaxPlayers` · `GameVersion` · `DriveClock` · `TimeSyncInterval` · `AllowDeveloperCommands` · `RelayStreams` |
+| `NetServer.AddRecorder(리플레이, 눈)` · `RemoveRecorder` · `NetServer.StartLocalRecording(세션, out 리플레이)` | 녹화(서버 쪽 · 혼자 하는 판) |
+| `NetServerOptions` | `MaxPlayers` · `GameVersion` · `DriveClock` · `TimeSyncInterval` · `AllowDeveloperCommands` · `RelayStreams` · `TimeoutSeconds` |
 | `NetClient.Connect` · `Update` · `Disconnect` · `State` · `PlayerId` · `Players` · `RoundTrip` · `PendingActions` | 접속 · 상태 |
 | `NetClient.Joined` · `Closed` · `ActionFailed` · `PlayersChanged` · `RunDeveloperCommand` · `SendStream` · `StreamReceived` | 알림 · 서버 개발 명령 · 실시간 바이트 |
+| `NetClient.Token` · `TimeoutSeconds` · `ServerClosed` · `Reached` · `ClearOnJoin` · `Drop()` | 입장 표 · 끊김 판단 · 다시 접속 |
+| `NetClient.StartRecording(이어 쌓을 녹화)` · `StopRecording` · `Recording` | 녹화(내가 본 것) |
+| `NetReplay.Save` · `Load` · `ToBytes` · `FromBytes` · `Duration` · `Source` / `NetReplayPlayer(세션, 리플레이)` · `Update` · `Seek` · `Step` · `Speed` · `Playing` | 리플레이 |
+| `IOwnedEvent` · `[GameEvent(ServerOnly = true)]` | 주인만 받는 이벤트 · 서버만 아는 이벤트 |
 | `NetClient.Queue(종류)` · `CancelQueue` · `AnswerMatch(수락)` · `Account` · `Match` · `LobbyChanged` · `MatchFound` · `MatchCancelled` · `MatchEnded` | 매칭큐 |
 | `NetHub.RoomStarting` · `RoomReady` · `RoomEnded` · `EndMatch(방, 결과)` · `ResumeOpenMatches` · `Rooms` · `Log` · `Options` | 매칭큐 서버 |
 | `session.Data.SetVisibility(키, 범위, 주인)` · `VisibilityOf` · `IsVisibleTo` | 공개 범위 |
@@ -214,8 +266,8 @@ room.Session.Events.SubscribeAfterAction<MatchDecided>(e => GameNet.Hub.EndMatch
 ### 4-2. 친구 협동(사설 호스트) — 내 캐릭터는 각자, 판정은 방장
 
 ```csharp
-// 메뉴: 방 만들기 / 초대
-SteamLobby.Create(4);  SteamLobby.Invite();
+// 메뉴: 방 만들기 / 초대(Steam이 준비되면 Steam 로비, 아니면 직접 접속)
+GameNet.CreateRoom(4);  GameNet.InviteToRoom();
 // 캐릭터를 만들 때(모든 프로그램에서 같은 이름으로):
 var sync = hero.AddComponent<NetTransformSync>();
 sync.entityId = "hero:" + playerId;
@@ -236,7 +288,7 @@ GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
 - **실패는 예외가 아니라 알림으로.** 클라이언트의 거절은 `ActionFailed`로 온다(`GameScreens.Do`는 싱글 실패와 같은 알림을 띄운다).
 - **이벤트는 `[GameEvent]` 클래스로.** 구조체 이벤트는 보낼 수 없다(서버 기록에 경고).
 - **주고받는 클래스에 `#if UNITY_EDITOR` 필드를 두지 않는다**(에디터와 빌드의 필드 차례가 달라진다).
-- **숨길 정보는 플레이어마다 키를 나누고 Owner로.** 키 하나 안의 일부만 숨길 수는 없다.
+- **숨길 정보는 플레이어마다 키를 나누고 Owner로.** 키 하나 안의 일부만 숨길 수는 없다. 숨길 이벤트(카드를 뽑음)는 `IOwnedEvent`로.
 - 매칭큐 서버의 계정 값(재화·점수)은 서버 저장소에만 있다. 클라이언트가 보낸 값을 믿지 않는다 — 바꾸는 것은 서버의 규칙(행동)이다.
 - 방장이 서버 세션을 그대로 쓰므로 방장 화면은 모든 데이터를 본다(친구 방 — 숨김이 필요 없는 게임에 쓴다).
 - 직접 접속이 안 될 때: 주소·포트(기본 7777)·Windows 방화벽 허용, 같은 가상 랜에 들어와 있는지, 게임 버전이 같은지.

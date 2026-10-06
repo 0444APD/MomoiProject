@@ -14,8 +14,9 @@ namespace GBible
     // 사설 호스트 멀티(친구 방): Steam 로비(친구 초대) + Steam Datagram Relay(NAT 통과, 서버 비용 없음). 방장 권한.
     //   방 생성:     SteamLobby.Create(4);            — 로비를 만들고 이 프로그램이 방장(GameNet.Host)이 된다. 친구 초대 창: SteamLobby.Invite()
     //   방 참가:     친구의 초대를 받거나(Steam 친구 목록 › 게임 참가) SteamLobby.Join(로비 번호) — 방장에게 접속(GameNet.Join)
-    //   나가기:      SteamLobby.Leave();              — 방장이 나가면 판이 끝난다(모두 연결이 끊긴다).
+    //   나가기:      SteamLobby.Leave();              — 방장이 나가면 판이 끝난다(모두 연결이 끊긴다. 방장 이어받기는 하지 않는다).
     // 게임 코드는 4블록 그대로다(Game.Do·SubscribeAfterAction). 전송만 Steam 릴레이로 바뀐다. 시험은 직접 접속(GameNet.HostDirect·JoinDirect)으로 해도 같다.
+    // 화면은 보통 GameNet.CreateRoom·JoinRoom·InviteToRoom을 부른다 — Steam이 준비되면 이 로비(SteamRoomProvider)로, 아니면 직접 접속으로 간다.
     public static class SteamLobby
     {
         // 지금 들어가 있는 로비(없으면 0).
@@ -33,6 +34,7 @@ namespace GBible
         static CallResult<LobbyEnter_t> _entered;
         static Callback<GameLobbyJoinRequested_t> _joinRequested;
         static string _playerName;
+        static int _maxPlayers;
 #endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -47,6 +49,7 @@ namespace GBible
             _entered = null;
             _joinRequested = null;
             _playerName = null;
+            _maxPlayers = 0;
 #endif
         }
 
@@ -63,6 +66,9 @@ namespace GBible
         {
 #if !DISABLESTEAMWORKS
             SteamNetworkingUtils.InitRelayNetworkAccess();
+            // 바꿔 끼우는 곳: 방 창구를 Steam 로비로, 입장 표를 Steam 인증 티켓으로(다른 것을 이미 넣었으면 그대로).
+            if (GameNet.Rooms == null || GameNet.Rooms is DirectRoomProvider) GameNet.Rooms = new SteamRoomProvider();
+            GameNet.TokenSource ??= SteamTickets.Request;
             _joinRequested ??= Callback<GameLobbyJoinRequested_t>.Create(e => Join(e.m_steamIDLobby.m_SteamID));
             var args = Environment.GetCommandLineArgs();
             var index = Array.IndexOf(args, "+connect_lobby");
@@ -77,6 +83,7 @@ namespace GBible
             if (!GameSteam.IsReady) { Fail("Steam이 준비되지 않았습니다."); return; }
             Leave();
             _playerName = playerName;
+            _maxPlayers = Mathf.Clamp(maxPlayers, 1, 250);
             _created ??= CallResult<LobbyCreated_t>.Create(OnCreated);
             _created.Set(SteamMatchmaking.CreateLobby(friendsOnly ? ELobbyType.k_ELobbyTypeFriendsOnly : ELobbyType.k_ELobbyTypePublic, Mathf.Clamp(maxPlayers, 1, 250)));
 #else
@@ -132,7 +139,10 @@ namespace GBible
             IsHost = true;
             var lobby = new CSteamID(Current);
             SteamMatchmaking.SetLobbyData(lobby, HostKey, SteamUser.GetSteamID().m_SteamID.ToString());
-            GameNet.Host(new SteamServerTransport(), _playerName ?? GameSteam.PlayerName);
+            var transport = new SteamServerTransport();
+            var server = GameNet.Host(transport, _playerName ?? GameSteam.PlayerName, GameNet.ServerOptions(_maxPlayers));
+            // 같은 Steam 계정이면 이름이 바뀌어도 같은 자리로 잇는다(다시 접속).
+            server.Admit = hello => transport.SteamIdOf(hello.Connection) is ulong id && id != 0 ? NetAdmission.Accept("steam:" + id, hello.Name) : NetAdmission.Accept();
             Entered?.Invoke(Current);
         }
 
@@ -145,8 +155,99 @@ namespace GBible
             if (SteamMatchmaking.GetLobbyOwner(lobby) == SteamUser.GetSteamID()) return;
             IsHost = false;
             if (!ulong.TryParse(SteamMatchmaking.GetLobbyData(lobby, HostKey), out var host) || host == 0) host = SteamMatchmaking.GetLobbyOwner(lobby).m_SteamID;
-            GameNet.Join(new SteamClientTransport(host), _playerName ?? GameSteam.PlayerName);
+            // 끊기면 같은 방장에게 새 연결로 다시 접속한다.
+            GameNet.Join(() => new SteamClientTransport(host), _playerName ?? GameSteam.PlayerName);
             Entered?.Invoke(Current);
+        }
+#endif
+    }
+
+    // 방 창구(Steam): Steam이 준비되면 GameNet.Rooms에 들어간다 — 화면의 GameNet.CreateRoom·JoinRoom·InviteToRoom이 Steam 로비로 간다.
+    public sealed class SteamRoomProvider : INetRoomProvider
+    {
+        public string Name => "Steam";
+        public bool Available => GameSteam.IsReady;
+
+        public void Create(int maxPlayers, string playerName) => SteamLobby.Create(maxPlayers, friendsOnly: true, playerName: playerName);
+
+        // target: 로비 번호. 숫자가 아니면 직접 접속 주소로 본다(시험).
+        public void Join(string target, string playerName)
+        {
+            if (ulong.TryParse(target?.Trim(), out var lobby)) SteamLobby.Join(lobby, playerName);
+            else if (!string.IsNullOrWhiteSpace(target)) GameNet.JoinDirect(target.Trim(), string.IsNullOrWhiteSpace(playerName) ? GameSteam.PlayerName : playerName);
+        }
+
+        public void Invite() => SteamLobby.Invite();
+
+        public void Leave()
+        {
+            SteamLobby.Leave();
+            if (GameNet.IsOnline) GameNet.Leave();
+        }
+
+        public string InviteText => SteamLobby.Current != 0 && SteamLobby.IsHost ? "Steam 친구 초대(로비 " + SteamLobby.Current + ")" : null;
+    }
+
+    // 입장 표(Steam): 매칭큐 서버가 확인할 인증 티켓(GetAuthTicketForWebApi). Steam이 준비되면 GameNet.TokenSource에 들어간다.
+    // 서버는 SteamWebAuthenticator(퍼블리셔 웹 API 키 + App ID)로 확인한다 — 둘의 identity 글이 같아야 한다(SteamWebAuthenticator.DefaultIdentity).
+    public static class SteamTickets
+    {
+#if !DISABLESTEAMWORKS
+        static Callback<GetTicketForWebApiResponse_t> _response;
+        static HAuthTicket _ticket = HAuthTicket.Invalid;
+        static Action<string> _waiting;
+#endif
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+#if !DISABLESTEAMWORKS
+            _response = null;
+            _ticket = HAuthTicket.Invalid;
+            _waiting = null;
+#endif
+        }
+
+        // 새 티켓을 받아 16진 글로 넘긴다(못 받으면 null). 앞 티켓은 취소한다(한 번에 하나).
+        public static void Request(Action<string> done)
+        {
+            if (done == null) return;
+#if !DISABLESTEAMWORKS
+            if (!GameSteam.IsReady)
+            {
+                done(null);
+                return;
+            }
+            _response ??= Callback<GetTicketForWebApiResponse_t>.Create(OnResponse);
+            if (_ticket != HAuthTicket.Invalid) SteamUser.CancelAuthTicket(_ticket);
+            var previous = _waiting;
+            _waiting = done;
+            previous?.Invoke(null);
+            _ticket = SteamUser.GetAuthTicketForWebApi(SteamWebAuthenticator.DefaultIdentity);
+            if (_ticket == HAuthTicket.Invalid)
+            {
+                _waiting = null;
+                done(null);
+            }
+#else
+            done(null);
+#endif
+        }
+
+#if !DISABLESTEAMWORKS
+        static void OnResponse(GetTicketForWebApiResponse_t e)
+        {
+            if (e.m_hAuthTicket != _ticket) return;
+            var done = _waiting;
+            _waiting = null;
+            if (done == null) return;
+            if (e.m_eResult != EResult.k_EResultOK || e.m_rgubTicket == null || e.m_cubTicket <= 0)
+            {
+                Debug.LogWarning("[MomoiProject] Steam 인증 티켓을 받지 못했습니다(" + e.m_eResult + ").");
+                done(null);
+                return;
+            }
+            done(BitConverter.ToString(e.m_rgubTicket, 0, Math.Min(e.m_cubTicket, e.m_rgubTicket.Length)).Replace("-", ""));
         }
 #endif
     }
@@ -190,6 +291,7 @@ namespace GBible
     {
         readonly Queue<NetEvent> _inbox = new Queue<NetEvent>();
         readonly Dictionary<int, HSteamNetConnection> _connections = new Dictionary<int, HSteamNetConnection>();
+        readonly Dictionary<int, ulong> _steamIds = new Dictionary<int, ulong>();
         readonly IntPtr[] _buffer = new IntPtr[SteamNetShared.MaxBatch];
         HSteamListenSocket _listen;
         Callback<SteamNetConnectionStatusChangedCallback_t> _status;
@@ -205,6 +307,9 @@ namespace GBible
             _started = true;
         }
 
+        // 연결의 SteamID(없으면 0) — 방장이 입장 확인(Admit)에서 계정 키로 쓴다.
+        public ulong SteamIdOf(int connection) => _steamIds.TryGetValue(connection, out var id) ? id : 0;
+
         static int IdOf(HSteamNetConnection connection) => unchecked((int)connection.m_HSteamNetConnection);
 
         void OnStatus(SteamNetConnectionStatusChangedCallback_t e)
@@ -218,11 +323,13 @@ namespace GBible
                     break;
                 case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
                     _connections[id] = e.m_hConn;
+                    _steamIds[id] = e.m_info.m_identityRemote.GetSteamID64();
                     _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Connected, Connection = id });
                     break;
                 case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
                 case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
                     SteamNetworkingSockets.CloseConnection(e.m_hConn, 0, null, false);
+                    _steamIds.Remove(id);
                     if (_connections.Remove(id))
                         _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Disconnected, Connection = id, Reason = string.IsNullOrEmpty(e.m_info.m_szEndDebug) ? "연결이 끊겼습니다." : e.m_info.m_szEndDebug });
                     break;
@@ -238,6 +345,7 @@ namespace GBible
         {
             if (!_connections.TryGetValue(connection, out var handle)) return;
             _connections.Remove(connection);
+            _steamIds.Remove(connection);
             SteamNetworkingSockets.CloseConnection(handle, 0, reason ?? "", true);
         }
 
@@ -258,6 +366,7 @@ namespace GBible
         {
             foreach (var handle in _connections.Values) SteamNetworkingSockets.CloseConnection(handle, 0, "방이 닫혔습니다.", true);
             _connections.Clear();
+            _steamIds.Clear();
             if (_started) SteamNetworkingSockets.CloseListenSocket(_listen);
             _status?.Dispose();
             _status = null;
