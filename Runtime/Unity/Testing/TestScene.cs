@@ -209,9 +209,46 @@ namespace GBible
                 address = GUILayout.TextField(address);
                 if (GUILayout.Button("들어가기", GUILayout.Width(80))) Run(() => GameNet.JoinDirect(address, NameOrDefault()), "들어가는 중…");
                 GUILayout.EndHorizontal();
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button($"매칭큐 서버 :{port}")) Run(() => GameNet.StartMatchServer(port), "매칭큐 서버를 열었습니다");
+                if (GUILayout.Button("매칭 찾기(주소)")) Run(() => GameNet.FindMatch(address, NameOrDefault()), "매칭큐 서버에 들어가는 중…");
+                GUILayout.EndHorizontal();
+                return;
+            }
+            if (GameNet.Hub is NetHub hub)
+            {
+                GUILayout.Label($"매칭큐 서버 · 로비 {hub.LobbyCount}명 · 방 {hub.Rooms.Count}개");
+                GUILayout.Label("접속 주소: " + hub.Address);
+                foreach (var room in hub.Rooms)
+                    GUILayout.Label($"  방 {room.MatchId}{(room.Ready ? "" : " (기다리는 중)")}: {string.Join(", ", room.Server.Players.Select(p => p.Name + (p.Connected ? "" : "(나감)")))}");
+                if (GUILayout.Button("서버 닫기")) Run(GameNet.Leave, "닫았습니다");
                 return;
             }
             var client = GameNet.Client;
+            if (client != null && client.Account != null && !client.IsJoined && client.State != NetClientState.Joining)
+            {
+                // 매칭큐 로비.
+                GUILayout.Label($"{client.Account.Name} · 점수 {client.Account.Rating:0} · {client.Account.Wins}승 {client.Account.Losses}패 {client.Account.Draws}무");
+                switch (client.State)
+                {
+                    case NetClientState.Lobby:
+                        if (GUILayout.Button("줄 서기")) Run(() => client.Queue(), "줄을 섰습니다");
+                        break;
+                    case NetClientState.Queued:
+                        GUILayout.Label("매칭을 기다리는 중…");
+                        if (GUILayout.Button("취소")) Run(client.CancelQueue);
+                        break;
+                    case NetClientState.MatchFound:
+                        GUILayout.Label("매치 성사: " + string.Join(", ", client.Match?.Players ?? Array.Empty<string>()));
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button("수락")) Run(() => client.AnswerMatch(true), "수락했습니다");
+                        if (GUILayout.Button("거절")) Run(() => client.AnswerMatch(false), "거절했습니다");
+                        GUILayout.EndHorizontal();
+                        break;
+                }
+                if (GUILayout.Button("나가기(혼자 하기)")) Run(GameNet.Leave, "혼자 하기로 돌아왔습니다");
+                return;
+            }
             var role = GameNet.IsTestMode ? "시험 모드" : GameNet.IsHost ? "방장" : "클라이언트";
             var state = client == null ? "" : client.IsJoined ? $" · 핑 {client.RoundTrip * 1000:0}ms" : $" · {client.State}";
             GUILayout.Label($"{role} · 내 번호 #{session.LocalPlayer}{state}");
