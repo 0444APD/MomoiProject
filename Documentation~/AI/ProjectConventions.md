@@ -22,7 +22,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
   2. **재사용 Block 하나 추가**(효과·대상·조건·결과 클래스. 다른 항목도 쓸 수 있게 일반적으로)
   3. **그 항목 전용 `[BindTo]` 코드**(한 항목만의 특수한 결과)
   4. **중간층 확장**(규칙 함수·의도 필드·새 가로채기 자리)
-- GBible 자체에 없는 범용 기능이 필요하면(라이브러리를 고쳐야 하면) 고치지 않고 사람에게 알린다. 프로젝트 코드로 우회할 수 있으면 우회하고 그 사실을 보고한다.
+- GBible 자체에 없는 범용 기능이 필요하면(라이브러리를 고쳐야 하면) 고치지 않고 사람에게 알린다. 단 화면 쪽 도구(UI·입력·카메라·이동)는 알리지 않고 프로젝트에 만든다(21절). 프로젝트 코드로 우회할 수 있으면 우회하고 그 사실을 보고한다.
 
 ## 1. 폴더·어셈블리, 데이터와 코드
 
@@ -259,3 +259,26 @@ static class AchievementSeeds
 - **되감기 기믹**: 턴 시작 행동에서 `Game.MarkRewind()`, 기믹은 `Game.Rewind`·`RewindKey`·`RewindEntity`(행동 안). 멀티에서 플레이어의 일반 무르기는 없다.
 - **주고받는 클래스**: `[Serializable]`(생성 코드), `#if UNITY_EDITOR` 필드를 두지 않는다. 이벤트는 `[GameEvent]` 클래스(구조체 이벤트는 보낼 수 없다).
 - **시험**: 단계 1에서 테스트 씬의 멀티플레이를 '시험 모드'로 한 번 돌려 본다(지연 0.1 이상 — 화면이 결과를 기다리는지). 매칭큐는 `GameNet.StartMatchServer` + 테스트 패널의 매칭 찾기로 로컬에서 끝까지(줄 → 수락 → 방 → `EndMatch` → 로비) 확인한다. 규칙 테스트는 코어에서 `NetServer`·`NetClient`·`MemoryNetwork`(Manual)로 서버 하나·클라이언트 둘을 띄워 단언할 수 있다(`Tests/Editor/NetTests.cs`가 본보기).
+
+## 21. 화면 쪽 도구는 프로젝트에 만든다(UI·입력·카메라·이동)
+
+GBible에는 넣지 않는다(2026-10-06 결정 — 장르마다 달라 미리 만들어 두면 맞지 않는다). 필요하면 AI가 그 프로젝트의 `Assets/Code/Client`에 만든다. 3절(규칙과 화면의 경계)·6절(화면)을 그대로 따르고, 아래를 더 지킨다.
+
+- **입력은 행동까지만.** 입력 코드가 하는 일은 "무엇을 하려는가"를 행동 하나로 바꿔 `Game.Do`(화면 버튼이면 `GameScreens.Do`)에 넘기는 것까지다. 키·패드는 Input System의 동작(선택 기능 '입력'을 켰으면 `GameInput.Use(동작 에셋)` — 키 바꾸기가 따라온다), 화면 버튼은 UI Toolkit(6절). `GameView.Busy`일 때는 받지 않는다.
+- **월드를 누르기 전에 화면 칸 위인지 본다.** 화면(UI Toolkit) 칸 위에서 누른 것은 월드로 보내지 않는다.
+  ```csharp
+  // screen: Pointer.current.position(왼쪽 아래가 원점)
+  public static bool OverScreen(Vector2 screen)
+  {
+      var root = GameScreens.Overlay?.parent;   // 화면 층들을 담은 뿌리
+      if (root?.panel == null) return false;
+      var picked = root.panel.Pick(RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(screen.x, Screen.height - screen.y)));
+      return picked != null && picked != root && root.Contains(picked);
+  }
+  ```
+- **누른 오브젝트 → 데이터.** 3D는 `Physics.Raycast(camera.ScreenPointToRay(screen), out var hit)`, 2D는 `Physics2D.OverlapPoint(camera.ScreenToWorldPoint(screen))`. 오브젝트를 만들 때(`ViewList`의 bind) 데이터 id를 담는 프로젝트 컴포넌트(`Client/DataTag.cs` — `public string id`)를 채워 두고, 맞은 것에서 `GetComponentInParent<DataTag>()` → `Game.Find<T>(id)`로 찾은 객체를 행동 필드에 넣는다.
+- **좌표 변환은 한 곳에.** 칸 단위 게임은 칸 좌표가 데이터다(매뉴얼 36장 격자). 칸 ↔ 월드 위치 변환은 Client의 함수 한 쌍(`Board.ToWorld(칸)`·`ToCell(위치)`)에만 두고 화면 코드가 모두 그것을 쓴다.
+- **이동.** 위치가 규칙 데이터인 게임(칸·턴제)은 행동이 칸을 바꾸고 화면은 그 변화를 연출로 옮긴다(Transform 보간 — `GameView.Present`). 실시간 액션은 위치가 화면 쪽이다: 방식(Transform·Rigidbody·CharacterController·NavMesh)은 명세서의 장르·조작으로 고르고, 규칙에는 판정 보고 행동만 보낸다(3절). 멀티면 움직이는 것에 `NetTransformSync`(20절).
+- **카메라.** Client의 컴포넌트 하나가 맡는다(따라가기·경계·확대). 흔들기·확대 같은 연출은 `GameView.Present`·`Play`의 연출 안에서 부른다. 새 패키지(Cinemachine 등)를 들여야 하면 먼저 사람에게 묻는다(내려받기).
+- **인벤토리·슬롯 UI.** 데이터는 인벤토리(매뉴얼 25장)·자리(37장 — 칸 옮기기 예제), UI는 6절의 `List<T>` 칸. 옮기기(끌어 놓기·두 번 누르기)는 놓는 순간 행동 하나이고, 끄는 동안에는 화면만 움직인다. 놓을 수 있는지는 `Game.CanDo`로 미리 보이고, 칸 수·겹치기·장비 칸 규칙은 규칙 함수에 둔다. 명세서에 칸 수·겹치기·장비 칸·옮기는 법이 없으면 묻는다(데이터 모양이라 뒤집기 비용이 크다).
+- **생김새·배치는 묻지 않는다.** 명세서에 없으면 기본 화면·테마 변수(6절)로 만들고 결정 기록에 남긴다(17절 — 되돌리기 쉬운 것). 다른 UI 방식(UGUI 프리팹·UI 에셋)은 들이지 않는다.
