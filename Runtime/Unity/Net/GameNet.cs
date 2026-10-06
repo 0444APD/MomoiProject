@@ -14,6 +14,9 @@ namespace GBible
     // 화면 코드는 싱글과 같다(Game.Do·Data·SubscribeAfterAction). 내 번호는 Game.Session.LocalPlayer.
     public static class GameNet
     {
+        // 직접 접속의 기본 포트.
+        public const int DefaultPort = 7777;
+
         static readonly List<NetClient> Extras = new List<NetClient>();
         static MemoryNetwork _testNet;
 
@@ -77,6 +80,25 @@ namespace GBible
             return Server;
         }
 
+        // 직접 접속(WebSocket)으로 방을 연다 — 테스트용 멀티·사설 호스트 시험. 다른 사람은 Address의 주소로 들어온다.
+        public static NetServer HostDirect(int port = DefaultPort, string playerName = null) => Host(new WebSocketServerTransport(port), playerName);
+
+        // 직접 접속으로 들어간다. address: "주소:포트" 또는 "ws://주소:포트"(포트를 빼면 7777).
+        public static NetClient JoinDirect(string address, string playerName) => Join(new WebSocketClientTransport(address), playerName);
+
+        // 화면 없는 서버(테스트 서버·서버 빌드): 지금 세션을 서버로 연다(방장 플레이어 없음 — 모두 접속해서 들어온다).
+        public static NetServer StartDedicated(int port = DefaultPort, NetServerOptions options = null)
+        {
+            Leave();
+            var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
+            Server = new NetServer(session, new WebSocketServerTransport(port), options ?? new NetServerOptions { AllowDeveloperCommands = Debug.isDebugBuild });
+            WireServer(Server);
+            Server.Start();
+            Debug.Log($"[MomoiProject] 서버를 열었습니다 — 접속 주소: {Server.Address}");
+            ServerStarted?.Invoke(Server);
+            return Server;
+        }
+
         // 서버에 들어간다: 이 화면의 세션을 멈추고(프로필은 저장) '받는 쪽' 세션으로 다시 시작한다.
         public static NetClient Join(INetClientTransport transport, string playerName, string token = null, string gameVersion = null)
         {
@@ -86,7 +108,8 @@ namespace GBible
 
         // 시험 모드: 서버를 이 프로그램 안에 띄우고(화면 없음, DB로 만든 세션 + 새 판 행동), 이 화면은 그 서버의 클라이언트가 된다.
         // 메시지는 메모리로 오가며 latency(초)·jitter(±초)만큼 늦는다 — 싱글에서 숨는 화면 문제(Do 직후 결과 읽기 등)가 드러난다.
-        public static void StartTestMode(double latency = 0.08, double jitter = 0.02, int extraClients = 0, string playerName = "나")
+        // prepareServer: 서버 세션의 판을 직접 준비할 때(테스트 상황 불러오기 등). 비우면 DB의 새 판 행동.
+        public static void StartTestMode(double latency = 0.08, double jitter = 0.02, int extraClients = 0, string playerName = "나", Action<GameSession> prepareServer = null)
         {
             Leave();
             _testNet = new MemoryNetwork { Latency = Math.Max(0, latency), Jitter = Math.Max(0, jitter) };
@@ -95,7 +118,8 @@ namespace GBible
             Server = new NetServer(serverSession, _testNet.Server(), new NetServerOptions { AllowDeveloperCommands = true });
             WireServer(Server);
             Server.Start();
-            StartRun(serverSession);
+            if (prepareServer != null) prepareServer(serverSession);
+            else StartRun(serverSession);
             ServerStarted?.Invoke(Server);
             for (var i = 0; i < Math.Max(0, extraClients); i++)
             {
@@ -182,6 +206,33 @@ namespace GBible
             if (type == null || type.IsAbstract || !typeof(GameAction).IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null) return;
             try { session.Do((GameAction)Activator.CreateInstance(type)); }
             catch (Exception e) { session.Journal.Append(JournalKind.Error, "Net", $"시험 모드 서버의 새 판 행동이 실패했습니다 — {e.Message}"); }
+        }
+
+        // 명령줄로 시작(빌드 여러 개를 띄워 시험할 때·서버 빌드):
+        //   -momoi-server [포트]                 화면 없는 서버(방장 없음). 서버 빌드는 -batchmode -nographics와 함께.
+        //   -momoi-host [포트] -momoi-name 이름   방장으로 연다
+        //   -momoi-join 주소 -momoi-name 이름     들어간다(주소 = "IP:포트")
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void FromCommandLine()
+        {
+            string[] args;
+            try { args = Environment.GetCommandLineArgs(); }
+            catch (Exception) { return; }
+            string ValueAfter(string flag)
+            {
+                var index = Array.IndexOf(args, flag);
+                return index >= 0 && index + 1 < args.Length && !args[index + 1].StartsWith("-", StringComparison.Ordinal) ? args[index + 1] : null;
+            }
+            int PortAfter(string flag) => int.TryParse(ValueAfter(flag), out var port) && port > 0 ? port : DefaultPort;
+            var name = ValueAfter("-momoi-name");
+            if (Array.IndexOf(args, "-momoi-server") >= 0)
+            {
+                // 서버는 화면을 그리지 않으므로 프레임을 낮춰 CPU를 아낀다(턴제·느린 실시간 서버 틱).
+                Application.targetFrameRate = 30;
+                StartDedicated(PortAfter("-momoi-server"));
+            }
+            else if (Array.IndexOf(args, "-momoi-host") >= 0) HostDirect(PortAfter("-momoi-host"), name);
+            else if (ValueAfter("-momoi-join") is string address) JoinDirect(address, name ?? Environment.UserName);
         }
 
         // GBibleHost.Update: 받은 메시지를 먼저 처리한다.

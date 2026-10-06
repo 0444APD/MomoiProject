@@ -39,8 +39,19 @@ namespace GBible.EditorTools
         VisualElement _feedback;
         VisualElement _dock;
 
-        // 테스트에서 런타임 없이 세션을 주입하기 위한 통로.
-        internal static Func<GameSession> SessionSource = () => GBibleRuntime.Session;
+        // 테스트에서 런타임 없이 세션을 주입하기 위한 통로. 기본: 멀티 시험 모드·방장이면 머리에서 고른 세션(서버·클라이언트), 아니면 이 화면의 세션.
+        internal static Func<GameSession> SessionSource = PickedSession;
+
+        // 머리에서 고른 멀티 세션 이름(null = 이 화면의 세션).
+        static string _picked;
+
+        static GameSession PickedSession()
+        {
+            if (_picked != null)
+                foreach (var (name, session) in GameNet.Sessions)
+                    if (name == _picked) return session;
+            return GBibleRuntime.Session;
+        }
         internal static int TabCount => TabNames.Length;
         internal static string TabKey(int index) => ((Tab)index).ToString();
 
@@ -119,6 +130,21 @@ namespace GBible.EditorTools
             titles.Add(_sessionInfo);
             header.Add(titles);
             header.Add(Gs.Spacer());
+            // 멀티(시험 모드·방장): 서버 쪽·클라이언트 쪽 세션을 골라 본다.
+            var sessions = GameNet.Sessions.ToList();
+            if (sessions.Count > 1)
+            {
+                var names = sessions.Select(s => s.name).ToArray();
+                var picker = new GsSegmented(names);
+                picker.Select(Math.Max(0, Array.FindIndex(sessions.ToArray(), s => s.session == _session)));
+                picker.Changed += index =>
+                {
+                    _picked = names[index];
+                    Build(rootVisualElement);
+                };
+                header.Add(picker);
+                header.Add(Gs.HSpace(16));
+            }
             if (_session != null)
             {
                 if (Application.isPlaying)

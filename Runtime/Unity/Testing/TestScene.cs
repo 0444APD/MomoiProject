@@ -5,6 +5,19 @@ using UnityEngine;
 
 namespace GBible
 {
+    // 테스트 씬을 플레이할 때의 멀티플레이.
+    public enum TestNetMode
+    {
+        // 혼자 하기.
+        Off,
+        // 시험 모드: 한 프로그램 안에 서버(화면 없음) + 이 화면은 그 클라이언트(메모리 전송, 일부러 지연).
+        TestMode,
+        // 직접 접속으로 방을 연다(이 화면 = 방장).
+        Host,
+        // 직접 접속으로 들어간다.
+        Join,
+    }
+
     // 테스트 씬: 프로젝트마다 AI가 만드는 씬(Assets/Scenes/Test.unity)에 이 컴포넌트를 하나 둔다.
     //   플레이하면 ① 'test' 슬롯으로 옮겨(개발자의 실제 저장을 건드리지 않음) ② 시작 테스트 상황을 불러오고(없으면 새 판)
     //   ③ 게임 화면 위에 테스트 패널을 띄운다: 테스트 명령(DB › 개발 명령·코드 등록) 버튼 · 상황 저장·불러오기 · 시간 · Undo.
@@ -19,6 +32,15 @@ namespace GBible
         [Tooltip("시작할 때의 게임 속도"), Range(0f, 8f)] public float speed = 1f;
         [Tooltip("시작할 때 테스트 패널을 펼친다")] public bool showPanel = true;
         [Tooltip("테스트 패널을 펼치고 접는 키")] public KeyCode panelKey = KeyCode.F1;
+
+        [Header("멀티플레이")]
+        [Tooltip("플레이할 때 멀티로 시작: 시험 모드(한 프로그램) · 방장 · 들어가기(직접 접속)")] public TestNetMode multiplayer = TestNetMode.Off;
+        [Tooltip("시험 모드: 한쪽 방향 지연(초)"), Range(0f, 1f)] public float latency = 0.08f;
+        [Tooltip("시험 모드: 지연 흔들림(±초)"), Range(0f, 0.5f)] public float jitter = 0.02f;
+        [Tooltip("시험 모드: 화면 없는 클라이언트 수(명단·공개 범위 시험)"), Range(0, 7)] public int extraClients;
+        [Tooltip("방장: 열 포트")] public int port = GameNet.DefaultPort;
+        [Tooltip("들어가기: 주소(IP:포트)")] public string address = "127.0.0.1:7777";
+        [Tooltip("멀티에서 보일 이름(비우면 컴퓨터 사용자 이름)")] public string playerName = "";
 
         public const string Slot = "test";
         const int WindowId = 0x6D6F6D6F;   // IMGUI 창 번호(다른 창과 겹치지 않게 고정)
@@ -49,7 +71,32 @@ namespace GBible
             }
             else GBibleRuntime.NewRun(session, fixedSeed);
             GameTime.SetSpeed(speed);
+            StartNet(fixedSeed);
         }
+
+        string NameOrDefault() => string.IsNullOrWhiteSpace(playerName) ? Environment.UserName : playerName.Trim();
+
+        void StartNet(ulong? fixedSeed)
+        {
+            switch (multiplayer)
+            {
+                case TestNetMode.TestMode:
+                    var start = scenario;
+                    // 서버 세션의 판: 시작 상황이 있으면 그것을, 없으면 DB의 새 판 행동.
+                    GameNet.StartTestMode(latency, jitter, extraClients, NameOrDefault(),
+                        string.IsNullOrWhiteSpace(start) ? (Action<GameSession>)null : server => TestScenarios.Load(server, start, fixedSeed));
+                    break;
+                case TestNetMode.Host:
+                    GameNet.HostDirect(port, NameOrDefault());
+                    break;
+                case TestNetMode.Join:
+                    GameNet.JoinDirect(address, NameOrDefault());
+                    break;
+            }
+        }
+
+        // 판을 바꾸는 쪽(Undo·새 판·테스트 상황): 서버 세션이 이 프로그램에 있으면 그것(시험 모드·방장·혼자), 남의 서버에 들어갔으면 null.
+        static GameSession Authority => GameNet.Server?.Session ?? (GameNet.Client == null ? GBibleRuntime.Session : null);
 
         void OnGUI()
         {
@@ -84,28 +131,49 @@ namespace GBible
                 if (GUILayout.Toggle(Mathf.Approximately(GameTime.Speed, s), $"×{s}", "Button")) GameTime.SetSpeed(s);
             if (GUILayout.Button(GameTime.IsPaused ? "계속" : "멈춤")) GameTime.TogglePause("테스트");
             GUILayout.EndHorizontal();
+            // Undo·새 판·테스트 상황은 판을 가진 쪽(서버)에서 한다.
+            var authority = Authority;
+            var client = GameNet.Client;
             GUILayout.BeginHorizontal();
-            GUI.enabled = session.UndoCount > 0 && !session.Data.InTransaction;
-            if (GUILayout.Button($"Undo ({session.UndoCount})")) Run(() => session.Undo());
-            GUI.enabled = true;
-            if (GUILayout.Button("새 판")) Run(() => GBibleRuntime.NewRun(session));
+            if (authority != null)
+            {
+                GUI.enabled = authority.UndoCount > 0 && !authority.Data.InTransaction;
+                if (GUILayout.Button($"Undo ({authority.UndoCount})")) Run(() => authority.Undo());
+                GUI.enabled = true;
+                if (GUILayout.Button("새 판")) Run(() =>
+                {
+                    if (authority == GBibleRuntime.Session) GBibleRuntime.NewRun(authority);
+                    else authority.NewRun();
+                });
+            }
+            else if (client != null)
+            {
+                if (GUILayout.Button("Undo(서버)")) Run(() => client.RunDeveloperCommand("세션", "Undo (Undo)"), "서버에 보냄");
+                if (GUILayout.Button("새 판(서버)")) Run(() => client.RunDeveloperCommand("저장", "새 판"), "서버에 보냄");
+            }
             GUILayout.EndHorizontal();
+
+            DrawNet(session);
 
             // 테스트 상황
             GUILayout.Space(6);
             GUILayout.Label("테스트 상황");
-            GUILayout.BeginHorizontal();
-            _saveName = GUILayout.TextField(_saveName);
-            GUI.enabled = !string.IsNullOrWhiteSpace(_saveName);
-            if (GUILayout.Button("지금 저장", GUILayout.Width(80))) Run(() => TestScenarios.Save(session, _saveName), $"저장: {_saveName}");
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
-            foreach (var name in TestScenarios.Names())
+            if (authority == null) GUILayout.Label("남의 서버에 들어가 있어 저장·불러오기는 서버에서 합니다.");
+            else
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(name);
-                if (GUILayout.Button("불러오기", GUILayout.Width(80))) Run(() => TestScenarios.Load(session, name), $"불러옴: {name}");
+                _saveName = GUILayout.TextField(_saveName);
+                GUI.enabled = !string.IsNullOrWhiteSpace(_saveName);
+                if (GUILayout.Button("지금 저장", GUILayout.Width(80))) Run(() => TestScenarios.Save(authority, _saveName), $"저장: {_saveName}");
+                GUI.enabled = true;
                 GUILayout.EndHorizontal();
+                foreach (var name in TestScenarios.Names())
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(name);
+                    if (GUILayout.Button("불러오기", GUILayout.Width(80))) Run(() => TestScenarios.Load(authority, name), $"불러옴: {name}");
+                    GUILayout.EndHorizontal();
+                }
             }
 
             // 테스트 명령(DB › 개발 명령 · 코드 등록)
@@ -124,6 +192,46 @@ namespace GBible
             }
             GUILayout.EndScrollView();
             GUI.DragWindow();
+        }
+
+        // 멀티: 시작·상태(내 번호·명단·핑)·시험 모드 지연·나가기.
+        void DrawNet(GameSession session)
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("멀티");
+            if (!GameNet.IsOnline)
+            {
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("시험 모드")) Run(() => GameNet.StartTestMode(latency, jitter, extraClients, NameOrDefault()), "시험 모드");
+                if (GUILayout.Button($"방 열기 :{port}")) Run(() => GameNet.HostDirect(port, NameOrDefault()), "방을 열었습니다");
+                GUILayout.EndHorizontal();
+                GUILayout.BeginHorizontal();
+                address = GUILayout.TextField(address);
+                if (GUILayout.Button("들어가기", GUILayout.Width(80))) Run(() => GameNet.JoinDirect(address, NameOrDefault()), "들어가는 중…");
+                GUILayout.EndHorizontal();
+                return;
+            }
+            var client = GameNet.Client;
+            var role = GameNet.IsTestMode ? "시험 모드" : GameNet.IsHost ? "방장" : "클라이언트";
+            var state = client == null ? "" : client.IsJoined ? $" · 핑 {client.RoundTrip * 1000:0}ms" : $" · {client.State}";
+            GUILayout.Label($"{role} · 내 번호 #{session.LocalPlayer}{state}");
+            if (GameNet.IsHost) GUILayout.Label("접속 주소: " + GameNet.Server.Address);
+            if (GameNet.Server != null)
+                foreach (var player in GameNet.Server.Players) GUILayout.Label($"  #{player.Id} {player.Name}{(player.Connected ? "" : " (나감)")}");
+            else if (client != null)
+                foreach (var player in client.Players) GUILayout.Label($"  #{player.Id} {player.Name}{(player.Connected ? "" : " (나감)")}");
+            if (GameNet.TestNetwork is MemoryNetwork net)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"지연 {net.Latency * 1000:0}ms", GUILayout.Width(90));
+                net.Latency = GUILayout.HorizontalSlider((float)net.Latency, 0f, 0.5f);
+                GUILayout.EndHorizontal();
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"흔들림 {net.Jitter * 1000:0}ms", GUILayout.Width(90));
+                net.Jitter = GUILayout.HorizontalSlider((float)net.Jitter, 0f, 0.2f);
+                GUILayout.EndHorizontal();
+            }
+            if (GUILayout.Button("나가기(혼자 하기)")) Run(GameNet.Leave, "혼자 하기로 돌아왔습니다");
         }
 
         void Run(Action action, string done = null)
