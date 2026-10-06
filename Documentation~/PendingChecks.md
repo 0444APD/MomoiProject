@@ -3,8 +3,6 @@
 코드·오프라인 테스트로는 확인한 상태이고, Unity 화면·마우스·소리·빌드로만 알 수 있는 것을 **위에서 아래 순서대로** 적었다. 단계마다 **할 일 → 보이면 정상**이다. 이상하면 단계 번호와 함께 알려 주면 된다. 확인된 줄은 지운다.
 
 > 2026-10-04: 이 개발 프로젝트의 테스트 요소(Assets/Code·DB 데이터·생성 코드·테스트 씬·ProjectSettings/MomoiProject·GBIBLE_ 심볼·저장 파일)를 `MomoiProjectBackups/20261004-1851-test-cleanup/`로 옮겼다(되돌리는 법은 그 안의 README). 그래서 예전 데이터를 옮기는 확인(옛 키워드 에셋·옛 형식 DB 항목)은 이 목록에서 뺐다.
->
-> 2026-10-06: 설치 직후 상태로 한 번 더 정리했다 — 예전 버전이 만든 빈 Addressables 그룹 'MomoiProject Default'와 에디터 설정(GBible.* 창 위치·옛 키워드 이전 표시)을 `MomoiProjectBackups/20261006-reset-to-install/`로 옮겼다. 단계 0부터 하면 된다.
 
 ---
 
@@ -41,23 +39,7 @@
   - 오버레이(Shift+Tab)는 **에디터에서는 뜨지 않는다**(Unity 에디터에는 Steam이 오버레이를 붙이지 못한다). 확인하려면 Windows 개발 빌드를 만들어 Steam을 켠 채 실행 → Shift+Tab으로 오버레이가 뜨고, 열면 게임이 멈추고 닫으면 이어진다. 빌드에서도 안 뜨면 Steam 라이브러리 › 게임 추가 › 비 Steam 게임 추가로 그 exe를 넣고 Steam에서 실행해 본다.
   - 도전과제 달성 경고는 480에서 정상이다(그 앱에 우리 도전과제가 없음).
 
-## 단계 2-1. DB 사이드바(2026-10-06)
-
-- **창이 낮을 때**: DB 창 높이를 줄이면 사이드바의 탭 목록만 스크롤되고 항목이 찌그러지지 않는다. 아래 저장·검증 칸은 바닥에 그대로 보인다. 탭을 옮겨 다녀도 스크롤 위치가 그대로다.
-- **빈 탭 숨기기**: 'DB' 그룹에 항목이 없는 종류(능력·상태 효과·패시브 …)의 탭이 안 보이고, 바닥에 "빈 탭 N개 숨김 · 보기". 누르면 다 보이고("빈 탭 숨기기"로 바뀜), 다시 누르면 숨는다.
-- **Dev 폴더 탭**: 사이드바 'DEV' 그룹 아래 "Assets/Dev 안에 폴더를 만들면 여기 탭이 생깁니다"를 누르면 Project 창에서 `Assets/Dev`가 골라진다(없으면 생긴다). 그 안에 `Levels` 폴더를 만들고 그림 하나·DB 항목 하나를 넣으면 'Levels' 탭이 생기고 둘 다 보인다. 하위 폴더를 만들면 탭 안에 접는 묶음이 생긴다. 줄을 누르면 Project 창에서 골라지고(DB 항목이면 상세 창), '열기'는 씬·프리팹을 연다.
-- **영어 폴더**: 콘솔에 "폴더 이름을 영어로 바꿨습니다: Assets/MomoiProject/Data/플레이어 데이터 → …/PlayerData"가 한 번 나오고, run·profile이 그대로 열린다(참조가 끊기지 않음).
-
-## 단계 2-2. 폴더 나눔 · 요소 탭 · 스프라이트 규격 파일(2026-10-06)
-
-- **폴더 옮기기**: Unity로 돌아가 다시 컴파일되면 콘솔에 "시스템 폴더를 옮겼습니다: Assets/Code → Assets/MomoiProject/Code"·"… Assets/MomoiProjectData → Assets/MomoiProject/Data". 새 자리에 먼저 생긴 폴더가 있으면 "시스템 폴더를 합쳤습니다: Assets/MomoiProjectData → Assets/MomoiProject/Data(옮긴 파일 N개, … 같은 이름 M개는 MomoiProjectBackups/…-merge에 옮겨 둠)". Project 창의 `Assets` 바로 아래에는 `MomoiProject`·`Dev`(+ Unity 기본 폴더)만 남는다. 플레이하면 그대로 돈다(참조가 끊기지 않음). `CLAUDE.md`의 경로도 새 자리로 바뀐다.
-- **경고**: 플레이해도 `[MomoiProject] Hit에 읽기 코드가 없어…`·`[BindTo("fn.use")]…` 같은 경고가 나오지 않는다. 다시 컴파일해도 "Assembly … will not be compiled, because it has no scripts"(Editor·Tests)와 `UAC…` 경고가 나오지 않는다(`Code/Editor/EditorAssembly.cs`·`Code/Tests/TestsAssembly.cs` 자리 표시 파일이 생긴다).
-- **사이드바**: 그룹 '선언'이 **요소**로, '진행' 그룹이 없어지고 **도전과제**가 **개발** 그룹에. 시작 파일 아래의 RunState·Profile 줄이 없다. **플레이어 데이터** 탭에 마우스를 올리면 오른쪽에 **cs ↗** — 누르면 PlayerData.cs가 열린다(탭으로 가지 않음).
-- **클래스·이벤트 탭**: 폴더 묶음(Rules·Client …)·폴더 경로·'Code 폴더 밖'이 없고, `Assets/MomoiProject/Code` 안의 클래스(이벤트)가 이름순 한 목록으로 보인다. 아래에 라이브러리 기본 묶음('자동')은 그대로.
-- **스프라이트 규격 파일**: 사이드바에 '이미지' 그룹이 없다. `Assets/Dev` 아래 폴더에서 우클릭 › Create › MomoiProject › 스프라이트 규격 → 파일 이름을 `icon`으로 → 인스펙터에 전용 화면(ID · 그룹 · 새 그룹 만들기 · 가로·세로 · ↔ · 빠른 크기 · 비율 미리보기 · 쓰임). 새 그룹 칸에 `character` → 만들기 → 같은 폴더에 그룹 파일이 생기고 그룹이 골라진다. 크기를 바꾸면 미리보기 상자가 따라 바뀐다. DB의 Dev 탭에도 두 파일이 보인다.
-- **에셋 관리**: 탐색기에서 png를 에셋 관리 창에 끌어 놓으면 `Assets/Dev/Art/`에 들어간다(예전 `Assets/Art`).
-- **씬 폴더**: 콘솔에 "씬 폴더를 옮겼습니다: Assets/Scenes → Assets/Dev/Scenes". SampleScene이 `Assets/Dev/Scenes`에 있고 File › Build Profiles의 씬 목록도 새 자리를 가리킨다(빠진 씬 없음). 테스트 씬을 만들면 `Assets/MomoiProject/Scenes/Test.unity`에 생긴다.
-- **화면 설정**: 사이드바 **개발** 그룹에 **화면 설정** 탭이 있고 항목 `screenSettings`가 저절로 있다(Panel Settings·테마 연결). `Assets/MomoiProject/UI`에 PanelSettings·Theme.uss·DefaultTheme.tss가 생긴다. 요소 그룹에는 화면 설정이 없다.
+- **플레이 경고**(2026-10-06 고침): 플레이해도 `[BindTo("fn.use")]…`·`[BindTo] 'GBible.Tests…'`·`… 읽기 코드가 없어 리플렉션으로 읽습니다` 같은 경고가 나오지 않는다(테스트용 클래스를 훑지 않음). 다시 컴파일해도 "Assembly … will not be compiled, because it has no scripts"와 `UAC…` 경고가 없다.
 
 ## 단계 3. DB 화면 — 첫 게임 프로젝트에서
 
