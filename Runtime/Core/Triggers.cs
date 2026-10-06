@@ -128,10 +128,21 @@ namespace GBible
         public TriggerKinds Kinds() => Leaves().Aggregate(TriggerKinds.None, (all, leaf) => all | leaf.Kind);
 
         // 이벤트 받기 잎들이 보는 이벤트 형식(결과의 "이벤트 값"이 어느 이벤트의 필드인지 정할 때).
+        // NOT 안의 이벤트는 그 순간이 일어나지 않은 것이라 값을 읽을 수 없으므로 뺀다.
         public IEnumerable<Type> EventTypes() =>
-            Leaves().OfType<EventTrigger>().Select(e => TypeResolver.Find(e.eventType))
-                .Concat(Leaves().OfType<InterceptTrigger>().Select(i => TypeResolver.Find(i.intentType)))
+            ReadableLeaves().OfType<EventTrigger>().Select(e => TypeResolver.Find(e.eventType))
+                .Concat(ReadableLeaves().OfType<InterceptTrigger>().Select(i => TypeResolver.Find(i.intentType)))
                 .Where(t => t != null).Distinct();
+
+        IEnumerable<Trigger> ReadableLeaves()
+        {
+            if (this is NotTrigger) yield break;
+            if (Kind != TriggerKinds.None) yield return this;
+            foreach (var child in Children)
+                if (child != null)
+                    foreach (var leaf in child.ReadableLeaves())
+                        yield return leaf;
+        }
 
         // 조건 충족 잎들의 조건.
         public IEnumerable<Condition> Conditions() =>

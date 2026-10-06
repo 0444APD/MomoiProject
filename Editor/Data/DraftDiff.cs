@@ -88,8 +88,13 @@ namespace GBible.EditorTools
             var iterator = property.Copy();
             var end = property.GetEndProperty();
             var prefix = property.propertyPath.Length;
+            var depth = property.depth;
+            var first = true;
             do
             {
+                // 이 칸 안쪽만(빈 목록 다음의 숨은 칸 등 다음 칸의 내용이 섞이지 않게).
+                if (!first && iterator.depth <= depth) break;
+                first = false;
                 builder.Append(iterator.propertyPath.Substring(System.Math.Min(prefix, iterator.propertyPath.Length))).Append('=');
                 switch (iterator.propertyType)
                 {

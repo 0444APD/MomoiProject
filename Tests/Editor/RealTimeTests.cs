@@ -32,6 +32,8 @@ namespace GBible.Tests
         [SetUp]
         public void SetUp()
         {
+            // NUnit은 한 객체로 여러 시험을 돌린다 — 앞 시험이 옮긴 시각이 남지 않게 매번 처음 시각으로.
+            _now = new DateTime(2026, 10, 4, 3, 30, 0, DateTimeKind.Utc);
             _session = new GameSession(new SessionOptions { Seed = 1, RealClock = () => _now, TimeZone = TimeZoneInfo.Utc });
             _session.Data.Define("run", DataZone.Session, new RtRun(), "판");
         }

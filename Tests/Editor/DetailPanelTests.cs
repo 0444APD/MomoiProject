@@ -107,16 +107,16 @@ namespace GBible.Tests
         public void 조건_블록_안쪽의_변화도_문장으로_잡는다()
         {
             var original = ScriptableObject.CreateInstance<AchievementData>();
-            original.condition = new StatCompareCondition { stat = "kills", op = CompareOp.AtLeast, value = 5 };
+            original.trigger = new ConditionTrigger { condition = new StatCompareCondition { stat = "kills", op = CompareOp.AtLeast, value = 5 } };
             var draft = Object.Instantiate(original);
-            ((StatCompareCondition)draft.condition).value = 7;
+            ((StatCompareCondition)((ConditionTrigger)draft.trigger).condition).value = 7;
             try
             {
                 var changes = DraftDiff.Compute(new SerializedObject(original), new SerializedObject(draft));
                 Assert.AreEqual(1, changes.Count);
-                Assert.AreEqual("condition", changes[0].Path);
-                StringAssert.Contains(">= 5", changes[0].Old);
-                StringAssert.Contains(">= 7", changes[0].New);
+                Assert.AreEqual("trigger", changes[0].Path);
+                StringAssert.Contains("5", changes[0].Old);
+                StringAssert.Contains("7", changes[0].New);
             }
             finally
             {

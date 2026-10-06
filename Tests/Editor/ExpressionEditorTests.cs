@@ -14,15 +14,24 @@ namespace GBible.Tests
     {
         AchievementData _data;
 
+        bool _authoring;
+
         [SetUp]
         public void SetUp()
         {
+            // 식 편집(빈칸·괄호·더하기 버튼)은 구조 편집을 열었을 때만 그려진다.
+            _authoring = EditorPolicy.Authoring;
+            EditorPolicy.Authoring = true;
             _data = ScriptableObject.CreateInstance<AchievementData>();
             _data.hideFlags = HideFlags.DontSave;
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_data);
+        public void TearDown()
+        {
+            Object.DestroyImmediate(_data);
+            EditorPolicy.Authoring = _authoring;
+        }
 
         static StatCompareCondition Stat(string id, double value) => new StatCompareCondition { stat = id, op = CompareOp.AtLeast, value = value };
 
