@@ -396,7 +396,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
   - ⑦ 고정 틱(`SessionOptions.TickRate`, `session.Ticked`·`TickAlpha`, DB › Bootstrap), 미리보기 실행(`Game.Preview`·`CanDo`, `Journal.Mute`, 미리보기에서는 도전과제 달성 없음), DB CSV(`DataCsv`, DB 목록 'CSV' 버튼). 매뉴얼 33장.
   - 공통 바탕: 라이브러리 키(`$modifiers`·`$statuses`·`$schedule`·`$choices`·`$world`)는 필요할 때 등록하되 판 불러오기 직후에도 보이게 `PlayerDataStore.IsPending`으로 받는다. 라이브러리 내부 id는 `$` 접두어(`$mod1`·`$status1` …)로 DB id와 겹치지 않는다. 바깥 행동이 끝나기 직전 `ActionDispatcher.Committing`에서 사라진 개체의 상태 효과·이번 판 Modifier를 정리(그 행동 안이라 같이 Undo). `[ShowIf]`는 값 여러 개 + DB 항목 안 묶음 필드에서도. `OutcomeSlot(BindTo = false)` 칸은 [BindTo]가 잠그지 않는다. enum은 `InspectorName`(Core는 `#if UNITY_2020_1_OR_NEWER`)으로 한글.
   - 테스트: `AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`(`Tools/RunCoreTests.ps1` 목록에 있음, 코어 217 통과). Unity 쪽(슬롯·설정·입력·화면)은 `PendingChecks.md` 7절.
-  - Steam 모듈(2026-10-04, 사용자 결정: Steamworks.NET, 범위 = 기본·도전과제·로그 → 통계·리치 프레즌스·Steam Cloud 안내): `Optional/Steam`(`GBible.Steam`, 심볼 `GBIBLE_STEAM` + 패키지가 있으면 `GBIBLE_STEAMWORKS`), DB › Steam `SteamData`, `GameSteam`. 이 개발 프로젝트 `Packages/manifest.json`에 `com.rlabrecque.steamworks.net` 2025.164.1(git URL, 사용자 허락)을 넣었다 — Unity가 받아 컴파일하기 전이라 모듈은 아직 컴파일 확인 전(`CompileOffline.ps1`은 DLL이 생기면 검사, 없으면 SKIP). 매뉴얼 34장.
+  - Steam 모듈(2026-10-04, 사용자 결정: Steamworks.NET, 범위 = 기본·도전과제·로그 → 통계·리치 프레즌스·Steam Cloud 안내): `Optional/Steam`(`GBible.Steam`, 심볼 `GBIBLE_STEAM` + 패키지가 있으면 `GBIBLE_STEAMWORKS`), DB › Steam `SteamData`, `GameSteam`. 이 개발 프로젝트 `Packages/manifest.json`에 `com.rlabrecque.steamworks.net` 2025.164.1(git URL, 사용자 허락)을 넣었다 — 2026-10-06 Unity가 받아 컴파일했고 `CompileOffline.ps1`로도 통과(그 뒤로는 DLL이 있어 매번 검사된다). `steam_appid.txt`는 Steam 기능이 켜지면 없을 때 만들고(`SteamData.EnsureAppIdFile`), 저장된 DB › Steam 항목의 App ID만 따라 쓴다(필드 목록용 임시 인스턴스는 쓰지 않음). 매뉴얼 34장.
   - 예시 게임의 시작 체력·시작 골드·보상 골드는 밸런스 값 `startHp`·`startGold`·`winGold`(사용자 결정). 가이드 1장 수정본(사용자 파일, 커밋 안 함)에 Bootstrap의 고정 틱·씬 흐름 줄을 넣었다.
   - 장르 프리셋은 만들지 않기로(사용자 결정, 2026-10-04): 장르마다 세부가 너무 달라 시작 설정에서 고르는 대신 기획 명세서·질문으로 정한다(Bootstrap 옵션·선택 기능·데이터 뼈대·규칙 함수 뼈대·이벤트·DB 기본 항목). 기능 설명은 참조 문서가 맡는다.
   - 프로젝트 관례: `Documentation~/AI/ProjectConventions.md`(사용자가 "공백이 없다고 판단되면 넘어가"라고 맡김). 프로젝트 CLAUDE.md가 이것을 불러오게 하는 것은 5번(시작 설정의 CLAUDE.md 생성)에서. DB 항목은 AI가 DB 추가 메뉴(Editor 스크립트, `EditorDatabase.Staging.Add`, 이름은 사용자 결정)·CSV로 만들고 사람이 Ctrl+S(예시 `Tools/GuideExample/Editor/AddBalanceValues.cs`).
@@ -510,6 +510,6 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - 다이얼로그 UI의 템플릿 글("로그", "대사 로그")은 UXML에 한국어로 박혀 있다(프로젝트가 바꾸거나 텍스트 키로 대체 필요).
 - 창 모드 스탠딩은 스프라이트 스탠딩만 지원.
 - 대본 워커(시트)는 시간을 보지 않고 효과의 끝 모습만 적용한다.
-- 멀티플레이: Steam 모듈(`SteamNet.cs`)은 Steamworks.NET이 없어 컴파일해 보지 못했다(PendingChecks 단계 8). FlexMatch·PostgreSQL·Steam 결제 어댑터는 없다(계정 준비 뒤). 방장 이어받기는 하지 않는다.
+- 멀티플레이: FlexMatch·PostgreSQL·Steam 결제 어댑터는 없다(계정 준비 뒤). 방장 이어받기는 하지 않는다.
 - Architecture.md §13의 옛 미결 항목 중 "ID 형식"은 lowerCamelCase로 해결됨, "asmdef 전환"은 어셈블리 분리로 대부분 해결(심볼 게이트 `GBIBLE_READY`는 옛 시스템 기준), "손상 파일 원본(24개 한글 복구)"은 옛 시스템 관련 기록.
 - 로컬 `legacy` 브랜치는 원격에 없다(옛 시스템은 `master` 이력의 첫 커밋들에 남아 있음).

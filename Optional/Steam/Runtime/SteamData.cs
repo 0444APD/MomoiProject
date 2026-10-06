@@ -45,20 +45,50 @@ namespace GBible.Data
         }
 
 #if UNITY_EDITOR
-        void OnValidate()
+        static string AppIdPath => Path.Combine(Directory.GetParent(Application.dataPath).FullName, "steam_appid.txt");
+
+        // Steam 기능을 켜면(이 어셈블리가 컴파일되면) steam_appid.txt가 없을 때 바로 만든다 — 에디터 플레이가 그 앱으로 Steam에 붙는다.
+        // DB › Steam 항목이 있으면 그 App ID, 없으면 480. 이미 있으면 그대로 둔다(App ID를 고치면 OnValidate가 고친다).
+        [UnityEditor.InitializeOnLoadMethod]
+        static void EnsureAppIdFile()
         {
-            if (appId == 0) return;
+            if (File.Exists(AppIdPath)) return;
+            UnityEditor.EditorApplication.delayCall += () =>
+            {
+                if (File.Exists(AppIdPath)) return;
+                uint id = 480;
+                foreach (var guid in UnityEditor.AssetDatabase.FindAssets("t:" + nameof(SteamData)))
+                {
+                    var item = UnityEditor.AssetDatabase.LoadAssetAtPath<SteamData>(UnityEditor.AssetDatabase.GUIDToAssetPath(guid));
+                    if (item != null && item.appId != 0)
+                    {
+                        id = item.appId;
+                        break;
+                    }
+                }
+                WriteAppId(id);
+            };
+        }
+
+        static void WriteAppId(uint id)
+        {
             try
             {
-                var path = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "steam_appid.txt");
-                var text = appId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                if (File.Exists(path) && File.ReadAllText(path).Trim() == text) return;
-                File.WriteAllText(path, text, new System.Text.UTF8Encoding(false));
+                var text = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (File.Exists(AppIdPath) && File.ReadAllText(AppIdPath).Trim() == text) return;
+                File.WriteAllText(AppIdPath, text, new System.Text.UTF8Encoding(false));
             }
             catch (Exception e)
             {
                 Debug.LogWarning("[MomoiProject] steam_appid.txt를 쓰지 못했습니다: " + e.Message);
             }
+        }
+
+        void OnValidate()
+        {
+            // 저장된 DB 항목만(에디터가 필드 목록을 읽으려고 잠깐 만든 기본값 인스턴스가 프로젝트의 App ID를 480으로 덮지 않게).
+            if (appId == 0 || !UnityEditor.EditorUtility.IsPersistent(this)) return;
+            WriteAppId(appId);
         }
 #endif
     }
