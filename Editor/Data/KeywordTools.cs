@@ -97,8 +97,8 @@ namespace GBible.EditorTools
         public static IEnumerable<(Type type, FieldInfo field)> FieldsLinkedTo(string group) =>
             Fields().Where(f => GroupOf(f.field) == group);
 
-        // 키워드 그룹 코드가 있는 곳(관례: Assets/Code/Keywords/그룹.cs).
-        public const string Folder = "Assets/Code/Keywords";
+        // 키워드 그룹 코드가 있는 곳(관례: Assets/MomoiProject/Code/Keywords/그룹.cs).
+        public const string Folder = ProjectFolders.Code + "/Keywords";
 
         // 그룹 형식이 정의된 파일(바깥 클래스 기준). 못 찾으면 null.
         public static string FileOf(Type group)

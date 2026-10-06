@@ -299,6 +299,10 @@
 .gs-sidebar__scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }
 .gs-sidebar__footer { flex-shrink: 0; padding-top: 8px; }
 .gs-sidebar .gs-nav-item { flex-shrink: 0; }
+/* 탭에 마우스를 올렸을 때만 보이는 작은 버튼(플레이어 데이터 → cs 파일). */
+.gs-root .gs-nav-item__tool { display: none; font-size: 10px; color: var(--gs-text-2); padding: 1px 6px; margin-left: 6px; border-radius: 4px; background-color: var(--gs-surface-2); }
+.gs-root .gs-nav-item:hover .gs-nav-item__tool { display: flex; }
+.gs-root .gs-nav-item__tool:hover { color: var(--gs-text); background-color: var(--gs-hover); }
 .gs-nav-item {
     flex-direction: row;
     align-items: center;

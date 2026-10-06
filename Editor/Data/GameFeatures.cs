@@ -7,6 +7,9 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
 
+// 불러온 어셈블리 이름만 본다(기능 어셈블리가 컴파일되어 있는가). 다시 컴파일하면 도메인이 새로 뜨므로 한 번만 모은다.
+#pragma warning disable UAC0005
+
 namespace GBible.EditorTools
 {
     // 프로젝트마다 켜고 끄는 선택 기능(다이얼로그 시스템 등) 하나.

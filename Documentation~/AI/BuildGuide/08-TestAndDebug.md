@@ -169,7 +169,7 @@ static void KillAll(TriggerContext c)
 
 카드 내기·실패 취소·Undo처럼 지켜야 할 규칙은 EditMode 테스트로 묶는다.
 
-- `Assets/Code/Tests`에 테스트 파일을 둔다. asmdef는 시작 설정이 이미 만들었다.
+- `Assets/MomoiProject/Code/Tests`에 테스트 파일을 둔다. asmdef는 시작 설정이 이미 만들었다.
 - Unity의 Test Runner 창(`Window › General › Test Runner` › EditMode)에서 돈다.
 
 테스트는 DB 없이 세션을 손으로 만든다. 플레이어 데이터는 `Define`으로, 밸런스 값은 `session.Balance.Define`으로, 카드·몬스터 원본은 `session.Instances`에 함수로 넣는다.
@@ -293,7 +293,7 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
 - [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
 - [ ] 밸런스 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
-- [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/Code/Tests`에 테스트로 있다.
+- [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/MomoiProject/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
 
 > [!note]- 다른 장르라면

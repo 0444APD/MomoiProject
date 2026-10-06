@@ -54,7 +54,7 @@ namespace GBible.EditorTools.UI
             }
             else
             {
-                tools.Add(Gs.Label("Bootstrap.cs가 없습니다. 메뉴 MomoiProject › 시작 설정에서 '적용'하면 Assets/Code/Client/Bootstrap.cs가 만들어집니다.", "gs-caption"));
+                tools.Add(Gs.Label("Bootstrap.cs가 없습니다. 메뉴 MomoiProject › 시작 설정에서 '적용'하면 Assets/MomoiProject/Code/Client/Bootstrap.cs가 만들어집니다.", "gs-caption"));
             }
             root.Add(tools);
 

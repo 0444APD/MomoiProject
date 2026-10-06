@@ -15,7 +15,7 @@
 |---|---|
 | 테스트 씬 | 게임 화면과 같은 클라이언트에 `TestScene` 컴포넌트를 둔 씬(`Assets/Scenes/Test.unity`). |
 | 테스트 패널 | 테스트 씬을 플레이하면 게임 화면 위에 뜨는 개발용 창(F1). 시간 · Undo · 새 판 · 테스트 상황 · 테스트 명령. |
-| 테스트 상황 | 지금 판(세션 구역·난수·게임 시각)과 프로필(메타 구역)의 스냅숏 파일. `Assets/MomoiProjectData/Tests/<이름>.json`. |
+| 테스트 상황 | 지금 판(세션 구역·난수·게임 시각)과 프로필(메타 구역)의 스냅숏 파일. `Assets/MomoiProject/Data/Tests/<이름>.json`. |
 | 테스트 명령 | 버튼 하나로 도는 개발용 동작. DB › 개발 › 개발 명령 항목(결과 Block) 또는 코드 등록(`session.Debug.Register`). 22장. |
 | 'test' 슬롯 | 테스트 씬이 쓰는 저장 슬롯. 개발자의 실제 저장(기본 슬롯)을 건드리지 않는다. 다음 실행의 시작 슬롯으로 기억되지 않는다. |
 | 자동 시뮬레이션 | 상황을 시드만 바꿔 여러 번 불러오고, 프로젝트가 정한 '한 수'를 끝날 때까지 두게 한 뒤 숫자를 잰다. |
@@ -45,7 +45,7 @@
 
 ### 2-2. 테스트 상황(`TestScenarios`)
 
-- `Save(session, 이름)`: `{ kind, name, savedAt, run = session.ExportRun(), meta = session.ExportMeta() }`를 JSON으로. 에디터는 `Assets/MomoiProjectData/Tests/`(프로젝트와 함께 커밋), 개발 빌드는 `<persistentDataPath>/MomoiProject/Tests/`.
+- `Save(session, 이름)`: `{ kind, name, savedAt, run = session.ExportRun(), meta = session.ExportMeta() }`를 JSON으로. 에디터는 `Assets/MomoiProject/Data/Tests/`(프로젝트와 함께 커밋), 개발 빌드는 `<persistentDataPath>/MomoiProject/Tests/`.
 - `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`).
 - 행동 밖에서 부른다(행동 안이면 `ExportRun`이 예외).
 

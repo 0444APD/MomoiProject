@@ -21,7 +21,7 @@
 
 할 일: 시작 설정 창에서 이름·언어 등을 고르고 **적용**.
 
-- `Assets/Code/Rules·Client·Editor·Tests`와 asmdef, `Client/Bootstrap.cs`, `Rules/PlayerData.cs`, DB › 플레이어 데이터 `run`·`profile`이 생긴다. 다시 컴파일된 뒤 `GameIds.cs`에 `Game.Data().Run`·`Profile`이 생긴다(콘솔에 "식별자 코드를 만들었습니다").
+- `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`와 asmdef, `Client/Bootstrap.cs`, `Rules/PlayerData.cs`, DB › 플레이어 데이터 `run`·`profile`이 생긴다. 다시 컴파일된 뒤 `GameIds.cs`에 `Game.Data().Run`·`Profile`이 생긴다(콘솔에 "식별자 코드를 만들었습니다").
 - DB 창(메뉴 `MomoiProject › DB`) 사이드바 맨 위 **시작 파일 › Bootstrap**: 칸을 고치면 바로 저장된다(Undo 방식에 따라 칸이 바뀜, 고급 접기). 새 칸 **고정 틱(초당 틱 수)**·**씬 흐름(플레이어 데이터·필드·빈 값일 때 씬)**이 보이고 값이 남는다(창을 닫았다 열어도). RunState·Profile을 누르면 cs가 열린다.
 - 시드 고정을 켜면 플레이할 때 모니터 머리의 시드가 그 값이다. `Bootstrap.cs`의 Configure에서 같은 값을 바꾸면 타임라인에 "코드(Configuring)가 … 바꿨습니다"가 남는다.
 - **Claude Code 파일**: 적용 결과 목록에 `CLAUDE.md`·`.claude/skills/think-momoi/SKILL.md`·`.claude/hooks/compile-check.ps1`·`.claude/settings.json`·`Docs/PlanningSpec.md`가 "만듦(Claude Code)"으로 나온다. 프로젝트 폴더(`D:/Unity/Projects/UnitySystemProject`)의 `CLAUDE.md`를 열면 `/com.momoi.gbible/Documentation~/AI/ProjectConventions.md` 줄이 있다. 메뉴 `MomoiProject › Claude Code 파일 › 지금 맞추기`를 다시 누르면 "이미 맞습니다".
@@ -42,7 +42,16 @@
 - **창이 낮을 때**: DB 창 높이를 줄이면 사이드바의 탭 목록만 스크롤되고 항목이 찌그러지지 않는다. 아래 저장·검증 칸은 바닥에 그대로 보인다. 탭을 옮겨 다녀도 스크롤 위치가 그대로다.
 - **빈 탭 숨기기**: 'DB' 그룹에 항목이 없는 종류(능력·상태 효과·패시브 …)의 탭이 안 보이고, 바닥에 "빈 탭 N개 숨김 · 보기". 누르면 다 보이고("빈 탭 숨기기"로 바뀜), 다시 누르면 숨는다.
 - **Dev 폴더 탭**: 사이드바 'DEV' 그룹 아래 "Assets/Dev 안에 폴더를 만들면 여기 탭이 생깁니다"를 누르면 Project 창에서 `Assets/Dev`가 골라진다(없으면 생긴다). 그 안에 `Levels` 폴더를 만들고 그림 하나·DB 항목 하나를 넣으면 'Levels' 탭이 생기고 둘 다 보인다. 하위 폴더를 만들면 탭 안에 접는 묶음이 생긴다. 줄을 누르면 Project 창에서 골라지고(DB 항목이면 상세 창), '열기'는 씬·프리팹을 연다.
-- **영어 폴더**: 콘솔에 "폴더 이름을 영어로 바꿨습니다: Assets/MomoiProjectData/플레이어 데이터 → …/PlayerData"가 한 번 나오고, run·profile이 그대로 열린다(참조가 끊기지 않음).
+- **영어 폴더**: 콘솔에 "폴더 이름을 영어로 바꿨습니다: Assets/MomoiProject/Data/플레이어 데이터 → …/PlayerData"가 한 번 나오고, run·profile이 그대로 열린다(참조가 끊기지 않음).
+
+## 단계 2-2. 폴더 나눔 · 요소 탭 · 스프라이트 규격 파일(2026-10-06)
+
+- **폴더 옮기기**: Unity로 돌아가 다시 컴파일되면 콘솔에 "시스템 폴더를 옮겼습니다: Assets/Code → Assets/MomoiProject/Code"·"… Assets/MomoiProjectData → Assets/MomoiProject/Data". Project 창의 `Assets` 바로 아래에는 `MomoiProject`·`Dev`(+ Unity 기본 폴더)만 남는다. 플레이하면 그대로 돈다(참조가 끊기지 않음). `CLAUDE.md`의 경로도 새 자리로 바뀐다.
+- **경고**: 플레이해도 `[MomoiProject] Hit에 읽기 코드가 없어…`·`[BindTo("fn.use")]…` 같은 경고가 나오지 않는다. 다시 컴파일해도 "Assembly … will not be compiled, because it has no scripts"(Editor·Tests)와 `UAC…` 경고가 나오지 않는다(`Code/Editor/EditorAssembly.cs`·`Code/Tests/TestsAssembly.cs` 자리 표시 파일이 생긴다).
+- **사이드바**: 그룹 '선언'이 **요소**로, '진행' 그룹이 없어지고 **도전과제**가 **개발** 그룹에. 시작 파일 아래의 RunState·Profile 줄이 없다. **플레이어 데이터** 탭에 마우스를 올리면 오른쪽에 **cs ↗** — 누르면 PlayerData.cs가 열린다(탭으로 가지 않음).
+- **클래스·이벤트 탭**: 폴더 묶음(Rules·Client …)·폴더 경로·'Code 폴더 밖'이 없고, `Assets/MomoiProject/Code` 안의 클래스(이벤트)가 이름순 한 목록으로 보인다. 아래에 라이브러리 기본 묶음('자동')은 그대로.
+- **스프라이트 규격 파일**: 사이드바에 '이미지' 그룹이 없다. `Assets/Dev` 아래 폴더에서 우클릭 › Create › MomoiProject › 스프라이트 규격 → 파일 이름을 `icon`으로 → 인스펙터에 전용 화면(ID · 그룹 · 새 그룹 만들기 · 가로·세로 · ↔ · 빠른 크기 · 비율 미리보기 · 쓰임). 새 그룹 칸에 `character` → 만들기 → 같은 폴더에 그룹 파일이 생기고 그룹이 골라진다. 크기를 바꾸면 미리보기 상자가 따라 바뀐다. DB의 Dev 탭에도 두 파일이 보인다.
+- **에셋 관리**: 탐색기에서 png를 에셋 관리 창에 끌어 놓으면 `Assets/Dev/Art/`에 들어간다(예전 `Assets/Art`).
 
 ## 단계 3. DB 화면 — 첫 게임 프로젝트에서
 
@@ -92,7 +101,7 @@
 ## 단계 6. 예전부터 남은 확인
 
 **에디터 기본**
-- EditMode 테스트(Window › General › Test Runner): 전체 통과. 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`, `MirrorTests`(모든 생성 코드가 실행 가능, 생성된 읽기·쓰기로 멤버를 다룸), `SavedIdRenameTests`, 새 테스트(`AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`·`GimmickPartsTests`·`GimmickTrialTests`·`TestScenarioTests`(테스트 상황 저장·불러오기·시뮬레이션 — Assets/MomoiProjectData/Tests에 임시 파일을 만들었다 지운다)), 다이얼로그 `DialogueRunnerTests`(새 줄: 신호를 받은 쪽이 다른 다이얼로그를 열면 그쪽이 이어 간다 — Unity 안에서만 돈다). (예전 PlayMode 샘플 테스트는 샘플과 함께 지웠다.)
+- EditMode 테스트(Window › General › Test Runner): 전체 통과. 특히 `TriggerSlotTests`, `CodexTreeTests`, `ContractTests`, `MirrorTests`(모든 생성 코드가 실행 가능, 생성된 읽기·쓰기로 멤버를 다룸), `SavedIdRenameTests`, 새 테스트(`AttributeInterceptTests`·`StatusScheduleTests`·`ChoiceTests`·`BalanceTableTests`·`WorldStateTests`·`TickPreviewTests`·`GimmickPartsTests`·`GimmickTrialTests`·`TestScenarioTests`(테스트 상황 저장·불러오기·시뮬레이션 — Assets/MomoiProject/Data/Tests에 임시 파일을 만들었다 지운다)), 다이얼로그 `DialogueRunnerTests`(새 줄: 신호를 받은 쪽이 다른 다이얼로그를 열면 그쪽이 이어 간다 — Unity 안에서만 돈다). (예전 PlayMode 샘플 테스트는 샘플과 함께 지웠다.)
 - Mirror: 플레이 중 플레이어 데이터(클래스)의 필드를 게임 코드에서 바꾸면 타임라인에 `경로  옛 값 → 새 값`으로 남고 Undo로 돌아간다. "예전 방식(리플렉션)으로 비교합니다" 경고가 뜨면 그 클래스에 [Serializable]이 빠진 것. "읽기 코드가 없어 리플렉션으로 읽습니다"도 같다.
 - 공유 객체: 플레이어 데이터 안에서 같은 객체를 두 곳에 넣고(장착 칸 = 인벤토리 안의 아이템) 고치면 기록이 한 번만 남고 Undo가 맞다.
 
@@ -130,18 +139,18 @@ GBible이 '개발자가 만드는 도구'에서 'AI가 만든 것을 개발자�
   - 패시브 `rules`(발동 더) 줄에 + 추가·✕가 없다. 인스턴스 값에 '+ 기능'·기능 ✕가 없다.
   - 다이얼로그 그래프·DB › 장소·스탠딩 프로필·스프라이트 규격은 추가·삭제가 된다.
   - 메뉴 **MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)** → 체크 표시가 붙고, 위의 버튼이 다시 보인다. 다시 누르면 숨는다.
-- **DB 반영 스크립트**: 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**가 있다(스크립트가 없으면 "없습니다"). 시험: `Assets/Code/Editor`에 `[DbSeed("1")] static void T() { if (EditorDatabase.Instance.FindById("seedTest") == null) EditorDatabase.Staging.Add(typeof(BalanceData), "seedTest"); }` 하나를 만들고 컴파일 → DB › 밸런스 값에 `seedTest`가 '새 항목 · 적용 전'으로, 콘솔에 "DB 반영 스크립트 1개를 돌렸습니다". Ctrl+S 뒤 `ProjectSettings/MomoiProject/DbSeeds.json`에 기록. 다시 컴파일해도 또 돌지 않는다. 확인 뒤 스크립트와 항목을 지운다(구조 편집을 열고).
+- **DB 반영 스크립트**: 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**가 있다(스크립트가 없으면 "없습니다"). 시험: `Assets/MomoiProject/Code/Editor`에 `[DbSeed("1")] static void T() { if (EditorDatabase.Instance.FindById("seedTest") == null) EditorDatabase.Staging.Add(typeof(BalanceData), "seedTest"); }` 하나를 만들고 컴파일 → DB › 밸런스 값에 `seedTest`가 '새 항목 · 적용 전'으로, 콘솔에 "DB 반영 스크립트 1개를 돌렸습니다". Ctrl+S 뒤 `ProjectSettings/MomoiProject/DbSeeds.json`에 기록. 다시 컴파일해도 또 돌지 않는다. 확인 뒤 스크립트와 항목을 지운다(구조 편집을 열고).
 - **테스트 씬**
   - 아무 씬을 열고 메뉴 **MomoiProject › 테스트 › 지금 씬을 복사해 테스트 씬 만들기** → `Assets/Scenes/Test.unity`, 오브젝트 '[테스트]'에 컴포넌트 '테스트 씬'. 인스펙터의 시작 상황이 드롭다운('(새 판)' + 저장된 상황).
   - 테스트 씬 플레이 → 왼쪽 위 테스트 패널(F1로 접고 펼침): 시간 ×0.5~×4·멈춤·Undo·새 판, 테스트 상황(이름 적고 '지금 저장' → 목록에 생김 → '불러오기'), 테스트 명령(DB › 개발 명령·기본 명령이 분류별 버튼).
   - `%USERPROFILE%\AppData\LocalLow\…\MomoiProject\slots\test\`가 생기고, 플레이를 멈춘 뒤 원래 씬을 플레이하면 기본 슬롯으로 시작한다(test가 기억되지 않음).
-  - 저장한 상황이 `Assets/MomoiProjectData/Tests/이름.json`에 보이고, 시작 상황으로 고르면 다음 플레이가 그 상황에서 시작한다.
+  - 저장한 상황이 `Assets/MomoiProject/Data/Tests/이름.json`에 보이고, 시작 상황으로 고르면 다음 플레이가 그 상황에서 시작한다.
 - **모니터 › 명령 탭**: 선택 대기 다음에 '테스트 상황' 패널(이름 칸·지금 저장·저장된 상황 버튼).
 - **에셋 관리**(메뉴 **MomoiProject › 에셋 관리**)
-  - 탭 넣을 것·목록·안 쓰는 것·폴더 정돈. 탐색기에서 png를 창에 끌어 놓으면 `Assets/Art/`로 들어온다.
+  - 탭 넣을 것·목록·안 쓰는 것·폴더 정돈. 탐색기에서 png를 창에 끌어 놓으면 `Assets/Dev/Art/`로 들어온다.
   - 목록 › 그림에서 아무 그림의 '쓰는 곳 n'을 누르면 그 그림을 쓰는 에셋이 펼쳐진다. '바꾸기…'로 다른 png를 고르면 그림이 바뀌고, 그 그림을 쓰던 프리팹·UI가 끊기지 않고 새 그림을 보인다.
-  - 안 쓰는 것 › 찾기 → 목록. 옮기면 `Assets/_Unused/` 아래로(지워지지 않음).
-  - 시험: `Assets/Code/Editor`의 반영 스크립트에서 `AssetRequests.Sprite("Assets/Art/Test/sample.png", 128, 128, "확인용")` → 넣을 것 탭에 줄, 그 경로에 단색 스프라이트. '파일 넣기…'로 다른 그림 → ✓.
+  - 안 쓰는 것 › 찾기 → 목록. 옮기면 `Assets/Dev/_Unused/` 아래로(지워지지 않음).
+  - 시험: `Assets/MomoiProject/Code/Editor`의 반영 스크립트에서 `AssetRequests.Sprite("Assets/Dev/Art/Test/sample.png", 128, 128, "확인용")` → 넣을 것 탭에 줄, 그 경로에 단색 스프라이트. '파일 넣기…'로 다른 그림 → ✓.
 - **시작 설정**: 적용한 뒤 '다음' 문구가 "자료를 Docs/Source에 넣고 Claude Code에서 /think-momoi …"이고, `Docs/Decisions.md`가 생긴다(없을 때만).
 - **Obsidian**: `Documentation~/Guide/`가 운영 가이드(00~09)로 바뀌었다. 예전 프로그래머 가이드는 `Documentation~/AI/BuildGuide/`. 개인 파일(`.obsidian`·`01-StartProject 수정본.md`)은 그대로.
 - **작성 전용 코드 지움(2026-10-06)**

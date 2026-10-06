@@ -181,6 +181,19 @@ namespace GBible.EditorTools.UI
         public void SetCount(string text) => _count.text = text;
 
         public void SetActive(bool active) => EnableInClassList("gs-nav-item--active", active);
+
+        // 마우스를 올렸을 때만 오른쪽에 보이는 작은 버튼(누르면 탭으로 가지 않고 그 일만 한다).
+        public void AddHoverTool(string text, string tooltip, Action onClick)
+        {
+            var tool = Gs.Label(text, "gs-nav-item__tool");
+            tool.tooltip = tooltip;
+            tool.RegisterCallback<ClickEvent>(e =>
+            {
+                e.StopPropagation();
+                onClick?.Invoke();
+            });
+            Add(tool);
+        }
     }
 
     public enum GsNoticeKind

@@ -48,7 +48,7 @@ namespace GBible.EditorTools
             rootVisualElement.Add(root);
 
             root.Add(Gs.Label("에셋 관리", "gs-heading"));
-            var hint = Gs.Label("밖에서 파일·폴더를 이 창에 끌어 놓으면 종류별 폴더(그림 → Assets/Art · 소리 → Assets/Audio …)로 가져옵니다. 바꾸기는 같은 자리에 내용을 넣으므로 그 에셋을 쓰는 곳이 모두 새 것을 씁니다.", "gs-caption");
+            var hint = Gs.Label("밖에서 파일·폴더를 이 창에 끌어 놓으면 종류별 폴더(그림 → Assets/Dev/Art · 소리 → Assets/Dev/Audio …)로 가져옵니다. 바꾸기는 같은 자리에 내용을 넣으므로 그 에셋을 쓰는 곳이 모두 새 것을 씁니다.", "gs-caption");
             hint.style.whiteSpace = WhiteSpace.Normal;
             hint.style.marginBottom = 8;
             root.Add(hint);
@@ -266,7 +266,7 @@ namespace GBible.EditorTools
 
         void BuildUnused()
         {
-            var note = Gs.Label("빌드에 든 씬·Resources·DB 데이터·UI·넣을 것 목록에서 닿지 않는 그림·소리·글꼴·모델·프리팹·머티리얼·애니메이션·영상입니다. 코드가 경로로 불러오는 것(Resources 밖)은 여기서 안 쓰는 것으로 보일 수 있으니 확인하고 옮기세요. 옮기면 Assets/_Unused 아래로 갑니다(지우지 않음).", "gs-caption");
+            var note = Gs.Label("빌드에 든 씬·Resources·DB 데이터·UI·넣을 것 목록에서 닿지 않는 그림·소리·글꼴·모델·프리팹·머티리얼·애니메이션·영상입니다. 코드가 경로로 불러오는 것(Resources 밖)은 여기서 안 쓰는 것으로 보일 수 있으니 확인하고 옮기세요. 옮기면 Assets/Dev/_Unused 아래로 갑니다(지우지 않음).", "gs-caption");
             note.style.whiteSpace = WhiteSpace.Normal;
             _body.Add(note);
             var bar = Gs.Row();

@@ -43,7 +43,7 @@ runner.Start("shopIntro");
 
 ## 화면: 템플릿 프리팹
 
-`MomoiProject → 다이얼로그 시스템 → UI 템플릿 만들기`는 `Assets/MomoiProjectData/DialogueUI/`에 모든 기능이 연결된 한 벌을 만든다: `DialogueSystem.prefab`, `DialogueUI.uxml`·`DialogueUI.uss`(글상자·이름표·선택지·레터박스·번쩍임·검은 화면·툴팁), `DialogueChoice.uxml`(선택지 하나), 패널 설정·런타임 테마, 기본 모션 4개(열림·클릭 대기 깜빡임·선택지 나타남·고름), 흰 스프라이트. 프리팹을 씬에 놓고 `GetComponent<DialoguePlayer>().Play("다이얼로그 ID")`로 재생한다. 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI > font`에 한글 TTF를 넣는다.
+`MomoiProject → 다이얼로그 시스템 → UI 템플릿 만들기`는 `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 한 벌을 만든다: `DialogueSystem.prefab`, `DialogueUI.uxml`·`DialogueUI.uss`(글상자·이름표·선택지·레터박스·번쩍임·검은 화면·툴팁), `DialogueChoice.uxml`(선택지 하나), 패널 설정·런타임 테마, 기본 모션 4개(열림·클릭 대기 깜빡임·선택지 나타남·고름), 흰 스프라이트. 프리팹을 씬에 놓고 `GetComponent<DialoguePlayer>().Play("다이얼로그 ID")`로 재생한다. 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI > font`에 한글 TTF를 넣는다.
 
 프리팹 구성: `DialoguePlayer`(실행기·입력·게임 시간 멈춤·신호 이벤트) › `Stage`(`DialogueStage`: 게임 카메라 앞에 배경 두 장·배경 어둡게·스탠딩·이펙트, 음악·효과음, 카메라 확대·이동·흔들기) · `UI`(`UIDocument` + `DialogueUI`).
 

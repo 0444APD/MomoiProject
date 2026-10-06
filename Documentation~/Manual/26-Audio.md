@@ -46,7 +46,7 @@
 
 ### 오디오 설정(선택)
 
-**오디오 설정 만들기**는 `Assets/MomoiProjectData/Resources/MomoiProject/GameAudioSettings.asset`을 만든다(직접 만들려면 `Create → MomoiProject → 오디오 설정`, 위치는 `Resources/MomoiProject/GameAudioSettings`). 없으면 기본값으로 동작한다.
+**오디오 설정 만들기**는 `Assets/MomoiProject/Data/Resources/MomoiProject/GameAudioSettings.asset`을 만든다(직접 만들려면 `Create → MomoiProject → 오디오 설정`, 위치는 `Resources/MomoiProject/GameAudioSettings`). 없으면 기본값으로 동작한다.
 
 | 칸 | 뜻 | 기본 |
 |---|---|---|

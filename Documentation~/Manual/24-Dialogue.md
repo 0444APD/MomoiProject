@@ -27,7 +27,7 @@
 ### 에디터에서
 
 1. `MomoiProject → DB` → 사이드바 "다이얼로그 시스템" 그룹의 **기능 활성화** → **켜기**. 다시 컴파일되면 **스탠딩 프로필**·**장소** 탭과 메뉴 `MomoiProject → 다이얼로그 시스템 → …`가 열린다(스크립팅 심볼 `GBIBLE_DIALOGUE`, `20-Setup.md` 6절).
-2. `MomoiProject → 다이얼로그 시스템 → UI 템플릿 만들기`. `Assets/MomoiProjectData/DialogueUI/`에 모든 기능이 연결된 화면 한 벌(프리팹 `DialogueSystem`, UXML·USS·선택지 UXML, 패널 설정·런타임 테마, 기본 UI 모션, 흰 스프라이트)과 설정 `Resources/MomoiProject/DialogueSettings`를 만든다. 설정의 **playerPrefab**이 이 프리팹으로 정해진다.
+2. `MomoiProject → 다이얼로그 시스템 → UI 템플릿 만들기`. `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 화면 한 벌(프리팹 `DialogueSystem`, UXML·USS·선택지 UXML, 패널 설정·런타임 테마, 기본 UI 모션, 흰 스프라이트)과 설정 `Resources/MomoiProject/DialogueSettings`를 만든다. 설정의 **playerPrefab**이 이 프리팹으로 정해진다.
 3. DB › **스탠딩 프로필**에서 화자를 만든다.
    - **expressions**: 스탠딩 목록(**스탠딩 ID** · **스프라이트**, 기본 `default` 하나).
    - **defaultExpression**: 기본 스탠딩 ID(비우면 첫 스탠딩).

@@ -271,7 +271,7 @@ static void Started(GameSession session)
 
 ### 01. 프로젝트 시작하기
 
-- [ ] 시작 설정을 적용했다. `Assets/Code/Rules·Client·Editor·Tests`, DB › 플레이어 데이터 `run`·`profile`이 있다.
+- [ ] 시작 설정을 적용했다. `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`, DB › 플레이어 데이터 `run`·`profile`이 있다.
 - [ ] 쓸 선택 모듈을 켰다.
 - [ ] 규칙 코드는 Rules에, Unity에 붙는 코드는 Client에 있다.
 - [ ] `RunState`·`Profile`에 필드를 채웠다.
@@ -358,7 +358,7 @@ static void Started(GameSession session)
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
 - [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
 - [ ] 밸런스 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
-- [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/Code/Tests`에 테스트로 있다.
+- [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/MomoiProject/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
 
 > [!note]- 다른 장르라면
@@ -616,7 +616,7 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | `GameDatabase`(DB 에셋) | 20 · 21 | 01 §1(시작 설정이 만든다) |
 | 선택 기능 켜기(기능 활성화), `#if GBIBLE_*` | 20 | 01 §1 |
 | 어셈블리·asmdef 참조 | 20 | 01 §2, 08 §6(Tests) |
-| DB › 시작 파일(Bootstrap 화면, RunState·Profile 바로가기) | 20 · 21 | 01 §3·§4 |
+| DB › 시작 파일(Bootstrap 화면) · 요소 › 플레이어 데이터(cs ↗로 RunState·Profile 파일) | 20 · 21 | 01 §3·§4 |
 | Bootstrap 화면: Undo 방식·보관 수·시드 고정 | 20 · 02 · 07 | 01 §4, 07 §2·§4 |
 | Bootstrap 화면: 판 저장·판 끝 이벤트 | 20 · 06 | 01 §4, 10 §2 |
 | Bootstrap 화면 › 고급: 기록 보관 줄 수(`JournalCapacity`) | 20 · 22 | 01 §4, 07 §2, 12 §3-4 |

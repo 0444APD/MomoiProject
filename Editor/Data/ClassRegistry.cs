@@ -7,7 +7,7 @@ using UnityEngine;
 namespace GBible.EditorTools
 {
     // DB › 클래스·이벤트 탭의 설정: 새 클래스의 네임스페이스, DB에서 만든 클래스의 파일 위치 기억.
-    // 그룹은 여기 두지 않는다: 그룹 = Assets/Code 아래 폴더(ClassFolders). ProjectSettings/MomoiProject/Classes.json에 두어 팀과 공유한다.
+    // 그룹은 여기 두지 않는다: 그룹 = Assets/MomoiProject/Code 아래 폴더(ClassFolders). ProjectSettings/MomoiProject/Classes.json에 두어 팀과 공유한다.
     public static class ClassRegistry
     {
         public const string SettingsPath = "ProjectSettings/MomoiProject/Classes.json";

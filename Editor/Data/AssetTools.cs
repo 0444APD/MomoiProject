@@ -28,24 +28,24 @@ namespace GBible.EditorTools
     //   쓰는 곳 · 안 쓰는 것(Assets/_Unused로 옮김, 지우지 않음) · 폴더 정돈(종류별 폴더로 옮김, GUID 그대로).
     public static class AssetTools
     {
-        public const string UnusedFolder = "Assets/_Unused";
+        public const string UnusedFolder = ProjectFolders.Dev + "/_Unused";
 
-        // 종류별 기본 폴더.
+        // 종류별 기본 폴더(개발자 폴더 안 — 개발자는 Assets/Dev에서만 다룬다. 옮겨 정리해도 된다).
         public static string FolderFor(AssetKind kind)
         {
             switch (kind)
             {
-                case AssetKind.Sprite: return "Assets/Art";
-                case AssetKind.Audio: return "Assets/Audio";
-                case AssetKind.Font: return "Assets/Fonts";
-                case AssetKind.Model: return "Assets/Models";
-                case AssetKind.Prefab: return "Assets/Prefabs";
-                case AssetKind.Scene: return "Assets/Scenes";
-                case AssetKind.Material: return "Assets/Materials";
-                case AssetKind.Animation: return "Assets/Animations";
-                case AssetKind.UI: return "Assets/UI";
-                case AssetKind.Video: return "Assets/Video";
-                default: return "Assets/Other";
+                case AssetKind.Sprite: return ProjectFolders.Dev + "/Art";
+                case AssetKind.Audio: return ProjectFolders.Dev + "/Audio";
+                case AssetKind.Font: return ProjectFolders.Dev + "/Fonts";
+                case AssetKind.Model: return ProjectFolders.Dev + "/Models";
+                case AssetKind.Prefab: return ProjectFolders.Dev + "/Prefabs";
+                case AssetKind.Scene: return ProjectFolders.Dev + "/Scenes";
+                case AssetKind.Material: return ProjectFolders.Dev + "/Materials";
+                case AssetKind.Animation: return ProjectFolders.Dev + "/Animations";
+                case AssetKind.UI: return ProjectFolders.Dev + "/UI";
+                case AssetKind.Video: return ProjectFolders.Dev + "/Video";
+                default: return ProjectFolders.Dev + "/Other";
             }
         }
 
@@ -95,7 +95,7 @@ namespace GBible.EditorTools
         // 관리 대상이 아닌 곳: 코드·패키지·DB 데이터·Unity가 이름으로 찾는 특수 폴더.
         static readonly string[] Skip =
         {
-            "Assets/Code", "Assets/MomoiProjectData", "Assets/MomoiProjectGenerated", "Assets/Plugins", "Assets/StreamingAssets",
+            ProjectFolders.Root, "Assets/Plugins", "Assets/StreamingAssets",
             "Assets/Editor", "Assets/Gizmos", "Assets/TextMesh Pro", "Assets/Settings", UnusedFolder,
         };
 
@@ -207,7 +207,7 @@ namespace GBible.EditorTools
             var roots = new List<string>();
             roots.AddRange(EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path));
             roots.AddRange(AssetDatabase.GetAllAssetPaths().Where(p => p.StartsWith("Assets/", StringComparison.Ordinal)
-                && (p.Contains("/Resources/") || p.StartsWith("Assets/MomoiProjectData/", StringComparison.Ordinal) || p.StartsWith("Assets/UI/", StringComparison.Ordinal))));
+                && (p.Contains("/Resources/") || p.StartsWith(ProjectFolders.Root + "/", StringComparison.Ordinal))));
             roots.AddRange(AssetRequests.Load().Select(r => r.path));
             var reachable = new HashSet<string>(AssetDatabase.GetDependencies(roots.Where(File.Exists).ToArray(), true), StringComparer.Ordinal);
             var kinds = new[] { AssetKind.Sprite, AssetKind.Audio, AssetKind.Font, AssetKind.Model, AssetKind.Prefab, AssetKind.Material, AssetKind.Animation, AssetKind.Video };

@@ -4,25 +4,25 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // DB의 클래스 탭: 프로젝트가 코드로 정의한 클래스(아이템·유닛 …)와 DB 종류를 폴더별로 본다(읽기 전용).
-    // 클래스는 코드(C# 파일)에서 만들고 고친다. 이 탭은 결과를 확인하는 곳: 눌러서 필드의 이름·형식·키워드 연결을 보고,
-    // 다른 클래스 형식으로 이동하거나 스크립트를 연다. 폴더 = Assets/Code 아래 실제 폴더.
+    // DB의 클래스 탭: AI가 쓴 코드(Assets/MomoiProject/Code) 안의 클래스(아이템·유닛 …)와 DB 종류를 본다(읽기 전용).
+    // 클래스는 AI가 코드(C# 파일)로 만들고 고친다. 이 탭은 결과를 확인하는 곳: 눌러서 필드의 이름·형식·키워드 연결을 보고,
+    // 다른 클래스 형식으로 이동하거나 스크립트를 연다. 코드 폴더의 경로·구조는 보이지 않는다(이름순 한 목록 + 기본 묶음).
     // 목록 모양·조작은 모든 DB 탭 공용(CodexTree).
     public class ClassesPage : CodexPage
     {
         public const string PageKey = "classes";
-        public const string DeclareGroup = "선언";
+        public const string DeclareGroup = "요소";
 
         public override string Key => PageKey;
         public override string TabLabel => "클래스";
         public override string TabGroup => DeclareGroup;
         public override int TabOrder => 1;
-        public override string TabCount => ClassCatalog.All(Tab).Count.ToString();
+        public override string TabCount => ClassCatalog.All(Tab).Count(c => !c.AutoGroup && c.Group != null && c.Group != ClassFolders.Outside).ToString();
 
         protected virtual string Tab => ClassRegistry.ClassTab;
         protected virtual string Noun => "클래스";
         protected virtual string EmptyHint =>
-            "클래스는 코드에서 만듭니다. [Serializable] 클래스를 Assets/Code 아래에 쓰면 다시 컴파일한 뒤 여기에 보입니다.";
+            "클래스는 AI가 코드로 만듭니다. 다시 컴파일한 뒤 여기에 보입니다.";
 
         const string AutoPrefix = "$auto:";
 
@@ -32,7 +32,7 @@ namespace GBible.EditorTools.UI
         public override string Caption(CodexPageContext context)
         {
             var classes = ClassCatalog.All(Tab);
-            return $"폴더 {ClassFolders.Groups().Count}개 · {Noun} {classes.Count}개  ·  코드에서 만들고 고칩니다 · 눌러서 필드 보기 · ↗ 새 창에서 열기";
+            return $"{Noun} {classes.Count(c => !c.AutoGroup)}개  ·  AI가 코드로 만들고 고칩니다 · 눌러서 필드 보기";
         }
 
         public override void Create(CodexPageContext context)
@@ -43,20 +43,15 @@ namespace GBible.EditorTools.UI
         {
             var list = Gs.Col("gs-grouped__list");
             context.Content.Add(list);
-            var classes = ClassCatalog.All(Tab);
-            var groups = ClassFolders.Groups();
+            // AI 코드 폴더 안의 것만(밖의 스크립트·플러그인은 보이지 않는다) + 이 라이브러리의 기본 묶음.
+            var classes = ClassCatalog.All(Tab).Where(c => c.AutoGroup || (c.Group != null && c.Group != ClassFolders.Outside)).ToList();
             var tree = new CodexTree { Key = Key, ItemNoun = Noun, Query = (context.Search ?? "").Trim() };
 
-            tree.Folders.Add(FolderNode(context, "", null));
-            foreach (var group in groups) tree.Folders.Add(FolderNode(context, group, ClassFolders.Parent(group)));
-
-            var outside = classes.Count(c => !c.AutoGroup && c.Group == ClassFolders.Outside);
-            if (outside > 0)
-                tree.Folders.Add(new CodexTree.Folder
-                {
-                    Path = ClassFolders.Outside, Parent = null, Name = "Code 폴더 밖", Info = $"{Noun} {outside}개",
-                    Draggable = false, AcceptsItems = false, AcceptsFolders = false,
-                });
+            tree.Folders.Add(new CodexTree.Folder
+            {
+                Path = "", Parent = null, Name = TabLabel, Info = $"{Noun} {classes.Count(c => !c.AutoGroup)}개",
+                Draggable = false, AcceptsItems = false, AcceptsFolders = false, Hint = EmptyHint,
+            });
 
             // 자동 묶음(이 라이브러리가 기본으로 내는 이벤트·기능의 클래스).
             foreach (var auto in classes.Where(c => c.AutoGroup).Select(c => c.Group).Distinct())
@@ -73,7 +68,7 @@ namespace GBible.EditorTools.UI
                 tree.Items.Add(new CodexTree.Item
                 {
                     Key = e.FullName,
-                    Folder = e.AutoGroup ? AutoPrefix + e.Group : e.Group ?? "",
+                    Folder = e.AutoGroup ? AutoPrefix + e.Group : "",
                     Name = e.Name,
                     SearchText = e.Label,
                     Build = () => Chip(e),
@@ -84,31 +79,6 @@ namespace GBible.EditorTools.UI
             }
             tree.Build(list, context.Host, context.Group);
         }
-
-        CodexTree.Folder FolderNode(CodexPageContext context, string group, string parent) =>
-            new CodexTree.Folder
-            {
-                Path = group,
-                Parent = parent,
-                Name = group == "" ? "Code" : ClassFolders.Name(group),
-                Tooltip = ClassFolders.FolderOf(group),
-                Draggable = false,
-                AcceptsItems = false,
-                AcceptsFolders = false,
-                Hint = group == "" ? EmptyHint : null,
-                Tools = tools =>
-                {
-                    if (context.Group != group)
-                    {
-                        var open = new GsButton("↗", () => CodexGroupWindow.Open(Key, group, $"{TabLabel} · {(group == "" ? "Code" : group)}"), GsButtonKind.Ghost);
-                        open.tooltip = "새 창에서 열기";
-                        tools.Add(open);
-                    }
-                    var ping = new GsButton("프로젝트 창", () => EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(ClassFolders.FolderOf(group))), GsButtonKind.Ghost);
-                    ping.tooltip = "프로젝트 창에서 이 폴더 보기";
-                    tools.Add(ping);
-                },
-            };
 
         // 클래스 한 줄: 이름 · 표시 이름 · 필드 수, 오른쪽에 종류 배지.
         static VisualElement Chip(ClassEntry entry)

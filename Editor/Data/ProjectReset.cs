@@ -17,7 +17,7 @@ namespace GBible.EditorTools
     //   기록에 없는 파일은 치우고, 바뀐 파일은 기록의 것으로 되돌리고, 지워진 파일은 다시 만든다. 저장 파일·PlayerPrefs도 지운다.
     //   치우거나 덮어쓴 것은 모두 MomoiProjectBackups/<시각>/에 옮겨 두므로 되돌리기를 되돌릴 수 있다(영구 삭제 없음).
     //   끝나면 Unity를 다시 연다(ProjectSettings·패키지를 깨끗이 다시 읽도록).
-    // 기록이 없으면 시스템이 만든 것만(Assets/Code, DB 데이터, 생성 코드, ProjectSettings/MomoiProject, GBIBLE_ 심볼, 저장) 치울 수 있다.
+    // 기록이 없으면 시스템이 만든 것만(Assets/MomoiProject/Code, DB 데이터, 생성 코드, ProjectSettings/MomoiProject, GBIBLE_ 심볼, 저장) 치울 수 있다.
     public static class ProjectReset
     {
         public const string BaselineFolder = "MomoiProjectBaseline";
@@ -33,7 +33,7 @@ namespace GBible.EditorTools
 
         // 시스템이 아직 아무것도 만들지 않은 프로젝트인가(처음 상태를 저절로 기록해도 되는 때).
         public static bool LooksClean =>
-            !Directory.Exists(StartSetup.CodeRoot) && !Directory.Exists(EditorDatabase.DataRoot) && !File.Exists(StartSetup.MarkerPath);
+            !Directory.Exists(ProjectFolders.Root) && !ProjectFolders.AnyLegacy() && !File.Exists(StartSetup.MarkerPath);
 
         // ── 처음 상태 기록 ─────────────────────────────────────
 
@@ -130,8 +130,8 @@ namespace GBible.EditorTools
         // 처음 상태 기록이 없을 때: 시스템이 만든 것만 치운다.
         static void ResetSystemOnly()
         {
-            var targets = new[] { StartSetup.CodeRoot, EditorDatabase.DataRoot, GameIdsGenerator.DefaultFolder, "ProjectSettings/MomoiProject" }
-                .Where(p => Directory.Exists(p)).ToList();
+            var targets = new[] { ProjectFolders.Root, "ProjectSettings/MomoiProject" }.Concat(ProjectFolders.Legacy.Where(l => File.Exists(l.marker) || Directory.Exists(l.marker)).Select(l => l.from))
+                .Where(p => Directory.Exists(p)).Distinct().ToList();
             var message =
                 "처음 상태 기록이 없습니다(깨끗한 프로젝트를 처음 열 때 저절로 남거나, 메뉴 '지금 상태를 처음 상태로 기록'으로 남깁니다).\n\n" +
                 "대신 시스템이 만든 것만 치울 수 있습니다:\n" +

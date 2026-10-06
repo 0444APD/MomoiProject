@@ -10,7 +10,7 @@ namespace GBible.Data
     //   코드: GameSettings.Number(GameIds.Setting.X) / Toggle / Choice / Text, 바꾸기 GameSettings.Set(id, 값), 받기 GameSettings.Changed.
     //   적용 대상(언어·음량·화면)을 고르면 라이브러리가 켤 때와 바꿀 때 바로 적용한다.
     // 화면 글자: 칸 이름은 텍스트 표의 'id.name'(GameSettings.Label), 선택지는 선택지마다 적은 글(텍스트 키면 번역된 글).
-    [Database("설정", Group = "선언", Order = 6, IdPrefix = "setting")]
+    [Database("설정", Group = "요소", Order = 6, IdPrefix = "setting")]
     [CreateAssetMenu(menuName = "MomoiProject/설정", fileName = "NewSetting")]
     public sealed class SettingData : GameData
     {

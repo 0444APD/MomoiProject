@@ -11,7 +11,7 @@ namespace GBible.EditorTools
     // 탭은 보여 주기만 한다(옮기기·이름 바꾸기는 Project 창). AI는 요청받을 때만 이 폴더를 건드린다(관례 21절).
     public static class DevFolders
     {
-        public const string Root = "Assets/Dev";
+        public const string Root = ProjectFolders.Dev;
         public const string Group = "Dev";
 
         // Assets/Dev 아래가 바뀌었을 때(만들기·지우기·옮기기·가져오기).

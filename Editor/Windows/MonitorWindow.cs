@@ -1369,7 +1369,7 @@ namespace GBible.EditorTools
             }
         }
 
-        // 테스트 상황: 지금 판·프로필·난수·시각을 이름 붙여 저장하고 불러온다(Assets/MomoiProjectData/Tests, TestScenarios).
+        // 테스트 상황: 지금 판·프로필·난수·시각을 이름 붙여 저장하고 불러온다(Assets/MomoiProject/Data/Tests, TestScenarios).
         void BuildScenarios(VisualElement scroll)
         {
             var panel = Gs.Panel("테스트 상황", "지금 상황을 저장해 두고 다시 연다(테스트 씬의 시작 상황으로도 고를 수 있다)", out _, out var body);

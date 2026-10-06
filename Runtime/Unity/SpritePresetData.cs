@@ -3,7 +3,8 @@ using UnityEngine;
 namespace GBible.Data
 {
     // 스프라이트 규격 하나: 출력 크기. 바꾸면 이 규격으로 베이크한 이미지가 모두 다시 베이크된다.
-    [Database("스프라이트 규격", Group = "이미지", Order = 0, IdPrefix = "spritePreset", Page = "sprites", DeveloperAuthored = true)]
+    // 개발자가 Project 창(Assets/Dev 아래 아무 폴더)에서 우클릭 › Create › MomoiProject › 스프라이트 규격으로 만들고 인스펙터(SpritePresetInspector)에서 채운다. DB 탭은 없다.
+    [Database("스프라이트 규격", Group = "이미지", Order = 0, IdPrefix = "spritePreset", Page = "sprites", DeveloperAuthored = true, Hidden = true)]
     [CreateAssetMenu(menuName = "MomoiProject/스프라이트 규격", fileName = "NewSpritePreset")]
     public sealed class SpritePresetData : GameData, IGroupedData
     {

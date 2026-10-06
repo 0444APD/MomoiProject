@@ -21,8 +21,8 @@
 | 연결 글 (binding-path) | UXML 칸의 `binding-path` 속성에 적는 글. `키:경로`(플레이어 데이터의 값) · `@텍스트키`(번역된 글) · 둘 다(`키:경로@텍스트키`, 값을 틀에 넣어서). `ScreenBinding`이 읽는다. |
 | 목록 칸 | 데이터 목록의 항목마다 하나씩 만드는 칸(목록 칸 UXML 하나를 복제). `ElementList`가 만들고 없애고 순서를 맞춘다. |
 | 기본 화면 | 라이브러리에 들어 있는 범용 화면: 고르기 창 · 확인 · 설정 · 슬롯 · 일시정지(+ 알림). 코드로 만들고 테마 USS로 모양을 바꾼다. |
-| 테마 USS | 모든 화면에 붙는 USS(DB › 화면 설정 › 테마 USS, 기본 `Assets/UI/Theme.uss`). 색·글자 크기 변수(`--momoi-…`)와 클래스(`.momoi-button` …). |
-| Panel Settings | UI Toolkit의 패널 설정(화면 크기 맞춤·기본 테마). `Assets/UI/PanelSettings.asset`. |
+| 테마 USS | 모든 화면에 붙는 USS(DB › 화면 설정 › 테마 USS, 기본 `Assets/MomoiProject/UI/Theme.uss`). 색·글자 크기 변수(`--momoi-…`)와 클래스(`.momoi-button` …). |
+| Panel Settings | UI Toolkit의 패널 설정(화면 크기 맞춤·기본 테마). `Assets/MomoiProject/UI/PanelSettings.asset`. |
 | 알림 (Toast) | 화면 아래쪽에 잠깐 뜨는 한 줄. 입력을 막지 않는다. |
 
 ---
@@ -184,17 +184,17 @@ protected override void Tick(float deltaTime)
 
 | 만드는 것 | 뜻 |
 |---|---|
-| `Assets/UI/DefaultTheme.tss` | UI Toolkit 기본 테마(버튼·슬라이더의 기본 모양) |
-| `Assets/UI/PanelSettings.asset` | 1920×1080 기준 화면 맞춤 + 위 테마 |
-| `Assets/UI/Theme.uss` | 프로젝트 테마(2-7의 변수). 색·크기를 여기서 고친다 |
-| `Assets/UI/Screens/` · `Assets/UI/Items/` | 화면 UXML·USS, 목록 칸 UXML을 둘 폴더 |
+| `Assets/MomoiProject/UI/DefaultTheme.tss` | UI Toolkit 기본 테마(버튼·슬라이더의 기본 모양) |
+| `Assets/MomoiProject/UI/PanelSettings.asset` | 1920×1080 기준 화면 맞춤 + 위 테마 |
+| `Assets/MomoiProject/UI/Theme.uss` | 프로젝트 테마(2-7의 변수). 색·크기를 여기서 고친다 |
+| `Assets/MomoiProject/UI/Screens/` · `Assets/MomoiProject/UI/Items/` | 화면 UXML·USS, 목록 칸 UXML을 둘 폴더 |
 | DB › 화면 설정 `screenSettings`(적용 전) | 위 Panel Settings·테마가 연결된 항목 → Ctrl+S |
 
-### 3-2. DB › 화면 설정(사이드바 선언 그룹)
+### 3-2. DB › 화면 설정(사이드바 요소 그룹)
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
-| `panelSettings` | Panel Settings | `Assets/UI/PanelSettings.asset` |
+| `panelSettings` | Panel Settings | `Assets/MomoiProject/UI/PanelSettings.asset` |
 | `theme` | 테마 USS | 모든 화면에 붙는 USS 목록 |
 | `font` | 글꼴 | 한글이 든 TTF·OTF |
 | `choiceWindow` | 고르기 창 저절로 | 기본 켬. 고르기 창을 같은 ID(`momoi.choice`)로 바꿨으면 켜 둔다. 다른 ID로 따로 만들었을 때만 끈다(2-5) |
@@ -210,7 +210,7 @@ protected override void Tick(float deltaTime)
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
-| `layout` | UXML | 화면 UXML(`Assets/UI/Screens/BattleHud.uxml`) |
+| `layout` | UXML | 화면 UXML(`Assets/MomoiProject/UI/Screens/BattleHud.uxml`) |
 | `styles` | 더할 USS | 이 화면에만 붙는 USS |
 | `items` | 목록 칸 UXML | 목록 한 칸 UXML들(코드 `Item("파일 이름")`) |
 | `layer` | 층 | `바탕(HUD)` / `창(메뉴)`(기본) / `팝업(위에 뜨는 창)` / `알림(입력을 막지 않음)` |
@@ -297,7 +297,7 @@ hand.OnRemove = (element, done) => { element.AddToClassList("card--gone"); eleme
 
 ### 5-1. 전투 HUD — UXML + DB + 화면 코드
 
-`Assets/UI/Screens/BattleHud.uxml`:
+`Assets/MomoiProject/UI/Screens/BattleHud.uxml`:
 
 ```xml
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
@@ -317,7 +317,7 @@ hand.OnRemove = (element, done) => { element.AddToClassList("card--gone"); eleme
 </ui:UXML>
 ```
 
-`Assets/UI/Items/CardItem.uxml`:
+`Assets/MomoiProject/UI/Items/CardItem.uxml`:
 
 ```xml
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
@@ -330,7 +330,7 @@ hand.OnRemove = (element, done) => { element.AddToClassList("card--gone"); eleme
 
 DB › 화면 `battleHud`: UXML `BattleHud.uxml` · 층 `바탕(HUD)` · 뒤로로 닫기 끔 · 열 씬 `Battle`.
 
-`Assets/Code/Client/Screens/BattleHud.cs`:
+`Assets/MomoiProject/Code/Client/Screens/BattleHud.cs`:
 
 ```csharp
 [BindTo(GameIds.Screen.BattleHud)]
@@ -450,7 +450,7 @@ Game.Session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(done
 
 ### 5-5. 테마 바꾸기
 
-`Assets/UI/Theme.uss`:
+`Assets/MomoiProject/UI/Theme.uss`:
 
 ```css
 :root {
@@ -469,19 +469,19 @@ Game.Session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(done
 ### 5-6. AI가 화면 하나를 만드는 순서
 
 1. 화면 목록(기획 명세서 6절)에서 기본 화면으로 되는 것(고르기·확인·설정·슬롯·일시정지·알림)을 빼고 남은 화면마다:
-2. `Assets/UI/Screens/<이름>.uxml`(+ 필요하면 `.uss`), 목록이 있으면 `Assets/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색·크기는 테마 변수(`var(--momoi-…)`)를 쓴다. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`.
-3. 버튼·목록이 있으면 `Assets/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`).
-4. DB 반영 스크립트(관례 15절)에 화면 항목을 더한다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
+2. `Assets/MomoiProject/UI/Screens/<이름>.uxml`(+ 필요하면 `.uss`), 목록이 있으면 `Assets/MomoiProject/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색·크기는 테마 변수(`var(--momoi-…)`)를 쓴다. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`.
+3. 버튼·목록이 있으면 `Assets/MomoiProject/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`).
+4. DB 반영 스크립트(관례 15절)에 화면 항목을 더한다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
 5. 그림이 필요한 곳(카드 그림·아이콘)은 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳)`로 임시 그림과 넣을 것 목록을 만들고 UXML·USS가 그 경로를 쓴다 — 개발자가 에셋 관리에서 진짜 그림을 넣으면 그대로 바뀐다(39장).
 
 ```csharp
-// Assets/Code/Editor/Seeds/ScreenSeeds.cs — DB 반영 스크립트(컴파일 뒤 저절로 돈다, 관례 15절)
+// Assets/MomoiProject/Code/Editor/Seeds/ScreenSeeds.cs — DB 반영 스크립트(컴파일 뒤 저절로 돈다, 관례 15절)
 [DbSeed("1")]
 static void Screens()
 {
     ScreenSetup.Ensure();
-    Add("battleHud", "Assets/UI/Screens/BattleHud.uxml", ScreenLayer.Base, back: false, scene: "Battle");
-    Add("shop", "Assets/UI/Screens/Shop.uxml", ScreenLayer.Window, back: true);
+    Add("battleHud", "Assets/MomoiProject/UI/Screens/BattleHud.uxml", ScreenLayer.Base, back: false, scene: "Battle");
+    Add("shop", "Assets/MomoiProject/UI/Screens/Shop.uxml", ScreenLayer.Window, back: true);
 }
 
 static void Add(string id, string uxml, ScreenLayer layer, bool back, string scene = null)

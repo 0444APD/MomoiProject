@@ -88,7 +88,7 @@ namespace GBible.EditorTools
             var names = TestScenarios.Names();
             var options = new[] { "(새 판)" }.Concat(names).ToArray();
             var index = names.IndexOf(scenario.stringValue) + 1;
-            var picked = EditorGUILayout.Popup(new GUIContent("시작 상황", "플레이하면 이 테스트 상황으로 시작한다(Assets/MomoiProjectData/Tests). 테스트 패널·모니터 › 명령에서 저장한다"), Mathf.Max(0, index), options);
+            var picked = EditorGUILayout.Popup(new GUIContent("시작 상황", "플레이하면 이 테스트 상황으로 시작한다(Assets/MomoiProject/Data/Tests). 테스트 패널·모니터 › 명령에서 저장한다"), Mathf.Max(0, index), options);
             scenario.stringValue = picked == 0 ? "" : names[picked - 1];
             if (index == 0 && !string.IsNullOrEmpty(scenario.stringValue))
                 EditorGUILayout.HelpBox($"테스트 상황 '{scenario.stringValue}' 파일이 없습니다.", MessageType.Warning);

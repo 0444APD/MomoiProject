@@ -132,11 +132,9 @@ namespace GBible
                     if (!map.TryGetValue(id, out var list)) map[id] = list = new List<BoundCode>();
                     list.Add(code);
                 }
-                const string core = "GBible.Core";
                 const BindingFlags methods = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                foreach (var assembly in GameAssemblies.UsingCore())
                 {
-                    if (assembly.GetName().Name != core && !assembly.GetReferencedAssemblies().Any(r => r.Name == core)) continue;
                     Type[] types;
                     try { types = assembly.GetTypes(); }
                     catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }

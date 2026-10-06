@@ -61,7 +61,6 @@ namespace GBible.EditorTools
             {
                 case BootstrapPage.Group: return -10;
                 case ClassesPage.DeclareGroup: return 0;
-                case "진행": return 10;
                 case "DB": return 20;
                 case "이미지": return 30;
                 case DevFolders.Group: return 50;
@@ -502,12 +501,10 @@ namespace GBible.EditorTools
                     var errors = _issues.Count(i => i.Severity == ValidationSeverity.Error && i.Asset != null && types.Contains(i.Asset.GetType()));
                     item.SetCount(errors > 0 ? $"{count} · 오류 {errors}" : count.ToString());
                     item.SetActive(type == selected);
+                    // 플레이어 데이터: 마우스를 올리면 오른쪽에 판·프로필 클래스 파일(PlayerData.cs)로 가는 버튼.
+                    if (type == typeof(PlayerDataEntry)) AddDataFileTool(item);
                     _sidebarNav.Add(item);
                 }
-                // 시작 파일 그룹: Bootstrap 탭 아래에 판·프로필 클래스 바로가기(누르면 코드 파일을 연다).
-                if (group.Key == BootstrapPage.Group)
-                    foreach (var (label, id, className) in StartFiles.DataShortcuts)
-                        _sidebarNav.Add(DataShortcut(label, id, className));
             }
 
             // 탭이 하나도 없는 선택 기능도 켜고 끌 수 있게 그룹을 보인다.
@@ -592,20 +589,16 @@ namespace GBible.EditorTools
         }
 
         // 판·프로필 데이터 클래스 바로가기: 탭이 아니라 누르면 그 클래스의 cs 파일을 연다.
-        VisualElement DataShortcut(string label, string id, string className)
+        static void AddDataFileTool(GsNavItem item)
         {
-            var (file, typeName) = StartFiles.DataFile(id, className);
-            var item = new GsNavItem(typeName, Gs.PaletteFor("class:" + typeName), () =>
+            var (label, id, className) = StartFiles.DataShortcuts[0];
+            var (file, _) = StartFiles.DataFile(id, className);
+            if (file == null) return;
+            item.AddHoverTool("cs ↗", "판·프로필 클래스(RunState·Profile) 파일 열기", () =>
             {
                 var (now, _) = StartFiles.DataFile(id, className);
                 if (now != null) StartFiles.Open(now);
             });
-            item.SetCount("cs ↗");
-            item.tooltip = file != null
-                ? $"{file} 열기 — 플레이어 데이터 '{id}'의 값 형식"
-                : $"'{label}' 클래스를 찾지 못했습니다. 메뉴 MomoiProject › 시작 설정에서 '적용'하면 Assets/Code/Rules/PlayerData.cs가 만들어집니다.";
-            if (file == null) item.SetEnabled(false);
-            return item;
         }
 
         // ── 선택 기능 켜고 끄기 ─────────────────────────────────

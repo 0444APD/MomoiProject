@@ -161,7 +161,7 @@
 
 ### 3-1. 맵 원본 — DB › 인스턴스의 `rows`
 
-1. 맵 클래스를 코드로 쓴다(`Assets/Code/Rules/Board.cs`, 5절 앞).
+1. 맵 클래스를 코드로 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`, 5절 앞).
 
 ```csharp
 [Serializable] public class MapData { public List<string> rows = new List<string>(); }
@@ -309,7 +309,7 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 
 ## 5. 상황별 예제
 
-5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 가로채기 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런스 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런스 값에 항목을 만들고 저장하면 생긴다.
+5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 가로채기 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런스 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런스 값에 항목을 만들고 저장하면 생긴다.
 
 ```csharp
 using System;

@@ -22,24 +22,25 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 ### 에디터에서
 
-1. 저장소를 대상 프로젝트의 `Assets` 아래에 복사하거나 `git clone`한다(이 프로젝트는 `Assets/Code/System`). 폴더 위치에 의존하지 않는다.
+1. 저장소를 대상 프로젝트의 `Packages/com.momoi.gbible`에 복사하거나 `git clone`한다(embedded 패키지).
 2. Unity 6(6000.6.3f1에서 확인)으로 연다.
 3. 패키지 `com.unity.nuget.mono-cecil`이 프로젝트에 있는지 확인한다(Burst·Collections가 함께 가져오는 경우가 많다). 이 패키지가 있어야 컴파일할 때 플레이어 데이터 비교 코드가 만들어진다(아래 9절).
-4. 메뉴 `MomoiProject → DB`을 한 번 연다. DB 창이 열리면서 데이터 에셋 목록을 모아 런타임용 목록(`GameDatabase`)을 `Assets/MomoiProjectData/Resources/MomoiProject/GameDatabase.asset`에 만든다(항목이 하나라도 있을 때).
+4. 메뉴 `MomoiProject → DB`을 한 번 연다. DB 창이 열리면서 데이터 에셋 목록을 모아 런타임용 목록(`GameDatabase`)을 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`에 만든다(항목이 하나라도 있을 때).
 5. 플레이 버튼을 누른다. 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`(세션 진행)과 `[오디오]` 오브젝트가 생기면 정상이다.
 
 만들어지는 곳:
 
 | 위치 | 내용 |
 |---|---|
-| `Assets/MomoiProjectData/` | DB 항목 에셋(종류마다 영어 폴더 — `Ability`·`PlayerData` …, 예전 한글 폴더는 열 때 저절로 옮겨진다), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
-| `Assets/Dev/` | 개발자 폴더. 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다(21장 2-1). 시스템·AI는 요청받을 때만 건드린다. |
-| `Assets/MomoiProjectGenerated/GameIds.cs` | 식별자 코드(8절). 플레이어 데이터 값 형식이 asmdef 안에 있으면 그 asmdef 폴더의 `Generated/`에 생긴다. |
+| `Assets/MomoiProject/` | 시스템·AI가 쓰는 곳(개발자는 들어가지 않는다): `Code/`(AI가 쓰는 코드 — Rules·Client·Editor·Tests·Keywords, DB 요소 탭이 여기서 읽는다) · `Data/`(아래) · `UI/`(화면 UXML·USS) · `Generated/`. 예전 자리(`Assets/Code`·`Assets/MomoiProjectData`·`Assets/UI`)는 에디터를 열 때 저절로 옮겨진다. |
+| `Assets/MomoiProject/Data/` | DB 항목 에셋(종류마다 영어 폴더 — `Ability`·`PlayerData` …, 예전 한글 폴더는 열 때 저절로 옮겨진다), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
+| `Assets/Dev/` | 개발자가 노는 곳. 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다(21장 2-1). 에셋 관리의 가져오기·넣을 에셋 자리도 여기(`Dev/Art`·`Dev/Audio` …). 시스템·AI는 요청받을 때만 건드린다. |
+| `Assets/MomoiProject/Generated/GameIds.cs` | 식별자 코드(8절). 플레이어 데이터 값 형식이 asmdef 안에 있으면 그 asmdef 폴더의 `Generated/`에 생긴다. |
 | `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`, `Ids.json`, `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
 
 ### 주의할 점
 
-- 저장소 폴더 안(`Assets/Code/System`)에는 게임 코드를 두지 않는다. DB의 클래스 탭은 `Assets/Code` 아래 폴더를 "내 코드" 폴더로 보고, 이 라이브러리 폴더는 목록에서 뺀다.
+- 패키지 폴더 안에는 게임 코드를 두지 않는다. DB의 요소 탭(클래스·이벤트)은 `Assets/MomoiProject/Code` 안의 스크립트만 보인다(폴더 경로는 보이지 않는다).
 - 런타임이 `GameDatabase`를 찾지 못하면 기록(Journal)에 경고 "GameDatabase를 찾을 수 없습니다. 에디터에서 DB 창을 한 번 열면 자동으로 만들어집니다."가 남고, DB 데이터 없이 빈 세션으로 시작한다.
 
 ---
@@ -439,7 +440,7 @@ public sealed class QuestTracker : MonoBehaviour
 
 ### 에디터에서
 
-직접 편집하지 않는다. DB에서 항목을 만들고 저장(Ctrl+S)하면, 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProjectData/Resources/MomoiProject/GameDatabase.asset`이다.
+직접 편집하지 않는다. DB에서 항목을 만들고 저장(Ctrl+S)하면, 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`이다.
 
 ### 코드로 쓰는 법
 
@@ -552,7 +553,7 @@ public static class Cutscenes
 **에디터 코드: `GameFeatures`** (`GBible.EditorTools`, 어셈블리 `GBible.Editor`, 에디터 전용) — `Find("dialogue")`, `IsEnabled(feature)`, `IsActive(feature)`(켜져 있고 컴파일까지 끝남), `SetEnabled(feature, bool)`, `Changed` 이벤트. `Editor` 폴더 안의 스크립트(또는 `GBible.Editor`를 참조하는 에디터 asmdef)에서 쓴다.
 
 ```csharp
-// Assets/Code/Editor/FeatureCheck.cs
+// Assets/MomoiProject/Code/Editor/FeatureCheck.cs
 using GBible.EditorTools;
 
 static class FeatureCheck
@@ -589,7 +590,7 @@ static class FeatureCheck
 
 - 자동: DB 변경을 저장(Ctrl+S)하면 다시 만든다. 내용이 같으면 파일을 건드리지 않는다.
 - 수동: 메뉴 `MomoiProject → 식별자 코드 다시 만들기`. 콘솔에 "[MomoiProject] 식별자 코드를 만들었습니다: 경로"가 찍힌다.
-- 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다). 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProjectGenerated/`. `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다.
+- 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다). 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProject/Generated/`. `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다.
 
 ### 코드로 쓰는 법
 
@@ -718,7 +719,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ### 처음 상태 기록
 - 프로젝트 폴더 바로 아래 `MomoiProjectBaseline/`에 Assets·ProjectSettings·Packages(GBible 자신은 빼고)의 사본을 둔다. Assets 밖이라 Unity가 읽지 않는다.
-- **저절로 남는 때:** 시스템이 아직 아무것도 만들지 않은 깨끗한 프로젝트(`Assets/Code`·DB 데이터·시작 설정 표시가 없음)를 처음 열 때, 시작 설정 창이 뜨기 전에 남긴다. 콘솔에 "처음 상태를 기록했습니다"가 나온다.
+- **저절로 남는 때:** 시스템이 아직 아무것도 만들지 않은 깨끗한 프로젝트(`Assets/MomoiProject/Code`·DB 데이터·시작 설정 표시가 없음)를 처음 열 때, 시작 설정 창이 뜨기 전에 남긴다. 콘솔에 "처음 상태를 기록했습니다"가 나온다.
 - **직접 남기기:** 메뉴 `MomoiProject → 지금 상태를 처음 상태로 기록`. 이미 있으면 덮어쓴다. 프로젝트를 막 만든 깨끗한 때에만 한다(예: Odin 같은 필수 에셋까지 설치한 직후).
 
 ### 되돌리기가 하는 일
@@ -738,7 +739,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 - 플레이 중에는 할 수 없다.
 
 ### 기록이 없을 때
-처음 상태 기록이 없으면 **시스템이 만든 것만** 치울지 묻는다: `Assets/Code`, `Assets/MomoiProjectData`(DB 데이터), `Assets/MomoiProjectGenerated`(생성 코드), `ProjectSettings/MomoiProject`, 모듈 심볼(`GBIBLE_…`), 저장 파일, PlayerPrefs. 그 밖에 개발자가 더한 에셋·패키지·설정은 남는다. 치운 것은 마찬가지로 백업 폴더에 옮긴다.
+처음 상태 기록이 없으면 **시스템이 만든 것만** 치울지 묻는다: `Assets/MomoiProject/Code`, `Assets/MomoiProject/Data`(DB 데이터), `Assets/MomoiProject/Generated`(생성 코드), `ProjectSettings/MomoiProject`, 모듈 심볼(`GBIBLE_…`), 저장 파일, PlayerPrefs. 그 밖에 개발자가 더한 에셋·패키지·설정은 남는다. 치운 것은 마찬가지로 백업 폴더에 옮긴다.
 
 ### 주의할 점
 - 처음 기록하기 전에 바꾼 것은 "처음 상태"에 들어가 버린다. 깨끗할 때 기록됐는지 `MomoiProjectBaseline/baseline.json`의 시각으로 확인한다.

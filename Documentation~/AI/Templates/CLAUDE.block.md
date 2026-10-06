@@ -18,9 +18,9 @@
 - **테스트할 수 있게**: 테스트 씬·테스트 명령·테스트 상황을 함께 만든다(관례 19절).
 - **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안 · 플레이어별 칸 · 숨길 것은 Owner 키 · 서버 규칙(Validate) · 연출은 SubscribeAfterAction · 실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
 - **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
-- 규칙(`Assets/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/Code/Client`, UI는 `Assets/UI`(UXML·USS) + DB › 화면.
+- 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".
 - 기믹(효과 문장)은 `{{GBIBLE}}/Documentation~/AI/GimmickCatalog.md`의 갈래로 쪼개 만든다. 조각이 놓이는 메인 룰은 그 문서 1절의 모양으로.
-- DB 항목은 DB 반영 스크립트(`Assets/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 '적용 전'으로 들어간다)나 CSV로 만들고, 개발자가 읽어 보고 Ctrl+S로 적용한다.
+- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 '적용 전'으로 들어간다)나 CSV로 만들고, 개발자가 읽어 보고 Ctrl+S로 적용한다.
 - 응답을 끝낼 때 훅(`.claude/hooks/compile-check.ps1`)이 프로젝트 코드를 컴파일한다. 오류가 나오면 고친 뒤 끝낸다.
 - 응답 끝에: 개발자가 할 일(적용할 DB 항목·넣을 에셋·돌려 볼 테스트 상황·Unity에서 볼 것) · 기록한 결정 · 지금 단계와 다음 할 일.

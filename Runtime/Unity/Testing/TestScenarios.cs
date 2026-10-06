@@ -9,7 +9,7 @@ using UnityEngine;
 namespace GBible
 {
     // 테스트 상황: 지금 판(세션 구역·난수·게임 시각)과 프로필(메타 구역)을 이름 붙여 저장한 파일. 개발용.
-    //   에디터: Assets/MomoiProjectData/Tests/<이름>.json(프로젝트와 함께 커밋) · 개발 빌드: <persistentDataPath>/MomoiProject/Tests/
+    //   에디터: Assets/MomoiProject/Data/Tests/<이름>.json(프로젝트와 함께 커밋) · 개발 빌드: <persistentDataPath>/MomoiProject/Tests/
     //   TestScenarios.Save(session, "보스 직전");  TestScenarios.Load(session, "보스 직전", seed: 7);
     // 테스트 씬(TestScene)이 시작할 때 불러오고, 테스트 패널·모니터에서 저장·불러오기를 한다. 행동 밖에서 부른다.
     public static class TestScenarios
@@ -17,7 +17,7 @@ namespace GBible
         public const string Kind = "testScenario";
 
         public static string Folder => Application.isEditor
-            ? Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? ".", "Assets", "MomoiProjectData", "Tests")
+            ? Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? ".", "Assets", "MomoiProject", "Data", "Tests")
             : Path.Combine(Application.persistentDataPath, "MomoiProject", "Tests");
 
         public static string PathOf(string name) => Path.Combine(Folder, Clean(name) + ".json");

@@ -149,7 +149,7 @@ public class RandomEnemy : TargetSelector<Fighter> { … }
 DB › 클래스 › `Card`를 열면 필드마다 설정이 있다. 코드는 쓰지 않는다.
 
 1. `title`·`art`에 **필수 (비어 있으면 DB 검증 오류)** 를 켠다.
-2. DB › **스프라이트 규격** 탭에서 그룹 `card`를 만들고 규격을 둔다(예: `cardArt` 300×420, `cardIcon` 64×64).
+2. Project 창(`Assets/Dev` 아래)에서 우클릭 › Create › MomoiProject › 스프라이트 규격으로 `cardArt`(300×420)·`cardIcon`(64×64) 파일을 만들고, 인스펙터에서 그룹 `card`를 만들어 둘 다 넣는다.
 3. `art`의 **스프라이트 규격 그룹**에 `card`를 연결한다.
 
 이제 기획자가 카드 그림을 넣으면 맞춤 창이 열리고, 중심·배율을 한 번 정하면 모든 규격이 함께 베이크된다. 화면 코드는 원본 그림과 규격 ID로 베이크본을 꺼낸다.

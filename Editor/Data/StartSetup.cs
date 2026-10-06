@@ -10,7 +10,7 @@ using UnityEngine;
 namespace GBible.EditorTools
 {
     // 시작 설정: 새 프로젝트에서 한 번에 하는 준비.
-    //   코드 구조(고정): Assets/Code/Rules · Client · Editor · Tests, 어셈블리 MomoiProject.*, 네임스페이스 MomoiProject.
+    //   코드 구조(고정): Assets/MomoiProject/Code/Rules · Client · Editor · Tests, 어셈블리 MomoiProject.*, 네임스페이스 MomoiProject.
     //     Rules  = 규칙(데이터·행동·이벤트·Block·[BindTo]) — GBible.Core·GBible.Unity(+ 데이터 모듈)만 참조
     //     Client = Unity 쪽(시작 설정 코드·화면·연출) — Rules + GBible + 켠 모듈
     //     Editor = 에디터 확장(Editor 전용), Tests = EditMode 규칙 테스트
@@ -19,7 +19,7 @@ namespace GBible.EditorTools
     [InitializeOnLoad]
     public static class StartSetup
     {
-        public const string CodeRoot = "Assets/Code";
+        public const string CodeRoot = ProjectFolders.Code;
         public const string Prefix = "MomoiProject";
         public const string MarkerPath = "ProjectSettings/MomoiProject/StartSetup.json";
         public const string MenuPath = "MomoiProject/시작 설정";
@@ -76,6 +76,23 @@ namespace GBible.EditorTools
                     ClaudeFiles.Sync();
                     EditorDatabase.Upkeep();
                 };
+        }
+
+        // 스크립트가 하나도 없는 코드 어셈블리(처음의 Editor·Tests)에 자리 표시 파일을 둔다 — Unity가 "어셈블리에 스크립트가 없다" 경고를 내지 않게.
+        // AI가 그 어셈블리에 스크립트를 쓴 뒤에는 지워도 된다.
+        public static void EnsurePlaceholders(List<string> done)
+        {
+            foreach (var part in Parts)
+            {
+                var folder = FolderOf(part);
+                if (!File.Exists(AsmdefPathOf(part)) || Directory.GetFiles(folder, "*.cs", SearchOption.AllDirectories).Length > 0) continue;
+                var path = $"{folder}/{part}Assembly.cs";
+                File.WriteAllText(path,
+                    $"// {AssemblyOf(part)} 어셈블리의 자리 표시: 스크립트가 하나도 없으면 Unity가 경고를 내므로 둔다. 이 어셈블리에 다른 스크립트가 생기면 지워도 된다.\n" +
+                    $"namespace {Prefix}\n{{\n    static class {part}Assembly\n    {{\n    }}\n}}\n", new UTF8Encoding(false));
+                AssetDatabase.ImportAsset(path);
+                done?.Add($"{path} 만듦(빈 어셈블리 경고 막기)");
+            }
         }
 
         static void OpenOnce()
@@ -136,6 +153,7 @@ namespace GBible.EditorTools
                 File.WriteAllText(AsmdefPathOf(part), AsmdefJson(part), new UTF8Encoding(false));
                 done.Add($"{AsmdefPathOf(part)} 만듦");
             }
+            EnsurePlaceholders(done);
 
             var bootstrap = FolderOf("Client") + "/Bootstrap.cs";
             if (!File.Exists(bootstrap))

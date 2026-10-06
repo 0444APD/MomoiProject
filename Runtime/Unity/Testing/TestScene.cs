@@ -26,7 +26,7 @@ namespace GBible
     [AddComponentMenu("MomoiProject/테스트 씬")]
     public sealed class TestScene : MonoBehaviour
     {
-        [Tooltip("시작할 테스트 상황(Assets/MomoiProjectData/Tests). 비우면 새 판")] public string scenario = "";
+        [Tooltip("시작할 테스트 상황(Assets/MomoiProject/Data/Tests). 비우면 새 판")] public string scenario = "";
         [Tooltip("글자 시드. 비우면 상황의 시드(상황이 없으면 무작위)")] public string seed = "";
         [Tooltip("켜면 'test' 슬롯에서 돈다 — 개발자의 실제 저장(기본 슬롯)을 건드리지 않는다")] public bool separateSlot = true;
         [Tooltip("시작할 때의 게임 속도"), Range(0f, 8f)] public float speed = 1f;

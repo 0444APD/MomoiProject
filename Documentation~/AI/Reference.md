@@ -35,7 +35,7 @@ GBible.Unity
 ```
 
 - **한 판의 흐름**: 게임이 켜지면 `GBibleRuntime.Start`가 DB를 읽어 세션을 만들고(Bootstrap 옵션 → `Configuring` → 세션 → DB의 정의 등록 → `Started`), 프로필을 불러온다. 입력은 행동(`Game.Do`), 행동이 데이터를 바꾸고 이벤트를 쏜다. 화면은 프레임 끝에 데이터를 읽어 그린다.
-- **프로젝트 폴더**(관례 1절): `Assets/Code/Rules`(규칙, Unity API 없음) · `Assets/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/Code/Tests` · `Assets/UI`(UXML·USS·Panel Settings) · `Assets/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProjectData/Tests`(테스트 상황) · `Assets/MomoiProjectGenerated`(GameIds, 손대지 않음) · `Docs/`(명세서·결정 기록·`Source`).
+- **프로젝트 폴더**(관례 1절): `Assets/MomoiProject/Code/Rules`(규칙, Unity API 없음) · `Assets/MomoiProject/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/MomoiProject/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/MomoiProject/Code/Tests` · `Assets/MomoiProject/UI`(UXML·USS·Panel Settings) · `Assets/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProject/Data/Tests`(테스트 상황) · `Assets/MomoiProject/Generated`(GameIds, 손대지 않음) · `Docs/`(명세서·결정 기록·`Source`).
 
 ---
 
@@ -117,20 +117,20 @@ GBible.Unity
 | 빚(돈이 −20까지) | 가로채기 '비용 지불' → `floor` 값으로 바꾸기 −20 | 28 |
 | 한 번 달성(도전과제) | DB › 도전과제(트리거 → 결과), Steam이면 같은 ID로 | 14·34 |
 | 쌓는 숫자(처치 수·최대 콤보) | DB › 로그(이벤트 받기 → 기록 규칙: 더하기·최대·마지막), `session.Stats.Get(id)` | 15 |
-| 필수 값·스프라이트 규격 | 필드 규칙(클래스 상세)·DB › 스프라이트 규격 | 27 |
+| 필수 값·스프라이트 규격 | 필드 규칙(클래스 상세)·스프라이트 규격 파일(Project 창 Create › MomoiProject › 스프라이트 규격 — 개발자가 Dev에서 만든다) | 27 |
 | 수치 수십 개 한꺼번에 | DB 목록의 CSV(목록 칸 `entries[0].weight`) | 33 |
-| AI가 DB 항목 만들기 | DB 반영 스크립트(`Assets/Code/Editor/Seeds`, `[DbSeed("버전")]` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)` → 컴파일 뒤 저절로 적용 전 → 개발자가 Ctrl+S) 또는 CSV | 관례 15절 |
+| AI가 DB 항목 만들기 | DB 반영 스크립트(`Assets/MomoiProject/Code/Editor/Seeds`, `[DbSeed("버전")]` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)` → 컴파일 뒤 저절로 적용 전 → 개발자가 Ctrl+S) 또는 CSV | 관례 15절 |
 
 ### 2-4. 화면 · 연출 · 소리 · 글
 
 | 하고 싶은 일 | 쓸 것 | 장 |
 |---|---|---|
-| HUD·상점·타이틀 같은 화면 | `Assets/UI/Screens/X.uxml` + DB › 화면(층·뒤로로 닫기·열 씬) + `[BindTo(GameIds.Screen.X)] class X : GameScreen`. 먼저 메뉴 '화면 준비' | 35 |
+| HUD·상점·타이틀 같은 화면 | `Assets/MomoiProject/UI/Screens/X.uxml` + DB › 화면(층·뒤로로 닫기·열 씬) + `[BindTo(GameIds.Screen.X)] class X : GameScreen`. 먼저 메뉴 '화면 준비' | 35 |
 | 값을 보이기만 하는 칸 | UXML `binding-path="run:gold"`·`"run:gold@hud.gold"`(텍스트 틀)·`"@hud.endTurn"`(번역 글). 코드 없음 | 35 2-2 |
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
-| 화면 색·글꼴 | `Assets/UI/Theme.uss`의 `--momoi-…` 변수, DB › 화면 설정 › 글꼴(한글 TTF) | 35 2-7 |
+| 화면 색·글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수, DB › 화면 설정 › 글꼴(한글 TTF) | 35 2-7 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
 | 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy` | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |
@@ -147,7 +147,7 @@ GBible.Unity
 |---|---|---|
 | 설정(음량·언어·화면·전투 속도) | DB › 설정(종류: 켜기/끄기·숫자·선택지·글, 적용 대상: 언어·음량·전체 화면·해상도·수직 동기화·최대 프레임) → `GameSettings.Number(id)`·`Toggle`·`Choice`·`Set`·`Changed`. 화면은 기본 설정 화면 | 31·35 |
 | 플레이 중 값·기록 보기, 이벤트 쏴 보기, 버튼 하나로 시험 | 모니터(타임라인·데이터·행동·명령·이벤트 호출), DB › 개발 명령(결과 Block 조립 → 명령 탭 버튼) | 22 |
-| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/Code/Editor`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add·Work·Remove` → 컴파일 뒤 저절로 '적용 전', 개발자가 Ctrl+S. 이미 있는 항목은 건너뛴다 | 관례 15, 21 |
+| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/MomoiProject/Code/Editor`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add·Work·Remove` → 컴파일 뒤 저절로 '적용 전', 개발자가 Ctrl+S. 이미 있는 항목은 건너뛴다 | 관례 15, 21 |
 | 개발자가 에디터에서 바꾸게(밸런싱) | 숫자 = 밸런스 값·DB 칸·인스턴스 필드, 가리키는 것 = `[DataRef(typeof(…))]` 드롭다운, 효과 = Block 문장(`[BlockInfo(Sentence = "…{필드}…")]`). DB는 구조를 잠그고 값만 연다(`EditorPolicy`) | 관례 18, 21 |
 | 개발자가 추가·삭제하는 DB 종류(레벨 배치·대사) | `[Database("층", DeveloperAuthored = true)]` — 이 종류만 DB에서 추가·삭제·ID 바꾸기가 열린다. 인스턴스(DB › 인스턴스)는 잠겨 있으니 개발자가 배치할 레벨 데이터에 쓰지 않는다 | 관례 18, 21 |
 | 테스트 씬·패널·상황 | `TestSceneSetup.Ensure(copyFrom:, scenario:)`(반영 스크립트에서) · 컴포넌트 `TestScene`(test 슬롯·시작 상황·패널 F1) · `TestScenarios.Save·Load(session, 이름, seed)` | 관례 19, 38 |
@@ -300,13 +300,13 @@ public class PlayCard : GameAction
 | 사이드바 그룹 › 탭 | 형식 · ID 앞부분 | 항목 하나 | 상수 | 장 |
 |---|---|---|---|---|
 | 시작 파일 › Bootstrap | `GameDatabase` | 세션 옵션: Undo 방식·보관 수·Undo 끊는 이벤트·판 저장·판 끝 이벤트·시작할 때 이어 하기·초당 틱 수·씬 흐름·개발 시드 | — | 20 |
-| 시작 파일 › RunState · Profile | (cs 파일) | 판·프로필 클래스 | — | 01 |
+| 요소 › 플레이어 데이터의 cs ↗ | (PlayerData.cs) | 판·프로필 클래스(RunState·Profile) | — | 01 |
 | 선언 › 키워드 · 클래스 · 이벤트 | (코드) | 읽기 전용 목록 | — | 05·10 |
 | 선언 › 로그 | `StatData` · `stat` | 쌓는 숫자 | `GameIds.Stat` | 15 |
 | 선언 › 플레이어 데이터 | `PlayerDataEntry` · `playerData` | 키·구역·형식 | `GameIds.PlayerData` | 01 |
 | 선언 › 설정 | `SettingData` · `setting` | 설정 칸 하나 | `GameIds.Setting` | 31 |
 | 선언 › 화면 설정 | `ScreenSettingsData` · `screens` | Panel Settings·테마·글꼴(하나) | — | 35 |
-| 진행 › 도전과제 | `AchievementData` · `achievement` | 트리거 → 결과 | `GameIds.Achievement` | 14 |
+| 개발 › 도전과제 | `AchievementData` · `achievement` | 트리거 → 결과 | `GameIds.Achievement` | 14 |
 | DB › 능력 | `AbilityData` · `ability` | 쓰는 것(조건·대상·효과·쓸 수 없을 때 글) | `GameIds.Ability` | 16 |
 | DB › 상태 효과 | `StatusData` · `status` | 버프·디버프·쿨다운(`kind` 종류·중첩·지속·주기·보정·트리거·결과·아이콘·화면에 숨김) | `GameIds.Status` | 29 |
 | DB › 패시브 | `PassiveData` · `passive` | 가지고 있으면 발동(`ownerKey`·`ownerPath` 가진 목록 · `matchField` 일치 필드 · `matchVia` 원본에서 읽기 · `perElement` 놓인 것마다 · `levelField` 레벨 필드 · `trigger` 발동 · `holderField` 가진 쪽 필드 · `outcomes` 결과 · `rules` 발동 더 · `pulse`·`pulseByLevel` 주기 · `modifiers` 가진 동안 능력치 보정 · `modifierTarget` 보정 받을 대상 · `modifierWhen` 보정 조건 · `stacking` 여럿일 때 · `icon`) | `GameIds.Passive` | 17·29 |
@@ -315,7 +315,7 @@ public class PlayCard : GameAction
 | DB › 화면 | `ScreenData` · `screen` | UI Toolkit 화면 | `GameIds.Screen` | 35 |
 | DB › 인스턴스 | `InstanceData` · `instance` | 원본 하나(클래스의 값) | `GameIds.Instance` | 04 |
 | DB › 프리팹 | `PrefabData` · `prefab` | 프리팹 연결 | `GameIds.Prefab` | 21 |
-| 이미지 › 스프라이트 규격 | `SpritePresetData` | 그림 크기·피벗 규격 | — | 27 |
+| (파일 — Dev) 스프라이트 규격 | `SpritePresetData` | 그림 크기·피벗 규격 | — | 27 |
 | 데이터 › (프로젝트 종류) | `GameData` 상속 | 유물·퀘스트 … | `GameIds.<이름>` | 17 |
 | 개발 › 개발 명령 · 저장 변환 · Steam | `DebugCommandData` · `SaveMigrationData` · `SteamData` | 명령 탭 버튼 · 변환 한 단계 · Steam 설정 | — | 22·06·34 |
 | 다이얼로그 시스템 › 스탠딩 프로필 · 장소 | (선택 기능) | 화자 그림 · 장소 | — | 24 |
@@ -362,7 +362,7 @@ public class PlayCard : GameAction
 11. 고르기 창·설정·확인 창을 새로 만들었다 → 기본 화면.
 12. 텍스트를 코드·UXML에 글로 적었다 → 텍스트 키(`@hud.endTurn`, `Texts.Get`).
 13. `GameIds` 상수를 쓰지 않고 ID를 글자로 적었다 → 오타가 컴파일에서 잡히지 않는다.
-14. 생성 파일(`Assets/MomoiProjectGenerated`)을 고쳤다 → DB를 저장하면 덮인다.
+14. 생성 파일(`Assets/MomoiProject/Generated`)을 고쳤다 → DB를 저장하면 덮인다.
 15. 같은 ID에 `[BindTo]`를 둘 → 모두 돌고 순서가 정해지지 않는다(검증 경고).
 16. 규칙에서 `DateTime.Now`·`Time.time` → `Game.Now`(현실)·`session.Clock`(게임 시간).
 17. 실시간에서 맞는 효과를 `Present`로 → 차례로 돌고 그동안 `Busy`라 입력이 막힌다. 동시에·입력을 막지 않을 것은 `GameView.Play`.

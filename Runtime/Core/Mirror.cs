@@ -42,11 +42,8 @@ namespace GBible
                 _initializing = true;
                 try
                 {
-                    const string core = "GBible.Core";
-                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    foreach (var assembly in GameAssemblies.UsingCore())
                     {
-                        var name = assembly.GetName().Name;
-                        if (name != core && !assembly.GetReferencedAssemblies().Any(r => r.Name == core)) continue;
                         Type[] types;
                         try { types = assembly.GetTypes(); }
                         catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }

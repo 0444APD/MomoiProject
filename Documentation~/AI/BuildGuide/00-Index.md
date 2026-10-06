@@ -36,7 +36,7 @@ Momoi Project(코드 이름 `GBible`)로 **프로젝트를 시작해서 출시�
 | [05. 기획자와 함께 일하기](05-WorkingWithDesigners.md) | 나눌 일, 키워드, 인스턴스 화면 정리(`[Hide]`·`[ShowIf]`), `[DataRef]`, Block 이름표(`[BlockInfo]`), 필드 규칙(필수·스프라이트 규격), 고유 검사(`Validate`·`ValidateData`), ID 바꾸기와 지우기, 기획자에게 넘기기 |
 | [06. 화면과 연출](06-Presentation.md) | 화면 갱신(`GameView.Redraw`, 화면 연결 `ViewList`·데이터 연결), 입력은 행동으로(`GameView.Busy`, 미리보기 `Game.Preview`·`CanDo`), 성공한 행동의 이벤트로 연출(`SubscribeAfterAction`), 데이터와 연출의 시간(연출 대기열 `GameView.Present`), 텍스트·현지화(실패 글 번역), 다이얼로그, 소리, 인벤토리 칸 |
 | [07. 장르별 설정](07-GenreRecipes.md) | 기믹 범위와 장르, 장르별로 고를 것(표, 장르마다 더 쓰는 부품, 부가 기능), Undo 방식과 범위, 저장 구역, 난수 흐름과 시드(시드 입력·일일 도전), 시간 값은 게임 시계로, 다른 장르(턴제 전술·실시간 액션(고정 틱)·수집형·방치형·RPG·어드벤처) |
-| [08. 시험과 디버깅](08-TestAndDebug.md) | 같은 판 다시 만들기(고정 시드·판 저장), 개발 명령(DB › 개발 › 개발 명령, 밸런스 값 바로 반영), 모니터로 원인 찾기, Undo로 앞뒤 보기, 이벤트로 반응 보기(선택 대기 패널), 규칙 테스트(`Assets/Code/Tests`), 경고 메시지별 대응 |
+| [08. 시험과 디버깅](08-TestAndDebug.md) | 같은 판 다시 만들기(고정 시드·판 저장), 개발 명령(DB › 개발 › 개발 명령, 밸런스 값 바로 반영), 모니터로 원인 찾기, Undo로 앞뒤 보기, 이벤트로 반응 보기(선택 대기 패널), 규칙 테스트(`Assets/MomoiProject/Code/Tests`), 경고 메시지별 대응 |
 | [09. 3요소를 지키는 습관](09-Habits.md) | 코딩 쉬움·멀티와 패킷·리플렉션 금지 각각의 습관(비용 `Game.Pay`, 실패 `Game.Fail`, 숫자는 밸런스 값, 연출은 `Present`, 예상 값은 `Preview`), 판 데이터에는 ID와 바뀌는 값만, 하지 말 것과 이유, 데이터 크기·성능 기준 |
 | [10. 저장과 출시](10-SaveAndRelease.md) | 구역 확인(기기 설정 DB › 설정, 입력), 판 저장 설정(DB › 시작 파일 › Bootstrap), 이어 하기와 새 판(`GBibleRuntime.NewRun`, 슬롯), 저장되지 않는 값, 개발 중 저장 시험, 출시 상태로 바꾸기, 출시 후 구조 바꾸기(DB › 개발 › 저장 변환) |
 | [11. 멀티플레이 대비](11-MultiplayerReady.md) | 네 블록 구조와 통신이 붙을 때의 흐름, 기능 로직(Rules)이 지킬 것, UI(Client)가 지킬 것, 저장·Undo·여러 플레이어 |

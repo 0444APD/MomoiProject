@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 namespace GBible.EditorTools
 {
     // 시작 설정 창: 새 프로젝트에서 처음 한 번 저절로 열린다(나중에는 메뉴로). 고르는 것은 Product Name·선택 모듈·Undo 방식·언어뿐이고,
-    // 코드 구조(Assets/Code/Rules·Client·Editor·Tests + asmdef)·시작 파일·DB 에셋은 '적용'이 자동으로 만든다.
+    // 코드 구조(Assets/MomoiProject/Code/Rules·Client·Editor·Tests + asmdef)·시작 파일·DB 에셋은 '적용'이 자동으로 만든다.
     public sealed class StartSetupWindow : EditorWindow
     {
         StartSetup.Choices _choices;

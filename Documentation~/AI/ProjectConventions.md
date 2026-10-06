@@ -26,10 +26,10 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 
 ## 1. 폴더·어셈블리, 데이터와 코드
 
-- `Assets/Code/Rules`(어셈블리 `MomoiProject.Rules`): 게임 규칙 전부 — 데이터 클래스(RunState·Profile·원본 클래스), 행동, 규칙 함수(`Rules`), 이벤트·의도, Block, `[BindTo]` 함수. **화면 API(MonoBehaviour·GameObject·씬·입력)를 쓰지 않는다.** 서버·테스트에서도 같은 코드가 돈다.
-- `Assets/Code/Client`: 화면·입력·연출·사운드. 규칙은 바꾸지 않고 행동만 보낸다.
-- `Assets/Code/Editor`: 에디터 도구만. `Assets/Code/Tests`: 규칙 테스트(Rules만 참조).
-- `Assets/MomoiProjectGenerated/`(`GameIds.cs`)는 손대지 않는다(DB를 저장하면 다시 만들어진다).
+- `Assets/MomoiProject/Code/Rules`(어셈블리 `MomoiProject.Rules`): 게임 규칙 전부 — 데이터 클래스(RunState·Profile·원본 클래스), 행동, 규칙 함수(`Rules`), 이벤트·의도, Block, `[BindTo]` 함수. **화면 API(MonoBehaviour·GameObject·씬·입력)를 쓰지 않는다.** 서버·테스트에서도 같은 코드가 돈다.
+- `Assets/MomoiProject/Code/Client`: 화면·입력·연출·사운드. 규칙은 바꾸지 않고 행동만 보낸다.
+- `Assets/MomoiProject/Code/Editor`: 에디터 도구만. `Assets/MomoiProject/Code/Tests`: 규칙 테스트(Rules만 참조).
+- `Assets/MomoiProject/Generated/`(`GameIds.cs`)는 손대지 않는다(DB를 저장하면 다시 만들어진다).
 - 파일 하나에 주제 하나: `Actions/BattleActions.cs`, `Rules/Rules.cs`, `Events/Events.cs`, `Events/Intents.cs`, `Cards/CardBlocks.cs` …
 - **데이터는 DB, 동작은 코드.**
   - 같은 모양의 원본(카드·몬스터·아이템·스킬)은 코드에 클래스만 두고, 하나하나는 DB › 인스턴스(또는 능력·상태 효과 같은 전용 종류)에서 만든다.
@@ -47,8 +47,9 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 - Block: 효과는 동사(`DealDamage`), 대상은 명사구(`AllEnemies`), 조건은 서술(`HasLowHp`) + `[BlockInfo("표시 이름", Category = …, Description = …)]`. Description은 꼭 적는다(기획자가 목록에서 읽는다).
 - 텍스트 키: `fail.*`(행동 실패), `hint.*`(미리보기 글), `hud.*`, `popup.*`, `menu.*`, DB 항목 이름은 `<id>.name`.
 - 난수 흐름 이름: 쓰임 하나에 하나(`"deck"`, `"loot"`, `"ai"`).
-- 폴더·파일 이름(만드는 것 모두 — `Assets/Code`·`Assets/UI`·`Assets/Art` …)은 영어. 한글은 쓰지 않는다.
-- `Assets/Dev`는 개발자 폴더다(안의 폴더 = DB 'Dev' 탭). 요청받을 때만 만들거나 바꾼다.
+- 폴더·파일 이름(만드는 것 모두 — `Assets/MomoiProject/Code`·`Assets/MomoiProject/UI`·`Assets/Dev/Art` …)은 영어. 한글은 쓰지 않는다.
+- `Assets/Dev`는 개발자 폴더다(안의 폴더 = DB 'Dev' 탭). 요청받을 때만 만들거나 바꾼다. 예외: 넣을 에셋 자리(`AssetRequests`)는 `Assets/Dev/Art`·`Dev/Audio`·`Dev/Fonts` … — 개발자가 진짜 파일을 넣는 곳이다.
+- AI가 쓰는 것은 모두 `Assets/MomoiProject/` 아래: 코드 `Code/`(Rules·Client·Editor·Tests·Keywords), 화면 `UI/`. `Assets` 바로 아래에 새 폴더를 만들지 않는다.
 - 기획 명세서에 없는 **새 개념**(새 DB 종류·새 시스템)의 이름만 사람에게 확인한다. 이벤트·의도·행동·Block 같은 나머지는 이 규칙대로 짓고 보고만 한다.
 
 ## 3. 규칙과 화면의 경계
@@ -91,11 +92,11 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 
 ## 6. 화면·연출
 
-- **UI(HUD·메뉴·팝업)는 UI Toolkit 화면**(매뉴얼 35장): 화면 하나 = `Assets/UI/Screens/<이름>.uxml`(+ `.uss`) + DB › 화면 항목(층·뒤로로 닫기·열 씬) + 필요하면 `Assets/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`). UXML·USS·화면 코드는 AI가 쓰고, 프리팹·인스펙터 연결은 쓰지 않는다.
+- **UI(HUD·메뉴·팝업)는 UI Toolkit 화면**(매뉴얼 35장): 화면 하나 = `Assets/MomoiProject/UI/Screens/<이름>.uxml`(+ `.uss`) + DB › 화면 항목(층·뒤로로 닫기·열 씬) + 필요하면 `Assets/MomoiProject/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`). UXML·USS·화면 코드는 AI가 쓰고, 프리팹·인스펙터 연결은 쓰지 않는다.
   - 값을 보이기만 하는 칸은 UXML의 `binding-path`(`run:gold`, `run:gold@hud.gold`, `@hud.endTurn`). 화면 코드에 같은 일을 쓰지 않는다.
   - 버튼 → 행동은 `OnClick("이름", () => new 행동())`(Busy면 무시, 플레이어용 실패는 알림). 화면을 여는 버튼은 `OnClick("이름", () => GameScreens.Open(…))`.
-  - 데이터 목록은 `List<T>("컨테이너", Item("칸 UXML"), …)`(목록 칸 UXML은 `Assets/UI/Items/`, 화면 UXML에 `<ui:Template>`로 적는다).
-  - 고르기 창·확인·설정·슬롯·일시정지·알림은 **기본 화면**을 쓰고 새로 만들지 않는다. 모양은 `Assets/UI/Theme.uss`의 `--momoi-…` 변수로 맞추고, 프로젝트 화면의 USS도 그 변수를 쓴다.
+  - 데이터 목록은 `List<T>("컨테이너", Item("칸 UXML"), …)`(목록 칸 UXML은 `Assets/MomoiProject/UI/Items/`, 화면 UXML에 `<ui:Template>`로 적는다).
+  - 고르기 창·확인·설정·슬롯·일시정지·알림은 **기본 화면**을 쓰고 새로 만들지 않는다. 모양은 `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수로 맞추고, 프로젝트 화면의 USS도 그 변수를 쓴다.
   - 1920×1080 기준 px. 그림(스프라이트·아이콘)·글꼴은 사람이 넣는다: 그 자리는 색 상자로 두고 보고에 "넣을 에셋(경로·크기·쓰는 곳)"을 적는다.
 - 씬에 놓이는 것(캐릭터·카드 오브젝트)은 `GameView.Redraw(그리기, 키…)`·`ViewList`·컴포넌트 '데이터 연결'. 값이 바뀔 때마다 그리지 말고 이 도구가 프레임 끝에 한 번 그리게 한다.
 - 연출(피해 숫자·카드 이동·쓰러짐)은 규칙이 끝난 뒤의 일이다: `session.Events.SubscribeAfterAction<이벤트>(e => GameView.Present(연출(e)))`. 실패한 행동의 이벤트는 오지 않는다. 연출 코드는 데이터를 바꾸지 않는다.
@@ -161,17 +162,17 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 ## 14. 하지 않는 것
 
 - GBible 라이브러리(`Packages/com.momoi.gbible`) 코드를 고치지 않는다.
-- 생성 파일(`Assets/MomoiProjectGenerated/`)을 고치지 않는다.
+- 생성 파일(`Assets/MomoiProject/Generated/`)을 고치지 않는다.
 - DB 에셋 파일(.asset)을 텍스트로 직접 쓰지 않는다(15절의 방법으로 만든다).
 - 행동 밖에서 플레이어 데이터를 바꾸지 않는다(개발용 명령도 DB › 개발 명령이나 행동으로).
 - 화면 코드에 규칙 계산을 복사하지 않는다(미리보기를 쓴다).
 
 ## 15. DB 항목 만들기 — DB 반영 스크립트
 
-AI는 Unity 창을 누를 수 없다. DB 항목은 **DB 반영 스크립트**로 만든다: `Assets/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 GBible이 저절로 한 번 돌린다. 만든 항목은 DB에 **적용 전**으로 들어가고, 개발자가 읽어 보고 Ctrl+S로 적용한다(적용했을 때만 "이 버전은 돌았다"로 기록 — 버리면 다음 컴파일 뒤 다시 돈다).
+AI는 Unity 창을 누를 수 없다. DB 항목은 **DB 반영 스크립트**로 만든다: `Assets/MomoiProject/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 GBible이 저절로 한 번 돌린다. 만든 항목은 DB에 **적용 전**으로 들어가고, 개발자가 읽어 보고 Ctrl+S로 적용한다(적용했을 때만 "이 버전은 돌았다"로 기록 — 버리면 다음 컴파일 뒤 다시 돈다).
 
 ```csharp
-// Assets/Code/Editor/Seeds/AchievementSeeds.cs
+// Assets/MomoiProject/Code/Editor/Seeds/AchievementSeeds.cs
 using GBible; using GBible.Data; using GBible.EditorTools;
 
 static class AchievementSeeds
@@ -190,14 +191,14 @@ static class AchievementSeeds
 }
 ```
 
-- 함수 하나 = 주제 하나(종류 하나·콘텐츠 묶음 하나). 파일은 `Assets/Code/Editor/Seeds/<주제>Seeds.cs`.
+- 함수 하나 = 주제 하나(종류 하나·콘텐츠 묶음 하나). 파일은 `Assets/MomoiProject/Code/Editor/Seeds/<주제>Seeds.cs`.
 - **이미 있는 항목은 건너뛴다.** 개발자가 밸런싱한 값을 덮지 않는다. 구조(Block·참조 칸의 종류)를 고쳐야 하면 버전을 올리고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 고친다(숫자 칸은 건드리지 않는다).
 - **지우기**는 버전을 올리고 `EditorDatabase.Staging.Remove(항목)`. 그 ID를 쓰는 코드(`GameIds` 상수)도 같이 지운다.
 - **값이 많은 것**(밸런스 값·카드 수치·몬스터 수치·가중치 표 줄 — 숫자·글자·enum과 그 목록)은 CSV도 된다: 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`, 목록은 `entries[0].weight`). 개발자가 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. Block 칸(트리거·조건·결과)은 CSV에 없다.
 - 메뉴 `MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기`가 모든 스크립트를 다시 돌린다(이미 있는 항목은 건너뛰므로 안전하다).
 - 예전 방식(`[MenuItem("MomoiProject/DB 추가/…")]`을 사람이 누름)도 돈다. 새로 쓸 때는 `[DbSeed]`.
 - 보고할 때: 적용 전으로 들어갈 항목 목록, 적용(Ctrl+S) 뒤 확인할 것(DB 아래 "검증 통과").
-- 플레이어 데이터 키·필드처럼 시작 설정이 만드는 것은 시작 설정에. 화면은 반영 스크립트에서 `ScreenSetup.Ensure()`(Panel Settings·테마·DB › 화면 설정)를 먼저 부르고, 화면 항목의 `layout`을 `AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/Screens/….uxml")`로 넣는다(매뉴얼 35장 5-6). 그림·글꼴·소리 에셋은 개발자가 가져온다(AI는 넣을 목록과 자리를 만든다 — 18절).
+- 플레이어 데이터 키·필드처럼 시작 설정이 만드는 것은 시작 설정에. 화면은 반영 스크립트에서 `ScreenSetup.Ensure()`(Panel Settings·테마·DB › 화면 설정)를 먼저 부르고, 화면 항목의 `layout`을 `AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/….uxml")`로 넣는다(매뉴얼 35장 5-6). 그림·글꼴·소리 에셋은 개발자가 가져온다(AI는 넣을 목록과 자리를 만든다 — 18절).
 
 ## 16. 기본 진행 순서(단계 1 시스템층)
 
@@ -235,7 +236,7 @@ static class AchievementSeeds
 - **지켜보기 좋게.** 판의 상태는 플레이어 데이터에 있어야 모니터에 보인다(규칙이 쓰는 값을 static이나 화면 쪽에 숨기지 않는다). 다른 기능이 반응할 만한 일은 이벤트로 쏜다(모니터 타임라인에 남는다).
 - **개발자 몫은 개발자 도구로.** 레벨 배치·다이얼로그 그래프·에셋은 개발자가 하므로, AI는 그 데이터 모양과 연결을 만들고 직접 채우지 않는다(요청받으면 예시 하나만).
   - **레벨 데이터**: DB에서 배치하게 하려면 프로젝트 DB 종류에 `[Database("층", Group = "레벨", DeveloperAuthored = true)]`를 붙인다 — 이 종류만 개발자가 추가·삭제·ID 바꾸기를 할 수 있다(DB는 로직 쪽 종류의 추가·삭제를 잠근다, 매뉴얼 21장 3-1). 인스턴스(DB › 인스턴스)는 잠겨 있으므로 레벨 배치에 쓰지 않는다. 맵 모양은 Unity 씬·타일맵에 두고, 스폰 지점·사건 칸은 컴포넌트로 만들어 규칙 데이터로 읽힌다.
-  - **에셋**: 그림·소리가 필요한 곳은 반영 스크립트에서 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳, 느낌)`·`Audio(경로, 쓰는 곳, 초)`·`Request(경로, 쓰는 곳)`로 임시 에셋과 넣을 것 목록을 만든다. 화면·DB는 그 경로의 에셋을 바로 쓴다 — 개발자가 에셋 관리에서 진짜 파일을 넣으면(같은 자리·GUID 유지) 다시 연결할 필요가 없다(매뉴얼 39장). 경로는 종류별 폴더(그림 `Assets/Art` · 소리 `Assets/Audio` · 글꼴 `Assets/Fonts` …).
+  - **에셋**: 그림·소리가 필요한 곳은 반영 스크립트에서 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳, 느낌)`·`Audio(경로, 쓰는 곳, 초)`·`Request(경로, 쓰는 곳)`로 임시 에셋과 넣을 것 목록을 만든다. 화면·DB는 그 경로의 에셋을 바로 쓴다 — 개발자가 에셋 관리에서 진짜 파일을 넣으면(같은 자리·GUID 유지) 다시 연결할 필요가 없다(매뉴얼 39장). 경로는 종류별 폴더(그림 `Assets/Dev/Art` · 소리 `Assets/Dev/Audio` · 글꼴 `Assets/Dev/Fonts` …).
 
 ## 19. 테스트할 수 있게
 
@@ -243,7 +244,7 @@ static class AchievementSeeds
 
 - **테스트 씬**: 단계 1에서 반영 스크립트로 `TestSceneSetup.Ensure(copyFrom: "Assets/Scenes/게임씬.unity", scenario: "")`를 부른다 — 게임 씬을 복사해 `Assets/Scenes/Test.unity`를 만들고 컴포넌트 `TestScene`(시작할 테스트 상황 · 시드 · 따로 슬롯 · 시간 배속 · 테스트 패널)을 붙인다(이미 있으면 건너뛴다). 플레이하면 그 상황으로 바로 시작하고, 게임 화면 위에 테스트 패널(테스트 명령 버튼 · 상황 저장·불러오기 · 시간 · Undo)이 뜬다(개발 빌드·에디터에서만).
 - **테스트 명령** = DB › 개발 명령(`DebugCommandData`) 항목: 주입(인스턴스를 목록에 넣기 · 자원 주기 · 패시브 얻기 · 상태 효과 걸기 · 적 만들기)과 발동(이벤트 쏘기 · 행동 실행)을 결과 Block으로 조립한다. 문장 안의 값(어느 인스턴스·몇 개·어느 대상)은 개발자가 드롭다운으로 바꾼다. Block으로 안 되는 것만 `[BindTo]`. 모두 행동으로 돌아 Undo·기록이 남는다. 반영 스크립트로 만들고 분류(`category`)로 묶는다(예: "판", "조각", "적", "상황").
-- **테스트 상황** = 지금 플레이어 데이터·시드·게임 시각을 이름 붙여 저장한 파일(`TestScenarios`, `Assets/MomoiProjectData/Tests/`). 개발자가 패널이나 모니터에서 저장하고, AI는 명세서 13절·버그 보고의 상황을 테스트 명령으로 만들어 두고 저장 방법을 알린다. 규칙 테스트는 같은 상황을 코드로 다시 만든다.
+- **테스트 상황** = 지금 플레이어 데이터·시드·게임 시각을 이름 붙여 저장한 파일(`TestScenarios`, `Assets/MomoiProject/Data/Tests/`). 개발자가 패널이나 모니터에서 저장하고, AI는 명세서 13절·버그 보고의 상황을 테스트 명령으로 만들어 두고 저장 방법을 알린다. 규칙 테스트는 같은 상황을 코드로 다시 만든다.
 - **단계 2의 조각마다** 얻기·쓰기·걸기 테스트 명령을 만든다. 버그 보고를 받으면 같은 상황을 테스트 상황·규칙 테스트로 재현한 뒤 고친다.
 - 테스트 도구는 출시 빌드에 들어가지 않는다(`session.Debug.Enabled`가 거짓이면 명령이 생기지 않고, `TestScene`은 개발 빌드에서만 패널을 띄운다).
 
@@ -264,7 +265,7 @@ static class AchievementSeeds
 
 ## 21. 화면 쪽 도구는 프로젝트에 만든다(UI·입력·카메라·이동)
 
-GBible에는 넣지 않는다(2026-10-06 결정 — 장르마다 달라 미리 만들어 두면 맞지 않는다). 필요하면 AI가 그 프로젝트의 `Assets/Code/Client`에 만든다. 3절(규칙과 화면의 경계)·6절(화면)을 그대로 따르고, 아래를 더 지킨다.
+GBible에는 넣지 않는다(2026-10-06 결정 — 장르마다 달라 미리 만들어 두면 맞지 않는다). 필요하면 AI가 그 프로젝트의 `Assets/MomoiProject/Code/Client`에 만든다. 3절(규칙과 화면의 경계)·6절(화면)을 그대로 따르고, 아래를 더 지킨다.
 
 - **입력은 행동까지만.** 입력 코드가 하는 일은 "무엇을 하려는가"를 행동 하나로 바꿔 `Game.Do`(화면 버튼이면 `GameScreens.Do`)에 넘기는 것까지다. 키·패드는 Input System의 동작(선택 기능 '입력'을 켰으면 `GameInput.Use(동작 에셋)` — 키 바꾸기가 따라온다), 화면 버튼은 UI Toolkit(6절). `GameView.Busy`일 때는 받지 않는다.
 - **월드를 누르기 전에 화면 칸 위인지 본다.** 화면(UI Toolkit) 칸 위에서 누른 것은 월드로 보내지 않는다.

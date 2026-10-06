@@ -25,7 +25,7 @@
 
 ### 에디터에서
 
-1. 메뉴 `MomoiProject → 다국어 → 설정 열기`. 설정이 없으면 `Assets/MomoiProjectData/Resources/MomoiProject/LocalizationSettings.asset`과 원문 표 `Assets/MomoiProjectData/Texts/Texts_ko.asset`을 만들고 선택한다.
+1. 메뉴 `MomoiProject → 다국어 → 설정 열기`. 설정이 없으면 `Assets/MomoiProject/Data/Resources/MomoiProject/LocalizationSettings.asset`과 원문 표 `Assets/MomoiProject/Data/Texts/Texts_ko.asset`을 만들고 선택한다.
 2. 인스펙터에서 고친다.
    - **termStyles**: 용어 모양(3.8절).
    - **sourceLanguage**: 원문 언어(기본 `ko`).

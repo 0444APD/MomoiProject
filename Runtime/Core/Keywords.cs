@@ -121,10 +121,8 @@ namespace GBible
                 if (_groups != null) return;
                 var groups = new List<KeywordGroupInfo>();
                 var byType = new Dictionary<Type, KeywordGroupInfo>();
-                const string core = "GBible.Core";
-                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                foreach (var assembly in GameAssemblies.UsingCore())
                 {
-                    if (assembly.GetName().Name != core && !assembly.GetReferencedAssemblies().Any(r => r.Name == core)) continue;
                     Type[] types;
                     try { types = assembly.GetTypes(); }
                     catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }

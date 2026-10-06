@@ -6,8 +6,8 @@
 > | 말 | 뜻 |
 > |---|---|
 > | 서버 권한 | 게임 결과를 한 곳(서버, 또는 친구 방이면 방장)만 계산하고 나머지는 결과를 받아 보여 주는 방식. Momoi Project의 멀티플레이 설계는 이것을 기준으로 한다. |
-> | 기능 로직 | 게임 규칙 코드. 행동·Block·결과·`[BindTo]` 함수·데이터 클래스. `Assets/Code/Rules`에 있다. 멀티에서는 서버에서 돈다. |
-> | UI | 화면·입력·연출 코드. `Assets/Code/Client`에 있다(`RunDirector`·화면·Bootstrap). 멀티에서는 클라이언트에서 돈다. |
+> | 기능 로직 | 게임 규칙 코드. 행동·Block·결과·`[BindTo]` 함수·데이터 클래스. `Assets/MomoiProject/Code/Rules`에 있다. 멀티에서는 서버에서 돈다. |
+> | UI | 화면·입력·연출 코드. `Assets/MomoiProject/Code/Client`에 있다(`RunDirector`·화면·Bootstrap). 멀티에서는 클라이언트에서 돈다. |
 > | 중개 | 기능 로직과 UI 사이에서 행동을 넘기고 결과·이벤트를 돌려주는 층. 라이브러리 몫이다. 싱글에서는 세션(`GameSession`)이 이 일을 한다. |
 > | 행동(`GameAction`) | 플레이어 입력 하나를 담은 데이터 클래스. 멀티에서는 클라이언트가 서버로 보내는 유일한 것이다. |
 > | Mirror · Sync · ChangeSet | 시스템이 플레이어 데이터의 사본(Mirror)과 지금 값을 비교(Sync)해 바뀐 곳만 담은 묶음(ChangeSet)을 만든다. ChangeSet의 앞으로 기록(Forward)이 네트워크로 보낼 변경분이다. |

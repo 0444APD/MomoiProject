@@ -54,7 +54,7 @@
 | 5 문법 밖 | 별도 판단 | 관례 13절: 무엇이 밖인지, 만드는 방법(화면 쪽·별도 시스템·근사)과 비용을 붙여 질문 | — |
 | 6 부가 기능 | 켤 기능 | 아래 '부가 기능' 표 | 표시한 것만 |
 | 7 씬 | 씬 흐름 | 판 데이터에 씬 이름 필드 + DB › Bootstrap '씬 흐름'(빈 값일 때 씬 = 타이틀) | 질문 |
-| 7 화면 | UI 화면 | 화면마다 UXML·USS(`Assets/UI/Screens`) + DB › 화면 + 화면 코드(매뉴얼 35장). 값 칸은 binding-path, 버튼은 `OnClick` → 행동, 목록은 `ElementList`. 고르기·확인·설정·슬롯·일시정지·알림은 기본 화면. 그림은 색 상자로 두고 넣을 에셋 목록을 보고 | 씬마다 화면 하나 + 타이틀(이어 하기·새 게임·설정·종료) |
+| 7 화면 | UI 화면 | 화면마다 UXML·USS(`Assets/MomoiProject/UI/Screens`) + DB › 화면 + 화면 코드(매뉴얼 35장). 값 칸은 binding-path, 버튼은 `OnClick` → 행동, 목록은 `ElementList`. 고르기·확인·설정·슬롯·일시정지·알림은 기본 화면. 그림은 색 상자로 두고 넣을 에셋 목록을 보고 | 씬마다 화면 하나 + 타이틀(이어 하기·새 게임·설정·종료) |
 | 7 연출·입력 막기 | 연출 대기열 | 턴제: `SubscribeAfterAction` → `GameView.Present`(차례로, 그동안 `GameView.Busy`). 실시간·클릭: `GameView.Play`(대기열 밖, 입력을 막지 않음). 시간에 따라 바뀌는 칸(쿨다운 원)은 `GameScreen.Tick` | 피해·죽음 연출 자리만 |
 | 7 고르기 창 | 선택 대기 화면 | 기본 고르기 창(저절로 뜬다). 다시 뽑기 버튼은 `GameScreens.Reroll = choice => 다시 뽑기 행동(비용·횟수를 내고 `Game.RerollChoice`) 또는 null`(기본 창에 버튼이 생긴다). 모양이 특별하면 같은 ID(`momoi.choice`)로 화면을 만든다 | 기본 고르기 창 |
 | 8 성장 숫자 | 밸런스 값 | DB › 밸런스 값 + 곡선(`Game.Balance(id, 단계)`) | 이름만 만들고 값은 자리 표시 |

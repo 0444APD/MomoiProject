@@ -32,15 +32,13 @@
 | 그룹 | 탭 | 종류 | 만드는 곳 |
 |---|---|---|---|
 | 시작 파일 | Bootstrap | 세션 옵션(GameDatabase 에셋) | 화면에서 고치면 바로 저장. **cs 열기**로 `Client/Bootstrap.cs` ([20장](20-Setup.md) 3절) |
-| 시작 파일 | RunState · Profile | 판·프로필 데이터 클래스 | 탭이 아니라 누르면 cs 파일을 바로 연다. 플레이어 데이터 `run`·`profile`의 값 형식을 따라가므로 이름을 바꿔도 열린다 |
-| 선언 | 키워드 | `[KeywordGroup]` 코드 | DB 또는 코드(코드가 원본) |
-| 선언 | 클래스 | `[Serializable]` 클래스·DB 종류 | 코드만(읽기 전용) |
-| 선언 | 로그 | `StatData` | DB |
-| 선언 | 이벤트 | `[GameEvent]` 클래스 | 코드만(읽기 전용) |
-| 선언 | 플레이어 데이터 | `PlayerDataEntry` | DB |
-| 선언 | 설정 | `SettingData` — 설정 화면의 칸 하나(음량·언어·전체 화면 …, [31장](31-Slots-Settings-Input.md)) | DB |
-| 선언 | 화면 설정 | `ScreenSettingsData` — 모든 화면의 Panel Settings·테마 USS·글꼴, 기본 화면 켜기(항목 하나, [35장](35-Screens.md)) | DB |
-| 진행 | 도전과제 | `AchievementData` | DB |
+| 요소 | 키워드 | `[KeywordGroup]` 코드 | DB 또는 코드(코드가 원본) |
+| 요소 | 클래스 | `[Serializable]` 클래스·DB 종류 — `Assets/MomoiProject/Code` 안의 것만, 폴더 경로 없이 한 목록 | 코드만(읽기 전용) |
+| 요소 | 로그 | `StatData` | DB |
+| 요소 | 이벤트 | `[GameEvent]` 클래스(같은 범위) | 코드만(읽기 전용) |
+| 요소 | 플레이어 데이터 | `PlayerDataEntry` — 마우스를 올리면 오른쪽 **cs ↗**로 판·프로필 클래스 파일(PlayerData.cs)을 연다 | DB |
+| 요소 | 설정 | `SettingData` — 설정 화면의 칸 하나(음량·언어·전체 화면 …, [31장](31-Slots-Settings-Input.md)) | DB |
+| 요소 | 화면 설정 | `ScreenSettingsData` — 모든 화면의 Panel Settings·테마 USS·글꼴, 기본 화면 켜기(항목 하나, [35장](35-Screens.md)) | DB |
 | DB | 능력 | `AbilityData` | DB |
 | DB | 상태 효과 | `StatusData` — 버프·디버프·쿨다운([29장](29-Statuses-Schedules-Choices.md)) | DB(결과를 코드로 쓰면 `[BindTo]`) |
 | DB | 패시브 | `PassiveData` — "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과, [17장](17-Custom-Features.md) 0절) | DB(결과를 코드로 쓰면 `[BindTo]`) |
@@ -49,14 +47,15 @@
 | DB | 화면 | `ScreenData` — UI Toolkit 화면 하나(UXML·층·뒤로 닫기·열 씬, [35장](35-Screens.md)) | DB |
 | DB | 인스턴스 | `InstanceData` | DB |
 | DB | 프리팹 | `PrefabData` | DB(프리팹 연결) |
-| 이미지 | 스프라이트 규격 | `SpritePresetGroupData` + `SpritePresetData` | DB |
 | 데이터 | (프로젝트가 만든 DB 종류) | `GameData` 상속 클래스 | DB |
+| 개발 | 도전과제 | `AchievementData` | DB |
 | 개발 | 개발 명령 | `DebugCommandData` — 모니터 › 명령 탭의 버튼 하나(결과 Block 조립, [22장](22-Monitor-Debug.md) 7절) | DB(코드가 필요하면 `[BindTo]`) |
 | 개발 | 저장 변환 | `SaveMigrationData` — 출시 후 저장 구조 변환 한 단계(필드 옮김·키 이름 바꿈·키 삭제, [06장](06-SaveLoad.md) 1.4) | DB(값을 계산하는 변환만 코드) |
 | 다이얼로그 시스템 | 기능 활성화 · 스탠딩 프로필 · 장소 | 선택 기능 | DB |
 | 인벤토리 시스템 | 기능 활성화 | 선택 기능 | — |
 | 입력(키 바꾸기) | 기능 활성화 | 선택 기능(Input System 패키지 필요, [31장](31-Slots-Settings-Input.md)) | — |
-| Steam | 기능 활성화 · Steam(그룹 개발) | 선택 기능(Steamworks.NET 패키지 필요). `SteamData` — Steam 연동 설정 항목 하나([34장](34-Steam.md)) | DB |
+| Steam | 기능 활성화 · Steam(그룹 개발) | 선택 기능(Steamworks.NET 패키지 필요). `SteamData` — Steam 연동 설정 항목 하나(켜면 저절로 생긴다, [34장](34-Steam.md)) | DB |
+| Dev | (Assets/Dev 바로 아래 폴더마다) | 그 폴더의 모든 에셋(2-1). 스프라이트 규격 파일도 여기 — Project 창에서 만들고 인스펙터로 채운다([27장](27-Field-Rules-Sprites.md)) | Project 창 |
 
 숨겨진 종류: 필드 규칙(`FieldRuleData`, 클래스 상세에서 정한다, `27-Field-Rules-Sprites.md`), 다이얼로그·연출 프리셋(그래프 창에서 편집, `24-Dialogue.md`).
 
@@ -147,7 +146,7 @@ public sealed class MonsterData : GameData
 
 | 탭 | 폴더 |
 |---|---|
-| 클래스 · 이벤트 | `Assets/Code` 아래 **실제 폴더**. 스크립트 파일이 있는 폴더가 곧 그 클래스의 폴더다(읽기 전용, 끌어 옮기기 없음). Code 밖의 클래스는 "Code 폴더 밖", 라이브러리가 기본으로 내는 것은 "자동" 배지가 붙은 묶음. |
+| 클래스 · 이벤트 | `Assets/MomoiProject/Code` 아래 **실제 폴더**. 스크립트 파일이 있는 폴더가 곧 그 클래스의 폴더다(읽기 전용, 끌어 옮기기 없음). Code 밖의 클래스는 "Code 폴더 밖", 라이브러리가 기본으로 내는 것은 "자동" 배지가 붙은 묶음. |
 | 키워드 · 스프라이트 규격 | **그룹**. 그룹 안에 하위 그룹을 둔다. |
 | 그 밖의 모든 종류 | **정리용**. 게임 동작·디스크 위치와 상관없다. 항목의 폴더는 항목 자신(숨은 칸)에, 빈 폴더 목록은 `ProjectSettings/MomoiProject/CodexFolders.json`에 남는다. |
 
@@ -179,7 +178,7 @@ public sealed class MonsterData : GameData
 3. **Ctrl+S**(DB·상세·그룹 창에 포커스가 있을 때)는 확인 없이 바로 저장한다. 콘솔에 "[MomoiProject] 저장했습니다: DB 항목 n건, …"이 찍힌다. 단축키는 Unity Shortcuts 관리자의 "MomoiProject/DB 변경 저장 (DB 창)"·"(상세 창)"·"(그룹 창)"으로 바꿀 수 있다.
 4. 저장하지 않은 채로 DB 창을 닫거나, 플레이를 시작하거나, Unity를 끄면 "DB에 저장 안 된 변경" 창이 **저장** / **취소** / **되돌리기**를 묻는다. 도메인 리로드(스크립트 다시 컴파일) 뒤에도 작업본은 남는다.
 
-저장할 때 일어나는 일: 항목 에셋 쓰기(새 항목은 `Assets/MomoiProjectData/<종류 폴더>/<ID>.asset` — 종류 폴더는 영어(`Ability`·`PlayerData` …), 지운 항목은 휴지통), ID 바꾸기(참조·파일 이름·이력), 키워드·어트리뷰트 코드 쓰기(스크립트가 바뀌면 다시 컴파일), 폴더 정리, 그리고 `GameDatabase`·`GameIds.cs` 갱신.
+저장할 때 일어나는 일: 항목 에셋 쓰기(새 항목은 `Assets/MomoiProject/Data/<종류 폴더>/<ID>.asset` — 종류 폴더는 영어(`Ability`·`PlayerData` …), 지운 항목은 휴지통), ID 바꾸기(참조·파일 이름·이력), 키워드·어트리뷰트 코드 쓰기(스크립트가 바뀌면 다시 컴파일), 폴더 정리, 그리고 `GameDatabase`·`GameIds.cs` 갱신.
 
 **바로 적용되는 것**(작업본을 거치지 않음): 스프라이트 베이크, 프리팹 컴포넌트 수정, 선택 기능 켜고 끄기, 보기 설정·배치 같은 화면 설정, 다이얼로그 그래프·연출 프리셋 창의 편집.
 
@@ -205,7 +204,7 @@ public sealed class MonsterData : GameData
 - 잠긴 종류의 헤더에는 "값을 바꿉니다(추가·삭제·구조는 AI에게)"가 보이고 **+ 새로 만들기**·**삭제**가 없다. 상세 창 제목(ID)은 고칠 수 없다.
 - 라이브러리를 고치거나 급할 때: 메뉴 **MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)**(이 컴퓨터에만, 기본 꺼짐).
 
-**DB 반영 스크립트**: `Assets/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 저절로 한 번 돈다. 함수 안에서 `EditorDatabase.Staging.Add·Work·Remove`로 항목을 만들고·고치고·지운다 → DB에 **적용 전**으로 보이고, 개발자가 읽어 본 뒤 Ctrl+S로 적용한다. 적용했을 때만 그 버전이 돈 것으로 기록되고(`ProjectSettings/MomoiProject/DbSeeds.json`), 버리면 다음 컴파일 뒤 다시 돈다. 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**. 예와 규칙은 AI 문서 `ProjectConventions.md` 15절.
+**DB 반영 스크립트**: `Assets/MomoiProject/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 저절로 한 번 돈다. 함수 안에서 `EditorDatabase.Staging.Add·Work·Remove`로 항목을 만들고·고치고·지운다 → DB에 **적용 전**으로 보이고, 개발자가 읽어 본 뒤 Ctrl+S로 적용한다. 적용했을 때만 그 버전이 돈 것으로 기록되고(`ProjectSettings/MomoiProject/DbSeeds.json`), 버리면 다음 컴파일 뒤 다시 돈다. 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**. 예와 규칙은 AI 문서 `ProjectConventions.md` 15절.
 
 ---
 
@@ -264,7 +263,7 @@ ID 규칙(`IdRules`): 영문 소문자로 시작, 영문·숫자만, 단어 사�
 
 **에디터에서**
 
-1. 그룹 = 폴더(하위 그룹은 안쪽), 키워드 = 줄(왼쪽 ID, 오른쪽 코드 상수 이름). 그룹 줄의 **cs 열기**는 그룹 코드 파일을 연다. 만들기·이름 바꾸기·지우기 버튼은 없다 — 키워드가 더 필요하면 AI에게(새 그룹은 `Assets/Code/Keywords/그룹이름.cs`).
+1. 그룹 = 폴더(하위 그룹은 안쪽), 키워드 = 줄(왼쪽 ID, 오른쪽 코드 상수 이름). 그룹 줄의 **cs 열기**는 그룹 코드 파일을 연다. 만들기·이름 바꾸기·지우기 버튼은 없다 — 키워드가 더 필요하면 AI에게(새 그룹은 `Assets/MomoiProject/Code/Keywords/그룹이름.cs`).
 2. 그룹 아래 "연결된 필드"에 이 그룹을 쓰는 필드(`클래스.필드`)가 칩으로 보인다. 누르면 그 클래스 상세로 간다.
 
 **코드로 쓰는 법**
@@ -325,7 +324,7 @@ public class Item
 
 ### 6.2 클래스 (읽기 전용)
 
-**한 줄 요약.** 코드로 정의한 `[Serializable]` 클래스와 프로젝트의 DB 종류를 `Assets/Code` 폴더별로 본다. 만들고 고치는 것은 코드에서 한다.
+**한 줄 요약.** 코드로 정의한 `[Serializable]` 클래스와 프로젝트의 DB 종류를 `Assets/MomoiProject/Code` 폴더별로 본다. 만들고 고치는 것은 코드에서 한다.
 
 **에디터에서**
 

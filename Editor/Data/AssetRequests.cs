@@ -11,14 +11,14 @@ namespace GBible.EditorTools
     // 그 줄에 진짜 파일을 고르면(교체 — GUID 그대로) 그 자리를 쓰는 모든 곳이 바뀐다.
     //   [DbSeed("1")] static void Art()
     //   {
-    //       AssetRequests.Sprite("Assets/Art/Cards/fireball.png", 256, 256, "카드 '파이어볼' 그림", "주황 계열");
-    //       AssetRequests.Audio("Assets/Audio/Sfx/hit.wav", "맞을 때 효과음(0.3초 안팎)");
-    //       AssetRequests.Request("Assets/Fonts/Main.ttf", "모든 화면의 한글 글꼴");   // 임시 파일 없이 목록만
+    //       AssetRequests.Sprite("Assets/Dev/Art/Cards/fireball.png", 256, 256, "카드 '파이어볼' 그림", "주황 계열");
+    //       AssetRequests.Audio("Assets/Dev/Audio/Sfx/hit.wav", "맞을 때 효과음(0.3초 안팎)");
+    //       AssetRequests.Request("Assets/Dev/Fonts/Main.ttf", "모든 화면의 한글 글꼴");   // 임시 파일 없이 목록만
     //   }
-    // 목록: Assets/MomoiProjectData/AssetRequests.json(프로젝트와 함께 커밋).
+    // 목록: Assets/MomoiProject/Data/AssetRequests.json(프로젝트와 함께 커밋).
     public static class AssetRequests
     {
-        public const string FilePath = "Assets/MomoiProjectData/AssetRequests.json";
+        public const string FilePath = ProjectFolders.Data + "/AssetRequests.json";
 
         [Serializable]
         public sealed class Item

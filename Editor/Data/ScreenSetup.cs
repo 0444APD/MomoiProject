@@ -10,10 +10,10 @@ namespace GBible.EditorTools
 {
     // 화면(UI Toolkit) 준비: Assets/UI에 기본 테마(.tss)·Panel Settings·프로젝트 테마 USS를 만들고, DB › 화면 설정 항목을 적용 전으로 만든다.
     // 이미 있는 파일·항목은 건너뛴다(사람이 고친 것을 덮지 않는다). 시작 설정·DB 추가 메뉴에서도 부른다(ScreenSetup.Ensure()).
-    // 폴더: Assets/UI/Screens(화면 UXML·USS), Assets/UI/Items(목록 한 칸 UXML). 화면 코드는 Assets/Code/Client/Screens.
+    // 폴더: Assets/MomoiProject/UI/Screens(화면 UXML·USS), Assets/MomoiProject/UI/Items(목록 한 칸 UXML). 화면 코드는 Assets/MomoiProject/Code/Client/Screens.
     public static class ScreenSetup
     {
-        public const string Folder = "Assets/UI";
+        public const string Folder = ProjectFolders.UI;
         public const string ThemeFile = Folder + "/DefaultTheme.tss";
         public const string PanelFile = Folder + "/PanelSettings.asset";
         public const string ProjectThemeFile = Folder + "/Theme.uss";

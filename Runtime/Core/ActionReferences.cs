@@ -207,9 +207,8 @@ namespace GBible
         // 게임이 켜질 때: 불러온 모든 어셈블리의 행동 형식을 미리 정해 둔다(실행 중에 형식 정보를 읽지 않게).
         public static void PrepareAll()
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var assembly in GameAssemblies.All())
             {
-                if (assembly.IsDynamic) continue;
                 Type[] types;
                 try { types = assembly.GetTypes(); }
                 catch (System.Reflection.ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }

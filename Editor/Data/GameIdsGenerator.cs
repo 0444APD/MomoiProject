@@ -17,11 +17,11 @@ namespace GBible.EditorTools
     //   GameIds.Stat.KillsTotal         → "kills_total"                             (그 밖의 항목: ID 문자열)
     //
     // 파일 위치: 플레이어 데이터의 값 형식이 들어 있는 어셈블리(asmdef) 폴더의 Generated/ 아래 — 그래야 그 형식을 참조할 수 있다.
-    // 형식이 없거나 Assembly-CSharp에 있으면 Assets/MomoiProjectGenerated/. 설정 파일로 직접 지정할 수도 있다.
+    // 형식이 없거나 Assembly-CSharp에 있으면 Assets/MomoiProject/Generated/. 설정 파일로 직접 지정할 수도 있다.
     public static class GameIdsGenerator
     {
         public const string FileName = "GameIds.cs";
-        public const string DefaultFolder = "Assets/MomoiProjectGenerated";
+        public const string DefaultFolder = ProjectFolders.Generated;
         const string SettingsPath = "ProjectSettings/MomoiProject/Ids.json";
 
         [Serializable]

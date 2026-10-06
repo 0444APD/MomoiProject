@@ -22,10 +22,10 @@
 > [!note]- 새 프로젝트의 화면은 DB › 화면으로(UXML + 화면 코드)
 > 카드 던전의 전투 화면은 씬의 UIDocument에 MonoBehaviour를 붙여 만들었다(아래). 새 프로젝트는 매뉴얼 [35장](../../Manual/35-Screens.md)의 **화면**으로 만든다. 인스펙터에서 연결할 것이 없어 AI가 파일만으로 끝낸다.
 > 1. 메뉴 `MomoiProject › 화면 › 화면 준비`(한 번) → Ctrl+S.
-> 2. `Assets/UI/Screens/BattleHud.uxml`: 값 칸은 `binding-path`만 적는다 — `<ui:Label binding-path="run:gold@hud.gold" />`(텍스트 `hud.gold` = "골드 {value}"). 코드 없이 바뀐다.
+> 2. `Assets/MomoiProject/UI/Screens/BattleHud.uxml`: 값 칸은 `binding-path`만 적는다 — `<ui:Label binding-path="run:gold@hud.gold" />`(텍스트 `hud.gold` = "골드 {value}"). 코드 없이 바뀐다.
 > 3. DB › 화면 `battleHud`: UXML · 층 `바탕(HUD)` · 열 씬 `Battle`.
 > 4. 버튼·손패만 코드로: `[BindTo(GameIds.Screen.BattleHud)] class BattleHud : GameScreen` 안에서 `OnClick("end-turn", () => new EndTurn())`(연출·선택 중이면 무시, "에너지가 모자랍니다"는 알림으로 저절로).
-> 5. 고르기 창·설정·슬롯·일시정지·"정말 할까요?"·알림은 **기본 화면**이 있어 만들지 않는다. 색은 `Assets/UI/Theme.uss`의 변수로.
+> 5. 고르기 창·설정·슬롯·일시정지·"정말 할까요?"·알림은 **기본 화면**이 있어 만들지 않는다. 색은 `Assets/MomoiProject/UI/Theme.uss`의 변수로.
 >
 > 아래 1~4절의 규칙(읽기만·입력은 행동·연출 뒤에 그리기)은 두 방식 모두 같다.
 

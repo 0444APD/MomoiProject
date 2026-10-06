@@ -227,7 +227,7 @@ if (!Game.IsPreviewing) Telemetry.Send("kill");
 | `IEnumerable<Type> InstanceClasses()` | 인스턴스 값의 클래스들(이름순) |
 
 ```csharp
-// 메뉴 하나로 밸런스 값을 정해 둔 경로에 내보낸다(Assets/Code/Editor/BalanceExport.cs)
+// 메뉴 하나로 밸런스 값을 정해 둔 경로에 내보낸다(Assets/MomoiProject/Code/Editor/BalanceExport.cs)
 using System.IO;
 using System.Text;
 using GBible.Data;
@@ -255,7 +255,7 @@ static class BalanceExport
 - DB › 플레이어 데이터 `arena`: 구역 `Session`, 값 형식 `ArenaState`(아래 클래스).
 - DB › 밸런스 값 `waveInterval` `10`, `waveSize` `3`(곡선 `일정하게` +1/웨이브, 30장).
 
-**규칙** — `Assets/Code/Rules/Arena.cs`. 순수 C#이다(`UnityEngine`도 Unity 시작 방식도 쓰지 않는다 → 서버·테스트에서 그대로 돈다).
+**규칙** — `Assets/MomoiProject/Code/Rules/Arena.cs`. 순수 C#이다(`UnityEngine`도 Unity 시작 방식도 쓰지 않는다 → 서버·테스트에서 그대로 돈다).
 
 ```csharp
 using System;
@@ -299,7 +299,7 @@ public static class ArenaRules
 }
 ```
 
-**연결** — `Assets/Code/Client/Bootstrap.cs`의 `Started`에 한 줄(17장 2-6).
+**연결** — `Assets/MomoiProject/Code/Client/Bootstrap.cs`의 `Started`에 한 줄(17장 2-6).
 
 ```csharp
 static void Started(GameSession session)

@@ -6,20 +6,20 @@
 
 | 용어 | 뜻 |
 |---|---|
-| 넣을 것 | AI가 올린 에셋 요청 한 줄(경로 · 쓰는 곳 · 크기 · 느낌 · 넣었나). `Assets/MomoiProjectData/AssetRequests.json`. |
+| 넣을 것 | AI가 올린 에셋 요청 한 줄(경로 · 쓰는 곳 · 크기 · 느낌 · 넣었나). `Assets/MomoiProject/Data/AssetRequests.json`. |
 | 임시 에셋 | 요청 경로에 AI가 만든 자리(그림 = 단색 PNG를 Sprite로, 소리 = 무음 WAV). |
 | 바꾸기(교체) | 에셋 파일의 내용을 다른 파일로 덮는다. 경로·GUID·.meta는 그대로. |
-| 종류별 폴더 | 그림 `Assets/Art` · 소리 `Assets/Audio` · 글꼴 `Assets/Fonts` · 모델 `Assets/Models` · 프리팹 `Assets/Prefabs` · 씬 `Assets/Scenes` · 머티리얼 `Assets/Materials` · 애니메이션 `Assets/Animations` · UI `Assets/UI` · 영상 `Assets/Video`. |
+| 종류별 폴더 | 그림 `Assets/Dev/Art` · 소리 `Assets/Dev/Audio` · 글꼴 `Assets/Dev/Fonts` · 모델 `Assets/Dev/Models` · 프리팹 `Assets/Dev/Prefabs` · 씬 `Assets/Scenes` · 머티리얼 `Assets/Dev/Materials` · 애니메이션 `Assets/Dev/Animations` · UI `Assets/MomoiProject/UI` · 영상 `Assets/Dev/Video`. |
 
 ---
 
 ## 1. 동작 규칙
 
-- **관리 대상**: `Assets/` 아래 에셋 중 코드(`.cs`·`.asmdef`)·`Assets/Code`·`Assets/MomoiProjectData`·`Assets/MomoiProjectGenerated`·`Plugins`·`StreamingAssets`·`Editor`·`Resources` 안·`Assets/_Unused`를 뺀 것.
+- **관리 대상**: `Assets/` 아래 에셋 중 코드(`.cs`·`.asmdef`)·`Assets/MomoiProject/Code`·`Assets/MomoiProject/Data`·`Assets/MomoiProject/Generated`·`Plugins`·`StreamingAssets`·`Editor`·`Resources` 안·`Assets/Dev/_Unused`를 뺀 것.
 - **가져오기**(`AssetTools.Import`): 밖의 파일·폴더를 종류별 폴더로 복사한다(폴더는 안의 파일을 하나씩, `.meta`는 빼고). 같은 이름이 있으면 `이름 1.png`처럼 번호를 붙인다.
 - **바꾸기**(`AssetTools.Replace`): 같은 종류만(그림 ↔ 그림). 확장자가 다르면 먼저 `AssetDatabase.MoveAsset`으로 확장자를 바꿔(GUID 유지) 내용을 덮는다. 넣을 것 목록에 있으면 넣음(✓)으로 표시한다.
 - **쓰는 곳**(`AssetTools.UsedBy`): 모든 에셋의 의존(`AssetDatabase.GetDependencies`)을 거꾸로 묶은 표. 프로젝트가 바뀌면 다시 만든다.
-- **안 쓰는 것**(`AssetTools.Unused`): 뿌리(빌드에 든 씬 · `Resources` 안 · `Assets/MomoiProjectData` · `Assets/UI` · 넣을 것 목록)에서 닿지 않는 그림·소리·글꼴·모델·프리팹·머티리얼·애니메이션·영상. **코드가 경로 글자로 불러오는 것은 연결이 보이지 않는다** — 옮기기 전에 확인한다. 옮기면 `Assets/_Unused/<원래 경로>`(지우지 않음).
+- **안 쓰는 것**(`AssetTools.Unused`): 뿌리(빌드에 든 씬 · `Resources` 안 · `Assets/MomoiProject/Data` · `Assets/MomoiProject/UI` · 넣을 것 목록)에서 닿지 않는 그림·소리·글꼴·모델·프리팹·머티리얼·애니메이션·영상. **코드가 경로 글자로 불러오는 것은 연결이 보이지 않는다** — 옮기기 전에 확인한다. 옮기면 `Assets/Dev/_Unused/<원래 경로>`(지우지 않음).
 - **폴더 정돈**(`AssetTools.Misplaced` · `Tidy`): 종류별 폴더 밖의 에셋을 그 폴더로 옮긴다(`MoveAsset` — GUID 유지).
 
 ## 2. 에디터에서 쓰는 법
@@ -32,9 +32,9 @@
 [DbSeed("1")]
 static void Art()
 {
-    AssetRequests.Sprite("Assets/Art/Cards/fireball.png", 256, 256, "카드 '파이어볼' 그림", "주황 불꽃, 카드 틀 안쪽");
-    AssetRequests.Audio("Assets/Audio/Sfx/hit.wav", "맞을 때 효과음", seconds: 0.3f);
-    AssetRequests.Request("Assets/Fonts/Main.ttf", "모든 화면의 한글 글꼴", note: "가독성 좋은 고딕");   // 임시 파일 없이 목록만
+    AssetRequests.Sprite("Assets/Dev/Art/Cards/fireball.png", 256, 256, "카드 '파이어볼' 그림", "주황 불꽃, 카드 틀 안쪽");
+    AssetRequests.Audio("Assets/Dev/Audio/Sfx/hit.wav", "맞을 때 효과음", seconds: 0.3f);
+    AssetRequests.Request("Assets/Dev/Fonts/Main.ttf", "모든 화면의 한글 글꼴", note: "가독성 좋은 고딕");   // 임시 파일 없이 목록만
 }
 ```
 

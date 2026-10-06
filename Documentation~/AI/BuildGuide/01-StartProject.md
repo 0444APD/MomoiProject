@@ -32,16 +32,18 @@
 > [!note]- 시작 설정이 만드는 것
 > ```
 > Assets/
->   Code/
->     Rules/    MomoiProject.Rules.asmdef   PlayerData.cs   ← RunState·Profile 클래스
->     Client/   MomoiProject.Client.asmdef  Bootstrap.cs    ← 시작 코드
->     Editor/   MomoiProject.Editor.asmdef
->     Tests/    MomoiProject.Tests.asmdef
->   MomoiProjectData/
->     Resources/MomoiProject/GameDatabase.asset          ← DB 데이터·프로젝트 설정(런타임이 읽는다)
->     Resources/MomoiProject/LocalizationSettings.asset  ← 다국어 설정
->     Texts/Texts_ko.asset …                             ← 언어별 텍스트 표
->     (플레이어 데이터 폴더)/run.asset  profile.asset      ← DB › 플레이어 데이터 run·profile
+>   MomoiProject/                                         ← 시스템·AI가 쓰는 곳(개발자는 들어가지 않는다)
+>     Code/
+>       Rules/    MomoiProject.Rules.asmdef   PlayerData.cs   ← RunState·Profile 클래스
+>       Client/   MomoiProject.Client.asmdef  Bootstrap.cs    ← 시작 코드
+>       Editor/   MomoiProject.Editor.asmdef  EditorAssembly.cs(자리 표시)
+>       Tests/    MomoiProject.Tests.asmdef   TestsAssembly.cs(자리 표시)
+>     Data/
+>       Resources/MomoiProject/GameDatabase.asset          ← DB 데이터·프로젝트 설정(런타임이 읽는다)
+>       Resources/MomoiProject/LocalizationSettings.asset  ← 다국어 설정
+>       Texts/Texts_ko.asset …                             ← 언어별 텍스트 표
+>       PlayerData/run.asset  profile.asset                ← DB › 플레이어 데이터 run·profile
+>   Dev/                                                  ← 개발자가 노는 곳(안의 폴더 = DB 'Dev' 탭)
 > ProjectSettings/MomoiProject/Features.json              ← 켠 모듈(팀이 같이 쓴다)
 > CLAUDE.md                                               ← Claude Code가 늘 읽는 규칙(관례·참조 문서를 불러온다)
 > .claude/skills/think-momoi/  .claude/hooks/compile-check.ps1  .claude/settings.json  ← 스킬 /think-momoi, 응답을 끝낼 때 컴파일 검사
@@ -85,7 +87,7 @@
 
 ## 2. 코드 폴더
 
-`Assets/Code` 아래 네 폴더로 나뉜다.
+`Assets/MomoiProject/Code` 아래 네 폴더로 나뉜다.
 
 - **Rules**: 게임 규칙. 데이터 클래스·행동·이벤트·Block·`[BindTo]` 함수 같은 일반 C# 클래스.
 - **Client**: Unity에 붙는 코드. `MonoBehaviour`·UI·연출, 그리고 Bootstrap.
@@ -109,9 +111,9 @@ Rules에서 Client의 코드(예: `BattleHud`)를 부르면 컴파일 오류가 
 > | `MomoiProject.Tests` | Rules, `GBible.Core`, `GBible.Unity`, 켠 데이터 모듈, Test Runner, NUnit. 테스트 실행 때만 |
 
 > [!note]- 하위 폴더
-> Rules·Client 아래 하위 폴더는 자유다. DB의 클래스·이벤트 탭은 `Assets/Code` 아래 실제 폴더별로 묶어 보여 준다(그룹 "Rules/Data" = 폴더 `Assets/Code/Rules/Data`). 카드 던전은 이렇게 나눴다.
+> Rules·Client 아래 하위 폴더는 자유다. DB의 클래스·이벤트 탭은 `Assets/MomoiProject/Code` 아래 실제 폴더별로 묶어 보여 준다(그룹 "Rules/Data" = 폴더 `Assets/MomoiProject/Code/Rules/Data`). 카드 던전은 이렇게 나눴다.
 > ```
-> Assets/Code/
+> Assets/MomoiProject/Code/
 >   Rules/   Data/  Events/  Actions/  Cards/  Relics/  Run/  Generated/(GameIds.cs)
 >   Client/  UI/  Presentation/  Bootstrap.cs  RunDirector.cs
 > ```
@@ -173,7 +175,7 @@ run.gold += 10;              // 필드는 그냥 고친다(Undo·저장·멀티�
 > 그래서 코드에서 따로 정의(`session.Data.Define`)할 필요가 없다. `Define`은 DB 없이 세션을 손으로 만드는 테스트([08장](08-TestAndDebug.md))에서나 쓴다. DB로 정의하면 `GameIds` 접근자, ID 이름 변경 이력, 저장 호환 검사가 따라온다.
 
 > [!note]- `Game.Data().Run`이라는 이름
-> DB를 저장하면(Ctrl+S) `Assets/Code/Rules/Generated/GameIds.cs`가 다시 만들어진다(직접 고치지 않는다). ID를 `.`·`_`·`-`에서 잘라 각 조각의 첫 글자를 대문자로 붙인 이름이 된다: `run` → `Run`, `best_floor` → `BestFloor`. 다른 이름을 원하면 DB에서 ID를 바꾼다.
+> DB를 저장하면(Ctrl+S) `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`가 다시 만들어진다(직접 고치지 않는다). ID를 `.`·`_`·`-`에서 잘라 각 조각의 첫 글자를 대문자로 붙인 이름이 된다: `run` → `Run`, `best_floor` → `BestFloor`. 다른 이름을 원하면 DB에서 ID를 바꾼다.
 >
 > 구역은 저장 파일과 같다. `Session`은 이번 판(`run.json`), `Meta`는 프로필(`profile.json`). 무엇을 어느 쪽에 둘지는 [02장](02-DesignToCode.md) 3절.
 
@@ -281,7 +283,7 @@ static void Started(GameSession session)
 
 ## 6. 체크리스트
 
-- [ ] 시작 설정을 적용했다. `Assets/Code/Rules·Client·Editor·Tests`, DB › 플레이어 데이터 `run`·`profile`이 있다.
+- [ ] 시작 설정을 적용했다. `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`, DB › 플레이어 데이터 `run`·`profile`이 있다.
 - [ ] 쓸 선택 모듈을 켰다.
 - [ ] 규칙 코드는 Rules에, Unity에 붙는 코드는 Client에 있다.
 - [ ] `RunState`·`Profile`에 필드를 채웠다.

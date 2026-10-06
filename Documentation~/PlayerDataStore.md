@@ -432,7 +432,7 @@ public class SampleEquipment
 
 ### 11.6 생성 코드의 위치
 
-`GameIds.cs`는 플레이어 데이터의 값 형식이 들어 있는 어셈블리(asmdef) 폴더 아래 `Generated/`에 만들어집니다. 그래야 그 형식을 참조해 `PlayerDataKey<Inventory>`처럼 타입을 붙일 수 있습니다. 형식이 없거나 asmdef 밖(Assembly-CSharp)에 있으면 `Assets/MomoiProjectGenerated/`에 만들어집니다.
+`GameIds.cs`는 플레이어 데이터의 값 형식이 들어 있는 어셈블리(asmdef) 폴더 아래 `Generated/`에 만들어집니다. 그래야 그 형식을 참조해 `PlayerDataKey<Inventory>`처럼 타입을 붙일 수 있습니다. 형식이 없거나 asmdef 밖(Assembly-CSharp)에 있으면 `Assets/MomoiProject/Generated/`에 만들어집니다.
 
 위치를 직접 정하려면 `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 폴더 경로를 적습니다. 그 위치에서 참조할 수 없는 형식의 키는 타입 없이 ID 문자열로만 만들어집니다. 수동으로 다시 만들려면 메뉴 `MomoiProject > 식별자 코드 다시 만들기`를 누릅니다.
 

@@ -13,7 +13,7 @@ namespace GBible.EditorTools
     // 에디터에서 GameData 에셋 전체를 다루는 창구: 조회, 생성, ID 부여, 이름 조회, GameDatabase 동기화.
     public sealed class EditorDatabase : INameResolver
     {
-        public const string DataRoot = "Assets/MomoiProjectData";
+        public const string DataRoot = ProjectFolders.Data;
         public const string DatabaseAssetPath = DataRoot + "/Resources/MomoiProject/GameDatabase.asset";
 
         static EditorDatabase _instance;
@@ -346,8 +346,10 @@ namespace GBible.EditorTools
             _all = null;
             foreach (var data in Committed.Where(d => string.IsNullOrEmpty(d.Id)).ToList())
             {
+                // Project 창에서 만든 항목(Create 메뉴): 파일 이름을 ID로(쓸 수 있으면), 아니면 연번.
                 var info = DataTypes.Find(data.GetType());
-                data.EditorAssignId(NextId(info));
+                var fromName = IdRules.Normalize(data.name ?? "");
+                data.EditorAssignId(fromName.Length > 1 && CanUseId(fromName, data, out _) ? fromName : NextId(info));
                 EditorUtility.SetDirty(data);
                 AssetDatabase.SaveAssetIfDirty(data);
                 _all = null;
@@ -410,6 +412,10 @@ namespace GBible.EditorTools
         // ② 하나만 두는 설정 종류([Database(Single = true)])가 비어 있으면 기본값으로 하나 만든다.
         public static void Upkeep()
         {
+            // 예전 자리(Assets/Code · Assets/MomoiProjectData · Assets/UI …)의 시스템 폴더를 Assets/MomoiProject 아래로.
+            ProjectFolders.MoveLegacy();
+            // 스크립트가 없는 asmdef(Editor·Tests)에 자리 표시 파일(Unity의 "스크립트가 없다" 경고를 막는다).
+            StartSetup.EnsurePlaceholders(null);
             foreach (var info in DataTypes.All)
             {
                 var legacy = $"{DataRoot}/{Sanitize(info.DisplayName)}";

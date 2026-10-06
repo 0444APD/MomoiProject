@@ -20,9 +20,9 @@ namespace GBible.Data
     [CreateAssetMenu(menuName = "MomoiProject/화면", fileName = "NewScreen")]
     public sealed class ScreenData : GameData
     {
-        [FieldLabel("UXML"), Tooltip("이 화면의 UXML(Assets/UI/Screens/…)")] public VisualTreeAsset layout;
+        [FieldLabel("UXML"), Tooltip("이 화면의 UXML(Assets/MomoiProject/UI/Screens/…)")] public VisualTreeAsset layout;
         [FieldLabel("더할 USS"), Tooltip("이 화면에만 붙는 USS. 모든 화면에 붙는 것은 DB › 화면 설정의 테마")] public List<StyleSheet> styles = new List<StyleSheet>();
-        [FieldLabel("목록 칸 UXML"), Tooltip("목록 한 칸의 UXML(Assets/UI/Items/…). 코드는 Item(\"파일 이름\")으로 찾는다. 화면 UXML에 <ui:Template>로 적은 것도 찾는다")] public List<VisualTreeAsset> items = new List<VisualTreeAsset>();
+        [FieldLabel("목록 칸 UXML"), Tooltip("목록 한 칸의 UXML(Assets/MomoiProject/UI/Items/…). 코드는 Item(\"파일 이름\")으로 찾는다. 화면 UXML에 <ui:Template>로 적은 것도 찾는다")] public List<VisualTreeAsset> items = new List<VisualTreeAsset>();
         [FieldLabel("층")] public ScreenLayer layer = ScreenLayer.Window;
         [FieldLabel("아래 입력 막기"), Tooltip("창: 켜면 열린 동안 아래 층 화면을 누를 수 없습니다. 팝업은 늘 막고, 바탕·알림은 막지 않습니다")] public bool blockInput = true;
         [FieldLabel("뒤로(Esc)로 닫기")] public bool closeOnBack = true;
