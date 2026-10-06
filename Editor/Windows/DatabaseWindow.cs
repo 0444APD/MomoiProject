@@ -70,11 +70,29 @@ namespace GBible.EditorTools
             return 40;
         }
 
-        static List<TabEntry> Tabs()
+        // 'DB' 그룹의 로직 종류(능력·상태 효과·패시브·가중치 표 …)는 항목이 없으면 탭을 숨긴다 — 그 프로젝트가 쓰는 것만 보인다(AI가 항목을 만들면 나타난다).
+        // 개발자가 만드는 종류(DeveloperAuthored)는 비어 있어도 보인다(첫 항목을 만들 수 있게). keep: 지금 연 탭은 비어도 남긴다.
+        const string LogicGroup = "DB";
+        static int _hiddenEmpty;
+
+        static bool ShowEmptyTabs
+        {
+            get => SessionState.GetBool("MomoiProject.DB.ShowEmptyTabs", false);
+            set => SessionState.SetBool("MomoiProject.DB.ShowEmptyTabs", value);
+        }
+
+        static List<TabEntry> Tabs(string keep = null)
         {
             var tabs = new List<TabEntry>();
+            _hiddenEmpty = 0;
             foreach (var info in DataTypes.All.Where(i => !i.Hidden))
             {
+                if (info.Group == LogicGroup && !info.DeveloperAuthored && !ShowEmptyTabs && info.Type.FullName != keep &&
+                    !EditorDatabase.Instance.All.Any(d => d != null && d.GetType() == info.Type))
+                {
+                    _hiddenEmpty++;
+                    continue;
+                }
                 // 막 끈 기능의 종류는 다시 컴파일되기 전이라도 바로 뺀다(아래에서 흐린 탭으로 보인다).
                 if (GameFeatures.Of(info.Type) is GameFeature owner && !GameFeatures.IsEnabled(owner)) continue;
                 tabs.Add(new TabEntry { Key = info.Type.FullName, Label = info.DisplayName, Group = info.Group, Order = info.Order, Type = info.Type });
@@ -245,7 +263,7 @@ namespace GBible.EditorTools
         // 처음 열 때, 또는 없어진 탭(지운 종류·꺼진 기능의 탭)을 열어 두었으면 첫 탭으로.
         void EnsureTab()
         {
-            if (_selectedType == null || !Tabs().Any(t => t.Key == TabOfName(_selectedType) && t.DisabledReason == null)) _selectedType = FirstTabKey();
+            if (_selectedType == null || !Tabs(_selectedType).Any(t => t.Key == TabOfName(_selectedType) && t.DisabledReason == null)) _selectedType = FirstTabKey();
         }
 
         void OnEnable()
@@ -439,7 +457,7 @@ namespace GBible.EditorTools
             var selected = SelectedType;
             var currentPage = CurrentPage;
             var shownGroups = new HashSet<string>();
-            foreach (var group in Tabs().GroupBy(t => t.Group))
+            foreach (var group in Tabs(_selectedType).GroupBy(t => t.Group))
             {
                 _sidebarNav.Add(Gs.Label(group.Key.ToUpperInvariant(), "gs-sidebar__group"));
                 shownGroups.Add(group.Key);
@@ -509,6 +527,21 @@ namespace GBible.EditorTools
                 buttons.Add(save);
                 buttons.Add(new GsButton("되돌리기", ConfirmDiscard, GsButtonKind.Ghost));
                 _sidebarFooter.Add(buttons);
+            }
+
+            if (_hiddenEmpty > 0 || ShowEmptyTabs)
+            {
+                // 숨긴 빈 탭: 눌러서 보이기·다시 숨기기(이 에디터를 쓰는 동안 기억).
+                var toggle = Gs.Label(ShowEmptyTabs ? "빈 탭 숨기기" : $"빈 탭 {_hiddenEmpty}개 숨김 · 보기", "gs-caption");
+                toggle.tooltip = "항목이 없는 로직 종류(능력·상태 효과·패시브 …)의 탭. 이 프로젝트가 쓰기 시작하면(항목이 생기면) 저절로 보입니다.";
+                toggle.style.marginLeft = 12;
+                toggle.style.marginBottom = 6;
+                toggle.RegisterCallback<ClickEvent>(_ =>
+                {
+                    ShowEmptyTabs = !ShowEmptyTabs;
+                    RebuildSidebar();
+                });
+                _sidebarFooter.Add(toggle);
             }
 
             var errorCount = _issues.Count(i => i.Severity == ValidationSeverity.Error);
