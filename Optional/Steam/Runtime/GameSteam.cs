@@ -173,6 +173,9 @@ namespace GBible
                 return;
             }
             IsReady = true;
+            // 붙었다는 표시(에디터에서는 오버레이 Shift+Tab이 뜨지 않으므로 콘솔로 알린다 — 오버레이는 빌드에서).
+            Debug.Log($"[MomoiProject] Steam에 붙었습니다: {SteamFriends.GetPersonaName()} · App ID {SteamUtils.GetAppID().m_AppId}. Steam 친구 목록에 이 앱을 하는 중으로 보입니다" +
+                      (Application.isEditor ? " (오버레이 Shift+Tab은 에디터에서는 뜨지 않습니다 — 빌드에서 확인)." : "."));
             var host = new GameObject("[MomoiProject Steam]");
             UnityEngine.Object.DontDestroyOnLoad(host);
             host.AddComponent<GameSteamHost>();

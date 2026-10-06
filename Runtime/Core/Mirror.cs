@@ -25,6 +25,8 @@ namespace GBible
         static readonly List<MirrorType> ById = new List<MirrorType>();
         static bool _initialized;
         static bool _initializing;
+        // 훑은 어셈블리(다시 훑을 때 새로 들어온 것만 — Rescan).
+        static readonly HashSet<string> Scanned = new HashSet<string>(StringComparer.Ordinal);
 
         // 생성 코드가 없어 변경을 따라가지 못하는 객체를 만났을 때(한 형식에 한 번).
         public static event Action<string> Warning;
@@ -42,22 +44,7 @@ namespace GBible
                 _initializing = true;
                 try
                 {
-                    foreach (var assembly in GameAssemblies.UsingCore())
-                    {
-                        Type[] types;
-                        try { types = assembly.GetTypes(); }
-                        catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
-                        foreach (var type in types)
-                        {
-                            if (type.IsGenericTypeDefinition) continue;
-                            var register = type.GetMethod("__gb_register", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly, null, Type.EmptyTypes, null);
-                            register?.Invoke(null, null);
-                        }
-                    }
-                    // 형식 번호: 이름순(같은 코드로 빌드한 서버·클라이언트가 같은 번호를 쓴다).
-                    ById.Clear();
-                    ById.AddRange(ByType.Values.OrderBy(t => t.Type.FullName, StringComparer.Ordinal).ThenBy(t => t.Type.Assembly.GetName().Name, StringComparer.Ordinal));
-                    for (var i = 0; i < ById.Count; i++) ById[i].Id = i;
+                    Scan();
                     _initialized = true;
                 }
                 finally
@@ -65,6 +52,39 @@ namespace GBible
                     _initializing = false;
                 }
             }
+        }
+
+        // 처음 훑을 때 빠졌던 어셈블리(테스트 어셈블리를 다시 넣을 때 — GameAssemblies.Use)를 더 훑는다. 형식 번호를 다시 매긴다.
+        public static void Rescan()
+        {
+            lock (Gate)
+            {
+                if (!_initialized || _initializing) return;
+                _initializing = true;
+                try { Scan(); }
+                finally { _initializing = false; }
+            }
+        }
+
+        static void Scan()
+        {
+            foreach (var assembly in GameAssemblies.UsingCore())
+            {
+                if (!Scanned.Add(assembly.FullName)) continue;
+                Type[] types;
+                try { types = assembly.GetTypes(); }
+                catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
+                foreach (var type in types)
+                {
+                    if (type.IsGenericTypeDefinition) continue;
+                    var register = type.GetMethod("__gb_register", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly, null, Type.EmptyTypes, null);
+                    register?.Invoke(null, null);
+                }
+            }
+            // 형식 번호: 이름순(같은 코드로 빌드한 서버·클라이언트가 같은 번호를 쓴다).
+            ById.Clear();
+            ById.AddRange(ByType.Values.OrderBy(t => t.Type.FullName, StringComparer.Ordinal).ThenBy(t => t.Type.Assembly.GetName().Name, StringComparer.Ordinal));
+            for (var i = 0; i < ById.Count; i++) ById[i].Id = i;
         }
 
         internal static void Add(MirrorType type)

@@ -373,6 +373,8 @@ namespace GBible.EditorTools
 
         public void SyncDatabaseAsset()
         {
+            // 예전 자리의 데이터 폴더가 아직 있으면(옮기기 전) 새 자리에 GameDatabase를 따로 만들지 않는다 — 옮긴 뒤(Upkeep) 맞춘다.
+            if (ProjectFolders.AnyLegacy()) return;
             var entries = Committed.ToList();
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
             if (database == null)
@@ -414,6 +416,7 @@ namespace GBible.EditorTools
         {
             // 예전 자리(Assets/Code · Assets/MomoiProjectData · Assets/UI …)의 시스템 폴더를 Assets/MomoiProject 아래로.
             ProjectFolders.MoveLegacy();
+            Instance.SyncDatabaseAsset();
             // 게임 씬 폴더(Assets/Scenes)를 개발자 폴더로(테스트 씬은 시스템 쪽).
             ProjectFolders.MoveScenes(null);
             // 스크립트가 없는 asmdef(Editor·Tests)에 자리 표시 파일(Unity의 "스크립트가 없다" 경고를 막는다).

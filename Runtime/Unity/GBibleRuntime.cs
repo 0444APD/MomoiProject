@@ -315,7 +315,7 @@ namespace GBible
         static void PrepareStatics()
         {
             // 게임 코드만 훑는다: 패키지·프로젝트의 테스트 어셈블리(테스트용 행동·[BindTo])는 플레이에 섞지 않는다(경고가 나지 않게).
-            GameAssemblies.SkipTests = true;
+            GameAssemblies.Use(skipTests: true);
             // Mirror 비교 코드를 모은다(리플렉션은 게임이 켜질 때 여기서 한 번만).
             Mirror.Warning -= LogMirrorWarning;
             Mirror.Warning += LogMirrorWarning;

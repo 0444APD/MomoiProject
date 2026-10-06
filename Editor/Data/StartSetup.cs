@@ -56,6 +56,8 @@ namespace GBible.EditorTools
 
         static StartSetup()
         {
+            // 에디터도 게임처럼 테스트 어셈블리를 훑지 않는다(DB 창·검증에 테스트용 [BindTo]·키워드가 섞이지 않게). Unity에서 테스트를 돌릴 때는 테스트가 다시 넣는다.
+            GameAssemblies.Use(skipTests: true);
             // 깨끗한 프로젝트를 처음 열 때(시작 설정 전) 처음 상태를 기록해 둔다(메뉴 '처음 상태로 되돌리기'가 돌아올 곳).
             if (!Application.isBatchMode) ProjectReset.CaptureIfClean();
             GameFeatures.Changed -= SyncModuleReferences;

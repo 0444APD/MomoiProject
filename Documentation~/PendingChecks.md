@@ -35,7 +35,11 @@
 - 사이드바에 '확인용 패널·샘플' 그룹이 없다(2026-10-06에 지움). 예전에 켜 두어 `GBIBLE_SAMPLES` 심볼이 남아 있어도 오류는 없다(지워도 된다).
 - Steam을 켜면 다시 컴파일된 뒤 프로젝트 폴더(`Assets`와 같은 높이 — Unity 프로젝트 창에는 안 보이고 탐색기에서 보인다)에 `steam_appid.txt`(480)가 생긴다(이미 있으면 그대로).
 - Steam을 켜면 DB 창(메뉴 `MomoiProject › DB`) 사이드바 **개발** 그룹에 **Steam** 탭이 생기고, 그 안에 항목 `steam`이 저절로 하나 생긴다(App ID 480 = Valve의 시험용 앱 Spacewar). 콘솔에 "DB › Steam 항목을 기본값으로 만들었습니다". App ID를 고치면 `steam_appid.txt`가 따라 바뀐다(시험은 480으로 되돌려 둔다).
-- **Steam 플레이**(이 PC의 Steam 프로그램을 켜고 로그인한 채, Unity에서 아무 씬이나 열고 플레이 버튼): 콘솔에 경고 없이 붙고, Steam 친구 목록에 Spacewar 플레이 중으로 보인다. Shift+Tab 오버레이를 열면 게임이 멈추고 닫으면 이어진다. Steam을 끈 채 플레이하면 "Steam에 붙지 못해 Steam 없이 시작합니다" 경고 하나만 나온다. 도전과제 달성 경고는 480에서 정상이다(그 앱에 도전과제가 없음).
+- **Steam 플레이**(이 PC의 Steam 프로그램을 켜고 로그인한 채, Unity에서 아무 씬이나 열고 플레이 버튼)
+  - 콘솔에 "[MomoiProject] Steam에 붙었습니다: (내 Steam 이름) · App ID 480 …" 한 줄. Steam 친구 목록에서 내 상태가 Spacewar 하는 중으로 바뀐다(플레이를 멈추면 돌아온다).
+  - Steam을 끈 채 플레이하면 "Steam에 붙지 못해 Steam 없이 시작합니다" 경고 하나만 나온다.
+  - 오버레이(Shift+Tab)는 **에디터에서는 뜨지 않는다**(Unity 에디터에는 Steam이 오버레이를 붙이지 못한다). 확인하려면 Windows 개발 빌드를 만들어 Steam을 켠 채 실행 → Shift+Tab으로 오버레이가 뜨고, 열면 게임이 멈추고 닫으면 이어진다. 빌드에서도 안 뜨면 Steam 라이브러리 › 게임 추가 › 비 Steam 게임 추가로 그 exe를 넣고 Steam에서 실행해 본다.
+  - 도전과제 달성 경고는 480에서 정상이다(그 앱에 우리 도전과제가 없음).
 
 ## 단계 2-1. DB 사이드바(2026-10-06)
 
@@ -46,7 +50,7 @@
 
 ## 단계 2-2. 폴더 나눔 · 요소 탭 · 스프라이트 규격 파일(2026-10-06)
 
-- **폴더 옮기기**: Unity로 돌아가 다시 컴파일되면 콘솔에 "시스템 폴더를 옮겼습니다: Assets/Code → Assets/MomoiProject/Code"·"… Assets/MomoiProjectData → Assets/MomoiProject/Data". Project 창의 `Assets` 바로 아래에는 `MomoiProject`·`Dev`(+ Unity 기본 폴더)만 남는다. 플레이하면 그대로 돈다(참조가 끊기지 않음). `CLAUDE.md`의 경로도 새 자리로 바뀐다.
+- **폴더 옮기기**: Unity로 돌아가 다시 컴파일되면 콘솔에 "시스템 폴더를 옮겼습니다: Assets/Code → Assets/MomoiProject/Code"·"… Assets/MomoiProjectData → Assets/MomoiProject/Data". 새 자리에 먼저 생긴 폴더가 있으면 "시스템 폴더를 합쳤습니다: Assets/MomoiProjectData → Assets/MomoiProject/Data(옮긴 파일 N개, … 같은 이름 M개는 MomoiProjectBackups/…-merge에 옮겨 둠)". Project 창의 `Assets` 바로 아래에는 `MomoiProject`·`Dev`(+ Unity 기본 폴더)만 남는다. 플레이하면 그대로 돈다(참조가 끊기지 않음). `CLAUDE.md`의 경로도 새 자리로 바뀐다.
 - **경고**: 플레이해도 `[MomoiProject] Hit에 읽기 코드가 없어…`·`[BindTo("fn.use")]…` 같은 경고가 나오지 않는다. 다시 컴파일해도 "Assembly … will not be compiled, because it has no scripts"(Editor·Tests)와 `UAC…` 경고가 나오지 않는다(`Code/Editor/EditorAssembly.cs`·`Code/Tests/TestsAssembly.cs` 자리 표시 파일이 생긴다).
 - **사이드바**: 그룹 '선언'이 **요소**로, '진행' 그룹이 없어지고 **도전과제**가 **개발** 그룹에. 시작 파일 아래의 RunState·Profile 줄이 없다. **플레이어 데이터** 탭에 마우스를 올리면 오른쪽에 **cs ↗** — 누르면 PlayerData.cs가 열린다(탭으로 가지 않음).
 - **클래스·이벤트 탭**: 폴더 묶음(Rules·Client …)·폴더 경로·'Code 폴더 밖'이 없고, `Assets/MomoiProject/Code` 안의 클래스(이벤트)가 이름순 한 목록으로 보인다. 아래에 라이브러리 기본 묶음('자동')은 그대로.

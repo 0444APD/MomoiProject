@@ -86,6 +86,43 @@ namespace GBible.EditorTools
             if (!scenes.Select(s => s.path).SequenceEqual(fixedScenes.Select(s => s.path))) EditorBuildSettings.scenes = fixedScenes;
         }
 
+        // 새 자리에 이미 폴더가 생겼을 때(옮기기 전에 무언가 새 자리에 만들었을 때): 예전 것을 파일마다 새 자리로 합친다.
+        // 같은 파일이 양쪽에 있으면 예전 것(원래 데이터 · 원래 GUID)을 쓰고, 새 자리의 것은 MomoiProjectBackups/<시각>-merge/로 옮겨 둔다(지우지 않는다).
+        static void Merge(string from, string to)
+        {
+            var files = Directory.GetFiles(from, "*", SearchOption.AllDirectories)
+                .Select(f => f.Replace('\\', '/')).Where(f => !f.EndsWith(".meta", System.StringComparison.OrdinalIgnoreCase)).ToList();
+            var backup = Path.Combine(ProjectReset.BackupFolder, System.DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-merge");
+            var replaced = 0;
+            foreach (var file in files)
+            {
+                var target = to + file.Substring(from.Length);
+                if (!File.Exists(target)) continue;
+                var keep = Path.Combine(backup, target);
+                Directory.CreateDirectory(Path.GetDirectoryName(keep));
+                File.Move(target, keep);
+                if (File.Exists(target + ".meta")) File.Move(target + ".meta", keep + ".meta");
+                replaced++;
+            }
+            if (replaced > 0) AssetDatabase.Refresh();
+            var moved = 0;
+            foreach (var file in files)
+            {
+                var target = to + file.Substring(from.Length);
+                EditorDatabase.EnsureFolder(Path.GetDirectoryName(target).Replace('\\', '/'));
+                if (string.IsNullOrEmpty(AssetDatabase.MoveAsset(file, target))) moved++;
+            }
+            // 빈 예전 폴더를 치운다(안이 빈 폴더만 — 데이터 없음).
+            foreach (var dir in Directory.GetDirectories(from, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length).Append(from))
+            {
+                var path = dir.Replace('\\', '/');
+                if (Directory.Exists(path) && !Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Any(f => !f.EndsWith(".meta", System.StringComparison.OrdinalIgnoreCase)))
+                    AssetDatabase.DeleteAsset(path);
+            }
+            Debug.Log($"[MomoiProject] 시스템 폴더를 합쳤습니다: {from} → {to} (옮긴 파일 {moved}개" +
+                      (replaced > 0 ? $", 새 자리에 먼저 생긴 같은 이름 {replaced}개는 {backup}에 옮겨 둠)" : ")"));
+        }
+
         // 예전 자리의 시스템 폴더를 새 자리로 옮긴다(GUID 유지 — 참조가 끊기지 않는다). 새 자리에 이미 있으면 그대로 두고 알린다.
         internal static void MoveLegacy()
         {
@@ -94,7 +131,7 @@ namespace GBible.EditorTools
                 if (!AssetDatabase.IsValidFolder(from) || !(File.Exists(marker) || Directory.Exists(marker))) continue;
                 if (AssetDatabase.IsValidFolder(to))
                 {
-                    Debug.LogWarning($"[MomoiProject] {from}를 {to}(으)로 옮기지 않았습니다 — 새 자리에 이미 폴더가 있습니다. 안의 것을 직접 옮겨 주세요.");
+                    Merge(from, to);
                     continue;
                 }
                 EditorDatabase.EnsureFolder(Path.GetDirectoryName(to).Replace('\\', '/'));
