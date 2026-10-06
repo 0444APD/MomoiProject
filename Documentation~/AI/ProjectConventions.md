@@ -47,6 +47,8 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 - Block: 효과는 동사(`DealDamage`), 대상은 명사구(`AllEnemies`), 조건은 서술(`HasLowHp`) + `[BlockInfo("표시 이름", Category = …, Description = …)]`. Description은 꼭 적는다(기획자가 목록에서 읽는다).
 - 텍스트 키: `fail.*`(행동 실패), `hint.*`(미리보기 글), `hud.*`, `popup.*`, `menu.*`, DB 항목 이름은 `<id>.name`.
 - 난수 흐름 이름: 쓰임 하나에 하나(`"deck"`, `"loot"`, `"ai"`).
+- 폴더·파일 이름(만드는 것 모두 — `Assets/Code`·`Assets/UI`·`Assets/Art` …)은 영어. 한글은 쓰지 않는다.
+- `Assets/Dev`는 개발자 폴더다(안의 폴더 = DB 'Dev' 탭). 요청받을 때만 만들거나 바꾼다.
 - 기획 명세서에 없는 **새 개념**(새 DB 종류·새 시스템)의 이름만 사람에게 확인한다. 이벤트·의도·행동·Block 같은 나머지는 이 규칙대로 짓고 보고만 한다.
 
 ## 3. 규칙과 화면의 경계

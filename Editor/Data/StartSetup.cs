@@ -69,7 +69,13 @@ namespace GBible.EditorTools
             // 처음 한 번: 시작 설정을 마치지 않은 프로젝트면 창을 연다(배치 실행·테스트에서는 열지 않는다).
             if (!IsDone && !Application.isBatchMode) EditorApplication.delayCall += OpenOnce;
             // 시작 설정을 마친 프로젝트: Claude Code 파일(CLAUDE.md·스킬·컴파일 검사 훅)을 패키지 경로·템플릿에 맞춘다.
-            if (IsDone && !Application.isBatchMode) EditorApplication.delayCall += () => ClaudeFiles.Sync();
+            // 그리고 DB 정리: 옛 한글 종류 폴더를 영어 이름으로 옮기고, 하나만 두는 설정(Steam 등)이 없으면 만든다.
+            if (IsDone && !Application.isBatchMode)
+                EditorApplication.delayCall += () =>
+                {
+                    ClaudeFiles.Sync();
+                    EditorDatabase.Upkeep();
+                };
         }
 
         static void OpenOnce()
@@ -172,6 +178,13 @@ namespace GBible.EditorTools
                 database.EditorSetSessionOptions(choices.history, database.HistoryLimit, database.SnapshotInterval, database.SnapshotLimit, database.FixSeedInDevelopment, database.DevelopmentSeed);
                 EditorUtility.SetDirty(database);
                 done.Add($"Undo 방식: {choices.history}");
+            }
+
+            // 개발자 폴더: 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다.
+            if (!AssetDatabase.IsValidFolder(DevFolders.Root))
+            {
+                EditorDatabase.EnsureFolder(DevFolders.Root);
+                done.Add($"{DevFolders.Root} 만듦(개발자 폴더 — 안에 폴더를 만들면 DB 탭이 된다)");
             }
 
             SyncModuleReferences();

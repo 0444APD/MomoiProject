@@ -32,7 +32,8 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 | 위치 | 내용 |
 |---|---|
-| `Assets/MomoiProjectData/` | DB 항목 에셋(종류 이름 폴더), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
+| `Assets/MomoiProjectData/` | DB 항목 에셋(종류마다 영어 폴더 — `Ability`·`PlayerData` …, 예전 한글 폴더는 열 때 저절로 옮겨진다), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
+| `Assets/Dev/` | 개발자 폴더. 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다(21장 2-1). 시스템·AI는 요청받을 때만 건드린다. |
 | `Assets/MomoiProjectGenerated/GameIds.cs` | 식별자 코드(8절). 플레이어 데이터 값 형식이 asmdef 안에 있으면 그 asmdef 폴더의 `Generated/`에 생긴다. |
 | `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`, `Ids.json`, `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
 

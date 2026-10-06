@@ -64,6 +64,7 @@ namespace GBible.EditorTools
                 case "진행": return 10;
                 case "DB": return 20;
                 case "이미지": return 30;
+                case DevFolders.Group: return 50;
             }
             for (int i = 0; i < GameFeatures.All.Count; i++)
                 if (GameFeatures.All[i].Name == group) return 60 + i;
@@ -99,6 +100,13 @@ namespace GBible.EditorTools
             }
             foreach (var page in CodexPage.All.Where(p => p.TabLabel != null))
                 tabs.Add(new TabEntry { Key = PagePrefix + page.Key, Label = page.TabLabel, Group = page.TabGroup, Order = page.TabOrder, Page = page });
+            // 개발자 폴더(Assets/Dev 바로 아래 폴더마다 탭 하나).
+            var devFolders = DevFolders.Tabs();
+            for (int i = 0; i < devFolders.Count; i++)
+            {
+                var page = DevFolderPage.For(devFolders[i]);
+                tabs.Add(new TabEntry { Key = PagePrefix + page.Key, Label = page.TabLabel, Group = DevFolders.Group, Order = i, Page = page });
+            }
             foreach (var feature in GameFeatures.All.Where(f => !GameFeatures.IsActive(f)))
                 for (int i = 0; i < feature.TabNames.Length; i++)
                     tabs.Add(new TabEntry
@@ -273,6 +281,7 @@ namespace GBible.EditorTools
             ClassRegistry.Changed += QueueRefresh;
             CodexFolders.Changed += QueueRefresh;
             GameFeatures.Changed += QueueRefresh;
+            DevFolders.Changed += QueueRefresh;
             Undo.undoRedoPerformed += QueueRefresh;
         }
 
@@ -283,6 +292,7 @@ namespace GBible.EditorTools
             ClassRegistry.Changed -= QueueRefresh;
             CodexFolders.Changed -= QueueRefresh;
             GameFeatures.Changed -= QueueRefresh;
+            DevFolders.Changed -= QueueRefresh;
             Undo.undoRedoPerformed -= QueueRefresh;
         }
 
@@ -505,6 +515,24 @@ namespace GBible.EditorTools
             {
                 _sidebarNav.Add(Gs.Label(feature.Name.ToUpperInvariant(), "gs-sidebar__group"));
                 _sidebarNav.Add(FeatureToggle(feature));
+            }
+
+            // 개발자 폴더가 아직 없으면: 그룹 제목 + 안내(누르면 Assets/Dev를 만들어 Project 창에서 고른다).
+            if (!shownGroups.Contains(DevFolders.Group))
+            {
+                _sidebarNav.Add(Gs.Label(DevFolders.Group.ToUpperInvariant(), "gs-sidebar__group"));
+                var hint = Gs.Label($"{DevFolders.Root} 안에 폴더를 만들면 여기 탭이 생깁니다", "gs-caption");
+                hint.style.marginLeft = 12;
+                hint.style.whiteSpace = WhiteSpace.Normal;
+                hint.tooltip = "눌러서 Project 창에서 Dev 폴더 보기(없으면 만든다). 폴더 하나 = 탭 하나, 그 안의 모든 에셋이 보입니다.";
+                hint.RegisterCallback<ClickEvent>(_ =>
+                {
+                    EditorDatabase.EnsureFolder(DevFolders.Root);
+                    var folder = AssetDatabase.LoadMainAssetAtPath(DevFolders.Root);
+                    Selection.activeObject = folder;
+                    EditorGUIUtility.PingObject(folder);
+                });
+                _sidebarNav.Add(hint);
             }
 
             if (DataTypes.All.Count == 0)

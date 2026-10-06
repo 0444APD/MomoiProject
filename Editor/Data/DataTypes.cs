@@ -22,6 +22,8 @@ namespace GBible.EditorTools
         public string Page;
         // 개발자가 에디터에서 만드는 종류([Database(DeveloperAuthored = true)]) — 추가·삭제·ID 바꾸기가 열린다(EditorPolicy).
         public bool DeveloperAuthored;
+        // 하나만 두는 설정 종류([Database(Single = true)]) — 없으면 에디터가 기본값으로 만든다(EditorDatabase.Upkeep).
+        public bool Single;
     }
 
     // 데이터베이스 등록 판별: GameData를 상속한 구체 클래스만(명시적 참여).
@@ -66,6 +68,7 @@ namespace GBible.EditorTools
                 Hidden = attr?.Hidden ?? false,
                 Page = attr?.Page,
                 DeveloperAuthored = attr?.DeveloperAuthored ?? false,
+                Single = attr?.Single ?? false,
             };
         }
 

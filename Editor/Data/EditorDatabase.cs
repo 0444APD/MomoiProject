@@ -106,11 +106,11 @@ namespace GBible.EditorTools
             return data;
         }
 
-        // 메모리의 항목을 에셋으로 저장한다(종류 이름 폴더, 파일 이름 = ID). DB의 '적용'이 새 항목에 쓴다.
+        // 메모리의 항목을 에셋으로 저장한다(종류 폴더, 파일 이름 = ID). DB의 '적용'이 새 항목에 쓴다.
         public void CreateAsset(GameData data)
         {
             var info = DataTypes.Find(data.GetType()) ?? throw new ArgumentException($"{data.GetType().Name}은 데이터베이스 타입이 아닙니다.");
-            var folder = $"{DataRoot}/{Sanitize(info.DisplayName)}";
+            var folder = FolderOf(info);
             EnsureFolder(folder);
             var path = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{data.Id}.asset");
             AssetDatabase.CreateAsset(data, path);
@@ -395,6 +395,50 @@ namespace GBible.EditorTools
         }
 
         static string Sanitize(string name) => Regex.Replace(name, "[\\\\/:*?\"<>|]", "_");
+
+        // 종류의 폴더(영어): ID 앞부분을 대문자로 시작(ability → Ability, playerData → PlayerData). 프로젝트에 저절로 생기는 폴더 이름에 한글을 쓰지 않는다.
+        public static string FolderOf(DataTypeInfo info) => $"{DataRoot}/{FolderName(info)}";
+
+        static string FolderName(DataTypeInfo info)
+        {
+            var name = Regex.Replace(info.IdPrefix ?? "", "[^A-Za-z0-9]", "");
+            if (name.Length == 0 || !char.IsLetter(name[0])) name = Regex.Replace(Regex.Replace(info.Type.Name, "Data$", ""), "[^A-Za-z0-9]", "");
+            return name.Length == 0 ? "Data" : char.ToUpperInvariant(name[0]) + name.Substring(1);
+        }
+
+        // 에디터를 열 때(시작 설정을 마친 프로젝트): ① 옛 한글 종류 폴더(표시 이름)를 영어 폴더로 옮긴다(GUID 유지 — 참조가 끊기지 않는다)
+        // ② 하나만 두는 설정 종류([Database(Single = true)])가 비어 있으면 기본값으로 하나 만든다.
+        public static void Upkeep()
+        {
+            foreach (var info in DataTypes.All)
+            {
+                var legacy = $"{DataRoot}/{Sanitize(info.DisplayName)}";
+                var target = FolderOf(info);
+                if (legacy == target || !AssetDatabase.IsValidFolder(legacy)) continue;
+                if (!AssetDatabase.IsValidFolder(target))
+                {
+                    var error = AssetDatabase.MoveAsset(legacy, target);
+                    if (string.IsNullOrEmpty(error)) Debug.Log($"[MomoiProject] 폴더 이름을 영어로 바꿨습니다: {legacy} → {target}");
+                    else Debug.LogWarning($"[MomoiProject] {legacy}를 {target}(으)로 옮기지 못했습니다: {error}");
+                    continue;
+                }
+                // 둘 다 있으면 안의 것을 하나씩 옮긴다(이름이 겹치는 것은 그대로 둔다).
+                foreach (var child in Directory.GetFileSystemEntries(legacy).Where(p => !p.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var from = child.Replace('\\', '/');
+                    var to = target + "/" + Path.GetFileName(from);
+                    if (!File.Exists(to) && !Directory.Exists(to)) AssetDatabase.MoveAsset(from, to);
+                }
+                if (!Directory.EnumerateFileSystemEntries(legacy).Any()) AssetDatabase.DeleteAsset(legacy);
+            }
+            if (!StartSetup.IsDone) return;
+            foreach (var info in DataTypes.All.Where(i => i.Single))
+            {
+                if (Instance.All.Any(d => d != null && d.GetType() == info.Type)) continue;
+                Instance.Create(info.Type, info.IdPrefix);
+                Debug.Log($"[MomoiProject] DB › {info.DisplayName} 항목을 기본값으로 만들었습니다(프로젝트에 하나만 두는 설정).");
+            }
+        }
     }
 
     // GameData 에셋이 추가·삭제·이동되면 자동으로 동기화한다.

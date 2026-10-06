@@ -71,6 +71,12 @@ namespace GBible.EditorTools.UI
                 var info = DataTypes.All.FirstOrDefault(i => i.Type.FullName == key.Substring(DataListPage.Prefix.Length));
                 return info != null ? new DataListPage(info.Type) : null;
             }
+            // 개발자 폴더 탭: "dev:" + 폴더 경로(그 폴더가 있을 때만).
+            if (key.StartsWith(DevFolderPage.Prefix, StringComparison.Ordinal))
+            {
+                var folder = key.Substring(DevFolderPage.Prefix.Length);
+                return DevFolders.Tabs().Contains(folder) ? DevFolderPage.For(folder) : null;
+            }
             foreach (var page in All)
                 if (page.Key == key) return page;
             return null;

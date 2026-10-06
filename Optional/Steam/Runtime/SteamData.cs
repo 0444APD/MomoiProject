@@ -6,10 +6,10 @@ using UnityEngine;
 
 namespace GBible.Data
 {
-    // DB › Steam(선택 기능 'Steam'): Steam 연동 설정. 항목은 하나만 둔다(여럿이면 첫 항목).
+    // DB › Steam(선택 기능 'Steam'): Steam 연동 설정. 항목은 하나만 둔다(여럿이면 첫 항목). Steam을 켜면 에디터가 기본값(App ID 480)으로 하나 만든다.
     //   App ID · Steam 밖에서 켜면 Steam으로 다시 시작 · 오버레이 일시정지 · 처음 언어 · 도전과제 올리기(이름이 다르면 표) · 로그 → Steam 통계.
     // 에디터에서 App ID를 고치면 프로젝트 폴더의 steam_appid.txt도 같이 고친다(에디터·개발 빌드가 Steam에 그 앱으로 붙는다).
-    [Database("Steam", Group = "개발", Order = 40, IdPrefix = "steam")]
+    [Database("Steam", Group = "개발", Order = 40, IdPrefix = "steam", Single = true)]
     [CreateAssetMenu(menuName = "MomoiProject/Steam", fileName = "Steam")]
     public sealed class SteamData : GameData
     {

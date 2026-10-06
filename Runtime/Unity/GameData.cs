@@ -46,6 +46,8 @@ namespace GBible.Data
         // 개발자가 에디터에서 만드는 종류: 추가·삭제·ID 바꾸기가 열린다(다이얼로그·연출 프리셋·장소·스탠딩 프로필, 프로젝트의 레벨 배치 종류).
         // 거짓(기본)이면 로직 쪽 종류 — 항목은 AI가 DB 반영 스크립트로 만들고, 개발자는 값(숫자·고르는 값·참조)만 바꾼다.
         public bool DeveloperAuthored { get; set; }
+        // 프로젝트에 하나만 두는 설정 종류(Steam 등): 그 종류가 켜져 있는데 항목이 없으면 에디터가 기본값으로 하나 만든다(시작 설정을 마친 뒤).
+        public bool Single { get; set; }
 
         public DatabaseAttribute(string displayName)
         {
