@@ -212,6 +212,27 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 방장의_연출이_미리보기나_실패한_행동을_해도_방금_행동의_이벤트는_간다()
+        {
+            var rig = new Rig();
+            var client = rig.Join("철수");
+            var hits = new List<NtHit>();
+            client.Session.Events.SubscribeAfterAction<NtHit>(hits.Add);
+            // 방장 화면의 연출: 맞을 때마다 버튼을 다시 보려고 미리보기(CanDo)를 하고, 실패하는 행동도 한 번 해 본다.
+            rig.ServerSession.Events.SubscribeAfterAction<NtHit>(hit =>
+            {
+                rig.ServerSession.Game.CanDo(new NtStrike { unit = UnitOf(rig.ServerSession, "b"), damage = 1 }, out _);
+                Assert.Throws<GameFailure>(() => rig.ServerSession.Do(new NtFail()));
+            });
+            rig.ServerSession.Do(new NtStrike { unit = UnitOf(rig.ServerSession, "a"), damage = 2 });
+            rig.Pump();
+            Assert.AreEqual(8, UnitOf(client.Session, "a").hp, "바뀐 곳은 온다");
+            Assert.AreEqual(1, hits.Count, "그 행동의 이벤트도 온다(미리보기·실패한 행동이 버리지 않는다)");
+            Assert.AreEqual(2, hits[0].damage);
+            Assert.AreEqual(8, UnitOf(client.Session, "b").hp, "미리보기는 아무것도 보내지 않는다");
+        }
+
+        [Test]
         public void 서버에서_새로_생긴_객체와_키도_온다()
         {
             var rig = new Rig();

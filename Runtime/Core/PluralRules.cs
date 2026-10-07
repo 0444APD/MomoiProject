@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 
 namespace GBible
 {
@@ -39,6 +40,8 @@ namespace GBible
                     return i == 0 || i == 1 ? "one" : "other";
 
                 case "pt":
+                    // 브라질(기본)은 0·1, 포르투갈(pt-PT)은 정수 1만 one(CLDR pt_PT).
+                    if (IsPortugal(language)) return i == 1 && v == 0 ? "one" : "other";
                     return i == 0 || i == 1 ? "one" : "other";
 
                 case "ru":
@@ -109,5 +112,9 @@ namespace GBible
             var dash = language.IndexOfAny(new[] { '-', '_' });
             return (dash < 0 ? language : language.Substring(0, dash)).ToLowerInvariant();
         }
+
+        // "pt-PT" · "pt_PT" · "pt-Latn-PT"
+        static bool IsPortugal(string language) =>
+            language.Split('-', '_').Skip(1).Any(part => string.Equals(part, "PT", StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -208,7 +208,16 @@ namespace GBible
             };
 
             Debug.Register("세션", "Undo (Undo)", () => Undo(), "마지막 행동(스냅샷 방식이면 마지막 스냅샷)으로 되돌립니다.");
-            Debug.Register("세션", "이번 판 수치 초기화", () => Stats.ResetRun());
+            // 개발 명령도 행동 하나로(Undo·기록이 남는다). 멀티 클라이언트의 값은 서버가 가지므로 서버 세션에서 한다.
+            Debug.Register("세션", "이번 판 수치 초기화", () =>
+            {
+                if (Role == SessionRole.Client)
+                {
+                    Journal.Append(JournalKind.Warning, "Stats", "멀티 클라이언트 세션의 로그는 여기서 초기화하지 않습니다 — 서버 세션에서 하세요.");
+                    return;
+                }
+                Do(new DeveloperEditAction { label = "이번 판 수치 초기화", Edit = Stats.ResetRun });
+            });
         }
 
         public IEnumerable<IInspectable> Inspectables
@@ -569,20 +578,21 @@ namespace GBible
             if (version > SaveVersion)
                 throw new FormatException($"[MomoiProject] 판 저장 데이터가 이 게임보다 새 버전입니다(저장 v{version}, 게임 v{SaveVersion}).");
 
-            if (root.TryGetValue("seed", out var seed) && seed is string seedText)
-                Random.Reseed(ulong.Parse(seedText, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture));
+            // 먼저 다 읽고(실패할 수 있는 것 — 숫자 읽기·저장 변환·데이터 불러오기) 데이터가 들어간 뒤에 난수·게임 시계를 바꾼다:
+            // 중간에 실패하면 아무것도 바뀌지 않는다(저장 파일의 시드·시각에 지금 판 데이터가 섞인 반쪽 판이 다음 저장에 남지 않게).
+            ulong? reseed = root.TryGetValue("seed", out var seed) && seed is string seedText
+                ? ulong.Parse(seedText, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture)
+                : (ulong?)null;
+            Dictionary<string, ulong[]> states = null;
             if (root.TryGetValue("random", out var random) && random is Dictionary<string, object> streams)
             {
-                var states = new Dictionary<string, ulong[]>(StringComparer.Ordinal);
+                states = new Dictionary<string, ulong[]>(StringComparer.Ordinal);
                 foreach (var pair in streams)
                     if (pair.Value is List<object> parts && parts.Count == 4)
                         states[pair.Key] = parts.Select(p => ulong.Parse((string)p, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
-                Random.ImportStates(states);
             }
             var tick = root.TryGetValue("tick", out var t) && t is double tickValue ? (long)tickValue : 0;
             var time = root.TryGetValue("time", out var s) && s is double timeValue ? timeValue : 0;
-            Clock.Rewind(tick, time);
-            ClockMoved();
 
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
             {
@@ -590,6 +600,10 @@ namespace GBible
                 Migrations.EveryLoad?.Invoke(values);
                 Data.Import(values, DataZone.Session);
             }
+            if (reseed.HasValue) Random.Reseed(reseed.Value);
+            if (states != null) Random.ImportStates(states);
+            Clock.Rewind(tick, time);
+            ClockMoved();
             // 불러온 시점부터 새로 시작한다(이전 판의 Undo 이력·스냅샷은 버린다).
             ClearUndo();
             Journal.Append(JournalKind.System, "Save", $"판 불러옴 (틱 {tick}, {time:0.0}초)");

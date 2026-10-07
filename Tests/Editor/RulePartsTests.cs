@@ -88,6 +88,25 @@ namespace GBible.Tests
         void Do(Action<GameApi> run) => Game.Do(new Edit { run = run });
 
         [Test]
+        public void 값_하나인_데이터의_검사는_빈_경로가_값_전체라_검증도_통과한다()
+        {
+            // 숫자·글자·목록 하나인 플레이어 데이터(골드 · 이름 목록)는 실행할 때 빈 경로를 값 전체로 본다 — DB 검증도 같게(빌드가 막히지 않게).
+            var problems = new List<string>();
+            new FieldFilter { op = FieldOp.AtLeast, value = "100" }.Validate(typeof(double), problems);
+            Assert.AreEqual(0, problems.Count, string.Join(" / ", problems));
+            Assert.IsTrue(new FieldFilter { op = FieldOp.AtLeast, value = "100" }.Test(150.0), "실행도 값 전체");
+            new FieldFilter { op = FieldOp.AtLeast, value = "많이" }.Validate(typeof(double), problems);
+            Assert.AreEqual(1, problems.Count, "값의 형식은 그대로 본다");
+            problems.Clear();
+            new ElementFilter { mode = ElementMode.CountAtLeast, count = 2 }.Validate(typeof(List<string>), problems);
+            Assert.AreEqual(0, problems.Count, string.Join(" / ", problems));
+            Assert.IsTrue(new ElementFilter { mode = ElementMode.CountAtLeast, count = 2 }.Test(new List<string> { "a", "b" }));
+            new FieldFilter { op = FieldOp.Equal, value = "1" }.Validate(typeof(RpWallet), problems);
+            new ElementFilter { mode = ElementMode.Any }.Validate(typeof(RpWallet), problems);
+            Assert.AreEqual(2, problems.Count, "클래스 값이면 칸을 골라야 한다");
+        }
+
+        [Test]
         public void 경로_도구는_키_형식_소수_점_든_키를_맞게_다룬다()
         {
             _session.Data.Define("player.bag", DataZone.Session, new RpBag(), "가방");

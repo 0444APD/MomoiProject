@@ -92,11 +92,70 @@ namespace GBible.Tests
         }
     }
 
+    // 첫 대상(orc1)에게 주는 도중 같은 능력을 다른 대상(orc2)에게 한 번 더 쓴다 — 같은 효과 Block 인스턴스가 안에서 다시 돈다(반격·연쇄).
+    [Serializable, BlockInfo("연쇄 피해", Category = "전투")]
+    public class TbChainHit : Effect<TbUnit>
+    {
+        public int amount = 5;
+        protected override void Apply(TbUnit target)
+        {
+            if (target.id == "orc1") Game.Use("chain", User<TbUnit>(), "orc2");
+            target.hp -= User<TbUnit>() == null ? 0 : amount;
+        }
+    }
+
+    // 고르는 도중 같은 능력을 다른 대상(orc2)에게 한 번 더 쓴다 — 같은 대상 Block 인스턴스가 안에서 다시 돈다.
+    [Serializable, BlockInfo("연쇄 대상", Category = "대상")]
+    public class TbChainPick : TargetSelector<TbUnit>
+    {
+        protected override IEnumerable<TbUnit> Select(IEnumerable<TbUnit> targets, TbUnit user)
+        {
+            var list = targets.ToList();
+            if (list.Any(t => t.id == "orc1")) Game.Use("chainPick", user, "orc2");
+            return Use?.User == null ? new List<TbUnit>() : list;
+        }
+    }
+
     [Serializable, BlockInfo("적 전멸", Category = "전투")]
     public class TbAllEnemiesDown : SimpleCondition
     {
         public string team = "enemy";
         protected override bool Check() => Game.All<TbUnit>().Where(u => u.team == team).All(u => u.hp <= 0);
+    }
+
+    // 검사 도중 같은 조건 인스턴스가 한 번 더 검사된다(능력치의 보정 조건이 이 조건일 때처럼) — 끝난 뒤 바깥 검사의 Game이 남아야 한다.
+    [Serializable, BlockInfo("다시 검사", Category = "시험")]
+    public class TbReentrantCheck : SimpleCondition
+    {
+        [NonSerialized] int _depth;
+        protected override bool Check()
+        {
+            if (_depth == 0)
+            {
+                _depth++;
+                try { Evaluate(Game.Session); }
+                finally { _depth--; }
+            }
+            return Game != null;
+        }
+    }
+
+    // 결과를 내는 도중 같은 결과 인스턴스가 한 번 더 돈다(결과가 쏜 이벤트가 같은 항목을 다시 발동할 때처럼) — 끝난 뒤 바깥 순간이 남아야 한다.
+    [Serializable, BlockInfo("다시 내기", Category = "시험")]
+    public class TbReentrantReward : Reward
+    {
+        [NonSerialized] int _depth;
+        [NonSerialized] public bool outerContext;
+        public override RewardEffect Effect => RewardEffect.Reversible;
+        public override string Describe(INameResolver names) => "다시 내기";
+        public override void Grant(GameSession session)
+        {
+            if (_depth > 0) return;
+            _depth++;
+            try { Run(new TriggerContext { Session = session, Owner = "inner" }); }
+            finally { _depth--; }
+            outerContext = Context?.Owner == "outer";
+        }
     }
 
     public class GameApiTests
@@ -229,6 +288,25 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 효과_안에서_같은_능력을_다시_써도_바깥_효과의_사용자가_남는다()
+        {
+            var chain = new AbilityDefinition { Id = "chain" };
+            chain.Effects.Add(new TbChainHit());
+            _session.Abilities.Define(chain);
+            Game.Use("chain", "hero", "orc1");
+            Assert.AreEqual(25, Hp("orc2"), "안쪽 사용");
+            Assert.AreEqual(25, Hp("orc1"), "안쪽 사용이 끝난 뒤에도 바깥 효과는 자기 사용(사용자·Game)을 본다");
+
+            var pick = new AbilityDefinition { Id = "chainPick" };
+            pick.Targets.Add(new TbChainPick());
+            pick.Effects.Add(new TbDamage { amount = 10 });
+            _session.Abilities.Define(pick);
+            Game.Use("chainPick", "hero", "orc1");
+            Assert.AreEqual(15, Hp("orc2"), "안쪽 사용");
+            Assert.AreEqual(15, Hp("orc1"), "대상 Block도 안쪽 사용이 끝나면 바깥 사용을 본다");
+        }
+
+        [Test]
         public void 사용자_자신에게_부여한다()
 
         {
@@ -291,6 +369,20 @@ namespace GBible.Tests
             ids.Add(Game.NewId("u1_"));
             CollectionAssert.AreEqual(new[] { "u1_2", "u1_3", "u1_4" }, ids.Skip(12).ToList(), "u1과 u1_은 같은 번호를 이어 쓴다");
             Assert.AreEqual(ids.Count, ids.Distinct().Count(), string.Join(", ", ids));
+        }
+
+        [Test]
+        public void 조건이_검사_도중_다시_검사돼도_바깥_검사의_Game이_남는다()
+        {
+            Assert.IsTrue(new TbReentrantCheck().Evaluate(_session), "안쪽 검사가 끝나도 바깥 Check의 Game은 null이 아니다");
+        }
+
+        [Test]
+        public void 결과가_내는_도중_다시_돌아도_바깥_순간이_남는다()
+        {
+            var reward = new TbReentrantReward();
+            reward.Run(new TriggerContext { Session = _session, Owner = "outer" });
+            Assert.IsTrue(reward.outerContext, "안쪽 Run이 끝나도 바깥 Grant의 Context는 바깥 순간");
         }
 
         [Test]

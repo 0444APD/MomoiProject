@@ -99,6 +99,8 @@ namespace GBible.EditorTools
             var tables = codes.ToDictionary(c => c, c => settings.Find(c)?.table?.ToDictionary() ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
             var sourceTable = tables.TryGetValue(settings.sourceLanguage, out var st) ? st : new Dictionary<string, string>();
             var order = settings.Find(settings.sourceLanguage)?.table?.entries.Select(e => e.key).ToList() ?? new List<string>();
+            // 순서 목록에 이미 있는 키(대사가 수만 줄이면 List.Contains는 줄 수의 제곱만큼 걸린다).
+            var ordered = new HashSet<string>(order, StringComparer.Ordinal);
 
             // 모듈이 더하는 행(다이얼로그 시스템의 대사 등): 원문은 모듈 쪽(그래프)이 기준이다.
             var rows = SourceRows(sourceTable).ToList();
@@ -109,7 +111,7 @@ namespace GBible.EditorTools
             {
                 if (string.IsNullOrEmpty(row.Key)) continue;
                 sourceTable[row.Key] = row.Source ?? "";
-                if (!order.Contains(row.Key)) order.Add(row.Key);
+                if (ordered.Add(row.Key)) order.Add(row.Key);
                 if (!string.IsNullOrEmpty(row.Note)) notes[row.Key] = row.Note;
                 context[row.Key] = row.Context;
                 foreach (var column in row.Context.Keys)
@@ -151,9 +153,13 @@ namespace GBible.EditorTools
             var codes = settings.Codes.Where(c => includeSource || !string.Equals(c, settings.sourceLanguage, StringComparison.OrdinalIgnoreCase)).ToList();
             var result = TextSheet.Import(csv, codes);
             // 모듈 행(다이얼로그 시스템의 대사 등)의 원문은 그래프가 기준이므로 원문 언어 표에 넣지 않는다.
+            // 지금 원문 표를 넘긴다(빈 표를 넘기면 모듈이 원문 표에 이미 있는 이름 — 프로필·장소의 '<id>.name' — 까지 제 행으로 내놓아 시트에서 고친 그 이름이 들어가지 않는다).
             if (result.Tables.TryGetValue(settings.sourceLanguage, out var sourceImport))
-                foreach (var row in SourceRows(new Dictionary<string, string>()))
+            {
+                var sourceTable = settings.Find(settings.sourceLanguage)?.table?.ToDictionary() ?? new Dictionary<string, string>();
+                foreach (var row in SourceRows(sourceTable))
                     if (!string.IsNullOrEmpty(row.Key)) sourceImport.Remove(row.Key);
+            }
             var lines = new List<string>();
             foreach (var pair in result.Tables)
             {

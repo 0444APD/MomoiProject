@@ -144,12 +144,14 @@ namespace GBible
                         group.Parent = parent;
                         parent.Children.Add(group);
                     }
+                // 겹친 ID(코드 실수)는 그룹 ID 순으로 앞선 그룹의 것 — 어셈블리를 불러온 차례와 상관없이, DB 키워드 탭과 같게.
+                var sorted = groups.OrderBy(g => g.Id, StringComparer.Ordinal).ToList();
                 var byId = new Dictionary<string, KeywordInfo>(StringComparer.Ordinal);
-                foreach (var keyword in groups.SelectMany(g => g.Keywords))
+                foreach (var keyword in sorted.SelectMany(g => g.Keywords))
                     if (!byId.ContainsKey(keyword.Id)) byId[keyword.Id] = keyword;
                 _byType = byType;
                 _byId = byId;
-                _groups = groups.OrderBy(g => g.Id, StringComparer.Ordinal).ToList();
+                _groups = sorted;
             }
         }
     }

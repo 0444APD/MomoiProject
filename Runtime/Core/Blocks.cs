@@ -121,11 +121,13 @@ namespace GBible
 
         public override OutcomeKinds Kind => OutcomeKinds.Coded;
 
+        // 안에서 같은 결과가 다시 돌아도(결과가 쏜 이벤트가 같은 항목을 다시 발동) 끝나면 바깥 순간으로 돌아간다.
         public override void Run(TriggerContext context)
         {
+            var previous = _context;
             _context = context;
             try { Grant(context.Session); }
-            finally { _context = null; }
+            finally { _context = previous; }
         }
 
         public abstract RewardEffect Effect { get; }

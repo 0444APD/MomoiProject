@@ -240,6 +240,16 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 - 정상: 1은 끄는 대로 커지고 줄며 200×120 밑으로는 안 준다. 2는 안의 노드가 함께 움직인다. 3은 끄는 동안 선택 사각형이 보이고 놓으면 겹친 노드(그룹 상자는 다 들어온 것)가 골라진다. 4는 한 단계씩 되돌아간다.
 - 이상하면: 안 먹은 조작.
 
+### 다이얼로그 — 시트를 '모든 언어'로 가져와도 이름 줄이 들어간다
+준비: 다이얼로그 — 준비(스탠딩 프로필 `hero`까지).
+1. 메뉴 `MomoiProject › 다국어 › DB 이름 키 채우기` → Console의 '[다국어] 원문 표에 이름 키 N개를 더했습니다…'.
+2. `MomoiProject › 다국어 › 시트 내보내기 (CSV)` → `D:\Builds\texts.csv`로 저장.
+3. 메모장으로 그 파일을 열어 `hero.name` 줄의 ko 칸을 `주인공`으로 바꾼다. 대사 줄(그래프의 대사)이 있으면 그 ko 칸도 하나 바꾼다 → UTF-8로 저장.
+4. `MomoiProject › 다국어 › 시트 가져오기 (CSV)` → 그 파일 → 창에서 '모든 언어'.
+5. Project 창 `Assets/MomoiProject/Data/Texts/Texts_ko`를 골라 Inspector › Entries에서 `hero.name`과 바꾼 대사의 키를 찾는다.
+- 정상: `hero.name` = 주인공(이름 줄의 원문 수정은 들어간다). 대사 줄의 ko 수정은 들어가지 않는다(대사 원문은 그래프가 기준). Console '[다국어] 가져옴: …'.
+- 이상하면: Entries의 그 두 줄, Console 줄.
+
 ### 스프라이트 틀 — 크기 표·한꺼번에 굽기·예외 촬영
 준비: 0-1·0-3(부록 B의 `CheckSeeds.cs`까지 넣는다). 그림 세 장을 `Assets\Dev\Art\Check`에 넣는다(예: `C:\Windows\Web\Wallpaper\Windows\img0.jpg`와 `C:\Windows\Web\Screen` 안의 그림 둘 — 2D 프로젝트라 스프라이트로 들어온다).
 1. (예전 규격 옮기기) Unity를 열고 컴파일이 끝나면 Console을 본다 → Project 창에서 `Assets/MomoiProject/Data/SpriteGroup/aa`를 고른다.
@@ -323,6 +333,13 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 - 정상: 1·3 뒤 행동 탭에 '[개발] 모니터에서 … 고침'이 생기고 'Undo (N)'이 하나 늘며, 'Undo'로 원래 값이 된다. 4는 값이 바뀌지 않고 모니터 아래에 '멀티 클라이언트 세션의 값은 여기서 고치지 않습니다 — 위쪽에서 서버 세션을 골라 고치세요.'가 뜬다.
 - 이상하면: 탭·단계, 모니터 아래 알림 글, Console.
 
+### 모니터 — 조건 있는 로그를 '이벤트로 더하기'
+준비: 0-2·0-3, 모니터 창, 부록 B의 `CheckSeeds.cs`(버전 2 — 로그 `checkBigHits`: 점검 타격 중 amount 20 이상만 센다)를 넣고 Ctrl+S로 적용.
+1. 테스트 씬 Play → 모니터 › 로그 → `checkBigHits` 줄을 누른다 → 오른쪽 아래 값 칸에 2 → 버튼 '이벤트로 더하기'에 마우스를 올려 설명을 본 뒤 누른다.
+2. 패널 › 점검 › '타격 ×3'.
+- 정상: 1의 설명에 '점검 타격 ×2'가 보이고, 누르면 모니터 아래 알림 '점검 타격 ×2 받기' · 화면에 노란 숫자 20이 두 번 떠오른다(조건 '20 이상'에 맞춘 이벤트) · `checkBigHits` = 2. 2 뒤 `checkBigHits` = 4(10은 세지 않고 20·30만).
+- 이상하면: 값, 모니터 아래 알림 글, 타임라인의 '점검 타격 (amount=…)' 줄.
+
 ### 저장 — 깨진 저장 파일은 바로 전 저장으로
 준비: 0-2.
 1. 테스트 씬 Play → 패널 › 점검 › '타격 ×3' → 저장 › '판 저장' → 점검 › '타격 ×3' → 저장 › '판 저장'(두 번 저장해야 바로 전 저장 `.bak`이 생긴다) → Play 멈춤.
@@ -340,6 +357,15 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 4. '안 쓰는 것' 탭 → 목록의 한 줄 '옮기기' → 확인 창 '옮기기' → '마지막 옮기기 되돌리기' → '되돌리기'.
 - 정상: 1의 목록은 `Assets/Dev` 안 것만이고 하위 폴더 모양을 지킨다(예: `Dev/Misc/a.png` → `Dev/Art/Misc/a.png`, 소리 → `Dev/Audio/Check/…`). 2의 확인 창에 옮길 개수와 앞의 다섯 줄, 'MomoiProjectBackups/<시각>-tidy/moves.tsv'. 3에서 원래 자리로 돌아오고 그 파일을 쓰던 곳(DB 칸 등)이 끊기지 않는다(GUID 그대로). 4도 `_Unused`로 갔다가 돌아온다.
 - 이상하면: 탭·단계, 확인 창 글, Console 경고.
+
+### DB CSV — 정수 범위·엑셀에 열어 둔 파일
+준비: 0-1, 부록 B의 `CheckSeeds.cs`(버전 2 — 상태 효과 `checkStatus`)를 넣고 Ctrl+S로 적용(사이드바 'DB' › 상태 효과 탭이 생긴다). 엑셀이 있으면 3까지, 없으면 2까지.
+1. DB › DB › 상태 효과 → 목록 위 'CSV' › 'CSV로 내보내기…' → `D:\Builds\status.csv`로 저장(탐색기가 열린다).
+2. 메모장으로 그 파일을 열어 `checkStatus` 줄의 `maxStacks` 칸(지금 1)을 `3000000000`으로 바꿔 저장 → DB 'CSV' › 'CSV 가져오기…' → 그 파일.
+3. 메모장에서 그 칸을 `5`로 바꿔 저장 → 엑셀로 그 파일을 열어 둔 채(닫지 않는다) DB 'CSV 가져오기…' → 그 파일 → 엑셀을 닫는다.
+4. 상세 창의 `maxStacks`를 본 뒤 사이드바 아래에서 적용 전 변경을 버리거나 Ctrl+S.
+- 정상: 2의 결과 창에 "checkStatus.maxStacks: 이 칸의 정수 형식에 들어가지 않는 크기입니다('3000000000')" 같은 줄이 있고 `maxStacks`는 1 그대로(잘린 숫자가 들어가지 않는다). 3은 엑셀이 열고 있어도 '다른 프로세스가 사용 중' 같은 오류 없이 '1개 고침'이고 `maxStacks` = 5(적용 전).
+- 이상하면: 결과 창 글, Console 첫 줄.
 
 ### 스파인 스탠딩(스파인이 있는 프로젝트에서)
 준비: spine-unity 런타임이 있는 프로젝트, 다이얼로그 준비, SkeletonAnimation이 붙은 캐릭터 프리팹. 이 프로젝트에는 스파인이 없어 한 번도 실행하지 못했다.
@@ -477,7 +503,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 
 ## 확인이 끝나면
 
-- 시험하느라 만든 항목·스크립트(`Assets/Dev/Checks`(Editor 포함) · `Assets/Dev/Art`·`Audio`·`Fonts`·`Misc`의 시험 파일 · 스프라이트 틀 `cardFrame`과 `Assets/MomoiProject/Data/Sprites` · DB 설정 넷·`scene`·`hero`·`office`·`checkCard`·`rule.checkCard.art` · `Texts_en` · 테스트 상황 `check` · Test.unity·CheckB · 빌드 씬 목록 · Run In Background · Scripting Backend · Managed Stripping Level · 다이얼로그 기능)는 지우거나, 메뉴 `MomoiProject › 처음 상태로 되돌리기…`로 처음 상태(설치 직후)로 돌린다(저장 파일·PlayerPrefs도 지운다). 그 뒤 시작 설정을 다시 한다.
+- 시험하느라 만든 항목·스크립트(`Assets/Dev/Checks`(Editor 포함) · `Assets/Dev/Art`·`Audio`·`Fonts`·`Misc`의 시험 파일 · 스프라이트 틀 `cardFrame`과 `Assets/MomoiProject/Data/Sprites` · DB 설정 넷·`scene`·`hero`·`office`·`checkCard`·`rule.checkCard.art`·`checkStatus`·`checkBigHits` · `Texts_en` · 테스트 상황 `check` · `D:\Builds`의 `status.csv`·`texts.csv` · Test.unity·CheckB · 빌드 씬 목록 · Run In Background · Scripting Backend · Managed Stripping Level · 다이얼로그 기능)는 지우거나, 메뉴 `MomoiProject › 처음 상태로 되돌리기…`로 처음 상태(설치 직후)로 돌린다(저장 파일·PlayerPrefs도 지운다). 그 뒤 시작 설정을 다시 한다.
 - 구조 편집을 켰으면 메뉴 `MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)`로 다시 끈다(이 컴퓨터 설정이라 되돌리기로 꺼지지 않는다).
 
 ---
@@ -706,10 +732,11 @@ namespace MomoiChecks
 
 ## 부록 B — 점검용 DB 반영 스크립트(`Assets/Dev/Checks/Editor/CheckSeeds.cs`)
 
-스프라이트 틀 점검(1절)에 쓴다. 에디터 전용이라 `Editor` 폴더에 둔다(0-3과 같은 방법으로 `Assets\Dev\Checks\Editor` 폴더를 만들고 저장). 컴파일이 끝나면 DB에 '적용 전' 항목이 생긴다 — 스프라이트 틀 항목 12에서 Ctrl+S로 적용한다.
+스프라이트 틀·DB CSV·조건 있는 로그 점검(1절)에 쓴다. 에디터 전용이라 `Editor` 폴더에 둔다(0-3과 같은 방법으로 `Assets\Dev\Checks\Editor` 폴더를 만들고 저장). 컴파일이 끝나면 DB에 '적용 전' 항목이 생긴다 — 스프라이트 틀 항목 12에서 Ctrl+S로 적용한다.
 
 ```csharp
-// Assets/Dev/Checks/Editor/CheckSeeds.cs — PendingChecks.md 점검용(스프라이트 틀). 점검이 끝나면 Assets/Dev/Checks 폴더째 지운다.
+// Assets/Dev/Checks/Editor/CheckSeeds.cs — PendingChecks.md 점검용(스프라이트 틀 · DB CSV · 조건 있는 로그). 점검이 끝나면 Assets/Dev/Checks 폴더째 지운다.
+using GBible;
 using GBible.Data;
 using GBible.EditorTools;
 using MomoiChecks;
@@ -717,7 +744,8 @@ using MomoiChecks;
 static class CheckSeeds
 {
     // CheckCard.art를 틀 cardFrame(미리보기 크기 cardFront)에 잇고, 그 클래스의 인스턴스 checkCard를 만든다(적용 전 → Ctrl+S).
-    [DbSeed("1")]
+    // 버전 2: 정수 칸이 있는 상태 효과 checkStatus(DB CSV 점검), 점검 타격 중 amount 20 이상만 세는 로그 checkBigHits.
+    [DbSeed("2")]
     static void SpriteFrameCheck()
     {
         var db = EditorDatabase.Instance;
@@ -734,6 +762,12 @@ static class CheckSeeds
         {
             var item = (InstanceData)EditorDatabase.Staging.Add(typeof(InstanceData), "checkCard");
             item.value = new CheckCard { title = "점검 카드" };
+        }
+        if (db.FindById("checkStatus") == null) EditorDatabase.Staging.Add(typeof(StatusData), "checkStatus");
+        if (db.FindById("checkBigHits") == null)
+        {
+            var stat = (StatData)EditorDatabase.Staging.Add(typeof(StatData), "checkBigHits");
+            stat.triggers.Add(new StatRule { eventType = typeof(CheckHit).FullName, filter = new FieldFilter { path = "amount", op = FieldOp.AtLeast, value = "20" } }.ToTriggerRule());
         }
     }
 }

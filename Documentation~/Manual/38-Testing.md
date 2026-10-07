@@ -47,7 +47,7 @@
 
 - `Save(session, 이름)`: `{ kind, name, savedAt, run = session.ExportRun(), meta = session.ExportMeta() }`를 JSON으로. 에디터는 `Assets/MomoiProject/Data/Tests/`(프로젝트와 함께 커밋), 개발 빌드는 `<persistentDataPath>/MomoiProject/Tests/`.
 - 개발 빌드에는 에디터의 상황이 같이 들어간다: 개발 빌드를 만들 때 `Assets/MomoiProject/Data/Tests/*.json`을 빌드의 `StreamingAssets/MomoiProject/Tests/`에 넣는다(`TestScenarios.BundledFolder`, 읽기 전용 — 프로젝트의 `Assets/StreamingAssets`는 건드리지 않는다). 출시 빌드에는 넣지 않는다. 개발 빌드의 목록·불러오기는 기기에 저장한 것과 이것을 함께 보고, 같은 이름이면 기기에 저장한 것을 쓴다. 저장·지우기는 기기 쪽만. Android·WebGL은 StreamingAssets를 파일로 열 수 없어 기기에 저장한 것만 보인다.
-- `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`). 없거나 읽지 못하면 저널에 이유를 남기고 `false`(던지지 않는다).
+- `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`). 없거나 읽지 못하면 저널에 이유를 남기고 `false`(던지지 않는다). 프로필을 불러온 뒤 판에서 실패하면 프로필도 되돌린다(`false`면 프로필이 바뀌지 않는다 — 반쪽 상태가 판 저장으로 슬롯에 남지 않게).
 - 행동 밖에서 부른다(행동 안이면 `Save`는 `ExportRun`이, `Load`는 스스로 예외).
 
 ### 2-3. 자동 시뮬레이션(`TestScenarios.Simulate`)

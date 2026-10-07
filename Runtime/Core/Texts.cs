@@ -79,7 +79,9 @@ namespace GBible
         // 한 언어의 표에 항목을 더한다(같은 키는 덮어쓴다).
         public void Merge(string language, IReadOnlyDictionary<string, string> entries)
         {
-            if (!_tables.TryGetValue(language, out var table)) _tables[language] = table = new Dictionary<string, string>(StringComparer.Ordinal);
+            // 아직 읽지 않은 언어면 Loader의 표부터 읽는다(빈 표를 새로 만들면 그 언어의 표 전체가 가려진다).
+            var table = Table(language);
+            if (table == null) _tables[language] = table = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var pair in entries)
                 if (!string.IsNullOrEmpty(pair.Key)) table[pair.Key] = pair.Value ?? "";
             Invalidate(language);
@@ -259,6 +261,13 @@ namespace GBible
             if (FieldAccess.IsGenerated(type))
             {
                 foreach (var name in FieldAccess.NamesOf(type)) map[name] = FieldAccess.Find(type, name)?.Get(args);
+                return map;
+            }
+            // 값이 object가 아닌 딕셔너리(Dictionary<string, int> …)도 키 → 값으로(아래 리플렉션은 Count·Keys 속성을 읽는다).
+            if (args is System.Collections.IDictionary entries)
+            {
+                foreach (System.Collections.DictionaryEntry entry in entries)
+                    if (entry.Key is string name && name.Length > 0) map[name] = entry.Value;
                 return map;
             }
             // 익명 객체(new { item = …, count = 3 })는 리플렉션으로 읽는다(형식마다 멤버 목록은 한 번만 찾는다).

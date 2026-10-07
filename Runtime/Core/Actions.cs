@@ -328,6 +328,7 @@ namespace GBible
             {
                 case ActionStatus.Done: return "실행";
                 case ActionStatus.Undone: return "Undo됨";
+                case ActionStatus.Sent: return "보냄";
                 default: return "실패";
             }
         }

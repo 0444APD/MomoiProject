@@ -182,7 +182,13 @@ namespace GBible.EditorTools
         }
 
         // 잘못된 바이트(UTF-8이 아님)면 DecoderFallbackException.
-        internal static string ReadUtf8(string path) => File.ReadAllText(path, new UTF8Encoding(false, true));
+        // 엑셀에 열어 둔 채로도 읽는다(엑셀은 쓰기 권한으로 열어 두어 File.ReadAllText는 '다른 프로세스가 사용 중' IOException).
+        internal static string ReadUtf8(string path)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, new UTF8Encoding(false, true), true))
+                return reader.ReadToEnd();
+        }
 
         // 인스턴스 탭: 값의 클래스 목록(내보내기 메뉴용).
         public static IEnumerable<Type> InstanceClasses() =>
@@ -393,10 +399,29 @@ namespace GBible.EditorTools
                 case SerializedPropertyType.Integer:
                 {
                     var plain = PlainNumber(text);
-                    if (long.TryParse(plain, NumberStyles.Integer, CultureInfo.InvariantCulture, out var whole)) { property.longValue = whole; return true; }
-                    if (double.TryParse(plain, NumberStyles.Float, CultureInfo.InvariantCulture, out var rounded) && Math.Abs(rounded - Math.Round(rounded)) < 1e-9) { property.longValue = (long)Math.Round(rounded); return true; }
-                    error = plain == null ? CommaError(text) : $"정수가 아닙니다('{text}')";
-                    return false;
+                    if (!long.TryParse(plain, NumberStyles.Integer, CultureInfo.InvariantCulture, out var whole))
+                    {
+                        if (!double.TryParse(plain, NumberStyles.Float, CultureInfo.InvariantCulture, out var rounded) || Math.Abs(rounded - Math.Round(rounded)) >= 1e-9)
+                        {
+                            error = plain == null ? CommaError(text) : $"정수가 아닙니다('{text}')";
+                            return false;
+                        }
+                        // long 밖(1e19)이면 (long) 바꾸기가 엉뚱한 값이 된다.
+                        if (Math.Abs(rounded) >= 9.2233720368547758E18)
+                        {
+                            error = RangeError(text);
+                            return false;
+                        }
+                        whole = (long)Math.Round(rounded);
+                    }
+                    // 필드 형식(int·byte …)에 들어가지 않는 값은 넣지 않고 알린다(longValue는 범위를 보지 않아 그 형식으로 잘린 다른 값이 말없이 들어간다).
+                    if (!Fits(property.numericType, whole))
+                    {
+                        error = RangeError(text);
+                        return false;
+                    }
+                    property.longValue = whole;
+                    return true;
                 }
                 case SerializedPropertyType.Float:
                 {
@@ -443,5 +468,22 @@ namespace GBible.EditorTools
         }
 
         static string CommaError(string text) => $"쉼표가 천 단위인지 소수점인지 알 수 없습니다('{text}' — 1000.5처럼 적어 주세요)";
+
+        static string RangeError(string text) => $"이 칸의 정수 형식에 들어가지 않는 크기입니다('{text}')";
+
+        // 정수 칸의 형식에 들어가는 값인가. ulong은 내보내기가 longValue로 적으므로(큰 값은 음수) 가리지 않는다.
+        static bool Fits(SerializedPropertyNumericType type, long value)
+        {
+            switch (type)
+            {
+                case SerializedPropertyNumericType.Int8: return value >= sbyte.MinValue && value <= sbyte.MaxValue;
+                case SerializedPropertyNumericType.UInt8: return value >= byte.MinValue && value <= byte.MaxValue;
+                case SerializedPropertyNumericType.Int16: return value >= short.MinValue && value <= short.MaxValue;
+                case SerializedPropertyNumericType.UInt16: return value >= ushort.MinValue && value <= ushort.MaxValue;
+                case SerializedPropertyNumericType.Int32: return value >= int.MinValue && value <= int.MaxValue;
+                case SerializedPropertyNumericType.UInt32: return value >= uint.MinValue && value <= uint.MaxValue;
+                default: return true;
+            }
+        }
     }
 }

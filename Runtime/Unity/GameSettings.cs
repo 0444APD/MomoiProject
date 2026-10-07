@@ -263,11 +263,11 @@ namespace GBible
                     case SettingTarget.Language:
                         if (value is string code && code.Length > 0 && code != GameLanguage.Current) GameLanguage.Set(code, remember: false);
                         break;
-                    case SettingTarget.MasterVolume: GameAudio.SetVolume(AudioChannel.Master, (float)Convert.ToDouble(value), save: false); break;
-                    case SettingTarget.BgmVolume: GameAudio.SetVolume(AudioChannel.Bgm, (float)Convert.ToDouble(value), save: false); break;
-                    case SettingTarget.VoiceVolume: GameAudio.SetVolume(AudioChannel.Voice, (float)Convert.ToDouble(value), save: false); break;
-                    case SettingTarget.SfxVolume: GameAudio.SetVolume(AudioChannel.Sfx, (float)Convert.ToDouble(value), save: false); break;
-                    case SettingTarget.UiVolume: GameAudio.SetVolume(AudioChannel.Ui, (float)Convert.ToDouble(value), save: false); break;
+                    case SettingTarget.MasterVolume: GameAudio.SetVolume(AudioChannel.Master, (float)Convert.ToDouble(value, CultureInfo.InvariantCulture), save: false); break;
+                    case SettingTarget.BgmVolume: GameAudio.SetVolume(AudioChannel.Bgm, (float)Convert.ToDouble(value, CultureInfo.InvariantCulture), save: false); break;
+                    case SettingTarget.VoiceVolume: GameAudio.SetVolume(AudioChannel.Voice, (float)Convert.ToDouble(value, CultureInfo.InvariantCulture), save: false); break;
+                    case SettingTarget.SfxVolume: GameAudio.SetVolume(AudioChannel.Sfx, (float)Convert.ToDouble(value, CultureInfo.InvariantCulture), save: false); break;
+                    case SettingTarget.UiVolume: GameAudio.SetVolume(AudioChannel.Ui, (float)Convert.ToDouble(value, CultureInfo.InvariantCulture), save: false); break;
                     case SettingTarget.VSync: QualitySettings.vSyncCount = value is bool on && on ? 1 : 0; break;
                     case SettingTarget.FrameRate:
                         var fps = GameNumbers.RoundToInt(Convert.ToDouble(value, CultureInfo.InvariantCulture));

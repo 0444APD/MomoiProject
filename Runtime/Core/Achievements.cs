@@ -42,18 +42,19 @@ namespace GBible
     {
         readonly Dictionary<string, AchievementDefinition> _definitions = new Dictionary<string, AchievementDefinition>(StringComparer.Ordinal);
         readonly GameSession _session;
-        // 달성 기록(달성 기록 id, 도전과제 ID). 스냅샷 되감기 후 그 구간의 달성을 유지하는 데 쓴다.
-        readonly List<(long entryId, string id)> _unlocks = new List<(long, string)>();
-        // 행동 안에서 발동해 바깥 행동이 끝나기를 기다리는 달성(발동한 순간과 그때의 기록 원인 — 달성 줄이 그 이벤트를 원인으로 잇게).
-        readonly List<(string id, string reason, TriggerContext moment, long cause)> _pending = new List<(string, string, TriggerContext, long)>();
+        // 달성 기록(달성 기록 id, 도전과제 ID, 발동한 순간). 스냅샷 되감기 후 그 구간의 달성을 유지하는 데 쓴다(결과는 그 순간 — 받은 이벤트 — 으로 다시).
+        readonly List<(long entryId, string id, TriggerContext moment)> _unlocks = new List<(long, string, TriggerContext)>();
+        // 행동 안에서 발동해 바깥 행동이 끝나기를 기다리는 달성(발동한 순간과 그때의 기록 원인 — 달성 줄이 그 이벤트를 원인으로 잇게 — 와 그 행동의 번호).
+        readonly List<(string id, string reason, TriggerContext moment, long cause, long transaction)> _pending = new List<(string, string, TriggerContext, long, long)>();
 
         public event Action<AchievementDefinition> Unlocked;
 
         public AchievementSystem(GameSession session)
         {
             _session = session;
-            // 행동이 취소되면 기다리던 달성을 버린다(트리거는 TriggerSystem이 되살린다). 행동 안에서 일부만 되돌린 이벤트(실패한 이벤트 예약)로 발동한 것도.
-            session.Actions.TransactionAborted += _ => _pending.Clear();
+            // 행동이 취소되면 그 행동에서 기다리던 달성을 버린다(트리거는 TriggerSystem이 되살린다). 행동 안에서 일부만 되돌린 이벤트(실패한 이벤트 예약)로 발동한 것도.
+            // 그 행동 것만: 성공한 행동의 달성은 CommitPending 전에(행동 뒤에 받는 쪽 안에서) 다른 행동이 실패하거나 미리보기(CanDo)가 끝나도 남는다 — 트리거는 이미 빠졌다.
+            session.Actions.TransactionAborted += transaction => _pending.RemoveAll(p => p.transaction == transaction);
             session.Events.Retracted += evt => _pending.RemoveAll(p => p.moment?.Event != null && ReferenceEquals(p.moment.Event, evt));
         }
 
@@ -116,14 +117,14 @@ namespace GBible
             // 행동 안: 바깥 행동이 성공한 뒤에 달성한다(CommitPending). 실패하면 버려진다.
             if (_session.Data.InTransaction)
             {
-                if (!_pending.Any(p => p.id == id)) _pending.Add((id, reason, moment, _session.Journal.CurrentCause));
+                if (!_pending.Any(p => p.id == id)) _pending.Add((id, reason, moment, _session.Journal.CurrentCause, _session.Data.ActiveTransactionId));
                 return;
             }
 
             _session.Triggers.Unregister(id);
             var entry = _session.Journal.Append(JournalKind.Achievement, "Achievements",
                 $"달성: {definition.DisplayName}" + (reason != null ? $" ({reason})" : ""), PlayerDataKeys.Achievement(id));
-            _unlocks.Add((entry.Id, id));
+            _unlocks.Add((entry.Id, id, moment));
 
             using (_session.Journal.Cause(entry.Id))
             using (_session.Data.Permanent())
@@ -149,7 +150,7 @@ namespace GBible
             if (_pending.Count == 0) return;
             var ready = _pending.ToArray();
             _pending.Clear();
-            foreach (var (id, reason, moment, cause) in ready)
+            foreach (var (id, reason, moment, cause, _) in ready)
             {
                 try
                 {
@@ -182,9 +183,10 @@ namespace GBible
         }
 
         // 스냅샷으로 되감은 뒤: 그 기록 id 이후에 달성한 도전과제의 달성 표시와 보상을 다시 적용한다(달성은 되감기로 취소되지 않는다).
+        // 보상은 달성할 때와 같은 순간으로 낸다(이벤트 값을 쓰는 결과·[BindTo](이벤트, …) 함수가 같은 값을 다시 준다).
         public void ReapplyUnlocksAfter(long journalId)
         {
-            foreach (var (entryId, id) in _unlocks.ToArray())
+            foreach (var (entryId, id, moment) in _unlocks.ToArray())
             {
                 if (entryId <= journalId) continue;
                 var definition = Find(id);
@@ -194,7 +196,7 @@ namespace GBible
                 using (_session.Data.Permanent())
                 {
                     _session.Data.Set(PlayerDataKeys.Achievement(id), true);
-                    GrantRewards(definition, null);
+                    GrantRewards(definition, moment);
                 }
             }
         }

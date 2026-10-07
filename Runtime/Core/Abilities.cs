@@ -21,11 +21,13 @@ namespace GBible
         protected AbilityUse Use => _use;
         protected GameApi Game => _use?.Game;
 
+        // 안에서 같은 Block이 다시 돌아도(효과가 같은 능력을 다시 씀 — 반격·연쇄) 끝나면 바깥 사용으로 돌아간다.
         internal void Run(AbilityUse use, object target)
         {
+            var previous = _use;
             _use = use;
             try { Apply(target); }
-            finally { _use = null; }
+            finally { _use = previous; }
         }
 
         protected abstract void Apply(object target);
@@ -70,9 +72,10 @@ namespace GBible
 
         internal IEnumerable<object> Run(AbilityUse use, IEnumerable<object> targets)
         {
+            var previous = _use;
             _use = use;
             try { return Select(targets).ToList(); }
-            finally { _use = null; }
+            finally { _use = previous; }
         }
 
         protected abstract IEnumerable<object> Select(IEnumerable<object> targets);

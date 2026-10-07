@@ -110,13 +110,24 @@ namespace GBible
                 session.Journal.Append(JournalKind.Error, "Test", $"테스트 상황 '{name}'의 형식이 올바르지 않습니다.");
                 return false;
             }
+            // 프로필을 바꾼 뒤 판에서 실패하면 프로필도 되돌린다 — 거짓이면 아무것도 바뀌지 않게(반쪽 상태가 판 저장으로 슬롯에 남지 않게).
+            string metaBefore = null;
             try
             {
-                if (root.TryGetValue("meta", out var meta) && meta is string metaJson) session.ImportMeta(metaJson);
+                if (root.TryGetValue("meta", out var meta) && meta is string metaJson)
+                {
+                    metaBefore = session.ExportMeta();
+                    session.ImportMeta(metaJson);
+                }
                 session.ImportRun(runJson);
             }
             catch (Exception e)
             {
+                if (metaBefore != null)
+                {
+                    try { session.ImportMeta(metaBefore); }
+                    catch (Exception restore) { session.Journal.Append(JournalKind.Error, "Test", $"테스트 상황 '{name}': 바뀐 프로필을 되돌리지 못했습니다: {restore.Message}"); }
+                }
                 session.Journal.Append(JournalKind.Error, "Test", $"테스트 상황 '{name}'을(를) 불러오지 못했습니다(저장한 뒤 데이터 구조가 바뀌었으면 다시 저장하세요): {e.Message}");
                 return false;
             }

@@ -190,7 +190,7 @@ namespace GBible
             var owner = "status:" + definition.Id;
             _session.Triggers.Unregister(owner);
             if (definition.When != null)
-                _session.Triggers.Register(owner, definition.When, repeat: true, fire: moment => FireFor(definition, moment), holders: moment => HoldersFor(definition, moment));
+                _session.Triggers.Register(owner, definition.When, repeat: true, fire: moment => FireFor(definition, moment), holders: moment => HoldersFor(definition, moment), item: definition.Id);
         }
 
         // ── 걸기·풀기 ─────────────────────────────────────────

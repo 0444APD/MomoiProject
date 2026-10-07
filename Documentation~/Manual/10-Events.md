@@ -165,7 +165,7 @@ public class UnitKilled : IDescribable
 
 | | `SubscribeAfterAction<T>(Action<T>)` | `Subscribe<T>(Action<T>)` |
 |---|---|---|
-| 받는 때 | 행동 안에서 쏜 이벤트: **바깥 행동이 성공한 뒤**, 쏜 순서대로(안쪽 행동의 이벤트 포함). 행동 밖에서 쏜 이벤트: 바로 | 쏜 그 자리에서 바로(행동 안이면 행동 안에서) |
+| 받는 때 | 행동 안에서 쏜 이벤트: **바깥 행동이 성공한 뒤**, 쏜 순서대로(안쪽 행동의 이벤트 포함. 받는 쪽 — 규칙·트리거 결과 — 이 받는 동안 쏜 이벤트는 그 이벤트 뒤). 행동 밖에서 쏜 이벤트: 바로 | 쏜 그 자리에서 바로(행동 안이면 행동 안에서) |
 | 실패한 행동의 이벤트 | 오지 않는다(버린다) | 이미 받았다(값은 취소됐는데 연출은 나간 상태가 된다) |
 | 받는 시점의 위치 | 늘 행동 밖(`session.Data.InTransaction` 거짓) | 행동 안일 수 있다 |
 | 받는 함수가 예외를 던지면 | 기록만 남고 다른 받는 쪽은 계속 불린다 | 행동 안: **그 행동 전체가 실패해 취소된다**. 행동 밖: 기록만 남는다 |
@@ -190,7 +190,7 @@ public class KillEffects : MonoBehaviour
 
 - 연출 스크립트는 예외 없이 `SubscribeAfterAction`을 쓴다. 행동이 성공했는지 기다리는 대기열·`Actions.Executed`/실패 처리·안쪽 행동 거르기 같은 코드를 직접 쓰지 않는다.
 - 한 행동에서 여러 이벤트가 오면 한꺼번에 이어서 불린다. 시간 간격을 두고 틀려면 받은 것을 큐에 넣고 `Update`에서 하나씩 꺼낸다(3-7).
-- 돌려받는 `IDisposable`을 `Dispose()`하면 그만 받는다. 씬 오브젝트는 `OnDisable`·`OnDestroy`에서 꼭 Dispose한다(세션은 씬보다 오래 산다).
+- 돌려받는 `IDisposable`을 `Dispose()`하면 그만 받는다. 그 순간부터다: 같은 이벤트를 먼저 받은 쪽이 Dispose하면(화면을 닫음) 뒤의 그 받는 쪽은 지금 이벤트도, 모아 둔 이벤트도 받지 않는다(`Subscribe`·`SubscribeAll`도 같다). 씬 오브젝트는 `OnDisable`·`OnDestroy`에서 꼭 Dispose한다(세션은 씬보다 오래 산다).
 - `T`와 **정확히 같은 형식**의 이벤트만 받는다. `UnitKilled`를 상속한 `BossKilled`를 쏘면 `<UnitKilled>`로 받는 쪽은 받지 않는다.
 - **행동 안에서 쏜 이벤트를 받는 함수가 예외를 던지면 그 행동 전체가 실패한다.** `Subscribe`로 받는 함수, 트리거·로그·상태 효과·패시브의 결과처럼 시스템이 받는 쪽 모두 같다. 그 행동이 바꾼 것이 모두 되돌아가고, 예외(플레이어용 실패 `GameFailure` 포함)가 `Do`를 부른 쪽으로 올라간다(`02-Actions-Undo.md` 2.7). 반쯤 바뀐 값이 남지 않게 하려는 것이다. 그 뒤의 받는 쪽은 불리지 않는다. 이벤트 예약(`Game.ScheduleOn`)만은 따로다: 그 예약이 바꾼 것만 되돌리고 행동은 계속된다(`29-Statuses-Schedules-Choices.md` 2-5).
 - 행동 밖에서 쏜 이벤트, 그리고 `SubscribeAfterAction`으로 받는 함수(늘 행동 밖)에서는 예외가 나도 다른 받는 쪽이 계속 불린다. 예외는 삼키지 않고 Journal에 오류("구독자 오류 (클래스.함수): …", 출처 `Events`)로 남는다.
@@ -211,7 +211,7 @@ all.Dispose();
 
 | 멤버 | 뜻 |
 |---|---|
-| `event Action<object> Published` | 모든 받는 쪽을 부른 **뒤**에 한 번 불린다. |
+| `event Action<object> Published` | 이벤트마다 한 번, `SubscribeAfterAction`이 받는 차례와 같은 차례로 불린다: 행동 안이면 쏜 순간(받는 쪽보다 **먼저** — 받는 쪽이 안에서 쏜 이벤트보다 앞), 행동 밖이면 모든 받는 쪽을 부른 **뒤**. 멀티플레이 서버가 보낼 이벤트를 이것으로 모은다(클라이언트의 연출 차례가 방장과 같다). |
 | `int SubscriberCount(Type)` | 그 형식을 `Subscribe`로 받는 곳의 수(`SubscribeAll`·`SubscribeAfterAction`은 세지 않는다). |
 | `static string EventBus.DisplayNameOf(Type)` | `[GameEvent]`의 표시 이름(없으면 클래스 이름). |
 | `static string EventBus.Describe(object)` | Journal에 쓰는 문장(2-6 규칙). |

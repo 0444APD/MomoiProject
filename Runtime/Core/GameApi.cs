@@ -653,11 +653,13 @@ namespace GBible
 
         protected abstract bool Check();
 
+        // 안에서 같은 조건이 다시 검사돼도(조건이 읽는 능력치의 보정 조건이 이 조건 — 패시브 modifierWhen) 끝나면 바깥 검사로 돌아간다.
         public override bool Evaluate(GameSession session)
         {
+            var previous = _game;
             _game = session.Game;
             try { return Check(); }
-            finally { _game = null; }
+            finally { _game = previous; }
         }
 
         public override void CollectDependencies(ICollection<string> stateKeys)

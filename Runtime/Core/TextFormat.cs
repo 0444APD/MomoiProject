@@ -35,6 +35,41 @@ namespace GBible
                 .Concat(Walk(Nodes).OfType<ChoiceNode>().Select(c => c.Name)).Distinct();
             public IEnumerable<string> Terms => Walk(Nodes).OfType<TermNode>().Select(t => t.Id).Distinct();
 
+            // 용어에 넘기는 값 이름([[potion, count]]의 count). 글자로 보이지는 않지만 코드가 넘기는 값이다(검증).
+            internal IEnumerable<string> TermArguments =>
+                Walk(Nodes).OfType<TermNode>().SelectMany(t => t.Params.Where(p => p.value == null).Select(p => p.name)).Distinct();
+
+            // 태그 이름별 개수(검증: 번역에도 같은 태그가 있는지). tags = 글자 → 그 안의 태그들.
+            // 경우(plural·select)는 경우마다 세어 태그마다 가장 많은 경우를 쓴다 — 경우마다 같은 태그를 되풀이해도 한 벌.
+            internal Dictionary<string, int> TagCounts(Func<string, IEnumerable<string>> tags) => CountTags(Nodes, tags);
+
+            static Dictionary<string, int> CountTags(Node[] nodes, Func<string, IEnumerable<string>> tags)
+            {
+                var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+                var text = new StringBuilder();
+                foreach (var node in nodes ?? Array.Empty<Node>())
+                {
+                    if (node is LitNode lit)
+                    {
+                        text.Append(lit.Text);
+                        continue;
+                    }
+                    // 값·경우 자리는 글자 하나로 둔다(태그 안의 값 <color={c}>도 태그 하나).
+                    text.Append('\u0001');
+                    if (!(node is ChoiceNode choice)) continue;
+                    var most = new Dictionary<string, int>(StringComparer.Ordinal);
+                    foreach (var (_, body) in choice.Cases)
+                        foreach (var pair in CountTags(body, tags))
+                            if (!most.TryGetValue(pair.Key, out var known) || known < pair.Value) most[pair.Key] = pair.Value;
+                    foreach (var pair in most) Add(counts, pair.Key, pair.Value);
+                }
+                foreach (var tag in tags(text.ToString())) Add(counts, tag, 1);
+                return counts;
+            }
+
+            static void Add(Dictionary<string, int> counts, string tag, int count) =>
+                counts[tag] = (counts.TryGetValue(tag, out var known) ? known : 0) + count;
+
             static IEnumerable<Node> Walk(IEnumerable<Node> nodes)
             {
                 if (nodes == null) yield break;
@@ -362,7 +397,8 @@ namespace GBible
 
         public static string Format(string template, Context context) => Format(Parse(template), context);
 
-        static void Emit(Node[] nodes, Context ctx, StringBuilder b, double? pound)
+        // pound: 복수형 안의 #에 넣을 글자(복수형 밖이면 null → '#' 그대로).
+        static void Emit(Node[] nodes, Context ctx, StringBuilder b, string pound)
         {
             foreach (var node in nodes)
             {
@@ -372,7 +408,7 @@ namespace GBible
                         b.Append(ctx.Pseudo ? Pseudo(lit.Text) : lit.Text);
                         break;
                     case PoundNode _:
-                        b.Append(pound.HasValue ? FormatNumber(pound.Value, null, ctx.Culture) : "#");
+                        b.Append(pound ?? "#");
                         break;
                     case ArgNode arg:
                         EmitArgument(arg, ctx, b);
@@ -424,11 +460,13 @@ namespace GBible
         {
             TryArg(ctx, choice.Name, out var value);
             Node[] body = null;
-            double? pound = null;
+            string pound = null;
             if (choice.Plural)
             {
                 var n = ToDouble(value);
-                pound = n - choice.Offset;
+                var number = n - choice.Offset;
+                // 큰 수(BigNumber)의 #은 {n}과 같은 큰 수의 형식(1.5K)으로.
+                pound = value is BigNumber big ? Convert.ToString(big - choice.Offset, ctx.Culture) : FormatNumber(number, null, ctx.Culture);
                 foreach (var (key, nodes) in choice.Cases)
                     if (key.StartsWith("=", StringComparison.Ordinal) &&
                         double.TryParse(key.Substring(1), NumberStyles.Float, CultureInfo.InvariantCulture, out var exact) && Math.Abs(exact - n) < 1e-9)
@@ -438,7 +476,7 @@ namespace GBible
                     }
                 if (body == null)
                 {
-                    var category = choice.Ordinal ? PluralRules.Ordinal(ctx.Language, pound.Value) : PluralRules.Category(ctx.Language, pound.Value);
+                    var category = choice.Ordinal ? PluralRules.Ordinal(ctx.Language, number) : PluralRules.Category(ctx.Language, number);
                     body = choice.Cases.FirstOrDefault(c => c.key == category).body;
                 }
             }
@@ -519,11 +557,14 @@ namespace GBible
         static DateTime Shown(DateTime value) => value.Kind == DateTimeKind.Utc ? value.ToLocalTime() : value;
 
         static bool IsNumber(object value) =>
-            value is int || value is long || value is float || value is double || value is decimal || value is short || value is byte || value is uint || value is ulong;
+            value is int || value is long || value is float || value is double || value is decimal || value is short || value is byte || value is uint || value is ulong ||
+            value is sbyte || value is ushort;
 
         static double ToDouble(object value)
         {
             if (value == null) return 0;
+            // 큰 수는 IConvertible이 아니라 Convert가 실패한다(1e308 위는 무한대 → other).
+            if (value is BigNumber big) return big.ToDouble();
             try
             {
                 return Convert.ToDouble(value, CultureInfo.InvariantCulture);
@@ -535,6 +576,14 @@ namespace GBible
         }
 
         public static string FormatNumber(double value, string style, CultureInfo culture)
+        {
+            // 0으로 반올림되는 음수(-0.0001 · -0.0)는 "0"으로 적는다(그대로 두면 .NET은 "-0", Mono는 "0" — 런타임마다 다르다).
+            if (value == 0) value = 0;
+            var text = NumberText(value, style, culture);
+            return value < 0 && text == NumberText(-0.0, style, culture) ? NumberText(0, style, culture) : text;
+        }
+
+        static string NumberText(double value, string style, CultureInfo culture)
         {
             switch (style)
             {

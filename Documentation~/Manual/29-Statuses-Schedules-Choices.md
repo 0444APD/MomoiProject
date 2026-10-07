@@ -718,7 +718,7 @@ public class DiscardChosen : GameAction
 | `[Chosen]` 필드 형식 | 들어오는 것 |
 |---|---|
 | `string` | 고른 id 하나(고르지 않았으면 `null`) |
-| `id`가 있는 클래스(`DeckCard`) | 고른 객체 하나. 실행 직전에 id로 지금 데이터에서 찾는다 |
+| `id`가 있는 클래스(`DeckCard`, 추상 부모 `Unit`도) | 고른 객체 하나. 실행 직전에 id로 지금 데이터에서 찾는다 |
 | 위의 `List<…>` · 배열 | 고른 것 여럿(고른 순서대로) |
 
 - 한 행동에 하나만 둔다(처음 것만 쓴다). 다른 형식이면 요구할 때 "[MomoiProject] 'X.f': [Chosen] 필드는 string, id가 있는 클래스, 그 리스트·배열이어야 합니다." 예외.

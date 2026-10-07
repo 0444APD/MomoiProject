@@ -126,6 +126,19 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void PluralWithBigNumber()
+        {
+            // 큰 수(BigNumber)도 숫자다: 복수 규칙은 그 값으로, #은 {n}처럼 큰 수의 형식(1.5K)으로(0으로 읽지 않는다).
+            _texts.Language = "en";
+            const string template = "{n, plural, one {# cookie} other {# cookies}}";
+            Assert.AreEqual("1 cookie", _texts.FormatTemplate(template, TextArgs.From(("n", new BigNumber(1)))));
+            Assert.AreEqual("1.5K cookies", _texts.FormatTemplate(template, TextArgs.From(("n", new BigNumber(1500)))));
+            Assert.AreEqual("1.5K", _texts.FormatTemplate("{n}", TextArgs.From(("n", new BigNumber(1500)))), "#과 같은 모양");
+            Assert.AreEqual("4 left", _texts.FormatTemplate("{n, plural, offset:1 =1 {none} other {# left}}", TextArgs.From(("n", new BigNumber(5)))));
+            Assert.AreEqual("1.23e400 cookies", _texts.FormatTemplate(template, TextArgs.From(("n", new BigNumber(1.23, 400)))));
+        }
+
+        [Test]
         public void PluralCategoriesPerLanguage()
         {
             Assert.AreEqual("one", PluralRules.Category("en", 1));
@@ -139,6 +152,17 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void PortugalPortugueseIsOneOnlyForOne()
+        {
+            // CLDR: pt(브라질) one = 정수 부분 0·1, pt_PT one = 정수 1만.
+            Assert.AreEqual("one", PluralRules.Category("pt", 0));
+            Assert.AreEqual("one", PluralRules.Category("pt-BR", 1.5));
+            Assert.AreEqual("other", PluralRules.Category("pt-PT", 0));
+            Assert.AreEqual("one", PluralRules.Category("pt-PT", 1));
+            Assert.AreEqual("other", PluralRules.Category("pt_pt", 1.5));
+        }
+
+        [Test]
         public void NumbersFollowLanguage()
         {
             _texts.SetTable("de", new Dictionary<string, string> { ["gold.total"] = "{gold, number} Gold" });
@@ -148,6 +172,24 @@ namespace GBible.Tests
             Assert.AreEqual("1,234,567.5 gold", _texts.Get("gold.total", ("gold", 1234567.5)));
             Assert.AreEqual("50%", _texts.FormatTemplate("{p, number, percent}", TextArgs.From(("p", 0.5))));
             Assert.AreEqual("3", _texts.FormatTemplate("{p, number, integer}", TextArgs.From(("p", 2.6))));
+            // 모든 정수 형식이 숫자다(ushort·sbyte도 천 단위 표기).
+            Assert.AreEqual("65,535", _texts.FormatTemplate("{p}", TextArgs.From(("p", ushort.MaxValue))));
+            Assert.AreEqual("-128", _texts.FormatTemplate("{p, number, integer}", TextArgs.From(("p", sbyte.MinValue))));
+        }
+
+        [Test]
+        public void NegativeRoundingToZeroShowsZero()
+        {
+            // 0으로 반올림되는 음수는 "0"(.NET은 "-0", Mono는 "0"으로 적는다 — 어디서나 같게).
+            string F(string template, double n) => _texts.FormatTemplate(template, TextArgs.From(("n", n)));
+            Assert.AreEqual("0", F("{n}", -0.0001));
+            Assert.AreEqual("0", F("{n}", -0.0));
+            Assert.AreEqual("0", F("{n, number, integer}", -0.3));
+            Assert.AreEqual("0%", F("{n, number, percent}", -0.00001));
+            Assert.AreEqual("0.0", F("{n, number, 0.0}", -0.01));
+            Assert.AreEqual("-0.5", F("{n}", -0.5));
+            Assert.AreEqual("-1", F("{n, number, integer}", -0.5));
+            Assert.AreEqual("0 messages", _texts.FormatTemplate("{n, plural, one {# message} other {# messages}}", TextArgs.From(("n", -0.0001))));
         }
 
         [Test]
@@ -191,6 +233,19 @@ namespace GBible.Tests
             Assert.AreEqual(1, changed);
             _texts.Language = "ja";
             Assert.AreEqual(1, changed, "같은 언어면 알리지 않는다");
+        }
+
+        [Test]
+        public void MergeBeforeFirstUseKeepsLoadedTable()
+        {
+            // 아직 읽지 않은 언어에 Merge·Set을 해도 Loader의 표에 더한다(빈 표가 Loader 표를 가리지 않는다).
+            var catalog = new TextCatalog { SourceLanguage = "ko", Language = "en" };
+            catalog.Loader = lang => lang == "en" ? new Dictionary<string, string> { ["ui.start"] = "Start", ["ui.quit"] = "Quit" } : null;
+            catalog.Set("en", "ui.extra", "Extra");
+            catalog.Merge("en", new Dictionary<string, string> { ["ui.quit"] = "Leave" });
+            Assert.AreEqual("Start", catalog.Get("ui.start"));
+            Assert.AreEqual("Extra", catalog.Get("ui.extra"));
+            Assert.AreEqual("Leave", catalog.Get("ui.quit"), "같은 키는 덮어쓴다");
         }
 
         [Test]
@@ -240,6 +295,18 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void CsvQuoteInsideUnquotedCellIsText()
+        {
+            // 칸 가운데의 따옴표는 글자다(따옴표 칸은 칸 맨 앞의 따옴표로만 시작한다). 손으로 쓴 5" 칼이 뒤 줄을 삼키지 않는다.
+            var rows = Csv.Read("id,title\r\nsword,5\" blade\r\nbow,say \"hi\" now\r\nstaff, \"a, b\"\r\n");
+            Assert.AreEqual(4, rows.Count);
+            CollectionAssert.AreEqual(new[] { "sword", "5\" blade" }, rows[1]);
+            CollectionAssert.AreEqual(new[] { "bow", "say \"hi\" now" }, rows[2]);
+            CollectionAssert.AreEqual(new[] { "staff", " a, b" }, rows[3], "공백 뒤의 따옴표는 따옴표 칸");
+            CollectionAssert.AreEqual(new[] { "ab\"c\"" }, Csv.Read("\"a\"b\"c\"")[0], "닫는 따옴표 뒤의 따옴표는 글자");
+        }
+
+        [Test]
         public void SheetExportImportByHeaderName()
         {
             var tables = new Dictionary<string, IReadOnlyDictionary<string, string>>
@@ -259,6 +326,18 @@ namespace GBible.Tests
             Assert.IsFalse(result.Tables.ContainsKey("ko"), "요청한 언어만");
 
             Assert.IsNotEmpty(TextSheet.Import("a,b\n1,2").Warnings, "key 열 없음");
+        }
+
+        [Test]
+        public void SheetRowStartingWithHashInOtherColumnIsData()
+        {
+            // 머리줄 아래에서는 key 칸이 '#'일 때만 설명 줄이다. 앞으로 옮긴 메모·언어 열이 '#'으로 시작해도 그 줄을 읽는다.
+            var edited = "#gbible-text,1\nmemo,key,en\n#확인 필요,ui.quit,Quit\n#1 판매,ui.best,#1 Seller\n# 상점,,\n,#note,무시\n";
+            var result = TextSheet.Import(edited, new[] { "en" });
+            Assert.AreEqual("Quit", result.Tables["en"]["ui.quit"]);
+            Assert.AreEqual("#1 Seller", result.Tables["en"]["ui.best"]);
+            Assert.AreEqual(2, result.Tables["en"].Count, "key가 '#'인 줄은 설명");
+            Assert.IsEmpty(result.Warnings);
         }
 
         [Test]
@@ -289,6 +368,29 @@ namespace GBible.Tests
             Assert.IsNotEmpty(TextSheet.Check("[[burn]] 피해", "damage"));
             Assert.IsNotEmpty(TextSheet.Check("<b>{n}</b>", "{n}"));
             Assert.IsNotEmpty(TextSheet.Check("{n}", "{n, plural, one {x}}"));
+        }
+
+        [Test]
+        public void TranslationCheckReadsPluralCasesAndTermValues()
+        {
+            // 경우마다 같은 태그를 되풀이한 번역(영어 복수형)은 원문과 같은 태그다.
+            Assert.IsEmpty(TextSheet.Check("<b>{n}</b>개의 [[potion]]", "{n, plural, one {<b>#</b> [[potion, n]]} other {<b>#</b> [[potion, n]]}}"));
+            Assert.IsEmpty(TextSheet.Check("<color={c}>{n}</color>", "{n, plural, =0 {<color={c}>none</color>} other {<color={c}>#</color>}}"));
+            Assert.IsNotEmpty(TextSheet.Check("<b>A</b> <b>B</b>", "<b>A</b> <b>B"), "닫는 태그가 빠짐");
+            Assert.IsNotEmpty(TextSheet.Check("<b>{n}</b>", "{n, plural, one {#} other {#}}"), "모든 경우에서 태그가 빠짐");
+            // 용어에 넘기는 값([[potion, count]])도 코드가 넘기는 값이다. 번역이 그 값을 보여도 된다.
+            Assert.IsEmpty(TextSheet.Check("[[potion, count]]을 얻었다", "Got {count} [[potion, count]]"));
+            Assert.IsNotEmpty(TextSheet.Check("{count}개의 [[potion]]", "[[potion, count]]"), "원문이 보여 주는 값을 번역이 보여 주지 않음");
+            Assert.IsNotEmpty(TextSheet.Check("{count}개의 [[potion]]", "{count} [[potion, n]]"), "용어에 원문에 없는 값");
+        }
+
+        [Test]
+        public void DictionaryArgsOfAnyValueType()
+        {
+            // Dictionary<string, object>가 아닌 딕셔너리도 값 묶음이다(속성 Count·Keys를 값으로 읽지 않는다).
+            Assert.AreEqual("고블린이 나타났다!", _texts.Get("enemy.appear", new Dictionary<string, string> { ["enemy"] = "goblin" }));
+            _texts.Language = "en";
+            Assert.AreEqual("1,200 messages", _texts.Get("inbox", new Dictionary<string, int> { ["n"] = 1200 }));
         }
 
         [Test]

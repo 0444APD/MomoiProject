@@ -5,6 +5,14 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
+    // 기록 글을 만들 때 값을 읽다가 던지는 이벤트(게임 코드의 속성).
+    [GameEvent("던지는 값")]
+    public sealed class TgThrowingValue
+    {
+        public int amount = 3;
+        public string Label => throw new InvalidOperationException("값 읽기 실패");
+    }
+
     // 트리거·결과: 로그·도전과제·능력이 같은 두 칸(트리거 AND·OR 중첩 + 결과 목록)으로 돈다.
     [GameEvent("보스 처치")]
     public sealed class TgBossKilled
@@ -321,6 +329,76 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 성공한_행동_뒤에_받는_쪽의_미리보기나_실패한_행동이_그_행동의_달성을_버리지_않는다()
+        {
+            DefineSlayer();
+            var game = _session.Game;
+            // 화면 쪽: 행동이 끝난 뒤 버튼 상태를 미리 보고(CanDo·Preview — 해 보고 되돌린다), 실패하는 행동도 하나 보낸다(오류는 기록만).
+            _session.Events.SubscribeAfterAction<TgBossKilled>(e =>
+            {
+                game.CanDo(new TgKill { boss = "slime" }, out _);
+                game.Preview(new TgKill { boss = "slime" }, g => 0);
+                game.Do(new TgKill { boss = "slime", fail = true });
+            });
+            game.Do(new TgKill());
+            Assert.IsTrue(_session.Achievements.IsUnlocked("slayer"), "성공한 행동에서 발동한 달성은 그 뒤의 미리보기·실패한 행동이 지우지 않는다");
+            Assert.AreEqual(10, _session.Data.GetNumber("gold"), "보상도 나온다");
+        }
+
+        [Test]
+        public void 스냅샷으로_되감으면_이벤트로_발동한_도전과제의_결과를_그_이벤트로_다시_적용한다()
+        {
+            var session = new GameSession(new SessionOptions { History = HistoryMode.Snapshots, SnapshotInterval = 1, Seed = 1 });
+            session.Data.Define("gold", DataZone.Meta, 0.0);
+            var bounty = new AchievementDefinition { Id = "bounty", DisplayName = "bounty", When = Boss("dragon") };
+            bounty.Outcomes.Add(new TgGoldFromEvent());
+            session.Achievements.Define(bounty);
+            session.EndFrame(0.5);                          // 스냅샷(달성 전)
+            session.Game.Do(new TgKill());                   // 드래곤 처치(피해 3) → 달성, 골드 +3
+            Assert.AreEqual(3, session.Data.GetNumber("gold"));
+            session.EndFrame(0.2);
+            Assert.IsTrue(session.Undo(), "달성 전 스냅샷으로 되감는다");
+            Assert.IsTrue(session.Achievements.IsUnlocked("bounty"), "달성은 유지");
+            Assert.AreEqual(3, session.Data.GetNumber("gold"), "결과도 발동한 이벤트(처치 피해 3)로 다시 적용한다");
+        }
+
+        [Test]
+        public void 그만_받은_쪽은_같은_이벤트를_더_받지_않는다()
+        {
+            var calls = new List<string>();
+            IDisposable rule = null, all = null, view = null;
+            _session.Events.Subscribe<TgBossKilled>(_ => { calls.Add("규칙1"); rule.Dispose(); });
+            rule = _session.Events.Subscribe<TgBossKilled>(_ => calls.Add("규칙2"));
+            _session.Events.SubscribeAll(e => { if (e is TgBossKilled) { calls.Add("전체1"); all.Dispose(); } });
+            all = _session.Events.SubscribeAll(e => { if (e is TgBossKilled) calls.Add("전체2"); });
+            _session.Events.SubscribeAfterAction<TgBossKilled>(_ => { calls.Add("연출1"); view.Dispose(); });
+            view = _session.Events.SubscribeAfterAction<TgBossKilled>(_ => calls.Add("연출2"));
+            _session.Game.Do(new TgKill());
+            CollectionAssert.AreEqual(new[] { "규칙1", "전체1", "연출1" }, calls, "앞의 받는 쪽이 그만 받게 한 쪽은 지금 이벤트도 받지 않는다");
+        }
+
+        [GameEvent("보스 현상금")]
+        public sealed class TgBounty
+        {
+            public int Gold;
+        }
+
+        [Test]
+        public void 행동_뒤에_받는_쪽은_받는_쪽이_안에서_쏜_이벤트보다_먼저_쏜_이벤트를_먼저_받는다()
+        {
+            // 규칙: 보스 처치를 받으면 그 자리에서 현상금 이벤트를 쏜다(트리거 결과 '이벤트 쏘기'·상태 효과의 반응과 같다).
+            _session.Events.Subscribe<TgBossKilled>(e => _session.Events.Publish(new TgBounty { Gold = e.Damage }));
+            var seen = new List<string>();
+            _session.Events.SubscribeAfterAction<TgBossKilled>(_ => seen.Add("처치"));
+            _session.Events.SubscribeAfterAction<TgBounty>(_ => seen.Add("현상금"));
+            var published = new List<string>();
+            _session.Events.Published += e => published.Add(e is TgBounty ? "현상금" : e is TgBossKilled ? "처치" : "");
+            _session.Game.Do(new TgKill());
+            CollectionAssert.AreEqual(new[] { "처치", "현상금" }, seen, "쏜 순서대로: 처치를 받은 쪽이 쏜 현상금은 처치 뒤");
+            CollectionAssert.AreEqual(new[] { "처치", "현상금" }, published.Where(p => p.Length > 0).ToList(), "Published(멀티 서버가 모으는 차례)도 연출과 같은 차례");
+        }
+
+        [Test]
         public void 실패해_되돌린_이벤트_예약이_쏜_이벤트로는_달성되지_않는다()
         {
             DefineSlayer();
@@ -398,6 +476,18 @@ namespace GBible.Tests
             StringAssert.Contains("Damage", text);
             Assert.AreEqual(TriggerKinds.Event | TriggerKinds.Condition, rule.when.Kinds());
             CollectionAssert.AreEqual(new[] { typeof(TgBossKilled) }, rule.when.EventTypes().ToArray());
+        }
+
+        [Test]
+        public void 기록_글을_만들다_값이_던져도_이벤트는_쏘인다()
+        {
+            var got = 0;
+            _session.Events.Subscribe<TgThrowingValue>(_ => got++);
+            Assert.DoesNotThrow(() => _session.Events.Publish(new TgThrowingValue()));
+            Assert.AreEqual(1, got, "받는 쪽에 간다");
+            var line = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Event).Message;
+            StringAssert.Contains("amount=3", line);
+            StringAssert.Contains("Label=?", line);
         }
     }
 }

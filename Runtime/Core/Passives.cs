@@ -148,9 +148,9 @@ namespace GBible
         {
             if (definition.PerElement)
                 _session.Triggers.Register(owner, when, repeat: true, fire: moment => Fire(definition, outcomes, moment),
-                    orderedHolders: moment => OrderedHoldersFor(definition, moment), orderGroup: definition.OrderGroup);
+                    orderedHolders: moment => OrderedHoldersFor(definition, moment), orderGroup: definition.OrderGroup, item: definition.Id);
             else
-                _session.Triggers.Register(owner, when, repeat: true, fire: moment => Fire(definition, outcomes, moment), holders: moment => HoldersFor(definition, moment));
+                _session.Triggers.Register(owner, when, repeat: true, fire: moment => Fire(definition, outcomes, moment), holders: moment => HoldersFor(definition, moment), item: definition.Id);
         }
 
         // 몇 개 가졌나. holder를 비우면 모든 가진 쪽의 합. 놓인 것마다면 holder = 요소 하나(그 요소의 레벨). 침묵한 가진 쪽은 0.

@@ -24,6 +24,25 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 판_불러오기가_실패하면_난수와_게임_시계도_그대로다()
+        {
+            // 다른 시드·시각의 v1 저장.
+            var old = new GameSession(new SessionOptions { Seed = 7 });
+            old.Data.Define("gold", DataZone.Session, 5.0);
+            old.EndFrame(3.0);
+            var saved = old.ExportRun();
+
+            // 지금 게임은 v2이고 v1 → v2 변환이 이 저장에서 실패한다.
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            session.Migrations.Add(2, "깨지는 변환", _ => throw new InvalidOperationException("변환 실패"));
+            session.Data.Define("gold", DataZone.Session, 9.0);
+            var before = session.ExportRun();
+            Assert.Throws<InvalidOperationException>(() => session.ImportRun(saved));
+            Assert.AreEqual(before, session.ExportRun(), "실패하면 데이터·난수·게임 시계가 모두 불러오기 전 그대로(반쪽 판이 저장되지 않게)");
+            Assert.AreEqual(0.0, session.Clock.Time);
+        }
+
+        [Test]
         public void 구역을_비우면_미리_불러_둔_옛_값도_버린다()
         {
             var session = new GameSession();

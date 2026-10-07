@@ -84,16 +84,33 @@ namespace GBible
         {
             var instance = CreateDefault(type);
             if (values == null) return instance;
-            foreach (var pair in values)
-            {
-                var member = (MemberInfo)type.GetField(pair.Key, BindingFlags.Public | BindingFlags.Instance)
-                             ?? type.GetProperty(pair.Key, BindingFlags.Public | BindingFlags.Instance);
-                if (member == null) throw new ArgumentException($"[MomoiProject] '{type.Name}'에 '{pair.Key}' 멤버가 없습니다.");
-                var converted = Convert(pair.Value, MemberType(member), pair.Key);
-                if (member is FieldInfo field) field.SetValue(instance, converted);
-                else ((PropertyInfo)member).SetValue(instance, converted);
-            }
+            foreach (var pair in values) SetMember(instance, pair.Key, pair.Value);
             return instance;
+        }
+
+        static void SetMember(object instance, string name, object value)
+        {
+            var type = instance.GetType();
+            var member = (MemberInfo)type.GetField(name, BindingFlags.Public | BindingFlags.Instance)
+                         ?? type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+            if (member == null) throw new ArgumentException($"[MomoiProject] '{type.Name}'에 '{name}' 멤버가 없습니다.");
+            var converted = Convert(value, MemberType(member), name);
+            if (member is FieldInfo field) field.SetValue(instance, converted);
+            else ((PropertyInfo)member).SetValue(instance, converted);
+        }
+
+        // 반영 조건(이벤트 조건)에 맞게 값을 채운 새 이벤트. 맞추지 못한 값은 그대로다(부르는 쪽이 조건으로 다시 본다).
+        static object Matching(Type type, ValueFilter filter)
+        {
+            var evt = CreateDefault(type);
+            if (filter != null) Satisfy(evt, filter);
+            return evt;
+        }
+
+        static bool IsFlag(Type type, string name)
+        {
+            var member = (MemberInfo)type.GetField(name, BindingFlags.Public | BindingFlags.Instance) ?? type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+            return member != null && MemberType(member) == typeof(bool);
         }
 
         static object Convert(object value, Type target, string name)
@@ -128,7 +145,7 @@ namespace GBible
         // ── 수치를 이벤트로 움직이기 ─────────────────────────────
 
         // 합계형: amount만큼 더한다. 최고·최저·마지막 값형: amount를 한 번 기록한다.
-        // 수치의 반영 규칙을 거꾸로 따라가 필요한 이벤트를 만든다. 같은 이벤트를 받는 다른 수치도 게임에서처럼 함께 움직인다.
+        // 수치의 반영 규칙을 거꾸로 따라가 필요한 이벤트를 만든다(규칙의 조건이 있으면 그 조건에 맞춘 이벤트). 같은 이벤트를 받는 다른 수치도 게임에서처럼 함께 움직인다.
         public static bool TryPlanForStat(StatSystem stats, string statId, double amount, out EventPlan plan, out string error)
         {
             plan = null;
@@ -164,7 +181,9 @@ namespace GBible
                 var raw = amount / rule.multiplier;
                 try
                 {
-                    if (string.IsNullOrEmpty(rule.field))
+                    // 참/거짓 값을 더하는 규칙은 참 하나가 1이라 횟수 규칙처럼 센다(3을 더하려면 참인 이벤트 3번).
+                    var flag = definition.Aggregate == StatAggregate.Sum && !string.IsNullOrEmpty(rule.field) && IsFlag(type, rule.field);
+                    if (string.IsNullOrEmpty(rule.field) || flag)
                     {
                         // 횟수 규칙: 이벤트 1회 = multiplier만큼 반영.
                         if (definition.Aggregate != StatAggregate.Sum)
@@ -175,11 +194,24 @@ namespace GBible
                         var count = (int)Math.Round(raw);
                         if (count < 1 || Math.Abs(raw - count) > 1e-9 || count > MaxRepeat)
                         {
-                            reasons.Add($"{name}: 횟수 규칙이라 1~{MaxRepeat} 사이의 정수 배만 가능");
+                            reasons.Add($"{name}: {(flag ? $"참/거짓 값({rule.field})" : "횟수 규칙")}이라 1~{MaxRepeat} 사이의 정수 배만 가능");
                             continue;
                         }
-                        plan = new EventPlan { Description = $"{name} ×{count}" };
-                        for (int i = 0; i < count; i++) plan.Events.Add(CreateDefault(type));
+                        object Counted()
+                        {
+                            var made = Matching(type, rule.filter);
+                            if (flag) SetMember(made, rule.field, true);
+                            return made;
+                        }
+                        var first = Counted();
+                        if (rule.filter != null && !rule.filter.Test(first))
+                        {
+                            reasons.Add($"{name}: 반영 조건 '{rule.filter.Natural()}'에 맞는 이벤트를 자동으로 만들 수 없음");
+                            continue;
+                        }
+                        plan = new EventPlan { Description = $"{name} ×{count}" + (flag ? $" ({rule.field} = 참)" : "") };
+                        plan.Events.Add(first);
+                        for (int i = 1; i < count; i++) plan.Events.Add(Counted());
                         return true;
                     }
 
@@ -188,7 +220,18 @@ namespace GBible
                         reasons.Add($"{name}: 중첩 필드({rule.field})는 자동 생성하지 않음");
                         continue;
                     }
-                    var evt = Create(type, new Dictionary<string, object> { [rule.field] = raw });
+                    if (IsFlag(type, rule.field) && Math.Abs(raw) > 1e-9 && Math.Abs(raw - 1) > 1e-9)
+                    {
+                        reasons.Add($"{name}: 참/거짓 값({rule.field})은 0이나 1만 기록할 수 있음");
+                        continue;
+                    }
+                    var evt = Matching(type, rule.filter);
+                    SetMember(evt, rule.field, raw);
+                    if (rule.filter != null && !rule.filter.Test(evt))
+                    {
+                        reasons.Add($"{name}: 반영 조건 '{rule.filter.Natural()}'에 맞는 이벤트를 자동으로 만들 수 없음({rule.field} = {raw.ToString("0.##", CultureInfo.InvariantCulture)})");
+                        continue;
+                    }
                     plan = new EventPlan { Description = $"{name} ({rule.field} = {raw.ToString("0.##", CultureInfo.InvariantCulture)})" };
                     plan.Events.Add(evt);
                     return true;
@@ -208,6 +251,7 @@ namespace GBible
         // 트리거를 따라가 테스트로 발동시키는 계획: 먼저 조건을 채울 로그 차이(로그 id, 반영할 값), 그다음 쏠 이벤트(값 조건을 맞춘 것).
         // 게임과 같은 경로라 조건이 맞은 상태에서 이벤트를 받아 트리거가 스스로 발동한다.
         //   조건 충족 → 부족한 로그를 이벤트로 채운다 / 이벤트 받기 → 그 이벤트를 만들고 값 조건(같음·이상·포함 …)에 맞춰 채운다 /
+        //   다른 도전과제 달성 → 그 트리거도 같이 채운다(두 갈래가 같은 도전과제를 보면 한 번만) /
         //   AND → 모두 / OR → 계획이 서는 첫 갈래 / NOT·사용 → 자동으로 만들 수 없다(강제 달성을 쓴다).
         public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out List<object> events, out string error)
         {
@@ -220,7 +264,7 @@ namespace GBible
                 error = "트리거가 없는 도전과제입니다.";
                 return false;
             }
-            PlanTrigger(session, definition.When, steps, events, problems, new HashSet<string> { achievementId });
+            PlanTrigger(session, definition.When, steps, events, problems, new HashSet<string> { achievementId }, new HashSet<string> { achievementId });
             // 같은 로그를 여러 조건이 보면 가장 큰 요구치 하나로 합친다.
             steps = steps.GroupBy(s => s.stat).Select(g => (g.Key, g.Max(s => s.amount))).ToList();
             error = problems.Count > 0 ? string.Join(" / ", problems) : null;
@@ -231,12 +275,13 @@ namespace GBible
         public static bool TryPlanForAchievement(GameSession session, string achievementId, out List<(string stat, double amount)> steps, out string error) =>
             TryPlanForAchievement(session, achievementId, out steps, out _, out error);
 
-        static void PlanTrigger(GameSession session, Trigger trigger, List<(string stat, double amount)> steps, List<object> events, List<string> problems, HashSet<string> visiting)
+        // planned: 이 계획에 넣은 도전과제(다시 만나면 건너뛴다). path: 지금 따라 들어온 도전과제(다시 만나면 순환).
+        static void PlanTrigger(GameSession session, Trigger trigger, List<(string stat, double amount)> steps, List<object> events, List<string> problems, HashSet<string> planned, HashSet<string> path)
         {
             switch (trigger)
             {
                 case ConditionTrigger single:
-                    if (single.condition != null) Collect(session, single.condition, steps, problems, visiting);
+                    if (single.condition != null) Collect(session, single.condition, steps, events, problems, planned, path);
                     return;
                 case EventTrigger fired:
                     var type = TypeResolver.Find(fired.eventType);
@@ -254,7 +299,8 @@ namespace GBible
                     }
                     if (fired.filter != null)
                     {
-                        Satisfy(evt, fired.filter);
+                        try { Satisfy(evt, fired.filter); }
+                        catch (Exception) { }   // 맞추지 못한 값(형식 범위 밖 등)은 아래 검사가 알린다
                         if (!fired.filter.Test(evt))
                         {
                             problems.Add($"{EventBus.DisplayNameOf(type)}의 값 조건 '{fired.filter.Natural()}'을 자동으로 맞출 수 없음(이벤트 탭에서 값을 채워 직접 쏘세요)");
@@ -265,7 +311,7 @@ namespace GBible
                     return;
                 case AllTrigger all:
                     if (all.Children.Count(c => c is EventTrigger) > 1) problems.Add("서로 다른 이벤트를 AND로 묶어 같은 순간을 만들 수 없음");
-                    foreach (var child in all.Children) PlanTrigger(session, child, steps, events, problems, visiting);
+                    foreach (var child in all.Children) PlanTrigger(session, child, steps, events, problems, planned, path);
                     return;
                 case AnyTrigger any:
                     // 계획이 서는 첫 갈래.
@@ -274,10 +320,12 @@ namespace GBible
                         var s = new List<(string, double)>();
                         var e = new List<object>();
                         var p = new List<string>();
-                        PlanTrigger(session, child, s, e, p, new HashSet<string>(visiting));
+                        var branch = new HashSet<string>(planned);
+                        PlanTrigger(session, child, s, e, p, branch, path);
                         if (p.Count > 0) continue;
                         steps.AddRange(s);
                         events.AddRange(e);
+                        planned.UnionWith(branch);
                         return;
                     }
                     problems.Add("OR의 어느 갈래도 자동으로 채울 수 없음");
@@ -329,9 +377,24 @@ namespace GBible
                             break;
                         case FieldOp.Contains:
                             if (type == typeof(string)) value = field.value;
-                            else if (GetValue(member, evt) is System.Collections.IList list && FieldPaths.ElementTypeOf(type) is Type element &&
-                                     PlayerDataGrants.TryParse(element, field.value, out var item, out _))
-                                list.Add(item);
+                            else if (FieldPaths.ElementTypeOf(type) is Type element && PlayerDataGrants.TryParse(element, field.value, out var item, out _))
+                            {
+                                var current = GetValue(member, evt);
+                                if (type.IsArray)
+                                {
+                                    // 배열은 크기가 정해져 있어 늘린 새 배열로 바꾼다.
+                                    var old = current as Array;
+                                    var grown = Array.CreateInstance(element, (old?.Length ?? 0) + 1);
+                                    old?.CopyTo(grown, 0);
+                                    grown.SetValue(item, grown.Length - 1);
+                                    value = grown;
+                                }
+                                else if ((current ?? DataModel.Create(type)) is System.Collections.IList list)
+                                {
+                                    list.Add(item);
+                                    value = list;
+                                }
+                            }
                             break;
                     }
                     if (value == null) return;
@@ -341,7 +404,7 @@ namespace GBible
             }
         }
 
-        static void Collect(GameSession session, Condition condition, List<(string stat, double amount)> steps, List<string> problems, HashSet<string> visiting)
+        static void Collect(GameSession session, Condition condition, List<(string stat, double amount)> steps, List<object> events, List<string> problems, HashSet<string> planned, HashSet<string> path)
         {
             if (condition.Evaluate(session)) return;
             switch (condition)
@@ -353,11 +416,17 @@ namespace GBible
                         problems.Add($"없는 수치 '{compare.stat}'");
                         return;
                     }
-                    var current = session.Stats.Get(compare.stat);
-                    if (double.IsNaN(current)) current = 0;
+                    var recorded = session.Stats.Get(compare.stat);
+                    var current = double.IsNaN(recorded) ? 0 : recorded;
                     if (compare.op != CompareOp.AtLeast && compare.op != CompareOp.GreaterThan)
                     {
                         problems.Add($"'{condition.Describe(session)}'은 값을 늘려서 채울 수 없는 비교");
+                        return;
+                    }
+                    // 최저치는 첫 기록만 올릴 수 있다(이미 기록이 있으면 더 큰 값을 기록해도 그대로다).
+                    if (definition.Aggregate == StatAggregate.Min && !double.IsNaN(recorded))
+                    {
+                        problems.Add($"'{condition.Describe(session)}': 최저치 로그는 이미 기록된 값보다 크게 올릴 수 없음");
                         return;
                     }
                     var target = compare.op == CompareOp.GreaterThan ? compare.value + 1 : compare.value;
@@ -365,23 +434,45 @@ namespace GBible
                     return;
 
                 case AchievementUnlockedCondition unlocked:
-                    if (!visiting.Add(unlocked.achievement))
+                    if (path.Contains(unlocked.achievement))
                     {
                         problems.Add("도전과제 순환 참조");
                         return;
                     }
+                    // 다른 갈래가 이미 이 도전과제를 채운다.
+                    if (!planned.Add(unlocked.achievement)) return;
                     var other = session.Achievements.Find(unlocked.achievement);
-                    if (other?.When == null) problems.Add($"'{session.AchievementName(unlocked.achievement)}'의 트리거가 없음");
-                    else PlanTrigger(session, other.When, steps, new List<object>(), problems, visiting);
+                    if (other?.When == null)
+                    {
+                        problems.Add($"'{session.AchievementName(unlocked.achievement)}'의 트리거가 없음");
+                        return;
+                    }
+                    // 그 도전과제의 트리거 이벤트도 쏜다(달성은 행동이 끝난 뒤 — 이 조건은 그때 다시 평가된다).
+                    path.Add(unlocked.achievement);
+                    PlanTrigger(session, other.When, steps, events, problems, planned, path);
+                    path.Remove(unlocked.achievement);
                     return;
 
                 case AllOfCondition all:
-                    foreach (var child in all.Children) Collect(session, child, steps, problems, visiting);
+                    foreach (var child in all.Children) Collect(session, child, steps, events, problems, planned, path);
                     return;
 
                 case AnyOfCondition any:
-                    var first = any.Children.FirstOrDefault();
-                    if (first != null) Collect(session, first, steps, problems, visiting);
+                    // 계획이 서는 첫 갈래.
+                    foreach (var child in any.Children)
+                    {
+                        var s = new List<(string, double)>();
+                        var e = new List<object>();
+                        var p = new List<string>();
+                        var branch = new HashSet<string>(planned);
+                        Collect(session, child, s, e, p, branch, path);
+                        if (p.Count > 0) continue;
+                        steps.AddRange(s);
+                        events.AddRange(e);
+                        planned.UnionWith(branch);
+                        return;
+                    }
+                    problems.Add("OR의 어느 갈래도 자동으로 채울 수 없음");
                     return;
 
                 default:

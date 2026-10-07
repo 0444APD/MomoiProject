@@ -415,6 +415,37 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 패시브_트리거의_조건은_검사하는_순간에도_패시브_ID와_이_조각의_레벨을_본다()
+        {
+            // 값 틀 {owner}·{level}은 결과뿐 아니라 트리거를 검사하는 순간에도 그 패시브(등록 키 'passive:…'가 아니라)와 가진 조각의 레벨.
+            var named = Piece("named", new AllTrigger { triggers = { On<TrScored>(), new ConditionTrigger { condition = new UserFieldCondition { path = "card", op = FieldOp.Equal, value = "{owner}" } } } }, new Log { text = "owner" });
+            var leveled = Piece("leveled", new AllTrigger { triggers = { On<TrScored>(), new ConditionTrigger { condition = new UserFieldCondition { path = "counter", op = FieldOp.Equal, value = "{level}" } } } }, new Log { text = "level" });
+            _session.Passives.Define(named);
+            _session.Passives.Define(leveled);
+            Do(g =>
+            {
+                g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "n1", card = "named" });
+                g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "l1", card = "leveled", level = 3, counter = 3 });
+            });
+            Publish(new TrScored());
+            Assert.AreEqual(1, Run.log.Count(l => l.StartsWith("owner")), "{owner} = 패시브 ID");
+            Assert.AreEqual(1, Run.log.Count(l => l.StartsWith("level")), "{level} = 이 조각의 레벨 3");
+        }
+
+        [Test]
+        public void 상태_효과_트리거의_조건은_검사하는_순간에도_그_상태_효과의_중첩을_본다()
+        {
+            // {stacks}는 트리거를 검사하는 순간에도 이 상태 효과(등록 키 'status:…'가 아니라)가 가진 쪽에 걸린 중첩.
+            var focus = new StatusDefinition { Id = "focus", MaxStacks = 0, When = new AllTrigger { triggers = { On<TrScored>(), new ConditionTrigger { condition = new UserFieldCondition { path = "counter", op = FieldOp.Equal, value = "{stacks}" } } } } };
+            focus.Outcomes.Add(new Log { text = "focus" });
+            _session.Statuses.Define(focus);
+            Do(g => g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "s1", card = "none", counter = 2 }));
+            Do(g => g.ApplyStatus("s1", "focus", 2));
+            Publish(new TrScored());
+            Assert.AreEqual(1, Run.log.Count(l => l.StartsWith("focus")), "{stacks} = 2");
+        }
+
+        [Test]
         public void 빌려_쓰기는_가진_쪽_필드를_빌리는_쪽으로_본다()
         {
             // 메인 룰이 조커마다 차례 이벤트(pieceId)를 쏘고, 패시브는 가진 쪽 필드 pieceId로 "내 차례"만 받는다.

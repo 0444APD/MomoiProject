@@ -51,14 +51,23 @@ namespace GBible
         public static string PathLabel(string path) =>
             string.IsNullOrEmpty(path) ? "(필드 없음)" : path.Replace("[]", "의 각 항목").Replace(".", " › ");
 
+        // 경로를 비우면 값 전체 — 숫자·글자·참거짓·목록 하나인 값(골드 · 이름 목록)은 실행할 때도 그렇게 본다. 클래스 값이면 칸을 골라야 한다.
+        public static bool IsWholeValue(Type type)
+        {
+            if (type == null) return false;
+            type = Nullable.GetUnderlyingType(type) ?? type;
+            return type == typeof(bool) || type.IsEnum || TypeResolver.IsNumeric(type) || type == typeof(string) || FieldPaths.ElementTypeOf(type) != null;
+        }
+
         public override void Validate(Type root, List<string> errors)
         {
-            if (string.IsNullOrEmpty(path))
+            if (string.IsNullOrEmpty(path) && !IsWholeValue(root))
             {
                 errors.Add("검사할 필드가 선택되지 않았습니다.");
                 return;
             }
-            var type = FieldPaths.TypeAt(root, path, out var error);
+            string error = null;
+            var type = string.IsNullOrEmpty(path) ? root : FieldPaths.TypeAt(root, path, out error);
             if (type == null)
             {
                 errors.Add(error);
@@ -247,12 +256,14 @@ namespace GBible
 
         public override void Validate(Type root, List<string> errors)
         {
-            if (string.IsNullOrEmpty(path))
+            // 경로를 비우면 값 전체(목록 하나인 값 — 실행할 때도 그렇게 본다).
+            if (string.IsNullOrEmpty(path) && FieldPaths.ElementTypeOf(root) == null)
             {
                 errors.Add("검사할 배열·리스트가 선택되지 않았습니다.");
                 return;
             }
-            var type = FieldPaths.TypeAt(root, path, out var error);
+            string error = null;
+            var type = string.IsNullOrEmpty(path) ? root : FieldPaths.TypeAt(root, path, out error);
             if (type == null)
             {
                 errors.Add(error);

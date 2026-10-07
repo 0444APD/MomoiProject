@@ -414,6 +414,20 @@ namespace GBible.Tests
         static StatCompareCondition AtLeast(string stat, double value) => new StatCompareCondition { stat = stat, op = CompareOp.AtLeast, value = value };
 
         [Test]
+        public void 개발_명령_이번_판_수치_초기화는_행동_하나라_Undo된다()
+        {
+            _session.Do(new TestKillAction());
+            _session.Do(new TestKillAction());
+            Assert.AreEqual(2, _session.Stats.Get("run_kills"));
+            var reset = _session.Debug.All.First(c => c.Name == "이번 판 수치 초기화");
+            reset.Execute();
+            Assert.AreEqual(0, _session.Stats.Get("run_kills"), "이번 판 로그만 처음으로");
+            Assert.AreEqual(2, _session.Stats.Get("kills"), "전체 로그는 그대로");
+            Assert.IsTrue(_session.Undo(), "행동으로 남는다");
+            Assert.AreEqual(2, _session.Stats.Get("run_kills"), "Undo로 되돌아온다");
+        }
+
+        [Test]
         public void 이벤트_규칙이_수치를_집계한다()
         {
             _session.Events.Publish(new TestKill { Count = 2, Combo = 5 });

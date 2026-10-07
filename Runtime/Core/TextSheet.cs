@@ -6,7 +6,7 @@ namespace GBible
 {
     // 텍스트 시트(CSV) 주고받기. 규칙은 최소한만 둔다(세부 규칙은 대사 시스템과 함께 정한다).
     //
-    //   #gbible-text,1          ← 첫 칸이 '#'인 줄은 설명·형식 버전(읽을 때 건너뛴다)
+    //   #gbible-text,1          ← 첫 칸이 '#'인 줄은 설명·형식 버전(읽을 때 건너뛴다. 머리줄 아래에서는 key 칸이 '#'인 줄)
     //   key,ko,en,ja,note            ← 머리줄. 'key' 열과 언어 코드 열을 '이름'으로 찾는다(열 순서·다른 열은 상관없음)
     //   ui.start,시작하기,Start,スタート,
     //
@@ -113,15 +113,15 @@ namespace GBible
             foreach (var row in rows)
             {
                 line++;
-                var first = row.Length > 0 ? row[0].Trim() : "";
-                if (first.StartsWith("#", StringComparison.Ordinal)) continue;
                 if (!headerSeen)
                 {
-                    headerSeen = true;
+                    var first = row.Length > 0 ? row[0].Trim() : "";
+                    if (!first.StartsWith("#", StringComparison.Ordinal)) headerSeen = true;
                     continue;
                 }
+                // 머리줄 아래의 설명 줄은 key 칸이 '#'으로 시작한다(앞으로 옮긴 메모·언어 열의 '#'은 글이다).
                 var key = Csv.Cell(row, keyColumn).Trim();
-                if (key.Length == 0) continue;
+                if (key.Length == 0 || key.StartsWith("#", StringComparison.Ordinal)) continue;
                 if (!keys.Add(key)) result.Warnings.Add($"{line}번째 줄: 키 '{key}'가 두 번 나옵니다(뒤의 값을 씁니다).");
                 foreach (var (language, column) in columns)
                 {
@@ -147,16 +147,26 @@ namespace GBible
             if (original.Error != null) yield break;
             var sourceArgs = new HashSet<string>(original.Arguments, StringComparer.Ordinal);
             var targetArgs = new HashSet<string>(target.Arguments, StringComparer.Ordinal);
+            // 용어에 넘기는 값([[potion, count]])도 코드가 넘기는 값이다: 번역이 그 값을 보여도 되고, 번역의 용어가 넘기지 않는 값을 쓰면 알린다.
+            var passed = new HashSet<string>(sourceArgs.Concat(original.TermArguments), StringComparer.Ordinal);
             foreach (var missing in sourceArgs.Except(targetArgs)) yield return $"원문의 값 {{{missing}}}이(가) 없습니다.";
-            foreach (var extra in targetArgs.Except(sourceArgs)) yield return $"원문에 없는 값 {{{extra}}}을(를) 씁니다.";
+            foreach (var extra in targetArgs.Concat(target.TermArguments).Except(passed)) yield return $"원문에 없는 값 {{{extra}}}을(를) 씁니다.";
             var sourceTerms = new HashSet<string>(original.Terms, StringComparer.Ordinal);
             var targetTerms = new HashSet<string>(target.Terms, StringComparer.Ordinal);
             foreach (var missing in sourceTerms.Except(targetTerms)) yield return $"원문의 용어 [[{missing}]]이(가) 없습니다.";
             foreach (var extra in targetTerms.Except(sourceTerms)) yield return $"원문에 없는 용어 [[{extra}]]을(를) 씁니다.";
-            var sourceTags = Tags(source);
-            var targetTags = Tags(translation);
+            // 경우(plural·select)마다 되풀이한 태그는 한 벌로 센다(영어 one {<b>#</b> …} other {<b>#</b> …} = 원문 <b>{n}</b>).
+            var sourceTags = Sorted(original.TagCounts(Tags));
+            var targetTags = Sorted(target.TagCounts(Tags));
             if (!sourceTags.SequenceEqual(targetTags))
                 yield return $"태그가 원문과 다릅니다(원문: {string.Join(" ", sourceTags)} / 번역: {string.Join(" ", targetTags)}).";
+        }
+
+        static List<string> Sorted(Dictionary<string, int> counts)
+        {
+            var tags = counts.SelectMany(pair => Enumerable.Repeat(pair.Key, pair.Value)).ToList();
+            tags.Sort(StringComparer.Ordinal);
+            return tags;
         }
 
         // <…> 태그 이름 목록(정렬). 태그는 번역에서도 그대로 있어야 한다.

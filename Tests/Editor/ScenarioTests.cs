@@ -43,6 +43,19 @@ namespace GBible.Tests
         public List<string> tags = new List<string>();
     }
 
+    // 키워드 ID가 두 그룹에 겹친 코드(실수). 그룹 ID 순서와 반대로 선언한다(모으는 차례 ≠ 그룹 ID 차례).
+    [KeywordGroup("예제: 뒤 그룹")]
+    public static class ScenarioZoneZ
+    {
+        public const string Shared = "scenarioShared";
+    }
+
+    [KeywordGroup("예제: 앞 그룹")]
+    public static class ScenarioZoneA
+    {
+        public const string Shared = "scenarioShared";
+    }
+
     [Serializable] public sealed class ScenarioAttack : GameAction { public string monster; public string[] tags = Array.Empty<string>(); public override string Describe() => $"{monster} 공격"; }
     [Serializable] public sealed class ScenarioLoot : GameAction { public string template; public override string Describe() => $"{template} 획득"; }
     [Serializable] public sealed class ScenarioEnhance : GameAction { public string effect; public override string Describe() => $"첫 장비 {effect} 강화"; }
@@ -183,6 +196,14 @@ namespace GBible.Tests
             Assert.IsTrue(resumed.Achievements.IsUnlocked("dragon_slayer"));
             Assert.IsTrue(resumed.Achievements.IsUnlocked("enhance_master"));
             Assert.AreEqual(nextRoll, resumed.Random.Get("enhance").Range(1, 10), "난수도 저장 시점부터 그대로");
+        }
+
+        [Test]
+        public void 겹친_키워드_ID는_그룹_ID_순으로_앞선_그룹의_것이다()
+        {
+            Keywords.Reset();
+            Assert.AreSame(Keywords.GroupOf(typeof(ScenarioZoneA)), Keywords.Find(ScenarioZoneA.Shared).Group, "DB 키워드 탭(그룹 ID 순)과 같은 하나");
+            Assert.AreEqual(1, Keywords.GroupOf(typeof(ScenarioZoneZ)).Keywords.Count, "그룹 목록에는 둘 다 있다");
         }
     }
 }

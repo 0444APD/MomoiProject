@@ -364,7 +364,10 @@ namespace GBible
                 var name = link.steamName.Trim();
                 if (double.IsNaN(value))
                 {
-                    WarnOnce("statnan:" + name, $"로그 '{link.stat}'의 값이 숫자가 아니어서(NaN) Steam 통계 '{name}'에 올리지 않습니다.");
+                    // 최고·최저 로그는 첫 기록 전에는 비어 있다(NaN) — 올릴 것이 없을 뿐이라 알리지 않는다.
+                    var aggregate = session.Stats.Find(link.stat)?.Aggregate;
+                    if (aggregate != StatAggregate.Max && aggregate != StatAggregate.Min)
+                        WarnOnce("statnan:" + name, $"로그 '{link.stat}'의 값이 숫자가 아니어서(NaN) Steam 통계 '{name}'에 올리지 않습니다.");
                     continue;
                 }
                 bool ok;

@@ -42,10 +42,12 @@ namespace GBible
         {
             public Action<object> Invoke;
             public Delegate Original;
+            // 그만 받았다(Dispose). 이미 꺼내 둔 차례(지금 이벤트를 받는 중·모아 둔 연출)에서도 부르지 않는다.
+            public bool Removed;
         }
 
         readonly Dictionary<Type, List<Handler>> _handlers = new Dictionary<Type, List<Handler>>();
-        readonly List<Action<object>> _listeners = new List<Action<object>>();
+        readonly List<Handler> _listeners = new List<Handler>();
         // 행동이 성공한 뒤에 받는 쪽(연출): 행동 중에 쏜 이벤트는 모았다가 바깥 행동이 끝나면 차례로, 실패하면 버린다.
         readonly Dictionary<Type, List<Handler>> _afterAction = new Dictionary<Type, List<Handler>>();
         readonly List<(Handler handler, object evt)> _pending = new List<(Handler, object)>();
@@ -67,7 +69,11 @@ namespace GBible
                 _handlers[typeof(T)] = list = new List<Handler>();
             var entry = new Handler { Invoke = o => handler((T)o), Original = handler };
             list.Add(entry);
-            return new Subscription(() => list.Remove(entry));
+            return new Subscription(() =>
+            {
+                entry.Removed = true;
+                list.Remove(entry);
+            });
         }
 
         // 행동이 성공한 뒤에만 받는다(화면 연출용). 행동 중에 쏜 이벤트는 바깥 행동이 성공하면 쏜 순서대로 오고, 실패하면 오지 않는다.
@@ -81,6 +87,7 @@ namespace GBible
             list.Add(entry);
             return new Subscription(() =>
             {
+                entry.Removed = true;
                 list.Remove(entry);
                 _pending.RemoveAll(p => p.handler == entry);
             });
@@ -93,7 +100,7 @@ namespace GBible
             if (_pending.Count == 0) return;
             var ready = _pending.ToArray();
             _pending.Clear();
-            foreach (var (handler, evt) in ready) Invoke(handler.Invoke, evt, handler.Original);
+            foreach (var (handler, evt) in ready) Invoke(handler, evt);
         }
 
         // 행동이 실패해 취소됐을 때: 모아 둔 이벤트를 버린다.
@@ -122,8 +129,13 @@ namespace GBible
         public IDisposable SubscribeAll(Action<object> listener)
         {
             if (listener == null) throw new ArgumentNullException(nameof(listener));
-            _listeners.Add(listener);
-            return new Subscription(() => _listeners.Remove(listener));
+            var entry = new Handler { Invoke = listener, Original = listener };
+            _listeners.Add(entry);
+            return new Subscription(() =>
+            {
+                entry.Removed = true;
+                _listeners.Remove(entry);
+            });
         }
 
         public void Publish<T>(T evt) => PublishObject(evt);
@@ -135,27 +147,33 @@ namespace GBible
             var entry = _journal.Append(JournalKind.Event, "Events", Describe(evt));
             entry.Payload = evt;
             var inAction = InAction?.Invoke() ?? false;
-            if (inAction) _inAction.Add(evt);
+            _afterAction.TryGetValue(evt.GetType(), out var after);
+            if (inAction)
+            {
+                _inAction.Add(evt);
+                // 행동 안: 연출(SubscribeAfterAction)의 차례와 Published(멀티 서버가 모으는 차례)는 쏜 순간에 잡는다 —
+                // 받는 쪽이 안에서 쏜 이벤트(반사 피해·현상금 …)보다 먼저 온다(쏜 순서대로).
+                if (after != null)
+                    foreach (var handler in after) _pending.Add((handler, evt));
+                Published?.Invoke(evt);
+            }
 
             using (_journal.Cause(entry.Id))
             {
                 if (_handlers.TryGetValue(evt.GetType(), out var list))
                 {
                     foreach (var handler in list.ToArray())
-                        Invoke(handler.Invoke, evt, handler.Original);
+                        Invoke(handler, evt);
                 }
                 foreach (var listener in _listeners.ToArray())
-                    Invoke(listener, evt, listener);
-                if (_afterAction.TryGetValue(evt.GetType(), out var after) && after.Count > 0)
+                    Invoke(listener, evt);
+                if (!inAction && after != null && after.Count > 0)
                 {
                     foreach (var handler in after.ToArray())
-                    {
-                        if (inAction) _pending.Add((handler, evt));
-                        else Invoke(handler.Invoke, evt, handler.Original);
-                    }
+                        Invoke(handler, evt);
                 }
             }
-            Published?.Invoke(evt);
+            if (!inAction) Published?.Invoke(evt);
         }
 
         // 멀티플레이 클라이언트: 서버가 보낸 이벤트를 연출 쪽(SubscribeAfterAction)에만 준다.
@@ -169,18 +187,20 @@ namespace GBible
             {
                 if (_afterAction.TryGetValue(evt.GetType(), out var after))
                     foreach (var handler in after.ToArray())
-                        Invoke(handler.Invoke, evt, handler.Original);
+                        Invoke(handler, evt);
             }
             Published?.Invoke(evt);
         }
 
         public int SubscriberCount(Type eventType) => _handlers.TryGetValue(eventType, out var list) ? list.Count : 0;
 
-        void Invoke(Action<object> call, object evt, Delegate target)
+        void Invoke(Handler handler, object evt)
         {
+            if (handler.Removed) return;
+            var target = handler.Original;
             try
             {
-                call(evt);
+                handler.Invoke(evt);
             }
             catch (Exception e)
             {
@@ -207,11 +227,16 @@ namespace GBible
         }
 
         // 기록 문장: "표시 이름 (필드=값, …)". 값은 생성 코드(FieldAccess)로 읽는다.
+        // 기록에 남길 한 줄. 이벤트의 Describe·값의 ToString(게임 코드)이 던져도 쏘기는 실패하지 않는다(기록 글만 '?').
         public static string Describe(object evt)
         {
-            if (evt is IDescribable describable) return describable.Describe();
-
             var type = evt.GetType();
+            if (evt is IDescribable describable)
+            {
+                try { return describable.Describe(); }
+                catch (Exception) { return DisplayNameOf(type) + " (?)"; }
+            }
+
             var builder = new StringBuilder(DisplayNameOf(type));
             var names = FieldAccess.NamesOf(type);
             if (names.Count == 0) return builder.ToString();
@@ -220,9 +245,14 @@ namespace GBible
             for (int i = 0; i < names.Count; i++)
             {
                 if (i > 0) builder.Append(", ");
-                var value = FieldAccess.Find(type, names[i])?.Get(evt);
-                builder.Append(names[i]).Append('=')
-                       .Append(value is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : value?.ToString() ?? "없음");
+                string text;
+                try
+                {
+                    var value = FieldAccess.Find(type, names[i])?.Get(evt);
+                    text = value is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : value?.ToString() ?? "없음";
+                }
+                catch (Exception) { text = "?"; }
+                builder.Append(names[i]).Append('=').Append(text);
             }
             return builder.Append(')').ToString();
         }

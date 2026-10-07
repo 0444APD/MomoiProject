@@ -7,6 +7,7 @@ namespace GBible
 {
     // CSV 읽기·쓰기(RFC 4180): 쉼표 구분, 큰따옴표로 감싼 칸 안의 쉼표·줄바꿈·"" 허용.
     // 구글 시트·엑셀에서 내려받은 CSV를 그대로 읽는다(맨 앞 BOM 무시, \r\n·\n 모두 허용).
+    // 손으로 쓴 CSV처럼 따옴표로 감싸지 않은 칸 가운데의 "는 글자로 읽는다(엑셀과 같다).
     public static class Csv
     {
         public static List<string[]> Read(string text)
@@ -18,11 +19,14 @@ namespace GBible
             var quoted = false;
             var i = text[0] == '﻿' ? 1 : 0;
             var any = false;
+            // 이 칸에 공백 아닌 글자나 따옴표 칸이 나왔는가. 따옴표 칸은 칸 맨 앞(공백 뒤)에서만 시작한다 — 가운데의 "는 글자(5" 칼).
+            var started = false;
 
             void EndCell()
             {
                 row.Add(cell.ToString());
                 cell.Clear();
+                started = false;
             }
 
             void EndRow()
@@ -54,7 +58,8 @@ namespace GBible
                 switch (c)
                 {
                     case '"':
-                        quoted = true;
+                        if (started) cell.Append(c);
+                        else quoted = started = true;
                         any = true;
                         break;
                     case ',':
@@ -71,6 +76,7 @@ namespace GBible
                     default:
                         cell.Append(c);
                         any = true;
+                        if (!char.IsWhiteSpace(c)) started = true;
                         break;
                 }
             }

@@ -514,7 +514,11 @@ namespace GBible
     {
         sealed class Entry
         {
+            // 감시 키(Unregister·IsRegistered가 찾는 이름 — 패시브는 'passive:<ID>'처럼 종류를 붙여 겹치지 않게).
             public string Owner;
+            // 검사·발동하는 순간에 보일 '가진 항목 ID'(Context.Owner — 값 틀 {owner}·{level}·{stacks}, 확률의 source). 비우면 감시 키.
+            public string Item;
+            public string ContextOwner => Item ?? Owner;
             public Trigger When;
             public bool Repeat;
             public Action<TriggerContext> Fire;
@@ -575,14 +579,15 @@ namespace GBible
         // 따로 검사하고, 참인 가진 쪽마다 fire를 부른다(조건 Block이 Context.User로 "가진 쪽의 체력" 같은 것을 본다).
         // orderedHolders + orderGroup: 가진 쪽마다 검사하되, 같은 묶음의 다른 항목들과 섞어 가진 쪽의 자리(order)가 작은 것부터 발동한다.
         //   이벤트 하나에 '놓인 것마다' 패시브 여럿이 걸리면 패시브 등록 순서가 아니라 목록 순서대로 돈다(가로채기는 같은 '순서' 칸끼리).
+        // item: 순간(Context.Owner)에 보일 항목 ID — 감시 키(owner)에 종류를 붙였을 때(패시브 'passive:<ID>' → <ID>). 비우면 owner.
         public void Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null,
-            Func<TriggerContext, IEnumerable<(object holder, int order)>> orderedHolders = null, string orderGroup = null)
+            Func<TriggerContext, IEnumerable<(object holder, int order)>> orderedHolders = null, string orderGroup = null, string item = null)
         {
             if (when == null) return;
             if (orderedHolders != null) holders = moment => orderedHolders(moment).Select(p => p.holder);
             var entry = new Entry
             {
-                Owner = owner, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds(), Holders = holders,
+                Owner = owner, Item = item, When = when, Repeat = repeat, Fire = fire, Kinds = when.Kinds(), Holders = holders,
                 OrderedHolders = orderedHolders, OrderGroup = orderedHolders == null ? null : orderGroup,
             };
             _entries.Add(entry);
@@ -626,7 +631,7 @@ namespace GBible
                         FireInPlaceOrder(sorted.Where(p => p.order == order && p.entry.OrderGroup == entry.OrderGroup).Select(p => p.entry).ToList(), intent, true);
                         continue;
                     }
-                    var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = intent, IsIntercept = true };
+                    var moment = new TriggerContext { Session = _session, Owner = entry.ContextOwner, Event = intent, IsIntercept = true };
                     TestAndFire(entry, moment);
                 }
             }
@@ -705,8 +710,8 @@ namespace GBible
             Watcher.Watch(entry.WatchKey, probe, () =>
             {
                 entry.WatchKey = null;
-                if (entry.Holders == null) Fire(entry, Moment(entry.Owner));
-                else TestAndFire(entry, Moment(entry.Owner));
+                if (entry.Holders == null) Fire(entry, Moment(entry.ContextOwner));
+                else TestAndFire(entry, Moment(entry.ContextOwner));
                 if (entry.Repeat && entry.Live) WatchConditions(entry, armed: false);
             });
         }
@@ -740,7 +745,7 @@ namespace GBible
                         FireInPlaceOrder(ordered.Where(e => e.OrderGroup == entry.OrderGroup).ToList(), evt, false);
                         continue;
                     }
-                    var moment = new TriggerContext { Session = _session, Owner = entry.Owner, Event = evt };
+                    var moment = new TriggerContext { Session = _session, Owner = entry.ContextOwner, Event = evt };
                     TestAndFire(entry, moment);
                 }
             }
@@ -799,14 +804,14 @@ namespace GBible
             var queue = new List<(Entry entry, object holder, int order, int seq)>();
             for (int i = 0; i < entries.Count; i++)
             {
-                var moment = new TriggerContext { Session = _session, Owner = entries[i].Owner, Event = evt, IsIntercept = intercept };
+                var moment = new TriggerContext { Session = _session, Owner = entries[i].ContextOwner, Event = evt, IsIntercept = intercept };
                 foreach (var (holder, order) in OrderedHoldersOf(entries[i], moment)) queue.Add((entries[i], holder, order, i));
             }
             foreach (var item in queue.OrderBy(q => q.order).ThenBy(q => q.seq).ToList())
             {
                 if (!item.entry.Live) continue;
                 if (intercept && Intents.IsCancelled(evt)) break;
-                var moment = new TriggerContext { Session = _session, Owner = item.entry.Owner, Event = evt, IsIntercept = intercept };
+                var moment = new TriggerContext { Session = _session, Owner = item.entry.ContextOwner, Event = evt, IsIntercept = intercept };
                 if (!HoldersOf(item.entry, moment).Any(h => ReferenceEquals(h, item.holder))) continue;
                 var each = ForHolder(moment, item.holder);
                 if (Test(item.entry.When, each)) Fire(item.entry, each);
@@ -883,7 +888,7 @@ namespace GBible
 
             public override bool Evaluate(GameSession session)
             {
-                var moment = _system.Moment(_entry.Owner);
+                var moment = _system.Moment(_entry.ContextOwner);
                 var result = _entry.Holders == null
                     ? _system.Test(_entry.When, moment)
                     : _system.HoldersOf(_entry, moment).Any(h => _system.Test(_entry.When, ForHolder(moment, h)));

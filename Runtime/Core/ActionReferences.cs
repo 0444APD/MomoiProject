@@ -30,6 +30,8 @@ namespace GBible
             public Type FieldType;
             public bool Many;
             public bool Ids;
+            // id만 든 객체로 만들 형식. 추상 형식이면 그 아래 구체 형식 하나(실행 직전에 Resolve가 id로 지금 객체로 바꾸므로 어느 것이든 된다).
+            public Type StubType;
             public MemberAccess Access;
         }
 
@@ -61,6 +63,13 @@ namespace GBible
                     foreach (var item in list) fresh.Add(item == null ? null : Live(game, action, field, item));
                     field.Access.Set(action, fresh);
                 }
+                else if (DataModel.Of(field.FieldType) is { Kind: DataKind.Collection } info)
+                {
+                    // 리스트가 아닌 컬렉션(HashSet·Queue …)도 새 컬렉션에 담는다.
+                    var collection = DataModel.Create(field.FieldType);
+                    info.WriteItems(collection, info.ReadItems(value).Select(item => item == null ? null : Live(game, action, field, item)).ToList());
+                    field.Access.Set(action, collection);
+                }
             }
         }
 
@@ -84,6 +93,12 @@ namespace GBible
                 {
                     foreach (var item in list) fresh.Add(item == null ? null : Stub(item));
                     field.Access.Set(action, fresh);
+                }
+                else if (DataModel.Of(field.FieldType) is { Kind: DataKind.Collection } info)
+                {
+                    var collection = DataModel.Create(field.FieldType);
+                    info.WriteItems(collection, info.ReadItems(value).Select(item => item == null ? null : Stub(item)).ToList());
+                    field.Access.Set(action, collection);
                 }
             }
         }
@@ -111,7 +126,7 @@ namespace GBible
             var field = ChosenOf(action.GetType())
                 ?? throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'에 [Chosen] 필드가 없습니다.");
             ids ??= Array.Empty<string>();
-            object Item(string id) => field.Ids ? id : StubOf(field.ElementType, id);
+            object Item(string id) => field.Ids ? id : StubOf(field.StubType, id);
             if (!field.Many)
             {
                 field.Access.Set(action, ids.Count == 0 ? null : Item(ids[0]));
@@ -145,12 +160,26 @@ namespace GBible
                     var element = many ? info.ElementType : fieldType;
                     if (element != typeof(string) && !IsReferenceType(element))
                         throw new InvalidOperationException($"[MomoiProject] '{type.Name}.{field.Name}': [Chosen] 필드는 string, id가 있는 클래스, 그 리스트·배열이어야 합니다.");
-                    found = new ChosenField { Name = field.Name, ElementType = element, FieldType = fieldType, Many = many, Ids = element == typeof(string), Access = FieldAccess.Find(type, field.Name) };
+                    found = new ChosenField
+                    {
+                        Name = field.Name, ElementType = element, FieldType = fieldType, Many = many, Ids = element == typeof(string),
+                        StubType = element == typeof(string) ? null : StubTypeOf(element), Access = FieldAccess.Find(type, field.Name),
+                    };
                     break;
                 }
                 Chosen[type] = found;
                 return found;
             }
+        }
+
+        // 추상 형식은 만들 수 없으므로 그 아래 구체 형식으로 id만 든 객체를 만든다(형식마다 한 번 — 게임이 켜질 때 PrepareAll).
+        static Type StubTypeOf(Type type)
+        {
+            if (!type.IsAbstract) return type;
+            foreach (var assembly in GameAssemblies.All())
+                foreach (var candidate in GameAssemblies.TypesOf(assembly))
+                    if (!candidate.IsAbstract && !candidate.ContainsGenericParameters && type.IsAssignableFrom(candidate)) return candidate;
+            return type;
         }
 
         // 형식마다 한 번(게임이 켜질 때 PrepareAll) 어트리뷰트를 본다.

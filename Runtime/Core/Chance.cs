@@ -39,7 +39,7 @@ namespace GBible
             return Game.Chance(percent / 100.0, stream, moment.Owner, moment.User);
         }
 
-        public override string Describe(INameResolver names) => $"{percent:0.##}% 확률";
+        public override string Describe(INameResolver names) => percent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "% 확률";
 
         public override void Validate(IValidationContext context)
         {

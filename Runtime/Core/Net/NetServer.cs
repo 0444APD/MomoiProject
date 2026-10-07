@@ -81,7 +81,9 @@ namespace GBible
         readonly HashSet<string> _values = new HashSet<string>(StringComparer.Ordinal);
         readonly HashSet<string> _trees = new HashSet<string>(StringComparer.Ordinal);
         readonly List<object> _events = new List<object>();
-        readonly List<object> _pendingEvents = new List<object>();
+        // 행동 안에서 쏜 이벤트와 그 행동 번호. 그 행동이 성공하면 보낼 것으로 옮기고, 취소되면 그 행동 것만 버린다 —
+        // 성공한 행동 뒤(이 서버가 Executed를 받기 전, 연출이 그 이벤트를 받는 동안) 미리보기(CanDo)나 다른 행동이 실패해도 남는다.
+        readonly List<(object evt, long transaction)> _pendingEvents = new List<(object, long)>();
         readonly HashSet<Type> _warnedEvents = new HashSet<Type>();
         readonly MirrorWriter _out = new MirrorWriter(1024);
         bool _scanAll;
@@ -610,23 +612,25 @@ namespace GBible
         void OnPublished(object evt)
         {
             if (_session.Actions.IsPreviewing) return;
-            if (_session.Data.InTransaction) _pendingEvents.Add(evt);
+            if (_session.Data.InTransaction) _pendingEvents.Add((evt, _session.Data.ActiveTransactionId));
             else _events.Add(evt);
         }
 
         void OnExecuted(ActionRecord record)
         {
             if (record.Nested) return;
-            if (record.Status == ActionStatus.Done) _events.AddRange(_pendingEvents);
-            _pendingEvents.Clear();
+            if (record.Status == ActionStatus.Done)
+                foreach (var (evt, transaction) in _pendingEvents)
+                    if (transaction == record.TransactionId) _events.Add(evt);
+            _pendingEvents.RemoveAll(p => p.transaction == record.TransactionId);
         }
 
-        void OnAborted(long transaction) => _pendingEvents.Clear();
+        void OnAborted(long transaction) => _pendingEvents.RemoveAll(p => p.transaction == transaction);
 
         // 행동 안에서 일부만 되돌린 이벤트(실패한 이벤트 예약)는 보내지 않는다.
         void OnRetracted(object evt)
         {
-            var i = _pendingEvents.LastIndexOf(evt);
+            var i = _pendingEvents.FindLastIndex(p => Equals(p.evt, evt));
             if (i >= 0) _pendingEvents.RemoveAt(i);
         }
 
