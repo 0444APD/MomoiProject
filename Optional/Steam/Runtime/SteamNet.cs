@@ -272,13 +272,20 @@ namespace GBible
             return count;
         }
 
+        // 보내지 못한 (연결, 결과) — 한 번만 알린다.
+        static readonly HashSet<(uint, EResult)> Failed = new HashSet<(uint, EResult)>();
+
         public static void Send(HSteamNetConnection connection, byte[] data, int length, bool reliable)
         {
             var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
             try
             {
                 var flags = reliable ? Constants.k_nSteamNetworkingSend_Reliable : Constants.k_nSteamNetworkingSend_Unreliable;
-                SteamNetworkingSockets.SendMessageToConnection(connection, handle.AddrOfPinnedObject(), (uint)length, flags, out _);
+                var result = SteamNetworkingSockets.SendMessageToConnection(connection, handle.AddrOfPinnedObject(), (uint)length, flags, out _);
+                // 보내지 못하면(한 메시지가 512KB를 넘음 · 보낼 버퍼가 참) Steam은 그 메시지를 버린다 — 조용히 넘기면 그 사람의 판이 어긋나므로 알린다.
+                if (result != EResult.k_EResultOK && Failed.Add((connection.m_HSteamNetConnection, result)))
+                    Debug.LogError($"[MomoiProject] Steam으로 메시지를 보내지 못했습니다({length}바이트, {(reliable ? "신뢰" : "비신뢰")}, {result}). " +
+                                   "한 메시지가 512KB를 넘거나 보낼 버퍼가 찼습니다 — 들어올 때 보내는 처음 모습·한 번에 바뀌는 데이터를 줄이세요(직접 접속의 한도는 32MB).");
             }
             finally
             {

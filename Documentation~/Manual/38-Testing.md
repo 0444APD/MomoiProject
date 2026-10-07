@@ -122,6 +122,7 @@ TestScenarios.SaveReport(report);                   // Tests/Reports/보스 직�
 - 테스트 상황은 저장할 때의 데이터 구조로 남는다. 데이터 클래스가 바뀌면 오래된 상황은 불러올 때 경고·빈 값이 생길 수 있다 — 다시 저장한다(출시 뒤 저장 변환처럼 맞추지 않는다).
 - 테스트 씬에서 '따로 슬롯'을 끄면 개발자의 실제 저장으로 돈다(판 저장이 덮일 수 있다).
 - 시뮬레이션의 `step`에서 플레이어의 선택 대기(`Game.Ask`)가 생기면 답(`Game.Answer`)까지 `step`이 해야 한다. 안 하면 그 자리에서 멈춘다(`maxSteps`까지 헛돈다).
+- 시뮬레이션은 현실 시각(`Game.Now`)을 고정하지 않는다 — 회차마다 지금 시각이다. 현실 시각으로 계산하는 규칙(오프라인 보상·일일 초기화)은 회차마다 결과가 조금 다를 수 있으니, 그런 숫자는 `measure`로 재지 않거나 `step`이 정한 값으로 시험한다(게임 안 시간 `session.Clock`·난수는 시드대로 같다).
 - 테스트 명령·패널은 출시 빌드에 없다. 게임 기능(치트 코드 등)으로 쓰지 않는다.
 - **Unity Test Runner로 규칙 테스트를 돌릴 때**: 에디터·게임은 평소 테스트 어셈블리의 형식(`[BindTo]`·키워드·Mirror 비교 코드)을 훑지 않는다(DB 창·검증에 테스트용 형식이 섞이지 않게). Test Runner의 실행 하나가 도는 동안만 넣는다 — 그동안 테스트가 게임 세션을 만들어도 빠지지 않는다(`GameAssemblies.KeepTests`, 에디터 `TestRuns`가 실행 시작·끝에 켜고 끈다. PlayMode 테스트가 도메인을 다시 읽어도 그대로). Test Framework 패키지(`com.unity.test-framework` 1.1 이상)가 있을 때만 돈다(`GBIBLE_TEST_FRAMEWORK` — `GBible.Editor.asmdef`의 versionDefines).
 - 테스트 어셈블리에는 Mirror 비교 코드 생성 경고를 내지 않는다(일부러 다루지 못하는 형식을 담아 시험하기도 하므로). 콘솔에는 게임 코드의 경고만 나온다.

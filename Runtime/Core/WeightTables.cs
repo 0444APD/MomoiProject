@@ -50,7 +50,11 @@ namespace GBible
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(숫자)")] public string path = "";
 
         // 숫자 필드가 id 있는 객체의 필드면 능력치(보정 포함 — 패시브 '가진 동안 능력치 보정'으로 +1)로 읽는다.
-        public double Read(GameSession session)
+        public double Read(GameSession session) => ReadNumber(session, key, path);
+
+        // 플레이어 데이터 키 › 경로의 숫자(Read와 같은 규칙). 가중치 표 줄의 단계(무게를 밸런스 값에서)도 이것으로 읽는다 —
+        // 후보 수에 더할 숫자와 단계가 같은 값을 다르게 읽지 않게(행운 유물의 보정이 확률에도 든다).
+        public static double ReadNumber(GameSession session, string key, string path)
         {
             if (session == null || string.IsNullOrEmpty(key) || !session.Data.IsDefined(key)) return 0;
             var root = session.Data.Get(key);
@@ -92,10 +96,11 @@ namespace GBible
         readonly HashSet<string> _warnedSingle = new HashSet<string>(StringComparer.Ordinal);
 
         // 하나만 뽑기(Game.Roll(id)): 개수가 2 이상인 항목이 나오면 첫 ID만 돌려주고, 표마다 한 번 경고한다.
+        // 미리보기(Game.CanDo·Preview)에서는 기록이 남지 않으므로 알린 것으로 치지 않는다.
         public string RollOne(string id)
         {
             var rolled = Roll(id);
-            if (rolled.Count > 1 && _warnedSingle.Add(id))
+            if (rolled.Count > 1 && !_session.Journal.IsMuted && _warnedSingle.Add(id))
                 _session.Journal.Append(JournalKind.Warning, "Tables",
                     $"가중치 표 '{id}'에서 개수가 2 이상인 항목이 나와 Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요.");
             return rolled.FirstOrDefault();
@@ -131,7 +136,7 @@ namespace GBible
             if (depth >= MaxDepth) throw new InvalidOperationException($"[MomoiProject] 가중치 표 '{table.Id}'가 {MaxDepth}단계 넘게 서로를 부릅니다(표끼리 돌고 있는지 확인하세요).");
             blocked = Blocked(table, blocked);
             var candidates = Candidates(table, used, blocked, depth);
-            var total = candidates.Sum(e => e.weight) + Math.Max(0, table.EmptyWeight);
+            var total = candidates.Sum(e => e.weight) + Share(table.EmptyWeight);
             if (total <= 0) return;
             var random = _session.Random.Get(stream);
             var roll = random.NextDouble() * total;
@@ -168,7 +173,7 @@ namespace GBible
             foreach (var source in table.Entries)
             {
                 if (source == null) continue;
-                var w = WeightOf(source);
+                var w = Share(WeightOf(source));
                 if (w <= 0) continue;
                 var e = w == source.weight ? source : new WeightEntry { item = source.item, weight = w, minCount = source.minCount, maxCount = source.maxCount, condition = source.condition, listKey = source.listKey, listPath = source.listPath };
                 if (e.condition != null && !e.condition.Evaluate(_session)) continue;
@@ -195,9 +200,14 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(entry.weightBalance)) return entry.weight;
             if (string.IsNullOrEmpty(entry.weightStepKey) || !_session.Data.IsDefined(entry.weightStepKey)) return _session.Balance.Get(entry.weightBalance);
-            var step = ScreenBinding.Number(FieldPaths.Resolve(_session.Data.Get(entry.weightStepKey), entry.weightStepPath ?? "").FirstOrDefault());
+            var step = PlayerDataNumberRef.ReadNumber(_session, entry.weightStepKey, entry.weightStepPath);
             return _session.Balance.Get(entry.weightBalance, step);
         }
+
+        // 뽑기에 쓰는 몫: 0보다 큰 수만(0 이하·숫자가 아님은 0 — 후보가 아니다, 다른 줄을 막지 않는다).
+        // 끝없이 큰 무게(∞)는 MaxWeight로 본다 — 무게 ÷ 합이 1이 되고(다른 줄·꽝은 0에 가깝다), 합이 double을 넘지 않는다.
+        const double MaxWeight = 1e300;
+        static double Share(double weight) => weight > 0 ? Math.Min(weight, MaxWeight) : 0;
 
         static bool Open(string id, HashSet<string> used, HashSet<string> blocked) =>
             (used == null || !used.Contains(id)) && (blocked == null || !blocked.Contains(id));
@@ -213,15 +223,27 @@ namespace GBible
         }
 
         // 플레이어 데이터 목록의 ID들: 요소가 글자면 그대로, id가 있는 객체면 그 id. 없는 키는 비어 있다.
+        // 딕셔너리(가진 특성 ID → 레벨 · 해금 ID → 참)는 키가 ID다 — 키 이름순(딕셔너리 차례는 Undo·불러오기에서 달라질 수 있어 뽑기 결과가 흔들리지 않게).
         IEnumerable<string> IdsAt(string key, string path)
         {
             if (string.IsNullOrEmpty(key) || !_session.Data.IsDefined(key)) yield break;
             foreach (var node in FieldPaths.Resolve(_session.Data.Get(key), path))
+            {
+                if (node is System.Collections.IDictionary map)
+                {
+                    var keys = new List<string>();
+                    foreach (var k in map.Keys)
+                        if (Convert.ToString(k, System.Globalization.CultureInfo.InvariantCulture) is string text && text.Length > 0) keys.Add(text);
+                    keys.Sort(StringComparer.Ordinal);
+                    foreach (var id in keys) yield return id;
+                    continue;
+                }
                 foreach (var item in FieldPaths.IsCollectionValue(node) ? FieldPaths.Items(node) : new[] { node })
                 {
                     var id = item as string ?? (item != null && GameApi.HasId(item.GetType()) ? GameApi.IdOf(item) : null);
                     if (!string.IsNullOrEmpty(id)) yield return id;
                 }
+            }
         }
 
         // 표 하나의 항목별 확률(조건·목록·뺄 목록은 지금 상태로 본다). 화면의 "드롭 확률" 표시·검증용. 안쪽 표는 한 줄.
@@ -230,8 +252,22 @@ namespace GBible
             var table = Find(id);
             if (table == null) return Array.Empty<(string, double)>();
             var candidates = Candidates(table, null, Blocked(table, null), 0);
-            var total = candidates.Sum(e => e.weight) + Math.Max(0, table.EmptyWeight);
-            return total <= 0 ? Array.Empty<(string, double)>() : candidates.Select(e => (e.item, e.weight / total)).ToList();
+            var total = candidates.Sum(e => e.weight) + Share(table.EmptyWeight);
+            if (total <= 0) return Array.Empty<(string, double)>();
+            // 항목마다 하나: 같은 항목이 여러 줄에 있으면(직접 적은 줄 + 플레이어 데이터 목록 줄) 몫을 합친다 — 한 번 뽑을 때 그 항목이 나올 확률이고,
+            // 처음 나온 줄의 차례를 지킨다(사전으로 바꿔도 겹치지 않는다).
+            var result = new List<(string item, double chance)>();
+            var at = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var e in candidates)
+            {
+                if (at.TryGetValue(e.item, out var i)) result[i] = (e.item, result[i].chance + e.weight / total);
+                else
+                {
+                    at[e.item] = result.Count;
+                    result.Add((e.item, e.weight / total));
+                }
+            }
+            return result;
         }
     }
 }

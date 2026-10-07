@@ -28,6 +28,8 @@ namespace GBible
     public sealed class ChoiceCandidate
     {
         public string id;
+        // 보일 이름(글 또는 텍스트 키). 비우면 보여 주는 쪽이 그때 언어로 Texts.NameOf(id)('<id>.name', 없으면 id)를 읽는다 —
+        // 고르기를 요구한 순간의 번역을 넣어 두면 언어를 바꾼 뒤·불러온 뒤·다른 언어의 서버에서 그 언어로 굳는다.
         public string label;
 
         public ChoiceCandidate()
@@ -37,8 +39,11 @@ namespace GBible
         public ChoiceCandidate(string id, string label = null)
         {
             this.id = id;
-            this.label = label ?? id;
+            this.label = label;
         }
+
+        // 화면에 보일 글(지금 언어).
+        public string DisplayText() => string.IsNullOrEmpty(label) ? Texts.NameOf(id ?? "") : Texts.Has(label) ? Texts.Get(label) : label;
     }
 
     [Serializable]
@@ -136,7 +141,7 @@ namespace GBible
             var (key, choice) = Locate(id);
             if (choice == null || string.IsNullOrEmpty(choice.table)) return false;
             var options = _session.Game.Roll(choice.table, Math.Max(1, choice.count), choice.unique)
-                .Where(o => !string.IsNullOrEmpty(o)).Distinct().Select(o => new ChoiceCandidate(o, Texts.NameOf(o))).ToList();
+                .Where(o => !string.IsNullOrEmpty(o)).Distinct().Select(o => new ChoiceCandidate(o)).ToList();
             if (options.Count == 0) return false;
             _session.Data.Modify<ChoiceList>(key, _ =>
             {
@@ -306,7 +311,7 @@ namespace GBible
             var use = new AbilityUse { Game = context.Game, User = context.User, Picked = context.Picked ?? Array.Empty<object>(), Context = context };
             IEnumerable<object> pool = use.Picked;
             foreach (var selector in candidates.Where(t => t != null)) pool = selector.Run(use, pool);
-            var options = pool.Where(o => o != null && GameApi.HasId(o.GetType())).Select(o => GameApi.IdOf(o)).Select(id => new ChoiceCandidate(id, Texts.NameOf(id))).ToList();
+            var options = pool.Where(o => o != null && GameApi.HasId(o.GetType())).Select(o => GameApi.IdOf(o)).Select(id => new ChoiceCandidate(id)).ToList();
             var user = context.User != null && GameApi.HasId(context.User.GetType()) ? GameApi.IdOf(context.User) : "";
             var next = new ChoiceEffectsRun
             {

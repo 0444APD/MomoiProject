@@ -613,7 +613,7 @@ namespace GBible.Ids
 ```
 
 - **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `instance.potion` → `InstancePotion`).
-- **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`, `StatusData` → `Status`, `BalanceData` → `Balance`, `WeightTableData` → `WeightTable`, `SettingData` → `Setting`). 플레이어 데이터만 `PlayerData`.
+- **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`, `StatusData` → `Status`, `BalanceData` → `Balance`, `WeightTableData` → `WeightTable`, `SettingData` → `Setting`). 플레이어 데이터만 `PlayerData`. 짧은 이름이 같은 종류가 둘이면(프로젝트의 `LocationData`와 다이얼로그 모듈의 `LocationData` 등 — 네임스페이스만 다름) 전체 이름 순으로 뒤의 것에 `_2`를 붙인다(`Location_2`). `GameIds`·`SpriteSize`(스프라이트 틀이 있을 때)도 피한다.
 - **플레이어 데이터 = `PlayerDataKey<T>`**: 값 형식이 붙은 키. `.Id`가 ID 글자이고, `string`으로 바로 바뀐다(암시 변환).
 - **그 밖의 항목 = `const string`**: `[BindTo(...)]` 같은 어트리뷰트 인자에도 쓸 수 있다.
 
@@ -744,6 +744,7 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 - 치우거나 덮어쓴 것은 지우지 않고 모두 `MomoiProjectBackups/<시각>/`에 옮긴다. 되돌리기를 되돌리려면 Unity를 닫고 그 폴더의 Assets·ProjectSettings·Packages(와 `CLAUDE.md`·`.claude`·`Docs`·`steam_appid.txt` — 있으면)를 프로젝트 폴더에 덮어쓴다(`_saves`는 저장 파일 — 하위 폴더 그대로).
 - 열린 씬·DB의 저장 안 된 변경은 먼저 묻는다(저장·버리기·취소). 그 뒤 열린 씬은 빈 씬으로 바뀐다.
 - 끝나면 Unity를 다시 연다(ProjectSettings·패키지를 깨끗이 다시 읽도록). 처음 상태에는 시작 설정을 하기 전이라 시작 설정 창이 다시 뜬다.
+- 옮기지 못한 파일(다른 프로그램 — 엑셀 등 — 이 열어 둔 파일)이 있어도 멈추지 않고 나머지를 마저 옮긴 뒤 "파일 n개를 옮기지 못해 그대로 두었습니다…" 창으로 알리고 다시 연다(목록은 백업 폴더의 `README.txt`). 그 프로그램을 닫고 한 번 더 되돌리면 남은 것만 옮긴다. 옮기지 못한 파일이 남은 폴더는 지우지 않는다.
 - 플레이 중에는 할 수 없다.
 
 ### 기록이 없을 때

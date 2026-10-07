@@ -477,5 +477,94 @@ namespace GBible.Tests
                 try { Directory.Delete(folder, true); } catch (Exception) { }
             }
         }
+
+        [Test]
+        public void 방을_열지_못하면_수락한_사람들은_로비로_돌아가고_다시_줄을_설_수_있다()
+        {
+            using (var rig = new Rig())
+            {
+                // 방 세션을 만들다 실패하는 서버(게임 코드 오류 흉내).
+                rig.Hub.Dispose();
+                var broken = true;
+                rig.Hub = new NetHub(rig.Net.Server(), room => broken ? throw new InvalidOperationException("세션을 만들지 못함(시험)") : Rig.NewMatchSession(),
+                                     new FakeAuthenticator(), rig.Matchmaker, rig.Store) { Clock = () => rig.Net.Now };
+                rig.Hub.Start();
+                var a = rig.Connect("철수");
+                var b = rig.Connect("영희");
+                a.Queue();
+                b.Queue();
+                rig.Pump();
+                a.AnswerMatch(true);
+                b.AnswerMatch(true);
+                rig.Pump();
+                Assert.AreEqual(0, rig.Hub.Rooms.Count);
+                Assert.AreEqual(NetClientState.Lobby, a.State, "없어진 매치의 수락 대기에 갇히지 않는다");
+                Assert.AreEqual(NetClientState.Lobby, b.State);
+
+                broken = false;
+                StartMatch(rig, a, b);
+                Assert.IsTrue(a.IsJoined && b.IsJoined, "다시 줄을 서서 매치에 들어간다");
+            }
+        }
+
+        [Test]
+        public void 서버를_다시_켜_이어_연_매치는_정원이_돌아와도_첫_턴을_다시_시작하지_않는다()
+        {
+            using (var rig = new Rig())
+            {
+                // 게임의 첫 턴 시작(RoomReady): 판에 유닛을 하나 넣는다. 이어 연 매치에서 다시 불리면 저장된 판 위에서 또 시작한다.
+                var started = 0;
+                void Hook() => rig.Hub.RoomReady += room => room.Session.Do(new NtRecruit { newId = "r" + ++started });
+                Hook();
+                var a = rig.Connect("철수");
+                var b = rig.Connect("영희");
+                StartMatch(rig, a, b);
+                Assert.AreEqual(1, started);
+                a.Session.Do(new NtStrike { unit = UnitA(a.Session), damage = 5 });
+                rig.Pump();
+
+                // 서버가 꺼졌다 켜지기를 두 번(두 번째는 아무도 돌아오기 전에).
+                for (var restart = 0; restart < 2; restart++)
+                {
+                    rig.Hub.Dispose();
+                    rig.Pump(5);
+                    rig.Open();
+                    Hook();
+                    Assert.AreEqual(1, rig.Hub.ResumeOpenMatches());
+                }
+                var a2 = rig.Connect("철수");
+                var b2 = rig.Connect("영희");
+                rig.Pump();
+                Assert.IsTrue(a2.IsJoined && b2.IsJoined);
+                Assert.AreEqual(1, started, "이미 시작한 매치다 — RoomReady를 다시 쏘지 않는다");
+                Assert.AreEqual(2, b2.Session.Data.Get<NtParty>("party").units.Count, "저장된 판 그대로");
+                Assert.AreEqual(5, UnitA(b2.Session).hp);
+            }
+        }
+
+        [Test]
+        public void 매치가_닫히는_사이에_보낸_행동을_로비에서_계속_기다리지_않는다()
+        {
+            using (var rig = new Rig())
+            {
+                var a = rig.Connect("철수");
+                var b = rig.Connect("영희");
+                var room = StartMatch(rig, a, b);
+                rig.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 1, Place = 1 }, new NetMatchResult { Player = 2, Place = 2 } });
+                // 서버가 방을 닫는 틱. 끝났다는 알림이 오는 중에 철수가 행동을 보낸다 — 서버에는 방이 닫힌 뒤(로비에) 닿아 결과가 오지 않는다.
+                rig.Hub.Update(0.001);
+                Assert.AreEqual(0, rig.Hub.Rooms.Count);
+                Assert.IsTrue(a.IsJoined, "아직 끝난 줄 모른다");
+                a.Session.Do(new NtStrike { unit = UnitA(a.Session), damage = 1 });
+                Assert.AreEqual(1, a.PendingActions);
+                rig.Pump();
+                Assert.AreEqual(NetClientState.Lobby, a.State);
+                Assert.AreEqual(0, a.PendingActions, "결과가 올 수 없는 행동은 기다리지 않는다(다음 매치의 대화·화면이 막히지 않게)");
+
+                StartMatch(rig, a, b);
+                Assert.IsTrue(a.IsJoined);
+                Assert.AreEqual(0, a.PendingActions);
+            }
+        }
     }
 }

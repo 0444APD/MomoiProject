@@ -194,7 +194,7 @@ public class AddEnemiesAround : TargetSelector<Unit>
 | 이벤트의 개체 | `EventFieldTarget` | `field`(이벤트 필드(id 또는 개체)) | 받은 이벤트(가로채기면 의도)의 그 필드가 가리키는 개체. 글자면 그 id의 개체, 객체면 그대로(id가 있는 것만), 목록이면 요소마다. 예: 피해 이벤트의 `sourceId` = 때린 쪽(반사), `targetId` = 맞은 쪽 |
 | 조건으로 거르기 | `FilterTarget` | `path`(필드) · `op`(비교, `FieldOp`) · `value`(값) | 앞 대상 중 필드 검사가 참인 것만. 비교는 값 조건과 같다(`hp 이하 10`, `element 일치 fire`, `tags 포함 boss`, 11장 3-2) |
 | 상태 효과로 거르기 | `StatusFilterTarget` | `status`(상태 효과) · `kind`(종류(상태 효과를 비웠을 때)) · `op`(비교 `>=` `<=` `>` `<` `==`) · `stacks`(중첩(종류면 가짓수)) | 앞 대상 중 그 상태 효과의 중첩 비교가 참인 것만. 걸려 있지 않으면 0이다. "독에 걸린 적 모두" = `poison` `>=` `1`, "디버프가 없는 아군" = `status` 비우고 `kind` 디버프 `<=` `0`. 조건 `상태 효과 검사`(29장)와 같은 비교 |
-| 무작위 n개 | `RandomTarget` | `count`(개수, 기본 1) · `stream`(난수 흐름, 기본 `target`) | 앞 대상 중 서로 다른 n개. 결정론 난수 흐름 `Game.Random(stream)`이라 Undo하고 다시 해도 같은 결과다. 모자라면 있는 만큼 |
+| 무작위 n개 | `RandomTarget` | `count`(개수, 기본 1) · `stream`(난수 흐름, 기본 `target`) | 앞 대상 중 서로 다른 n개(같은 개체가 여럿 들어 있어도 한 번만 센다 — 맞힌 목록의 같은 적). 결정론 난수 흐름 `Game.Random(stream)`이라 Undo하고 다시 해도 같은 결과다. 모자라면 있는 만큼 |
 | 정렬해서 n개 | `SortTarget` | `path`(숫자 필드) · `descending`(큰 것부터) · `count`(개수(0 = 모두), 기본 1) | 앞 대상을 숫자로 정렬해 앞에서 n개. 기본은 작은 것부터. 값이 같으면 원래 순서. 필드 이름이 하나(`hp`)이고 대상에 id가 있으면 **능력치**(Modifier까지 반영한 `Game.Attribute`)로 재고, 경로(`stats.speed`)면 그 값으로 잰다 |
 
 - 요약은 이어 붙인 Block이 화살표로 보인다(아래 코드의 조립이면 `battle › units → team enemy 일치 → hp 0 초과 → hp 작은 것부터 1개: 피해`).

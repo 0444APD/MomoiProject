@@ -237,6 +237,251 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 이어받으면_옛_연결은_나간_것으로_알린_뒤_새_연결로_들어온다()
+        {
+            var net = new MemoryNetwork { Manual = true, Latency = 0.01 };
+            var server = new NetServer(ServerSession(), net.Server(), new NetServerOptions { TimeoutSeconds = 30 }) { Clock = () => net.Now };
+            server.Start();
+            // 들어올 때 캐릭터를 만들고 나갈 때 지우는 게임 코드: 들어옴·나감이 짝을 이뤄야 한 사람의 캐릭터가 둘이 되지 않는다.
+            var seen = new List<string>();
+            server.PlayerJoined += p => seen.Add("들어옴 " + p.Id);
+            server.PlayerLeft += p => seen.Add("나감 " + p.Id);
+            var first = new NetClient(new GameSession(), net.Client(), "철수") { Clock = () => net.Now, TimeoutSeconds = 30 };
+            first.Connect();
+            NetClient second = null;
+            // 옛 연결(first)은 멈춰 있다 — 네트워크가 끊겼는데 서버는 아직 모름.
+            void Pump(double seconds)
+            {
+                for (var t = 0.0; t < seconds; t += 0.05)
+                {
+                    net.Advance(0.05);
+                    server.Update(0.05);
+                    second?.Update(0.05);
+                }
+            }
+            for (var i = 0; i < 20; i++)
+            {
+                net.Advance(0.05);
+                server.Update(0.05);
+                first.Update(0.05);
+            }
+            Assert.IsTrue(first.IsJoined);
+            Pump(4);
+            second = new NetClient(new GameSession(), net.Client(), "철수") { Clock = () => net.Now, TimeoutSeconds = 30 };
+            second.Connect();
+            Pump(1);
+            Assert.IsTrue(second.IsJoined, "이어받는다");
+            CollectionAssert.AreEqual(new[] { "들어옴 1", "나감 1", "들어옴 1" }, seen);
+            Assert.IsTrue(server.Players.Single().Connected);
+        }
+
+        // 받은 바이트를 한 번에 chunk바이트까지만 돌려주는 흐름(머리만 오고 내용은 아직 오는 중인 연결 흉내). Read에 넘어온 버퍼 중 가장 큰 크기를 남긴다.
+        sealed class TrickleStream : Stream
+        {
+            readonly byte[] _data;
+            readonly int _chunk;
+            int _position;
+            public int LargestBuffer;
+
+            public TrickleStream(byte[] data, int chunk = int.MaxValue)
+            {
+                _data = data;
+                _chunk = chunk;
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                LargestBuffer = Math.Max(LargestBuffer, buffer.Length);
+                var n = Math.Min(Math.Min(count, _chunk), _data.Length - _position);
+                Buffer.BlockCopy(_data, _position, buffer, offset, n);
+                _position += n;
+                return n;
+            }
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        }
+
+        [Test]
+        public void WebSocket_머리에_적힌_길이만큼_미리_잡지_않고_받은_만큼만_잡는다()
+        {
+            // 64비트 길이 칸에 한도(32MB)를 적고 내용은 10바이트만 보낸 프레임. 머리 14바이트마다 32MB를 잡으면 연결 몇백 개로 서버 메모리가 바닥난다.
+            var frame = new List<byte> { 0x82, 0x80 | 127 };
+            for (var i = 7; i >= 0; i--) frame.Add((byte)((long)WebSocketFrames.MaxMessage >> (8 * i)));
+            frame.AddRange(new byte[] { 1, 2, 3, 4 });
+            frame.AddRange(new byte[10]);
+            var stream = new TrickleStream(frame.ToArray());
+            Assert.Throws<EndOfStreamException>(() => WebSocketFrames.ReadMessage(stream, null, out _));
+            Assert.IsTrue(stream.LargestBuffer <= 1024 * 1024, $"잡은 버퍼 {stream.LargestBuffer}바이트");
+
+            // 조각조각 오는 큰 메시지(가면 씀)도 그대로 받는다.
+            var payload = Enumerable.Range(0, 300000).Select(i => (byte)(i * 7)).ToArray();
+            var written = new MemoryStream();
+            WebSocketFrames.Write(written, 2, payload, 0, payload.Length, true, new Random(3));
+            var received = WebSocketFrames.ReadMessage(new TrickleStream(written.ToArray(), chunk: 1000), null, out var opcode);
+            Assert.AreEqual(2, opcode);
+            CollectionAssert.AreEqual(payload, received);
+        }
+
+        [Test]
+        public void WebSocket_제어_프레임은_125바이트까지만_받는다()
+        {
+            // 큰 핑(규격은 125바이트까지)에 같은 크기의 퐁을 쌓게 하지 않는다.
+            var pongs = 0;
+            var big = new MemoryStream();
+            WebSocketFrames.Write(big, 9, new byte[126], 0, 126, true, new Random(5));
+            big.Position = 0;
+            Assert.Throws<IOException>(() => WebSocketFrames.ReadMessage(big, _ => pongs++, out _));
+            Assert.AreEqual(0, pongs);
+
+            // 규격 안의 핑에는 퐁을 하고 다음 메시지를 받는다.
+            var ok = new MemoryStream();
+            WebSocketFrames.Write(ok, 9, new byte[125], 0, 125, true, new Random(6));
+            WebSocketFrames.Write(ok, 2, new byte[] { 1, 2 }, 0, 2, true, new Random(7));
+            ok.Position = 0;
+            CollectionAssert.AreEqual(new byte[] { 1, 2 }, WebSocketFrames.ReadMessage(ok, _ => pongs++, out _));
+            Assert.AreEqual(1, pongs);
+        }
+
+        // 코어 시험 실행기는 System.Net.Sockets를 직접 참조하지 않는다 — 날 TCP 연결(WebSocket을 흉내 내는 클라이언트)은 형식 이름으로 만든다.
+        static (IDisposable tcp, Stream stream) RawTcp(int port)
+        {
+            var type = Type.GetType("System.Net.Sockets.TcpClient, System.Net.Sockets") ?? Type.GetType("System.Net.Sockets.TcpClient, System");
+            var tcp = (IDisposable)Activator.CreateInstance(type, "127.0.0.1", port);
+            return (tcp, (Stream)type.GetMethod("GetStream").Invoke(tcp, null));
+        }
+
+        static readonly byte[] Upgrade = System.Text.Encoding.ASCII.GetBytes(
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n");
+
+        [Test]
+        public void WebSocket_서버는_연결을_알린_뒤에_그_연결에서_받은_것을_넘긴다()
+        {
+            var transport = new WebSocketServerTransport(0);
+            transport.Start();
+            var raws = new List<IDisposable>();
+            try
+            {
+                // 악수 요청 바로 뒤에 첫 메시지를 붙여 보내는 클라이언트(또는 응답을 받자마자 Hello를 보내는 빠른 클라이언트).
+                // 받은 것이 Connected보다 먼저 넘어가면 서버는 모르는 연결의 메시지로 버린다 — Hello를 잃은 클라이언트는 들어가지 못한 채 핑만 주고받는다.
+                for (var i = 0; i < 5; i++)
+                {
+                    var (tcp, stream) = RawTcp(transport.Port);
+                    raws.Add(tcp);
+                    var frame = new MemoryStream();
+                    WebSocketFrames.Write(frame, 2, new byte[] { (byte)NetMessage.Ping, 1, 2, 3 }, 0, 4, true, new Random(i));
+                    var bytes = Upgrade.Concat(frame.ToArray()).ToArray();
+                    stream.Write(bytes, 0, bytes.Length);
+                }
+                var connected = new HashSet<int>();
+                var data = 0;
+                var early = 0;
+                var until = DateTime.UtcNow.AddSeconds(10);
+                while (data < 5 && DateTime.UtcNow < until)
+                {
+                    while (transport.Poll(out var e))
+                    {
+                        if (e.Kind == NetEventKind.Connected) connected.Add(e.Connection);
+                        else if (e.Kind == NetEventKind.Data)
+                        {
+                            data++;
+                            if (!connected.Contains(e.Connection)) early++;
+                        }
+                    }
+                    System.Threading.Thread.Sleep(1);
+                }
+                Assert.AreEqual(5, data);
+                Assert.AreEqual(0, early, "받은 것이 연결 알림보다 먼저 왔다");
+            }
+            finally
+            {
+                foreach (var raw in raws) raw.Dispose();
+                transport.Dispose();
+            }
+        }
+
+        [Test]
+        public void WebSocket_받는_쪽이_멈춰_보낼_목록이_넘쳐_닫으면_끊김을_알린다()
+        {
+            var transport = new WebSocketServerTransport(0);
+            transport.Start();
+            var (tcp, stream) = RawTcp(transport.Port);
+            try
+            {
+                stream.Write(Upgrade, 0, Upgrade.Length);
+                Assert.IsNotNull(WebSocketFrames.ReadHeader(stream));
+                var connection = -1;
+                var until = DateTime.UtcNow.AddSeconds(10);
+                while (connection < 0 && DateTime.UtcNow < until)
+                {
+                    if (transport.Poll(out var e) && e.Kind == NetEventKind.Connected) connection = e.Connection;
+                    else System.Threading.Thread.Sleep(1);
+                }
+                Assert.IsTrue(connection > 0, "연결됨");
+                // 이 클라이언트는 더 읽지 않는다: 보낼 목록이 한도(8192개)를 넘을 만큼 보낸다.
+                var message = new byte[1024];
+                for (var i = 0; i < 30000; i++) transport.Send(connection, message, message.Length);
+                var closed = false;
+                until = DateTime.UtcNow.AddSeconds(10);
+                while (!closed && DateTime.UtcNow < until)
+                {
+                    while (transport.Poll(out var e)) closed |= e.Kind == NetEventKind.Disconnected && e.Connection == connection;
+                    System.Threading.Thread.Sleep(5);
+                }
+                Assert.IsTrue(closed, "전송이 스스로 닫은 연결도 끊김으로 알린다(서버가 그 사람을 끊긴 것으로 안다)");
+            }
+            finally
+            {
+                tcp.Dispose();
+                transport.Dispose();
+            }
+        }
+
+        [Test]
+        public void WebSocket_핑만_쏟아붓고_읽지_않는_연결은_퐁을_한없이_쌓지_않고_끊는다()
+        {
+            var transport = new WebSocketServerTransport(0);
+            transport.Start();
+            var (tcp, stream) = RawTcp(transport.Port);
+            try
+            {
+                stream.Write(Upgrade, 0, Upgrade.Length);
+                Assert.IsNotNull(WebSocketFrames.ReadHeader(stream));
+                // WebSocket 핑(제어 프레임)은 전송이 스스로 퐁을 한다 — 게임 쪽 메시지가 아니라 서버의 메시지 수 제한·시간 넘김에도 걸리지 않는다.
+                var pings = new MemoryStream();
+                var random = new Random(9);
+                for (var i = 0; i < 60000; i++) WebSocketFrames.Write(pings, 9, new byte[125], 0, 125, true, random);
+                var bytes = pings.ToArray();
+                var closed = false;
+                var until = DateTime.UtcNow.AddSeconds(15);
+                var sender = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try { stream.Write(bytes, 0, bytes.Length); }
+                    catch (Exception) { }   // 서버가 끊으면 쓰기가 실패한다
+                });
+                while (!closed && DateTime.UtcNow < until)
+                {
+                    while (transport.Poll(out var e)) closed |= e.Kind == NetEventKind.Disconnected;
+                    System.Threading.Thread.Sleep(5);
+                }
+                Assert.IsTrue(closed, "보낼 목록(퐁)이 한도를 넘으면 끊고 알린다");
+                sender.Wait(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                tcp.Dispose();
+                transport.Dispose();
+            }
+        }
+
+        [Test]
         public void 방장이_방을_닫으면_다시_접속하지_않는다()
         {
             var net = new MemoryNetwork { Manual = true, Latency = 0.01 };

@@ -31,7 +31,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 1. 탐색기로 `D:\Unity\Projects\UnitySystemProject\Assets\Dev\Checks` 폴더를 만든다.
 2. 메모장에 부록 A의 코드를 통째로 붙여 넣고 그 폴더에 `CheckCommands.cs`로 저장한다(파일 형식 '모든 파일', 인코딩 UTF-8). asmdef가 없는 폴더라 참조를 손대지 않아도 된다.
 3. Unity로 돌아가 컴파일이 끝날 때까지 기다린다.
-- 정상: Console에 오류가 없고, 테스트 씬 Play → 테스트 패널 아래쪽(모니터 › 명령에도) '점검' 묶음: 고르기 창 · 타격 ×3 · 실패 알림 · 슬롯 화면 · 연출 속도 1↔3 · 연출 건너뛰기 · 마지막 기록 · 씬 바꾸기 · 연출 버리기 · 전환 오류 켬↔끔 · 방 만들기 · 친구 초대 · 키 바꾸기(Jump) · 지금 키(Jump) · 키 되돌리기.
+- 정상: Console에 오류가 없고, 테스트 씬 Play → 테스트 패널 아래쪽(모니터 › 명령에도) '점검' 묶음: 고르기 창 · 타격 ×3 · 실패 알림 · 슬롯 화면 · 연출 속도 1↔3 · 연출 건너뛰기 · 마지막 기록 · 씬 바꾸기 · 연출 버리기 · 전환 오류 켬↔끔 · 방 만들기 · 친구 초대 · 보스 때리기 · 보스 보기 · 큰 값 600KB↔비움 · 키 바꾸기(Jump) · 지금 키(Jump) · 키 되돌리기.
 - 이상하면: Console 첫 오류 줄.
 
 ### 0-4. 점검용 설정 항목(DB › 요소 › 설정)
@@ -255,7 +255,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 1. (예전 규격 옮기기) Unity를 열고 컴파일이 끝나면 Console을 본다 → Project 창에서 `Assets/MomoiProject/Data/SpriteGroup/aa`를 고른다.
 2. (새 틀) Project 창 `Assets/Dev/Art/Check`에서 우클릭 › Create › MomoiProject › 스프라이트 틀 → 이름 `cardFrame` → Enter → Inspector를 본다.
 3. (크기 표) '+ 크기 더하기'를 두 번 → 첫 줄: 이름 칸에 `cardFront`, 가로 600, 세로 900(칸마다 Enter) / 둘째 줄: 이름 `icon`, 오른쪽 '▾' › 128×128.
-4. (잘못된 이름) '+ 크기 더하기' → 새 줄 이름을 `icon`으로 → Enter → 빨간 글을 본다 → 그 줄 '✕'.
+4. (잘못된 이름·크기) '+ 크기 더하기' → 새 줄 이름을 `icon`으로 → Enter → 뜬 창 '확인' → 그 줄 가로 칸에 5 → Enter → 빨간 글을 본다 → 그 줄 '✕'.
 5. (한 장 맞추기) Project 창의 img0을 Inspector '원본 넣기' 칸에 끌어 놓는다 → '스프라이트 맞춤 · img0' 창에서 캔버스를 눌러 중심을 옮기고 휠을 굴린다.
 6. (예외 촬영) 창 위쪽 'icon' 단추 → 캔버스의 다른 곳을 누르고 휠 → '공통' 단추 → 캔버스를 한 번 더 누른다 → '적용 (모든 크기 굽기)'.
 7. (구운 것 보기) Project 창 `Assets/MomoiProject/Data/Sprites/cardFrame/`의 `cardFront`·`icon` 폴더에서 png를 하나씩 골라 Inspector 아래 미리보기와 크기를 본다.
@@ -265,19 +265,27 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 11. (크기 이름 바꾸기·빼기) icon 이름을 `thumb`로 → Enter → thumb 줄 '✕' → 확인 창 '빼기' → Ctrl+Z.
 12. (필드에 연결된 칸) Ctrl+S(부록 B가 만든 적용 전 항목 적용) → DB › 요소 › 클래스 → CheckCard → 클래스 상세의 `art` 줄을 본다 → DB 사이드바 'DB' › 인스턴스 › `checkCard` → 상세의 `art` 칸에 img0을 끌어 놓는다 → 열린 맞춤 창에서 '적용 (모든 크기 굽기)'.
 13. (모두 다시 굽기) 메뉴 `MomoiProject › 스프라이트 틀 모두 다시 굽기`.
+14. (잘못된 값 동안 남기기) DB 창에서 Ctrl+S(12에서 바꾼 art 칸을 적용해 둔다) → Project 창에서 cardFrame을 고른다 → 표의 thumb 가로를 5로 → Enter → 2초 기다린 뒤 다시 64로 → Enter.
+15. (맞춤 적용 되돌리기) img0의 cardFront png를 Project 창에서 한 번 보아 둔다 → cardFrame을 고른다 → img0 줄 '맞추기' → '공통'에서 캔버스의 먼 곳을 누른다 → '적용' → 맞춤 창이 닫히면 다른 것을 고르지 말고 바로 Ctrl+Z(고르기도 Ctrl+Z에 들어간다) → img0 줄 '맞추기'를 열어 중심을 본 뒤 '취소' → cardFront png를 다시 본다.
+16. (크기 바꾸기 되돌리기) 표의 cardFront 세로를 700으로 → Enter → Ctrl+Z → img0의 cardFront png를 본다.
+17. (2048보다 큰 크기) '+ 크기 더하기' → 이름 `wide` → 가로 4096, 세로 2048(칸마다 Enter) → `…/cardFrame/wide/`의 img0 png를 골라 Inspector를 본다 → cardFrame을 다시 골라 wide 줄 '✕' → '빼기'.
 - 정상:
   - 1: Console에 '[MomoiProject] 예전 스프라이트 규격 파일 1개를 틀의 크기 줄로 옮겼습니다(원래 파일은 MomoiProjectBackups/…-sprites)'가 한 번. aa의 Inspector는 '스프라이트 틀' 화면이고 크기 표에 예전 규격 이름 줄 하나. `Assets/Dev/Spp/AA/NewSpritePreset.asset`은 없고 그 백업 폴더에 있다.
   - 2·3: 맨 위 '스프라이트 틀', ID cardFrame. 칸을 벗어나면(Enter) 바로 저장되고, 표 아래 비율 상자(cardFront 세로로 긴 상자 · icon 정사각형)가 생긴다.
-  - 4: "크기 이름 'icon'이(가) 겹칩니다."가 빨갛게 뜨고, '✕' 뒤 사라진다.
+  - 4: 창 "'icon'은(는) 이 틀에 이미 있습니다."가 뜨고 '확인' 뒤 그 줄 이름이 size1로 돌아온다. 가로 5에서 "'size1': 크기는 8~8192px 사이여야 합니다."가 빨갛게 뜨고 '원본 넣기'가 "먼저 위 표에 올바른 크기를 하나 이상 적으세요."로 바뀐다. '✕' 뒤 둘 다 사라진다.
   - 5: 오른쪽 미리보기 두 장(cardFront·icon)이 누르고 굴리는 대로 함께 바뀐다. 캔버스 위 색 테두리 두 개가 자를 곳.
   - 6: 'icon' 상태에서는 icon 미리보기만 바뀌고 이름 옆에 '· 예외'. '공통'에서 누르면 cardFront만 바뀌고 icon은 그대로. '적용' 뒤 Console "'img0'을(를) 틀 cardFrame의 크기 2개로 구웠습니다." 틀 Inspector에 '이 틀로 자른 원본 1개' · img0 줄 '예외 1'.
-  - 7: cardFront png는 600×900, icon png는 128×128이고 icon은 6에서 따로 잡은 곳이 잘려 있다.
+  - 7: cardFront png는 600×900, icon png는 128×128이고 icon은 6에서 따로 잡은 곳이 잘려 있다. 크게 줄인 icon도 계단지거나 지글거리지 않고 부드럽다.
   - 8: img0 줄의 '예외' 표시가 없어지고 icon png가 공통 맞춤으로 다시 구워진다.
   - 9: 맞춤 창 없이 Console '원본 2개를 틀 'cardFrame'의 모든 크기로 구웠습니다(이미지 4개)…', 목록이 3줄.
   - 10: Console "틀 'cardFrame'의 바뀐 크기로 3개를 다시 구웠습니다."(cardFront png가 600×800). icon을 바꾸면 노란 경고 '크기가 바뀌어 예외 촬영을 확인해야 합니다…'와 img0 줄의 '확인 필요' — '맞추기'에서 icon을 다시 누르고 '적용'하면 없어진다.
-  - 11: 이름을 바꿔도 img0 줄의 '예외'가 남고 png가 `…/thumb/`로 다시 구워진다. '빼기' 뒤 thumb png는 `MomoiProjectBackups/<시각>-sprites/` 아래로 옮겨진다. Ctrl+Z로 thumb 줄이 돌아오고 다시 구워진다.
+  - 11: 이름을 바꿔도 img0 줄의 '예외'가 남고 png가 `…/thumb/`로 다시 구워진다. '빼기' 뒤 thumb png는 `MomoiProjectBackups/<시각>-sprites/` 아래로 옮겨진다. Ctrl+Z로 thumb 줄과 img0 줄의 '예외'가 함께 돌아오고, thumb png가 그 예외 맞춤으로 다시 구워진다.
   - 12: 클래스 상세 `art` 줄에 '스프라이트 틀 cardFrame' · '미리보기 크기 cardFront'. 끌어 놓는 순간 맞춤 창이 열리고, 적용 뒤 상세 칸의 그림은 cardFront로 구운 모양. 틀 Inspector '쓰는 필드: CheckCard.art'.
-  - 13: 모든 줄이 지금 맞춤 그대로 다시 구워지고 Console에 오류가 없다.
+  - 13: 모든 줄이 지금 맞춤 그대로 다시 구워지고 Console에 오류가 없다. '확인 필요'가 새로 생기지 않는다(10에서 남겨 둔 것은 그대로).
+  - 14: 5일 때 빨간 글이 뜨고 64로 돌리면 사라진다. img0 줄의 '예외'가 그대로이고 thumb png도 그대로다(그사이 Console에 '틀에서 빠진 크기로 구운 이미지 …를 옮겨 두었습니다'가 나오지 않는다).
+  - 15: Ctrl+Z 뒤 맞춤 창의 중심이 적용 전 자리이고, cardFront png도 처음 보아 둔 모양(적용 전)으로 다시 구워져 있다.
+  - 16: Ctrl+Z 뒤 표가 600×800으로 돌아오고 cardFront png도 600×800으로 다시 구워진다(700으로 남지 않는다).
+  - 17: wide png는 4096×2048이고 Inspector의 Max Size가 4096이다(2048로 줄지 않는다). '빼기' 뒤 wide png는 백업 폴더로 옮겨진다.
 - 이상하면: 단계 번호, Console 줄, 구운 png의 크기·잘린 곳.
 
 ### 키 바꾸기
@@ -316,13 +324,14 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 
 ### 실시간 위치(NetTransformSync)
 준비: 0-2·0-3, 1의 물체를 넣은 뒤 0-6대로 빌드.
-1. 테스트 씬에서 `GameObject › 2D Object › Sprites › Square` → 이름 `check1`, Position X -3 → Add Component › MomoiProject › 실시간 위치 맞추기 → Owner 1. Ctrl+D → 이름 `check2`, X 3, Owner 2(Entity Id는 비움 = 오브젝트 이름) → 씬 저장 → 빌드.
+1. 테스트 씬에서 `GameObject › 2D Object › Sprites › Square` → 이름 `check1`, Position X -3 → Add Component › MomoiProject › 실시간 위치 맞추기 → Owner 1. Ctrl+D → 이름 `check2`, X 3, Owner 2(Entity Id는 비움 = 오브젝트 이름). 같은 방법으로 `check0`(X 0, Owner 0 — 방장이 움직이는 물체)과 `check3`(X 6, Owner 3)도 만든다 → 씬 저장 → 빌드.
 2. 에디터 테스트 씬 Play → 패널 › 멀티 › '방 생성 :7777'(내 번호 #1).
 3. 명령 프롬프트: `UnitySystemProject.exe -momoi-join 127.0.0.1:7777 -momoi-name 빌드`(내 번호 #2).
 4. 두 창을 나란히 두고 본다.
 5. (선택) 에디터 Hierarchy check2 › 실시간 위치 맞추기 › Delay를 0과 0.3으로 바꿔 본다.
-- 정상: 에디터는 check1, 빌드는 check2를 위아래로 움직이고(스크립트가 내 것만 움직인다), 상대 화면의 같은 물체가 끊김 없이 부드럽게(0.1초쯤 늦게) 따라온다. 5는 0이면 빠르지만 덜 부드럽고, 0.3이면 더 늦다.
-- 이상하면: 어느 쪽 물체가 멈추거나 튀는지, 두 패널의 명단.
+6. (선택, 세 사람) 명령 프롬프트를 하나 더 열어 `UnitySystemProject.exe -momoi-join 127.0.0.1:7777 -momoi-name 빌드2`(내 번호 #3) → 세 창을 나란히 둔다.
+- 정상: 에디터는 check1과 check0, 빌드는 check2를 위아래로 움직이고(스크립트가 내 것만 움직인다 — check0은 방장 것), 상대 화면의 같은 물체가 끊김 없이 부드럽게(0.1초쯤 늦게) 따라온다. check3은 6 전에는 어느 창에서도 움직이지 않는다. 5는 0이면 빠르지만 덜 부드럽고, 0.3이면 더 늦다. 6 뒤에는 빌드2가 check3을 움직이고, 세 창 모두에서 check0~3이 같은 모양으로 움직인다(빌드끼리도 방장을 거쳐 서로의 물체가 보인다).
+- 이상하면: 어느 창의 어느 물체가 멈추거나 튀는지, 세 패널의 명단.
 
 ### 모니터 — 값 고치기는 행동 하나(Undo)
 준비: 0-2, 모니터 창.
@@ -367,6 +376,23 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 - 정상: 2의 결과 창에 "checkStatus.maxStacks: 이 칸의 정수 형식에 들어가지 않는 크기입니다('3000000000')" 같은 줄이 있고 `maxStacks`는 1 그대로(잘린 숫자가 들어가지 않는다). 3은 엑셀이 열고 있어도 '다른 프로세스가 사용 중' 같은 오류 없이 '1개 고침'이고 `maxStacks` = 5(적용 전).
 - 이상하면: 결과 창 글, Console 첫 줄.
 
+### DB 검증 — 가중치 표 줄의 조건
+준비: 0-1의 구조 편집을 켠 상태, 부록 B의 `CheckSeeds.cs`(버전 3 — 가중치 표 `checkTable`, 줄 하나)를 넣고 Ctrl+S로 적용.
+1. DB › DB › 가중치 표 → `checkTable` → 상세의 `entries` 첫 줄 › `condition` 칸 '+ 블럭' → 도전과제 › '도전과제 달성'(도전과제는 고르지 않고 비워 둔다).
+2. 상세 창 위의 글과 사이드바 맨 아래를 본다.
+3. 그 블럭 오른쪽 '⋯' › 삭제 → '저장  Ctrl+S'.
+- 정상: 2에 빨간 '확인할 도전과제가 선택되지 않았습니다.'가 뜨고 사이드바의 검증 오류가 하나 는다('… 빌드가 막힙니다'). 3 뒤 둘 다 사라진다. (예전에는 줄의 조건을 검사하지 않아 아무 글 없이 그 줄만 뽑히지 않았다.)
+- 이상하면: 2에 빨간 글이 없으면 그때 상세 창 스크린숏.
+
+### 시작 설정 — 다시 적용해도 겹치지 않는다
+준비: 시작 설정을 마친 이 프로젝트(단계 0 전제). Play 멈춤.
+1. Project 창 `Assets/MomoiProject/Code/Rules/PlayerData.cs`를 고르고 F2 → 이름 `RunData` → Enter(안의 클래스를 다른 파일로 옮긴 것과 같다) → 컴파일이 끝날 때까지 기다린다.
+2. 메뉴 `MomoiProject › 시작 설정` → '적용'.
+3. 컴파일이 끝나면 Console과 Project 창 `Assets/MomoiProject/Code/Rules` 폴더, DB › 요소 › 플레이어 데이터를 본다.
+4. `RunData`의 이름을 다시 `PlayerData`로 바꾼다.
+- 정상: 3에 `PlayerData.cs`가 새로 생기지 않고(`RunData.cs` 하나), Console에 컴파일 오류('… 이미 정의되어 있습니다' CS0101)가 없다. 플레이어 데이터는 `run`·`profile` 그대로이고 새 줄이 생기지 않는다.
+- 이상하면: Console 첫 오류 줄, 시작 설정 창의 '적용함' 목록.
+
 ### 스파인 스탠딩(스파인이 있는 프로젝트에서)
 준비: spine-unity 런타임이 있는 프로젝트, 다이얼로그 준비, SkeletonAnimation이 붙은 캐릭터 프리팹. 이 프로젝트에는 스파인이 없어 한 번도 실행하지 못했다.
 1. 그 프리팹에 Add Component → 'Spine Standing View'(검색) → `animations`에 스탠딩 ID ↔ 애니메이션 이름(같으면 비움).
@@ -407,14 +433,16 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 - 이상하면: 단계와 Player.log 첫 오류. 5에서 다시 켰을 때 fullscreen 값과 실제 화면 모드(전체 화면/창)가 다르면 그것도 알린다.
 
 ### 빌드 — 코드 줄이기(Managed Stripping Level) High
-준비: '빌드(PC, IL2CPP)'를 마친 뒤(IL2CPP 모듈).
+준비: '빌드(PC, IL2CPP)'를 마친 뒤(IL2CPP 모듈). 부록 B의 `CheckSeeds.cs`(버전 3 — 플레이어 데이터 `checkBoss`)를 Ctrl+S로 적용한 상태.
 1. Project 창 `Assets/MomoiProject/link.xml`이 있는지 본다(에디터를 열 때 저절로 생긴다).
-2. `Edit › Project Settings › Player › Other Settings › Managed Stripping Level` = High → 0-6대로 빌드(Scripting Backend IL2CPP) → exe 켜기.
-3. 패널 › 점검 › '타격 ×3' → '고르기 창' → '나' → 'Undo (N)'.
-4. 패널 › 멀티 › '시험 모드' → '지연 400ms' → 점검 › '타격 ×3' → '나가기(혼자 하기)'.
-5. Player.log를 연다. 끝나면 Managed Stripping Level을 원래(Minimal 등)로 돌려도 된다.
-- 정상: 1 파일이 있다. 2의 빌드 중 Console에 'link.xml' 경고가 없다. 3·4가 에디터와 똑같이 돈다(숫자·고르기 창·Undo·시험 모드). 5에 'MissingMethodException'·'등록하지 못했습니다'·Exception이 없다.
-- 이상하면: Player.log의 첫 Exception(형식 이름 포함), 빌드 중 Console 경고.
+2. (에디터에서 먼저) 테스트 씬 Play → 패널 '새 판' → 점검 › '보스 때리기'를 두 번 → '보스 보기' → 'Undo (N)' → '보스 보기' → Play 멈춤.
+3. `Edit › Project Settings › Player › Other Settings › Managed Stripping Level` = High → 0-6대로 빌드(Scripting Backend IL2CPP) → exe 켜기.
+4. 패널 › 점검 › '타격 ×3' → '고르기 창' → '나' → 'Undo (N)'.
+5. 패널 '새 판' → 점검 › '보스 때리기'를 두 번 → '보스 보기' → 'Undo (N)' → '보스 보기'.
+6. 패널 › 멀티 › '시험 모드' → '지연 400ms' → 점검 › '타격 ×3' → '나가기(혼자 하기)'.
+7. Player.log를 연다. 끝나면 Managed Stripping Level을 원래(Minimal 등)로 돌려도 된다.
+- 정상: 1 파일이 있다. 2와 5는 알림이 '보스 hp 8 · 높이 2 · 층 2' → Undo 뒤 '보스 hp 9 · 높이 1 · 층 1'(hp는 [Serializable]이 없는 중간 부모 위의 필드, 높이는 구조체 안의 Vector3 — 둘 다 되돌아간다. hp가 8로 남으면 이상). 3의 빌드 중 Console에 'link.xml' 경고가 없다. 4·6이 에디터와 똑같이 돈다(숫자·고르기 창·Undo·시험 모드). 7에 'MissingMethodException'·'등록하지 못했습니다'·Exception이 없다.
+- 이상하면: 2·5의 알림 글, Player.log의 첫 Exception(형식 이름 포함), 빌드 중 Console 경고.
 
 ### 개발 빌드 — 테스트 상황이 함께 들어간다
 준비: 0-2·0-6.
@@ -486,9 +514,10 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 2. 방장: 패널 › 점검 › '방 만들기'.
 3. 방장: 점검 › '친구 초대' → Steam 초대 창에서 손님을 초대.
 4. 손님: Steam 채팅·친구 목록의 초대에서 참가.
-5. 방장: 멀티 › '나가기(혼자 하기)'.
-- 정상: 2 뒤 방장 패널 '방장 · 내 번호 #1', '접속 주소: Steam 로비 …'. 4 뒤 두 패널 명단 2명, 손님 '클라이언트 · 내 번호 #2'. 5 뒤 손님 화면에 '서버 연결이 끝났습니다: 방이 닫혔습니다.'.
-- 이상하면: 2의 접속 주소가 'ws://…'(직접 접속)면 Steam이 붙지 않은 것 — Player.log의 '[MomoiProject] Steam' 줄. 4에서 안 들어가면 손님 Player.log.
+5. (선택, 큰 메시지 — 부록 B 버전 3의 플레이어 데이터 `big`이 있어야 한다) 방장: 점검 › '큰 값 600KB↔비움' → 방장 Player.log를 연다 → 방장: '큰 값 600KB↔비움'을 한 번 더(비움).
+6. 방장: 멀티 › '나가기(혼자 하기)'.
+- 정상: 2 뒤 방장 패널 '방장 · 내 번호 #1', '접속 주소: Steam 로비 …'. 4 뒤 두 패널 명단 2명, 손님 '클라이언트 · 내 번호 #2'. 5의 방장 Player.log에 빨간 '[MomoiProject] Steam으로 메시지를 보내지 못했습니다(…바이트, 신뢰, …). 한 메시지가 512KB를 넘거나 보낼 버퍼가 찼습니다…'가 한 번 있다(Steam은 512KB를 넘는 메시지를 버린다 — 조용히 어긋나지 않고 알리는지 보는 것. 그 값은 손님에게 가지 않는다). 두 번째(비움)는 오류 없이 간다. 6 뒤 손님 화면에 '서버 연결이 끝났습니다: 방이 닫혔습니다.'.
+- 이상하면: 2의 접속 주소가 'ws://…'(직접 접속)면 Steam이 붙지 않은 것 — Player.log의 '[MomoiProject] Steam' 줄. 4에서 안 들어가면 손님 Player.log. 5에서 오류 줄이 없으면 손님 화면이 그 뒤에도 방장과 같게 움직이는지(점검 › '타격 ×3').
 
 ## 3. Unity 안에서만 도는 시험(버튼 한 번)
 
@@ -498,12 +527,15 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 2. 끝날 때까지 기다린다.
 3. 같은 창 'PlayMode' → 'Run All' → 끝날 때까지 기다린다(게임이 켜졌다 꺼진다 — 1분 안쪽).
 4. Console 검색 칸에 `MomoiProject`.
-- 정상: 모든 테스트가 초록(통과), 도는 동안·끝난 뒤 Console에 `[MomoiProject]` 경고가 없다(테스트용 형식의 경고는 나오지 않는다). 단 PlayMode의 '연출이 0.5초 동안 나아가지 않아 넘어갑니다'·'연출이 0.3초 안에 끝나지 않아 넘어갑니다'는 시험이 일부러 내는 것이다. 에디터 전용 시험(DB 목록·저장·적용(Ctrl+S) 계획·ID 바꾸기·에셋 관리(넣을 것·정돈)·저장 변환 항목·Mirror 빌드(링크 파일)·다이얼로그 진행·테스트 상황·[ShowIf] 숨김 등)은 오프라인으로 돌릴 수 없어 이것만 남긴다. 에셋 관리 시험은 `Assets/__GBibleAssetToolTests`를 잠깐 만들었다가 지운다(끝난 뒤 남아 있으면 이상). PlayMode에는 다이얼로그를 꺼도 `PresentationPlayTests`(연출 대기열을 플레이 중에 돌려 봄: 씬 흐름이 죽는 모습을 기다림 · 멈춘 연출 넘기기와 일시정지 · 버리기의 finally·씬 열기·사라지는 오브젝트 · 배속을 세션에 알림 · 확인 창을 Esc로 닫을 때 다시 뜬 창)가 있다 — 화면 설정이 없는 실행이면 확인 창 시험 하나는 '건너뜀'(회색)으로 남는다(실패 아님).
+- 정상: 모든 테스트가 초록(통과), 도는 동안·끝난 뒤 Console에 `[MomoiProject]` 경고가 없다(테스트용 형식의 경고는 나오지 않는다). 컴파일 때의 빨간 '[MomoiProject] Mirror 비교 코드 생성 실패(…)'도 없다 — Mirror 시험(`MirrorTests`·`MirrorBuildTests`)은 여기서 실제 Unity 생성 코드로 다시 돈다. 단 PlayMode의 '연출이 0.5초 동안 나아가지 않아 넘어갑니다'·'연출이 0.3초 안에 끝나지 않아 넘어갑니다'는 시험이 일부러 내는 것이다. 에디터 전용 시험(DB 목록·저장·적용(Ctrl+S) 계획·ID 바꾸기·에셋 관리(넣을 것·정돈)·저장 변환 항목·Mirror 빌드(링크 파일)·다이얼로그 진행·테스트 상황·[ShowIf] 숨김 등)은 오프라인으로 돌릴 수 없어 이것만 남긴다. 에셋 관리 시험은 `Assets/__GBibleAssetToolTests`를 잠깐 만들었다가 지운다(끝난 뒤 남아 있으면 이상). PlayMode에는 다이얼로그를 꺼도 `PresentationPlayTests`(연출 대기열을 플레이 중에 돌려 봄: 씬 흐름이 죽는 모습을 기다림 · 멈춘 연출 넘기기와 일시정지 · 버리기의 finally·씬 열기·사라지는 오브젝트 · 배속을 세션에 알림 · 확인 창을 Esc로 닫을 때 다시 뜬 창)가 있다 — 화면 설정이 없는 실행이면 확인 창 시험 하나는 '건너뜀'(회색)으로 남는다(실패 아님).
 - 이상하면: 실패한 테스트 이름과 메시지(Test Runner 아래 칸), 경고 첫 줄.
 
 ## 확인이 끝나면
 
 - 시험하느라 만든 항목·스크립트(`Assets/Dev/Checks`(Editor 포함) · `Assets/Dev/Art`·`Audio`·`Fonts`·`Misc`의 시험 파일 · 스프라이트 틀 `cardFrame`과 `Assets/MomoiProject/Data/Sprites` · DB 설정 넷·`scene`·`hero`·`office`·`checkCard`·`rule.checkCard.art`·`checkStatus`·`checkBigHits` · `Texts_en` · 테스트 상황 `check` · `D:\Builds`의 `status.csv`·`texts.csv` · Test.unity·CheckB · 빌드 씬 목록 · Run In Background · Scripting Backend · Managed Stripping Level · 다이얼로그 기능)는 지우거나, 메뉴 `MomoiProject › 처음 상태로 되돌리기…`로 처음 상태(설치 직후)로 돌린다(저장 파일·PlayerPrefs도 지운다). 그 뒤 시작 설정을 다시 한다.
+- (되돌리기를 고를 때 한 번 — 옮기지 못하는 파일) 되돌리기 전에 `D:\Builds\status.csv`를 탐색기로 `Assets\Dev\Checks`에 복사하고 엑셀로 열어 둔 채(닫지 않는다) `MomoiProject › 처음 상태로 되돌리기…` → 창이 뜨면 '확인' → Unity가 다시 열리면 엑셀을 닫고 `처음 상태로 되돌리기…`를 한 번 더.
+  - 정상: 첫 번째에 창 '파일 1개를 옮기지 못해 그대로 두었습니다(다른 프로그램이 열어 두었을 수 있습니다)…'와 그 파일 경로가 뜨고, 나머지는 다 옮겨진 채 Unity가 다시 열린다(중간에 멈추지 않는다). 첫 번째 백업 폴더 `MomoiProjectBackups/<시각>/README.txt`에 '옮기지 못해 프로젝트에 그대로 둔 파일 1개'와 그 경로가 적혀 있다. 두 번째에는 창 없이 남은 것만 옮겨지고, 새 백업 폴더에 `Assets/Dev/Checks/status.csv`가 있다.
+  - 이상하면: 창 글, 다시 열린 뒤 Console 첫 줄, `Assets/Dev`에 남은 것.
 - 구조 편집을 켰으면 메뉴 `MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)`로 다시 끈다(이 컴퓨터 설정이라 되돌리기로 꺼지지 않는다).
 
 ---
@@ -565,6 +597,57 @@ namespace MomoiChecks
     {
         public string title;
         public Sprite art;
+    }
+
+    // 생성 코드 점검(빌드 — 코드 줄이기 High): [Serializable]이 없는 중간 부모를 건너 그 위 부모의 필드(hp)와
+    // Vector3를 담은 구조체(spot)도 기록·Undo되는지. 부록 B(버전 3)가 이 형식의 플레이어 데이터 checkBoss를 만든다.
+    [Serializable]
+    public class CheckThing
+    {
+        public string name = "보스";
+        public int hp = 10;
+    }
+
+    public abstract class CheckThingBase : CheckThing   // [Serializable]이 없는 중간 부모(필드 없이 동작만)
+    {
+        public string Summary => $"{name} hp {hp}";
+    }
+
+    [Serializable]
+    public struct CheckSpot
+    {
+        public Vector3 at;
+        public int floor;
+    }
+
+    [Serializable]
+    public class CheckBoss : CheckThingBase
+    {
+        public CheckSpot spot;
+    }
+
+    [Serializable]
+    public class CheckHurt : GameAction
+    {
+        protected override void Run()
+        {
+            if (!Game.Session.Data.IsDefined("checkBoss")) throw Game.Fail("check.boss", "부록 B(버전 3)를 Ctrl+S로 적용해 플레이어 데이터 checkBoss를 먼저 만드세요.");
+            var boss = Game.Get<CheckBoss>("checkBoss");
+            boss.hp -= 1;
+            boss.spot.at += Vector3.up;
+            boss.spot.floor += 1;
+        }
+    }
+
+    // Steam 큰 메시지 점검: 글자 플레이어 데이터 big을 600KB(Steam 한 메시지 한도 512KB보다 크게)로 채우거나 비운다.
+    [Serializable]
+    public class CheckBig : GameAction
+    {
+        protected override void Run()
+        {
+            if (!Game.Session.Data.IsDefined("big")) throw Game.Fail("check.big", "부록 B(버전 3)를 Ctrl+S로 적용해 플레이어 데이터 big을 먼저 만드세요.");
+            Game.Set("big", string.IsNullOrEmpty(Game.Get<string>("big")) ? new string('가', 200000) : "");
+        }
     }
 
     [Serializable]
@@ -632,6 +715,13 @@ namespace MomoiChecks
             s.Debug.Register(Group, "전환 오류 켬↔끔", () => GameScreens.Toast((_failFade = !_failFade) ? "전환 오류: 켬" : "전환 오류: 끔"));
             s.Debug.Register(Group, "방 만들기", () => GameNet.CreateRoom(4));
             s.Debug.Register(Group, "친구 초대", GameNet.InviteToRoom);
+            s.Debug.Register(Group, "보스 때리기", () => GameScreens.Do(() => new CheckHurt()));
+            s.Debug.Register(Group, "보스 보기", () =>
+            {
+                var boss = s.Data.IsDefined("checkBoss") ? s.Data.Get<CheckBoss>("checkBoss") : null;
+                GameScreens.Toast(boss == null ? "checkBoss 없음(부록 B 버전 3을 적용)" : $"{boss.Summary} · 높이 {boss.spot.at.y:0} · 층 {boss.spot.floor}", 5f);
+            });
+            s.Debug.Register(Group, "큰 값 600KB↔비움", () => GameScreens.Do(() => new CheckBig()));
 #if GBIBLE_INPUT
             s.Debug.Register(Group, "키 바꾸기(Jump)", RebindJump);
             s.Debug.Register(Group, "지금 키(Jump)", () => GameScreens.Toast("Jump = " + GameInput.BindingText(GameInput.Find("Player/Jump"), 0)));
@@ -709,10 +799,10 @@ namespace MomoiChecks
             _sceneWatch = GameView.Redraw(() => label.text = $"새 씬 {name} · scene = {GBibleRuntime.Session?.Data.Get<string>("scene")}", "scene");
         }
 
-        // 위치 맞추기: 이름이 check1·check2인 물체 중 이 프로그램 것(IsMine)을 위아래로 움직인다.
+        // 위치 맞추기: 이름이 check0~check3인 물체 중 이 프로그램 것(IsMine — check0은 방장 것)을 위아래로 움직인다.
         static IEnumerator MoveSquares()
         {
-            var names = new[] { "check1", "check2" };
+            var names = new[] { "check0", "check1", "check2", "check3" };
             while (true)
             {
                 foreach (var name in names)
@@ -732,10 +822,10 @@ namespace MomoiChecks
 
 ## 부록 B — 점검용 DB 반영 스크립트(`Assets/Dev/Checks/Editor/CheckSeeds.cs`)
 
-스프라이트 틀·DB CSV·조건 있는 로그 점검(1절)에 쓴다. 에디터 전용이라 `Editor` 폴더에 둔다(0-3과 같은 방법으로 `Assets\Dev\Checks\Editor` 폴더를 만들고 저장). 컴파일이 끝나면 DB에 '적용 전' 항목이 생긴다 — 스프라이트 틀 항목 12에서 Ctrl+S로 적용한다.
+스프라이트 틀·DB CSV·조건 있는 로그·가중치 표 줄 조건 점검(1절)과 코드 줄이기 High·Steam 큰 메시지 점검(2절)에 쓴다. 에디터 전용이라 `Editor` 폴더에 둔다(0-3과 같은 방법으로 `Assets\Dev\Checks\Editor` 폴더를 만들고 저장). 컴파일이 끝나면 DB에 '적용 전' 항목이 생긴다 — 스프라이트 틀 항목 12에서 Ctrl+S로 적용한다.
 
 ```csharp
-// Assets/Dev/Checks/Editor/CheckSeeds.cs — PendingChecks.md 점검용(스프라이트 틀 · DB CSV · 조건 있는 로그). 점검이 끝나면 Assets/Dev/Checks 폴더째 지운다.
+// Assets/Dev/Checks/Editor/CheckSeeds.cs — PendingChecks.md 점검용(스프라이트 틀 · DB CSV · 조건 있는 로그 · 가중치 표 · 생성 코드 · Steam 큰 메시지). 점검이 끝나면 Assets/Dev/Checks 폴더째 지운다.
 using GBible;
 using GBible.Data;
 using GBible.EditorTools;
@@ -745,7 +835,8 @@ static class CheckSeeds
 {
     // CheckCard.art를 틀 cardFrame(미리보기 크기 cardFront)에 잇고, 그 클래스의 인스턴스 checkCard를 만든다(적용 전 → Ctrl+S).
     // 버전 2: 정수 칸이 있는 상태 효과 checkStatus(DB CSV 점검), 점검 타격 중 amount 20 이상만 세는 로그 checkBigHits.
-    [DbSeed("2")]
+    // 버전 3: 가중치 표 checkTable(줄 하나 — 줄 조건 검증 점검), 플레이어 데이터 checkBoss(CheckBoss — 코드 줄이기 High)·big(글자 — Steam 큰 메시지).
+    [DbSeed("3")]
     static void SpriteFrameCheck()
     {
         var db = EditorDatabase.Instance;
@@ -768,6 +859,21 @@ static class CheckSeeds
         {
             var stat = (StatData)EditorDatabase.Staging.Add(typeof(StatData), "checkBigHits");
             stat.triggers.Add(new StatRule { eventType = typeof(CheckHit).FullName, filter = new FieldFilter { path = "amount", op = FieldOp.AtLeast, value = "20" } }.ToTriggerRule());
+        }
+        if (db.FindById("checkTable") == null)
+        {
+            var table = (WeightTableData)EditorDatabase.Staging.Add(typeof(WeightTableData), "checkTable");
+            table.entries.Add(new WeightTableEntry { item = "checkCard" });
+        }
+        if (db.FindById("checkBoss") == null)
+        {
+            var boss = (PlayerDataEntry)EditorDatabase.Staging.Add(typeof(PlayerDataEntry), "checkBoss");
+            boss.valueType = typeof(CheckBoss).FullName;
+        }
+        if (db.FindById("big") == null)
+        {
+            var big = (PlayerDataEntry)EditorDatabase.Staging.Add(typeof(PlayerDataEntry), "big");
+            big.valueType = typeof(string).FullName;
         }
     }
 }

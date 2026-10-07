@@ -92,6 +92,8 @@ namespace GBible.EditorTools
         // 만든(또는 이미 최신인) 파일 경로. 식별자가 하나도 없으면 null.
         public static string Generate(bool force = false)
         {
+            // 처음 상태로 되돌리는 중(파일을 옮긴 뒤 Unity를 다시 열기 전): 옮긴 자리에 설정·생성 코드를 다시 만들지 않는다.
+            if (ProjectReset.Resetting) return null;
             var all = EditorDatabase.Instance.Committed.Where(d => d != null && !string.IsNullOrEmpty(d.Id)).ToList();
             if (all.Count == 0) return null;
 
@@ -154,14 +156,18 @@ namespace GBible.EditorTools
             b.AppendLine("    public static class GameIds");
             b.AppendLine("    {");
 
-            var groups = all.GroupBy(d => d.GetType()).OrderBy(g => g.Key == typeof(PlayerDataEntry) ? "" : g.Key.Name, StringComparer.Ordinal);
+            var groups = all.GroupBy(d => d.GetType()).OrderBy(g => g.Key == typeof(PlayerDataEntry) ? "" : g.Key.Name, StringComparer.Ordinal).ThenBy(g => g.Key.FullName, StringComparer.Ordinal);
+            var frames = SpriteFramesWithSizes(all);
+            // 안쪽 클래스 이름이 겹치지 않게(짧은 이름이 같은 종류 — 프로젝트의 LocationData와 선택 기능의 LocationData 등 —, GameIds 자신, 아래 SpriteSize) 뒤에 _2 …
+            var classNames = new HashSet<string>(StringComparer.Ordinal) { "GameIds" };
+            if (frames.Count > 0) classNames.Add("SpriteSize");
             bool firstGroup = true;
             foreach (var group in groups)
             {
                 if (!firstGroup) b.AppendLine();
                 firstGroup = false;
                 var info = DataTypes.Find(group.Key);
-                var className = group.Key == typeof(PlayerDataEntry) ? "PlayerData" : ClassName(group.Key);
+                var className = Unique(group.Key == typeof(PlayerDataEntry) ? "PlayerData" : ClassName(group.Key), classNames);
                 b.AppendLine($"        /// <summary>{Escape(info?.DisplayName ?? group.Key.Name)}</summary>");
                 b.AppendLine($"        public static class {className}");
                 b.AppendLine("        {");
@@ -196,18 +202,21 @@ namespace GBible.EditorTools
                 }
                 b.AppendLine("        }");
             }
-            AppendSpriteSizes(b, all.OfType<SpriteFrameData>(), names);
+            AppendSpriteSizes(b, frames, names);
             b.AppendLine("    }");
             if (typedKeys) AppendPlayerDataView(b, all.OfType<PlayerDataEntry>(), visible, names);
             b.AppendLine("}");
             return b.ToString().Replace("\r\n", "\n");
         }
 
-        // 스프라이트 틀의 크기 이름: SpriteSpecs.Get(원본, GameIds.SpriteSize.Character.Icon) — 틀마다 안쪽 클래스, 크기마다 상수.
-        static void AppendSpriteSizes(StringBuilder b, IEnumerable<SpriteFrameData> frames, Dictionary<string, string> names)
-        {
-            var list = frames.Where(f => !string.IsNullOrEmpty(f.Id) && f.sizes.Any(s => s != null && SpriteFrameData.IsValidName(s.name, out _)))
+        // 크기 이름 상수를 만들 틀(올바른 이름의 크기가 하나라도 있는 것, ID 순).
+        static List<SpriteFrameData> SpriteFramesWithSizes(IEnumerable<GameData> all) =>
+            all.OfType<SpriteFrameData>().Where(f => !string.IsNullOrEmpty(f.Id) && f.sizes.Any(s => s != null && SpriteFrameData.IsValidName(s.name, out _)))
                 .OrderBy(f => f.Id, StringComparer.Ordinal).ToList();
+
+        // 스프라이트 틀의 크기 이름: SpriteSpecs.Get(원본, GameIds.SpriteSize.Character.Icon) — 틀마다 안쪽 클래스, 크기마다 상수.
+        static void AppendSpriteSizes(StringBuilder b, List<SpriteFrameData> list, Dictionary<string, string> names)
+        {
             if (list.Count == 0) return;
             b.AppendLine();
             b.AppendLine("        /// <summary>스프라이트 틀의 크기 이름: SpriteSpecs.Get(원본, GameIds.SpriteSize.틀.크기)</summary>");

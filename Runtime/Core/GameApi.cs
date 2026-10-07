@@ -352,7 +352,7 @@ namespace GBible
                 .Select(c =>
                 {
                     var id = c as string ?? IdOf(c);
-                    return new ChoiceCandidate(id, label?.Invoke(c) ?? Texts.NameOf(id));
+                    return new ChoiceCandidate(id, label?.Invoke(c));
                 }), then, min, max, source, player);
 
         // 글 선택지: Game.Ask("자세", new[] { new ChoiceCandidate("attack", "공격"), new ChoiceCandidate("guard", "방어") }, new ChooseStance());
@@ -406,13 +406,19 @@ namespace GBible
             have = 0;
             if (cost.cancelled || cost.amount <= 0) return true;
             have = ReadNumber(cost.key, cost.path);
-            if (have - cost.amount < cost.floor) return false;
-            WriteNumber(cost.key, cost.path, have - cost.amount);
+            // 아주 작은 차이는 같다고 본다(FieldOps.Near — 0.1씩 찬 0.9999999999999999로도 1을 낸다). 하한 바로 아래로 내려가면 하한으로.
+            var next = have - cost.amount;
+            if (next < cost.floor)
+            {
+                if (!FieldOps.Near(next, cost.floor)) return false;
+                next = cost.floor;
+            }
+            WriteNumber(cost.key, cost.path, next);
             return true;
         }
 
         // 낼 수 있는지(지금 값 기준, 가로채기 전 — 화면 미리보기용). 실제 지불은 Pay가 가로채기까지 거쳐 다시 판정한다.
-        public bool CanPay(string key, string path, double amount) => ReadNumber(key, path ?? "") >= amount;
+        public bool CanPay(string key, string path, double amount) => FieldOps.AtLeast(ReadNumber(key, path ?? ""), amount);
 
         // 경로에 []가 있나(요소마다 펼치는 경로 — 값이 여럿). 비용처럼 숫자 하나에만 쓰는 곳은 받지 않는다(목록의 한 요소는 [id]로 고른다).
         internal static bool IsManyPath(string path) => !string.IsNullOrEmpty(path) && path.IndexOf(FieldPaths.Each, StringComparison.Ordinal) >= 0;

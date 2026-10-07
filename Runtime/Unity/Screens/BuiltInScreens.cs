@@ -134,7 +134,7 @@ namespace GBible
             foreach (var option in choice.options)
             {
                 var id = option.id;
-                var button = ScreenUi.Button(_options, ScreenUi.Text(option.label ?? id), () => Pick(id));
+                var button = ScreenUi.Button(_options, option.DisplayText(), () => Pick(id));
                 button.AddToClassList("momoi-option");
                 // 설명 글: 텍스트 표의 '<id>.desc'(있을 때만).
                 if (Texts.Has(id + ".desc"))

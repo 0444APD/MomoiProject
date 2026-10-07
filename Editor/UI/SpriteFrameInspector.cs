@@ -29,12 +29,12 @@ namespace GBible.EditorTools.UI
 
         void OnDisable() => Undo.undoRedoPerformed -= OnUndoRedo;
 
-        // 되돌리기(Ctrl+Z)로 표가 바뀌었으면 다시 그리고 그 크기로 다시 굽는다.
+        // 되돌리기(Ctrl+Z)로 표가 바뀌었으면 다시 그리고 그 크기로 다시 굽는다(맞춤 기록이 함께 돌아갔으면 구운 파일도 그에 맞춘다).
         void OnUndoRedo()
         {
             if (target == null) return;
             EditorDatabase.MarkDirty();
-            if (!Problems(Frame).Any()) SpriteSpecEditor.RebakeStale();
+            if (!Problems(Frame).Any()) SpriteSpecEditor.RebakeStale(checkFiles: SpriteSpecEditor.TakeUndoCheck());
             Rebuild();
         }
 
@@ -256,10 +256,13 @@ namespace GBible.EditorTools.UI
         }
 
         // 틀을 고치고 저장한 뒤 바뀐 크기로 다시 굽는다(틀에서 빠진 크기의 구운 이미지는 백업으로).
+        // 맞춤 기록도 같은 되돌리기에 넣는다 — 크기를 빼거나 바꾼 것을 Ctrl+Z로 되돌리면 예외 촬영·구운 기록도 돌아오고, 파일은 다시 맞춰 굽는다.
         void Edit(string undoName, Action<SpriteFrameData> edit)
         {
             var frame = Frame;
             Undo.RecordObject(frame, undoName);
+            var registry = AssetDatabase.LoadAssetAtPath<SpriteSpecDatabase>(SpriteSpecEditor.RegistryPath);
+            if (registry != null) Undo.RecordObject(registry, undoName);
             edit(frame);
             EditorUtility.SetDirty(frame);
             AssetDatabase.SaveAssetIfDirty(frame);

@@ -89,7 +89,8 @@ namespace GBible
             {
                 case CurveKind.Linear: value = baseValue + step * (x - startX); break;
                 case CurveKind.Exponential: value = baseValue * Math.Pow(rate, x - startX); break;
-                case CurveKind.Power: value = startX > 0 ? baseValue * Math.Pow(Math.Max(0, x) / startX, power) : baseValue; break;
+                // 단계가 0 이하면 값 0(지수가 음수여도 0^지수 = ∞가 되지 않게).
+                case CurveKind.Power: value = startX > 0 ? (x > 0 ? baseValue * Math.Pow(x / startX, power) : 0) : baseValue; break;
                 case CurveKind.Table: value = Interpolate(x, baseValue); break;
                 // 방식 없음: 기준 값 그대로(반올림·자르기 칸은 화면에서 숨으므로 적용하지 않는다).
                 default: return baseValue;
@@ -108,6 +109,9 @@ namespace GBible
         double Interpolate(double x, double fallback)
         {
             var sorted = points.Where(p => p != null).OrderBy(p => p.x).ToList();
+            // 같은 단계의 점이 둘이면 목록에서 뒤의 점만 쓴다(정렬은 안정적이라 같은 단계 안에서는 목록 차례 그대로).
+            for (int i = sorted.Count - 2; i >= 0; i--)
+                if (sorted[i].x == sorted[i + 1].x) sorted.RemoveAt(i);
             if (sorted.Count == 0) return fallback;
             if (x <= sorted[0].x) return sorted[0].y;
             for (int i = 1; i < sorted.Count; i++)

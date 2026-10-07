@@ -336,6 +336,16 @@ namespace GBible
 
     public static class FieldOps
     {
+        // 게임 숫자 비교의 한 가지 규칙: 아주 작은 차이(1e-9, 1000을 넘는 수는 그 크기의 1e-12배)는 같다고 본다 — 0.1씩 열 번 찬 마나
+        // (0.9999999999999999)도 1이다. '같음'뿐 아니라 이상·이하·초과·미만·비용(Game.Pay·CanPay)도 이 기준이라 '1과 같은데 1 이상은 아님'이 없다.
+        public static bool Near(double a, double b) =>
+            a == b || Math.Abs(a - b) <= Math.Max(1e-9, Math.Max(Math.Abs(a), Math.Abs(b)) * 1e-12);
+
+        public static bool AtLeast(double value, double limit) => value >= limit || Near(value, limit);
+        public static bool AtMost(double value, double limit) => value <= limit || Near(value, limit);
+        public static bool Greater(double value, double limit) => value > limit && !Near(value, limit);
+        public static bool Less(double value, double limit) => value < limit && !Near(value, limit);
+
         static readonly FieldOp[] Numeric = { FieldOp.AtLeast, FieldOp.AtMost, FieldOp.Greater, FieldOp.Less, FieldOp.Equal, FieldOp.NotEqual };
         static readonly FieldOp[] Text = { FieldOp.Equal, FieldOp.NotEqual, FieldOp.IsEmpty, FieldOp.IsNotEmpty };
         static readonly FieldOp[] Boolean = { FieldOp.IsTrue, FieldOp.IsFalse };
@@ -504,10 +514,10 @@ namespace GBible
             if (!TryNumber(value, out var number) || !double.TryParse(target, NumberStyles.Float, CultureInfo.InvariantCulture, out var limit)) return false;
             switch (op)
             {
-                case FieldOp.AtLeast: return number >= limit;
-                case FieldOp.AtMost: return number <= limit;
-                case FieldOp.Greater: return number > limit;
-                case FieldOp.Less: return number < limit;
+                case FieldOp.AtLeast: return AtLeast(number, limit);
+                case FieldOp.AtMost: return AtMost(number, limit);
+                case FieldOp.Greater: return Greater(number, limit);
+                case FieldOp.Less: return Less(number, limit);
             }
             return false;
         }
@@ -518,7 +528,7 @@ namespace GBible
             if (value is bool b) return string.Equals(target, b ? "true" : "false", StringComparison.OrdinalIgnoreCase) || target == (b ? "참" : "거짓");
             if (value is Enum e) return string.Equals(e.ToString(), target, StringComparison.Ordinal);
             if (TryNumber(value, out var number))
-                return double.TryParse(target, NumberStyles.Float, CultureInfo.InvariantCulture, out var other) && Math.Abs(number - other) < 1e-9;
+                return double.TryParse(target, NumberStyles.Float, CultureInfo.InvariantCulture, out var other) && Near(number, other);
             return string.Equals(Convert.ToString(value, CultureInfo.InvariantCulture), target, StringComparison.Ordinal);
         }
 

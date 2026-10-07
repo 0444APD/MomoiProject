@@ -132,6 +132,38 @@ namespace GBible.Tests
         public MtLoop next;
     }
 
+    [Serializable]
+    public class MtFloats
+    {
+        public float field;
+        public float? maybe = 0f;
+        public List<float> list = new List<float> { 0f };
+        public double[] array = { 0.0 };
+        public Dictionary<string, float> map = new Dictionary<string, float> { ["a"] = 0f };
+    }
+
+    // 컬렉션 클래스를 상속한 데이터(class Deck : List<Card>) — 요소는 상속한 클래스의 private 칸이다.
+    [Serializable]
+    public class MtDeck : List<string>
+    {
+    }
+
+    [Serializable]
+    public class MtDeckHolder
+    {
+        public string name = "덱";
+        public MtDeck deck = new MtDeck();
+    }
+
+    // 요소가 자기를 가진 객체를 가리킨다(부모 참조).
+    [Serializable]
+    public class MtTreeNode
+    {
+        public string name;
+        public MtTreeNode parent;
+        public List<MtTreeNode> children = new List<MtTreeNode>();
+    }
+
     // 새로 만든 객체가 이미 있던 객체를 가리킬 때(앞쪽 필드에서 먼저 만난다): 그 객체의 변경이 기록에서 빠지지 않는지.
     [Serializable]
     public class MtUnit
@@ -575,9 +607,133 @@ namespace GBible.Tests
             Assert.AreSame(oldShape, w.shape);
         }
 
+        static MtTreeNode Tree()
+        {
+            var root = new MtTreeNode { name = "root" };
+            foreach (var name in new[] { "a", "b", "c" }) root.children.Add(new MtTreeNode { name = name, parent = root });
+            return root;
+        }
+
+        // 뺀 요소가 그 리스트를 가진 객체를 가리키면(부모 참조) 뒤로 기록에 그 객체도 원래 객체째 들어간다. 되돌리며 그 객체를
+        // 다시 채울 때 리스트 필드가 새 리스트로 바뀌어도, 배치를 짜던 리스트에 끝까지 짠다(요소가 겹치지 않고 같은 리스트 인스턴스).
+        [Test]
+        public void 부모를_가리키는_요소를_빼고_되돌려도_리스트가_겹치지_않는다()
+        {
+            var root = Tree();
+            var children = root.children;
+            var removed = root.children[1];
+            var node = Mirror.Make(root);
+            var receiver = new MirrorReceiver();
+            var client = (MtTreeNode)receiver.Load(Mirror.Snapshot(node));
+            var before = Bytes(root);
+            root.children.RemoveAt(1);
+            var changes = new ChangeSet();
+            Mirror.Sync(root, node, changes);
+            receiver.Apply(client, changes);
+            Mirror.Undo(root, changes);
+            CollectionAssert.AreEqual(new[] { "a", "b", "c" }, root.children.Select(c => c.name).ToList(), "겹치지 않는다");
+            Assert.AreSame(children, root.children, "같은 리스트 인스턴스");
+            Assert.AreSame(removed, root.children[1], "빠졌던 객체도 같은 인스턴스");
+            CollectionAssert.AreEqual(before, Bytes(root));
+            var redo = new ChangeSet();
+            Mirror.Sync(root, node, redo);
+            receiver.Apply(client, redo);
+            CollectionAssert.AreEqual(before, Bytes(client), "받는 쪽도 되돌린 모습");
+        }
+
+        sealed class MtCut : GameAction
+        {
+            public bool fail;
+            protected override void Run()
+            {
+                Game.Get<MtTreeNode>("tree").children.RemoveAt(1);
+                if (fail) throw Game.Fail("fail.test", "시험 실패");
+            }
+        }
+
+        // 미리보기(CanDo)·실패한 행동·Undo는 같은 되돌리기(Mirror.Undo)를 쓴다: 부모 참조가 있어도 데이터가 그대로 돌아온다.
+        [Test]
+        public void 부모를_가리키는_요소를_빼는_행동의_미리보기와_실패와_Undo는_데이터를_깨지_않는다()
+        {
+            var session = new GameSession();
+            var root = Tree();
+            session.Data.Define("tree", DataZone.Session, root);
+            string Names() => string.Join(",", session.Data.Get<MtTreeNode>("tree").children.Select(c => c.name));
+            Assert.IsTrue(session.Game.CanDo(new MtCut(), out _));
+            Assert.AreEqual("a,b,c", Names(), "미리보기 뒤");
+            Assert.Throws<GameFailure>(() => session.Game.Do(new MtCut { fail = true }));
+            Assert.AreEqual("a,b,c", Names(), "실패한 행동 뒤");
+            session.Game.Do(new MtCut());
+            Assert.AreEqual("a,c", Names());
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual("a,b,c", Names(), "Undo 뒤");
+        }
+
+        sealed class MtDraw : GameAction
+        {
+            protected override void Run() => Game.Get<MtDeckHolder>("deck").deck.Add("card");
+        }
+
+        // 컬렉션 클래스를 상속한 데이터: 생성 코드는 요소를 보지 못하므로 그 형식(과 그것을 담은 형식)을 생성 코드로 다루지 않고 이유를 밝힌다 —
+        // 플레이어 데이터는 예전 비교 방식으로 요소의 변경도 기록·Undo하고, 네트워크로는 보내기 전에 막는다(예전에는 요소의 변경을 조용히 놓쳤다).
+        [Test]
+        public void 컬렉션_클래스를_상속한_데이터는_생성_코드로_다루지_않고_요소의_변경도_되돌린다()
+        {
+            Mirror.Initialize();
+            Assert.IsFalse(Mirror.Supports(typeof(MtDeck), out var reason));
+            StringAssert.Contains("컬렉션 클래스", reason);
+            Assert.IsFalse(Mirror.Supports(typeof(MtDeckHolder), out reason), "그것을 담은 클래스도");
+            StringAssert.Contains("컬렉션 클래스", reason);
+            Assert.IsFalse(Mirror.CanSend(typeof(MtDeckHolder), out _), "네트워크로 보낼 때도 막는다");
+
+            var session = new GameSession();
+            session.Data.Define("deck", DataZone.Session, new MtDeckHolder());
+            session.Game.Do(new MtDraw());
+            Assert.AreEqual(1, session.Data.Get<MtDeckHolder>("deck").deck.Count);
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(0, session.Data.Get<MtDeckHolder>("deck").deck.Count, "요소의 변경도 되돌린다");
+        }
+
         // 비교 코드가 없는 객체(에셋 참조처럼)는 참조 그대로: 복사·되돌리기에서 같은 인스턴스를 잇는다.
         public sealed class MtAssetLike
         {
+        }
+
+        // 이어 붙인 기록(Append — 한 행동 안의 여러 Sync)은 원래 객체 번호를 기록마다 따로 센다: 떼어 내거나(Detach) 비우고(Clear) 다시 써도 맞는다.
+        [Test]
+        public void 이어_붙인_기록을_떼어_내거나_비우고_다시_써도_원래_객체로_되돌린다()
+        {
+            var w = World();
+            var asset = new MtAssetLike();
+            w.anything = asset;
+            var shape = w.shape;
+            var node = Mirror.Make(w);
+            ChangeSet Step(Action change)
+            {
+                change();
+                var changes = new ChangeSet();
+                Mirror.Sync(w, node, changes);
+                return changes;
+            }
+            var combined = new ChangeSet();
+            combined.Append(Step(() => w.anything = new MtAssetLike()));
+            combined.Append(Step(() => w.shape = new MtBox()));
+            Mirror.Undo(w, combined.Detach());
+            Assert.AreSame(asset, w.anything);
+            Assert.AreSame(shape, w.shape, "떼어 낸 기록: 뒤 기록의 원래 객체 번호도 맞다");
+
+            Mirror.Sync(w, node, new ChangeSet());
+            combined.Append(Step(() => w.anything = new MtAssetLike()));
+            combined.Append(Step(() => w.shape = new MtBox()));
+            combined.Clear();
+            var box = w.shape;
+            combined.Append(Step(() =>
+            {
+                w.items[0].id = new string('x', 200); // 앞에 긴 기록 — 원래 객체를 가리키는 기록이 비우기 전 이어 붙인 자리보다 뒤에 온다
+                w.shape = new MtCircle();
+            }));
+            Mirror.Undo(w, combined);
+            Assert.AreSame(box, w.shape, "비운 기록: 비우기 전 이어 붙인 자리가 남지 않는다");
         }
 
         [Test]
@@ -745,6 +901,168 @@ namespace GBible.Tests
             Assert.Throws<FormatException>(() => new MirrorReader(endless).UVar(), "끝나지 않는 숫자 인코딩");
             Assert.AreEqual("abc", NetProtocol.CleanName("\u0001 abc \n"));
             Assert.AreEqual(NetProtocol.MaxNameLength, NetProtocol.CleanName(new string('가', 100)).Length);
+        }
+
+        // 형식 번호표(입장할 때 받는 이름 목록)는 한도보다 많으면 배열을 잡기 전에 거절한다: 1바이트짜리 빈 이름 수천만 개를 담은 메시지가
+        // 입장 확인 전에 서버 메모리를 메시지의 여러 배로 잡지 못하게.
+        [Test]
+        public void 형식_번호표는_한도보다_많은_이름을_잡기_전에_거절한다()
+        {
+            var w = new MirrorWriter();
+            var count = NetProtocol.MaxTypeTable + 1;
+            w.UVar((ulong)count);
+            for (var i = 0; i < count; i++) w.Str(null);
+            Assert.Throws<FormatException>(() => NetProtocol.ReadStrings(new MirrorReader(w.ToArray()), NetProtocol.MaxTypeTable));
+            Assert.AreEqual(count, NetProtocol.ReadStrings(new MirrorReader(w.ToArray())).Length, "한도를 주지 않으면 예전처럼 다 읽는다");
+            var ok = new MirrorWriter();
+            NetProtocol.WriteStrings(ok, new[] { "a", "b" });
+            CollectionAssert.AreEqual(new[] { "a", "b" }, NetProtocol.ReadStrings(new MirrorReader(ok.ToArray()), NetProtocol.MaxTypeTable));
+        }
+
+        // 리스트·배열·딕셔너리 값·Nullable의 float·double도 필드처럼 비트로 비교한다: 0 → -0도 바뀐 것이라 받는 쪽도 같은 값(-x·1/x가 같은 결과)이 된다.
+        [Test]
+        public void 컬렉션과_Nullable의_음의_영도_필드처럼_바뀐_것으로_본다()
+        {
+            Mirror.Initialize();
+            var live = new MtFloats();
+            var node = Mirror.Make(live);
+            var receiver = new MirrorReceiver();
+            var client = (MtFloats)receiver.Load(Mirror.Snapshot(node));
+            live.field = -0f;
+            live.maybe = -0f;
+            live.list[0] = -0f;
+            live.array[0] = -0.0;
+            live.map["a"] = -0f;
+            var changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            Assert.AreEqual(5, changes.Count, "필드와 같이 다섯 곳 모두");
+            receiver.Apply(client, changes);
+            CollectionAssert.AreEqual(Bytes(live), Bytes(client), "받는 쪽도 -0");
+            Assert.IsTrue(float.IsNegativeInfinity(1 / client.list[0]) && float.IsNegativeInfinity(1 / client.map["a"]) && float.IsNegativeInfinity(1 / client.maybe.Value));
+            Mirror.Sync(live, node, changes = new ChangeSet());
+            Assert.IsTrue(changes.IsEmpty, "그대로면 기록하지 않는다");
+            live.list[0] = float.NaN;
+            Mirror.Sync(live, node, new ChangeSet());
+            Mirror.Sync(live, node, changes = new ChangeSet());
+            Assert.IsTrue(changes.IsEmpty, "NaN은 같은 값");
+        }
+
+        // 짝을 잃은 서러게이트(이모지를 글자 수로 자른 글 등)도 글자 그대로 오간다(UTF-8로만 쓰면 U+FFFD로 바뀌어 받는 쪽·Undo가 다른 글이 된다).
+        // 짝이 맞는 글은 예전과 같은 바이트다.
+        [Test]
+        public void 짝을_잃은_서러게이트도_글자_그대로_오가고_되돌린다()
+        {
+            foreach (var text in new[] { "a\uD83D", "\uDE00b", "x\uDC00\uD800y", "😀가\uD83D", ((char)0xFFFD).ToString(), "한글", "" })
+            {
+                var w = new MirrorWriter();
+                w.Str(text);
+                Assert.IsTrue(text == new MirrorReader(w.ToArray()).Str(), "글: " + string.Join(" ", text.Select(c => ((int)c).ToString("X4"))));
+            }
+            var valid = new MirrorWriter();
+            valid.Str("가😀a");
+            var utf8 = System.Text.Encoding.UTF8.GetBytes("가😀a");
+            CollectionAssert.AreEqual(new[] { (byte)(utf8.Length + 1) }.Concat(utf8).ToArray(), valid.ToArray(), "짝이 맞는 글은 UTF-8 그대로");
+
+            var live = new MtLoop { name = "a" };
+            var node = Mirror.Make(live);
+            var receiver = new MirrorReceiver();
+            var client = (MtLoop)receiver.Load(Mirror.Snapshot(node));
+            live.name = "b\uD83D";
+            var changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            receiver.Apply(client, changes);
+            Assert.IsTrue(client.name == "b\uD83D", "받는 쪽");
+            live.name = "c";
+            changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            Mirror.Undo(live, changes);
+            Assert.IsTrue(live.name == "b\uD83D", "되돌리기");
+            Assert.IsTrue(Mirror.Clone(live).name == "b\uD83D", "복사");
+        }
+
+        // 받은 덩어리(시작·끝 — 메시지 안의 한 기록)의 끝을 넘어 읽지 않는다: 잘린 기록은 뒤에 이어진 바이트(다음 기록·지난 메시지의 찌꺼기)를
+        // 값으로 읽어 적용하는 대신 거절한다.
+        [Test]
+        public void 받은_범위의_끝을_넘어_읽지_않고_거절한다()
+        {
+            var live = new MtUnit();
+            var node = Mirror.Make(live);
+            live.hp = 300;                                   // 2바이트 숫자
+            var changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            var bytes = changes.Forward.ToArray();
+            var target = new MtUnit();
+            Assert.Throws<FormatException>(() => Mirror.Apply(target, bytes, 0, bytes.Length - 1), "숫자 중간에서 잘린 기록");
+            Assert.AreEqual(10, target.hp, "잘린 값을 적용하지 않는다");
+            Mirror.Apply(target, bytes, 0, bytes.Length);
+            Assert.AreEqual(300, target.hp);
+
+            var data = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+            Assert.Throws<FormatException>(() => new MirrorReader(data, 0, 0).Byte());
+            Assert.Throws<FormatException>(() => new MirrorReader(data, 0, 0).Bool());
+            Assert.Throws<FormatException>(() => new MirrorReader(data, 0, 3).Float());
+            Assert.Throws<FormatException>(() => new MirrorReader(data, 0, 7).Double());
+            Assert.Throws<FormatException>(() => new MirrorReader(new byte[] { 0x80, 0x80 }).UVar(), "배열 끝에서 끝나는 숫자도");
+        }
+
+        // 받은 개수만큼 미리 잡지 않는다: 겹친 리스트마다 "남은 바이트만큼"을 잡게 한 작은 메시지가 메모리를 수천 배로 부풀리지 못한다.
+        [Test]
+        public void 겹친_리스트의_큰_개수로_메모리를_부풀리지_못한다()
+        {
+            Mirror.Initialize();
+            var id = (ulong)Mirror.Find(typeof(MtTreeNode)).Id;
+            var w = new MirrorWriter();
+            for (var level = 0; level < 300; level++)
+            {
+                w.Byte(1);              // 객체(형식 번호 + 필드)
+                w.UVar(id);
+                w.Str("x");             // name
+                w.Byte(0);              // parent = null
+                w.UVar(60000 + 1);      // children: 60000개라고 한다(남은 바이트 안)
+            }
+            w.Bytes(new byte[64 * 1024], 0, 64 * 1024);
+            var bytes = w.ToArray();
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            Assert.Throws<FormatException>(() => new MirrorReceiver().Load(bytes));
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.IsTrue(allocated < 16 * 1024 * 1024, $"메시지 {bytes.Length / 1024}KB에 {allocated / (1024 * 1024)}MB를 잡았다");
+        }
+
+        // 깊이 한도는 받은 데이터(네트워크·리플레이)를 막기 위한 것이다: 이 프로그램이 쓴 기록(되돌리기·복사)은 더 깊어도 읽는다.
+        [Test]
+        public void 이_프로그램이_쓴_깊은_기록은_한도와_상관없이_되돌리고_복사한다()
+        {
+            var head = new MtLoop { name = "0" };
+            var tail = head;
+            for (var i = 1; i < 300; i++)
+            {
+                tail.next = new MtLoop { name = i.ToString() };
+                tail = tail.next;
+            }
+            var node = Mirror.Make(head);
+            tail.name = "끝";
+            var changes = new ChangeSet();
+            Mirror.Sync(head, node, changes);
+            Assert.DoesNotThrow(() => Mirror.Undo(head, changes), "깊은 곳의 변경");
+            Assert.AreEqual("299", tail.name);
+            Mirror.Sync(head, node, new ChangeSet());
+
+            var second = head.next;
+            head.next = null;
+            changes = new ChangeSet();
+            Mirror.Sync(head, node, changes);
+            Assert.DoesNotThrow(() => Mirror.Undo(head, changes), "깊은 사슬을 떼었다가 되돌리기");
+            Assert.AreSame(second, head.next);
+
+            MtLoop copy = null;
+            Assert.DoesNotThrow(() => copy = Mirror.Clone(head), "깊은 데이터의 복사");
+            var count = 0;
+            for (var at = copy; at != null; at = at.next) count++;
+            Assert.AreEqual(300, count);
+
+            // 받은 데이터는 그대로 막는다.
+            Mirror.Sync(head, node, new ChangeSet());
+            Assert.Throws<FormatException>(() => new MirrorReceiver().Load(Mirror.Snapshot(node)));
         }
 
         // 미리보기(받는 쪽에 보내지 않음)에서 빠졌다가 되돌려진 객체: 번호가 그대로라 받는 쪽에서 계속 같은 인스턴스로 이어진다.

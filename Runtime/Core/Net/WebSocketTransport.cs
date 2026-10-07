@@ -92,6 +92,10 @@ namespace GBible
                     for (var i = 0; i < 8; i++) length = (length << 8) | bytes[i];
                 }
                 if (length < 0 || length > MaxMessage) throw new IOException("WebSocket 메시지가 너무 큽니다.");
+                // 제어 프레임(닫기·핑·퐁)은 125바이트 이하·조각 없음(RFC 6455 5.5) — 큰 핑으로 같은 크기의 퐁을 쌓게 하지 않는다.
+                if (code >= 8 && (length > 125 || !fin)) throw new IOException("WebSocket 제어 프레임이 규격에 맞지 않습니다.");
+                // 조각난 메시지는 이어 붙일 전체가 한도를 넘을지 내용을 받기 전에 안다(제어 프레임은 메시지에 붙지 않는다).
+                if (code < 8 && assembled != null && length > MaxMessage - assembled.Length) throw new IOException("WebSocket 메시지가 너무 큽니다.");
                 var key = masked ? ReadExact(stream, 4) : null;
                 var payload = ReadExact(stream, (int)length);
                 if (key != null)
@@ -115,14 +119,19 @@ namespace GBible
             }
         }
 
-        // count바이트를 다 읽는다(끊기면 예외).
+        // 처음 잡는 받기 버퍼(바이트). 더 오면 두 배씩 늘린다.
+        const int ReadChunk = 64 * 1024;
+
+        // count바이트를 다 읽는다(끊기면 예외). 버퍼는 실제로 온 만큼 늘린다 — 머리에 큰 길이(최대 32MB)만 적고 내용은 보내지 않는
+        // 연결이 그만큼의 메모리를 미리 잡게 하지 않는다(연결 몇백 개로 서버 메모리가 바닥나지 않게).
         static byte[] ReadExact(Stream stream, int count)
         {
-            var buffer = new byte[count];
+            var buffer = new byte[Math.Min(count, ReadChunk)];
             var read = 0;
             while (read < count)
             {
-                var n = stream.Read(buffer, read, count - read);
+                if (read == buffer.Length) Array.Resize(ref buffer, (int)Math.Min(count, (long)buffer.Length * 2));
+                var n = stream.Read(buffer, read, buffer.Length - read);
                 if (n <= 0) throw new EndOfStreamException();
                 read += n;
             }
@@ -197,30 +206,39 @@ namespace GBible
             _mask = mask;
             _received = received;
             _closed = closed;
+        }
+
+        // 받기·보내기 스레드를 시작한다. 연결을 알린(Connected) 뒤에 부른다 — 받은 것·끊김이 연결 알림보다 먼저 가지 않게.
+        public void Start()
+        {
             new Thread(ReadLoop) { IsBackground = true, Name = "MomoiProject Net 받기" }.Start();
             new Thread(WriteLoop) { IsBackground = true, Name = "MomoiProject Net 보내기" }.Start();
         }
 
         public void Send(byte[] data, int length)
         {
-            if (_done != 0) return;
-            // 받는 쪽이 멈춰(읽지 않음) 보낼 목록이 끝없이 쌓이면 끊는다(핑만 보내는 클라이언트가 서버 메모리를 채우지 못하게).
-            if (_outbox.Count >= MaxQueued)
-            {
-                Close("보낼 메시지가 너무 많이 쌓였습니다(받는 쪽이 멈췄습니다).");
-                return;
-            }
+            if (_done != 0 || Full()) return;
             var copy = new byte[length];
             Buffer.BlockCopy(data, 0, copy, 0, length);
             try { _outbox.Add((2, copy)); }
             catch (InvalidOperationException) { }
         }
 
-        // 닫기: 보낼 목록에 남은 메시지(방이 닫혔다는 Bye 등)를 다 보낸 뒤 닫기 프레임을 보내고 끊는다(보내기 스레드가 한다).
-        // 보내기가 막혀 있으면 1초 뒤 그냥 끊는다.
-        public void Close(string reason)
+        // 보낼 목록이 한도를 넘었는가: 받는 쪽이 멈춰(읽지 않음) 끝없이 쌓이면 끊는다(핑만 보내고 읽지 않는 클라이언트가 서버 메모리를 채우지 못하게 —
+        // 게임의 핑에 답하는 퐁도, WebSocket 핑에 전송이 스스로 하는 퐁도). 이쪽이 닫은 것이어도 끊김을 알린다(Disconnected) — 서버가 그 사람을 끊긴 것으로 안다.
+        bool Full()
         {
-            if (Interlocked.Exchange(ref _done, 1) != 0) return;
+            if (_outbox.Count < MaxQueued) return false;
+            const string full = "보낼 메시지가 너무 많이 쌓였습니다(받는 쪽이 멈췄습니다).";
+            if (Close(full)) _closed(full);
+            return true;
+        }
+
+        // 닫기: 보낼 목록에 남은 메시지(방이 닫혔다는 Bye 등)를 다 보낸 뒤 닫기 프레임을 보내고 끊는다(보내기 스레드가 한다).
+        // 보내기가 막혀 있으면 1초 뒤 그냥 끊는다. 돌려주는 값: 이 호출이 닫았는가(이미 닫혔으면 거짓).
+        public bool Close(string reason)
+        {
+            if (Interlocked.Exchange(ref _done, 1) != 0) return false;
             var bytes = Encoding.UTF8.GetBytes(reason ?? "");
             var payload = new byte[2 + Math.Min(bytes.Length, 120)];
             payload[0] = 0x03;
@@ -233,6 +251,7 @@ namespace GBible
             }
             catch (InvalidOperationException) { }
             System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ => Shutdown());
+            return true;
         }
 
         void Shutdown()
@@ -250,9 +269,13 @@ namespace GBible
                 {
                     var message = WebSocketFrames.ReadMessage(_stream, ping =>
                     {
+                        if (_done != 0 || Full()) return;
                         try { _outbox.Add((10, ping)); } catch (InvalidOperationException) { }
                     }, out _);
                     if (message == null) { reason = "상대가 연결을 닫았습니다."; break; }
+                    // 닫은 뒤(Close)에 온 것은 넘기지 않는다 — 끊김 뒤에 받은 것이 가지 않게. 읽기는 이어 간다: 소켓은 보내기 스레드가
+                    // 남은 것(방이 닫혔다는 Bye 등)을 다 보낸 뒤 끊는다(여기서 끊으면 그것을 잃는다).
+                    if (_done != 0) continue;
                     _received(message, message.Length);
                 }
             }
@@ -360,6 +383,10 @@ namespace GBible
                     });
                 _links[connection] = link;
                 _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Connected, Connection = connection });
+                // 받기·보내기는 연결을 알린 뒤에 시작한다 — 악수 바로 뒤에 온 첫 메시지(Hello)가 Connected보다 먼저 가면 서버가 모르는 연결의 것으로 버린다.
+                link.Start();
+                // 그 사이 서버가 닫혔으면(Dispose) 이 연결도 닫는다 — 아무도 읽지 않는 연결이 남지 않게.
+                if (!_running && _links.TryRemove(connection, out _)) link.Close("서버가 닫혔습니다.");
             }
             catch (Exception)
             {
@@ -444,11 +471,14 @@ namespace GBible
                 // 연결하는 동안 닫혔으면(Dispose) 막 만든 연결도 닫는다 — 연결과 스레드가 남지 않게.
                 if (_closedWhileConnecting)
                 {
+                    link.Start();
                     link.Close("나갔습니다.");
                     return;
                 }
                 _link = link;
                 _inbox.Enqueue(new NetEvent { Kind = NetEventKind.Connected });
+                // 받기·보내기는 연결을 알린 뒤에 시작한다(받은 것·끊김이 Connected보다 먼저 가지 않게).
+                link.Start();
             }
             catch (Exception e)
             {

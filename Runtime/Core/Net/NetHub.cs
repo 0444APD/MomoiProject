@@ -43,6 +43,8 @@ namespace GBible
         // 마지막 저장 뒤 행동이 있었다(MatchSaveSeconds마다 저장).
         internal bool SaveDirty;
         internal double LastSaved;
+        // 서버를 다시 켜 이어 연 매치가 꺼지기 전에 이미 시작했다(RoomReady를 쏜 뒤) — 정원이 돌아와도 RoomReady를 다시 쏘지 않는다.
+        internal bool WasReady;
     }
 
     // 매칭큐 서버: 전송 하나로 로비(입장 확인·줄 서기·수락)와 여러 방(매치)을 돌린다. 엔진 없는 코어라 어떤 서버 프로그램에서도 같다.
@@ -418,7 +420,14 @@ namespace GBible
             var match = proposal.Match;
             var room = new NetRoom { MatchId = match.MatchId, Mode = match.Mode, CreatedAt = Now };
             room.Accounts.AddRange(match.Tickets.Select(t => t.Account));
-            if (!OpenRoom(room, match.Tickets.Select(t => (t.Account, t.Name)).ToList(), null)) return;
+            if (!OpenRoom(room, match.Tickets.Select(t => (t.Account, t.Name)).ToList(), null))
+            {
+                // 방을 열지 못했다(세션 만들기 실패): 수락한 사람들을 로비로 돌려보낸다(없어진 매치의 수락 대기에 남지 않게).
+                // 다시 줄을 세우지 않는다 — 곧바로 같은 실패가 되풀이된다.
+                proposal.Accepted.Clear();
+                Cancel(proposal, "매치를 시작하지 못했습니다(서버 오류).");
+                return;
+            }
             foreach (var ticket in match.Tickets)
             {
                 var member = _lobby.Values.FirstOrDefault(l => l.Account?.id == ticket.Account);
@@ -487,8 +496,12 @@ namespace GBible
             if (!room.Ready && players.Count == room.Accounts.Count && players.All(p => p.Connected))
             {
                 room.Ready = true;
-                try { RoomReady?.Invoke(room); }
-                catch (Exception e) { Say($"RoomReady 처리 중 오류(매치 {room.MatchId}): {e.Message}"); }
+                // 이어 연 매치가 이미 시작했던 것이면 첫 턴 시작(RoomReady)을 다시 하지 않는다 — 저장된 판에서 이어 간다.
+                if (!room.WasReady)
+                {
+                    try { RoomReady?.Invoke(room); }
+                    catch (Exception e) { Say($"RoomReady 처리 중 오류(매치 {room.MatchId}): {e.Message}"); }
+                }
                 room.Server.Flush();
                 SaveRoom(room);
             }
@@ -613,7 +626,8 @@ namespace GBible
                 {
                     ["matchId"] = room.MatchId,
                     ["mode"] = room.Mode ?? "",
-                    ["ready"] = room.Ready,
+                    // 이어 연 뒤 아직 정원이 돌아오지 않았어도 이미 시작한 매치다(다시 꺼졌다 켜져도 RoomReady를 다시 쏘지 않게).
+                    ["ready"] = room.Ready || room.WasReady,
                     ["players"] = players,
                     ["run"] = room.Session.ExportRun(),
                 };
@@ -636,7 +650,12 @@ namespace GBible
                 try
                 {
                     if (!(MiniJson.Deserialize(_store.LoadMatch(matchId) ?? "") is Dictionary<string, object> state)) continue;
-                    var room = new NetRoom { MatchId = matchId, Mode = state.TryGetValue("mode", out var mode) ? mode as string : "", CreatedAt = Now, Ready = false };
+                    // 정원이 다시 다 들어올 때까지는 준비 전(ReadySeconds 안에 안 돌아오면 없던 것으로). 이미 시작했던 매치면 RoomReady는 다시 쏘지 않는다.
+                    var room = new NetRoom
+                    {
+                        MatchId = matchId, Mode = state.TryGetValue("mode", out var mode) ? mode as string : "", CreatedAt = Now, Ready = false,
+                        WasReady = state.TryGetValue("ready", out var ready) && ready is bool started && started,
+                    };
                     var players = new List<(string, string)>();
                     if (state.TryGetValue("players", out var list) && list is List<object> items)
                         foreach (var item in items.OfType<Dictionary<string, object>>().OrderBy(p => p.TryGetValue("id", out var id) ? Convert.ToDouble(id) : 0))

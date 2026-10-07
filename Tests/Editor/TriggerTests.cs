@@ -42,6 +42,62 @@ namespace GBible.Tests
         protected override bool Check() => Context?.User is TbUnit unit && unit.hp > 0;
     }
 
+    // 처음 쓸 때 정의되는 라이브러리 키($world)를 읽는 조건(읽은 값으로 감시한다).
+    [Serializable, BlockInfo("상자 열림")]
+    public sealed class TgChestOpened : SimpleCondition
+    {
+        protected override bool Check() => Game.WorldFlag("chest");
+    }
+
+    // 나중에 정의되는 플레이어 데이터를 읽는 조건(정의 전에는 읽다가 던진다).
+    [Serializable, BlockInfo("늦은 값 있음")]
+    public sealed class TgLateValue : SimpleCondition
+    {
+        protected override bool Check() => Game.Session.Data.GetNumber("late") >= 1;
+    }
+
+    [Serializable, PlayerData]
+    public sealed class TgHand
+    {
+        public List<int> cards = new List<int>();
+    }
+
+    // 손패의 첫 장을 읽는 조건(빈 손이면 읽다가 던진다).
+    [Serializable, BlockInfo("첫 장 3 이상")]
+    public sealed class TgFirstCardHigh : SimpleCondition
+    {
+        protected override bool Check() => Game.Session.Data.Get<TgHand>("hand").cards[0] >= 3;
+    }
+
+    [Serializable]
+    public sealed class TgDrawCard : GameAction
+    {
+        public int card = 5;
+        protected override void Run() => Game.Session.Data.Get<TgHand>("hand").cards.Add(card);
+    }
+
+    [Serializable]
+    public sealed class TgOpenChest : GameAction
+    {
+        protected override void Run() => Game.SetWorld("chest", true);
+    }
+
+    [Serializable]
+    public sealed class TgEarn : GameAction
+    {
+        public double amount = 100;
+        protected override void Run() => Game.Session.Data.Set("gold", Game.Session.Data.GetNumber("gold") + amount);
+    }
+
+    // 던지는 코딩한 결과(프로젝트 코드의 실수).
+    [Serializable, BlockInfo("던지는 결과")]
+    public sealed class TgThrowingReward : Reward
+    {
+        public override RewardEffect Effect => RewardEffect.Reversible;
+        public override string Describe(INameResolver names) => "던지는 결과";
+        public override void Grant(GameSession session) => throw new InvalidOperationException("결과 실패");
+    }
+
     public class TriggerTests
     {
         GameSession _session;
@@ -466,6 +522,36 @@ namespace GBible.Tests
             Assert.IsTrue(problems.Any(p => p.Contains("숫자가 아닙니다")), string.Join("\n", problems));
         }
 
+        [Serializable] public sealed class TgPacket { public int amount; }
+        [Serializable, Intent("묶음 피해")] public sealed class TgPacketIntent { public TgPacket info; public bool cancelled; }
+
+        [Test]
+        public void 의도_고치기는_경로의_부모가_비었으면_알린다()
+        {
+            var intent = new TgPacketIntent();   // info가 비었다
+            new ModifyIntentOutcome { path = "info.amount", op = IntentOp.Add, value = "1" }.Run(new TriggerContext { Session = _session, Event = intent, IsIntercept = true });
+            Assert.IsNull(intent.info);
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("info.amount")), "아무것도 고치지 않았으면 알린다");
+        }
+
+        [Serializable, PlayerData]
+        public class TgTitles
+        {
+            public string title = "--Dark--";
+            public int debt = -2;
+        }
+
+        [Test]
+        public void 값_틀의_빼기는_틀_앞의_마이너스와_음수인_값만_합친다()
+        {
+            _session.Data.Define("titles", DataZone.Session, new TgTitles());
+            var context = new TriggerContext { Session = _session, Owner = "relic" };
+            Assert.AreEqual("2", ModifyIntentOutcome.Expand("-{data:titles.debt}", context), "-(-2) = 2");
+            Assert.AreEqual("-2", ModifyIntentOutcome.Expand("{data:titles.debt}", context));
+            Assert.AreEqual("--Dark--", ModifyIntentOutcome.Expand("{data:titles.title}", context), "틀이 펼친 글자 안의 --는 그대로");
+            Assert.AreEqual("relic--x", ModifyIntentOutcome.Expand("{owner}--x", context), "틀 밖의 --도 그대로");
+        }
+
         [Test]
         public void 트리거와_결과는_문장으로_읽힌다()
         {
@@ -476,6 +562,66 @@ namespace GBible.Tests
             StringAssert.Contains("Damage", text);
             Assert.AreEqual(TriggerKinds.Event | TriggerKinds.Condition, rule.when.Kinds());
             CollectionAssert.AreEqual(new[] { typeof(TgBossKilled) }, rule.when.EventTypes().ToArray());
+        }
+
+        [Test]
+        public void 처음_쓸_때_정의되는_키를_읽는_조건도_그_키가_생기면_다시_평가된다()
+        {
+            _session.Achievements.Define(new AchievementDefinition { Id = "opener", DisplayName = "opener", Condition = new TgChestOpened() });
+            _session.Achievements.Define(new AchievementDefinition { Id = "late", DisplayName = "late", Condition = new TgLateValue() });
+            _session.Achievements.EvaluateAll();                 // 게임이 켜질 때처럼 한 번 평가한다(아직 $world·late 없음)
+            Assert.IsFalse(_session.Achievements.IsUnlocked("opener"));
+            _session.Game.Do(new TgOpenChest());                 // $world가 이 행동에서 처음 정의된다
+            Assert.IsTrue(_session.Achievements.IsUnlocked("opener"), "처음 정의된 키를 읽는 조건도 다시 평가한다");
+            _session.Data.Define("late", DataZone.Session, 3.0);
+            _session.Achievements.Flush();
+            Assert.IsTrue(_session.Achievements.IsUnlocked("late"), "나중에 정의된 키(정의 전에는 읽다가 던짐)도 정의되면 다시 평가한다");
+        }
+
+        [Test]
+        public void 평가하다_던진_조건도_그때까지_읽은_키가_바뀌면_다시_평가된다()
+        {
+            _session.Achievements.Define(new AchievementDefinition { Id = "high", DisplayName = "high", Condition = new TgFirstCardHigh() });
+            _session.Data.Define("hand", DataZone.Session, new TgHand());   // 빈 손: 평가하면 hand를 읽고 던진다
+            _session.Achievements.Flush();
+            Assert.IsFalse(_session.Achievements.IsUnlocked("high"));
+            _session.Game.Do(new TgDrawCard { card = 5 });
+            Assert.IsTrue(_session.Achievements.IsUnlocked("high"), "던지기 전에 읽은 hand가 바뀌면 다시 평가한다");
+        }
+
+        [Test]
+        public void 조건으로_발동한_결과_하나가_던져도_행동은_성공이고_다른_조건도_발동한다()
+        {
+            var broken = new AchievementDefinition { Id = "broken", DisplayName = "broken", When = GoldAtLeast(50) };
+            broken.Outcomes.Add(new TgThrowingReward());
+            _session.Achievements.Define(broken);
+            _session.Achievements.Define(new AchievementDefinition { Id = "rich", DisplayName = "rich", When = GoldAtLeast(50) });
+            var watched = 0;
+            _session.Triggers.Register("watch", GoldAtLeast(50), repeat: true, fire: _ => watched++);
+            Assert.DoesNotThrow(() => _session.Game.Do(new TgEarn()), "행동은 이미 성공했다(행동 뒤 평가의 오류가 행동을 실패로 보이게 하지 않는다)");
+            Assert.AreEqual(100, _session.Data.GetNumber("gold"));
+            Assert.IsTrue(_session.Achievements.IsUnlocked("rich"), "같은 값 변화로 참이 된 다른 조건도 발동한다");
+            Assert.AreEqual(1, watched);
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Error && e.Message.Contains("결과 실패")), "오류는 기록에 남긴다");
+        }
+
+        [Test]
+        public void 반복_조건_트리거는_발동이_던져도_계속_감시한다()
+        {
+            var fired = 0;
+            _session.Triggers.Register("flaky", GoldAtLeast(10), repeat: true, fire: _ =>
+            {
+                fired++;
+                if (fired == 1) throw new InvalidOperationException("첫 발동 실패");
+            });
+            _session.Data.Set("gold", 20.0);
+            _session.Triggers.Flush();
+            _session.Data.Set("gold", 0.0);
+            _session.Triggers.Flush();
+            _session.Data.Set("gold", 15.0);
+            _session.Triggers.Flush();
+            Assert.AreEqual(2, fired, "첫 발동이 실패해도 거짓 → 참이 되면 다시 발동한다");
+            Assert.IsTrue(_session.Triggers.IsRegistered("flaky"));
         }
 
         [Test]

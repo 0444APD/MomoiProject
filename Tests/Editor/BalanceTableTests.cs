@@ -9,7 +9,7 @@ namespace GBible.Tests
     public class BalanceTableTests
     {
         [Serializable] public class BtCard { public string id; }
-        [Serializable] public class BtRun { public int floor = 1; public int energy = 3; public List<BtCard> hand = new List<BtCard>(); public List<string> unlocked = new List<string>(); public List<string> relics = new List<string>(); }
+        [Serializable] public class BtRun { public int floor = 1; public int energy = 3; public List<BtCard> hand = new List<BtCard>(); public List<string> unlocked = new List<string>(); public List<string> relics = new List<string>(); public Dictionary<string, int> perks = new Dictionary<string, int>(); }
 
         // 조건: 3층 이상.
         public sealed class DeepFloor : SimpleCondition
@@ -177,6 +177,23 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 뺄_목록과_목록_줄이_딕셔너리면_키를_ID로_본다()
+        {
+            // 가진 특성(ID → 레벨)을 빼고, 가진 특성에서 뽑는다 — 값(레벨)이 아니라 키가 ID.
+            var pool = Table("perkPool", 0, ("swift", 1), ("tough", 1), ("lucky", 1));
+            pool.Exclude.Add(new PlayerDataListRef { key = "run", path = "perks" });
+            _session.Tables.Define(pool);
+            Game.Do(new Edit { run = g => { var run = g.Get<BtRun>("run"); run.perks["swift"] = 2; run.perks["lucky"] = 1; } });
+            Assert.IsTrue(Enumerable.Range(0, 20).All(_ => RollIn("perkPool", 1).Single() == "tough"), "가진 특성(키)은 빠진다");
+
+            var owned = new WeightTableDefinition { Id = "ownedPerk" };
+            owned.Entries.Add(new WeightEntry { listKey = "run", listPath = "perks" });
+            _session.Tables.Define(owned);
+            var seen = Enumerable.Range(0, 100).SelectMany(_ => RollIn("ownedPerk", 1)).Distinct().ToList();
+            CollectionAssert.AreEquivalent(new[] { "swift", "lucky" }, seen, "목록 줄도 키");
+        }
+
+        [Test]
         public void 코드로_만든_풀에서_뽑고_Undo하면_같은_결과()
         {
             List<string> first = null;
@@ -202,6 +219,20 @@ namespace GBible.Tests
             Game.Do(new Edit { run = g => { first = g.Roll("coins"); g.Roll("coins"); } });
             Assert.AreEqual("coin", first);
             Assert.AreEqual(1, _session.Journal.Entries.Count(e => e.Message.Contains("첫 ID만 돌려줍니다")));
+        }
+
+        [Test]
+        public void 하나만_뽑기의_알림은_미리보기에서_써_버리지_않는다()
+        {
+            var table = new WeightTableDefinition { Id = "coins" };
+            table.Entries.Add(new WeightEntry { item = "coin", weight = 1, minCount = 3, maxCount = 3 });
+            _session.Tables.Define(table);
+            string seen = null;
+            Game.Preview(new Edit { run = g => seen = g.Roll("coins") }, g => 0);   // 버튼을 흐리게 할지 보는 Game.CanDo처럼
+            Assert.AreEqual("coin", seen);
+            Assert.AreEqual(0, _session.Journal.Entries.Count(e => e.Message.Contains("첫 ID만 돌려줍니다")), "미리보기의 줄은 남지 않는다");
+            Game.Do(new Edit { run = g => g.Roll("coins") });
+            Assert.AreEqual(1, _session.Journal.Entries.Count(e => e.Message.Contains("첫 ID만 돌려줍니다")), "실제로 뽑을 때 한 번은 알린다");
         }
 
         public sealed class Never : SimpleCondition
@@ -255,6 +286,81 @@ namespace GBible.Tests
             {
                 Texts.Catalog = previous;
             }
+        }
+
+        [Test]
+        public void 표_곡선은_같은_단계의_점이_둘이면_목록에서_뒤의_점을_쓴다()
+        {
+            var middle = new Curve { kind = CurveKind.Table, points = { new CurvePoint { x = 1, y = 10 }, new CurvePoint { x = 5, y = 50 }, new CurvePoint { x = 5, y = 70 }, new CurvePoint { x = 10, y = 100 } } };
+            Assert.AreEqual(70, middle.Evaluate(0, 5), 1e-9, "그 단계에서는 뒤의 점");
+            Assert.AreEqual(55, middle.Evaluate(0, 4), 1e-9, "앞의 점은 쓰지 않는다(1 → 5 사이도 뒤의 점으로 잇는다)");
+            Assert.AreEqual(76, middle.Evaluate(0, 6), 1e-9);
+            var first = new Curve { kind = CurveKind.Table, points = { new CurvePoint { x = 1, y = 10 }, new CurvePoint { x = 1, y = 20 }, new CurvePoint { x = 5, y = 60 } } };
+            Assert.AreEqual(20, first.Evaluate(0, 1), 1e-9, "첫 단계에 둘");
+            Assert.AreEqual(20, first.Evaluate(0, 0), 1e-9, "첫 점 앞도 뒤의 점");
+            var unordered = new Curve { kind = CurveKind.Table, points = { new CurvePoint { x = 5, y = 70 }, new CurvePoint { x = 1, y = 10 }, new CurvePoint { x = 5, y = 50 } } };
+            Assert.AreEqual(50, unordered.Evaluate(0, 5), 1e-9, "적은 순서와 상관없이 같은 단계면 목록에서 뒤의 점");
+            Assert.AreEqual(30, unordered.Evaluate(0, 3), 1e-9);
+        }
+
+        [Test]
+        public void 거듭제곱은_단계가_0_이하면_지수가_음수여도_0이다()
+        {
+            var decay = new Curve { kind = CurveKind.Power, power = -1 };
+            Assert.AreEqual(50, decay.Evaluate(100, 2), 1e-9, "100 × 2^−1");
+            Assert.AreEqual(0, decay.Evaluate(100, 0), 1e-9, "단계 0 — ∞가 아니다");
+            Assert.AreEqual(0, decay.Evaluate(100, -3), 1e-9);
+            var zero = decay.Evaluate(0, 0);
+            Assert.IsTrue(zero == 0, $"기준 값 0이어도 0(숫자가 아님이 아니다): {zero}");
+            Assert.AreEqual(0, new Curve { kind = CurveKind.Power, power = 1.5 }.Evaluate(100, 0), 1e-9, "지수가 양수면 전과 같다");
+        }
+
+        [Test]
+        public void 숫자가_아닌_무게의_줄은_후보가_아니고_다른_줄을_막지_않는다()
+        {
+            // 코드 풀: 무게 = 남은 체력 비율(0 / 0)
+            List<string> picks = null;
+            Game.Do(new Edit { run = g => picks = g.Roll(new[] { ("ghost", double.NaN), ("slime", 1.0) }, 5, stream: "nan") });
+            CollectionAssert.AreEqual(new[] { "slime", "slime", "slime", "slime", "slime" }, picks, "숫자가 아닌 무게는 0 이하처럼 후보가 아니다");
+
+            // 표: 무게를 밸런스 값에서 읽었는데 숫자가 아니다
+            _session.Balance.Define("brokenWeight", double.NaN);
+            var table = Table("loot", 1, ("gem", 3));
+            table.Entries.Add(new WeightEntry { item = "relic", weightBalance = "brokenWeight" });
+            _session.Tables.Define(table);
+            var got = Enumerable.Range(0, 200).SelectMany(_ => RollIn("loot", 1)).ToList();
+            Assert.IsTrue(got.Count > 100 && got.All(i => i == "gem"), $"꽝 1 · gem 3만 남는다({got.Count}개)");
+            var chances = _session.Tables.Chances("loot");
+            Assert.AreEqual("gem", chances.Single().item);
+            Assert.AreEqual(0.75, chances.Single().chance, 1e-9);
+        }
+
+        [Test]
+        public void 끝없이_큰_무게의_줄은_늘_나온다()
+        {
+            List<string> picks = null;
+            Game.Do(new Edit { run = g => picks = g.Roll(new[] { ("rat", 1.0), ("boss", double.PositiveInfinity), ("bat", 1.0) }, 5, stream: "inf") });
+            CollectionAssert.AreEqual(new[] { "boss", "boss", "boss", "boss", "boss" }, picks, "무게 ÷ 합 = 1(다른 줄·꽝은 0)");
+            Game.Do(new Edit { run = g => picks = g.Roll(new[] { ("a", double.PositiveInfinity), ("b", double.PositiveInfinity), ("c", 1.0) }, 40, stream: "inf2") });
+            CollectionAssert.AreEquivalent(new[] { "a", "b" }, picks.Distinct().ToList(), "끝없이 큰 줄이 여럿이면 그 줄끼리 같은 몫");
+
+            _session.Tables.Define(Table("jackpot", 5, ("coin", 1), ("crown", double.PositiveInfinity)));
+            Assert.IsTrue(Enumerable.Range(0, 20).All(_ => RollIn("jackpot", 1).SingleOrDefault() == "crown"), "꽝 무게가 있어도");
+            var chances = _session.Tables.Chances("jackpot").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(1, chances["crown"], 1e-9);
+            Assert.AreEqual(0, chances["coin"], 1e-9);
+        }
+
+        // 확률 공개는 항목마다 한 줄: 같은 항목이 여러 줄에 있으면 몫을 합친다(한 번 뽑을 때 그 항목이 나올 확률, 처음 나온 줄의 차례).
+        [Test]
+        public void 확률_공개는_같은_항목의_여러_줄을_합친다()
+        {
+            _session.Tables.Define(Table("mixed", 0, ("gem", 1), ("coin", 1), ("gem", 2)));
+            var chances = _session.Tables.Chances("mixed");
+            CollectionAssert.AreEqual(new[] { "gem", "coin" }, chances.Select(c => c.item).ToList());
+            Assert.AreEqual(0.75, chances[0].chance, 1e-9);
+            Assert.AreEqual(0.25, chances[1].chance, 1e-9);
+            Assert.DoesNotThrow(() => chances.ToDictionary(c => c.item, c => c.chance), "사전으로 바꿔도 겹치지 않는다");
         }
     }
 }

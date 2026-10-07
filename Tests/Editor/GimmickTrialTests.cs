@@ -12,7 +12,7 @@ namespace GBible.Tests
     public class GimmickTrialTests
     {
         [Serializable] public class TrPiece { public string id; public string card; public List<string> traits = new List<string>(); public int level = 1; public int mult; public int counter; }
-        [Serializable] public class TrUnit { public string id; public int hp = 20; public int attack = 2; public int options = 3; }
+        [Serializable] public class TrUnit { public string id; public int hp = 20; public int attack = 2; public int options = 3; public Dictionary<string, int> perks = new Dictionary<string, int>(); }
         [Serializable] public class TrPlayer { public string id; public List<TrPiece> charms = new List<TrPiece>(); }
         [Serializable] public class TrCard { public string name = ""; public List<string> passives = new List<string>(); }
         [Serializable]
@@ -177,6 +177,21 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 딕셔너리_레벨이_0_아래면_꺼진_것이라_합에서_0으로_센다()
+        {
+            // 동료마다 ID → 레벨 딕셔너리. 레벨 0 이하 = 꺼짐(목록 요소의 레벨과 같다) — 다른 동료의 레벨을 깎지 않는다.
+            var shell = new PassiveDefinition { Id = "shell", OwnerKey = "run", OwnerPath = "party[].perks" };
+            shell.Modifiers.Add(new PassiveModifier { attribute = "attack", value = 1, perLevel = true });
+            _session.Passives.Define(shell);
+            Do(g => { var p = g.Get<TrRun>("run").party; p[0].perks["shell"] = -1; p[1].perks["shell"] = 2; });
+            Assert.AreEqual(2, Game.Owned("shell"), "−1인 동료는 0으로");
+            Assert.AreEqual(0, Game.Owned("shell", Run.party[0]));
+            Assert.AreEqual(2, Game.Owned("shell", Run.party[1]));
+            Assert.AreEqual(2, Game.Attribute("ally1", "attack"), "꺼진 동료는 보정 없음");
+            Assert.AreEqual(2 + 2, Game.Attribute("ally2", "attack"));
+        }
+
+        [Test]
         public void 주기_패시브는_N초마다_가진_쪽마다_발동한다()
         {
             var ember = Piece("ember", null, new Log { text = "ember" });
@@ -219,6 +234,68 @@ namespace GBible.Tests
             Assert.AreEqual(0, Run.log.Count, "100 → 100.5: 경계가 없다(밀린 8번을 몰아서 내지 않는다)");
             _session.EndFrame(0.75);
             Assert.AreEqual(1, Run.log.Count, "101을 넘으면 한 번");
+        }
+
+        // 결과: 이 조각의 오른쪽 조각을 판에서 뺀다(주기 도중에 뒤 가진 쪽이 사라지는 경우).
+        [Serializable]
+        public sealed class RemoveRightPiece : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context)
+            {
+                var pieces = context.Game.Get<TrRun>("run").pieces;
+                var right = Placement.Around(pieces, (TrPiece)context.User, 0, PlaceDirection.Right).FirstOrDefault();
+                if (right != null) pieces.Remove(right);
+            }
+            public override string Describe(INameResolver names) => "오른쪽 빼기";
+        }
+
+        // 결과: 이 조각 자신을 판에서 뺀다(터지고 사라지는 조각).
+        [Serializable]
+        public sealed class RemoveSelfPiece : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context) => context.Game.Get<TrRun>("run").pieces.Remove((TrPiece)context.User);
+            public override string Describe(INameResolver names) => "자기 빼기";
+        }
+
+        [Test]
+        public void 주기_도중에_앞_가진_쪽이_없앤_가진_쪽과_사라진_자신은_주기를_더_내지_않는다()
+        {
+            var ember = Piece("ember", null, new RemoveRightPiece(), new Log { text = "ember" });
+            ember.Pulse = 1;
+            _session.Passives.Define(ember);
+            Do(g => g.Get<TrRun>("run").pieces.AddRange(new[] { new TrPiece { id = "e1", card = "ember" }, new TrPiece { id = "e2", card = "ember" }, new TrPiece { id = "e3", card = "ember" } }));
+            _session.EndFrame(0.5);    // 기준 시각
+            _session.EndFrame(0.75);   // 1.25: 경계 1
+            CollectionAssert.AreEqual(new[] { "ember:e1:1", "ember:e3:1" }, Run.log, "e1의 주기가 뺀 e2는 그 주기에 내지 않는다");
+
+            // 밀린 회차(최대 8번)를 내는 도중에 자기를 뺀 조각은 남은 회차를 내지 않는다.
+            Do(g => { var r = g.Get<TrRun>("run"); r.log.Clear(); r.pieces.Clear(); });
+            var fuse = Piece("fuse", null, new RemoveSelfPiece(), new Log { text = "fuse" });
+            fuse.Pulse = 1;
+            _session.Passives.Define(fuse);
+            Do(g => g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "f1", card = "fuse" }));
+            _session.EndFrame(3);      // 4.25: 경계 2·3·4를 한 프레임에
+            CollectionAssert.AreEqual(new[] { "fuse:f1:1" }, Run.log, "사라진 뒤의 회차는 없다");
+        }
+
+        [Test]
+        public void 빌려_쓰기_안에서_또_빌려도_가진_쪽_필드는_처음_빌린_조각으로_본다()
+        {
+            // Brainstorm(맨 왼쪽을 빌림) → Blueprint(오른쪽을 빌림) → plus: Brainstorm 차례에 plus가 한 번 더 돈다.
+            PlaceTarget Pick(PlaceDirection direction) => new PlaceTarget { list = new PlayerDataListRef { key = "run", path = "pieces" }, direction = direction };
+            var plus = Piece("plus", On<TrScored>(), new Log { text = "plus" });
+            var blueprint = Piece("blueprint", On<TrScored>(), new BorrowOutcome { targets = { Pick(PlaceDirection.Right) } });
+            var brainstorm = Piece("brainstorm", On<TrScored>(), new BorrowOutcome { targets = { Pick(PlaceDirection.First) } });
+            foreach (var d in new[] { plus, blueprint, brainstorm })
+            {
+                d.HolderField = "pieceId";
+                _session.Passives.Define(d);
+            }
+            Do(g => g.Get<TrRun>("run").pieces.AddRange(new[] { new TrPiece { id = "j1", card = "blueprint" }, new TrPiece { id = "j2", card = "plus" }, new TrPiece { id = "j3", card = "brainstorm" } }));
+            Publish(new TrScored { pieceId = "j3" });
+            CollectionAssert.AreEqual(new[] { "plus:j2:1" }, Run.log, "j3(Brainstorm) 차례: j1(Blueprint)을 빌려 그 오른쪽 j2(plus)를 낸다");
         }
 
         // 결과: 가진 쪽이 p1이면 p2를 판에서 뺀다(같은 순간에 뒤 가진 쪽이 사라지는 경우).

@@ -66,5 +66,14 @@ namespace GBible.Tests
             Assert.AreEqual(0, inventory.Remove("potion", 5));
             Assert.AreEqual(0, inventory.slots.Count);
         }
+
+        [Test]
+        public void 음수로_잘못_고친_칸은_빈_칸으로_보고_채운다()
+        {
+            var inventory = new Inventory { capacity = 2, slots = { new InventorySlot { item = "potion", count = -3 } } };
+            Assert.AreEqual(20, inventory.RoomFor("potion", 10), "빈 칸으로 본 그 칸 10 + 새 칸 10");
+            Assert.AreEqual(0, inventory.Add("potion", 13, 10));
+            Assert.AreEqual(13, inventory.CountOf("potion"), "넣은 13개가 모두 있다(10 + 새 칸 3)");
+        }
     }
 }

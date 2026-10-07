@@ -372,6 +372,52 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 조금씩_찬_값도_같은_수로_보고_비교하고_낸다()
+        {
+            // 0.1을 열 번 더하면 0.9999999999999999 — 화면에는 1이고, 비교·비용도 1로 본다(같음과 이상·미만이 서로 어긋나지 않게).
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            session.Data.Define("mana", DataZone.Session, 0.0);
+            var mana = 0.0;
+            for (var i = 0; i < 10; i++) mana += 0.1;
+            Assert.IsTrue(mana < 1.0, "이 시험의 전제(부동소수 오차)");
+            session.Do(new DeveloperEditAction { Edit = () => session.Data.Set("mana", mana) });
+            Assert.IsTrue(new FieldFilter { op = FieldOp.Equal, value = "1" }.Test(mana));
+            Assert.IsTrue(new FieldFilter { op = FieldOp.AtLeast, value = "1" }.Test(mana), "1과 같으면 1 이상");
+            Assert.IsFalse(new FieldFilter { op = FieldOp.Less, value = "1" }.Test(mana), "1과 같으면 1 미만이 아니다");
+            Assert.IsTrue(new FieldFilter { op = FieldOp.Less, value = "1" }.Test(0.999), "진짜 작은 것은 그대로");
+            Assert.IsTrue(CompareOps.Apply(CompareOp.AtLeast, mana, 1), "로그 비교도 같은 규칙");
+            Assert.IsFalse(CompareOps.Apply(CompareOp.LessThan, mana, 1));
+            Assert.IsTrue(CompareOps.Apply(CompareOp.Equal, mana, 1));
+            Assert.IsTrue(session.Game.CanPay("mana", "", 1), "낼 수 있다고 보인다");
+            session.Do(new DeveloperEditAction { Edit = () => session.Game.Pay("mana", "", 1) });
+            Assert.AreEqual(0.0, session.Data.GetNumber("mana"), "하한(0)으로 — 아주 작은 음수가 남지 않는다");
+            Assert.Throws<GameFailure>(() => session.Do(new DeveloperEditAction { Edit = () => session.Game.Pay("mana", "", 0.5) }), "진짜 모자라면 실패");
+        }
+
+        // 조사: 공백뿐인 이름도 던지지 않고 받침을 모르는 이름처럼 둘 다 적는다(그 이름을 쓰는 조건 문장·DB 화면이 멈추지 않게).
+        [Test]
+        public void 조사는_공백뿐인_이름에도_던지지_않는다()
+        {
+            Assert.AreEqual("   (이)가", Josa.IGa("   "));
+            Assert.AreEqual("(이)라면", Josa.RaMyeon(" "));
+            Assert.AreEqual(" (이)가 100 이상", CompareOps.Clause(" ", CompareOp.AtLeast, "100"));
+            Assert.AreEqual("처치 수가 100 이상", CompareOps.Clause("처치 수", CompareOp.AtLeast, "100"), "보통 이름은 그대로");
+            Assert.AreEqual("골드를", Josa.EulReul("골드"));
+        }
+
+        // 정수 칸에 담기지 않는 수는 자르지 않고 던지되, 무엇을 고칠지 알리는 글로(.NET의 "Value was either too large…" 대신).
+        [Test]
+        public void 정수_칸에_담기지_않는_수는_고칠_것을_알리며_던진다()
+        {
+            var big = Assert.Throws<OverflowException>(() => GameNumbers.ToType(3e9, typeof(int)));
+            StringAssert.Contains("Int32 칸에 담기지 않습니다", big.Message);
+            var nan = Assert.Throws<OverflowException>(() => GameNumbers.ToType(double.NaN, typeof(int)));
+            StringAssert.Contains("NaN", nan.Message);
+            Assert.AreEqual(3000000000L, GameNumbers.ToType(3e9, typeof(long)), "담기는 형식은 그대로");
+            Assert.AreEqual(3, GameNumbers.ToType(2.5, typeof(int?)), "반올림 규칙도 그대로");
+        }
+
+        [Test]
         public void 조건이_검사_도중_다시_검사돼도_바깥_검사의_Game이_남는다()
         {
             Assert.IsTrue(new TbReentrantCheck().Evaluate(_session), "안쪽 검사가 끝나도 바깥 Check의 Game은 null이 아니다");

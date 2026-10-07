@@ -25,6 +25,7 @@ namespace GBible.Tests
             public int mult = 1;
         }
         [Serializable, GameEvent("점수 단계")] public class GpScored { public string card; }
+        [Serializable, GameEvent("맞힘")] public class GpHits { public List<string> hits = new List<string>(); }
         [Serializable, Intent("피해")] public class GpDamage { public string target; public int amount; public bool cancelled; }
 
         // 결과: 플레이어 데이터의 log에 "글:사용자" 한 줄(능력 정의는 복사되므로 테스트 객체 대신 데이터에 남긴다).
@@ -182,6 +183,24 @@ namespace GBible.Tests
             Do(g => g.Get<GpRun>("run").relics["shell"] = 2);
             Game.Do(new Hit { target = "hero", amount = 5 });
             Assert.AreEqual(30 - 3, Run.hero.hp, "레벨 2만큼 덜 맞는다");
+        }
+
+        [Test]
+        public void id가_없는_가진_쪽에서도_상태_효과_틀과_읽기는_0이고_걸기는_알린다()
+        {
+            // 가진 목록 run › relics의 가진 쪽 = run(id 없음). {stacks}는 상태 효과의 중첩이라 패시브에서는 0이다.
+            _session.Statuses.Define(new StatusDefinition { Id = "burn" });
+            var spikes = new PassiveDefinition { Id = "spikes", OwnerKey = "run", OwnerPath = "relics", When = new InterceptTrigger { intentType = typeof(GpDamage).FullName } };
+            spikes.Outcomes.Add(new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{stacks}" });
+            _session.Passives.Define(spikes);
+            Do(g => g.Get<GpRun>("run").relics["spikes"] = 1);
+            Assert.DoesNotThrow(() => Game.Do(new Hit { target = "hero", amount = 5 }), "패시브의 {stacks}는 0");
+            Assert.AreEqual(30 - 5, Run.hero.hp);
+            Assert.AreEqual(0, Game.StatusStacks(Run, "burn"));
+            Assert.AreEqual(0, Game.StatusCount(Run, StatusKind.Debuff));
+            Assert.AreEqual(0, Game.Statuses(Run).Count);
+            var e = Assert.Throws<InvalidOperationException>(() => Do(g => g.ApplyStatus(g.Get<GpRun>("run"), "burn")));
+            StringAssert.Contains("상태 효과를 걸 대상의 id가 없습니다", e.Message);
         }
 
         [Test]
@@ -355,6 +374,22 @@ namespace GBible.Tests
             _session.Abilities.Define(check);
             Assert.IsTrue(Game.TryUse("fury", "a"), "a의 오른쪽(1번)이 빈 칸, 왼쪽은 밖");
             Assert.IsFalse(Game.TryUse("fury", "c"), "c의 오른쪽(4번)에 d가 있다");
+        }
+
+        [Test]
+        public void 무작위_n개는_앞_대상에_같은_것이_여럿이어도_서로_다른_것을_고른다()
+        {
+            // 판정 보고의 맞힌 목록처럼 같은 개체가 여러 번 든 앞 대상에서 "서로 다른 2명".
+            var splash = new PassiveDefinition { Id = "splash", OwnerKey = "run", OwnerPath = "relics", When = new EventTrigger { eventType = typeof(GpHits).FullName } };
+            splash.Outcomes.Add(new TargetedOutcome { targets = { new EventFieldTarget { field = "hits" }, new RandomTarget { count = 2, stream = "splash" } }, effects = { new PokeEffect { amount = 1 } } });
+            _session.Passives.Define(splash);
+            Do(g => g.Get<GpRun>("run").relics["splash"] = 1);
+            for (int i = 1; i <= 10; i++)
+            {
+                Do(g => g.Session.Events.Publish(new GpHits { hits = { "e1", "e1", "e1", "e2" } }));
+                Assert.AreEqual(10 - i, Run.enemies[1].hp, $"{i}번째: e1은 한 번만");
+                Assert.AreEqual(10 - i, Run.enemies[2].hp, $"{i}번째: 다른 하나는 e2");
+            }
         }
 
         [Serializable, BlockInfo("테스트 피해")]

@@ -43,6 +43,64 @@ namespace GBible.Tests
         public int bonus;
     }
 
+    // [Serializable]이 없는 중간 부모(필드 없음): 그 위의 저장 대상 부모(MbBasePiece)의 필드는 그 부모의 생성 코드로 다룬다.
+    public abstract class MbPlainMiddle : MbBasePiece
+    {
+    }
+
+    [Serializable]
+    public class MbMiddleJoker : MbPlainMiddle
+    {
+        public int bonus;
+    }
+
+    // 행동도 같다: 중간 부모에 [Serializable]이 없어도 GameAction의 필드(actorId …)를 쓴다.
+    public abstract class MbUnitAction : GameAction
+    {
+    }
+
+    [Serializable]
+    public class MbMove : MbUnitAction
+    {
+        public int x;
+
+        protected override void Run()
+        {
+        }
+    }
+
+    // 중간 부모에 [Serializable]이 없고 필드가 있으면 그 필드는 생성 코드가 쓰지 않는다 → 보내기 전에 실패(받는 쪽에 기본값으로 가지 않게).
+    public abstract class MbTargetAction : GameAction
+    {
+        public string target;
+    }
+
+    [Serializable]
+    public class MbAim : MbTargetAction
+    {
+        public int power;
+
+        protected override void Run()
+        {
+        }
+    }
+
+    // 제네릭 [Serializable] 부모의 필드: 생성 코드가 다루지 못하는 부모(LostBase) — 보낼 수 없는 이유도 그것이다.
+    [Serializable]
+    public abstract class MbBaseAction<T> : GameAction
+    {
+        public T value;
+
+        protected override void Run()
+        {
+        }
+    }
+
+    [Serializable]
+    public class MbIntAction : MbBaseAction<int>
+    {
+    }
+
 #if UNITY_5_3_OR_NEWER
     // GBible.Core를 참조하지 않는 어셈블리(UnityEngine.CoreModule)의 [Serializable] 부모: 그 저장 필드(m_PersistentCalls)를 잃는다.
     [Serializable]
@@ -186,6 +244,48 @@ namespace GBible.Tests
         public List<int> items;
     }
 
+    // 쓰고 읽을 수 없는 구조체(KeyValuePair·[Serializable]이 없는 구조체)를 품은 구조체: 그 구조체도 쓰고 읽을 수 없다(쓰다가 멈추지 않게 미리 거절).
+    public struct MbPlainPoint
+    {
+        public int x;
+    }
+
+    [Serializable]
+    public struct MbPairSlot
+    {
+        public int count;
+        public KeyValuePair<int, int> pair;
+    }
+
+    [Serializable]
+    public struct MbPointSlot
+    {
+        public int count;
+        public MbPlainPoint point;
+    }
+
+    [Serializable]
+    public class MbPairBox
+    {
+        public MbPairSlot slot;
+    }
+
+    [Serializable]
+    public class MbPointBox
+    {
+        public List<MbPointSlot> slots = new List<MbPointSlot>();
+    }
+
+    [Serializable]
+    public class MbSlotAction : GameAction
+    {
+        public MbPairSlot slot;
+
+        protected override void Run()
+        {
+        }
+    }
+
     [GameEvent("시험 격자")]
     public class MbGridEvent
     {
@@ -303,6 +403,33 @@ namespace GBible.Tests
             Assert.AreEqual(1, session.Data.Get<MbJokerBox>("box").joker.bonus);
         }
 
+        [Test]
+        public void Serializable이_없는_중간_부모를_건너_그_위_저장_대상_부모의_필드도_다룬다()
+        {
+            Mirror.Initialize();
+            Assert.IsTrue(Mirror.Supports(typeof(MbMiddleJoker), out var reason), reason);
+            CollectionAssert.AreEqual(new[] { "id", "level", "bonus" }, Mirror.Find(typeof(MbMiddleJoker)).Names, "위 부모의 필드가 먼저");
+            var joker = new MbMiddleJoker { id = "j", level = 2, bonus = 1 };
+            var node = Mirror.Make(joker);
+            joker.level = 5;
+            var changes = new ChangeSet();
+            Mirror.Sync(joker, node, changes);
+            Assert.IsFalse(changes.IsEmpty, "위 부모 필드의 변경도 기록한다");
+            Mirror.Undo(joker, changes);
+            Assert.AreEqual(2, joker.level, "되돌린다");
+            var copy = Mirror.Clone(new MbMiddleJoker { id = "c", level = 3, bonus = 4 });
+            Assert.AreEqual("c", copy.id, "복사본에도");
+            Assert.AreEqual(3, copy.level);
+            Assert.AreEqual(4, copy.bonus);
+
+            var w = new MirrorWriter();
+            Mirror.Write(w, new MbMove { actorId = 3, tick = 9, x = 1 });
+            var sent = (MbMove)Mirror.Read(new MirrorReader(w.ToArray()), typeof(MbMove));
+            Assert.AreEqual(3, sent.actorId, "행동의 GameAction 필드도 쓰고 읽는다");
+            Assert.AreEqual(9L, sent.tick);
+            Assert.AreEqual(1, sent.x);
+        }
+
 #if UNITY_5_3_OR_NEWER
         [Test]
         public void GBible_Core를_참조하지_않는_어셈블리의_부모_필드를_잃는_형식도_예전_비교_방식으로_다룬다()
@@ -378,6 +505,29 @@ namespace GBible.Tests
             Assert.IsFalse(Mirror.CanSendValue(5, out reason));
             StringAssert.Contains("Int32", reason);
             Assert.IsTrue(Mirror.CanSendValue(new MbUnit(), out reason), reason);
+            Assert.IsTrue(Mirror.CanSend(typeof(MbMove), out reason), "필드 없는 중간 부모는 상관없다: " + reason);
+            Assert.IsFalse(Mirror.CanSend(typeof(MbAim), out reason), "[Serializable]이 없는 중간 부모의 필드는 쓰이지 않는다");
+            StringAssert.Contains("MbAim.target", reason);
+            Assert.IsFalse(Mirror.CanSend(typeof(MbIntAction), out reason));
+            StringAssert.Contains("제네릭", reason);
+        }
+
+        [Test]
+        public void 쓸_수_없는_구조체를_품은_구조체는_비교_코드로_다루지_않고_보내기_전에_거절한다()
+        {
+            Mirror.Initialize();
+            Assert.IsFalse(Mirror.Supports(typeof(MbPairBox), out var reason), "KeyValuePair를 품은 구조체");
+            StringAssert.Contains("KeyValuePair", reason);
+            Assert.IsFalse(Mirror.Supports(typeof(MbPointBox), out reason), "[Serializable]이 없는 구조체를 품은 구조체의 리스트");
+            StringAssert.Contains("MbPlainPoint", reason);
+            Assert.IsFalse(Mirror.CanSend(typeof(MbSlotAction), out reason), "보내다가 멈추지 않게 미리 거절");
+            StringAssert.Contains("KeyValuePair", reason);
+
+            // 예전 비교 방식으로 다루므로 바꿔도 멈추지 않는다.
+            var session = new GameSession();
+            session.Data.Define("box", DataZone.Session, new MbPairBox());
+            Assert.DoesNotThrow(() => session.Do(new MbEdit { run = () => session.Data.Modify<MbPairBox>("box", b => b.slot.count = 2) }));
+            Assert.AreEqual(2, session.Data.Get<MbPairBox>("box").slot.count);
         }
 
         [Test]

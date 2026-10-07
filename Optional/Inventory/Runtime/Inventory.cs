@@ -42,8 +42,10 @@ namespace GBible.InventorySystem
             {
                 if (left <= 0) break;
                 if (slot == null || slot.item != itemId || slot.count >= maxStack) continue;
-                var put = Math.Min(left, maxStack - slot.count);
-                slot.count += put;
+                // 0개·음수인 칸(잘못 고친 값)은 빈 칸으로 보고 채운다 — 음수에 더하면 넣은 만큼 들어가지 않고 사라진다(Remove와 같은 기준).
+                var current = Math.Max(0, slot.count);
+                var put = Math.Min(left, maxStack - current);
+                slot.count = current + put;
                 left -= put;
             }
             while (left > 0 && (capacity <= 0 || slots.Count < capacity))
@@ -61,7 +63,7 @@ namespace GBible.InventorySystem
             maxStack = Math.Max(1, maxStack);
             long room = 0;
             foreach (var slot in slots)
-                if (slot != null && slot.item == itemId) room += Math.Max(0, maxStack - slot.count);
+                if (slot != null && slot.item == itemId) room += Math.Max(0, maxStack - Math.Max(0, slot.count));
             if (capacity <= 0) return int.MaxValue;
             room += (long)Math.Max(0, capacity - slots.Count) * maxStack;
             return (int)Math.Min(int.MaxValue, room);

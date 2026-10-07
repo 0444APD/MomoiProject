@@ -137,6 +137,27 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 기본_이름의_후보는_요구한_순간의_언어로_굳지_않는다()
+        {
+            // 이름을 따로 주지 않은 후보는 이름을 비워 두고, 보여 주는 쪽이 그때 언어로 읽는다(언어를 바꾼 뒤·다른 언어의 서버에서도).
+            var previous = Texts.Catalog;
+            try
+            {
+                Texts.Catalog = new TextCatalog { SourceLanguage = "ko", Language = "ko" };
+                Texts.Catalog.Set("ko", "c1.name", "불꽃");
+                Texts.Catalog.Set("en", "c1.name", "Flame");
+                Game.Do(new AskDiscard());
+                var option = Game.Choice.options.First(o => o.id == "c1");
+                Assert.IsTrue(string.IsNullOrEmpty(option.label), "요구할 때 번역해 넣지 않는다");
+                Assert.AreEqual("불꽃", option.DisplayText());
+                Texts.Catalog.Language = "en";
+                Assert.AreEqual("Flame", option.DisplayText(), "언어를 바꾸면 그 언어로");
+                Assert.AreEqual("c2", Game.Choice.options.First(o => o.id == "c2").DisplayText(), "이름이 없으면 id");
+            }
+            finally { Texts.Catalog = previous; }
+        }
+
+        [Test]
         public void 글_선택지는_id를_받는다()
         {
             Game.Do(new AskStance());

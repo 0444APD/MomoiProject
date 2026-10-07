@@ -182,6 +182,8 @@ namespace GBible
         // 부모 쪽 필드를 생성 코드가 다루지 못한 클래스(제네릭 부모·GBible.Core를 참조하지 않는 어셈블리의 부모)의 표시:
         // 필드 배치 맨 앞의 종류 None 칸, 이름 = 이 앞부분 + 사람이 읽는 설명(MirrorWeaver와 같은 값). 이 형식은 Supports·CanSend가 거짓이다.
         internal const string LostBaseMarker = "$base ";
+        // 컬렉션 클래스(List<T>·Dictionary<K, V> …)를 상속해 요소를 잃는 클래스의 표시(이름 = 이 앞부분 + 상속한 컬렉션 형식). 이 형식도 Supports·CanSend가 거짓이다.
+        internal const string LostItemsMarker = "$items ";
 
         // 형식을 네트워크로 보낼 수 있는지(행동: 클라이언트 → 서버, 이벤트: 서버 → 클라이언트). 형식만 보고, 결과는 기억한다
         // (보내는 쪽이 형식마다 처음 보낼 때 부른다 — NetClient·NetServer). 아니면 reason에 첫 이유(어느 필드인지 경로로).
@@ -331,6 +333,8 @@ namespace GBible
         static string NoneReason(MirrorType type, int i, string path)
         {
             var name = type.Names[i] ?? "";
+            if (name.StartsWith(LostItemsMarker, StringComparison.Ordinal))
+                return $"{path}: 컬렉션 클래스 {name.Substring(LostItemsMarker.Length)}을(를) 상속해 생성 코드가 요소의 변경을 따라가지 못합니다(상속 대신 List<T>·Dictionary<K, V> 필드를 두세요)";
             if (name.StartsWith(LostBaseMarker, StringComparison.Ordinal))
                 return $"{path}: 부모 {name.Substring(LostBaseMarker.Length)}는 생성 코드가 다루지 못합니다(그 필드를 이 클래스로 옮기거나, 부모를 제네릭이 아닌 [Serializable] 클래스로 GBible.Core를 참조하는 어셈블리에 두세요)";
             return $"{path}.{name}({DataModel.FriendlyName(type.FieldTypes[i] ?? typeof(object))})는 생성 코드가 다루지 못하는 형식입니다(중첩 컬렉션·다차원 배열·키가 글자·정수·enum이 아닌 딕셔너리 — List<T>·Dictionary<K, V>·[Serializable] 클래스로 바꾸세요)";
@@ -341,7 +345,11 @@ namespace GBible
         {
             if (type != null && (network ? MirrorValues.CanWrite(type) : MirrorValues.IsSupported(type))) return true;
             var shown = DataModel.FriendlyName(type ?? typeof(object));
-            reason = !network && type != null && MirrorValues.IsShallow(type)
+            var shallow = !network && type != null && MirrorValues.IsShallow(type);
+            // 이 구조체는 다루지만 안쪽 값 칸(구조체 필드·요소)을 다루지 못하면 그 칸의 형식을 밝힌다.
+            var inner = type == null || shallow ? null : MirrorValues.MissingNeed(type, network);
+            if (inner != null) return CheckValue(inner, $"{name}({shown} 안)", network, ref reason);
+            reason = shallow
                 ? $"{name}: {shown}는 안쪽에 객체·컬렉션 필드가 있는 구조체라 안쪽 변경을 따라가지 못합니다([Serializable] 클래스로 바꾸세요)"
                 : $"{name}: {shown}는 쓰고 읽는 방법이 없는 구조체입니다((int, int)·KeyValuePair 같은 구조체는 담지 못합니다 — [Serializable] 구조체나 클래스로 바꾸세요)";
             return false;
@@ -394,11 +402,17 @@ namespace GBible
             return CheckType(found, name, seen, ref reason, network, false);
         }
 
-        // 값으로 보이는데 생성 코드가 쓰지 않는 필드(readonly 필드·자동 속성·대리자): 네트워크로 보내면 받는 쪽에 기본값으로 도착한다.
+        // 값으로 보이는데 생성 코드가 쓰지 않는 필드(readonly 필드·자동 속성·대리자·생성 코드가 없는 부모 — [Serializable]이 없는 중간 클래스 — 의 필드):
+        // 네트워크로 보내면 받는 쪽에 기본값으로 도착한다.
         // [NonSerialized]와 private 필드([SerializeField] 없음)는 값이 아닌 것으로 본다(Unity와 같다). 보낼 형식 자신만 본다(CanSend가 형식마다 한 번).
         static bool CheckUnwritten(Type type, string path, ref string reason)
         {
             for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+            {
+                // 생성 코드가 있거나 저장 대상인 형식. 생성 코드가 없는 저장 대상 부모(제네릭·GBible.Core를 참조하지 않는 어셈블리)는
+                // CheckType이 잃은 부모 표시로 이유를 밝힌다 — 여기서는 저장 대상이 아닌 중간 부모만 본다.
+                var covered = FieldAccess.IsGenerated(t) || t.IsSerializable || t.IsDefined(typeof(PlayerDataAttribute), false) ||
+                              t.IsDefined(typeof(GameEventAttribute), false) || t.IsDefined(typeof(IntentAttribute), false);
                 foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                 {
                     if (field.IsNotSerialized) continue;
@@ -409,12 +423,15 @@ namespace GBible
                     if (field.IsInitOnly) what = backing ? "읽기 전용 자동 속성" : "readonly 필드";
                     else if (backing && !serialized) what = "자동 속성";
                     else if (typeof(Delegate).IsAssignableFrom(field.FieldType)) what = "대리자(함수) 필드";
+                    else if (!covered) what = $"[Serializable]이 없는 부모 {DataModel.FriendlyName(t)}의 필드";
                     if (what == null) continue;
                     var end = field.Name.IndexOf('>');
                     var name = backing && end > 1 ? field.Name.Substring(1, end - 1) : field.Name;
-                    reason = $"{path}.{name}: {what}는 보내지 않습니다(받는 쪽에는 기본값으로 도착) — public 필드로 바꾸거나, 보내지 않을 값이면 [NonSerialized]를 붙이세요";
+                    reason = $"{path}.{name}: {what}는 보내지 않습니다(받는 쪽에는 기본값으로 도착) — " +
+                             (covered ? "public 필드로 바꾸거나" : "그 부모에 [Serializable]을 붙이거나") + ", 보내지 않을 값이면 [NonSerialized]를 붙이세요";
                     return false;
                 }
+            }
             return true;
         }
 
@@ -690,8 +707,11 @@ namespace GBible
         [ThreadStatic] static int _writeDepth;
         [ThreadStatic] static Dictionary<object, int> _written;
         [ThreadStatic] static int _readDepth;
-        // 읽기·적용에서 허용하는 객체·경로 깊이(게임 데이터는 이만큼 깊지 않다).
+        // 읽기·적용에서 허용하는 객체·경로 깊이(게임 데이터는 이만큼 깊지 않다). 받은 데이터만 본다(_local 참고).
         const int MaxDepth = 256;
+        // 이 프로그램이 쓴 기록을 읽는 중(되돌리기·복사·기록용 다시 만들기): 받은 데이터가 아니라 깊이 한도를 두지 않는다
+        // (쓸 때 그만큼 깊이 들어갔던 데이터다 — 한도로 막으면 깊은 데이터의 Undo·복사가 실패한다).
+        [ThreadStatic] static bool _local;
         [ThreadStatic] static List<object> _read;
         // 네트워크로 쓰는 중(사본 → 5·6). _snapshot이 있으면 처음 모습(한 번 쓴 사본은 5로), 없으면 앞으로 기록(Sent로 판단).
         [ThreadStatic] static bool _net;
@@ -789,7 +809,7 @@ namespace GBible
             try
             {
                 // 받은 데이터(네트워크·리플레이)가 객체를 끝없이 겹쳐 넣어도 스택이 넘치지 않게(StackOverflow는 잡을 수 없어 프로세스가 죽는다).
-                if (_readDepth > MaxDepth) throw new FormatException("[MomoiProject] 객체가 너무 깊이 겹쳐 있습니다(받은 데이터가 깨졌거나 잘못되었습니다).");
+                if (_readDepth > MaxDepth && !_local) throw new FormatException("[MomoiProject] 객체가 너무 깊이 겹쳐 있습니다(받은 데이터가 깨졌거나 잘못되었습니다).");
                 switch (reader.Byte())
                 {
                     case 0:
@@ -1018,7 +1038,10 @@ namespace GBible
             if (shadow == null || !(shadow is MirrorNode)) return shadow;
             var w = new MirrorWriter();
             WriteShadow(w, shadow);
-            return Read(new MirrorReader(w.Data, 0, w.Length), declared);
+            var previousLocal = _local;
+            _local = true;
+            try { return Read(new MirrorReader(w.Data, 0, w.Length), declared); }
+            finally { _local = previousLocal; }
         }
 
         // 생성 코드로 깊은 복사(쓰고 다시 읽기). 인스턴스의 사본을 만들 때 쓴다. 에셋 참조(스프라이트 등)는 같은 참조 그대로.
@@ -1029,6 +1052,7 @@ namespace GBible
             var previousWrite = _writeRefs;
             var previousRead = _undoOriginals;
             var previousOffset = _undoOffset;
+            var previousLocal = _local;
             try
             {
                 _writeRefs = refs;
@@ -1037,6 +1061,7 @@ namespace GBible
                 _writeRefs = previousWrite;
                 _undoOriginals = refs;
                 _undoOffset = 0;
+                _local = true;
                 return (T)Read(new MirrorReader(w.Data, 0, w.Length), typeof(T));
             }
             finally
@@ -1044,13 +1069,16 @@ namespace GBible
                 _writeRefs = previousWrite;
                 _undoOriginals = previousRead;
                 _undoOffset = previousOffset;
+                _local = previousLocal;
             }
         }
 
         // ── 찾기 ───────────────────────────────────────────────
         // 사본 나무를 따라가며 객체를 찾는다(리플렉션 없음). 사본은 마지막 Sync 때의 모습이라, 부르기 전에 Sync한다.
 
-        static int _walk;
+        // 찾기마다 하나씩(프로그램 전체). long이라 한 바퀴 돌지 않는다 — int면 오래 켜 둔 서버에서 약 43억 번 뒤 오래 들르지 않은 사본의
+        // 지난 회차 번호와 같아져 그 사본(과 그 아래)을 건너뛰고 Find가 없다고 답할 수 있다.
+        static long _walk;
 
         // root 안의 T를 들어 있는 순서로(필드 순서 → 리스트 순서) into에 더한다. 두 곳에서 가리키는 객체는 한 번만.
         public static void Collect<T>(MirrorNode root, List<T> into) where T : class
@@ -1129,7 +1157,9 @@ namespace GBible
         public static void Undo(object root, ChangeSet changes)
         {
             var previous = _undoOriginals;
+            var previousLocal = _local;
             _undoOriginals = changes.Originals;
+            _local = true;
             try
             {
                 for (var i = changes.BackwardStarts.Count - 1; i >= 0; i--)
@@ -1143,6 +1173,7 @@ namespace GBible
             {
                 _undoOriginals = previous;
                 _undoOffset = 0;
+                _local = previousLocal;
             }
         }
 
@@ -1153,7 +1184,7 @@ namespace GBible
         {
             var op = (MirrorOp)reader.Byte();
             var depth = reader.UVar();
-            if (depth > MaxDepth) throw new FormatException("[MomoiProject] 변경 기록의 경로가 너무 깁니다(받은 데이터가 깨졌습니다).");
+            if (depth > MaxDepth && !_local) throw new FormatException("[MomoiProject] 변경 기록의 경로가 너무 깁니다(받은 데이터가 깨졌습니다).");
             ApplyInto(root, reader, (int)depth, op);
         }
 
@@ -1237,7 +1268,7 @@ namespace GBible
         internal int Refs;
         // 마지막으로 비교한 Sync 회차·찾기 회차.
         internal int Pass;
-        internal int Walk;
+        internal long Walk;
         // 받는 쪽이 이미 가진 객체인지(처음 나무에 있었거나 앞으로 기록으로 통째로 보냈음).
         internal bool Sent;
         // 이 사본이 속한 나무(객체 → 사본, Sync 회차).
@@ -1401,16 +1432,52 @@ namespace GBible
             lock (Boxed) return Shallow.Contains(type);
         }
 
-        // 변경을 따라갈 수 있는 값 형식인가. T?는 T도 되어야 한다(T?의 비교·쓰기가 T의 것을 부른다).
+        // 구조체 → 안쪽 값 칸 형식(구조체 필드·컬렉션의 구조체 요소 — 생성 코드가 등록: MirrorCode.StructNeeds).
+        // 안쪽 형식을 쓰고 읽을 수 없으면 이 구조체의 생성 코드도 쓰다가 멈춘다. 다른 어셈블리의 구조체도 여기서 본다.
+        static readonly Dictionary<Type, List<Type>> Needs = new Dictionary<Type, List<Type>>();
+        [ThreadStatic] static HashSet<Type> _visiting;
+
+        internal static void AddNeed(Type owner, Type need)
+        {
+            lock (Boxed)
+            {
+                if (!Needs.TryGetValue(owner, out var list)) Needs[owner] = list = new List<Type>();
+                if (!list.Contains(need)) list.Add(need);
+            }
+        }
+
+        // 안쪽 값 칸 중 다룰 수 없는 첫 형식(없으면 null). network면 쓰고 읽을 수만 있으면 되고, 아니면 변경을 따라갈 수 있어야 한다.
+        internal static Type MissingNeed(Type type, bool network)
+        {
+            List<Type> needs;
+            lock (Boxed)
+                if (!Needs.TryGetValue(type, out needs)) return null;
+            var visiting = _visiting ??= new HashSet<Type>();
+            if (!visiting.Add(type)) return null; // 리스트로 서로 담는 구조체(고리): 이미 보는 중
+            try
+            {
+                foreach (var need in needs)
+                    if (!(network ? CanWrite(need) : IsSupported(need))) return need;
+                return null;
+            }
+            finally
+            {
+                visiting.Remove(type);
+            }
+        }
+
+        // 변경을 따라갈 수 있는 값 형식인가. T?는 T도 되어야 한다(T?의 비교·쓰기가 T의 것을 부른다). 구조체는 안쪽 값 칸도.
         public static bool IsSupported(Type type)
         {
             if (type.IsPrimitive || type.IsEnum || type == typeof(string) || BuiltinTypes.Contains(type)) return true;
             var inner = Nullable.GetUnderlyingType(type);
             if (inner != null && !IsSupported(inner)) return false;
-            lock (Boxed) return Boxed.ContainsKey(type) && !Shallow.Contains(type);
+            lock (Boxed)
+                if (!Boxed.ContainsKey(type) || Shallow.Contains(type)) return false;
+            return MissingNeed(type, false) == null;
         }
 
-        // 쓰고 읽을 수 있는 값 형식인가(변경 추적과 상관없이 — 네트워크로 보낼 때). 안쪽에 객체·컬렉션이 있는 구조체도 된다.
+        // 쓰고 읽을 수 있는 값 형식인가(변경 추적과 상관없이 — 네트워크로 보낼 때). 안쪽에 객체·컬렉션이 있는 구조체도 된다(안쪽 값 칸은 써야 한다).
         // IntPtr·UIntPtr은 기본 형식이지만 쓰는 방법이 없다.
         public static bool CanWrite(Type type)
         {
@@ -1418,7 +1485,9 @@ namespace GBible
             if (type.IsPrimitive || type.IsEnum || type == typeof(string) || BuiltinTypes.Contains(type)) return true;
             var inner = Nullable.GetUnderlyingType(type);
             if (inner != null && !CanWrite(inner)) return false;
-            lock (Boxed) return Boxed.ContainsKey(type);
+            lock (Boxed)
+                if (!Boxed.ContainsKey(type)) return false;
+            return MissingNeed(type, true) == null;
         }
 
         internal static void WriteBoxed(Type type, MirrorWriter writer, object value)
@@ -1442,10 +1511,10 @@ namespace GBible
             var t = typeof(T);
             if (t == typeof(int)) Set<int, T>((a, b) => a == b, (w, v) => w.Long(v), r => (int)r.Long());
             else if (t == typeof(string)) Set<string, T>(string.Equals, (w, v) => w.Str(v), r => r.Str());
-            else if (t == typeof(float)) Set<float, T>((a, b) => a.Equals(b), (w, v) => w.Float(v), r => r.Float());
+            else if (t == typeof(float)) Set<float, T>(MirrorCode.Same, (w, v) => w.Float(v), r => r.Float());
             else if (t == typeof(bool)) Set<bool, T>((a, b) => a == b, (w, v) => w.Bool(v), r => r.Bool());
             else if (t == typeof(long)) Set<long, T>((a, b) => a == b, (w, v) => w.Long(v), r => r.Long());
-            else if (t == typeof(double)) Set<double, T>((a, b) => a.Equals(b), (w, v) => w.Double(v), r => r.Double());
+            else if (t == typeof(double)) Set<double, T>(MirrorCode.Same, (w, v) => w.Double(v), r => r.Double());
             else if (t == typeof(byte)) Set<byte, T>((a, b) => a == b, (w, v) => w.UVar(v), r => (byte)r.UVar());
             else if (t == typeof(sbyte)) Set<sbyte, T>((a, b) => a == b, (w, v) => w.Long(v), r => (sbyte)r.Long());
             else if (t == typeof(short)) Set<short, T>((a, b) => a == b, (w, v) => w.Long(v), r => (short)r.Long());

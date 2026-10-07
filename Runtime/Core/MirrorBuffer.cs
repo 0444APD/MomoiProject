@@ -78,10 +78,70 @@ namespace GBible
                 UVar(0);
                 return;
             }
+            if (HasLoneSurrogate(v))
+            {
+                StrWithLoneSurrogates(v);
+                return;
+            }
             var count = Encoding.UTF8.GetByteCount(v);
             UVar((ulong)count + 1);
             Ensure(count);
             Length += Encoding.UTF8.GetBytes(v, 0, v.Length, Data, Length);
+        }
+
+        // 짝을 잃은 서러게이트(U+D800~DFFF 한 글자)가 있는지. UTF-8은 그 글자를 U+FFFD로 바꾸므로 따로 쓴다.
+        static bool HasLoneSurrogate(string v)
+        {
+            for (var i = 0; i < v.Length; i++)
+                if (IsLoneAt(v, ref i)) return true;
+            return false;
+        }
+
+        // 짝을 잃은 서러게이트는 그 값의 3바이트 꼴(ED A0~BF 80~BF — 올바른 UTF-8에는 없는 바이트)로, 나머지는 UTF-8로 쓴다(MirrorReader.Str가 되살린다).
+        void StrWithLoneSurrogates(string v)
+        {
+            var count = 0;
+            for (var i = 0; i < v.Length; i++)
+            {
+                var c = v[i];
+                if (c < 0x80) count += 1;
+                else if (c < 0x800) count += 2;
+                else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < v.Length && char.IsLowSurrogate(v[i + 1]))
+                {
+                    count += 4;
+                    i++;
+                }
+                else count += 3;
+            }
+            UVar((ulong)count + 1);
+            Ensure(count);
+            var start = 0;
+            for (var i = 0; i <= v.Length; i++)
+            {
+                if (i < v.Length && !IsLoneAt(v, ref i)) continue;
+                Length += Encoding.UTF8.GetBytes(v, start, i - start, Data, Length);
+                if (i < v.Length)
+                {
+                    var c = v[i];
+                    Data[Length++] = 0xED;
+                    Data[Length++] = (byte)(0x80 | ((c >> 6) & 0x3F));
+                    Data[Length++] = (byte)(0x80 | (c & 0x3F));
+                }
+                start = i + 1;
+            }
+        }
+
+        // v[i]가 짝을 잃은 서러게이트인지(짝이 맞으면 거짓이고 i를 짝의 뒤 글자로 옮긴다 — 부른 쪽 반복이 짝을 한 번에 넘긴다).
+        static bool IsLoneAt(string v, ref int i)
+        {
+            var c = v[i];
+            if (c < 0xD800 || c > 0xDFFF) return false;
+            if (c <= 0xDBFF && i + 1 < v.Length && char.IsLowSurrogate(v[i + 1]))
+            {
+                i++;
+                return false;
+            }
+            return true;
         }
 
         public void Bytes(byte[] data, int start, int count)
@@ -110,12 +170,19 @@ namespace GBible
         {
             Data = data;
             Position = start;
-            End = end < 0 ? data.Length : end;
+            End = end < 0 ? data.Length : Math.Min(end, data.Length);
         }
 
         public bool AtEnd => Position >= End;
 
-        public byte Byte() => Data[Position++];
+        // 읽기는 End를 넘지 않는다: 받은 범위(메시지 안의 한 기록)가 잘렸으면 뒤의 바이트(다음 기록·버퍼 찌꺼기)를 값으로 읽는 대신 거절한다.
+        static FormatException Truncated() => new FormatException("[MomoiProject] 데이터가 중간에 끝났습니다(받은 데이터가 잘렸거나 깨졌습니다).");
+
+        public byte Byte()
+        {
+            if (Position >= End) throw Truncated();
+            return Data[Position++];
+        }
 
         public ulong UVar()
         {
@@ -123,6 +190,7 @@ namespace GBible
             var shift = 0;
             while (true)
             {
+                if (Position >= End) throw Truncated();
                 var b = Data[Position++];
                 v |= (ulong)(b & 0x7F) << shift;
                 if (b < 0x80) return v;
@@ -147,10 +215,11 @@ namespace GBible
         }
 
         public int Int() => (int)Long();
-        public bool Bool() => Data[Position++] != 0;
+        public bool Bool() => Byte() != 0;
 
         public float Float()
         {
+            if (End - Position < 4) throw Truncated();
             var bits = Data[Position] | Data[Position + 1] << 8 | Data[Position + 2] << 16 | Data[Position + 3] << 24;
             Position += 4;
             return new FloatBits { I = bits }.F;
@@ -158,6 +227,7 @@ namespace GBible
 
         public double Double()
         {
+            if (End - Position < 8) throw Truncated();
             long bits = 0;
             for (var i = 0; i < 8; i++) bits |= (long)Data[Position + i] << (8 * i);
             Position += 8;
@@ -168,9 +238,36 @@ namespace GBible
         {
             var n = Count(1);
             if (n == 0) return null;
-            var s = Encoding.UTF8.GetString(Data, Position, n - 1);
-            Position += n - 1;
+            var end = Position + n - 1;
+            var s = HasLoneSurrogate(Position, end) ? StrWithLoneSurrogates(Position, end) : Encoding.UTF8.GetString(Data, Position, n - 1);
+            Position = end;
             return s;
+        }
+
+        // 짝을 잃은 서러게이트의 3바이트 꼴(MirrorWriter.Str)이 있는지.
+        bool HasLoneSurrogate(int start, int end)
+        {
+            for (var i = Array.IndexOf(Data, (byte)0xED, start, end - start); i >= 0; i = Array.IndexOf(Data, (byte)0xED, i + 1, end - i - 1))
+                if (IsLoneAt(i, end)) return true;
+            return false;
+        }
+
+        bool IsLoneAt(int i, int end) => i + 2 < end && Data[i] == 0xED && Data[i + 1] >= 0xA0 && Data[i + 1] <= 0xBF && Data[i + 2] >= 0x80 && Data[i + 2] <= 0xBF;
+
+        string StrWithLoneSurrogates(int start, int end)
+        {
+            var b = new StringBuilder(end - start);
+            var segment = start;
+            for (var i = start; i < end; i++)
+            {
+                if (!IsLoneAt(i, end)) continue;
+                if (i > segment) b.Append(Encoding.UTF8.GetString(Data, segment, i - segment));
+                b.Append((char)(0xD000 | ((Data[i + 1] & 0x3F) << 6) | (Data[i + 2] & 0x3F)));
+                i += 2;
+                segment = i + 1;
+            }
+            if (end > segment) b.Append(Encoding.UTF8.GetString(Data, segment, end - segment));
+            return b.ToString();
         }
     }
 

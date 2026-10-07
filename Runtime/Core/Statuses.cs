@@ -247,9 +247,10 @@ namespace GBible
                     if (definition.Reapply != StatusReapply.Refresh) existing.stacks = Cap(cap, existing.stacks + stacks);
                     if (definition.Reapply != StatusReapply.AddStacks) existing.remaining = Initial(definition, length);
                     if (!string.IsNullOrEmpty(byId)) existing.by = byId;
-                    // 주기는 이번에 건 의도의 값으로(가로채기가 빠지면 정의의 주기로 돌아온다). 주기가 없다가 생기면 지금부터 센다.
+                    // 주기는 이번에 건 의도의 값으로(가로채기가 빠지면 정의의 주기로 돌아온다). 주기가 없다가 생기면 지금부터 세고, 0이 되면 멈춘다(처음 걸 때와 같다).
                     existing.pulse = pulse != definition.Pulse ? pulse : 0;
-                    if (pulse > 0 && existing.nextPulse <= 0) existing.nextPulse = _session.Clock.Time + pulse;
+                    if (pulse <= 0) existing.nextPulse = 0;
+                    else if (existing.nextPulse <= 0) existing.nextPulse = _session.Clock.Time + pulse;
                 });
                 RefreshModifiers(definition, existing);
                 _session.Events.Publish(new StatusApplied { holder = targetId, status = statusId, stacks = existing.stacks, source = source ?? "", by = byId });
@@ -421,6 +422,8 @@ namespace GBible
             for (var i = 0; i < 8 && active.nextPulse > 0 && active.nextPulse <= until; i++)
             {
                 _session.Data.Modify<StatusList>(Key, _ => active.nextPulse += interval);
+                // 앞 회차의 결과가 가진 쪽을 데이터에서 뺐으면(쓰러져 빠짐) 남은 회차는 내지 않는다(그 상태 효과는 행동 끝에 정리된다).
+                if (i > 0 && holder != null) holder = _session.Game.Find(active.target);
                 if (holder != null)
                 {
                     if (!isolate) Run(definition, active, definition.Outcomes, holder, null, false, "Status");
@@ -443,6 +446,8 @@ namespace GBible
             // 같은 순간에 끝나는 다른 상태 효과의 끝날 때 결과가 이미 풀었으면(풀린 것은 끝날 때 결과 없이 끝난다) 다시 끝내지 않는다.
             if (!Current().Any(s => s.id == active.id)) return;
             var definition = Find(active.status);
+            // 다시 걸어 지속을 갱신했으면(앞의 끝날 때 결과가 다시 걸었다) 아직 끝나지 않았다.
+            if (definition != null && !IsDue(definition, active)) return;
             var holder = _session.Game.Find(active.target);
             Drop(active);
             if (definition != null && holder != null)
@@ -541,6 +546,11 @@ namespace GBible
 
         static int Cap(int max, int stacks) => max > 0 ? Math.Min(max, stacks) : stacks;
 
+        // 지속이 다 됐나(이벤트 횟수: 남은 횟수 0 이하, 게임 시간: 끝나는 시각이 지남). 영구는 끝내는 쪽이 정한다.
+        bool IsDue(StatusDefinition definition, ActiveStatus active) =>
+            definition.Duration == StatusDuration.Events ? active.remaining <= 0 :
+            definition.Duration != StatusDuration.Seconds || active.remaining <= _session.Clock.Time;
+
         static string ByIdOf(object by) => by == null ? "" : by as string ?? (GameApi.HasId(by.GetType()) ? GameApi.IdOf(by) ?? "" : "");
 
         // 걸린 것의 주기(초): 걸 때 의도가 바꾼 값, 없으면 정의의 주기.
@@ -580,7 +590,8 @@ namespace GBible
                 id = text;
                 return _session.Game.Find(text);
             }
-            id = target == null ? null : GameApi.IdOf(target);
+            // id가 없는 형식(가진 쪽 run 같은 것)에는 걸린 것이 없다 — 읽기는 0·없음, 걸기는 "대상의 id가 없습니다".
+            id = target == null || !GameApi.HasId(target.GetType()) ? null : GameApi.IdOf(target);
             return target;
         }
 

@@ -216,10 +216,14 @@ namespace GBible.EditorTools.UI
             var buttons = Gs.Box("gs-dialog__buttons");
             box.Add(buttons);
             var modal = GsModal.Show(host, box);
-            modal.Closed += () =>
+            // 미리보기 텍스처는 닫을 때(적용·취소) 지운다. 창째 닫히거나(창의 X) 다른 원본으로 다시 열려 떨어져 나갈 때도.
+            void Release()
             {
                 foreach (var t in textures) UnityEngine.Object.DestroyImmediate(t);
-            };
+                textures.Clear();
+            }
+            modal.Closed += Release;
+            modal.RegisterCallback<DetachFromPanelEvent>(_ => Release());
             buttons.Add(new GsButton("취소", modal.Close, GsButtonKind.Ghost));
             buttons.Add(new GsButton("적용 (모든 크기 굽기)", () =>
             {

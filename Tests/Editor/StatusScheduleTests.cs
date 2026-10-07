@@ -534,6 +534,72 @@ namespace GBible.Tests
             CollectionAssert.AreEqual(new[] { "second:False", "first:True" }, ended, "끝남은 한 번씩");
         }
 
+        // 결과: 가진 쪽을 파티에서 뺀다(쓰러져 전투에서 빠짐).
+        public sealed class RemoveHolderUnit : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context) => context.Game.Get<SsParty>("party").units.Remove((SsUnit)context.User);
+            public override string Describe(INameResolver names) => "가진 쪽 빼기";
+        }
+
+        [Test]
+        public void 밀린_주기를_내는_도중에_가진_쪽이_사라지면_남은_회차를_내지_않는다()
+        {
+            var rot = new StatusDefinition { Id = "rot", Pulse = 1 };
+            var marks = new Mark { text = "rot" };
+            rot.Outcomes.Add(new RemoveHolderUnit());
+            rot.Outcomes.Add(marks);
+            _session.Statuses.Define(rot);
+            Do(g => g.ApplyStatus(Foe, "rot"));
+            _session.EndFrame(3.5);   // 1·2·3초 주기가 한 프레임에 밀렸다
+            CollectionAssert.AreEqual(new[] { "rot:foe" }, marks.log, "첫 회차가 뺀 가진 쪽에는 남은 회차가 없다");
+            Assert.IsNull(Foe);
+            Assert.AreEqual(0, _session.Statuses.Of("foe").Count, "사라진 가진 쪽의 상태 효과는 정리된다");
+        }
+
+        // 결과: 가진 쪽에게 그 상태 효과를 다시 건다.
+        public sealed class ReapplyStatusOutcome : Outcome
+        {
+            public string status;
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context) => context.Game.ApplyStatus(context.User, status);
+            public override string Describe(INameResolver names) => "다시 걸기";
+        }
+
+        [Test]
+        public void 같은_순간에_끝나는_상태_효과를_앞의_끝날_때_결과가_다시_걸면_그것은_끝나지_않는다()
+        {
+            // 이벤트 횟수: 같은 턴 끝에 둘 다 끝나는데, first가 끝날 때 second를 다시 걸면(지속 갱신) second는 그 턴 끝에 끝나지 않는다.
+            var first = new StatusDefinition { Id = "first", Duration = StatusDuration.Events, Length = 1, TickEvent = typeof(SsTurnEnded).FullName };
+            first.OnExpire.Add(new ReapplyStatusOutcome { status = "second" });
+            var second = new StatusDefinition { Id = "second", Reapply = StatusReapply.Refresh, Duration = StatusDuration.Events, Length = 1, TickEvent = typeof(SsTurnEnded).FullName };
+            var expire = new Mark { text = "second" };
+            second.OnExpire.Add(expire);
+            _session.Statuses.Define(first);
+            _session.Statuses.Define(second);
+            Do(g => { g.ApplyStatus(Hero, "first"); g.ApplyStatus(Hero, "second"); });
+            TurnEnd("hero");
+            Assert.IsFalse(Game.HasStatus(Hero, "first"));
+            Assert.IsTrue(Game.HasStatus(Hero, "second"), "다시 걸어 갱신했으니(1턴) 아직 남는다");
+            Assert.AreEqual(0, expire.log.Count);
+            TurnEnd("hero");
+            Assert.IsFalse(Game.HasStatus(Hero, "second"), "갱신한 1턴이 지나면 끝난다");
+            Assert.AreEqual(1, expire.log.Count);
+
+            // 게임 시간: 같은 프레임에 끝나는 것도 같다.
+            var fuse = new StatusDefinition { Id = "fuse", Duration = StatusDuration.Seconds, Length = 1 };
+            fuse.OnExpire.Add(new ReapplyStatusOutcome { status = "glow" });
+            var glow = new StatusDefinition { Id = "glow", Reapply = StatusReapply.Refresh, Duration = StatusDuration.Seconds, Length = 1 };
+            _session.Statuses.Define(fuse);
+            _session.Statuses.Define(glow);
+            Do(g => { g.ApplyStatus(Foe, "fuse"); g.ApplyStatus(Foe, "glow"); });
+            _session.EndFrame(1.5);
+            Assert.IsFalse(Game.HasStatus(Foe, "fuse"));
+            Assert.IsTrue(Game.HasStatus(Foe, "glow"), "fuse가 끝날 때 다시 건 glow는 그 프레임에 끝나지 않는다");
+            _session.EndFrame(1);
+            Assert.IsFalse(Game.HasStatus(Foe, "glow"));
+        }
+
         [Test]
         public void 앞_가진_쪽의_결과가_없앤_가진_쪽은_발동하지_않는다()
         {
@@ -589,6 +655,30 @@ namespace GBible.Tests
             Console.WriteLine($"상태 효과 걸린 유닛 60명 → 600명: 행동 한 번 평균 {small:0.000}ms → {large:0.000}ms (×{large / small:0.0})");
             // 대상마다 Find하면(데이터 전체 × 대상 수) 10배 많은 유닛에 100배 가까이 든다. 한 번 훑으면 10배 남짓.
             Assert.IsTrue(large / small < 30, $"×{large / small:0.0}");
+        }
+
+        [Test]
+        public void 다시_걸_때_의도가_주기를_0으로_하면_주기가_멈춘다()
+        {
+            // 처음 걸 때 주기 0이면 돌지 않는 것과 같게, 이미 돌던 것도 다시 걸 때 주기 0이면 멈춘다.
+            var burn = new StatusDefinition { Id = "burn", MaxStacks = 0, Pulse = 1 };
+            burn.Outcomes.Add(new Hurt());
+            _session.Statuses.Define(burn);
+            var freeze = new StatusDefinition { Id = "freeze", When = new InterceptTrigger { intentType = typeof(StatusIntent).FullName } };
+            freeze.Outcomes.Add(new ModifyIntentOutcome { path = "pulse", op = IntentOp.Set, value = "0" });
+            _session.Statuses.Define(freeze);
+            Do(g => g.ApplyStatus(Hero, "burn"));
+            _session.EndFrame(1.5);
+            Assert.AreEqual(29, Hero.hp, "1초: 주기 1번");
+
+            Do(g => { g.ApplyStatus(Foe, "freeze"); g.ApplyStatus(Hero, "burn"); });
+            Assert.AreEqual(0, Game.Statuses(Hero).Single(s => s.status == "burn").nextPulse, 1e-9, "주기 없음");
+            _session.EndFrame(3);
+            Assert.AreEqual(29, Hero.hp, "다시 걸 때 주기 0 → 더 돌지 않는다");
+
+            Do(g => { g.RemoveStatus(Foe, "freeze"); g.ApplyStatus(Hero, "burn"); });
+            _session.EndFrame(1.25);
+            Assert.AreEqual(29 - 3, Hero.hp, "가로채기가 빠지면 정의의 주기로 지금부터 다시 센다(3중첩 × 1)");
         }
 
         [Test]

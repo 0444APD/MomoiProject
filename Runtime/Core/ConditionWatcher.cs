@@ -33,6 +33,7 @@ namespace GBible
             _session = session;
             // 값이 바뀌는 즉시 반응한다(달성은 조건을 만족하는 순간 일어난다).
             session.Data.Changed += OnDataChanged;
+            session.Data.KeyDefined += OnKeyDefined;
         }
 
         public int EvaluationCount { get; private set; }
@@ -112,6 +113,19 @@ namespace GBible
             }
         }
 
+        // 새 키가 정의됐다(처음 쓸 때 정의되는 $statuses·$world·$modifiers …, 나중에 정의한 플레이어 데이터). 키가 없을 때 조건은 그 키를
+        // 읽지 못해(정의를 보고 건너뛰거나 읽다가 던짐) 읽은 키에 없다 → 그 키가 생기고 바뀌어도 다시 평가되지 않는다.
+        // 읽은 값으로 감시하는 조건과 그 키를 선언한 조건을 다음 Flush에서 다시 평가한다(그때 읽은 키로 다시 감시한다).
+        void OnKeyDefined(string key)
+        {
+            _index.TryGetValue(key, out var declared);
+            foreach (var watch in _watches.Values)
+            {
+                if (!watch.Condition.AutoDependencies && (declared == null || !declared.Contains(watch))) continue;
+                if (_dirty.Add(watch)) watch.Cause = 0;
+            }
+        }
+
         public void EvaluateAll()
         {
             foreach (var watch in _watches.Values)
@@ -177,22 +191,33 @@ namespace GBible
                     try
                     {
                         using (_session.Data.RecordReads(read)) satisfied = watch.Condition.Evaluate(_session);
-                        if (!read.SetEquals(watch.Keys)) Index(watch, read);
                     }
                     catch (Exception e)
                     {
+                        // 던지기 전까지 읽은 키로도 감시한다(그 값이 바뀌면 다시 본다 — 등록할 때 미리 평가한 것과 같다).
+                        if (!read.SetEquals(watch.Keys)) Index(watch, read);
                         _session.Journal.Append(JournalKind.Error, "Conditions", $"조건 평가 오류 ({watch.Owner}): {e.Message}");
                         continue;
                     }
+                    if (!read.SetEquals(watch.Keys)) Index(watch, read);
                     if (!satisfied) continue;
                     Unwatch(watch.Owner);
-                    if (watch.Cause != 0)
+                    try
                     {
-                        using (_session.Journal.Cause(watch.Cause)) watch.OnSatisfied?.Invoke();
+                        if (watch.Cause != 0)
+                        {
+                            using (_session.Journal.Cause(watch.Cause)) watch.OnSatisfied?.Invoke();
+                        }
+                        else
+                        {
+                            watch.OnSatisfied?.Invoke();
+                        }
                     }
-                    else
+                    catch (Exception e) when (!_session.Data.InTransaction)
                     {
-                        watch.OnSatisfied?.Invoke();
+                        // 행동 밖(행동이 끝난 뒤·프레임 끝): 발동한 결과 하나의 오류가 이미 성공한 행동을 실패로 보이게 하거나 남은 조건 평가를 막지 않게
+                        // 기록에 남기고 넘어간다(이벤트를 받는 쪽의 오류와 같다). 행동 안이면 그대로 올라가 그 행동이 실패한다.
+                        _session.Journal.Append(JournalKind.Error, "Conditions", $"조건 충족 처리 오류 ({watch.Owner}): {e.Message}");
                     }
                 }
             }

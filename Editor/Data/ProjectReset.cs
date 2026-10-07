@@ -34,6 +34,10 @@ namespace GBible.EditorTools
         static string ProjectRoot => Path.GetFullPath(".").Replace('\\', '/');
         public static bool HasBaseline => File.Exists(Path.Combine(BaselineFolder, "baseline.json"));
 
+        // 되돌리는 중(파일을 옮기기 시작한 뒤 Unity를 다시 열 때까지). DB 작업본을 버리면 'DB가 바뀌었다' 알림이 미뤄 둔 일(GameIds 만들기·스프라이트 다시 굽기)을
+        // 예약하는데, 그 일이 Unity를 닫기 전에 돌면 옮긴 자리에 파일(Ids.json·GameIds.cs·구운 이미지)을 다시 만든다 — 그 일들이 이 표시를 보고 멈춘다.
+        internal static bool Resetting { get; private set; }
+
         // 시스템이 아직 아무것도 만들지 않은 프로젝트인가(처음 상태를 저절로 기록해도 되는 때).
         // 개발자 폴더(Assets/Dev)가 있으면 아니다 — '시스템이 만든 것만 치우기' 뒤에 남은 개발자 것을 처음 상태로 기록하지 않게.
         public static bool LooksClean =>
@@ -45,7 +49,7 @@ namespace GBible.EditorTools
         static void CaptureFromMenu()
         {
             var message = HasBaseline
-                ? "이미 있는 처음 상태 기록을 지금 상태로 바꿉니다. 앞으로 '처음 상태로 되돌리기'는 지금 상태로 돌아옵니다.\n\n프로젝트를 막 만든 깨끗한 때에만 하세요."
+                ? "이미 있는 처음 상태 기록을 지금 상태로 바꿉니다(예전 기록은 " + BackupFolder + "로 옮깁니다). 앞으로 '처음 상태로 되돌리기'는 지금 상태로 돌아옵니다.\n\n프로젝트를 막 만든 깨끗한 때에만 하세요."
                 : "지금 상태를 처음 상태로 기록합니다. 앞으로 '처음 상태로 되돌리기'는 지금 상태로 돌아옵니다.\n\n프로젝트를 막 만든 깨끗한 때에만 하세요.";
             if (!EditorUtility.DisplayDialog("처음 상태 기록", message, "기록", "취소")) return;
             AssetDatabase.SaveAssets();
@@ -70,7 +74,14 @@ namespace GBible.EditorTools
 
         static void Capture()
         {
-            if (Directory.Exists(BaselineFolder)) Directory.Delete(BaselineFolder, true);
+            // 예전 기록은 지우지 않고 백업 폴더로 옮긴다(영구 삭제 없음 — 잘못 다시 기록했어도 예전 처음 상태를 되찾을 수 있게).
+            if (Directory.Exists(BaselineFolder))
+            {
+                Directory.CreateDirectory(BackupFolder);
+                var old = Path.Combine(BackupFolder, DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-baseline");
+                for (var i = 2; Directory.Exists(old); i++) old = Path.Combine(BackupFolder, DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-baseline-" + i);
+                Directory.Move(BaselineFolder, old);
+            }
             foreach (var file in CurrentFiles()) CopyFile(file, Path.Combine(BaselineFolder, file));
             File.WriteAllText(Path.Combine(BaselineFolder, "baseline.json"),
                 $"{{\"time\":\"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\",\"unity\":\"{Application.unityVersion}\"}}");
@@ -116,25 +127,27 @@ namespace GBible.EditorTools
             plan = Plan();
 
             var backup = PrepareBackup();
+            var failed = new List<string>();
             try
             {
                 EditorUtility.DisplayProgressBar("처음 상태로 되돌리기", "파일을 옮기는 중", 0.3f);
-                foreach (var file in plan.remove) MoveFile(file, Path.Combine(backup, file));
+                int removed = 0, restored = 0, recreated = 0;
+                foreach (var file in plan.remove)
+                    if (TryMove(file, Path.Combine(backup, file), failed)) removed++;
                 foreach (var file in plan.restore)
-                {
-                    MoveFile(file, Path.Combine(backup, file));
-                    CopyFile(Path.Combine(BaselineFolder, file), file);
-                }
-                foreach (var file in plan.recreate) CopyFile(Path.Combine(BaselineFolder, file), file);
+                    if (TryMove(file, Path.Combine(backup, file), failed) && TryCopy(Path.Combine(BaselineFolder, file), file, failed)) restored++;
+                foreach (var file in plan.recreate)
+                    if (TryCopy(Path.Combine(BaselineFolder, file), file, failed)) recreated++;
                 foreach (var area in new[] { "Assets", "Packages" }) RemoveEmptyFolders(area);
-                var rootMoved = MoveRootItems(backup, rootItems);
-                ClearSavesAndPrefs(backup);
-                WriteBackupNote(backup, plan.remove.Count + rootMoved, plan.restore.Count, plan.recreate.Count);
+                var rootMoved = MoveRootItems(backup, rootItems, failed);
+                ClearSavesAndPrefs(backup, failed);
+                WriteBackupNote(backup, removed + rootMoved, restored, recreated, failed);
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
             }
+            ReportFailed(failed);
             Reopen();
         }
 
@@ -156,22 +169,22 @@ namespace GBible.EditorTools
 
             AssetDatabase.SaveAssets();
             var backup = PrepareBackup();
+            var failed = new List<string>();
             var moved = 0;
             foreach (var folder in targets)
             {
                 foreach (var file in Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Select(Normalize))
-                {
-                    MoveFile(file, Path.Combine(backup, file));
-                    moved++;
-                }
-                Directory.Delete(folder, true);
-                if (File.Exists(folder + ".meta")) MoveFile(folder + ".meta", Path.Combine(backup, folder + ".meta"));
+                    if (TryMove(file, Path.Combine(backup, file), failed)) moved++;
+                // 빈 폴더만 지운다 — 옮기지 못한 파일이 남은 폴더는 그대로 둔다(지우지 않는다).
+                RemoveEmptyTree(folder);
+                if (!Directory.Exists(folder) && File.Exists(folder + ".meta")) TryMove(folder + ".meta", Path.Combine(backup, folder + ".meta"), failed);
             }
             // 미리 정한 목록으로(ProjectSettings/MomoiProject를 옮긴 뒤에는 '맞추지 않기' 표시도 빠져 있다).
-            moved += MoveRootItems(backup, rootItems);
+            moved += MoveRootItems(backup, rootItems, failed);
             RemoveModuleSymbols();
-            ClearSavesAndPrefs(backup);
-            WriteBackupNote(backup, moved, 0, 0);
+            ClearSavesAndPrefs(backup, failed);
+            WriteBackupNote(backup, moved, 0, 0, failed);
+            ReportFailed(failed);
             Reopen();
         }
 
@@ -271,23 +284,19 @@ namespace GBible.EditorTools
             items.Count == 0 ? "" : $"프로젝트 폴더의 시스템 파일도 치웁니다(AI가 예전 결정을 따르지 않게): {string.Join(" · ", items.Select(RootLabel))}\n";
 
         // 백업으로 옮긴다(같은 상대 경로). 옮긴 파일 수.
-        static int MoveRootItems(string backup, List<string> items)
+        static int MoveRootItems(string backup, List<string> items, List<string> failed)
         {
             var moved = 0;
             foreach (var item in items)
             {
                 if (File.Exists(item))
                 {
-                    MoveFile(item, Path.Combine(backup, item));
-                    moved++;
+                    if (TryMove(item, Path.Combine(backup, item), failed)) moved++;
                 }
                 else if (Directory.Exists(item))
                 {
                     foreach (var file in Directory.GetFiles(item, "*", SearchOption.AllDirectories).Select(Normalize))
-                    {
-                        MoveFile(file, Path.Combine(backup, file));
-                        moved++;
-                    }
+                        if (TryMove(file, Path.Combine(backup, file), failed)) moved++;
                     RemoveEmptyTree(item);
                 }
             }
@@ -305,6 +314,7 @@ namespace GBible.EditorTools
 
         static string PrepareBackup()
         {
+            Resetting = true;
             // 열린 씬·DB 작업본을 놓는다(바뀐 파일을 Unity가 다시 쓰지 않게). 저장 안 된 변경은 그 전에 물었다(AskAboutUnsaved).
             CodexChanges.Discard();
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -326,6 +336,46 @@ namespace GBible.EditorTools
             File.Copy(from, to, true);
         }
 
+        // 옮기거나 복사하지 못하면(다른 프로그램이 열어 둔 파일 등) 멈추지 않고 적어 둔다 — 중간에 멈추면 반만 되돌린 채 남고 Unity도 다시 열리지 않는다.
+        // 남은 것은 Unity가 다시 열린 뒤 되돌리기를 한 번 더 하면 그것만 옮긴다(계획을 다시 세운다).
+        static bool TryMove(string from, string to, List<string> failed)
+        {
+            try
+            {
+                MoveFile(from, to);
+                return true;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                failed.Add($"{from}: {e.Message}");
+                return false;
+            }
+        }
+
+        static bool TryCopy(string from, string to, List<string> failed)
+        {
+            try
+            {
+                CopyFile(from, to);
+                return true;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                failed.Add($"{to}: {e.Message}");
+                return false;
+            }
+        }
+
+        static void ReportFailed(List<string> failed)
+        {
+            if (failed.Count == 0) return;
+            Debug.LogWarning($"[MomoiProject] 처음 상태로 되돌리기: 파일 {failed.Count}개를 옮기지 못해 그대로 두었습니다:\n  " + string.Join("\n  ", failed));
+            EditorUtility.DisplayDialog("처음 상태로 되돌리기",
+                $"파일 {failed.Count}개를 옮기지 못해 그대로 두었습니다(다른 프로그램이 열어 두었을 수 있습니다). " +
+                "Unity가 다시 열린 뒤 그 프로그램을 닫고 '처음 상태로 되돌리기'를 한 번 더 하면 남은 것만 옮깁니다(목록은 백업 폴더의 README.txt).\n\n" +
+                string.Join("\n", failed.Take(8)) + (failed.Count > 8 ? "\n…" : ""), "확인");
+        }
+
         static void RemoveEmptyFolders(string root)
         {
             if (!Directory.Exists(root)) return;
@@ -341,7 +391,7 @@ namespace GBible.EditorTools
         // 저장 폴더 안 모두(하위 폴더 — 슬롯 slots/<이름>/ · Replays/ · server/ · Tests/ 등 — 까지).
         static bool HasSaves() => Directory.Exists(SaveFolder) && Directory.EnumerateFiles(SaveFolder, "*", SearchOption.AllDirectories).Any();
 
-        static void ClearSavesAndPrefs(string backup)
+        static void ClearSavesAndPrefs(string backup, List<string> failed)
         {
             if (Directory.Exists(SaveFolder))
             {
@@ -349,7 +399,7 @@ namespace GBible.EditorTools
                 foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
                 {
                     var relative = Path.GetFullPath(file).Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    MoveFile(file, Path.Combine(backup, "_saves", relative));
+                    TryMove(file, Path.Combine(backup, "_saves", relative), failed);
                 }
                 RemoveEmptyTree(root);
             }
@@ -380,13 +430,14 @@ namespace GBible.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        static void WriteBackupNote(string backup, int moved, int restored, int recreated)
+        static void WriteBackupNote(string backup, int moved, int restored, int recreated, List<string> failed)
         {
             File.WriteAllText(Path.Combine(backup, "README.txt"),
                 $"MomoiProject 처음 상태로 되돌리기 백업 ({DateTime.Now:yyyy-MM-dd HH:mm:ss})\r\n" +
                 $"치운 파일 {moved}개, 덮어쓴 파일 {restored}개(원래 것이 여기 있음), 다시 만든 파일 {recreated}개.\r\n" +
                 "되돌리려면 Unity를 닫고 이 폴더의 Assets·ProjectSettings·Packages(와 CLAUDE.md·.claude·Docs·steam_appid.txt — 있으면)를 프로젝트 폴더에 덮어쓴다. " +
-                "_saves는 저장 파일(persistentDataPath/MomoiProject — 하위 폴더 그대로).\r\n");
+                "_saves는 저장 파일(persistentDataPath/MomoiProject — 하위 폴더 그대로).\r\n" +
+                (failed.Count == 0 ? "" : $"옮기지 못해 프로젝트에 그대로 둔 파일 {failed.Count}개:\r\n" + string.Join("\r\n", failed.Select(f => "  " + f)) + "\r\n"));
         }
 
         static string BaselineTime()

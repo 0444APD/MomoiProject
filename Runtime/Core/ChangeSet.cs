@@ -77,6 +77,7 @@ namespace GBible
             Reshaped.Clear();
             Count = 0;
             _depth = 0;
+            _appended = null;
         }
 
         // 지금 내용을 새 ChangeSet으로 떼어 내고(정확한 크기로 복사) 이것은 비운다. 계속 쓰는 작업용 기록에서 결과만 남길 때.
@@ -97,6 +98,7 @@ namespace GBible
             copy.Changes.AddRange(Changes);
             copy.Originals.AddRange(Originals);
             copy.Reshaped.AddRange(Reshaped);
+            copy._appended = _appended; // 이어 붙인 기록의 원래 객체 번호 자리도 함께(Clear가 이쪽은 비운다)
             Clear();
             return copy;
         }

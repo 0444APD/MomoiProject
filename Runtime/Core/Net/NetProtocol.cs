@@ -109,9 +109,14 @@ namespace GBible
             foreach (var item in items) w.Str(item);
         }
 
-        public static string[] ReadStrings(MirrorReader r)
+        // 형식 번호표(Mirror.TypeTable)로 받는 이름 수의 한도. 게임의 데이터 형식은 이만큼 많지 않다 — 받은 개수만큼 배열을 잡기 전에 막는다
+        // (1바이트짜리 빈 이름 수천만 개를 담은 32MB 메시지 하나가 입장 확인 전에 수백 MB를 잡게 하지 못하게).
+        public const int MaxTypeTable = 1 << 16;
+
+        public static string[] ReadStrings(MirrorReader r, int max = int.MaxValue)
         {
             var count = r.Count();
+            if (count > max) throw new FormatException($"[MomoiProject] 이름 수({count})가 한도({max})를 넘습니다(받은 데이터가 깨졌거나 잘못되었습니다).");
             var items = new string[count];
             for (var i = 0; i < count; i++) items[i] = r.Str();
             return items;

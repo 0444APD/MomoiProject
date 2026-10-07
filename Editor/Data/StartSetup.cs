@@ -206,14 +206,15 @@ namespace GBible.EditorTools
                 done.Add($"{AsmdefPathOf(part)} 만듦");
             }
 
+            // 시작 파일의 클래스가 이미 다른 파일에 있으면(옮겼거나 나눴으면) 다시 만들지 않는다 — 같은 클래스가 둘이 되어 컴파일되지 않는다.
             var bootstrap = FolderOf("Client") + "/Bootstrap.cs";
-            if (!File.Exists(bootstrap))
+            if (!File.Exists(bootstrap) && !HasClass("Bootstrap"))
             {
                 File.WriteAllText(bootstrap, BootstrapCode, new UTF8Encoding(false));
                 done.Add($"{bootstrap} 만듦");
             }
             var playerData = FolderOf("Rules") + "/PlayerData.cs";
-            if (!File.Exists(playerData))
+            if (!File.Exists(playerData) && !DataEntries.Any(e => HasClass(e.className)))
             {
                 File.WriteAllText(playerData, PlayerDataCode, new UTF8Encoding(false));
                 done.Add($"{playerData} 만듦");
@@ -235,7 +236,8 @@ namespace GBible.EditorTools
             var madeEntries = false;
             foreach (var (id, zone, className, label) in DataEntries)
             {
-                if (EditorDatabase.Instance.FindById(id) != null) continue;
+                // ID를 바꿨어도 같은 클래스를 가리키는 항목이 있으면 새로 만들지 않는다(같은 데이터가 두 키로 생긴다).
+                if (EditorDatabase.Instance.FindById(id) != null || EditorDatabase.Instance.OfType<PlayerDataEntry>().Any(e => e.valueType == $"{Prefix}.{className}")) continue;
                 var entry = (PlayerDataEntry)EditorDatabase.Instance.Create(typeof(PlayerDataEntry), id);
                 entry.zone = zone;
                 entry.valueType = $"{Prefix}.{className}";
@@ -270,6 +272,9 @@ namespace GBible.EditorTools
             AssetDatabase.Refresh();
             return done;
         }
+
+        // 시작 설정 네임스페이스의 클래스가 컴파일되어 있는가(어느 파일에 있든).
+        static bool HasClass(string name) => TypeResolver.Find($"{Prefix}.{name}") != null;
 
         // 예전 자리(2026-10-06 전 — Assets/MomoiProjectData 등)의 시스템 폴더가 남은 프로젝트: 시작 설정 표시 파일이 없어 에디터를 열 때의 정리(Upkeep)가 돌지 않았다.
         // 새 자리에 DB 에셋·언어 설정을 새로 만들기 전에 옮긴다 — 아니면 다음에 에디터를 열 때 합치기가 새로 만든 쪽을 백업으로 빼 버린다(고른 Undo 방식·언어가 사라진다).

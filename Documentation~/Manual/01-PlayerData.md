@@ -283,7 +283,7 @@ public class Hero
 
 **`[Serializable]`이 꼭 필요하다.** 플레이어 데이터의 값이 되는 클래스, 그 안에 든 클래스, 구조체, 리스트 요소 클래스, 부모 클래스 모두에 붙인다.
 
-- 부모 클래스에 `[Serializable]`이 없으면 비교 코드가 그 부모의 필드를 다루지 않는다(경고 없이 기록에서 빠진다).
+- 부모 클래스에 `[Serializable]`이 없으면 비교 코드가 그 부모의 필드를 다루지 않는다(기록·Undo·멀티에서 빠진다 — 컴파일할 때 콘솔 경고). 그 위의 `[Serializable]` 조상 클래스의 필드는 그대로 다룬다. 행동·이벤트면 보낼 때 그 필드를 밝힌 오류가 난다(받는 쪽에 기본값으로 가지 않게).
 - 추상 클래스·인터페이스 형식의 필드·요소에 실제로 들어 있는 객체가 `[Serializable]`이 아니면, 그 객체는 참조만 비교되고 안쪽 변경은 따라가지 못한다(콘솔에 "비교 코드가 없어 안쪽 변경을 따라가지 못합니다" 경고가 형식마다 한 번). Mirror의 경고는 플레이할 때마다 다시 나온다.
 
 ---
@@ -297,7 +297,7 @@ public class Hero
 | 숫자 | `int` `long` `float` `double` `byte` `sbyte` `short` `ushort` `uint` `ulong` `decimal` |
 | 그 밖의 단순 값 | `bool` `char` `string` enum `DateTime` `TimeSpan` `DateTimeOffset` `Guid` |
 | 비어 있을 수 있는 값 | `int?` `float?` `MyEnum?` 같은 `Nullable<T>`(필드·리스트 요소) |
-| 구조체 | `[Serializable]` 구조체(필드 규칙은 클래스와 같다). 안쪽에 객체·컬렉션 필드가 없는 것만 — 있으면 4.2 |
+| 구조체 | `[Serializable]` 구조체(필드 규칙은 클래스와 같다). 안쪽에 객체·컬렉션 필드가 없고 안쪽 구조체 필드도 이 표의 것인 것만 — 아니면 4.2 |
 | Unity 구조체 | `Vector2` `Vector3` `Vector4` `Vector2Int` `Vector3Int` `Quaternion` `Color` `Color32` `Rect` `RectInt` `Bounds` |
 | 클래스 | `[Serializable]` 클래스. 다른 클래스를 필드로 품어도 된다(256단계까지 — 그보다 깊게 겹친 값은 복제·저장이 멈추거나 경고한다). `null`도 된다. 같은 객체를 두 곳에서 가리키거나 서로 가리켜도 된다(5장 7) |
 | 리스트·배열 | `List<T>`, 1차원 배열 `T[]` (요소는 위의 값·구조체·클래스) |
@@ -340,8 +340,10 @@ public class Unit
 - `[Serializable]`이 없는 클래스
 - `HashSet<T>` `SortedSet<T>` `Queue<T>` `Stack<T>` `LinkedList<T>` 같은 그 밖의 컬렉션
 - 중첩 컬렉션(`List<List<int>>`, 값이 리스트인 딕셔너리 등). 컴파일할 때 "중첩 컬렉션·이 형식은 비교 코드로 다루지 않습니다" 경고가 난다
+- 컬렉션 클래스를 상속한 클래스(`class Deck : List<Card>`). 요소는 상속한 `List`의 안쪽 칸이라 비교 코드가 보지 못한다. 컴파일할 때 "컬렉션 클래스 …을(를) 상속해 생성 코드가 요소의 변경을 따라가지 못합니다 … 상속 대신 List<T>·Dictionary<K, V> 필드를 두세요" 경고가 나고, 행동·이벤트에 담으면 보낼 때 오류다. 상속 대신 `List<Card> cards` 필드를 둔다
 - `float`·`double`·`Guid`·`DateTime`·`DateTimeOffset`·`TimeSpan` 키 딕셔너리(저장·불러오기는 된다)
 - 안쪽에 객체·컬렉션 필드(클래스·List·배열·Dictionary)가 있는 `[Serializable]` 구조체. 구조체는 값으로 복사되므로 안쪽 변경을 따라가지 못한다. 컴파일할 때 "구조체 안의 객체·컬렉션 필드(…)는 안쪽 변경을 따라가지 못합니다. … 구조체 대신 [Serializable] 클래스로 바꾸세요." 경고가 난다. 클래스로 바꾼다(예전 방식은 느리고 `Modify`가 필요하다, 6장)
+- 쓰고 읽는 방법이 없는 구조체(`KeyValuePair<K, V>`·`(int, int)` 같은 튜플·`[Serializable]`이 없는 구조체)를 담은 칸. `[Serializable]` 구조체의 필드·요소로 들어 있어도 같다(그 구조체도 예전 방식)
 - 뿌리 값이 컬렉션 그 자체
 
 예전 방식 데이터를 정의하면 기록(모니터 타임라인·콘솔)에 "'이름'은(는) 예전 방식(리플렉션)으로 비교합니다: 이유" 경고가 한 번 남는다.

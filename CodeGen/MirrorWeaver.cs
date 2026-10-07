@@ -16,7 +16,7 @@ namespace GBible.CodeGen
     //     static T    __gb_new()                                      빈 객체(인자 없는 생성자, 없으면 생성자 없이)
     //     static void __gb_apply(T t, int field, int depth, MirrorReader r, MirrorOp op)  기록 한 줄을 필드 하나에
     //     static void __gb_register()                                 위 메서드를 Mirror에 등록(게임 시작 때 한 번)
-    //   구조체 T: __gb_eq(T a, T b) · __gb_write · __gb_read(r) → T · __gb_register
+    //   구조체 T: __gb_eq(T a, T b) · __gb_write · __gb_read(r) → T · __gb_register(안쪽 값 칸 형식도 알린다 — MirrorCode.StructNeeds)
     //   모두(추상 클래스 포함): __gb_get(object o, int i) → object · __gb_set(object o, int i, object v)
     //     이 형식에 선언된 읽을 수 있는 멤버(저장 필드 + readonly 공개 필드 + 공개 읽기 속성)를 번호로 읽고 쓴다(필드 경로·저장·이벤트 값 읽기).
     //     부모 형식의 멤버는 부모의 것으로(FieldAccess가 부모를 따라 올라간다). 쓰기는 readonly가 아닌 필드만.
@@ -27,6 +27,7 @@ namespace GBible.CodeGen
     // 필드 = Unity가 저장하는 필드(public 또는 [SerializeField]·[SerializeReference], static·readonly·const·[NonSerialized] 제외).
     //   필드 형식의 수식자(volatile의 modreq 등)는 떼고 다룬다(제네릭 인자에 수식자가 들어가면 IL이 깨진다).
     // 필드 번호는 부모 클래스의 필드가 먼저다(부모도 생성 대상이면 부모의 메서드를 먼저 부른다).
+    //   부모 = 가장 가까운 저장 대상 조상: 사이에 [Serializable]이 없는 클래스가 있으면 건너뛰고(그 필드는 다루지 않는다 — 경고) 그 위 조상의 메서드를 부른다.
     //   부모가 저장 대상인데 생성 코드가 다루지 못하면(제네릭 부모, GBible.Core를 참조하지 않는 어셈블리의 부모) 필드 배치 맨 앞에
     //   표시(종류 None, 이름 LostBaseMarker + 설명)를 둔다 — 부모 필드를 잃는 형식이라 Mirror.Supports가 거짓(예전 비교 방식)이 된다.
     // 제네릭 형식, ref struct(Span<T>처럼 상자에 담을 수 없는 형식), UnityEngine.Object 파생, 예외·어트리뷰트 클래스는 만들지 않는다.
@@ -37,6 +38,8 @@ namespace GBible.CodeGen
         const string Prefix = "__gb_";
         // 부모 필드를 잃는 형식의 표시 이름 앞부분(Mirror.LostBaseMarker와 같은 값).
         const string LostBaseMarker = "$base ";
+        // 컬렉션 클래스(List<T>·Dictionary<K, V>·HashSet<T> …)를 상속해 요소를 잃는 형식의 표시 이름 앞부분(Mirror.LostItemsMarker와 같은 값).
+        const string LostItemsMarker = "$items ";
 
         // MirrorKind(코어)와 같은 값.
         const byte KNone = 0, KBool = 1, KSByte = 2, KByte = 3, KInt16 = 4, KUInt16 = 5, KInt32 = 6, KUInt32 = 7, KInt64 = 8, KUInt64 = 9,
@@ -132,12 +135,46 @@ namespace GBible.CodeGen
             void Visit(TypeDefinition t)
             {
                 if (!done.Add(t)) return;
-                var parent = t.BaseType == null ? null : TryResolve(t.BaseType);
+                var parent = DataParent(t, out _);
                 if (parent != null && set.Contains(parent)) Visit(parent);
                 order.Add(t);
             }
             foreach (var t in types) Visit(t);
             return order;
+        }
+
+        // 가장 가까운 저장 대상([Serializable] 등) 조상과 그것을 가리키는 형식 참조(제네릭이면 Piece<JokerData>처럼). 없으면 null.
+        // 사이의 저장 대상이 아닌 클래스는 건너뛴다 — 그 필드는 다루지 않지만(Generate가 알린다) 그 위 조상의 필드는 다룬다.
+        static TypeDefinition DataParent(TypeDefinition type, out TypeReference reference)
+        {
+            reference = null;
+            if (type.IsValueType) return null;
+            for (var current = type; current.BaseType != null && current.BaseType.FullName != "System.Object";)
+            {
+                var parent = TryResolve(current.BaseType);
+                if (parent == null) return null;
+                if (IsDataClass(parent))
+                {
+                    reference = current.BaseType;
+                    return parent;
+                }
+                current = parent;
+            }
+            return null;
+        }
+
+        // 상속한 .NET 컬렉션 클래스(System.Collections… 네임스페이스 — List<T>·Dictionary<K, V>·HashSet<T>·Collection<T> …). 없으면 null.
+        // 인터페이스만 구현한 클래스(IEnumerable<T>를 구현하고 List 필드를 가진 것)는 아니다 — 요소가 그 클래스의 필드에 있다.
+        static TypeReference CollectionBase(TypeDefinition type)
+        {
+            for (var current = type.BaseType; current != null && current.FullName != "System.Object";)
+            {
+                if (current.Namespace != null && current.Namespace.StartsWith("System.Collections", StringComparison.Ordinal)) return current;
+                var resolved = TryResolve(current);
+                if (resolved == null) return null;
+                current = resolved.BaseType;
+            }
+            return null;
         }
 
         static TypeDefinition TryResolve(TypeReference reference)
@@ -329,11 +366,10 @@ namespace GBible.CodeGen
                 if (_warnings != null && !_warnings.Contains(message)) _warnings.Add(message);
             }
 
-            // 부모 클래스(생성 대상이고 실제로 생성될 어셈블리에 있을 때).
+            // 부모 클래스(가장 가까운 저장 대상 조상 — DataParent — 이 생성 대상이고 실제로 생성될 어셈블리에 있을 때).
             TypeDefinition BaseOf(TypeDefinition type)
             {
-                if (type.IsValueType || type.BaseType == null || type.BaseType.FullName == "System.Object") return null;
-                var parent = TryResolve(type.BaseType);
+                var parent = DataParent(type, out _);
                 if (parent == null || !IsTarget(parent)) return null;
                 var module = parent.Module;
                 var processed = module == _module || module.Assembly.Name.Name == CoreAssembly || module.AssemblyReferences.Any(r => r.Name == CoreAssembly);
@@ -353,7 +389,7 @@ namespace GBible.CodeGen
                 else if (LostBase(type) is { } lost)
                 {
                     _lost[type] = lost;
-                    var marker = new FieldDefinition(LostBaseMarker + lost.Describe(), FieldAttributes.Private, _module.TypeSystem.Object);
+                    var marker = new FieldDefinition((lost.Collection ? LostItemsMarker : LostBaseMarker) + lost.Describe(), FieldAttributes.Private, _module.TypeSystem.Object);
                     list.Add(new FieldPlan { Field = marker, Type = _module.TypeSystem.Object, Kind = KNone });
                 }
                 list.AddRange(Own(type));
@@ -369,25 +405,32 @@ namespace GBible.CodeGen
             {
                 public string Parent;
                 public bool Generic;
+                // 컬렉션 클래스를 상속했다: 요소는 그 클래스의 private 칸이라 생성 코드가 보지 못한다(Fields는 비어 있다).
+                public bool Collection;
                 public List<string> Fields;
 
-                public string Describe() => $"{Parent}({(Generic ? "제네릭 클래스" : "GBible.Core를 참조하지 않는 어셈블리")})의 필드({string.Join(", ", Fields)})";
+                public string Describe() => Collection
+                    ? Parent
+                    : $"{Parent}({(Generic ? "제네릭 클래스" : "GBible.Core를 참조하지 않는 어셈블리")})의 필드({string.Join(", ", Fields)})";
             }
 
             // 이 형식이 부모 쪽 필드를 잃는지. 잃는 필드가 없거나 부모를 생성 코드가 다루면 null.
-            // [Serializable]이 없는 부모는 여기서 다루지 않는다(Unity도 저장하지 않는 필드 — Generate가 경고만 한다).
+            // [Serializable]이 없는 부모는 여기서 다루지 않는다(Unity도 저장하지 않는 필드 — Generate가 경고만 한다). 그 위의 저장 대상 조상은 본다(DataParent).
+            // 컬렉션 클래스를 상속한 형식(class Deck : List<Card>)은 요소를 잃는다 — 표시가 없으면 요소의 변경(Undo·네트워크·복사)을 조용히 놓친다.
             LostParent LostBase(TypeDefinition type)
             {
-                if (type.IsValueType || type.BaseType == null || type.BaseType.FullName == "System.Object" || BaseOf(type) != null) return null;
-                var parent = TryResolve(type.BaseType);
-                if (parent == null || !IsDataClass(parent)) return null;
+                if (BaseOf(type) != null) return null;
+                if (!type.IsValueType && CollectionBase(type) is { } collection)
+                    return new LostParent { Parent = Display(collection), Collection = true, Fields = new List<string>() };
+                var parent = DataParent(type, out var reference);
+                if (parent == null) return null;
                 var fields = new List<string>();
                 for (var current = parent; current != null && current.FullName != "System.Object";)
                 {
                     if (IsDataClass(current)) fields.AddRange(current.Fields.Where(IsField).Select(f => f.Name));
                     current = current.BaseType == null ? null : TryResolve(current.BaseType);
                 }
-                return fields.Count == 0 ? null : new LostParent { Parent = Display(type.BaseType), Generic = !IsTarget(parent), Fields = fields };
+                return fields.Count == 0 ? null : new LostParent { Parent = Display(reference), Generic = !IsTarget(parent), Fields = fields };
             }
 
             // 경고·표시용 형식 이름(제네릭은 Piece<JokerData>처럼).
@@ -422,7 +465,13 @@ namespace GBible.CodeGen
                 var own = Own(type).ToList();
                 var all = Layout(type);
                 var role = RoleOf(type);
-                if (_lost.TryGetValue(type, out var lost))
+                if (_lost.TryGetValue(type, out var lost) && lost.Collection)
+                {
+                    Warn($"{type.FullName}: 컬렉션 클래스 {lost.Parent}을(를) 상속해 생성 코드가 요소의 변경을 따라가지 못합니다. " +
+                         (role == null ? "이 형식을 담은 플레이어 데이터는 예전 비교 방식(느림)으로 다룹니다." : $"{Topic(role)} 멀티플레이로 보낼 수 없습니다(보낼 때 오류).") +
+                         " 상속 대신 List<T>·Dictionary<K, V> 필드를 두세요.");
+                }
+                else if (lost != null)
                 {
                     Warn($"{type.FullName}: 부모 {lost.Parent}이(가) {(lost.Generic ? "제네릭 클래스라" : "GBible.Core를 참조하지 않는 어셈블리에 있어")} 생성 코드가 부모 쪽 필드({string.Join(", ", lost.Fields)})를 다루지 못합니다. " +
                          (role == null ? "이 형식을 담은 플레이어 데이터는 예전 비교 방식(느림)으로 다룹니다." : $"{Topic(role)} 멀티플레이로 보낼 수 없습니다(보낼 때 오류).") +
@@ -430,8 +479,11 @@ namespace GBible.CodeGen
                 }
                 else
                 {
-                    var rawParent = type.IsValueType || type.BaseType == null ? null : TryResolve(type.BaseType);
-                    if (rawParent != null && rawParent.FullName != "System.Object" && BaseOf(type) == null && !IsDataClass(rawParent))
+                    // 가장 가까운 저장 대상 조상(DataParent)까지 사이의 [Serializable]이 없는 부모들.
+                    var dataParent = DataParent(type, out _);
+                    for (var rawParent = type.IsValueType || type.BaseType == null ? null : TryResolve(type.BaseType);
+                         rawParent != null && rawParent != dataParent && rawParent.FullName != "System.Object";
+                         rawParent = rawParent.BaseType == null ? null : TryResolve(rawParent.BaseType))
                     {
                         var missing = rawParent.Fields.Where(IsField).Select(f => f.Name).ToList();
                         if (missing.Count > 0)
@@ -815,6 +867,21 @@ namespace GBible.CodeGen
                             il.Emit(OpCodes.Call, Code("RegisterNullable", g.GenericArguments[0]));
             }
 
+            // 구조체 안의 값 칸 형식(구조체 필드·리스트·배열·딕셔너리 값의 구조체 요소)을 알린다(MirrorCode.StructNeeds):
+            // 그 형식을 쓰고 읽을 수 없으면(KeyValuePair·[Serializable]이 없는 구조체 …) 이 구조체도 못 쓴다 — 클래스와 달리 구조체는 필드 형식을 Mirror가 모른다.
+            void EmitNeeds(ILProcessor il, TypeDefinition type, List<FieldPlan> own)
+            {
+                var seen = new HashSet<string>();
+                foreach (var plan in own)
+                {
+                    var value = plan.Kind == KStruct ? plan.Type : plan.Kind == KList || plan.Kind == KArray ? plan.A : plan.Kind == KDict ? plan.B : null;
+                    if (value == null || KindOf(value, out _, out _) != KStruct || !seen.Add(value.FullName)) continue;
+                    il.Emit(OpCodes.Ldtoken, ImportType(type));
+                    il.Emit(OpCodes.Ldtoken, _module.ImportReference(StripModifiers(value)));
+                    il.Emit(OpCodes.Call, Code("StructNeeds"));
+                }
+            }
+
             // FieldAccess에 이 형식의 멤버 이름·종류·읽기·쓰기를 등록한다.
             void EmitAccessRegister(ILProcessor il, TypeDefinition type, Access access)
             {
@@ -1114,6 +1181,7 @@ namespace GBible.CodeGen
                 if (shallow.Count > 0)
                     Warn($"{type.FullName}: 구조체 안의 객체·컬렉션 필드({string.Join(", ", shallow)})는 안쪽 변경을 따라가지 못합니다. 이 구조체를 담은 플레이어 데이터는 예전 비교 방식(느림)으로 다룹니다. 구조체 대신 [Serializable] 클래스로 바꾸세요.");
                 il.Emit(OpCodes.Call, Code(shallow.Count > 0 ? "RegisterShallowStruct" : "RegisterStruct", type));
+                EmitNeeds(il, type, own);
                 EmitNullables(il, own);
                 EmitAccessRegister(il, type, access);
                 il.Emit(OpCodes.Ret);

@@ -115,6 +115,8 @@ namespace GBible
         readonly Dictionary<string, List<PassiveDefinition>> _byAttribute = new Dictionary<string, List<PassiveDefinition>>(StringComparer.Ordinal);
         // 지금 빌려 쓰는 중인 (패시브, 원본) — 서로 빌리는 고리(Blueprint ↔ Brainstorm)를 끊는다.
         readonly HashSet<(string, object)> _borrowing = new HashSet<(string, object)>();
+        // 빌려 쓰는 중인 빌리는 쪽(맨 위 = 지금) — 빌려 쓰는 결과 안에서 또 빌리면(Brainstorm → Blueprint → 오른쪽) 가진 쪽 필드를 처음 빌린 조각으로 본다.
+        readonly Stack<object> _borrowers = new Stack<object>();
         // 보정 조건을 검사하는 중인 (패시브, 가진 쪽) — 조건이 같은 능력치를 읽어 다시 들어오면 그 보정은 없는 것으로 본다.
         readonly HashSet<(string, object)> _checking = new HashSet<(string, object)>();
         double _lastPulse = -1;
@@ -324,6 +326,7 @@ namespace GBible
         // 빌려 쓰기(복사·흉내): 지금 순간(이벤트·의도)으로 그 패시브의 트리거를 원본(lender)을 가진 쪽으로 검사하고, 참이면 결과를 낸다.
         //   결과의 사용자 = 원본 조각(원본의 값을 읽는다), IsBorrowed = 참 — '필드 바꾸기'는 원본 자신의 필드를 바꾸지 않는다(쌓이는 값은 원본만).
         //   가진 쪽 필드는 빌리는 쪽(지금 순간의 사용자)으로 본다 — "이 조커의 차례" 이벤트에서 Blueprint가 오른쪽 조커를 빌린다.
+        //     빌려 쓰는 결과 안에서 또 빌리면(Brainstorm → Blueprint → 오른쪽) 처음 빌린 조각(그 차례의 조각)으로 본다.
         //   발동이 여러 줄이면 맞는 줄마다. 이미 빌려 쓰는 중인 (패시브, 원본)을 다시 빌리면 거짓(고리 끊기). 결과를 냈으면 참.
         //   꺼진 원본(침묵·레벨 0 이하)은 빌리지 못한다(거짓) — 직접 발동하지 않는 조각은 빌려도 발동하지 않는다.
         public bool Borrow(string id, object lender, TriggerContext moment)
@@ -341,14 +344,20 @@ namespace GBible
                     Session = _session, Owner = definition.Id, Event = moment.Event, IsIntercept = moment.IsIntercept, IsUse = moment.IsUse,
                     User = lender, Picked = new[] { lender }, IsBorrowed = true,
                 };
-                if (!HolderFieldMatches(definition, moment.User ?? lender, context)) return false;
+                var borrower = moment.IsBorrowed && _borrowers.Count > 0 ? _borrowers.Peek() : moment.User ?? lender;
+                if (!HolderFieldMatches(definition, borrower, context)) return false;
                 var fired = false;
-                foreach (var (when, outcomes) in RulesOf(definition))
+                _borrowers.Push(borrower);
+                try
                 {
-                    if (!_session.Triggers.Test(when, context)) continue;
-                    Fire(definition, outcomes, context);
-                    fired = true;
+                    foreach (var (when, outcomes) in RulesOf(definition))
+                    {
+                        if (!_session.Triggers.Test(when, context)) continue;
+                        Fire(definition, outcomes, context);
+                        fired = true;
+                    }
                 }
+                finally { _borrowers.Pop(); }
                 return fired;
             }
             finally { _borrowing.Remove(key); }
@@ -421,20 +430,39 @@ namespace GBible
                 var definition = Find(id);
                 if (definition == null) continue;
                 // 주기는 가진 쪽 필드(이벤트 거르기)와 상관없이 켜진 가진 쪽마다, 목록 순서로.
+                // 앞 결과(앞 가진 쪽·앞 회차)가 가진 쪽을 없애거나 껐으면(목록에서 뺌·침묵·레벨 0) 그 가진 쪽은 남은 회차를 내지 않는다(이벤트 발동과 같다).
                 var holders = ActiveHolders(definition).ToList();
-                foreach (var (holder, level) in holders)
+                var fired = false;
+                foreach (var (holder, listed) in holders)
                 {
+                    var level = listed;
+                    if (fired && !LevelNow(definition, holder, out level)) continue;
                     var interval = definition.PulseAt(Math.Max(1, level));
                     if (interval <= 0) continue;
                     var times = Math.Min(8, (int)(Math.Floor(to / interval) - Math.Floor(from / interval)));
                     for (int i = 0; i < times; i++)
                     {
+                        if (i > 0 && !LevelNow(definition, holder, out _)) break;
                         var moment = new TriggerContext { Session = _session, Owner = definition.Id, User = holder };
+                        fired = true;
                         if (!isolate) Fire(definition, definition.Outcomes, moment);
                         else if (!Guarded(definition, holder, () => Fire(definition, definition.Outcomes, moment))) break;
                     }
                 }
             }
+        }
+
+        // 지금도 켜진 가진 쪽인가(그 레벨).
+        bool LevelNow(PassiveDefinition definition, object holder, out int level)
+        {
+            foreach (var (active, now) in ActiveHolders(definition))
+                if (ReferenceEquals(active, holder))
+                {
+                    level = now;
+                    return true;
+                }
+            level = 0;
+            return false;
         }
 
         // 저장점 안에서 돌린다. 실패하면 그것이 바꾼 것과 쏜 이벤트(연출·전송)만 되돌리고 경고를 남긴다. 돌았으면 참.
@@ -525,7 +553,8 @@ namespace GBible
                     foreach (DictionaryEntry entry in map)
                     {
                         if (!string.Equals(Convert.ToString(entry.Key, CultureInfo.InvariantCulture), id, StringComparison.Ordinal)) continue;
-                        return entry.Value is IConvertible && !(entry.Value is string) ? GameNumbers.RoundToInt(Convert.ToDouble(entry.Value, CultureInfo.InvariantCulture)) : 1;
+                        // 0 이하 = 꺼짐(목록 요소의 레벨과 같다) — 여러 가진 쪽의 합을 깎지 않는다.
+                        return entry.Value is IConvertible && !(entry.Value is string) ? Math.Max(0, GameNumbers.RoundToInt(Convert.ToDouble(entry.Value, CultureInfo.InvariantCulture))) : 1;
                     }
                     return 0;
                 case IEnumerable list:

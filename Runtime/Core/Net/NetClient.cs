@@ -388,6 +388,8 @@ namespace GBible
             PlayerId = 0;
             Match = null;
             _session.LocalPlayer = 0;
+            // 방에 보냈는데 결과가 오지 않은 행동(방이 닫히는 사이에 보냄)은 이제 결과가 오지 않는다 — 기다리지 않는다(PendingActions).
+            _pending.Clear();
             LobbyChanged?.Invoke();
         }
 
@@ -425,7 +427,7 @@ namespace GBible
             Reached = true;
             PlayerId = (int)r.UVar();
             _replica.Reset();
-            var missing = _replica.UseTypes(NetProtocol.ReadStrings(r));
+            var missing = _replica.UseTypes(NetProtocol.ReadStrings(r, NetProtocol.MaxTypeTable));
             if (missing.Count > 0)
                 _session.Journal.Append(JournalKind.Warning, "Net", $"서버에는 있고 이 게임에는 없는 형식 {missing.Count}개: {string.Join(", ", missing.GetRange(0, Math.Min(3, missing.Count)))}{(missing.Count > 3 ? " …" : "")} — 버전이 다를 수 있습니다.");
             ReadPlayers(r);

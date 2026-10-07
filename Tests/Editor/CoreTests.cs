@@ -109,6 +109,48 @@ namespace GBible.Tests
             public TestItem[] arrows = new TestItem[0];
         }
 
+        [Serializable]
+        public sealed class TestCollections
+        {
+            public HashSet<string> unlocked = new HashSet<string>();
+            public Queue<string> waves = new Queue<string>();
+        }
+
+        [Test]
+        public void 주기_보상은_리스트가_아닌_컬렉션에도_요소를_끝에_넣는다()
+        {
+            var sets = _session.Data.Define("s:sets", DataZone.Session, new TestCollections(), "모음");
+            new PlayerDataReward { key = "s:sets", path = "unlocked", items = { "a", "b", "a" } }.Grant(_session);
+            new PlayerDataReward { key = "s:sets", path = "waves", items = { "w1", "w2" } }.Grant(_session);
+            CollectionAssert.AreEquivalent(new[] { "a", "b" }, sets.unlocked);
+            CollectionAssert.AreEqual(new[] { "w1", "w2" }, sets.waves.ToArray(), "큐도 끝(뒤)에 넣는다");
+        }
+
+        [Test]
+        public void 주기_보상의_값_읽기는_형식에_담기지_않는_숫자를_던지지_않고_알린다()
+        {
+            Assert.IsFalse(PlayerDataGrants.TryParse(typeof(int), "3000000000", out _, out var error), "int에 담기지 않는다");
+            StringAssert.Contains("3000000000", error);
+            var errors = new List<string>();
+            Assert.DoesNotThrow(() => new PlayerDataReward { key = "s:scores", items = { "3000000000" } }.Validate(typeof(int[]), errors), "DB 검증이 멈추지 않는다");
+            Assert.AreEqual(1, errors.Count, string.Join("\n", errors));
+            _session.Data.Define("s:scores", DataZone.Session, new[] { 1 }, "점수");
+            Assert.DoesNotThrow(() => new PlayerDataReward { key = "s:scores", items = { "3000000000", "2" } }.Grant(_session));
+            CollectionAssert.AreEqual(new[] { 1, 2 }, _session.Data.Get<int[]>("s:scores"), "읽을 수 있는 요소만 넣고 나머지는 경고");
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("3000000000")));
+        }
+
+        [Test]
+        public void 원본_ID_넣기는_값_하나인_필드를_그_ID로_바꾼다()
+        {
+            var hero = _session.Data.Define("s:hero", DataZone.Session, new TestItem { name = "old" }, "영웅");
+            _session.Data.Define("s:class", DataZone.Session, "none", "직업");
+            GrantIds.Into(_session, "s:hero", "name", new[] { "fire" });
+            Assert.AreEqual("fire", hero.name, "글자 필드를 비우지 않고 고른 ID로");
+            GrantIds.Into(_session, "s:class", "", new[] { "mage", "knight" });
+            Assert.AreEqual("knight", _session.Data.Get("s:class"), "여럿이면 차례로 넣어 마지막 것");
+        }
+
         [Test]
         public void 주기_보상은_필드_형식으로_주는_방법이_정해진다()
         {

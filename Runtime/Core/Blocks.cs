@@ -162,13 +162,14 @@ namespace GBible
         public static bool Apply(CompareOp op, double left, double right)
         {
             if (double.IsNaN(left)) return false;
+            // 같은 숫자 비교 규칙(FieldOps.Near — 아주 작은 차이는 같다): 0.1씩 쌓은 로그도 '같음'·'이상'이 서로 맞는다.
             switch (op)
             {
-                case CompareOp.AtLeast: return left >= right;
-                case CompareOp.AtMost: return left <= right;
-                case CompareOp.GreaterThan: return left > right;
-                case CompareOp.LessThan: return left < right;
-                default: return Math.Abs(left - right) < 1e-9;
+                case CompareOp.AtLeast: return FieldOps.AtLeast(left, right);
+                case CompareOp.AtMost: return FieldOps.AtMost(left, right);
+                case CompareOp.GreaterThan: return FieldOps.Greater(left, right);
+                case CompareOp.LessThan: return FieldOps.Less(left, right);
+                default: return FieldOps.Near(left, right);
             }
         }
 
@@ -220,8 +221,10 @@ namespace GBible
     {
         static bool? HasFinal(string word)
         {
-            if (string.IsNullOrEmpty(word)) return null;
-            var c = word.TrimEnd()[word.TrimEnd().Length - 1];
+            // 공백뿐인 이름(이름 칸에 띄어쓰기만)도 판단할 수 없는 것으로 — 끝 글자가 없어 던지면 그 문장을 쓰는 DB 화면·설명이 멈춘다.
+            var trimmed = word?.TrimEnd();
+            if (string.IsNullOrEmpty(trimmed)) return null;
+            var c = trimmed[trimmed.Length - 1];
             if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28 != 0;
             if (char.IsDigit(c)) return "013678".IndexOf(c) >= 0;
             return null;

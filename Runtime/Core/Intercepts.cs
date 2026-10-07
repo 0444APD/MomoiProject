@@ -159,35 +159,42 @@ namespace GBible
 
         public override OutcomeKinds Kind => OutcomeKinds.Intent;
 
-        static readonly Regex Token = new Regex(@"\{(user(?::[^}]+)?|owner|stacks|level(?::[^}]+)?|event:[^}]+|data:[^}]+|count:[^}]+|balance:[^}]+)\}", RegexOptions.Compiled);
+        // 틀 앞의 '-'도 함께 잡는다(-{stacks}): 틀의 값과 숫자 하나로 읽는다.
+        static readonly Regex Token = new Regex(@"(-?)\{(user(?::[^}]+)?|owner|stacks|level(?::[^}]+)?|event:[^}]+|data:[^}]+|count:[^}]+|balance:[^}]+)\}", RegexOptions.Compiled);
 
-        // 틀을 이 순간의 값으로 바꾼다. 앞에 붙은 '-'와 겹치면(-{stacks}가 -3) 숫자 하나로 읽힌다.
+        // 틀을 이 순간의 값으로 바꾼다. 앞에 붙은 '-'와 겹치면(-{stacks}가 -3) 숫자 하나로 읽힌다 — 틀의 값이 음수면 부호가 바뀐다(-{x}에서 x가 -2면 2).
+        // 합치는 것은 틀 앞의 '-'와 그 틀 값의 부호뿐이다(틀이 펼친 글자 안·틀 밖의 '--'는 그대로).
         public static string Expand(string text, TriggerContext context)
         {
             if (string.IsNullOrEmpty(text) || text.IndexOf('{') < 0 || context == null) return text ?? "";
-            var expanded = Token.Replace(text, m =>
+            return Token.Replace(text, m =>
             {
-                var name = m.Groups[1].Value;
-                if (name == "user") return context.User == null || !GameApi.HasId(context.User.GetType()) ? "" : GameApi.IdOf(context.User) ?? "";
-                if (name.StartsWith("user:", StringComparison.Ordinal)) return Text(FieldPaths.Resolve(context.User, name.Substring(5)).FirstOrDefault());
-                if (name.StartsWith("event:", StringComparison.Ordinal)) return Text(FieldPaths.Resolve(context.Event, name.Substring(6)).FirstOrDefault());
-                if (name.StartsWith("data:", StringComparison.Ordinal)) return Text(DataAt(context, name.Substring(5)));
-                if (name.StartsWith("count:", StringComparison.Ordinal))
-                {
-                    var found = DataAt(context, name.Substring(6));
-                    // 빈 칸(null)은 세지 않는다(34칸 가방에 든 것의 수).
-                    return (found is IEnumerable items && !(found is string) ? items.Cast<object>().Count(o => o != null) : 0).ToString(CultureInfo.InvariantCulture);
-                }
-                if (name == "owner") return context.Owner ?? "";
-                if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
-                if (name == "level" || name.StartsWith("level:", StringComparison.Ordinal))
-                {
-                    var level = context.User == null || string.IsNullOrEmpty(context.Owner) ? 0 : context.Session.Passives.Owned(context.Owner, context.User);
-                    return name == "level" ? level.ToString(CultureInfo.InvariantCulture) : PickByLevel(name.Substring("level:".Length), level);
-                }
-                return context.Game.Balance(name.Substring("balance:".Length)).ToString("R", CultureInfo.InvariantCulture);
+                var value = ValueOf(m.Groups[2].Value, context);
+                if (m.Groups[1].Length == 0) return value;
+                return value.StartsWith("-", StringComparison.Ordinal) ? value.Substring(1) : "-" + value;
             });
-            return expanded.Replace("--", "");
+        }
+
+        static string ValueOf(string name, TriggerContext context)
+        {
+            if (name == "user") return context.User == null || !GameApi.HasId(context.User.GetType()) ? "" : GameApi.IdOf(context.User) ?? "";
+            if (name.StartsWith("user:", StringComparison.Ordinal)) return Text(FieldPaths.Resolve(context.User, name.Substring(5)).FirstOrDefault());
+            if (name.StartsWith("event:", StringComparison.Ordinal)) return Text(FieldPaths.Resolve(context.Event, name.Substring(6)).FirstOrDefault());
+            if (name.StartsWith("data:", StringComparison.Ordinal)) return Text(DataAt(context, name.Substring(5)));
+            if (name.StartsWith("count:", StringComparison.Ordinal))
+            {
+                var found = DataAt(context, name.Substring(6));
+                // 빈 칸(null)은 세지 않는다(34칸 가방에 든 것의 수).
+                return (found is IEnumerable items && !(found is string) ? items.Cast<object>().Count(o => o != null) : 0).ToString(CultureInfo.InvariantCulture);
+            }
+            if (name == "owner") return context.Owner ?? "";
+            if (name == "stacks") return context.User == null || string.IsNullOrEmpty(context.Owner) ? "0" : context.Game.StatusStacks(context.User, context.Owner).ToString(CultureInfo.InvariantCulture);
+            if (name == "level" || name.StartsWith("level:", StringComparison.Ordinal))
+            {
+                var level = context.User == null || string.IsNullOrEmpty(context.Owner) ? 0 : context.Session.Passives.Owned(context.Owner, context.User);
+                return name == "level" ? level.ToString(CultureInfo.InvariantCulture) : PickByLevel(name.Substring("level:".Length), level);
+            }
+            return context.Game.Balance(name.Substring("balance:".Length)).ToString("R", CultureInfo.InvariantCulture);
         }
 
         static string Text(object value) => value == null ? "" : value is double d ? d.ToString("R", CultureInfo.InvariantCulture) : Convert.ToString(value, CultureInfo.InvariantCulture);
@@ -239,9 +246,11 @@ namespace GBible
             // 마지막 마디는 필드나 딕셔너리의 키(byElement[fire]). 괄호 안의 점(x[forest.chest3])은 나누지 않는다.
             FieldPaths.SplitLast(path, out var parentPath, out var member);
             var text = Expand(value, context);
+            var reached = false;
             foreach (var parent in FieldPaths.Resolve(intent, parentPath).ToList())
             {
                 if (parent == null) continue;
+                reached = true;
                 if (parent.GetType().IsValueType)
                 {
                     context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'의 부모가 구조체라 고칠 수 없습니다(클래스로 바꾸세요).");
@@ -258,6 +267,10 @@ namespace GBible
                 if (unreadable) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'에 '{text}'를 넣을 수 없습니다({type.Name}).");
                 else if (!written) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'에 쓰지 못했습니다(그 필드·키가 없습니다).");
             }
+            // 경로 중간이 비었다(info.amount의 info가 null, units[hero]의 hero가 없음): 고칠 곳이 없다 — 조용히 넘어가지 않고 알린다.
+            // 요소마다 펼치는 경로([])가 빈 목록이면 고칠 것이 없는 것이 맞다.
+            if (!reached && parentPath.IndexOf(FieldPaths.Each, StringComparison.Ordinal) < 0)
+                context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'의 부모가 비어 있어 쓰지 못했습니다(경로 중간의 값이 없습니다).");
         }
 
         object Compute(object current, Type type, string text)

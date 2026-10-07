@@ -201,7 +201,11 @@ namespace GBible
                         if (_peers.TryGetValue(e.Connection, out var peer))
                         {
                             peer.LastHeard = Now;
-                            if (!WithinBudget(peer)) break;
+                            if (!WithinBudget(peer))
+                            {
+                                RefuseOverBudget(peer, e.Data, e.Length);
+                                break;
+                            }
                             try { Handle(peer, e.Data, e.Length); }
                             catch (Exception ex)
                             {
@@ -232,6 +236,26 @@ namespace GBible
                 Drop(peer.Connection, "메시지를 너무 많이 보냈습니다");
             }
             return false;
+        }
+
+        // 한도를 넘어 버린 행동에도 결과(거절)를 돌려준다 — 결과가 오지 않으면 보낸 쪽이 그 행동을 끝없이 기다린다(PendingActions·대사 진행).
+        // 입장 전·행동이 아닌 메시지·끊은 연결(네 배를 넘김)은 그냥 버린다. 거절은 요청 번호만 읽고 행동은 읽지 않는다(가볍게).
+        void RefuseOverBudget(Peer peer, byte[] data, int length)
+        {
+            if (!peer.Joined || !_peers.ContainsKey(peer.Connection) || NetProtocol.KindOf(data, length) != NetMessage.Act) return;
+            long request;
+            try { request = (long)new MirrorReader(data, 1, length).UVar(); }
+            catch (FormatException) { return; }
+            var connection = peer.Connection;
+            QueueResult(() => Send(connection, w =>
+            {
+                NetProtocol.Begin(NetMessage.ActResult, w);
+                w.UVar((ulong)request);
+                w.Bool(false);
+                w.Str("");
+                w.Str("요청이 너무 많아 이 행동을 처리하지 않았습니다(1초에 보낼 수 있는 메시지 수를 넘음).");
+                w.UVar(0);
+            }));
         }
 
         // 아무것도 오지 않은 지 오래된 연결을 끊는다(갑자기 꺼진 컴퓨터 — 전송이 알아채지 못한 끊김).
@@ -370,7 +394,7 @@ namespace GBible
             if (peer.Joined) return;
             var version = (int)r.UVar();
             var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Connection = peer.Connection };
-            var table = NetProtocol.ReadStrings(r);
+            var table = NetProtocol.ReadStrings(r, NetProtocol.MaxTypeTable);
             if (version != NetProtocol.Version) { Refuse(peer, $"멀티플레이 규격 버전이 다릅니다(서버 {NetProtocol.Version}, 클라이언트 {version})."); return; }
             if (!string.IsNullOrEmpty(Options.GameVersion) && hello.GameVersion != Options.GameVersion) { Refuse(peer, $"게임 버전이 다릅니다(서버 {Options.GameVersion}, 클라이언트 {hello.GameVersion})."); return; }
 
@@ -397,8 +421,9 @@ namespace GBible
                 }
                 if (old != null)
                 {
-                    _peers.Remove(old.Connection);
                     _transport.Disconnect(old.Connection, "같은 계정이 다시 접속했습니다.");
+                    // 옛 연결은 나간 것으로 알린다(PlayerLeft) — 이어서 새 연결로 들어온다(PlayerJoined). 들어옴·나감이 짝을 이룬다.
+                    Drop(old.Connection, "같은 계정이 다시 접속했습니다");
                 }
                 player.Connected = false;
             }
@@ -488,7 +513,7 @@ namespace GBible
             }
             if (action != null)
             {
-                if (action.GetType().IsDefined(typeof(SystemActionAttribute), false))
+                if (IsSystemAction(action.GetType()))
                     failMessage = $"'{action.GetType().Name}'은(는) 시스템 행동이라 보낼 수 없습니다.";
                 else
                 {
@@ -496,7 +521,10 @@ namespace GBible
                     action.actorId = peer.Player.Id;
                     action.utc = 0;
                     action.tick = 0;
-                    var refused = Validate?.Invoke(peer.Player, action);
+                    // 검사 코드의 오류도 거절로 돌려준다(결과가 오지 않으면 클라이언트가 그 행동을 끝없이 기다린다).
+                    string refused;
+                    try { refused = Validate?.Invoke(peer.Player, action); }
+                    catch (Exception e) { refused = "행동 검사 중 오류: " + e.Message; }
                     if (refused != null) failMessage = refused;
                     else
                     {
@@ -588,7 +616,9 @@ namespace GBible
             peer.Player.Connected = false;
             peer.Player.Connection = -1;
             _session.Journal.Append(JournalKind.System, "Net", $"{peer.Player}이(가) 나갔습니다{(string.IsNullOrEmpty(reason) ? "" : ": " + reason)}.");
-            PlayerLeft?.Invoke(peer.Player);
+            // 게임 코드의 오류가 받기(남은 메시지)·이어받기(새 연결의 입장)를 멈추지 않게.
+            try { PlayerLeft?.Invoke(peer.Player); }
+            catch (Exception e) { _session.Journal.Append(JournalKind.Error, "Net", $"PlayerLeft 처리 중 오류({peer.Player}): {e.Message}"); }
             BroadcastPlayers();
         }
 
@@ -844,6 +874,18 @@ namespace GBible
         {
             if (_warnedEvents.Add(type))
                 _session.Journal.Append(JournalKind.Error, "Net", $"이벤트 '{type.Name}'을(를) 클라이언트에 보낼 수 없어 뺐습니다: {reason}");
+        }
+
+        // [SystemAction]인가(형식마다 처음 한 번 찾아 둔다 — 받은 행동마다 리플렉션하지 않게).
+        static readonly Dictionary<Type, bool> SystemActions = new Dictionary<Type, bool>();
+
+        static bool IsSystemAction(Type type)
+        {
+            lock (SystemActions)
+            {
+                if (SystemActions.TryGetValue(type, out var found)) return found;
+                return SystemActions[type] = type.IsDefined(typeof(SystemActionAttribute), false);
+            }
         }
 
         // [GameEvent(ServerOnly = true)]인가(형식마다 처음 한 번 찾아 둔다).

@@ -710,9 +710,16 @@ namespace GBible
             Watcher.Watch(entry.WatchKey, probe, () =>
             {
                 entry.WatchKey = null;
-                if (entry.Holders == null) Fire(entry, Moment(entry.ContextOwner));
-                else TestAndFire(entry, Moment(entry.ContextOwner));
-                if (entry.Repeat && entry.Live) WatchConditions(entry, armed: false);
+                try
+                {
+                    if (entry.Holders == null) Fire(entry, Moment(entry.ContextOwner));
+                    else TestAndFire(entry, Moment(entry.ContextOwner));
+                }
+                finally
+                {
+                    // 발동(결과)이 던져도 반복 항목은 다시 감시한다 — 한 번의 오류로 감시를 영영 잃지 않게(오류는 감시기가 기록한다).
+                    if (entry.Repeat && entry.Live && entry.WatchKey == null) WatchConditions(entry, armed: false);
+                }
             });
         }
 

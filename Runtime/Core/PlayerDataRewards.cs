@@ -36,10 +36,17 @@ namespace GBible
         }
 
         // 숫자를 그 숫자 형식의 값으로(정수 형식이면 Round로 맞춘 뒤).
+        // 그 형식에 담기지 않으면(int 칸에 30억·NaN) 자르지 않고 던진다 — 조용히 자르면 계산 실수가 숨는다. 글은 무엇을 고칠지 알린다.
         public static object ToType(double number, Type type)
         {
             type = Nullable.GetUnderlyingType(type) ?? type;
-            return Convert.ChangeType(IsWhole(type) ? Round(number) : number, type, CultureInfo.InvariantCulture);
+            var value = IsWhole(type) ? Round(number) : number;
+            try { return Convert.ChangeType(value, type, CultureInfo.InvariantCulture); }
+            catch (OverflowException)
+            {
+                var shown = double.IsNaN(value) ? "숫자가 아닌 값(NaN)" : value.ToString("R", CultureInfo.InvariantCulture);
+                throw new OverflowException($"[MomoiProject] {shown}은(는) {type.Name} 칸에 담기지 않습니다 — 더 큰 형식(long·double·BigNumber)의 필드를 쓰거나 계산을 고치세요.");
+            }
         }
     }
 
@@ -114,7 +121,13 @@ namespace GBible
                     error = text.Length == 0 ? "숫자가 비어 있습니다." : $"'{text}'는 숫자가 아닙니다.";
                     return false;
                 }
-                value = ToNumber(number, type);
+                // 형식에 담기지 않는 숫자(int에 30억)도 읽지 못한 값이다 — 던지지 않는다(DB 검증·보상 실행이 멈추지 않게).
+                try { value = ToNumber(number, type); }
+                catch (OverflowException)
+                {
+                    error = $"'{text}'는 {DataModel.FriendlyName(type)}에 담을 수 없는 크기입니다.";
+                    return false;
+                }
                 return true;
             }
             error = $"{DataModel.FriendlyName(type)}은(는) 글자로 적을 수 없습니다.";
@@ -158,7 +171,8 @@ namespace GBible
             (string.IsNullOrEmpty(key) ? "(플레이어 데이터 없음)" : key) + (string.IsNullOrEmpty(path) ? "" : " › " + FieldFilter.PathLabel(path));
     }
 
-    // 뽑은·고른 원본 ID들을 플레이어 데이터에 넣는 공통 규칙(가중치 표에서 주기·고르기): 목록이면 요소로, 딕셔너리면 그 키의 개수 +1, 숫자 하나면 개수만큼 +.
+    // 뽑은·고른 원본 ID들을 플레이어 데이터에 넣는 공통 규칙(가중치 표에서 주기·고르기): 목록이면 요소로, 딕셔너리면 그 키의 개수 +1, 숫자 하나면 개수만큼 +,
+    // 값 하나(글자·enum·클래스)면 그 ID로(차례로 넣어 여럿이면 마지막 것, 클래스면 그 인스턴스의 사본).
     public static class GrantIds
     {
         public static void Into(GameSession session, string key, string path, IReadOnlyList<string> ids)
@@ -172,6 +186,8 @@ namespace GBible
                 new PlayerDataReward { key = key, path = path ?? "", keys = counts.Select(g => g.Key).ToList(), items = counts.Select(g => g.Count().ToString(CultureInfo.InvariantCulture)).ToList() }.Grant(session);
             }
             else if (kind == GrantKind.Number) new PlayerDataReward { key = key, path = path ?? "", amount = ids.Count }.Grant(session);
+            // 값 하나는 요소 넣기(items)가 아니다 — 그대로 주면 빈 value로 정해져 글자 필드가 지워진다.
+            else if (kind == GrantKind.Value || kind == GrantKind.Instance) new PlayerDataReward { key = key, path = path ?? "", value = ids[ids.Count - 1] }.Grant(session);
             else new PlayerDataReward { key = key, path = path ?? "", items = ids.ToList() }.Grant(session);
         }
     }
@@ -330,17 +346,19 @@ namespace GBible
                 for (int i = 0; i < made.Count; i++) grown.SetValue(made[i], old.Length + i);
                 return grown;
             }
-            if (collection == null) return null;
-            foreach (var item in made)
+            if (collection == null || made.Count == 0) return collection;
+            if (collection is IList list)
             {
-                if (collection is IList list) list.Add(item);
-                else
-                {
-                    var add = collection.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public)
-                        .FirstOrDefault(m => m.Name == "Add" && m.GetParameters().Length == 1);
-                    add?.Invoke(collection, new[] { item });
-                }
+                foreach (var item in made) list.Add(item);
+                return collection;
             }
+            // 그 밖의 컬렉션(HashSet·Queue·Stack …): 데이터 모델이 형식마다 한 번 정해 둔 꺼내기·다시 채우기로 차례 끝에 붙인다
+            // (넣을 때마다 Add를 찾지 않는다 — Queue·Stack에는 Add가 없어 아무것도 넣지 못했다).
+            var info = DataModel.Of(collection.GetType());
+            if (info.ReadItems == null || info.WriteItems == null) return collection;
+            var all = info.ReadItems(collection);
+            all.AddRange(made);
+            info.WriteItems(collection, all);
             return collection;
         }
 

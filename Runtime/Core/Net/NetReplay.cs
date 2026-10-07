@@ -171,7 +171,7 @@ namespace GBible
                         _welcomed = true;
                         _session.LocalPlayer = (int)r.UVar();
                         _replica.Reset();
-                        _replica.UseTypes(NetProtocol.ReadStrings(r));
+                        _replica.UseTypes(NetProtocol.ReadStrings(r, NetProtocol.MaxTypeTable));
                         break;
                     case NetMessage.Batch:
                         _replica.ApplyBatch(r, events);

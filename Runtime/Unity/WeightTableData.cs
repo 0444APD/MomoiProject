@@ -49,6 +49,8 @@ namespace GBible.Data
                 else if (entry.item == Id) context.Error("표가 자기 자신을 항목으로 가지고 있습니다.");
                 if (entry.weight < 0) context.Error($"'{name}': 무게는 0 이상이어야 합니다.");
                 if (entry.minCount < 0 || entry.maxCount < entry.minCount) context.Error($"'{name}': 개수는 0 ≤ 최소 ≤ 최대여야 합니다.");
+                // 줄의 조건 Block(없는 도전과제·로그, 비어 있는 AND …). 트리거 칸이 아니라 DB 검증이 따로 보지 않는다.
+                entry.condition?.Validate(context);
             }
             if (exclude.Any(l => l == null || string.IsNullOrEmpty(l.key))) context.Error("뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다.");
             if (emptyWeight < 0) context.Error("꽝 무게는 0 이상이어야 합니다.");
@@ -142,7 +144,7 @@ namespace GBible
         {
             var game = context.Game;
             var total = Math.Max(1, count + GameNumbers.RoundToInt(countBonus?.Read(game.Session) ?? 0));
-            var options = game.Roll(table, total, unique).Select(id => new ChoiceCandidate(id, Texts.NameOf(id)));
+            var options = game.Roll(table, total, unique).Select(id => new ChoiceCandidate(id));
             var user = context.User != null && GameApi.HasId(context.User.GetType()) ? GameApi.IdOf(context.User) : "";
             var next = new ChoiceEffectsRun
             {

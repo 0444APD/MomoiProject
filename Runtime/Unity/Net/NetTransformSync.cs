@@ -8,6 +8,7 @@ namespace GBible
     //   · 주인(owner = 플레이어 번호)이 이 프로그램이면: 위치·회전을 초당 sendRate번 보낸다(잃어도 되는 메시지 — 다음 것이 곧 온다).
     //   · 아니면: 받은 위치를 delay초 뒤에서 부드럽게 따라간다(보간).
     // 방장은 받은 위치를 다른 사람에게 그대로 전한다(NetServer.RelayStreams). 판정(피해·드롭·상태 효과)은 방장의 규칙이 한다 — 위치는 판정의 재료.
+    // 받는 쪽(방장 포함)은 보낸 사람이 주인인 물체만 움직인다(보낸 사람 번호는 서버가 붙인다 — 남의 캐릭터를 옮길 수 없다). 방장·서버가 보낸 것은 모두 받는다.
     //   스폰할 때: var sync = go.AddComponent<NetTransformSync>(); sync.entityId = "hero:" + playerId; sync.owner = playerId;
     // entityId는 모든 프로그램에서 같은 글자여야 한다(같은 물체). 싱글(멀티 아님)에서는 아무것도 하지 않는다.
     [AddComponentMenu("MomoiProject/실시간 위치 맞추기")]
@@ -135,7 +136,8 @@ namespace GBible
                 Packet.Float(r.w);
             }
             if (GameNet.Client != null) GameNet.Client.SendStream(Channel, Packet.Data, 0, Packet.Length);
-            else GameNet.Server?.SendStream(Channel, Packet.Data, Packet.Length, from: GBibleRuntime.Session?.LocalPlayer ?? 0);
+            // 방장·서버가 보낸 것은 보낸 사람 0(서버) — 받는 쪽이 판정하는 쪽의 것으로 받는다(방장이 주인인 것·서버가 움직이는 것).
+            else GameNet.Server?.SendStream(Channel, Packet.Data, Packet.Length);
         }
 
         static void Hook()
@@ -154,18 +156,20 @@ namespace GBible
             }
         }
 
+        // 보낸 사람 번호는 서버가 붙인다(클라이언트가 속일 수 없다): 0 = 서버·방장, 아니면 그 플레이어.
         static void OnClientStream(int from, byte channel, byte[] data, int start, int end)
         {
-            if (channel == Channel) Read(new MirrorReader(data, start, end));
+            if (channel == Channel) Read(new MirrorReader(data, start, end), from, authority: from == 0);
         }
 
         // 방장: 클라이언트가 보낸 것(앞의 두 바이트 = 메시지 종류·채널).
         static void OnServerStream(NetPlayer from, byte channel, byte[] data, int length)
         {
-            if (channel == Channel) Read(new MirrorReader(data, 2, length));
+            if (channel == Channel && from != null) Read(new MirrorReader(data, 2, length), from.Id, authority: false);
         }
 
-        static void Read(MirrorReader r)
+        // 보낸 사람이 주인인 물체만 움직인다(판정하는 쪽은 모두) — 남의 캐릭터를 옮기는 위치가 방장의 판정 재료가 되거나 다른 화면에 그려지지 않게.
+        static void Read(MirrorReader r, int from, bool authority)
         {
             var count = (int)r.UVar();
             for (var i = 0; i < count && !r.AtEnd; i++)
@@ -176,7 +180,7 @@ namespace GBible
                 if (id == null) continue;
                 if (ById.TryGetValue(id, out var sync))
                 {
-                    sync.Receive(position, rotation);
+                    if (authority || sync.owner == from) sync.Receive(position, rotation);
                     continue;
                 }
                 // 막 이름을 바꾼 물체(아직 다시 등록 전)도 찾는다.
@@ -184,7 +188,7 @@ namespace GBible
                     if (candidate.Id == id)
                     {
                         candidate.Register();
-                        candidate.Receive(position, rotation);
+                        if (authority || candidate.owner == from) candidate.Receive(position, rotation);
                         break;
                     }
             }

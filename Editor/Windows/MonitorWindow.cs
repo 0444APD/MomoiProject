@@ -12,6 +12,9 @@ namespace GBible.EditorTools
     // 런타임 모니터: 통합 기록(인과 추적), 데이터, 도전과제, 수치, 행동(Undo), 디버그 명령.
     public sealed class MonitorWindow : EditorWindow
     {
+        // 모니터에서 달성시키면 게임과 같은 길이라 Steam이 붙어 있으면 Steam 도전과제에도 간다(이 계정에 남는다).
+        const string SteamUnlockNote = "\nSteam이 붙어 있으면 Steam 도전과제에도 달성으로 보냅니다 — 지우려면 명령 › Steam › 'Steam 통계·도전과제 모두 지우기'.";
+
         enum Tab
         {
             Timeline,
@@ -951,7 +954,7 @@ namespace GBible.EditorTools
                     _session.Achievements.Unlock(selected.Id, "모니터에서 강제 달성");
                     ShowFeedback($"'{selected.DisplayName}' 강제 달성", GsNoticeKind.Ok);
                 });
-                force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다.";
+                force.tooltip = "직접 수정: 조건·이벤트 없이 달성 처리만 합니다." + SteamUnlockNote;
                 buttons.Add(force);
                 buttons.Add(Gs.HSpace(8));
                 var fill = new GsButton("트리거로 달성", () =>
@@ -961,7 +964,7 @@ namespace GBible.EditorTools
                     else
                         ShowFeedback(error, GsNoticeKind.Warning);
                 }, GsButtonKind.Primary);
-                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 쏩니다.\nUndo하면 수치는 돌아가고 달성은 유지됩니다.";
+                fill.tooltip = "게임과 같은 경로: 부족한 수치만큼 실제 이벤트를 쏩니다.\nUndo하면 수치는 돌아가고 달성은 유지됩니다." + SteamUnlockNote;
                 GsMotion.AddPressSpring(fill);
                 buttons.Add(fill);
             }
@@ -1472,7 +1475,7 @@ namespace GBible.EditorTools
                 foreach (var candidate in pending.options)
                 {
                     var id = candidate.id;
-                    var label = string.IsNullOrEmpty(candidate.label) ? id : candidate.label;
+                    var label = candidate.DisplayText();
                     GsButton button = null;
                     button = new GsButton(label, () =>
                     {

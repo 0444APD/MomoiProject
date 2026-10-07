@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace GBible
@@ -140,6 +139,8 @@ namespace GBible
         IReadOnlyList<Modifier> StoredOf(string id, string attribute)
         {
             if (string.IsNullOrEmpty(id)) return Array.Empty<Modifier>();
+            // 미리보기는 변경 알림이 없어 저장점 취소(실패한 이벤트 예약이 붙인 보정을 되돌림)를 알 수 없다 — 읽을 때마다 다시 만든다.
+            if (_session.Actions.IsPreviewing) _index = null;
             BuildIndex();
             if (attribute != null) return _index.TryGetValue((id, attribute), out var list) ? list : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();
             return _index.Where(p => p.Key.Item1 == id).SelectMany(p => p.Value).ToList();
@@ -222,11 +223,11 @@ namespace GBible
             return entity;
         }
 
+        // 숫자로 읽는 규칙은 경로로 읽을 때(ScreenBinding.Number — 정렬해서 n개·숫자 참조의 다른 길)와 같다: 큰 수는 double, 숫자로 읽히지 않는 글자는 0.
         static double BaseOf(object target, string attribute)
         {
             if (target == null || string.IsNullOrEmpty(attribute)) return 0;
-            var value = FieldAccess.Read(target, attribute);
-            return value == null ? 0 : Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            return ScreenBinding.Number(FieldAccess.Read(target, attribute));
         }
 
         static bool IsNumericField(Type type, string attribute)

@@ -303,6 +303,44 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 행동_검사가_오류를_내도_거절로_결과가_돌아온다()
+        {
+            var rig = new Rig();
+            var client = rig.Join("철수");
+            var failures = new List<NetActionFailure>();
+            client.ActionFailed += failures.Add;
+            // 게임의 검사 코드가 예외를 낸다 — 결과가 오지 않으면 클라이언트는 그 행동을 끝없이 기다린다(대화 진행이 멈추는 등).
+            rig.Server.Validate = (player, action) => throw new InvalidOperationException("검사 오류(시험)");
+            client.Session.Do(new NtStrike { unit = UnitOf(client.Session, "a") });
+            rig.Pump();
+            Assert.AreEqual(0, client.PendingActions, "결과가 온다");
+            Assert.AreEqual(1, failures.Count, "거절로 온다");
+            StringAssert.Contains("검사 오류", failures[0].Message);
+            Assert.AreEqual(10, UnitOf(rig.ServerSession, "a").hp, "실행하지 않는다");
+        }
+
+        [Test]
+        public void 초당_한도를_넘어_버린_행동도_거절로_결과가_돌아온다()
+        {
+            var rig = new Rig();
+            var now = 0.0;
+            rig.Server.Clock = () => now;   // 서버의 1초 창을 시험이 정한다
+            var client = rig.Join("철수");
+            var failures = new List<NetActionFailure>();
+            client.ActionFailed += failures.Add;
+            now = 5;   // 입장 메시지의 1초 창을 지나 새 창에서 센다
+            rig.Server.Options.MaxMessagesPerSecond = 3;
+            // 한 번에 다섯 — 셋만 실행하고 둘은 한도를 넘는다. 넘은 것도 결과가 와야 보낸 쪽이 그 행동을 끝없이 기다리지 않는다.
+            for (var i = 0; i < 5; i++) client.Session.Do(new NtStrike { unit = UnitOf(client.Session, "a") });
+            rig.Pump();
+            Assert.AreEqual(0, client.PendingActions, "모두 결과가 온다");
+            Assert.AreEqual(1, UnitOf(rig.ServerSession, "a").hp, "셋만 실행한다");
+            Assert.AreEqual(2, failures.Count, "한도를 넘은 둘은 거절로");
+            StringAssert.Contains("너무 많아", failures[0].Message);
+            Assert.AreEqual(1, UnitOf(client.Session, "a").hp, "네 배 전에는 끊지 않고 바뀐 곳도 계속 온다");
+        }
+
+        [Test]
         public void 클라이언트는_되돌리지_않고_규칙이_스스로_돌지_않는다()
         {
             var rig = new Rig();

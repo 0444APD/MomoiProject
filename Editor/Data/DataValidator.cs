@@ -99,6 +99,10 @@ namespace GBible.EditorTools
                 else if (!IdRules.IsValid(data.Id, out var idError)) context.Error($"ID '{data.Id}': {idError} 'ID 바꾸기'로 고치세요.");
                 // 트리거·결과 칸을 먼저: 플레이어 데이터 검사·주기의 없는 키는 여기서 자세히 알리고, 아래 참조 검사는 같은 키를 다시 알리지 않는다.
                 CheckSlots(data, all, context);
+                // 트리거 칸이 아닌 조건(가중치 표 줄의 조건)도 플레이어 데이터 검사의 키·경로를 같은 규칙으로 본다(오타면 그 줄이 말없이 안 나온다).
+                if (data is WeightTableData table)
+                    foreach (var entry in table.entries)
+                        if (entry?.condition != null) CheckPlayerDataFields(entry.condition, all, context);
                 CheckReferences(data, all, context);
                 CheckStrings(data, all, context);
                 CheckRequired(data, context);
@@ -286,7 +290,8 @@ namespace GBible.EditorTools
         }
         // 글자 칸 한 번 훑기(저장 전 변경 포함):
         //   · [Keyword(typeof(그룹))] 필드의 값이 그 그룹의 키워드인지. 비어 있는 값은 필수 검사가 본다.
-        //   · 값 틀({balance:ID}·{data:키.경로}·{count:키.경로})이 있는 밸런스 값·플레이어 데이터를 가리키는지 — ID를 바꿔도 틀 안의 글자는 따라가지 않으니 끊긴 것을 경고한다.
+        //   · 값 틀({balance:ID}·{data:키.경로}·{count:키.경로})이 있는 밸런스 값·플레이어 데이터를 가리키는지 — ID를 바꿔도 틀 안의 글자는 따라가지 않으니 끊긴 것을 알린다
+        //     (없는 밸런스 값은 실행하면 행동이 실패하므로 오류, 없는 플레이어 데이터는 빈 글로 넘어가므로 경고).
         static void CheckStrings(GameData data, IReadOnlyList<GameData> all, Context context)
         {
             var so = new UnityEditor.SerializedObject(data);
@@ -314,8 +319,9 @@ namespace GBible.EditorTools
                 var value = match.Groups[2].Value.Trim();
                 if (kind == "balance")
                 {
+                    // 오류: 실행하면 없는 밸런스 값을 읽다가 그 행동 전체가 실패한다({data:}·{count:}는 빈 글 + 경고로 넘어가므로 경고).
                     if (!all.OfType<BalanceData>().Any(b => b.Id == value))
-                        context.Warning($"{LabelOf(field, property)}: 값 틀 '{match.Value}'의 밸런스 값 '{value}'가 없습니다(ID를 바꿨다면 틀의 글자도 고치세요).");
+                        context.Error($"{LabelOf(field, property)}: 값 틀 '{match.Value}'의 밸런스 값 '{value}'가 없습니다 — 이대로면 이 결과가 도는 행동이 실패합니다(ID를 바꿨다면 틀의 글자도 고치세요).");
                     continue;
                 }
                 // {data:키.경로}·{count:키.경로}: 정의된 가장 긴 앞부분(점까지)이 플레이어 데이터 키 — 실행(ModifyIntentOutcome.DataAt)과 같다(player.inventory.gold).

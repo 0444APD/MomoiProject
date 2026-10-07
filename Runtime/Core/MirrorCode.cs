@@ -64,6 +64,11 @@ namespace GBible
             MirrorValues.MarkShallow(typeof(T));
         }
 
+        // 구조체 안의 값 칸 형식(구조체 필드·리스트·배열·딕셔너리 값의 구조체 요소). 생성 코드가 구조체 등록에서 부른다:
+        // 안쪽 형식을 쓰고 읽을 수 없으면(KeyValuePair·[Serializable]이 없는 구조체 …) 이 구조체도 못 쓴다(MirrorValues.IsSupported·CanWrite).
+        public static void StructNeeds(RuntimeTypeHandle owner, RuntimeTypeHandle need) =>
+            MirrorValues.AddNeed(Type.GetTypeFromHandle(owner), Type.GetTypeFromHandle(need));
+
         static Type FieldType(Type type, string name)
         {
             for (var t = type; t != null; t = t.BaseType)
@@ -85,6 +90,10 @@ namespace GBible
         public static long D2B(double v) => BitConverter.DoubleToInt64Bits(v);
         public static float B2F(long bits) => (float)BitConverter.Int64BitsToDouble(bits);
         public static double B2D(long bits) => BitConverter.Int64BitsToDouble(bits);
+
+        // 값 비교(리스트·딕셔너리 값·Nullable·구조체 성분)도 필드처럼 비트로: NaN은 같고 0과 -0은 다르다(Equals는 -0을 0으로 본다).
+        public static bool Same(float a, float b) => F2B(a) == F2B(b);
+        public static bool Same(double a, double b) => D2B(a) == D2B(b);
 
         public static void WriteBits(MirrorWriter w, long bits, int kind)
         {
@@ -724,11 +733,15 @@ namespace GBible
 
         static T ReadElement<T>(MirrorReader r) => Elem<T>.IsValue ? ValueOps<T>.Read(r) : (T)Mirror.Read(r, typeof(T));
 
+        // 읽기 전에 미리 잡는 칸 수의 한도(넘으면 읽으면서 늘린다). 개수는 남은 바이트 안이지만(MirrorReader.Count) 겹친 컬렉션마다
+        // 남은 바이트만큼 잡으면 작은 받은 메시지가 메모리를 수천 배로 부풀린다 — 읽은 요소만큼만 커지게.
+        const int MaxPrealloc = 1024;
+
         public static List<T> ReadList<T>(MirrorReader r)
         {
             var n = r.Count(1);
             if (n == 0) return null;
-            var list = new List<T>(n - 1);
+            var list = new List<T>(Math.Min(n - 1, MaxPrealloc));
             for (var i = 1; i < n; i++) list.Add(ReadElement<T>(r));
             return list;
         }
@@ -737,6 +750,12 @@ namespace GBible
         {
             var n = r.Count(1);
             if (n == 0) return null;
+            if (n - 1 > MaxPrealloc)
+            {
+                var items = new List<T>(MaxPrealloc);
+                for (var i = 1; i < n; i++) items.Add(ReadElement<T>(r));
+                return items.ToArray();
+            }
             var array = new T[n - 1];
             for (var i = 0; i < array.Length; i++) array[i] = ReadElement<T>(r);
             return array;
@@ -746,7 +765,7 @@ namespace GBible
         {
             var n = r.Count(1);
             if (n == 0) return null;
-            var map = new Dictionary<TKey, TValue>(n - 1);
+            var map = new Dictionary<TKey, TValue>(Math.Min(n - 1, MaxPrealloc));
             for (var i = 1; i < n; i++)
             {
                 var key = ValueOps<TKey>.Read(r);
@@ -788,22 +807,26 @@ namespace GBible
                     case MirrorOp.Layout:
                         r.UVar();
                         var runs = (int)r.UVar();
-                        var old = field.ToArray();
-                        field.Clear();
+                        // 요소를 읽다가 이 리스트를 가진 객체가 다시 채워질 수 있다(뺀 요소가 그 객체를 가리키면 뒤로 기록에 원래 객체째 들어 있다) —
+                        // 그때 필드가 새 리스트로 바뀌어도 이 리스트에 끝까지 짜고 다시 넣는다(요소가 두 리스트로 갈리지 않게).
+                        var list = field;
+                        var old = list.ToArray();
+                        list.Clear();
                         for (var q = 0; q < runs; q++)
                         {
                             if (r.Byte() == 0)
                             {
                                 var start = (int)r.UVar();
                                 var len = (int)r.UVar();
-                                for (var k = 0; k < len; k++) field.Add(old[start + k]);
+                                for (var k = 0; k < len; k++) list.Add(old[start + k]);
                             }
                             else
                             {
                                 var len = (int)r.UVar();
-                                for (var k = 0; k < len; k++) field.Add(ReadElement<T>(r));
+                                for (var k = 0; k < len; k++) list.Add(ReadElement<T>(r));
                             }
                         }
+                        field = list;
                         return;
                 }
                 throw new InvalidOperationException("[MomoiProject] 리스트에 쓸 수 없는 기록입니다: " + op);

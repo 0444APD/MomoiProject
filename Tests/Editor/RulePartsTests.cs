@@ -279,6 +279,24 @@ namespace GBible.Tests
             Assert.AreEqual("legend", pulls.Single(), "89번째에는 거의 확정");
         }
 
+        // 단계가 id 있는 객체의 숫자 필드면 능력치(보정 포함)로 읽는다 — 후보 수에 더할 숫자와 같은 규칙(행운 유물 +N이 확률에도 든다).
+        [Test]
+        public void 밸런스_값_무게의_단계는_보정을_포함한_능력치로_읽는다()
+        {
+            _session.Balance.Define("luckWeight", 0, new Curve { kind = CurveKind.Table, points = { new CurvePoint { x = 0, y = 0 }, new CurvePoint { x = 49, y = 0 }, new CurvePoint { x = 50, y = 1000000 } } });
+            var table = new WeightTableDefinition { Id = "lucky" };
+            table.Entries.Add(new WeightEntry { item = "common", weight = 1 });
+            table.Entries.Add(new WeightEntry { item = "legend", weightBalance = "luckWeight", weightStepKey = "run", weightStepPath = "units[hero].hp" });
+            _session.Tables.Define(table);
+            List<string> pulls = null;
+            Do(g => pulls = g.Roll("lucky", 10));
+            Assert.IsTrue(pulls.All(p => p == "common"), "hero 체력 40 — 50 전에는 무게 0");
+            Do(g => g.AddModifier(Unit("hero"), "hp", ModifierKind.Flat, 10, "relic"));
+            Assert.AreEqual(40, Unit("hero").hp, "필드 자체는 그대로");
+            Do(g => pulls = g.Roll("lucky", 1));
+            Assert.AreEqual("legend", pulls.Single(), "보정 +10으로 단계 50 — 거의 확정");
+        }
+
         [Test]
         public void 패시브는_가진_쪽마다_발동하고_개수를_센다()
         {

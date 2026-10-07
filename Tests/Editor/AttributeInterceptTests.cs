@@ -255,6 +255,64 @@ namespace GBible.Tests
             Assert.AreEqual(-3, GameNumbers.Round(-2.5));
         }
 
+        [Serializable, GameEvent("턴 끝")] public class AiTurnEnded { }
+
+        // 보정을 붙이고 그 능력치를 읽은 뒤 실패하는 행동(이벤트 예약으로 돌면 그 예약이 바꾼 것만 되돌아간다).
+        [Serializable]
+        public sealed class BuffReadThenFail : GameAction
+        {
+            public AiUnit unit;
+            protected override void Run()
+            {
+                Game.AddModifier(unit, nameof(AiUnit.attack), ModifierKind.Flat, 50, "doomed");
+                Game.Attribute(unit, nameof(AiUnit.attack));
+                throw new InvalidOperationException("일부러 실패");
+            }
+        }
+
+        [Test]
+        public void 미리보기_안에서_부분_취소된_보정은_미리보기의_읽기에도_없다()
+        {
+            var hero = Hero;
+            Do(g => g.ScheduleOn<AiTurnEnded>(1, new BuffReadThenFail { unit = hero }));
+            var predicted = Game.Preview(new Edit { run = g => g.Session.Events.Publish(new AiTurnEnded()) }, g => g.Attribute("hero", nameof(AiUnit.attack)));
+            Game.Do(new Edit { run = g => g.Session.Events.Publish(new AiTurnEnded()) });
+            var actual = Game.Attribute("hero", nameof(AiUnit.attack));
+            Assert.AreEqual(100, actual, 1e-9, "실패한 예약이 붙인 보정은 되돌아간다");
+            Assert.AreEqual(actual, predicted, 1e-9, "미리보기도 실제와 같다");
+        }
+
+        [Serializable] public class AiBoss { public string id; public BigNumber power; public string title = ""; public int marked; }
+        [Serializable] public class AiBosses { public List<AiBoss> list = new List<AiBoss>(); }
+
+        [Serializable]
+        public sealed class MarkBoss : Effect<AiBoss>
+        {
+            protected override void Apply(AiBoss target) => target.marked++;
+        }
+
+        [Test]
+        public void 큰_수나_글자_필드도_능력치로_읽을_때_예외_없이_숫자로_본다()
+        {
+            _session.Data.Define("bosses", DataZone.Session, new AiBosses
+            {
+                list = { new AiBoss { id = "b1", power = 5, title = "7" }, new AiBoss { id = "b2", power = new BigNumber(2, 400), title = "x" }, new AiBoss { id = "b3", power = 40 } },
+            }, "보스");
+            // "가장 강한 보스" = 정렬해서 n개(power 큰 것부터 1개). 필드 이름 하나면 능력치로 잰다.
+            var strongest = new AbilityDefinition { Id = "strongest" };
+            strongest.Outcomes.Add(new TargetedOutcome
+            {
+                targets = { new DataListTarget { key = "bosses", path = "list" }, new SortTarget { path = "power", descending = true, count = 1 } },
+                effects = { new MarkBoss() },
+            });
+            _session.Abilities.Define(strongest);
+            Assert.DoesNotThrow(() => Game.Use("strongest", "hero"));
+            Assert.AreEqual(1, Game.Find<AiBoss>("b2").marked, "2e400이 가장 크다");
+            Assert.AreEqual(40, Game.Attribute("b3", "power"), 1e-9, "경로로 읽을 때(ScreenBinding.Number)와 같은 값");
+            Assert.AreEqual(7, Game.Attribute("b1", "title"), 1e-9, "숫자로 읽히는 글자는 그 숫자");
+            Assert.AreEqual(0, Game.Attribute("b2", "title"), 1e-9, "숫자가 아닌 글자는 0(없는 필드와 같다)");
+        }
+
         [Test]
         public void 비용_지불도_가로챌_수_있다()
         {

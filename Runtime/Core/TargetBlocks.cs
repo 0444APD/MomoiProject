@@ -85,7 +85,8 @@ namespace GBible
 
         protected override IEnumerable<object> Select(IEnumerable<object> targets)
         {
-            var list = targets.Where(t => t != null).ToList();
+            // 앞 대상에 같은 개체가 여럿이어도(맞힌 목록의 같은 적) 한 번만 — 서로 다른 n개.
+            var list = targets.Where(t => t != null).Distinct(RefEq.Instance).ToList();
             var random = Game.Random(string.IsNullOrEmpty(stream) ? "target" : stream);
             var take = Math.Min(Math.Max(0, count), list.Count);
             for (var i = 0; i < take; i++)
