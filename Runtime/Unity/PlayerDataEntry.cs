@@ -42,7 +42,7 @@ namespace GBible.Data
                 if (type == typeof(string)) value = text;
                 else if (type == typeof(bool)) value = text == "true" || text == "예" || text == "1";
                 else if (type.IsEnum) value = Enum.Parse(type, text);
-                else if (TypeResolver.IsNumeric(type)) value = Convert.ChangeType(double.Parse(text, CultureInfo.InvariantCulture), type, CultureInfo.InvariantCulture);
+                else if (TypeResolver.IsNumeric(type)) value = GameNumbers.ToType(double.Parse(text, CultureInfo.InvariantCulture), type);
                 else value = DataModel.FromTree(text, type, null, null);
                 return true;
             }

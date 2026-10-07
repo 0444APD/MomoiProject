@@ -11,7 +11,7 @@ namespace GBible.Dialogue
     //  · UI Toolkit(DialogueUI): 글상자, 이름, 선택지, 레터박스, 번쩍임, 검은 화면
     // 상태 효과는 모두 '앞 모습 → 뒤 모습'을 섞는 한 가지 방식으로 그린다(바뀐 값만 움직인다).
     [AddComponentMenu("MomoiProject/다이얼로그 화면")]
-    public sealed class DialogueStage : MonoBehaviour, IDialogueStage
+    public sealed class DialogueStage : MonoBehaviour, IDialogueStage, IDialogueTextRefresh
     {
         public DialogueUI ui;
         [Tooltip("비우면 Camera.main")] public Camera stageCamera;
@@ -28,8 +28,8 @@ namespace GBible.Dialogue
         [Tooltip("강조가 꺼진 스탠딩의 밝기"), Range(0, 1)] public float dimmedBrightness = 0.7f;
         public int backgroundOrder = -100;
         public int standingOrder;
-        [Tooltip("다이얼로그가 브금을 바꿨으면 끝날 때 다이얼로그 전의 브금으로 되돌린다")] public bool restoreMusicOnEnd = true;
-        [Tooltip("다이얼로그가 끝나면 배경·스탠딩을 지우고 카메라를 되돌린다")] public bool clearOnEnd = true;
+        [Tooltip("다이얼로그가 브금을 바꿨으면 끝날 때 다이얼로그 전의 브금(음량·반복 포함)으로 되돌린다")] public bool restoreMusicOnEnd = true;
+        [Tooltip("다이얼로그가 끝나면 배경·스탠딩·이미지·어둡게·레터박스를 지운다(끄면 남긴다). 카메라·목소리·브금·이펙트는 늘 되돌린다")] public bool clearOnEnd = true;
 
         // 캐릭터 ID → 데이터(다이얼로그 재생기가 채운다).
         public Func<string, StandingProfileData> Characters = _ => null;
@@ -55,7 +55,12 @@ namespace GBible.Dialogue
         Vector3 _cameraShake;
         int _visibleTotal;
         AudioClip _musicBefore;
+        float _musicVolumeBefore = 1f;
+        bool _musicLoopBefore = true;
+        bool _musicCaptured;
         bool _musicTouched;
+        // 이 화면이 만든 이펙트(끝날 때 지운다 — 이펙트 부모를 비워 둔 경우에도).
+        readonly List<GameObject> _spawned = new List<GameObject>();
 
         Camera Cam => stageCamera != null ? stageCamera : Camera.main;
 
@@ -63,12 +68,11 @@ namespace GBible.Dialogue
 
         void Capture()
         {
+            CaptureMusic();
             if (_captured) return;
             var cam = Cam;
             if (cam == null) return;
             _captured = true;
-            _musicBefore = GameAudio.CurrentBgm;
-            _musicTouched = false;
             _cameraBase = cam.transform.position;
             _sizeBase = cam.orthographicSize;
             _fovBase = cam.fieldOfView;
@@ -90,6 +94,67 @@ namespace GBible.Dialogue
             }
             _captured = false;
             _cameraShake = Vector3.zero;
+        }
+
+        // 지금 브금의 음량·반복. GameAudio에 읽는 창구가 없어 오디오 오브젝트의 소리 자리(AudioSource)에서 읽는다
+        // (음량 = 소리 자리 음량 ÷ 채널 음량 — 페이드 중이면 대략, 거의 0이면 알 수 없는 것으로 1). 찾지 못하면 1·반복.
+        static (float volume, bool loop) BgmSettings(AudioClip clip)
+        {
+            if (clip == null) return (1f, true);
+            var host = UnityEngine.Object.FindAnyObjectByType<GameAudioHost>(FindObjectsInactive.Include);
+            if (host == null) return (1f, true);
+            AudioSource best = null;
+            foreach (var source in host.GetComponentsInChildren<AudioSource>(true))
+                if (source.clip == clip && (best == null || source.volume > best.volume))
+                    best = source;
+            if (best == null) return (1f, true);
+            var channel = GameAudio.Effective(AudioChannel.Bgm);
+            var volume = channel > 0.0001f ? Mathf.Clamp01(best.volume / channel) : 1f;
+            return (volume < 0.05f ? 1f : volume, best.loop);
+        }
+
+        // 다이얼로그 전의 브금을 기억한다(카메라와 따로 — 카메라가 없는 화면에서도). 다이얼로그가 끝날 때까지 한 번만.
+        void CaptureMusic()
+        {
+            if (_musicCaptured) return;
+            _musicCaptured = true;
+            _musicBefore = GameAudio.CurrentBgm;
+            _musicVolumeBefore = 1f;
+            _musicLoopBefore = true;
+            _musicTouched = false;
+        }
+
+        // 다이얼로그가 처음으로 브금을 바꾸기 직전: 그때 나오던 브금의 음량·반복을 읽어 둔다(게임 브금의 페이드가 끝났을 때에 가깝게).
+        void TouchMusic()
+        {
+            if (_musicTouched) return;
+            _musicTouched = true;
+            if (_musicBefore != null && GameAudio.CurrentBgm == _musicBefore) (_musicVolumeBefore, _musicLoopBefore) = BgmSettings(_musicBefore);
+        }
+
+        // 다이얼로그가 브금을 바꿨으면 다이얼로그 전의 브금(음량·반복 포함)으로.
+        void RestoreMusic()
+        {
+            if (_musicTouched && restoreMusicOnEnd)
+            {
+                if (_musicBefore != null) GameAudio.PlayBgm(_musicBefore, _musicVolumeBefore, -1f, _musicLoopBefore);
+                else GameAudio.StopBgm();
+            }
+            _musicTouched = false;
+            _musicCaptured = false;
+        }
+
+        // 다이얼로그가 만든 것(스탠딩·이펙트)은 멈추지 않는 시간으로 돈다: pauseGame이 Time.timeScale을 0으로 해도 파티클·애니메이터가 움직인다.
+        // (스파인은 SpineStandingView가 스켈레톤의 unscaledTime을 켠다.)
+        static void UseUnscaledTime(GameObject root)
+        {
+            if (root == null) return;
+            foreach (var particle in root.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = particle.main;
+                main.useUnscaledTime = true;
+            }
+            foreach (var animator in root.GetComponentsInChildren<Animator>(true)) animator.updateMode = AnimatorUpdateMode.UnscaledTime;
         }
 
         // 기본 카메라(확대 전)가 보는 화면 크기(월드 단위).
@@ -136,6 +201,8 @@ namespace GBible.Dialogue
         public void ApplyState(StageState state)
         {
             Capture();
+            // 모습을 바로 맞출 때(시작·불러오기·스킵·시간 이동 뒤)는 앞에서 남은 한 번짜리 이펙트를 치운다(진행 중인 것은 실행기가 그 시점으로 다시 만든다).
+            ClearSpawned();
             SetBackground(backgroundBack, state.background, 1f);
             SetBackground(backgroundFront, null, 0f);
             SetDim(state.dim);
@@ -146,7 +213,7 @@ namespace GBible.Dialogue
             _offset = state.cameraOffset;
             if (state.musicSet)
             {
-                _musicTouched = true;
+                TouchMusic();
                 if (state.music != null) GameAudio.PlayBgm(state.music, state.musicVolume, 0f);
                 else GameAudio.StopBgm(0f);
             }
@@ -209,8 +276,10 @@ namespace GBible.Dialogue
             if (character != null && character.standingPrefab != null)
             {
                 var instance = Instantiate(character.standingPrefab, parent);
-                view = instance.GetComponent<StandingView>() ?? instance.AddComponent<SpriteStandingView>();
+                // Unity의 가짜 null(파괴된 컴포넌트)은 ?? 를 지나치므로 TryGetComponent로 본다.
+                if (!instance.TryGetComponent<StandingView>(out view)) view = instance.AddComponent<SpriteStandingView>();
                 instance.transform.localScale = character.standingPrefab.transform.localScale * character.standingScale;
+                UseUnscaledTime(instance);
             }
             else
             {
@@ -323,10 +392,22 @@ namespace GBible.Dialogue
         public void ShowLine(LineNode line, string speakerName, string text)
         {
             _visibleTotal = DialogueRunner.VisibleLength(text);
-            var character = Characters(line.speaker);
             // 목소리: 대사에 목소리가 있으면 재생(이전 목소리는 짧게 사라진다), 없으면 이전 목소리를 멈춘다.
             if (line.voice != null) GameAudio.PlayVoice(line.voice);
             else GameAudio.StopVoice();
+            ui?.ShowLine(LineInfo(line, speakerName, text));
+        }
+
+        // 지금 줄의 글만 새로 그린다(언어가 바뀌었을 때 — 목소리·줄 시작 모션·상태는 그대로).
+        public void RefreshLine(LineNode line, string speakerName, string text)
+        {
+            _visibleTotal = DialogueRunner.VisibleLength(text);
+            ui?.UpdateLine(LineInfo(line, speakerName, text));
+        }
+
+        DialogueLineInfo LineInfo(LineNode line, string speakerName, string text)
+        {
+            var character = Characters(line.speaker);
             var info = new DialogueLineInfo
             {
                 Line = line,
@@ -350,7 +431,7 @@ namespace GBible.Dialogue
                 if (!extras.ContainsKey("location")) extras["location"] = Texts.NameOf(info.Location);
             }
             info.Extras = extras;
-            ui?.ShowLine(info);
+            return info;
         }
 
         // 추가 글: 대사의 같은 키가 캐릭터 것보다 우선. 번역 표에 '<대사 키>.<키>' 또는 '<캐릭터 ID>.<키>'가 있으면 그것을 쓴다.
@@ -373,28 +454,43 @@ namespace GBible.Dialogue
 
         public void ShowChoices(IReadOnlyList<DialogueChoice> choices) => ui?.ShowChoices(choices);
 
+        // 다이얼로그가 끝났다. 다이얼로그가 잡은 것(카메라·목소리·브금·번쩍임·검은 화면·남은 이펙트)은 늘 되돌리고,
+        // 배경·스탠딩·이미지·어둡게·레터박스만 clearOnEnd를 따른다(끄면 화면에 남긴다).
         public void Hide()
         {
             ui?.SetOpen(false);
-            if (!clearOnEnd) return;
-            foreach (var id in _standings.Keys.ToList()) RemoveStanding(id);
-            foreach (var slot in _images.Keys.ToList()) RemoveImage(slot);
-            SetBackground(backgroundBack, null, 0f);
-            SetBackground(backgroundFront, null, 0f);
-            SetDim(0f);
-            ui?.SetLetterbox(0f);
+            GameAudio.StopVoice();
+            RestoreMusic();
             ui?.SetFlash(Color.clear, 0f);
             ui?.SetFade(0f);
-            GameAudio.StopVoice();
-            if (_musicTouched && restoreMusicOnEnd)
+            ClearSpawned();
+            if (clearOnEnd)
             {
-                if (_musicBefore != null) GameAudio.PlayBgm(_musicBefore);
-                else GameAudio.StopBgm();
+                foreach (var id in _standings.Keys.ToList()) RemoveStanding(id);
+                foreach (var slot in _images.Keys.ToList()) RemoveImage(slot);
+                SetBackground(backgroundBack, null, 0f);
+                SetBackground(backgroundFront, null, 0f);
+                SetDim(0f);
+                ui?.SetLetterbox(0f);
             }
-            _musicTouched = false;            if (effectRoot != null)
+            else
+            {
+                // 남긴 스탠딩의 흔들림은 멈춘다(카메라를 놓으면 더 맞추지 않는다).
+                foreach (var standing in _standings.Values) standing.Shake = Vector3.zero;
+                _cameraShake = Vector3.zero;
+                Sync();
+            }
+            Release();
+        }
+
+        void ClearSpawned()
+        {
+            if (effectRoot != null)
                 for (var i = effectRoot.childCount - 1; i >= 0; i--)
                     Destroy(effectRoot.GetChild(i).gameObject);
-            Release();
+            foreach (var spawned in _spawned)
+                if (spawned != null) Destroy(spawned);
+            _spawned.Clear();
         }
 
         // ── 효과 ─────────────────────────────────────────────
@@ -428,6 +524,9 @@ namespace GBible.Dialogue
             if (spawn.prefab == null) return null;
             var parent = effectRoot != null ? effectRoot : transform;
             var instance = Instantiate(spawn.prefab, parent);
+            UseUnscaledTime(instance);
+            _spawned.RemoveAll(s => s == null);
+            _spawned.Add(instance);
             var target = string.IsNullOrEmpty(spawn.character) ? null : context.Character(spawn.character);
             if (target != null && _standings.TryGetValue(target, out var standing) && standing.View != null)
                 instance.transform.position = standing.View.transform.position + Local(0.5f, spawn.screenPosition.y) - Local(0.5f, 0f);
@@ -461,7 +560,7 @@ namespace GBible.Dialogue
                 // 브금은 오디오 채널이 교차 페이드한다(효과의 진행 시간 = 페이드 시간).
                 if (_musicChange)
                 {
-                    stage._musicTouched = true;
+                    stage.TouchMusic();
                     var fade = effect.EffectiveDuration;
                     if (after.music != null) GameAudio.PlayBgm(after.music, after.musicVolume, fade);
                     else GameAudio.StopBgm(fade);
@@ -476,10 +575,18 @@ namespace GBible.Dialogue
                     var from = before.Standing(id);
                     var to = after.Standing(id);
                     if (Same(from, to)) continue;
+                    var existed = stage._standings.TryGetValue(id, out var known) && known.View != null;
                     var view = stage.EnsureStanding(id);
                     if (view == null) continue;
                     if (to != null && (from == null || from.expression != to.expression || from.sprite != to.sprite)) view.View.BeginExpression(to.expression, to.sprite);
                     if (to != null && (from == null || from.frame != to.frame || from.frameMask != to.frameMask)) view.View.SetFrame(to.frame, to.frameMask);
+                    if (to == null && from != null && !existed)
+                    {
+                        // 퇴장 중인 스탠딩을 새로 만든 경우(스킵·시간 이동 뒤 그 시점으로 그릴 때): 떠나기 전 모습으로.
+                        view.View.BeginExpression(from.expression, from.sprite);
+                        view.View.SetExpressionBlend(1f);
+                        if (from.frame != null) view.View.SetFrame(from.frame, from.frameMask);
+                    }
                     _standings.Add((id, from, to, view));
                 }
                 foreach (var slot in before.images.Select(i => i.slot).Union(after.images.Select(i => i.slot)))

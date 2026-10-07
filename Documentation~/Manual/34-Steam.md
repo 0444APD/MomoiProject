@@ -39,8 +39,11 @@
 ### 2-1. 켜고 끄기
 
 - 세션이 시작될 때(`GBibleRuntime.Started`) 한 번 Steam을 켠다. 슬롯을 바꿔 세션이 다시 시작돼도 Steam은 다시 켜지 않고, 도전과제·통계만 새 세션에 다시 잇는다.
-- **Steam으로 다시 시작**(설정, 기본 켬): **출시 빌드**를 Steam 밖에서(exe를 바로) 켜면 `SteamAPI.RestartAppIfNecessary`로 Steam이 게임을 다시 켜고 지금 실행은 끝난다. 에디터·개발 빌드는 하지 않는다(`steam_appid.txt`로 바로 붙는다).
-- Steam에 붙지 못하면(클라이언트가 꺼짐·App ID가 다름) 경고 하나를 남기고 Steam 없이 돈다. 이때 `GameSteam.IsReady`가 거짓이고 모든 호출이 아무것도 하지 않는다 — 게임 코드는 분기하지 않아도 된다.
+- 화면 없는 실행(Dedicated Server 빌드·`-batchmode`로 켠 빌드 — `GBibleRuntime.IsHeadless`)에서는 켜지 않는다. 서버에는 Steam 클라이언트가 없고, 출시 빌드의 '다시 시작'이 서버를 끄지 않게 한다.
+- **Steam으로 다시 시작**(설정, 기본 켬): **출시 빌드**를 Steam 밖에서(exe를 바로) 켜면 `SteamAPI.RestartAppIfNecessary`로 Steam이 게임을 다시 켜고 지금 실행은 끝난다. App ID가 480이면 하지 않는다(Spacewar가 켜지고 이 게임은 꺼지기만 한다 — DB 검증이 경고). 에디터·개발 빌드는 하지 않고 바로 붙는다:
+  - 에디터: 프로젝트 폴더의 `steam_appid.txt`.
+  - 개발 빌드: 빌드에 든 DB › Steam의 App ID를 이 프로세스의 환경 변수 `SteamAppId`·`SteamGameId`로 넣고 붙는다. `steam_appid.txt`를 빌드 폴더에 복사하지 않는다 — 그 파일은 '현재 작업 폴더'에서 찾으므로 바로 가기·다른 폴더에서 켜기·macOS `.app`에서는 못 찾고, 빌드 폴더에 남으면 출시 빌드로 새어 나간다. Steam이 켠 실행(환경 변수가 이미 있음 — 베타 브랜치에 올린 개발 빌드 등)은 그대로 둔다.
+- Steam에 붙지 못하면(클라이언트가 꺼짐·App ID가 다름) 경고 하나를 남기고 Steam 없이 돈다. Steam 라이브러리(`steam_api` 네이티브 파일)가 없거나 플랫폼·버전이 맞지 않아도(`DllNotFoundException` 등) 원인을 적은 경고 하나로 같다 — 게임 시작은 끊기지 않는다. 이때 `GameSteam.IsReady`가 거짓이고 모든 호출이 아무것도 하지 않는다 — 게임 코드는 분기하지 않아도 된다.
 - 매 프레임 `SteamAPI.RunCallbacks`, 끌 때 남은 통계를 올리고 `SteamAPI.Shutdown`. 오브젝트 `[MomoiProject Steam]`(DontDestroyOnLoad)이 돌린다.
 
 ### 2-2. 오버레이·언어
@@ -58,7 +61,7 @@
 ### 2-4. 로그 → Steam 통계
 
 - **로그 → Steam 통계** 표: (로그 · Steam 통계 이름 · 정수(INT)). 로그(15장) 값이 바뀌면 모아 두었다가 **2초마다** `SetStat` + `StoreStats`로 올린다. 켤 때 한 번 전부 올린다.
-- 정수면 반올림한 `int`, 아니면 `float`. Steamworks의 통계 형식(INT/FLOAT)과 맞춘다(틀리면 경고 한 번).
+- 정수면 반올림한 `int`, 아니면 `float`. Steamworks의 통계 형식(INT/FLOAT)과 맞춘다(틀리면 경고 한 번). `int` 범위(±2,147,483,647)를 넘는 값은 끝값으로 자르고 경고 한 번(큰 값은 FLOAT 통계로), 숫자가 아닌 값(NaN)은 올리지 않는다.
 - Steam은 되돌리지 않는다. Undo로 로그 값이 줄면 줄어든 값이 올라간다(Steamworks에서 "증가만"으로 둔 통계는 Steam이 거절한다).
 - 미리보기는 데이터 변경 알림을 보내지 않으므로 올라가지 않는다.
 
@@ -66,15 +69,15 @@
 
 | 칸 | 기본 | 뜻 |
 |---|---|---|
-| `appId` App ID | 480 | Steamworks 앱 ID. 고쳐 저장하면(DB Ctrl+S 포함) 프로젝트 폴더의 `steam_appid.txt`도 같이 고친다(에디터·개발 빌드가 그 앱에 붙음). |
-| `restartThroughSteam` Steam 밖에서 켜면 Steam으로 다시 시작 | 켬 | 출시 빌드에서만(2-1). |
+| `appId` App ID | 480 | Steamworks 앱 ID. 고쳐 저장하면(DB Ctrl+S 포함) 프로젝트 폴더의 `steam_appid.txt`도 같이 고친다(에디터가 그 앱에 붙음). 개발 빌드는 빌드에 든 이 값으로 붙는다(2-1). |
+| `restartThroughSteam` Steam 밖에서 켜면 Steam으로 다시 시작 | 켬 | 출시 빌드에서만, App ID 480이면 하지 않음(2-1). |
 | `pauseOnOverlay` 오버레이가 열리면 일시정지 | 켬 | 2-2. |
 | `languageFromSteam` 처음 실행 언어는 Steam 언어 | 켬 | 2-2. |
 | `achievements` 도전과제를 Steam에 올리기 | 켬 | 2-3. |
 | `achievementNames` 도전과제 이름(ID와 다를 때) | 비어 있음 | 줄마다 도전과제 · Steam 이름(API Name). |
 | `stats` 로그 → Steam 통계 | 비어 있음 | 줄마다 로그 · Steam 통계 이름 · 정수(INT). |
 
-검증: App ID 0, 같은 도전과제를 두 번 적음, 도전과제를 고르지 않은 줄, 로그를 고르지 않은 줄, Steam 통계 이름이 빈 줄, 같은 Steam 통계에 로그 둘 → 오류.
+검증: App ID 0, 같은 도전과제를 두 번 적음, 도전과제를 고르지 않은 줄, 로그를 고르지 않은 줄, Steam 통계 이름이 빈 줄, 같은 Steam 통계에 로그 둘 → 오류. App ID 480인데 '다시 시작'이 켜짐 → 경고(출시 전에 실제 App ID로 — 빌드는 막지 않는다).
 
 모니터 › 명령 탭(개발 빌드): **Steam › Steam 통계·도전과제 모두 지우기** — 시험용으로 이 계정의 이 앱 Steam 통계·도전과제를 모두 지운다(GBible 쪽은 그대로). 다시 달성을 시험할 때 GBible 쪽은 모니터 › 도전과제의 초기화를 쓴다.
 
@@ -151,7 +154,8 @@ GBible의 저장은 `Application.persistentDataPath/MomoiProject/` 아래 파일
 
 | 증상 | 원인과 해결 |
 |---|---|
-| "Steam에 붙지 못해 Steam 없이 시작합니다" | Steam 클라이언트가 꺼져 있거나, `steam_appid.txt`(프로젝트 폴더)의 App ID가 계정이 가진 앱이 아니다. 480은 누구나 쓸 수 있다. |
+| "Steam에 붙지 못해 Steam 없이 시작합니다" | Steam 클라이언트가 꺼져 있거나, App ID(에디터는 프로젝트 폴더의 `steam_appid.txt`, 개발 빌드는 DB › Steam의 App ID)가 계정이 가진 앱이 아니다. 480은 누구나 쓸 수 있다. |
+| "Steam을 켜지 못해 Steam 없이 시작합니다: Steam 라이브러리(steam_api)를…" | Steamworks.NET 패키지의 네이티브 파일(`steam_api64.dll`·`libsteam_api.so`·`steam_api.bundle`)이 빌드에 없거나 플랫폼·CPU·버전이 맞지 않는다. 패키지 버전과 Plugins의 플랫폼 설정을 확인한다. |
 | "DB › Steam 항목이 없어 Steam을 켜지 않습니다" | 선택 기능은 켰는데 DB › Steam에 항목이 없다. 하나 만든다. |
 | 도전과제 달성 경고("달성하지 못했습니다") | Steamworks에 그 API Name이 없거나 아직 게시(Publish)하지 않았다. ID를 맞추거나 표에 적고, Steamworks에서 변경 사항을 게시한다. |
 | 통계 경고("올리지 못했습니다") | 통계 이름이 없거나 형식(INT/FLOAT)이 '정수' 칸과 다르다. |

@@ -62,6 +62,7 @@
 - 알림은 한 행동에도 여러 번 온다(중간 Sync·실패한 행동의 되돌림·Undo). 다시 그리기는 표시만 해 두었다가 프레임 끝에 모아 한 번 그린다(23장 4절). 행동이 실행 중이면 다음 프레임으로 미룬다.
 - **연출을 기다린다(기본).** 연출이 남아 있으면 그 연출이 다 끝난 뒤의 프레임 끝까지 미룬다. 기다리지 않을 화면(골드·에너지처럼 늘 지금 값이어야 하는 것)은 `Redraw(draw, waitForPresentation: false, 키…)`.
 - **처음 한 번은 기다리지 않는다.** 연출 중이어도 등록한 프레임 끝에 지금 값으로 그린다(새로 연 화면·씬 전환 뒤의 새 씬은 그 전 모습이 없다). 기다리기는 그 뒤의 다시 그리기부터다. 씬 흐름(2-6)은 처음 열기도 연출을 기다린다.
+- **씬 흐름은 맨 뒤에 돈다.** 프레임 끝에 다른 다시 그리기(ViewList·데이터 연결·화면)를 모두 돈 뒤, 연출이 남았는지 **다시 보고** 씬 흐름을 본다. 그래서 같은 프레임에 목록이 넣은 사라지는 연출(`OnRemove` — 마지막 적의 죽는 모습)이 있으면 그것이 끝난 뒤에 씬을 연다(먼저 열면 죽는 모습을 틀 오브젝트가 씬과 함께 없어진다).
 - **세션이 바뀌면**(슬롯 바꾸기·다시 시작, 31장) 새 세션에 다시 연결하고 모두 다시 그린다.
 - 그리는 함수가 예외를 내면 콘솔에 찍히고 다른 화면은 계속 그린다.
 - `Dispose`하면 그만 그린다(`OnDisable`에서).
@@ -72,7 +73,7 @@
 
 | 넣는 것 | 끝나는 때 |
 |---|---|
-| 코루틴 `Present(IEnumerator)` | 코루틴이 끝날 때. 안에서 `yield return` 한 코루틴도 기다린다 |
+| 코루틴 `Present(IEnumerator)` | 코루틴이 끝날 때. 안에서 `yield return` 한 코루틴도 기다린다. 한 걸음(`yield` 하나)이 실제 30초(일시정지 중은 세지 않음) 넘게 끝나지 않으면 콘솔에 경고하고 다음으로 넘어간다(아래 '진행이 멈춘 연출') |
 | 완료 콜백 `Present(done => …)` | 연출 코드가 `done()`을 부를 때(트윈 라이브러리의 완료 콜백 등). 제한 시간(기본 실제 30초) 안에 `done()`이 오지 않으면 콘솔에 경고하고 다음으로 넘어간다 |
 | 쉬기 `Present(초)` | 그 시간이 지날 때(속도 반영) |
 
@@ -80,8 +81,9 @@
 - 대기열이 비면(마지막 연출이 끝난 순간) `Presented` 이벤트를 쏜다.
 - **속도**: `PresentationSpeed`(기본 1, 2 = 두 배). 연출 코드는 시간을 `GameView.DeltaTime`(= `Time.deltaTime` × 속도, 건너뛰기 중이면 ×10)이나 `GameView.Wait(초)`로 잰다. 그래야 속도·건너뛰기가 먹는다. `WaitForSeconds`·`Time.deltaTime`으로 잰 연출은 속도를 따르지 않는다.
 - **건너뛰기**: `SkipPresentation()`은 남은 연출을 ×10으로 돌린다. 대기열이 비면 원래 속도로 돌아온다. 연출이 없을 때 부르면 아무 일도 없다.
-- **버리기**: `ClearPresentation()`은 남은 연출을 버리고 재생 중인 것은 그 자리에서 멈춘다(씬을 직접 떠날 때). `Presented`도 쏜다.
-- **연출 하나가 예외를 내면** 콘솔에 찍히고 그 연출만 끝난다. 대기열은 계속 돈다(안쪽 코루틴의 예외도 같다).
+- **버리기**: `ClearPresentation()`은 남은 연출을 버리고 재생 중인 것은 그 자리에서 멈춘다(씬을 직접 떠날 때). 안쪽 코루틴(`yield return 다른연출()`)까지 다음 `yield`에서 멈추고, 멈춘 코루틴의 `finally`(`using`)는 돈다 — 만든 오브젝트(피해 숫자)를 꼭 치워야 하면 `try { … } finally { Destroy(…); }`. `Presented`도 쏜다. 단 **씬 흐름이 씬을 여는 중이면 그것은 끝까지 연다**(씬이 바뀌다 말거나 전환 연출의 페이드가 어두운 채 남지 않게, 2-6). 그동안은 `Busy`이고, 다 열면 대기열이 비어 `Presented`가 온다.
+- **연출 하나가 예외를 내면** 콘솔에 찍히고 그 연출만 끝난다. 대기열은 계속 돈다. 안쪽 코루틴(`yield return 다른연출()`)이 예외를 내면 그 안쪽만 끝나고 바깥 연출은 다음 줄부터 이어 간다.
+- **진행이 멈춘 연출**: 연출의 한 걸음(`yield` 하나)이 실제 30초(일시정지 중은 세지 않음) 넘게 끝나지 않으면 경고("[MomoiProject] 연출이 30초 동안 나아가지 않아 넘어갑니다(…)")하고 그 연출을 버린 뒤 다음으로 넘어간다. 흔한 원인은 `yield return x.StartCoroutine(…)`: 다른 오브젝트에서 돌린 코루틴은 그 오브젝트가 없어지거나 꺼지거나 그 코루틴이 예외로 멈추면 Unity가 기다리던 연출을 다시 깨우지 않는다. 안쪽 연출은 `yield return Inner()`처럼 코루틴을 직접 넘긴다(그래야 예외가 나도 바로 이어 간다). `yield return null`로 매 프레임 나아가는 연출은 길어도 넘기지 않는다.
 - 연출은 `[MomoiProject]` 오브젝트가 돌린다(씬이 바뀌어도 계속 돈다). 일시정지(`Time.timeScale` 0) 중에는 `DeltaTime`이 0이라 시간을 재는 연출이 멈춘다.
 - 행동은 연출을 기다리지 않는다. 연출이 도는 동안에도 `Game.Do`는 그대로 실행된다(입력을 막는 것은 화면의 일).
 
@@ -114,13 +116,13 @@
 
 - 다시 그리기 위에서 돈다(보는 키 · 연출 기다리기 규칙이 같다).
 - 그릴 때마다 목록을 처음부터 훑어 항목마다:
-  1. 항목의 **열쇠**를 정한다: 항목이 글자면 그 글자, 아니면 `id` 필드. 같은 열쇠가 두 번째로 나오면 `"id#2"`, 세 번째는 `"id#3"`.
+  1. 항목의 **열쇠**를 정한다: 항목이 글자면 그 글자, `id`가 있는 객체면 `id` 필드. `id`가 없는 항목(정수 목록·`id` 없는 클래스)은 **자리 번호**(`"$0"`, `"$1"` …)다 — 순서가 바뀌면 다른 항목으로 다시 그려지고, 화면 오브젝트로 등록하지 않는다(`Find`로 찾을 수 없다). 같은 열쇠가 두 번째로 나오면 `"id#2"`, 세 번째는 `"id#3"`.
   2. 그 열쇠의 오브젝트가 없으면 프리팹을 부모 아래에 만들고, 첫 번째 것은 `GameView.Register(id)`로 등록하고, `OnCreate(view, item)`을 부른다.
   3. 목록 순서대로 자리(sibling 순서)를 맞추고 `bind(view, item)`으로 그린다(매번).
-- 목록에 없는 열쇠의 오브젝트는 등록을 지운 뒤 없앤다. `OnRemove`가 있으면 바로 없애지 않고 **연출 대기열에 넣어** `OnRemove(view, done)`을 부르고, `done()` 뒤에 없앤다.
-- `bind`가 예외를 내면 콘솔에 찍히고 다른 항목은 계속 그린다.
+- 목록에 없는 열쇠의 오브젝트는 등록을 지운 뒤 없앤다. `OnRemove`가 있으면 바로 없애지 않고 **연출 대기열에 넣어** `OnRemove(view, done)`을 부르고, `done()` 뒤에 없앤다. 차례가 왔을 때 목록이 이미 정리됐거나(`Dispose` — 씬을 떠남) 오브젝트가 없어졌으면 `OnRemove` 없이 바로 없애고 넘어간다(없어진 오브젝트의 연출은 `done()`을 부르지 못해 대기열이 30초 멈춘다). 연출 대기열을 버리면(`ClearPresentation`) 차례를 기다리던 사라짐은 그 자리에서 없앤다(도는 중인 `OnRemove`는 그 연출의 `done()`에).
+- `OnCreate`·`bind`가 예외를 내면 콘솔에 찍히고 그 오브젝트·다른 항목은 계속 그린다.
 - 목록 함수가 `null`을 돌려주면 빈 목록으로 본다(전투 밖이면 `battle?.enemies`가 `null` → 적 오브젝트를 모두 없앤다).
-- `Dispose()`는 다시 그리기를 끊고 만든 오브젝트를 모두 없앤다(`OnRemove` 없이). `OnDestroy`에서 부른다.
+- `Dispose()`는 다시 그리기를 끊고 만든 오브젝트를 모두 없앤다(`OnRemove` 없이). 사라지는 중인 오브젝트도 없애고, 도는 중인 `OnRemove` 연출은 `done()`을 기다리지 않는다(대기열이 넘어간다). `OnDestroy`에서 부른다.
 
 ### 2-5. 데이터 연결
 
@@ -147,8 +149,9 @@
   - 새 판·판 끝으로 값이 비면 '빈 값일 때 씬'(보통 타이틀)이 열린다.
   - Undo로 값이 돌아가면 씬도 돌아간다.
   - 한 행동 안에서 여러 번 바꿔도 프레임 끝의 마지막 값 하나만 본다.
-- **연출이 끝난 뒤에 연다**(다시 그리기의 기다리기). 여는 동안은 연출 대기열의 한 칸이라 `Busy`가 참이다(입력이 막힌다). 연 뒤 `GameScenes.Loaded(씬 이름)`를 쏜다.
-- 전환 연출(`GameScenes.Transition`)을 넣으면 씬 열기를 그 코루틴으로 감싼다(5-7).
+- **연출이 끝난 뒤에 연다**(다시 그리기의 기다리기). 같은 프레임에 목록이 넣은 사라지는 연출(`OnRemove`)까지 기다린다(2-1). 여는 동안은 연출 대기열의 한 칸이라 `Busy`가 참이다(입력이 막힌다). `ClearPresentation()`도 여는 중인 씬은 멈추지 않는다(2-2). 연 뒤 `GameScenes.Loaded(씬 이름)`를 쏜다 — **열었을 때만**이다. 열지 못하면(씬 열기 실패) 쏘지 않고 타임라인에 경고 "씬 '…'을(를) 열지 못했습니다(지금 씬 '…')."를 남긴다.
+- 전환 연출(`GameScenes.Transition`)을 넣으면 씬 열기를 그 코루틴으로 감싼다(5-7). 전환 연출이 씬 열기(`load`)를 돌리지 않고 끝나면(연출 안의 예외로 멈춤·`yield return load`를 빠뜨림) 경고 "전환 연출(GameScenes.Transition)이 씬 '…'을(를) 열지 않고 끝나 전환 없이 엽니다(…)."를 남기고 전환 없이 연다.
+- 전환 연출이 30초 넘게 나아가지 않아 대기열이 넘기면(2-2) 대기열이 빈 뒤 판 값의 씬을 다시 본다(아직 열리지 않았으면 다시 연다).
 - 슬롯을 바꾸면(31장) 런타임이 다시 따라가게 한다.
 
 ### 2-7. 월드 상태
@@ -245,7 +248,7 @@ GameView.Play(ShowHit(e));                                // 대기열 밖: 바�
 
 | 멤버 | 뜻 |
 |---|---|
-| `void Present(IEnumerator routine)` | 코루틴 하나를 넣는다(`null`이면 무시). 부를 때마다 새 코루틴(`Show(e)`)을 넘긴다 |
+| `void Present(IEnumerator routine)` | 코루틴 하나를 넣는다(`null`이면 무시). 부를 때마다 새 코루틴(`Show(e)`)을 넘긴다. 한 걸음이 실제 30초 넘게 끝나지 않으면 경고하고 넘어간다(2-2) |
 | `void Present(Action<Action> step, float timeout = 30f)` | 완료 콜백 연출. `step(done)`을 부르고 `done()`까지 기다린다. `timeout`(실제 시간 초) 안에 오지 않으면 경고("[MomoiProject] 연출이 30초 안에 끝나지 않아 넘어갑니다(done()을 부르지 않았거나 오브젝트가 먼저 없어졌는지 확인).")하고 넘어간다. 0이면 끝없이 기다린다 |
 | `void Present(float seconds)` | 쉬기(속도 반영) |
 | `void Play(IEnumerator routine)` | 대기열 밖에서 바로 튼다(`null`이면 무시). `IsPresenting`·`Busy`·다시 그리기와 상관없다(2-2). 게임이 시작되기 전이면 경고하고 틀지 않는다 |
@@ -257,7 +260,7 @@ GameView.Play(ShowHit(e));                                // 대기열 밖: 바�
 | `float DeltaTime` | 이번 프레임의 연출 시간(속도·건너뛰기 반영) |
 | `IEnumerator Wait(float seconds)` | 연출 안에서 쓰는 기다리기(`yield return GameView.Wait(0.5f)`). `WaitForSeconds` 대신 |
 | `void SkipPresentation()` | 남은 연출을 ×10으로. 대기열이 비면 원래대로 |
-| `void ClearPresentation()` | 남은 연출을 버린다. 재생 중인 것은 멈춘다(`Play`로 튼 것은 그대로 돈다) |
+| `void ClearPresentation()` | 남은 연출을 버린다. 재생 중인 것은 안쪽 코루틴까지 다음 `yield`에서 멈춘다(`finally`는 돈다). ViewList·ElementList의 차례를 기다리던 사라짐(`OnRemove`)은 바로 없앤다. 씬 흐름이 여는 중인 씬은 끝까지 연다. `Play`로 튼 것은 그대로 돈다 |
 
 ### 4-3. `GameView.Register` · `Find` — 화면 오브젝트
 
@@ -289,12 +292,12 @@ void OnDestroy() => _enemies.Dispose();
 | `ViewList(TView prefab, Transform parent, Func<IEnumerable<TItem>> items, Action<TView, TItem> bind, params string[] keys)` | 만든다(연출을 기다린다). `prefab`이 `null`이면 `ArgumentNullException` |
 | `ViewList(…, bool waitForPresentation, params string[] keys)` | 기다릴지 정한다 |
 | `Action<TView, TItem> OnCreate` | 새로 만든 직후(처음 `bind` 전). 클릭 연결 등 |
-| `Action<TView, Action> OnRemove` | 사라질 때 연출. 연출 대기열에 들어가고 `done` 뒤에 없앤다. 비우면 바로 없앤다 |
+| `Action<TView, Action> OnRemove` | 사라질 때 연출. 연출 대기열에 들어가고 `done` 뒤에 없앤다. 비우면 바로 없앤다. 차례가 왔을 때 목록이 정리됐거나 오브젝트가 없어졌으면 부르지 않는다 · 대기열을 버리면(`ClearPresentation`) 차례를 기다리던 것은 바로 없앤다 |
 | `IReadOnlyDictionary<string, TView> Views` | 지금 오브젝트들(열쇠 → 오브젝트) |
-| `TView ViewOf(string id)` · `ViewOf(TItem item)` | 그 항목의 오브젝트(없으면 `null`) |
-| `void Dispose()` | 그만 그리고 만든 오브젝트를 모두 없앤다 |
+| `TView ViewOf(string id)` · `ViewOf(TItem item)` | 그 항목의 오브젝트(없으면 `null`. `id`가 없는 항목은 `ViewOf("$0")`처럼 자리 번호로) |
+| `void Dispose()` | 그만 그리고 만든 오브젝트를 모두 없앤다(사라지는 중인 것도 — 도는 `OnRemove`의 `done`을 기다리지 않는다) |
 
-- `TView`는 프리팹의 컴포넌트 형식이다(`where TView : Component`). `TItem`은 `id`가 있는 클래스 또는 `string`(글자 자체가 id). `id`가 없는 클래스면 그릴 때 "…에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다." 예외가 콘솔에 찍힌다.
+- `TView`는 프리팹의 컴포넌트 형식이다(`where TView : Component`). `TItem`은 `id`가 있는 클래스 또는 `string`(글자 자체가 id). `id`가 없는 항목(`int` 목록·`id` 없는 클래스)은 자리 번호(`"$0"` …)로 잇는다 — 예외 없이 그려지지만 순서가 바뀌면 다른 항목으로 다시 그려지고 `GameView.Find`로 찾을 수 없다. 항목마다 오브젝트를 따로 두려면 `public string id;`를 더한다.
 
 ### 4-5. `DataBinding` — 컴포넌트 '데이터 연결'
 
@@ -320,7 +323,7 @@ GameScenes.Loaded += scene => GameAudio.PlayBgm(MusicOf(scene));
 | `void Follow(string key, string path, string emptyScene = null)` | 따라가기 시작(앞의 것은 그만둔다) |
 | `void Stop()` | 그만 따라간다 |
 | `Func<IEnumerator, IEnumerator> Transition` | 씬 열기(`load`)를 감싸는 코루틴. 안에서 `yield return load`. 비우면 바로 연다 |
-| `event Action<string> Loaded` | 씬을 연 뒤(씬 이름) |
+| `event Action<string> Loaded` | 씬을 연 뒤(씬 이름, 전환 연출까지 끝난 뒤). 열지 못하면 쏘지 않는다 |
 | `string Current` | 지금 씬 이름(`SceneManager.GetActiveScene().name`) |
 
 - `Transition`·`Loaded`는 매 플레이 시작 때 비워진다. 플레이마다 다시 넣는다(5-7).
@@ -779,11 +782,14 @@ public class RealtimeHits : MonoBehaviour
 | 골드·에너지가 연출이 끝나야 바뀜 | 기본은 연출을 기다린다. 늘 지금 값이어야 하는 표시는 `waitForPresentation: false`(데이터 연결은 칸을 끈다). |
 | 실패한 카드의 피해 숫자가 뜸 | 연출을 `Events.Subscribe`(바로 받는 쪽)로 받았다. `SubscribeAfterAction`으로 받는다. |
 | 마우스를 올려 예상 피해를 볼 때 피해 숫자가 뜸 | 같은 원인. 미리보기 실행(33장)에서도 바로 받는 쪽은 불린다. |
-| 연출이 한참 멈췄다가 "연출이 30초 안에 끝나지 않아 넘어갑니다" 경고 | 완료 콜백 연출이 `done()`을 부르지 않았다(오브젝트가 먼저 없어졌거나 예외). 끝나는 길마다 `done()`을 부르거나 코루틴으로 넣는다. 원래 긴 연출이면 `Present(step, timeout: 60f)`처럼 늘린다(0 = 끝없이 기다림). 씬을 직접 떠날 때는 `ClearPresentation()`. |
+| 연출이 한참 멈췄다가 "연출이 30초 안에 끝나지 않아 넘어갑니다" 경고 | 완료 콜백 연출이 `done()`을 부르지 않았다(오브젝트가 먼저 없어졌거나 예외). 끝나는 길마다 `done()`을 부르거나 코루틴으로 넣는다. 원래 긴 연출이면 `Present(step, timeout: 60f)`처럼 늘린다(0 = 끝없이 기다림). 씬을 직접 떠날 때는 `ClearPresentation()`. ViewList·ElementList의 `OnRemove`는 목록을 `Dispose`하면(씬을 떠남·화면을 닫음) 기다리지 않는다 — 정리를 빠뜨리지 않았는지 본다. |
+| 연출이 한참 멈췄다가 "연출이 30초 동안 나아가지 않아 넘어갑니다" 경고 | 코루틴 연출의 `yield` 하나가 30초 넘게 끝나지 않았다. 대개 `yield return x.StartCoroutine(…)`으로 기다린 코루틴이 멈췄다(x가 없어지거나 꺼졌거나 예외 — Unity는 기다리던 쪽을 깨우지 않는다). 안쪽 연출은 `yield return Inner()`로 직접 넘긴다. 원래 긴 기다림(`WaitForSecondsRealtime(40)`)이면 `GameView.Wait`처럼 매 프레임 `yield return null`로 나누거나 완료 콜백 연출(`timeout`)로 넣는다(2-2). |
+| `ClearPresentation()` 뒤에 피해 숫자가 화면에 멈춘 채 남음 | 버리면 재생 중인 연출은 그 자리에서 멈춰 뒤의 `Destroy`가 돌지 않는다. 치우는 줄은 `try { … } finally { Destroy(…); }`에 둔다(멈출 때 `finally`는 돈다, 2-2). |
+| 경고 "전환 연출(GameScenes.Transition)이 씬 '…'을(를) 열지 않고 끝나 전환 없이 엽니다" | 전환 연출이 `load`를 돌리기 전에 예외로 멈췄거나 `yield return load`를 빠뜨렸다. 씬은 전환 없이 열린다. 콘솔의 예외를 보고 고친다(5-7). |
 | 속도·건너뛰기가 먹지 않음 | 시간을 `WaitForSeconds`·`Time.deltaTime`으로 쟀다. `GameView.Wait`·`GameView.DeltaTime`(5-6). |
 | 일시정지하니 연출이 멈춤 | `DeltaTime`은 게임 시간을 따른다. 일시정지와 상관없어야 하는 것(메뉴 페이드)은 `Time.unscaledDeltaTime`. |
 | 버튼을 누를 때마다 클릭이 여러 번 | `bind`에서 `AddListener`했다(그릴 때마다 불린다). `OnCreate`에서 한다(5-2). |
-| ViewList가 "…에 string id 필드가 없어 …" | 항목 클래스에 `public string id;`가 없다. 글자 목록이면 `ViewList<string, …>`. |
+| ViewList 항목의 순서가 바뀌면 오브젝트가 다른 항목의 그림으로 바뀜(연출이 엉뚱한 오브젝트에서 돎) · `GameView.Find`로 안 찾힘 | 항목에 `id`가 없어 자리 번호(`"$0"` …)로 이었다(4-4). 항목 클래스에 `public string id;`를 더한다. 글자 목록이면 `ViewList<string, …>`. |
 | 같은 항목 두 개 중 하나만 `GameView.Find`로 찾힘 | 같은 id의 두 번째부터는 `"id#2"`로 만들어지고 등록은 첫 번째만이다. `ViewList.Views["id#2"]`로 찾는다. |
 | 씬을 나갔다 왔더니 ViewList 오브젝트가 남음·사라지지 않음 | `Dispose`를 부르지 않았다. `OnDestroy`에서 `Dispose`. |
 | 데이터 연결이 아무것도 안 보임 | `key`가 없는 플레이어 데이터이거나 `path`의 중간이 비었다(전투 밖의 `battle.energy`). 이벤트의 Dynamic 속성을 골랐는지도 본다(Static을 고르면 인스펙터에 적은 값이 들어간다). |

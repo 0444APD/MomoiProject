@@ -322,7 +322,7 @@ static void Started(GameSession session)
 - [ ] 게임이 채우는 칸은 `[Hide]`, 조건부 칸은 `[ShowIf]`로 정리했다.
 - [ ] 다른 DB 항목을 가리키는 칸(원본·판 데이터 모두)에 `[DataRef]`가 있다.
 - [ ] 모든 Block에 `[BlockInfo]` 이름·분류·설명이 있고, 칸이 있는 Block에는 `Sentence`가 있다.
-- [ ] 비면 안 되는 칸에 필수, 그림 칸에 스프라이트 규격 그룹을 정했다.
+- [ ] 비면 안 되는 칸에 필수, 그림 칸에 스프라이트 틀을 정했다.
 - [ ] DB 종류·Block에 필요한 `ValidateData`·`Validate`를 넣었다.
 - [ ] 코드에는 ID 문자열 대신 `GameIds`를 쓴다.
 - [ ] DB 사이드바가 "검증 통과"다.
@@ -803,7 +803,7 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | 내 코드 범위 | 21 | 12 §3-10 |
 | 프리팹 탭 | 21 | 12 §3-10 |
 | 필드 규칙(필수) | 27 | 05 §6 |
-| 스프라이트 규격·`SpriteSpecs.Get` | 27 | 05 §6 |
+| 스프라이트 틀·`SpriteSpecs.Get` | 27 | 05 §6 |
 
 ### 모니터·디버깅
 

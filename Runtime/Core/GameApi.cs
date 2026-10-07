@@ -172,6 +172,50 @@ namespace GBible
             return null;
         }
 
+        // id 여럿을 한꺼번에 찾는다: id → 객체. Find(id)와 같은 규칙·같은 차례라 같은 id가 여럿이면 Find가 돌려줄 첫 객체다. 없는 id는 빠진다.
+        // 데이터를 한 번만 훑고 다 찾으면 멈춘다 — id마다 Find하면 데이터 전체를 id 수만큼 훑는다(가진 쪽 여럿·사라진 개체 정리).
+        internal Dictionary<string, object> FindAll(ICollection<string> ids)
+        {
+            var found = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (ids == null || ids.Count == 0) return found;
+            var wanted = new HashSet<string>(ids.Where(id => !string.IsNullOrEmpty(id)), StringComparer.Ordinal);
+            // 훑을 때 쓰는 목록은 다시 쓴다(행동마다 부른다). 안에서 다시 불리면 새로 만든다.
+            var all = _scan ?? new List<object>();
+            _scan = null;
+            try
+            {
+                foreach (var key in DataKeys())
+                {
+                    if (found.Count == wanted.Count) break;
+                    all.Clear();
+                    var mirror = Session.Data.SyncedMirror(key);
+                    if (mirror != null) Mirror.Collect(mirror, all);
+                    else Collect(Session.Data.Get(key), all, 0);
+                    foreach (var item in all)
+                    {
+                        var id = mirror != null ? MirrorIdOf(item) : IdMember(item.GetType()) != null ? IdOf(item) : null;
+                        if (id != null && wanted.Contains(id) && !found.ContainsKey(id)) found.Add(id, item);
+                    }
+                }
+            }
+            finally
+            {
+                all.Clear();
+                _scan = all;
+            }
+            return found;
+        }
+
+        List<object> _scan;
+
+        // Mirror 사본 나무에서 Find가 읽는 id(Mirror.FindById와 같다): string id 필드(id·Id), 없으면 생성 코드로 id·Id를 읽는다.
+        static string MirrorIdOf(object item)
+        {
+            var type = Mirror.Find(item.GetType());
+            var field = type?.FindIdField() ?? -1;
+            return field >= 0 ? FieldAccess.Read(item, type.Names[field]) as string : (FieldAccess.Read(item, "id") ?? FieldAccess.Read(item, "Id")) as string;
+        }
+
         // 단순 값(숫자·글자 등) 플레이어 데이터.
         public T Get<T>(string key) => Session.Data.Get<T>(key);
         public void Set(string key, object value) => Session.Data.Set(key, value);
@@ -242,9 +286,9 @@ namespace GBible
         //   var energy = Game.Balance(GameIds.Balance.StartEnergy);     var hp = Game.Balance(GameIds.Balance.EnemyHp, floor);
         public double Balance(string id) => Session.Balance.Get(id);
         public double Balance(string id, double x) => Session.Balance.Get(id, x);
-        // 단계 from부터 count개의 합("10개 사기": 가격 곡선, 단계 = 산 개수).
+        // 단계 from부터 count개의 합("10개 사기": 가격 곡선, 단계 = 산 개수). 값이 0 이하인 단계(값을 매길 수 없는 가격)에서 멈춘다.
         public double BalanceSum(string id, double from, int count) => Session.Balance.Sum(id, from, count);
-        // budget으로 단계 from부터 몇 개를 살 수 있나("살 수 있는 만큼").
+        // budget으로 단계 from부터 몇 개를 살 수 있나("살 수 있는 만큼"). 값이 0 이하인 단계 앞까지만 센다.
         public int BalanceCount(string id, double from, double budget) => Session.Balance.MaxCount(id, from, budget);
 
         // 가중치 표(DB › 가중치 표)에서 뽑는다(행동 안에서). 하나: 항목 ID(꽝이면 null). 여럿: unique면 서로 다른 것.
@@ -353,6 +397,7 @@ namespace GBible
 
         bool TryPayCore(string key, string path, double amount, string forId, object user, out CostIntent cost, out double have)
         {
+            RequireSingle(key, path);
             cost = Intercept(new CostIntent
             {
                 key = key, path = path ?? "", amount = amount, forId = forId ?? "",
@@ -369,15 +414,30 @@ namespace GBible
         // 낼 수 있는지(지금 값 기준, 가로채기 전 — 화면 미리보기용). 실제 지불은 Pay가 가로채기까지 거쳐 다시 판정한다.
         public bool CanPay(string key, string path, double amount) => ReadNumber(key, path ?? "") >= amount;
 
+        // 경로에 []가 있나(요소마다 펼치는 경로 — 값이 여럿). 비용처럼 숫자 하나에만 쓰는 곳은 받지 않는다(목록의 한 요소는 [id]로 고른다).
+        internal static bool IsManyPath(string path) => !string.IsNullOrEmpty(path) && path.IndexOf(FieldPaths.Each, StringComparison.Ordinal) >= 0;
+
+        // 비용을 낼 곳은 숫자 하나다: 요소마다 펼치는 경로면 첫 요소로 판정하고 모든 요소에 그 값을 쓰게 된다(프로그래머 실수로 막는다).
+        static void RequireSingle(string key, string path)
+        {
+            if (IsManyPath(path))
+                throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'에 []가 있어 낼 곳이 하나로 정해지지 않습니다. 숫자 필드 하나를 가리키세요(목록의 한 요소는 [id]로).");
+        }
+
         double ReadNumber(string key, string path)
         {
             if (string.IsNullOrEmpty(key) || !Session.Data.IsDefined(key)) throw new InvalidOperationException($"[MomoiProject] 비용: 없는 플레이어 데이터 '{key}'입니다.");
+            RequireSingle(key, path);
             if (string.IsNullOrEmpty(path)) return Session.Data.GetNumber(key);
             var type = FieldPaths.TypeAt(Session.Data.TypeOf(key), path, out var error);
             if (type == null) throw new InvalidOperationException($"[MomoiProject] 비용: '{key}'에 필드 '{path}'가 없습니다({error}).");
             var underlying = Nullable.GetUnderlyingType(type) ?? type;
             if (!(underlying.IsPrimitive && underlying != typeof(bool) && underlying != typeof(char)) && underlying != typeof(decimal))
                 throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'는 숫자 필드가 아닙니다({type.Name}).");
+            // 낼 곳의 부모가 구조체면 읽은 것은 사본이라 빼도 실제 값이 바뀌지 않는다(공짜로 사게 된다) — 클래스로 바꾸게 막는다(맨 위 값 자체가 구조체인 것은 된다).
+            FieldPaths.SplitLast(path, out var parentPath, out _);
+            if (parentPath.Length > 0 && FieldPaths.TypeAt(Session.Data.TypeOf(key), parentPath, out _) is Type parentType && parentType.IsValueType)
+                throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'의 부모({parentType.Name})가 구조체라 낸 값을 쓸 수 없습니다. [Serializable] 클래스로 바꾸세요.");
             var value = FieldPaths.Resolve(Session.Data.Get(key), path).FirstOrDefault();
             return value == null ? 0 : Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
         }
@@ -393,11 +453,7 @@ namespace GBible
             Session.Data.Modify<object>(key, root =>
             {
                 foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
-                    FieldPaths.Assign(parent, member, (_, type) =>
-                    {
-                        var underlying = Nullable.GetUnderlyingType(type) ?? type;
-                        return Convert.ChangeType(value, underlying, System.Globalization.CultureInfo.InvariantCulture);
-                    });
+                    FieldPaths.Assign(parent, member, (_, type) => GameNumbers.ToType(value, type));
             });
         }
 
@@ -406,8 +462,11 @@ namespace GBible
         static string Format(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
         // 새 개체의 id(소환 등). 접두어별 번호를 플레이어 데이터 저장소에 두므로 Undo·저장·멀티플레이에서도 같다.
+        // 접두어가 숫자로 끝나면 번호와의 사이에 '_'를 넣는다("u1" → "u1_1"): 그대로 붙이면 "u"의 11번과 "u1"의 1번이 둘 다 "u11"이 된다.
+        // 숫자로 끝나지 않는 접두어는 그대로 붙는다("card" → "card1"). 번호는 '_'를 넣은 접두어마다 하나다("u1"과 "u1_"은 같은 번호를 이어 쓴다).
         public string NewId(string prefix)
         {
+            prefix = IdPrefix(prefix);
             var key = "$id." + prefix;
             if (!Session.Data.IsDefined(key)) Session.Data.Define(key, DataZone.Meta, 0.0, $"{prefix} 번호");
             var next = Session.Data.GetNumber(key) + 1;
@@ -434,15 +493,33 @@ namespace GBible
 
         long DayOf(DateTime utc, int resetHour)
         {
-            var zone = Session.Options.TimeZone ?? TimeZoneInfo.Local;
-            var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
+            var local = TimeZoneInfo.ConvertTimeFromUtc(ActionDispatcher.AsUtc(utc), DayZone());
             var shifted = local.AddHours(-resetHour);
             return (long)Math.Floor((shifted - new DateTime(1970, 1, 1)).TotalDays);
         }
 
-        // 새 id 여럿을 한 번에(적 수십 마리 소환 — 번호를 한 번만 쓴다).
+        bool _warnedDayZone;
+
+        // 날짜 번호를 셀 시간대: SessionOptions.TimeZone, 비우면 싱글은 이 컴퓨터의 시간대.
+        // 멀티(서버·클라이언트)는 비우면 UTC다 — 컴퓨터마다 시간대가 달라(서버는 흔히 UTC) 서버의 판정과 클라이언트의 미리보기가 다른 날을 세지 않게.
+        // 그때는 기록에 한 번 알린다(게임의 기준 시간대를 정하라고).
+        TimeZoneInfo DayZone()
+        {
+            if (Session.Options.TimeZone != null) return Session.Options.TimeZone;
+            if (Session.Role == SessionRole.Local) return TimeZoneInfo.Local;
+            if (!_warnedDayZone && !Session.Journal.IsMuted)
+            {
+                _warnedDayZone = true;
+                Session.Journal.Append(JournalKind.Warning, "Time",
+                    "멀티플레이에서 SessionOptions.TimeZone이 비어 있어 날짜 번호(Game.Day·Week)를 UTC로 셉니다(서버와 클라이언트가 같게). 일일 초기화를 맞출 시간대를 SessionOptions.TimeZone에 정하세요.");
+            }
+            return TimeZoneInfo.Utc;
+        }
+
+        // 새 id 여럿을 한 번에(적 수십 마리 소환 — 번호를 한 번만 쓴다). 접두어 규칙은 NewId와 같다.
         public List<string> NewIds(string prefix, int count)
         {
+            prefix = IdPrefix(prefix);
             var key = "$id." + prefix;
             if (!Session.Data.IsDefined(key)) Session.Data.Define(key, DataZone.Meta, 0.0, $"{prefix} 번호");
             var first = (long)Session.Data.GetNumber(key);
@@ -450,6 +527,14 @@ namespace GBible
             for (var i = 1; i <= count; i++) result.Add(prefix + (first + i));
             if (count > 0) Session.Data.Set(key, (double)(first + count));
             return result;
+        }
+
+        // 번호를 붙일 접두어: 숫자(0~9)로 끝나면 '_'를 넣는다(NewId).
+        static string IdPrefix(string prefix)
+        {
+            prefix ??= "";
+            var last = prefix.Length == 0 ? ' ' : prefix[prefix.Length - 1];
+            return last >= '0' && last <= '9' ? prefix + "_" : prefix;
         }
 
         // 데이터 키 목록(이름순). 정의가 늘 때만 다시 만든다.

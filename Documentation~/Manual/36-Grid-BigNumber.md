@@ -1,6 +1,6 @@
 # 36. 격자·큰 수
 
-**한 줄 요약**: 칸 단위 게임(전술·로그라이크 던전·보드·농장)은 칸 좌표 `Cell`과 `Grid`의 함수(거리·이웃·방향·이동 범위·길찾기·직선·시야·범위 모양)로 규칙을 쓴다. `Grid`는 맵을 들고 있지 않다. 맵은 게임의 데이터(바뀌지 않는 맵은 원본 인스턴스의 `rows` 글자 목록)이고, `Grid` 함수는 "이 칸에 들어가는 비용"·"이 칸이 시야를 막나"를 함수로 받는다. 플레이어 데이터에는 개체의 `x`·`y`(정수)만 두고, 칸마다의 판 값(심은 작물·부서진 벽)은 `Grid.Key(x, y)` = `"x,y"`를 키로 한 딕셔너리에 둔다. 같은 입력이면 늘 같은 길이 나와 Undo·멀티플레이·재현에서 같다. **큰 수**(`BigNumber`)는 double(약 1e308)을 넘는 방치형·인플레이션 수치를 가수 × 10^지수로 담는 구조체다. 연산자로 평소처럼 계산하고, 플레이어 데이터에 그냥 두면 저장·Undo·Mirror가 따라오고, `ToString()`은 `"1.23K"`·`"4.56Qa"`·`"1.5e400"`이다. `Game.Pay`·DB의 숫자 칸은 double만 알아서 큰 수의 비용은 코드로 검사한다. 가격 곡선(30장)의 "10개 사기"·"살 수 있는 만큼"은 `Game.BalanceSum`·`Game.BalanceCount`다.
+**한 줄 요약**: 칸 단위 게임(전술·로그라이크 던전·보드·농장)은 칸 좌표 `Cell`과 `Grid`의 함수(거리·이웃·방향·이동 범위·길찾기·직선·시야·범위 모양)로 규칙을 쓴다. `Grid`는 맵을 들고 있지 않다. 맵은 게임의 데이터(바뀌지 않는 맵은 원본 인스턴스의 `rows` 글자 목록)이고, `Grid` 함수는 "이 칸에 들어가는 비용"·"이 칸이 시야를 막나"를 함수로 받는다. 플레이어 데이터에는 개체의 `x`·`y`(정수)만 두고, 칸마다의 판 값(심은 작물·부서진 벽)은 `Grid.Key(x, y)` = `"x,y"`를 키로 한 딕셔너리에 둔다. 같은 입력이면 늘 같은 길이 나와 Undo·멀티플레이·재현에서 같다. **큰 수**(`BigNumber`)는 double(약 1e308)을 넘는 방치형·인플레이션 수치를 담는 구조체다(1e300 아래는 double 값 그대로, 그 위는 가수 × 10^지수). 연산자로 평소처럼 계산하고, 플레이어 데이터에 그냥 두면 저장·Undo·Mirror가 따라오고, `ToString()`은 `"1.23K"`·`"4.56Qa"`·`"1.5e400"`이다. `Game.Pay`·DB의 숫자 칸은 double만 알아서 큰 수의 비용은 코드로 검사한다. 가격 곡선(30장)의 "10개 사기"·"살 수 있는 만큼"은 `Game.BalanceSum`·`Game.BalanceCount`다.
 
 **언제 쓰는가**
 
@@ -26,8 +26,8 @@
 | Bresenham | 두 칸 사이의 직선을 칸들로 근사하는 방법. `Grid.Line`이 쓴다. |
 | 결정론 | 같은 입력이면 늘 같은 결과. 비용이 같은 길이 여럿이어도 늘 같은 길을 고른다. |
 | 맵 | 칸마다의 지형. 바뀌지 않는 맵은 원본 인스턴스(DB › 인스턴스)의 `rows`(글자 목록, 글자 하나 = 칸 하나), 판에서 바뀌는 칸은 플레이어 데이터의 딕셔너리(칸 키 → 값). |
-| 큰 수 (`BigNumber`) | 가수 `m`(0이거나 1 ≤ \|m\| < 10, double) × 10^`e`(지수, long). `[Serializable]` 구조체. |
-| 유효 숫자 | 정확히 담기는 자릿수. 가수가 double이라 약 15자리다. |
+| 큰 수 (`BigNumber`) | 1e300 아래는 double 값 그대로(`m` = 값, `e` = 0), 그 위는 가수 `m`(1 ≤ \|m\| < 10, double) × 10^`e`(지수, long). `[Serializable]` 구조체. |
+| 유효 숫자 | 정확히 담기는 자릿수. 1e300 아래는 double과 같다(정수는 2^53까지 정확). 그 위는 가수가 double이라 약 15자리다. |
 | 가격 곡선 | 곡선을 붙인 밸런스 값(30장)에서 단계 = 이미 산 개수인 것. |
 
 ---
@@ -90,20 +90,20 @@
 
 ### 2-4. 길찾기 — `Path`
 
-`Grid.Path(시작, 목표, 비용 함수, diagonal = false, maxCost = 0)` → `List<Cell>`.
+`Grid.Path(시작, 목표, 비용 함수, diagonal = false, maxCost = 0, minCost = 0)` → `List<Cell>`.
 
-- A*로 가장 싼 길을 찾는다. 돌려주는 목록은 **시작 칸을 뺀** 칸들의 차례이고 마지막이 목표 칸이다. `path[0]`이 다음 걸음이다.
+- A*로 가장 싼 길을 찾는다(`Reachable`과 같은 비용 — `minCost`가 모든 칸 비용 이하일 때, 기본 0이면 늘). 돌려주는 목록은 **시작 칸을 뺀** 칸들의 차례이고 마지막이 목표 칸이다. `path[0]`이 다음 걸음이다.
 - 갈 수 없으면 빈 목록이다. 시작 칸이 목표면 빈 목록이다.
 - **목표 칸의 비용도 센다.** 목표 칸이 음수면(적이 선 칸) 길이 없다 → 적에게 다가가는 길은 비용 함수가 목표 칸만 들어갈 수 있게 한다(5-5).
 - `maxCost`를 주면 그보다 비싼 길은 찾지 않는다(0 = 제한 없음). 찾다가 10만 번을 넘으면 그만두고 빈 목록이다 → 비용 함수는 **맵 밖에서 음수**를 돌려줘야 한다. 그렇지 않으면 갈 수 없는 목표를 찾을 때 맵 밖으로 끝없이 퍼진다.
 - 결정론: 비용이 같은 길이 여럿이면 늘 같은 길이다(넓혀 간 차례가 늘 같다).
-- 어림 거리는 대각선이면 Chebyshev, 아니면 Manhattan이고 한 칸에 1로 친다. 비용이 0인 칸이 섞이면 가장 싼 길이 아닐 수 있다.
+- **`minCost`(들어갈 수 있는 칸 비용의 최솟값)**: 목표까지의 어림 = 남은 칸 수(대각선이면 Chebyshev, 아니면 Manhattan) × `minCost`라 실제로 남은 비용을 넘지 않는다. 기본 0이면 어림 없이 싼 칸부터 넓혀, 비용 0인 칸(길·다리)이 있어도 늘 가장 싼 길이다. 모든 칸이 1 이상인 맵은 `minCost: 1`을 주면 목표 쪽으로만 넓혀 더 빨리 찾는다. **`minCost`보다 싼 칸이 있으면 가장 싼 길이 아닐 수 있다** — 아직 보지 않은 싼 칸은 미리 알 수 없다. 찾다가 만난 칸이 더 싸면 그때부터 그 비용으로 어림을 낮추지만, 덜 빗나가게 할 뿐 보장은 아니다. 그러니 맵의 가장 싼 칸 비용보다 크게 주지 않는다.
 
 ### 2-5. 직선 · 시야 — `Line` · `Visible`
 
 - `Grid.Line(a, b)`: Bresenham으로 a에서 b까지의 칸들(양 끝 포함).
 - `Grid.Visible(a, b, 막힘 함수)`: a와 b **사이**(양 끝 뺀) 칸 중 막는 칸이 없으면 참. 붙은 칸은 늘 보인다. 대상이 벽 칸 위에 있어도 대상 칸은 보지 않으므로 보인다.
-- `Line(a, b)`와 `Line(b, a)`의 칸이 다를 수 있다. 그래서 "A가 B를 보는데 B는 A를 못 보는" 칸이 생길 수 있다. 서로 같아야 하는 규칙이면 쏘는 쪽 기준 하나로 정하거나 둘 다 본다.
+- **대칭이다.** 늘 같은 쪽 끝(x가 작은 쪽, 같으면 y가 작은 쪽)에서 긋고 필요하면 뒤집으므로, `Line(b, a)`는 `Line(a, b)`를 거꾸로 한 것이다. 그래서 A가 B를 보면 B도 A를 본다.
 - 직선이 대각선으로 두 벽 사이를 지나가면 막지 않는다(한 칸씩 대각선으로 넘어간다).
 
 ### 2-6. 범위 모양 — `Area` · `Ray` · `Cone`
@@ -122,13 +122,13 @@
 
 ### 2-7. 큰 수 — `BigNumber`
 
-- 값 = `m` × 10^`e`. 만들 때 가수를 1 ≤ |m| < 10으로 맞춘다(`new BigNumber(1234)` → m 1.234, e 3). 0은 m 0, e 0이다. `m`·`e`를 직접 고치지 않는다.
-- `double`·`int`·`long`에서 **저절로** 바뀐다(`BigNumber x = 5;`, `run.cookies += 0.1`). 거꾸로는 명시해야 한다: `(double)x` 또는 `x.ToDouble()` — 1e308을 넘으면 ±무한대, 아주 작으면 0.
+- **담는 모양**: 1e300 아래는 double 값 그대로 담는다(`m` = 값, `e` = 0 — `new BigNumber(1234)` → m 1234, e 0). 그 위는 가수(1 ≤ |m| < 10) × 10^`e`다(`new BigNumber(1.5, 400)` → m 1.5, e 400). 0은 m 0, e 0이다. `m`·`e`를 직접 고치지 않는다. 예전 방식으로 저장된 값(작은 값도 가수 × 10^지수)도 셈·비교할 때 맞춘다.
+- `double`·`int`·`long`에서 **저절로** 바뀐다(`BigNumber x = 5;`, `run.cookies += 0.1`). 거꾸로는 명시해야 한다: `(double)x` 또는 `x.ToDouble()` — 1e308을 넘으면 ±무한대.
 - 연산자: `+` `−` `×` `÷`, 부호 `−x`, 비교 `==` `!=` `<` `>` `<=` `>=`(`CompareTo`·`Equals`도 같다).
-- **정밀도**: 가수가 double이라 유효 숫자는 약 15자리다. 더하기·빼기는 지수 차이가 17자리를 넘으면 작은 쪽을 버린다: 1.5e400 + 1 = 1.5e400. 쿠키 1e30개에 1개를 더해도 그대로인 것이 정상이다.
+- **정밀도**: 1e300 아래는 double 셈 그대로라 오차가 쌓이지 않는다 — 1을 49번 더하면 정확히 49, 0.5씩 모아도 정확하고, 정수는 2^53(약 9e15)까지 정확하다(그보다 크면 double처럼 끝자리가 둥글어진다 — 쿠키 1e30개에 1을 더해도 그대로). 1e300 위는 가수가 double이라 유효 숫자 약 15자리이고, 더하기·빼기는 지수 차이가 17자리를 넘으면 작은 쪽을 버린다: 1.5e400 + 1 = 1.5e400.
 - 무한대·NaN은 담을 수 없다. 넘치는 double 계산(1e308을 넘은 가격 합, `1.0 / 0`)을 넣으면 `ArgumentOutOfRangeException`("[MomoiProject] 큰 수: 무한·NaN은 담을 수 없습니다."). 0으로 나누면 `DivideByZeroException`("[MomoiProject] 큰 수: 0으로 나눌 수 없습니다.").
-- `Pow(값, 지수)`: 음수의 거듭제곱은 예외("[MomoiProject] 큰 수: 음수의 거듭제곱은 지원하지 않습니다."). 0^0 = 1, 0^p = 0.
-- `Floor`: 지수가 15 이상이면 그대로(이미 소수가 없다).
+- `Pow(값, 지수)`: 작은 수는 double의 거듭제곱 그대로다(2^3 = 8, 5^2 = 25 정확히 — 넘치면 가수 × 10^지수로). 음수의 거듭제곱은 예외("[MomoiProject] 큰 수: 음수의 거듭제곱은 지원하지 않습니다."). 0^0 = 1, 0^p = 0.
+- `Floor`: 1e300 아래는 소수를 버린다(음의 무한대 쪽, −1.5 → −2). 그 위는 그대로(소수가 없다).
 - `[Serializable]` 구조체라 플레이어 데이터 필드·목록(`List<BigNumber>`)에 그냥 둔다. 판 저장·Undo·Mirror(Sync)가 다른 필드처럼 따라온다.
 - **`Game.Pay`와 DB의 숫자 칸은 double 숫자 필드만 안다.** `Game.Pay(키, "cookies", …)`는 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)."로 프로그래머 실수가 된다. DB Block의 숫자 비교·증감도 큰 수 필드에 쓰지 않는다. 큰 수의 비용은 코드로 검사하고 뺀다: `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7).
 
@@ -137,15 +137,16 @@
 | 형식 | 쓰는 법 | 예 |
 |---|---|---|
 | 기본(짧게) | `x.ToString()` · binding-path · 문장 틀 `{cookies}` | `999` · `1.23K` · `45.6M` · `4.56Qa` … `999Dc`, 그 위(1e36부터)는 `1e36` |
-| `"sci"` | `x.ToString("sci", null)` · `$"{x:sci}"` | `1.23e45`(지수가 −2~2면 `12.5`처럼 그대로) |
-| `"ko"` | `x.ToString("ko", null)` · `$"{x:ko}"` | `1.23만` · `1.23억` · `5000만` … `극`(1e48)까지, 그 위는 지수 |
-| `"full"` | `x.ToString("full", null)` | `1,234,567`(1e15 아래, 소수는 버림), 그 위는 지수 |
+| `"sci"` | `x.ToString("sci")` · `$"{x:sci}"` | `1.23e45`(지수가 −2~2면 `12.5`처럼 그대로). 반올림이 10에 닿으면 지수를 올린다(9.996e5 → `1e6`) |
+| `"ko"` | `x.ToString("ko")` · `$"{x:ko}"` | `1.23만` · `1.23억` · `5000만` … `극`(1e48)까지, 그 위는 지수 |
+| `"full"` | `x.ToString("full")` | `1,234,567`(1e15 아래. 소수는 0 쪽으로 버린다 — −0.004 → `0`), 그 위는 지수 |
 
-- 짧은 단위: K(천) · M(백만) · B(십억) · T(조) · Qa · Qi · Sx · Sp · Oc · No · Dc(1e33). 숫자는 10 아래면 소수 둘째 자리까지(`1.23K`, `2K`), 100 아래면 첫째 자리까지(`45.6M`), 그 위는 정수(`456B`)다.
+- 짧은 단위: K(천) · M(백만) · B(십억) · T(조) · Qa · Qi · Sx · Sp · Oc · No · Dc(1e33). 숫자는 10 아래면 소수 둘째 자리까지(`1.23K`, `2K`), 100 아래면 첫째 자리까지(`45.6M`), 그 위는 정수(`456B`)다. 1000 아래는 그 수 그대로다(소수 둘째 자리까지).
 - 한국어 단위: 만 · 억 · 조 · 경 · 해 · 자 · 양 · 구 · 간 · 정 · 재 · 극.
-- `ToString(형식)` 하나짜리는 없다. 인자 둘(`ToString("ko", null)`)이나 문자열 보간의 형식(`$"{x:ko}"`)을 쓴다.
+- **반올림이 단위 하나를 채우면 다음 단위로** 올린다: 999,600은 `1000K`가 아니라 `1M`, 한국어 99,999,999는 `1억`. 음수도 같은 자릿수로 반올림한다(−155,500 → `-156K`).
+- 형식은 하나만 줘도 된다(`x.ToString("ko")` = `x.ToString("ko", null)`). 문자열 보간의 형식(`$"{x:ko}"`)도 같다.
 - binding-path(`run:cookies`, 35장)와 문장 틀의 값(`Texts.Get("hud.cookies", ("count", run.cookies))`, `Game.Fail`의 값)은 기본 형식이다.
-- `BigNumber.Parse(글)`: `"1.5e40"`(e·E) · 짧은 단위(`"3.2K"`) · 숫자(`"12345"`)를 읽는다. 비거나 공백이면 0. 한국어 단위(`"1.23억"`)는 읽지 못한다(`FormatException`).
+- `BigNumber.Parse(글)`: `"1.5e40"`(e·E) · 짧은 단위(`"3.2K"`) · 숫자(`"12345"`)를 읽는다. double로 담기는 크기는 글자 그대로 읽는다(`"1.13e2"` → 정확히 113). 비거나 공백이면 0. 한국어 단위(`"1.23억"`)는 읽지 못한다(`FormatException`).
 - binding-path의 **숫자** 칸(ProgressBar·Slider)과 컴포넌트 '데이터 연결'의 `onNumber`는 double로 바꿀 수 있는 값만 읽어 큰 수는 0이다. 막대의 비율은 화면 코드에서 `(float)(a / b).ToDouble()`로 계산한다.
 
 ### 2-9. 가격 곡선의 합 · 개수 — `BalanceSum` · `BalanceCount`
@@ -154,6 +155,7 @@
 - `Game.BalanceCount(ID, from, budget)`: `budget`으로 단계 `from`부터 차례로 몇 개를 살 수 있나("살 수 있는 만큼"). 다음 하나를 더하면 넘을 때 멈춘다. 많아야 10000개까지 센다.
 - 둘 다 double이다(밸런스 값이 double). 큰 수 예산은 `run.cookies.ToDouble()`로 넘긴다. 가격 자체가 1e308을 넘을 만큼 오르면 곡선 대신 `BigNumber.Pow`로 계산한다(5-7).
 - 곡선의 반올림(30장 2-2)은 단계마다 먼저 적용된 뒤 더한다.
+- 가격이 0 이하(또는 숫자가 아님)가 되는 단계에서 멈춘다(그 단계부터는 사지 못하고 더하지 않는다, 30장 4-1).
 
 ---
 
@@ -217,7 +219,7 @@ caveMap,#####,#...#,#.#.#,#####,,
 
 ### 3-3. 모니터에서 확인하기
 
-- **데이터** 탭: 개체의 `x`·`y`, 칸 딕셔너리(키 `"3,4"`)가 보인다. 큰 수 필드는 구조체라 `m`(가수)·`e`(지수) 두 필드로 보인다(1.5e400 = m 1.5, e 400).
+- **데이터** 탭: 개체의 `x`·`y`, 칸 딕셔너리(키 `"3,4"`)가 보인다. 큰 수 필드는 구조체라 `m`·`e` 두 필드로 보인다(1e300 아래는 m = 값·e = 0 — 1234 = m 1234, e 0. 그 위는 가수·지수 — 1.5e400 = m 1.5, e 400).
 - 큰 수에는 DB › 개발 명령의 '플레이어 데이터에 주기'를 쓸 수 없다(double 숫자 칸). 개발 명령 항목을 만들고 그 ID에 `[BindTo]`로 코드를 잇는다.
 
 ```csharp
@@ -268,9 +270,9 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 | `Cell Direction(Cell from, Cell to)` | 가장 가까운 4방향(같으면 가로). 같은 칸이면 (0, 0) |
 | `Cell Rotate(Cell offset, int turns)` | 상대 좌표를 시계 방향으로 90° × `turns`(y 위 + 기준, 2-1). 목록 칸은 `Placement.Rotate`(37장) |
 | `Dictionary<Cell, int> Reachable(Cell start, int budget, Func<Cell, int> cost, bool diagonal = false)` | 갈 수 있는 칸 → 남은 이동력(시작 칸 포함). `cost`가 음수면 못 들어간다(2-3) |
-| `List<Cell> Path(Cell start, Cell goal, Func<Cell, int> cost, bool diagonal = false, int maxCost = 0)` | A* 길. 시작 칸을 뺀 차례(마지막 = 목표). 없으면 빈 목록. `maxCost` 0 = 제한 없음(2-4) |
-| `List<Cell> Line(Cell a, Cell b)` | 직선의 칸들(양 끝 포함, Bresenham) |
-| `bool Visible(Cell a, Cell b, Func<Cell, bool> blocks)` | 사이 칸(양 끝 뺀)이 막지 않으면 참 |
+| `List<Cell> Path(Cell start, Cell goal, Func<Cell, int> cost, bool diagonal = false, int maxCost = 0, int minCost = 0)` | A* 길. 시작 칸을 뺀 차례(마지막 = 목표). 없으면 빈 목록. `maxCost` 0 = 제한 없음. `minCost` = 들어갈 수 있는 칸 비용의 최솟값(기본 0 — 늘 가장 싼 길. 주면 빨라지고, 그보다 싼 칸이 있으면 가장 싼 길이 아닐 수 있다, 2-4) |
+| `List<Cell> Line(Cell a, Cell b)` | 직선의 칸들(양 끝 포함, Bresenham). `Line(b, a)`는 이것을 거꾸로 한 것(대칭) |
+| `bool Visible(Cell a, Cell b, Func<Cell, bool> blocks)` | 사이 칸(양 끝 뺀)이 막지 않으면 참. a ↔ b 대칭 |
 | `IEnumerable<Cell> Area(Cell center, int radius, GridMetric metric = Manhattan, int minRadius = 0)` | 거리 minRadius~radius인 칸들(2-6) |
 | `IEnumerable<Cell> Ray(Cell origin, Cell direction, int length)` | origin 다음 칸부터 direction으로 length칸 |
 | `IEnumerable<Cell> Cone(Cell origin, Cell direction, int length)` | direction(4방향) 쪽 앞 삼각형 |
@@ -282,7 +284,7 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 
 | 멤버 | 뜻 |
 |---|---|
-| `double m` · `long e` | 가수(0이거나 1 ≤ \|m\| < 10) · 10의 지수. 직접 고치지 않는다 |
+| `double m` · `long e` | 1e300 아래는 값 · 0, 그 위는 가수(1 ≤ \|m\| < 10) · 10의 지수. 직접 고치지 않는다 |
 | `new BigNumber(double value)` · `new BigNumber(double mantissa, long exponent)` | 만든다(`new BigNumber(1.5, 400)` = 1.5e400). 무한대·NaN이면 예외 |
 | `BigNumber.Zero` · `BigNumber.One` | 0 · 1 |
 | `bool IsZero` · `int Sign` | 0인지 · 부호(−1, 0, 1) |
@@ -290,18 +292,18 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 | 명시 `(double)x` · `double ToDouble()` | double로. 1e308을 넘으면 ±무한대 |
 | `+` `−` `×` `÷` · 부호 `−` · `==` `!=` `<` `>` `<=` `>=` · `CompareTo` · `Equals` | 연산·비교(2-7) |
 | `double Log10()` | 상용로그(절댓값의). 정수 부분 = 자릿수 − 1(1234 → 3.09). 0이면 음의 무한대 |
-| `static BigNumber Pow(BigNumber value, double power)` | 거듭제곱. 음수의 거듭제곱은 예외 |
-| `static BigNumber Floor(BigNumber value)` | 내림(1e15 이상은 그대로) |
+| `static BigNumber Pow(BigNumber value, double power)` | 거듭제곱(작은 수는 double 그대로 — 2^3 = 8). 음수의 거듭제곱은 예외 |
+| `static BigNumber Floor(BigNumber value)` | 내림(1e300 위는 그대로) |
 | `static BigNumber Max(a, b)` · `Min(a, b)` | 큰 것 · 작은 것 |
-| `string ToString()` · `ToString(string format, IFormatProvider provider)` | 글로(2-8). 형식 `null`(짧게) · `"sci"` · `"ko"` · `"full"` |
+| `string ToString()` · `ToString(string format)` · `ToString(string format, IFormatProvider provider)` | 글로(2-8). 형식 `null`(짧게) · `"sci"` · `"ko"` · `"full"` |
 | `static BigNumber Parse(string text)` | `"1.5e40"` · `"3.2K"` · `"12345"`를 읽는다 |
 
 ### 4-5. `Game.BalanceSum` · `Game.BalanceCount`
 
 | 멤버 | 뜻 |
 |---|---|
-| `double BalanceSum(string id, double from, int count)` | 단계 `from`부터 `count`개(단계 1씩)의 값의 합 |
-| `int BalanceCount(string id, double from, double budget)` | `budget`으로 단계 `from`부터 살 수 있는 개수(최대 10000) |
+| `double BalanceSum(string id, double from, int count)` | 단계 `from`부터 `count`개(단계 1씩)의 값의 합. 값이 0 이하인 단계에서 멈춘다 |
+| `int BalanceCount(string id, double from, double budget)` | `budget`으로 단계 `from`부터 살 수 있는 개수(최대 10000, 값이 0 이하인 단계 앞까지) |
 
 `session.Balance.Sum(id, from, count)` · `session.Balance.MaxCount(id, from, budget, limit = 10000)`은 같은 일의 세션 쪽 이름이다(`limit`을 고를 수 있다). 값을 바꾸지 않으므로 화면 코드에서도 부른다(가격 표시).
 
@@ -508,7 +510,7 @@ public class Shoot : GameAction
 - 사이 칸만 본다. 물(`~`)은 시야를 막지 않으므로 물 너머로 쏠 수 있다.
 - 다른 유닛도 가리게 하려면 막힘 함수에 더한다: `c => Board.BlocksSight(Board.TileAt(map, c)) || occupants.ContainsKey(c)`.
 - 쏠 수 있는 적을 칠하는 화면은 적마다 `Game.CanDo(new Shoot { user = me, target = enemy }, out var why)`를 부른다(33장 5-4). 이유("벽에 가려 보이지 않습니다.")가 그대로 툴팁이 된다.
-- 쏘는 쪽에서 본 직선으로 정한다. 맞는 쪽에서 본 직선은 다를 수 있다(2-5).
+- 시야는 대칭이다. 쏘는 쪽이 보면 맞는 쪽도 쏘는 쪽을 본다(2-5).
 
 ### 5-4. 밀쳐 내기 — `Direction` + 막힘이면 추가 피해
 
@@ -599,7 +601,7 @@ public class Step : GameAction
             var taken = new HashSet<Cell>(d.monsters.Where(o => o != m && o.hp > 0).Select(o => o.At));
             var path = Grid.Path(m.At, d.hero.At,
                 c => c == d.hero.At ? 1 : taken.Contains(c) ? -1 : Board.TerrainCost(Board.TileAt(map, c)),   // 목표 칸(주인공)은 들어갈 수 있게
-                maxCost: 12);
+                maxCost: 12, minCost: 1);                // 이 맵은 들어갈 수 있는 칸이 모두 1 이상
             if (path.Count > 1)
             {
                 m.x = path[0].x;                        // 첫 칸만(마지막 칸은 주인공 자리)
@@ -620,7 +622,7 @@ public class Step : GameAction
 - 걸음 하나 = 행동 하나 = Undo 한 칸. 주인공의 걸음·공격, 몬스터 차례, 안개가 한 행동이라 Undo하면 몬스터도 함께 돌아간다.
 - 목표 칸(주인공 자리)을 비용 함수가 막으면 길이 없다(2-4). 목표 칸만 1로 둔다.
 - 몬스터마다 `taken`을 다시 만드는 것은 앞의 몬스터가 이미 옮겼기 때문이다(같은 칸에 둘이 서지 않는다).
-- `maxCost: 12`는 먼 길을 찾지 않게 하는 상한이다. 몬스터가 많아도 걸음 하나의 계산이 일정하다.
+- `maxCost: 12`는 먼 길을 찾지 않게 하는 상한이다. 몬스터가 많아도 걸음 하나의 계산이 일정하다. 칸 비용이 모두 1 이상이라 `minCost: 1`로 목표 쪽으로만 넓힌다(2-4).
 - 화면은 `d.seen.ContainsKey(Grid.Key(x, y))`인 칸만 그리고, 지금 보이는 칸(같은 `Area` + `Visible`)은 밝게 그린다.
 
 ### 5-6. 농장 — 칸 키 딕셔너리(`Grid.Key`)
@@ -814,8 +816,7 @@ public static int Affordable(BigNumber budget, double basePrice, double rate, in
 | 길찾기·범위 계산이 든 행동이 느림 | 비용·막힘 함수 안에서 `Game.Find`·`Game.All`을 불렀다(칸마다 데이터 전체를 훑는다). 개체가 선 칸은 먼저 한 번 사전으로(`Board.Occupants`). |
 | 대각선 이동으로 벽 모서리를 빠져나감 | 비용 함수는 들어가는 칸만 받아 모서리를 모른다(2-3). 4방향으로 하거나 이웃을 직접 거른다. |
 | 대각선 걸음이 더 비싸지 않음 | `diagonal: true`면 8방향 모두 그 칸의 비용 그대로다. 대각선을 비싸게 하는 것은 이 함수로 되지 않는다. |
-| 비용 0인 칸이 있으면 가장 싼 길이 아님 | A*의 어림 거리가 한 칸을 1로 친다. 비용은 1 이상으로 둔다(2-4). |
-| A는 B를 보는데 B는 A를 못 봄 | `Line(a, b)`와 `Line(b, a)`의 칸이 다를 수 있다(2-5). 쏘는 쪽 기준 하나로 정하거나 둘 다 본다. |
+| 길찾기가 가장 싼 길이 아님 | `minCost`를 맵에서 가장 싼 칸 비용보다 크게 줬다(비용 0인 길이 있는데 `minCost: 1`). 비우면(0) 늘 가장 싼 길이다(2-4). |
 | 벽 칸 위의 대상이 보임 | `Visible`은 양 끝을 보지 않는다. 대상 칸도 막게 하려면 따로 검사한다. |
 | 창·돌진이 벽을 뚫음 | `Ray`·`Cone`·`Area`는 모양만 준다. `TakeWhile`로 막힌 칸에서 멈춘다(5-2). |
 | 브레스 모양이 비뚤어짐 | `Cone`에 대각선 방향을 넣었다. 4방향(`Grid.Up` … 또는 `Direction`) 하나를 넣는다. |
@@ -828,12 +829,11 @@ public static int Affordable(BigNumber budget, double basePrice, double rate, in
 | 원본 맵이 게임 중에 바뀜 | `session.Instances`의 원본을 고쳤다. 바뀌는 칸은 판 데이터의 딕셔너리로(3-1). |
 | 시트에서 맵 줄이 수식으로 바뀜 | 줄이 `=`·`+`·`-`·`@`로 시작한다. 테두리를 `#`으로(3-2). |
 | `Game.Pay`가 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)." | `Game.Pay`·DB 숫자 칸은 double 숫자 필드만 안다. `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7). |
-| 쿠키에 1을 더해도 그대로 | 정상이다. 유효 숫자가 약 15자리라 차이가 17자리를 넘으면 작은 쪽은 사라진다(2-7). |
+| 쿠키에 1을 더해도 그대로 | 정상이다. 1e300 아래는 double 셈이라 정수는 2^53(약 9e15)까지만 정확하고, 그 위는 유효 숫자 약 15자리라 차이가 17자리를 넘으면 작은 쪽은 사라진다(2-7). |
 | "[MomoiProject] 큰 수: 무한·NaN은 담을 수 없습니다." | double 계산이 먼저 넘쳤다(1e308을 넘은 `BalanceSum`, `x / 0.0`). 넘칠 값은 처음부터 `BigNumber`로 계산한다(5-7의 `PriceSum`). |
 | "[MomoiProject] 큰 수: 0으로 나눌 수 없습니다." | 0인 `BigNumber`로 나눴다. 생산량 0일 때 "다음까지 몇 초"를 나누기 전에 `IsZero`를 본다. |
 | `(double)x`가 무한대 | 1e308을 넘은 값이다. 비교·계산은 `BigNumber`끼리 한다. |
-| `x.ToString("ko")`가 컴파일되지 않음 | 형식 하나짜리는 없다. `x.ToString("ko", null)` 또는 `$"{x:ko}"`(2-8). |
 | `BigNumber.Parse("1.23억")`이 `FormatException` | `Parse`는 지수·짧은 단위·숫자만 읽는다. 큰 수를 글로 바꿔 저장하지 않는다: 필드 그대로 두면 판 저장이 `m`·`e`를 그대로 담는다. `ToString`의 글은 소수 둘째 자리까지라 다시 읽으면 정밀도가 준다(보이기용). |
 | 진행 막대·슬라이더·'데이터 연결'의 숫자가 0 | 숫자 칸은 double로 바꿀 수 있는 값만 읽는다. 비율을 화면 코드에서 계산한다(2-8). |
 | DB 조건으로 쿠키 수를 비교할 수 없음 | DB의 숫자 비교는 double 숫자 필드용이다. 규칙이 자릿수 같은 `int` 필드를 함께 두고 그것을 본다(5-7). |
-| 큰 수 필드를 고쳤는데 값이 이상함 | `m`·`e`를 직접 고쳤다(가수가 1~10 밖). 연산자·생성자로만 바꾼다. |
+| 큰 수 필드를 고쳤는데 값이 이상함 | `m`·`e`를 직접 고쳤다(1e300 아래는 m = 값·e = 0, 그 위만 가수 1~10 × 10^지수). 연산자·생성자로만 바꾼다. |

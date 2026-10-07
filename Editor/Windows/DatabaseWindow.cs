@@ -895,7 +895,7 @@ namespace GBible.EditorTools
                     new DialogField { Key = "id", Label = "ID", Value = db.NextId(info), Caption = "영문 소문자로 시작, 단어 사이는 대문자(띄어쓰기·밑줄 없음), 분류는 점(.)으로. 예: playerGold, player.inventory" },
                 },
                 "만들기",
-                values => db.CanUseId(values["id"], null, out var error) ? null : error,
+                values => db.CanUseId(values["id"], null, type, out var error) ? null : error,
                 values =>
                 {
                     var created = Staging.Add(type, values["id"]);
@@ -908,26 +908,10 @@ namespace GBible.EditorTools
         }
 
 
-        // ID 바꾸기도 모아 둔다: 이 항목과, 이 ID를 가리키는 항목들의 작업본을 함께 고친다(DB가 바로 새 ID로 보인다).
-        // 적용하면 내용을 원본에 옮긴 뒤 ID 바꾸기(파일 이름·변경 이력·GameIds)가 실제로 일어난다.
-        static int StageRename(GameData item, string newId)
-        {
-            var db = EditorDatabase.Instance;
-            var work = Staging.Work(item);
-            var usages = db.FindUsages(work);
-            foreach (var usage in usages)
-            {
-                var owner = Staging.Work(usage.Owner);
-                var so = new SerializedObject(owner);
-                var property = so.FindProperty(usage.PropertyPath);
-                if (property == null) continue;
-                property.stringValue = newId;
-                so.ApplyModifiedPropertiesWithoutUndo();
-            }
-            work.EditorAssignId(newId);
-            Staging.Touch();
-            return usages.Count;
-        }
+        // ID 바꾸기도 모아 둔다(CodexStaging.Rename): 이 항목과, 이 ID를 가리키는 항목들의 작업본을 함께 고친다(DB가 바로 새 ID로 보인다).
+        // 적용하면 내용을 원본에 옮기고 ID·파일 이름·변경 이력·이름 텍스트·GameIds가 바뀐다(참조는 다시 훑지 않는다 — 서로 바꾸기·비운 ID 다시 쓰기도 맞다).
+        // 돌려주는 값: 함께 바꾼 참조 수(같은 ID를 쓰는 항목이 또 있어 참조를 옮기지 않았으면 -1).
+        static int StageRename(GameData item, string newId) => Staging.Rename(item, newId);
 
         // ── 상세 패널(모든 카드·시트 공용) ──────────────────────
         // 패널은 작업본(메모리 사본)을 고친다. '반영'하면 DB 목록에 바로 보이고, Unity 에셋에는 저장(Ctrl+S)할 때 적용된다.
@@ -966,7 +950,9 @@ namespace GBible.EditorTools
                     if (panel.DraftTarget is GameData draft) draft.EditorAssignId(id);
                     _selectedId = id;
                     QueueRefresh();
-                    Debug.Log($"[MomoiProject] ID를 {id}(으)로 바꿨습니다(참조 {count}곳 함께, 저장(Ctrl+S)할 때 적용).");
+                    Debug.Log(count < 0
+                        ? $"[MomoiProject] ID를 {id}(으)로 바꿨습니다. 예전 ID '{oldId}'를 쓰는 항목이 또 있어(복제한 에셋) 참조는 옮기지 않았습니다 — 그 칸들은 남은 항목을 그대로 가리킵니다. 저장(Ctrl+S)할 때 적용."
+                        : $"[MomoiProject] ID를 {id}(으)로 바꿨습니다(참조 {count}곳 함께, 저장(Ctrl+S)할 때 적용).");
                 }),
                 Placeholder = Gs.PaletteFor(item.GetType().Name),
                 FocusPath = focusPath,

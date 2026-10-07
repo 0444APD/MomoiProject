@@ -258,7 +258,7 @@ namespace GBible.EditorTools.UI
                     if (rule != null && value is Sprite placed)
                     {
                         var host = tile.panel?.visualTree.Q(className: "gs-root");
-                        if (host != null) GsSpriteFraming.Open(host, placed, rule.spriteGroup);
+                        if (host != null) GsSpriteFraming.Open(host, placed, rule.spriteFrame);
                     }
                 };
                 image.Add(picker.Element);
@@ -272,9 +272,9 @@ namespace GBible.EditorTools.UI
                 var frame = new GsButton("맞추기", () =>
                 {
                     var host = tile.panel?.visualTree.Q(className: "gs-root");
-                    if (host != null) GsSpriteFraming.Open(host, original, rule.spriteGroup);
+                    if (host != null) GsSpriteFraming.Open(host, original, rule.spriteFrame);
                 }, GsButtonKind.Ghost);
-                frame.tooltip = "규격 틀에 맞춰 중심·배율을 다시 잡고 베이크합니다(규격별 예외 촬영 가능).";
+                frame.tooltip = "틀의 크기에 맞춰 중심·배율을 다시 잡고 모든 크기를 굽습니다(크기마다 예외 촬영 가능).";
                 caption.Add(frame);
             }
             tile.Add(caption);

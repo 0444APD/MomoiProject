@@ -19,6 +19,9 @@
 > - **2026-10-06 DB 사이드바**(사용자): 창이 낮으면 탭 목록만 스크롤 · 'DB' 그룹의 빈 로직 탭 숨김(능력·상태 효과·패시브 등은 GBible에 두고 탭만 프로젝트마다) · **Dev 폴더 탭**(`Assets/Dev` 바로 아래 폴더 = 탭, 안의 모든 에셋, 하위 폴더 = 접는 묶음 — `DevFolders`·`DevFolderPage`) · **저절로 생기는 폴더 이름은 영어**(DB 종류 폴더 = ID 앞부분 PascalCase, 옛 한글 폴더는 `EditorDatabase.Upkeep`이 옮김) · 하나만 두는 설정 `[Database(Single = true)]`(Steam 항목 저절로).
 > - **2026-10-06 멀티 보강**(1.11 보강 문단): 응답 확인·다시 접속·리플레이·이벤트 공개 범위·서버 빌드 화면 끔·부하 시험, 실제 서비스 자리(`GameNet.TokenSource`·`GameNet.Rooms` — 지금 사설, Steam 모듈이 스스로 바꿈). 방장 이어받기 안 함, 부분 유료화는 상품이 생길 때까지 없음.
 > - **2026-10-07 코드 리뷰 수정**: 저장 데이터 손실(읽지 않은 판을 빈 판으로 덮지 않음 · 읽지 못한 저장 파일 사본 · 스냅샷 되감기 뒤 판 저장), 처음 상태로 되돌리기(저장 폴더 전체·프로젝트 폴더 시스템 파일·저장 안 된 씬/DB 먼저 묻기), Mirror 추적 빈틈(새 객체가 가리킨 기존 객체 변경 · 컬렉션 두 곳 공유 경고 · 객체 필드 든 구조체는 예전 방식), 시간 규칙 행동 Undo는 앞 행동과 묶고 시계도 되돌림(`ITimeRuleAction`), 행동 밖 리스트 구조 변경 뒤 Undo 거절, 멀티 같은 계정 이어받기(3초 `TakeoverSilence`)·미리보기 번호 유지(`Mirror.KeepIds`), 화면(언어 바뀌면 기본 화면 다시 만들기 · 슬라이더 `Flush` · 슬롯 `{saved}` · 고르기 창 첫 프레임 · 글꼴 검증). `TestRuns` + `GBIBLE_TEST_FRAMEWORK`(Test Framework 1.1 이상): Test Runner 실행 동안 테스트 어셈블리를 고정(`GameAssemblies.KeepTests`). 매뉴얼·AI 관례에 반영.
+> - **2026-10-07 스프라이트 틀**(사용자 "규격은 추천대로 + 한꺼번에·예외 촬영 유지"): 그룹+크기별 파일 → 틀 파일 하나의 크기 표, 틀 인스펙터에 원본 끌어 놓기(하나 = 맞춤 창, 여럿 = 한꺼번에 굽기), 예전 파일은 열 때 옮김, `GameIds.SpriteSize`.
+> - **2026-10-07 저장·데이터·멀티 다지기**: 한 값 안의 같은 객체 공유·서로 가리킴 허용(저장 `$n`/`$ref`, 다른 키끼리는 안 됨) · 안전한 저장(`SafeFile` — `.tmp`로 바꿔 넣기·`.bak`, 깨지면 `.broken-` 사본을 남기고 `.bak`으로) · 불러오기는 깨진 자리만 기본값 + 다 읽은 뒤 한 번에 · 깊이 제한(데이터 256·JSON 512) · `SaveRun` = `Saving` → 프로필 → 판 · 개발 중 초기화는 맞지 않는 파일만 `.reset-`으로 옆에 · 슬롯 폴더 소문자·장치 이름 금지 · `Permanent` 안의 행동은 그 행동의 일부 · 되감기·스냅샷이 요소 인스턴스를 지킴 · 정수 반올림은 0에서 먼 쪽(`GameNumbers.Round`) · 멀티 받은 데이터 검사·초당 메시지 제한·보낼 수 없는 행동/이벤트는 오류·선택 대기는 답할 사람 키(`$choices:번호`) · 인터페이스·추상 컬렉션 칸 금지 · 키 바꾸기 중 Esc는 화면 뒤로에 안 감(`GameScreens.HoldBack`) · `link.xml`·생성 코드 `[Preserve]`. 매뉴얼(01·02·06·20·31·40장 외)·참조·구현 가이드에 반영.
+> - **2026-10-07 버그 점검 2차**(사용자 "보지 않은 방향 위주로 꼼꼼히"): 새 판이 기본값 객체를 함께 써 지난 판의 강화가 남던 것 · 저장 대체 경로가 `.bak`을 지우던 것 · 슬롯 복사가 옛 `.bak`을 남기던 것 · `Permanent` 안의 변경도 일어나지 않은 일(실패한 행동·미리보기·저장점 뒤 취소)에서는 함께 취소(Undo로는 남음) · 행동 중 저장점이 예전 방식 키의 변경을 잃던 것 · Mirror(실패한 행동을 되돌려도 NetId 유지 · `Nullable` 칸이 프레임마다 바뀜으로 잡히던 것 · 닿지 않게 된 고리 노드 정리) · `BigNumber`는 1e300 아래 double 그대로(쌓이는 오차 없음 · 반올림이 단위를 채우면 다음 단위) · 경로·값 틀 도구(키 형식으로 찾기 · float 비교 · 점 든 키 · 구조체 부모의 비용 경로는 오류) · 긴 판의 메모리(식별 표 청소 · 이력 끈 세션의 난수 사본) · DB(개발자 몫 종류는 구조 편집이 열림 — 다이얼로그 선택지 줄 더하기 · 새 항목 ID 검사에 종류를 넘김) · 모니터의 값 고치기는 행동 하나(`DeveloperEditAction`, 멀티 클라이언트 세션은 막음) · 화면·연출(씬 흐름은 같은 프레임에 넣은 사라지는 연출 뒤 · 30초 나아가지 않는 연출은 넘김(멈춘 동안은 세지 않음) · 버리기는 세대 번호로 안쪽 코루틴까지 멈추고 `finally`를 돌림 · 씬 열기는 버려도 끝까지 · 버린 사라짐(`OnRemove`)은 바로 치움 · 화면 다시 열기(확인 창의 '아니오'가 다시 띄움) · 토글·슬라이더 `@키` · id 없는 항목은 자리 번호 · 배속이면 한 프레임 틱 한도 × 배속(`TickLimit`, 최대 128)) · binding-path의 `:` 든 키(`stat:kills`)도 다시 그림. 새 시험: `Tests/PlayMode`(`GBible.Tests.PlayMode` — 연출 대기열을 플레이 중에 돌림, Test Runner PlayMode) · `TickSpeedTests`(코어). 확인 목록(`PendingChecks.md`)은 항목마다 준비 → 번호 단계 → 정상 → 이상하면.
 
 ---
 
@@ -63,11 +66,11 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 ### 1.3 Unity 런타임 (Runtime/Unity)
 
 - **`GameData`**: DB 항목의 바탕(ScriptableObject). **ID로만 식별**(표시 이름 필드 없음, `DisplayName` = ID). 상속하면 코드 추가 없이 DB에 나타난다. `[Database(표시 이름, Group, Order, IdPrefix, Hidden, Page)]`. 참조 필드는 `[DataRef(typeof(X))]`(ID 문자열, 이름을 바꾸면 따라 바뀜).
-- **기본 DB 종류**: 플레이어 데이터(`PlayerDataEntry`, 에디터 명칭 "플레이어 데이터"), 로그(`StatData`), 도전과제(`AchievementData`), 키워드 그룹(`KeywordGroupData`, 키워드 탭 안에 숨김)·키워드(`KeywordData`, 용어 스타일·아이콘 포함), 필드 규칙(`FieldRuleData`), 인스턴스(`InstanceData`, 예전 이름 템플릿·`TemplateData`: 아무 클래스의 미리 채운 인스턴스, `CreateInstance<T>()`로 사본), 프리팹(`PrefabData`: 프리팹 컴포넌트 필드를 탐색기로 편집), 스프라이트 규격 그룹·규격(`SpritePresetGroupData`·`SpritePresetData`).
+- **기본 DB 종류**: 플레이어 데이터(`PlayerDataEntry`, 에디터 명칭 "플레이어 데이터"), 로그(`StatData`), 도전과제(`AchievementData`), 키워드 그룹(`KeywordGroupData`, 키워드 탭 안에 숨김)·키워드(`KeywordData`, 용어 스타일·아이콘 포함), 필드 규칙(`FieldRuleData`), 인스턴스(`InstanceData`, 예전 이름 템플릿·`TemplateData`: 아무 클래스의 미리 채운 인스턴스, `CreateInstance<T>()`로 사본), 프리팹(`PrefabData`: 프리팹 컴포넌트 필드를 탐색기로 편집), 스프라이트 틀(`SpriteFrameData`, DB 탭 없이 파일).
 - **`GameDatabase`**: 모든 GameData 목록(Resources/MomoiProject/GameDatabase). 이름 바꾸기 기록(저장 파일 호환).
 - **`GBibleRuntime`**: 게임 시작 시 세션 자동 생성, 이벤트(Configuring/Started/Stopped), 프로필 저장(`profile.json`, 메타 구역)·판 저장(`run.json`, 세션 구역·난수·시간), 종료 시 자동 저장, `LoadRun`.
 - **`GameTime`**: `Pause/Resume`(이유별로 겹침), `SetSpeed`(배속), `StepFrame`. `Time.timeScale` 기반.
-- **스프라이트 규격(`SpriteSpecs`)**: 필드에 원본을 넣으면 맞춤 창(중심·배율 한 번)으로 그룹의 모든 규격을 GPU 베이크. 예외 촬영 기록. `SpriteSpecs.Get(원본, GameIds.SpritePreset.X)`.
+- **스프라이트 틀(`SpriteFrameData`·`SpriteSpecs`)**: 용도마다 틀 파일 하나의 크기 표(이름·가로·세로). 틀 인스펙터나 틀을 연결한 필드에 원본을 넣으면 맞춤 창(중심·배율 한 번)으로 틀의 모든 크기를 GPU로 한꺼번에 굽는다(여럿을 끌어 놓으면 지금 맞춤으로 모두). 예외 촬영 기록. 크기를 빼면 구운 이미지는 `MomoiProjectBackups/<시각>-sprites/`로. `SpriteSpecs.Get(원본, GameIds.SpriteSize.틀.크기)`.
 - **오디오(`GameAudio`)**: 1.8 참고.
 - **화면·기기 쪽(2026-10-04)**: DB 종류 상태 효과·밸런스 값·가중치 표·설정, 슬롯(`GBibleRuntime.UseSlot`)·설정(`GameSettings`), 연출 대기열·화면 연결(`GameView`·`ViewList`·컴포넌트 '데이터 연결'·'월드 상태 연결'), 씬 흐름(`GameScenes`) — 매뉴얼 29~32장.
 - **다국어 Unity 쪽(`GameLanguage`, `LocalizationSettings`, `TextTable`, `LocalizedText`)**: 1.6 참고.
@@ -87,7 +90,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 
 | 메뉴 | 내용 |
 |---|---|
-| DB | GameData 종류별 탭(시트·카드), 추가·검색·삭제. **모든 변경은 모아 두었다가 탭을 옮길 때만 Unity에 적용**(적용/되돌리기/계속 편집 확인 창, 플레이·창 닫기·종료 때도 묻고 도메인 리로드에도 유지. 예외: 프리팹 컴포넌트 수정·스프라이트 베이크·키워드 연결 창·샘플 메뉴는 즉시). 키워드 탭(그룹·키워드 한 화면, 끌어 놓기로 순서·그룹 이동), 스프라이트 규격 탭(같은 그룹 디자인). |
+| DB | GameData 종류별 탭(시트·카드), 추가·검색·삭제. **모든 변경은 모아 두었다가 탭을 옮길 때만 Unity에 적용**(적용/되돌리기/계속 편집 확인 창, 플레이·창 닫기·종료 때도 묻고 도메인 리로드에도 유지. 예외: 프리팹 컴포넌트 수정·스프라이트 굽기·키워드 연결 창·샘플 메뉴는 즉시). 키워드 탭(그룹·키워드 한 화면, 끌어 놓기로 순서·그룹 이동). |
 | (메뉴 없음) 상세 | DB에서 항목·클래스를 열 때만 뜬다. DB 항목의 상세 속성 창(도킹). 크롬식 탭: 항목이 탭으로 열리고 클래스·배열·리스트에 들어가면 오른쪽에 안쪽 탭. 제목 = ID(눌러서 바로 이름 바꾸기, 참조 따라감). 값은 바로 작업본에 반영. 배치 편집(그리드 12칸 + 블록: 스프라이트 나열·데이터 나열·특정 스프라이트·필드 카드·클래스 카드, 타입별 저장 `ProjectSettings/MomoiProject/Layouts.json`). |
 | (메뉴 없음) 키워드 연결 | 창을 없앴다. DB › 클래스 › 클래스 상세에서 필드마다 연결한다(5.0). |
 | 모니터 | 플레이 중: 통합 기록(인과), 데이터 탭(판 데이터·프로필 데이터·로그·도전과제를 탐색기로, 고치면 Undo 가능), 도전과제 진행도, 이벤트 발생기, 행동 로그, 디버그 명령, 게임 시간 조절. |
@@ -97,7 +100,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 | 다국어 › … | 설정 열기, 시트 내보내기·가져오기(CSV), 번역 검사, DB 이름 키 채우기. |
 | 내 코드 범위 | 1.10. |
 | Tests › UI 샘플 | 디자인 시스템 부품 모음. |
-| 식별자 코드 다시 만들기 · 스프라이트 규격 다시 베이크 | 도구 |
+| 식별자 코드 다시 만들기 · 스프라이트 틀 모두 다시 굽기 | 도구 |
 | Tests › 샘플 › 샘플 데이터 만들기 · 샘플 텍스트 만들기 | 예시 데이터. |
 | (프로젝트 창 우클릭) Assets › MomoiProject › 오디오 재생 · 정지 | 1.8. |
 
@@ -255,6 +258,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 
 ### 3.4 검증 절차
 1. `powershell -File Tools/CompileOffline.ps1` — 모든 어셈블리(모듈 포함) 오프라인 컴파일, 경고 0 유지.
+   - `powershell -File Tools/CompilePlayer.ps1 [-Extra "DEVELOPMENT_BUILD" | "UNITY_SERVER"]` — 런타임 어셈블리만 플레이어 빌드처럼(에디터 심볼·UnityEditor 참조 없이). `#if UNITY_EDITOR` 밖에서 에디터 API를 쓰면 여기서 걸린다(직렬화 칸의 CS0649 경고는 정상). `Tools/CompileMatrix.ps1`은 예전 구조 기준이라 쓰지 않는다.
 2. `powershell -File Tools/RunCoreTests.ps1` — 코어 테스트(새 코어 테스트 파일은 스크립트 목록에 등록; 대역 Shim에 `Assert.IsInstanceOf` 없음).
 3. `powershell -File Tools/Verify.ps1 [-Filter 이름] [-SkipPlayMode]` — Unity 배치 테스트. **사용자 에디터가 이 프로젝트를 열고 있으면 못 돌린다**(에디터 로그: `Logs/Editor.log`). 결과 로그 `Logs/Verify/`.
 4. 기준 결과(2026-09-30): EditMode 231 통과·7 건너뜀, PlayMode 2 통과·3 건너뜀(샘플 데이터가 없어서; `샘플 › 샘플 데이터 만들기` 후 검증됨), 코어 103 통과.
@@ -270,6 +274,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - 클래스 목록을 새로 만들면 `ProjectCode` 필터를 거칠 것.
 - UI Toolkit: 패널에 붙지 않은 요소는 클릭 이벤트가 전달되지 않고 `ScrollView.ScrollTo`가 예외(패널 확인 필요). `maxVisibleCharacters` 없음(→ 알파 태그 방식). `backdrop-filter`·`filter`·`-unity-material`·텍스트 외곽선/그림자·링크 이벤트·월드 공간 패널 지원(6000.6에서 확인).
 - 다이얼로그 시스템 테스트는 `Optional/Dialogue/Tests`(에디터), `…/Tests/PlayMode`.
+- 화면 쪽 시험: `Tests/Editor/PresentationTests.cs`(EditMode — 대기열은 돌지 않고 넣기·남은 것까지), `Tests/PlayMode`(`GBible.Tests.PlayMode` — 플레이 중 호스트 코루틴으로 대기열을 돌림. `GameView.StallSeconds`를 줄여 멈춘 연출 넘기기를 본다). 둘 다 Unity Test Runner에서만 돈다.
 
 ---
 
@@ -306,7 +311,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **'대화' → '다이얼로그 시스템'**(기능 이름). 합친 말은 '다이얼로그 그래프'·'다이얼로그 UI'처럼 쓴다.
 
 **구현**
-- 기능 켜고 끄기: `Editor/Data/GameFeatures.cs`. 상태는 `ProjectSettings/MomoiProject/Features.json`(팀 공유), 스크립팅 심볼(`GBIBLE_DIALOGUE`)은 그 파일에 맞춰 자동으로 넣고 뺀다(지금 고른 플랫폼과 PC). 다이얼로그 어셈블리 4개의 asmdef에 `defineConstraints`. 새 프로젝트는 꺼진 상태로 시작하고, 이 프로젝트는 켜 두었다(Features.json). 새 선택 기능은 `GameFeatures.All`에 한 항목을 더한다(이름·심볼·어셈블리·꺼졌을 때 보일 탭 이름·데이터 클래스).
+- 기능 켜고 끄기: `Editor/Data/GameFeatures.cs`. 상태는 `ProjectSettings/MomoiProject/Features.json`(팀 공유), 스크립팅 심볼(`GBIBLE_DIALOGUE`)은 그 파일에 맞춰 자동으로 넣고 뺀다(고른 플랫폼·지금 빌드 대상·PC·Server(전용 서버), 플랫폼을 바꾸면 그 플랫폼도 — `GameFeatures.Targets`·`GameFeaturesBuildTargetSync`). 다이얼로그 어셈블리 4개의 asmdef에 `defineConstraints`. 새 프로젝트는 꺼진 상태로 시작하고, 이 프로젝트는 켜 두었다(Features.json). 새 선택 기능은 `GameFeatures.All`에 한 항목을 더한다(이름·심볼·어셈블리·꺼졌을 때 보일 탭 이름·데이터 클래스).
 - DB 사이드바: `DatabaseWindow.Tabs()`가 DB 종류 탭 + 독립 탭(`CodexPage.TabLabel`이 있는 화면: 클래스·이벤트) + 꺼진 기능의 흐린 탭을 그룹 순서대로 만든다. 그룹 순서는 `GroupRank`(선언 → 진행 → DB → 이미지 → 데이터 → 선택 기능 → 샘플).
 - 클래스: `ClassCode`(클래스 본문 찾기, 순수 함수 — 코드 쓰기는 2026-10-06 지움), `ClassCatalog`(컴파일된 클래스 + 적용 전 변경 + 그룹 + 기능 클래스를 합친 목록, 파일 찾기, 삭제 검사, 필드 형식 목록), `ClassRegistry`(그룹·폴더·네임스페이스, `ProjectSettings/MomoiProject/Classes.json`), 화면 `ClassesPage`·`EventsPage`·`ClassDetail`·`FeaturePage`.
   - **원본은 C# 파일 하나뿐**이다(따로 정의 파일을 두지 않는다). DB는 TypeCache·리플렉션으로 읽으므로 코드와 DB가 어긋날 수 없고, 읽는 비용은 DB를 그릴 때뿐이다.

@@ -110,6 +110,9 @@ namespace GBible
         {
             if (record.Nested || record.Status != ActionStatus.Done) return; // 안쪽 행동은 바깥 행동이 끝날 때 한 번에
             if (GBibleRuntime.IsSaving) return;                              // 저장 직전(Saving)에 담은 행동은 이번 저장에 들어간다
+            // 시스템 행동(상태 효과 주기·만료·예약·패시브 주기 …)은 틱마다 돌 수 있다: '행동마다' 저장은 플레이어 행동에만 —
+            // 그 변경은 다음 플레이어 행동·끌 때 함께 저장된다(매 프레임 판 파일을 쓰지 않게). 'N초마다'는 간격이 있으니 그대로 센다.
+            if (_mode != RunSaveMode.Interval && IsSystem(record.Action)) return;
             _dirty = true;
             _profileDirty = true;
         }
@@ -233,8 +236,10 @@ namespace GBible
             _dirty = false;
             _profileDirty = false;
             var saveRun = _eachAction && !Ended && Live;
+            // 저장 직전 알림(Saving)을 먼저 — 그 안에서 바뀐 메타 값도 이번 프로필 저장에 들어가게.
+            if (saveRun) GBibleRuntime.NotifySaving(_session);
             if (_profileEachAction || (saveRun && _metaDirty)) GBibleRuntime.SaveProfile(_session);
-            if (saveRun) GBibleRuntime.SaveRun(_session);
+            if (saveRun) GBibleRuntime.WriteRun(_session);
             _metaDirty = false;
             if (saveRun) _lastSave = UnityEngine.Time.unscaledTime;
         }
@@ -242,8 +247,9 @@ namespace GBible
         // N초마다·이벤트 때: 판을 저장하고, 그동안 프로필(메타 구역)이 바뀌었으면 프로필도.
         void Save(bool run, bool profile = true)
         {
+            if (run) GBibleRuntime.NotifySaving(_session);
             if ((profile && _profileEachAction) || (run && _metaDirty)) GBibleRuntime.SaveProfile(_session);
-            if (run) GBibleRuntime.SaveRun(_session);
+            if (run) GBibleRuntime.WriteRun(_session);
             _metaDirty = false;
             _lastSave = UnityEngine.Time.unscaledTime;
         }

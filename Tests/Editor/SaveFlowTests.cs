@@ -78,6 +78,33 @@ namespace GBible.Tests
             Assert.AreEqual(0.0, session.Data.GetNumber("burn"));
         }
 
+
+        // 저장 파일은 임시 파일에 다 쓴 뒤 바꿔 넣고, 바로 전 파일을 .bak으로 남긴다. 빈 파일은 깨진 것("").
+        [Test]
+        public void 저장_파일은_바꿔_넣고_바로_전_파일을_남긴다()
+        {
+            var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "momoi-safefile-" + Guid.NewGuid().ToString("N"));
+            var path = System.IO.Path.Combine(folder, "profile.json");
+            try
+            {
+                Assert.IsNull(SafeFile.ReadAllText(path), "없으면 null");
+                SafeFile.WriteAllText(path, "{\"a\":1}");
+                SafeFile.WriteAllText(path, "{\"a\":2}");
+                Assert.AreEqual("{\"a\":2}", SafeFile.ReadAllText(path));
+                Assert.AreEqual("{\"a\":1}", System.IO.File.ReadAllText(SafeFile.Backup(path)), "바로 전 저장");
+                Assert.IsFalse(System.IO.File.Exists(path + ".tmp"), "임시 파일은 남지 않는다");
+                System.IO.File.WriteAllText(path, "  \n");
+                Assert.AreEqual("", SafeFile.ReadAllText(path), "비었으면 깨진 것");
+                SafeFile.Delete(path);
+                Assert.IsFalse(System.IO.File.Exists(path));
+                Assert.IsFalse(System.IO.File.Exists(SafeFile.Backup(path)), "지우면 .bak도");
+            }
+            finally
+            {
+                if (System.IO.Directory.Exists(folder)) System.IO.Directory.Delete(folder, true);
+            }
+        }
+
         [Serializable] public class SfUnit { public string id; public int hp = 30; }
         [Serializable] public class SfParty { public List<SfUnit> units = new List<SfUnit>(); }
 

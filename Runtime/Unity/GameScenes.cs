@@ -10,8 +10,9 @@ namespace GBible
     // 규칙은 행동 안에서 그 필드만 바꾼다(run.scene = "Battle"). 씬을 직접 열지 않는다.
     //   Bootstrap(게임이 켜질 때 한 번): GameScenes.Follow(GameIds.PlayerData.Run, "scene", emptyScene: "Title");
     // → 이어 하기로 판을 불러오면 그 씬이 열리고, 새 판·판 끝으로 값이 비면 emptyScene이 열리고, Undo로 값이 돌아가면 씬도 돌아간다.
-    // 연출이 재생 중이면 끝난 뒤에 연다. 여는 동안은 연출 대기열의 한 칸이라 GameView.Busy가 참(입력이 막힌다).
+    // 연출이 재생 중이면 끝난 뒤에 연다(같은 프레임에 목록이 넣은 사라지는 연출까지). 여는 동안은 연출 대기열의 한 칸이라 GameView.Busy가 참(입력이 막힌다).
     // 전환 연출: GameScenes.Transition = load => FadeAround(load)  (load를 감싸는 코루틴: 페이드 아웃 → yield return load → 페이드 인).
+    //   전환 연출이 씬을 열지 않고 끝나면(예외·yield return load를 빠뜨림) 경고하고 전환 없이 연다. Loaded는 씬이 열렸을 때만 쏜다.
     public static class GameScenes
     {
         static IDisposable _watch;
@@ -41,6 +42,7 @@ namespace GBible
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
+            GameView.Presented -= OnPresented;
             _watch = null;
             _key = _path = _emptyScene = _loading = null;
             Hold = false;
@@ -55,17 +57,29 @@ namespace GBible
             _path = path ?? "";
             _emptyScene = emptyScene;
             _watch = GameView.RedrawAfterPresentation(Check, key);
+            GameView.Presented -= OnPresented;
+            GameView.Presented += OnPresented;
         }
 
         public static void Stop()
         {
             _watch?.Dispose();
             _watch = null;
+            GameView.Presented -= OnPresented;
+        }
+
+        // 대기열이 비었는데 씬 열기가 끝나지 않았다(전환 연출이 30초 넘게 나아가지 않아 GameView가 넘겼다 — 버리기에는 끝까지 돈다):
+        // 판 값의 씬이 아직 열리지 않았을 수 있으니 다음 프레임 끝에 다시 본다(이미 그 씬이면 아무 일도 없다).
+        static void OnPresented()
+        {
+            if (_loading == null || _watch == null) return;
+            _loading = null;
+            GameView.MarkDirty(_watch);
         }
 
         static void Check()
         {
-            // 연출 대기열이 비었을 때만 불린다(Redraw가 기다린다) → 앞서 연 씬은 끝났다.
+            // 연출 대기열이 비었을 때만 불린다(Redraw가 기다린다 — 같은 프레임에 넣은 사라지는 연출까지) → 앞서 연 씬은 끝났다.
             _loading = null;
             var session = GBibleRuntime.Session;
             if (Hold || session == null || string.IsNullOrEmpty(_key) || !session.Data.IsDefined(_key)) return;
@@ -79,21 +93,50 @@ namespace GBible
                 return;
             }
             _loading = target;
-            GameView.Present(Open(target));
+            // 대기열의 한 칸(여는 동안 Busy)이지만 버리기(ClearPresentation)에도 끝까지 연다.
+            GameView.PresentSceneChange(Open(target));
         }
 
         static IEnumerator Open(string scene)
         {
-            var load = Load(scene);
-            yield return Transition != null ? Transition(load) : load;
+            var load = new SceneLoad();
+            if (Transition != null)
+            {
+                IEnumerator transition = null;
+                try { transition = Transition(load.Run(scene)); }
+                catch (Exception e) { Debug.LogException(e); }
+                if (transition != null) yield return transition;
+                // 전환 연출이 씬 열기(load)를 돌리지 않고 끝났다(연출 안의 예외로 멈춤·yield return load를 빠뜨림) → 전환 없이 연다.
+                if (!load.Started) Warn($"전환 연출(GameScenes.Transition)이 씬 '{scene}'을(를) 열지 않고 끝나 전환 없이 엽니다(연출 안의 예외나 yield return load를 빠뜨렸는지 확인).");
+            }
+            if (!load.Started) yield return load.Run(scene);
             if (_loading == scene) _loading = null;
-            Loaded?.Invoke(scene);
+            // 열렸을 때만 알린다(못 열었는데 쏘면 받는 쪽이 그 씬의 배경음·화면을 띄운다).
+            if (load.Done || IsCurrent(scene)) Loaded?.Invoke(scene);
+            else Warn($"씬 '{scene}'을(를) 열지 못했습니다(지금 씬 '{Current}').");
         }
 
-        static IEnumerator Load(string scene)
+        // 씬 열기 한 번 — 전환 연출이 돌렸는지(Started), 끝까지 열었는지(Done) 본다.
+        sealed class SceneLoad
         {
-            var operation = SceneManager.LoadSceneAsync(scene);
-            while (operation != null && !operation.isDone) yield return null;
+            public bool Started;
+            public bool Done;
+
+            public IEnumerator Run(string scene)
+            {
+                Started = true;
+                var operation = SceneManager.LoadSceneAsync(scene);
+                if (operation == null) yield break;
+                while (!operation.isDone) yield return null;
+                Done = true;
+            }
+        }
+
+        static void Warn(string message)
+        {
+            var session = GBibleRuntime.Session;
+            if (session != null) session.Journal.Append(JournalKind.Warning, "Scenes", message);
+            else Debug.LogWarning("[MomoiProject] " + message);
         }
     }
 }

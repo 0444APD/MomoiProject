@@ -56,7 +56,8 @@ namespace GBible
             foreach (var key in data.Keys.ToArray())
             {
                 if (key == Key || data.ZoneOf(key) != DataZone.Session) continue;
-                trees[key] = data.ExportTree(key);
+                // 요소마다 ID를 남긴다 — 되감을 때 지금 인스턴스와 ID로 짝지어(순서가 바뀌거나 빠졌어도) 같은 인스턴스로 되돌린다.
+                trees[key] = data.ExportTree(key, elementIds: true);
             }
             var json = MiniJson.Serialize(trees);
             long serial = 0;
@@ -107,10 +108,13 @@ namespace GBible
             if (!trees.TryGetValue(key, out var tree)) return false;
             var past = data.FromTree(key, tree);
             if (past == null) return false;
-            var node = Mirror.Make(past);
-            var then = Mirror.FindById(node, entity.GetType(), id);
+            var type = entity.GetType();
+            var then = data.IsMirroredKey(key)
+                ? Mirror.FindById(Mirror.Make(past), type, id)
+                : DataModel.FindObject(past, o => type.IsInstanceOfType(o) && GameApi.IdOf(o) == id);
             if (then == null) return false;
-            DataModel.ApplyInPlace(entity, then, data.Identity);
+            // Modify로 고친다 — 예전 방식 데이터도 이 행동의 변경으로 기록된다(Mirror 데이터는 어차피 Sync가 잡는다).
+            data.Modify<object>(key, _ => DataModel.ApplyInPlace(entity, then, data.Identity));
             return true;
         }
 

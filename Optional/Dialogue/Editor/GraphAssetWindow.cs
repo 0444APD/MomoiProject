@@ -313,7 +313,7 @@ namespace GBible.EditorTools.Graph
             var suggested = EditorDatabase.Instance.NextId(info);
             GsDialog.Form(_root, $"새 {Noun}", "ID는 lowerCamelCase로 짓습니다(예: shopIntro).",
                 new List<DialogField> { new DialogField { Key = "id", Label = "id", Value = suggested } }, "만들기",
-                values => EditorDatabase.Instance.CanUseId(values["id"], null, out var error) ? null : error,
+                values => EditorDatabase.Instance.CanUseId(values["id"], null, AssetType, out var error) ? null : error,
                 values =>
                 {
                     var data = EditorDatabase.Instance.Create(AssetType, values["id"]);
@@ -390,6 +390,10 @@ namespace GBible.EditorTools.Graph
                 var error = TextFormat.Parse(line.text).Error;
                 if (error != null) yield return "대사 문법 오류: " + error;
             }
+            var noFallback = DialogueChecks.ChoicesWithoutFallback(graph).Count;
+            if (noFallback > 0) yield return $"선택지가 모두 조건부인 대사 {noFallback}개(다 막히면 '고를 선택지 없음' 점으로 — 잇지 않으면 다이얼로그 끝)";
+            var loops = DialogueChecks.LoopingEffects(graph).Count;
+            if (loops > 0) yield return $"신호가 고리로 이어진 효과 {loops}개(끝없이 반복 — 두 번째 바퀴부터는 클릭을 막지 않음)";
         }
     }
 
@@ -431,6 +435,8 @@ namespace GBible.EditorTools.Graph
             if (entries.Count > 0 && !entries.Any(e => graph.From(e.guid, PresetEntryNode.StartPort).Any())) yield return "'프리셋 시작'에 이어진 효과가 없습니다";
             foreach (var duplicate in graph.OfType<PresetOutputNode>().GroupBy(o => o.signal).Where(g => g.Count() > 1))
                 yield return $"내보내는 신호 '{duplicate.Key}'가 {duplicate.Count()}곳에 있습니다(한 이름은 한 곳에서)";
+            var loops = DialogueChecks.LoopingEffects(graph).Count;
+            if (loops > 0) yield return $"신호가 고리로 이어진 효과 {loops}개(끝없이 반복 — 두 번째 바퀴부터는 클릭을 막지 않음)";
         }
     }
 

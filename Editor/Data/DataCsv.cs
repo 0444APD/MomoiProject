@@ -21,6 +21,7 @@ namespace GBible.EditorTools
     // 목록의 길이는 값이 있는 마지막 줄 번호까지다(뒤쪽 줄을 모두 비우면 그만큼 줄어든다). 새로 생긴 줄은 그 클래스·형식의 기본값에서 시작한다.
     // 목록 안의 빈 글자는 ""로 적는다(빈 칸은 '값 없음'이라 맨 뒤 빈 글자 줄이 사라지지 않게 — 내보낼 때 필요한 곳에 적는다).
     // enum 칸은 코드 이름(Flat)과 DB에 보이는 이름(플랫(+값)) 모두 읽는다. 내보낼 때는 코드 이름.
+    // 숫자 칸은 천 단위 쉼표(1,000·1,000.5)와 소수 쉼표 하나(0,5)도 읽는다. 어느 쪽인지 알 수 없는 쉼표(1.000,5·0,500)는 그 칸을 오류로 알린다.
     // 파일은 UTF-8로 읽는다(Excel은 'CSV UTF-8'로 저장). 다른 인코딩이면 읽지 않고 알린다(한글이 깨진 채 들어가지 않게).
     public static class DataCsv
     {
@@ -28,6 +29,9 @@ namespace GBible.EditorTools
         // 목록 안의 빈 글자 표시(가져올 때 빈 글자로 읽는다).
         const string EmptyText = "\"\"";
         static readonly Regex Index = new Regex(@"\[(\d+)\]", RegexOptions.CultureInvariant);
+        // 천 단위 쉼표(1,000 · -1,234,567 · 1,000.5)와 소수 쉼표 하나(0,5 · 3,14 — 쉼표 뒤가 세 자리면 천 단위와 헷갈려 받지 않는다).
+        static readonly Regex Grouped = new Regex(@"^[+-]?[1-9][0-9]{0,2}(,[0-9]{3})+(\.[0-9]+)?$", RegexOptions.CultureInvariant);
+        static readonly Regex DecimalComma = new Regex(@"^[+-]?[0-9]+,([0-9]{1,2}|[0-9]{4,})$", RegexOptions.CultureInvariant);
 
         public static string Export(Type kind, Type valueClass = null)
         {
@@ -155,20 +159,30 @@ namespace GBible.EditorTools
         {
             var path = EditorUtility.OpenFilePanel("CSV 가져오기", "", "csv");
             if (string.IsNullOrEmpty(path)) return;
-            string text;
-            try
-            {
-                // UTF-8만(잘못된 바이트면 예외). Excel의 기본 'CSV'(한국어 Windows = CP949)는 한글이 깨진 채 들어가므로 멈춘다.
-                text = File.ReadAllText(path, new UTF8Encoding(false, true));
-            }
-            catch (DecoderFallbackException)
-            {
-                EditorUtility.DisplayDialog("CSV 가져오기", "CSV를 UTF-8로 저장해 주세요(Excel: CSV UTF-8).\n아무것도 바꾸지 않았습니다.", "확인");
-                return;
-            }
+            if (!TryReadUtf8(path, "CSV 가져오기", out var text)) return;
             var report = Import(kind, valueClass, text);
             EditorUtility.DisplayDialog("CSV 가져오기", report, "확인");
         }
+
+        // UTF-8로만 읽는다. Excel의 기본 'CSV'(한국어 Windows = CP949)는 한글이 깨진 채(U+FFFD) 들어가므로 알리고 멈춘다(아무것도 바꾸지 않음).
+        // 텍스트 시트 가져오기도 쓴다.
+        internal static bool TryReadUtf8(string path, string title, out string text)
+        {
+            try
+            {
+                text = ReadUtf8(path);
+                return true;
+            }
+            catch (DecoderFallbackException)
+            {
+                EditorUtility.DisplayDialog(title, "CSV를 UTF-8로 저장해 주세요(Excel: CSV UTF-8).\n아무것도 바꾸지 않았습니다.", "확인");
+                text = null;
+                return false;
+            }
+        }
+
+        // 잘못된 바이트(UTF-8이 아님)면 DecoderFallbackException.
+        internal static string ReadUtf8(string path) => File.ReadAllText(path, new UTF8Encoding(false, true));
 
         // 인스턴스 탭: 값의 클래스 목록(내보내기 메뉴용).
         public static IEnumerable<Type> InstanceClasses() =>
@@ -370,21 +384,27 @@ namespace GBible.EditorTools
             }
         }
 
-        static bool Parse(SerializedProperty property, string cell, out string error)
+        internal static bool Parse(SerializedProperty property, string cell, out string error)
         {
             error = null;
             var text = (cell ?? "").Trim();
             switch (property.propertyType)
             {
                 case SerializedPropertyType.Integer:
-                    if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var whole)) { property.longValue = whole; return true; }
-                    if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var rounded) && Math.Abs(rounded - Math.Round(rounded)) < 1e-9) { property.longValue = (long)Math.Round(rounded); return true; }
-                    error = $"정수가 아닙니다('{text}')";
+                {
+                    var plain = PlainNumber(text);
+                    if (long.TryParse(plain, NumberStyles.Integer, CultureInfo.InvariantCulture, out var whole)) { property.longValue = whole; return true; }
+                    if (double.TryParse(plain, NumberStyles.Float, CultureInfo.InvariantCulture, out var rounded) && Math.Abs(rounded - Math.Round(rounded)) < 1e-9) { property.longValue = (long)Math.Round(rounded); return true; }
+                    error = plain == null ? CommaError(text) : $"정수가 아닙니다('{text}')";
                     return false;
+                }
                 case SerializedPropertyType.Float:
-                    if (double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) { property.doubleValue = number; return true; }
-                    error = $"숫자가 아닙니다('{text}')";
+                {
+                    var plain = PlainNumber(text);
+                    if (double.TryParse(plain, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) { property.doubleValue = number; return true; }
+                    error = plain == null ? CommaError(text) : $"숫자가 아닙니다('{text}')";
                     return false;
+                }
                 case SerializedPropertyType.Boolean:
                     switch (text.ToLowerInvariant())
                     {
@@ -410,5 +430,18 @@ namespace GBible.EditorTools
                     return false;
             }
         }
+
+        // 숫자 칸의 글자 → 읽을 수 있는 꼴(알 수 없으면 null). 쉼표가 없으면 그대로(1000.5 · 1e3).
+        // 천 단위 쉼표(한국어 Excel·구글 시트의 1,000 · 1,000.5)는 뺀다. 소수 쉼표 하나(0,5)는 점이 없고 쉼표 뒤가 세 자리가 아닐 때만 점으로.
+        // 그 밖의 쉼표(1.000,5 · 0,500 · 1,00,000)는 어느 쪽인지 알 수 없어 읽지 않는다 — 쉼표를 모두 점으로 바꾸면 1,000이 1이 되어 값이 1000배 작아진다.
+        internal static string PlainNumber(string text)
+        {
+            if (text == null || text.IndexOf(',') < 0) return text;
+            if (Grouped.IsMatch(text)) return text.Replace(",", "");
+            if (DecimalComma.IsMatch(text)) return text.Replace(',', '.');
+            return null;
+        }
+
+        static string CommaError(string text) => $"쉼표가 천 단위인지 소수점인지 알 수 없습니다('{text}' — 1000.5처럼 적어 주세요)";
     }
 }

@@ -525,10 +525,22 @@ namespace GBible
             // 자리 순서: 같은 묶음(OrderGroup)의 항목들은 등록 순서가 아니라 가진 쪽의 자리(order)대로 섞여서 발동한다(조커 칸 왼쪽부터).
             public Func<TriggerContext, IEnumerable<(object holder, int order)>> OrderedHolders;
             public string OrderGroup;
+            // 반복이 아닌 항목이 행동 안에서 발동했다: 그 행동이 성공하면 지우고, 취소되면(미리보기·CanDo·실패한 행동) 되살린다 —
+            // 해 보기만 했거나 없던 일이 된 실행이 감시를 잃지 않게. 등록 순서도 그대로다(지웠다 다시 넣지 않는다).
+            public bool Spent;
+            // 발동시킨 이벤트(있으면). 행동 안에서 일부만 되돌린 이벤트(실패한 이벤트 예약)로 발동한 것도 되살린다.
+            public object SpentBy;
+            // 감시에서 뺐다(Unregister·발동이 굳음).
+            public bool Removed;
+
+            // 지금 발동할 수 있다(빠지지 않았고, 이번 행동에서 이미 쓰이지 않았다).
+            public bool Live => !Removed && !Spent;
         }
 
         readonly GameSession _session;
         readonly List<Entry> _entries = new List<Entry>();
+        // 행동 안에서 발동해 쓰인(Spent) 반복이 아닌 항목.
+        readonly List<Entry> _spent = new List<Entry>();
         readonly Dictionary<string, List<Entry>> _byEvent = new Dictionary<string, List<Entry>>(StringComparer.Ordinal);
         // 가로채기 잎: 의도 형식 → (순서, 항목).
         readonly Dictionary<string, List<(int order, Entry entry)>> _byIntent = new Dictionary<string, List<(int, Entry)>>(StringComparer.Ordinal);
@@ -542,6 +554,13 @@ namespace GBible
             _session = session;
             Watcher = new ConditionWatcher(session);
             session.Events.SubscribeAll(OnEvent);
+            // 반복이 아닌 항목의 발동은 바깥 행동이 성공해야 굳는다. 취소되면 감시가 그대로 남는다.
+            session.Actions.Executed += record =>
+            {
+                if (!record.Nested && record.Status == ActionStatus.Done) Settle();
+            };
+            session.Actions.TransactionAborted += _ => Revive(null);
+            session.Events.Retracted += evt => Revive(evt);
         }
 
         public ConditionWatcher Watcher { get; }
@@ -549,7 +568,7 @@ namespace GBible
         // 지금 검사·발동 중인 순간(조건·결과 Block이 이벤트·사용자·대상을 볼 때). 밖에서는 null.
         public TriggerContext Current { get; private set; }
 
-        public int Count => _entries.Count;
+        public int Count => _entries.Count(e => !e.Spent);
 
         // owner의 트리거를 감시한다. fire: 발동했을 때(결과 실행은 부르는 쪽이 RunOutcomes로). repeat이 아니면 한 번 발동하면 감시를 그만둔다.
         // holders를 주면 가진 쪽마다 검사한다: 순간마다 holders(순간)의 각 객체를 컨텍스트의 사용자(User)로 넣어 트리거 전체(조건 포함)를
@@ -598,7 +617,7 @@ namespace GBible
                 var done = new HashSet<(int, string)>();
                 foreach (var (order, entry) in sorted)
                 {
-                    if (!_entries.Contains(entry)) continue;
+                    if (!entry.Live) continue;
                     if (Intents.IsCancelled(intent)) break;
                     if (entry.OrderGroup != null)
                     {
@@ -615,20 +634,66 @@ namespace GBible
             return intent;
         }
 
+        // owner의 항목을 모두 뺀다. 이번 행동에서 쓰인 항목도 빼서 행동이 취소돼도 되살아나지 않는다(감시를 그만둔 것이 먼저다).
         public void Unregister(string owner)
         {
             foreach (var entry in _entries.Where(e => e.Owner == owner).ToList()) Remove(entry);
         }
 
-        public bool IsRegistered(string owner) => _entries.Any(e => e.Owner == owner);
+        // 지금 감시 중인가(이번 행동에서 이미 발동해 쓰인 반복이 아닌 항목은 빼고 본다).
+        public bool IsRegistered(string owner) => _entries.Any(e => e.Owner == owner && !e.Spent);
+
+        // owner의 조건 감시를 다음 Flush에서 다시 평가하게 한다(불러온 뒤 새로 감시를 시작한 것 — 이미 참이면 그때 발동한다).
+        public void Touch(string owner)
+        {
+            foreach (var entry in _entries.Where(e => e.Owner == owner && e.Live && e.WatchKey != null)) Watcher.Touch(entry.WatchKey);
+        }
 
         void Remove(Entry entry)
         {
+            entry.Removed = true;
             _entries.Remove(entry);
+            if (entry.Spent) _spent.Remove(entry);
             foreach (var list in _byEvent.Values) list.Remove(entry);
             foreach (var list in _byIntent.Values) list.RemoveAll(p => p.entry == entry);
             if (entry.WatchKey != null) Watcher.Unwatch(entry.WatchKey);
             entry.WatchKey = null;
+        }
+
+        // 반복이 아닌 항목이 발동했다: 행동 밖이면 바로 빼고, 행동 안이면 쓰인 것으로 두었다가 바깥 행동이 성공하면 뺀다(Settle).
+        void Consume(Entry entry, TriggerContext moment)
+        {
+            if (!_session.Data.InTransaction)
+            {
+                Remove(entry);
+                return;
+            }
+            entry.Spent = true;
+            entry.SpentBy = moment?.Event;
+            _spent.Add(entry);
+        }
+
+        // 바깥 행동이 성공했다: 그 행동에서 쓰인 항목을 뺀다.
+        void Settle()
+        {
+            if (_spent.Count == 0) return;
+            foreach (var entry in _spent.ToArray()) Remove(entry);
+            _spent.Clear();
+        }
+
+        // 행동이 취소됐다(retracted = null): 그 행동에서 쓰인 항목을 모두 되살린다. 이벤트 하나만 되돌렸으면 그 이벤트로 쓰인 것만.
+        // 조건 감시로 발동해 감시가 빠진 항목은 다시 감시한다.
+        void Revive(object retracted)
+        {
+            if (_spent.Count == 0) return;
+            foreach (var entry in _spent.ToArray())
+            {
+                if (retracted != null && !ReferenceEquals(entry.SpentBy, retracted)) continue;
+                _spent.Remove(entry);
+                entry.Spent = false;
+                entry.SpentBy = null;
+                if (!entry.Removed && entry.WatchKey == null && (entry.Kinds & TriggerKinds.Condition) != 0) WatchConditions(entry, armed: true);
+            }
         }
 
         // 조건이 들어 있는 트리거: 조건이 읽는 값이 바뀔 때 이벤트 없는 순간으로 검사한다(OR 안의 조건도 이렇게 발동한다).
@@ -642,7 +707,7 @@ namespace GBible
                 entry.WatchKey = null;
                 if (entry.Holders == null) Fire(entry, Moment(entry.Owner));
                 else TestAndFire(entry, Moment(entry.Owner));
-                if (entry.Repeat && _entries.Contains(entry)) WatchConditions(entry, armed: false);
+                if (entry.Repeat && entry.Live) WatchConditions(entry, armed: false);
             });
         }
 
@@ -666,7 +731,7 @@ namespace GBible
                 HashSet<string> done = null;
                 foreach (var entry in ordered)
                 {
-                    if (!_entries.Contains(entry)) continue;
+                    if (!entry.Live) continue;
                     if (entry.OrderGroup != null)
                     {
                         // 같은 묶음('놓인 것마다' 패시브가 보는 같은 목록)은 처음 만난 자리에서 한꺼번에, 자리 순서로.
@@ -699,6 +764,8 @@ namespace GBible
         }
 
         // 검사해서 참이면 발동. 가진 쪽마다 검사하는 항목은 가진 쪽마다(User = 가진 쪽) 따로.
+        // 앞 가진 쪽의 결과가 뒤 가진 쪽을 없앴으면(데이터에서 빠짐·상태 효과가 풀림·목록에서 빠짐) 그 가진 쪽은 발동하지 않는다:
+        // 결과가 돈 뒤에만 가진 쪽 목록을 한 번 다시 만들어 본다(아무도 발동하지 않은 동안은 다시 만들지 않는다).
         void TestAndFire(Entry entry, TriggerContext moment)
         {
             if (entry.Holders == null)
@@ -706,12 +773,21 @@ namespace GBible
                 if (Test(entry.When, moment)) Fire(entry, moment);
                 return;
             }
+            HashSet<object> still = null;
+            var fired = false;
             foreach (var holder in HoldersOf(entry, moment))
             {
+                if (fired)
+                {
+                    still ??= new HashSet<object>(HoldersOf(entry, moment), RefEq.Instance);
+                    if (!still.Contains(holder)) continue;
+                }
                 var each = ForHolder(moment, holder);
                 if (!Test(entry.When, each)) continue;
                 Fire(entry, each);
-                if (!_entries.Contains(entry)) break;
+                fired = true;
+                still = null;
+                if (!entry.Live) break;
                 if (each.IsIntercept && Intents.IsCancelled(each.Event)) break;
             }
         }
@@ -728,7 +804,7 @@ namespace GBible
             }
             foreach (var item in queue.OrderBy(q => q.order).ThenBy(q => q.seq).ToList())
             {
-                if (!_entries.Contains(item.entry)) continue;
+                if (!item.entry.Live) continue;
                 if (intercept && Intents.IsCancelled(evt)) break;
                 var moment = new TriggerContext { Session = _session, Owner = item.entry.Owner, Event = evt, IsIntercept = intercept };
                 if (!HoldersOf(item.entry, moment).Any(h => ReferenceEquals(h, item.holder))) continue;
@@ -765,7 +841,7 @@ namespace GBible
 
         void Fire(Entry entry, TriggerContext moment)
         {
-            if (!entry.Repeat) Remove(entry);
+            if (!entry.Repeat) Consume(entry, moment);
             var previous = Current;
             Current = moment;
             try { entry.Fire?.Invoke(moment); }

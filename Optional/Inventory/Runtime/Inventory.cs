@@ -26,7 +26,7 @@ namespace GBible.InventorySystem
         {
             var total = 0;
             foreach (var slot in slots)
-                if (slot != null && slot.item == itemId) total += slot.count;
+                if (slot != null && slot.item == itemId && slot.count > 0) total += slot.count;
             return total;
         }
 
@@ -76,6 +76,12 @@ namespace GBible.InventorySystem
             {
                 var slot = slots[i];
                 if (slot == null || slot.item != itemId) continue;
+                // 0개·음수인 칸(잘못 고친 값)은 빈 칸으로 치운다 — 음수를 빼면 오히려 더 많이 빼게 된다.
+                if (slot.count <= 0)
+                {
+                    slots.RemoveAt(i);
+                    continue;
+                }
                 var take = Math.Min(left, slot.count);
                 slot.count -= take;
                 left -= take;

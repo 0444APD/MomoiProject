@@ -79,6 +79,53 @@ namespace GBible.Tests
         public TestNode next;
     }
 
+    // 같은 객체를 두 곳(목록·필드)에서 가리키는 데이터.
+    [Serializable]
+    public sealed class TestGraph
+    {
+        public List<TestNode> nodes = new List<TestNode>();
+        public TestNode pinned;
+    }
+
+    // [Serializable]이 없는 자기 참조 클래스: 예전 방식(리플렉션 비교).
+    public sealed class TestPlainNode
+    {
+        public int value;
+        public TestPlainNode next;
+    }
+
+    // 빈 칸(null)이 섞인 고정 칸 배열: 예전 방식.
+    public sealed class TestPlainSlots
+    {
+        public TestPlainItem[] slots = new TestPlainItem[3];
+    }
+
+    // 처음 값에 요소가 든 데이터(새 판의 시작 덱 같은 것).
+    [Serializable]
+    public sealed class TestDeck
+    {
+        public List<TestItem> cards = new List<TestItem> { new TestItem { name = "타격", level = 1 }, new TestItem { name = "수비", level = 1 } };
+    }
+
+    // 인터페이스 형식 컬렉션 칸: 담을 수 없다(불러올 때 실제 형식을 정할 수 없고 비교 코드도 안쪽을 놓친다).
+    [Serializable]
+    public sealed class TestInterfaceBag
+    {
+        public IList<int> items = new List<int>();
+    }
+
+    // 불러올 때 깨진 키·형식을 견디는지 보는 데이터.
+    [Serializable]
+    public sealed class TestKeyed
+    {
+        public Dictionary<TestElement, int> byElement = new Dictionary<TestElement, int>();
+        public Dictionary<Guid, int> byGuid = new Dictionary<Guid, int>();
+        public Dictionary<TimeSpan, string> byTime = new Dictionary<TimeSpan, string>();
+        public ITestEffect effect;
+        public TestElement flags;
+        public int after = 3;
+    }
+
     [Serializable]
     public sealed class TestCollections
     {
@@ -341,14 +388,264 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 순환_참조는_알기_쉬운_오류로_막는다()
+        public void Permanent_안에서도_행동은_이어지고_그_변경만_Undo에서_빠진다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var inv = session.Data.Define("s:inv", DataZone.Session, new TestInventory());
+            session.Data.Define("s:flag", DataZone.Session, 0.0);
+            bool inside = false;
+            session.Actions.Register<DataAction>(_ =>
+            {
+                session.Data.Modify<TestInventory>("s:inv", i => i.gold = 10);
+                using (session.Data.Permanent())
+                {
+                    inside = session.Data.InTransaction;
+                    session.Data.Set("s:flag", 1.0);
+                    session.Data.Modify<TestInventory>("s:inv", i => i.counts["kept"] = 1);
+                }
+            });
+            session.Do(new DataAction());
+            Assert.IsTrue(inside, "Permanent 안에서도 행동은 진행 중이다");
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(0, inv.gold, "행동의 변경은 되돌린다");
+            Assert.AreEqual(1.0, session.Data.Get<double>("s:flag"), "Permanent 안의 변경은 남는다");
+            Assert.AreEqual(1, inv.counts["kept"]);
+        }
+
+        [Test]
+        public void Permanent_안의_변경도_행동이_실패하거나_미리보기면_취소된다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var inv = session.Data.Define("s:inv", DataZone.Session, new TestInventory());
+            session.Data.Define("s:flag", DataZone.Session, 0.0);
+            var fail = false;
+            session.Actions.Register<DataAction>(_ =>
+            {
+                using (session.Data.Permanent())
+                {
+                    session.Data.Set("s:flag", 1.0);
+                    session.Data.Modify<TestInventory>("s:inv", i => i.counts["kept"] = 1);
+                }
+                if (fail) throw new InvalidOperationException("의도된 실패");
+            });
+            var seen = session.Game.Preview(new DataAction(), g => g.Session.Data.Get<double>("s:flag"));
+            Assert.AreEqual(1.0, seen, "미리보기 안에서는 보인다");
+            Assert.AreEqual(0.0, session.Data.Get<double>("s:flag"), "미리보기 뒤에는 남지 않는다");
+            Assert.IsFalse(inv.counts.ContainsKey("kept"));
+            fail = true;
+            Assert.Throws<InvalidOperationException>(() => session.Do(new DataAction()));
+            Assert.AreEqual(0.0, session.Data.Get<double>("s:flag"), "실패한 행동의 Permanent 변경도 없던 일");
+            Assert.IsFalse(inv.counts.ContainsKey("kept"));
+            fail = false;
+            session.Do(new DataAction());
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(1.0, session.Data.Get<double>("s:flag"), "성공한 행동을 Undo해도 Permanent 변경은 남는다");
+            Assert.AreEqual(1, inv.counts["kept"]);
+        }
+
+        [Test]
+        public void 행동_밖_Permanent에서_시작한_행동은_이력에_없지만_실패하면_취소된다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var inv = session.Data.Define("s:inv", DataZone.Session, new TestInventory());
+            bool fail = false;
+            session.Actions.Register<DataAction>(_ =>
+            {
+                session.Data.Modify<TestInventory>("s:inv", i => i.gold += 5);
+                if (fail) throw new InvalidOperationException("의도된 실패");
+            });
+            using (session.Data.Permanent()) session.Do(new DataAction());
+            Assert.AreEqual(5, inv.gold);
+            Assert.AreEqual(0, session.Data.HistoryCount, "되돌리지 않을 행동이라 이력에 없다");
+            fail = true;
+            using (session.Data.Permanent()) Assert.Throws<InvalidOperationException>(() => session.Do(new DataAction()));
+            Assert.AreEqual(5, inv.gold, "실패한 행동은 통째로 취소된다");
+        }
+
+        [Test]
+        public void 저장점에서_Sync해도_꺼낸_예전_방식_데이터의_변경은_행동에_남는다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            session.Data.Define("s:bag", DataZone.Session, new TestPlainBag());
+            session.Actions.Register<DataAction>(_ =>
+            {
+                var bag = session.Data.Get<TestPlainBag>("s:bag");
+                bag.gold = 7;
+                var point = session.Data.Mark();
+                bag.gold = 9;
+                session.Data.RollbackTo(point);
+            });
+            session.Do(new DataAction());
+            var after = session.Data.Get<TestPlainBag>("s:bag");
+            Assert.AreEqual(7, after.gold, "저장점 뒤만 취소된다");
+            Assert.IsFalse(session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("Modify를 거치지 않고")), "행동 안에서 꺼낸 값을 고친 것은 경고하지 않는다");
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(0, after.gold, "저장점 앞의 변경도 Undo된다");
+        }
+
+        [Test]
+        public void 나중에_정의한_단순_값도_저장_형식대로_읽는다()
+        {
+            var when = new DateTime(2026, 10, 7, 9, 30, 0, DateTimeKind.Utc);
+            var source = new GameSession(new SessionOptions { Seed = 1 });
+            source.Data.Define("s:when", DataZone.Session, when);
+            var json = source.ExportRun();
+            var loaded = new GameSession(new SessionOptions { Seed = 1 });
+            loaded.ImportRun(json);
+            loaded.Data.Define("s:when", DataZone.Session, default(DateTime));
+            Assert.AreEqual(when, loaded.Data.Get<DateTime>("s:when"));
+        }
+
+        [Test]
+        public void 인터페이스_컬렉션_칸은_등록할_때_막는다()
         {
             var session = new GameSession();
-            var node = new TestNode();
-            node.next = node;
-            var e = Assert.Throws<InvalidOperationException>(() => session.Data.Define("s:node", DataZone.Session, node));
-            StringAssert.Contains("순환 참조", e.Message);
-            Assert.DoesNotThrow(() => session.Data.Define("s:chain", DataZone.Session, new TestNode { next = new TestNode() }), "자기 타입을 필드로 갖는 것 자체는 괜찮다");
+            var e = Assert.Throws<ArgumentException>(() => session.Data.Define("s:ibag", DataZone.Session, new TestInterfaceBag()));
+            StringAssert.Contains("List<T>", e.Message);
+        }
+
+        [Test]
+        public void 서로_가리키는_객체도_담고_되돌리고_저장한다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var a = new TestNode { value = 1 };
+            var b = new TestNode { value = 2, next = a };
+            a.next = b;
+            var graph = session.Data.Define("s:graph", DataZone.Session, new TestGraph { nodes = { a, b }, pinned = a });
+            session.Actions.Register<DataAction>(_ => session.Data.Modify<TestGraph>("s:graph", g => g.nodes[1].value = 20));
+            session.Do(new DataAction());
+            Assert.AreEqual(20, b.value);
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(2, b.value);
+            Assert.AreSame(a, graph.pinned);
+            Assert.AreSame(a, b.next);
+
+            var json = session.ExportRun();
+            var loaded = new GameSession(new SessionOptions { Seed = 1 });
+            var into = loaded.Data.Define("s:graph", DataZone.Session, new TestGraph());
+            loaded.ImportRun(json);
+            Assert.AreEqual(2, into.nodes.Count);
+            Assert.AreSame(into.nodes[0], into.pinned, "두 곳에서 가리키던 객체는 불러온 뒤에도 같은 인스턴스");
+            Assert.AreSame(into.nodes[1], into.nodes[0].next);
+            Assert.AreSame(into.nodes[0], into.nodes[1].next, "서로 가리키던 객체도 그대로");
+            Assert.AreEqual(2, into.nodes[1].value);
+            Assert.DoesNotThrow(() => loaded.ExportRun(), "불러온 값도 다시 저장된다");
+            Assert.DoesNotThrow(() => session.Data.Define("s:chain", DataZone.Session, new TestNode { next = new TestNode() }), "자기 타입을 필드로 갖는 것 자체도 괜찮다");
+        }
+
+        [Test]
+        public void 예전_방식_데이터도_서로_가리키는_객체를_담는다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var a = new TestPlainNode { value = 1 };
+            a.next = new TestPlainNode { value = 2, next = a };
+            session.Data.Define("s:plain", DataZone.Session, a);
+            session.Actions.Register<DataAction>(_ => session.Data.Modify<TestPlainNode>("s:plain", n => n.next.value = 5));
+            session.Do(new DataAction());
+            Assert.AreEqual(5, a.next.value);
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(2, a.next.value);
+            Assert.AreSame(a, a.next.next, "되돌린 뒤에도 서로 가리킨다");
+
+            var json = session.ExportRun();
+            var loaded = new GameSession(new SessionOptions { Seed = 1 });
+            var into = loaded.Data.Define("s:plain", DataZone.Session, new TestPlainNode());
+            loaded.ImportRun(json);
+            Assert.AreSame(into, into.next.next);
+            Assert.AreEqual(2, into.next.value);
+        }
+
+        [Test]
+        public void 가리키는_곳을_먼저_읽어도_같은_인스턴스로_잇는다()
+        {
+            // 필드 순서가 바뀐 저장: 번호로 가리키는 곳($ref)이 처음 쓴 곳($n)보다 앞에 온다.
+            var tree = MiniJson.Deserialize("{\"pinned\":{\"$ref\":1},\"nodes\":[{\"$n\":1,\"$type\":\"GBible.Tests.TestNode\",\"value\":7,\"next\":null}]}");
+            var warnings = new List<string>();
+            var graph = (TestGraph)DataModel.FromTree(tree, typeof(TestGraph), null, warnings);
+            Assert.AreEqual(1, graph.nodes.Count);
+            Assert.AreSame(graph.nodes[0], graph.pinned);
+            Assert.AreEqual(7, graph.pinned.value);
+            Assert.AreEqual(0, warnings.Count, string.Join(" / ", warnings));
+
+            var missing = (TestGraph)DataModel.FromTree(MiniJson.Deserialize("{\"pinned\":{\"$ref\":9}}"), typeof(TestGraph), null, warnings);
+            Assert.IsNull(missing.pinned, "가리키는 객체가 없으면 비워 둔다");
+            Assert.IsTrue(warnings.Any(w => w.Contains("#9")));
+        }
+
+        [Test]
+        public void 새_판은_처음_값을_건드리지_않는다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var deck = session.Data.Define("s:deck", DataZone.Session, new TestDeck());
+            session.Actions.Register<DataAction>(_ => session.Data.Modify<TestDeck>("s:deck", d => d.cards[0].level = 9));
+            for (int round = 0; round < 3; round++)
+            {
+                session.NewRun();
+                Assert.AreEqual(1, deck.cards[0].level, $"{round + 1}번째 새 판: 지난 판의 강화가 남지 않는다");
+                session.Do(new DataAction());
+                Assert.AreEqual(9, deck.cards[0].level);
+            }
+
+            // 저장에 없는 키를 처음 값으로 되돌리는 불러오기도 같다.
+            var other = new GameSession(new SessionOptions { Seed = 1 });
+            other.Actions.Register<DataAction>(_ => other.Data.Modify<TestDeck>("s:deck", d => d.cards[0].level = 9));
+            var otherDeck = other.Data.Define("s:deck", DataZone.Session, new TestDeck());
+            var empty = new GameSession(new SessionOptions { Seed = 1 }).ExportRun();
+            for (int round = 0; round < 3; round++)
+            {
+                other.ImportRun(empty);
+                Assert.AreEqual(1, otherDeck.cards[0].level, $"{round + 1}번째 불러오기");
+                other.Do(new DataAction());
+            }
+        }
+
+        [Test]
+        public void 빈_칸이_섞인_배열에서_옮긴_것도_기록한다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            var bag = session.Data.Define("s:slots", DataZone.Session, new TestPlainSlots());
+            Action<TestPlainSlots> change = null;
+            session.Actions.Register<DataAction>(_ => session.Data.Modify("s:slots", change));
+            change = s => s.slots[0] = new TestPlainItem { level = 3 };
+            session.Do(new DataAction());
+            var item = bag.slots[0];
+            change = s =>
+            {
+                s.slots[2] = s.slots[0];
+                s.slots[0] = null;
+            };
+            session.Do(new DataAction());
+            Assert.IsNull(bag.slots[0]);
+            Assert.AreSame(item, bag.slots[2]);
+            Assert.IsTrue(session.Undo());
+            Assert.AreSame(item, bag.slots[0], "옮기기를 되돌리면 처음 칸으로");
+            Assert.IsNull(bag.slots[2]);
+        }
+
+        [Test]
+        public void 불러오기는_깨진_키와_형식을_그_자리만_버린다()
+        {
+            var id = Guid.NewGuid();
+            var source = new TestKeyed { flags = TestElement.Ice, after = 9 };
+            source.byElement[TestElement.Fire] = 1;
+            source.byGuid[id] = 5;
+            source.byTime[TimeSpan.FromSeconds(90)] = "90초";
+            var tree = (Dictionary<string, object>)DataModel.ToTree(source, typeof(TestKeyed), null, new List<string>());
+            var roundTrip = (TestKeyed)DataModel.FromTree(MiniJson.Deserialize(MiniJson.Serialize(tree)), typeof(TestKeyed), null, new List<string>());
+            Assert.AreEqual(5, roundTrip.byGuid[id], "Guid 키도 되읽는다");
+            Assert.AreEqual("90초", roundTrip.byTime[TimeSpan.FromSeconds(90)], "시간 키도 되읽는다");
+            Assert.AreEqual(TestElement.Ice, roundTrip.flags);
+
+            ((Dictionary<string, object>)tree["byElement"])["Gone"] = 2.0;
+            tree["effect"] = new Dictionary<string, object> { ["$type"] = "GBible.Tests.NoSuchEffect", ["damage"] = 1.0 };
+            var warnings = new List<string>();
+            TestKeyed broken = null;
+            Assert.DoesNotThrow(() => broken = (TestKeyed)DataModel.FromTree(tree, typeof(TestKeyed), null, warnings));
+            Assert.AreEqual(1, broken.byElement.Count, "없어진 enum 키는 그 항목만 버린다");
+            Assert.AreEqual(1, broken.byElement[TestElement.Fire]);
+            Assert.IsNull(broken.effect, "만들 수 없는 형식은 비워 둔다");
+            Assert.AreEqual(9, broken.after, "나머지는 그대로 읽는다");
+            Assert.IsTrue(warnings.Any(w => w.Contains("Gone")));
         }
 
         [Test]

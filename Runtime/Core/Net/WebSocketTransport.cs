@@ -49,20 +49,21 @@ namespace GBible
                 header[length++] = (byte)(maskBit | 127);
                 for (var i = 7; i >= 0; i--) header[length++] = (byte)((long)count >> (8 * i));
             }
-            if (!mask)
+            // 머리와 내용을 한 버퍼로 한 번에 쓴다(따로 쓰면 NoDelay라 메시지마다 TCP 조각이 둘 — 작은 메시지가 많은 실시간 멀티에서 두 배).
+            byte[] key = null;
+            if (mask)
             {
-                stream.Write(header, 0, length);
-                if (count > 0) stream.Write(data, start, count);
-                return;
+                key = new byte[4];
+                lock (random) random.NextBytes(key);
+                Buffer.BlockCopy(key, 0, header, length, 4);
+                length += 4;
             }
-            var key = new byte[4];
-            lock (random) random.NextBytes(key);
-            Buffer.BlockCopy(key, 0, header, length, 4);
-            length += 4;
-            var masked = new byte[count];
-            for (var i = 0; i < count; i++) masked[i] = (byte)(data[start + i] ^ key[i & 3]);
-            stream.Write(header, 0, length);
-            if (count > 0) stream.Write(masked, 0, count);
+            var frame = new byte[length + count];
+            Buffer.BlockCopy(header, 0, frame, 0, length);
+            if (key == null) Buffer.BlockCopy(data, start, frame, length, count);
+            else
+                for (var i = 0; i < count; i++) frame[length + i] = (byte)(data[start + i] ^ key[i & 3]);
+            stream.Write(frame, 0, frame.Length);
         }
 
         // 메시지 하나를 읽는다(조각 이어 붙이기, 핑에는 퐁). 닫기·끊김이면 null. opcode는 마지막 데이터 프레임의 종류.
@@ -183,6 +184,8 @@ namespace GBible
         readonly bool _mask;
         readonly Random _random = new Random();
         readonly BlockingCollection<(int opcode, byte[] data)> _outbox = new BlockingCollection<(int, byte[])>();
+        // 보낼 목록에 쌓아 둘 수 있는 메시지 수(넘으면 끊는다).
+        const int MaxQueued = 8192;
         readonly Action<byte[], int> _received;
         readonly Action<string> _closed;
         int _done;
@@ -201,6 +204,12 @@ namespace GBible
         public void Send(byte[] data, int length)
         {
             if (_done != 0) return;
+            // 받는 쪽이 멈춰(읽지 않음) 보낼 목록이 끝없이 쌓이면 끊는다(핑만 보내는 클라이언트가 서버 메모리를 채우지 못하게).
+            if (_outbox.Count >= MaxQueued)
+            {
+                Close("보낼 메시지가 너무 많이 쌓였습니다(받는 쪽이 멈췄습니다).");
+                return;
+            }
             var copy = new byte[length];
             Buffer.BlockCopy(data, 0, copy, 0, length);
             try { _outbox.Add((2, copy)); }

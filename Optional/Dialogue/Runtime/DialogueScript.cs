@@ -64,6 +64,8 @@ namespace GBible.Dialogue
                             }
                             foreach (var option in line.options)
                                 Follow(graph.Next(line, LineNode.OptionPrefix + option.id), state.Clone());
+                            // 고를 선택지가 없을 때 가는 쪽도 대본에 넣는다.
+                            Follow(graph.Next(line, LineNode.NoChoicePort), state.Clone());
                             return;
                         case BranchNode branch:
                             Follow(graph.Next(branch, BranchNode.TruePort), state.Clone());

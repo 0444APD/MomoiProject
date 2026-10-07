@@ -280,6 +280,20 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 숫자로_끝나는_접두어의_id는_다른_접두어의_id와_겹치지_않는다()
+        {
+            var ids = new List<string>();
+            for (var i = 0; i < 11; i++) ids.Add(Game.NewId("u"));
+            Assert.AreEqual("u11", ids[10], "숫자로 끝나지 않는 접두어는 예전과 같다");
+            ids.Add(Game.NewId("u1"));
+            Assert.AreEqual("u1_1", ids[11], "u의 11번(u11)과 겹치지 않게 사이에 _");
+            ids.AddRange(Game.NewIds("u1", 2));
+            ids.Add(Game.NewId("u1_"));
+            CollectionAssert.AreEqual(new[] { "u1_2", "u1_3", "u1_4" }, ids.Skip(12).ToList(), "u1과 u1_은 같은 번호를 이어 쓴다");
+            Assert.AreEqual(ids.Count, ids.Distinct().Count(), string.Join(", ", ids));
+        }
+
+        [Test]
         public void id가_없는_형식은_Find할_수_없다()
         {
             var e = Assert.Throws<InvalidOperationException>(() => Game.Find<TbBoard>("x"));

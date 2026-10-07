@@ -14,7 +14,8 @@ namespace GBible
     {
         public const int MaxLength = 64;
         // lowerCamelCase: 영문 소문자로 시작, 단어 사이는 대문자. 분류는 점(.)으로. 예: playerGold, player.inventory
-        static readonly Regex Pattern = new Regex(@"^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)*$", RegexOptions.CultureInvariant);
+        // 끝은 \z($는 마지막 줄바꿈 앞에서도 맞아 "gold\n"을 통과시킨다 — GameIds 생성 코드가 깨진다).
+        static readonly Regex Pattern = new Regex(@"^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)*\z", RegexOptions.CultureInvariant);
 
         public static bool IsValid(string id, out string error)
         {

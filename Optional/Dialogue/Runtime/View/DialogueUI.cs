@@ -137,9 +137,13 @@ namespace GBible.Dialogue
         VisualElement _log;
         ScrollView _logList;
         string _fullText = "";
+        int _visibleCount;
         string _speaker;
         bool _open;
         IReadOnlyList<DialogueChoice> _choiceData = Array.Empty<DialogueChoice>();
+        // 선택지 묶음 번호(띄우거나 지울 때마다 바뀐다)와 고름 모션을 기다리는 중인지: 늦게 도착한 고름이 다음 선택지에 붙지 않게.
+        int _choiceVersion;
+        bool _pickPending;
 
         public VisualElement Root => _root;
         public bool IsOpen => _open;
@@ -291,10 +295,27 @@ namespace GBible.Dialogue
                 _root.RemoveFromClassList(cls);
         }
 
+        static readonly string[] States = { "dialogue--staging", "dialogue--typing", "dialogue--waiting", "dialogue--choosing" };
+
         void SetState(string state)
         {
-            foreach (var cls in new[] { "dialogue--staging", "dialogue--typing", "dialogue--waiting", "dialogue--choosing" })
+            var wasWaiting = _root.ClassListContains("dialogue--waiting");
+            foreach (var cls in States)
                 _root.EnableInClassList(cls, cls == state);
+            // 클릭 대기 모션(다음 표시 깜빡임 등)은 대기가 끝나면 멈추고 인라인 값을 지운다 — 인라인 값이 USS를 이겨 선택지·연출 중에도 보이지 않게.
+            if (wasWaiting && state != "dialogue--waiting") StopMoment(Moment.Waiting);
+        }
+
+        void StopMoment(Moment moment)
+        {
+            foreach (var slot in motions)
+            {
+                if (slot.moment != moment || slot.motion == null) continue;
+                var element = Element(slot.element);
+                if (element == null) continue;
+                _motions.Stop(element);
+                slot.motion.Restore(element);
+            }
         }
 
         // ── 대사 ─────────────────────────────────────────────
@@ -332,10 +353,37 @@ namespace GBible.Dialogue
             }
             if (_nameBox != null) _nameBox.style.display = narration ? DisplayStyle.None : DisplayStyle.Flex;
             _fullText = text ?? "";
+            _visibleCount = 0;
             if (_text != null) _text.text = TextReveal.Reveal(_fullText, 0);
             SetState("dialogue--typing");
             if (_next != null) _motions.Stop(_next);
             StopLoopingMotions();
+            ApplyExtras(info);
+            if (changed) PlayMoment(Moment.SpeakerChanged);
+            PlayMoment(Moment.LineStart);
+            foreach (var extension in _extensions) extension.OnLine(this, info);
+        }
+
+        // 글만 바꾼다(언어가 바뀌었을 때): 이름·대사·추가 글. 상태 클래스·모션·보이는 글자 수는 그대로.
+        public void UpdateLine(DialogueLineInfo info)
+        {
+            if (!Ready() || _root == null || info == null) return;
+            var narration = string.IsNullOrEmpty(info.SpeakerName);
+            _root.EnableInClassList("dialogue--narration", narration);
+            if (_name != null)
+            {
+                _name.text = info.SpeakerName ?? "";
+                _name.style.color = narration ? StyleKeyword.Null : new StyleColor(info.NameColor);
+            }
+            if (_nameBox != null) _nameBox.style.display = narration ? DisplayStyle.None : DisplayStyle.Flex;
+            _fullText = info.Text ?? "";
+            if (_text != null) _text.text = TextReveal.Reveal(_fullText, _visibleCount);
+            ApplyExtras(info);
+            foreach (var extension in _extensions) extension.OnLine(this, info);
+        }
+
+        void ApplyExtras(DialogueLineInfo info)
+        {
             foreach (var (key, element) in _extras)
             {
                 var value = info.Extras != null && info.Extras.TryGetValue(key, out var found) ? found : "";
@@ -344,15 +392,13 @@ namespace GBible.Dialogue
                 element.EnableInClassList("dialogue-extra--empty", empty);
                 _root.EnableInClassList("dialogue--has-" + key, !empty);
             }
-            if (changed) PlayMoment(Moment.SpeakerChanged);
-            PlayMoment(Moment.LineStart);
-            foreach (var extension in _extensions) extension.OnLine(this, info);
         }
 
         public void SetVisibleCharacters(int count, int total)
         {
             if (!Ready()) return;
             if (_text == null) return;
+            _visibleCount = count;
             _text.text = TextReveal.Reveal(_fullText, count);
             if (count >= total && _root.ClassListContains("dialogue--typing"))
             {
@@ -363,6 +409,7 @@ namespace GBible.Dialogue
 
         // ── 선택지 ───────────────────────────────────────────
 
+        // 고를 수 있는 선택지가 하나도 없으면(모두 조건에 막혀 흐리게만 보임) 고르기 상태가 아니라 클릭 대기다(클릭하면 넘어간다).
         public void ShowChoices(IReadOnlyList<DialogueChoice> choices)
         {
             if (!Ready()) return;
@@ -370,7 +417,7 @@ namespace GBible.Dialogue
             ClearChoices();
             _choiceData = choices ?? Array.Empty<DialogueChoice>();
             if (_choiceData.Count == 0) return;
-            SetState("dialogue--choosing");
+            SetState(_choiceData.Any(c => c.Enabled) ? "dialogue--choosing" : "dialogue--waiting");
             for (var i = 0; i < _choiceData.Count; i++)
             {
                 var choice = _choiceData[i];
@@ -408,17 +455,36 @@ namespace GBible.Dialogue
 
         public void Pick(int index)
         {
-            if (index < 0 || index >= _choiceData.Count || !_choiceData[index].Enabled) return;
+            if (_pickPending || index < 0 || index >= _choiceData.Count || !_choiceData[index].Enabled) return;
             var element = index < _choiceElements.Count ? _choiceElements[index] : null;
             element?.AddToClassList("dialogue-choice--picked");
             PlayMoment(Moment.ChoicePicked, element);
+            var version = _choiceVersion;
             if (choicePickDelay > 0 && element != null)
-                element.schedule.Execute(() => ChoiceRequested?.Invoke(index)).StartingIn((long)(choicePickDelay * 1000));
-            else ChoiceRequested?.Invoke(index);
+            {
+                // 고름 모션을 보이는 동안 다른 고름은 받지 않는다. 그사이 선택지가 바뀌었으면(다음 줄의 선택지) 이 고름은 버린다.
+                _pickPending = true;
+                element.schedule.Execute(() =>
+                {
+                    if (version != _choiceVersion) return;
+                    _pickPending = false;
+                    Request(index, element, version);
+                }).StartingIn((long)(choicePickDelay * 1000));
+            }
+            else Request(index, element, version);
+        }
+
+        void Request(int index, VisualElement element, int version)
+        {
+            ChoiceRequested?.Invoke(index);
+            // 받아들여지지 않았으면(클릭 막는 연출 중·값 바꾸기 실패) 선택지가 그대로다: 고름 표시를 거둔다.
+            if (version == _choiceVersion) element?.RemoveFromClassList("dialogue-choice--picked");
         }
 
         void ClearChoices()
         {
+            _choiceVersion++;
+            _pickPending = false;
             foreach (var element in _choiceElements)
             {
                 _motions.Stop(element);
@@ -500,6 +566,14 @@ namespace GBible.Dialogue
             // 맨 아래(가장 최근)부터 보인다.
             _logList.schedule.Execute(() => _logList.scrollOffset = new Vector2(0, float.MaxValue)).StartingIn(16);
             LogOpened?.Invoke();
+        }
+
+        // 열려 있으면 줄을 다시 만든다(언어가 바뀌었을 때).
+        public void RefreshLog()
+        {
+            if (!IsLogOpen || _logList == null) return;
+            _logList.Clear();
+            foreach (var entry in LogSource?.Invoke() ?? Array.Empty<DialogueLogEntry>()) _logList.Add(LogRow(entry));
         }
 
         public void CloseLog()
@@ -620,54 +694,56 @@ namespace GBible.Dialogue
     }
 
     // 타이핑 효과: 글 전체를 두고 아직 안 나온 부분만 투명하게 한다(줄바꿈 위치가 타이핑 중에 흔들리지 않는다).
+    // 태그는 알려진 리치 텍스트 태그만(RichText) — "<주인공>"처럼 태그가 아닌 <…>는 글자로 한 자씩 나온다.
     public static class TextReveal
     {
         public static string Reveal(string text, int visible)
         {
             if (string.IsNullOrEmpty(text)) return "";
-            var total = DialogueRunner.VisibleLength(text);
+            var total = RichText.VisibleLength(text);
             if (visible >= total) return text;
             var b = new StringBuilder(text.Length + 16);
             var count = 0;
+            var noparse = false;
             var i = 0;
             for (; i < text.Length; i++)
             {
-                var c = text[i];
-                if (c == '<')
+                var tag = text[i] == '<' ? RichText.TagLength(text, i, noparse) : 0;
+                if (tag > 0)
                 {
-                    var close = text.IndexOf('>', i);
-                    if (close < 0) break;
-                    b.Append(text, i, close - i + 1);
-                    i = close;
+                    b.Append(text, i, tag);
+                    noparse = RichText.Noparse(text, i, tag, noparse);
+                    i += tag - 1;
                     continue;
                 }
                 if (count >= visible) break;
-                b.Append(c);
+                b.Append(text[i]);
                 count++;
             }
-            b.Append("<alpha=#00>");
+            // <noparse> 안에서 끊겼으면 잠깐 닫고 투명 태그를 넣은 뒤 다시 연다(투명 태그가 글자로 보이지 않게).
+            b.Append(noparse ? "</noparse><alpha=#00><noparse>" : "<alpha=#00>");
             // 숨긴 부분의 색 태그는 알파를 되살리므로 뺀다(크기·굵기 태그는 줄바꿈 위치를 위해 남긴다).
             for (; i < text.Length; i++)
             {
-                var c = text[i];
-                if (c == '<')
+                var tag = text[i] == '<' ? RichText.TagLength(text, i, noparse) : 0;
+                if (tag > 0)
                 {
-                    var close = text.IndexOf('>', i);
-                    if (close < 0)
-                    {
-                        b.Append(text, i, text.Length - i);
-                        break;
-                    }
-                    var tag = text.Substring(i, close - i + 1);
-                    var lower = tag.ToLowerInvariant();
-                    if (!(lower.StartsWith("<color") || lower.StartsWith("</color") || lower.StartsWith("<alpha") || lower.StartsWith("<mark") || lower.StartsWith("</mark") || lower.StartsWith("<#")))
-                        b.Append(tag);
-                    i = close;
+                    var wasNoparse = noparse;
+                    noparse = RichText.Noparse(text, i, tag, noparse);
+                    if (wasNoparse || !RestoresAlpha(text, i)) b.Append(text, i, tag);
+                    i += tag - 1;
                     continue;
                 }
-                b.Append(c);
+                b.Append(text[i]);
             }
             return b.ToString();
         }
+
+        static bool RestoresAlpha(string text, int index) =>
+            StartsWith(text, index, "<color") || StartsWith(text, index, "</color") || StartsWith(text, index, "<alpha") ||
+            StartsWith(text, index, "<mark") || StartsWith(text, index, "</mark") || StartsWith(text, index, "<#");
+
+        static bool StartsWith(string text, int index, string prefix) =>
+            index + prefix.Length <= text.Length && string.Compare(text, index, prefix, 0, prefix.Length, StringComparison.OrdinalIgnoreCase) == 0;
     }
 }

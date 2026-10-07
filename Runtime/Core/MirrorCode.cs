@@ -169,7 +169,8 @@ namespace GBible
         {
             var box = n.R[i];
             var equal = ValueOps<T>.Equal;
-            if (box != null && (equal != null ? equal((T)box, now) : EqualityComparer<T>.Default.Equals((T)box, now))) return;
+            // int?·enum? 같은 Nullable의 null은 상자에 담으면 null이다 — 둘 다 비었으면 같은 것(매 Sync "null → null"을 기록하지 않게).
+            if (box == null ? now == null : equal != null ? equal((T)box, now) : EqualityComparer<T>.Default.Equals((T)box, now)) return;
             n.R[i] = now;
             if (cs == null) return;
             var old = box == null ? default : (T)box;
@@ -725,7 +726,7 @@ namespace GBible
 
         public static List<T> ReadList<T>(MirrorReader r)
         {
-            var n = (int)r.UVar();
+            var n = r.Count(1);
             if (n == 0) return null;
             var list = new List<T>(n - 1);
             for (var i = 1; i < n; i++) list.Add(ReadElement<T>(r));
@@ -734,7 +735,7 @@ namespace GBible
 
         public static T[] ReadArray<T>(MirrorReader r)
         {
-            var n = (int)r.UVar();
+            var n = r.Count(1);
             if (n == 0) return null;
             var array = new T[n - 1];
             for (var i = 0; i < array.Length; i++) array[i] = ReadElement<T>(r);
@@ -743,7 +744,7 @@ namespace GBible
 
         public static Dictionary<TKey, TValue> ReadDict<TKey, TValue>(MirrorReader r)
         {
-            var n = (int)r.UVar();
+            var n = r.Count(1);
             if (n == 0) return null;
             var map = new Dictionary<TKey, TValue>(n - 1);
             for (var i = 1; i < n; i++)

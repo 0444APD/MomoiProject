@@ -255,6 +255,8 @@ namespace GBible
         }
 
         // session.Do가 부른다: 행동을 서버로 보낸다(대상 객체는 id만).
+        // 생성 코드가 온전히 쓰지 못하는 행동(중첩 컬렉션·쓸 수 없는 구조체·생성 코드가 없는 값·readonly 필드 …)은 보내지 않는다 —
+        // 서버에 빈 칸으로 도착하거나 쓰다가 멈추는 대신, 어느 필드인지 밝힌 오류(기록 + 예외)로 실패한다.
         ActionRecord Send(GameAction action)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
@@ -263,9 +265,13 @@ namespace GBible
                 _session.Journal.Append(JournalKind.Warning, "Net", $"서버에 들어가기 전이라 '{action.GetType().Name}'을(를) 보내지 못했습니다.");
                 return new ActionRecord { Action = action, Status = ActionStatus.Failed, Error = "서버에 연결되어 있지 않습니다." };
             }
+            // 형식 검사(형식마다 처음 보낼 때 한 번 — 결과는 Mirror.CanSend가 기억한다). 참조 필드를 id로 바꾸기(Detach) 전에 본다.
+            if (!Mirror.CanSend(action.GetType(), out var reason)) throw Unsendable(action, reason, null);
             ActionReferences.Detach(action);
             var body = new MirrorWriter();
-            Mirror.Write(body, action);
+            // object·추상·인터페이스 칸의 실제 값은 쓰는 동안 객체마다 본다(CheckValue).
+            try { Mirror.WriteNetValue(body, action, CheckValue); }
+            catch (Exception e) { throw Unsendable(action, e.Message, e); }
             var request = _nextRequest++;
             var w = NetProtocol.Begin(NetMessage.Act, new MirrorWriter(body.Length + 16));
             w.UVar((ulong)request);
@@ -281,6 +287,21 @@ namespace GBible
         {
             try { return action.Describe(); }
             catch (Exception) { return action.GetType().Name; }
+        }
+
+        // 행동을 쓰는 동안 객체마다(Mirror.WriteNetValue): 보낼 수 없는 값이면 예외(Send가 행동 이름을 붙인다).
+        // 서버가 가진 객체를 번호로 가리키지 않으므로(참조 필드는 id만 든 객체로 바뀌어 있다) 언제나 null.
+        static readonly Func<object, MirrorNode> CheckValue = value => Mirror.CanSendValue(value, out var reason) ? (MirrorNode)null : throw new InvalidOperationException(reason);
+
+        // 보낼 수 없다고 알린 행동 형식(기록에는 형식마다 한 번 — 예외는 보낼 때마다).
+        readonly HashSet<Type> _unsendable = new HashSet<Type>();
+
+        Exception Unsendable(GameAction action, string reason, Exception inner)
+        {
+            var type = action.GetType();
+            var message = $"행동 '{type.Name}'을(를) 서버로 보낼 수 없습니다: {reason}";
+            if (_unsendable.Add(type)) _session.Journal.Append(JournalKind.Error, "Net", message);
+            return new InvalidOperationException("[MomoiProject] " + message, inner);
         }
 
         // ── 받기 ───────────────────────────────────────────────

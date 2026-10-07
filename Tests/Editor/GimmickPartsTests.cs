@@ -466,6 +466,19 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 레벨_0으로_꺼진_조각은_빌려_쓰지도_못한다()
+        {
+            Joker("plus", new PlusMult { value = 4 });
+            Joker("blueprint", new BorrowOutcome { targets = { Neighbor(PlaceDirection.Right) } });
+            Do(g => g.Get<GpRun>("run").jokers.AddRange(new[] { new GpJoker { id = "j1", joker = "blueprint" }, new GpJoker { id = "j2", joker = "plus", level = 0 } }));
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Assert.AreEqual(1, Run.mult, "꺼진 j2는 직접도, Blueprint가 빌려서도 발동하지 않는다");
+            Do(g => g.Get<GpRun>("run").jokers[1].level = 1);
+            Do(g => g.Session.Events.Publish(new GpScored()));
+            Assert.AreEqual(1 + 4 + 4, Run.mult, "켜면 둘 다");
+        }
+
+        [Test]
         public void 같은_시드로_새_판을_시작하면_같은_난수가_나온다()
         {
             var seed = RandomStreams.SeedOf(" daily-2026-10-05 ");

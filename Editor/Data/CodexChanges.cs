@@ -62,7 +62,10 @@ namespace GBible.EditorTools
             if (items > 0) parts.Add($"DB 항목 {items}건");
             if (registry) parts.Add("클래스 설정");
             if (folders) parts.Add("DB 폴더");
-            Debug.Log("[MomoiProject] 저장했습니다: " + (parts.Count > 0 ? string.Join(", ", parts) : "변경 없음"));
+            // 적용이 막혔거나(겹치는 ID 등 — 까닭은 바로 앞 오류) 일부가 실패하면 변경이 남는다: '변경 없음'으로 적지 않는다.
+            var left = EditorDatabase.Staging.HasChanges;
+            if (left) Debug.LogWarning("[MomoiProject] 저장하지 못한 DB 변경이 남아 있습니다" + (parts.Count > 0 ? " (저장한 것: " + string.Join(", ", parts) + ")" : "") + " — Console의 오류를 보고 고친 뒤 다시 저장(Ctrl+S)하세요.");
+            else Debug.Log("[MomoiProject] 저장했습니다: " + (parts.Count > 0 ? string.Join(", ", parts) : "변경 없음"));
             return items + (registry ? 1 : 0) + (folders ? 1 : 0);
         }
 

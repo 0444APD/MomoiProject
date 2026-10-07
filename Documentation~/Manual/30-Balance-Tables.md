@@ -95,6 +95,7 @@
 | 내림 (`Floor`) | 작은 정수로 |
 | 올림 (`Ceiling`) | 큰 정수로 |
 
+- 라이브러리가 숫자를 정수로 맞추는 곳은 모두 이 반올림이다(정수 필드에 넣는 값 · 중첩 · 이벤트 횟수 · `가중치 표에서 고르기`의 후보 수 더하기 …). 코드에서 같게 맞추려면 `GameNumbers.Round`·`GameNumbers.RoundToInt`를 쓴다. `Math.Round`의 기본은 짝수 쪽(2.5 → 2)이라 결과가 다르다.
 - **자르기**: `최솟값으로 자르기`를 켜면 최솟값보다 작은 값을 최솟값으로, `최댓값으로 자르기`를 켜면 최댓값보다 큰 값을 최댓값으로 만든다. 두 쪽은 따로 켠다(최댓값만 켜면 "3배에서 멈춘다", 최솟값만 켜면 "1 아래로는 내려가지 않는다"). 둘 다 켰는데 최솟값이 최댓값보다 크면 검증 오류다.
 
 ### 2-3. 가중치 표 뽑기
@@ -129,6 +130,8 @@
 | `NotACandidate` | `momoi.fail.notACandidate` | `{item}` | "{item}은(는) 고를 수 있는 후보가 아닙니다." | `Game.Answer` |
 | `ChosenTwice` | `momoi.fail.chosenTwice` | — | "같은 것을 두 번 골랐습니다." | `Game.Answer` |
 | `ChoiceGone` | `momoi.fail.choiceGone` | — | "이미 답했거나 취소된 선택입니다." | `Game.Answer` |
+| `NotYourChoice` | `momoi.fail.notYourChoice` | — | "다른 플레이어에게 온 선택입니다." | `Game.Answer`(멀티 서버 — 답할 사람이 정해진 선택, 29장 2-6) |
+| `RewindTooFar` | `momoi.fail.rewindTooFar` | `{steps}` `{marks}` | "{steps}지점 앞으로 되감을 수 없습니다(남은 지점 {marks}개)." | `Game.Rewind`·`RewindKey`·`RewindEntity`(40장) |
 | `CannotUse` | `momoi.fail.cannotUse` | `{ability}` `{condition}` | "{ability}: 사용 조건을 만족하지 않습니다({condition})." | `Game.Use`(사용 조건이 거짓이고 그 능력·아이템의 쓸 수 없을 때 글이 비었을 때, 16장) |
 
 - `NotEnough`의 `{what}`은 낼 것의 이름이다. `Game.Pay(키, 경로, 양, what: "energy.name")`·결과 `비용 내기`의 `보일 이름`에 텍스트 키를 주면 그 키의 번역된 글, 글자를 주면 그 글자가 들어간다. 비우면 "플레이어 데이터의 이름 › 필드 경로"(예: "판 › battle.energy")라서 DB의 이름과 코드 경로가 플레이어에게 보인다 → 플레이어가 보는 비용에는 늘 이름을 준다(5-8). `{have}`·`{need}`는 이미 글자로 바꾼 숫자(소수 둘째 자리까지)다.
@@ -160,6 +163,7 @@
 
 - 방식을 바꾸면 그 방식의 칸만 보인다(묶음 필드 안의 `[ShowIf]`, `21-Editor-Database.md` 5절).
 - 검증 오류(빌드를 막는다): "곡선: 거듭제곱은 시작 단계가 0보다 커야 합니다." / "곡선: 비율은 0보다 커야 합니다(1.1 = 단계마다 +10%)." / "곡선: 표에 점이 없습니다." / "곡선: 최솟값이 최댓값보다 큽니다."(두 쪽을 다 켰을 때)
+- 검증 경고: "곡선: N단계에서 0 이하가 됩니다. 가격으로 쓰면 BalanceCount·BalanceSum이 그 단계부터 세지 않습니다(0 이하는 값을 매길 수 없는 가격). 최솟값으로 자르기를 켜세요."(표는 "점 N에서 …"). 시작 단계부터 100단계(표는 점마다)를 계산해 0보다 크던 값이 0 이하로 내려가면 알린다 — 단계마다 줄어드는 `일정하게`, 0 아래로 가는 표의 점. 처음부터 0 이하인 곡선은 가격이 아닌 값으로 보고 묻지 않고, `최솟값으로 자르기`의 최솟값이 0보다 크면 보지 않는다.
 - 플레이 중에 고치면 0.5초 안에 게임에 반영된다(2-1). 마음에 들면 저장(Ctrl+S), 아니면 사이드바의 **되돌리기**.
 
 ### 3-2. DB › 가중치 표
@@ -223,8 +227,8 @@
 | `key` · `path` | 고른 것을 넣을 플레이어 데이터 · 필드(목록) | 고른 원본 ID를 넣는다(`가중치 표에서 주기`와 같은 원본 ID 넣기 — 목록이면 요소, 딕셔너리면 그 키 +1, 숫자면 +개수). 비우면 넣지 않는다 |
 | `then` | 고른 뒤 결과 | 고른 다음에 도는 결과. 컨텍스트의 `Picked`가 고른 원본 ID(글자)들 |
 
-- 뽑기는 요구하는 순간(그 행동 안)에 끝나고 후보는 선택 대기(`$choices`)에 남는다. 그래서 끄고 켜거나 답하기를 Undo해도 후보가 바뀌지 않는다(29장 2-6). 후보를 바꾸는 것은 다시 뽑기(아래)뿐이다.
-- **후보 수** = `count`(후보 수) + `countBonus`(후보 수에 더할 숫자)가 가리키는 숫자(반올림). 합이 1보다 작으면 1이다. 플레이어 데이터를 비웠거나, 그 키가 없거나, 숫자로 읽을 수 없으면 0을 더한다. 요구하는 순간의 값을 읽으므로 그 행동 안에서 앞서 바꾼 값까지 들어간다. 요약 문장에는 `count`만 보인다.
+- 뽑기는 요구하는 순간(그 행동 안)에 끝나고 후보는 선택 대기(`$choices`, 멀티에서는 그 행동을 한 플레이어에게 묻는 `$choices:번호` — 29장 2-6)에 남는다. 그래서 끄고 켜거나 답하기를 Undo해도 후보가 바뀌지 않는다(29장 2-6). 후보를 바꾸는 것은 다시 뽑기(아래)뿐이다.
+- **후보 수** = `count`(후보 수) + `countBonus`(후보 수에 더할 숫자)가 가리키는 숫자(반올림 — 0.5는 0에서 먼 쪽, 2-2). 합이 1보다 작으면 1이다. 플레이어 데이터를 비웠거나, 그 키가 없거나, 숫자로 읽을 수 없으면 0을 더한다. 요구하는 순간의 값을 읽으므로 그 행동 안에서 앞서 바꾼 값까지 들어간다. 요약 문장에는 `count`만 보인다.
 - **보정까지 읽는다**: 그 숫자 필드가 `id`가 있는 객체의 필드면(`run` › `hero.options`의 `hero`) 필드 값이 아니라 **능력치 최종값**(`Game.Attribute`, Modifier·패시브의 가진 동안 능력치 보정 포함, 28장 2-1)으로 읽는다. 그래서 "선택지 +1" 유물을 필드를 올리는 결과 대신 패시브의 `modifiers`(가진 동안 능력치 보정) `options` +1로 만들면, 잃을 때 저절로 빠진다(5-13). 부모에 `id`가 없으면(`run` › `rewardBonus`의 `run`) 필드 값 그대로다.
 - **다시 뽑기**: 기다리는 동안 다른 행동 안에서 `Game.RerollChoice(선택 id)`를 부르면 같은 표·같은 후보 수·같은 `unique`로 후보를 새로 뽑는다(후보 수는 처음 요구할 때 더한 값 그대로). 선택 id는 같고 `ChoiceRequested`를 다시 쏜다(화면이 새로 그린다). 비용·남은 횟수는 부르는 행동이 정한다. 그 행동을 Undo하면 원래 후보다(4-6, 5-13, 29장 4-10b).
 - 후보 이름은 텍스트 표의 `<ID>.name`(없으면 ID). 꽝이 나와 후보가 줄면 그만큼만 보이고, 후보가 하나도 없으면 기다리지 않고 고른 뒤 결과만 돈다.
@@ -264,8 +268,9 @@ var max = Game.BalanceCount(GameIds.Balance.CursorPrice, run.cursors, run.gold);
 | `double BalanceSum(string id, double from, int count)` | 단계 `from`부터 1씩 `count`개의 값을 더한다("10개 사기": 가격 곡선, 단계 = 이미 산 개수). 단계마다 곡선의 반올림·자르기를 한 값의 합이다 |
 | `int BalanceCount(string id, double from, double budget)` | `budget`으로 단계 `from`부터 몇 개를 살 수 있나("살 수 있는 만큼"). 앞에서부터 더해 `budget`을 넘기 직전까지(최대 10000개까지 센다) |
 
-- 돌려주는 값은 `double`이다. 정수가 필요하면 곡선의 반올림을 고르거나 `(int)`·`Math.Round`로 바꾼다.
+- 돌려주는 값은 `double`이다. 정수가 필요하면 곡선의 반올림을 고르거나 코드에서 `GameNumbers.RoundToInt`로 바꾼다(2-2).
 - `BalanceSum`·`BalanceCount`는 단계마다 곡선을 한 번씩 계산해 더한다(개수만큼 돈다). `BalanceCount`는 10000개에서 세기를 멈춘다.
+- **값이 0 이하(또는 숫자가 아님)인 단계에서 멈춘다.** 값을 매길 수 없는 가격이라 그 단계부터는 살 수 없고(`BalanceCount`) 합에도 더하지 않는다(`BalanceSum` — 음수가 되지 않는다). 곡선이 0 아래로 내려가는 것은 데이터 실수라 DB 검증이 경고한다(3-1). 내려가면 안 되는 가격은 `최솟값으로 자르기`를 켠다.
 - 숫자가 double의 끝(약 1e308)을 넘을 만큼 커지는 게임은 그 값만 `BigNumber`로 둔다(→ `36-Grid-BigNumber.md`). 밸런스 값·`Game.Pay`·DB 숫자 칸은 double만 알므로, 그때의 가격 계산과 비용 검사는 코드로 한다.
 - 값을 바꾸지 않으므로 행동 밖(화면 코드)에서 읽어도 된다. 없는 ID면 `InvalidOperationException`(2-1).
 
@@ -311,7 +316,7 @@ string text = exp.Preview(100, 5);           // "1 → 100 · 2 → 283 · 3 →
 | `useMax` · `max` | 켜면 `max`보다 큰 값을 `max`로 |
 | `double Evaluate(double baseValue, double x)` | 기준 값 `baseValue`에서 단계 `x`의 값(2-2) |
 | `string Preview(double baseValue, int count = 5)` | 시작 단계부터 `count`개의 "단계 → 값" 글(툴팁·로그용) |
-| `Validate(IValidationContext context, string label)` | 3-1의 검증. 프로젝트의 DB 종류에 곡선 칸을 둘 때 `ValidateData`에서 부른다 |
+| `Validate(IValidationContext context, string label)` · `Validate(context, label, double? baseValue)` | 3-1의 검증. 기준 값을 넘기면 0 이하로 내려가는 곡선의 경고까지 본다(넘기지 않으면 기준 값과 상관없이 정해지는 것만 — 표의 점, 단계마다 줄어드는 `일정하게`). 프로젝트의 DB 종류에 곡선 칸을 둘 때 `ValidateData`에서 부른다 |
 
 ### 4-4. `Game.Roll` — 가중치 표에서 뽑기
 
@@ -505,7 +510,7 @@ public static Enemy NewEnemy(GameApi game, string monster)
 {
     var data = MonsterOf(game, monster) ?? throw new InvalidOperationException($"몬스터 '{monster}'이(가) DB에 없습니다.");
     var floor = Math.Max(1, game.Data().Run.floor);
-    var hp = (int)Math.Round(data.maxHp * game.Balance(GameIds.Balance.EnemyHpScale, floor));
+    var hp = GameNumbers.RoundToInt(data.maxHp * game.Balance(GameIds.Balance.EnemyHpScale, floor));   // 0.5는 0에서 먼 쪽(2-2)
     return new Enemy { id = game.NewId("enemy"), name = data.title, hp = hp, maxHp = hp, monster = monster };
 }
 ```
@@ -956,7 +961,8 @@ rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
 | 1층 값이 기준 값과 다름 | 시작 단계가 1이 아니다. 0층부터 세면 시작 단계를 0으로(거듭제곱은 0보다 커야 한다). |
 | 표 곡선에 적은 기준 값이 무시됨 | 표는 기준 값을 쓰지 않는다. 점의 값이 곧 값이다. |
 | 최솟값·최댓값을 적었는데 자르지 않음 | `최솟값으로 자르기`·`최댓값으로 자르기`를 켜지 않았다. 자를 쪽을 켠다(2-2). |
-| 소수가 나와 체력이 1.21 | 곡선은 `double`이다. 반올림을 고르거나 코드에서 `(int)Math.Round`. |
+| 소수가 나와 체력이 1.21 | 곡선은 `double`이다. 반올림을 고르거나 코드에서 `GameNumbers.RoundToInt`(라이브러리와 같은 반올림, 2-2). |
+| `BalanceCount`가 예산이 남는데 멈춤 · `BalanceSum`이 생각보다 작음 / 경고 "곡선: N단계에서 0 이하가 됩니다…" | 가격 곡선이 그 단계에서 0 이하가 된다(단계마다 줄어드는 곡선). 값을 매길 수 없는 가격이라 그 단계부터 세지 않는다. `최솟값으로 자르기`를 켠다(4-1). |
 | 방치형 후반에 값이 `∞`가 되거나 큰 수의 끝자리가 안 맞음 | DB 숫자 칸·밸런스 값·`Game.Pay`는 `double`이다. 약 1e308을 넘으면 ∞이고, 15~16자리를 넘는 정수는 끝자리가 정확하지 않다. 그 값은 `BigNumber`로 두고 계산·비용 검사는 코드로 한다(→ `36-Grid-BigNumber.md`). |
 | 천장을 걸었는데 확률이 그대로 | 줄의 `단계(플레이어 데이터)`를 비워 늘 기준 값이다. 또는 단계 값(`pity`)을 올리는 코드가 없거나 `Game.Roll` 앞에서 0으로 돌린다. 밸런스 값의 곡선 방식이 `없음`이어도 그대로다(5-11). |
 | 플레이 중 고친 값이 지금 적에게 안 보임 | 반영은 다음에 읽을 때부터다. 이미 만든 적의 체력은 판 데이터에 들어 있다. |

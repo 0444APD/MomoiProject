@@ -85,7 +85,8 @@ namespace GBible
 
         void Apply(string text)
         {
-            var component = target;
+            // 칸을 비워 두었으면 처음 찾은 컴포넌트를 계속 쓴다(새로 고칠 때마다 컴포넌트를 리플렉션으로 훑지 않게).
+            var component = target != null ? target : _boundTarget;
             if (component == null)
                 foreach (var candidate in GetComponents<Component>())
                     if (candidate != this && TextProperty(candidate) != null)

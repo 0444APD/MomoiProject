@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace GBible
@@ -13,6 +14,9 @@ namespace GBible
     // DB 원본(아직 판에 없는 카드·유물)에서 고르는 것은 결과 '가중치 표에서 고르기'(표에서 뽑아 보이고, 고른 원본 id를 목록에 넣는다).
     // 후보가 없으면 기다리지 않고 바로 이어서 할 행동을 실행한다(고른 것 없음).
     // 기다리는 동안 다른 입력을 막는 것은 화면의 일이다(Game.IsWaiting).
+    // 멀티: 답할 플레이어가 정해진 선택은 그 사람의 키('$choices:번호', 주인에게만 보냄)에 둔다 — 남의 후보·이어서 할 행동이 다른 클라이언트에 가지 않는다.
+    // 답할 사람을 정하지 않으면(player 생략) 멀티에서는 그 행동을 한 플레이어에게 묻는다. 누구나 답하게 하려면 player: "".
+    // Game.Choice는 이 프로그램이 답할 선택이다(혼자 하기면 모두, 멀티면 모두에게 온 것과 내 번호에게 온 것).
 
     // 이어서 할 행동의 이 필드에 고른 것이 들어간다. 형식: string(id 하나) · id가 있는 클래스(객체 하나) · 그 리스트·배열(여럿).
     [AttributeUsage(AttributeTargets.Field)]
@@ -77,17 +81,33 @@ namespace GBible
         public const string Key = "$choices";
 
         readonly GameSession _session;
+        // 정의된 선택 키('$choices'와 '$choices:번호'). 키가 정의될 때 더한다(Game.Choice를 읽을 때마다 키를 훑지 않게).
+        readonly List<string> _keys = new List<string>();
 
         internal ChoiceSystem(GameSession session)
         {
             _session = session;
+            foreach (var key in session.Data.Keys)
+                if (IsChoiceKey(key)) _keys.Add(key);
+            session.Data.KeyDefined += key =>
+            {
+                if (IsChoiceKey(key) && !_keys.Contains(key)) _keys.Add(key);
+            };
         }
+
+        // 이 플레이어에게 온 선택을 두는 키(비우면 누구나 답하는 선택 — '$choices').
+        public static string KeyFor(string player) => string.IsNullOrEmpty(player) ? Key : Key + ":" + player;
+
+        public static bool IsChoiceKey(string key) => key == Key || (key != null && key.StartsWith(Key + ":", StringComparison.Ordinal));
 
         public string Ask(string prompt, IEnumerable<ChoiceCandidate> options, GameAction then, int min = 1, int max = 1, string source = null, string player = null)
         {
             if (then == null) throw new ArgumentNullException(nameof(then));
             if (!ActionReferences.HasChosen(then.GetType()))
                 throw new InvalidOperationException($"[MomoiProject] 이어서 할 행동 '{then.GetType().Name}'에 고른 것을 받을 [Chosen] 필드가 없습니다.");
+            // 멀티: 답할 사람을 정하지 않으면 이 행동을 한 플레이어에게 묻는다(누구나 답하게 하려면 player: "").
+            if (player == null && _session.Role != SessionRole.Local && _session.Actions.CurrentActor > 0)
+                player = _session.Actions.CurrentActor.ToString(CultureInfo.InvariantCulture);
             var list = (options ?? Enumerable.Empty<ChoiceCandidate>()).Where(o => o != null && !string.IsNullOrEmpty(o.id)).GroupBy(o => o.id).Select(g => g.First()).ToList();
             if (list.Count == 0)
             {
@@ -103,8 +123,8 @@ namespace GBible
                 id = _session.Game.NewId("$choice"), prompt = prompt ?? "", player = player ?? "", source = source ?? "",
                 options = list, min = min, max = max, then = then,
             };
-            if (!_session.Data.IsDefined(Key)) _session.Data.Define(Key, DataZone.Session, new ChoiceList(), "선택 대기");
-            _session.Data.Modify<ChoiceList>(Key, l => l.items.Add(choice));
+            var key = Ensure(choice.player);
+            _session.Data.Modify<ChoiceList>(key, l => l.items.Add(choice));
             _session.Events.Publish(new ChoiceRequested { choice = choice.id, prompt = choice.prompt, player = choice.player });
             return choice.id;
         }
@@ -113,12 +133,12 @@ namespace GBible
         // 화면은 ChoiceRequested를 다시 받아 후보를 새로 그린다. 표로 만든 선택이 아니면 거짓.
         public bool Reroll(string id)
         {
-            var choice = Items().FirstOrDefault(c => c.id == id);
+            var (key, choice) = Locate(id);
             if (choice == null || string.IsNullOrEmpty(choice.table)) return false;
             var options = _session.Game.Roll(choice.table, Math.Max(1, choice.count), choice.unique)
                 .Where(o => !string.IsNullOrEmpty(o)).Distinct().Select(o => new ChoiceCandidate(o, Texts.NameOf(o))).ToList();
             if (options.Count == 0) return false;
-            _session.Data.Modify<ChoiceList>(Key, _ =>
+            _session.Data.Modify<ChoiceList>(key, _ =>
             {
                 choice.options = options;
                 choice.min = Math.Min(choice.wantMin, options.Count);
@@ -131,9 +151,9 @@ namespace GBible
         // 표로 만든 선택이라고 적어 둔다(다시 뽑기용).
         public void MarkTable(string id, string table, int count, bool unique, int wantMin = -1, int wantMax = -1)
         {
-            var choice = Items().FirstOrDefault(c => c.id == id);
+            var (key, choice) = Locate(id);
             if (choice == null) return;
-            _session.Data.Modify<ChoiceList>(Key, _ =>
+            _session.Data.Modify<ChoiceList>(key, _ =>
             {
                 choice.table = table ?? "";
                 choice.count = count;
@@ -143,32 +163,88 @@ namespace GBible
             });
         }
 
-        public PendingChoice Current => Items().FirstOrDefault();
-        public IReadOnlyList<PendingChoice> All => Items().ToList();
+        // 이 프로그램(화면)이 답할 선택 가운데 먼저 요구한 것.
+        public PendingChoice Current
+        {
+            get
+            {
+                PendingChoice first = null;
+                foreach (var choice in Items())
+                    if (Mine(choice) && (first == null || Serial(choice.id) < Serial(first.id))) first = choice;
+                return first;
+            }
+        }
+
+        // 기다리는 선택 모두(먼저 요구한 차례). 멀티 클라이언트에는 모두에게 온 것과 내 것만 온다.
+        public IReadOnlyList<PendingChoice> All => Items().OrderBy(c => Serial(c.id)).ToList();
 
         public bool Cancel(string id)
         {
-            if (!Items().Any(c => c.id == id)) return false;
-            _session.Data.Modify<ChoiceList>(Key, l => l.items.RemoveAll(c => c.id == id));
+            var (key, choice) = Locate(id);
+            if (choice == null) return false;
+            _session.Data.Modify<ChoiceList>(key, l => l.items.RemoveAll(c => c.id == id));
             return true;
         }
 
         internal PendingChoice Take(string id)
         {
-            var found = Items().FirstOrDefault(c => c.id == id);
-            if (found != null) _session.Data.Modify<ChoiceList>(Key, l => l.items.Remove(found));
+            var (key, found) = Locate(id);
+            if (found != null) _session.Data.Modify<ChoiceList>(key, l => l.items.Remove(found));
             return found;
         }
 
-        // 등록돼 있거나 불러온 저장의 값이 기다리고 있으면(지금 등록한다) 그 목록.
+        // 혼자 하기면 모두, 멀티면 누구나 답하는 것과 내 번호에게 온 것.
+        bool Mine(PendingChoice choice) =>
+            _session.Role == SessionRole.Local || string.IsNullOrEmpty(choice.player) ||
+            choice.player == _session.LocalPlayer.ToString(CultureInfo.InvariantCulture);
+
+        // 요구한 차례: 선택 id('$choice' + 번호)의 번호. 번호가 없으면 맨 뒤.
+        static long Serial(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return long.MaxValue;
+            var start = id.Length;
+            while (start > 0 && char.IsDigit(id[start - 1])) start--;
+            return start < id.Length && long.TryParse(id.Substring(start), NumberStyles.None, CultureInfo.InvariantCulture, out var serial) ? serial : long.MaxValue;
+        }
+
+        (string key, PendingChoice choice) Locate(string id)
+        {
+            foreach (var key in Keys())
+            {
+                var found = _session.Data.Get<ChoiceList>(key)?.items.FirstOrDefault(c => c.id == id);
+                if (found != null) return (key, found);
+            }
+            return (null, null);
+        }
+
+        // 이 플레이어의 선택 키를 정의한다(없으면). 플레이어 번호가 있으면 그 주인에게만 보낸다.
+        string Ensure(string player)
+        {
+            var key = KeyFor(player);
+            if (_session.Data.IsDefined(key)) return key;
+            _session.Data.Define(key, DataZone.Session, new ChoiceList(), string.IsNullOrEmpty(player) ? "선택 대기" : $"선택 대기({player})");
+            if (!string.IsNullOrEmpty(player) && int.TryParse(player, NumberStyles.Integer, CultureInfo.InvariantCulture, out var owner))
+                _session.Data.SetVisibility(key, DataVisibility.Owner, owner);
+            return key;
+        }
+
+        // 선택 키(불러온 저장의 값이 기다리고 있으면 지금 정의한다).
+        List<string> Keys()
+        {
+            foreach (var key in _session.Data.PendingKeys.Where(IsChoiceKey).ToList())
+                Ensure(key == Key ? "" : key.Substring(Key.Length + 1));
+            return _keys;
+        }
+
+        // 기다리는 선택(키마다 요구한 차례).
         IEnumerable<PendingChoice> Items()
         {
-            if (!_session.Data.IsDefined(Key))
+            foreach (var key in Keys())
             {
-                if (!_session.Data.IsPending(Key)) return Enumerable.Empty<PendingChoice>();
-                _session.Data.Define(Key, DataZone.Session, new ChoiceList(), "선택 대기");
+                var list = _session.Data.Get<ChoiceList>(key)?.items;
+                if (list == null) continue;
+                foreach (var choice in list) yield return choice;
             }
-            return _session.Data.Get<ChoiceList>(Key)?.items ?? Enumerable.Empty<PendingChoice>();
         }
     }
 

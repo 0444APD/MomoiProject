@@ -495,6 +495,48 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 비어_있는_Nullable은_Sync마다_바뀐_것으로_기록하지_않는다()
+        {
+            Mirror.Initialize();
+            var live = new MtOptional();
+            var node = Mirror.Make(live);
+            var changes = new ChangeSet();
+            Mirror.Sync(live, node, changes);
+            Assert.IsTrue(changes.IsEmpty, "아무것도 바꾸지 않았다(null → null)");
+            live.maybe = 2;
+            Mirror.Sync(live, node, changes = new ChangeSet());
+            Assert.IsFalse(changes.IsEmpty);
+            live.maybe = null;
+            Mirror.Sync(live, node, changes = new ChangeSet());
+            Assert.IsFalse(changes.IsEmpty, "값 → null은 바뀐 것");
+            Mirror.Sync(live, node, changes = new ChangeSet());
+            Assert.IsTrue(changes.IsEmpty);
+        }
+
+        [Test]
+        public void 닿지_않게_된_고리는_나무에서_빠지고_다시_들어와도_늦게_온_받는_쪽이_읽는다()
+        {
+            Mirror.Initialize();
+            var r = new MtLoop { name = "r" };
+            var a = new MtLoop { name = "a" };
+            var b = new MtLoop { name = "b", next = a };
+            a.next = b;
+            r.next = a;
+            var node = Mirror.Make(r);
+            r.next = null;
+            Mirror.Sync(r, node, new ChangeSet());
+            var late = new MirrorReceiver();
+            var client = (MtLoop)late.Load(Mirror.Snapshot(node));
+            Assert.IsNull(client.next);
+            r.next = a;
+            var changes = new ChangeSet();
+            Mirror.Sync(r, node, changes);
+            Assert.DoesNotThrow(() => late.Apply(client, changes), "다시 들어온 고리는 내용째 간다");
+            Assert.AreEqual("a", client.next.name);
+            Assert.AreSame(client.next, client.next.next.next, "고리 모양도 그대로");
+        }
+
+        [Test]
         public void 서로_가리키는_객체도_비교하고_복사한다()
         {
             var a = new MtLoop { name = "a" };
@@ -671,6 +713,38 @@ namespace GBible.Tests
             {
                 Mirror.Warning -= listen;
             }
+        }
+
+
+        // 받은 데이터(네트워크·리플레이)는 믿지 않는다: 끝없이 겹친 객체·남은 데이터보다 큰 개수는 거절(FormatException — 잡을 수 있는 예외).
+        [Test]
+        public void 깨진_데이터는_스택을_넘기거나_거대하게_할당하지_않고_거절한다()
+        {
+            var head = new MtLoop { name = "0" };
+            var cur = head;
+            for (var i = 1; i < 400; i++)
+            {
+                cur.next = new MtLoop { name = i.ToString() };
+                cur = cur.next;
+            }
+            var w = new MirrorWriter();
+            Mirror.Write(w, head);
+            Assert.Throws<FormatException>(() => Mirror.Read(new MirrorReader(w.ToArray()), typeof(MtLoop)));
+
+            // 그 뒤에도 보통 읽기는 그대로 된다(깊이 세기가 남지 않는다).
+            var shallow = new MirrorWriter();
+            Mirror.Write(shallow, new MtLoop { name = "a", next = new MtLoop { name = "b" } });
+            Assert.AreEqual("b", ((MtLoop)Mirror.Read(new MirrorReader(shallow.ToArray()), typeof(MtLoop))).next.name);
+
+            var huge = new MirrorWriter();
+            huge.UVar(100_000_000);
+            Assert.Throws<FormatException>(() => NetProtocol.ReadStrings(new MirrorReader(huge.ToArray())), "개수가 남은 데이터보다 많다");
+            Assert.Throws<FormatException>(() => new MirrorReader(huge.ToArray()).Str(), "글자 길이가 남은 데이터보다 길다");
+            var endless = new byte[16];
+            for (var i = 0; i < endless.Length; i++) endless[i] = 0xFF;
+            Assert.Throws<FormatException>(() => new MirrorReader(endless).UVar(), "끝나지 않는 숫자 인코딩");
+            Assert.AreEqual("abc", NetProtocol.CleanName("\u0001 abc \n"));
+            Assert.AreEqual(NetProtocol.MaxNameLength, NetProtocol.CleanName(new string('가', 100)).Length);
         }
 
         // 미리보기(받는 쪽에 보내지 않음)에서 빠졌다가 되돌려진 객체: 번호가 그대로라 받는 쪽에서 계속 같은 인스턴스로 이어진다.

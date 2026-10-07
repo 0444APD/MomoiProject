@@ -70,11 +70,16 @@ namespace GBible
             throw new ArgumentException($"[MomoiProject] JSON으로 쓸 수 없는 값 형식입니다: {value.GetType().Name}");
         }
 
+        // i의 서로게이트가 짝을 이루는가(앞 반 + 뒤 반).
+        static bool IsPaired(string text, int i) =>
+            char.IsHighSurrogate(text[i]) ? i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]) : i > 0 && char.IsHighSurrogate(text[i - 1]);
+
         static void WriteString(StringBuilder b, string text)
         {
             b.Append('"');
-            foreach (var c in text)
+            for (var i = 0; i < text.Length; i++)
             {
+                var c = text[i];
                 switch (c)
                 {
                     case '"': b.Append("\\\""); break;
@@ -83,7 +88,8 @@ namespace GBible
                     case '\r': b.Append("\\r"); break;
                     case '\t': b.Append("\\t"); break;
                     default:
-                        if (c < 0x20) b.Append("\\u").Append(((int)c).ToString("x4"));
+                        // 제어 문자와 짝 없는 서로게이트(이모지 중간에서 자른 글)는 \uXXXX로 — UTF-8 파일을 거쳐도 글자가 바뀌지 않게.
+                        if (c < 0x20 || (char.IsSurrogate(c) && !IsPaired(text, i))) b.Append("\\u").Append(((int)c).ToString("x4"));
                         else b.Append(c);
                         break;
                 }
@@ -100,10 +106,15 @@ namespace GBible
             return value;
         }
 
+        // 객체·배열을 겹쳐 넣을 수 있는 깊이(저장 데이터는 이만큼 깊지 않다). 깨지거나 손댄 파일이 끝없이 겹쳐 있어도 스택이 넘치지 않게
+        // (StackOverflow는 잡을 수 없어 프로세스가 죽는다 — 저장 파일 하나 때문에 게임이 켜지지 않게 된다).
+        const int MaxDepth = 512;
+
         sealed class Parser
         {
             readonly string _text;
             int _pos;
+            int _depth;
 
             public Parser(string text) => _text = text ?? throw new ArgumentNullException(nameof(text));
 
@@ -123,8 +134,13 @@ namespace GBible
                 var c = _text[_pos];
                 switch (c)
                 {
-                    case '{': return ReadObject();
-                    case '[': return ReadArray();
+                    case '{':
+                    case '[':
+                    {
+                        if (++_depth > MaxDepth) throw Fail($"객체·배열이 너무 깊이 겹쳐 있습니다({MaxDepth}단계 넘게)");
+                        try { return c == '{' ? (object)ReadObject() : ReadArray(); }
+                        finally { _depth--; }
+                    }
                     case '"': return ReadString();
                     case 't': Expect("true"); return true;
                     case 'f': Expect("false"); return false;
@@ -204,14 +220,25 @@ namespace GBible
                         case 'r': b.Append('\r'); break;
                         case 't': b.Append('\t'); break;
                         case 'u':
-                            if (_pos + 4 > _text.Length) throw Fail("잘못된 유니코드 이스케이프");
-                            b.Append((char)int.Parse(_text.Substring(_pos, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                        {
+                            // 16진수 네 자리만(공백·부호 없이).
+                            var code = 0;
+                            for (var k = 0; k < 4; k++)
+                            {
+                                var digit = _pos + k < _text.Length ? HexValue(_text[_pos + k]) : -1;
+                                if (digit < 0) throw Fail("잘못된 유니코드 이스케이프");
+                                code = code * 16 + digit;
+                            }
+                            b.Append((char)code);
                             _pos += 4;
                             break;
+                        }
                         default: throw Fail($"알 수 없는 이스케이프 '\\{e}'");
                     }
                 }
             }
+
+            static int HexValue(char c) => c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
 
             double ReadNumber()
             {

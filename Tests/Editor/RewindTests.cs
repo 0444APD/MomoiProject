@@ -53,6 +53,43 @@ namespace GBible.Tests
         protected override void Run() => Game.RewindKey(key, steps);
     }
 
+    [Serializable]
+    public class RwRemove : GameAction
+    {
+        public string id;
+
+        protected override void Run() => Game.Session.Data.Get<NtParty>("party").units.RemoveAll(u => u.id == id);
+    }
+
+    // [Serializable]이 없는 데이터: 예전 방식(리플렉션 비교).
+    public sealed class RwPlainUnit
+    {
+        public string id;
+        public int hp;
+    }
+
+    public sealed class RwPlainParty
+    {
+        public System.Collections.Generic.List<RwPlainUnit> units = new System.Collections.Generic.List<RwPlainUnit>();
+    }
+
+    [Serializable]
+    public class RwPlainHit : GameAction
+    {
+        public string id;
+        public int damage;
+
+        protected override void Run() => Game.Session.Data.Modify<RwPlainParty>("plain", p => p.units.First(u => u.id == id).hp -= damage);
+    }
+
+    [Serializable]
+    public class RwPlainBack : GameAction
+    {
+        public string id;
+
+        protected override void Run() => Game.RewindEntity(Game.Session.Data.Get<RwPlainParty>("plain").units.First(u => u.id == id));
+    }
+
     // 되감기 기믹: 지점 → 전체·키 하나·객체 하나 되돌리기(하나의 행동, Undo·멀티에 그대로).
     public class RewindTests
     {
@@ -144,6 +181,39 @@ namespace GBible.Tests
             Pump();
             Assert.AreEqual(10, Unit(serverSession, "a").hp);
             Assert.AreEqual(10, Unit(client.Session, "a").hp, "되감은 결과는 바뀐 곳으로 온다");
+        }
+        [Test]
+        public void 되감으면_빠졌던_요소는_원래_인스턴스로_남은_요소는_제_인스턴스로_돌아온다()
+        {
+            var session = NewSession();
+            session.Data.Modify<NtParty>("party", p => p.units.Add(new NtUnit { id = "c", hp = 6 }));
+            var b = Unit(session, "b");
+            var c = Unit(session, "c");
+            session.Do(new RwMark());
+            session.Do(new RwRemove { id = "b" });
+            session.Do(new RwHit { unit = c, damage = 1 });
+            session.Do(new RwBack());
+            var units = session.Data.Get<NtParty>("party").units;
+            CollectionAssert.AreEqual(new[] { "a", "b", "c" }, units.Select(u => u.id).ToArray());
+            Assert.AreSame(b, units[1], "빠졌던 요소는 원래 인스턴스로");
+            Assert.AreSame(c, units[2], "남은 요소는 자기 인스턴스 그대로");
+            Assert.AreEqual(6, c.hp);
+        }
+
+        [Test]
+        public void 예전_방식_데이터의_객체_하나도_되감는다()
+        {
+            var session = new GameSession();
+            session.Data.Define("plain", DataZone.Session, new RwPlainParty { units = { new RwPlainUnit { id = "a", hp = 10 }, new RwPlainUnit { id = "b", hp = 8 } } });
+            session.Do(new RwMark());
+            session.Do(new RwPlainHit { id = "a", damage = 3 });
+            session.Do(new RwPlainHit { id = "b", damage = 2 });
+            session.Do(new RwPlainBack { id = "a" });
+            var units = session.Data.Get<RwPlainParty>("plain").units;
+            Assert.AreEqual(10, units[0].hp);
+            Assert.AreEqual(6, units[1].hp, "다른 객체는 그대로");
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(7, units[0].hp, "되감기도 하나의 행동이라 Undo된다");
         }
     }
 }

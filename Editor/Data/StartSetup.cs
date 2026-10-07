@@ -14,7 +14,8 @@ namespace GBible.EditorTools
     //     Rules  = 규칙(데이터·행동·이벤트·Block·[BindTo]) — GBible.Core·GBible.Unity(+ 데이터 모듈)만 참조
     //     Client = Unity 쪽(시작 설정 코드·화면·연출) — Rules + GBible + 켠 모듈
     //     Editor = 에디터 확장(Editor 전용), Tests = EditMode 규칙 테스트
-    //   그 밖: Product Name, 선택 모듈, Undo 방식(DB 에셋의 세션 옵션), 언어, 시작 파일(Bootstrap.cs·플레이어 데이터 뼈대), DB 에셋.
+    //   그 밖: Product Name, 선택 모듈, Undo 방식(DB 에셋의 세션 옵션), 언어, 시작 파일(Bootstrap.cs·플레이어 데이터 뼈대), DB 에셋,
+    //   코드 줄이기 보호(Assets/MomoiProject/link.xml — 게임 어셈블리를 통째로 남긴다).
     // 이미 있는 파일은 덮어쓰지 않는다(다시 열어도 안전). 모듈을 켜고 끄면 asmdef 참조를 따라 맞춘다.
     [InitializeOnLoad]
     public static class StartSetup
@@ -73,11 +74,13 @@ namespace GBible.EditorTools
             if (!IsDone && !Application.isBatchMode) EditorApplication.delayCall += OpenOnce;
             // 시작 설정을 마친 프로젝트: Claude Code 파일(CLAUDE.md·스킬·컴파일 검사 훅)을 패키지 경로·템플릿에 맞춘다.
             // 그리고 DB 정리: 옛 한글 종류 폴더를 영어 이름으로 옮기고, 하나만 두는 설정(Steam 등)이 없으면 만든다.
+            // 코드 줄이기 보호(link.xml)가 없으면 만든다(이 기능 전에 시작 설정을 마친 프로젝트도 받게).
             if (IsDone && !Application.isBatchMode)
                 EditorApplication.delayCall += () =>
                 {
                     ClaudeFiles.Sync();
                     EditorDatabase.Upkeep();
+                    EnsureLinkXml(null);
                 };
         }
 
@@ -96,6 +99,49 @@ namespace GBible.EditorTools
                 AssetDatabase.ImportAsset(path);
                 done?.Add($"{path} 만듦(빈 어셈블리 경고 막기)");
             }
+        }
+
+        // 코드 줄이기 보호 파일. 패키지 안의 link.xml은 Unity가 읽지 않으므로 프로젝트(Assets)에 둔다.
+        public const string LinkXmlPath = ProjectFolders.Root + "/link.xml";
+
+        // 코드 줄이기(Player Settings › Managed Stripping Level이 Low·Medium·High)는 코드에서 가리키지 않는 것을 지운다 —
+        // GBible이 리플렉션으로만 찾는 게임 코드([BindTo] 함수·Reward 클래스·화면 코드(GameScreen)·DB가 이름으로 가리키는 행동·이벤트 형식)가 지워지면
+        // 빌드에서만 조용히 망가진다(행동이 서버에서 거절·이벤트 빠짐·화면이 동작하지 않음). 그래서 게임 어셈블리를 통째로 남기는 link.xml을 둔다.
+        // 이미 있으면 건드리지 않는다(개발자가 고친 줄을 덮지 않는다). 빌드 직전 검사: LinkXmlBuildGuard.
+        public static void EnsureLinkXml(List<string> done)
+        {
+            if (File.Exists(LinkXmlPath)) return;
+            EditorDatabase.EnsureFolder(ProjectFolders.Root);
+            File.WriteAllText(LinkXmlPath, LinkXmlText(), new UTF8Encoding(false));
+            AssetDatabase.ImportAsset(LinkXmlPath);
+            done?.Add($"{LinkXmlPath} 만듦(코드 줄이기가 리플렉션으로 찾는 게임 코드를 지우지 않게)");
+        }
+
+        // 남길 게임 어셈블리: Rules·Client와 그 밖의 빌드에 들어가는 MomoiProject.* 어셈블리(에디터·테스트 전용은 빌드에 없으므로 뺀다),
+        // 그리고 Assembly-CSharp(asmdef 없이 Assets에 둔 스크립트).
+        internal static List<string> GameAssembliesToPreserve()
+        {
+            var names = new List<string> { AssemblyOf("Rules"), AssemblyOf("Client") };
+            foreach (var assembly in UnityEditor.Compilation.CompilationPipeline.GetAssemblies(UnityEditor.Compilation.AssembliesType.PlayerWithoutTestAssemblies))
+                if (assembly.name.StartsWith(Prefix + ".", StringComparison.Ordinal) && !names.Contains(assembly.name)) names.Add(assembly.name);
+            names.Add("Assembly-CSharp");
+            return names;
+        }
+
+        internal static string LinkXmlText()
+        {
+            var b = new StringBuilder();
+            b.Append("<!--\n");
+            b.Append("  시작 설정이 만든 파일(MomoiProject). 코드 줄이기(Player Settings › Managed Stripping Level이 Low·Medium·High)가\n");
+            b.Append("  GBible이 리플렉션으로만 찾는 게임 코드([BindTo] 함수·Reward 클래스·화면 코드·DB가 이름으로 가리키는 행동·이벤트 형식)를\n");
+            b.Append("  지우지 않게 게임 어셈블리를 통째로 남긴다.\n");
+            b.Append("  빌드에 들어가는 MomoiProject.* 어셈블리를 새로 만들면 한 줄 더한다(빠진 것은 빌드할 때 경고한다).\n");
+            b.Append("  파일을 지우면 에디터를 열 때 다시 만든다. 다른 어셈블리의 줄은 더해도 된다(다시 만들 때 덮지 않는다).\n");
+            b.Append("-->\n");
+            b.Append("<linker>\n");
+            foreach (var name in GameAssembliesToPreserve()) b.Append($"  <assembly fullname=\"{name}\" preserve=\"all\" />\n");
+            b.Append("</linker>\n");
+            return b.ToString();
         }
 
         static void OpenOnce()
@@ -174,6 +220,7 @@ namespace GBible.EditorTools
             }
             // 시작 파일을 쓴 뒤에(Rules·Client에는 위 파일이 있으므로 자리 표시가 생기지 않는다 — 스크립트가 없는 Editor·Tests만).
             EnsurePlaceholders(done);
+            EnsureLinkXml(done);
 
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
             if (database == null)

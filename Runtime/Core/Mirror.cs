@@ -74,17 +74,33 @@ namespace GBible
                 Type[] types;
                 try { types = assembly.GetTypes(); }
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
-                foreach (var type in types)
-                {
-                    if (type.IsGenericTypeDefinition) continue;
-                    var register = type.GetMethod("__gb_register", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly, null, Type.EmptyTypes, null);
-                    register?.Invoke(null, null);
-                }
+                foreach (var type in types) RegisterType(type);
             }
             // 형식 번호: 이름순(같은 코드로 빌드한 서버·클라이언트가 같은 번호를 쓴다).
             ById.Clear();
             ById.AddRange(ByType.Values.OrderBy(t => t.Type.FullName, StringComparer.Ordinal).ThenBy(t => t.Type.Assembly.GetName().Name, StringComparer.Ordinal));
             for (var i = 0; i < ById.Count; i++) ById[i].Id = i;
+            // 새로 등록된 형식이 있으면 보내기 검사(CanSend·CanSendValue) 결과가 달라질 수 있다.
+            lock (SendChecks) SendChecks.Clear();
+            lock (ValueChecks) ValueChecks.Clear();
+        }
+
+        // 형식 하나의 생성 코드(__gb_register)를 부른다. 한 형식이 실패해도(깨진 생성 코드·형식을 불러오지 못함 …) 나머지 형식과
+        // 게임 시작은 그대로 간다: 그 형식은 비교 코드가 없는 것으로 남기고(예전 비교 방식 — 반쯤 등록된 것도 뺀다) 이유를 한 번 알린다.
+        static void RegisterType(Type type)
+        {
+            try
+            {
+                if (type.IsGenericTypeDefinition) return;
+                var register = type.GetMethod("__gb_register", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly, null, Type.EmptyTypes, null);
+                register?.Invoke(null, null);
+            }
+            catch (Exception e)
+            {
+                var cause = e is TargetInvocationException { InnerException: { } inner } ? inner : e;
+                lock (Gate) ByType.Remove(type);
+                Warn($"{type.FullName}의 생성 코드를 등록하지 못했습니다 — 이 형식은 비교 코드가 없는 것으로 다룹니다(예전 비교 방식). {cause.GetType().Name}: {cause.Message}");
+            }
         }
 
         internal static void Add(MirrorType type)
@@ -149,7 +165,7 @@ namespace GBible
             return map;
         }
 
-        // 이 형식을 뿌리로 쓸 수 있는지(모든 필드가 생성 코드로 다뤄지는지). 아니면 reason에 첫 이유.
+        // 이 형식을 뿌리로 쓸 수 있는지(모든 필드가 생성 코드로 다뤄지는지). 아니면 reason에 첫 이유(어느 필드인지 경로로).
         public static bool Supports(Type type, out string reason)
         {
             if (!_initialized) Initialize();
@@ -160,46 +176,175 @@ namespace GBible
                 reason = $"{DataModel.FriendlyName(type)}에 비교 코드가 없습니다([Serializable] 클래스가 아님)";
                 return false;
             }
-            return CheckType(root, new HashSet<Type>(), ref reason);
+            return CheckType(root, DataModel.FriendlyName(type), new HashSet<Type>(), ref reason, false, false);
         }
 
-        static bool CheckType(MirrorType type, HashSet<Type> seen, ref string reason)
+        // 부모 쪽 필드를 생성 코드가 다루지 못한 클래스(제네릭 부모·GBible.Core를 참조하지 않는 어셈블리의 부모)의 표시:
+        // 필드 배치 맨 앞의 종류 None 칸, 이름 = 이 앞부분 + 사람이 읽는 설명(MirrorWeaver와 같은 값). 이 형식은 Supports·CanSend가 거짓이다.
+        internal const string LostBaseMarker = "$base ";
+
+        // 형식을 네트워크로 보낼 수 있는지(행동: 클라이언트 → 서버, 이벤트: 서버 → 클라이언트). 형식만 보고, 결과는 기억한다
+        // (보내는 쪽이 형식마다 처음 보낼 때 부른다 — NetClient·NetServer). 아니면 reason에 첫 이유(어느 필드인지 경로로).
+        //   · 생성 코드가 모든 필드를 쓰고 읽는지: 중첩 컬렉션·쓸 수 없는 구조체((int, int)·KeyValuePair …)·생성 코드가 없는 클래스(HashSet …)·
+        //     다루지 못한 부모 필드가 있으면 받는 쪽에 빈 칸으로 도착하거나 쓰다가 멈춘다.
+        //     안쪽에 컬렉션이 있는 구조체는 된다(쓰기·읽기는 온전 — 변경 추적만 못 하므로 Supports는 거짓).
+        //   · 값으로 보이는데 생성 코드가 쓰지 않는 필드(readonly·자동 속성·대리자)가 없는지 — 받는 쪽에 기본값으로 도착한다.
+        //   · 행동의 참조 필드(id가 있는 객체와 그 리스트·배열 — ActionReferences)는 id만 가므로 안쪽을 보지 않는다.
+        //   object·추상·인터페이스 칸의 실제 값은 형식만으로 알 수 없으므로 보낼 때 CanSendValue로 본다.
+        public static bool CanSend(Type type, out string reason)
+        {
+            reason = null;
+            if (type == null) return true;
+            if (!_initialized) Initialize();
+            lock (SendChecks)
+                if (SendChecks.TryGetValue(type, out reason)) return reason == null;
+            string problem = null;
+            var path = DataModel.FriendlyName(type);
+            var root = Find(type);
+            if (root == null)
+                problem = type.IsValueType ? $"{path}: 구조체는 보낼 수 없습니다([Serializable] 클래스로 만드세요)" : $"{path}에 생성 코드가 없습니다([Serializable]을 붙이세요)";
+            else if (CheckUnwritten(type, path, ref problem))
+                CheckType(root, path, new HashSet<Type>(), ref problem, true, typeof(GameAction).IsAssignableFrom(type));
+            lock (SendChecks) SendChecks[type] = problem;
+            reason = problem;
+            return problem == null;
+        }
+
+        static readonly Dictionary<Type, string> SendChecks = new Dictionary<Type, string>();
+
+        // 행동·이벤트 안의 값 하나(실제 형식)를 네트워크로 보낼 수 있는지 — 보내는 쪽이 값을 쓰는 동안 객체마다 부른다(Mirror.WriteNetValue의 nodeOf).
+        // object·추상·인터페이스 칸에 든 값처럼 형식만으로 모르는 것을 잡는다: 생성 코드가 없는 값(상자에 든 숫자·글자, [Serializable]이 없는 클래스)과
+        // ID가 없는 에셋 참조는 받는 쪽에 null로 도착한다. 생성 코드가 있는 값은 그 형식 자신의 필드만 본다(안쪽 객체는 쓸 때 따로 불린다).
+        // 결과는 형식마다 기억한다(에셋 참조는 값마다).
+        public static bool CanSendValue(object value, out string reason)
+        {
+            reason = null;
+            if (value == null) return true;
+            var type = value.GetType();
+            if (DataModel.IsReferenceType(type))
+            {
+                if (DataModel.ReferenceToId == null || !string.IsNullOrEmpty(DataModel.ReferenceToId(value))) return true;
+                reason = $"{DataModel.FriendlyName(type)} 에셋은 ID가 있는 DB 항목이 아니라 보낼 수 없습니다(받는 쪽에는 null) — DB 항목이나 그 ID를 담으세요";
+                return false;
+            }
+            if (!_initialized) Initialize();
+            lock (ValueChecks)
+                if (ValueChecks.TryGetValue(type, out reason)) return reason == null;
+            var path = DataModel.FriendlyName(type);
+            var found = Find(type);
+            string problem = null;
+            if (found == null)
+                problem = $"{path} 값은 생성 코드가 없어 보낼 수 없습니다(받는 쪽에는 null) — 숫자·글자는 object 칸 대신 그 형식의 필드에, 객체는 [Serializable] 클래스로";
+            else
+                // id가 있는 객체(데이터 안의 객체)는 행동에서는 id만 쓰이고(받는 쪽이 지금 데이터에서 다시 찾는다) 이벤트에서는 보통 받는 쪽이
+                // 가진 객체를 번호로 가리키므로 빠지는 칸은 상관없다 — 쓸 수 있는지만 본다.
+                CheckOwnFields(found, path, ref problem, SentAsId(type));
+            lock (ValueChecks) ValueChecks[type] = problem;
+            reason = problem;
+            return problem == null;
+        }
+
+        static readonly Dictionary<Type, string> ValueChecks = new Dictionary<Type, string>();
+
+        // 형식의 필드를 차례로 본다(안쪽 객체 형식까지). path = 이 형식까지의 경로(이유에 쓴다).
+        // network: 네트워크로 보낼 값(쓰고 읽을 수만 있으면 된다). actionRoot: 행동 형식 자신(참조 필드는 id만 가므로 안쪽을 보지 않는다).
+        static bool CheckType(MirrorType type, string path, HashSet<Type> seen, ref string reason, bool network, bool actionRoot)
         {
             if (!seen.Add(type.Type)) return true;
             for (var i = 0; i < type.FieldCount; i++)
             {
                 var field = type.FieldTypes[i];
+                var name = path + "." + type.Names[i];
                 bool ok;
                 switch (type.Kinds[i])
                 {
                     case MirrorKind.None:
-                        ok = false;
-                        break;
+                        reason = NoneReason(type, i, path);
+                        return false;
                     case MirrorKind.Struct:
-                        ok = MirrorValues.IsSupported(field);
-                        if (!ok && field != null && MirrorValues.IsShallow(field))
-                            reason = $"{DataModel.FriendlyName(field)}는 안쪽에 객체·컬렉션 필드가 있는 구조체라 안쪽 변경을 따라가지 못합니다([Serializable] 클래스로 바꾸세요)";
+                        ok = CheckValue(field, name, network, ref reason);
                         break;
                     case MirrorKind.Object:
-                        ok = CheckReference(field, seen, ref reason);
+                        ok = (actionRoot && SentAsId(field)) || CheckReference(field, name, seen, ref reason, network);
                         break;
                     case MirrorKind.List:
                     case MirrorKind.Array:
-                        ok = CheckElement(field.IsArray ? field.GetElementType() : field.GetGenericArguments()[0], seen, ref reason);
+                    {
+                        var element = ElementOf(field);
+                        ok = element != null && ((actionRoot && SentAsId(element)) || CheckElement(element, name + "[]", seen, ref reason, network));
                         break;
+                    }
                     case MirrorKind.Dictionary:
-                        var args = field.GetGenericArguments();
-                        ok = IsKeyType(args[0]) && CheckElement(args[1], seen, ref reason);
+                    {
+                        var args = field != null && field.IsGenericType ? field.GetGenericArguments() : Type.EmptyTypes;
+                        ok = args.Length == 2 && IsKeyType(args[0]) && CheckElement(args[1], name + "[]", seen, ref reason, network);
                         break;
+                    }
                     default:
                         ok = true;
                         break;
                 }
                 if (ok) continue;
-                reason ??= $"{DataModel.FriendlyName(type.Type)}.{type.Names[i]}({DataModel.FriendlyName(field ?? typeof(object))})는 비교 코드로 다룰 수 없는 형식입니다";
+                reason ??= $"{name}({DataModel.FriendlyName(field ?? typeof(object))})는 비교 코드로 다룰 수 없는 형식입니다";
                 return false;
             }
             return true;
+        }
+
+        // 형식 자신의 필드만(안쪽 객체는 쓸 때 따로 본다 — CanSendValue): 생성 코드가 빼먹는 칸(skipMissing이면 보지 않는다)·쓸 수 없는 구조체·요소.
+        static void CheckOwnFields(MirrorType type, string path, ref string reason, bool skipMissing)
+        {
+            for (var i = 0; i < type.FieldCount && reason == null; i++)
+            {
+                var field = type.FieldTypes[i];
+                var name = path + "." + type.Names[i];
+                switch (type.Kinds[i])
+                {
+                    case MirrorKind.None:
+                        if (!skipMissing) reason = NoneReason(type, i, path);
+                        break;
+                    case MirrorKind.Struct:
+                        CheckValue(field, name, true, ref reason);
+                        break;
+                    case MirrorKind.List:
+                    case MirrorKind.Array:
+                    {
+                        var element = ElementOf(field);
+                        if (element != null && element.IsValueType) CheckValue(element, name + "[]", true, ref reason);
+                        break;
+                    }
+                    case MirrorKind.Dictionary:
+                    {
+                        var args = field != null && field.IsGenericType ? field.GetGenericArguments() : Type.EmptyTypes;
+                        if (args.Length == 2 && args[1].IsValueType) CheckValue(args[1], name + "[]", true, ref reason);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 행동의 참조 필드로 id만 보내는 객체인지: id가 있는 클래스(ActionReferences — 받는 쪽이 지금 데이터에서 id로 다시 찾는다)이고
+        // 그 id를 생성 코드가 쓴다(잃은 부모 쪽에 있으면 id도 가지 않는다).
+        static bool SentAsId(Type type) => ActionReferences.IsReferenceType(type) && Find(type) is { } found && found.FindIdField() >= 0;
+
+        // 종류 None 칸(생성 코드가 다루지 못하는 필드, 또는 잃은 부모 필드의 표시)의 이유.
+        static string NoneReason(MirrorType type, int i, string path)
+        {
+            var name = type.Names[i] ?? "";
+            if (name.StartsWith(LostBaseMarker, StringComparison.Ordinal))
+                return $"{path}: 부모 {name.Substring(LostBaseMarker.Length)}는 생성 코드가 다루지 못합니다(그 필드를 이 클래스로 옮기거나, 부모를 제네릭이 아닌 [Serializable] 클래스로 GBible.Core를 참조하는 어셈블리에 두세요)";
+            return $"{path}.{name}({DataModel.FriendlyName(type.FieldTypes[i] ?? typeof(object))})는 생성 코드가 다루지 못하는 형식입니다(중첩 컬렉션·다차원 배열·키가 글자·정수·enum이 아닌 딕셔너리 — List<T>·Dictionary<K, V>·[Serializable] 클래스로 바꾸세요)";
+        }
+
+        // 구조체·값 요소 하나. network면 쓰고 읽을 수만 있으면 되고(안쪽에 컬렉션이 있는 구조체도), 아니면 변경을 따라갈 수 있어야 한다.
+        static bool CheckValue(Type type, string name, bool network, ref string reason)
+        {
+            if (type != null && (network ? MirrorValues.CanWrite(type) : MirrorValues.IsSupported(type))) return true;
+            var shown = DataModel.FriendlyName(type ?? typeof(object));
+            reason = !network && type != null && MirrorValues.IsShallow(type)
+                ? $"{name}: {shown}는 안쪽에 객체·컬렉션 필드가 있는 구조체라 안쪽 변경을 따라가지 못합니다([Serializable] 클래스로 바꾸세요)"
+                : $"{name}: {shown}는 쓰고 읽는 방법이 없는 구조체입니다((int, int)·KeyValuePair 같은 구조체는 담지 못합니다 — [Serializable] 구조체나 클래스로 바꾸세요)";
+            return false;
         }
 
         static bool IsKeyType(Type type) => type == typeof(string) || type.IsEnum || (type.IsPrimitive && type != typeof(float) && type != typeof(double));
@@ -207,27 +352,70 @@ namespace GBible
         static bool IsCollection(Type type) =>
             type.IsArray || (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(List<>) || type.GetGenericTypeDefinition() == typeof(Dictionary<,>)));
 
-        static bool CheckElement(Type type, HashSet<Type> seen, ref string reason)
+        static Type ElementOf(Type collection) =>
+            collection == null ? null : collection.IsArray ? collection.GetElementType() : collection.IsGenericType ? collection.GetGenericArguments()[0] : null;
+
+        static bool CheckElement(Type type, string name, HashSet<Type> seen, ref string reason, bool network)
         {
-            if (type.IsPrimitive || type.IsEnum || type == typeof(string)) return true;
-            if (IsCollection(type)) return false;
-            if (type.IsValueType) return MirrorValues.IsSupported(type);
-            return CheckReference(type, seen, ref reason);
+            if (type == typeof(string) || type.IsEnum) return true;
+            if (IsCollection(type))
+            {
+                reason = $"{name}({DataModel.FriendlyName(type)}): 컬렉션 안의 컬렉션은 다루지 못합니다([Serializable] 클래스로 한 번 감싸세요)";
+                return false;
+            }
+            if (type.IsValueType) return CheckValue(type, name, network, ref reason);
+            return CheckReference(type, name, seen, ref reason, network);
         }
 
-        static bool CheckReference(Type type, HashSet<Type> seen, ref string reason)
+        static bool CheckReference(Type type, string name, HashSet<Type> seen, ref string reason, bool network)
         {
             if (type == null) return false;
-            if (DataModel.IsReferenceType(type)) return true;               // 에셋 참조: 참조 그대로 비교
-            if (type == typeof(object) || type.IsAbstract || type.IsInterface) return true; // 실제 형식으로 그때그때
-            if (IsCollection(type)) return false;
+            if (DataModel.IsReferenceType(type)) return true;               // 에셋 참조: 참조 그대로 비교(네트워크는 ID로 — 보낼 때 값마다 본다)
+            // 인터페이스·추상 컬렉션(IList<T>·IDictionary<K,V>·IReadOnlyList<T> …): 실제 값(List·Dictionary)은 생성 코드가 없어 참조로만 비교한다 — 안쪽 변경을 놓친다.
+            if ((type.IsAbstract || type.IsInterface) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type))
+            {
+                reason = $"{name}({DataModel.FriendlyName(type)}): 인터페이스·추상 컬렉션 형식은 다루지 못합니다(List<T>·Dictionary<K, V>로 선언하세요)";
+                return false;
+            }
+            if (type == typeof(object) || type.IsAbstract || type.IsInterface) return true; // 실제 형식으로 그때그때(네트워크는 보낼 때 값마다 본다)
+            if (IsCollection(type))
+            {
+                reason = $"{name}({DataModel.FriendlyName(type)}): 컬렉션 안의 컬렉션은 다루지 못합니다([Serializable] 클래스로 한 번 감싸세요)";
+                return false;
+            }
             var found = Find(type);
             if (found == null)
             {
-                reason = $"{DataModel.FriendlyName(type)}에 비교 코드가 없습니다([Serializable]을 붙이세요)";
+                reason = type.Namespace == "System" || (type.Namespace?.StartsWith("System.", StringComparison.Ordinal) ?? false)
+                    ? $"{name}({DataModel.FriendlyName(type)})는 다루지 못하는 형식입니다(List<T>·Dictionary<K, V>·배열이나 [Serializable] 클래스로 바꾸세요)"
+                    : $"{name}({DataModel.FriendlyName(type)})에 비교 코드가 없습니다([Serializable]을 붙이세요)";
                 return false;
             }
-            return CheckType(found, seen, ref reason);
+            return CheckType(found, name, seen, ref reason, network, false);
+        }
+
+        // 값으로 보이는데 생성 코드가 쓰지 않는 필드(readonly 필드·자동 속성·대리자): 네트워크로 보내면 받는 쪽에 기본값으로 도착한다.
+        // [NonSerialized]와 private 필드([SerializeField] 없음)는 값이 아닌 것으로 본다(Unity와 같다). 보낼 형식 자신만 본다(CanSend가 형식마다 한 번).
+        static bool CheckUnwritten(Type type, string path, ref string reason)
+        {
+            for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+                foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                {
+                    if (field.IsNotSerialized) continue;
+                    var backing = field.Name.StartsWith("<", StringComparison.Ordinal);
+                    var serialized = field.CustomAttributes.Any(a => a.AttributeType.Name == "SerializeField" || a.AttributeType.Name == "SerializeReference");
+                    if (!field.IsPublic && !backing && !serialized) continue;
+                    string what = null;
+                    if (field.IsInitOnly) what = backing ? "읽기 전용 자동 속성" : "readonly 필드";
+                    else if (backing && !serialized) what = "자동 속성";
+                    else if (typeof(Delegate).IsAssignableFrom(field.FieldType)) what = "대리자(함수) 필드";
+                    if (what == null) continue;
+                    var end = field.Name.IndexOf('>');
+                    var name = backing && end > 1 ? field.Name.Substring(1, end - 1) : field.Name;
+                    reason = $"{path}.{name}: {what}는 보내지 않습니다(받는 쪽에는 기본값으로 도착) — public 필드로 바꾸거나, 보내지 않을 값이면 [NonSerialized]를 붙이세요";
+                    return false;
+                }
+            return true;
         }
 
         // ── 사본 ───────────────────────────────────────────────
@@ -301,12 +489,34 @@ namespace GBible
                 tree.Pass++;
                 root.Pass = tree.Pass;
                 root.Type.Sync(live, root, changes);
+                if (tree.MaybeOrphans) Sweep(tree);
             }
             finally
             {
                 _tree = previousTree;
                 _building = previousBuilding;
                 _making = previousMaking;
+            }
+        }
+
+        // 이번 회차에 들르지 않은 사본(뿌리에서 닿지 않는다 — 서로 가리키는 객체가 함께 빠진 고리)을 나무에서 뺀다.
+        // Sync는 닿는 사본마다 한 번 들어가므로(Enter) 들르지 않음 = 닿지 않음이다. 빼지 않으면 메모리에 남고, 다시 들어올 때
+        // 늦게 들어온 받는 쪽이 모르는 번호로 보낸다. 번호를 지키는 동안(KeepIds)이면 기억해 두었다가 돌아오면 그 번호를 쓴다.
+        static void Sweep(MirrorTree tree)
+        {
+            tree.MaybeOrphans = false;
+            List<MirrorNode> orphans = null;
+            foreach (var node in tree.Nodes.Values)
+                if (node.Pass != tree.Pass) (orphans ??= new List<MirrorNode>()).Add(node);
+            if (orphans == null) return;
+            foreach (var node in orphans)
+            {
+                if (node.Origin == null || !tree.Nodes.TryGetValue(node.Origin, out var found) || found != node) continue;
+                tree.Nodes.Remove(node.Origin);
+                if (tree.Retired != null) tree.Retired[node.Origin] = node;
+                node.Refs = 0;
+                for (var i = 0; i < node.Type.FieldCount; i++)
+                    if (node.R[i] is MirrorCollection tracked) Untrack(tracked);
             }
         }
 
@@ -364,6 +574,9 @@ namespace GBible
             tree.Retired = keep ? tree.Retired ?? new Dictionary<object, MirrorNode>(RefEq.Instance) : null;
         }
 
+        // 번호를 지키는 중인가(KeepIds).
+        internal static bool KeepingIds(MirrorNode root) => root?.Tree?.Retired != null;
+
         // 이번 회차에 이 사본을 처음 비교하는지(처음이면 표시하고 true). 나무 밖(Sync 중이 아님)이면 언제나 true.
         // 새 사본을 만드는 동안(기록 없음)에는 false: 새 객체가 이미 있던 객체를 가리킬 때 그 객체의 바뀐 곳을 기록 없이 맞춰 버리면
         // 이번 변경이 기록에서 빠진다(예: u.hp -= 5; log.Add(new Hit { target = u })). 다 만든 뒤 부른 쪽이 Visit로 새 사본을
@@ -386,7 +599,12 @@ namespace GBible
             {
                 var tree = node.Tree;
                 if (tree == null) return;
-                if (--node.Refs > 0) return;
+                if (--node.Refs > 0)
+                {
+                    // 아직 가리키는 곳이 남았다 — 서로 가리키는 객체끼리만 가리키는 것(닿지 않는 고리)일 수 있다: 이번 Sync 끝에 훑는다.
+                    tree.MaybeOrphans = true;
+                    return;
+                }
                 if (node.Origin != null && tree.Nodes.TryGetValue(node.Origin, out var found) && found == node)
                 {
                     tree.Nodes.Remove(node.Origin);
@@ -472,6 +690,8 @@ namespace GBible
         [ThreadStatic] static int _writeDepth;
         [ThreadStatic] static Dictionary<object, int> _written;
         [ThreadStatic] static int _readDepth;
+        // 읽기·적용에서 허용하는 객체·경로 깊이(게임 데이터는 이만큼 깊지 않다).
+        const int MaxDepth = 256;
         [ThreadStatic] static List<object> _read;
         // 네트워크로 쓰는 중(사본 → 5·6). _snapshot이 있으면 처음 모습(한 번 쓴 사본은 5로), 없으면 앞으로 기록(Sent로 판단).
         [ThreadStatic] static bool _net;
@@ -568,6 +788,8 @@ namespace GBible
             OpenScope(false);
             try
             {
+                // 받은 데이터(네트워크·리플레이)가 객체를 끝없이 겹쳐 넣어도 스택이 넘치지 않게(StackOverflow는 잡을 수 없어 프로세스가 죽는다).
+                if (_readDepth > MaxDepth) throw new FormatException("[MomoiProject] 객체가 너무 깊이 겹쳐 있습니다(받은 데이터가 깨졌거나 잘못되었습니다).");
                 switch (reader.Byte())
                 {
                     case 0:
@@ -930,8 +1152,9 @@ namespace GBible
         static void ApplyOne(object root, MirrorReader reader)
         {
             var op = (MirrorOp)reader.Byte();
-            var depth = (int)reader.UVar();
-            ApplyInto(root, reader, depth, op);
+            var depth = reader.UVar();
+            if (depth > MaxDepth) throw new FormatException("[MomoiProject] 변경 기록의 경로가 너무 깁니다(받은 데이터가 깨졌습니다).");
+            ApplyInto(root, reader, (int)depth, op);
         }
 
         // 경로의 다음 칸(필드)을 읽고 그 객체의 적용 코드로 넘긴다. depth = 남은 칸 수(이 필드 칸 포함).
@@ -1038,6 +1261,8 @@ namespace GBible
         public Dictionary<object, MirrorCollection> Collections;
         // KeepIds 동안 나무에서 빠진 사본(원래 객체 → 사본). 다시 들어오면 그 번호를 쓴다.
         public Dictionary<object, MirrorNode> Retired;
+        // 이번 Sync에서 가리키는 곳이 줄었지만 남은 사본이 있었다(닿지 않는 고리일 수 있다 — Sync 끝에 훑는다).
+        public bool MaybeOrphans;
     }
 
     // 받는 쪽: 보내는 쪽의 객체 번호 → 이쪽 인스턴스. 같은 객체를 두 곳에서 가리키면 이쪽도 같은 인스턴스를 가리킨다.
@@ -1176,11 +1401,24 @@ namespace GBible
             lock (Boxed) return Shallow.Contains(type);
         }
 
-        // 변경을 따라갈 수 있는 값 형식인가.
+        // 변경을 따라갈 수 있는 값 형식인가. T?는 T도 되어야 한다(T?의 비교·쓰기가 T의 것을 부른다).
         public static bool IsSupported(Type type)
         {
             if (type.IsPrimitive || type.IsEnum || type == typeof(string) || BuiltinTypes.Contains(type)) return true;
+            var inner = Nullable.GetUnderlyingType(type);
+            if (inner != null && !IsSupported(inner)) return false;
             lock (Boxed) return Boxed.ContainsKey(type) && !Shallow.Contains(type);
+        }
+
+        // 쓰고 읽을 수 있는 값 형식인가(변경 추적과 상관없이 — 네트워크로 보낼 때). 안쪽에 객체·컬렉션이 있는 구조체도 된다.
+        // IntPtr·UIntPtr은 기본 형식이지만 쓰는 방법이 없다.
+        public static bool CanWrite(Type type)
+        {
+            if (type == typeof(IntPtr) || type == typeof(UIntPtr)) return false;
+            if (type.IsPrimitive || type.IsEnum || type == typeof(string) || BuiltinTypes.Contains(type)) return true;
+            var inner = Nullable.GetUnderlyingType(type);
+            if (inner != null && !CanWrite(inner)) return false;
+            lock (Boxed) return Boxed.ContainsKey(type);
         }
 
         internal static void WriteBoxed(Type type, MirrorWriter writer, object value)

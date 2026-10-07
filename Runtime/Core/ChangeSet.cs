@@ -23,6 +23,9 @@ namespace GBible
     // Describe가 켜져 있으면 사람이 읽는 변경 목록(Changes: 경로 이름·옛 값·새 값)도 함께 만든다(기록·모니터용).
     public sealed class ChangeSet
     {
+        // Permanent 안의 변경: 그 행동의 Undo로는 되돌리지 않지만, 행동이 실패·미리보기면 함께 취소된다(PlayerDataStore).
+        internal bool Permanent;
+
         enum SegKind : byte
         {
             Field = 0,
@@ -58,7 +61,8 @@ namespace GBible
         // 번호로 적용하는 기록(되돌리기)이 그 뒤 구조가 바뀐 리스트에 닿는지 볼 때 쓴다(PlayerDataStore.UndoLast).
         public readonly List<string> Reshaped = new List<string>();
 
-        Seg[] _path = new Seg[32];
+        // 경로 쌓기 버퍼(처음 쓸 때 만든다 — 떼어 낸 결과 ChangeSet(Detach)은 경로를 쓰지 않으므로 그만큼 메모리를 잡지 않는다).
+        Seg[] _path;
         int _depth;
 
         public bool IsEmpty => Count == 0;
@@ -133,7 +137,8 @@ namespace GBible
 
         void Push(Seg seg)
         {
-            if (_depth == _path.Length) Array.Resize(ref _path, _depth * 2);
+            if (_path == null) _path = new Seg[16];
+            else if (_depth == _path.Length) Array.Resize(ref _path, _depth * 2);
             _path[_depth++] = seg;
         }
 

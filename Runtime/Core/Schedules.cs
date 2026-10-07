@@ -151,7 +151,8 @@ namespace GBible
         {
             if (_session.Data.InTransaction) return;
             var now = _session.Clock.Time;
-            var due = All.Where(s => s.at >= 0 && s.at <= now).OrderBy(s => s.at).ThenBy(s => s.id, StringComparer.Ordinal).ToList();
+            // 같은 시각이면 예약한 차례대로(OrderBy는 순서를 지킨다 — id 글자 순이면 $schedule10이 $schedule2보다 먼저 돈다).
+            var due = All.Where(s => s.at >= 0 && s.at <= now).OrderBy(s => s.at).ToList();
             foreach (var item in due)
             {
                 try

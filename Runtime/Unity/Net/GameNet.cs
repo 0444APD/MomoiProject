@@ -253,11 +253,20 @@ namespace GBible
         public static NetHub StartMatchServer(int port = DefaultPort, int playersPerMatch = 2, INetAuthenticator auth = null, INetMatchmaker matchmaker = null, INetPlayerStore store = null, NetHubOptions options = null)
         {
             Leave();
-            store ??= new FilePlayerStore(Path.Combine(Application.persistentDataPath, "MomoiProject", "server"));
+            if (store == null)
+            {
+                var files = new FilePlayerStore(Path.Combine(Application.persistentDataPath, "MomoiProject", "server"));
+                files.Log += message => Debug.LogWarning("[MomoiProject] " + message);
+                store = files;
+            }
             matchmaker ??= new LocalMatchmaker { PlayersPerMatch = Math.Max(1, playersPerMatch) };
             Hub = new NetHub(new WebSocketServerTransport(port), room =>
             {
                 var session = GBibleRuntime.CreateSession();
+                // 방 세션은 서버만 판정한다: 플레이어 무르기가 없으니 Undo 이력을 두지 않고, 바뀐 곳의 사람용 문장(기록·모니터용)도 만들지 않는다
+                // (방마다 메모리·CPU — 방 수십 개를 한 서버가 돌린다). 되감기 기믹(Game.Rewind)은 이력이 아니라 지점 데이터를 쓰므로 그대로 된다.
+                session.Data.RecordHistory = false;
+                session.Data.DescribeChanges = false;
                 GBibleRuntime.RunNewRunAction(session);
                 return session;
             }, auth, matchmaker, store, options ?? new NetHubOptions { AllowDeveloperCommands = Debug.isDebugBuild, GameVersion = Application.version });

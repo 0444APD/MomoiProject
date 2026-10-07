@@ -700,11 +700,7 @@ namespace GBible.EditorTools
                     Type = type ?? state.Get(key)?.GetType(),
                 };
                 // 고치는 일은 행동 하나로(Undo 버튼으로 되돌린다). 행동 중이면(드묾) 그 자리에서.
-                void AsAction(Action edit)
-                {
-                    if (state.InTransaction) edit();
-                    else session.Do(new DeveloperEditAction { label = $"모니터에서 {state.LabelOf(key)} 고침", Edit = edit });
-                }
+                void AsAction(Action edit) => EditAsAction(session, state.LabelOf(key), edit);
                 if (state.IsData(key)) item.Apply = change => AsAction(() => state.Modify<object>(key, _ => change()));
                 else
                 {
@@ -824,11 +820,11 @@ namespace GBible.EditorTools
             {
                 if (_session == null || !_session.Data.IsDefined(key)) return;
                 GsDataExplorer.BrowseModal(_root, node.Label, _session.Data.Get(key),
-                    change => _session.Data.Modify<object>(key, _ => change()));
+                    change => EditAsAction(_session, node.Label, () => _session.Data.Modify<object>(key, _ => change())));
             });
             return box;
         }
-        // 모니터에서 플레이어 데이터 값을 직접 바꾼다(디버그 조작, 트랜잭션 밖에서 바로 적용되며 기록에 남는다).
+        // 모니터에서 플레이어 데이터 값을 바꾼다(디버그 조작 — 행동 하나로 실행되어 기록·Undo에 남는다).
         VisualElement StateValue(InspectNode node)
         {
             var box = Gs.Box("gs-inline", "gs-inline--editable", "gs-grow");
@@ -841,7 +837,7 @@ namespace GBible.EditorTools
                 var current = _session.Data.Get(node.PlayerDataKey);
                 if (current is bool b)
                 {
-                    _session.Data.Set(node.PlayerDataKey, !b);
+                    EditAsAction(_session, node.Label, () => _session.Data.Set(node.PlayerDataKey, !b));
                     return;
                 }
                 var field = new TextField { value = current is double d ? d.ToString(CultureInfo.InvariantCulture) : current?.ToString() ?? "" };
@@ -858,7 +854,7 @@ namespace GBible.EditorTools
                         object value = field.value;
                         if (current is double || current == null)
                             if (double.TryParse(field.value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) value = number;
-                        try { _session.Data.Set(node.PlayerDataKey, value); }
+                        try { EditAsAction(_session, node.Label, () => _session.Data.Set(node.PlayerDataKey, value)); }
                         catch (Exception e) { Debug.LogWarning($"[MomoiProject] 값을 바꿀 수 없습니다: {e.Message}"); }
                     }
                     field.RemoveFromHierarchy();
@@ -1045,7 +1041,7 @@ namespace GBible.EditorTools
             dock.Add(Gs.HSpace(8));
             var apply = new GsButton("직접 수정", () =>
             {
-                _session.Data.Set(statKey, direct.value);
+                if (!EditAsAction(_session, selected.DisplayName, () => _session.Data.Set(statKey, direct.value))) return;
                 ShowFeedback($"{selected.DisplayName} = {PlayerDataStore.Format(direct.value)} (직접 수정)", GsNoticeKind.Info);
             });
             apply.tooltip = "값만 덮어씁니다. 이벤트·다른 수치·반영 규칙은 움직이지 않습니다.";
@@ -1284,6 +1280,21 @@ namespace GBible.EditorTools
             else
                 ShowFeedback(_session.Options.History == HistoryMode.None ? "이 세션은 되돌리기를 쓰지 않습니다(SessionOptions.History)." : "되돌릴 행동이 없습니다.", GsNoticeKind.Warning);
         }
+        // 모니터에서 값을 고치는 일은 행동 하나로(게임 행동처럼 기록·Undo — 3요소: 모든 상태 변경은 행동). 행동 중이면(드묾) 그 자리에서.
+        // 멀티 클라이언트 세션은 고치지 않는다: 그 값은 서버가 정하고, 고치는 일(코드)은 서버로 보낼 수 없다 — 서버 세션에서 고친다. 고쳤으면 참.
+        bool EditAsAction(GameSession session, string what, Action edit)
+        {
+            if (session == null) return false;
+            if (session.IsClient)
+            {
+                ShowFeedback("멀티 클라이언트 세션의 값은 여기서 고치지 않습니다 — 위쪽에서 서버 세션을 골라 고치세요.", GsNoticeKind.Warning);
+                return false;
+            }
+            if (session.Data.InTransaction) edit();
+            else session.Do(new DeveloperEditAction { label = $"모니터에서 {what} 고침", Edit = edit });
+            return true;
+        }
+
         void ShowFeedback(string text, GsNoticeKind kind)
         {
             if (_feedback == null) return;

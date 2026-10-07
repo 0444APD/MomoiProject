@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using GBible.Data;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -24,6 +25,8 @@ namespace GBible.EditorTools
             readonly HashSet<string> _achievements;
             public GameData Current;
             public readonly List<ValidationIssue> Issues = new List<ValidationIssue>();
+            // 지금 항목에서 트리거·결과 칸 검사가 이미 '없는 플레이어 데이터'로 알린 키(참조 검사가 같은 키를 다시 알리지 않게).
+            public readonly HashSet<string> ReportedKeys = new HashSet<string>(StringComparer.Ordinal);
 
             public Context(IEnumerable<GameData> all)
             {
@@ -43,7 +46,14 @@ namespace GBible.EditorTools
                 Issues.Add(new ValidationIssue { Asset = Current, Severity = severity, Message = message });
         }
 
+        // DB 창이 보는 모습(저장 안 된 변경 포함).
         public static List<ValidationIssue> ValidateAll() => Validate(EditorDatabase.Instance.All);
+
+        // 적용된(저장한) 데이터만 — 빌드 검사. 저장 안 된 변경은 빌드에 들어가지 않으므로 그것으로 막거나 통과시키지 않는다(필드 규칙도 적용된 것만).
+        public static List<ValidationIssue> ValidateCommitted()
+        {
+            using (EditorDatabase.CommittedRules()) return Validate(EditorDatabase.Instance.Committed);
+        }
 
         public static List<ValidationIssue> Validate(IReadOnlyList<GameData> all)
         {
@@ -51,20 +61,46 @@ namespace GBible.EditorTools
             all = all.Where(d => d != null).ToList();
             var context = new Context(all);
 
-            foreach (var group in all.Where(d => !string.IsNullOrEmpty(d.Id)).GroupBy(d => d.Id).Where(g => g.Count() > 1))
+            // 같은 ID — 대소문자만 달라도 같은 ID로 본다(ID 바꾸기·만들기의 규칙과 같다).
+            foreach (var group in all.Where(d => !string.IsNullOrEmpty(d.Id)).GroupBy(d => d.Id, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+            {
+                var spellings = group.Select(d => d.Id).Distinct(StringComparer.Ordinal).ToList();
                 foreach (var data in group)
                 {
                     context.Current = data;
-                    context.Error($"ID '{data.Id}'가 {group.Count()}개 항목에서 중복됩니다(복제한 에셋일 수 있음). 'ID 바꾸기'로 고치세요.");
+                    // 글자까지 같은 ID는 참조가 어느 쪽을 가리키는지 알 수 없어, ID를 바꾼 쪽으로 참조를 옮기지 않는다(CodexStaging.Rename).
+                    var same = group.Count(d => d.Id == data.Id) > 1;
+                    context.Error(same
+                        ? $"ID '{data.Id}'가 {group.Count()}개 항목에서 중복됩니다(복제한 에셋일 수 있음). 하나를 'ID 바꾸기'로 고치세요 — 이때 이 ID를 가리키던 칸은 옮기지 않고 " +
+                          "남은 항목을 그대로 가리킵니다(바꾼 항목을 가리켜야 하는 칸은 다시 고르세요)."
+                        : $"ID '{data.Id}'가 {group.Count()}개 항목에서 중복됩니다(대소문자만 다름: {string.Join(", ", spellings)} — 같은 ID로 봅니다). 하나를 'ID 바꾸기'로 고치세요.");
                 }
+            }
+
+            // 같은 종류 안에서 생성 코드(GameIds) 이름이 같아지는 ID(bossDragon·boss.dragon → BossDragon). 하나는 BossDragon_2가 되어 코드가 헷갈린다.
+            foreach (var group in all.Where(d => !string.IsNullOrEmpty(d.Id)).GroupBy(d => (d.GetType(), IdRules.ToIdentifier(d.Id))))
+            {
+                var ids = group.Select(d => d.Id).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (ids.Count < 2) continue;
+                foreach (var data in group)
+                {
+                    context.Current = data;
+                    var others = string.Join(", ", ids.Where(i => !string.Equals(i, data.Id, StringComparison.OrdinalIgnoreCase)).Select(i => $"'{i}'"));
+                    context.Error($"ID '{data.Id}'는 같은 종류의 {others}와(과) 생성 코드 이름(GameIds의 {group.Key.Item2})이 같습니다. 점(.)·대문자 자리만 다른 ID는 쓸 수 없습니다 — 하나를 'ID 바꾸기'로 고치세요.");
+                }
+            }
+            CheckReleasedRenames(all, context);
 
             foreach (var data in all)
             {
                 context.Current = data;
+                context.ReportedKeys.Clear();
                 if (string.IsNullOrEmpty(data.Id)) context.Error("ID가 없습니다.");
                 else if (!IdRules.IsValid(data.Id, out var idError)) context.Error($"ID '{data.Id}': {idError} 'ID 바꾸기'로 고치세요.");
+                // 트리거·결과 칸을 먼저: 플레이어 데이터 검사·주기의 없는 키는 여기서 자세히 알리고, 아래 참조 검사는 같은 키를 다시 알리지 않는다.
+                CheckSlots(data, all, context);
                 CheckReferences(data, all, context);
-                CheckKeywords(data, context);
+                CheckStrings(data, all, context);
                 CheckRequired(data, context);
                 try
                 {
@@ -75,7 +111,9 @@ namespace GBible.EditorTools
                     context.Error($"검증 중 오류: {e.Message}");
                 }
 
-                CheckSlots(data, all, context);
+                // 프리팹이 없어졌는데 다른 항목이 가리키는 등으로 지우지 않고 둔 항목(EditorDatabase.RemoveOrphanPrefabEntries).
+                if (data is PrefabData prefab && EditorDatabase.IsOrphanPrefab(prefab))
+                    context.Warning("프리팹이 없습니다(지웠거나 .meta 없이 옮겼을 수 있습니다). 프리팹 칸에 다시 넣거나, 필요 없으면 Project 창에서 이 항목 에셋을 지우세요.");
                 // 같은 ID에 [BindTo] 코드가 여럿이면 모두 실행되고 순서가 정해지지 않는다.
                 var bound = BoundOutcomes.For(data.Id);
                 if (bound.Count > 1) context.Warning($"이 항목에 [BindTo] 코드가 {bound.Count}개 연결되어 있습니다({string.Join(", ", bound.Select(b => b.Name))}). 모두 실행되고 순서는 정해지지 않으니 하나로 합치세요.");
@@ -84,6 +122,26 @@ namespace GBible.EditorTools
             FindCycles(all.OfType<AchievementData>().ToList(), context);
             CheckSpriteReviews(all, context);
             return context.Issues;
+        }
+
+        // 출시 뒤 ID 변경 이력의 예전 ID를 지금 다른 항목이 쓰면, 예전 저장의 그 ID(바꾸기 전 항목)와 이 항목을 구분할 수 없다
+        // (런타임은 그 줄을 쓰지 않으므로 예전 저장의 값이 이 항목으로 읽힌다). 에디터는 이런 ID를 막는다 — 이미 있는 것을 알린다.
+        static void CheckReleasedRenames(IReadOnlyList<GameData> all, Context context)
+        {
+            var database = UnityEditor.AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
+            if (database == null || !database.IsReleased) return;
+            foreach (var rename in database.Renames)
+            {
+                if (rename == null || string.IsNullOrEmpty(rename.oldId) || rename.oldId == rename.newId) continue;
+                foreach (var data in all.Where(d => string.Equals(d.Id, rename.oldId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    // 같은 항목이 예전 이름으로 돌아가는 중(저장 전 — 적용된 ID가 이력이 이어지는 ID)이면 괜찮다(저장하면 이력이 그 항목으로 정리된다).
+                    var applied = EditorDatabase.Staging.OriginalOf(data);
+                    if (applied != null && applied.GetType().FullName == rename.dataType && applied.Id == rename.newId) continue;
+                    context.Current = data;
+                    context.Error($"ID '{data.Id}'는 출시 뒤 '{rename.newId}'(으)로 바꾼 예전 ID입니다. 예전 저장의 '{data.Id}'(바꾸기 전 항목)와 구분할 수 없으니 이 항목의 ID를 바꾸세요.");
+                }
+            }
         }
 
         // 트리거·결과 칸(모든 기능 공용): 칸의 잠금(고를 수 있는 종류·고정), 조건이 값을 관찰하는지, 플레이어 데이터 검사·주기의 형식.
@@ -143,7 +201,11 @@ namespace GBible.EditorTools
             if (condition is PlayerDataCondition check && !string.IsNullOrEmpty(check.key))
             {
                 var key = all.OfType<PlayerDataEntry>().FirstOrDefault(k => k.Id == check.key);
-                if (key == null) context.Error($"플레이어 데이터 검사: 없는 플레이어 데이터 '{check.key}'를 가리킵니다.");
+                if (key == null)
+                {
+                    context.ReportedKeys.Add(check.key);
+                    context.Error($"플레이어 데이터 검사: 없는 플레이어 데이터 '{check.key}'를 가리킵니다.");
+                }
                 else if (key.ValueType != null && check.filter != null)
                 {
                     var problems = new List<string>();
@@ -161,6 +223,7 @@ namespace GBible.EditorTools
             var key = all.OfType<PlayerDataEntry>().FirstOrDefault(k => k.Id == change.key);
             if (key == null)
             {
+                context.ReportedKeys.Add(change.key);
                 context.Error($"플레이어 데이터에 주기: 없는 플레이어 데이터 '{change.key}'를 가리킵니다.");
                 return;
             }
@@ -221,8 +284,10 @@ namespace GBible.EditorTools
                 if (empty) context.Error($"필수 값 '{it.displayName}'({it.propertyPath})이 비어 있습니다.");
             }
         }
-        // [Keyword(typeof(그룹))] 필드의 값이 그 그룹의 키워드인지(저장 전 변경 포함). 비어 있는 값은 필수 검사가 본다.
-        static void CheckKeywords(GameData data, Context context)
+        // 글자 칸 한 번 훑기(저장 전 변경 포함):
+        //   · [Keyword(typeof(그룹))] 필드의 값이 그 그룹의 키워드인지. 비어 있는 값은 필수 검사가 본다.
+        //   · 값 틀({balance:ID}·{data:키.경로}·{count:키.경로})이 있는 밸런스 값·플레이어 데이터를 가리키는지 — ID를 바꿔도 틀 안의 글자는 따라가지 않으니 끊긴 것을 경고한다.
+        static void CheckStrings(GameData data, IReadOnlyList<GameData> all, Context context)
         {
             var so = new UnityEditor.SerializedObject(data);
             var it = so.GetIterator();
@@ -230,6 +295,7 @@ namespace GBible.EditorTools
             {
                 if (it.propertyType != UnityEditor.SerializedPropertyType.String || string.IsNullOrEmpty(it.stringValue)) continue;
                 var field = PropertyUtil.GetField(it, out _);
+                if (it.stringValue.IndexOf('{') >= 0) CheckTemplates(it.stringValue, field, it, all, context);
                 var group = KeywordTools.GroupOf(field);
                 if (group == null) continue;
                 if (KeywordTools.KeywordsOf(group).Any(k => k.Id == it.stringValue)) continue;
@@ -238,7 +304,34 @@ namespace GBible.EditorTools
             }
         }
 
-        // [DataRef] 필드가 없는 항목을 가리키는지(수치·도전과제 참조는 블록 검증이 따로 본다).
+        static readonly Regex TemplateToken = new Regex(@"\{(balance|data|count):([^}]+)\}", RegexOptions.CultureInvariant);
+
+        static void CheckTemplates(string text, FieldInfo field, UnityEditor.SerializedProperty property, IReadOnlyList<GameData> all, Context context)
+        {
+            foreach (Match match in TemplateToken.Matches(text))
+            {
+                var kind = match.Groups[1].Value;
+                var value = match.Groups[2].Value.Trim();
+                if (kind == "balance")
+                {
+                    if (!all.OfType<BalanceData>().Any(b => b.Id == value))
+                        context.Warning($"{LabelOf(field, property)}: 값 틀 '{match.Value}'의 밸런스 값 '{value}'가 없습니다(ID를 바꿨다면 틀의 글자도 고치세요).");
+                    continue;
+                }
+                // {data:키.경로}·{count:키.경로}: 정의된 가장 긴 앞부분(점까지)이 플레이어 데이터 키 — 실행(ModifyIntentOutcome.DataAt)과 같다(player.inventory.gold).
+                var keys = all.OfType<PlayerDataEntry>().Select(k => k.Id).ToList();
+                var found = false;
+                for (var cut = value.Length; cut > 0 && !found; cut = value.LastIndexOf('.', cut - 1))
+                    found = keys.Contains(value.Substring(0, cut));
+                if (!found)
+                {
+                    var first = value.IndexOf('.') is var dot && dot > 0 ? value.Substring(0, dot) : value;
+                    context.Warning($"{LabelOf(field, property)}: 값 틀 '{match.Value}'의 플레이어 데이터 '{first}'가 없습니다(ID를 바꿨다면 틀의 글자도 고치세요).");
+                }
+            }
+        }
+
+        // ID 참조 칸([DataRef]·필드 규칙·[PlayerDataRef])이 없는 항목을 가리키는지(수치·도전과제 참조는 블록 검증이 따로 본다).
         static void CheckReferences(GameData data, IReadOnlyList<GameData> all, Context context)
         {
             try
@@ -250,6 +343,10 @@ namespace GBible.EditorTools
                     var kind = DataTypes.Find(refType)?.DisplayName ?? refType.Name;
                     var field = PropertyUtil.GetField(property, out _);
                     var name = LabelOf(field, property);
+                    // 플레이어 데이터 칸([PlayerDataRef]): 비어도 되는 칸이 있다(가중치 표의 단계 키 등 — 꼭 골라야 하는 칸은 그 항목의 검증이 알린다).
+                    // 라이브러리 키($statuses·stat:… — DB 항목이 아님)와, 트리거·결과 칸 검사가 이미 알린 키는 넘어간다.
+                    var playerData = refType == typeof(PlayerDataEntry) && field != null && field.IsDefined(typeof(PlayerDataRefAttribute), false);
+                    if (playerData && (string.IsNullOrEmpty(id) || id.StartsWith("$", StringComparison.Ordinal) || id.IndexOf(':') >= 0 || context.ReportedKeys.Contains(id))) return;
                     if (string.IsNullOrEmpty(id))
                     {
                         if (!WarnWhenEmpty(data, property, field)) return;
@@ -315,17 +412,28 @@ namespace GBible.EditorTools
             return string.IsNullOrEmpty(shown) ? field.Name : $"{shown}({field.Name})";
         }
 
-        // 규격이 바뀌어 다시 확인해야 하는 예외 촬영(규격 항목의 경고로).
+        // 스프라이트 틀: 크기가 바뀌어 다시 확인해야 하는 예외 촬영(틀의 경고로), 필드 규칙의 미리보기 크기가 그 틀에 없음(규칙의 경고로).
         static void CheckSpriteReviews(IReadOnlyList<GameData> all, Context context)
         {
+            var frames = all.OfType<SpriteFrameData>().GroupBy(f => f.Id ?? "").ToDictionary(g => g.Key, g => g.First());
+            foreach (var rule in all.OfType<FieldRuleData>())
+            {
+                if (string.IsNullOrEmpty(rule.spriteFrame) || string.IsNullOrEmpty(rule.previewSize)) continue;
+                if (!frames.TryGetValue(rule.spriteFrame, out var frame) || frame.Find(rule.previewSize) != null) continue;
+                context.Current = rule;
+                context.Warning($"미리보기 크기 '{rule.previewSize}'이(가) 틀 '{rule.spriteFrame}'에 없습니다(원본이 대신 보인다). DB › 클래스 › 클래스 상세에서 다시 고르세요.");
+            }
             var registry = UnityEditor.AssetDatabase.LoadAssetAtPath<SpriteSpecDatabase>(SpriteSpecEditor.RegistryPath);
             if (registry == null) return;
-            foreach (var preset in all.OfType<SpritePresetData>())
+            foreach (var frame in frames.Values)
             {
-                var pending = registry.Framings.Where(f => f.OverrideFor(preset.Id)?.needsReview == true).Select(f => f.source != null ? f.source.name : "?").ToList();
+                var pending = registry.Framings
+                    .Where(f => f != null && f.frame == frame.Id)
+                    .SelectMany(f => f.overrides.Where(o => o.needsReview).Select(o => $"{(f.source != null ? f.source.name : "?")} · {o.size}"))
+                    .ToList();
                 if (pending.Count == 0) continue;
-                context.Current = preset;
-                context.Warning($"규격이 바뀌어 예외 촬영을 확인해야 합니다: {string.Join(", ", pending)}");
+                context.Current = frame;
+                context.Warning($"크기가 바뀌어 예외 촬영을 확인해야 합니다(틀 인스펙터의 '이 틀로 자른 원본' › 맞추기): {string.Join(", ", pending)}");
             }
         }
         // A 달성 → B 조건 → A 조건 같은 순환 참조.
@@ -377,7 +485,17 @@ namespace GBible.EditorTools
 
         public void OnPreprocessBuild(BuildReport report)
         {
-            var errors = DataValidator.ValidateAll().Where(i => i.Severity == ValidationSeverity.Error).ToList();
+            // 빌드에는 적용(저장)된 데이터만 들어간다. 저장 안 된 변경이 있으면 알리고, 창이 있으면 그대로 빌드할지 묻는다
+            // (빌드 중에 저장하면 에셋·GameIds가 빌드 도중에 바뀌므로 여기서 저장하지는 않는다).
+            if (EditorDatabase.Staging.HasChanges)
+            {
+                var message = $"DB에 저장 안 된 변경 {EditorDatabase.Staging.Changes().Count}건이 있습니다. 빌드에는 저장(Ctrl+S)한 데이터만 들어갑니다.";
+                if (!UnityEngine.Application.isBatchMode &&
+                    !UnityEditor.EditorUtility.DisplayDialog("DB에 저장 안 된 변경", message + "\n\n넣으려면 빌드를 취소하고 DB 창에서 저장(Ctrl+S)한 뒤 다시 빌드하세요.", "그대로 빌드", "빌드 취소"))
+                    throw new BuildFailedException("[MomoiProject] DB에 저장 안 된 변경이 있어 빌드를 취소했습니다. DB 창에서 저장(Ctrl+S)한 뒤 다시 빌드하세요.");
+                UnityEngine.Debug.LogWarning("[MomoiProject] " + message);
+            }
+            var errors = DataValidator.ValidateCommitted().Where(i => i.Severity == ValidationSeverity.Error).ToList();
             if (errors.Count == 0) return;
             var lines = errors.Take(20).Select(e => $"- {(e.Asset != null ? e.Asset.DisplayName : "?")}: {e.Message}");
             throw new BuildFailedException($"[MomoiProject] 데이터 검증 오류 {errors.Count}건으로 빌드를 중단합니다. DB 창에서 확인하세요.\n" + string.Join("\n", lines));

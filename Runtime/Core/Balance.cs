@@ -96,7 +96,7 @@ namespace GBible
             }
             switch (rounding)
             {
-                case CurveRounding.Round: value = Math.Round(value, MidpointRounding.AwayFromZero); break;
+                case CurveRounding.Round: value = GameNumbers.Round(value); break;
                 case CurveRounding.Floor: value = Math.Floor(value); break;
                 case CurveRounding.Ceiling: value = Math.Ceiling(value); break;
             }
@@ -132,12 +132,44 @@ namespace GBible
             return string.Join(" · ", parts);
         }
 
-        public void Validate(IValidationContext context, string label)
+        public void Validate(IValidationContext context, string label) => Validate(context, label, null);
+
+        // baseValue: 기준 값. 알면 시작 단계부터 100단계를 계산해 0 이하로 내려가는지 보고, 모르면 기준 값과 상관없이 정해지는 것만 본다
+        // (표의 점, 단계마다 줄어드는 일정 곡선). 0 이하로 내려가는 곡선은 경고다(가격이면 그 단계부터 BalanceCount·BalanceSum이 세지 않는다).
+        public void Validate(IValidationContext context, string label, double? baseValue)
         {
             if (kind == CurveKind.Power && startX <= 0) context.Error($"{label}: 거듭제곱은 시작 단계가 0보다 커야 합니다.");
             if (kind == CurveKind.Exponential && rate <= 0) context.Error($"{label}: 비율은 0보다 커야 합니다(1.1 = 단계마다 +10%).");
             if (kind == CurveKind.Table && points.Count == 0) context.Error($"{label}: 표에 점이 없습니다.");
             if (useMin && useMax && min > max) context.Error($"{label}: 최솟값이 최댓값보다 큽니다.");
+            var drop = NonPositiveAt(baseValue);
+            if (drop != null)
+                context.Warning($"{label}: {drop} 0 이하가 됩니다. 가격으로 쓰면 BalanceCount·BalanceSum이 그 단계부터 세지 않습니다(0 이하는 값을 매길 수 없는 가격). 최솟값으로 자르기를 켜세요.");
+        }
+
+        // 0보다 큰 값에서 0 이하로 내려가는 곳(경고 글의 앞부분), 없으면 null. 처음부터 0 이하인 곡선은 가격이 아닌 값으로 보고 묻지 않는다.
+        string NonPositiveAt(double? baseValue)
+        {
+            if (kind == CurveKind.None || (useMin && min > 0)) return null;
+            if (kind == CurveKind.Table)
+            {
+                var positive = false;
+                foreach (var point in points.Where(p => p != null).OrderBy(p => p.x))
+                {
+                    if (Evaluate(0, point.x) > 0) positive = true;
+                    else if (positive) return $"점 {Format(point.x)}에서";
+                }
+                return null;
+            }
+            if (!baseValue.HasValue) return kind == CurveKind.Linear && step < 0 ? "단계마다 줄어 언젠가" : null;
+            var rising = false;
+            for (var i = 0; i < 100; i++)
+            {
+                var x = startX + i;
+                if (Evaluate(baseValue.Value, x) > 0) rising = true;
+                else if (rising) return $"{Format(x)}단계에서";
+            }
+            return null;
         }
 
         static string Format(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
@@ -164,15 +196,23 @@ namespace GBible
             return curve == null ? value : curve.Evaluate(value, x);
         }
 
-        // 단계 from부터 count개(단계 1씩)의 값을 더한다. "10개 사기" = Sum(가격, 산 개수, 10).
+        // 가격 곡선의 합·개수에서 값이 0 이하인(또는 숫자가 아닌) 단계는 값을 매길 수 없는 가격으로 보고 거기서 세기를 멈춘다:
+        // 그 단계부터는 살 수 없고(MaxCount), 합에도 더하지 않는다(Sum — 음수가 되지 않는다). 곡선이 0 아래로 내려간 것은 데이터 실수라 DB 검증이 경고한다.
+
+        // 단계 from부터 count개(단계 1씩)의 값을 더한다. "10개 사기" = Sum(가격, 산 개수, 10). 값을 매길 수 없는 단계에서 멈춘다.
         public double Sum(string id, double from, int count)
         {
             var total = 0.0;
-            for (var i = 0; i < count; i++) total += Get(id, from + i);
+            for (var i = 0; i < count; i++)
+            {
+                var next = Get(id, from + i);
+                if (!(next > 0)) break;
+                total += next;
+            }
             return total;
         }
 
-        // budget 안에서 단계 from부터 몇 개를 살 수 있나("살 수 있는 만큼"). limit개까지만 센다.
+        // budget 안에서 단계 from부터 몇 개를 살 수 있나("살 수 있는 만큼"). limit개까지만, 값을 매길 수 없는 단계 앞까지만 센다.
         public int MaxCount(string id, double from, double budget, int limit = 10000)
         {
             var count = 0;
@@ -180,7 +220,7 @@ namespace GBible
             while (count < limit)
             {
                 var next = Get(id, from + count);
-                if (spent + next > budget) break;
+                if (!(next > 0) || spent + next > budget) break;
                 spent += next;
                 count++;
             }

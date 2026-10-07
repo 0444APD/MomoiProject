@@ -38,7 +38,7 @@
 다른 컴포넌트보다 먼저(실행 순서 −10000) `Awake`에서:
 
 1. `separateSlot`이 켜져 있으면 `GBibleRuntime.UseSlot("test", remember: false)` — 'test' 슬롯으로 세션을 다시 시작한다.
-2. `scenario`가 있으면 `TestScenarios.Load(session, scenario, seed)`, 없으면 `GBibleRuntime.NewRun(session, seed)`. `seed`는 글자 시드(`RandomStreams.SeedOf`), 비우면 상황의 시드.
+2. `scenario`가 있으면 `TestScenarios.Load(session, scenario, seed)`. 비었거나 불러오지 못하면(파일 없음·형식이 틀림·저장한 뒤 데이터 구조가 바뀜 — 콘솔에 경고) `GBibleRuntime.StartNewRun(session, seed)`(새 판 + Bootstrap '새 판 행동'). 시험 모드 서버의 판도 같다. `seed`는 글자 시드(`RandomStreams.SeedOf`), 비우면 상황의 시드.
 3. `GameTime.SetSpeed(speed)`.
 
 출시 빌드(`Debug.isDebugBuild`가 거짓이고 에디터가 아님)에서는 아무것도 하지 않는다.
@@ -46,8 +46,9 @@
 ### 2-2. 테스트 상황(`TestScenarios`)
 
 - `Save(session, 이름)`: `{ kind, name, savedAt, run = session.ExportRun(), meta = session.ExportMeta() }`를 JSON으로. 에디터는 `Assets/MomoiProject/Data/Tests/`(프로젝트와 함께 커밋), 개발 빌드는 `<persistentDataPath>/MomoiProject/Tests/`.
-- `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`).
-- 행동 밖에서 부른다(행동 안이면 `ExportRun`이 예외).
+- 개발 빌드에는 에디터의 상황이 같이 들어간다: 개발 빌드를 만들 때 `Assets/MomoiProject/Data/Tests/*.json`을 빌드의 `StreamingAssets/MomoiProject/Tests/`에 넣는다(`TestScenarios.BundledFolder`, 읽기 전용 — 프로젝트의 `Assets/StreamingAssets`는 건드리지 않는다). 출시 빌드에는 넣지 않는다. 개발 빌드의 목록·불러오기는 기기에 저장한 것과 이것을 함께 보고, 같은 이름이면 기기에 저장한 것을 쓴다. 저장·지우기는 기기 쪽만. Android·WebGL은 StreamingAssets를 파일로 열 수 없어 기기에 저장한 것만 보인다.
+- `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`). 없거나 읽지 못하면 저널에 이유를 남기고 `false`(던지지 않는다).
+- 행동 밖에서 부른다(행동 안이면 `Save`는 `ExportRun`이, `Load`는 스스로 예외).
 
 ### 2-3. 자동 시뮬레이션(`TestScenarios.Simulate`)
 
@@ -61,8 +62,8 @@ for i in 0..runs-1:
 
 - `step`은 "플레이어의 한 수"다 — 프로젝트(AI)가 행동을 골라 `Game.Do`. 더 둘 수 없으면(판 끝) 거짓.
 - `measure`는 그 판에서 잴 숫자(승리 1/0·턴·남은 체력 …).
-- 예외가 나면 그 회차는 `Failures`로 세고 다음으로.
-- 라이브 세션에서 돈다(화면이 쌓은 연출은 회차마다 비운다). 턴제에 맞다. 실시간은 화면 판정을 `step`이 근사해야 한다.
+- `step`·`measure`가 예외를 던지면 그 회차는 `Failures`로 세고(저널에 이유) 다음으로. 끝나면(도중에 던져도) 처음 시드로 다시 연다.
+- 라이브 세션에서 돈다(화면이 쌓은 연출은 회차마다 — 실패한 회차도 — 비운다). 턴제에 맞다. 실시간은 화면 판정을 `step`이 근사해야 한다.
 
 ## 3. 에디터에서 쓰는 법
 
@@ -93,10 +94,11 @@ TestScenarios.SaveReport(report);                   // Tests/Reports/보스 직�
 
 | 멤버 | 하는 일 |
 |---|---|
-| `TestScenarios.Folder` · `PathOf(이름)` · `Exists` · `Names()` | 상황 파일 위치·목록 |
-| `Save(session, 이름)` · `Load(session, 이름, seed)` · `Delete(이름)` | 저장·불러오기·지우기 |
+| `TestScenarios.Folder` · `PathOf(이름)` · `Exists` · `Names()` | 상황 파일 위치(저장하는 곳)·목록 |
+| `TestScenarios.BundledFolder` · `BundledPath` | 개발 빌드에 같이 넣은 상황(읽기 전용, 에디터·출시 빌드는 `null`) · 그 자리(`StreamingAssets` 아래) |
+| `Save(session, 이름)` · `Load(session, 이름, seed)` · `Delete(이름)` | 저장·불러오기·지우기(지우기는 저장한 것만) |
 | `Simulate(session, 상황, runs, step, measure, maxSteps = 1000, firstSeed = 1)` | 자동 시뮬레이션 → `TestReport` |
-| `SaveReport(report, 이름)` | CSV(엑셀용 UTF-8 BOM) |
+| `SaveReport(report, 이름)` | CSV(엑셀용 UTF-8 BOM, RFC 4180 — 쉼표·따옴표·줄바꿈이 든 칸은 따옴표로 감싼다) |
 | `TestReport.Runs` · `Columns` · `Average(열)` · `Min` · `Max` · `Failures` · `ToText()` · `ToCsv()` | 결과 |
 | `TestSceneSetup.Ensure(path, copyFrom, scenario)` (에디터) | 테스트 씬 만들기 |
 | `GBibleRuntime.UseSlot(슬롯, remember: false)` · `NotifyRunLoaded(session)` | 기억하지 않는 슬롯 · 판을 불러온 알림 |

@@ -186,6 +186,8 @@ namespace GBible
         // 그 칸에서 상대 무늬(돌린 뒤)에 해당하는 칸 번호들(목록 밖은 뺀다).
         public static IEnumerable<int> Pattern(int index, int count, int columns, IEnumerable<Cell> offsets, int turns = 0)
         {
+            // 목록 밖의 칸(없는 칸 −1 등)에서는 무늬도 없다.
+            if (index < 0 || index >= count) yield break;
             var origin = CellOf(index, columns);
             foreach (var offset in offsets ?? Enumerable.Empty<Cell>())
             {

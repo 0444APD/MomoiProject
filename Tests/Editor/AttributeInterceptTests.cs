@@ -164,6 +164,97 @@ namespace GBible.Tests
             Assert.IsFalse(e is GameFailure, "플레이어에게 보일 \"모자랍니다\"가 아니다");
         }
 
+        sealed class Collect : IValidationContext
+        {
+            public readonly List<string> Errors = new List<string>();
+            public bool StatExists(string id) => true;
+            public bool AchievementExists(string id) => true;
+            public StatDefinitionInfo? FindStat(string id) => null;
+            public void Report(ValidationSeverity severity, string message)
+            {
+                if (severity == ValidationSeverity.Error) Errors.Add(message);
+            }
+        }
+
+        [Test]
+        public void 요소마다_펼치는_경로로는_비용을_낼_수_없다()
+        {
+            var e = Assert.Throws<InvalidOperationException>(() => Do(g => g.Pay("party", "units[].hp", 5)));
+            Assert.IsFalse(e is GameFailure, "프로그래머 실수로 알린다");
+            StringAssert.Contains("[]", e.Message);
+            Assert.AreEqual(50, Game.Find<AiUnit>("hero").hp, "모든 요소를 첫 요소의 값으로 덮지 않는다");
+            Assert.AreEqual(50, Game.Find<AiUnit>("foe").hp);
+            Assert.Throws<InvalidOperationException>(() => Game.CanPay("party", "units[].hp", 1));
+            Assert.Throws<InvalidOperationException>(() => Do(g => g.TryPay("party", "units[].hp", 0)), "양이 0이어도 경로는 본다");
+
+            Do(g => g.Pay("party", "units[foe].hp", 5));
+            Assert.AreEqual(45, Game.Find<AiUnit>("foe").hp, "한 요소는 [id]로 고른다");
+            Assert.AreEqual(50, Game.Find<AiUnit>("hero").hp);
+
+            var check = new Collect();
+            new PayOutcome { key = "party", path = "units[].hp", amount = 1 }.Validate(check);
+            Assert.IsTrue(check.Errors.Any(m => m.Contains("[]")), string.Join("\n", check.Errors));
+        }
+
+        [Serializable, Intent("막기")] public class AiGuard { public bool parry; public int armor; public bool cancelled; }
+        [Serializable, GameEvent("막음")] public class AiParried { public bool parried; public int armor; }
+
+        [Test]
+        public void 참거짓은_대소문자와_틀을_가리지_않고_읽지_못하는_글자는_넣지_않는다()
+        {
+            var seen = new List<bool>();
+            _session.Events.Subscribe<AiParried>(e => seen.Add(e.parried));
+            foreach (var text in new[] { "True", "TRUE", "참", "{event:parry}" })
+            {
+                var publish = new PublishEventOutcome { eventType = typeof(AiParried).FullName };
+                publish.values.Add(new EventFieldValue { path = "parried", value = text });
+                publish.Run(new TriggerContext { Session = _session, Event = new AiGuard { parry = true } });
+            }
+            CollectionAssert.AreEqual(new[] { true, true, true, true }, seen, "틀이 펼친 True도 참");
+
+            var garbled = new PublishEventOutcome { eventType = typeof(AiParried).FullName };
+            garbled.values.Add(new EventFieldValue { path = "parried", value = "yes" });
+            garbled.Run(new TriggerContext { Session = _session });
+            Assert.IsFalse(seen.Last(), "읽지 못한 글자는 넣지 않는다(기본값)");
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("'yes'")), "알린다");
+            var check = new Collect();
+            garbled.Validate(check);
+            Assert.IsTrue(check.Errors.Any(m => m.Contains("yes")), "DB 검증도 잡는다");
+
+            var guard = new AiGuard();
+            new ModifyIntentOutcome { path = "parry", op = IntentOp.Set, value = "TRUE" }.Run(new TriggerContext { Session = _session, Event = guard, IsIntercept = true });
+            Assert.IsTrue(guard.parry, "의도 고치기도 같은 규칙");
+            new ModifyIntentOutcome { path = "parry", op = IntentOp.Set, value = "maybe" }.Run(new TriggerContext { Session = _session, Event = guard, IsIntercept = true });
+            Assert.IsTrue(guard.parry, "읽지 못한 글자로 거짓을 넣지 않는다");
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("'maybe'")));
+            Assert.IsFalse(PlayerDataGrants.TryParse(typeof(bool), "maybe", out _, out _));
+            Assert.IsTrue(PlayerDataGrants.TryParse(typeof(bool), " FALSE ", out var parsed, out _) && parsed is bool b && !b);
+        }
+
+        [Test]
+        public void 정수_필드에_넣는_값은_0점5에서_0에서_먼_쪽으로_반올림한다()
+        {
+            var party = _session.Data.Get<AiParty>("party");
+            Do(g => g.Pay("party", "gold", 3.5));
+            Assert.AreEqual(7, party.gold, "10 − 3.5 = 6.5 → 7(짝수 쪽 6이 아니다)");
+
+            RegisterIntercept(_session, "brittle", order: 0, IntentOp.Add, "0.5");
+            Game.Do(new Hit { unit = Hero, amount = 4 });
+            Assert.AreEqual(50 - 5, Hero.hp, "피해 4 + 0.5 = 4.5 → 5");
+
+            new PlayerDataReward { key = "party", path = "energy", amount = 1.5 }.Grant(_session);
+            Assert.AreEqual(5, party.energy, "3 + 1.5 = 4.5 → 5");
+
+            var seen = new List<int>();
+            _session.Events.Subscribe<AiParried>(e => seen.Add(e.armor));
+            var publish = new PublishEventOutcome { eventType = typeof(AiParried).FullName };
+            publish.values.Add(new EventFieldValue { path = "armor", value = "2.5" });
+            publish.Run(new TriggerContext { Session = _session });
+            CollectionAssert.AreEqual(new[] { 3 }, seen, "이벤트 쏘기의 정수 칸도");
+            Assert.AreEqual(3, GameNumbers.Round(2.5));
+            Assert.AreEqual(-3, GameNumbers.Round(-2.5));
+        }
+
         [Test]
         public void 비용_지불도_가로챌_수_있다()
         {

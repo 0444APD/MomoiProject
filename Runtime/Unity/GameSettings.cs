@@ -39,19 +39,34 @@ namespace GBible
         {
             if (_values != null) return;
             _values = new Dictionary<string, object>(StringComparer.Ordinal);
-            try
-            {
-                if (File.Exists(FilePath) && MiniJson.Deserialize(File.ReadAllText(FilePath)) is Dictionary<string, object> saved)
-                    foreach (var pair in saved) _values[pair.Key] = pair.Value;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[MomoiProject] 설정 파일을 읽지 못해 기본값으로 시작합니다: " + e.Message);
-            }
+            // 깨진 파일(비었거나 읽지 못함)이면 바로 전 저장(.bak)으로 — 마지막 슬롯·키 설정을 잃지 않게.
+            if (!TryLoad(FilePath) && SafeFile.Exists(FilePath) && TryLoad(SafeFile.Backup(FilePath)))
+                Debug.LogWarning("[MomoiProject] 설정 파일이 깨져 바로 전 저장(.bak)으로 시작합니다.");
             var database = GameDatabase.Load();
             _ordered = database == null ? new List<SettingData>() : database.All<SettingData>().Where(s => s != null && !string.IsNullOrEmpty(s.Id)).ToList();
             _definitions = _ordered.ToDictionary(s => s.Id, StringComparer.Ordinal);
-            foreach (var setting in _ordered) Apply(setting, Current(setting));
+            // 화면(해상도·전체 화면)은 플레이어가 고른 값이 있을 때만 켤 때 적용한다 — 기본값(데스크톱 해상도)을 매번 적용하면 창 모드 빌드가 켤 때마다 데스크톱 크기가 된다.
+            foreach (var setting in _ordered)
+                if (!IsScreenTarget(setting.target) || _values.ContainsKey(setting.Id)) Apply(setting, Current(setting));
+        }
+
+        // 설정 파일 하나를 읽어 넣는다. 읽었으면 참.
+        static bool TryLoad(string path)
+        {
+            // 처음 켤 때(파일 없음)는 조용히 기본값으로.
+            if (!File.Exists(path)) return false;
+            try
+            {
+                if (!(MiniJson.Deserialize(SafeFile.ReadAllText(path) ?? "") is Dictionary<string, object> saved)) return false;
+                _values.Clear();
+                foreach (var pair in saved) _values[pair.Key] = pair.Value;
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[MomoiProject] 설정 파일을 읽지 못했습니다(" + path + "): " + e.Message);
+                return false;
+            }
         }
 
         public static IReadOnlyList<SettingData> All
@@ -211,7 +226,7 @@ namespace GBible
         static double Snap(SettingSpec spec, double value)
         {
             if (spec.max > spec.min) value = Math.Max(spec.min, Math.Min(spec.max, value));
-            if (spec.step > 0) value = spec.min + Math.Round((value - spec.min) / spec.step) * spec.step;
+            if (spec.step > 0) value = spec.min + GameNumbers.Round((value - spec.min) / spec.step) * spec.step;
             return value;
         }
 
@@ -228,14 +243,15 @@ namespace GBible
             try
             {
                 _unsaved = false;
-                Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
-                File.WriteAllText(FilePath, MiniJson.Serialize(_values));
+                SafeFile.WriteAllText(FilePath, MiniJson.Serialize(_values));
             }
             catch (Exception e)
             {
                 Debug.LogWarning("[MomoiProject] 설정을 저장하지 못했습니다: " + e.Message);
             }
         }
+
+        static bool IsScreenTarget(SettingTarget target) => target == SettingTarget.Resolution || target == SettingTarget.Fullscreen;
 
         // 적용 대상: 언어·음량은 언제나, 화면(전체 화면·해상도)은 빌드에서만(에디터 창을 건드리지 않게).
         static void Apply(SettingData setting, object value)
@@ -254,7 +270,7 @@ namespace GBible
                     case SettingTarget.UiVolume: GameAudio.SetVolume(AudioChannel.Ui, (float)Convert.ToDouble(value), save: false); break;
                     case SettingTarget.VSync: QualitySettings.vSyncCount = value is bool on && on ? 1 : 0; break;
                     case SettingTarget.FrameRate:
-                        var fps = (int)Math.Round(Convert.ToDouble(value, CultureInfo.InvariantCulture));
+                        var fps = GameNumbers.RoundToInt(Convert.ToDouble(value, CultureInfo.InvariantCulture));
                         Application.targetFrameRate = fps <= 0 ? -1 : fps;
                         break;
                     case SettingTarget.Fullscreen:
@@ -263,7 +279,7 @@ namespace GBible
                     case SettingTarget.Resolution:
                         if (Application.isEditor || !(value is string size)) break;
                         var parts = size.Split('x');
-                        if (parts.Length == 2 && int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var h)) Screen.SetResolution(w, h, Screen.fullScreenMode);
+                        if (parts.Length == 2 && int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var w) && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var h)) Screen.SetResolution(w, h, Screen.fullScreenMode);
                         break;
                 }
             }

@@ -19,6 +19,9 @@ namespace GBible
     // 걸기 직전에 의도 '상태 효과 걸기'(StatusIntent)를 거친다: 가로채기가 상태 효과를 바꾸고(화상 → 푸른 화상)·중첩·길이를 고치고(독 ×2·디버프 지속 +)·막는다(면역).
     // 종류(버프·디버프): 디버프만 풀기·디버프 개수·디버프 지속 늘리기처럼 묶어서 다룰 때.
     // 모두 플레이어 데이터라 Undo·저장·멀티 그대로다. 가진 쪽이 데이터에서 사라지면 그 상태 효과도 정리된다.
+    // 시간 규칙(주기·시간 만료)의 결과가 실패하면(비용이 모자람 등) 그 결과가 바꾼 것만 되돌리고 기록에 경고를 남긴다: 주기는 그 회차를 건너뛰고
+    // 다음 시각으로 넘어가며(밀린 회차도 버린다), 만료는 끝날 때 결과 없이 그대로 끝난다. 그래서 같은 실패가 매 프레임 되풀이되지 않는다.
+    // (실패가 없으면 같은 프레임의 주기·만료는 행동 하나에 묶인다. 실패한 프레임에만 상태 효과마다 저장점으로 감싸 다시 낸다.)
     public enum StatusReapply
     {
 #if UNITY_2020_1_OR_NEWER
@@ -292,7 +295,7 @@ namespace GBible
             var active = Current().FirstOrDefault(s => s.target == targetId && s.status == statusId);
             var definition = Find(statusId);
             if (active == null || definition == null || definition.Duration == StatusDuration.Permanent || amount <= 0) return false;
-            _session.Data.Modify<StatusList>(Key, _ => active.remaining -= definition.Duration == StatusDuration.Events ? Math.Round(amount) : amount);
+            _session.Data.Modify<StatusList>(Key, _ => active.remaining -= definition.Duration == StatusDuration.Events ? GameNumbers.Round(amount) : amount);
             if (definition.Duration == StatusDuration.Events ? active.remaining <= 0 : active.remaining <= _session.Clock.Time) Expire(active);
             return true;
         }
@@ -328,14 +331,16 @@ namespace GBible
 
         internal bool HasAny => _session.Data.IsDefined(Key) && (_session.Data.Get<StatusList>(Key)?.items.Count ?? 0) > 0;
 
-        // 가진 쪽이 데이터에서 사라진 상태 효과를 지운다(끝날 때 결과 없이). 바깥 행동이 끝나기 직전에 부른다.
+        // 가진 쪽이 데이터에서 사라진 상태 효과를 지운다(끝날 때 결과 없이). 바깥 행동이 끝나기 직전에 부른다(모든 바깥 행동·미리보기·시간 규칙).
+        // 가진 쪽은 데이터를 한 번 훑어 한꺼번에 찾는다(FindAll) — 가진 쪽마다 찾으면 데이터 전체를 가진 쪽 수만큼 훑는다.
         internal void PruneMissing()
         {
             var list = _session.Data.IsDefined(Key) ? _session.Data.Get<StatusList>(Key)?.items : null;
             if (list == null || list.Count == 0) return;
-            var gone = new HashSet<string>(list.Select(s => s.target).Distinct().Where(id => _session.Game.Find(id) == null), StringComparer.Ordinal);
-            if (gone.Count == 0) return;
-            foreach (var active in list.Where(s => gone.Contains(s.target)).ToList()) Drop(active);
+            var targets = new HashSet<string>(list.Select(s => s.target).Where(id => !string.IsNullOrEmpty(id)), StringComparer.Ordinal);
+            var alive = _session.Game.FindAll(targets);
+            var gone = list.Where(s => string.IsNullOrEmpty(s.target) || !alive.ContainsKey(s.target)).ToList();
+            foreach (var active in gone) Drop(active);
         }
 
         // ── 지속 ───────────────────────────────────────────────
@@ -377,13 +382,33 @@ namespace GBible
             if (_session.Data.InTransaction || !Exists()) return;
             var now = _session.Clock.Time;
             var pulsing = Current().Where(s => s.nextPulse > 0 && s.nextPulse <= now && Find(s.status) is StatusDefinition d && PulseOf(d, s) > 0).Select(s => s.id).ToList();
-            if (pulsing.Count > 0) _session.Do(new StatusPulseRun { statuses = pulsing });
+            if (pulsing.Count > 0) RunTimeRule(new StatusPulseRun { statuses = pulsing }, new StatusPulseRun { statuses = pulsing, isolate = true });
             var due = Current().Where(s => Find(s.status)?.Duration == StatusDuration.Seconds && s.remaining <= now).Select(s => s.id).ToList();
-            if (due.Count > 0) _session.Do(new StatusExpireRun { statuses = due });
+            if (due.Count > 0) RunTimeRule(new StatusExpireRun { statuses = due }, new StatusExpireRun { statuses = due, isolate = true });
+        }
+
+        // 시간 규칙 행동을 낸다. 실패하면(행동은 이미 취소됐고 기록에 "행동 실패"가 남는다) 상태 효과마다 결과를 저장점으로 감싼 같은 행동을
+        // 한 번 더 낸다: 실패한 결과만 되돌리고 나머지는 그대로 돌며, 실패한 주기·만료도 시각이 넘어가 다음 프레임에 다시 실패하지 않는다.
+        void RunTimeRule(GameAction action, GameAction isolated)
+        {
+            try
+            {
+                _session.Do(action);
+                return;
+            }
+            catch (Exception)
+            {
+            }
+            try { _session.Do(isolated); }
+            catch (Exception e)
+            {
+                _session.Journal.Append(JournalKind.Error, "Status", $"{isolated.Describe()}: 결과를 하나씩 감싸 다시 냈는데도 실패했습니다 — {e.Message}");
+            }
         }
 
         // 주기 결과: 밀린 만큼(최대 8번) 낸다. 다음 시각은 주기만큼 뒤로.
-        internal void PulseById(string id)
+        // isolate: 회차마다 결과를 저장점으로 감싼다 — 실패한 회차는 그 결과만 되돌리고 남은 밀린 회차도 버린다(다음 시각은 지금 + 주기).
+        internal void PulseById(string id, bool isolate = false)
         {
             var active = Current().FirstOrDefault(s => s.id == id);
             var definition = active == null ? null : Find(active.status);
@@ -396,25 +421,58 @@ namespace GBible
             for (var i = 0; i < 8 && active.nextPulse > 0 && active.nextPulse <= until; i++)
             {
                 _session.Data.Modify<StatusList>(Key, _ => active.nextPulse += interval);
-                if (holder != null) Run(definition, active, definition.Outcomes, holder, null, false, "Status");
+                if (holder != null)
+                {
+                    if (!isolate) Run(definition, active, definition.Outcomes, holder, null, false, "Status");
+                    else if (!Guarded(active, "주기 결과", () => Run(definition, active, definition.Outcomes, holder, null, false, "Status"))) break;
+                }
                 if (!Current().Contains(active)) return;   // 결과가 그 상태 효과를 풀었다
             }
             if (active.nextPulse <= now) _session.Data.Modify<StatusList>(Key, _ => active.nextPulse = now + interval);
         }
 
-        internal void ExpireById(string id)
+        internal void ExpireById(string id, bool isolate = false)
         {
             var active = Current().FirstOrDefault(s => s.id == id);
-            if (active != null) Expire(active);
+            if (active != null) Expire(active, isolate);
         }
 
-        void Expire(ActiveStatus active)
+        // isolate: 끝날 때 결과와 StatusEnded를 받은 쪽의 반응을 저장점으로 감싼다 — 실패하면 그것만 되돌리고 상태 효과는 그대로 끝난다.
+        void Expire(ActiveStatus active, bool isolate = false)
         {
+            // 같은 순간에 끝나는 다른 상태 효과의 끝날 때 결과가 이미 풀었으면(풀린 것은 끝날 때 결과 없이 끝난다) 다시 끝내지 않는다.
+            if (!Current().Any(s => s.id == active.id)) return;
             var definition = Find(active.status);
             var holder = _session.Game.Find(active.target);
             Drop(active);
-            if (definition != null && holder != null) Run(definition, active, definition.OnExpire, holder, null, false, "Status");
-            _session.Events.Publish(new StatusEnded { holder = active.target, status = active.status, expired = true });
+            if (definition != null && holder != null)
+            {
+                if (!isolate) Run(definition, active, definition.OnExpire, holder, null, false, "Status");
+                else Guarded(active, "끝날 때 결과", () => Run(definition, active, definition.OnExpire, holder, null, false, "Status"));
+            }
+            var ended = new StatusEnded { holder = active.target, status = active.status, expired = true };
+            if (!isolate) _session.Events.Publish(ended);
+            else Guarded(active, "끝남(StatusEnded)을 받은 반응", () => _session.Events.Publish(ended));
+        }
+
+        // 저장점 안에서 돌린다. 실패하면 그것이 바꾼 것과 쏜 이벤트(연출·전송)만 되돌리고 경고를 남긴다(실패한 이벤트 예약과 같은 방식). 돌았으면 참.
+        bool Guarded(ActiveStatus active, string what, Action run)
+        {
+            var point = _session.Data.Mark();
+            var events = _session.Events.MarkEvents();
+            try
+            {
+                run();
+                return true;
+            }
+            catch (Exception e)
+            {
+                _session.Data.RollbackTo(point);
+                _session.Events.RollbackEvents(events);
+                _session.Journal.Append(JournalKind.Warning, "Status",
+                    $"상태 효과 '{Find(active.status)?.DisplayName ?? active.status}'({active.target})의 {KoreanParticles.Attach(what, "가")} 실패해 그것이 바꾼 것만 되돌렸습니다 — {e.Message}");
+                return false;
+            }
         }
 
         void Drop(ActiveStatus active)
@@ -425,15 +483,21 @@ namespace GBible
 
         // ── 걸려 있는 동안의 발동 ───────────────────────────────
 
-        // 트리거를 가진 쪽마다 검사한다(TriggerSystem이 User = 가진 쪽으로 트리거 전체를 검사): 걸려 있고, 가진 쪽 필드가 맞는 대상만.
+        // 트리거를 가진 쪽마다 검사한다(TriggerSystem이 User = 가진 쪽으로 트리거 전체를 검사): 걸려 있고, 가진 쪽 필드가 맞고, 데이터에 있는 대상만.
+        // 가진 쪽이 여럿이면 데이터를 한 번 훑어 한꺼번에 찾는다(FindAll — 가진 쪽마다 Find하면 데이터 전체를 가진 쪽 수만큼 훑는다).
         IEnumerable<object> HoldersFor(StatusDefinition definition, TriggerContext moment)
         {
-            foreach (var active in Current().Where(s => s.status == definition.Id).ToList())
+            var targets = new List<string>();
+            foreach (var active in Current())
             {
+                if (active.status != definition.Id) continue;
                 if (!string.IsNullOrEmpty(definition.HolderField) && FieldText(moment.Event, definition.HolderField) != active.target) continue;
-                var holder = _session.Game.Find(active.target);
-                if (holder != null) yield return holder;
+                targets.Add(active.target);
             }
+            if (targets.Count == 0) return Array.Empty<object>();
+            if (targets.Count == 1) return _session.Game.Find(targets[0]) is { } single ? new[] { single } : Array.Empty<object>();
+            var found = _session.Game.FindAll(targets);
+            return targets.Select(id => id != null && found.TryGetValue(id, out var holder) ? holder : null).Where(h => h != null).ToList();
         }
 
         void FireFor(StatusDefinition definition, TriggerContext moment)
@@ -469,7 +533,7 @@ namespace GBible
             var span = length ?? definition.Length;
             switch (definition.Duration)
             {
-                case StatusDuration.Events: return Math.Max(1, Math.Round(span));
+                case StatusDuration.Events: return Math.Max(1, GameNumbers.Round(span));
                 case StatusDuration.Seconds: return _session.Clock.Time + Math.Max(0, span);
                 default: return 0;
             }
@@ -533,13 +597,15 @@ namespace GBible
     public sealed class StatusPulseRun : GameAction, ITimeRuleAction
     {
         public List<string> statuses = new List<string>();
+        // 결과를 회차마다 저장점으로 감싼다(묶음이 한 번 실패한 뒤 다시 낼 때 — 실패한 결과만 되돌리고 그 회차를 건너뛴다).
+        public bool isolate;
 
         public override ActionVisibility Visibility => ActionVisibility.Developer;
-        public override string Describe() => "상태 효과 주기";
+        public override string Describe() => isolate ? "상태 효과 주기(실패 감싸기)" : "상태 효과 주기";
 
         protected override void Run()
         {
-            foreach (var id in statuses) Game.Session.Statuses.PulseById(id);
+            foreach (var id in statuses) Game.Session.Statuses.PulseById(id, isolate);
         }
     }
 
@@ -548,13 +614,15 @@ namespace GBible
     public sealed class StatusExpireRun : GameAction, ITimeRuleAction
     {
         public List<string> statuses = new List<string>();
+        // 끝날 때 결과를 저장점으로 감싼다(묶음이 한 번 실패한 뒤 다시 낼 때 — 실패한 결과만 되돌리고 상태 효과는 그대로 끝낸다).
+        public bool isolate;
 
         public override ActionVisibility Visibility => ActionVisibility.Developer;
-        public override string Describe() => "상태 효과 만료";
+        public override string Describe() => isolate ? "상태 효과 만료(실패 감싸기)" : "상태 효과 만료";
 
         protected override void Run()
         {
-            foreach (var id in statuses) Game.Session.Statuses.ExpireById(id);
+            foreach (var id in statuses) Game.Session.Statuses.ExpireById(id, isolate);
         }
     }
 }

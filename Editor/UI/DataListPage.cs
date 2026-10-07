@@ -190,7 +190,7 @@ namespace GBible.EditorTools.UI
                     new DialogField { Key = "id", Label = "ID", Value = Db.NextId(info), Caption = "영문 소문자로 시작, 단어 사이는 대문자(띄어쓰기·밑줄 없음), 분류는 점(.)으로. 예: playerGold, player.inventory" },
                 },
                 "만들기",
-                values => Db.CanUseId(values["id"], null, out var error) ? null : error,
+                values => Db.CanUseId(values["id"], null, _type, out var error) ? null : error,
                 values =>
                 {
                     var created = Staging.Add(_type, values["id"]);

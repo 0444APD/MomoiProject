@@ -21,6 +21,17 @@ namespace GBible.Tests
         void Do(Action<GameApi> run) => Game.Do(new Edit { run = run });
 
         [Test]
+        public void 거짓_글자는_대소문자를_가리지_않는다()
+        {
+            Do(g => g.SetWorld("door", false.ToString()));
+            Assert.IsFalse(Game.WorldFlag("door"), "bool.ToString()의 \"False\"도 거짓");
+            Do(g => g.SetWorld("door", "FALSE"));
+            Assert.IsFalse(Game.WorldFlag("door"));
+            Do(g => g.SetWorld("door", "opened"));
+            Assert.IsTrue(Game.WorldFlag("door"));
+        }
+
+        [Test]
         public void 이름으로_기억하고_Undo된다()
         {
             Assert.IsNull(Game.World("forest.chest3"));

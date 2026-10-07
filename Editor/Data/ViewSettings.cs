@@ -181,8 +181,17 @@ namespace GBible.EditorTools
             get
             {
                 if (_data != null) return _data;
-                _data = File.Exists(FilePath) ? JsonUtility.FromJson<FileData>(File.ReadAllText(FilePath)) ?? new FileData() : new FileData();
-                return _data;
+                try
+                {
+                    _data = File.Exists(FilePath) ? JsonUtility.FromJson<FileData>(File.ReadAllText(FilePath)) : null;
+                }
+                catch (Exception e)
+                {
+                    // 병합 충돌 표시가 남았거나 잘린 파일: 기본 보기로 연다. 한 번만 알린다(다음부터는 이 기본값을 쓴다).
+                    Debug.LogWarning($"[MomoiProject] {FilePath}를 읽지 못해 기본 보기로 엽니다(보기를 바꾸면 이 파일을 덮어씁니다): {e.Message}");
+                    _data = null;
+                }
+                return _data ??= new FileData();
             }
         }
 

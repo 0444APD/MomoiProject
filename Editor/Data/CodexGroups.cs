@@ -58,13 +58,13 @@ namespace GBible.EditorTools
             (text ?? "").Split(new[] { '\n', '\r', ',', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
 
         // 여러 항목을 만들기 전에 검사: 형식·중복(서로 간, 기존 항목과, 대소문자 무시).
-        public static string CheckNew(IEnumerable<string> ids)
+        public static string CheckNew(IEnumerable<string> ids, Type type = null)
         {
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var id in ids)
             {
                 if (!seen.Add(id)) return $"'{id}'가 두 번 들어 있습니다.";
-                if (!Db.CanUseId(id, null, out var error)) return $"'{id}': {error}";
+                if (!Db.CanUseId(id, null, type, out var error)) return $"'{id}': {error}";
             }
             return null;
         }

@@ -49,6 +49,8 @@ namespace GBible
         public DataZone Zone;
         public object Old;
         public object New;
+        // Permanent 안의 변경(Undo로는 되돌리지 않고, 행동이 실패·미리보기면 함께 취소).
+        public bool Permanent;
     }
 
     // 데이터 값 하나가 한 행동 안에서 바뀐 기록. Before는 행동 전 첫 모습, After는 마지막 모습.
@@ -60,6 +62,8 @@ namespace GBible
         public object Before;
         public object After;
         public List<DataChange> Changes = new List<DataChange>();
+        // Permanent 안의 변경(Undo로는 되돌리지 않고, 행동이 실패·미리보기면 함께 취소).
+        public bool Permanent;
     }
 
     // 행동 하나로 일어난 변화 전체. Undo 한 단위.
@@ -236,7 +240,7 @@ namespace GBible
             var slot = new Slot { Zone = zone, Default = value, Value = value, Label = label ?? key, ValueType = valueType };
             if (TakePreloaded(key, out var loaded))
             {
-                if (TryNormalize(loaded, out var normalized)) slot.Value = normalized;
+                if (TryNormalize(ReadScalar(slot, loaded), out var normalized)) slot.Value = normalized;
                 else _journal.Append(JournalKind.Warning, "Data", $"저장된 '{slot.Label}' 값의 형식이 맞지 않아 기본값을 씁니다.", key);
             }
             _slots.Add(key, slot);
@@ -368,6 +372,9 @@ namespace GBible
         // 필요할 때 등록하는 라이브러리 키($modifiers·$statuses·$schedule)가 판을 불러온 직후에도 보이게 쓴다.
         public bool IsPending(string key) => key != null && _preloaded.ContainsKey(key);
 
+        // 불러온 저장에서 아직 정의되지 않고 기다리는 키들(키 이름 규칙으로 찾는 기능 — 플레이어별 선택 대기 등).
+        internal IEnumerable<string> PendingKeys => _preloaded.Keys;
+
         public bool IsData(string key) => key != null && _slots.TryGetValue(key, out var slot) && slot.DataType != null;
 
         // 등록된 타입(데이터 값은 클래스·컬렉션 타입, 단순 값은 선언 타입 또는 null).
@@ -419,8 +426,12 @@ namespace GBible
             var target = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
             try
             {
-                if (target.IsEnum) return (T)Enum.ToObject(target, System.Convert.ToInt64(value, CultureInfo.InvariantCulture));
-                if (value is IConvertible && TypeResolver.IsNumeric(target)) return (T)System.Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
+                // 숫자는 double로 들어 있다 — 정수로 읽을 때는 규칙 전체와 같은 반올림(0에서 먼 쪽, GameNumbers).
+                if (target.IsEnum) return (T)Enum.ToObject(target, (long)GameNumbers.Round(System.Convert.ToDouble(value, CultureInfo.InvariantCulture)));
+                if (value is IConvertible && TypeResolver.IsNumeric(target))
+                    return (T)(value is double || value is float || value is decimal
+                        ? GameNumbers.ToType(System.Convert.ToDouble(value, CultureInfo.InvariantCulture), target)
+                        : System.Convert.ChangeType(value, target, CultureInfo.InvariantCulture));
             }
             catch (Exception e) when (e is InvalidCastException || e is FormatException || e is OverflowException)
             {
@@ -438,7 +449,8 @@ namespace GBible
             {
                 if (value != null && !slot.DataType.IsInstanceOfType(value))
                     throw new ArgumentException($"[MomoiProject] 플레이어 데이터 '{key}'에는 {DataModel.FriendlyName(slot.DataType)}만 넣을 수 있습니다({value.GetType().Name}).");
-                var copy = DataModel.Clone(value, Identity);
+                // 넘긴 값은 데이터 안으로 들어오지 않는다(복사만) — 지금 데이터의 요소는 ID로 이어 같은 인스턴스를 다시 쓴다.
+                var copy = DataModel.CloneForeign(value, Identity);
                 ModifyCore(key, slot, live => DataModel.ApplyInPlace(live, copy, Identity));
                 return;
             }
@@ -448,7 +460,7 @@ namespace GBible
             var old = slot.Value;
             if (Equals(old, normalized)) return;
             slot.Value = normalized;
-            _active?.ValueChanges.Add(new PlayerDataChange { TransactionId = _active.Id, Key = key, Zone = slot.Zone, Old = old, New = normalized });
+            if (_active != null) _active.ValueChanges.Add(new PlayerDataChange { TransactionId = _active.Id, Key = key, Zone = slot.Zone, Old = old, New = normalized, Permanent = !Recording });
             _lastEntry[key] = _journal.Append(JournalKind.Data, "Data", Describe(key, old, normalized), key, old, normalized, _active?.Id ?? 0).Id;
             Changed?.Invoke(key);
         }
@@ -519,10 +531,10 @@ namespace GBible
         }
 
         // 마지막 기록(Shadow) 이후 바뀐 곳을 찾아 기록한다: 행동 안이면 Undo 단위에, 그리고 Journal·변경 알림.
-        void Commit(string key, Slot slot, object before)
+        bool Commit(string key, Slot slot, object before)
         {
             var changes = DataModel.Diff(before, slot.Value, Identity);
-            if (changes.Count == 0) return;
+            if (changes.Count == 0) return false;
             // 기록에는 그 시점의 모습을 남긴다(나중에 실제 인스턴스가 바뀌어도 기록은 그대로).
             foreach (var c in changes)
                 if (c.New != null && IsDataType(c.New.GetType())) c.New = DataModel.Clone(c.New, Identity);
@@ -530,10 +542,11 @@ namespace GBible
 
             if (_active != null)
             {
-                var record = _active.DataChanges.FirstOrDefault(r => r.Key == key);
+                var permanent = !Recording;
+                var record = _active.DataChanges.FirstOrDefault(r => r.Key == key && r.Permanent == permanent);
                 if (record == null)
                 {
-                    record = new DataRecord { Key = key, Zone = slot.Zone, Before = before };
+                    record = new DataRecord { Key = key, Zone = slot.Zone, Before = before, Permanent = permanent };
                     _active.DataChanges.Add(record);
                 }
                 record.After = slot.Shadow;
@@ -543,6 +556,7 @@ namespace GBible
             Changed?.Invoke(key);
             DataChanged?.Invoke(key, changes);
             CheckRequired(key, slot);
+            return true;
         }
 
         object CloneShadow(Slot slot)
@@ -616,7 +630,12 @@ namespace GBible
                 {
                     if (SyncSlot(key, slot) != null) count++;
                 }
-                else if (slot.DataType != null && DetectUntrackedChanges && AdoptUntracked(key, slot)) count++;
+                else if (slot.DataType != null)
+                {
+                    // 이번 행동에서 꺼낸 키(Track)를 직접 고친 것은 이 행동의 변경이다 — 저장점(Mark)·Permanent 경계에서 Sync해도 행동 밖 변경으로 흡수하지 않는다.
+                    if (_touched != null && _touched.Contains(key)) { if (Commit(key, slot, slot.Shadow)) count++; }
+                    else if (DetectUntrackedChanges && AdoptUntracked(key, slot)) count++;
+                }
             }
             return count;
         }
@@ -667,25 +686,27 @@ namespace GBible
             var changes = _work.Detach();
             if (kind == JournalKind.Data && _active != null)
             {
-                // 한 행동 안에서 같은 데이터를 잇달아 Sync하면 Undo 기록 하나로 합친다.
+                // 한 행동 안에서 같은 데이터를 잇달아 Sync하면 Undo 기록 하나로 합친다(Permanent 안의 것은 따로 — Undo가 건너뛴다).
+                var permanent = !Recording;
                 var history = _active.Mirrored;
                 var last = history.Count > 0 ? history[history.Count - 1] : null;
-                if (last == null || last.Key != key || history.Count <= _active.SealedMirrored)
+                if (last == null || last.Key != key || last.Permanent != permanent || history.Count <= _active.SealedMirrored)
                 {
-                    last = new ChangeSet { Key = key };
+                    last = new ChangeSet { Key = key, Permanent = permanent };
                     history.Add(last);
                 }
                 last.Append(changes);
             }
             LogChanges(key, slot, changes.Changes, kind, prefix, transactionId >= 0 ? transactionId : _active?.Id ?? 0);
-            Changed?.Invoke(key);
-            DataChanged?.Invoke(key, changes.Changes);
+            // 받는 쪽(멀티)에 먼저 보낸다: 알림을 받은 쪽이 다른 데이터를 바꿔도 그 변경이 이 변경보다 앞서 가지 않게(받는 쪽은 보낸 차례대로 적용한다).
             if (_holding) _held.Add(changes);
             else
             {
                 if (kind == JournalKind.Data) NoteOutside(key, changes);
                 Synced?.Invoke(changes);
             }
+            Changed?.Invoke(key);
+            DataChanged?.Invoke(key, changes.Changes);
             CheckRequired(key, slot);
             return changes;
         }
@@ -705,7 +726,7 @@ namespace GBible
         {
             var found = new List<string>();
             if (tx.OutsideAfter == null) return found;
-            foreach (var changes in tx.Mirrored)
+            foreach (var changes in tx.Mirrored.Where(c => !c.Permanent))   // Permanent 안의 것은 Undo가 되돌리지 않는다
             foreach (var change in changes.Changes)
             {
                 var mine = changes.Key + ":" + change.Path;
@@ -719,7 +740,7 @@ namespace GBible
         static string Reshaped(Transaction tx)
         {
             if (tx.ReshapedAfter == null) return null;
-            foreach (var changes in tx.Mirrored)
+            foreach (var changes in tx.Mirrored.Where(c => !c.Permanent))
             foreach (var change in changes.Changes)
             {
                 var mine = changes.Key + ":" + change.Path;
@@ -741,14 +762,25 @@ namespace GBible
         }
 
         // 마지막 Sync 이후의 변경을 버리고 사본 모습으로 되돌린다(기록 없이). 예외로 중단된 변경에 쓴다.
+        // 번호를 지키며 되돌린다(KeepIds): 받는 쪽은 이 변경을 받지 않았으니(보내기 전에 취소), 빠졌다 돌아온 객체는 예전 번호·보낸 표시를 그대로 써야 한다
+        // — 아니면 새 번호를 받아 받는 쪽과 어긋난다(다음 변경이 받는 쪽에 없는 번호를 가리킨다).
         void RevertToMirror(Slot slot)
         {
-            _work.Clear();
-            Mirror.Sync(slot.Value, slot.Mirror, _work);
-            if (_work.IsEmpty) return;
-            var changes = _work.Detach();
-            Mirror.Undo(slot.Value, changes);
-            Mirror.Sync(slot.Value, slot.Mirror, null);
+            var keeping = Mirror.KeepingIds(slot.Mirror);
+            if (!keeping) Mirror.KeepIds(slot.Mirror, true);
+            try
+            {
+                _work.Clear();
+                Mirror.Sync(slot.Value, slot.Mirror, _work);
+                if (_work.IsEmpty) return;
+                var changes = _work.Detach();
+                Mirror.Undo(slot.Value, changes);
+                Mirror.Sync(slot.Value, slot.Mirror, null);
+            }
+            finally
+            {
+                if (!keeping) Mirror.KeepIds(slot.Mirror, false);
+            }
         }
 
         bool AdoptUntracked(string key, Slot slot)
@@ -1034,7 +1066,13 @@ namespace GBible
             var tx = _active;
             _active = null;
             Release();
-            if (!RecordHistory) return;
+            // Permanent 안에서 시작한 행동(되돌리지 않을 보상이 부른 행동 등)은 이력에 남기지 않는다 — 실패하면 그래도 통째로 취소된다.
+            // 이력에 넣지 않는 행동은 바로 잊힌 것으로 알린다(행동마다 붙여 둔 난수 상태 등을 받는 쪽이 놓는다 — 이력을 끈 방 세션에서 쌓이지 않게).
+            if (!RecordHistory || _permanentDepth > 0)
+            {
+                TransactionForgotten?.Invoke(tx);
+                return;
+            }
             // 값이 바뀌지 않은 행동(빗나감 등)도 하나의 Undo 단위로 남긴다(난수 소비도 되돌려야 하므로).
             _history.Add(tx);
             if (HistoryLimit > 0 && _history.Count > HistoryLimit)
@@ -1075,7 +1113,7 @@ namespace GBible
             tx.DataChanges.RemoveRange(point.Data, tx.DataChanges.Count - point.Data);
             foreach (var pair in point.LegacyAt)
                 if (_slots.TryGetValue(pair.Key, out var slot)) tail.DataChanges.Add(new DataRecord { Key = pair.Key, Zone = slot.Zone, Before = pair.Value });
-            Revert(tail, "부분 취소");
+            Revert(tail, "부분 취소", includePermanent: true);
             tx.SealedMirrored = tx.Mirrored.Count;
         }
 
@@ -1087,32 +1125,51 @@ namespace GBible
             var tx = _active;
             _active = null;
             // 중단은 진행분과 되돌림을 함께 알린다: 받는 쪽은 한 묶음으로 적용해 같은 결과(Permanent 변경만 남음)가 된다.
-            Revert(tx, "중단");
+            Revert(tx, "중단", includePermanent: true);
             Release();
         }
 
         // 이 안의 변화는 Undo 이력에 넣지 않는다(도전과제 달성·보상처럼 한 번 일어나면 되돌리지 않을 일).
         // 예: using (state.Permanent()) state.Set("achievement:first", true);
+        // 진행 중인 행동은 그대로 진행 중이다(InTransaction이 참 — 안에서 부른 행동도 그 행동의 일부로 그 자리에서 돈다). 그 행동을 Undo해도 이 안의 변경은 남는다.
+        // 다만 그 행동이 실패하거나 미리보기(Preview·CanDo)·저장점 취소면 없던 일이라 이 안의 변경도 함께 취소된다(발동한 감시가 되살아나는 것과 맞게).
+        // 행동 밖에서 열면 안에서 시작한 행동은 실패하면 통째로 취소되지만 이력에는 남지 않는다.
+        // 예전 방식 데이터(Mirror가 아님)는 키마다 행동 전 모습 하나로 되돌리므로, 같은 행동이 이미 바꾼 키를 이 안에서 또 바꾸면 그 행동이 실패할 때 함께 되돌아간다.
         public IDisposable Permanent() => new PermanentScope(this);
+
+        int _permanentDepth;
+        // Permanent를 열 때 진행 중이던 행동(그 행동에는 기록하지 않는다). 행동 밖에서 열었으면 null.
+        Transaction _permanentOf;
+
+        // 지금 바뀐 것을 진행 중인 행동의 Undo 기록에 넣는가.
+        bool Recording => _active != null && (_permanentDepth == 0 || _active != _permanentOf);
 
         sealed class PermanentScope : IDisposable
         {
             readonly PlayerDataStore _store;
-            readonly Transaction _suspended;
+            readonly Transaction _previous;
+            bool _disposed;
 
             // 들어가기 전 변경은 진행 중인 행동의 것으로, 안의 변경은 이력 밖으로 Sync한다.
             public PermanentScope(PlayerDataStore store)
             {
                 _store = store;
                 store.Sync();
-                _suspended = store._active;
-                store._active = null;
+                _previous = store._permanentOf;
+                store._permanentOf = store._active;
+                store._permanentDepth++;
             }
 
             public void Dispose()
             {
-                _store.Sync();
-                _store._active = _suspended;
+                if (_disposed) return;
+                _disposed = true;
+                try { _store.Sync(); }
+                finally
+                {
+                    _store._permanentDepth--;
+                    _store._permanentOf = _previous;
+                }
             }
         }
 
@@ -1141,7 +1198,7 @@ namespace GBible
                 var overwritten = Overwritten(tx);
                 try
                 {
-                    Revert(tx, "Undo");
+                    Revert(tx, "Undo", includePermanent: false);
                 }
                 catch (Exception e)
                 {
@@ -1172,7 +1229,8 @@ namespace GBible
             foreach (var tx in _history) TransactionForgotten?.Invoke(tx);
             _history.Clear();
         }
-        void Revert(Transaction tx, string reason)
+        // includePermanent: Permanent 안의 변경도 되돌린다(행동 실패·미리보기·저장점 취소 — 없던 일). Undo는 건너뛴다(되돌리지 않을 일).
+        void Revert(Transaction tx, string reason, bool includePermanent)
         {
             // Mirror 데이터: 뒤로 기록을 거꾸로 적용하고, 다시 Sync해 되돌린 내용을 기록·전파한다.
             if (tx.Mirrored.Count > 0)
@@ -1181,6 +1239,7 @@ namespace GBible
                 for (int i = tx.Mirrored.Count - 1; i >= 0; i--)
                 {
                     var changes = tx.Mirrored[i];
+                    if (changes.Permanent && !includePermanent) continue;
                     if (!_slots.TryGetValue(changes.Key, out var mirrored) || mirrored.Mirror == null) continue;
                     Mirror.Undo(mirrored.Value, changes);
                     if (!keys.Contains(changes.Key)) keys.Add(changes.Key);
@@ -1193,6 +1252,7 @@ namespace GBible
             for (int i = tx.ValueChanges.Count - 1; i >= 0; i--)
             {
                 var change = tx.ValueChanges[i];
+                if (change.Permanent && !includePermanent) continue;
                 var slot = _slots[change.Key];
                 var current = slot.Value;
                 if (reason == "Undo" && lastSeen.Add(change.Key) && !Equals(current, change.New)) overwritten.Add(change.Key);
@@ -1207,6 +1267,7 @@ namespace GBible
             for (int i = tx.DataChanges.Count - 1; i >= 0; i--)
             {
                 var record = tx.DataChanges[i];
+                if (record.Permanent && !includePermanent) continue;
                 var slot = _slots[record.Key];
                 if (DetectUntrackedChanges) AdoptUntracked(record.Key, slot);
                 var before = slot.Shadow ?? DataModel.Clone(slot.Value, Identity);
@@ -1238,9 +1299,8 @@ namespace GBible
                     var slot = pair.Value;
                     if (slot.Zone != zone) continue;
                     var warnings = new List<string>();
-                    result[pair.Key] = slot.DataType == null
-                        ? DataModel.ToTree(slot.Value, slot.Value?.GetType() ?? typeof(object), Identity, warnings, slot.Label)
-                        : DataModel.ToTree(slot.Value, slot.DataType, Identity, warnings, slot.Label);
+                    // 메모리 안 트리(스냅샷)는 요소마다 ID를 남긴다 — 되감을 때 지금 인스턴스와 ID로 짝지어(순서가 바뀌거나 빠졌어도) 같은 인스턴스로 되돌린다.
+                    result[pair.Key] = DataModel.ToTree(slot.Value, slot.DataType ?? slot.Value?.GetType() ?? typeof(object), Identity, warnings, slot.Label, keepReferences);
                     if (report) foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, pair.Key);
                 }
                 // 불러왔지만 아직 정의되지 않은 키(라이브러리가 처음 쓸 때 정의하는 $id.… · $modifiers · $world …)도 그대로 다시 쓴다 —
@@ -1272,14 +1332,14 @@ namespace GBible
                 if (slot.DataType != null && slot.Mirror != null)
                 {
                     SyncSlot(key, slot);
-                    slot.Value = LoadData(key, slot, saved);
+                    slot.Value = LoadData(key, slot, saved, detached: true);
                     SyncSlot(key, slot, JournalKind.Undo, $"{reason}: ", 0);
                 }
                 else if (slot.DataType != null)
                 {
                     if (DetectUntrackedChanges) AdoptUntracked(key, slot);
                     var before = slot.Shadow ?? DataModel.Clone(slot.Value, Identity);
-                    slot.Value = LoadData(key, slot, saved);
+                    slot.Value = LoadData(key, slot, saved, detached: true);
                     RefreshShadow(slot);
                     var changes = DataModel.Diff(before, slot.Value, Identity);
                     if (changes.Count == 0) continue;
@@ -1300,43 +1360,56 @@ namespace GBible
         // 아직 정의되지 않은 키는 보관했다가 Define 시점에 적용한다. 이름이 바뀐 키는 새 이름으로 옮긴다.
         public void Import(Dictionary<string, object> values, DataZone zone)
         {
-            // 이 구역의 앞 저장에서 미리 불러 둔 값은 버린다(새 저장이 대신한다).
-            foreach (var stale in _preloadedZone.Where(p => p.Value == zone).Select(p => p.Key).ToList())
-            {
-                _preloaded.Remove(stale);
-                _preloadedZone.Remove(stale);
-            }
+            // 1) 먼저 모두 읽는다 — 읽는 동안에는 지금 값을 건드리지 않는다(읽다가 멈춰도 반쯤 불러온 모습이 남지 않게).
             var present = new HashSet<string>(StringComparer.Ordinal);
+            var loaded = new List<(string key, Slot slot, object value)>();
+            var pending = new List<(string key, object tree)>();
             foreach (var pair in values)
             {
                 var key = _aliases.TryGetValue(pair.Key, out var renamed) && !values.ContainsKey(renamed) ? renamed : pair.Key;
                 present.Add(key);
                 if (!_slots.TryGetValue(key, out var slot))
                 {
-                    _preloaded[key] = pair.Value;
-                    _preloadedZone[key] = zone;
+                    pending.Add((key, pair.Value));
                     continue;
                 }
                 if (slot.Zone != zone) continue;
                 if (slot.DataType != null)
                 {
-                    slot.Value = LoadData(key, slot, pair.Value);
-                    // 불러온 값이 새 출발점: 기록 없이 사본을 다시 만든다. 받는 쪽(멀티플레이)에는 처음 모습을 통째로 보낸다.
-                    ChooseMirror(key, slot);
-                    if (slot.Mirror != null && Synced != null) Synced(new ChangeSet { Key = key, Snapshot = Mirror.Snapshot(slot.Mirror) });
-                    RefreshShadow(slot);
-                    CheckRequired(key, slot);
+                    var warnings = new List<string>();
+                    var value = DataModel.FromTree(pair.Value, slot.DataType, Identity, warnings, slot.Label);
+                    foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, key);
+                    loaded.Add((key, slot, value));
                 }
                 else if (TryNormalize(ReadScalar(slot, pair.Value), out var value))
-                {
-                    slot.Value = value;
-                }
+                    loaded.Add((key, slot, value));
                 else
-                {
                     _journal.Append(JournalKind.Warning, "Save", $"저장된 '{slot.Label}' 값의 형식이 맞지 않아 무시합니다.", key);
-                    continue;
+            }
+
+            // 2) 한 번에 넣는다. 이 구역의 앞 저장에서 미리 불러 둔 값은 버린다(새 저장이 대신한다).
+            foreach (var stale in _preloadedZone.Where(p => p.Value == zone).Select(p => p.Key).ToList())
+            {
+                _preloaded.Remove(stale);
+                _preloadedZone.Remove(stale);
+            }
+            foreach (var (key, tree) in pending)
+            {
+                _preloaded[key] = tree;
+                _preloadedZone[key] = zone;
+            }
+            var changed = new List<string>();
+            foreach (var (key, slot, value) in loaded)
+            {
+                if (slot.DataType != null)
+                {
+                    // 불러온 값이 새 출발점: 기록 없이 사본을 다시 만든다(게임 코드가 쥔 인스턴스·요소 ID는 이어진다).
+                    slot.Value = DataModel.ApplyInPlace(slot.Value, value, Identity);
+                    ChooseMirror(key, slot);
+                    RefreshShadow(slot);
                 }
-                Changed?.Invoke(key);
+                else slot.Value = value;
+                changed.Add(key);
             }
             // 저장에 없는 이 구역의 키(저장한 뒤에 처음 생긴 상태 효과·월드 상태·기다리는 선택·예약 …)는 처음 값으로 — 불러온 모습에 섞이지 않게.
             foreach (var pair in _slots.ToList())
@@ -1346,18 +1419,31 @@ namespace GBible
                 if (slot.Zone != zone || present.Contains(key)) continue;
                 if (slot.DataType != null)
                 {
-                    if (DataModel.Diff(slot.Value, slot.Default, Identity).Count == 0) continue;
-                    slot.Value = DataModel.ApplyInPlace(slot.Value, DataModel.Clone(slot.Default, Identity), Identity);
+                    // 처음 값(Default)은 ID표에 올리지 않는다 — 올리면 제자리 복원이 처음 값의 객체를 데이터 안으로 끌어와 다음 판의 처음 값이 바뀐다.
+                    if (DataModel.Diff(slot.Value, slot.Default, null).Count == 0) continue;
+                    slot.Value = DataModel.ApplyInPlace(slot.Value, DataModel.Clone(slot.Default, null), Identity);
                     ChooseMirror(key, slot);
-                    if (slot.Mirror != null && Synced != null) Synced(new ChangeSet { Key = key, Snapshot = Mirror.Snapshot(slot.Mirror) });
                     RefreshShadow(slot);
-                    CheckRequired(key, slot);
                 }
                 else
                 {
                     if (Equals(slot.Value, slot.Default)) continue;
                     slot.Value = slot.Default;
                 }
+                changed.Add(key);
+            }
+
+            // 3) 다 넣은 뒤에 알린다: 받는 쪽(멀티플레이)에 처음 모습을 통째로 먼저 보내고, 그다음 화면·규칙 쪽 알림.
+            if (Synced != null)
+                foreach (var key in changed)
+                {
+                    var slot = _slots[key];
+                    if (slot.DataType != null && slot.Mirror != null) Synced(new ChangeSet { Key = key, Snapshot = Mirror.Snapshot(slot.Mirror) });
+                }
+            foreach (var key in changed)
+            {
+                var slot = _slots[key];
+                if (slot.DataType != null) CheckRequired(key, slot);
                 Changed?.Invoke(key);
             }
         }
@@ -1376,10 +1462,13 @@ namespace GBible
             return DataModel.FromTree(tree, slot.ValueType, null, null);
         }
 
-        object LoadData(string key, Slot slot, object tree)
+        // detached: 같은 세션의 과거 모습(스냅샷 되감기) — 읽은 요소를 ID표의 실제 인스턴스로 올리지 않아, 빠졌던 요소는 원래 인스턴스로 되살아난다.
+        object LoadData(string key, Slot slot, object tree, bool detached = false)
         {
             var warnings = new List<string>();
-            var loaded = DataModel.FromTree(tree, slot.DataType, Identity, warnings, slot.Label);
+            var loaded = detached
+                ? DataModel.FromTreeDetached(tree, slot.DataType, Identity, warnings, slot.Label)
+                : DataModel.FromTree(tree, slot.DataType, Identity, warnings, slot.Label);
             foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Save", warning, key);
             return DataModel.ApplyInPlace(slot.Value, loaded, Identity);
         }
@@ -1517,7 +1606,7 @@ namespace GBible
             if (slot.DataType != null || !Equals(slot.Value, slot.Default)) Set(key, slot.Default);
         }
 
-        // 이 객체가 들어 있는 플레이어 데이터(Mirror 데이터만). 없으면 null.
+        // 이 객체가 들어 있는 플레이어 데이터. 없으면 null. Mirror 데이터는 사본 표로, 예전 방식 데이터는 값을 따라가며 찾는다.
         internal string KeyOf(object live)
         {
             if (live == null) return null;
@@ -1525,6 +1614,11 @@ namespace GBible
             {
                 var mirror = _slots[key].Mirror;
                 if (mirror?.Tree != null && mirror.Tree.Nodes.ContainsKey(live)) return key;
+            }
+            foreach (var key in SlotKeys())
+            {
+                var slot = _slots[key];
+                if (slot.Mirror == null && slot.DataType != null && DataModel.FindObject(slot.Value, o => ReferenceEquals(o, live)) != null) return key;
             }
             return null;
         }
@@ -1535,7 +1629,7 @@ namespace GBible
             var slot = GetSlot(key);
             if (slot.DataType == null) return null;
             var warnings = new List<string>();
-            var value = DataModel.FromTree(tree, slot.DataType, Identity, warnings, slot.Label);
+            var value = DataModel.FromTreeDetached(tree, slot.DataType, Identity, warnings, slot.Label);
             foreach (var warning in warnings.Distinct()) _journal.Append(JournalKind.Warning, "Data", warning, key);
             return value;
         }
@@ -1547,11 +1641,12 @@ namespace GBible
             return TryNormalize(ReadScalar(slot, tree), out var value) ? value : slot.Default;
         }
 
-        // 보내는 쪽: 예전 방식 데이터 값의 저장 트리(받는 쪽 LoadRemoteTree).
-        internal object ExportTree(string key)
+        // 키 하나의 저장 트리(보내는 쪽: 예전 방식 데이터 값을 받는 쪽 LoadRemoteTree로 · 되감기 지점).
+        // elementIds: 요소마다 ID를 남긴다(되감기 — 지금 인스턴스와 ID로 짝짓는다).
+        internal object ExportTree(string key, bool elementIds = false)
         {
             var slot = GetSlot(key);
-            return DataModel.ToTree(slot.Value, slot.DataType ?? slot.Value?.GetType() ?? typeof(object), Identity, new List<string>(), slot.Label);
+            return DataModel.ToTree(slot.Value, slot.DataType ?? slot.Value?.GetType() ?? typeof(object), Identity, new List<string>(), slot.Label, elementIds);
         }
 
         public void ResetZone(DataZone zone)

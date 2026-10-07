@@ -235,9 +235,13 @@ namespace GBible
                 case string _:
                     return null;
                 case IDictionary map:
+                {
+                    // 쓰기(Assign)와 같게 키 형식으로 바꿔 찾는다(flags[true]·byLevel[01]도). 바꿀 수 없으면 글자로 견준다.
+                    if (TryKey(DataModel.Of(map.GetType()).KeyType, key, out var typed) && typed != null && map.Contains(typed)) return map[typed];
                     foreach (DictionaryEntry entry in map)
                         if (string.Equals(Convert.ToString(entry.Key, CultureInfo.InvariantCulture), key, StringComparison.Ordinal)) return entry.Value;
                     return null;
+                }
                 case IEnumerable list:
                     foreach (var item in list)
                     {
@@ -522,7 +526,8 @@ namespace GBible
         {
             number = 0;
             if (value == null || value is bool || value is Enum || !TypeResolver.IsNumeric(value.GetType())) return false;
-            number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            // float는 적힌 소수 그대로(0.1f는 double로 0.10000000149… — 0.1과 같다고 보게).
+            number = value is float f && !float.IsNaN(f) && !float.IsInfinity(f) && Math.Abs(f) < 7.9e27f ? (double)(decimal)f : Convert.ToDouble(value, CultureInfo.InvariantCulture);
             return true;
         }
 

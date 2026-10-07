@@ -19,14 +19,14 @@ namespace GBible
     }
 
     // 테스트 씬: 프로젝트마다 AI가 만드는 씬(Assets/MomoiProject/Scenes/Test.unity)에 이 컴포넌트를 하나 둔다.
-    //   플레이하면 ① 'test' 슬롯으로 옮겨(개발자의 실제 저장을 건드리지 않음) ② 시작 테스트 상황을 불러오고(없으면 새 판)
+    //   플레이하면 ① 'test' 슬롯으로 옮겨(개발자의 실제 저장을 건드리지 않음) ② 시작 테스트 상황을 불러오고(비었거나 불러오지 못하면 새 판 — 개발 빌드는 빌드에 같이 넣은 상황도 찾는다)
     //   ③ 게임 화면 위에 테스트 패널을 띄운다: 테스트 명령(DB › 개발 명령·코드 등록) 버튼 · 상황 저장·불러오기 · 시간 · Undo.
     // 에디터와 개발 빌드에서만 돈다(출시 빌드에서는 아무것도 하지 않는다). 다른 컴포넌트보다 먼저 돈다.
     [DefaultExecutionOrder(-10000)]
     [AddComponentMenu("MomoiProject/테스트 씬")]
     public sealed class TestScene : MonoBehaviour
     {
-        [Tooltip("시작할 테스트 상황(Assets/MomoiProject/Data/Tests). 비우면 새 판")] public string scenario = "";
+        [Tooltip("시작할 테스트 상황(Assets/MomoiProject/Data/Tests — 개발 빌드에도 같이 들어간다). 비우거나 불러오지 못하면 새 판")] public string scenario = "";
         [Tooltip("글자 시드. 비우면 상황의 시드(상황이 없으면 무작위)")] public string seed = "";
         [Tooltip("켜면 'test' 슬롯에서 돈다 — 개발자의 실제 저장(기본 슬롯)을 건드리지 않는다")] public bool separateSlot = true;
         [Tooltip("시작할 때의 게임 속도"), Range(0f, 8f)] public float speed = 1f;
@@ -79,13 +79,27 @@ namespace GBible
             var session = GBibleRuntime.Session;
             if (session == null) return;
             ulong? fixedSeed = string.IsNullOrWhiteSpace(seed) ? (ulong?)null : RandomStreams.SeedOf(seed);
-            if (!string.IsNullOrWhiteSpace(scenario))
-            {
-                if (!TestScenarios.Load(session, scenario, fixedSeed)) Debug.LogWarning($"[MomoiProject] 테스트 씬: 테스트 상황 '{scenario}'를 불러오지 못했습니다(콘솔·모니터 저널).");
-            }
-            else GBibleRuntime.StartNewRun(session, fixedSeed);
+            StartRun(session, scenario, fixedSeed);
             GameTime.SetSpeed(speed);
             StartNet(fixedSeed);
+        }
+
+        // 시작 상황으로 판을 연다. 비었거나 불러오지 못하면(파일 없음·형식이 틀림·데이터 구조가 바뀜) 새 판(시드 + 새 판 행동) — 빈 판으로 시작하지 않게.
+        static void StartRun(GameSession session, string start, ulong? fixedSeed)
+        {
+            if (!string.IsNullOrWhiteSpace(start))
+            {
+                bool loaded;
+                try { loaded = TestScenarios.Load(session, start, fixedSeed); }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                    loaded = false;
+                }
+                if (loaded) return;
+                Debug.LogWarning($"[MomoiProject] 테스트 씬: 테스트 상황 '{start}'를 불러오지 못해 새 판으로 시작합니다(이유는 콘솔·모니터 저널).");
+            }
+            GBibleRuntime.StartNewRun(session, fixedSeed);
         }
 
         string NameOrDefault() => string.IsNullOrWhiteSpace(playerName) ? Environment.UserName : playerName.Trim();
@@ -96,9 +110,8 @@ namespace GBible
             {
                 case TestNetMode.TestMode:
                     var start = scenario;
-                    // 서버 세션의 판: 시작 상황이 있으면 그것을, 없으면 새 판(시드 + 새 판 행동).
-                    GameNet.StartTestMode(latency, jitter, extraClients, NameOrDefault(),
-                        string.IsNullOrWhiteSpace(start) ? (Action<GameSession>)(server => GBibleRuntime.StartNewRun(server, fixedSeed)) : server => TestScenarios.Load(server, start, fixedSeed));
+                    // 서버 세션의 판: 시작 상황이 있으면 그것을, 없거나 불러오지 못하면 새 판(시드 + 새 판 행동).
+                    GameNet.StartTestMode(latency, jitter, extraClients, NameOrDefault(), server => StartRun(server, start, fixedSeed));
                     break;
                 case TestNetMode.Host:
                     GameNet.HostDirect(port, NameOrDefault());
@@ -186,7 +199,7 @@ namespace GBible
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Label(name);
-                    if (GUILayout.Button("불러오기", GUILayout.Width(80))) Run(() => TestScenarios.Load(authority, name), $"불러옴: {name}");
+                    if (GUILayout.Button("불러오기", GUILayout.Width(80))) LoadScenario(authority, name);
                     GUILayout.EndHorizontal();
                 }
             }
@@ -336,6 +349,15 @@ namespace GBible
             }
             if (GUILayout.Button("틀기")) Run(() => GameNet.PlayReplay(replay), "리플레이");
             GUILayout.EndHorizontal();
+        }
+
+        // 패널의 '불러오기': 불러오지 못하면(Load가 거짓) 그렇다고 보인다(이유는 저널).
+        void LoadScenario(GameSession session, string name)
+        {
+            var loaded = false;
+            Run(() => loaded = TestScenarios.Load(session, name));
+            if (loaded) _message = $"불러옴: {name}";
+            else if (string.IsNullOrEmpty(_message)) _message = $"'{name}'를 불러오지 못했습니다(콘솔·모니터 저널).";
         }
 
         void Run(Action action, string done = null)

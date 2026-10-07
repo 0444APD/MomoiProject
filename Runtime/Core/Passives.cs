@@ -325,10 +325,13 @@ namespace GBible
         //   결과의 사용자 = 원본 조각(원본의 값을 읽는다), IsBorrowed = 참 — '필드 바꾸기'는 원본 자신의 필드를 바꾸지 않는다(쌓이는 값은 원본만).
         //   가진 쪽 필드는 빌리는 쪽(지금 순간의 사용자)으로 본다 — "이 조커의 차례" 이벤트에서 Blueprint가 오른쪽 조커를 빌린다.
         //   발동이 여러 줄이면 맞는 줄마다. 이미 빌려 쓰는 중인 (패시브, 원본)을 다시 빌리면 거짓(고리 끊기). 결과를 냈으면 참.
+        //   꺼진 원본(침묵·레벨 0 이하)은 빌리지 못한다(거짓) — 직접 발동하지 않는 조각은 빌려도 발동하지 않는다.
         public bool Borrow(string id, object lender, TriggerContext moment)
         {
             var definition = Find(id);
             if (definition == null || lender == null || moment == null || IsSilenced(lender)) return false;
+            // 레벨이 0 이하인 조각은 꺼져 있다(발동·보정 없음) — 빌려 쓰지도 못한다(침묵한 조각과 같다).
+            if (LevelOf(definition, lender) <= 0) return false;
             var key = (definition.Id, lender);
             if (!_borrowing.Add(key)) return false;
             try
@@ -372,6 +375,8 @@ namespace GBible
         // ── 주기 ─────────────────────────────────────────────
 
         // 프레임 끝(행동 밖): 주기가 있는 패시브 중 경계를 넘은 것이 있으면 행동 하나로 낸다.
+        // 그 행동이 실패하면(결과의 비용이 모자람 등) 가진 쪽의 결과마다 저장점으로 감싸 한 번 더 낸다: 실패한 결과만 되돌리고(경고)
+        // 다른 가진 쪽·패시브의 주기는 돈다. 지난 구간은 실패해도 지난 것으로 둔다(다음 프레임에 다시 내지 않는다).
         internal void Tick()
         {
             if (_session.Data.InTransaction) return;
@@ -387,12 +392,29 @@ namespace GBible
             _lastPulse = now;
             if (pulsing.Count == 0) return;
             if (!pulsing.Any(id => ActiveHolders(Find(id)).Any(h => Crosses(Find(id).PulseAt(h.level), from, now)))) return;
-            _session.Do(new PassivePulseRun { passives = pulsing, from = from, to = now });
+            try
+            {
+                _session.Do(new PassivePulseRun { passives = pulsing, from = from, to = now });
+                return;
+            }
+            catch (Exception)
+            {
+            }
+            try { _session.Do(new PassivePulseRun { passives = pulsing, from = from, to = now, isolate = true }); }
+            catch (Exception e)
+            {
+                _session.Journal.Append(JournalKind.Error, "Passive", $"패시브 주기: 결과를 하나씩 감싸 다시 냈는데도 실패했습니다 — {e.Message}");
+            }
         }
+
+        // 게임 시계를 되돌리거나 불러온 판의 시각으로 옮긴 뒤(세션이 부른다): 지난 경계를 새 시각으로 — 그 시각까지의 주기는 이미 낸 것으로 본다.
+        // 그러지 않으면 앞으로 크게 옮긴 뒤 밀린 주기를 한꺼번에(최대 8번) 내고, 뒤로 돌린 뒤 첫 프레임의 경계를 건너뛴다.
+        internal void ResetPulseClock() => _lastPulse = _session.Clock.Time;
 
         static bool Crosses(double interval, double from, double to) => interval > 0 && Math.Floor(to / interval) > Math.Floor(from / interval);
 
-        internal void PulseRun(List<string> ids, double from, double to)
+        // isolate: 가진 쪽의 결과를 회차마다 저장점으로 감싼다(실패한 회차는 그 결과만 되돌리고 그 가진 쪽의 남은 회차를 버린다).
+        internal void PulseRun(List<string> ids, double from, double to, bool isolate = false)
         {
             foreach (var id in ids)
             {
@@ -406,8 +428,32 @@ namespace GBible
                     if (interval <= 0) continue;
                     var times = Math.Min(8, (int)(Math.Floor(to / interval) - Math.Floor(from / interval)));
                     for (int i = 0; i < times; i++)
-                        Fire(definition, definition.Outcomes, new TriggerContext { Session = _session, Owner = definition.Id, User = holder });
+                    {
+                        var moment = new TriggerContext { Session = _session, Owner = definition.Id, User = holder };
+                        if (!isolate) Fire(definition, definition.Outcomes, moment);
+                        else if (!Guarded(definition, holder, () => Fire(definition, definition.Outcomes, moment))) break;
+                    }
                 }
+            }
+        }
+
+        // 저장점 안에서 돌린다. 실패하면 그것이 바꾼 것과 쏜 이벤트(연출·전송)만 되돌리고 경고를 남긴다. 돌았으면 참.
+        bool Guarded(PassiveDefinition definition, object holder, Action run)
+        {
+            var point = _session.Data.Mark();
+            var events = _session.Events.MarkEvents();
+            try
+            {
+                run();
+                return true;
+            }
+            catch (Exception e)
+            {
+                _session.Data.RollbackTo(point);
+                _session.Events.RollbackEvents(events);
+                var who = holder != null && !(holder is string) && GameApi.HasId(holder.GetType()) ? GameApi.IdOf(holder) : holder as string ?? "";
+                _session.Journal.Append(JournalKind.Warning, "Passive", $"패시브 '{definition.DisplayName ?? definition.Id}'({who})의 주기 결과가 실패해 그것이 바꾼 것만 되돌렸습니다 — {e.Message}");
+                return false;
             }
         }
 
@@ -465,7 +511,7 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(definition.LevelField) || element is string) return 1;
             var value = FieldAccess.Read(element, definition.LevelField);
-            return value is IConvertible && !(value is string) ? (int)Math.Round(Convert.ToDouble(value, CultureInfo.InvariantCulture)) : 1;
+            return value is IConvertible && !(value is string) ? GameNumbers.RoundToInt(Convert.ToDouble(value, CultureInfo.InvariantCulture)) : 1;
         }
 
         int CountIn(PassiveDefinition definition, object collection)
@@ -479,7 +525,7 @@ namespace GBible
                     foreach (DictionaryEntry entry in map)
                     {
                         if (!string.Equals(Convert.ToString(entry.Key, CultureInfo.InvariantCulture), id, StringComparison.Ordinal)) continue;
-                        return entry.Value is IConvertible && !(entry.Value is string) ? (int)Math.Round(Convert.ToDouble(entry.Value, CultureInfo.InvariantCulture)) : 1;
+                        return entry.Value is IConvertible && !(entry.Value is string) ? GameNumbers.RoundToInt(Convert.ToDouble(entry.Value, CultureInfo.InvariantCulture)) : 1;
                     }
                     return 0;
                 case IEnumerable list:
@@ -509,11 +555,13 @@ namespace GBible
         public List<string> passives = new List<string>();
         public double from;
         public double to;
+        // 결과를 회차마다 저장점으로 감싼다(묶음이 한 번 실패한 뒤 다시 낼 때 — 실패한 결과만 되돌린다).
+        public bool isolate;
 
         public override ActionVisibility Visibility => ActionVisibility.Developer;
-        public override string Describe() => "패시브 주기";
+        public override string Describe() => isolate ? "패시브 주기(실패 감싸기)" : "패시브 주기";
 
-        protected override void Run() => Game.Session.Passives.PulseRun(passives, from, to);
+        protected override void Run() => Game.Session.Passives.PulseRun(passives, from, to, isolate);
     }
 
     // 결과 '빌려 쓰기': 대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 빌려 쓴다(Blueprint·Brainstorm).

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace GBible.Tests
@@ -51,6 +52,64 @@ namespace GBible.Tests
             Game.Do(replay);
             Assert.AreEqual("03:30:00", Run.seen[2], "받은 행동(시각이 이미 있음)은 그 시각으로 돈다");
             Assert.AreEqual("03:35:00", Game.Now.ToString("HH:mm:ss"), "행동 밖에서는 지금 시각");
+        }
+
+        sealed class NowProbe : GameAction
+        {
+            public DateTime seen;
+            public long day;
+            protected override void Run()
+            {
+                seen = Game.Now;
+                day = Game.Day();
+            }
+        }
+
+        [Test]
+        public void 시계가_Kind_없는_시각이나_지역_시각을_줘도_행동_안팎의_시각이_같다()
+        {
+            var unspecified = new DateTime(2026, 10, 4, 3, 30, 0, DateTimeKind.Unspecified);
+            var session = new GameSession(new SessionOptions { RealClock = () => unspecified, TimeZone = TimeZoneInfo.Utc });
+            var probe = new NowProbe();
+            session.Do(probe);
+            Assert.AreEqual(new DateTime(2026, 10, 4, 3, 30, 0, DateTimeKind.Utc), probe.seen, "Kind가 없으면 UTC로 본다");
+            Assert.AreEqual(probe.seen, session.Game.Now, "행동 밖도 같은 순간");
+            Assert.AreEqual(DateTimeKind.Utc, session.Game.Now.Kind);
+            Assert.AreEqual(probe.day, session.Game.Day(), "날짜 번호도 같다");
+
+            var local = new DateTime(2026, 10, 4, 12, 30, 0, DateTimeKind.Local);
+            var localSession = new GameSession(new SessionOptions { RealClock = () => local, TimeZone = TimeZoneInfo.Utc });
+            var localProbe = new NowProbe();
+            localSession.Do(localProbe);
+            Assert.AreEqual(local.ToUniversalTime(), localProbe.seen, "지역 시각은 UTC로 바꾼다");
+            Assert.AreEqual(localProbe.seen, localSession.Game.Now);
+            Assert.AreEqual(DateTimeKind.Utc, localSession.Game.Now.Kind);
+        }
+
+        [Test]
+        public void 멀티에서_시간대를_비우면_서버와_클라이언트가_UTC로_같은_날을_센다()
+        {
+            var clock = new DateTime(2026, 10, 4, 23, 30, 0, DateTimeKind.Utc);
+            var utcDay = (long)Math.Floor((clock - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalDays);
+            var server = new GameSession(new SessionOptions { RealClock = () => clock });
+            var client = new GameSession(new SessionOptions { RealClock = () => clock });
+            var network = new MemoryNetwork();
+            new NetServer(server, network.Server());
+            new NetClient(client, network.Client(), "철수");
+            Assert.AreEqual(utcDay, server.Game.Day(), "서버(흔히 UTC 컴퓨터)와");
+            Assert.AreEqual(utcDay, client.Game.Day(), "클라이언트(제 지역 시각)가 같은 날을 센다");
+            server.Game.Day();
+            Assert.AreEqual(1, server.Journal.Entries.Count(e => e.Kind == JournalKind.Warning && e.Message.Contains("SessionOptions.TimeZone")), "한 번 알린다");
+
+            var single = new GameSession(new SessionOptions { RealClock = () => clock });
+            var mine = TimeZoneInfo.ConvertTimeFromUtc(clock, TimeZoneInfo.Local);
+            Assert.AreEqual((long)Math.Floor((mine - new DateTime(1970, 1, 1)).TotalDays), single.Game.Day(), "싱글은 이 컴퓨터의 시간대 그대로");
+            Assert.IsFalse(single.Journal.Entries.Any(e => e.Message.Contains("SessionOptions.TimeZone")));
+
+            var kst = TimeZoneInfo.CreateCustomTimeZone("KST", TimeSpan.FromHours(9), "KST", "KST");
+            var zoned = new GameSession(new SessionOptions { RealClock = () => clock, TimeZone = kst });
+            new NetServer(zoned, new MemoryNetwork().Server());
+            Assert.AreEqual(utcDay + 1, zoned.Game.Day(), "정해 두면 그 시간대(23:30 UTC = 다음 날 08:30 KST)");
         }
 
         [Test]

@@ -127,7 +127,17 @@ namespace GBible
                 v |= (ulong)(b & 0x7F) << shift;
                 if (b < 0x80) return v;
                 shift += 7;
+                if (shift > 63) throw new FormatException("[MomoiProject] 잘못된 숫자 인코딩입니다(받은 데이터가 깨졌습니다).");
             }
+        }
+
+        // 뒤따르는 항목 수(항목마다 1바이트 이상). 남은 바이트보다 많으면 깨진(또는 악의적인) 데이터다 — 거대한 미리 할당을 막는다.
+        // bias: 개수에 더해 쓰는 값(0 = null을 뜻하는 목록 인코딩이면 1).
+        public int Count(int bias = 0)
+        {
+            var value = UVar();
+            if (value > (ulong)Math.Max(0, End - Position) + (ulong)bias) throw new FormatException("[MomoiProject] 항목 수가 남은 데이터보다 많습니다(받은 데이터가 깨졌습니다).");
+            return (int)value;
         }
 
         public long Long()
@@ -156,7 +166,7 @@ namespace GBible
 
         public string Str()
         {
-            var n = (int)UVar();
+            var n = Count(1);
             if (n == 0) return null;
             var s = Encoding.UTF8.GetString(Data, Position, n - 1);
             Position += n - 1;

@@ -36,18 +36,25 @@ namespace GBible
     // 얇은 층: 정의 목록 + 달성 상태(메타 구역) + 달성 알림. 트리거 판정은 공용 트리거 감시(TriggerSystem)가 한다.
     // 달성은 조건을 만족하는 순간 일어나고 보상도 그때 지급한다. 달성·보상은 Undo 이력에 넣지 않으므로(Permanent)
     // Undo·되감기로 취소되지 않는다. 행동이 바꾼 값(소지 골드·누적 수치)만 돌아가므로 Undo하고 다시 해도 쌓이지 않는다.
+    // 행동 안에서 발동하면 그 바깥 행동이 성공한 뒤에 달성한다(달성 표시·보상·AchievementUnlocked·Unlocked가 그때, 발동한 차례대로).
+    // 행동이 실패하거나 미리보기(Preview·CanDo)면 달성하지 않고 트리거도 그대로 감시한다 — 없던 일이 된 실행이 되돌릴 수 없는 달성을 남기지 않게.
     public sealed class AchievementSystem : IInspectable
     {
         readonly Dictionary<string, AchievementDefinition> _definitions = new Dictionary<string, AchievementDefinition>(StringComparer.Ordinal);
         readonly GameSession _session;
         // 달성 기록(달성 기록 id, 도전과제 ID). 스냅샷 되감기 후 그 구간의 달성을 유지하는 데 쓴다.
         readonly List<(long entryId, string id)> _unlocks = new List<(long, string)>();
+        // 행동 안에서 발동해 바깥 행동이 끝나기를 기다리는 달성(발동한 순간과 그때의 기록 원인 — 달성 줄이 그 이벤트를 원인으로 잇게).
+        readonly List<(string id, string reason, TriggerContext moment, long cause)> _pending = new List<(string, string, TriggerContext, long)>();
 
         public event Action<AchievementDefinition> Unlocked;
 
         public AchievementSystem(GameSession session)
         {
             _session = session;
+            // 행동이 취소되면 기다리던 달성을 버린다(트리거는 TriggerSystem이 되살린다). 행동 안에서 일부만 되돌린 이벤트(실패한 이벤트 예약)로 발동한 것도.
+            session.Actions.TransactionAborted += _ => _pending.Clear();
+            session.Events.Retracted += evt => _pending.RemoveAll(p => p.moment?.Event != null && ReferenceEquals(p.moment.Event, evt));
         }
 
         public string InspectName => "도전과제";
@@ -104,7 +111,14 @@ namespace GBible
             var definition = Find(id) ?? throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 도전과제 '{id}'입니다.");
             if (IsUnlocked(id)) return;
             // 미리보기(해 보기만 하는 실행)에서는 달성하지 않는다(달성은 되돌리지 않는 변경이라 미리보기 뒤에도 남는다).
+            // 발동한 트리거는 미리보기가 끝나면 되살아난다(TriggerSystem).
             if (_session.Actions.IsPreviewing) return;
+            // 행동 안: 바깥 행동이 성공한 뒤에 달성한다(CommitPending). 실패하면 버려진다.
+            if (_session.Data.InTransaction)
+            {
+                if (!_pending.Any(p => p.id == id)) _pending.Add((id, reason, moment, _session.Journal.CurrentCause));
+                return;
+            }
 
             _session.Triggers.Unregister(id);
             var entry = _session.Journal.Append(JournalKind.Achievement, "Achievements",
@@ -126,6 +140,45 @@ namespace GBible
         {
             moment ??= new TriggerContext { Session = _session, Owner = definition.Id };
             _session.Triggers.RunOutcomes(definition.AllOutcomes(), moment, "Achievements");
+        }
+
+        // 바깥 행동이 성공한 뒤(세션이 부른다): 그 행동 안에서 발동한 달성을 발동한 차례대로 달성한다.
+        // 행동은 이미 끝났으므로 보상 하나의 오류가 행동을 실패로 보이게 하거나 뒤의 달성을 막지 않게 기록에 남기고 넘어간다.
+        internal void CommitPending()
+        {
+            if (_pending.Count == 0) return;
+            var ready = _pending.ToArray();
+            _pending.Clear();
+            foreach (var (id, reason, moment, cause) in ready)
+            {
+                try
+                {
+                    using (_session.Journal.Cause(cause)) Unlock(id, reason, moment);
+                }
+                catch (Exception e)
+                {
+                    _session.Journal.Append(JournalKind.Error, "Achievements", $"도전과제 '{_session.AchievementName(id)}'을(를) 달성하다 오류가 났습니다: {e.Message}");
+                }
+            }
+        }
+
+        // 프로필을 불러온 뒤(ImportMeta): 감시를 불러온 달성 상태에 맞춘다. 달성한 것은 감시를 그만두고, 달성하지 않은 것은 다시 감시한다
+        // (이 세션에서 달성했지만 불러온 프로필에서는 아직인 것). 다시 감시한 것은 다음 Flush에서 지금 값으로 평가된다(이미 넘었으면 소급 달성).
+        // 여기서 바로 평가하지 않는다: 판도 이어서 불러오는 중이면(테스트 상황) 반쯤 불러온 상태로 달성하게 된다 — 판 불러오기 끝의 Flush가 평가한다.
+        internal void SyncWithData()
+        {
+            _unlocks.RemoveAll(u => !IsUnlocked(u.id));
+            foreach (var definition in _definitions.Values.ToList())
+            {
+                if (IsUnlocked(definition.Id))
+                {
+                    _session.Triggers.Unregister(definition.Id);
+                    continue;
+                }
+                if (definition.When == null || _session.Triggers.IsRegistered(definition.Id)) continue;
+                WatchCondition(definition);
+                _session.Triggers.Touch(definition.Id);
+            }
         }
 
         // 스냅샷으로 되감은 뒤: 그 기록 id 이후에 달성한 도전과제의 달성 표시와 보상을 다시 적용한다(달성은 되감기로 취소되지 않는다).

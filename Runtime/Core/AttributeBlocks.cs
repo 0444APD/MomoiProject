@@ -71,6 +71,7 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(key)) context.Error("비용 내기: 플레이어 데이터를 고르세요.");
             if (amount < 0) context.Error("비용 내기: 양은 0 이상이어야 합니다(얻는 것은 '플레이어 데이터에 주기').");
+            if (GameApi.IsManyPath(path)) context.Error($"비용 내기: 필드 '{path}'에 []가 있어 낼 곳이 하나로 정해지지 않습니다. 낼 숫자 하나를 고르세요(목록의 그 요소는 [id]로).");
         }
     }
 
@@ -128,16 +129,11 @@ namespace GBible
                     var power = Use?.Context?.Power ?? 1;
                     var next = change == FieldChange.Add ? now + amount * power : change == FieldChange.Multiply ? now * amount : amount;
                     if (clampZero && next < 0) next = 0;
-                    return IsInteger(underlying)
-                        ? Convert.ChangeType(Math.Round(next, MidpointRounding.AwayFromZero), underlying, System.Globalization.CultureInfo.InvariantCulture)
-                        : Convert.ChangeType(next, underlying, System.Globalization.CultureInfo.InvariantCulture);
+                    return GameNumbers.ToType(next, underlying);
                 });
             }
             if (!wrote) Game?.Session.Journal.Append(JournalKind.Warning, "Effect", $"필드 바꾸기: {target.GetType().Name}에서 숫자 필드 '{field}'를 찾지 못했습니다.");
         }
-
-        static bool IsInteger(Type type) =>
-            type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte) || type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort) || type == typeof(sbyte);
 
         public override string Describe() => change == FieldChange.Add ? $"{field} {(value.StartsWith("-") ? "" : "+")}{value}" : change == FieldChange.Multiply ? $"{field} ×{value}" : $"{field} = {value}";
 

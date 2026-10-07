@@ -444,7 +444,8 @@ namespace GBible
             }
             else
             {
-                var key = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
+                // 참거짓은 보이는 글자와 같은 소문자로(true/false) — {flag, select, true {…} other {…}}.
+                var key = value is bool flag ? (flag ? "true" : "false") : Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
                 body = choice.Cases.FirstOrDefault(c => c.key == key).body;
             }
             body ??= choice.Cases.First(c => c.key == "other").body;
@@ -498,9 +499,9 @@ namespace GBible
                 case "number":
                     return IsNumber(value) ? FormatNumber(ToDouble(value), style, culture) : Convert.ToString(value, culture);
                 case "date":
-                    return value is DateTime date ? date.ToString(style == "long" || style == "full" ? "D" : "d", culture) : Convert.ToString(value, culture);
+                    return value is DateTime date ? Shown(date).ToString(style == "long" || style == "full" ? "D" : "d", culture) : Convert.ToString(value, culture);
                 case "time":
-                    return value is DateTime time ? time.ToString(style == "long" || style == "medium" ? "T" : "t", culture) : Convert.ToString(value, culture);
+                    return value is DateTime time ? Shown(time).ToString(style == "long" || style == "medium" ? "T" : "t", culture) : Convert.ToString(value, culture);
             }
             switch (value)
             {
@@ -508,11 +509,14 @@ namespace GBible
                 case TextKey key: return ctx.ResolveKey?.Invoke(key.Key) ?? key.Key;
                 case string s: return ctx.ResolveName?.Invoke(s) ?? s;
                 case bool flag: return flag ? "true" : "false";
-                case DateTime moment: return moment.ToString("d", culture);
+                case DateTime moment: return Shown(moment).ToString("d", culture);
             }
             if (IsNumber(value)) return FormatNumber(ToDouble(value), null, culture);
             return Convert.ToString(value, culture);
         }
+
+        // UTC 시각(Game.Now 등)은 이 기기의 지역 시각으로 보인다(그대로 보이면 한국에서 9시간 이르고 자정 근처에는 날짜도 틀린다).
+        static DateTime Shown(DateTime value) => value.Kind == DateTimeKind.Utc ? value.ToLocalTime() : value;
 
         static bool IsNumber(object value) =>
             value is int || value is long || value is float || value is double || value is decimal || value is short || value is byte || value is uint || value is ulong;

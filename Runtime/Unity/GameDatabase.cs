@@ -145,10 +145,13 @@ namespace GBible.Data
 
         public void EditorAddRename(string dataType, string oldId, string newId)
         {
+            if (string.IsNullOrEmpty(oldId) || string.IsNullOrEmpty(newId) || oldId == newId) return;
             // a → b 다음 b → c 이면 a도 c로 가게 이어 준다.
             foreach (var rename in renames)
                 if (rename.dataType == dataType && rename.newId == oldId) rename.newId = newId;
-            renames.RemoveAll(r => r.dataType == dataType && r.oldId == newId);
+            // 같은 항목이 예전 이름으로 돌아가 제자리(a → a)가 된 줄만 지운다. 다른 항목의 이력(새 ID가 그 예전 ID인 줄)은 지우지 않는다 —
+            // 지우면 그 예전 이름으로 저장된 값이 엉뚱한 항목으로 이어진다(에디터는 이력의 예전 ID를 다른 항목이 쓰지 못하게 막는다).
+            renames.RemoveAll(r => r.dataType == dataType && r.oldId == r.newId);
             renames.Add(new IdRename { dataType = dataType, oldId = oldId, newId = newId });
         }
 #endif

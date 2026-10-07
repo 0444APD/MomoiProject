@@ -135,11 +135,13 @@ namespace GBible.EditorTools
             FillTables(settings);
             var path = EditorUtility.OpenFilePanel("텍스트 시트 가져오기", "", "csv");
             if (string.IsNullOrEmpty(path)) return;
+            // UTF-8만(DB CSV와 같은 검사): CP949로 저장한 시트는 한글이 U+FFFD로 깨진 채 들어가 원문 표까지 덮을 수 있다.
+            if (!DataCsv.TryReadUtf8(path, "텍스트 시트 가져오기", out var csv)) return;
             var choice = EditorUtility.DisplayDialogComplex("텍스트 시트 가져오기",
                 "어느 열을 가져올까요?\n\n번역 언어만: 원문(" + settings.sourceLanguage + ") 열은 건너뜁니다(원문은 에디터에서 쓰는 것이 기준).\n모든 언어: 원문 열도 덮어씁니다.",
                 "번역 언어만", "취소", "모든 언어");
             if (choice == 1) return;
-            var report = Import(settings, File.ReadAllText(path), includeSource: choice == 2);
+            var report = Import(settings, csv, includeSource: choice == 2);
             Debug.Log("[다국어] " + report);
         }
 

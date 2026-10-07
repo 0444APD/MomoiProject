@@ -41,6 +41,7 @@ namespace GBible.Dialogue
     // 대사 한 줄. 선택지가 있으면 선택지마다 나가는 흐름 점이 생긴다.
     //  신호: 진입(이 줄에 들어옴) · 타이핑 완료 · 넘김(다음으로 가기 직전)
     //  '대사 시작'에 신호를 이으면 그 신호가 올 때까지 글자가 나오지 않는다(연출이 끝난 뒤 말하기).
+    //  선택지가 모두 조건에 막혀 고를 것이 없으면 클릭으로 '고를 선택지 없음' 점으로 간다(이어지지 않았으면 다이얼로그 끝).
     [Serializable, GraphNode("대사", Category = "흐름", Order = -9)]
     public sealed class LineNode : GraphNode
     {
@@ -50,6 +51,7 @@ namespace GBible.Dialogue
         public const string TypedPort = "typed";
         public const string LeavePort = "leave";
         public const string OptionPrefix = "opt:";
+        public const string NoChoicePort = "noChoice";
 
         [FieldLabel("화자(스탠딩 프로필. 비우면 해설)"), DataRef(typeof(StandingProfileData))] public string speaker = "";
         [FieldLabel("다른 이름(비우면 프로필 이름. 예: ???, 병사 A — 프로필 없이 이름만 둘 때도)")] public string speakerName = "";
@@ -81,8 +83,11 @@ namespace GBible.Dialogue
                 yield return PortInfo.SignalOut(LeavePort, "넘김");
                 if (options.Count == 0) yield return PortInfo.FlowOut(NextPort, "다음");
                 else
+                {
                     for (var i = 0; i < options.Count; i++)
                         yield return PortInfo.FlowOut(OptionPrefix + options[i].id, string.IsNullOrEmpty(options[i].text) ? $"선택지 {i + 1}" : options[i].text);
+                    yield return PortInfo.FlowOut(NoChoicePort, "고를 선택지 없음");
+                }
             }
         }
     }
@@ -188,6 +193,8 @@ namespace GBible.Dialogue
 
     // 프로젝트 전용 흐름 노드의 바탕. Run이 돌려준 점(포트 ID)으로 흐름이 이어진다(null이면 다이얼로그 끝).
     // 예: 퀘스트 상태로 세 갈래 나누기, 미니게임 결과 기다리기 없이 즉시 판정 등. [GraphNode]를 붙이면 메뉴에 나온다.
+    // 고른 점은 진행 기록에 남아 불러올 때는 Run을 다시 부르지 않고 그 점으로 간다. 미리보기 시간 이동처럼 길을 조용히 다시 밟는 중
+    // (runner.Replaying)에도 불릴 수 있으니, Run 안에서 값을 바꾸는 일은 runner.Replaying이면 하지 않는다(값 바꾸기는 '값 바꾸기' 노드로).
     [Serializable]
     public abstract class CustomFlowNode : GraphNode
     {

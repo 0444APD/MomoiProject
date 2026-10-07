@@ -37,27 +37,36 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 없는_그룹을_가리키면_오류_그룹을_만들면_통과()
+        public void 없는_항목을_가리키면_오류_그_항목을_만들면_통과()
         {
-            var boss = Make<SpritePresetData>("boss", "보스");
-            boss.group = "monsterTag";
+            var boss = Rule("boss", "monsterTag");
             var issues = DataValidator.Validate(new List<GameData> { boss });
             Assert.IsTrue(issues.Any(i => i.Asset == boss && i.Severity == ValidationSeverity.Error && i.Message.Contains("'monsterTag'")));
 
-            var group = Make<SpritePresetGroupData>("monsterTag", "몬스터 태그");
-            issues = DataValidator.Validate(new List<GameData> { boss, group });
+            var frame = Make<SpriteFrameData>("monsterTag", "몬스터 틀");
+            issues = DataValidator.Validate(new List<GameData> { boss, frame });
             Assert.IsFalse(issues.Any(i => i.Asset == boss && i.Severity == ValidationSeverity.Error));
+        }
+
+        // 틀([DataRef(typeof(SpriteFrameData))])을 가리키는 필드 규칙(다른 칸은 올바르게 — 참조만 시험한다).
+        FieldRuleData Rule(string id, string frame)
+        {
+            var rule = Make<FieldRuleData>(id, id);
+            rule.targetType = typeof(FieldRuleData).FullName;
+            rule.field = nameof(FieldRuleData.spriteFrame);
+            rule.source = FieldRuleSource.Free;
+            rule.spriteFrame = frame;
+            return rule;
         }
 
         [Test]
         public void 참조_필드를_모두_찾는다()
         {
-            var boss = Make<SpritePresetData>("boss", "보스");
-            boss.group = "monsterTag";
+            var boss = Rule("boss", "monsterTag");
             var found = new List<(string value, System.Type type)>();
             EditorDatabase.ForEachReference(boss, (property, type) => found.Add((property.stringValue, type)));
             CollectionAssert.AreEqual(new[] { "monsterTag" }, found.Select(f => f.value));
-            Assert.IsTrue(found.All(f => f.type == typeof(SpritePresetGroupData)));
+            Assert.IsTrue(found.All(f => f.type == typeof(SpriteFrameData)));
 
             var achievement = Make<AchievementData>("hunter", "사냥꾼");
             achievement.condition = new StatCompareCondition { stat = "kills", value = 3 };
@@ -122,6 +131,22 @@ namespace GBible.Tests
             StringAssert.Contains("public static PlayerDataView Data(this global::GBible.GameApi game)", code);
         }
 
+
+        [Test]
+        public void 스프라이트_틀의_크기_이름도_상수로_만든다()
+        {
+            var frame = Make<SpriteFrameData>("character", "캐릭터");
+            frame.sizes.Add(new SpriteFrameSize { name = "standing", width = 600, height = 900 });
+            frame.sizes.Add(new SpriteFrameSize { name = "icon", width = 128, height = 128 });
+            frame.sizes.Add(new SpriteFrameSize { name = "Bad.Name", width = 128, height = 128 });
+            var code = GameIdsGenerator.Build(new List<GameData> { frame }, "GBible.Tests.Editor");
+            StringAssert.Contains("public const string Character = \"character\";", code);
+            StringAssert.Contains("public static class SpriteSize", code);
+            StringAssert.Contains("public const string Standing = \"standing\";", code);
+            StringAssert.Contains("public const string Icon = \"icon\";", code);
+            StringAssert.DoesNotContain("Bad.Name", code, "올바르지 않은 크기 이름은 빼고 만든다");
+        }
+
         [Test]
         public void 참조할_수_없는_위치면_ID_문자열만_만든다()
         {
@@ -129,6 +154,65 @@ namespace GBible.Tests
             bag.valueType = typeof(TestInventory).FullName;
             var code = GameIdsGenerator.Build(new List<GameData> { bag }, "없는어셈블리");
             StringAssert.Contains("public const string PlayerBag = \"player.bag\";", code);
+        }
+
+        [Test]
+        public void 상수_이름이_겹쳐도_이미_있던_상수는_같은_ID를_가리킨다()
+        {
+            var old = Make<StatData>("bossDragon", "");
+            var first = GameIdsGenerator.Build(new List<GameData> { old }, "GBible.Tests.Editor");
+            StringAssert.Contains("public const string BossDragon = \"bossDragon\";", first);
+
+            // 'boss.dragon'은 정렬 순서로 앞이지만, 기존 코드의 BossDragon이 새 항목을 가리키게 되지 않는다.
+            var added = Make<StatData>("boss.dragon", "");
+            var next = GameIdsGenerator.Build(new List<GameData> { old, added }, "GBible.Tests.Editor", first);
+            StringAssert.Contains("public const string BossDragon = \"bossDragon\";", next);
+            StringAssert.Contains("public const string BossDragon_2 = \"boss.dragon\";", next);
+            Assert.AreEqual(next, GameIdsGenerator.Build(new List<GameData> { old, added }, "GBible.Tests.Editor", next), "다시 만들어도 같다");
+
+            var gold = Make<PlayerDataEntry>("player.gold", "골드");
+            gold.valueType = typeof(int).FullName;
+            var view = GameIdsGenerator.Build(new List<GameData> { gold }, "GBible.Tests.Editor");
+            var names = GameIdsGenerator.PreviousNames(view);
+            Assert.AreEqual("PlayerGold", names["PlayerData|player.gold"]);
+            Assert.AreEqual("PlayerGold", names["PlayerDataView|player.gold"]);
+        }
+
+        [Test]
+        public void 같은_종류에서_코드_이름이_같아지는_ID와_대소문자만_다른_ID를_잡는다()
+        {
+            var a = Make<StatData>("bossDragon", "");
+            var b = Make<StatData>("boss.dragon", "");
+            var otherKind = Make<SpriteFrameData>("boss.dragon2", "");
+            var issues = DataValidator.Validate(new List<GameData> { a, b, otherKind });
+            Assert.AreEqual(2, issues.Count(i => i.Severity == ValidationSeverity.Error && i.Message.Contains("GameIds의 BossDragon")));
+
+            var upper = Make<StatData>("potionA", "");
+            var lower = Make<StatData>("potiona", "");
+            issues = DataValidator.Validate(new List<GameData> { upper, lower });
+            Assert.AreEqual(2, issues.Count(i => i.Message.Contains("중복")), "대소문자만 다른 ID도 중복(ID 바꾸기·만들기와 같은 규칙)");
+        }
+
+        [Test]
+        public void 플레이어_데이터_칸과_값_틀이_없는_항목을_가리키면_알린다()
+        {
+            var run = Make<PlayerDataEntry>("run", "판");
+            run.valueType = typeof(TestInventory).FullName;
+            var passive = Make<PassiveData>("passive1", "");
+            passive.ownerKey = "nope";
+            var found = new List<(string value, System.Type type)>();
+            EditorDatabase.ForEachReference(passive, (property, type) => found.Add((property.stringValue, type)));
+            Assert.IsTrue(found.Any(f => f.value == "nope" && f.type == typeof(PlayerDataEntry)), "ID 바꾸기·지우기 검사가 플레이어 데이터 칸도 본다");
+
+            var issues = DataValidator.Validate(new List<GameData> { run, passive });
+            Assert.IsTrue(issues.Any(i => i.Asset == passive && i.Severity == ValidationSeverity.Error && i.Message.Contains("'nope'")));
+
+            var rule = Make<FieldRuleData>("rule.template", "");
+            rule.previewSize = "{balance:missing} {data:run.gold} {count:nokey.items}";
+            issues = DataValidator.Validate(new List<GameData> { run, rule }).Where(i => i.Asset == rule && i.Severity == ValidationSeverity.Warning).ToList();
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("'missing'")));
+            Assert.IsTrue(issues.Any(i => i.Message.Contains("'nokey'")));
+            Assert.IsFalse(issues.Any(i => i.Message.Contains("'run'")), "있는 플레이어 데이터는 괜찮다");
         }
     }
 }

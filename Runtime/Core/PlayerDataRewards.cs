@@ -18,6 +18,31 @@ namespace GBible
         Dictionary, // 딕셔너리: 키 + 값 넣기. 키는 글자·숫자·enum·참거짓, 값은 숫자(증감: 없던 키는 0에서)·값·인스턴스(있던 키는 덮어쓴다).
     }
 
+    // 게임 숫자를 정수로 맞추는 한 가지 규칙: 반올림은 0에서 먼 쪽(2.5 → 3, −2.5 → −3). 정수 필드에 넣는 값(주기·의도 고치기·이벤트 쏘기·
+    // 필드 바꾸기·비용)·이벤트 횟수 지속·중첩·레벨·곡선의 반올림이 모두 이것을 쓴다. Math.Round의 기본과 Convert.ChangeType(정수로)은
+    // 짝수 쪽(2.5 → 2)이라, 곳마다 섞어 쓰면 같은 값이 곳마다 다르게 반올림된다.
+    public static class GameNumbers
+    {
+        public static double Round(double value) => Math.Round(value, MidpointRounding.AwayFromZero);
+
+        public static int RoundToInt(double value) => (int)Round(value);
+
+        // 정수 형식인가(부호 있는·없는 정수 모두, nullable이면 그 안쪽).
+        public static bool IsWhole(Type type)
+        {
+            type = Nullable.GetUnderlyingType(type) ?? type;
+            return type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte) ||
+                   type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort) || type == typeof(sbyte);
+        }
+
+        // 숫자를 그 숫자 형식의 값으로(정수 형식이면 Round로 맞춘 뒤).
+        public static object ToType(double number, Type type)
+        {
+            type = Nullable.GetUnderlyingType(type) ?? type;
+            return Convert.ChangeType(IsWhole(type) ? Round(number) : number, type, CultureInfo.InvariantCulture);
+        }
+    }
+
     public static class PlayerDataGrants
     {
         // 필드 형식 → 주는 방법. 리스트·배열·그 밖의 컬렉션은 모두 요소 넣기(배열은 늘린 새 배열로 바꾼다). 딕셔너리는 키 + 값 넣기.
@@ -64,14 +89,12 @@ namespace GBible
             }
             if (type == typeof(bool))
             {
-                var t = text.Trim();
-                if (t == "true" || t == "True" || t == "참" || t == "1") value = true;
-                else if (t == "false" || t == "False" || t == "거짓" || t == "0") value = false;
-                else
+                if (!TryParseBool(text, out var flag))
                 {
-                    error = t.Length == 0 ? "참/거짓이 선택되지 않았습니다." : $"'{text}'는 참/거짓이 아닙니다.";
+                    error = text.Trim().Length == 0 ? "참/거짓이 선택되지 않았습니다." : $"'{text}'는 참/거짓이 아닙니다.";
                     return false;
                 }
+                value = flag;
                 return true;
             }
             if (type.IsEnum)
@@ -98,14 +121,17 @@ namespace GBible
             return false;
         }
 
-        // 숫자를 형식에 맞춘다(정수형이면 반올림).
-        public static object ToNumber(double number, Type type)
+        // 참거짓 글자: true·false(대소문자 무관)·참·거짓·1·0, 앞뒤 빈칸은 무시. 그 밖의 글자는 읽지 못한다(거짓으로 보지 않는다).
+        // 틀을 펼친 값(값 틀 {event:…}의 True)도 같은 규칙으로 읽는다 — 의도 고치기·이벤트 쏘기·플레이어 데이터에 주기 공통.
+        public static bool TryParseBool(string text, out bool value)
         {
-            type = Nullable.GetUnderlyingType(type) ?? type;
-            var whole = type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte) ||
-                        type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort) || type == typeof(sbyte);
-            return Convert.ChangeType(whole ? Math.Round(number) : number, type, CultureInfo.InvariantCulture);
+            var t = (text ?? "").Trim();
+            value = string.Equals(t, "true", StringComparison.OrdinalIgnoreCase) || t == "참" || t == "1";
+            return value || string.Equals(t, "false", StringComparison.OrdinalIgnoreCase) || t == "거짓" || t == "0";
         }
+
+        // 숫자를 형식에 맞춘다(정수형이면 반올림 — GameNumbers의 규칙).
+        public static object ToNumber(double number, Type type) => GameNumbers.ToType(number, type);
 
         // 보상으로 고를 수 있는 필드 목록: 값 자체(단순 값·컬렉션·클래스) + 클래스 안의 필드(클래스는 안쪽으로 들어가고, 컬렉션 안쪽은 들어가지 않는다).
         public static IEnumerable<string> Paths(Type root, int depth = 3)

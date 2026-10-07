@@ -19,6 +19,7 @@ namespace GBible.Data
 
         public void Define(BalanceSystem balance) => balance.Define(Id, value, ActiveCurve);
 
-        public override void ValidateData(IValidationContext context) => ActiveCurve?.Validate(context, "곡선");
+        // 기준 값(값)을 넘겨 시작 단계부터 0 이하로 내려가는지까지 본다.
+        public override void ValidateData(IValidationContext context) => ActiveCurve?.Validate(context, "곡선", value);
     }
 }

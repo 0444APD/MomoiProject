@@ -122,6 +122,14 @@ namespace GBible
             Flush();
         }
 
+        // 그 감시를 다음 Flush에서 다시 평가한다(값이 바뀌지 않았어도 — 불러온 뒤 새로 감시를 시작한 것).
+        public void Touch(string owner)
+        {
+            if (!_watches.TryGetValue(owner, out var watch)) return;
+            watch.Cause = 0;
+            _dirty.Add(watch);
+        }
+
         public void Poll(double time)
         {
             foreach (var watch in _polling)
@@ -131,6 +139,13 @@ namespace GBible
                 watch.Cause = 0;
                 _dirty.Add(watch);
             }
+        }
+
+        // 게임 시계를 되돌리거나 불러온 판의 시각으로 옮긴 뒤: 다음 폴링을 새 시각에서 한 간격 뒤로(감시를 시작할 때와 같다).
+        // 그러지 않으면 시계를 뒤로 돌린 뒤 예전 시각까지 폴링을 건너뛴다.
+        public void ResetPolls(double time)
+        {
+            foreach (var watch in _polling) watch.NextPoll = time + watch.PollInterval;
         }
 
         // 조건 충족 → 보상 → 다른 값 변화 → 다른 조건 충족으로 이어질 수 있으므로 더 바뀌지 않을 때까지 반복한다.

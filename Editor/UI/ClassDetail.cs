@@ -190,12 +190,12 @@ namespace GBible.EditorTools.UI
             if (KeywordTools.IsSpriteField(info))
             {
                 var rule = KeywordTools.RuleOf(declaring, info);
-                var spriteGroup = rule?.spriteGroup ?? "";
-                row.Add(LinkRow("스프라이트 규격 그룹", spriteGroup == "" ? "연결 없음" : spriteGroup, "원본을 넣으면 그룹의 모든 규격으로 베이크", spriteGroup != "",
-                    anchor => PickSpriteGroup(anchor, declaring, info, spriteGroup)));
-                if (spriteGroup != "")
-                    row.Add(LinkRow("미리보기 규격", string.IsNullOrEmpty(rule.previewPreset) ? "원본 그대로" : rule.previewPreset, "목록·카드에 보일 규격", !string.IsNullOrEmpty(rule.previewPreset),
-                        anchor => PickPreview(anchor, declaring, info, spriteGroup, rule.previewPreset)));
+                var spriteFrame = rule?.spriteFrame ?? "";
+                row.Add(LinkRow("스프라이트 틀", spriteFrame == "" ? "연결 없음" : spriteFrame, "원본을 넣으면 틀의 모든 크기로 한꺼번에 자른다", spriteFrame != "",
+                    anchor => PickSpriteFrame(anchor, declaring, info, spriteFrame)));
+                if (spriteFrame != "")
+                    row.Add(LinkRow("미리보기 크기", string.IsNullOrEmpty(rule.previewSize) ? "원본 그대로" : rule.previewSize, "목록·카드에 보일 크기", !string.IsNullOrEmpty(rule.previewSize),
+                        anchor => PickPreview(anchor, declaring, info, spriteFrame, rule.previewSize)));
             }
 
             if (declaring != typeof(GameData))
@@ -240,38 +240,38 @@ namespace GBible.EditorTools.UI
 
         // ── 연결 고르기 ────────────────────────────────────────
 
-        static void PickSpriteGroup(VisualElement anchor, Type type, FieldInfo field, string current)
+        static void PickSpriteFrame(VisualElement anchor, Type type, FieldInfo field, string current)
         {
             var items = new List<GsDropdownItem>
             {
-                new GsDropdownItem("연결 없음", () => KeywordTools.SetSpriteGroup(type, field, "")) { Selected = current == "" },
+                new GsDropdownItem("연결 없음", () => KeywordTools.SetSpriteFrame(type, field, "")) { Selected = current == "" },
             };
-            foreach (var group in CodexGroups.Groups(typeof(SpritePresetGroupData)))
+            foreach (var frame in SpriteSpecEditor.Frames.OrderBy(f => f.Id, StringComparer.Ordinal))
             {
-                var id = group.Id;
-                items.Add(new GsDropdownItem(id, () => KeywordTools.SetSpriteGroup(type, field, id))
+                var id = frame.Id;
+                items.Add(new GsDropdownItem(id, () => KeywordTools.SetSpriteFrame(type, field, id))
                 {
-                    Group = "스프라이트 규격 그룹",
-                    Caption = string.Join(" · ", CodexGroups.Items(typeof(SpritePresetData), id).Cast<SpritePresetData>().Select(p => $"{p.Id} {p.width}×{p.height}")),
+                    Group = "스프라이트 틀",
+                    Caption = string.Join(" · ", SpriteSpecEditor.SizesOf(id).Select(s => $"{s.name} {s.width}×{s.height}")),
                     Selected = current == id,
                 });
             }
-            if (items.Count == 1) items.Add(new GsDropdownItem("그룹이 없습니다 — Project 창에서 Create › MomoiProject › 스프라이트 규격 그룹(또는 규격 파일 인스펙터의 '새 그룹')으로 먼저 만드세요") { Disabled = true });
-            GsDropdown.Show(anchor, items, placeholder: "폴더 검색");
+            if (items.Count == 1) items.Add(new GsDropdownItem("틀이 없습니다 — Project 창에서 Create › MomoiProject › 스프라이트 틀로 먼저 만드세요") { Disabled = true });
+            GsDropdown.Show(anchor, items, placeholder: "틀 검색");
         }
 
-        static void PickPreview(VisualElement anchor, Type type, FieldInfo field, string group, string current)
+        static void PickPreview(VisualElement anchor, Type type, FieldInfo field, string frame, string current)
         {
             var items = new List<GsDropdownItem>
             {
-                new GsDropdownItem("원본 그대로", () => KeywordTools.SetPreviewPreset(type, field, "")) { Selected = string.IsNullOrEmpty(current) },
+                new GsDropdownItem("원본 그대로", () => KeywordTools.SetPreviewSize(type, field, "")) { Selected = string.IsNullOrEmpty(current) },
             };
-            foreach (var preset in CodexGroups.Items(typeof(SpritePresetData), group).Cast<SpritePresetData>())
+            foreach (var size in SpriteSpecEditor.SizesOf(frame))
             {
-                var id = preset.Id;
-                items.Add(new GsDropdownItem(id, () => KeywordTools.SetPreviewPreset(type, field, id)) { Caption = $"{preset.width}×{preset.height}", Selected = current == id });
+                var name = size.name;
+                items.Add(new GsDropdownItem(name, () => KeywordTools.SetPreviewSize(type, field, name)) { Caption = $"{size.width}×{size.height}", Selected = current == name });
             }
-            GsDropdown.Show(anchor, items, placeholder: "규격 검색");
+            GsDropdown.Show(anchor, items, placeholder: "크기 검색");
         }
 
         // 그룹 표시: "" = Code 폴더 바로 아래, Outside = Code 폴더 밖.

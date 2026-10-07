@@ -96,8 +96,8 @@ namespace GBible.EditorTools
                             !typeof(Trigger).IsAssignableFrom(t) && !typeof(Effect).IsAssignableFrom(t) && !typeof(TargetSelector).IsAssignableFrom(t) &&
                             !t.IsDefined(typeof(GameEventAttribute), false));
 
-        // 라이브러리의 기본 클래스 가운데 클래스 탭에 보이는 것(너무 범용적이라 항상 있는 것): 스프라이트 규격.
-        static bool IsBuiltIn(Type type) => type == typeof(SpritePresetData) || type == typeof(SpritePresetGroupData);
+        // 라이브러리의 기본 클래스(스프라이트 틀): 개발자 클래스로 세지 않는다(상세는 열린다).
+        static bool IsBuiltIn(Type type) => type == typeof(SpritePresetData) || type == typeof(SpriteFrameData) || type == typeof(SpriteFrameSize);
 
         static ClassEntry Describe(Type type, ClassKind kind)
         {

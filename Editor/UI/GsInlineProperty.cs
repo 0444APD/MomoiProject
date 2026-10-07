@@ -615,7 +615,7 @@ namespace GBible.EditorTools.UI
             var rule = SpriteSpecEditor.RuleFor(_field);
             if (rule == null || !(value is Sprite sprite)) return;
             var host = panel?.visualTree.Q(className: "gs-root");
-            if (host != null) schedule.Execute(() => GsSpriteFraming.Open(host, sprite, rule.spriteGroup, Refresh)).StartingIn(50);
+            if (host != null) schedule.Execute(() => GsSpriteFraming.Open(host, sprite, rule.spriteFrame, Refresh)).StartingIn(50);
         }
 
         void ShowStorableTypeMenu()

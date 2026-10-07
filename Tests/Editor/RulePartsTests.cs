@@ -9,6 +9,19 @@ namespace GBible.Tests
     // NewIds, 의도 고치기 틀, 기본 대상 Block, 밸런스 값 무게, 패시브, 원본 ID 넣기(딕셔너리).
     public class RulePartsTests
     {
+        [Serializable] public class RpWallet { public int gold = 10; }
+        [Serializable] public struct RpPurse { public int gold; }
+        [Serializable]
+        public class RpBag
+        {
+            public RpPurse purse = new RpPurse { gold = 10 };
+            public Dictionary<bool, int> flags = new Dictionary<bool, int> { [true] = 5 };
+            public Dictionary<int, int> byLevel = new Dictionary<int, int> { [1] = 3 };
+            public float ratio = 0.1f;
+            public List<string> items = new List<string> { "a", "b" };
+        }
+        [Serializable, Intent("원소 피해")] public class RpElementHit { public Dictionary<string, int> byElement = new Dictionary<string, int> { ["fire"] = 1 }; public bool cancelled; }
+
         [Serializable] public class RpUnit { public string id; public int hp = 30; public string element = "none"; public List<string> perks = new List<string>(); }
         [Serializable]
         public class RpRun
@@ -73,6 +86,32 @@ namespace GBible.Tests
         }
 
         void Do(Action<GameApi> run) => Game.Do(new Edit { run = run });
+
+        [Test]
+        public void 경로_도구는_키_형식_소수_점_든_키를_맞게_다룬다()
+        {
+            _session.Data.Define("player.bag", DataZone.Session, new RpBag(), "가방");
+            var bag = _session.Data.Get<RpBag>("player.bag");
+            Assert.AreEqual(5, FieldPaths.Resolve(bag, "flags[true]").Single(), "bool 키도 쓰기와 같은 칸을 읽는다");
+            Assert.AreEqual(3, FieldPaths.Resolve(bag, "byLevel[01]").Single(), "int 키는 숫자로");
+            Assert.IsTrue(FieldOps.Test(bag, "ratio", FieldOp.Equal, "0.1"), "float 0.1f는 0.1과 같다");
+            Assert.IsTrue(FieldOps.Test(bag, "ratio", FieldOp.AtMost, "0.1"));
+            var context = new TriggerContext { Session = _session };
+            Assert.AreEqual("2", ModifyIntentOutcome.Expand("{count:player.bag.items}", context), "점이 든 키도 찾는다");
+            Assert.Throws<InvalidOperationException>(() => Do(g => g.Pay("player.bag", "purse.gold", 3)), "구조체 안의 숫자로는 낼 수 없다(사본만 줄어든다)");
+            Assert.AreEqual(10, bag.purse.gold);
+
+            var intent = new RpElementHit();
+            var modify = new ModifyIntentOutcome { path = "byElement[fire]", op = IntentOp.Add, value = "10" };
+            modify.Run(new TriggerContext { Session = _session, Event = intent, IsIntercept = true });
+            Assert.AreEqual(11, intent.byElement["fire"], "의도 고치기의 마지막 마디가 [키]여도 쓴다");
+
+            Assert.IsFalse(IdRules.IsValid("gold\n", out _), "끝의 줄바꿈은 ID가 아니다");
+            StringAssert.Contains("\\ud83d", MiniJson.Serialize("lone\uD83D"), "짝 없는 서로게이트는 이스케이프");
+            Assert.AreEqual("😀", MiniJson.Deserialize(MiniJson.Serialize("😀")), "짝이 맞는 이모지는 그대로");
+            Assert.Throws<FormatException>(() => MiniJson.Deserialize("\"\\u 41 \""), "\\u 뒤는 16진수 네 자리");
+            Assert.AreEqual(0, Placement.Pattern(-1, 12, 6, new[] { new Cell(1, 0) }).Count(), "목록 밖 칸에서는 무늬도 없다");
+        }
 
         [Test]
         public void 경로의_키로_딕셔너리_항목과_목록의_id_요소를_고른다()

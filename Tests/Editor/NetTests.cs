@@ -58,6 +58,30 @@ namespace GBible.Tests
         }
     }
 
+    [Serializable]
+    public class NtRemoveThenFail : GameAction
+    {
+        protected override void Run()
+        {
+            Game.Session.Data.Get<NtParty>("party").units.RemoveAt(0);
+            throw new GameFailure("test.netFail2", null, "실패");
+        }
+    }
+
+    [Serializable]
+    public class NtAskPick : GameAction
+    {
+        protected override void Run() => Game.Ask("고르기", new[] { new ChoiceCandidate("x", "엑스"), new ChoiceCandidate("y", "와이") }, new NtPicked());
+    }
+
+    [Serializable]
+    public class NtPicked : GameAction
+    {
+        [Chosen] public string picked;
+
+        protected override void Run() => Game.Session.Data.Set("gold", picked == "x" ? 1.0 : 2.0);
+    }
+
     // 멀티플레이 공통층: 한 프로그램 안의 서버 하나 + 클라이언트(메모리 전송, 시간은 손으로 흘린다).
     public class NetTests
     {
@@ -121,6 +145,47 @@ namespace GBible.Tests
             Assert.IsTrue(client.Session.Data.IsDefined("hand:1"), "내 손패는 보인다");
             Assert.IsFalse(client.Session.Data.IsDefined("hand:2"), "남의 손패는 오지 않는다");
             Assert.IsFalse(client.Session.Data.IsDefined("best"), "메타 구역(프로필)은 기본으로 보내지 않는다");
+        }
+
+        [Test]
+        public void 실패한_행동의_되돌림은_객체_번호를_바꾸지_않는다()
+        {
+            var rig = new Rig();
+            var client = rig.Join("철수");
+            var hits = new List<NtHit>();
+            client.Session.Events.SubscribeAfterAction<NtHit>(hits.Add);
+            client.Session.Do(new NtRemoveThenFail());
+            rig.Pump();
+            Assert.AreEqual(2, client.Session.Data.Get<NtParty>("party").units.Count, "실패라 그대로");
+            client.Session.Do(new NtStrike { unit = UnitOf(client.Session, "a"), damage = 2 });
+            rig.Pump();
+            Assert.AreEqual(1, hits.Count);
+            Assert.AreSame(UnitOf(client.Session, "a"), hits[0].unit, "이벤트의 객체가 받는 쪽 데이터의 같은 인스턴스(번호가 이어진다)");
+            Assert.AreEqual(8, UnitOf(client.Session, "a").hp);
+        }
+
+        [Test]
+        public void 한_사람에게_온_선택은_그_사람에게만_가고_그_사람이_답한다()
+        {
+            var rig = new Rig();
+            var first = rig.Join("철수");
+            var second = rig.Join("영희");
+            second.Session.Do(new NtAskPick());
+            rig.Pump();
+            Assert.IsNotNull(second.Session.Game.Choice, "물은 사람에게 고르기 창");
+            Assert.IsNull(first.Session.Game.Choice, "다른 사람에게는 오지 않는다");
+            Assert.IsFalse(first.Session.Data.IsDefined(ChoiceSystem.KeyFor("2")), "남의 후보는 받지 않는다");
+            Assert.IsNull(rig.ServerSession.Game.Choice, "서버(내 번호 없음)는 남의 선택을 자기 것으로 보지 않는다");
+            Assert.AreEqual(1, rig.ServerSession.Game.Choices.Count);
+
+            var id = second.Session.Game.Choice.id;
+            first.Session.Do(new ChoiceAnswer { choice = id, picked = { "x" } });
+            rig.Pump();
+            Assert.AreEqual(5.0, rig.ServerSession.Data.GetNumber("gold"), "남이 답하면 거절");
+            second.Session.Game.Answer(id, "y");
+            rig.Pump();
+            Assert.AreEqual(2.0, rig.ServerSession.Data.GetNumber("gold"));
+            Assert.IsNull(second.Session.Game.Choice);
         }
 
         [Test]

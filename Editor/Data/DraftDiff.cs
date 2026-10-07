@@ -19,14 +19,16 @@ namespace GBible.EditorTools
     }
 
     // 원본과 편집 중 사본을 최상위 필드 단위로 비교한다(조건 블록처럼 안쪽이 바뀐 것도 잡는다).
+    // hidden: 화면에 보이지 않는 칸([HideInInspector] — 프로젝트 DB 종류의 숨은 칸 등)까지 본다. 적용할 변경을 고를 때 쓰고,
+    // 화면(상세 패널)에 보일 변경 목록은 보이는 칸만 본다.
     public static class DraftDiff
     {
-        public static List<FieldChange> Compute(SerializedObject original, SerializedObject draft, ICollection<string> exclude = null)
+        public static List<FieldChange> Compute(SerializedObject original, SerializedObject draft, ICollection<string> exclude = null, bool hidden = false)
         {
             original.Update();
             draft.Update();
             var changes = new List<FieldChange>();
-            foreach (var property in PropertyUtil.TopLevel(draft))
+            foreach (var property in hidden ? AllTopLevel(draft) : PropertyUtil.TopLevel(draft))
             {
                 if (exclude != null && exclude.Contains(property.propertyPath)) continue;
                 var before = original.FindProperty(property.propertyPath);
@@ -43,6 +45,33 @@ namespace GBible.EditorTools
                 });
             }
             return changes;
+        }
+
+        // 값이 다른 최상위 칸의 경로만(사람이 읽는 글 없이 — 상세 패널이 옮길 칸·맞출 칸을 고를 때). 같은 형식끼리 비교한다.
+        public static List<string> ChangedPaths(SerializedObject original, SerializedObject draft, bool hidden)
+        {
+            original.Update();
+            draft.Update();
+            var paths = new List<string>();
+            foreach (var property in hidden ? AllTopLevel(draft) : PropertyUtil.TopLevel(draft))
+            {
+                var before = original.FindProperty(property.propertyPath);
+                if (before == null || Fingerprint(before) != Fingerprint(property)) paths.Add(property.propertyPath);
+            }
+            return paths;
+        }
+
+        // 숨은 칸까지 모든 최상위 직렬화 칸. Unity 내부 칸(m_ObjectHideFlags·m_Name·m_Script …)은 뺀다(사본은 숨김 플래그가 달라 늘 다르다).
+        static IEnumerable<SerializedProperty> AllTopLevel(SerializedObject so)
+        {
+            var iterator = so.GetIterator();
+            if (!iterator.Next(true)) yield break;
+            do
+            {
+                if (iterator.name.StartsWith("m_", System.StringComparison.Ordinal)) continue;
+                yield return iterator.Copy();
+            }
+            while (iterator.Next(false));
         }
 
         // 사람이 읽는 값: ID는 이름으로, 조건·보상은 문장으로, 목록은 요소를 이어서.

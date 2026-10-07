@@ -148,11 +148,14 @@ namespace GBible
         internal bool HasSessionModifiers => _session.Data.IsDefined(SessionKey) && (_session.Data.Get<ModifierList>(SessionKey)?.items.Count ?? 0) > 0;
 
         // 대상이 데이터에서 사라진 이번 판 Modifier를 지운다(바깥 행동이 끝나기 직전). 영구 Modifier는 두지 않는다(대상이 다음 판에 다시 생긴다).
+        // 대상은 데이터를 한 번 훑어 한꺼번에 찾는다(FindAll) — 대상마다 찾으면 데이터 전체를 대상 수만큼 훑는다.
         internal void PruneMissing()
         {
             var list = _session.Data.IsDefined(SessionKey) ? _session.Data.Get<ModifierList>(SessionKey)?.items : null;
             if (list == null || list.Count == 0) return;
-            var gone = new HashSet<string>(list.Select(m => m.target).Distinct().Where(id => !string.IsNullOrEmpty(id) && _session.Game.Find(id) == null), StringComparer.Ordinal);
+            var targets = new HashSet<string>(list.Select(m => m.target).Where(id => !string.IsNullOrEmpty(id)), StringComparer.Ordinal);
+            var alive = _session.Game.FindAll(targets);
+            var gone = new HashSet<string>(targets.Where(id => !alive.ContainsKey(id)), StringComparer.Ordinal);
             if (gone.Count == 0) return;
             _session.Data.Modify<ModifierList>(SessionKey, l => l.items.RemoveAll(m => gone.Contains(m.target)));
             _index = null;

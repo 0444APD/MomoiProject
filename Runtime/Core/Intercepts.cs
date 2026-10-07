@@ -192,14 +192,19 @@ namespace GBible
 
         static string Text(object value) => value == null ? "" : value is double d ? d.ToString("R", CultureInfo.InvariantCulture) : Convert.ToString(value, CultureInfo.InvariantCulture);
 
-        // "run.jokers" → 플레이어 데이터 run의 jokers.
+        // "run.jokers" → 플레이어 데이터 run의 jokers. 키에 점이 들어갈 수 있으므로(player.inventory) 정의된 가장 긴 앞부분을 키로 본다.
         static object DataAt(TriggerContext context, string keyAndPath)
         {
-            var cut = keyAndPath.IndexOf('.');
-            var key = cut < 0 ? keyAndPath : keyAndPath.Substring(0, cut);
-            if (context.Session == null || !context.Session.Data.IsDefined(key)) return null;
-            var root = context.Session.Data.Get(key);
-            return cut < 0 ? root : FieldPaths.Resolve(root, keyAndPath.Substring(cut + 1)).FirstOrDefault();
+            var data = context.Session?.Data;
+            if (data == null || string.IsNullOrEmpty(keyAndPath)) return null;
+            for (var cut = keyAndPath.Length; cut > 0; cut = keyAndPath.LastIndexOf('.', cut - 1))
+            {
+                var key = keyAndPath.Substring(0, cut);
+                if (!data.IsDefined(key)) continue;
+                var root = data.Get(key);
+                return cut == keyAndPath.Length ? root : FieldPaths.Resolve(root, keyAndPath.Substring(cut + 1)).FirstOrDefault();
+            }
+            return null;
         }
 
         // "2/4/7"에서 레벨 번째 값(1레벨 = 첫 값, 넘치면 마지막 값, 레벨 0이면 0).
@@ -231,16 +236,27 @@ namespace GBible
                 context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: {error}");
                 return;
             }
-            var cut = path.LastIndexOf('.');
-            var parentPath = cut < 0 ? "" : path.Substring(0, cut);
-            var member = cut < 0 ? path : path.Substring(cut + 1);
+            // 마지막 마디는 필드나 딕셔너리의 키(byElement[fire]). 괄호 안의 점(x[forest.chest3])은 나누지 않는다.
+            FieldPaths.SplitLast(path, out var parentPath, out var member);
+            var text = Expand(value, context);
             foreach (var parent in FieldPaths.Resolve(intent, parentPath).ToList())
             {
-                if (parent == null || parent.GetType().IsValueType) continue;
-                var access = FieldAccess.Find(parent.GetType(), member);
-                if (access == null) continue;
-                var next = Compute(access.Get(parent), type, Expand(value, context));
-                if (next != null) access.Set(parent, next);
+                if (parent == null) continue;
+                if (parent.GetType().IsValueType)
+                {
+                    context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'의 부모가 구조체라 고칠 수 없습니다(클래스로 바꾸세요).");
+                    continue;
+                }
+                var unreadable = false;
+                var written = FieldPaths.Assign(parent, member, (current, memberType) =>
+                {
+                    var next = Compute(current, memberType, text);
+                    unreadable = next == null;
+                    return next;
+                });
+                // 읽지 못한 값은 넣지 않고 알린다(참거짓·숫자가 아닌 글자 — 틀이 엉뚱한 값으로 펼쳐졌을 때).
+                if (unreadable) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'에 '{text}'를 넣을 수 없습니다({type.Name}).");
+                else if (!written) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'에 쓰지 못했습니다(그 필드·키가 없습니다).");
             }
         }
 
@@ -251,7 +267,7 @@ namespace GBible
             if (!TypeResolver.IsNumeric(underlying) || !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) return null;
             var before = current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture);
             var after = op == IntentOp.Add ? before + number : before * number;
-            return Convert.ChangeType(underlying == typeof(int) || underlying == typeof(long) || underlying == typeof(short) ? Math.Round(after) : after, underlying, CultureInfo.InvariantCulture);
+            return GameNumbers.ToType(after, underlying);
         }
 
         public override string Describe(INameResolver names)

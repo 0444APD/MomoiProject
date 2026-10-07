@@ -12,8 +12,10 @@ namespace GBible
         public double AcceptSeconds = 15;
         public string GameVersion = "";
         public bool AllowDeveloperCommands;
-        // 행동마다 진행 중인 매치를 저장한다(서버가 꺼져도 ResumeOpenMatches로 이어 하기).
+        // 진행 중인 매치를 저장한다(서버가 꺼져도 ResumeOpenMatches로 이어 하기). 행동이 있었던 매치를 MatchSaveSeconds마다 한 번.
         public bool SaveMatchEachAction = true;
+        // 저장 간격(초). 0이면 행동마다(실시간 방은 행동이 틱마다라 서버가 느려진다). 서버를 닫을 때·방이 준비될 때는 바로 저장한다.
+        public double MatchSaveSeconds = 2;
         // 방에 정원이 다 들어오지 않을 때 기다리는 시간(초). 넘기면 매치를 없던 것으로 하고(아무도 점수를 잃지 않는다) 로비로 돌려보낸다.
         public double ReadySeconds = 30;
         // 이만큼(초) 아무것도 오지 않는 연결은 끊는다(로비·줄·방 모두 — 클라이언트는 2초마다 핑). 0이면 끊지 않는다.
@@ -38,6 +40,9 @@ namespace GBible
         internal double CreatedAt;
         internal bool Ending;
         internal List<NetMatchResult> PendingEnd;
+        // 마지막 저장 뒤 행동이 있었다(MatchSaveSeconds마다 저장).
+        internal bool SaveDirty;
+        internal double LastSaved;
     }
 
     // 매칭큐 서버: 전송 하나로 로비(입장 확인·줄 서기·수락)와 여러 방(매치)을 돌린다. 엔진 없는 코어라 어떤 서버 프로그램에서도 같다.
@@ -69,6 +74,9 @@ namespace GBible
             public NetRoom Room;
             public string ProposalId;
             public double LastHeard;
+            // 로비 메시지 수 세기(초당 LobbyMessagesPerSecond — 넘친 것은 버리고 네 배면 끊는다).
+            public double WindowStart;
+            public int WindowCount;
         }
 
         sealed class Proposal
@@ -190,10 +198,32 @@ namespace GBible
                         who.Room.Transport.Enqueue(e);
                         return;
                     }
+                    if (!LobbyBudget(who)) return;
                     try { HandleLobby(who, e.Data, e.Length); }
                     catch (Exception ex) { Say($"로비 메시지를 처리하지 못했습니다(#{e.Connection}): {ex.Message}"); }
                     break;
             }
+        }
+
+        // 로비 연결 하나가 1초에 보낼 수 있는 메시지 수(줄 서기·수락·핑뿐이라 넉넉하다). 방 안의 메시지는 방의 서버 중개가 센다.
+        const int LobbyMessagesPerSecond = 60;
+
+        bool LobbyBudget(Lobbyist who)
+        {
+            var now = Now;
+            if (now - who.WindowStart >= 1)
+            {
+                who.WindowStart = now;
+                who.WindowCount = 0;
+            }
+            if (++who.WindowCount <= LobbyMessagesPerSecond) return true;
+            if (who.WindowCount == LobbyMessagesPerSecond * 4)
+            {
+                Say($"#{who.Connection}이(가) 로비에서 1초에 메시지를 {LobbyMessagesPerSecond * 4}개 넘게 보내 끊었습니다.");
+                _transport.Disconnect(who.Connection, "메시지를 너무 많이 보냈습니다.");
+                Lost(who.Connection, "메시지를 너무 많이 보냈습니다.");
+            }
+            return false;
         }
 
         // 로비·줄·수락 대기 중에 아무것도 오지 않은 지 오래된 연결을 끊는다(대기표도 함께 없어진다). 방 안은 방의 서버 중개가 끊는다.
@@ -215,7 +245,7 @@ namespace GBible
                 case NetMessage.Hello when who.State == LobbyState.Authenticating && who.Hello == null:
                 {
                     var version = (int)r.UVar();
-                    var hello = new NetHello { Name = r.Str(), Token = r.Str(), GameVersion = r.Str(), Connection = who.Connection };
+                    var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Connection = who.Connection };
                     if (version != NetProtocol.Version) { Refuse(who, $"멀티플레이 규격 버전이 다릅니다(서버 {NetProtocol.Version}, 클라이언트 {version})."); return; }
                     if (!string.IsNullOrEmpty(Options.GameVersion) && hello.GameVersion != Options.GameVersion) { Refuse(who, $"게임 버전이 다릅니다(서버 {Options.GameVersion}, 클라이언트 {hello.GameVersion})."); return; }
                     who.Hello = hello;
@@ -281,9 +311,20 @@ namespace GBible
                 _transport.Disconnect(old.Connection, "같은 계정이 다시 접속했습니다.");
                 Lost(old.Connection, "같은 계정이 다시 접속했습니다.");
             }
-            var account = _store?.Load(id) ?? new NetAccount { id = id };
-            account.name = !string.IsNullOrEmpty(admission.Name) ? admission.Name : string.IsNullOrEmpty(who.Hello.Name) ? account.name ?? "플레이어" : who.Hello.Name;
-            _store?.Save(account);
+            NetAccount account;
+            try
+            {
+                account = _store?.Load(id) ?? new NetAccount { id = id };
+                account.name = !string.IsNullOrEmpty(admission.Name) ? admission.Name : string.IsNullOrEmpty(who.Hello.Name) ? account.name ?? "플레이어" : who.Hello.Name;
+                _store?.Save(account);
+            }
+            catch (Exception e)
+            {
+                // 저장소가 실패해도(디스크·이름 문제) 이 틱의 다른 방·매칭은 계속 돈다 — 이 사람만 거절한다.
+                Say($"계정 {id}을(를) 불러오거나 저장하지 못했습니다: {e.Message}");
+                Refuse(who, "계정을 불러오지 못했습니다. 잠시 뒤 다시 접속하세요.");
+                return;
+            }
             who.Account = account;
             // 진행 중인 매치가 있으면(끊겼다 다시 옴) 그 방으로.
             var room = _rooms.FirstOrDefault(rm => !rm.Ended && !rm.Ending && rm.Accounts.Contains(id));
@@ -416,7 +457,9 @@ namespace GBible
             if (Options.SaveMatchEachAction && _store != null)
                 session.Actions.Executed += record =>
                 {
-                    if (!record.Nested && record.Status == ActionStatus.Done && !room.Ended) SaveRoom(room);
+                    if (record.Nested || record.Status != ActionStatus.Done || room.Ended) return;
+                    if (Options.MatchSaveSeconds <= 0) SaveRoom(room);
+                    else room.SaveDirty = true;
                 };
             try { RoomStarting?.Invoke(room); }
             catch (Exception e) { Say($"RoomStarting 처리 중 오류(매치 {room.MatchId}): {e.Message}"); }
@@ -439,6 +482,7 @@ namespace GBible
             try { room.Server.Update(deltaTime); }
             catch (Exception e) { Say($"매치 {room.MatchId} 처리 중 오류: {e.Message}"); }
             if (room.Ended) return;
+            if (room.SaveDirty && now - room.LastSaved >= Options.MatchSaveSeconds) SaveRoom(room);
             var players = room.Server.Players;
             if (!room.Ready && players.Count == room.Accounts.Count && players.All(p => p.Connected))
             {
@@ -468,28 +512,60 @@ namespace GBible
         void CloseRoom(NetRoom room, List<NetMatchResult> results, string cancelReason)
         {
             room.Ending = true;
+            // 결과는 한 번만 반영한다: 반영하기 전에 기다리던 결과를 비우고 진행 중 목록에서 뺀다. 아래에서 저장이 실패해도
+            // 다음 틱(PendingEnd)이나 서버를 다시 켠 뒤(ResumeOpenMatches)에 같은 결과가 이미 저장한 계정에 또 들어가지 않는다.
+            room.PendingEnd = null;
+            try { _store?.CloseMatch(room.MatchId); }
+            catch (Exception e) { Say($"매치 {room.MatchId}을(를) 진행 중 목록에서 빼지 못했습니다: {e.Message}"); }
             var outcome = new Dictionary<string, (int place, double rating, double delta)>(StringComparer.Ordinal);
             if (results != null)
             {
                 var rated = new List<(NetAccount account, int place)>();
+                var counted = new HashSet<string>(StringComparer.Ordinal);
+                // 저장하지 않은 계정(읽지 못함·저장 실패): 등수만 알리고 점수는 저장소에 남은 그대로.
+                var unsaved = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var result in results)
                 {
                     var player = room.Server.FindPlayer(result.Player);
-                    if (player == null) continue;
-                    var account = _store?.Load(player.Account) ?? _lobby.Values.FirstOrDefault(l => l.Account?.id == player.Account)?.Account ?? new NetAccount { id = player.Account, name = player.Name };
+                    // 같은 사람이 결과에 두 번 들어와도 한 번만 센다(점수가 두 번 바뀌거나 표가 겹쳐 멈추지 않게).
+                    if (player == null || !counted.Add(player.Account ?? "")) continue;
+                    var live = _lobby.Values.FirstOrDefault(l => l.Account?.id == player.Account)?.Account;
+                    NetAccount account;
+                    try { account = _store?.Load(player.Account) ?? live ?? new NetAccount { id = player.Account, name = player.Name }; }
+                    catch (Exception e)
+                    {
+                        // 읽지 못한 계정은 다른 사람의 점수 계산에만 넣고 저장하지 않는다(옛 값으로 덮어 재화·구매를 잃지 않게).
+                        Say($"매치 {room.MatchId}: 계정 {player.Account}을(를) 읽지 못해 이 계정의 결과는 저장하지 않습니다: {e.Message}");
+                        account = new NetAccount { id = player.Account, name = player.Name };
+                        if (live != null) account.rating = live.rating;
+                        unsaved.Add(account.id);
+                    }
                     rated.Add((account, Math.Max(1, result.Place)));
                 }
                 var before = rated.ToDictionary(r => r.account.id, r => r.account.rating, StringComparer.Ordinal);
                 NetRating.Apply(rated);
                 foreach (var (account, place) in rated)
                 {
-                    _store?.Save(account);
+                    if (!unsaved.Contains(account.id))
+                    {
+                        try { _store?.Save(account); }
+                        catch (Exception e)
+                        {
+                            // 한 계정이 실패해도 나머지 계정·방 닫기는 이어 간다(이 결과는 다시 반영하지 않는다).
+                            Say($"매치 {room.MatchId}: 계정 {account.id}의 결과(점수·전적)를 저장하지 못했습니다: {e.Message}");
+                            unsaved.Add(account.id);
+                        }
+                    }
+                    if (unsaved.Contains(account.id))
+                    {
+                        outcome[account.id] = (place, before[account.id], 0);
+                        continue;
+                    }
                     outcome[account.id] = (place, account.rating, account.rating - before[account.id]);
-                    var live = _lobby.Values.FirstOrDefault(l => l.Account?.id == account.id);
-                    if (live != null) live.Account = account;
+                    var holder = _lobby.Values.FirstOrDefault(l => l.Account?.id == account.id);
+                    if (holder != null) holder.Account = account;
                 }
             }
-            _store?.CloseMatch(room.MatchId);
             foreach (var who in _lobby.Values.Where(l => l.Room == room).ToList())
             {
                 var has = outcome.TryGetValue(who.Account.id, out var mine);
@@ -528,6 +604,8 @@ namespace GBible
         void SaveRoom(NetRoom room)
         {
             if (_store == null || room.Server == null) return;
+            room.SaveDirty = false;
+            room.LastSaved = Now;
             try
             {
                 var players = room.Server.Players.Select(p => (object)new Dictionary<string, object> { ["account"] = p.Account, ["name"] = p.Name, ["id"] = (double)p.Id }).ToList();
@@ -615,6 +693,8 @@ namespace GBible
         {
             foreach (var room in _rooms.ToList())
             {
+                // 저장 간격 사이에 있었던 행동도 남긴다(다시 켜면 ResumeOpenMatches가 이어 연다).
+                if (room.SaveDirty && !room.Ended) SaveRoom(room);
                 room.Ending = true;
                 try { room.Server.Dispose(); } catch (Exception) { }
             }

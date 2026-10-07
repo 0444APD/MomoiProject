@@ -8,13 +8,14 @@ namespace GBible.Data
 {
     // DB › Steam(선택 기능 'Steam'): Steam 연동 설정. 항목은 하나만 둔다(여럿이면 첫 항목). Steam을 켜면 에디터가 기본값(App ID 480)으로 하나 만든다.
     //   App ID · Steam 밖에서 켜면 Steam으로 다시 시작 · 오버레이 일시정지 · 처음 언어 · 도전과제 올리기(이름이 다르면 표) · 로그 → Steam 통계.
-    // 에디터에서 App ID를 고치면 프로젝트 폴더의 steam_appid.txt도 같이 고친다(에디터·개발 빌드가 Steam에 그 앱으로 붙는다).
+    // 에디터에서 App ID를 고치면 프로젝트 폴더의 steam_appid.txt도 같이 고친다(에디터가 Steam에 그 앱으로 붙는다).
+    // 개발 빌드는 파일 없이 이 App ID를 환경 변수 SteamAppId로 넣어 붙는다(GameSteam) — steam_appid.txt를 빌드 폴더에 복사하지 않는다.
     [Database("Steam", Group = "개발", Order = 40, IdPrefix = "steam", Single = true)]
     [CreateAssetMenu(menuName = "MomoiProject/Steam", fileName = "Steam")]
     public sealed class SteamData : GameData
     {
         [FieldLabel("App ID"), Tooltip("Steamworks의 앱 ID. 480은 Valve의 시험용 앱(Spacewar)")] public uint appId = 480;
-        [FieldLabel("Steam 밖에서 켜면 Steam으로 다시 시작"), Tooltip("출시 빌드에서만. Steam이 게임을 다시 켜고 지금 실행은 끝난다")] public bool restartThroughSteam = true;
+        [FieldLabel("Steam 밖에서 켜면 Steam으로 다시 시작"), Tooltip("출시 빌드에서만(App ID 480이면 하지 않는다). Steam이 게임을 다시 켜고 지금 실행은 끝난다")] public bool restartThroughSteam = true;
         [FieldLabel("오버레이가 열리면 일시정지")] public bool pauseOnOverlay = true;
         [FieldLabel("처음 실행 언어는 Steam 언어"), Tooltip("플레이어가 언어를 고른 적이 없을 때만 Steam 클라이언트의 언어로 시작한다")] public bool languageFromSteam = true;
         [FieldLabel("도전과제를 Steam에 올리기"), Tooltip("도전과제를 달성하면 같은 이름(아래 표에 없으면 ID)의 Steam 도전과제를 달성한다")] public bool achievements = true;
@@ -31,6 +32,10 @@ namespace GBible.Data
         public override void ValidateData(IValidationContext context)
         {
             if (appId == 0) context.Error("App ID가 0입니다(시험은 480).");
+            // 출시 빌드를 Steam 밖에서 켜면 Steam이 480(Spacewar)을 켜고 이 게임은 바로 꺼진다 — 그래서 480이면 다시 시작하지 않지만(GameSteam), 출시 전에 알린다.
+            if (appId == 480 && restartThroughSteam)
+                context.Warning("App ID가 480(시험용 Spacewar)인데 'Steam 밖에서 켜면 Steam으로 다시 시작'이 켜져 있습니다. 480으로 다시 시작하면 Spacewar가 켜지고 이 게임은 바로 꺼지므로 " +
+                                "출시 빌드는 다시 시작하지 않고 Steam 없이 돕니다 — 출시 전에 실제 App ID로 바꾸세요(시험만 할 때는 그대로 둬도 됩니다).");
             foreach (var group in achievementNames.Where(n => n != null && !string.IsNullOrEmpty(n.achievement)).GroupBy(n => n.achievement))
                 if (group.Count() > 1) context.Error($"도전과제 '{group.Key}'의 Steam 이름이 두 번 적혀 있습니다.");
             if (achievementNames.Any(n => n != null && string.IsNullOrEmpty(n.achievement))) context.Error("도전과제를 고르지 않은 이름 줄이 있습니다.");

@@ -14,14 +14,18 @@ namespace GBible
         public static Action<Dictionary<string, object>> Build(GameDatabase database)
         {
             var maps = new List<(Type type, Dictionary<string, string> map)>();
-            foreach (var group in database.Renames.GroupBy(r => r.dataType))
+            // 지금 항목이 쓰는 ID. 이력의 예전 ID를 다른 항목이 다시 쓰고 있으면 그 줄은 쓰지 않는다 — 쓰면 그 항목으로 저장한 값까지
+            // 불러올 때마다 예전 항목으로 바뀐다(에디터는 그런 ID를 막고, 이미 있으면 검증이 오류로 알린다).
+            var live = new HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
+            foreach (var group in database.Renames.Where(r => r != null).GroupBy(r => r.dataType))
             {
                 var type = TypeResolver.Find(group.Key);
                 // 플레이어 데이터·로그·도전과제의 ID는 저장 키라서 따로(별칭) 이어받는다.
                 if (type == null || type == typeof(PlayerDataEntry) || type == typeof(StatData) || type == typeof(AchievementData)) continue;
                 var map = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (var rename in group)
-                    if (!string.IsNullOrEmpty(rename.oldId) && !string.IsNullOrEmpty(rename.newId)) map[rename.oldId] = rename.newId;
+                    if (!string.IsNullOrEmpty(rename.oldId) && !string.IsNullOrEmpty(rename.newId) && rename.oldId != rename.newId && !live.Contains(rename.oldId))
+                        map[rename.oldId] = rename.newId;
                 if (map.Count > 0) maps.Add((type, map));
             }
             if (maps.Count == 0) return null;

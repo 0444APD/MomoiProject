@@ -190,6 +190,67 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 주기_패시브는_판을_불러오거나_시계를_되돌려도_몰아서_내거나_건너뛰지_않는다()
+        {
+            var ember = Piece("ember", null, new Log { text = "ember" });
+            ember.Pulse = 1;
+            _session.Passives.Define(ember);
+            Do(g => g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "e1", card = "ember" }));
+            _session.EndFrame(0.25);                       // 기준 시각
+            _session.EndFrame(1);                          // 1.25: 경계 1
+            Assert.AreEqual(1, Run.log.Count);
+            Do(g => g.Get<TrRun>("run").score++);          // 1.25초의 행동
+            _session.EndFrame(1);                          // 2.25: 경계 2(행동 '패시브 주기')
+            Assert.AreEqual(2, Run.log.Count);
+
+            // 주기(시간 규칙)와 앞의 행동을 함께 되돌리고 시계도 1.25로 — 시간이 다시 흐르면 경계 2에서 다시 낸다(건너뛰지 않는다).
+            Assert.IsTrue(_session.Undo());
+            Assert.AreEqual(1.25, _session.Clock.Time, 1e-9);
+            Assert.AreEqual(1, Run.log.Count);
+            _session.EndFrame(1);
+            Assert.AreEqual(2, Run.log.Count, "되돌린 경계를 다시 지나면 다시 낸다");
+
+            // 게임 시각이 훨씬 앞선 판을 불러오면 그 사이의 주기를 몰아서 내지 않는다(그 판은 그 시각까지 이미 냈다).
+            var other = new GameSession(new SessionOptions { Seed = 5 });
+            other.Data.Define("run", DataZone.Session, new TrRun { pieces = { new TrPiece { id = "e1", card = "ember" } } }, "판");
+            other.EndFrame(100);
+            _session.ImportRun(other.ExportRun());
+            _session.EndFrame(0.5);
+            Assert.AreEqual(0, Run.log.Count, "100 → 100.5: 경계가 없다(밀린 8번을 몰아서 내지 않는다)");
+            _session.EndFrame(0.75);
+            Assert.AreEqual(1, Run.log.Count, "101을 넘으면 한 번");
+        }
+
+        // 결과: 가진 쪽이 p1이면 p2를 판에서 뺀다(같은 순간에 뒤 가진 쪽이 사라지는 경우).
+        [Serializable]
+        public sealed class RemoveP2 : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context)
+            {
+                if (GameApi.IdOf(context.User) == "p1") context.Game.Get<TrRun>("run").players.RemoveAll(p => p.id == "p2");
+            }
+            public override string Describe(INameResolver names) => "p2 빼기";
+        }
+
+        [Test]
+        public void 앞_가진_쪽의_결과가_없앤_가진_쪽의_패시브는_발동하지_않는다()
+        {
+            // 가진 쪽 = 칸(charms)을 가진 플레이어마다. p1의 결과가 p2를 판에서 뺀다.
+            var oath = new PassiveDefinition { Id = "oath", OwnerKey = "run", OwnerPath = "players[].charms", MatchField = "card", When = On<TrScored>() };
+            oath.Outcomes.Add(new RemoveP2());
+            oath.Outcomes.Add(new Log { text = "oath" });
+            _session.Passives.Define(oath);
+            Do(g => g.Get<TrRun>("run").players.AddRange(new[]
+            {
+                new TrPlayer { id = "p1", charms = { new TrPiece { id = "c1", card = "oath" } } },
+                new TrPlayer { id = "p2", charms = { new TrPiece { id = "c2", card = "oath" } } },
+            }));
+            Publish(new TrScored());
+            CollectionAssert.AreEqual(new[] { "oath:p1:1" }, Run.log, "p1이 뺀 p2는 그 순간에 발동하지 않는다");
+        }
+
+        [Test]
         public void 효과_배율은_능력과_패시브의_수치를_곱한다_Lumin()
         {
             _session.Statuses.Define(new StatusDefinition { Id = "poison", MaxStacks = 0 });

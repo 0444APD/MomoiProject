@@ -256,6 +256,112 @@ namespace GBible.Tests
             StringAssert.Contains("사용", error);
         }
 
+        // 보스 처치를 쏘는 행동(fail이면 쏜 뒤 실패한다 — 바꾼 것이 모두 취소된다).
+        [Serializable]
+        public sealed class TgKill : GameAction
+        {
+            public string boss = "dragon";
+            public bool fail;
+            protected override void Run()
+            {
+                Game.Events.Publish(new TgBossKilled { Boss = boss, Damage = 3 });
+                if (fail) throw Game.Fail("fail.test", "일부러 실패");
+            }
+        }
+
+        // 다음 보스 처치를 받으면 '드래곤을 처치한 뒤 실패하는 행동'을 하도록 예약한다.
+        sealed class TgScheduleFailingKill : GameAction
+        {
+            protected override void Run() => Game.ScheduleOn<TgBossKilled>(1, new TgKill { fail = true });
+        }
+
+        void DefineSlayer()
+        {
+            var slayer = new AchievementDefinition { Id = "slayer", DisplayName = "slayer", When = Boss("dragon") };
+            slayer.Outcomes.Add(new PlayerDataReward { key = "gold", amount = 10 });
+            _session.Achievements.Define(slayer);
+        }
+
+        [Test]
+        public void 미리보기와_CanDo는_도전과제_트리거를_쓰지_않는다()
+        {
+            DefineSlayer();
+            var game = _session.Game;
+            Assert.IsTrue(game.CanDo(new TgKill(), out _));
+            game.Preview(new TgKill(), g => 0);
+            Assert.IsFalse(_session.Achievements.IsUnlocked("slayer"), "미리보기는 달성하지 않는다");
+            Assert.IsTrue(_session.Triggers.IsRegistered("slayer"), "미리보기가 끝나면 트리거가 그대로 감시한다");
+            game.Do(new TgKill());
+            Assert.IsTrue(_session.Achievements.IsUnlocked("slayer"), "실제로 하면 달성된다");
+            Assert.AreEqual(10, _session.Data.GetNumber("gold"));
+            Assert.IsFalse(_session.Triggers.IsRegistered("slayer"), "달성하면 감시를 그만둔다");
+        }
+
+        [Test]
+        public void 실패한_행동_안에서_발동한_도전과제는_달성되지_않고_계속_감시한다()
+        {
+            DefineSlayer();
+            var published = new List<string>();
+            _session.Events.Subscribe<AchievementUnlocked>(e => published.Add(e.Id));
+            var unlocked = 0;
+            _session.Achievements.Unlocked += _ => unlocked++;
+            Assert.Throws<GameFailure>(() => _session.Game.Do(new TgKill { fail = true }));
+            Assert.IsFalse(_session.Achievements.IsUnlocked("slayer"), "실패한 행동은 되돌릴 수 없는 달성을 남기지 않는다");
+            Assert.AreEqual(0, _session.Data.GetNumber("gold"), "보상도 없다");
+            Assert.AreEqual(0, published.Count + unlocked, "달성 이벤트·Unlocked(Steam)도 없다");
+            Assert.IsTrue(_session.Triggers.IsRegistered("slayer"), "트리거는 그대로 감시한다");
+
+            _session.Game.Do(new TgKill());
+            Assert.IsTrue(_session.Achievements.IsUnlocked("slayer"), "성공한 행동이 끝나면 달성된다");
+            Assert.AreEqual(10, _session.Data.GetNumber("gold"));
+            CollectionAssert.AreEqual(new[] { "slayer" }, published);
+            Assert.AreEqual(1, unlocked);
+            var entry = _session.Journal.Entries.Last(e => e.Kind == JournalKind.Achievement);
+            Assert.IsTrue(_session.Journal.CauseChain(entry.Id).Any(e => e.Kind == JournalKind.Event), "달성 줄은 발동한 이벤트를 원인으로 잇는다");
+        }
+
+        [Test]
+        public void 실패해_되돌린_이벤트_예약이_쏜_이벤트로는_달성되지_않는다()
+        {
+            DefineSlayer();
+            _session.Game.Do(new TgScheduleFailingKill());
+            // 슬라임 처치 → 예약 실행(드래곤 처치를 쏜 뒤 실패) → 그 예약이 바꾼 것·쏜 것만 되돌린다. 바깥 행동은 성공한다.
+            _session.Game.Do(new TgKill { boss = "slime" });
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Message.Contains("그 예약이 바꾼 것만 되돌렸습니다")));
+            Assert.IsFalse(_session.Achievements.IsUnlocked("slayer"), "되돌린 예약이 쏜 이벤트로는 달성되지 않는다");
+            Assert.IsTrue(_session.Triggers.IsRegistered("slayer"), "트리거도 되살아난다");
+            _session.Game.Do(new TgKill());
+            Assert.IsTrue(_session.Achievements.IsUnlocked("slayer"));
+        }
+
+        // 의존 값 없이 1초마다 다시 보는 조건(평가 횟수를 센다).
+        public sealed class TgPolled : SimpleCondition
+        {
+            public int evaluations;
+            public override double PollInterval => 1;
+            protected override bool Check()
+            {
+                evaluations++;
+                return false;
+            }
+        }
+
+        [Test]
+        public void 시계를_되돌리면_조건_폴링도_새_시각부터_센다()
+        {
+            var polled = new TgPolled();
+            _session.Triggers.Register("poll", new ConditionTrigger { condition = polled }, repeat: true, fire: _ => { });
+            _session.EndFrame(100);
+            var before = polled.evaluations;
+            // 10초 시점의 판을 불러온다(시계가 뒤로 간다).
+            var other = new GameSession(new SessionOptions { Seed = 1 });
+            other.EndFrame(10);
+            _session.ImportRun(other.ExportRun());
+            Assert.AreEqual(10, _session.Clock.Time, 1e-9);
+            _session.EndFrame(1.5);
+            Assert.AreEqual(before + 1, polled.evaluations, "11.5초: 1초마다의 폴링이 돈다(예전 시각 101초까지 건너뛰지 않는다)");
+        }
+
         [Serializable, PlayerData]
         public class TgBag
         {

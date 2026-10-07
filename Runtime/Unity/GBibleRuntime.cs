@@ -48,7 +48,12 @@ namespace GBible
         public static string SavePath => Path.Combine(SlotFolder(Slot), "profile.json");
         // 진행 중인 판(런) 저장 파일. 이어하기용.
         public static string RunSavePath => Path.Combine(SlotFolder(Slot), "run.json");
-        public static bool HasSavedRun => File.Exists(RunSavePath);
+        // 이어 할 판이 있는가(비어 있는 파일은 없는 것으로).
+        public static bool HasSavedRun => HasRun(RunSavePath);
+
+        static bool HasRun(string path) => NonEmpty(path) || (!File.Exists(path) && NonEmpty(SafeFile.Backup(path)));
+
+        static bool NonEmpty(string path) => File.Exists(path) && new FileInfo(path).Length > 0;
 
         // ── 슬롯 ───────────────────────────────────────────────
         // 저장 묶음(프로필 + 진행 중인 판) 하나. 슬롯마다 폴더가 따로다: MomoiProject/slots/<이름>/. 이름이 ""(기본)이면 MomoiProject/ 바로 아래.
@@ -71,14 +76,20 @@ namespace GBible
         public static string SlotFolder(string slot) =>
             string.IsNullOrEmpty(slot)
                 ? Path.Combine(Application.persistentDataPath, "MomoiProject")
-                : Path.Combine(Application.persistentDataPath, "MomoiProject", "slots", CheckSlotName(slot));
+                : Path.Combine(Application.persistentDataPath, "MomoiProject", "slots", CheckSlotName(slot).ToLowerInvariant());
 
+        // 슬롯 이름은 대소문자를 가리지 않는다 — 폴더는 소문자로(대소문자를 가리는 파일 시스템(리눅스·맥)에서도 "A"와 "a"가 같은 슬롯).
         static string CheckSlotName(string slot)
         {
-            if (slot.Any(c => !(char.IsLetterOrDigit(c) || c == '-' || c == '_')))
-                throw new ArgumentException($"[MomoiProject] 슬롯 이름 '{slot}'에는 글자·숫자·-·_만 쓸 수 있습니다.");
+            if (!IsValidSlotName(slot))
+                throw new ArgumentException($"[MomoiProject] 슬롯 이름 '{slot}'에는 글자·숫자·-·_만 쓸 수 있습니다(CON·NUL·COM1 같은 장치 이름은 안 됩니다).");
             return slot;
         }
+
+        static readonly string[] DeviceNames = { "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9" };
+
+        static bool IsValidSlotName(string slot) =>
+            slot != null && slot.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_') && !DeviceNames.Contains(slot.ToLowerInvariant());
 
         // remember: 거짓이면 다음 실행의 시작 슬롯으로 기억하지 않는다(테스트 씬의 'test' 슬롯).
         public static void UseSlot(string slot, bool remember = true)
@@ -101,8 +112,7 @@ namespace GBible
         {
             if (session == null) return;
             if (session == Session) _runSaver?.Reset();
-            try { RunLoaded?.Invoke(session); }
-            catch (Exception e) { Debug.LogException(e); }
+            InvokeEach(RunLoaded, session);
         }
 
         public static SlotInfo SlotInfoOf(string slot)
@@ -111,8 +121,9 @@ namespace GBible
             var info = new SlotInfo
             {
                 Name = slot ?? "",
-                HasProfile = File.Exists(Path.Combine(folder, "profile.json")),
-                HasRun = File.Exists(Path.Combine(folder, "run.json")),
+                // 바꿔 넣는 사이에 꺼져 바로 전 저장(.bak)만 남은 것도 저장이 있는 것(불러오면 .bak으로 이어 간다).
+                HasProfile = SafeFile.Exists(Path.Combine(folder, "profile.json")),
+                HasRun = HasRun(Path.Combine(folder, "run.json")),
             };
             var meta = Path.Combine(folder, "slot.json");
             if (!File.Exists(meta)) return info;
@@ -137,7 +148,8 @@ namespace GBible
         {
             var root = Path.Combine(Application.persistentDataPath, "MomoiProject", "slots");
             if (!Directory.Exists(root)) return Array.Empty<SlotInfo>();
-            return Directory.GetDirectories(root).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal)
+            // 플레이어가 탐색기에서 만든 폴더("1 - 복사본" 등)는 슬롯이 아니다 — 건너뛴다(목록 전체가 실패하지 않게).
+            return Directory.GetDirectories(root).Select(Path.GetFileName).Where(IsValidSlotName).OrderBy(n => n, StringComparer.Ordinal)
                 .Select(SlotInfoOf).Where(i => !i.IsEmpty).ToList();
         }
 
@@ -148,11 +160,8 @@ namespace GBible
             var current = Session != null && SameSlot(slot, Slot);
             if (current) Stop(save: false);
             var folder = SlotFolder(slot);
-            foreach (var file in new[] { "profile.json", "run.json", "slot.json" })
-            {
-                var path = Path.Combine(folder, file);
-                if (File.Exists(path)) File.Delete(path);
-            }
+            // 바로 전 저장(.bak)·쓰다 만 파일(.tmp)도 함께(지운 슬롯이 되살아나지 않게).
+            foreach (var file in new[] { "profile.json", "run.json", "slot.json" }) SafeFile.Delete(Path.Combine(folder, file));
             if (current) Start();
         }
 
@@ -168,8 +177,8 @@ namespace GBible
             if (Session != null && SameSlot(from, Slot))
             {
                 _runSaver?.FlushEnd();
-                SaveProfile(Session);
                 if (RunIsLive) SaveRun(Session);
+                else SaveProfile(Session);
             }
             var source = SlotFolder(from);
             var target = SlotFolder(to);
@@ -178,8 +187,10 @@ namespace GBible
             {
                 var path = Path.Combine(source, file);
                 var copy = Path.Combine(target, file);
+                // 바로 전 저장(.bak)까지 같이 옮긴다 — 대상의 옛 .bak이 남으면 원본에 없는 저장이 그 .bak에서 되살아난다.
+                SafeFile.Delete(copy);
                 if (File.Exists(path)) File.Copy(path, copy, true);
-                else if (File.Exists(copy)) File.Delete(copy);
+                if (File.Exists(SafeFile.Backup(path))) File.Copy(SafeFile.Backup(path), SafeFile.Backup(copy), true);
             }
         }
 
@@ -196,9 +207,7 @@ namespace GBible
                 ["playTime"] = _playTime,
                 ["summary"] = summary ?? "",
             };
-            var folder = SlotFolder(Slot);
-            Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder, "slot.json"), MiniJson.Serialize(root));
+            SafeFile.WriteAllText(Path.Combine(SlotFolder(Slot), "slot.json"), MiniJson.Serialize(root));
         }
         // 종료할 때 진행 중인 판을 자동으로 저장할지(불러오기는 게임이 LoadRun으로 직접 한다: 타이틀의 '이어하기' 등).
         // 기본은 DB › 시작 파일 › Bootstrap의 '판 저장'(저장하지 않음이면 거짓). 코드에서 값을 넣으면 그 값이 우선한다.
@@ -286,7 +295,6 @@ namespace GBible
             var saveEvent = _runSaveMode == RunSaveMode.OnEvent ? FindEvent(session, database?.RunSaveEvent, "판 저장 이벤트") : null;
             _runSaver = asClient == null ? new RunSaver(session, _runSaveMode, endEvent, database?.SaveProfileEachAction ?? false, database?.RunSaveInterval ?? 30f, saveEvent) : null;
 
-            session.Journal.Appended += ForwardToConsole;
             session.Debug.Register("저장", "프로필 저장", () => SaveProfile(session));
             session.Debug.Register("저장", "프로필 삭제", DeleteProfile, "저장 파일을 지웁니다. 다음 플레이부터 적용됩니다.");
             session.Debug.Register("저장", "판 저장", () => SaveRun(session), "진행 중인 판(세션 구역·난수·시간)을 저장합니다.");
@@ -312,7 +320,7 @@ namespace GBible
             // DB › 화면·화면 설정(UI Toolkit). 슬롯을 바꿔 다시 시작해도 한 번만 준비한다. 화면 없는 실행(서버 빌드)은 만들지 않는다.
             if (!IsHeadless) GameScreens.Initialize(database);
             asClient?.Invoke(session);
-            Started?.Invoke(session);
+            InvokeEach(Started, session);
             if (asClient == null && database != null && database.ContinueOnStart) ContinueOrStartRun(session, database);
             return session;
         }
@@ -344,12 +352,14 @@ namespace GBible
             var options = new SessionOptions { Seed = (ulong)DateTime.UtcNow.Ticks, DetectUntrackedChanges = Debug.isDebugBuild };
             // DB › 시작 파일 › Bootstrap에서 정한 옵션이 먼저 들어가고, 코드(Configuring)가 바꾸면 그 값이 우선한다.
             database?.ApplyTo(options, Debug.isDebugBuild);
-            // DB › 저장 변환(버전 순서, 같은 버전은 목록 순서). 코드(Configuring)가 그 뒤에 더 등록할 수 있다.
+            // DB › 저장 변환(버전 순서, 같은 버전은 ID 글자 순서 — DB 목록 차례). 코드(Configuring)가 그 뒤에 더 등록할 수 있다.
             if (database != null)
                 foreach (var migration in database.All<SaveMigrationData>().OrderBy(m => m.version)) migration.Register(options.Migrations);
             var fromDatabase = (options.History, options.HistoryLimit, options.SnapshotInterval, options.SnapshotLimit, options.Seed);
-            Configuring?.Invoke(options);
+            InvokeEach(Configuring, options);
             var session = new GameSession(options);
+            // 오류·경고를 콘솔에도 — 프로필을 불러올 때(저장 변환·읽기 실패)의 것도 보이게 불러오기 전에 붙인다.
+            if (main) session.Journal.Appended += ForwardToConsole;
             // 개발 명령(모니터 › 명령)은 개발 빌드에서만 등록된다. 출시 빌드에서는 Register가 아무것도 하지 않는다.
             session.Debug.Enabled = Debug.isDebugBuild;
             if (database != null && main) NoteCodeOverrides(session, database, fromDatabase, options);
@@ -494,19 +504,22 @@ namespace GBible
         static void Stop(bool save)
         {
             if (Session == null) return;
-            try { Stopping?.Invoke(Session); }
-            catch (Exception e) { Debug.LogException(e); }
+            InvokeEach(Stopping, Session);
             if (save)
             {
                 // 판 끝과 같은 프레임에 끄면: 판 끝 마무리(판 저장 지우기·프로필 저장)를 먼저.
                 _runSaver?.FlushEnd();
-                SaveProfile(Session);
-                // 살아 있는 판만 저장한다. 멀티 클라이언트·리플레이 세션(판 저장기가 없음)의 판은 서버·녹화의 것이라 남기지 않는다.
+                // 살아 있는 판만 저장한다(프로필도 함께). 멀티 클라이언트·리플레이 세션(판 저장기가 없음)의 판은 서버·녹화의 것이라 남기지 않는다.
                 if (AutoSaveRun && RunIsLive) SaveRun(Session);
+                else SaveProfile(Session);
             }
-            Stopped?.Invoke(Session);
-            Session = null;
-            _runSaver = null;
+            // 받는 쪽 하나가 던져도 나머지는 받고, 세션은 끝까지 비운다(UseSlot·DeleteSlot이 중간에 끊기지 않게).
+            try { InvokeEach(Stopped, Session); }
+            finally
+            {
+                Session = null;
+                _runSaver = null;
+            }
         }
 
         // 코드(Configuring)가 DB의 세션 옵션을 바꿨으면 기록에 남긴다(에디터 값이 왜 안 먹는지 바로 보이게).
@@ -532,8 +545,7 @@ namespace GBible
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(SavePath));
-                File.WriteAllText(SavePath, session.ExportMeta());
+                SafeFile.WriteAllText(SavePath, session.ExportMeta());
                 WriteSlotInfo(session);
                 session.Journal.Append(JournalKind.System, "Save", "프로필 저장: " + SavePath);
             }
@@ -545,15 +557,49 @@ namespace GBible
 
         static void LoadProfile(GameSession session)
         {
-            if (!File.Exists(SavePath)) return;
+            if (!SafeFile.Exists(SavePath)) return;
+            ImportSave(session, SavePath, "프로필", text => session.ImportMeta(text));
+        }
+
+        // 저장 파일 하나를 읽어 넣는다. 비었거나(쓰는 도중 꺼짐·디스크 가득) 읽지 못하면 원본을 옆에 남기고 바로 전 저장(.bak)으로. 넣었으면 참.
+        static bool ImportSave(GameSession session, string path, string what, Action<string> import)
+        {
+            string problem;
             try
             {
-                session.ImportMeta(File.ReadAllText(SavePath));
+                var text = SafeFile.ReadAllText(path);
+                if (!string.IsNullOrEmpty(text))
+                {
+                    import(text);
+                    return true;
+                }
+                problem = text == null ? "파일이 없습니다" : "파일이 비어 있습니다";
             }
             catch (Exception e)
             {
-                session.Journal.Append(JournalKind.Error, "Save", "프로필 불러오기 실패: " + e.Message + " — 원본은 " + KeepBroken(SavePath) + "에 남겨 둡니다.");
+                problem = e.Message;
             }
+            var kept = File.Exists(path) ? KeepBroken(path) : "(원본 없음)";
+            var backup = SafeFile.Backup(path);
+            if (File.Exists(backup))
+            {
+                try
+                {
+                    var text = SafeFile.ReadAllText(backup);
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        import(text);
+                        session.Journal.Append(JournalKind.Warning, "Save", $"{what} 불러오기 실패: {problem} — 바로 전 저장(.bak)으로 이어 갑니다. 원본은 {kept}에 남겨 둡니다.");
+                        return true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    problem += " / .bak도 읽지 못함: " + e.Message;
+                }
+            }
+            session.Journal.Append(JournalKind.Error, "Save", $"{what} 불러오기 실패: {problem} — 원본은 {kept}에 남겨 둡니다.");
+            return false;
         }
 
         // 데이터베이스가 정의한 저장 대상(플레이어 데이터·수치·도전과제)의 구조.
@@ -573,37 +619,55 @@ namespace GBible
         // 개발 중: 저장된 키·필드가 없어졌거나 이름·형식이 바뀌었으면 변환하지 않고 저장을 지운다(추가만 된 경우는 그대로 이어감).
         static void ResetIncompatibleSaves(GameSession session)
         {
-            foreach (var path in new[] { SavePath, RunSavePath })
+            foreach (var main in new[] { SavePath, RunSavePath })
             {
-                if (!File.Exists(path)) continue;
+                // 바로 전 저장(.bak)만 남았으면 그것을 본다(불러오기가 그것으로 이어 가므로).
+                var path = File.Exists(main) ? main : File.Exists(SafeFile.Backup(main)) ? SafeFile.Backup(main) : null;
+                if (path == null) continue;
                 string reason;
                 try
                 {
-                    if (GameSession.IsSaveCompatible(File.ReadAllText(path), session.SaveSchema, out reason)) continue;
+                    // 빈 파일(쓰는 도중 꺼짐)은 구조 문제가 아니다 — 불러올 때 바로 전 저장(.bak)으로 되돌린다.
+                    var text = SafeFile.ReadAllText(path);
+                    if (string.IsNullOrEmpty(text) || GameSession.IsSaveCompatible(text, session.SaveSchema, out reason)) continue;
                 }
                 catch (Exception e)
                 {
                     reason = e.Message;
                 }
-                DeleteProfile();
-                DeleteRun();
-                var message = $"개발 중 데이터 구조가 바뀌어 저장을 초기화했습니다: {reason}. (출시 후에는 초기화하지 않고 이어받습니다)";
+                // 맞지 않는 그 파일만 옆으로 옮긴다(지우지 않는다 — 판 파일 하나 때문에 멀쩡한 프로필까지 잃지 않게).
+                // 그 파일의 바로 전 저장(.bak)도 — 남기면 불러오기가 .bak으로 이어 가 초기화가 되지 않는다.
+                var kept = File.Exists(main) ? MoveAside(main, "reset") : "";
+                if (File.Exists(SafeFile.Backup(main))) kept += (kept.Length > 0 ? ", " : "") + MoveAside(SafeFile.Backup(main), "reset");
+                var message = $"개발 중 데이터 구조가 바뀌어 {Path.GetFileName(main)}을(를) 초기화했습니다: {reason}. 원래 파일은 {kept}. (출시 후에는 초기화하지 않고 이어받습니다)";
                 session.Journal.Append(JournalKind.Warning, "Save", message);
                 Debug.LogWarning("[MomoiProject] " + message);
-                return;
             }
         }
 
+        // 판을 저장한다: 저장 직전 알림(Saving) → 프로필 → 판. 프로필도 함께 쓰는 까닭: 판만 앞서 저장되면, 꺼진 뒤 이어 할 때
+        // 판은 지금 모습인데 프로필은 예전 모습이 된다(판에서 쓴 메타 재화가 되살아나는 등). Saving에서 바꾼 메타 값도 이번 프로필에 들어간다.
         public static void SaveRun(GameSession session)
         {
+            NotifySaving(session);
+            SaveProfile(session);
+            WriteRun(session);
+        }
+
+        // 저장 직전 알림. 이 안에서 담은 행동은 이번 저장에 들어간다(RunSaver가 따로 저장을 잡지 않는다).
+        internal static void NotifySaving(GameSession session)
+        {
             IsSaving = true;
-            try { Saving?.Invoke(session); }
-            catch (Exception e) { Debug.LogException(e); }
+            try { InvokeEach(Saving, session); }
             finally { IsSaving = false; }
+        }
+
+        // 판 파일(run.json)만 쓴다 — 부르는 쪽이 Saving·프로필 차례를 맡는다(RunSaver).
+        internal static void WriteRun(GameSession session)
+        {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(RunSavePath));
-                File.WriteAllText(RunSavePath, session.ExportRun());
+                SafeFile.WriteAllText(RunSavePath, session.ExportRun());
                 WriteSlotInfo(session);
                 session.Journal.Append(JournalKind.System, "Save", "판 저장: " + RunSavePath);
             }
@@ -616,20 +680,11 @@ namespace GBible
         // 저장한 판이 있으면 이어서 진행하고 true.
         public static bool LoadRun(GameSession session)
         {
-            if (!HasSavedRun) return false;
-            try
-            {
-                session.ImportRun(File.ReadAllText(RunSavePath));
-                if (session == Session) _runSaver?.Reset();
-                try { RunLoaded?.Invoke(session); }
-                catch (Exception e) { Debug.LogException(e); }
-                return true;
-            }
-            catch (Exception e)
-            {
-                session.Journal.Append(JournalKind.Error, "Save", "판 불러오기 실패: " + e.Message + " — 원본은 " + KeepBroken(RunSavePath) + "에 남겨 둡니다.");
-                return false;
-            }
+            if (!SafeFile.Exists(RunSavePath)) return false;
+            if (!ImportSave(session, RunSavePath, "판", text => session.ImportRun(text))) return false;
+            if (session == Session) _runSaver?.Reset();
+            InvokeEach(RunLoaded, session);
+            return true;
         }
 
         // 읽지 못한 저장 파일을 옆에 복사해 둔다(다음 저장이 빈 값으로 덮어도 원본이 남게). 돌려주는 값: 복사본 경로.
@@ -644,6 +699,32 @@ namespace GBible
             catch (Exception)
             {
                 return "(복사 실패)";
+            }
+        }
+
+        // 파일을 옆으로 옮긴다(이름.tag-시각.확장자). 돌려주는 값: 옮긴 경로.
+        static string MoveAside(string path, string tag)
+        {
+            try
+            {
+                var target = Path.Combine(Path.GetDirectoryName(path) ?? ".", Path.GetFileNameWithoutExtension(path) + "." + tag + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture) + Path.GetExtension(path));
+                File.Move(path, target);
+                return target;
+            }
+            catch (Exception)
+            {
+                return "(옮기기 실패)";
+            }
+        }
+
+        // 받는 쪽을 하나씩 부른다 — 한 곳(프로젝트 코드·선택 기능)이 던져도 나머지 시작 처리(다른 받는 쪽·이어 하기)는 그대로 돈다.
+        static void InvokeEach<T>(Action<T> handlers, T value)
+        {
+            if (handlers == null) return;
+            foreach (var handler in handlers.GetInvocationList())
+            {
+                try { ((Action<T>)handler)(value); }
+                catch (Exception e) { Debug.LogException(e); }
             }
         }
 
@@ -672,14 +753,17 @@ namespace GBible
             _runSaver?.Reset();
         }
 
-        public static void DeleteRun()
-        {
-            if (File.Exists(RunSavePath)) File.Delete(RunSavePath);
-        }
-
         static void DeleteProfile()
         {
-            if (File.Exists(SavePath)) File.Delete(SavePath);
+            try { SafeFile.Delete(SavePath); }
+            catch (Exception e) { Debug.LogWarning("[MomoiProject] 프로필 저장 파일을 지우지 못했습니다: " + e.Message); }
+        }
+
+        // 판 저장 파일을 지운다(.bak·.tmp도). 지우지 못해도(파일 잠금 등) 던지지 않는다 — 판 끝·새 판 처리가 중간에 끊기지 않게.
+        public static void DeleteRun()
+        {
+            try { SafeFile.Delete(RunSavePath); }
+            catch (Exception e) { Debug.LogWarning("[MomoiProject] 판 저장 파일을 지우지 못했습니다: " + e.Message); }
         }
     }
 

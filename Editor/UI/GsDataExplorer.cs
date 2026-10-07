@@ -703,7 +703,7 @@ namespace GBible.EditorTools.UI
                     Refresh();
                     var rule = SpriteSpecEditor.RuleFor(entry.Member as FieldInfo);
                     var host = panel?.visualTree.Q(className: "gs-root");
-                    if (rule != null && value is Sprite placed && host != null) GsSpriteFraming.Open(host, placed, rule.spriteGroup, Refresh);
+                    if (rule != null && value is Sprite placed && host != null) GsSpriteFraming.Open(host, placed, rule.spriteFrame, Refresh);
                 };
                 field.Box.Add(picker.Element);
             }
@@ -734,7 +734,7 @@ namespace GBible.EditorTools.UI
                 line.Add(new GsButton("맞추기", () =>
                 {
                     var host = panel?.visualTree.Q(className: "gs-root");
-                    if (host != null) GsSpriteFraming.Open(host, framed, spriteRule.spriteGroup, Refresh);
+                    if (host != null) GsSpriteFraming.Open(host, framed, spriteRule.spriteFrame, Refresh);
                 }, GsButtonKind.Ghost));
             }
 

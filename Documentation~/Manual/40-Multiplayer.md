@@ -37,6 +37,7 @@
 
 - **클라이언트**(`SessionRole.Client`)
   - `Game.Do(행동)` → 서버로 보낸다(대상 객체는 id만, `ActionReferences.Detach`). 돌려주는 기록의 상태는 `ActionStatus.Sent`. 결과는 묶음으로 온다.
+  - 생성 코드로 쓸 수 없는 필드(중첩 컬렉션·`KeyValuePair`·`HashSet`·readonly 필드·자동 속성·`object` 칸에 상자로 든 숫자·글자 등)가 있는 행동은 보내기 전에 `InvalidOperationException`("행동 'X'을(를) 서버로 보낼 수 없습니다: 필드 경로 …")으로 실패하고 기록에 Error를 남긴다(형식마다 한 번). 서버에 빈 칸으로 도착하는 대신 바로 드러난다.
   - 서버가 거절하면 `NetClient.ActionFailed`(예외가 아니다). Unity에서는 `GameScreens.ShowFailure`로 알림이 뜬다.
   - 받은 바뀐 곳은 **행동 밖 변경**으로 적용된다 → `Data.Changed`·`DataChanged`·화면 연결(binding-path)이 싱글과 똑같이 알림을 받는다.
   - 받은 이벤트는 **`SubscribeAfterAction`으로 받는 쪽에만** 온다(`EventBus.PublishRemote`). `Subscribe`·`SubscribeAll`(규칙 쪽)에는 오지 않는다 — 규칙은 서버에서 이미 돌았다.
@@ -47,8 +48,15 @@
   - 받은 행동의 `actorId`를 **보낸 사람 번호로 덮고** `utc`·`tick`을 지운다(속일 수 없게).
   - `[SystemAction]`이 붙은 행동(예약·주기·선택 효과·개발자 편집)은 클라이언트가 보내도 실행하지 않는다.
   - `NetServer.Validate(플레이어, 행동)`이 거절 글을 돌려주면 실행하지 않는다(내 차례가 아님 등).
-  - 묶음: 마지막으로 보낸 뒤의 바뀐 곳·이벤트를 키의 공개 범위대로 사람마다 골라 보낸다. 미리보기·실패한 행동의 이벤트는 보내지 않는다. 방장의 미리보기(`Game.Preview`)는 객체의 네트워크 번호를 바꾸지 않는다(`Mirror.KeepIds`) — 클라이언트는 같은 인스턴스를 그대로 가리킨다.
+  - 묶음: 마지막으로 보낸 뒤의 바뀐 곳·이벤트를 키의 공개 범위대로 사람마다 골라 보낸다. 미리보기·실패한 행동의 이벤트는 보내지 않는다. 방장의 미리보기(`Game.Preview`)는 객체의 네트워크 번호를 바꾸지 않는다(`Mirror.KeepIds`) — 클라이언트는 같은 인스턴스를 그대로 가리킨다. 실패한 행동을 되돌릴 때도 번호를 지키므로, 실패 뒤에도 같은 객체는 같은 인스턴스로 간다.
+  - 데이터 변경은 받는 쪽에 보낼 것(`Data.Synced`)에 먼저 넣고 그다음 이쪽 알림(`Data.Changed`)을 부른다. 알림을 받은 코드가 다른 데이터를 바꿔도 받는 쪽에는 차례가 뒤바뀌어 가지 않는다.
+  - 보낼 수 없는 이벤트(생성 코드로 쓸 수 없는 필드가 있음)는 빼고 기록에 Error("이벤트 'X'을(를) 클라이언트에 보낼 수 없어 뺐습니다: …", 형식마다 한 번)를 남긴다. 행동은 성공한다.
   - 늦게 들어왔거나 새로 보이게 된 키는 그 사람에게만 처음 모습(통째)을 보낸다.
+- **받은 것 검사·보내는 양 제한**(서버·클라이언트 모두)
+  - 받은 데이터의 객체 겹침은 256단계까지, 글자·목록 길이는 남은 바이트로 검사한다. 깨지거나 악의적인 메시지는 스택을 넘기거나 거대한 할당을 하지 못하고, 그 메시지만 버린 뒤 기록에 Error(서버 "…의 메시지를 처리하지 못했습니다" · 클라이언트 "서버 메시지를 처리하지 못했습니다")를 남긴다.
+  - 서버는 연결마다 1초에 `NetServerOptions.MaxMessagesPerSecond`(기본 300, 0 = 제한 없음)개, 매칭큐 로비는 60개까지 받는다. 넘친 것은 버리고, 네 배를 넘기면 연결을 끊는다("메시지를 너무 많이 보냈습니다").
+  - 받은 이름은 제어 문자를 빼고 앞뒤 공백을 지운 뒤 32자로 자른다(`NetProtocol.CleanName` — 화면·기록·계정 키에 쓰인다).
+  - WebSocket 전송: 메시지 하나는 32MB까지, 보낼 대기열이 8192개를 넘으면(받는 쪽이 멈춤) 연결을 닫는다.
 - **내 번호**: `session.LocalPlayer`(싱글 0). 클라이언트는 서버가 준 번호, 방장은 자기 번호. `Do`가 `actorId`를 비워 둔 행동에 채운다.
 
 ### 1-2. 공개 범위
@@ -60,6 +68,7 @@
 | `$schedule`(예약) · `$rewind`(Undo 지점) | `Server` |
 
 - 정하기: `session.Data.SetVisibility("hand:2", DataVisibility.Owner, owner: 2)`. **키 단위**다 — 남에게 숨길 것은 플레이어마다 키를 나눈다(`hand:1`·`hand:2`).
+- 선택 대기(`Game.Ask`, 29장)도 같다: 답할 플레이어가 정해진 선택은 그 사람의 키(`$choices:번호`, 주인에게만 보냄)에 두므로 남의 후보·이어서 할 행동이 다른 클라이언트에 가지 않는다. 답할 사람을 정하지 않으면(`player` 생략) 멀티에서는 그 행동을 한 플레이어(`session.Actions.CurrentActor` — 지금 돌고 있는 바깥 행동의 `actorId`)에게 묻는다. 누구나 답하게 하려면 `player: ""`. `Game.Choice`·`Game.IsWaiting`(→ `GameView.Busy`)은 이 프로그램이 답할 선택(모두에게 온 것과 내 번호에게 온 것)만 본다 — 방장 화면에 남의 고르기 창이 뜨지 않고, 남의 선택 때문에 입력이 막히지 않는다. 서버는 다른 사람에게 온 선택의 답을 거절한다("다른 플레이어에게 온 선택입니다").
 - 이벤트는 기본으로 모두에게 간다. 숨길 이벤트는 둘 중 하나로:
   - 주인만: 이벤트 클래스가 `IOwnedEvent`를 구현한다(`int Owner => player;`) — 그 플레이어(와 모두 보는 녹화)에게만 간다. `Owner`가 0이면 모두에게.
   - 서버만: `[GameEvent("…", ServerOnly = true)]` — 클라이언트에 보내지 않는다(서버 규칙끼리 주고받는 이벤트).
@@ -67,7 +76,7 @@
 ### 1-3. 되돌리기와 되감기
 
 - 멀티에서 플레이어가 누르는 일반 '무르기'는 없다(클라이언트 `Undo`는 경고만).
-- 되돌리기를 쓰는 곳: ① 규칙의 기믹(되감기 — `Game.Rewind`·`RewindKey`·`RewindEntity`, 1-4) ② 개발자 시험(서버의 개발 명령 '세션 › Undo', 테스트 패널의 Undo) ③ 판 밖 리플레이(받은 묶음을 녹화해 다시 트는 것 — 서버 없이).
+- 되돌리기를 쓰는 곳: ① 규칙의 기믹(되감기 — `Game.Rewind`·`RewindKey`·`RewindEntity`, 1-4) ② 개발자 시험(서버의 개발 명령 '세션 › Undo', 테스트 패널의 Undo — 매칭큐 방은 Undo 이력을 두지 않는다, 1-6) ③ 판 밖 리플레이(받은 묶음을 녹화해 다시 트는 것 — 서버 없이).
 - 서버의 Undo·되감기는 바뀐 곳으로 모두에게 간다.
 
 ### 1-4. 되감기(기믹)
@@ -76,8 +85,9 @@
 - 기믹 행동 안에서:
   - `Game.Rewind(2)` — 세션 구역 전체를 2지점 전 모습으로(그 뒤 생긴 키는 기본값).
   - `Game.RewindKey("hand:2", 1)` — 키 하나만.
-  - `Game.RewindEntity(unit, 2)` — 객체 하나만(id로 찾는다). 그 객체에 남이 한 일(피해)은 함께 돌아가고, 그 객체가 남에게 한 일은 남는다.
-- 되감기도 그 행동의 변경이다 → Undo·판 저장·멀티 동기화·리플레이에 그대로 남는다. 난수는 되감지 않는다.
+  - `Game.RewindEntity(unit, 2)` — 객체 하나만(id로 찾는다). 그 객체에 남이 한 일(피해)은 함께 돌아가고, 그 객체가 남에게 한 일은 남는다. 예전 방식 데이터(01장 6절) 안의 객체도 된다.
+- 지점은 컬렉션 요소마다 요소 번호를 남긴다. 되감으면 그 뒤 빠졌던 요소(쓰러진 유닛)는 원래 인스턴스로 돌아오고, 남은 요소는 순서가 바뀌었어도 자기 인스턴스를 지킨다 — 화면·코드가 쥔 객체가 엉뚱한 값을 받지 않는다.
+- 되감기도 그 행동의 변경이다(예전 방식 데이터도) → Undo·판 저장·멀티 동기화·리플레이에 그대로 남는다. 난수는 되감지 않는다.
 - 지점보다 멀리 가면 플레이어용 실패 `momoi.fail.rewindTooFar`.
 
 ### 1-5. 형식 번호표
@@ -95,7 +105,9 @@
 - 전원이 수락해야 방을 만든다. 수락하지 않으면(거절·시간 넘김 `AcceptSeconds`) 그 사람은 로비로, 수락한 사람은 **기다린 시간 그대로** 다시 줄.
 - 방이 만들어지면 묶인 차례대로 플레이어 번호 1, 2 …(`NetServer.Reserve`). `RoomStarting`에서 서버 규칙을 걸고, 정원이 다 들어오면 `RoomReady`(첫 턴 시작). `ReadySeconds` 안에 다 안 들어오면 매치를 없던 것으로(점수 변화 없음).
 - 매치 중에 끊겼다 다시 접속하면 로비를 거치지 않고 그 매치의 같은 자리로 들어가 지금 모습을 받는다.
-- 행동마다 진행 중인 매치를 저장(`SaveMatchEachAction`) → 서버를 다시 켜면 `ResumeOpenMatches`로 다시 열고, 플레이어가 다시 접속하면 이어 간다.
+- 진행 중인 매치를 저장한다(`NetHubOptions.SaveMatchEachAction`): 행동이 있었던 방만 `MatchSaveSeconds`(기본 2초, 0 = 행동마다)마다 한 번, 방이 준비될 때·서버를 닫을 때는 바로. 서버를 다시 켜면 `ResumeOpenMatches`로 다시 열고, 플레이어가 다시 접속하면 이어 간다.
+- `EndMatch`를 같은 방에 두 번 불러도 한 번만 반영한다(결과에 같은 사람이 두 번 들어와도 한 번만 센다).
+- `GameNet.StartMatchServer`가 만드는 방 세션은 Undo 이력과 바뀐 곳의 사람용 문장(기록·모니터용)을 만들지 않는다(`Data.RecordHistory`·`DescribeChanges`를 끔 — 서버 한 대가 방 수십 개를 돌린다). 되감기 기믹(1-4)은 이력이 아니라 지점 데이터를 쓰므로 그대로 된다.
 - 점수: Elo(K=32, 여럿이면 둘씩 짝지어 나눔). 같은 등수 = 무승부.
 
 | 창구 | 가짜(지금) | 진짜(출시, 계정 준비 뒤) |
@@ -228,7 +240,7 @@ hub.ResumeOpenMatches();
 | `NetServer.AddLocalPlayer(이름)` · `Reserve(계정, 이름)` · `FindPlayer` · `FindAccount` · `Kick` · `Players` | 방장 · 자리 예약 · 찾기 · 강퇴 |
 | `NetServer.Admit` · `Validate` · `PlayerJoined` · `PlayerLeft` · `StreamReceived` · `SendStream` | 입장 확인 · 행동 검사 · 알림 · 실시간 바이트 |
 | `NetServer.AddRecorder(리플레이, 눈)` · `RemoveRecorder` · `NetServer.StartLocalRecording(세션, out 리플레이)` | 녹화(서버 쪽 · 혼자 하는 판) |
-| `NetServerOptions` | `MaxPlayers` · `GameVersion` · `DriveClock` · `TimeSyncInterval` · `AllowDeveloperCommands` · `RelayStreams` · `TimeoutSeconds` |
+| `NetServerOptions` | `MaxPlayers` · `GameVersion` · `DriveClock` · `TimeSyncInterval` · `AllowDeveloperCommands` · `RelayStreams` · `TimeoutSeconds` · `ByeOnClose` · `MaxMessagesPerSecond` |
 | `NetClient.Connect` · `Update` · `Disconnect` · `State` · `PlayerId` · `Players` · `RoundTrip` · `PendingActions` | 접속 · 상태 |
 | `NetClient.Joined` · `Closed` · `ActionFailed` · `PlayersChanged` · `RunDeveloperCommand` · `SendStream` · `StreamReceived` | 알림 · 서버 개발 명령 · 실시간 바이트 |
 | `NetClient.Token` · `TimeoutSeconds` · `ServerClosed` · `Reached` · `ClearOnJoin` · `Drop()` | 입장 표 · 끊김 판단 · 다시 접속 |
@@ -237,8 +249,9 @@ hub.ResumeOpenMatches();
 | `IOwnedEvent` · `[GameEvent(ServerOnly = true)]` | 주인만 받는 이벤트 · 서버만 아는 이벤트 |
 | `NetClient.Queue(종류)` · `CancelQueue` · `AnswerMatch(수락)` · `Account` · `Match` · `LobbyChanged` · `MatchFound` · `MatchCancelled` · `MatchEnded` | 매칭큐 |
 | `NetHub.RoomStarting` · `RoomReady` · `RoomEnded` · `EndMatch(방, 결과)` · `ResumeOpenMatches` · `Rooms` · `Log` · `Options` | 매칭큐 서버 |
+| `NetHubOptions` | `AcceptSeconds` · `GameVersion` · `AllowDeveloperCommands` · `SaveMatchEachAction` · `MatchSaveSeconds` · `ReadySeconds` · `TimeoutSeconds` |
 | `session.Data.SetVisibility(키, 범위, 주인)` · `VisibilityOf` · `IsVisibleTo` | 공개 범위 |
-| `session.Role` · `IsClient` · `LocalPlayer` | 역할·내 번호 |
+| `session.Role` · `IsClient` · `LocalPlayer` · `session.Actions.CurrentActor` | 역할·내 번호 · 지금 도는 바깥 행동의 `actorId`(행동 밖·시스템 행동이면 0) |
 | `Game.MarkRewind` · `Rewind` · `RewindKey` · `RewindEntity` · `RewindMarks` | 되감기 |
 | `[SystemAction]` | 클라이언트가 보낼 수 없는 시스템 행동 |
 
@@ -288,6 +301,7 @@ GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
 - **연출은 `SubscribeAfterAction`으로 받는다.** `Subscribe`로 받는 연출은 클라이언트에서 불리지 않는다.
 - **실패는 예외가 아니라 알림으로.** 클라이언트의 거절은 `ActionFailed`로 온다(`GameScreens.Do`는 싱글 실패와 같은 알림을 띄운다).
 - **이벤트는 `[GameEvent]` 클래스로.** 구조체 이벤트는 보낼 수 없다(서버 기록에 경고).
+- **행동·이벤트의 필드는 생성 코드가 쓸 수 있는 것만.** 중첩 컬렉션·`KeyValuePair`·`HashSet`·readonly 필드·자동 속성·`object` 칸은 쓰지 않는다 — 행동은 보내기 전에 실패하고, 이벤트는 빠진다(1-1). 보내지 않을 값이면 `[NonSerialized]`.
 - **주고받는 클래스에 `#if UNITY_EDITOR` 필드를 두지 않는다**(에디터와 빌드의 필드 차례가 달라진다).
 - **숨길 정보는 플레이어마다 키를 나누고 Owner로.** 키 하나 안의 일부만 숨길 수는 없다. 숨길 이벤트(카드를 뽑음)는 `IOwnedEvent`로.
 - 매칭큐 서버의 계정 값(재화·점수)은 서버 저장소에만 있다. 클라이언트가 보낸 값을 믿지 않는다 — 바꾸는 것은 서버의 규칙(행동)이다.

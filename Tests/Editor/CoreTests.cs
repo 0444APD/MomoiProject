@@ -548,6 +548,38 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 프로필을_불러오면_도전과제_감시를_불러온_달성_상태에_맞춘다()
+        {
+            Achievement("first", AtLeast("kills", 1), Gold(50));
+            Achievement("hunter", AtLeast("kills", 3));
+            var fresh = _session.ExportMeta();          // 아무것도 달성하지 않은 프로필
+            _session.Do(new TestKillAction());
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"));
+            Assert.IsFalse(_session.Triggers.IsRegistered("first"));
+
+            // 이 세션에서는 달성했지만 불러온 프로필에서는 아직: 다시 감시하고 다시 달성할 수 있다(테스트 상황 불러오기).
+            _session.ImportMeta(fresh);
+            Assert.IsFalse(_session.Achievements.IsUnlocked("first"));
+            Assert.IsTrue(_session.Triggers.IsRegistered("first"), "다시 감시한다");
+            _session.Do(new TestKillAction());
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "다시 달성된다");
+            Assert.AreEqual(50, _session.Data.GetNumber("player.gold"), "불러온 프로필의 골드 0 + 보상");
+
+            // 불러온 프로필에서 이미 달성: 감시를 그만둔다.
+            _session.ImportMeta($"{{\"version\":1,\"state\":{{\"{PlayerDataKeys.Achievement("hunter")}\":true}}}}");
+            Assert.IsTrue(_session.Achievements.IsUnlocked("hunter"));
+            Assert.IsFalse(_session.Triggers.IsRegistered("hunter"), "달성한 것은 감시하지 않는다");
+            Assert.IsTrue(_session.Triggers.IsRegistered("first"), "불러온 프로필에서 아직인 것은 감시한다");
+
+            // 이미 조건을 넘은 프로필: 다음 Flush에서 소급 달성(불러오는 도중에는 평가하지 않는다).
+            _session.ImportMeta($"{{\"version\":1,\"state\":{{\"{PlayerDataKeys.Stat("kills")}\":5}}}}");
+            Assert.IsFalse(_session.Achievements.IsUnlocked("first"));
+            _session.Achievements.Flush();
+            Assert.IsTrue(_session.Achievements.IsUnlocked("first"), "소급 달성");
+            Assert.IsTrue(_session.Achievements.IsUnlocked("hunter"));
+        }
+
+        [Test]
         public void 진행도()
         {
             var definition = Achievement("k10", AtLeast("kills", 10));

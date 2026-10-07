@@ -42,12 +42,16 @@ namespace GBible
             public bool PauseTime;
             public VisualElement Host;
             public IDisposable Watch;
+            // 같은 화면이 닫히는 중(OnClose)에 다시 열렸다: 열림 알림(Opened)을 닫힘 알림(Closed) 뒤로 미뤄 둔다.
+            public bool OpenedLater;
             public readonly List<(VisualElement element, ScreenBinding binding, string template)> Bindings = new List<(VisualElement, ScreenBinding, string)>();
         }
 
         static readonly Dictionary<string, ScreenData> Data = new Dictionary<string, ScreenData>(StringComparer.Ordinal);
         static readonly Dictionary<string, GameScreen> Controllers = new Dictionary<string, GameScreen>(StringComparer.Ordinal);
         static readonly List<Entry> OpenEntries = new List<Entry>();
+        // OnClose를 도는 중인 화면 코드(그 안에서 같은 화면을 다시 열 수 있다 — 확인 창의 '아니오'가 확인 창을 다시 띄움).
+        static readonly List<GameScreen> Closing = new List<GameScreen>();
         static readonly List<(VisualElement element, float until)> Toasts = new List<(VisualElement, float)>();
         static ScreenSettingsData _settings;
         static UIDocument _document;
@@ -67,6 +71,7 @@ namespace GBible
             Data.Clear();
             Controllers.Clear();
             OpenEntries.Clear();
+            Closing.Clear();
             Toasts.Clear();
             _settings = null;
             _document = null;
@@ -74,6 +79,8 @@ namespace GBible
             _toasts = null;
             _initialized = false;
             _backFrame = -1;
+            _backHolds = 0;
+            _backReleased = -1;
             _language = null;
         }
 
@@ -151,10 +158,15 @@ namespace GBible
 
             try { screen.OnOpen(); }
             catch (Exception e) { Debug.LogException(e); }
-            // 다시 그릴 키: 코드가 정한 것, 없으면 binding-path의 키들(그것도 없으면 어느 값이 바뀌어도).
-            var keys = screen.Watch ?? entry.Bindings.Where(b => b.binding.HasData).Select(b => b.binding.Key).Distinct(StringComparer.Ordinal).ToArray();
+            // OnOpen 안에서 닫았으면(Close()) 이미 다 정리됐다: 다시 그리기를 걸지도 열림을 알리지도 않는다
+            // (걸면 아무도 끊지 않는 다시 그리기가 남아, 이 화면을 다음에 열면 값이 바뀔 때마다 Draw가 두 번 돈다).
+            if (!OpenEntries.Contains(entry)) return screen;
+            // 다시 그릴 키: 코드가 정한 것, 없으면 binding-path의 키 후보들("stat:kills"는 "stat:kills"와 "stat" — 그것도 없으면 어느 값이 바뀌어도).
+            var keys = screen.Watch ?? entry.Bindings.Where(b => b.binding.HasData).SelectMany(b => b.binding.Keys).Distinct(StringComparer.Ordinal).ToArray();
             entry.Watch = GameView.Redraw(() => DrawEntry(entry), screen.WaitForPresentation, keys);
-            Opened?.Invoke(screen);
+            // 같은 화면의 OnClose 안에서 다시 연 것이면 닫힘을 먼저 알린 뒤에 알린다(CloseEntry).
+            if (Closing.Contains(screen)) entry.OpenedLater = true;
+            else Opened?.Invoke(screen);
             return screen;
         }
 
@@ -182,10 +194,37 @@ namespace GBible
         public static T Get<T>() where T : GameScreen => OpenEntries.Select(e => e.Screen).OfType<T>().FirstOrDefault();
         public static IEnumerable<GameScreen> All => OpenEntries.Select(e => e.Screen).ToList();
 
+        // 뒤로(Esc)를 잠시 막는다: 키 바꾸기처럼 Esc를 '취소'로 쓰는 동안 같은 Esc가 창을 닫거나 일시정지 메뉴를 열지 않게(GameInput.Rebind가 잡는다).
+        // 놓은 프레임에도 막는다 — 입력 처리(키 바꾸기 취소)가 화면보다 먼저 돌아 그 프레임의 Esc가 화면에도 온다.
+        public static IDisposable HoldBack()
+        {
+            _backHolds++;
+            return new BackHold();
+        }
+
+        static int _backHolds;
+        static int _backReleased = -1;
+
+        static bool BackHeld => _backHolds > 0 || Time.frameCount == _backReleased;
+
+        sealed class BackHold : IDisposable
+        {
+            bool _released;
+
+            public void Dispose()
+            {
+                if (_released) return;
+                _released = true;
+                if (_backHolds > 0) _backHolds--;
+                _backReleased = Time.frameCount;
+            }
+        }
+
         // 맨 위의 창·팝업을 닫는다(Esc·뒤로). 그 화면이 '뒤로로 닫기'가 꺼져 있으면 아무것도 하지 않는다(고르기 창 등).
         // 닫을 화면이 없으면 DB › 화면 설정 'Esc로 일시정지 메뉴'일 때 일시정지 메뉴를 연다. 무엇이든 했으면 참.
         public static bool Back()
         {
+            if (BackHeld) return false;
             if (Time.frameCount == _backFrame) return true;   // 한 프레임에 두 번(키 입력 + UI 이벤트) 오지 않게
             _backFrame = Time.frameCount;
             var top = OpenEntries.Where(e => e.Layer == ScreenLayer.Window || e.Layer == ScreenLayer.Popup)
@@ -336,23 +375,48 @@ namespace GBible
             if (!OpenEntries.Remove(entry)) return;
             entry.Watch?.Dispose();
             var screen = entry.Screen;
+            // 이번 열림의 정리할 것·버튼 연결은 떼어 들고 정리한다. 화면 코드 인스턴스는 열 때마다 다시 쓰므로, OnClose 안에서 같은 화면을
+            // 다시 열면(확인 창을 Esc로 닫았더니 '아니오'가 확인 창을 다시 띄움) 새 열림이 같은 목록에 쌓는다 — 그것까지 끊지 않게.
+            var owned = screen.Owned.ToList();
+            screen.Owned.Clear();
+            var clicks = screen.Clicks.ToList();
+            screen.Clicks.Clear();
+            Closing.Add(screen);
             try { screen.OnClose(); }
             catch (Exception e) { Debug.LogException(e); }
-            foreach (var owned in screen.Owned)
+            finally { Closing.Remove(screen); }
+            var reopened = OpenEntries.Exists(e => e.Screen == screen);
+            if (!reopened)
             {
-                try { owned.Dispose(); }
+                // OnClose가 맡긴 것도 이번 열림의 것이다.
+                owned.AddRange(screen.Owned);
+                screen.Owned.Clear();
+                clicks.AddRange(screen.Clicks);
+                screen.Clicks.Clear();
+            }
+            foreach (var item in owned)
+            {
+                try { item.Dispose(); }
                 catch (Exception e) { Debug.LogException(e); }
             }
-            screen.Owned.Clear();
-            foreach (var (button, handler) in screen.Clicks) button.clicked -= handler;
-            screen.Clicks.Clear();
+            foreach (var (button, handler) in clicks) button.clicked -= handler;
             entry.Host.RemoveFromHierarchy();
-            if (entry.PauseTime) GameTime.Resume("화면 " + screen.Id);
-            screen.IsOpen = false;
-            screen.Root = null;
-            screen.Argument = null;
-            screen.Data = null;
+            // 다시 열렸으면 열림 표시·시간 멈춤은 새 열림의 것이다(같은 이유 글자로 멈췄으니 여기서 풀면 새 화면이 열린 채 시간이 흐른다).
+            if (!reopened)
+            {
+                if (entry.PauseTime) GameTime.Resume("화면 " + screen.Id);
+                screen.IsOpen = false;
+                screen.Root = null;
+                screen.Argument = null;
+                screen.Data = null;
+            }
             Closed?.Invoke(screen);
+            // OnClose 안에서 다시 연 것의 열림 알림은 닫힘 알림 뒤에(Opened → Closed 순이면 받는 쪽은 닫힌 것으로 안다).
+            foreach (var later in OpenEntries.Where(e => e.Screen == screen && e.OpenedLater).ToList())
+            {
+                later.OpenedLater = false;
+                Opened?.Invoke(screen);
+            }
         }
 
         static string _language;
@@ -374,7 +438,8 @@ namespace GBible
 
         static void DrawEntry(Entry entry)
         {
-            if (!entry.Screen.IsOpen) return;
+            // 화면 코드 인스턴스는 열 때마다 다시 쓰므로 IsOpen만으로는 닫힌 열림(entry)을 가리지 못한다.
+            if (!entry.Screen.IsOpen || !OpenEntries.Contains(entry)) return;
             var session = GBibleRuntime.Session;
             foreach (var (element, binding, template) in entry.Bindings)
             {
@@ -385,41 +450,53 @@ namespace GBible
             catch (Exception e) { Debug.LogException(e); }
         }
 
-        // binding-path가 있는 칸을 모은다(열 때 한 번). 원래 글자는 틀로 쓰려고 남겨 둔다.
+        // binding-path가 있는 칸을 모은다(열 때 한 번). 원래 글자(토글·슬라이더는 이름표)는 틀로 쓰려고 남겨 둔다.
         static void CollectBindings(Entry entry, VisualElement tree)
         {
             tree.Query<BindableElement>().ForEach(element =>
             {
                 var binding = ScreenBinding.Parse(element.bindingPath);
                 if (binding == null) return;
-                var template = element is TextElement text ? text.text : element is AbstractProgressBar bar ? bar.title : null;
+                var template = element is TextElement text ? text.text
+                    : element is AbstractProgressBar bar ? bar.title
+                    : element is Toggle toggle ? toggle.label
+                    : element is Slider slider ? slider.label
+                    : element is SliderInt sliderInt ? sliderInt.label
+                    : null;
                 entry.Bindings.Add((element, binding, template));
             });
         }
 
-        // 값을 칸에 넣는다: 글자 칸(Label·Button)은 글, 진행 막대는 값(+글), 토글·슬라이더는 값(보이기만, 바꾸는 입력은 행동으로).
-        static void Apply(VisualElement element, ScreenBinding binding, string template, GameSession session)
+        // 값을 칸에 넣는다: 글자 칸(Label·Button)은 글, 진행 막대는 값(+글), 토글·슬라이더는 값(보이기만, 바꾸는 입력은 행동으로) + 이름표.
+        // 값은 데이터를 가리킬 때만 넣는다: '@텍스트키'만 적은 토글·슬라이더는 값이 없으니 거짓·0으로 덮지 않고 이름표(label)만 번역한다.
+        internal static void Apply(VisualElement element, ScreenBinding binding, string template, GameSession session)
         {
             switch (element)
             {
                 case AbstractProgressBar bar:
                     if (binding.HasData) bar.value = (float)ScreenBinding.Number(binding.Read(session));
-                    if (binding.TextKey.Length > 0 || (template != null && template.Contains("{value}"))) bar.title = binding.Text(session, template);
+                    if (HasText(binding, template)) bar.title = binding.Text(session, template);
                     return;
                 case Toggle toggle:
-                    toggle.SetValueWithoutNotify(ScreenBinding.Flag(binding.Read(session)));
+                    if (binding.HasData) toggle.SetValueWithoutNotify(ScreenBinding.Flag(binding.Read(session)));
+                    if (HasText(binding, template)) toggle.label = binding.Text(session, template);
                     return;
                 case Slider slider:
-                    slider.SetValueWithoutNotify((float)ScreenBinding.Number(binding.Read(session)));
+                    if (binding.HasData) slider.SetValueWithoutNotify((float)ScreenBinding.Number(binding.Read(session)));
+                    if (HasText(binding, template)) slider.label = binding.Text(session, template);
                     return;
                 case SliderInt slider:
-                    slider.SetValueWithoutNotify((int)Math.Round(ScreenBinding.Number(binding.Read(session))));
+                    if (binding.HasData) slider.SetValueWithoutNotify((int)GameNumbers.Round(ScreenBinding.Number(binding.Read(session))));
+                    if (HasText(binding, template)) slider.label = binding.Text(session, template);
                     return;
                 case TextElement text:
                     text.text = binding.Text(session, template);
                     return;
             }
         }
+
+        // 제목·이름표도 바꾸는가: 텍스트 키가 있거나 원래 글에 {value}가 있을 때(값만 보이는 막대·토글·슬라이더의 원래 글은 그대로 둔다).
+        static bool HasText(ScreenBinding binding, string template) => binding.TextKey.Length > 0 || (template != null && template.Contains("{value}"));
 
         static bool EnsureRoot()
         {

@@ -43,6 +43,8 @@ namespace GBible.EditorTools.UI
 
     // 모든 카드·시트가 공유하는 상세 보기·편집 패널.
     // 편집은 이 패널 안에서만, 원본이 아닌 사본에 한다. 되돌리기·저장은 확인을 거친다.
+    // 저장(반영)할 때는 이 패널에서 바꾼 칸만 대상에 옮긴다 — 그 사이 다른 곳(CSV 가져오기·폴더 옮기기·ID 바꾸기의 참조 갱신 …)이 대상의 다른 칸을
+    // 바꿨으면 그것을 덮지 않고, 사본도 대상에 맞춘다.
     public sealed class GsDetailPanel : VisualElement
     {
         readonly VisualElement _host;
@@ -50,7 +52,9 @@ namespace GBible.EditorTools.UI
         readonly DetailOptions _options;
         readonly UnityEngine.Object _draft;
         readonly SerializedObject _draftObject;
-        SerializedObject _originalObject;
+        // 사본을 만들거나 대상에 맞춘 때의 대상 모습. 이 패널이 바꾼 칸 = 사본과 이것의 차이, 다른 곳이 바꾼 칸 = 대상과 이것의 차이.
+        readonly UnityEngine.Object _baseline;
+        readonly SerializedObject _baselineObject;
         GsModal _modal;
         List<FieldChange> _changes = new List<FieldChange>();
 
@@ -77,13 +81,21 @@ namespace GBible.EditorTools.UI
             _host = host;
             _target = target;
             _options = options ?? new DetailOptions();
-            _draft = UnityEngine.Object.Instantiate(target);
-            _draft.name = target.name;
-            _draft.hideFlags = HideFlags.HideAndDontSave;
+            _draft = Clone(target);
             _draftObject = new SerializedObject(_draft);
-            _originalObject = new SerializedObject(target);
+            _baseline = Clone(target);
+            _baselineObject = new SerializedObject(_baseline);
             AddToClassList("gs-detail");
             Build();
+        }
+
+        // 숨김 사본(저장하지 않는다).
+        static UnityEngine.Object Clone(UnityEngine.Object source)
+        {
+            var copy = UnityEngine.Object.Instantiate(source);
+            copy.name = source.name;
+            copy.hideFlags = HideFlags.HideAndDontSave;
+            return copy;
         }
 
         // 창 안에 붙여 쓰는 패널(모달 아님). 닫기를 누르면 CloseRequested가 온다.
@@ -595,7 +607,7 @@ namespace GBible.EditorTools.UI
                 if (_modal != null) CloseNow();
                 return;
             }
-            _changes = DraftDiff.Compute(_originalObject, _draftObject);
+            _changes = DraftDiff.Compute(_baselineObject, _draftObject);
             var changed = new HashSet<string>(_changes.Select(c => c.Path));
 
             foreach (var pair in _sections)
@@ -691,10 +703,8 @@ namespace GBible.EditorTools.UI
 
         internal void RevertNow()
         {
-            var name = _target.name;
-            EditorUtility.CopySerialized(_target, _draft);
-            _draft.name = name;
-            _draft.hideFlags = HideFlags.HideAndDontSave;
+            CopyInto(_target, _draft);
+            CopyInto(_target, _baseline);
             BuildBody();
         }
 
@@ -704,15 +714,80 @@ namespace GBible.EditorTools.UI
             // CopySerialized는 이름·숨김 플래그까지 복사하므로 원본의 것을 지킨다(사본은 숨김 상태).
             var name = _target.name;
             var flags = _target.hideFlags;
+            // 이 패널이 바꾼 칸(보이는 칸)과, 사본을 만든 뒤 다른 곳이 대상에서 바꾼 칸(숨은 칸 포함 — 폴더·ID).
+            var mine = DraftDiff.ChangedPaths(_baselineObject, _draftObject, hidden: false);
+            var theirs = DraftDiff.ChangedPaths(_baselineObject, new SerializedObject(_target), hidden: true);
             Undo.RecordObject(_target, "상세 편집 저장");
-            EditorUtility.CopySerialized(_draft, _target);
+            if (theirs.Count == 0) EditorUtility.CopySerialized(_draft, _target);
+            else
+            {
+                // 대상의 지금 모습에 이 패널이 바꾼 칸만 얹어 옮긴다(다른 곳이 바꾼 칸을 되돌리지 않게).
+                var merged = Clone(_target);
+                try
+                {
+                    var mergedObject = new SerializedObject(merged);
+                    foreach (var path in mine)
+                    {
+                        var property = _draftObject.FindProperty(path);
+                        if (property != null) mergedObject.CopyFromSerializedProperty(property);
+                    }
+                    mergedObject.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.CopySerialized(merged, _target);
+                }
+                catch (Exception e)
+                {
+                    // 칸 단위로 옮기지 못하면(드문 형식) 예전처럼 통째로 — 다른 곳이 바꾼 칸은 되돌아갈 수 있어 알린다.
+                    Debug.LogWarning($"[MomoiProject] 바꾼 칸만 옮기지 못해 사본 전체를 반영했습니다({e.Message}). 다른 곳에서 함께 바꾼 값({string.Join(", ", theirs)})을 확인하세요.");
+                    EditorUtility.CopySerialized(_draft, _target);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(merged);
+                }
+            }
             _target.name = name;
             _target.hideFlags = flags;
             EditorUtility.SetDirty(_target);
             if (AssetDatabase.Contains(_target)) AssetDatabase.SaveAssetIfDirty(_target);
-            _originalObject = new SerializedObject(_target);
+            CopyInto(_target, _baseline);
+            // 다른 곳이 바꾼 칸이 있었으면 사본도 대상에 맞추고 본문을 다시 그린다(칸이 쥔 값 객체가 바뀌었다).
+            if (theirs.Count > 0) PullTarget();
             _options.Saved?.Invoke(_target);
             RefreshState();
+        }
+
+        // 다른 곳(CSV 가져오기·폴더 옮기기·ID 바꾸기의 참조 갱신·Undo …)에서 대상이 바뀌었으면 사본을 대상에 맞춘다(상세 창이 DB가 바뀔 때 부른다).
+        // 이 패널에서 바꾸고 아직 옮기지 않은 칸이 있으면 그대로 둔다 — 반영할 때 그 칸만 옮긴다.
+        internal void SyncFromTarget()
+        {
+            if (_draft == null || _target == null) return;
+            if (DraftDiff.ChangedPaths(_baselineObject, _draftObject, hidden: false).Count > 0) return;
+            if (DraftDiff.ChangedPaths(_baselineObject, new SerializedObject(_target), hidden: true).Count == 0) return;
+            CopyInto(_target, _baseline);
+            PullTarget();
+            RefreshState();
+        }
+
+        // 사본을 대상의 지금 모습으로 바꾸고 본문을 다시 그린다(칸을 누르는 중일 수 있어 다음 틱에).
+        void PullTarget()
+        {
+            CopyInto(_target, _draft);
+            var scroll = _body.scrollOffset;
+            schedule.Execute(() =>
+            {
+                if (_draft == null) return;
+                BuildBody();
+                schedule.Execute(() => _body.scrollOffset = scroll);
+            });
+        }
+
+        // 숨김 사본에 원본의 내용을 옮긴다(이름·숨김 플래그는 사본 것 그대로).
+        static void CopyInto(UnityEngine.Object source, UnityEngine.Object copy)
+        {
+            var name = copy.name;
+            EditorUtility.CopySerialized(source, copy);
+            copy.name = name;
+            copy.hideFlags = HideFlags.HideAndDontSave;
         }
 
         public void Close() => CloseNow();
@@ -734,6 +809,7 @@ namespace GBible.EditorTools.UI
         void DestroyDraft()
         {
             if (_draft != null) UnityEngine.Object.DestroyImmediate(_draft);
+            if (_baseline != null) UnityEngine.Object.DestroyImmediate(_baseline);
         }
     }
 

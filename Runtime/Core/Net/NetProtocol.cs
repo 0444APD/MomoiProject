@@ -67,10 +67,10 @@ namespace GBible
         // 덩어리 하나를 건너뛰며 그 범위를 돌려준다(복사하지 않는다).
         public static void ReadBlock(MirrorReader r, out int start, out int end)
         {
-            var count = (int)r.UVar();
-            if (count < 0 || r.Position + count > r.End) throw new FormatException("[MomoiProject] 멀티플레이 메시지가 잘렸습니다.");
+            var count = r.UVar();
+            if (count > (ulong)Math.Max(0, r.End - r.Position)) throw new FormatException("[MomoiProject] 멀티플레이 메시지가 잘렸습니다.");
             start = r.Position;
-            end = start + count;
+            end = start + (int)count;
             r.Position = end;
         }
 
@@ -80,6 +80,24 @@ namespace GBible
             var copy = new byte[end - start];
             Buffer.BlockCopy(r.Data, start, copy, 0, copy.Length);
             return copy;
+        }
+
+        // 받은 이름(입장 표의 이름 — 화면·기록·계정 키에 쓰인다): 제어 문자를 빼고 앞뒤 공백을 지우고 32자로 자른다.
+        public const int MaxNameLength = 32;
+
+        public static string CleanName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            var b = new System.Text.StringBuilder(Math.Min(name.Length, MaxNameLength));
+            foreach (var c in name)
+            {
+                if (char.IsControl(c)) continue;
+                if (b.Length >= MaxNameLength) break;
+                b.Append(c);
+            }
+            // 잘린 자리에 짝 잃은 서러게이트가 남지 않게.
+            if (b.Length > 0 && char.IsHighSurrogate(b[b.Length - 1])) b.Length--;
+            return b.ToString().Trim();
         }
 
         // ── 글자 목록(형식 번호표 등) ──────────────────────────
@@ -93,7 +111,7 @@ namespace GBible
 
         public static string[] ReadStrings(MirrorReader r)
         {
-            var count = (int)r.UVar();
+            var count = r.Count();
             var items = new string[count];
             for (var i = 0; i < count; i++) items[i] = r.Str();
             return items;

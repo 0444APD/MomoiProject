@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using GBible.Data;
 using NUnit.Framework;
 using UnityEngine;
@@ -67,6 +68,34 @@ namespace GBible.Tests
         public void 이름_변경_이력이_없으면_아무것도_하지_않는다()
         {
             Assert.IsNull(SavedIdRenames.Build(Database(false)));
+        }
+
+        [Test]
+        public void 이력의_예전_ID를_지금_다른_항목이_쓰면_그_줄은_쓰지_않는다()
+        {
+            // strike → slash 뒤에 새 항목이 strike를 다시 쓰면, 그 항목으로 저장한 값이 불러올 때마다 slash로 바뀌면 안 된다.
+            var database = Database(true);
+            var reused = ScriptableObject.CreateInstance<InstanceData>();
+            reused.EditorAssignId("strike");
+            _created.Add(reused);
+            database.EditorSetEntries(new List<GameData>(database.Entries) { reused });
+            Assert.IsNull(SavedIdRenames.Build(database));
+        }
+
+        [Test]
+        public void 이력은_다른_항목의_줄을_지우지_않고_제자리로_돌아온_줄만_지운다()
+        {
+            var database = ScriptableObject.CreateInstance<GameDatabase>();
+            _created.Add(database);
+            var type = typeof(InstanceData).FullName;
+            database.EditorAddRename(type, "potion", "potionSmall");
+            database.EditorAddRename(type, "elixir", "potion");
+            Assert.IsTrue(database.Renames.Any(r => r.oldId == "potion" && r.newId == "potionSmall"), "비운 ID를 다른 항목이 써도 예전 항목의 이력은 남는다");
+
+            database.EditorAddRename(type, "a", "b");
+            database.EditorAddRename(type, "b", "a");
+            Assert.IsFalse(database.Renames.Any(r => r.oldId == r.newId), "같은 항목이 예전 이름으로 돌아온 줄(a → a)은 지운다");
+            Assert.IsTrue(database.Renames.Any(r => r.oldId == "b" && r.newId == "a"));
         }
     }
 }

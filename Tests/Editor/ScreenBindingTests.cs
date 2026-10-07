@@ -48,6 +48,17 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 키에_콜론이_든_플레이어_데이터도_가리킨다()
+        {
+            _session.Data.Define("stat:kills", DataZone.Meta, 12.0, "처치");
+            _session.Data.Define("hand:1", DataZone.Session, new SbRun { gold = 7 }, "손패 1");
+            Assert.AreEqual("12", ScreenBinding.Parse("stat:kills").Text(_session, null), "키 그대로");
+            Assert.AreEqual("7", ScreenBinding.Parse("hand:1:gold").Text(_session, null), "키 뒤의 경로");
+            Assert.AreEqual("99", ScreenBinding.Parse("run:gold").Text(_session, null), "콜론이 없는 키는 그대로");
+            CollectionAssert.AreEqual(new[] { "hand:1:gold", "hand:1", "hand" }, ScreenBinding.Parse("hand:1:gold").Keys, "다시 그릴 키 후보(긴 것부터)");
+        }
+
+        [Test]
         public void 값을_글로_보이고_목록은_개수다()
         {
             Assert.AreEqual("30", ScreenBinding.Parse("run:hero.hp").Text(_session, "HP"));

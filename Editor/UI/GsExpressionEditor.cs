@@ -295,7 +295,7 @@ namespace GBible.EditorTools.UI
             }
         }
 
-        static bool Locked => !EditorPolicy.CanEditStructure;
+        bool Locked => !EditorPolicy.CanEditStructureOf(_property);
 
         void DrawSequence(VisualElement host, Sequence sequence)
         {

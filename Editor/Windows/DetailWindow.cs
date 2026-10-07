@@ -98,6 +98,8 @@ namespace GBible.EditorTools
             EditorDatabase.Changed += QueueRebind;
             ClassRegistry.Changed += QueueRebind;
             EditorPolicy.Changed += QueueRebuildAll;
+            // Ctrl+Z로 작업본이 되돌아가면 열린 패널의 사본도 맞춘다.
+            Undo.undoRedoPerformed += QueueRebind;
         }
 
         void OnDisable()
@@ -105,6 +107,7 @@ namespace GBible.EditorTools
             EditorDatabase.Changed -= QueueRebind;
             ClassRegistry.Changed -= QueueRebind;
             EditorPolicy.Changed -= QueueRebuildAll;
+            Undo.undoRedoPerformed -= QueueRebind;
         }
 
         // 구조 잠금(EditorPolicy)이 바뀌면 열린 탭을 모두 다시 그린다(블록 도구·'+ 추가'·ID 바꾸기가 보이고 숨는다).
@@ -336,8 +339,14 @@ namespace GBible.EditorTools
             }
             foreach (var tab in _tabs.Where(t => t.Parent == null && t.Build == null).ToList())
             {
+                // 살아 있는 항목 탭: 다른 곳(CSV 가져오기·폴더 옮기기·ID 바꾸기의 참조 갱신·Undo …)이 작업본을 바꿨으면 패널의 사본을 맞춘다
+                // (그대로 두면 패널이 다음에 반영할 때 그 변경을 예전 값으로 덮는다). 이 패널이 아직 옮기지 않은 칸은 지킨다.
                 // 구조 잠금이 바뀌었으면 살아 있는 항목 탭도 다시 연다(바꾼 값은 이미 작업본에 반영되어 있다).
-                if (tab.Panel != null && tab.Panel.Target != null && !all) continue;
+                if (tab.Panel != null && tab.Panel.Target != null && !all)
+                {
+                    tab.Panel.SyncFromTarget();
+                    continue;
+                }
                 tab.Panel?.Release();
                 var item = EditorDatabase.Instance.All.FirstOrDefault(d => d.GetType() == tab.ItemType && d.Id == tab.ItemId);
                 foreach (var child in _tabs.Where(t => IsDescendant(t, tab)).ToList()) _tabs.Remove(child);

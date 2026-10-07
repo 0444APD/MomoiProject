@@ -19,15 +19,34 @@ namespace GBible
         public static event Action Changed;
 
         static InputActionRebindingExtensions.RebindingOperation _operation;
+        // 바꾸는 동안 Esc(취소)가 화면의 뒤로·일시정지 메뉴로 가지 않게 잡아 둔다.
+        static IDisposable _backHold;
 
         public static bool IsRebinding => _operation != null;
 
         [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
+            // 지난 플레이(도메인 리로드를 끈 설정)에서 끝나지 않은 키 바꾸기: 취소해 입력 이벤트 듣기를 끊고 메모리(네이티브)를 놓는다.
+            // 그 플레이의 화면 콜백(done)은 부르지 않는다 — 먼저 비워 두면 Finish가 지난 것으로 알아본다.
+            var stale = _operation;
+            _operation = null;
+            _backHold = null;
+            if (stale != null)
+            {
+                try { stale.Cancel(); }
+                finally { stale.Dispose(); }
+            }
             Actions = null;
             Changed = null;
-            _operation = null;
+        }
+
+        // 플레이가 끝날 때(게임을 끔·에디터에서 플레이를 멈춤) 진행 중인 키 바꾸기를 취소한다 — 끝난 뒤(에디터 편집 중)에 누른 키가 바꾸기를 마치고 설정에 쓰지 않게.
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        static void Hook()
+        {
+            UnityEngine.Application.quitting -= CancelRebind;
+            UnityEngine.Application.quitting += CancelRebind;
         }
 
         public static void Use(InputActionAsset actions, bool enable = true)
@@ -66,21 +85,23 @@ namespace GBible
                 .WithControlsExcluding("<Mouse>/delta")
                 .WithCancelingThrough("<Keyboard>/escape")
                 .OnMatchWaitForAnother(0.1f)
-                .OnCancel(_ => Finish(action, wasEnabled, new RebindResult { Cancelled = true }, done))
-                .OnComplete(_ =>
+                .OnCancel(operation => Finish(operation, action, wasEnabled, new RebindResult { Cancelled = true }, done))
+                .OnComplete(operation =>
                 {
                     var conflict = allowDuplicates ? null : ConflictOf(action, bindingIndex);
                     if (conflict != null)
                     {
                         if (string.IsNullOrEmpty(previous)) action.RemoveBindingOverride(bindingIndex);
                         else action.ApplyBindingOverride(bindingIndex, previous);
-                        Finish(action, wasEnabled, new RebindResult { Conflict = conflict }, done);
+                        Finish(operation, action, wasEnabled, new RebindResult { Conflict = conflict }, done);
                         return;
                     }
                     Save();
-                    Finish(action, wasEnabled, new RebindResult { Done = true }, done);
+                    Finish(operation, action, wasEnabled, new RebindResult { Done = true }, done);
                     Changed?.Invoke();
                 });
+            _backHold?.Dispose();
+            _backHold = GameScreens.HoldBack();
             _operation.Start();
         }
 
@@ -112,10 +133,14 @@ namespace GBible
             return null;
         }
 
-        static void Finish(InputAction action, bool wasEnabled, RebindResult result, Action<RebindResult> done)
+        static void Finish(InputActionRebindingExtensions.RebindingOperation operation, InputAction action, bool wasEnabled, RebindResult result, Action<RebindResult> done)
         {
-            _operation?.Dispose();
+            operation.Dispose();
+            // 지난 플레이에서 남아 ResetStatics가 끝낸 것이면 동작·화면은 건드리지 않는다(그 플레이의 화면은 이미 없다).
+            if (operation != _operation) return;
             _operation = null;
+            _backHold?.Dispose();
+            _backHold = null;
             if (wasEnabled) action.Enable();
             done?.Invoke(result);
         }

@@ -52,7 +52,7 @@ namespace GBible.EditorTools
     }
 
     // 선택 기능 목록과 켜짐 상태. 상태는 ProjectSettings/MomoiProject/Features.json에 두고(팀 공유),
-    // 스크립팅 심볼은 그 파일에 맞춰 자동으로 넣고 뺀다(플랫폼을 바꿔도 다시 맞춘다).
+    // 스크립팅 심볼은 그 파일에 맞춰 자동으로 넣고 뺀다 — 고른 플랫폼·PC·서버(Dedicated Server)에, 플랫폼을 바꾸는 순간 그 플랫폼에도.
     public static class GameFeatures
     {
         public const string SettingsPath = "ProjectSettings/MomoiProject/Features.json";
@@ -178,7 +178,7 @@ namespace GBible.EditorTools
         }
 
         // 설정 파일에 맞게 심볼을 넣고 뺀다. 바뀐 것이 있을 때만 쓴다(다시 컴파일이 일어난다).
-        static void ApplySymbols()
+        internal static void ApplySymbols()
         {
             var saved = false;
             foreach (var target in Targets())
@@ -219,12 +219,31 @@ namespace GBible.EditorTools
             if (saved) AssetDatabase.SaveAssets();
         }
 
-        // 지금 고른 플랫폼과 PC(에디터 기본). 다른 플랫폼은 그 플랫폼으로 바꿀 때 다시 맞춘다.
+        // 지금 고른 플랫폼, 지금 빌드 대상의 플랫폼, PC(에디터 기본), 서버(Dedicated Server).
+        // 서버는 PC와 심볼 칸이 따로라(NamedBuildTarget.Server) 늘 같이 맞춘다 — 서버 빌드 프로필로 바꿔도 기능 어셈블리와 그것을 쓰는 게임 코드가 컴파일된다.
+        // 다른 플랫폼은 그 플랫폼으로 바꾸는 순간(GameFeaturesBuildTargetSync) 맞춘다.
         static IEnumerable<NamedBuildTarget> Targets()
         {
+            var targets = new List<NamedBuildTarget>();
+            foreach (var group in new[] { EditorUserBuildSettings.selectedBuildTargetGroup, BuildPipeline.GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget) })
+            {
+                if (group == BuildTargetGroup.Unknown) continue;
+                try { targets.Add(NamedBuildTarget.FromBuildTargetGroup(group)); }
+                catch (Exception) { /* 이 에디터가 모르는 플랫폼 */ }
+            }
+            targets.Add(NamedBuildTarget.Standalone);
+            targets.Add(NamedBuildTarget.Server);
             var seen = new HashSet<string>();
-            foreach (var target in new[] { NamedBuildTarget.FromBuildTargetGroup(EditorUserBuildSettings.selectedBuildTargetGroup), NamedBuildTarget.Standalone })
-                if (seen.Add(target.TargetName)) yield return target;
+            return targets.Where(t => seen.Add(t.TargetName)).ToList();
         }
+    }
+
+    // 플랫폼(빌드 대상)을 바꾸면 그 플랫폼의 심볼도 바로 맞춘다. 바꾼 뒤의 다시 컴파일이 기능 심볼을 갖고 돌게 —
+    // 심볼 없이 먼저 컴파일되면 기능을 쓰는 게임 코드가 실패하고, 실패한 컴파일 뒤에는 InitializeOnLoad(SyncOnLoad)가 다시 돌지 않는다.
+    sealed class GameFeaturesBuildTargetSync : IActiveBuildTargetChanged
+    {
+        public int callbackOrder => 0;
+
+        public void OnActiveBuildTargetChanged(BuildTarget previousTarget, BuildTarget newTarget) => GameFeatures.ApplySymbols();
     }
 }

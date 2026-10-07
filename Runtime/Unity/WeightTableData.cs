@@ -141,7 +141,7 @@ namespace GBible
         public override void Run(TriggerContext context)
         {
             var game = context.Game;
-            var total = Math.Max(1, count + (int)Math.Round(countBonus?.Read(game.Session) ?? 0));
+            var total = Math.Max(1, count + GameNumbers.RoundToInt(countBonus?.Read(game.Session) ?? 0));
             var options = game.Roll(table, total, unique).Select(id => new ChoiceCandidate(id, Texts.NameOf(id)));
             var user = context.User != null && GameApi.HasId(context.User.GetType()) ? GameApi.IdOf(context.User) : "";
             var next = new ChoiceEffectsRun

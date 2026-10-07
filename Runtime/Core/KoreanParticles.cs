@@ -66,6 +66,9 @@ namespace GBible
             var text = Clean(word);
             if (text.Length == 0) return (false, false, false);
             if (Overrides.TryGetValue(text, out var forced)) return (true, forced, false);
+            // 예외 등록은 마지막 단어로도 찾는다("New Game" → "Game").
+            var space = text.LastIndexOf(' ');
+            if (space >= 0 && space < text.Length - 1 && Overrides.TryGetValue(text.Substring(space + 1), out var forcedLast)) return (true, forcedLast, false);
             var c = text[text.Length - 1];
 
             if (c >= 0xAC00 && c <= 0xD7A3)
@@ -159,6 +162,17 @@ namespace GBible
             }
             var lower = run.ToLowerInvariant();
             if (lower.EndsWith("ng", StringComparison.Ordinal)) return (true, true, false);
+            // 소리 나지 않는 e: game·frame·time(게임·프레임·타임) = ㅁ, rune·line(룬·라인) = ㄴ, table·castle(테이블·캐슬) = ㄹ, 그 밖(page·code·gate)은 받침 없음.
+            if (lower.Length >= 3 && last == 'e')
+            {
+                switch (lower[lower.Length - 2])
+                {
+                    case 'm':
+                    case 'n': return (true, true, false);
+                    case 'l': return (true, true, true);
+                    default: return (true, false, false);
+                }
+            }
             switch (last)
             {
                 case 'm':

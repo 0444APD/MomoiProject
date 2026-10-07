@@ -49,14 +49,21 @@ namespace GBible
                 error = $"'{value.path}'에 '{text}'를 넣을 수 없습니다({target.Name}).";
                 return false;
             }
-            var cut = value.path.LastIndexOf('.');
-            var parentPath = cut < 0 ? "" : value.path.Substring(0, cut);
-            var member = cut < 0 ? value.path : value.path.Substring(cut + 1);
+            // 마지막 마디는 필드나 딕셔너리의 키. 괄호 안의 점은 나누지 않는다.
+            FieldPaths.SplitLast(value.path, out var parentPath, out var member);
+            var written = false;
             foreach (var parent in FieldPaths.Resolve(evt, parentPath).ToList())
-                if (parent != null && !parent.GetType().IsValueType) FieldAccess.Find(parent.GetType(), member)?.Set(parent, parsed);
+                if (parent != null && !parent.GetType().IsValueType && FieldPaths.Assign(parent, member, (_, __) => parsed)) written = true;
+            if (!written)
+            {
+                error = $"'{value.path}'에 쓰지 못했습니다(부모가 비었거나 구조체입니다).";
+                return false;
+            }
             return true;
         }
 
+        // 글자를 그 형식의 값으로. 참거짓은 PlayerDataGrants.TryParseBool(대소문자 무관 — 값 틀이 펼친 True도), 읽지 못하는 글자는 거짓을 돌려준다
+        // (부르는 쪽이 경고한다 — 거짓으로 넣지 않는다). 정수 형식은 GameNumbers의 반올림(0에서 먼 쪽).
         public static bool TryParse(Type type, string text, out object value)
         {
             value = null;
@@ -65,9 +72,13 @@ namespace GBible
             try
             {
                 if (underlying == typeof(string)) value = text;
-                else if (underlying == typeof(bool)) value = text == "true" || text == "참" || text == "1";
+                else if (underlying == typeof(bool))
+                {
+                    if (!PlayerDataGrants.TryParseBool(text, out var flag)) return false;
+                    value = flag;
+                }
                 else if (underlying.IsEnum) value = Enum.Parse(underlying, text);
-                else if (TypeResolver.IsNumeric(underlying)) value = Convert.ChangeType(double.Parse(text, CultureInfo.InvariantCulture), underlying, CultureInfo.InvariantCulture);
+                else if (TypeResolver.IsNumeric(underlying)) value = GameNumbers.ToType(double.Parse(text, CultureInfo.InvariantCulture), underlying);
                 else return false;
                 return true;
             }

@@ -51,7 +51,7 @@ GBible.Unity
 | 되돌리기 | `session.Undo()`(Bootstrap Undo 방식: 행동 단위·스냅샷·쓰지 않음, 보관 수 — 새 DB 기본 200). 이번 턴만이면 Bootstrap 'Undo 끊는 이벤트'. "이번 턴 처음으로"·"되감기 3회"는 `session.HistoryMark`·`UndoTo(지점)` | 02 |
 | id로 객체 찾기 | `Game.Find<T>(id)`·`Game.All<T>()`. id가 있는 클래스(`public string id`). 새 id는 `Game.NewId("card")` | 03 |
 | 행동 필드에 객체 넣기 | 넣어도 된다: 기록·전송에는 id만 남고 실행 직전에 다시 찾는다(Undo·불러오기 뒤에도 맞다) | 02 |
-| 판을 이어 하기·저장 | Bootstrap '판 저장'(행동마다·끌 때·저장 안 함·N초마다·이벤트를 받을 때)·'판 끝 이벤트'. `GBibleRuntime.SaveRun`·`LoadRun`·`NewRun`·`HasSavedRun`, 저장 직전·불러온 뒤·끄기 직전 이벤트 `Saving`·`RunLoaded`·`Stopping` | 06·10장(가이드) |
+| 판을 이어 하기·저장 | Bootstrap '판 저장'(행동마다·끌 때·저장 안 함·N초마다·이벤트를 받을 때)·'판 끝 이벤트'. `GBibleRuntime.SaveRun`(`Saving` → 프로필 → 판 — 프로필도 함께)·`LoadRun`(깨졌으면 `.bak`으로)·`NewRun`·`HasSavedRun`, 저장 직전·불러온 뒤·끄기 직전 이벤트 `Saving`·`RunLoaded`·`Stopping` | 06·10장(가이드) |
 | 출시 뒤 저장 구조 변경 | DB › 개발 › 저장 변환(필드 옮김·키 이름 바꿈·키 삭제), 계산이 필요하면 `options.Migrations.Add` | 06 |
 | 결정론 난수 | `Game.Random("흐름 이름").Range(최소, 최대 + 1)`·`NextDouble()`. 흐름은 쓰는 곳마다 이름. 행동 안에서만. 확률은 아래 `Game.Chance` | 07 |
 | N% 확률(행운·"확률 2배"가 고침) | `Game.Chance(0.25, "흐름", source)`·조건 '확률'(이벤트·가로채기·사용 트리거와 AND, 미리 보기에서는 굴리지 않음). 의도 '확률'(`probability`)을 가로채면 모든 확률이 바뀐다 | 07·11 |
@@ -92,7 +92,7 @@ GBible.Unity
 | 조각을 차례로 쓰기(되는 것만) | `Game.TryUse(id, 사용자, 대상…)`(조건이 안 맞으면 실패 없이 거짓). 한 번 더 발동은 의도 '사용'의 `times` | 16 |
 | 자리(옆 칸·같은 줄·맞은편·가장자리·석판 무늬) | 목록 + 줄 길이(0 = 한 줄, 빈 칸 = null). 코드 `Placement.Around`·`Is`·`Pattern(칸, 개수, 열, 무늬, 회전)`·`Rotate`, DB 대상 '자리로 고르기'(다른 목록 = 맞은편, 기준 '없음' = 목록 전체의 맨 처음·맨 끝)·조건 '자리 검사'. 열 우선 순서(와일드프로스트)는 목록을 열 우선으로 담고 '같은 열 …'. 플레이어마다 칸은 `players[].charms`(기준이 든 목록) | 37 |
 | "3턴 뒤 폭발"·"2초 뒤" | 상태 효과의 끝날 때 결과(DB) / `Game.ScheduleAfter(초, 행동)`·`ScheduleOn<이벤트>(횟수, 행동)`(코드)·`CancelSchedule(s)` | 29 |
-| 플레이어가 고르기("1장 버리기") | `Game.Ask(안내, 후보, new 이어서할행동())` + 행동의 `[Chosen]` 필드 → 화면이 `Game.Answer`. DB 결과 '선택 요구'(판에 있는 것에서)·'가중치 표에서 고르기'(DB 원본에서) | 29·30 |
+| 플레이어가 고르기("1장 버리기") | `Game.Ask(안내, 후보, new 이어서할행동())` + 행동의 `[Chosen]` 필드 → 화면이 `Game.Answer`. DB 결과 '선택 요구'(판에 있는 것에서)·'가중치 표에서 고르기'(DB 원본에서). 멀티: 답할 사람(`player`)을 생략하면 그 행동을 한 플레이어 — 그 사람 키(`$choices:번호`)에 두어 주인에게만 간다, 누구나는 `player: ""` | 29·30 |
 | 대상 고르기(체력이 가장 낮은 적·불 속성 적 무작위 2·때린 쪽) | 기본 대상 Block: 플레이어 데이터 목록 → 정렬해서 n개 / 조건으로 거르기 → 무작위 n개 / 이벤트의 개체 | 16 |
 | 예상 피해·"낼 수 없음" 이유 | `Game.Preview(행동, g => 읽기)`·`Game.CanDo(행동, out 이유)`(해 보고 되돌림, 기록·연출 없음) | 33 |
 | 열린 상자·잡은 보스·스위치 | `Game.SetWorld("forest.chest3", true, permanent: true)`·`World`·`WorldFlag`·`ClearWorld`, 컴포넌트 '월드 상태 연결' | 32 |
@@ -117,7 +117,7 @@ GBible.Unity
 | 빚(돈이 −20까지) | 가로채기 '비용 지불' → `floor` 값으로 바꾸기 −20 | 28 |
 | 한 번 달성(도전과제) | DB › 도전과제(트리거 → 결과), Steam이면 같은 ID로 | 14·34 |
 | 쌓는 숫자(처치 수·최대 콤보) | DB › 로그(이벤트 받기 → 기록 규칙: 더하기·최대·마지막), `session.Stats.Get(id)` | 15 |
-| 필수 값·스프라이트 규격 | 필드 규칙(클래스 상세)·스프라이트 규격 파일(Project 창 Create › MomoiProject › 스프라이트 규격 — 개발자가 Dev에서 만든다) | 27 |
+| 필수 값·스프라이트 틀 | 필드 규칙(클래스 상세)·스프라이트 틀 파일(Project 창 Create › MomoiProject › 스프라이트 틀 — 용도 하나의 크기 표(이름·가로·세로), 개발자가 Dev에서 만든다) | 27 |
 | 수치 수십 개 한꺼번에 | DB 목록의 CSV(목록 칸 `entries[0].weight`) | 33 |
 | AI가 DB 항목 만들기 | DB 반영 스크립트(`Assets/MomoiProject/Code/Editor/Seeds`, `[DbSeed("버전")]` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)` → 컴파일 뒤 저절로 적용 전 → 개발자가 Ctrl+S) 또는 CSV | 관례 15절 |
 
@@ -172,8 +172,8 @@ GBible.Unity
 | 게임 안 달력·시각 | 판 데이터에 날짜·시각, 하루 넘김 행동이 이벤트를 쏜다 | 구현 가이드 07 |
 | 현실 시각(오프라인 보상·스태미나·일일 초기화) | `Game.Now`(UTC, 행동에 기록되어 Undo·멀티에서 같다) · `Game.Day(초기화 시각)` · `Game.Week()`. 규칙에서 `DateTime.Now`를 쓰지 않는다. 꺼 둔 시간 = `Game.Now − profile.lastSeen` | 07 |
 | 시드 입력·일일 도전 | `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))`(같은 글자 = 같은 판, 일일은 날짜 글자) | 07 |
-| 칸 단위 맵(전술·던전·농장) | `Grid`: `Distance`·`Neighbors`·`Reachable`(이동 범위)·`Path`(길찾기)·`Line`·`Visible`(시야)·`Area`·`Ray`·`Cone`·`Rotate`, `Cell`·`Grid.Key(x, y)`. 맵은 원본 인스턴스(rows 글자 목록) 또는 `Dictionary<string, …>`(키 "x,y") | 36 |
-| 1e308을 넘는 수 | `BigNumber`(필드 하나만, 연산자 그대로, "1.23Qa"·"1.23억" 표기). 비용 검사는 코드 | 36 |
+| 칸 단위 맵(전술·던전·농장) | `Grid`: `Distance`·`Neighbors`·`Reachable`(이동 범위)·`Path`(길찾기 — 기본은 늘 가장 싼 길, `minCost`는 모든 칸 비용 이하일 때만 빨라지는 힌트)·`Line`·`Visible`(시야)·`Area`·`Ray`·`Cone`·`Rotate`, `Cell`·`Grid.Key(x, y)`. 맵은 원본 인스턴스(rows 글자 목록) 또는 `Dictionary<string, …>`(키 "x,y") | 36 |
+| 1e308을 넘는 수 | `BigNumber`(필드 하나만, 연산자 그대로, "1.23Qa"·"1.23억" 표기 — `ToString("ko")`·`"sci"`·`"full"`). 1e300 아래는 double 그대로라 정수·0.5를 쌓아도 오차가 없다. 비용 검사는 코드 | 36 |
 | 되감기("이번 턴 처음으로") | `session.HistoryMark`·`UndoTo(지점)`(행동 단위 Undo) | 02 |
 | 세이브 슬롯 1·2·3 | `GBibleRuntime.UseSlot(이름)`·`SlotInfoOf`·`DeleteSlot`·`CopySlot`·`SlotSummary`(한 줄 요약 함수), 기본 슬롯 화면 | 31·35 |
 | 키 바꾸기 | 선택 기능 입력: `GameInput.Use(actions)`·`Rebind`·`ResetBindings`·`BindingText` | 31 |
@@ -194,7 +194,7 @@ GBible.Unity
 | 가로채기·비용·실패 | `Intercept<T>(의도)` · `Pay(키, 경로, 양, what, forId, user)` · `TryPay(키, 경로, 양, forId, user)` · `CanPay(키, 경로, 양)` · `Fail(키, [기본 문장,] (이름, 값)…)` |
 | 상태 효과·패시브 | `ApplyStatus(대상, id, 중첩 = 1, 출처, 길이 = 기본, by = 건 개체)`(의도 '상태 효과 걸기'를 거침, 막히면 null) · `RemoveStatus(대상, id, 중첩 = 0)` · `ShortenStatus(대상, id, 양)` · `StatusStacks` · `HasStatus` · `Statuses(대상)` · `StatusCount(대상, 종류)` · `RemoveStatuses(대상, 종류)` · `Owned(패시브 id, 가진 쪽)`(놓인 것마다면 가진 쪽 = 그 요소) · `BorrowPassive(패시브 id, 원본)` |
 | 예약 | `ScheduleAfter(초, 행동, 출처, permanent)` · `ScheduleOn<이벤트>(횟수, 행동, 출처, permanent)` · `CancelSchedule(id)` · `CancelSchedules(출처)` |
-| 선택 대기 | `Ask(안내, 후보(객체·id 글자), 이어서, min, max, source, player, label)` · `Ask(안내, ChoiceCandidate들, …)` · `Choice` · `Choices` · `IsWaiting` · `Answer(선택 id, 고른 것…)` · `CancelChoice(id)` · `RerollChoice(id)`(표로 만든 선택을 새로 뽑기) |
+| 선택 대기 | `Ask(안내, 후보(객체·id 글자), 이어서, min, max, source, player, label)` · `Ask(안내, ChoiceCandidate들, …)` · `Choice` · `Choices` · `IsWaiting`(`Choice`·`IsWaiting`은 이 프로그램이 답할 선택만 — 멀티면 모두에게 온 것과 내 번호의 것) · `Answer(선택 id, 고른 것…)` · `CancelChoice(id)` · `RerollChoice(id)`(표로 만든 선택을 새로 뽑기) |
 | 밸런스·뽑기 | `Balance(id[, 단계])` · `BalanceSum(id, from, n)` · `BalanceCount(id, from, 예산)` · `Roll(표 id)` · `Roll(표 id, n, unique)` · `Roll(풀 (id, 무게)…, n, unique, stream)` · `Roll(id 목록, n, unique, stream)` |
 | 월드 상태 | `World(id)` · `WorldFlag(id)` · `SetWorld(id, 값/참거짓, permanent)` · `ClearWorld(id)` |
 | 세션 | `Session`(아래) |
@@ -228,7 +228,7 @@ public class PlayCard : GameAction
 
 - DB › 플레이어 데이터: 키 · 구역(`Session` = 판, `Meta` = 프로필) · 값 형식. 생성 상수 `GameIds.PlayerData.Run`(`PlayerDataKey<RunState>`, `.Id`), 접근자 `Game.Data().Run`.
 - 코드로: `session.Data.Define("run", DataZone.Session, new RunState(), "판")` · `Get<T>(키)` · `Set(키, 값)` · `IsDefined(키)` · `Changed`(이벤트).
-- 담을 수 있는 것: 숫자·글자·참거짓·enum·`[Serializable]` 클래스·List·배열·Dictionary(글자/숫자 키). 에셋 참조는 원본(DB)에 두고 판 데이터에는 ID.
+- 담을 수 있는 것: 숫자·글자·참거짓·enum·`[Serializable]` 클래스·List·배열·Dictionary(글자/숫자 키). 에셋 참조는 원본(DB)에 두고 판 데이터에는 ID. 한 키 안에서 같은 객체를 두 곳에서 가리키거나 서로 가리켜도 된다(Undo·저장·불러오기가 같은 인스턴스로 지킨다 — 컬렉션 인스턴스는 한 곳에서만, 다른 키끼리는 나눠 쓰지 않는다).
 - 라이브러리가 쓰는 키: `$statuses` · `$schedule` · `$choices` · `$world`(·`.meta`) · 로그 `stat:<ID>` · 도전과제 `achievement:<ID>`. 직접 고치지 않는다.
 
 ### 3-5. 이벤트 · 의도 · 컨텍스트
@@ -272,7 +272,7 @@ public class PlayCard : GameAction
 | `GBibleRuntime` | `Session` · `Game` · `Start()` · 이벤트 `Configuring`·`Started`·`Stopped`·`Saving`·`RunLoaded`·`Stopping` · `Slot`·`UseSlot`·`SlotInfoOf`·`Slots()`·`DeleteSlot`·`CopySlot`·`SlotSummary`·`PlayTime` · `SaveProfile`·`SaveRun`·`LoadRun`·`NewRun(session, 시드)`·`DeleteRun`·`HasSavedRun`·`AutoSaveRun` |
 | `GameView` | `Redraw(그리기, [waitForPresentation,] 키…)` · `Present(코루틴 / done => … / 초)` · `Play(코루틴 / done => …)`(대기열 밖) · `IsPresenting` · `Busy` · `Wait(초)` · `DeltaTime` · `PresentationSpeed` · `SkipPresentation` · `ClearPresentation` · `Register`·`Find<T>(id)`(GameObject) · `RegisterElement`·`FindElement(id)`(UI 칸) |
 | `ViewList<항목, 컴포넌트>` | `(프리팹, 부모, () => 목록, (뷰, 항목) => …, 키…)` · `OnCreate` · `OnRemove` · `ViewOf(id)` |
-| `GameScreens` | `Open(id, 값)` · `Close` · `CloseAll` · `IsOpen` · `Get` · `All` · `Back()` · `Do(() => 행동, whileChoosing)` · `Reroll`(고르기 창의 다시 뽑기 행동) · `Toast` · `Confirm` · `Overlay` · `QuitToTitle` · `Quit()` · `Opened`·`Closed` · ID `Choice`·`Confirmation`·`Settings`·`Slots`·`Pause` |
+| `GameScreens` | `Open(id, 값)` · `Close` · `CloseAll` · `IsOpen` · `Get` · `All` · `Back()` · `HoldBack()`(Esc를 다른 뜻으로 쓰는 동안 뒤로 막기) · `Do(() => 행동, whileChoosing)` · `Reroll`(고르기 창의 다시 뽑기 행동) · `Toast` · `Confirm` · `Overlay` · `QuitToTitle` · `Quit()` · `Opened`·`Closed` · ID `Choice`·`Confirmation`·`Settings`·`Slots`·`Pause` |
 | `GameScreen` | `OnOpen`·`Draw`·`OnClose`·`Tick(초)` · `Watch` · `WaitForPresentation` · `Q<T>(이름)` · `OnClick(이름, () => 행동 / 할 일)` · `List<T>(…)` · `Item(이름)` · `Own(…)` · `Close()` · `Root`·`Argument`·`Data` |
 | `ElementList<항목>` | `(컨테이너, 칸 UXML, () => 목록, (칸, 항목) => …, 키…)` · `OnCreate` · `OnRemove` · `Find(id)` |
 | `GameSettings` | `Toggle`·`Number`·`Choice`·`Text`·`Get(id)` · `Set(id, 값)` · `Reset`·`ResetAll(분류)` · `All` · `Label`·`ChoicesOf` · `Changed` · `Raw`·`SetRaw`(모듈용) |
@@ -315,7 +315,7 @@ public class PlayCard : GameAction
 | DB › 화면 | `ScreenData` · `screen` | UI Toolkit 화면 | `GameIds.Screen` | 35 |
 | DB › 인스턴스 | `InstanceData` · `instance` | 원본 하나(클래스의 값) | `GameIds.Instance` | 04 |
 | DB › 프리팹 | `PrefabData` · `prefab` | 프리팹 연결 | `GameIds.Prefab` | 21 |
-| (파일 — Dev) 스프라이트 규격 | `SpritePresetData` | 그림 크기·피벗 규격 | — | 27 |
+| (파일 — Dev) 스프라이트 틀 | `SpriteFrameData` | 용도 하나의 크기 표(이름·가로·세로) | `GameIds.SpriteFrame` · `GameIds.SpriteSize.<틀>.<크기>` | 27 |
 | 데이터 › (프로젝트 종류) | `GameData` 상속 | 유물·퀘스트 … | `GameIds.<이름>` | 17 |
 | 개발 › 개발 명령 · 저장 변환 · Steam | `DebugCommandData` · `SaveMigrationData` · `SteamData` | 명령 탭 버튼 · 변환 한 단계 · Steam 설정 | — | 22·06·34 |
 | 다이얼로그 시스템 › 스탠딩 프로필 · 장소 | (선택 기능) | 화자 그림 · 장소 | — | 24 |
@@ -341,11 +341,12 @@ public class PlayCard : GameAction
 | 상태 효과 주기가 밀렸을 때 한 번에 | 8번 |
 | 사슬 한도(이벤트·트리거가 서로 부르는 깊이) | 16 |
 | 가중치 표 안쪽 표 깊이 | 8 |
-| 고정 틱 한 프레임 최대 | 8틱 |
+| 고정 틱 한 프레임 최대 | 8틱(배속이면 8 × 올림(배속), 최대 128틱 — `GameSession.TickLimit`, 남은 시간은 버림) |
 | 플레이 중 DB 반영(밸런스 값·가중치 표) | 0.5초 |
 | 화면 기준 크기 | 1920×1080 |
 | 알림 | 2.5초, 최대 4줄 |
-| 연출 `done` 기다림 | 30초(넘으면 경고 후 다음) |
+| 연출 `done` 기다림 · 코루틴 연출의 한 걸음 | 30초(실제 초, 게임이 멈춘 동안은 세지 않음 — 넘으면 경고 후 다음) |
+| 정수로 맞추는 반올림 | 0에서 먼 쪽(2.5 → 3, −2.5 → −3 — `GameNumbers.Round`). `Get<int>`·정수 필드에 넣는 값·중첩·곡선·설정 단위·Steam INT 통계가 모두 같다 |
 
 ## 7. 자주 틀리는 것
 

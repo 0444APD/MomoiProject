@@ -107,7 +107,7 @@ namespace GBible
 
         // 중첩은 효과 배율(Use.Context.Power)을 곱한다. 건 개체(by) = 사용자(처치 기여).
         protected override void Apply(object target) =>
-            Game.ApplyStatus(target, status, Math.Max(1, (int)Math.Round(stacks * (Use?.Context?.Power ?? 1), MidpointRounding.AwayFromZero)), Use?.Context?.Owner ?? Use?.Ability?.Id,
+            Game.ApplyStatus(target, status, Math.Max(1, GameNumbers.RoundToInt(stacks * (Use?.Context?.Power ?? 1))), Use?.Context?.Owner ?? Use?.Ability?.Id,
                 length > 0 ? length : (double?)null, Use?.User);
 
         public override string Describe() => stacks == 1 ? $"{status} 걸기" : $"{status} {stacks}중첩 걸기";

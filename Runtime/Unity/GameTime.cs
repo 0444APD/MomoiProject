@@ -13,6 +13,9 @@ namespace GBible
     // WaitForSecondsRealtime, 오디오(피치), UI 연출. 메뉴·일시정지 화면처럼 멈추면 안 되는 것만 이쪽을 쓴다.
     //
     // 일시정지는 이유별로 겹칠 수 있다(예: 메뉴와 다이얼로그 창이 동시에 멈춤 → 둘 다 풀려야 재개).
+    //
+    // 고정 틱: 세션은 배속을 모르고 deltaTime만 받으므로, 한 프레임에 따라잡는 틱 한도(GameSession.HostSpeed)를 배속에 맞춰 준다
+    // (×16이면 보통 프레임에도 틱이 16배 들어온다 — 한도가 그대로면 규칙 시간만 ×8로 늦어진다).
     public static class GameTime
     {
         public const float MinSpeed = 0.05f;
@@ -75,9 +78,10 @@ namespace GBible
             Apply();
         }
 
-        // 호스트가 매 프레임 끝에 호출한다. 넘기기 프레임을 하나씩 소모한다.
+        // 호스트가 매 프레임 끝에 호출한다. 넘기기 프레임을 하나씩 소모하고, 고정 틱 한도를 배속에 맞춘다(새로 만든 세션도 다음 프레임부터).
         internal static void OnFrameEnd()
         {
+            ShareSpeed();
             if (_stepFrames <= 0 || Time.frameCount == _stepRequestedFrame) return;
             _stepFrames--;
             if (_stepFrames == 0) Apply();
@@ -90,7 +94,25 @@ namespace GBible
             Time.timeScale = scale;
             // 슬로우에서도 물리가 뚝뚝 끊기지 않게 물리 간격을 배속에 맞춘다(빠르게 할 때는 기본 간격 유지).
             Time.fixedDeltaTime = scale > 0f && scale < 1f ? _baseFixedDelta * scale : _baseFixedDelta;
+            ShareSpeed();
             Changed?.Invoke();
+        }
+
+        // 이 프로그램이 시간을 흘리는 세션 모두에 배속을 알린다: 이 화면의 세션 · 시험 모드·방장의 서버 세션 · 매칭 서버의 방.
+        // 바뀐 배속은 다음 프레임의 deltaTime부터 들어오므로 프레임 끝에 맞춰 두면 된다.
+        static void ShareSpeed()
+        {
+            var main = GBibleRuntime.Session;
+            if (main != null) main.HostSpeed = _speed;
+            var server = GameNet.Server?.Session;
+            if (server != null) server.HostSpeed = _speed;
+            var rooms = GameNet.Hub?.Rooms;
+            if (rooms == null) return;
+            for (var i = 0; i < rooms.Count; i++)
+            {
+                var room = rooms[i]?.Session;
+                if (room != null) room.HostSpeed = _speed;
+            }
         }
 
         // 플레이 시작·종료 시 기본값으로(에디터에서 도메인 리로드를 꺼도 이전 플레이 상태가 남지 않게).

@@ -135,6 +135,54 @@ namespace GBible.Tests
             var suggestion = ViewSettings.Suggest(fields, "icons", Slot.Image);
             Assert.AreEqual("icon", suggestion?.Path);
         }
+
+        [Test]
+        public void CSV_숫자_칸은_천_단위_쉼표와_소수_쉼표를_가려_읽는다()
+        {
+            Assert.AreEqual("1000", DataCsv.PlainNumber("1,000"));
+            Assert.AreEqual("-1234567.5", DataCsv.PlainNumber("-1,234,567.5"));
+            Assert.AreEqual("0.5", DataCsv.PlainNumber("0,5"));
+            Assert.AreEqual("1e3", DataCsv.PlainNumber("1e3"));
+            Assert.IsNull(DataCsv.PlainNumber("1.000,5"), "점과 쉼표가 함께면 알 수 없다");
+            Assert.IsNull(DataCsv.PlainNumber("0,500"), "쉼표 뒤 세 자리: 천 단위인지 소수인지 알 수 없다");
+            Assert.IsNull(DataCsv.PlainNumber("1,00,000"));
+
+            var balance = ScriptableObject.CreateInstance<BalanceData>();
+            try
+            {
+                var so = new UnityEditor.SerializedObject(balance);
+                var value = so.FindProperty(nameof(BalanceData.value));
+                Assert.IsTrue(DataCsv.Parse(value, "1,000", out _));
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.AreEqual(1000.0, balance.value, "1이 아니라 1000");
+                Assert.IsFalse(DataCsv.Parse(value, "1.000,5", out var error));
+                StringAssert.Contains("쉼표", error);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.AreEqual(1000.0, balance.value, "읽지 못한 칸은 그대로");
+            }
+            finally
+            {
+                Object.DestroyImmediate(balance);
+            }
+        }
+
+        [Test]
+        public void CSV는_UTF_8이_아니면_읽지_않는다()
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "momoi-csv-" + System.Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                // "key,가" — 가 = CP949 B0 A1(한국어 Windows Excel의 기본 'CSV').
+                System.IO.File.WriteAllBytes(path, new byte[] { 0x6B, 0x65, 0x79, 0x2C, 0xB0, 0xA1 });
+                Assert.Throws<System.Text.DecoderFallbackException>(() => DataCsv.ReadUtf8(path));
+                System.IO.File.WriteAllText(path, "key,가", new System.Text.UTF8Encoding(true));
+                Assert.AreEqual("key,가", DataCsv.ReadUtf8(path), "BOM이 있는 UTF-8은 읽는다");
+            }
+            finally
+            {
+                System.IO.File.Delete(path);
+            }
+        }
     }
 
     public class WindowSmokeTests

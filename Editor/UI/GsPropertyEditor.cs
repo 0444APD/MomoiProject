@@ -168,8 +168,8 @@ namespace GBible.EditorTools.UI
                 }));
             }
 
-            // 구조 잠금(EditorPolicy): 블록을 더하는 것은 AI가 한다.
-            if (!EditorPolicy.CanEditStructure)
+            // 구조 잠금(EditorPolicy): 블록을 더하는 것은 AI가 한다(개발자가 만드는 종류의 에셋은 개발자가).
+            if (!EditorPolicy.CanEditStructureOf(list))
             {
                 if (list.arraySize == 0) container.Add(Gs.Label($"{KindName(elementType)} 없음", "gs-caption"));
                 return container;
@@ -252,7 +252,7 @@ namespace GBible.EditorTools.UI
             var listField = PropertyUtil.GetField(list, out _);
             if (KeywordTools.GroupOf(listField) != null) return KeywordChips(list, listField, onStructure);
             // 구조 잠금(EditorPolicy): 규칙 줄(TriggerRule)처럼 블록이 든 요소는 AI가 더하고 뺀다. 데이터 목록의 줄은 개발자가 더하고 뺀다.
-            var structureLocked = !EditorPolicy.CanEditStructure && EditorPolicy.IsStructural(elementType);
+            var structureLocked = !EditorPolicy.CanEditStructureOf(list) && EditorPolicy.IsStructural(elementType);
             VisualElement RemoveButton(Action onClick) => structureLocked ? new VisualElement() : GsPropertyEditor.RemoveButton(onClick);
             var container = Gs.Col();
             for (int i = 0; i < list.arraySize; i++)
@@ -460,7 +460,7 @@ namespace GBible.EditorTools.UI
         {
             var value = property.managedReferenceValue;
             // 구조 잠금(EditorPolicy): 블록을 고르고·바꾸고·빼고·옮기는 것은 AI가 한다. 블록 안의 값은 그대로 고친다.
-            var locked = !EditorPolicy.CanEditStructure;
+            var locked = !EditorPolicy.CanEditStructureOf(property);
             if (value == null && locked)
             {
                 var none = Gs.Label("(없음)", "gs-caption");

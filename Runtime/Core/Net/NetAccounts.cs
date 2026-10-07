@@ -110,8 +110,17 @@ namespace GBible
     }
 
     // 가짜 저장: 폴더 아래 accounts/<계정>.json, matches/<매치>.json.
+    // 쓰기는 SafeFile(임시 파일에 끝까지 써서 디스크에 내린 뒤 바꿔 넣는다 — 바로 전 파일은 .bak).
+    // 읽을 때 본 파일이 없거나 깨졌으면 .tmp(바꿔 넣는 사이에 꺼짐 — 끝까지 쓴 새 내용) → .bak(바로 전 저장) 차례로 되살린다.
+    // 깨진 파일은 지우지 않고 옆으로 옮긴다(<파일>.broken-<시각>). 읽을 수 있는 것이 하나도 없을 때만 Load가 null(없는 계정 → 새 계정).
     public sealed class FilePlayerStore : INetPlayerStore
     {
+        // 파일 이름에 넣는 계정 키 앞부분의 최대 글자 수. 한글(UTF-8 3바이트) 64자에 해시·확장자·.broken-시각을 붙여도
+        // ext4의 이름 한도 255바이트 안에 든다. 해시는 자르기 전 키 전체로 만들어 앞부분이 같은 긴 키끼리도 겹치지 않는다.
+        const int NameLength = 64;
+        // SafeFile이 쓰는 임시 파일(바꿔 넣기 전).
+        const string TempSuffix = ".tmp";
+
         readonly string _accounts;
         readonly string _matches;
 
@@ -124,11 +133,17 @@ namespace GBible
             Directory.CreateDirectory(_matches);
         }
 
+        // 기록(깨진 파일을 옮김 · .tmp/.bak에서 되살림). 서버 기록에 잇는다(예: store.Log += Debug.Log).
+        public event Action<string> Log;
+
         static string Safe(string id)
         {
             var b = new StringBuilder();
             foreach (var c in id ?? "")
+            {
+                if (b.Length >= NameLength) break;
                 b.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_');
+            }
             // 다른 글자가 같은 이름이 되지 않게 해시를 붙인다(실행마다 같은 값 — string.GetHashCode는 실행마다 다르다).
             var hash = 2166136261u;
             foreach (var c in id ?? "")
@@ -144,55 +159,105 @@ namespace GBible
 
         public NetAccount Load(string id)
         {
-            var path = AccountPath(id);
-            if (!File.Exists(path)) return null;
-            var tree = MiniJson.Deserialize(File.ReadAllText(path, Encoding.UTF8));
-            return DataModel.FromTree(tree, typeof(NetAccount), null, null) as NetAccount;
+            var tree = Read(AccountPath(id), out _, out var broken);
+            if (tree == null)
+            {
+                if (broken) Say($"계정 {id}: 읽을 수 있는 저장이 없어 없는 계정으로 봅니다(깨진 파일은 옆에 남겨 두었습니다).");
+                return null;
+            }
+            var account = DataModel.FromTree(tree, typeof(NetAccount), null, null) as NetAccount;
+            // 키가 빠진 파일이면 찾은 키로(매칭·결과 반영이 키로 계정을 찾는다).
+            if (account != null && string.IsNullOrEmpty(account.id)) account.id = id;
+            return account;
         }
 
         public void Save(NetAccount account)
         {
             if (account == null) return;
             var json = MiniJson.Serialize(DataModel.ToTree(account, typeof(NetAccount), null, new List<string>()));
-            WriteAtomic(AccountPath(account.id), json);
+            SafeFile.WriteAllText(AccountPath(account.id), json);
         }
 
-        public void SaveMatch(string matchId, string state) => WriteAtomic(MatchPath(matchId), state ?? "");
+        public void SaveMatch(string matchId, string state) => SafeFile.WriteAllText(MatchPath(matchId), state ?? "");
 
         public string LoadMatch(string matchId)
         {
-            var path = MatchPath(matchId);
-            return File.Exists(path) ? File.ReadAllText(path, Encoding.UTF8) : null;
+            Read(MatchPath(matchId), out var text, out _);
+            return text;
         }
 
         public IEnumerable<string> OpenMatches()
         {
-            foreach (var path in Directory.GetFiles(_matches, "*.json"))
+            // 본 파일 없이 .tmp·.bak만 남은 매치(바꿔 넣는 사이에 꺼짐)도 찾는다. 옮겨 둔 깨진 파일(.broken-…)은 보지 않는다.
+            var paths = Directory.GetFiles(_matches).Select(MainFile).Where(p => p != null).Distinct(StringComparer.Ordinal).ToList();
+            foreach (var path in paths)
             {
                 string id = null;
                 try
                 {
-                    if (MiniJson.Deserialize(File.ReadAllText(path, Encoding.UTF8)) is Dictionary<string, object> root && root.TryGetValue("matchId", out var value))
-                        id = value as string;
+                    if (Read(path, out _, out _) is Dictionary<string, object> root && root.TryGetValue("matchId", out var value)) id = value as string;
                 }
-                catch (Exception) { }
+                catch (Exception e)
+                {
+                    Say($"매치 파일 {Path.GetFileName(path)}을(를) 읽지 못했습니다: {e.Message}");
+                }
                 if (id != null) yield return id;
             }
         }
 
-        public void CloseMatch(string matchId)
+        // 끝난 매치: 본 파일과 .bak·.tmp를 함께 지운다(끝난 매치가 .bak에서 되살아나 다시 열리지 않게).
+        public void CloseMatch(string matchId) => SafeFile.Delete(MatchPath(matchId));
+
+        // 저장 파일 하나: 본 파일 → .tmp → .bak 차례로 JSON 객체로 읽히는 첫 내용(없으면 null, text = 그 글).
+        // 깨진 것(비었거나 JSON 객체가 아님)은 지우지 않고 옆으로 옮긴다(broken = 옮긴 것이 있다). 디스크 오류(잠김 등)는 그대로 던진다 —
+        // 깨진 것으로 보고 옛 내용을 고르면 다음 저장이 그 옛 내용으로 새 내용을 덮어쓴다.
+        Dictionary<string, object> Read(string path, out string text, out bool broken)
         {
-            var path = MatchPath(matchId);
-            if (File.Exists(path)) File.Delete(path);
+            text = null;
+            broken = false;
+            foreach (var file in new[] { path, path + TempSuffix, SafeFile.Backup(path) })
+            {
+                var content = SafeFile.ReadAllText(file);
+                if (content == null) continue;
+                if (Parse(content) is Dictionary<string, object> tree)
+                {
+                    if (file != path) Say($"{Path.GetFileName(path)}이(가) 없거나 깨져 {Path.GetFileName(file)}에서 되살렸습니다.");
+                    text = content;
+                    return tree;
+                }
+                Say($"깨진 저장 파일을 옆으로 옮겼습니다(지우지 않음): {Path.GetFileName(file)} → {MoveAside(file)}");
+                broken = true;
+            }
+            return null;
         }
 
-        // 쓰다가 꺼져도 반쯤 쓴 파일이 남지 않게: 임시 파일에 쓰고 바꿔 넣는다.
-        static void WriteAtomic(string path, string text)
+        // 비었거나(SafeFile: 공백뿐이면 "") JSON이 아니면 null.
+        static object Parse(string text)
         {
-            var temp = path + ".tmp";
-            File.WriteAllText(temp, text, new UTF8Encoding(false));
-            if (File.Exists(path)) File.Delete(path);
-            File.Move(temp, path);
+            if (string.IsNullOrEmpty(text)) return null;
+            try { return MiniJson.Deserialize(text); }
+            catch (FormatException) { return null; }
         }
+
+        // <파일>.broken-<시각>(같은 이름이 있으면 -2, -3 …)으로 옮긴다. 돌려주는 값: 옮긴 이름.
+        // 확장자 뒤에 붙여 OpenMatches(.json·.tmp·.bak)가 다시 집지 않는다.
+        static string MoveAside(string file)
+        {
+            var stamp = file + ".broken-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            var target = stamp;
+            for (var n = 2; File.Exists(target); n++) target = stamp + "-" + n.ToString(CultureInfo.InvariantCulture);
+            File.Move(file, target);
+            return Path.GetFileName(target);
+        }
+
+        // 매치 파일(.json)과 그 .tmp·.bak → 본 파일 경로. 그 밖(옮겨 둔 깨진 파일 등)은 null.
+        static string MainFile(string file)
+        {
+            if (file.EndsWith(".json", StringComparison.Ordinal)) return file;
+            if (file.EndsWith(".json" + TempSuffix, StringComparison.Ordinal) || file.EndsWith(".json.bak", StringComparison.Ordinal)) return file.Substring(0, file.Length - 4);
+            return null;
+        }
+
+        void Say(string message) => Log?.Invoke("[MomoiProject] " + message);
     }
 }

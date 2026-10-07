@@ -53,9 +53,9 @@ namespace GBible.Tests
 
             // 클래스 탭에는 개발자가 선언한 클래스만: 시스템·선택 기능의 클래스는 목록에 없다.
             var classes = ClassCatalog.All(ClassRegistry.ClassTab);
-            Assert.IsFalse(classes.Any(e => e.Type == typeof(SpritePresetData)), "시스템 클래스는 숨긴다");
+            Assert.IsFalse(classes.Any(e => e.Type == typeof(SpriteFrameData)), "시스템 클래스는 숨긴다");
             Assert.IsFalse(classes.Any(e => e.Type != null && GameFeatures.Of(e.Type) != null), "기능의 클래스는 숨긴다");
-            Assert.IsNotNull(ClassCatalog.Find(typeof(SpritePresetData).FullName), "숨긴 클래스도 상세는 열린다");
+            Assert.IsNotNull(ClassCatalog.Find(typeof(SpriteFrameData).FullName), "숨긴 클래스도 상세는 열린다");
             Assert.DoesNotThrow(() => ClassDetail.Build(new VisualElement(), typeof(AchievementData).FullName, null));
             foreach (var entry in classes.Concat(ClassCatalog.All(ClassRegistry.EventTab)))
             {
@@ -65,17 +65,32 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 스프라이트_규격_크기_검사와_종횡비_고정()
+        public void 스프라이트_틀의_크기_이름과_크기_검사()
         {
-            Assert.IsNull(SpritePresetsPage.CheckSize("128", "256", out var width, out var height));
-            Assert.AreEqual(128, width);
-            Assert.AreEqual(256, height);
-            Assert.IsNotNull(SpritePresetsPage.CheckSize("abc", "256", out _, out _));
-            Assert.IsNotNull(SpritePresetsPage.CheckSize("4", "256", out _, out _), "너무 작다");
-            Assert.IsNotNull(SpritePresetsPage.CheckSize("128", "9000", out _, out _), "너무 크다");
-            // 600×900(2:3)에서 가로를 400으로 바꾸면 세로는 600.
-            Assert.AreEqual(600, SpritePresetsPage.Follow(400, 900f / 600f));
-            Assert.AreEqual(1, SpritePresetsPage.Follow(1, 0.1f), "최소 1");
+            Assert.IsTrue(SpriteFrameData.IsValidName("standing", out _));
+            Assert.IsTrue(SpriteFrameData.IsValidName("cardFront", out _));
+            Assert.IsFalse(SpriteFrameData.IsValidName("Icon", out _), "소문자로 시작");
+            Assert.IsFalse(SpriteFrameData.IsValidName("card.front", out _), "점 없음");
+            Assert.IsFalse(SpriteFrameData.IsValidName("", out _));
+            Assert.IsTrue(SpriteFrameData.IsValidSize(8));
+            Assert.IsTrue(SpriteFrameData.IsValidSize(8192));
+            Assert.IsFalse(SpriteFrameData.IsValidSize(4), "너무 작다");
+            Assert.IsFalse(SpriteFrameData.IsValidSize(9000), "너무 크다");
+
+            var frame = UnityEngine.ScriptableObject.CreateInstance<SpriteFrameData>();
+            try
+            {
+                frame.EditorAssignId("character");
+                frame.sizes.Add(new SpriteFrameSize { name = "icon", width = 128, height = 128 });
+                frame.sizes.Add(new SpriteFrameSize { name = "Icon", width = 4, height = 128 });
+                var issues = DataValidator.Validate(new System.Collections.Generic.List<GameData> { frame });
+                Assert.IsTrue(issues.Any(i => i.Asset == frame && i.Severity == ValidationSeverity.Error && i.Message.Contains("8~8192")), "크기 범위");
+                Assert.IsTrue(issues.Any(i => i.Asset == frame && i.Severity == ValidationSeverity.Error && i.Message.Contains("'Icon'")), "이름 형식");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(frame);
+            }
         }
     }
 }

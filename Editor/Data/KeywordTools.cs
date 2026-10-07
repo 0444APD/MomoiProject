@@ -120,7 +120,7 @@ namespace GBible.EditorTools
             return null;
         }
 
-        // ── 필드 규칙(에디터 설정: 필수·스프라이트 규격) ─────────────
+        // ── 필드 규칙(에디터 설정: 필수·스프라이트 틀) ─────────────
 
         // 필드의 규칙: 있으면 그 규칙, 없으면 null.
         public static FieldRuleData RuleOf(Type type, FieldInfo field)
@@ -136,7 +136,7 @@ namespace GBible.EditorTools
         {
             type = field.DeclaringType ?? type;
             var rule = RuleOf(type, field);
-            bool Empty(FieldRuleData r) => r.source == FieldRuleSource.Free && !r.required && string.IsNullOrEmpty(r.spriteGroup);
+            bool Empty(FieldRuleData r) => r.source == FieldRuleSource.Free && !r.required && string.IsNullOrEmpty(r.spriteFrame);
 
             if (staged)
             {
@@ -189,27 +189,27 @@ namespace GBible.EditorTools
             EditRule(type, field, "필수 여부", rule => rule.required = required, staged);
         }
 
-        // 스프라이트 필드에 규격 그룹을 연결한다(비우면 해제). 미리보기 규격은 그 그룹의 규격 가운데 하나.
-        public static void SetSpriteGroup(Type type, FieldInfo field, string group, bool staged = true)
+        // 스프라이트 필드에 틀을 연결한다(비우면 해제). 미리보기 크기는 그 틀의 크기 가운데 하나.
+        public static void SetSpriteFrame(Type type, FieldInfo field, string frame, bool staged = true)
         {
-            EditRule(type, field, "스프라이트 규격 그룹 연결", rule =>
+            EditRule(type, field, "스프라이트 틀 연결", rule =>
             {
-                if (rule.spriteGroup != (group ?? "")) rule.previewPreset = "";
-                rule.spriteGroup = group ?? "";
+                if (rule.spriteFrame != (frame ?? "")) rule.previewSize = "";
+                rule.spriteFrame = frame ?? "";
             }, staged);
         }
 
-        public static void SetPreviewPreset(Type type, FieldInfo field, string preset, bool staged = true)
+        public static void SetPreviewSize(Type type, FieldInfo field, string size, bool staged = true)
         {
             if (RuleOf(field.DeclaringType ?? type, field) == null) return;
-            EditRule(type, field, "미리보기 규격", rule => rule.previewPreset = preset ?? "", staged);
+            EditRule(type, field, "미리보기 크기", rule => rule.previewSize = size ?? "", staged);
         }
 
         public static bool IsSpriteField(FieldInfo field) => field != null && field.FieldType == typeof(UnityEngine.Sprite);
 
-        // 스프라이트 규격 그룹에 연결된 필드.
-        public static IEnumerable<(Type type, FieldInfo field)> SpriteFieldsLinkedTo(string group) =>
-            Db.OfType<FieldRuleData>().Where(r => r.spriteGroup == group && r.TargetType != null && r.Field != null).Select(r => (r.TargetType, r.Field));
+        // 스프라이트 틀에 연결된 필드.
+        public static IEnumerable<(Type type, FieldInfo field)> SpriteFieldsLinkedTo(string frame) =>
+            Db.OfType<FieldRuleData>().Where(r => r.spriteFrame == frame && r.TargetType != null && r.Field != null).Select(r => (r.TargetType, r.Field));
 
         public static string FieldLabel(FieldInfo field) => field.GetCustomAttribute<FieldLabelAttribute>()?.Text ?? field.Name;
 
@@ -217,7 +217,7 @@ namespace GBible.EditorTools
         {
             var baseId = "rule." + IdRules.Normalize(type.Name) + "." + IdRules.Normalize(field.Name);
             var id = baseId;
-            for (int i = 2; !Db.CanUseId(id, null, out _); i++) id = baseId + "_" + i;
+            for (int i = 2; !Db.CanUseId(id, null, typeof(FieldRuleData), out _); i++) id = baseId + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
             return id;
         }
     }

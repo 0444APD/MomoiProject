@@ -239,6 +239,26 @@ namespace GBible.Tests
             Assert.AreEqual(1, _session.Statuses.Of("foe").Count, "그 행동을 Undo하면 같이 돌아온다");
         }
 
+        [Serializable]
+        public sealed class Note : GameAction
+        {
+            public string text;
+            public override string Describe() => text;
+            protected override void Run() { }
+        }
+
+        [Test]
+        public void 같은_시각의_시간_예약은_예약한_차례대로_돈다()
+        {
+            Do(g =>
+            {
+                for (var i = 1; i <= 12; i++) g.ScheduleAfter(1, new Note { text = "차례" + i });
+            });
+            _session.EndFrame(1.5);
+            var order = _session.Journal.Entries.Where(e => e.Kind == JournalKind.Action && e.Message.StartsWith("차례", StringComparison.Ordinal)).Select(e => e.Message).ToList();
+            CollectionAssert.AreEqual(Enumerable.Range(1, 12).Select(i => "차례" + i).ToList(), order, "id 글자 순(10이 2보다 먼저)이 아니라 예약한 차례");
+        }
+
         [Test]
         public void 시간_예약은_대상을_다시_찾아_실행한다()
         {
@@ -368,6 +388,207 @@ namespace GBible.Tests
             Assert.AreEqual(9, _session.Data.Get<SsLegacyBag>("bag").coins);
             Assert.IsTrue(_session.Undo());
             Assert.AreEqual(10, _session.Data.Get<SsLegacyBag>("bag").coins);
+        }
+
+        [Serializable] public class SsWallet { public int coins; }
+
+        // 조건: 주인공 체력이 20 미만.
+        public sealed class HeroHurt : SimpleCondition
+        {
+            protected override bool Check() => Game.Find<SsUnit>("hero").hp < 20;
+        }
+
+        // 결과: 가진 쪽이 주인공이면 적을 데이터에서 뺀다(같은 순간에 뒤 가진 쪽이 사라지는 경우).
+        public sealed class RemoveFoe : Outcome
+        {
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context)
+            {
+                if (GameApi.IdOf(context.User) == "hero") context.Game.Get<SsParty>("party").units.RemoveAll(u => u.id == "foe");
+            }
+            public override string Describe(INameResolver names) => "적 빼기";
+        }
+
+        // 결과: 그 상태 효과를 가진 쪽에서 푼다.
+        public sealed class RemoveStatusOutcome : Outcome
+        {
+            public string status;
+            public override OutcomeKinds Kind => OutcomeKinds.Coded;
+            public override void Run(TriggerContext context) => context.Game.RemoveStatus(context.User, status);
+            public override string Describe(INameResolver names) => "풀기";
+        }
+
+        int ErrorCount => _session.Journal.Entries.Count(e => e.Kind == JournalKind.Error);
+
+        [Test]
+        public void 주기_결과가_실패해도_다른_주기는_돌고_매_프레임_다시_실패하지_않는다()
+        {
+            _session.Data.Define("wallet", DataZone.Session, new SsWallet { coins = 1 }, "지갑");
+            var drain = new StatusDefinition { Id = "drain", Pulse = 1 };
+            drain.Outcomes.Add(new PayOutcome { key = "wallet", path = "coins", amount = 1 });
+            var regen = new StatusDefinition { Id = "regen", Pulse = 1 };
+            regen.Outcomes.Add(new Hurt { amount = -1 });
+            _session.Statuses.Define(drain);
+            _session.Statuses.Define(regen);
+            Do(g => { g.ApplyStatus(Hero, "drain"); g.ApplyStatus(Foe, "regen"); });
+            var ticked = 0;
+            _session.Ticked += _ => ticked++;
+
+            _session.EndFrame(1);
+            Assert.AreEqual(0, _session.Data.Get<SsWallet>("wallet").coins, "1초: 1을 냈다");
+            Assert.AreEqual(31, Foe.hp);
+
+            Assert.DoesNotThrow(() => _session.EndFrame(1), "2초: 낼 돈이 없어 주기 결과가 실패한다");
+            Assert.AreEqual(32, Foe.hp, "같은 프레임의 다른 상태 효과 주기는 돈다");
+            Assert.AreEqual(2, ticked, "프레임 끝의 나머지 처리도 돈다");
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("주기 결과가 실패")));
+            Assert.AreEqual(3, Game.Statuses(Hero).Single().nextPulse, 1e-9, "실패한 회차는 건너뛰고 다음 시각으로");
+
+            var errors = ErrorCount;
+            _session.EndFrame(0.5);
+            Assert.AreEqual(errors, ErrorCount, "실패한 주기를 매 프레임 다시 내지 않는다");
+            Assert.IsTrue(_session.Undo(), "주기 행동도 Undo된다");
+        }
+
+        [Test]
+        public void 끝날_때_결과가_실패해도_상태_효과는_끝나고_다시_시도하지_않는다()
+        {
+            _session.Data.Define("wallet", DataZone.Session, new SsWallet(), "지갑");
+            var bomb = new StatusDefinition { Id = "bomb", Duration = StatusDuration.Seconds, Length = 1 };
+            bomb.OnExpire.Add(new PayOutcome { key = "wallet", path = "coins", amount = 5 });
+            bomb.Modifiers.Add(new StatusModifier { attribute = nameof(SsUnit.attack), kind = ModifierKind.Flat, valuePerStack = 5 });
+            var shield = new StatusDefinition { Id = "shield", Duration = StatusDuration.Seconds, Length = 1 };
+            var expire = new Mark { text = "expire" };
+            shield.OnExpire.Add(expire);
+            _session.Statuses.Define(bomb);
+            _session.Statuses.Define(shield);
+            var ended = new List<string>();
+            _session.Events.SubscribeAfterAction<StatusEnded>(e => ended.Add($"{e.status}:{e.holder}"));
+            Do(g => { g.ApplyStatus(Hero, "bomb"); g.ApplyStatus(Foe, "shield"); });
+
+            Assert.DoesNotThrow(() => _session.EndFrame(1.5));
+            Assert.IsFalse(Game.HasStatus(Hero, "bomb"), "끝날 때 결과가 실패해도 끝난다");
+            Assert.AreEqual(10, Game.Attribute(Hero, nameof(SsUnit.attack)), 1e-9, "보정도 빠진다");
+            Assert.IsFalse(Game.HasStatus(Foe, "shield"), "같은 프레임에 끝나는 다른 상태 효과도 끝난다");
+            CollectionAssert.AreEqual(new[] { "expire:foe" }, expire.log);
+            CollectionAssert.AreEquivalent(new[] { "bomb:hero", "shield:foe" }, ended);
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Warning && e.Message.Contains("끝날 때 결과가 실패")));
+            var errors = ErrorCount;
+            _session.EndFrame(0.5);
+            Assert.AreEqual(errors, ErrorCount, "다시 시도하지 않는다");
+        }
+
+        [Test]
+        public void 프레임_끝의_한_처리가_던져도_나머지는_돈다()
+        {
+            _session.Achievements.Define(new AchievementDefinition { Id = "hurt", DisplayName = "hurt", Condition = new HeroHurt() });
+            _session.Ticked += _ => throw new InvalidOperationException("화면 쪽 실수");
+            Hero.hp = 10;   // 행동 밖에서 바꾼 값 — 프레임 끝의 Sync가 잡고 도전과제 조건을 평가한다
+            Assert.DoesNotThrow(() => _session.EndFrame(0.1));
+            Assert.IsTrue(_session.Journal.Entries.Any(e => e.Kind == JournalKind.Error && e.Message.Contains("Ticked")), "실패는 기록에 남긴다");
+            Assert.IsTrue(_session.Achievements.IsUnlocked("hurt"), "그 뒤의 Sync·도전과제 평가가 돈다");
+        }
+
+        [Test]
+        public void 미리보기에서도_그_이벤트를_받는_도중에_건_것은_그_이벤트를_세지_않는다()
+        {
+            var weak = new StatusDefinition { Id = "weak", Duration = StatusDuration.Events, Length = 2, TickEvent = typeof(SsTurnEnded).FullName };
+            _session.Statuses.Define(weak);
+            // 턴 끝마다 약화를 거는 상태 효과(턴 끝을 받는 도중에 건다).
+            var curse = new StatusDefinition { Id = "curse", When = new EventTrigger { eventType = typeof(SsTurnEnded).FullName } };
+            curse.Outcomes.Add(new TargetedOutcome { effects = { new ApplyWeak() } });
+            _session.Statuses.Define(curse);
+            Do(g => g.ApplyStatus(Hero, "curse"));
+            var turnEnd = new Edit { run = g => g.Session.Events.Publish(new SsTurnEnded { unit = "hero" }) };
+
+            var predicted = Game.Preview(turnEnd, g => g.Statuses("hero").Single(s => s.status == "weak").remaining);
+            Game.Do(new Edit { run = g => g.Session.Events.Publish(new SsTurnEnded { unit = "hero" }) });
+            var actual = Game.Statuses(Hero).Single(s => s.status == "weak").remaining;
+            Assert.AreEqual(2, actual, 1e-9, "건 순간의 턴 끝은 세지 않는다");
+            Assert.AreEqual(actual, predicted, 1e-9, "미리보기도 실제와 같다");
+        }
+
+        // 효과: 대상에게 약화를 건다.
+        [Serializable]
+        public sealed class ApplyWeak : Effect
+        {
+            protected override void Apply(object target) => Game.ApplyStatus(target, "weak");
+            public override string Describe() => "약화 걸기";
+        }
+
+        [Test]
+        public void 같은_순간에_끝나는_상태_효과를_앞의_끝날_때_결과가_풀면_두_번_끝나지_않는다()
+        {
+            var first = new StatusDefinition { Id = "first", Duration = StatusDuration.Events, Length = 1, TickEvent = typeof(SsTurnEnded).FullName };
+            first.OnExpire.Add(new RemoveStatusOutcome { status = "second" });
+            var second = new StatusDefinition { Id = "second", Duration = StatusDuration.Events, Length = 1, TickEvent = typeof(SsTurnEnded).FullName };
+            var expire = new Mark { text = "second" };
+            second.OnExpire.Add(expire);
+            _session.Statuses.Define(first);
+            _session.Statuses.Define(second);
+            var ended = new List<string>();
+            _session.Events.Subscribe<StatusEnded>(e => ended.Add($"{e.status}:{e.expired}"));
+            Do(g => { g.ApplyStatus(Hero, "first"); g.ApplyStatus(Hero, "second"); });
+            TurnEnd("hero");
+            Assert.AreEqual(0, expire.log.Count, "풀린 것은 끝날 때 결과가 돌지 않는다");
+            CollectionAssert.AreEqual(new[] { "second:False", "first:True" }, ended, "끝남은 한 번씩");
+        }
+
+        [Test]
+        public void 앞_가진_쪽의_결과가_없앤_가진_쪽은_발동하지_않는다()
+        {
+            var aura = new StatusDefinition { Id = "aura", When = new EventTrigger { eventType = typeof(SsTurnEnded).FullName } };
+            var marks = new Mark { text = "aura" };
+            aura.Outcomes.Add(new RemoveFoe());
+            aura.Outcomes.Add(marks);
+            _session.Statuses.Define(aura);
+            Do(g => { g.ApplyStatus(Hero, "aura"); g.ApplyStatus(Foe, "aura"); });
+            TurnEnd("hero");
+            CollectionAssert.AreEqual(new[] { "aura:hero" }, marks.log, "주인공의 결과가 뺀 적은 그 순간에 발동하지 않는다");
+            Assert.IsNull(Foe);
+            Assert.AreEqual(0, _session.Statuses.Of("foe").Count, "사라진 가진 쪽의 상태 효과는 행동 끝에 정리된다");
+        }
+
+        [Test]
+        public void 이벤트_횟수와_줄이기는_0점5에서_올림한다()
+        {
+            var weak = new StatusDefinition { Id = "weak", Duration = StatusDuration.Events, Length = 2.5, TickEvent = typeof(SsTurnEnded).FullName };
+            _session.Statuses.Define(weak);
+            Do(g => g.ApplyStatus(Hero, "weak"));
+            Assert.AreEqual(3, Game.Statuses(Hero).Single().remaining, 1e-9, "2.5번 → 3번(짝수 쪽 2가 아니다)");
+            Do(g => g.ShortenStatus(Hero, "weak", 0.5));
+            Assert.AreEqual(2, Game.Statuses(Hero).Single().remaining, 1e-9, "0.5 줄이기 → 1번 줄인다");
+        }
+
+        // 행동 하나의 평균 시간(ms): 유닛 units명 모두에 보정 있는 상태 효과를 걸어 두고, 아무도 사라지지 않는 작은 행동을 되풀이한다.
+        static double PruneCost(int units)
+        {
+            var session = new GameSession(new SessionOptions { Seed = 5, DetectUntrackedChanges = false });
+            var party = new SsParty();
+            for (int i = 0; i < units; i++) party.units.Add(new SsUnit { id = "u" + i });
+            session.Data.Define("party", DataZone.Session, party, "파티");
+            var mark = new StatusDefinition { Id = "mark" };
+            mark.Modifiers.Add(new StatusModifier { attribute = nameof(SsUnit.attack), kind = ModifierKind.Flat, valuePerStack = 1 });
+            session.Statuses.Define(mark);
+            session.Game.Do(new Edit { run = g => { foreach (var unit in g.Get<SsParty>("party").units) g.ApplyStatus(unit, "mark"); } });
+            for (int i = 0; i < 5; i++) session.Game.Do(new Edit { run = g => g.Get<SsParty>("party").units[0].hp-- });
+            const int runs = 40;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < runs; i++) session.Game.Do(new Edit { run = g => g.Get<SsParty>("party").units[0].hp-- });
+            var ms = watch.Elapsed.TotalMilliseconds / runs;
+            Assert.AreEqual(units, session.Statuses.Of("u" + (units - 1)).Count + units - 1, "아무도 사라지지 않았으니 정리하지 않는다");
+            return ms;
+        }
+
+        [Test]
+        public void 사라진_개체_정리는_대상_수만큼_데이터를_훑지_않는다()
+        {
+            PruneCost(20);
+            var small = PruneCost(60);
+            var large = PruneCost(600);
+            Console.WriteLine($"상태 효과 걸린 유닛 60명 → 600명: 행동 한 번 평균 {small:0.000}ms → {large:0.000}ms (×{large / small:0.0})");
+            // 대상마다 Find하면(데이터 전체 × 대상 수) 10배 많은 유닛에 100배 가까이 든다. 한 번 훑으면 10배 남짓.
+            Assert.IsTrue(large / small < 30, $"×{large / small:0.0}");
         }
 
         [Test]

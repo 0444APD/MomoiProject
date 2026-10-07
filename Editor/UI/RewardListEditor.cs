@@ -114,7 +114,7 @@ namespace GBible.EditorTools.UI
                     onStructure?.Invoke();
                 }
                 // 구조 잠금(EditorPolicy): 결과를 빼고 더하는 것은 AI가 한다. 값은 그대로 고친다.
-                var locked = isFixed || !EditorPolicy.CanEditStructure;
+                var locked = isFixed || !EditorPolicy.CanEditStructureOf(list);
                 var tools = locked ? Array.Empty<VisualElement>() : new VisualElement[] { RemoveTool(Remove) };
                 switch (element.managedReferenceValue)
                 {
@@ -135,7 +135,7 @@ namespace GBible.EditorTools.UI
                 if (list.arraySize == 0) container.Add(Problem($"이 칸은 '{TriggerSlots.Text(allowed)}' 하나로 고정입니다."));
                 return container;
             }
-            if (!EditorPolicy.CanEditStructure)
+            if (!EditorPolicy.CanEditStructureOf(list))
             {
                 if (list.arraySize == 0) container.Add(Gs.Label("결과 없음", "gs-caption"));
                 return container;

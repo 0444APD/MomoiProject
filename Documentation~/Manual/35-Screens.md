@@ -60,11 +60,13 @@ Esc(뒤로) → GameScreens.Back: 맨 위 창·팝업을 닫는다(뒤로로 닫
 - DB에 없는 ID면 `InvalidOperationException`("[MomoiProject] 없는 화면 'shp'입니다(DB › 화면).").
 - **층**: 바탕(HUD) · 창(메뉴) · 팝업 · 알림 순으로 위다. 같은 층에서는 나중에 연 것이 위다.
 - **아래 입력 막기**: 팝업은 늘 어두운 덮개로 아래를 막는다. 창은 '아래 입력 막기'가 켜져 있으면 투명한 덮개로 막는다. 바탕·알림은 막지 않는다. 화면의 빈 곳(배경이 없는 곳)은 클릭이 아래로 지나간다.
-- **뒤로(Esc)**: `GameScreens.Back()`이 맨 위의 창·팝업 하나를 닫는다. 그 화면의 '뒤로로 닫기'가 꺼져 있으면 아무것도 하지 않는다(고르기 창). 닫을 창·팝업이 없고 DB › 화면 설정 'Esc로 일시정지 메뉴'가 켜져 있으면 일시정지 메뉴를 연다. Esc 키(이전 입력 관리자를 쓸 때)와 UI의 취소 이벤트가 `Back`을 부른다. 입력(키 바꾸기) 기능의 "뒤로" 동작에도 `GameScreens.Back()`을 잇는다.
+- **뒤로(Esc)**: `GameScreens.Back()`이 맨 위의 창·팝업 하나를 닫는다. 그 화면의 '뒤로로 닫기'가 꺼져 있으면 아무것도 하지 않는다(고르기 창). 닫을 창·팝업이 없고 DB › 화면 설정 'Esc로 일시정지 메뉴'가 켜져 있으면 일시정지 메뉴를 연다. Esc 키(이전 입력 관리자를 쓸 때)와 UI의 취소 이벤트가 `Back`을 부른다. 입력(키 바꾸기) 기능의 "뒤로" 동작에도 `GameScreens.Back()`을 잇는다. Esc를 다른 뜻(키 바꾸기의 취소처럼)으로 쓰는 동안은 `using (GameScreens.HoldBack()) { … }`(또는 받은 것을 나중에 `Dispose`)로 뒤로를 막는다 — 놓은 그 프레임까지 막혀, 같은 Esc가 창을 닫거나 일시정지 메뉴를 열지 않는다(`GameInput.Rebind`가 이렇게 한다).
 - **시간 멈춤**: '열린 동안 게임 시간 멈춤'이면 열 때 `GameTime.Pause("화면 ID")`, 닫을 때 `Resume`. 일시정지 메뉴가 이것이다.
 - **열 씬**: 씬이 바뀌면(Single) 그 씬이 목록에 있는 화면을 열고, 없는 화면을 닫는다. 목록이 빈 화면은 씬과 상관없다.
 - **게임이 켜지면 열기**: 처음 한 번 연다(닫으면 다시 열지 않는다).
 - 닫으면 화면 코드의 `OnClose` → `Own`으로 맡긴 것 정리(목록 등) → 버튼 연결 끊기 → 트리 제거 순이다. 화면 코드 인스턴스는 **게임이 켜질 때 한 번 만들어** 두고 열 때마다 다시 쓴다(필드는 `OnOpen`에서 새로 채운다).
+- **`OnOpen` 안에서 닫으면**(`Close()`) 그 자리에서 닫히고(`OnClose`·정리·`Closed`) 다시 그리기를 걸지 않으며 `Opened`도 쏘지 않는다.
+- **`OnClose` 안에서 같은 화면을 다시 열어도 된다**(확인 창을 Esc로 닫았더니 '아니오'가 확인 창을 다시 띄움). 정리는 닫힌 쪽의 것(그 열림의 `Own`·버튼 연결·트리)만 하고, 새로 연 화면은 열린 채(`IsOpen`·시간 멈춤 그대로) 남는다. 알림 순서는 `Closed`(닫힌 쪽) → `Opened`(새로 연 쪽)다.
 
 ### 2-2. binding-path — 코드 없이 값 보이기
 
@@ -78,7 +80,9 @@ UXML 칸(Label·Button·ProgressBar·Toggle·Slider)의 `binding-path` 속성에
 | `@텍스트키` | 번역된 글(언어가 바뀌면 다시) | `<ui:Button binding-path="@hud.endTurn" />` → `턴 끝` |
 
 - 틀이 없고 그 칸의 원래 글자(`text`)에 `{value}`가 있으면 원래 글자를 틀로 쓴다: `<ui:Label binding-path="run:battle.energy" text="에너지 {value} / 3" />`.
-- 칸마다: 글자 칸(Label·Button)은 글, **ProgressBar**는 값(`value`, 최댓값 `high-value`는 UXML이나 코드에서) + 틀이 있으면 `title`, **Toggle**은 참거짓, **Slider·SliderInt**는 숫자. 토글·슬라이더는 보이기만 한다(바꾸면 알림을 보내지 않는다).
+- 칸마다: 글자 칸(Label·Button)은 글, **ProgressBar**는 값(`value`, 최댓값 `high-value`는 UXML이나 코드에서) + 틀이 있으면 `title`, **Toggle**은 참거짓, **Slider·SliderInt**는 숫자 + 틀이 있으면 이름표(`label`). 토글·슬라이더는 보이기만 한다(바꾸면 알림을 보내지 않는다).
+  - 틀이 있다 = 텍스트 키가 있거나(`키:경로@텍스트키`·`@텍스트키`) 원래 글(ProgressBar의 `title`, 토글·슬라이더의 `label`)에 `{value}`가 있다.
+  - 값은 데이터를 가리킬 때만 넣는다. 토글·슬라이더에 `@텍스트키`만 적으면 값은 건드리지 않고 이름표만 번역한다(`<ui:Toggle binding-path="@hud.auto" />`, 텍스트 `hud.auto` = "자동 진행" → 이름표 "자동 진행", 체크는 그대로).
 - 경로는 필드 경로 문법(11장)이다: `hero.hp`, `battle.energy`, 목록 펼치기 `deck[].upgraded`(첫 값). 없는 키·경로면 빈 글(0)이다.
 - 숫자는 소수 둘째 자리까지(`0.##`), 목록은 개수, 참거짓은 `True`/`False`(글로 보일 때는 텍스트 키 틀을 쓴다).
 - **다시 그리는 때**: 그 화면의 binding-path에 쓴 키가 바뀔 때(화면 코드의 `Watch`가 있으면 그 키), 그리고 언어가 바뀔 때. 연출 대기열이 재생 중이면 끝난 뒤(화면 코드의 `WaitForPresentation`이 거짓이면 바로).
@@ -161,10 +165,11 @@ protected override void Tick(float deltaTime)
 
 ### 2-6. 목록 칸 — `ElementList`
 
-- 항목 id(글자면 그대로, 객체면 `id`)마다 목록 칸 UXML을 하나 만든다. 같은 id가 여럿이면 `id#2`처럼 따로. 항목이 사라지면 칸을 없애고(`OnRemove`가 있으면 연출 대기열에서 그 연출 뒤에), 데이터 순서대로 놓는다.
+- 항목 id(글자면 그대로, `id`가 있는 객체면 `id`)마다 목록 칸 UXML을 하나 만든다. 같은 id가 여럿이면 `id#2`처럼 따로. `id`가 없는 항목(`int` 목록·`id` 없는 클래스)은 자리 번호(`"$0"`, `"$1"` …)로 잇는다(순서가 바뀌면 다른 항목으로 다시 그려진다). 항목이 사라지면 칸을 없애고(`OnRemove`가 있으면 연출 대기열에서 그 연출 뒤에), 데이터 순서대로 놓는다.
+- `OnRemove`의 차례가 왔을 때 목록이 이미 정리됐거나(화면을 닫음 — `GameScreen.List`로 만든 목록은 닫을 때 저절로 정리된다) 칸이 화면에서 떨어졌으면 연출 없이 바로 없애고 넘어간다(떨어진 칸에서는 `schedule`·전환이 돌지 않아 `done()`이 오지 않는다). 정리하면 사라지는 중인 칸도 치우고, 도는 연출의 `done()`을 기다리지 않는다. 연출 대기열을 버리면(`GameView.ClearPresentation`) 차례를 기다리던 칸은 그 자리에서 치운다.
 - 값이 바뀌면 bind를 다시 돈다(키를 주면 그 키가 바뀔 때만). 칸에는 `.momoi-item` 클래스가 붙는다.
-- 만든 칸은 `GameView.RegisterElement(id)`로 등록된다 → 연출이 `GameView.FindElement(id)`로 찾는다(5-4).
-- `OnCreate`(처음 bind 전): 칸 안의 버튼 잇기. 칸의 버튼에서 행동을 보낼 때는 `GameScreens.Do(() => …)`(Busy·실패 알림이 같다).
+- 만든 칸은 `GameView.RegisterElement(id)`로 등록된다 → 연출이 `GameView.FindElement(id)`로 찾는다(5-4). 자리 번호로 이은 칸은 등록하지 않는다(`Find("$0")`로).
+- `OnCreate`(처음 bind 전): 칸 안의 버튼 잇기. 칸의 버튼에서 행동을 보낼 때는 `GameScreens.Do(() => …)`(Busy·실패 알림이 같다). `OnCreate`·bind가 예외를 내면 콘솔에 찍히고 그 칸·다른 칸은 계속 그린다.
 
 ### 2-7. 루트 · Panel Settings · 테마 · 글꼴
 
@@ -240,7 +245,8 @@ protected override void Tick(float deltaTime)
 | `bool Close(string id)` · `Close(GameScreen)` | 닫는다(열려 있었으면 참) |
 | `CloseAll(ScreenLayer? layer = null)` | 그 층(비우면 전부)을 나중에 연 것부터 닫는다 |
 | `bool IsOpen(id)` · `GameScreen Get(id)` · `T Get<T>()` · `All` | 열려 있는지 · 열린 화면 코드 · 열린 화면들 |
-| `bool Back()` | 뒤로(2-1) |
+| `bool Back()` | 뒤로(2-1). 막혀 있으면(`HoldBack`) 거짓 |
+| `IDisposable HoldBack()` | 뒤로를 잠시 막는다(겹쳐 잡을 수 있고, 모두 놓은 프레임까지 막힌다 — 2-1) |
 | `bool Do(Func<GameAction> make)` | 화면 입력 → 행동(2-4). 했으면 참 |
 | `Toast(string text, float seconds = 2.5f)` | 알림(텍스트 키면 번역) |
 | `Confirm(message, yes, no = null, yesText = null, noText = null)` | 예/아니오 팝업 |
@@ -508,6 +514,7 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 | binding-path 칸이 비어 있다 | 키·경로가 틀렸거나 그 값이 아직 없다(모니터 › 데이터 탭). 목록 칸 안의 binding-path는 읽지 않는다(2-2). |
 | 버튼을 눌러도 아무 일이 없다 | 연출이 재생 중이거나 선택을 기다리는 중이다(`GameView.Busy`). 고르기 창이 떠 있는지 본다. |
 | 버튼이 두 번 돈다 | `OnOpen` 밖(생성자)이나 `Draw`에서 `clicked +=`를 했다. 버튼 잇기는 `OnOpen`(열 때마다 새 트리)이나 `OnCreate`(칸마다 한 번)에서. |
+| 목록 칸의 순서가 바뀌면 칸의 내용·클릭이 다른 항목으로 바뀜 · `FindElement`로 안 찾힘 | 항목에 `id`가 없어 자리 번호로 이었다(2-6). 항목 클래스에 `public string id;`를 더한다. |
 | HUD 아래의 월드를 클릭할 수 없다 | 화면 전체를 덮는 요소에 배경이 있거나 `picking-mode`가 Position이다. 빈 컨테이너에는 `picking-mode="Ignore"`. |
 | Esc가 HUD를 닫는다 | HUD의 '뒤로로 닫기'가 켜져 있다(기본 켬). HUD는 끈다. |
 | 고르기 창이 두 개 뜬다(프로젝트 것과 기본 것) | 프로젝트가 **다른 ID**로 고르기 화면을 만들었다. 그때만 '고르기 창 저절로'를 끈다. 같은 ID(`momoi.choice`)로 바꾸면 하나만 뜬다(2-5). |

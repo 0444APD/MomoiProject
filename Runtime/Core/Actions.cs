@@ -144,14 +144,23 @@ namespace GBible
         long _utc;
 
         // 지금 현실 시각(UTC). 행동 안이면 그 행동이 시작한 순간, 밖이면 지금.
-        public DateTime Now => _utc != 0 ? FromUtcMs(_utc) : (RealClock?.Invoke() ?? DateTime.UtcNow);
+        public DateTime Now => _utc != 0 ? FromUtcMs(_utc) : AsUtc(RealClock?.Invoke() ?? DateTime.UtcNow);
+
+        // 현실 시각을 UTC로 맞춘다: Utc는 그대로, Local은 UTC로 바꾸고, Kind가 없는 값(Unspecified)은 UTC로 본다.
+        // RealClock이 무엇을 돌려주든 행동 안(찍어 둔 utc)과 밖의 Game.Now·날짜 번호가 같은 순간을 가리키게.
+        internal static DateTime AsUtc(DateTime time) =>
+            time.Kind == DateTimeKind.Utc ? time : time.Kind == DateTimeKind.Local ? time.ToUniversalTime() : DateTime.SpecifyKind(time, DateTimeKind.Utc);
 
         static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        static long ToUtcMs(DateTime time) => (long)(time.ToUniversalTime() - Epoch).TotalMilliseconds;
+        static long ToUtcMs(DateTime time) => (long)(AsUtc(time) - Epoch).TotalMilliseconds;
         static DateTime FromUtcMs(long ms) => Epoch.AddMilliseconds(ms);
 
         // 미리보기 중(Preview 안). 규칙 코드가 밖으로 나가는 일(분석 전송 등)을 건너뛸 때 본다.
         public bool IsPreviewing { get; private set; }
+
+        // 지금 돌고 있는 바깥 행동을 한 플레이어 번호(actorId — 멀티 서버는 보낸 사람 번호로 덮는다). 행동 밖·시스템 행동이면 0.
+        // 안에서 부른 행동도 바깥 행동의 번호다(답할 사람을 정하지 않은 선택 요구가 이 사람에게 간다).
+        public int CurrentActor { get; private set; }
 
         // 미리보기: 행동을 실행해 보고 read로 결과를 읽은 뒤 모두 되돌린다.
         // 기록·Undo·행동 로그·행동 뒤에 받는 쪽(SubscribeAfterAction)·도전과제 달성이 남지 않고, 난수도 돌아간다.
@@ -175,6 +184,8 @@ namespace GBible
                 var tx = _state.Begin(0, "미리보기");
                 IsPreviewing = true;
                 _utc = action.utc;
+                var previousActor = CurrentActor;
+                CurrentActor = action.actorId;
                 TransactionStarted?.Invoke(tx.Id);
                 try
                 {
@@ -189,6 +200,7 @@ namespace GBible
                 }
                 finally
                 {
+                    CurrentActor = previousActor;
                     _state.Abort();
                     IsPreviewing = false;
                     _utc = 0;
@@ -237,6 +249,8 @@ namespace GBible
             record.TransactionId = tx.Id;
             entry.TransactionId = tx.Id;
             TransactionStarted?.Invoke(tx.Id);
+            var outerActor = CurrentActor;
+            CurrentActor = action.actorId;
 
             try
             {
@@ -248,10 +262,12 @@ namespace GBible
                 }
                 _state.End();
                 _utc = 0;
+                CurrentActor = outerActor;
             }
             catch (Exception e)
             {
                 _utc = 0;
+                CurrentActor = outerActor;
                 _state.Abort();
                 TransactionAborted?.Invoke(tx.Id);
                 record.Status = ActionStatus.Failed;

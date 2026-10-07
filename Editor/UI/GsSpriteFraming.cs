@@ -7,47 +7,51 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // 스프라이트 맞춤 창: 원본 위에 그룹의 규격 틀을 겹쳐 보이고, 클릭으로 중심·휠로 배율을 맞춘다.
-    //  · 공통: 모든 규격이 같은 중심·배율을 쓴다.
-    //  · 규격 하나 선택: 그 규격만 따로 잡는다(예외 촬영, 영구 기록).
-    // 적용하면 그룹의 규격이 모두 베이크된다.
+    // 스프라이트 맞춤 창: 원본 위에 틀의 크기마다 영역을 겹쳐 보이고, 클릭으로 중심·휠로 배율을 맞춘다.
+    //  · 공통: 모든 크기가 같은 중심·배율을 쓴다.
+    //  · 크기 하나 선택: 그 크기만 따로 잡는다(예외 촬영, 영구 기록).
+    // 적용하면 틀의 모든 크기를 한꺼번에 굽는다.
     public static class GsSpriteFraming
     {
         const float CanvasSize = 440f;
         const int PreviewMax = 120;
 
-        public static void Open(VisualElement host, Sprite source, string group, Action applied = null)
+        // 연 창(GsModal)을 돌려준다(열지 못하면 null). 닫히면 Closed가 온다.
+        public static GsModal Open(VisualElement host, Sprite source, string frame, Action applied = null)
         {
-            if (source == null || string.IsNullOrEmpty(group)) return;
-            var presets = SpriteSpecEditor.PresetsOf(group).ToList();
-            var groupData = EditorDatabase.Instance.FindById(group);
+            if (source == null || string.IsNullOrEmpty(frame) || host == null) return null;
+            var presets = SpriteSpecEditor.SizesOf(frame);
+            var frameData = SpriteSpecEditor.FrameOf(frame);
             var box = Gs.Box("gs-dialog", "gs-framing");
             box.Add(Gs.Label($"스프라이트 맞춤 · {source.name}", "gs-title"));
             if (presets.Count == 0)
             {
-                box.Add(Gs.Label($"'{groupData?.DisplayName ?? group}' 그룹에 규격이 없습니다. Project 창에서 Create › MomoiProject › 스프라이트 규격으로 만들고, 인스펙터에서 이 그룹을 고르세요.", "gs-caption"));
+                box.Add(Gs.Label(frameData == null
+                    ? $"틀 '{frame}'을(를) 찾지 못했습니다. Project 창에서 Create › MomoiProject › 스프라이트 틀로 만들거나, 필드 규칙의 틀을 다시 고르세요."
+                    : $"틀 '{frame}'에 크기가 없습니다. 틀 파일을 골라 인스펙터의 표에 크기를 더하세요.", "gs-caption"));
                 var close = Gs.Box("gs-dialog__buttons");
                 box.Add(close);
                 var m = GsModal.Show(host, box);
                 close.Add(new GsButton("닫기", m.Close, GsButtonKind.Primary));
-                return;
+                return m;
             }
 
-            // 기존 맞춤에서 시작한다.
+            // 기존 맞춤에서 시작한다(다른 틀로 구웠던 원본이면 공통 맞춤만 이어받고 예외는 새로).
             var existing = SpriteSpecEditor.Registry.Find(source);
             var center = existing?.center ?? new Vector2(0.5f, 0.5f);
             var zoom = existing?.zoom ?? 1f;
             var overrides = new Dictionary<string, (Vector2 center, float zoom)>();
             var reviews = new HashSet<string>();
-            if (existing != null)
+            if (existing != null && existing.frame == frame)
                 foreach (var o in existing.overrides)
                 {
-                    overrides[o.preset] = (o.center, o.zoom);
-                    if (o.needsReview) reviews.Add(o.preset);
+                    if (!presets.Any(p => p.name == o.size)) continue;
+                    overrides[o.size] = (o.center, o.zoom);
+                    if (o.needsReview) reviews.Add(o.size);
                 }
             string target = null; // null = 공통
 
-            var caption = Gs.Label($"{groupData?.DisplayName ?? group} 그룹 · 규격 {presets.Count}개. 클릭: 중심 · 휠: 배율", "gs-caption");
+            var caption = Gs.Label($"틀 {frame} · 크기 {presets.Count}개. 클릭: 중심 · 휠: 배율 · 크기 단추: 그 크기만 따로 잡기(예외 촬영)", "gs-caption");
             caption.style.marginTop = 4;
             box.Add(caption);
 
@@ -94,39 +98,39 @@ namespace GBible.EditorTools.UI
             {
                 foreach (var preset in presets)
                 {
-                    var (c, z) = Current(preset.Id);
+                    var (c, z) = Current(preset.name);
                     var crop = SpriteSpecEditor.Crop(new Rect(0, 0, rect.width, rect.height), c, z, preset.width, preset.height);
-                    var frame = frames[preset.Id];
-                    frame.style.left = shown.x + crop.x * fit;
+                    var outline = frames[preset.name];
+                    outline.style.left = shown.x + crop.x * fit;
                     // 원본 좌표는 아래에서 위로, 화면은 위에서 아래로.
-                    frame.style.top = shown.y + (rect.height - crop.y - crop.height) * fit;
-                    frame.style.width = crop.width * fit;
-                    frame.style.height = crop.height * fit;
-                    frame.EnableInClassList("gs-framing__frame--active", target == null || target == preset.Id);
-                    frame.EnableInClassList("gs-framing__frame--override", overrides.ContainsKey(preset.Id));
+                    outline.style.top = shown.y + (rect.height - crop.y - crop.height) * fit;
+                    outline.style.width = crop.width * fit;
+                    outline.style.height = crop.height * fit;
+                    outline.EnableInClassList("gs-framing__frame--active", target == null || target == preset.name);
+                    outline.EnableInClassList("gs-framing__frame--override", overrides.ContainsKey(preset.name));
                 }
                 foreach (var t in textures) UnityEngine.Object.DestroyImmediate(t);
                 textures.Clear();
                 foreach (var preset in presets)
                 {
-                    var (c, z) = Current(preset.Id);
+                    var (c, z) = Current(preset.name);
                     var crop = SpriteSpecEditor.Crop(source.textureRect, c, z, preset.width, preset.height);
                     var scale = Mathf.Min(1f, (float)PreviewMax / Mathf.Max(preset.width, preset.height));
                     var tex = SpriteSpecEditor.Render(source, crop, Mathf.Max(8, (int)(preset.width * scale)), Mathf.Max(8, (int)(preset.height * scale)));
                     textures.Add(tex);
-                    var (previewImage, label) = previews[preset.Id];
+                    var (previewImage, label) = previews[preset.name];
                     previewImage.style.backgroundImage = new StyleBackground(tex);
                     previewImage.style.width = tex.width;
                     previewImage.style.height = tex.height;
-                    label.text = $"{preset.DisplayName}  {preset.width}×{preset.height}" +
-                                 (overrides.ContainsKey(preset.Id) ? "  · 예외" : "") + (reviews.Contains(preset.Id) ? "  · 확인 필요" : "");
+                    label.text = $"{preset.name}  {preset.width}×{preset.height}" +
+                                 (overrides.ContainsKey(preset.name) ? "  · 예외" : "") + (reviews.Contains(preset.name) ? "  · 확인 필요" : "");
                 }
                 status.text = target == null
-                    ? "공통 맞춤을 조정합니다(예외가 없는 규격 모두)."
-                    : $"'{presets.First(p => p.Id == target).DisplayName}'만 따로 잡습니다(예외 촬영으로 영구 기록).";
+                    ? "공통 맞춤을 조정합니다(예외가 없는 크기 모두)."
+                    : $"'{target}'만 따로 잡습니다(예외 촬영으로 영구 기록).";
             }
 
-            // 모드: 공통 / 규격별
+            // 모드: 공통 / 크기별
             var segments = new List<(string id, GsButton button)>();
             void SelectMode(string preset)
             {
@@ -139,9 +143,9 @@ namespace GBible.EditorTools.UI
             modes.Add(common);
             foreach (var preset in presets)
             {
-                var id = preset.Id;
-                var button = new GsButton(preset.DisplayName, () => SelectMode(id), GsButtonKind.Ghost);
-                button.tooltip = "이 규격만 따로 잡기(예외 촬영)";
+                var id = preset.name;
+                var button = new GsButton(preset.name, () => SelectMode(id), GsButtonKind.Ghost);
+                button.tooltip = "이 크기만 따로 잡기(예외 촬영)";
                 segments.Add((id, button));
                 modes.Add(button);
             }
@@ -152,7 +156,7 @@ namespace GBible.EditorTools.UI
                 reviews.Remove(target);
                 Redraw();
             }, GsButtonKind.Ghost);
-            clear.tooltip = "선택한 규격을 공통 맞춤으로 되돌립니다.";
+            clear.tooltip = "선택한 크기를 공통 맞춤으로 되돌립니다.";
             modes.Add(Gs.Spacer());
             modes.Add(clear);
 
@@ -161,15 +165,15 @@ namespace GBible.EditorTools.UI
             foreach (var preset in presets)
             {
                 var color = colors[(index++ * 3) % colors.Length];
-                var frame = Gs.Box("gs-framing__frame");
-                frame.pickingMode = PickingMode.Ignore;
-                frame.style.borderLeftColor = frame.style.borderRightColor = frame.style.borderTopColor = frame.style.borderBottomColor = color;
-                var tag = Gs.Label(preset.DisplayName, "gs-framing__tag");
+                var outline = Gs.Box("gs-framing__frame");
+                outline.pickingMode = PickingMode.Ignore;
+                outline.style.borderLeftColor = outline.style.borderRightColor = outline.style.borderTopColor = outline.style.borderBottomColor = color;
+                var tag = Gs.Label(preset.name, "gs-framing__tag");
                 tag.style.backgroundColor = color;
                 tag.pickingMode = PickingMode.Ignore;
-                frame.Add(tag);
-                canvas.Add(frame);
-                frames[preset.Id] = frame;
+                outline.Add(tag);
+                canvas.Add(outline);
+                frames[preset.name] = outline;
 
                 var card = Gs.Col("gs-framing__preview");
                 var previewImage = Gs.Box("gs-framing__preview-image");
@@ -177,7 +181,7 @@ namespace GBible.EditorTools.UI
                 var label = Gs.Label("", "gs-caption");
                 card.Add(label);
                 side.Add(card);
-                previews[preset.Id] = (previewImage, label);
+                previews[preset.name] = (previewImage, label);
             }
 
             // 클릭: 중심, 휠: 배율
@@ -217,14 +221,15 @@ namespace GBible.EditorTools.UI
                 foreach (var t in textures) UnityEngine.Object.DestroyImmediate(t);
             };
             buttons.Add(new GsButton("취소", modal.Close, GsButtonKind.Ghost));
-            buttons.Add(new GsButton("적용 (베이크)", () =>
+            buttons.Add(new GsButton("적용 (모든 크기 굽기)", () =>
             {
-                var count = SpriteSpecEditor.Apply(source, group, center, zoom, overrides);
+                var count = SpriteSpecEditor.Apply(source, frame, center, zoom, overrides);
                 modal.Close();
-                Debug.Log($"[MomoiProject] '{source.name}'을(를) 규격 {count}개로 베이크했습니다.");
+                Debug.Log($"[MomoiProject] '{source.name}'을(를) 틀 {frame}의 크기 {count}개로 구웠습니다.");
                 applied?.Invoke();
             }, GsButtonKind.Primary));
             SelectMode(null);
+            return modal;
         }
     }
 }

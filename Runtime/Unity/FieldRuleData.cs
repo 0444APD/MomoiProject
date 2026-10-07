@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GBible.Data
 {
@@ -23,7 +24,7 @@ namespace GBible.Data
         Free = 4,
     }
 
-    // 필드 규칙: 에디터에서 정하는 필드 설정 — 값 출처(DB 항목·플레이어 데이터), 필수, 스프라이트 규격 그룹.
+    // 필드 규칙: 에디터에서 정하는 필드 설정 — 값 출처(DB 항목·플레이어 데이터), 필수, 스프라이트 틀.
     // 키워드 그룹 연결은 코드의 [Keyword(typeof(그룹))]로 한다(예전 Keyword 출처는 이전 도구가 옮긴다).
     // 모든 편집 칸(DB·탐색기·이벤트 호출·조건식 값)과 ID 바꾸기·검증이 이 규칙을 따른다.
     [Database("필드 규칙", Group = "요소", Order = 9, IdPrefix = "rule", Hidden = true)]
@@ -37,9 +38,10 @@ namespace GBible.Data
         [HideInInspector] public string keywordGroup = "";
         [FieldLabel("DB 종류"), GameDataTypeRef] public string dataType = "";
         [FieldLabel("필수")] public bool required;
-        // 스프라이트 필드: 원본을 넣으면 이 그룹의 규격으로 베이크하고, 목록·카드는 미리보기 규격으로 보여 준다.
-        [FieldLabel("스프라이트 규격 그룹"), DataRef(typeof(SpritePresetGroupData))] public string spriteGroup = "";
-        [FieldLabel("미리보기 규격"), DataRef(typeof(SpritePresetData))] public string previewPreset = "";
+        // 스프라이트 필드: 원본을 넣으면 이 틀의 모든 크기로 잘라 굽고, 목록·카드는 미리보기 크기로 보여 준다.
+        [FieldLabel("스프라이트 틀"), DataRef(typeof(SpriteFrameData)), FormerlySerializedAs("spriteGroup")] public string spriteFrame = "";
+        // 틀의 크기 이름(비우면 원본 그대로).
+        [FieldLabel("미리보기 크기"), FormerlySerializedAs("previewPreset")] public string previewSize = "";
 
         public Type TargetType => TypeResolver.Find(targetType);
 

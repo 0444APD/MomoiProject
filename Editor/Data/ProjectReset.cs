@@ -359,12 +359,17 @@ namespace GBible.EditorTools
 
         static void RemoveModuleSymbols()
         {
+            var targets = new List<UnityEditor.Build.NamedBuildTarget>();
             foreach (BuildTargetGroup group in Enum.GetValues(typeof(BuildTargetGroup)))
             {
                 if (group == BuildTargetGroup.Unknown) continue;
-                UnityEditor.Build.NamedBuildTarget target;
-                try { target = UnityEditor.Build.NamedBuildTarget.FromBuildTargetGroup(group); }
-                catch (Exception) { continue; }
+                try { targets.Add(UnityEditor.Build.NamedBuildTarget.FromBuildTargetGroup(group)); }
+                catch (Exception) { /* 이 에디터가 모르는 플랫폼 */ }
+            }
+            // 서버(Dedicated Server)는 빌드 대상 묶음(BuildTargetGroup)이 따로 없지만 심볼 칸은 따로다 — 기능 심볼을 서버에도 넣으므로(GameFeatures) 같이 뺀다.
+            targets.Add(UnityEditor.Build.NamedBuildTarget.Server);
+            foreach (var target in targets.GroupBy(t => t.TargetName).Select(g => g.First()))
+            {
                 string current;
                 try { current = PlayerSettings.GetScriptingDefineSymbols(target); }
                 catch (Exception) { continue; }

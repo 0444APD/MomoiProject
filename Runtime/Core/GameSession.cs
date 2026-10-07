@@ -234,6 +234,8 @@ namespace GBible
                 return RemoteDo?.Invoke(action) ?? throw new InvalidOperationException("[MomoiProject] 멀티플레이 클라이언트가 서버에 연결되어 있지 않습니다.");
             var record = Actions.Execute(action);
             if (nested) return record;
+            // 행동 안에서 발동한 도전과제는 행동이 성공한 지금 달성한다(실패하면 Execute가 던져 여기 오지 않고, 기다리던 달성은 버려진다).
+            Achievements.CommitPending();
             Data.Sync();
             Achievements.Flush();
             return record;
@@ -282,9 +284,22 @@ namespace GBible
                 if (!last.TimeRule) break;
                 timeRule = true;
             }
-            if (timeRule && earliest != null && !earliest.TimeRule) Clock.Rewind(earliest.Tick, earliest.Time);
+            if (timeRule && earliest != null && !earliest.TimeRule)
+            {
+                Clock.Rewind(earliest.Tick, earliest.Time);
+                ClockMoved();
+            }
             if (undone) Achievements.Flush();
             return undone;
+        }
+
+        // 게임 시계를 되돌리거나 불러온 판의 시각으로 옮긴 뒤: 메모리에만 있는 시간 기준(패시브 주기의 지난 경계·조건 폴링 시각)을 새 시각에 맞춘다.
+        // 새 시각까지의 시간 규칙은 이미 돈 것으로 본다(되돌린 시각 뒤의 규칙은 시간이 다시 흐르면 다시 돈다). 맞추지 않으면 앞으로 크게 옮긴 뒤
+        // 밀린 주기를 한꺼번에 내고(최대 8번), 뒤로 돌린 뒤에는 예전 시각까지 주기·폴링을 건너뛴다.
+        void ClockMoved()
+        {
+            Passives.ResetPulseClock();
+            Triggers.Watcher.ResetPolls(Clock.Time);
         }
 
         // 되돌리기 지점(행동 방식): 지금까지의 행동 이력 끝. UndoTo(지점)이 그 뒤의 행동을 모두 되돌린다.
@@ -344,6 +359,7 @@ namespace GBible
                 Data.Restore(snapshot.Meta, DataZone.Meta, "되감기");
                 Random.Restore(snapshot.Random);
                 Clock.Rewind(snapshot.Tick, snapshot.Time);
+                ClockMoved();
                 Actions.MarkUndoneAfter(snapshot.JournalId);
                 // 되감은 구간에 달성한 도전과제는 유지한다(달성·보상 다시 적용).
                 Achievements.ReapplyUnlocksAfter(snapshot.JournalId);
@@ -411,8 +427,19 @@ namespace GBible
         // 고정 틱: 다음 틱까지 지난 비율(0~1). 화면이 두 틱 사이를 부드럽게 그릴 때(보간).
         public double TickAlpha { get; private set; }
 
-        // 한 프레임에 따라잡는 최대 틱 수(느린 프레임에서 따라잡느라 멈추지 않게). 넘으면 남은 시간은 버린다.
+        // 한 프레임에 따라잡는 최대 틱 수(보통 속도에서 — 느린 프레임에서 따라잡느라 멈추지 않게). 넘으면 남은 시간은 버린다.
         public const int MaxTicksPerFrame = 8;
+
+        // 배속을 반영한 한도의 상한(배속이 아무리 커도 한 프레임에 이보다 많이 돌리지 않는다). 8 × Unity GameTime의 최대 배속 16.
+        public const int MaxTicksPerFrameAtSpeed = 128;
+
+        // 호스트의 배속(1 = 보통). 한 프레임에 따라잡는 틱 한도만 늘린다 — 흐르는 시간은 EndFrame의 deltaTime에 이미 배속이 들어 있다.
+        // ×16이면 보통 프레임에도 틱이 16배 들어오므로 한도가 8 그대로면 남은 시간을 버려 규칙 시간만 ×8로 늦어진다(물리·애니메이션은 ×16).
+        // Unity에서는 GameTime이 매 프레임 맞춘다. 세션을 직접 돌리는 호스트(서버·테스트)는 배속을 쓸 때만 정한다.
+        public double HostSpeed { get; set; } = 1;
+
+        // 이번 프레임에 따라잡는 최대 틱 수: MaxTicksPerFrame × 올림(배속), 최대 MaxTicksPerFrameAtSpeed(1 아래·NaN 배속은 1로 본다).
+        public int TickLimit => (int)Math.Min(MaxTicksPerFrameAtSpeed, MaxTicksPerFrame * (HostSpeed > 1 ? Math.Ceiling(Math.Min(HostSpeed, MaxTicksPerFrameAtSpeed)) : 1));
 
         double _tickCarry;
 
@@ -430,21 +457,19 @@ namespace GBible
                 var step = 1.0 / Options.TickRate;
                 _tickCarry += Math.Max(0, deltaTime);
                 var steps = 0;
+                var limit = TickLimit;
                 // 프레임 시간을 더해 가며 생기는 아주 작은 오차로 틱이 하나 밀리지 않게(60fps와 20fps가 같은 틱을 내도록).
                 var tolerance = step * 1e-6;
-                while (_tickCarry + tolerance >= step && steps < MaxTicksPerFrame)
+                while (_tickCarry + tolerance >= step && steps < limit)
                 {
                     _tickCarry = Math.Max(0, _tickCarry - step);
                     steps++;
                     Clock.Advance(step);
                     Achievements.Poll(Clock.Time);
                     if (Data.InTransaction) continue;
-                    Statuses.Tick();
-                    Passives.Tick();
-                    Schedules.Tick();
-                    Ticked?.Invoke(step);
+                    RunTimeRules(step);
                 }
-                if (steps == MaxTicksPerFrame && _tickCarry + tolerance >= step) _tickCarry = 0;
+                if (steps == limit && _tickCarry + tolerance >= step) _tickCarry = 0;
                 TickAlpha = _tickCarry / step;
                 if (Data.InTransaction) return;
             }
@@ -453,16 +478,32 @@ namespace GBible
                 Clock.Advance(deltaTime);
                 Achievements.Poll(Clock.Time);
                 if (Data.InTransaction) return;
-                Statuses.Tick();
-                Passives.Tick();
-                Schedules.Tick();
-                Ticked?.Invoke(deltaTime);
+                RunTimeRules(deltaTime);
             }
-            Data.Sync();
-            Achievements.Flush();
+            // 행동 밖 변경 맞추기·조건 평가도 받는 쪽(Changed·달성 보상)이 던질 수 있다 — 하나가 실패해도 프레임 끝의 나머지는 돈다.
+            try { Data.Sync(); }
+            catch (Exception e) { FrameEndFailed("행동 밖 변경 맞추기(Sync)", e); }
+            try { Achievements.Flush(); }
+            catch (Exception e) { FrameEndFailed("도전과제·조건 평가", e); }
             if (Options.History == HistoryMode.Snapshots && Clock.Time - _lastSnapshotTime >= Options.SnapshotInterval)
                 CaptureSnapshot();
         }
+
+        // 한 틱(고정 틱이 아니면 한 프레임)의 시간 규칙. 하나가 실패해도 나머지 시간 규칙과 프레임 끝 처리(Sync·도전과제·스냅샷, Unity 쪽의
+        // 판 저장·연출·화면·멀티 전송)는 돈다. 실패한 행동은 이미 취소됐고, 실패는 기록(오류)에 남긴다.
+        void RunTimeRules(double step)
+        {
+            try { Statuses.Tick(); }
+            catch (Exception e) { FrameEndFailed("상태 효과(주기·만료)", e); }
+            try { Passives.Tick(); }
+            catch (Exception e) { FrameEndFailed("패시브 주기", e); }
+            try { Schedules.Tick(); }
+            catch (Exception e) { FrameEndFailed("시간 예약", e); }
+            try { Ticked?.Invoke(step); }
+            catch (Exception e) { FrameEndFailed("Ticked", e); }
+        }
+
+        void FrameEndFailed(string what, Exception e) => Journal.Append(JournalKind.Error, "Session", $"프레임 끝의 {what} 처리가 실패했습니다: {e.Message}");
         // ── 저장 ───────────────────────────────────────────────
         // 메타 구역(프로필)만 저장한다. 세션 구역은 판이 끝나면 사라지는 게임 내용이다.
 
@@ -489,6 +530,8 @@ namespace GBible
                 if (version < SaveVersion) Migrations.Run(values, version, SaveVersion, Journal);
                 Migrations.EveryLoad?.Invoke(values);
                 Data.Import(values, DataZone.Meta);
+                // 도전과제 감시를 불러온 달성 상태에 맞춘다(이 세션에서 달성했지만 불러온 프로필에서는 아직인 것은 다시 감시).
+                Achievements.SyncWithData();
             }
             Journal.Append(JournalKind.System, "Save", $"프로필 데이터 불러옴 ({(root.TryGetValue("state", out var s) && s is Dictionary<string, object> d ? d.Count : 0)}개 값)");
         }
@@ -539,6 +582,7 @@ namespace GBible
             var tick = root.TryGetValue("tick", out var t) && t is double tickValue ? (long)tickValue : 0;
             var time = root.TryGetValue("time", out var s) && s is double timeValue ? timeValue : 0;
             Clock.Rewind(tick, time);
+            ClockMoved();
 
             if (root.TryGetValue("state", out var state) && state is Dictionary<string, object> values)
             {

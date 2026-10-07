@@ -65,6 +65,42 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 저장할_때_다른_곳이_바꾼_칸은_덮지_않는다()
+        {
+            var panel = GsDetailPanel.Open(_host, _item);
+            _item.description = "CSV로 고침";   // 패널을 연 뒤 다른 곳(CSV 가져오기·ID 바꾸기의 참조 갱신 …)이 대상을 고쳤다
+            Change(panel, "price", 300);
+            Assert.AreEqual(1, panel.Changes.Count, "이 패널이 바꾼 칸만 변경으로 잡힌다");
+            panel.SaveNow();
+
+            Assert.AreEqual(300, _item.price);
+            Assert.AreEqual("CSV로 고침", _item.description, "패널이 바꾸지 않은 칸은 예전 값으로 덮지 않는다");
+            Assert.AreEqual("CSV로 고침", panel.Draft.FindProperty("description").stringValue, "사본도 대상에 맞춘다");
+            Assert.AreEqual(0, panel.Changes.Count);
+            panel.Close();
+        }
+
+        [Test]
+        public void 바꾼_것이_없으면_대상의_새_값으로_사본을_맞춘다()
+        {
+            var panel = GsDetailPanel.Open(_host, _item);
+            _item.price = 777;
+            panel.SyncFromTarget();
+            Assert.AreEqual(777, panel.Draft.FindProperty("price").intValue);
+            Assert.AreEqual(0, panel.Changes.Count);
+
+            // 아직 옮기지 않은 이 패널의 변경은 지킨다(반영할 때 그 칸만 옮긴다).
+            Change(panel, "price", 5);
+            _item.description = "밖에서";
+            panel.SyncFromTarget();
+            Assert.AreEqual(5, panel.Draft.FindProperty("price").intValue);
+            panel.SaveNow();
+            Assert.AreEqual(5, _item.price);
+            Assert.AreEqual("밖에서", _item.description);
+            panel.Close();
+        }
+
+        [Test]
         public void 되돌리면_사본이_원본으로_돌아간다()
         {
             var panel = GsDetailPanel.Open(_host, _item);

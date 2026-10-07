@@ -185,9 +185,12 @@ if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) { … }   // 2
 ```csharp
 string id = Game.NewId("unit");               // "unit1", "unit2", …
 List<string> wave = Game.NewIds("slime", 30);  // "slime1" … "slime30"(번호를 한 번만 쓴다)
+string child = Game.NewId("u1");               // "u1_1", "u1_2", …(숫자로 끝나는 접두어는 '_'를 넣는다)
 ```
 
 소환·드롭처럼 객체를 새로 만들 때 겹치지 않는 id를 준다. 번호는 플레이어 데이터(메타 구역의 `$id.접두어` 키)에 있어서, 행동 안에서 만들면 Undo하면 번호도 돌아가고, 저장·멀티플레이에서도 같다. 메타 구역이므로 판이 바뀌어도(`NewRun`) 번호는 이어서 늘어난다.
+
+접두어가 숫자로 끝나면 번호와의 사이에 `_`를 넣는다(`"u1"` → `u1_1`, 번호 키 `$id.u1_`). 그대로 붙이면 `u`의 11번과 `u1`의 1번이 둘 다 `u11`이 된다. 숫자로 끝나지 않는 접두어는 그대로 붙는다(`card` → `card1`). `"u1"`과 `"u1_"`은 같은 번호를 이어 쓴다.
 
 적 수십 마리처럼 한 번에 많이 만들 때는 `NewIds`를 쓴다. `NewId`를 반복하면 그만큼 번호를 읽고 쓰지만, `NewIds`는 한 번에 끝낸다. `count`가 0 이하면 빈 목록이다.
 

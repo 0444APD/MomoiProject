@@ -124,20 +124,28 @@ namespace GBible
         }
 
         // 길찾기(A*): 시작 칸을 뺀 칸들의 차례. 갈 수 없으면 빈 목록. maxCost를 넘는 길은 찾지 않는다(0이면 제한 없음).
-        public static List<Cell> Path(Cell start, Cell goal, Func<Cell, int> cost, bool diagonal = false, int maxCost = 0)
+        // 가장 싼 길이다(Reachable과 같은 비용) — minCost가 모든 칸 비용 이하일 때: 목표까지의 어림 = 남은 칸 수 × minCost라 실제로 남은 비용을 넘지 않는다.
+        //   minCost = 들어갈 수 있는 칸 비용의 최솟값. 기본 0은 비용 0인 칸(길·다리)이 있어도 늘 맞다(어림 없이 싼 칸부터 넓힌다).
+        //   모든 칸이 1 이상인 맵은 1을 주면 목표 쪽으로만 넓혀 더 빨리 찾는다. 그보다 싼 칸이 있으면 가장 싼 길이 아닐 수 있다(아직 보지 않은 싼 칸은 미리 알 수 없다).
+        //   만난 칸이 minCost보다 싸면 그때부터 그 비용으로 어림을 낮춘다(덜 빗나가게 — 보장은 아니다).
+        public static List<Cell> Path(Cell start, Cell goal, Func<Cell, int> cost, bool diagonal = false, int maxCost = 0, int minCost = 0)
         {
             var metric = diagonal ? GridMetric.Chebyshev : GridMetric.Manhattan;
+            var scale = Math.Max(0, minCost);
             var spentTo = new Dictionary<Cell, int> { [start] = 0 };
             var cameFrom = new Dictionary<Cell, Cell>();
-            var open = new SortedSet<(int score, int order, Cell cell)>(Comparer<(int score, int order, Cell cell)>.Create((a, b) =>
-                a.score != b.score ? a.score.CompareTo(b.score) : a.order.CompareTo(b.order)));
+            var byScore = Comparer<(int score, int order, Cell cell, int spent)>.Create((a, b) =>
+                a.score != b.score ? a.score.CompareTo(b.score) : a.order.CompareTo(b.order));
+            var open = new SortedSet<(int score, int order, Cell cell, int spent)>(byScore);
             var order = 0;
-            open.Add((Distance(start, goal, metric), order++, start));
+            open.Add((Distance(start, goal, metric) * scale, order++, start, 0));
             var guard = 0;
             while (open.Count > 0 && guard++ < 100000)
             {
                 var current = open.Min;
                 open.Remove(current);
+                // 더 싼 길로 다시 넣은 칸의 옛 줄은 건너뛴다.
+                if (current.spent > spentTo[current.cell]) continue;
                 if (current.cell == goal)
                 {
                     var path = new List<Cell>();
@@ -149,20 +157,31 @@ namespace GBible
                 {
                     var step = cost(next);
                     if (step < 0) continue;
-                    var spent = spentTo[current.cell] + step;
+                    if (step < scale)
+                    {
+                        // minCost보다 싼 칸: 어림이 실제 비용을 넘지 않게 낮추고 열린 칸들의 점수를 다시 매긴다(넣은 차례는 그대로 — 결정론).
+                        scale = step;
+                        var rescored = new SortedSet<(int score, int order, Cell cell, int spent)>(byScore);
+                        foreach (var item in open) rescored.Add((item.spent + Distance(item.cell, goal, metric) * scale, item.order, item.cell, item.spent));
+                        open = rescored;
+                    }
+                    var spent = current.spent + step;
                     if (maxCost > 0 && spent > maxCost) continue;
                     if (spentTo.TryGetValue(next, out var had) && had <= spent) continue;
                     spentTo[next] = spent;
                     cameFrom[next] = current.cell;
-                    open.Add((spent + Distance(next, goal, metric), order++, next));
+                    open.Add((spent + Distance(next, goal, metric) * scale, order++, next, spent));
                 }
             }
             return new List<Cell>();
         }
 
-        // 직선(Bresenham): a에서 b까지(양 끝 포함)의 칸들.
+        // 직선(Bresenham): a에서 b까지(양 끝 포함)의 칸들. 늘 같은 쪽 끝(x가 작은 쪽, 같으면 y가 작은 쪽)에서 긋고 필요하면 뒤집으므로
+        // Line(a, b)는 Line(b, a)를 거꾸로 한 것이다 — A가 B를 보면 B도 A를 본다(시야가 대칭).
         public static List<Cell> Line(Cell a, Cell b)
         {
+            var swap = a.x > b.x || (a.x == b.x && a.y > b.y);
+            if (swap) (a, b) = (b, a);
             var cells = new List<Cell>();
             int x = a.x, y = a.y, dx = Math.Abs(b.x - a.x), dy = -Math.Abs(b.y - a.y), sx = a.x < b.x ? 1 : -1, sy = a.y < b.y ? 1 : -1, err = dx + dy;
             while (true)
@@ -173,6 +192,7 @@ namespace GBible
                 if (e2 >= dy) { err += dy; x += sx; }
                 if (e2 <= dx) { err += dx; y += sy; }
             }
+            if (swap) cells.Reverse();
             return cells;
         }
 

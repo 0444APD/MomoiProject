@@ -95,10 +95,16 @@ namespace GBible.Tests
             Assert.AreEqual("를", KoreanParticles.Pick("PC", "을"));
             Assert.AreEqual("을", KoreanParticles.Pick("<b>검</b>", "를"));
             Assert.AreEqual("을(를)", KoreanParticles.Pick("Kit", "을"));
+            // 소리 나지 않는 e: 게임·룬은 받침, 테이블은 ㄹ 받침, 페이지는 받침 없음.
+            Assert.AreEqual("을", KoreanParticles.Pick("Game", "를"));
+            Assert.AreEqual("이", KoreanParticles.Pick("Rune", "가"));
+            Assert.AreEqual("로", KoreanParticles.Pick("Table", "으로"));
+            Assert.AreEqual("를", KoreanParticles.Pick("Page", "을"));
             KoreanParticles.Overrides["Kit"] = true;
             try
             {
                 Assert.AreEqual("을", KoreanParticles.Pick("Kit", "을"));
+                Assert.AreEqual("을", KoreanParticles.Pick("Starter Kit", "을"), "예외 등록은 마지막 단어로도");
             }
             finally
             {

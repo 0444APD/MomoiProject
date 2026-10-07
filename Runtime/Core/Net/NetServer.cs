@@ -23,6 +23,8 @@ namespace GBible
         // 닫을 때(Dispose) 들어와 있는 사람에게 "방이 닫혔다"고 알린다 — 클라이언트가 다시 접속을 시도하지 않는다(방장이 나가면 판이 끝난다).
         // 매칭큐의 방은 끄고 연결을 로비로 돌린다(NetHub가 정한다).
         public bool ByeOnClose = true;
+        // 연결 하나가 1초에 보낼 수 있는 메시지 수. 넘친 것은 버리고, 네 배를 넘기면 끊는다(행동을 쏟아붓는 클라이언트가 서버를 멈추지 못하게). 0이면 제한 없음.
+        public int MaxMessagesPerSecond = 300;
     }
 
     // 서버 중개(4블록의 [서버 중개]): 이 세션(서버 권한)의 행동을 받아 실행하고, 바뀐 곳·이벤트를 클라이언트에 보낸다.
@@ -52,6 +54,9 @@ namespace GBible
             public NetReplay Recorder;
             public bool SeeAll;
             public double RecordStart;
+            // 초당 메시지 수 세기(MaxMessagesPerSecond).
+            public double WindowStart;
+            public int WindowCount;
         }
 
         readonly System.Diagnostics.Stopwatch _watch = System.Diagnostics.Stopwatch.StartNew();
@@ -165,6 +170,21 @@ namespace GBible
         public void Receive()
         {
             if (!_started) return;
+            _receiving = true;
+            try
+            {
+                ReceiveAll();
+            }
+            finally
+            {
+                _receiving = false;
+            }
+            SendPendingResults();
+            DropSilent();
+        }
+
+        void ReceiveAll()
+        {
             while (_transport.Poll(out var e))
             {
                 switch (e.Kind)
@@ -179,6 +199,7 @@ namespace GBible
                         if (_peers.TryGetValue(e.Connection, out var peer))
                         {
                             peer.LastHeard = Now;
+                            if (!WithinBudget(peer)) break;
                             try { Handle(peer, e.Data, e.Length); }
                             catch (Exception ex)
                             {
@@ -188,7 +209,27 @@ namespace GBible
                         break;
                 }
             }
-            DropSilent();
+        }
+
+        // 초당 메시지 수를 넘으면 그 메시지를 버리고(거짓), 네 배를 넘기면 연결을 끊는다.
+        bool WithinBudget(Peer peer)
+        {
+            var limit = Options.MaxMessagesPerSecond;
+            if (limit <= 0) return true;
+            var now = Now;
+            if (now - peer.WindowStart >= 1)
+            {
+                peer.WindowStart = now;
+                peer.WindowCount = 0;
+            }
+            if (++peer.WindowCount <= limit) return true;
+            if (peer.WindowCount == limit * 4)
+            {
+                _session.Journal.Append(JournalKind.Warning, "Net", $"{peer.Player?.ToString() ?? "#" + peer.Connection}이(가) 1초에 메시지를 {limit * 4}개 넘게 보내 끊었습니다.");
+                _transport.Disconnect(peer.Connection, "메시지를 너무 많이 보냈습니다.");
+                Drop(peer.Connection, "메시지를 너무 많이 보냈습니다");
+            }
+            return false;
         }
 
         // 아무것도 오지 않은 지 오래된 연결을 끊는다(갑자기 꺼진 컴퓨터 — 전송이 알아채지 못한 끊김).
@@ -326,7 +367,7 @@ namespace GBible
         {
             if (peer.Joined) return;
             var version = (int)r.UVar();
-            var hello = new NetHello { Name = r.Str(), Token = r.Str(), GameVersion = r.Str(), Connection = peer.Connection };
+            var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Connection = peer.Connection };
             var table = NetProtocol.ReadStrings(r);
             if (version != NetProtocol.Version) { Refuse(peer, $"멀티플레이 규격 버전이 다릅니다(서버 {NetProtocol.Version}, 클라이언트 {version})."); return; }
             if (!string.IsNullOrEmpty(Options.GameVersion) && hello.GameVersion != Options.GameVersion) { Refuse(peer, $"게임 버전이 다릅니다(서버 {Options.GameVersion}, 클라이언트 {hello.GameVersion})."); return; }
@@ -400,6 +441,33 @@ namespace GBible
             _peers.Remove(peer.Connection);
         }
 
+        // Receive 안에서 받은 행동의 결과(ActResult): 프레임 끝에 묶음 한 번 뒤 차례대로 보낸다. Receive 밖이면 바로.
+        readonly List<Action> _pendingResults = new List<Action>();
+        bool _receiving;
+
+        void QueueResult(Action send)
+        {
+            if (_receiving)
+            {
+                _pendingResults.Add(send);
+                return;
+            }
+            Flush();
+            send();
+        }
+
+        void SendPendingResults()
+        {
+            if (_pendingResults.Count == 0) return;
+            Flush();
+            foreach (var send in _pendingResults)
+            {
+                try { send(); }
+                catch (Exception e) { _session.Journal.Append(JournalKind.Error, "Net", "행동 결과를 보내지 못했습니다: " + e.Message); }
+            }
+            _pendingResults.Clear();
+        }
+
         void OnAct(Peer peer, MirrorReader r)
         {
             var request = (long)r.UVar();
@@ -444,8 +512,10 @@ namespace GBible
                     }
                 }
             }
-            Flush();
-            Send(peer.Connection, w =>
+            // 결과는 이 프레임의 행동을 다 돌린 뒤 묶음(바뀐 곳) 한 번 다음에 보낸다 — 받은 행동마다 Sync·묶음을 만들지 않게(Receive 끝).
+            // 받는 쪽은 바뀐 곳을 먼저 받고 결과를 받는다(지금과 같은 차례).
+            var connection = peer.Connection;
+            QueueResult(() => Send(connection, w =>
             {
                 NetProtocol.Begin(NetMessage.ActResult, w);
                 w.UVar((ulong)request);
@@ -461,7 +531,7 @@ namespace GBible
                     w.Str(pair.Key);
                     NetProtocol.WriteScalar(w, pair.Value);
                 }
-            });
+            }));
             if (failMessage != null)
                 _session.Journal.Append(JournalKind.Warning, "Net", $"{peer.Player}의 행동 거절: {failMessage}");
         }
@@ -735,11 +805,41 @@ namespace GBible
                         _session.Journal.Append(JournalKind.Warning, "Net", $"이벤트 '{type.Name}'은(는) 클라이언트에 보낼 수 없습니다(구조체이거나 비교 코드가 없음 — [GameEvent] 클래스로 만드세요).");
                     continue;
                 }
+                // 생성 코드가 온전히 쓰지 못하는 이벤트(중첩 컬렉션·쓸 수 없는 구조체·생성 코드가 없는 값·readonly 필드 …)는 보내지 않는다 —
+                // 받는 쪽에 빈 칸으로 도착하거나 쓰다가 멈추는 대신, 어느 필드인지 밝힌 오류를 남긴다. 형식 검사는 형식마다 처음 한 번(Mirror.CanSend).
+                if (!Mirror.CanSend(type, out var reason))
+                {
+                    Unsendable(type, reason);
+                    continue;
+                }
                 w.Clear();
-                Mirror.WriteNetValue(w, evt, _session.Data.NodeOf);
+                try { Mirror.WriteNetValue(w, evt, _checkedNode ??= new Func<object, MirrorNode>(CheckedNode)); }
+                catch (Exception e)
+                {
+                    Unsendable(type, e.Message);
+                    continue;
+                }
                 encoded.Add((w.ToArray(), evt is IOwnedEvent owned ? owned.Owner : 0));
             }
             return encoded;
+        }
+
+        Func<object, MirrorNode> _checkedNode;
+
+        // 이벤트를 쓰는 동안 객체마다: 받는 쪽이 가진 데이터 안의 객체면 번호로 가리키고(그대로), 아니면 내용째 쓰므로
+        // 보낼 수 있는 값인지 본다(object 칸의 숫자·글자, 생성 코드가 없는 객체 등 — Mirror.CanSendValue).
+        MirrorNode CheckedNode(object value)
+        {
+            var node = _session.Data.NodeOf(value);
+            if ((node == null || !node.Sent) && !Mirror.CanSendValue(value, out var reason)) throw new InvalidOperationException(reason);
+            return node;
+        }
+
+        // 보낼 수 없는 이벤트: 빼고 오류를 남긴다(형식마다 한 번).
+        void Unsendable(Type type, string reason)
+        {
+            if (_warnedEvents.Add(type))
+                _session.Journal.Append(JournalKind.Error, "Net", $"이벤트 '{type.Name}'을(를) 클라이언트에 보낼 수 없어 뺐습니다: {reason}");
         }
 
         // [GameEvent(ServerOnly = true)]인가(형식마다 처음 한 번 찾아 둔다).

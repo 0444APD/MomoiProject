@@ -56,7 +56,8 @@ namespace GBible
                     _session.Data.Modify<WorldStateTable>(key, t => t.values.Remove(id));
         }
 
-        public static bool IsTrue(string value) => !string.IsNullOrEmpty(value) && value != "false" && value != "0";
+        // 거짓: 비움 · "false"(대소문자 무관 — bool.ToString()은 "False") · "0".
+        public static bool IsTrue(string value) => !string.IsNullOrEmpty(value) && !value.Equals("false", StringComparison.OrdinalIgnoreCase) && value != "0";
 
         void Ensure(string key)
         {

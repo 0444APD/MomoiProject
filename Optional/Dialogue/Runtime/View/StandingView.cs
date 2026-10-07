@@ -167,6 +167,8 @@ namespace GBible.Dialogue
     // 스파인 스탠딩. 스파인 런타임을 직접 참조하지 않고(설치하지 않은 프로젝트도 컴파일되도록) 이름으로 찾아 부른다.
     // 같은 오브젝트(또는 자식)의 SkeletonAnimation·SkeletonGraphic·SkeletonMecanim 중 하나를 쓴다.
     // 표정 ID = 애니메이션 이름(다르면 목록에 짝을 적는다). 표정 전환은 스파인의 믹스(AnimationStateData)로 섞인다.
+    // 이름으로 찾는 일(리플렉션)은 붙일 때(Bind) 한 번만 하고 대리자로 들고 있는다 — 매 프레임 부르는 밝기·투명도는 대리자로만.
+    // 다이얼로그 시간(멈추지 않는 시간)에 맞춰 스켈레톤의 unscaledTime을 켠다(pauseGame으로 게임 시간이 멈춰도 움직인다).
     public sealed class SpineStandingView : StandingView
     {
         [Serializable]
@@ -185,14 +187,83 @@ namespace GBible.Dialogue
         public bool controlSorting = true;
 
         Component _skeleton;
+        // Bind에서 한 번 만든 대리자.
+        Func<object> _getState;
+        Func<object> _getSkeleton;
+        Action<Color> _setGraphicColor;
+        MethodInfo _setAnimationMethod;
+        PropertyInfo _r, _g, _b, _a;
+        // 스켈레톤·애니메이션 상태 객체가 바뀌면(스파인이 다시 초기화) 그때만 다시 묶는다.
+        object _boundState;
+        Func<int, string, bool, object> _setAnimation;
+        object _boundSkeleton;
+        Action<float> _setR, _setG, _setB, _setA;
 
         public override void Bind(StandingProfileData character)
         {
             base.Bind(character);
             _skeleton = FindSkeleton();
             if (_skeleton == null) Debug.LogWarning($"[다이얼로그] '{name}'에서 스파인 컴포넌트(SkeletonAnimation 등)를 찾지 못했습니다.", this);
+            Prepare();
             if (character != null && !string.IsNullOrEmpty(character.defaultExpression)) BeginExpression(character.defaultExpression);
         }
+
+        // 이름으로 찾는 일을 여기서 한 번만 한다.
+        void Prepare()
+        {
+            _getState = null;
+            _getSkeleton = null;
+            _setGraphicColor = null;
+            _setAnimationMethod = null;
+            _r = _g = _b = _a = null;
+            _boundState = null;
+            _setAnimation = null;
+            _boundSkeleton = null;
+            _setR = _setG = _setB = _setA = null;
+            if (_skeleton == null) return;
+            var type = _skeleton.GetType();
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+            // 멈추지 않는 시간: SkeletonAnimation·SkeletonGraphic의 unscaledTime(SkeletonMecanim은 애니메이터 — 다이얼로그 화면이 Unscaled로 바꾼다).
+            var unscaled = type.GetField("unscaledTime", flags);
+            if (unscaled != null && unscaled.FieldType == typeof(bool)) unscaled.SetValue(_skeleton, true);
+            else
+            {
+                var property = type.GetProperty("UnscaledTime", flags);
+                if (property != null && property.CanWrite && property.PropertyType == typeof(bool)) property.SetValue(_skeleton, true);
+            }
+            _getState = Getter(_skeleton, type.GetProperty("AnimationState", flags));
+            if (type.Name == "SkeletonGraphic")
+            {
+                var color = type.GetProperty("color", flags);
+                if (color != null && color.CanWrite && color.PropertyType == typeof(Color))
+                    _setGraphicColor = (Action<Color>)Delegate.CreateDelegate(typeof(Action<Color>), _skeleton, color.GetSetMethod());
+                return;
+            }
+            var skeletonProperty = type.GetProperty("Skeleton", flags);
+            _getSkeleton = Getter(_skeleton, skeletonProperty);
+            var skeletonType = skeletonProperty?.PropertyType;
+            if (skeletonType == null) return;
+            _r = FloatProperty(skeletonType, "R");
+            _g = FloatProperty(skeletonType, "G");
+            _b = FloatProperty(skeletonType, "B");
+            _a = FloatProperty(skeletonType, "A");
+        }
+
+        static Func<object> Getter(object target, PropertyInfo property)
+        {
+            var get = property?.GetGetMethod();
+            if (get == null || property.PropertyType.IsValueType) return null;
+            return (Func<object>)Delegate.CreateDelegate(typeof(Func<object>), target, get);
+        }
+
+        static PropertyInfo FloatProperty(Type type, string member)
+        {
+            var property = type.GetProperty(member, BindingFlags.Public | BindingFlags.Instance);
+            return property != null && property.CanWrite && property.PropertyType == typeof(float) ? property : null;
+        }
+
+        static Action<float> Setter(object target, PropertyInfo property) =>
+            target == null || property == null ? null : (Action<float>)Delegate.CreateDelegate(typeof(Action<float>), target, property.GetSetMethod());
 
         Component FindSkeleton()
         {
@@ -217,63 +288,58 @@ namespace GBible.Dialogue
                     animation = string.IsNullOrEmpty(pair.animation) ? expression : pair.animation;
                     loop = pair.loop;
                 }
-            var state = Get(_skeleton, "AnimationState");
-            var set = state?.GetType().GetMethod("SetAnimation", new[] { typeof(int), typeof(string), typeof(bool) });
-            if (set == null) return;
+            var state = _getState?.Invoke();
+            if (state == null) return;
+            if (!ReferenceEquals(state, _boundState))
+            {
+                // 애니메이션 상태가 처음이거나 바뀌었을 때만 묶는다(스파인이 다시 초기화한 경우).
+                _boundState = state;
+                _setAnimationMethod ??= state.GetType().GetMethod("SetAnimation", new[] { typeof(int), typeof(string), typeof(bool) });
+                _setAnimation = _setAnimationMethod == null || _setAnimationMethod.ReturnType.IsValueType
+                    ? null
+                    : (Func<int, string, bool, object>)Delegate.CreateDelegate(typeof(Func<int, string, bool, object>), state, _setAnimationMethod);
+            }
+            if (_setAnimation == null) return;
             try
             {
-                set.Invoke(state, new object[] { track, animation, loop });
+                _setAnimation(track, animation, loop);
             }
-            catch (TargetInvocationException e)
+            catch (Exception e)
             {
-                Debug.LogWarning($"[다이얼로그] 스파인 애니메이션 '{animation}'을(를) 재생하지 못했습니다: {e.InnerException?.Message}", this);
+                Debug.LogWarning($"[다이얼로그] 스파인 애니메이션 '{animation}'을(를) 재생하지 못했습니다: {e.Message}", this);
             }
         }
 
+        // 매 프레임 불린다(전환 중): Bind에서 만든 대리자만 쓴다.
         public override void SetTint(float brightness, float alpha)
         {
             if (_skeleton == null) return;
             // SkeletonGraphic은 Graphic.color, 나머지는 Skeleton의 R·G·B·A.
-            var colorProperty = _skeleton.GetType().GetProperty("color", typeof(Color));
-            if (_skeleton.GetType().Name == "SkeletonGraphic" && colorProperty != null && colorProperty.CanWrite)
+            if (_setGraphicColor != null)
             {
-                colorProperty.SetValue(_skeleton, new Color(brightness, brightness, brightness, alpha));
+                _setGraphicColor(new Color(brightness, brightness, brightness, alpha));
                 return;
             }
-            var skeleton = Get(_skeleton, "Skeleton") ?? Get(_skeleton, "skeleton");
+            var skeleton = _getSkeleton?.Invoke();
             if (skeleton == null) return;
-            Set(skeleton, "R", brightness);
-            Set(skeleton, "G", brightness);
-            Set(skeleton, "B", brightness);
-            Set(skeleton, "A", alpha);
+            if (!ReferenceEquals(skeleton, _boundSkeleton))
+            {
+                _boundSkeleton = skeleton;
+                _setR = Setter(skeleton, _r);
+                _setG = Setter(skeleton, _g);
+                _setB = Setter(skeleton, _b);
+                _setA = Setter(skeleton, _a);
+            }
+            _setR?.Invoke(brightness);
+            _setG?.Invoke(brightness);
+            _setB?.Invoke(brightness);
+            _setA?.Invoke(alpha);
         }
 
         public override void SetSortingOrder(int order)
         {
             if (!controlSorting) return;
             foreach (var renderer in GetComponentsInChildren<Renderer>(true)) renderer.sortingOrder = order;
-        }
-
-        static object Get(object target, string member)
-        {
-            var type = target.GetType();
-            var property = type.GetProperty(member, BindingFlags.Public | BindingFlags.Instance);
-            if (property != null) return property.GetValue(target);
-            var field = type.GetField(member, BindingFlags.Public | BindingFlags.Instance);
-            return field?.GetValue(target);
-        }
-
-        static void Set(object target, string member, float value)
-        {
-            var type = target.GetType();
-            var property = type.GetProperty(member, BindingFlags.Public | BindingFlags.Instance);
-            if (property != null && property.CanWrite && property.PropertyType == typeof(float))
-            {
-                property.SetValue(target, value);
-                return;
-            }
-            var field = type.GetField(member, BindingFlags.Public | BindingFlags.Instance) ?? type.GetField(member.ToLowerInvariant(), BindingFlags.NonPublic | BindingFlags.Instance);
-            if (field != null && field.FieldType == typeof(float)) field.SetValue(target, value);
         }
     }
 }

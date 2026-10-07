@@ -73,7 +73,22 @@ namespace GBible
         VisualElement _options;
         Button _skip, _confirm, _reroll;
 
-        protected internal override string[] Watch => new[] { ChoiceSystem.Key };
+        // 모두에게 온 선택, 내 번호에게 온 선택(멀티: '$choices:번호'), 지금 있는 플레이어별 선택 키.
+        protected internal override string[] Watch
+        {
+            get
+            {
+                var session = GBibleRuntime.Session;
+                var keys = new List<string> { ChoiceSystem.Key };
+                if (session != null)
+                {
+                    if (session.LocalPlayer > 0) keys.Add(ChoiceSystem.KeyFor(session.LocalPlayer.ToString(CultureInfo.InvariantCulture)));
+                    keys.AddRange(session.Data.Keys.Where(ChoiceSystem.IsChoiceKey));
+                }
+                return keys.Distinct().ToArray();
+            }
+        }
+
         protected internal override bool WaitForPresentation => false;
 
         protected internal override void OnOpen()
@@ -327,7 +342,7 @@ namespace GBible
 
         // 0~1 음량은 %, 그 밖에는 숫자.
         static string Shown(SettingData setting, double value) =>
-            setting.spec.min == 0 && setting.spec.max == 1 ? $"{Math.Round(value * 100)}%" : value.ToString("0.##", CultureInfo.InvariantCulture);
+            setting.spec.min == 0 && setting.spec.max == 1 ? $"{GameNumbers.Round(value * 100)}%" : value.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
     // 슬롯 화면의 내용(GameScreens.Open(GameScreens.Slots, new SlotsRequest { … })). 비우면 슬롯 "1"·"2"·"3".

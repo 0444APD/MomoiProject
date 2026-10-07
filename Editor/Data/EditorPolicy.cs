@@ -37,6 +37,13 @@ namespace GBible.EditorTools
         // Block·규칙 줄·기능 필드의 모양을 바꿀 수 있나.
         public static bool CanEditStructure => Authoring;
 
+        // 이 에셋 안의 구조를 바꿀 수 있나: 개발자가 만드는 종류([Database(DeveloperAuthored = true)] — 다이얼로그 그래프의 선택지·조건 등)는
+        // 안의 Block·목록 줄도 개발자가 짠다. 그 밖은 CanEditStructure와 같다.
+        public static bool CanEditStructureOf(UnityEngine.Object owner) =>
+            Authoring || (owner is GameData data && (DataTypes.Find(data.GetType())?.DeveloperAuthored ?? false));
+
+        public static bool CanEditStructureOf(SerializedProperty property) => CanEditStructureOf(property?.serializedObject?.targetObject);
+
         // 이 DB 종류의 항목을 추가·삭제하고 ID를 바꿀 수 있나.
         public static bool CanAddRemove(Type dataType) => Authoring || (dataType != null && (DataTypes.Find(dataType)?.DeveloperAuthored ?? false));
         public static bool CanAddRemove(GameData item) => item != null && CanAddRemove(item.GetType());

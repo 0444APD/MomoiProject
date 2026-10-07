@@ -144,25 +144,25 @@ public class RandomEnemy : TargetSelector<Fighter> { … }
 > - `Sentence`의 `{필드이름}` 자리가 눌러서 바꾸는 칸이 된다. `Sentence`가 없으면 Block 이름 아래에 칸이 나열된 상자로 보인다.
 > - 카드 던전의 Block에는 아직 `Sentence`가 없고, `RandomEnemy`("무작위 적")는 `Description`도 없어 목록에서 이름만 보인다. 위처럼 더한다. 처음 보는 Block일수록 설명을 단다.
 
-## 6. 필드 규칙: 필수와 스프라이트 규격
+## 6. 필드 규칙: 필수와 스프라이트 틀
 
 DB › 클래스 › `Card`를 열면 필드마다 설정이 있다. 코드는 쓰지 않는다.
 
 1. `title`·`art`에 **필수 (비어 있으면 DB 검증 오류)** 를 켠다.
-2. Project 창(`Assets/Dev` 아래)에서 우클릭 › Create › MomoiProject › 스프라이트 규격으로 `cardArt`(300×420)·`cardIcon`(64×64) 파일을 만들고, 인스펙터에서 그룹 `card`를 만들어 둘 다 넣는다.
-3. `art`의 **스프라이트 규격 그룹**에 `card`를 연결한다.
+2. Project 창(`Assets/Dev` 아래)에서 우클릭 › Create › MomoiProject › 스프라이트 틀로 틀 `card`를 만들고, 인스펙터의 **크기** 표에 `cardArt`(300×420)·`cardIcon`(64×64)를 적는다.
+3. `art`의 **스프라이트 틀**에 `card`를, **미리보기 크기**에 `cardIcon`을 고른다.
 
-이제 기획자가 카드 그림을 넣으면 맞춤 창이 열리고, 중심·배율을 한 번 정하면 모든 규격이 함께 베이크된다. 화면 코드는 원본 그림과 규격 ID로 베이크본을 꺼낸다.
+이제 기획자가 카드 그림을 넣으면 맞춤 창이 열리고, 중심·배율을 한 번 정하면 틀의 모든 크기가 함께 구워진다. 화면 코드는 원본 그림과 크기 이름으로 구운 이미지를 꺼낸다.
 
 ```csharp
-var icon = SpriteSpecs.Get(Rules.CardData(game, deckCard.card).art, "cardIcon");
+var icon = SpriteSpecs.Get(Rules.CardData(game, deckCard.card).art, GameIds.SpriteSize.Card.CardIcon);
 ```
 
 > [!note]- 자세히
 > - 그림을 빠뜨린 카드는 검증 오류로 빌드가 막힌다. 숫자 0은 비었다고 보지 않으므로 `cost` 같은 숫자 칸에는 필수가 효과가 없다.
-> - `SpriteSpecs.Get`은 베이크 전에는 원본을 돌려주므로 화면이 깨지지 않는다.
-> - `MonsterData.portrait`·`RelicData.icon`도 같은 방식으로 그룹을 정해 두면, 기획자가 크기를 맞추느라 그림 파일을 따로 자를 일이 없다. 유물 같은 DB 종류는 그 탭 위의 **필드 연결** 버튼으로 같은 화면을 연다.
-> - 이 설정은 코드가 아니라 DB에 저장된다(Ctrl+S).
+> - `SpriteSpecs.Get`은 굽기 전에는 원본을 돌려주므로 화면이 깨지지 않는다.
+> - `MonsterData.portrait`·`RelicData.icon`도 같은 방식으로 틀을 정해 두면, 기획자가 크기를 맞추느라 그림 파일을 따로 자를 일이 없다. 유물 같은 DB 종류는 그 탭 위의 **필드 연결** 버튼으로 같은 화면을 연다.
+> - 이 설정은 코드가 아니라 DB에 저장된다(Ctrl+S). 틀의 크기 표·굽기는 저장 없이 바로 에셋에 쓰인다.
 
 ## 7. 고유 검사 넣기
 
@@ -234,7 +234,7 @@ public override void Validate(IValidationContext context)
 - [ ] 게임이 채우는 칸은 `[Hide]`, 조건부 칸은 `[ShowIf]`로 정리했다.
 - [ ] 다른 DB 항목을 가리키는 칸(원본·판 데이터 모두)에 `[DataRef]`가 있다.
 - [ ] 모든 Block에 `[BlockInfo]` 이름·분류·설명이 있고, 칸이 있는 Block에는 `Sentence`가 있다.
-- [ ] 비면 안 되는 칸에 필수, 그림 칸에 스프라이트 규격 그룹을 정했다.
+- [ ] 비면 안 되는 칸에 필수, 그림 칸에 스프라이트 틀을 정했다.
 - [ ] DB 종류·Block에 필요한 `ValidateData`·`Validate`를 넣었다.
 - [ ] 코드에는 ID 문자열 대신 `GameIds`를 쓴다.
 - [ ] DB 사이드바가 "검증 통과"다.
@@ -243,6 +243,6 @@ public override void Validate(IValidationContext context)
 > - [21. DB](../../Manual/21-Editor-Database.md) — 탭·저장 흐름·ID 바꾸기·삭제·검증 메시지 모음
 > - [04. 인스턴스](../../Manual/04-Instances.md) — `[Hide]`·`[ShowIf]`·기능 필드
 > - [05. 키워드](../../Manual/05-Keywords.md) — 그룹·하위 그룹·연결
-> - [27. 필드 규칙과 스프라이트 규격](../../Manual/27-Field-Rules-Sprites.md) — 필수·맞춤·베이크
+> - [27. 필드 규칙과 스프라이트 틀](../../Manual/27-Field-Rules-Sprites.md) — 필수·맞춤·굽기
 > - [11. Trigger와 조건](../../Manual/11-Triggers-Conditions.md) · [12. 결과(Outcome)](../../Manual/12-Outcomes.md) — `[BlockInfo]`·`Validate`
 > - [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md) — `ValidateData`

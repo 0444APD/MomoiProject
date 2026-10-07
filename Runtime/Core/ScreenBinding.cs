@@ -10,12 +10,20 @@ namespace GBible
     //   "run:hero.hp@hud.hp"   값을 텍스트 키 hud.hp의 틀({value})에 넣어서
     //   "@ui.endTurn"          텍스트 키 하나(언어가 바뀌면 다시)
     //   "run"                  값 전체
+    //   "stat:kills"           키에 ':'이 든 플레이어 데이터(로그·도전과제·플레이어별 키) — 정의된 가장 긴 앞부분을 키로 본다
     // 틀이 없으면 그 칸의 원래 글자에 {value}가 있으면 그것을 틀로, 없으면 값 그대로 보인다.
     public sealed class ScreenBinding
     {
+        // 첫 ':' 앞(키에 ':'이 없을 때의 키)과 그 뒤. 실제로 읽는 키는 Read가 정의된 키에 맞춰 고른다(Keys).
         public string Key { get; private set; } = "";
         public string Path { get; private set; } = "";
         public string TextKey { get; private set; } = "";
+        // ' 앞 글 전체(키와 경로).
+        string _data = "";
+        string[] _keys = Array.Empty<string>();
+
+        // 이 칸이 읽을 수 있는 키 후보(긴 것부터): "stat:kills" → "stat:kills", "stat". 화면은 이 키들이 바뀔 때 다시 그린다.
+        public System.Collections.Generic.IReadOnlyList<string> Keys => _keys;
 
         public bool HasData => Key.Length > 0;
 
@@ -38,6 +46,11 @@ namespace GBible
                 binding.Key = (colon < 0 ? text : text.Substring(0, colon)).Trim();
                 binding.Path = colon < 0 ? "" : text.Substring(colon + 1).Trim();
                 if (binding.Key.Length == 0) return null;
+                binding._data = text;
+                var keys = new System.Collections.Generic.List<string> { text };
+                for (var at2 = text.LastIndexOf(':'); at2 > 0; at2 = text.LastIndexOf(':', at2 - 1))
+                    keys.Add(text.Substring(0, at2).Trim());
+                binding._keys = keys.Distinct().ToArray();
             }
             return binding.HasData || binding.TextKey.Length > 0 ? binding : null;
         }
@@ -45,9 +58,16 @@ namespace GBible
         // 지금 값(없는 키·경로면 null). 목록은 그대로 돌려준다(글자로 바꿀 때 개수).
         public object Read(GameSession session)
         {
-            if (!HasData || session == null || !session.Data.IsDefined(Key)) return null;
-            var root = session.Data.Get(Key);
-            return Path.Length == 0 ? root : FieldPaths.Resolve(root, Path).FirstOrDefault();
+            if (!HasData || session == null) return null;
+            // 정의된 가장 긴 앞부분이 키, 나머지가 경로("stat:kills"는 키 그대로, "run:gold"는 run의 gold).
+            foreach (var key in _keys)
+            {
+                if (!session.Data.IsDefined(key)) continue;
+                var root = session.Data.Get(key);
+                var path = key.Length >= _data.Length ? "" : _data.Substring(key.Length).TrimStart(':').Trim();
+                return path.Length == 0 ? root : FieldPaths.Resolve(root, path).FirstOrDefault();
+            }
+            return null;
         }
 
         // 보일 글. template: 그 칸의 원래 글자({value}가 있으면 틀로 쓴다).
@@ -71,6 +91,8 @@ namespace GBible
                 case null: return "";
                 case double number: return number.ToString("0.##", CultureInfo.InvariantCulture);
                 case float number: return number.ToString("0.##", CultureInfo.InvariantCulture);
+                // 시각은 이 기기의 지역 시각·지역 형식으로(UTC를 그대로 보이면 9시간 이르게 보인다).
+                case DateTime time: return (time.Kind == DateTimeKind.Utc ? time.ToLocalTime() : time).ToString("g", CultureInfo.CurrentCulture);
                 case IFormattable formattable: return formattable.ToString(null, CultureInfo.InvariantCulture);
                 default: return value.ToString();
             }
