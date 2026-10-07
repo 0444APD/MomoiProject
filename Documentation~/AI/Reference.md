@@ -35,7 +35,7 @@ GBible.Unity
 ```
 
 - **한 판의 흐름**: 게임이 켜지면 `GBibleRuntime.Start`가 DB를 읽어 세션을 만들고(Bootstrap 옵션 → `Configuring` → 세션 → DB의 정의 등록 → `Started`), 프로필을 불러온다. 입력은 행동(`Game.Do`), 행동이 데이터를 바꾸고 이벤트를 쏜다. 화면은 프레임 끝에 데이터를 읽어 그린다.
-- **프로젝트 폴더**(관례 1절): `Assets/MomoiProject/Code/Rules`(규칙, Unity API 없음) · `Assets/MomoiProject/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/MomoiProject/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/MomoiProject/Code/Tests` · `Assets/MomoiProject/UI`(UXML·USS·Panel Settings) · `Assets/MomoiProject/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProject/Data/Tests`(테스트 상황) · `Assets/MomoiProject/Generated`(GameIds, 손대지 않음) · `Docs/`(명세서·결정 기록·`Source`).
+- **프로젝트 폴더**(관례 1절): `Assets/MomoiProject/Code/Rules`(규칙, Unity API 없음) · `Assets/MomoiProject/Code/Client`(화면·입력·연출, `Client/Screens`) · `Assets/MomoiProject/Code/Editor`(DB 반영 스크립트 `Seeds/`) · `Assets/MomoiProject/Code/Tests` · `Assets/MomoiProject/UI`(UXML·USS·Panel Settings) · `Assets/MomoiProject/Scenes/Test.unity`(테스트 씬) · `Assets/MomoiProject/Data/Tests`(테스트 상황) · `Assets/MomoiProject/Code/Rules/Generated`(GameIds, 손대지 않음 — 플레이어 데이터 형식이 든 어셈블리 폴더) · `Docs/`(명세서·결정 기록·`Source`).
 
 ---
 
@@ -364,7 +364,7 @@ public class PlayCard : GameAction
 11. 고르기 창·설정·확인 창을 새로 만들었다 → 기본 화면.
 12. 텍스트를 코드·UXML에 글로 적었다 → 텍스트 키(`@hud.endTurn`, `Texts.Get`).
 13. `GameIds` 상수를 쓰지 않고 ID를 글자로 적었다 → 오타가 컴파일에서 잡히지 않는다.
-14. 생성 파일(`Assets/MomoiProject/Generated`)을 고쳤다 → DB를 저장하면 덮인다.
+14. 생성 파일(`Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`)을 고쳤다 → DB를 저장하면 덮인다.
 15. 같은 ID에 `[BindTo]`를 둘 → 모두 돌고 순서가 정해지지 않는다(검증 경고).
 16. 규칙에서 `DateTime.Now`·`Time.time` → `Game.Now`(현실)·`session.Clock`(게임 시간).
 17. 실시간에서 맞는 효과를 `Present`로 → 차례로 돌고 그동안 `Busy`라 입력이 막힌다. 동시에·입력을 막지 않을 것은 `GameView.Play`.

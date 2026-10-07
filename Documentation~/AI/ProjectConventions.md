@@ -29,7 +29,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 - `Assets/MomoiProject/Code/Rules`(어셈블리 `MomoiProject.Rules`): 게임 규칙 전부 — 데이터 클래스(RunState·Profile·원본 클래스), 행동, 규칙 함수(`Rules`), 이벤트·의도, Block, `[BindTo]` 함수. **화면 API(MonoBehaviour·GameObject·씬·입력)를 쓰지 않는다.** 서버·테스트에서도 같은 코드가 돈다.
 - `Assets/MomoiProject/Code/Client`: 화면·입력·연출·사운드. 규칙은 바꾸지 않고 행동만 보낸다.
 - `Assets/MomoiProject/Code/Editor`: 에디터 도구만. `Assets/MomoiProject/Code/Tests`: 규칙 테스트(Rules만 참조).
-- `Assets/MomoiProject/Generated/`(`GameIds.cs`)는 손대지 않는다(DB를 저장하면 다시 만들어진다).
+- 생성 파일 `GameIds.cs`는 손대지 않는다(DB를 저장하면 다시 만들어진다). 자리는 플레이어 데이터 형식이 든 어셈블리 폴더의 `Generated/` — 시작 설정을 한 프로젝트는 `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`(형식이 Assembly-CSharp에 있으면 `Assets/MomoiProject/Generated/`).
 - 파일 하나에 주제 하나: `Actions/BattleActions.cs`, `Rules/Rules.cs`, `Events/Events.cs`, `Events/Intents.cs`, `Cards/CardBlocks.cs` …
 - **데이터는 DB, 동작은 코드.**
   - 같은 모양의 원본(카드·몬스터·아이템·스킬)은 코드에 클래스만 두고, 하나하나는 DB › 인스턴스(또는 능력·상태 효과 같은 전용 종류)에서 만든다.
@@ -164,7 +164,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 ## 14. 하지 않는 것
 
 - GBible 라이브러리(`Packages/com.momoi.gbible`) 코드를 고치지 않는다.
-- 생성 파일(`Assets/MomoiProject/Generated/`)을 고치지 않는다.
+- 생성 파일(`…/Generated/GameIds.cs` — 보통 `Assets/MomoiProject/Code/Rules/Generated/`)을 고치지 않는다.
 - DB 에셋 파일(.asset)을 텍스트로 직접 쓰지 않는다(15절의 방법으로 만든다).
 - 행동 밖에서 플레이어 데이터를 바꾸지 않는다(개발용 명령도 DB › 개발 명령이나 행동으로).
 - 화면 코드에 규칙 계산을 복사하지 않는다(미리보기를 쓴다).
