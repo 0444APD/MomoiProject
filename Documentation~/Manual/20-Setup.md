@@ -779,7 +779,7 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 | `.claude/skills/think-momoi/SKILL.md` | 스킬 `/think-momoi`: 진행 매뉴얼(`ProjectFlow.md`)의 단계대로 — 0 흡수(자료 → 명세서·예외 잡기·질문) → 1 시스템층 → 2 콘텐츠 → 3 레벨 디자인 지원 → 4 연출 → 5 밸런싱·테스트 → 6 출시 준비, 결정 기록을 읽고 이어 간다 | 통째로 |
 | `.claude/hooks/compile-check.ps1` · `.claude/settings.json` | 응답을 끝낼 때(Stop 훅) 프로젝트 코드를 컴파일한다. 오류가 있으면 Claude가 고친 뒤 다시 끝낸다 | 스크립트는 통째로, settings.json은 훅 한 줄이 없을 때만 더한다 |
 | `Docs/PlanningSpec.md` | 기획 명세서 빈 양식(AI가 자료로 채우고 질문한다, 개발자가 채워 와도 된다) | 없을 때만 |
-| `Docs/Decisions.md` | 결정 기록(AI가 질문·답·추천값으로 정한 것을 쌓는다 — `D-n`) | 없을 때만 |
+| `Docs/Decisions.md` | 결정 기록(개발자의 답·승인으로 확정한 것을 쌓는다 — `D-n`, 답을 기다리는 추천은 '확인 기다리는 것') | 없을 때만 |
 
 - 템플릿은 패키지 `Documentation~/AI/Templates`, 컴파일 검사는 `Tools~/compile-check.ps1`이다. `{{GBIBLE}}` 자리에 프로젝트에서 본 패키지 경로(`Packages/com.momoi.gbible` 또는 `Library/PackageCache/com.momoi.gbible@…`)가 들어간다.
 - **컴파일 검사**: Unity가 만든 `.csproj`(Preferences › External Tools의 프로젝트 파일)의 참조·심볼을 빌려 `Assets` 아래 asmdef마다 그 폴더의 `.cs`를 직접 컴파일한다(Unity를 연 채로도, 방금 만든 파일도). 마지막으로 통과한 뒤 바뀐 파일·폴더가 없으면 바로 끝난다. Unity 설치 폴더는 `ProjectVersion.txt`의 버전으로 Hub 폴더에서 찾는다(못 찾으면 환경 변수 `MOMOI_UNITY_EDITOR_DATA`에 `…\Editor\Data`). csproj가 아직 없는 어셈블리는 건너뛰고 알린다. 같은 오류로 세 번 넘게 막지는 않는다. 손으로: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/compile-check.ps1 -Always`.
