@@ -32,6 +32,20 @@ namespace GBible.Tests
         }
     }
 
+    // 참조 필드가 스택·배열인 행동: 실행 직전에 지금 객체로 바꿔도 차례가 그대로인지 적는다.
+    [Serializable]
+    public sealed class SimOrder : GameAction
+    {
+        public Stack<SimUnit> stack = new Stack<SimUnit>();
+        public SimUnit[] row = Array.Empty<SimUnit>();
+        [NonSerialized] public List<string> seen = new List<string>();
+        protected override void Run()
+        {
+            foreach (var unit in stack) { seen.Add("s:" + unit.id); unit.hp -= 1; }
+            foreach (var unit in row) { seen.Add("r:" + unit.id); unit.hp -= 10; }
+        }
+    }
+
     // [Chosen] 필드의 형식이 추상 클래스인 선택.
     public sealed class SimAskHeal : GameAction
     {
@@ -338,6 +352,22 @@ namespace GBible.Tests
             session.Do(new SimHitAll { targets = { old } });
             Assert.AreEqual(29, live.hp, "id로 지금 데이터의 객체를 찾아 고친다");
             Assert.AreEqual(30, old.hp, "넣은 옛 객체는 건드리지 않는다");
+            Assert.IsTrue(session.Undo());
+            Assert.AreEqual(30, session.Game.Find<SimUnit>("a").hp);
+        }
+
+        [Test]
+        public void 스택_배열_참조_필드는_지금_객체로_바뀌어도_차례가_그대로다()
+        {
+            var session = UnitSession();
+            var stack = new Stack<SimUnit>();
+            stack.Push(new SimHero { id = "a" });
+            stack.Push(new SimFoe { id = "b" });   // 맨 위 = b
+            var action = new SimOrder { stack = stack, row = new SimUnit[] { new SimFoe { id = "b" }, new SimHero { id = "a" } } };
+            session.Do(action);
+            CollectionAssert.AreEqual(new[] { "s:b", "s:a", "r:b", "r:a" }, action.seen, "스택은 위에서부터, 배열은 칸 차례대로");
+            Assert.AreEqual(19, session.Game.Find<SimUnit>("a").hp, "지금 데이터의 객체를 고친다");
+            Assert.AreEqual(19, session.Game.Find<SimUnit>("b").hp);
             Assert.IsTrue(session.Undo());
             Assert.AreEqual(30, session.Game.Find<SimUnit>("a").hp);
         }

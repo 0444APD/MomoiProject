@@ -18,6 +18,8 @@ namespace GBible
             public Type FieldType;
             public bool Many;
             public MemberAccess Access;
+            // 새 배열·목록을 만드는 함수(형식마다 한 번 정한다 — 실행 중 리플렉션 없이). 배열·List·HashSet·Queue·Stack이 아니면 null(아래의 예전 길).
+            public Func<IReadOnlyList<object>, object> Make;
         }
 
         static readonly Dictionary<Type, Field[]> Plans = new Dictionary<Type, Field[]>();
@@ -33,6 +35,7 @@ namespace GBible
             // id만 든 객체로 만들 형식. 추상 형식이면 그 아래 구체 형식 하나(실행 직전에 Resolve가 id로 지금 객체로 바꾸므로 어느 것이든 된다).
             public Type StubType;
             public MemberAccess Access;
+            public Func<IReadOnlyList<object>, object> Make;
         }
 
         static readonly Dictionary<Type, ChosenField> Chosen = new Dictionary<Type, ChosenField>();
@@ -51,6 +54,13 @@ namespace GBible
                     continue;
                 }
                 // 넣어 준 목록은 고치지 않고 새 목록에 담아 바꿔 넣는다(데이터 안의 목록을 그대로 넣었어도 그 목록이 바뀌지 않게).
+                if (field.Make != null)
+                {
+                    var items = new List<object>();
+                    foreach (var item in (IEnumerable)value) items.Add(item == null ? null : Live(game, action, field, item));
+                    field.Access.Set(action, field.Make(items));
+                    continue;
+                }
                 if (value is Array array)
                 {
                     var copy = Array.CreateInstance(field.ElementType, array.Length);
@@ -83,6 +93,13 @@ namespace GBible
                 var value = field.Access?.Get(action);
                 if (value == null) continue;
                 if (!field.Many) { field.Access.Set(action, Stub(value)); continue; }
+                if (field.Make != null)
+                {
+                    var items = new List<object>();
+                    foreach (var item in (IEnumerable)value) items.Add(item == null ? null : Stub(item));
+                    field.Access.Set(action, field.Make(items));
+                    continue;
+                }
                 if (value is Array array)
                 {
                     var copy = Array.CreateInstance(field.ElementType, array.Length);
@@ -132,6 +149,11 @@ namespace GBible
                 field.Access.Set(action, ids.Count == 0 ? null : Item(ids[0]));
                 return;
             }
+            if (field.Make != null)
+            {
+                field.Access.Set(action, field.Make(ids.Select(Item).ToList()));
+                return;
+            }
             if (field.FieldType.IsArray)
             {
                 var array = Array.CreateInstance(field.ElementType, ids.Count);
@@ -164,6 +186,7 @@ namespace GBible
                     {
                         Name = field.Name, ElementType = element, FieldType = fieldType, Many = many, Ids = element == typeof(string),
                         StubType = element == typeof(string) ? null : StubTypeOf(element), Access = FieldAccess.Find(type, field.Name),
+                        Make = many ? MakerOf(fieldType, element) : null,
                     };
                     break;
                 }
@@ -267,12 +290,75 @@ namespace GBible
                     }
                     var info = DataModel.Of(fieldType);
                     if ((info.Kind == DataKind.List || info.Kind == DataKind.Array || info.Kind == DataKind.Collection) && IsReferenceType(info.ElementType))
-                        fields.Add(new Field { Name = field.Name, ElementType = info.ElementType, FieldType = fieldType, Many = true, Access = FieldAccess.Find(type, field.Name) });
+                        fields.Add(new Field { Name = field.Name, ElementType = info.ElementType, FieldType = fieldType, Many = true, Access = FieldAccess.Find(type, field.Name), Make = MakerOf(fieldType, info.ElementType) });
                 }
                 var plan = fields.ToArray();
                 Plans[type] = plan;
                 return plan;
             }
+        }
+
+        // 새 배열·목록을 만드는 함수: 배열·List<T>·HashSet<T>·Queue<T>·Stack<T>는 형식마다 한 번 일반화 도우미에 묶어 둔다(실행 중에는 그냥 부른다).
+        // 그 밖의 형식(목록을 상속한 클래스 등)은 null — 부르는 쪽이 예전 길(DataModel)로 만든다.
+        static Func<IReadOnlyList<object>, object> MakerOf(Type fieldType, Type element)
+        {
+            if (fieldType == null || element == null) return null;
+            string name = null;
+            if (fieldType.IsArray) name = fieldType.GetArrayRank() == 1 ? nameof(MakeArray) : null;
+            else if (fieldType.IsGenericType)
+            {
+                var definition = fieldType.GetGenericTypeDefinition();
+                name = definition == typeof(List<>) ? nameof(MakeList)
+                     : definition == typeof(HashSet<>) ? nameof(MakeSet)
+                     : definition == typeof(Queue<>) ? nameof(MakeQueue)
+                     : definition == typeof(Stack<>) ? nameof(MakeStack) : null;
+            }
+            var method = name == null ? null : typeof(ActionReferences).GetMethod(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            if (method == null) return null;
+            try { return (Func<IReadOnlyList<object>, object>)method.MakeGenericMethod(element).CreateDelegate(typeof(Func<IReadOnlyList<object>, object>)); }
+            catch (Exception) { return null; }
+        }
+
+        // 리플렉션으로만 묶이므로 코드 줄이기가 지우지 않게 [Preserve].
+        [Preserve]
+        static object MakeArray<T>(IReadOnlyList<object> items)
+        {
+            var array = new T[items.Count];
+            for (var i = 0; i < array.Length; i++) array[i] = (T)items[i];
+            return array;
+        }
+
+        [Preserve]
+        static object MakeList<T>(IReadOnlyList<object> items)
+        {
+            var list = new List<T>(items.Count);
+            foreach (var item in items) list.Add((T)item);
+            return list;
+        }
+
+        [Preserve]
+        static object MakeSet<T>(IReadOnlyList<object> items)
+        {
+            var set = new HashSet<T>();
+            foreach (var item in items) set.Add((T)item);
+            return set;
+        }
+
+        [Preserve]
+        static object MakeQueue<T>(IReadOnlyList<object> items)
+        {
+            var queue = new Queue<T>(items.Count);
+            foreach (var item in items) queue.Enqueue((T)item);
+            return queue;
+        }
+
+        // 스택은 위에서부터 나열되므로(꺼낸 차례) 거꾸로 쌓아야 같은 모양이 된다.
+        [Preserve]
+        static object MakeStack<T>(IReadOnlyList<object> items)
+        {
+            var stack = new Stack<T>(items.Count);
+            for (var i = items.Count - 1; i >= 0; i--) stack.Push((T)items[i]);
+            return stack;
         }
 
         static object Live(GameApi game, GameAction action, Field field, object item)
