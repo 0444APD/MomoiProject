@@ -24,6 +24,8 @@ namespace GBible.EditorTools
         public bool DeveloperAuthored;
         // 하나만 두는 설정 종류([Database(Single = true)]) — 없으면 에디터가 기본값으로 만든다(EditorDatabase.Upkeep).
         public bool Single;
+        // 항목이 없으면 탭을 숨긴다([Database(HideWhenEmpty = true)], 'DB' 그룹의 로직 종류는 늘).
+        public bool HideWhenEmpty;
     }
 
     // 데이터베이스 등록 판별: GameData를 상속한 구체 클래스만(명시적 참여).
@@ -69,7 +71,36 @@ namespace GBible.EditorTools
                 Page = attr?.Page,
                 DeveloperAuthored = attr?.DeveloperAuthored ?? false,
                 Single = attr?.Single ?? false,
+                HideWhenEmpty = (attr?.HideWhenEmpty ?? false) || ((attr?.Group ?? "데이터") == "DB" && !(attr?.DeveloperAuthored ?? false)),
             };
+        }
+
+        // 선택 요소(상태 효과·패시브·능력 — [Element]): 프로젝트에 그 규격(IStatusData …)을 붙인 DB 종류가 있으면 켜진 것.
+        // 고르는 목록(+ 메뉴의 Block·행동 직전 이벤트·이벤트)은 꺼진 요소에 딸린 형식을 뺀다(엔진 코드는 그대로 있다).
+        static HashSet<string> _elements;
+
+        public static bool ElementActive(string name)
+        {
+            if (_elements == null)
+            {
+                _elements = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var info in All)
+                    foreach (var face in info.Type.GetInterfaces())
+                        if (face.GetCustomAttribute<ElementAttribute>(false) is ElementAttribute element) _elements.Add(element.Name);
+            }
+            return _elements.Contains(name);
+        }
+
+        // 고르는 목록에 보일 형식인가: 선택 요소에 딸리지 않았거나, 그 요소가 켜져 있다.
+        public static bool Visible(Type type) =>
+            type == null || !(type.GetCustomAttribute<ElementAttribute>(false) is ElementAttribute element) || ElementActive(element.Name);
+
+        // 화면에 보일 종류 이름. 선택 요소의 규격(IStatusData …)이면 그것을 붙인 DB 종류의 이름, 그런 종류가 없으면 형식 이름.
+        public static string Label(Type type)
+        {
+            if (type == null) return "";
+            var info = Find(type) ?? (type.IsInterface ? All.FirstOrDefault(i => type.IsAssignableFrom(i.Type)) : null);
+            return info?.DisplayName ?? type.Name;
         }
 
         static string DefaultPrefix(Type type)

@@ -20,7 +20,7 @@
 | 결정론 난수 | 같은 시드에서 같은 순서로 부르면 기기·플랫폼과 상관없이 같은 수가 나오는 난수. 정수 연산만 쓴다(xoshiro256**). |
 | 마스터 시드 (`SessionOptions.Seed`) | 세션 전체의 씨앗. 스트림마다의 시드가 여기서 나온다. |
 | 스트림 (`RandomStream`) | 이름 하나("damage", "loot" …)에 붙은 난수 흐름. 스트림끼리 독립이라 한 곳에서 더 뽑아도 다른 곳의 결과가 바뀌지 않는다. "난수 흐름"이라고도 쓴다. |
-| 의도 '확률' (`ChanceIntent`) | `Game.Chance`가 굴리기 직전에 가로채기에 보이는 내용(확률·흐름·굴리는 쪽). 가로채기가 확률을 바꾸거나 막는다(28장). |
+| 행동 직전 이벤트 '확률' (`ChanceIntent`) | `Game.Chance`가 굴리기 직전에 행동 직전 이벤트에 보이는 내용(확률·흐름·굴리는 쪽). 행동 직전 이벤트가 확률을 바꾸거나 막는다(28장). |
 | 글자 시드 | 플레이어가 적거나 나누는 시드 글자("ABCD1234", "2026-10-05"). `RandomStreams.SeedOf`가 숫자 시드로 바꾼다. |
 | 게임 시계 (`GameClock`) | 세션의 시간. `Tick`(프레임 수)과 `Time`(초). 프레임 끝마다 흐른다. |
 | `GameTime` | Unity 쪽 시간 조절(일시정지·배속·프레임 넘기기). `Time.timeScale`을 바꾼다. |
@@ -73,7 +73,7 @@ ulong raw = damage.NextULong();
 | `Name` | 스트림 이름 |
 | `GetState()` · `SetState(ulong[4])` · `Reseed(seed)` | 상태 꺼내기·넣기·다시 시드(도구·테스트용) |
 
-`rng.Chance(p)`는 의도를 거치지 않는다. 유물·패시브("모든 확률 2배", 행운)가 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15)로 굴린다.
+`rng.Chance(p)`는 행동 직전 이벤트를 거치지 않는다. 유물·패시브("모든 확률 2배", 행운)가 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15)로 굴린다.
 
 ### 2.3 시드 정하기: `SessionOptions.Seed`
 
@@ -246,23 +246,23 @@ public static class ClockSetup
 
 ```csharp
 if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) { … }   // 25%. 흐름을 비우면 "chance"
-bool lucky = Game.Chance(0.1, user: hero);                                 // 굴리는 쪽(사용자)도 의도에 실린다
+bool lucky = Game.Chance(0.1, user: hero);                                 // 굴리는 쪽(사용자)도 행동 직전 이벤트에 실린다
 ```
 
 | 매개변수 | 뜻 |
 |---|---|
 | `probability` | 0~1. 1 이상이면 반드시 성공, 0 이하면 늘 실패 |
 | `stream` | 난수 흐름 이름(기본 `"chance"`, 비워도 `"chance"`) |
-| `source` | 굴리는 쪽의 항목 ID(패시브·능력). 의도의 `sourceId` |
-| `user` | 사용자·가진 쪽(객체 또는 id). 의도의 `userId` |
+| `source` | 굴리는 쪽의 항목 ID(패시브·능력). 행동 직전 이벤트의 `sourceId` |
+| `user` | 사용자·가진 쪽(객체 또는 id). 행동 직전 이벤트의 `userId` |
 
-1. 굴리기 전에 의도 **'확률'**(`ChanceIntent { probability, stream, sourceId, userId, cancelled }`)을 가로채기에 보인다.
-2. 가로채기가 `probability`를 바꾸면 바뀐 확률로 굴린다. "모든 확률 2배" = 가로채기 '확률' → `probability` 곱하기 2. 막으면(`cancelled`) 실패다.
+1. 굴리기 전에 행동 직전 이벤트 **'확률'**(`ChanceIntent { probability, stream, sourceId, userId, cancelled }`)을 행동 직전 이벤트에 보인다.
+2. 행동 직전 이벤트가 `probability`를 바꾸면 바뀐 확률로 굴린다. "모든 확률 2배" = 행동 직전 이벤트 '확률' 받기 → `probability` 곱하기 2. 막으면(`cancelled`) 실패다.
 3. 난수는 **늘 한 번** 굴린다. 확률이 바뀌거나 막혀도 같다. 그래서 같은 시드면 뒤의 결과가 밀리지 않는다.
 
-- 행동 안에서 부른다. 가로채기 결과가 그 행동 안에서 돈다.
-- DB에서는 조건 **'확률'**(칸: `percent`(확률(%)) · `stream`(난수 흐름(비우면 chance)))을 이벤트 받기·가로채기·사용 트리거와 `&& AND`로 쓴다. 이벤트를 받는 순간·가로채는 순간·쓰는 순간에만 굴린다. `Game.CanUse` 미리 보기에서는 굴리지 않고 참이다. 이벤트 없는 '조건 충족'만으로는 거짓이다(11장).
-- 의도 '확률'의 가로채기·의도 고치기는 28장이다.
+- 행동 안에서 부른다. 행동 직전 이벤트 결과가 그 행동 안에서 돈다.
+- DB에서는 조건 **'확률'**(칸: `percent`(확률(%)) · `stream`(난수 흐름(비우면 chance)))을 이벤트 받기·행동 직전 이벤트 받기·사용 트리거와 `&& AND`로 쓴다. 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. `Game.CanUse` 미리 보기에서는 굴리지 않고 참이다. 이벤트 없는 '조건 충족'만으로는 거짓이다(11장).
+- 행동 직전 이벤트 '확률'의 행동 직전 이벤트 고치기는 28장이다.
 
 ### 2.16 시드로 새 판: `NewRun(seed)` · `RandomStreams.SeedOf`
 
@@ -658,7 +658,7 @@ public static class RunStarter
 | 플레이마다 결과가 다름 | `GBibleRuntime`의 기본 시드는 현재 시각이다. 재현이 필요하면 `Configuring`에서 `Seed`를 고정한다. 판마다 정한 시드면 `GBibleRuntime.NewRun(session, seed)`(2.16). |
 | 같은 시드로 새 판을 열었는데 판이 다름 | `NewRun`에 시드를 주지 않았다(난수가 이어서 흐른다). 또는 판을 여는 행동이 난수를 뽑는 차례가 다르다(조건에 따라 한 번 더 뽑기). 새 판 행동은 같은 차례로 뽑는다(2.16). |
 | 시드 글자의 대소문자·빈칸만 달라도 다른 판일까 걱정 | `RandomStreams.SeedOf`가 앞뒤 빈칸을 떼고 대문자로 맞춘다. 같은 판이다. |
-| "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 의도를 거치지 않는다. 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15) 또는 DB 조건 '확률'. || 쿨다운이 되감기·이어하기 뒤 어긋남 | `Time.time`으로 적었다. `session.Clock.Time` 기준으로 플레이어 데이터에 적는다. |
+| "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 행동 직전 이벤트를 거치지 않는다. 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15) 또는 DB 조건 '확률'. || 쿨다운이 되감기·이어하기 뒤 어긋남 | `Time.time`으로 적었다. `session.Clock.Time` 기준으로 플레이어 데이터에 적는다. |
 | 일시정지했는데 쿨다운이 줄어듦 | `Time.unscaledTime`·`Time.realtimeSinceStartup` 같은 실제 시간을 썼다. |
 | 대화창을 닫았는데 게임이 안 움직임 | 다른 이유(메뉴 등)의 일시정지가 남아 있다. `GameTime.PausedBy`로 확인한다. 모니터의 일시정지 버튼 툴팁에도 멈춘 이유가 보인다. |
 | `StepFrame`이 아무 일도 안 함 | 일시정지 상태가 아니다. |

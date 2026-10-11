@@ -23,7 +23,7 @@
 | 조각 | 리더·동료·Clunker·적·소환(Shade) / 손패의 아이템 | 전투 사본 `Unit`(고유 `id` + 원본 ID `card`) — 덱 카드마다 전투 시작에 하나, 적·소환은 `Game.NewId` |
 | 자리 | 양편 보드 2줄 × 3칸, 손패 한 줄 | `battle.board`·`battle.enemies` = `List<Unit>`(6칸, 빈 칸 `null`, 줄 길이 3, 두 보드 모두 x = 0이 앞) · `battle.hand`(줄 길이 0, 맨 오른쪽 = 목록 맨 끝) |
 | 순서 | 적 먼저, 각 보드 **앞 열 위→아래, 다음 열 위→아래**(위키 그림 1·2 / 3·4 / 5·6) | 턴 함수가 칸 번호 `y*3 + x`를 **열 우선**(x 바깥, y 안쪽)으로 돈다. 목록 순서(줄 우선)와 다르다 → 5절 1 |
-| 카운터 | 턴마다 −1, 0이면 발동 후 되돌림 | 필드 `counter`·`maxCounter` + 카운터 동사 `Rules.CountDown`(의도 `카운터` — Snow가 막는다) |
+| 카운터 | 턴마다 −1, 0이면 발동 후 되돌림 | 필드 `counter`·`maxCounter` + 카운터 동사 `Rules.CountDown`(행동 직전 이벤트 `카운터` — Snow가 막는다) |
 | 공격 대상 | 맞은편 같은 줄 맨 앞, 비면 다른 줄 | 프로젝트 대상 Block `공격 대상`(안에서 `Placement.Around(…, RowFirst/RowLast/SameRow, target: 맞은편)`, 비면 다른 줄, Aimless·Barrage·Longshot·Haze·Bombard·반응 대상). 카드 글의 고정 대상("뒤의 아군", "같은 줄 아군")은 기본 `자리로 고르기` |
 | 반응 | 조건이 되면 발동, **발동 중인 카드의 효과가 끝난 뒤** | 패시브 '놓인 것마다'(`ownerPath` `board`/`enemies`, `matchField` `trait`)가 감지만 하고 결과 Block `반응 대기`로 대기열에 넣는다. 메인 룰이 발동이 끝날 때마다 대기열을 턴 순서로 비운다 |
 
@@ -60,7 +60,7 @@
 - **흐름**: `PlayCard` → (아이템: 공격이 있으면 `Rules.Hit` → `Game.TryUse(ability)` → Consume / 동료: `Rules.Deploy` → Spark면 `Rules.Trigger`) → Noomlin·Zoomlin이 아니고 왕관 단계가 아니면 `Rules.Turn`.
 - `Rules.Turn`: 적 보드 → 내 보드, 각각 열 우선. Snow면 `snowedAtCountdown = 1`(Ink도 같이 표시)하고 건너뛴다. 아니면 `Rules.CountDown(u, 1)` → 0이면 `Rules.Trigger(u)` + 되돌림. 끝에 `Rules.EndOfTurn`(이벤트 `TurnEnded` → Shroom · Summoned · 표시된 것만 Snow/Ink −1 · 웨이브 · 다시 뽑기 종).
 - `Rules.Trigger(u, forced, byReaction)`: `1 + frenzy`번 { `공격 대상`마다 `Rules.Hit` → Teeth 합산 피해 한 번 → 살아 있으면 `Game.TryUse(u.ability, u)` } → 이벤트 `UnitTriggered`(Spice·Frost 끝) → `DrainReactions`. 반응으로 발동하면 카운터를 되돌리지 않는다.
-- **동사(의도 → 이벤트)**: `Rules.Damage`(`피해` 의도 `{sourceId, targetId, amount, kind, hit}` → `DamageTaken`) · `Rules.Hit`(공격이 있으면 0이어도 `Hit`, 맞힐 때 디버프는 막혀도 건다) · `Rules.Destroy`(`Destroyed {unit, killer, sacrificed}`) · `Rules.Heal`(`최대 체력` 의도 — Fragile) · `Rules.CountDown`(`카운터` 의도) · `Rules.Consume`(`없애기` 의도 — Breakfast) · `Rules.GainBling`(`Bling` 의도 — Blingsack·Gold Blade) · `Rules.Draw` · `Rules.Deploy`(`Deployed`).
+- **동사(행동 직전 이벤트 → 이벤트)**: `Rules.Damage`(`피해` 행동 직전 이벤트 `{sourceId, targetId, amount, kind, hit}` → `DamageTaken`) · `Rules.Hit`(공격이 있으면 0이어도 `Hit`, 맞힐 때 디버프는 막혀도 건다) · `Rules.Destroy`(`Destroyed {unit, killer, sacrificed}`) · `Rules.Heal`(`최대 체력` 행동 직전 이벤트 — Fragile) · `Rules.CountDown`(`카운터` 행동 직전 이벤트) · `Rules.Consume`(`없애기` 행동 직전 이벤트 — Breakfast) · `Rules.GainBling`(`Bling` 행동 직전 이벤트 — Blingsack·Gold Blade) · `Rules.Draw` · `Rules.Deploy`(`Deployed`).
 - **계산 함수**: `Rules.Attack(u)` = `Game.Attribute(u, "attack")`(Spice·Frost 보정) + Fury(`Placement.Is(…, RowAlone)`) + 오라(같은 편 지속 효과, Ink면 뺌) + 종(Battle Bell). `Rules.EffectValue(user, n)` = 효과 수치 배율(4절 1). `Rules.Has(u, 키워드)` = 필드 값, Ink면 0.
 - **명세서 4-2 표시**: '놓인 순서·위치가 효과를 바꾼다' · '한 조각이 여러 칸을 차지한다'(보스 두 칸) · '효과가 반복 발동한다'(Frenzy) · '판정 규칙이 바뀐다'(대상 규칙). 4-2 목록에 없어 표시할 칸이 없는 것: **반응 대기열 · 효과 수치 배율 · 침묵 · 처치 기여(가장 최근에 건 쪽) · 카운트다운을 겪은 것만 턴 끝 감소**(5절 7).
 
@@ -73,20 +73,20 @@
 | 조각 | 분류 | 만드는 법 |
 |---|---|---|
 | 1 Health(리더가 죽으면 판 끝) | 메인 룰 | `hp`·`maxHp` 필드, `Rules.Damage` → 0 이하면 `Rules.Destroy`, 리더면 판 패배. 핵심 동사라 4-2 표시는 없다 |
-| 2 Scrap | 메인 룰 | `Rules.Damage` 안의 분기: 가로챈 뒤 양 ≥ 1이면 `scrap −1`(양과 상관없이). Shroom도 저절로 1. Overburn은 18 |
+| 2 Scrap | 메인 룰 | `Rules.Damage` 안의 분기: 받은 뒤 양 ≥ 1이면 `scrap −1`(양과 상관없이). Shroom도 저절로 1. Overburn은 18 |
 | 3 Attack(공격 없음 · 0 · 음수) | 메인 룰 | `attack` + `hasAttack` + `Rules.Attack`. 음수를 허용하고 피해에서 Bom을 더한 뒤 0으로 자른다. 공격이 있으면 0이어도 `Hit` |
-| 4 Counter(Sun Rod 즉시 발동 · 동시에 0이면 턴 순서 · 최대 카운터 최소 1) | 메인 룰 | `Rules.CountDown(u, n)`: 의도 `카운터` → 0이 되면 바로 발동(턴 카운트다운 전), 여럿이면 턴 순서. 최대 카운터 바꾸기는 Block `최대 카운터 바꾸기`(최소 1, 지금 값도 같이) |
+| 4 Counter(Sun Rod 즉시 발동 · 동시에 0이면 턴 순서 · 최대 카운터 최소 1) | 메인 룰 | `Rules.CountDown(u, n)`: 행동 직전 이벤트 `카운터` → 0이 되면 바로 발동(턴 카운트다운 전), 여럿이면 턴 순서. 최대 카운터 바꾸기는 Block `최대 카운터 바꾸기`(최소 1, 지금 값도 같이) |
 | 5 Reaction | 메인 룰 | 감지 = 카드 패시브(DB, `perElement` · `matchField` `trait` · `holderField` `targetId` 등), 결과 = Block `반응 대기`(능력 ID · 대상). `DrainReactions`가 살아 있음·Snow·Ink를 보고 `Rules.Trigger(u, 대상, byReaction: true)`. 4-2에 칸 없음 |
-| 6 Frenzy | 메인 룰 | `frenzy` 필드, `Rules.Trigger`가 공격까지 반복(가로채기 '사용' `times`는 능력만 반복하므로 쓰지 않는다). Spice·Frost는 다 끝난 뒤 한 번 빠진다. 4-2 '반복 발동' |
+| 6 Frenzy | 메인 룰 | `frenzy` 필드, `Rules.Trigger`가 공격까지 반복(행동 직전 이벤트 '사용' 받기 `times`는 능력만 반복하므로 쓰지 않는다). Spice·Frost는 다 끝난 뒤 한 번 빠진다. 4-2 '반복 발동' |
 
 ### 3-2. 버프
 
 | 조각 | 분류 | 만드는 법 |
 |---|---|---|
-| 7 Block | DB | 상태 효과 `block`(버프, 영구, 중첩 더하기). 트리거 가로채기 `피해`(`holderField` `targetId`, 의도 조건 `amount > 0`, `order` 2) → 의도 고치기 `막기` + `상태 효과 풀기` 1. 맞을 때 디버프는 메인 룰이 따로 건다 |
+| 7 Block | DB | 상태 효과 `block`(버프, 영구, 중첩 더하기). 트리거 행동 직전 이벤트 `피해` 받기(`holderField` `targetId`, 행동 직전 이벤트 조건 `amount > 0`, `order` 2) → 행동 직전 이벤트 고치기 `막기` + `상태 효과 풀기` 1. 맞을 때 디버프는 메인 룰이 따로 건다 |
 | 8 Lumin(효과 두 배, 새로 걸면 앞의 것은 잃음) | **예외** | 4절 1. 하나만 남기기는 걸릴 때 결과의 `[BindTo]`(같은 한 번의 사용으로 건 것은 남김 — Barrage Lumin Vase) |
-| 9 Shell | BindTo | 상태 효과 가로채기 `피해`(`targetId`, `order` 3): 깎는 양이 피해에 따라 정해져 `amount`와 중첩을 서로 깎는다(기믹 목록 2-10 그대로) |
-| 10 Resist Snow | BindTo | 상태 효과 가로채기 `상태 효과 걸기`(`targetId`, `statusId` = snow) → `stacks = max(0, 1 − 지금 Snow)`, 0이면 막기. 계산이라 값 틀로 안 된다 |
+| 9 Shell | BindTo | 상태 효과 행동 직전 이벤트 `피해` 받기(`targetId`, `order` 3): 깎는 양이 피해에 따라 정해져 `amount`와 중첩을 서로 깎는다(기믹 목록 2-10 그대로) |
+| 10 Resist Snow | BindTo | 상태 효과 행동 직전 이벤트 `상태 효과 걸기` 받기(`targetId`, `statusId` = snow) → `stacks = max(0, 1 − 지금 Snow)`, 0이면 막기. 계산이라 값 틀로 안 된다 |
 | 11 Spice | DB | 상태 효과: 능력치 보정 `attack` +1/중첩, 지속 이벤트 1번(셀 이벤트 `UnitTriggered`, 가진 쪽 필드 `unitId`), 다시 걸 때 중첩 더하기 |
 | 12 Teeth | Block | 상태 효과: 이벤트 `Hit`(`holderField` `targetId`) → Block `반격 쌓기`(`battle.teeth[sourceId] += {stacks}`). 메인 룰이 그 공격 뒤 **한 번의 피해**로 낸다(Barrage로 Teeth 여럿 = 한 번 — Block·Scrap·Demonize가 한 번만 반응). 출처 = Teeth를 가진 쪽(처치 기여) |
 
@@ -94,14 +94,14 @@
 
 | 조각 | 분류 | 만드는 법 |
 |---|---|---|
-| 13 Bom | DB | 상태 효과 가로채기 `피해`(`targetId`, `order` 0) → `amount` 더하기 `{stacks}`. 줄지 않는다. 0 공격 맞음에도 붙는다 |
-| 14 Demonize | DB | 가로채기 `피해`(`targetId`, 의도 조건 `amount >= 1`, `order` 1) → 곱하기 2 + `상태 효과 풀기` 1 |
+| 13 Bom | DB | 상태 효과 행동 직전 이벤트 `피해` 받기(`targetId`, `order` 0) → `amount` 더하기 `{stacks}`. 줄지 않는다. 0 공격 맞음에도 붙는다 |
+| 14 Demonize | DB | 행동 직전 이벤트 `피해` 받기(`targetId`, 행동 직전 이벤트 조건 `amount >= 1`, `order` 1) → 곱하기 2 + `상태 효과 풀기` 1 |
 | 15 Frost | DB | Spice와 같고 보정 −1/중첩. 음수 공격 허용은 3 |
 | 16 Haze | Block | `공격 대상` Block이 Haze면 같은 편 다른 카드 무작위 하나. 공격마다 −1은 상태 효과 트리거 이벤트 `Attacked`(`attackerId`) → `상태 효과 풀기` 1(DB) |
 | 17 Ink | **예외** | 4절 2. 턴 끝 −1은 Snow와 같은 메인 룰 |
 | 18 Overburn | BindTo | 상태 효과 트리거 `OR`(`상태 효과 걸림` · `DamageTaken` · 최대 체력 바뀜, 가진 쪽 필드) AND 조건 `Overburn ≥ 지금 체력`(프로젝트 조건 Block) → 자기와 같은 줄 아군에게 중첩만큼 피해. Clunker는 걸리면 바로. 처치 기여 = 체력을 Overburn 아래로 만든 마지막 쪽(피해·추가 Overburn)이라 코드 |
 | 19 Shroom | Block | 상태 효과(영구) 트리거 `TurnEnded` → 프로젝트 효과 `피해`(값 `{stacks}`, 맞음 아님, 출처 = `inflictedBy[shroom]`) + `상태 효과 풀기` 1. 거는 쪽은 Block `상태 효과 걸기(건 쪽 기록)` — 기본 Block은 출처가 항목 ID이고 다시 걸 때 출처를 바꾸지 않는다(5절 3) |
-| 20 Snow(카운터·반응 멈춤, 맞을 때 효과는 그대로) | 메인 룰 | 상태 효과 가로채기 `카운터`(`targetId`) → 막기(DB). 반응 막기는 `DrainReactions`. **카운트다운 때 얼어 있었던 것만** 턴 끝에 −1 → `snowedAtCountdown` 표시를 메인 룰이 보고 `Game.RemoveStatus(u, snow, 1)` |
+| 20 Snow(카운터·반응 멈춤, 맞을 때 효과는 그대로) | 메인 룰 | 상태 효과 행동 직전 이벤트 `카운터` 받기(`targetId`) → 막기(DB). 반응 막기는 `DrainReactions`. **카운트다운 때 얼어 있었던 것만** 턴 끝에 −1 → `snowedAtCountdown` 표시를 메인 룰이 보고 `Game.RemoveStatus(u, snow, 1)` |
 
 ### 3-4. 대상 키워드
 
@@ -117,15 +117,15 @@
 | 25 Explode X | 메인 룰 | `Rules.Destroy`가 `explode`를 읽어 맞은편 줄 전체에 X(동시, 맞음 아님). X는 효과 수치라 배율을 탄다 |
 | 26 Faith X | Block | 소환 효과 Block(`소환`)이 사용자의 `faith`만큼 공격(있을 때만)·체력을 더한다 |
 | 27 Fury X | 메인 룰 | `Rules.Attack`이 `Placement.Is(side, u, 3, RowAlone)`이면 +X. 패시브 '가진 동안 능력치 보정'은 조건을 받지 않는다(37장 5-4) |
-| 28 Greed | 메인 룰 | 공격·맞힐 때만 `피해` 의도에 `bling / 50` 더하기(늘 붙는 공격력이 아님). 적의 Greed도 플레이어 Bling을 본다 |
+| 28 Greed | 메인 룰 | 공격·맞힐 때만 `피해` 행동 직전 이벤트에 `bling / 50` 더하기(늘 붙는 공격력이 아님). 적의 Greed도 플레이어 Bling을 본다 |
 | 29 Soulbound | Block | 패시브 `soulbound`(`ownerPath` `board`, `perElement`, `matchField` `soulboundTag`): 남은 Soulbound 카드마다 이벤트 `Destroyed`(이벤트 조건 `sacrificed` 참 · `soulbound` 참) → `사용자 자신` → 효과 `피해` 100(자기 자신이 출처, 맞음 아님) |
 
 ### 3-6. 제한 키워드
 
 | 조각 | 분류 | 만드는 법 |
 |---|---|---|
-| 30 Consume | 메인 룰 | `PlayCard` 끝(모든 효과·Frenzy 뒤)에 `Rules.Consume` — 의도 `없애기`를 거쳐 Breakfast Bell이 막는다. 없애진 뒤 효과(Strawberry·Boonfire 참)는 `Destroyed` 이벤트 |
-| 31 Fragile | DB | 상태 효과 또는 패시브: 가로채기 `최대 체력`(`targetId`) → 막기. 회복 대상으로는 여전히 고를 수 있다 |
+| 30 Consume | 메인 룰 | `PlayCard` 끝(모든 효과·Frenzy 뒤)에 `Rules.Consume` — 행동 직전 이벤트 `없애기`를 거쳐 Breakfast Bell이 막는다. 없애진 뒤 효과(Strawberry·Boonfire 참)는 `Destroyed` 이벤트 |
+| 31 Fragile | DB | 상태 효과 또는 패시브: 행동 직전 이벤트 `최대 체력` 받기(`targetId`) → 막기. 회복 대상으로는 여전히 고를 수 있다 |
 | 32 Hogheaded | 메인 룰 | `Recall` 행동이 `Rules.Has(u, hogheaded)`면 `Game.Fail`(Ink면 된다) |
 | 33 Recycle X | Block | 능력의 사용 조건 Block `손패의 Junk ≥ X`(프로젝트 조건) + 효과 Block `Junk 없애기`(오른쪽부터, 효과보다 먼저, Frenzy여도 한 번). X는 효과 수치라 Lumin·Cake가 키운다(4절 1) |
 | 34 Summoned | 메인 룰 | 불러들이기 금지(32와 같음) + `EndOfTurn`이 `triggered`면 지금 체력 −1(피해 아님, Frenzy여도 한 번) |
@@ -163,7 +163,7 @@
 |---|---|---|
 | 52 Injured | 메인 룰 | 덱 카드 `injured`. `StartBattle`이 지금 체력·공격을 반(올림), 이긴 전투에서 죽지 않았으면 0으로(벤치에 있어도) |
 | 53 Active | DB | 카드 패시브의 가진 목록 = 보드라 떠나면 저절로 멈춘다 |
-| 54 Additional damage | DB | 상태 효과(능력치 보정 `attack`): 동료는 지속 이벤트 1번 `AttackFinished`(Frenzy 사이에도 빠짐), 아이템은 `TurnEnded` 1번. "~에게 추가 피해"는 가로채기 `피해` 더하기 |
+| 54 Additional damage | DB | 상태 효과(능력치 보정 `attack`): 동료는 지속 이벤트 1번 `AttackFinished`(Frenzy 사이에도 빠짐), 아이템은 `TurnEnded` 1번. "~에게 추가 피해"는 행동 직전 이벤트 `피해` 받기 더하기 |
 | 55 Ally | DB | `자리로 고르기` 나를 뺀 모두 · 같은 줄 · 오른쪽(= 뒤). 아이템은 손에서 내므로 `플레이어 데이터 목록` `battle.board` |
 | 56 Apply | DB | 이벤트 `상태 효과 걸림` |
 | 57 Deploy | 메인 룰 | `Rules.Deploy`(손패·소환·적 등장) → `Deployed` |
@@ -195,7 +195,7 @@
 | 73 Cursed Charms(한도를 차지) | Block | 72와 같은 모양(음수 효과) |
 | 74 Crowns(리더와 함께 먼저 배치 · 공짜로 냄 · 전투 사이 옮김 · 가격 75 Bling · 만든 카드는 왕관 아님) | 메인 룰 | `StartBattle`의 왕관 단계: 왕관 카드를 먼저 손에 → 내도 턴을 쓰지 않음, 왕관 아닌 카드는 `Game.Fail("fail.crownFirst", "왕관 카드를 먼저 내세요")`. 못 내는 왕관 카드는 다시 뽑기로 버림. `MoveCrown` 행동, 가격은 밸런스 값 |
 | 75 Cursed Crowns(못 뗌, 체력·공격 −1 "가능하면") | BindTo | 최소 체력 1·공격 0, 공격·체력이 없는 카드에도 붙는다 |
-| 76 Bling · 콤보 처치 · Gobling | Block | `run.bling` + `Game.Pay`(쓰기). 얻기는 효과 Block `Bling 얻기`(의도 `Bling`을 거쳐야 Blingsack·Gold Blade가 붙는다). 콤보 = 메인 룰이 턴마다 처치 수를 세서 `Rules.GainBling(…, source: combo)` |
+| 76 Bling · 콤보 처치 · Gobling | Block | `run.bling` + `Game.Pay`(쓰기). 얻기는 효과 Block `Bling 얻기`(행동 직전 이벤트 `Bling`을 거쳐야 Blingsack·Gold Blade가 붙는다). 콤보 = 메인 룰이 턴마다 처치 수를 세서 `Rules.GainBling(…, source: combo)` |
 | 77 덱에 새 카드 받기(보상 공통) | Block | 결과 Block `카드 받기`: 원본 ID → `DeckCard { id = Game.NewId("card"), card = ID, … }`. `가중치 표에서 고르기`·`플레이어 데이터에 주기`는 객체 목록에 새 id 조각을 만들지 못한다(5절 4) |
 | 78 보스 보상(Sun Vault: 종·참·왕관 중 정확히 2개) | Block | `가중치 표에서 고르기`(최소 2 · 최대 2, 보스마다 표) → `run.inventory`(종·참·`crown`을 한 ID 목록에. 종 패시브의 가진 목록도 이것) + 고른 뒤 결과 Block `받음 알리기`(고른 ID마다 이벤트 `RewardTaken { id }` — 바로 바꾸는 종이 받는다. `이벤트 쏘기`는 값이 고정이라 고른 ID를 못 싣는다) |
 
@@ -210,10 +210,10 @@
 | 85 Sun Bell of Recall | DB | 이벤트 `Recalled`(조건 `kind == companion`) → `battle.redraw` −2 |
 | 86 Noomlin Sun Bell | DB | `RewardTaken` → `run.deck` → `무작위 n개` 2 → `필드 바꾸기` `noomlin` 값으로 1 |
 | 87 Sun Bell of Strength | DB | `RewardTaken` → `run.deck` → 거르기 `kind == item`, `hasAttack == 1` → `attack` +2(얻은 뒤의 아이템은 아님) |
-| 88 Breakfast Sun Bell | DB | 가로채기 `없애기` AND `플레이어 데이터 검사`(`battle.breakfastUsed` 거짓) → 막기 + `breakfastUsed` = 참 |
+| 88 Breakfast Sun Bell | DB | 행동 직전 이벤트 `없애기` 받기 AND `플레이어 데이터 검사`(`battle.breakfastUsed` 거짓) → 막기 + `breakfastUsed` = 참 |
 | 89 Infinity Sun Bell | Block | 이벤트 턴 시작 AND `redrawCharged` → 효과 Block `뽑기` 1 |
 | 90 Storm Bell 고르기(점수 한도 5 → 최대에서 이길 때마다 +1, 10까지 · 10점이면 진짜 마지막 싸움 · 금테 · Overcrank) | 메인 룰 | 판 시작 설정 행동이 점수 합을 `profile.stormLimit`와 비교(`Game.Fail`). 금테·Overcrank는 도전과제(DB), 진짜 마지막 싸움은 지도 표 줄의 조건(DB) |
-| 91 Blingsnail Bell | BindTo | 상점 가격 의도에 +5, 왕관은 + 산 수 × 10(곱이라 값 틀로 안 됨) |
+| 91 Blingsnail Bell | BindTo | 상점 가격 행동 직전 이벤트에 +5, 왕관은 + 산 수 × 10(곱이라 값 틀로 안 됨) |
 | 92 Bell of Death | DB | 이벤트 `Destroyed`(동료) → `이벤트의 개체` `deckCard` → `필드 바꾸기` `injured` 값으로 1 |
 | 93 Titan Bell | Block | 이벤트 적 등장(보스·중간 보스) → 효과 Block `참 붙이기`(보스마다 가중치 표). 두 단계 보스는 첫 단계만 |
 | 94, 96, 99, 102 Frosthand · Icebourne · Frostbourne · Dread Bell | Block | 이벤트 `BattleStarted`(전투 번호 조건) → `battle.enemies` → 거르기(보스 아님 · Gobling 등 아님) → `무작위 n개` 2(Heart of the Storm은 1) → `참 붙이기` |
@@ -224,7 +224,7 @@
 | 101 Tyrant Bell | BindTo | 지도 생성: 2~6번째 싸움 사이 상점 정확히 하나에 저주 왕관 |
 | 103 Blood Bell | DB | 보스 처치 → `run.deck` → 거르기(팀) → `정렬해서 n개` `hp` 큰 것 1 → `hp` −2 |
 | 104 Battle Bell(모든 동료 공격 +1) | 메인 룰 | `Rules.Attack`이 `Game.Owned(battleBell)`을 더한다. 패시브 '가진 동안 능력치 보정'은 받는 쪽이 하나라 "모든 동료"가 안 된다 |
-| 105, 113 Blingsack · Gold Blade Bell | DB | 가로채기 `Bling`(의도 조건 `source` = gobling / combo) → 곱하기 2 |
+| 105, 113 Blingsack · Gold Blade Bell | DB | 행동 직전 이벤트 `Bling` 받기(행동 직전 이벤트 조건 `source` = gobling / combo) → 곱하기 2 |
 | 106 Bombskull Bell | Block | 아군 Clunker에 `참 붙이기`(Bombskull) |
 | 107 Broken Bell | Block | 이벤트 `RedrawRung`(`charged` 거짓) → `뽑기` 3 |
 | 108, 112 Fog · Goat Bell | Block | 102와 같은 모양(Ooba · Demon Eye 참, Gobling·Naked Gnome 제외) |
@@ -254,14 +254,14 @@
 
 | 조각 | 분류 | 만드는 법 |
 |---|---|---|
-| 129 지도(지역 3 · 단계마다 두 갈래 · 이벤트 수 3~4/1~2 · 싸움·보스 차례) | 메인 룰 | 지도 생성 규칙 함수 + 가중치 표(지역별 이벤트), 의도 `지도 만들기`(종이 고치는 자리), 길 고르기 행동 |
+| 129 지도(지역 3 · 단계마다 두 갈래 · 이벤트 수 3~4/1~2 · 싸움·보스 차례) | 메인 룰 | 지도 생성 규칙 함수 + 가중치 표(지역별 이벤트), 행동 직전 이벤트 `지도 만들기`(종이 고치는 자리), 길 고르기 행동 |
 | 130, 131 Frozen Travellers(1/3, 건너뛰기 없음) · Treasure Chest(1/3, 건너뛰기) | Block | `가중치 표에서 고르기`(후보 3, 최소 1 / 0, 넣을 곳 비움) → 고른 뒤 결과 Block `카드 받기`(고른 원본 ID → 새 덱 카드) |
 | 132 Blingsnail Cave(40~80) | DB | 가중치 표 한 줄(개수 40~80) → `run.bling`(숫자면 개수만큼 +) |
 | 133 Charm Dispenser | DB | `가중치 표에서 주기` → `run.inventory` |
 | 134 Gnome Traveller(몇 개든 고름, 둘은 Junk가 따라옴) | BindTo | `선택 요구`(최소 0 · 최대 3) → 고른 뒤 결과 `[BindTo]`가 짝 Junk까지 넣는다 |
 | 135 Muncher(최대 2장 빼기) | Block | `선택 요구`(덱, 0~2) → 효과 Block `카드 빼기` |
 | 136 Shade Sculptor(아이템·Clunker 복제, 참 유지·왕관 아님) | Block | `선택 요구` → 효과 Block `카드 복제`(`Game.NewId`, `crowned` = 0) |
-| 137, 138 Woolly Snail · Charm Merchant | 메인 룰 | 상점 생성(아이템 4 · 하나 50% · 참 50/70/90 · 왕관 75 / 참 3 + 참 붙은 카드 1), 가격은 밸런스 값 + 의도 `상점 가격`, `Buy` 행동이 `Game.Pay` |
+| 137, 138 Woolly Snail · Charm Merchant | 메인 룰 | 상점 생성(아이템 4 · 하나 50% · 참 50/70/90 · 왕관 75 / 참 3 + 참 붙은 카드 1), 가격은 밸런스 값 + 행동 직전 이벤트 `상점 가격`, `Buy` 행동이 `Game.Pay` |
 | 139 Injured Companion(지난 판이 졌으면 그 판의 동료, 참 유지) | BindTo | 판이 질 때 동료 하나를 `profile`에 남기고, 다음 판 지도 표 줄 조건 + 받을 때 `injured` = 1 |
 | 140 해금(Snowdwell 건물·도전 → 부족·카드·이벤트·Pet) | DB | 도전과제 → 프로필 해금 목록, 가중치 표 줄 조건 |
 
@@ -274,19 +274,19 @@
 ### 4-1. 효과 수치 배율 — Lumin · Critical · Lumin Bell · Boosted Leader "+1 효과" (예외 4)
 
 - **무엇**: 카드 글의 주황 숫자(Apply 2 Snow · Restore 3 · Gain +1 공격 · Deal 4 additional · Explode X · Draw X · Trash X · Recycle X(비용까지) · 카운터 −2)를 한꺼번에 키운다. Lumin·Critical은 각각 "기본값의 +100%"를 **더한다**(둘이면 세 배), 다른 값 바꾸기 뒤에 맨 마지막에 붙는다. Lumin Bell·Boosted Leader는 +1. **공격 스탯(주황 아님)은 키우지 않는다.**
-- **왜 GBible 기능으로 안 되나**: 기믹 목록 2-2는 "동사 의도의 `amount` 곱하기"라고 하지만
-  1. 공격 피해와 효과 피해가 같은 `피해` 의도를 지나 공격까지 두 배가 된다(의도에 `kind`를 넣으면 피하지만 아래가 남는다).
-  2. 기본 `상태 효과 걸기`가 의도에 넣는 `sourceId`는 **항목 ID**(능력 ID)라서 Lumin을 가진 카드를 가리키지 못한다. 같은 능력을 가진 카드 둘을 구별하지 못한다.
-  3. `필드 바꾸기`(Gain +1 공격·카운터 −2)·Explode·Draw·Trash·Recycle 비용은 지나는 의도가 없다.
+- **왜 GBible 기능으로 안 되나**: 기믹 목록 2-2는 "동사 행동 직전 이벤트의 `amount` 곱하기"라고 하지만
+  1. 공격 피해와 효과 피해가 같은 `피해` 행동 직전 이벤트를 지나 공격까지 두 배가 된다(행동 직전 이벤트에 `kind`를 넣으면 피하지만 아래가 남는다).
+  2. 기본 `상태 효과 걸기`가 행동 직전 이벤트에 넣는 `sourceId`는 **항목 ID**(능력 ID)라서 Lumin을 가진 카드를 가리키지 못한다. 같은 능력을 가진 카드 둘을 구별하지 못한다.
+  3. `필드 바꾸기`(Gain +1 공격·카운터 −2)·Explode·Draw·Trash·Recycle 비용은 지나는 행동 직전 이벤트가 없다.
   4. 기본 효과 Block의 수치 칸(`상태 효과 걸기`의 `stacks`는 정수)에 "사용자 기준 배율" 값 틀이 없다(`{level}`은 패시브에서만, 능력에서는 0).
 - **우회**: 메인 룰에 `Rules.EffectValue(user, n, scalable)` = `(n + 종·리더 보너스) × (1 + Lumin + Critical)`을 두고, 카드 효과는 모두 프로젝트 효과 Block(`피해` · `회복` · `상태 효과 걸기(건 쪽 기록)` · `필드 바꾸기(배율)` · `카운터` · `뽑기` · `카드 만들기` · `Junk 없애기`)으로 만든다. 이 Block들이 수치를 이 함수에 통과시킨다. 기본 `상태 효과 걸기`·`필드 바꾸기`는 카드 효과에 쓰지 않는다(참·종처럼 카드 밖에서 덱을 바꾸는 데만).
-- **라이브러리에 있으면 없어지는 것**: 기본 효과 Block이 수치를 내기 직전에 지나는 기본 의도(예: `효과 수치 { userId, ability, field, amount }`)나, 효과 기반 클래스의 "수치 칸 배율" 자리. 그러면 Lumin = 상태 효과 가로채기(`userId` 가진 쪽) 곱하기 2, Lumin Bell = 패시브 더하기 1로 DB가 된다. 덤으로 `상태 효과 걸기`의 출처를 사용자 id로 남기는 칸(4절 밖, 5절 3)도 같이 풀린다.
+- **라이브러리에 있으면 없어지는 것**: 기본 효과 Block이 수치를 내기 직전에 지나는 기본 행동 직전 이벤트(예: `효과 수치 { userId, ability, field, amount }`)나, 효과 기반 클래스의 "수치 칸 배율" 자리. 그러면 Lumin = 상태 효과 행동 직전 이벤트(`userId` 가진 쪽) 곱하기 2, Lumin Bell = 패시브 더하기 1로 DB가 된다. 덤으로 `상태 효과 걸기`의 출처를 사용자 id로 남기는 칸(4절 밖, 5절 3)도 같이 풀린다.
 
 ### 4-2. 침묵 — Ink (예외 1)
 
 - **무엇**: "글이 빈 것처럼" 카드의 효과를 모두 끈다 — 발동 능력, 반응, 지속 효과("가진 동안 모든 아군 공격 +1"), 키워드(Backline·Wild·Bombard·Summoned·Hogheaded …). 공격·카운터는 그대로.
 - **왜 GBible 기능으로 안 되나**: 패시브를 **가진 쪽마다 끄는 스위치가 없다**. 트리거는 패시브마다 조건(`상태 효과 검사` Ink ≤ 0)을 넣어야 하고(빠뜨리기 쉽다), `modifiers`(가진 동안 능력치 보정)는 조건을 받지 않아 끌 수 없다.
-- **우회**: ① 카드 글은 모두 능력으로 내게 한다 — 발동은 `Game.TryUse(ability)`, 반응도 대기열에서 `TryUse`. Ink 상태 효과가 가로채기 `사용`(`holderField` `userId`) → 막기(DB). ② 오라는 패시브 보정이 아니라 `Rules.Attack`이 같은 편의 오라 필드를 모으며 Ink를 뺀다. ③ 키워드는 `Rules.Has(u, 키워드)`가 Ink면 0. ④ 턴 끝 −1은 Snow와 같은 메인 룰 표시(`inkedAtCountdown`).
+- **우회**: ① 카드 글은 모두 능력으로 내게 한다 — 발동은 `Game.TryUse(ability)`, 반응도 대기열에서 `TryUse`. Ink 상태 효과가 행동 직전 이벤트 `사용` 받기(`holderField` `userId`) → 막기(DB). ② 오라는 패시브 보정이 아니라 `Rules.Attack`이 같은 편의 오라 필드를 모으며 Ink를 뺀다. ③ 키워드는 `Rules.Has(u, 키워드)`가 Ink면 0. ④ 턴 끝 −1은 Snow와 같은 메인 룰 표시(`inkedAtCountdown`).
 - **라이브러리에 있으면 없어지는 것**: 패시브에 "가진 쪽 조건"(트리거와 가진 동안 능력치 보정 둘 다에 걸리는 조건) 칸, 또는 상태 효과의 종류에 '침묵'(걸린 쪽의 패시브를 모두 끔).
 
 ### 4-3. 예외는 아니지만 기믹 목록 3절·명세서 4-2에 자리가 없어 메인 룰로 만든 것
@@ -346,8 +346,8 @@
 
 예외 5는 모두 없어졌다.
 
-- 효과 수치 배율(Lumin·Critical·Lumin Bell·Boosted Leader) → 기본 의도 **'효과 배율'**(`PowerIntent`). 능력을 쓸 때·패시브가 발동할 때 한 번 거치고, 기본 효과 Block('상태 효과 걸기'·'필드 바꾸기'·'능력치 보정')이 곱한다. 프로젝트 Block은 `Use.Context.Power`.
-- 침묵(Ink) → 상태 효과 `silencesPassives`. 능력까지 막으려면 가로채기 '사용' 막기.
+- 효과 수치 배율(Lumin·Critical·Lumin Bell·Boosted Leader) → 기본 행동 직전 이벤트 **'효과 배율'**(`PowerIntent`). 능력을 쓸 때·패시브가 발동할 때 한 번 거치고, 기본 효과 Block('상태 효과 걸기'·'필드 바꾸기'·'능력치 보정')이 곱한다. 프로젝트 Block은 `Use.Context.Power`.
+- 침묵(Ink) → 상태 효과 `silencesPassives`. 능력까지 막으려면 행동 직전 이벤트 '사용' 받기 막기.
 - 턴 순서(열 우선) → 보드 목록을 열 우선으로 담는다(줄 길이 2). 원작의 '같은 줄' = 여기의 '같은 열': 방향 '같은 열 맨 앞·맨 뒤', 자리 '같은 열 맨 앞'·'같은 열에 혼자'(Fury).
 - 키워드 여럿 → `matchField`가 글자 목록. 처치 기여 → 걸린 것의 `by`(다시 걸면 바뀜). 대상 '상태 효과로 거르기'. 값 틀 `{event:경로}`. Fury 같은 조건부 보정 → `modifierWhen`.
 - 문서: 참(Charm)은 붙이는 순간 한 번 바꾸는 능력(가진 동안 보정 아님), Shroom·Snow는 트리거 + 풀기 1, 덱에 넣기는 고른 뒤 결과의 프로젝트 Block, 반응 대기열은 메인 룰(기믹 목록 3절·명세서 4-2에 표시 칸).

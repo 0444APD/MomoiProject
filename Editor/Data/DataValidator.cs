@@ -346,7 +346,7 @@ namespace GBible.EditorTools
                 {
                     if (refType == typeof(StatData) || refType == typeof(AchievementData)) return;
                     var id = property.stringValue;
-                    var kind = DataTypes.Find(refType)?.DisplayName ?? refType.Name;
+                    var kind = DataTypes.Label(refType);
                     var field = PropertyUtil.GetField(property, out _);
                     var name = LabelOf(field, property);
                     // 플레이어 데이터 칸([PlayerDataRef]): 비어도 되는 칸이 있다(가중치 표의 단계 키 등 — 꼭 골라야 하는 칸은 그 항목의 검증이 알린다).

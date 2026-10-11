@@ -107,7 +107,7 @@ namespace GBible.EditorTools
             if ((kinds & TriggerKinds.Event) != 0) parts.Add("이벤트 받기");
             if ((kinds & TriggerKinds.Condition) != 0) parts.Add("조건 충족");
             if ((kinds & TriggerKinds.Use) != 0) parts.Add("사용");
-            if ((kinds & TriggerKinds.Intercept) != 0) parts.Add("가로채기");
+            if ((kinds & TriggerKinds.Intercept) != 0) parts.Add("행동 직전 이벤트 받기");
             return parts.Count == 0 ? "없음" : string.Join(" · ", parts);
         }
 
@@ -119,7 +119,7 @@ namespace GBible.EditorTools
             if ((kinds & OutcomeKinds.Targeted) != 0) parts.Add("대상에게 효과");
             if ((kinds & OutcomeKinds.Coded) != 0) parts.Add("코딩한 결과");
             if ((kinds & OutcomeKinds.Event) != 0) parts.Add("이벤트 쏘기");
-            if ((kinds & OutcomeKinds.Intent) != 0) parts.Add("의도 고치기");
+            if ((kinds & OutcomeKinds.Intent) != 0) parts.Add("행동 직전 이벤트 고치기");
             return parts.Count == 0 ? "없음" : string.Join(" · ", parts);
         }
 

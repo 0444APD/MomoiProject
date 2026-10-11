@@ -123,7 +123,7 @@ public class DealDamage : Effect<Fighter>
 > - 상태 효과의 결과에서는 사용자·고른 대상이 **가진 쪽**(화상이 걸린 적)이다. 그래서 대상을 비워 두면 화상이 걸린 적이 피해를 받는다.
 > - `maxStacks`(1)·`reapply`(중첩 더하고 지속 갱신)는 기본값 그대로다. 화염구를 또 맞으면 중첩은 1 그대로, 남은 횟수가 2로 돌아간다.
 > - 맨 위 칸 `kind`(종류: 없음·버프·디버프)는 `duration` 안의 `kind`(방식)와 다른 칸이다. 디버프로 두면 '상태 효과 풀기'(종류 전부 = 정화)·`Game.StatusCount(대상, 종류)`에 잡힌다.
-> - 피해는 `피해` Block → `Rules.Damage`를 거치므로 방어도·가시 갑옷 같은 가로채기·처치 이벤트가 카드 피해와 같다. 마지막 적이 화상으로 쓰러지면 `EndTurn`이 전투 승리로 넘어간다([03장](03-GameLoop.md) 4절).
+> - 피해는 `피해` Block → `Rules.Damage`를 거치므로 방어도·가시 갑옷 같은 행동 직전 이벤트·처치 이벤트가 카드 피해와 같다. 마지막 적이 화상으로 쓰러지면 `EndTurn`이 전투 승리로 넘어간다([03장](03-GameLoop.md) 4절).
 > - 시험: 화염구를 내고 모니터 **데이터** 탭 `$statuses`에서 `burn`의 `remaining`(2)을 본 뒤 턴을 끝낸다. 적이 2 피해를 받고 `remaining`이 1이 된다. **Undo**하면 피해와 남은 횟수가 함께 돌아간다.
 
 > [!note]- 독 — 턴 끝마다 중첩만큼 피해, 3턴(상태 효과)
@@ -143,11 +143,11 @@ public class DealDamage : Effect<Fighter>
 > 6. 카드 `poisonDart`(독침): 결과 `대상에게 효과` → 대상 비움(고른 적) → 효과 `피해`(4) → `상태 효과 걸기`(`poison`, 중첩 `3`).
 >
 > - 같은 턴 끝이 피해와 횟수 줄이기를 둘 다 하면 피해가 먼저다. 피해 세 번 뒤에 끝난다. 다시 걸면 중첩이 더해지고 3턴으로 돌아간다.
-> - 독 피해도 `Rules.Damage`를 거치므로 가시 갑옷 같은 가로채기를 탄다(9절).
+> - 독 피해도 `Rules.Damage`를 거치므로 가시 갑옷 같은 행동 직전 이벤트를 탄다(9절).
 > - 걸린 독은 플레이어 데이터 `$statuses`에 들어 있어 Undo·판 저장이 따라온다. 시험: 독침을 내고 모니터 **데이터** 탭 `$statuses`에서 `stacks`·`remaining`을 본 뒤 턴을 끝낸다. **Undo**하면 피해와 남은 횟수가 함께 돌아간다.
 > - 화상과 다른 점: 화상은 피해가 고정이라 결과를 Block으로 조립했고(코드 없음), 독은 중첩 수만큼이라 결과를 `[BindTo]` 함수로 쓴다.
 > - 코드에서 걸 때는 `Game.ApplyStatus(enemy, GameIds.Status.Poison, stacks: 3)`, 화면의 상태 아이콘은 `Game.Statuses(fighter)`·`Game.StatusStacks`로 읽는다. 상태 효과 없이 "2턴 뒤 이 행동"만 걸 때는 예약(`Game.ScheduleOn<TurnEnded>(2, 행동)`)을 쓴다.
-> - 능력치 보정(분노 +10%)·가로채기(보호막 "내가 받는 피해 반감")·끝날 때 결과("3턴 뒤 폭발")도 같은 항목의 칸이다. 매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md) 5장.
+> - 능력치 보정(분노 +10%)·행동 직전 이벤트(보호막 "내가 받는 피해 반감")·끝날 때 결과("3턴 뒤 폭발")도 같은 항목의 칸이다. 매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md) 5장.
 
 ## 5. 카드 — 연쇄 번개 (`[BindTo]`)
 
@@ -234,7 +234,7 @@ static void FirstWin(BattleWon e, TriggerContext c)
 > "가지고 있는 동안 발동"은 DB › **패시브**가 기본으로 맡는다. 아래의 `RelicData`·`RelicRules`를 만들지 않고 같은 유물을 코드 없이 만든다.
 > 1. DB › **패시브** → **+ 새로 만들기** → ID(예: `anchor`).
 > 2. 가진 목록: `ownerKey` `run`, `ownerPath` `relics`(기본값 그대로). `run.relics`에 이 ID가 있는 동안 발동한다. 얻고 잃는 것은 그 목록에 넣고 빼는 것이다.
-> 3. 발동(`trigger`)·결과(`outcomes`)는 9절의 유물과 같다. 이벤트 받기·조건 충족·가로채기와 의도 고치기가 처음부터 열려 있다.
+> 3. 발동(`trigger`)·결과(`outcomes`)는 9절의 유물과 같다. 이벤트 받기·조건 충족·행동 직전 이벤트와 행동 직전 이벤트 고치기가 처음부터 열려 있다.
 > 4. Ctrl+S. `GameIds.Passive.Anchor`가 생긴다. 결과를 코드로 쓰려면 `[BindTo(GameIds.Passive.Anchor)]` — 등록과 `BoundOutcomes` 확인은 라이브러리가 한다.
 >
 > - 결과의 사용자(가진 쪽)는 목록을 품은 `run`이다('놓인 것마다'를 켜면 목록의 요소 하나, 아래 접힌 칸). 주인공에게 줄 효과는 대상에 `주인공` Block(9절)을 둔다.
@@ -279,7 +279,7 @@ static void FirstWin(BattleWon e, TriggerContext c)
 > - 잠깐 올리는 것은 '능력치 보정'이다.
 >
 > **옆 조각 흉내 — 결과 '빌려 쓰기'**
-> - 빌릴 조각(대상 Block)이 고른 조각의 패시브를 지금 순간(이벤트·의도)으로 한 번 더 낸다. Blueprint·Brainstorm이다.
+> - 빌릴 조각(대상 Block)이 고른 조각의 패시브를 지금 순간(이벤트·행동 직전 이벤트)으로 한 번 더 낸다. Blueprint·Brainstorm이다.
 > - Blueprint = 패시브(`ownerPath` `jokers`, `matchField` `joker`, `perElement` 켬) + 결과 `빌려 쓰기`(빌릴 조각 `자리로 고르기` — `origin` `사용자(가진 쪽)`, `list` `run › jokers`, `direction` `오른쪽`). Brainstorm은 `direction` `목록 맨 처음`.
 > - 빌려 쓰는 쪽의 발동도 그 순간에 참이어야 한다. 원본이 도는 순간이 여럿이면 발동을 `OR`로 묶는다.
 > - 원본의 발동은 원본 조각을 가진 쪽으로 검사한다. 결과의 사용자는 원본 조각이다(원본의 값을 읽는다). 자기 자신은 빼고 빌린다.
@@ -336,7 +336,7 @@ RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
 > - `[Database]`로 탭 이름·사이드바 그룹·순서·새 ID 접두어를 정한다. 유물 탭은 DB 사이드바 **콘텐츠** 그룹에 생긴다.
 > - `Trigger`·`Outcome`은 추상 형식이라 `[SerializeReference]`가 꼭 있어야 한다.
 > - 잠금은 기능에 맞게 고른다. 감시해서 발동하는 기능에 `사용`(`TriggerKinds.Use`)은 의미가 없다. 결과에서 `로그에 기록`(`Record`)을 뺀 것은, 유물 ID는 로그가 아니어서 로그 칸을 비운 기록이 아무것도 하지 않기 때문이다.
-> - `TriggerKinds.Intercept`·`OutcomeKinds.Intent`를 넣으면 발동에 `가로채기`, 효과에 `의도 고치기`가 나온다. "받는 피해 −5"처럼 일어나기 직전의 일을 고치는 유물에 쓴다(9절 가시 갑옷).
+> - `TriggerKinds.Intercept`·`OutcomeKinds.Intent`를 넣으면 발동에 `행동 직전 이벤트 받기`, 효과에 `행동 직전 이벤트 고치기`가 나온다. "받는 피해 −5"처럼 일어나기 직전의 일을 고치는 유물에 쓴다(9절 가시 갑옷).
 > - 표시 이름 필드는 두지 않는다. ID가 이름이고, 플레이어에게 보일 이름은 텍스트로 붙인다([06장](06-Presentation.md)).
 > - `ValidateData`를 덮어써 "발동이 없다", "비어 있는 효과 칸이 있다"를 오류로 낸다([05장](05-WorkingWithDesigners.md) 7절).
 
@@ -390,19 +390,19 @@ static void BurningBlood(BattleWon e, TriggerContext c)
 > - 사용자가 없는 다른 유물·도전과제도 이 Block을 쓸 수 있으니 `[BindTo]`가 아니라 Block이 맞다.
 > - 대상 Block은 고르기만 하고 값을 바꾸지 않는다. 컴파일하면 **+ 대상 추가** 목록의 "대상" 분류에 `주인공`이 나온다.
 
-> [!note]- 가시 갑옷 — 받는 피해 −5(패시브 · 가로채기, 코드 없음)
-> 이벤트는 일이 일어난 **뒤**에 온다. "받는 피해 −5"는 피해가 들어가기 **직전**에 내용을 고쳐야 하므로 가로채기로 만든다. 가진 동안 늘 켜진 규칙이라 기본 종류 패시브로 만든다(8절 첫 접힌 칸). `RelicData`·등록 코드가 필요 없다.
+> [!note]- 가시 갑옷 — 받는 피해 −5(패시브 · 행동 직전 이벤트, 코드 없음)
+> 이벤트는 일이 일어난 **뒤**에 온다. "받는 피해 −5"는 피해가 들어가기 **직전**에 내용을 고쳐야 하므로 행동 직전 이벤트로 만든다. 가진 동안 늘 켜진 규칙이라 기본 종류 패시브로 만든다(8절 첫 접힌 칸). `RelicData`·등록 코드가 필요 없다.
 > 1. DB › **패시브** → `thornArmor`. 가진 목록은 기본값 `run` › `relics` 그대로.
-> 2. 발동(`trigger`): **+ 블럭** → `가로채기` → 의도 `피해`. 의도 조건(`filter`)에 `필드 검사` → `targetId` `일치` `hero`.
-> 3. 결과(`outcomes`): **+ 결과 추가** → `의도 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
+> 2. 발동(`trigger`): **+ 블럭** → `행동 직전 이벤트 받기` → 행동 직전 이벤트 `피해`. 행동 직전 이벤트 조건(`filter`)에 `필드 검사` → `targetId` `일치` `hero`.
+> 3. 결과(`outcomes`): **+ 결과 추가** → `행동 직전 이벤트 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
 > 4. Ctrl+S. `GameIds.Passive.ThornArmor`가 생긴다.
 >
 > - `Rules.Damage`가 피해를 주기 직전에 `DamageIntent`(`sourceId`·`targetId`·`amount`·`cancelled`)를 `Game.Intercept`로 통과시킨다. 이 패시브가 `amount`를 줄이고, 0 이하가 되면 피해가 들어가지 않는다. 방어도는 줄어든 뒤의 값으로 깎인다.
-> - "주인공이 맞을 때만"을 가진 쪽 필드가 아니라 의도 조건으로 정하는 이유: 가진 쪽이 목록을 품은 `run`이라 id가 없다. 가진 쪽 필드는 가진 쪽에 id가 있을 때(동료마다의 특성 `party[].traits`) 쓴다.
-> - 패시브의 발동·결과 칸은 가로채기·의도 고치기를 처음부터 허락한다. 직접 만든 `RelicData`로 할 때만 잠금에 `TriggerKinds.Intercept`·`OutcomeKinds.Intent`를 넣는다(8절).
+> - "주인공이 맞을 때만"을 가진 쪽 필드가 아니라 행동 직전 이벤트 조건으로 정하는 이유: 가진 쪽이 목록을 품은 `run`이라 id가 없다. 가진 쪽 필드는 가진 쪽에 id가 있을 때(동료마다의 특성 `party[].traits`) 쓴다.
+> - 패시브의 발동·결과 칸은 행동 직전 이벤트 고치기를 처음부터 허락한다. 직접 만든 `RelicData`로 할 때만 잠금에 `TriggerKinds.Intercept`·`OutcomeKinds.Intent`를 넣는다(8절).
 > - 시험: 모니터 **데이터** 탭에서 `run › relics`에 `thornArmor`를 넣고 턴을 끝낸다. 적 공격이 5씩 줄어 들어온다. 빼면 그때부터 그대로 들어온다. Undo하면 함께 돌아간다. 가진 목록 칸의 `[DataRef]`는 8절 첫 접힌 칸처럼 패시브 ID도 받게 둔다.
-> - "공격한 적에게 3 되돌려 주기"는 피해가 들어간 **뒤**의 일이라 이벤트 받기(`피해` 이벤트 `DamageDealt`, 이름이 같은 의도와는 목록이 따로다)로 만든다. 가로채는 쪽은 의도만 고친다.
-> - 의도 클래스는 `Rules/Events/Intents.cs`에 있다(`[Intent("피해")]`). 순서·막기·`[BindTo]`로 쓰는 법은 매뉴얼 [28장](../../Manual/28-Attributes-Intercepts.md) 5-4·5-5.
+> - "공격한 적에게 3 되돌려 주기"는 피해가 들어간 **뒤**의 일이라 이벤트 받기(`피해` 이벤트 `DamageDealt`, 이름이 같은 행동 직전 이벤트와는 목록이 따로다)로 만든다. 행동 직전 이벤트를 받는 쪽은 행동 직전 이벤트만 고친다.
+> - 행동 직전 이벤트 클래스는 `Rules/Events/Intents.cs`에 있다(`[Intent("피해")]`). 순서·막기·`[BindTo]`로 쓰는 법은 매뉴얼 [28장](../../Manual/28-Attributes-Intercepts.md) 5-4·5-5.
 
 > [!note]- 투척 단검 — 적 하나를 골라 피해(선택 요구, 코드 없음)
 > 유물에는 사용자도 고른 대상도 없다. "전투 첫 턴에 적 하나를 골라 피해 5"처럼 플레이어가 고르게 하려면 결과 `선택 요구`를 쓴다.

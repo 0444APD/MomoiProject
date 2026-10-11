@@ -5,7 +5,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 - 1절은 기획자가 쓴 것처럼 채운 명세서다(가상의 게임). [선택] 칸 몇 개는 일부러 비웠다: 1절 이어 하기, 4절 고리, 6절 가방, 9절 저장 시점.
 - 2~4절은 AI가 그 명세서를 `PlanningSpecGuide.md` 1·4·5·7절대로 읽고 내놓는 것: 질문 목록 → 시스템 목록 → 효과 쪼개기.
 - 5절은 빈틈, 6절은 하루 안에 되는지의 판단이다.
-- 판정 글자: **A** = DB만 · **B** = 코드 한 단위(재사용 Block·`[BindTo]`) · **C** = 중간층 확장(동사·의도 필드·새 이벤트) · **D** = 문법 밖.
+- 판정 글자: **A** = DB만 · **B** = 코드 한 단위(재사용 Block·`[BindTo]`) · **C** = 중간층 확장(동사·행동 직전 이벤트 필드·새 이벤트) · **D** = 문법 밖.
 - 코드로 확인하지 못한 것은 "가정"이라 적었다. 문서와 코드가 다르면 코드를 따랐고, 그 차이는 5-2에 적었다.
 
 확인한 코드: `Runtime/Core/GameSession.cs`(Undo·스냅샷·판 저장), `PlayerDataStore.cs`(Permanent·UndoLast), `Actions.cs`(Preview), `GameApi.cs`(Find·Use·Intercept), `Attributes.cs`, `Statuses.cs`, `EventBus.cs`, `Triggers.cs`(구독 순서·예외), `Random.cs`, `Runtime/Unity/GameDatabase.cs`·`RunSaver.cs`·`UndoBoundary.cs`·`StatusData.cs`·`AbilityData.cs`·`GameData.cs`, `Optional/Inventory/Runtime/Inventory.cs`.
@@ -201,7 +201,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 9. **숨은 적이 길을 막거나 지대 통제를 걸면**
    - 정하는 것: 이동 동사의 규칙. 이동 범위는 보이는 것만으로 계산되므로, 경로 위에 숨은 적이 있으면?
    - 추천: 경로를 따라가다 숨은 적 바로 앞(또는 숨은 적의 지대 통제 칸)에서 멈추고, 그 유닛은 행동을 할 수 없이 차례가 끝난다(매복). 실패가 아니라 멈춤이다.
-   - 이유: 길찾기·이동 의도의 모양이 이것으로 정해진다(경로를 칸마다 따라가야 한다 — 경계 사격과 같은 바탕).
+   - 이유: 길찾기·이동 행동 직전 이벤트의 모양이 이것으로 정해진다(경로를 칸마다 따라가야 한다 — 경계 사격과 같은 바탕).
    - 답이 없으면: 추천값으로 진행.
 
 10. **되감기가 갈 수 있는 곳**
@@ -269,7 +269,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 
 ### 3-3. 핵심 동사
 
-| 동사 | 규칙 함수 | 의도(`[Intent]`, 필드) | 끝난 뒤 이벤트(`[GameEvent]`) |
+| 동사 | 규칙 함수 | 행동 직전 이벤트(`[Intent]`, 필드) | 끝난 뒤 이벤트(`[GameEvent]`) |
 |---|---|---|---|
 | 이동 | `Rules.Move(game, unit, path, MoveKind)` — 칸마다 따라간다 | `MoveIntent`(unitId·path·toX·toY·kind·cancelled) | `UnitStepped`(칸마다: unitId·tileId·x·y·visible) · `UnitMoved` |
 | 밀치기 | `Rules.Push(game, source, target, distance)` | `MoveIntent`(kind Push) | `UnitPushed` · `UnitCollided`(unitId·otherId·wall) |
@@ -353,26 +353,26 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 
 | # | 효과 | 언제 · 누구에게 · 무엇을 · 안전장치 | GBible 부품(장 절) | 판정 |
 |---|---|---|---|---|
-| 1 | **밀치기** 1칸 + 충돌 3 | 언제: 즉시 — 공격 ③단계(본 공격 명중, 대상 생존, 무기·기술에 밀치기) · 누구: 맞은 대상 · 무엇: 이동(kind Push, 방향 = 공격자→대상). 막히면 제자리 + 고정 피해 3, 구덩이면 죽음(비행 제외) · 안전: 충돌 피해는 kind Collision이라 반격·밀치기를 부르지 않음 | 효과 Block `밀치기`(`Effect<BattleUnit>`, 칸 `distance`·`origin`, 16장 2-5) → `Rules.Push` → `Rules.Move`가 `MoveIntent`를 `Game.Intercept`(28장 4-7·4-8) → 막힘이면 `Rules.Damage(…, DamageKind.Collision)` + `Game.Balance(GameIds.Balance.CollisionDamage)` → 이벤트 `UnitPushed`·`UnitCollided`. 중장 = 영구 상태 효과(트리거 `가로채기(이동)` + 의도 조건 `kind` 일치 Push, 가진 쪽 필드 `unitId` → `의도 고치기` 막기) | **C** |
-| 2 | **반격** | 언제: 발동 — 공격 ④단계(받은 공격이 근접, 대상 생존, 공격자가 대상 무기 사거리 안) · 누구: 공격자(`attackerId`) · 무엇: 공격(kind Counter, 명중·치명 같은 규칙) · 안전: Counter·Assist·FollowUp·Reaction은 반격을 부르지 않음 — 규칙 함수 안의 분기라 이벤트 고리가 없다 | `Rules.Attack`의 단계 + `CounterIntent`("기습: 반격 받지 않음" = 가로채기 + 의도 고치기 막기) + `AttackResolved`. DB 조립(이벤트 받기 → 대상 '때린 쪽' → 공격, Guide 7절 '반사' 줄)도 되지만 협동·밀치기와의 순서를 코드가 쥐어야 해서 규칙 함수에 둔다 | **C** |
-| 3 | **숲 회피 +20%** | 언제: 지속(그 칸에 선 동안) — 명중을 셀 때 읽음 · 누구: 방어하는 유닛 · 무엇: 명중 −20 · 안전: 그 칸이 불타면 0 | 지형 인스턴스 `Terrain.evasion`(DB › 인스턴스, 04장) + `Tile.terrain`(`[DataRef(typeof(Terrain))]`). `Rules.Forecast`가 지형 값을 더하고 `Game.HasStatus(tile, GameIds.Status.Burning)`이면 뺀다. 값은 `AttackIntent.hit`에 실려 가로채기로 고칠 수 있다. 이동할 때 Modifier를 붙였다 떼는 길은 '칸 위에 있는 동안' 지속이 없어 버렸다(5-1 G8) | **A** |
+| 1 | **밀치기** 1칸 + 충돌 3 | 언제: 즉시 — 공격 ③단계(본 공격 명중, 대상 생존, 무기·기술에 밀치기) · 누구: 맞은 대상 · 무엇: 이동(kind Push, 방향 = 공격자→대상). 막히면 제자리 + 고정 피해 3, 구덩이면 죽음(비행 제외) · 안전: 충돌 피해는 kind Collision이라 반격·밀치기를 부르지 않음 | 효과 Block `밀치기`(`Effect<BattleUnit>`, 칸 `distance`·`origin`, 16장 2-5) → `Rules.Push` → `Rules.Move`가 `MoveIntent`를 `Game.Intercept`(28장 4-7·4-8) → 막힘이면 `Rules.Damage(…, DamageKind.Collision)` + `Game.Balance(GameIds.Balance.CollisionDamage)` → 이벤트 `UnitPushed`·`UnitCollided`. 중장 = 영구 상태 효과(트리거 `행동 직전 이벤트(이동)` + 행동 직전 이벤트 조건 `kind` 일치 Push, 가진 쪽 필드 `unitId` → `행동 직전 이벤트 고치기` 막기) | **C** |
+| 2 | **반격** | 언제: 발동 — 공격 ④단계(받은 공격이 근접, 대상 생존, 공격자가 대상 무기 사거리 안) · 누구: 공격자(`attackerId`) · 무엇: 공격(kind Counter, 명중·치명 같은 규칙) · 안전: Counter·Assist·FollowUp·Reaction은 반격을 부르지 않음 — 규칙 함수 안의 분기라 이벤트 고리가 없다 | `Rules.Attack`의 단계 + `CounterIntent`("기습: 반격 받지 않음" = 행동 직전 이벤트 + 행동 직전 이벤트 고치기 막기) + `AttackResolved`. DB 조립(이벤트 받기 → 대상 '때린 쪽' → 공격, Guide 7절 '반사' 줄)도 되지만 협동·밀치기와의 순서를 코드가 쥐어야 해서 규칙 함수에 둔다 | **C** |
+| 3 | **숲 회피 +20%** | 언제: 지속(그 칸에 선 동안) — 명중을 셀 때 읽음 · 누구: 방어하는 유닛 · 무엇: 명중 −20 · 안전: 그 칸이 불타면 0 | 지형 인스턴스 `Terrain.evasion`(DB › 인스턴스, 04장) + `Tile.terrain`(`[DataRef(typeof(Terrain))]`). `Rules.Forecast`가 지형 값을 더하고 `Game.HasStatus(tile, GameIds.Status.Burning)`이면 뺀다. 값은 `AttackIntent.hit`에 실려 행동 직전 이벤트로 고칠 수 있다. 이동할 때 Modifier를 붙였다 떼는 길은 '칸 위에 있는 동안' 지속이 없어 버렸다(5-1 G8) | **A** |
 | 4 | **불타는 칸**: 턴 시작마다 2 | 언제: 발동 — 그 칸 위 유닛의 턴 시작 · 누구: 그 유닛 · 무엇: 고정 피해 2(kind Fire) · 안전: 3라운드 뒤 꺼짐, 피해가 불을 키우지 않음 | 칸에 거는 상태 효과 `burning`(29장 2-1: 싸우지 않는 객체에도 걸린다): 지속 이벤트 횟수 3 · 셀 이벤트 `RoundEnded` / 트리거 `이벤트 받기(UnitTurnStarted)` · 가진 쪽 필드 `tileId` / 결과 `대상에게 효과` → 대상 Block `이벤트의 유닛`(`Use.Context.Event`의 unitId, 12장 3-6) → 효과 `피해`(2, Fire). `UnitTurnStarted`에 `tileId`를 미리 둔다 | **B** |
 | 5 | **불 번짐** 50% | 언제: 발동 — 라운드 끝 · 누구: 불타는 칸 옆의 숲 칸, 칸마다 50% · 무엇: `burning` 걸기 · 안전: 이미 타는 칸은 '다시 걸 때: 무시', 그 순간 새로 붙은 불은 같은 이벤트에서 다시 번지지 않음(가진 쪽 목록을 그 순간 찍어 둔다 — `Statuses.HoldersFor`가 `ToList()`) | 상태 효과 하나에 가진 쪽 필드가 하나라 `RoundEnded`(tileId 없음)는 `burning`의 `tileId` 필드에 걸러진다 → 같은 칸에 `fireSpread`를 함께 건다(`burning`의 걸릴 때 결과 `상태 효과 걸기`, 같은 지속). `fireSpread`: 트리거 `이벤트 받기(RoundEnded)` → `[BindTo(GameIds.Status.FireSpread)]` 함수(옆 숲 칸 × `Game.Random("fire").Chance(Game.Balance(…FireSpreadChance))` → `Game.ApplyStatus`). 주의: 같은 `RoundEnded`에서 새로 붙은 불은 그 이벤트에서 곧바로 지속이 하나 준다(5-1 G7) | **B** |
 | 6 | **시야(안개)** | 언제: 늘(파생 값) — 대상 고를 때·그릴 때 · 누구: 아군 시야 밖의 적 · 무엇: 대상으로 못 고름 + 화면에서 숨김 · 안전: 판정은 규칙 한 곳 | 규칙 함수 `Rules.Visible(game, team)`(아군마다 `Game.Attribute(u, "vision")` 칸 + 벽 선 긋기, 저장하지 않음). `Act`·`Rules.UseSkill`이 보이지 않는 대상이면 `throw Game.Fail("fail.notVisible", "보이지 않는 대상입니다.")`(30장 2-4). 대상 Block `보이는 적만`·조건 `보이는 대상`. 적 페이즈 연출은 끝난 데이터가 아니라 그 순간의 보임으로 그려야 하므로 `UnitStepped`·`AttackResolved`에 `visible`을 실어 쏜다. 화면: `ViewList`의 bind에서 숨김, 안개 칸 칠하기. 멀티 대전이면 숨은 정보를 보내지 않는 필터가 필요해 D가 되지만 이 게임은 멀티가 없다 | **C** |
-| 7 | **협동 공격** 50% | 언제: 즉시 — 공격 ②단계(밀리기 전 자리) · 누구: 대상과 붙은 다른 아군 · 무엇: 각자 공격(kind Assist, 피해 × 0.5 내림, 명중 있음·치명 없음) · 안전: 협동은 반격·협동·밀치기를 부르지 않음, 대상이 쓰러지면 남은 협동은 건너뜀 | `Rules.Attack`의 단계 + `AttackIntent.scale`(`Game.Balance(GameIds.Balance.AssistRatio)`)·`kind`. "협동 피해 100%" 특성 = 영구 상태 효과(트리거 `가로채기(공격)` + 의도 조건 `kind` 일치 Assist, 가진 쪽 필드 `attackerId` → `의도 고치기` `scale` 값으로 바꾸기 1) | **C** |
+| 7 | **협동 공격** 50% | 언제: 즉시 — 공격 ②단계(밀리기 전 자리) · 누구: 대상과 붙은 다른 아군 · 무엇: 각자 공격(kind Assist, 피해 × 0.5 내림, 명중 있음·치명 없음) · 안전: 협동은 반격·협동·밀치기를 부르지 않음, 대상이 쓰러지면 남은 협동은 건너뜀 | `Rules.Attack`의 단계 + `AttackIntent.scale`(`Game.Balance(GameIds.Balance.AssistRatio)`)·`kind`. "협동 피해 100%" 특성 = 영구 상태 효과(트리거 `행동 직전 이벤트(공격)` + 행동 직전 이벤트 조건 `kind` 일치 Assist, 가진 쪽 필드 `attackerId` → `행동 직전 이벤트 고치기` `scale` 값으로 바꾸기 1) | **C** |
 | 8 | **되감기 3회** | 언제: 플레이어가 누를 때 · 누구: 전투 전체 · 무엇: 지금(또는 바로 전) 아군 턴 시작 모습으로 · 안전: 전투마다 3번, 횟수는 되감아도 줄어든 채 | Bootstrap Undo 방식 행동 단위 · 보관 수 0 · Undo 끊는 이벤트 비움(10번 답이 '지금 턴만'이면 아군 `PhaseStarted`). 행동 `SpendRewind`: 남은 횟수 검사(`Game.Fail`) 뒤 `using (Game.Session.Data.Permanent()) { battle.rewindsLeft--; battle.rewindsUsed++; }`(02장 2.9). 화면 쪽 `Rewinder.Rewind(목표 라운드)`: `Game.Do(new SpendRewind())` → `while (session.UndoCount > 0 && !Rules.IsAllyTurnStart(battle, 목표)) session.Undo();`(02장 2.8, Undo마다 지금 객체를 다시 읽는다) → `GameView.ClearPresentation()` → `GBibleRuntime.SaveRun`(3번 답). HUD 칸 `binding-path="run:battle.rewindsLeft"`. 가정: Permanent로 줄인 `rewindsLeft`는 뒤의 Undo에 덮이지 않는다(되돌리는 행동들이 그 필드를 바꾸지 않아 02장 2.12의 겹침이 없다) | **C**. 끄고 켠 뒤에도 그 지점으로 가야 하면 **D**(Undo 이력이 판 저장에 없다). 되감은 뒤 다른 결과(난수 다시)도 **D** |
 | 9 | **지대 통제** | 언제: 이동 범위를 셀 때·이동할 때 · 누구: 움직이는 유닛(비행·잠입 제외) · 무엇: 적과 붙은 칸에 들어가면 거기서 멈춤 · 안전: 시작 칸이 적 옆이어도 한 칸은 나감 | 프로젝트 길찾기(`Rules.Reachable(unit)` — 이동 종류별 비용, 막힘, 멈출 칸) + `MoveIntent.path`. GBible 부품 없음(G1) | **C** |
 | 10 | **경계 사격** | 언제: 발동 — 적이 경계 유닛 사거리 안 칸에 들어오는 순간(이동 중 칸마다) · 누구: 들어온 적 · 무엇: 경계 유닛이 한 번 공격(kind Reaction). 그 적이 쓰러지면 이동이 멈추고 남은 행동 없음 · 안전: 한 번 쏘면 풀림, Reaction은 반격·협동·밀치기 없음 | 상태 효과 `overwatch`: 지속 이벤트 횟수 1 · 셀 이벤트 `UnitTurnStarted` · 지속의 가진 쪽 필드 `unitId` / 트리거 `이벤트 받기(UnitStepped)` AND 조건 Block `들어온 유닛이 가진 쪽의 적이고 사거리 안`(`SimpleCondition`, `Context.User` = 가진 쪽, 29장 2-3 '가진 쪽마다 검사') / 결과 `[BindTo(GameIds.Status.Overwatch)] static void Fire(UnitStepped e, TriggerContext c)` → `Rules.Attack(c.User, 들어온 유닛, AttackKind.Reaction)` + `Game.RemoveStatus`. 이동 규칙은 칸마다 `UnitStepped`를 쏘고, 그 뒤 움직인 유닛이 살아 있는지 본다. 이 결과는 이벤트로 발동하므로 안에서 던지지 않고 거른다(G12) | **C** |
 | 11 | **무기 상성** | 언제: 명중·피해를 셀 때 · 누구: 공격자·방어자 · 무엇: 유리하면 명중 +15·피해 +1, 불리하면 반대 · 안전: — | 키워드 그룹 `WeaponType`(05장) + `Weapon.type`(`[Keyword(typeof(WeaponType))]`) + `Rules.Forecast` 안의 상성 표 + 밸런스 값 `TriangleHit`·`TriangleDamage`. 상성 자체를 기획자가 바꾸려면 인스턴스 `TriangleRule { attacker, defender }` 목록으로 | **B**(수치는 A) |
 | 12 | **독**: 턴 끝마다 중첩만큼, 3턴 | 언제: 지속 · 누구: 걸린 유닛 · 무엇: 고정 피해 = 중첩 · 안전: 3번 뒤 끝 | DB › 상태 효과 `poison`: 최대 중첩 0 · 지속 이벤트 횟수 3 · 셀 이벤트 `UnitTurnEnded` · 지속의 가진 쪽 필드 `unitId` / 트리거 `이벤트 받기(UnitTurnEnded)` · 가진 쪽 필드 `unitId` / 결과 효과 `피해`의 '중첩마다' 칸(`Game.StatusStacks(c.User, c.Owner)`). 진영 페이즈 끝에 유닛마다 `UnitTurnEnded`를 쏘아야 "내 턴 끝"이 된다(G6) | **A** |
 | 13 | **화염 지팡이**: 고른 칸 + 십자 4칸을 불태우고 그 칸 유닛에게 마법 8 | 언제: 즉시 · 누구: 고른 칸 중심 십자 · 무엇: 칸마다 `burning`, 칸 위 유닛에게 피해 · 안전: 맵 밖 칸은 빠짐 | 기술 인스턴스(`Skill`, 사용 기능 `Usable`, 16장 2-7) → `Game.Use(기술 ID, 시전자, 칸)` → 결과 1: 대상 Block `범위 칸`(십자, 1) → 효과 `상태 효과 걸기`(burning) / 결과 2: `범위 칸` → `칸 위의 유닛` → 효과 `피해`(마법 8). 사용 조건 `사거리 안`(기술 인스턴스의 사거리를 `Context.Owner`로 찾음)·`보이는 대상`(8번 답: 칸 고르기는 안개 칸도 됨) | **B**(이후 비슷한 기술은 A) |
-| 14 | **용살검**: 비행에게 피해 ×2 | 언제: 지속(들고 있는 동안) · 누구: 이 무기를 든 유닛이 비행 유닛을 칠 때 · 무엇: 피해 ×2 · 안전: 협동·반격에도 적용 | `Weapon.passive`(상태 효과 ID) → `BeginBattle`이 `Game.ApplyStatus(unit, weapon.passive)`(영구), 장비를 바꾸면 `RemoveStatus`. 상태 효과 `dragonSlayer`: 트리거 `가로채기(피해)` + 의도 조건 `targetMoveType` 일치 flying, 가진 쪽 필드 `sourceId` → `의도 고치기` `amount` 곱하기 2(28장 3-3·3-4). 패시브를 아이콘 줄에서 숨길 칸이 없다(G10) | **A** |
-| 15 | **성장률 레벨업** | 언제: 발동 — 경험치 100이 찰 때 · 누구: 그 유닛 · 무엇: 능력치마다 (직업 + 개인 성장률)% 확률로 +1 · 안전: 여러 레벨이면 되풀이, 최대 20 | 규칙 함수 `Rules.GainExp` + `ExpIntent`("경험치 2배" 아이템 = 가로채기) + 난수 흐름 `growth`(07장) + 이벤트 `LevelUp`(연출이 받아 레벨업 화면) + 밸런스 값 `ExpPerLevel`·`MaxLevel`. 전투 사본에 쓰고 `Rules.EndBattle`이 동료로 옮긴다 | **C** |
+| 14 | **용살검**: 비행에게 피해 ×2 | 언제: 지속(들고 있는 동안) · 누구: 이 무기를 든 유닛이 비행 유닛을 칠 때 · 무엇: 피해 ×2 · 안전: 협동·반격에도 적용 | `Weapon.passive`(상태 효과 ID) → `BeginBattle`이 `Game.ApplyStatus(unit, weapon.passive)`(영구), 장비를 바꾸면 `RemoveStatus`. 상태 효과 `dragonSlayer`: 트리거 `행동 직전 이벤트(피해)` + 행동 직전 이벤트 조건 `targetMoveType` 일치 flying, 가진 쪽 필드 `sourceId` → `행동 직전 이벤트 고치기` `amount` 곱하기 2(28장 3-3·3-4). 패시브를 아이콘 줄에서 숨길 칸이 없다(G10) | **A** |
+| 15 | **성장률 레벨업** | 언제: 발동 — 경험치 100이 찰 때 · 누구: 그 유닛 · 무엇: 능력치마다 (직업 + 개인 성장률)% 확률로 +1 · 안전: 여러 레벨이면 되풀이, 최대 20 | 규칙 함수 `Rules.GainExp` + `ExpIntent`("경험치 2배" 아이템 = 행동 직전 이벤트) + 난수 흐름 `growth`(07장) + 이벤트 `LevelUp`(연출이 받아 레벨업 화면) + 밸런스 값 `ExpPerLevel`·`MaxLevel`. 전투 사본에 쓰고 `Rules.EndBattle`이 동료로 옮긴다 | **C** |
 | 16 | **영구 사망**·레아가 쓰러지면 패배 | 언제: 발동 — 죽음 · 누구: 아군 · 무엇: 전투에서 빠지고, 이기면 동료 목록에서 '떠남'. 레아면 즉시 패배 · 안전: 되감기로 함께 돌아옴(Undo) | `DeathIntent`(28장 5-3) → `UnitKilled { isLeader }`. `Rules.Kill`이 지도자면 `Rules.EndBattle(false)`. 동료 반영은 `EndBattle`이 프로필에. 호위 NPC 같은 맵마다의 패배는 전투 맵의 `defeat` Trigger | **B** |
 | 17 | **증원**: 3라운드에 적 4기 | 언제: 지연 — 3라운드 적 페이즈 시작 · 누구: 정해진 칸(막히면 옆 빈칸) · 무엇: 적 유닛 만들기 · 안전: 한 번 | 전투 맵의 `List<TriggerRule> events`(17장 2-4): 트리거 `이벤트 받기(PhaseStarted)` + 필드 검사 `round` 일치 3·`team` 일치 enemy → 결과 Block `유닛 등장`(`Reward`, 적 원본·칸·레벨, `Game.NewId("e")`). 한 번만은 `battle.firedEvents`(되감기와 함께 돌아가야 하므로 Permanent가 아니다) | **B** |
 | 18 | **승리 조건** '5라운드 버티기'·'두목 격파' | 언제: 발동 · 누구: — · 무엇: 승리 · 안전: 한 번 | 전투 맵 `victory` Trigger = `이벤트 받기(RoundEnded)` + `round` 이상 5 / `이벤트 받기(UnitKilled)` + `isBoss` 참 / 조건 `남은 적 0` → 감시가 `Rules.EndBattle(true)` | **A**(기능을 만든 뒤) |
-| 19 | **적 AI가 예상 피해로 대상 고르기** | 언제: 적 페이즈(`EndPhase` 행동 안) · 누구: 적 하나씩 · 무엇: 갈 수 있는 칸 × 칠 수 있는 대상마다 예측해 가장 좋은 것 · 안전: 같은 점수는 `ai` 흐름 | `Rules.Forecast`(순수 함수, 난수 없음). `Game.Preview`는 행동 안에서 못 부르고(`Actions.Preview`가 막는다, 33장 2-2), `Data.Mark/RollbackTo`는 난수·이벤트를 되돌리지 않아(02장 2.7) 실제 공격을 해 보고 되돌릴 수 없다. 그래서 Forecast가 `Game.Intercept(new DamageIntent { forecast = true, … })`로 가로채기를 거치고, 의도 밖 값을 바꾸는 가로채기는 의도 조건 `forecast` 거짓을 붙인다는 프로젝트 약속에 기댄다 | **C**(근사. 약속을 어긴 가로채기는 AI가 생각만 해도 값을 바꾼다 — G2) |
-| 20 | **직업 특성** '중갑병: 받는 근접 피해 −2' | 언제: 발동 — 피해 직전 · 누구: 가진 유닛 · 무엇: 피해 −2 · 안전: 0 아래로 안 감(규칙 함수 `amount <= 0`) | `UnitClass.passive` → 출격 때 영구 상태 효과. 트리거 `가로채기(피해)` + 의도 조건 `attackKind` 일치 Melee, 가진 쪽 필드 `targetId` → `의도 고치기` `amount` 더하기 −2 | **A** |
+| 19 | **적 AI가 예상 피해로 대상 고르기** | 언제: 적 페이즈(`EndPhase` 행동 안) · 누구: 적 하나씩 · 무엇: 갈 수 있는 칸 × 칠 수 있는 대상마다 예측해 가장 좋은 것 · 안전: 같은 점수는 `ai` 흐름 | `Rules.Forecast`(순수 함수, 난수 없음). `Game.Preview`는 행동 안에서 못 부르고(`Actions.Preview`가 막는다, 33장 2-2), `Data.Mark/RollbackTo`는 난수·이벤트를 되돌리지 않아(02장 2.7) 실제 공격을 해 보고 되돌릴 수 없다. 그래서 Forecast가 `Game.Intercept(new DamageIntent { forecast = true, … })`로 행동 직전 이벤트를 거치고, 행동 직전 이벤트 밖 값을 바꾸는 행동 직전 이벤트는 행동 직전 이벤트 조건 `forecast` 거짓을 붙인다는 프로젝트 약속에 기댄다 | **C**(근사. 약속을 어긴 행동 직전 이벤트는 AI가 생각만 해도 값을 바꾼다 — G2) |
+| 20 | **직업 특성** '중갑병: 받는 근접 피해 −2' | 언제: 발동 — 피해 직전 · 누구: 가진 유닛 · 무엇: 피해 −2 · 안전: 0 아래로 안 감(규칙 함수 `amount <= 0`) | `UnitClass.passive` → 출격 때 영구 상태 효과. 트리거 `행동 직전 이벤트(피해)` + 행동 직전 이벤트 조건 `attackKind` 일치 Melee, 가진 쪽 필드 `targetId` → `행동 직전 이벤트 고치기` `amount` 더하기 −2 | **A** |
 
 ### 4-3. 판정 합계
 
@@ -397,8 +397,8 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
   - Unity: `GridView`(Tilemap 또는 프리팹으로 칸 그리기, `PickCell(마우스)`, `Paint(cells, 색)`, `Path(cells)`).
 - 3요소: ① 평범한 static 함수와 상속할 데이터 클래스(감싸는 형식 없음) ② 지형은 칸에 원본 ID만 두어 변경이 적다 — 바뀌는 것(불)만 전송 ③ 리플렉션 없음.
 
-**G2. 행동 안의 미리보기 · 부수 효과 없는 가로채기**
-- 무엇: `Game.Preview`는 행동 밖에서만 되고(`Actions.Preview`), `Data.Mark/RollbackTo`는 난수와 이벤트를 되돌리지 않는다. 적 AI(행동 안)가 가로채기("받는 피해 −2", 특효 ×2)까지 반영한 예상 피해를 보려면 순수 예측 함수가 `Game.Intercept`를 직접 부르는 수밖에 없고, 의도 밖 값을 바꾸는 가로채기(28장 5-7 메아리의 `PlayerDataReward`)는 예측만으로도 돈다. Journal에 예측마다 "결과: 의도 amount -2"가 쌓인다.
+**G2. 행동 안의 미리보기 · 부수 효과 없는 행동 직전 이벤트**
+- 무엇: `Game.Preview`는 행동 밖에서만 되고(`Actions.Preview`), `Data.Mark/RollbackTo`는 난수와 이벤트를 되돌리지 않는다. 적 AI(행동 안)가 행동 직전 이벤트("받는 피해 −2", 특효 ×2)까지 반영한 예상 피해를 보려면 순수 예측 함수가 `Game.Intercept`를 직접 부르는 수밖에 없고, 행동 직전 이벤트 밖 값을 바꾸는 행동 직전 이벤트(28장 5-7 메아리의 `PlayerDataReward`)는 예측만으로도 돈다. Journal에 예측마다 "결과: 행동 직전 이벤트 amount -2"가 쌓인다.
 - 왜: 적 페이즈마다 수십~수백 번.
 - 다른 장르: 카드 게임 AI, 오토배틀러, 보드게임 AI, 행동 안에서 "이렇게 하면" 값을 미리 따지는 모든 규칙.
 - 제안: (가) `Game.Simulate(() => 읽기)` — 행동 안에서도 되는 미리보기(저장점 + 난수 상태 보관 + 그 안의 행동 뒤 받는 쪽·Journal 버림 → 되돌림). (나) 가벼운 쪽: `Game.Intercept(intent, dryRun: true)` + `TriggerContext.IsDryRun` + 조건 Block `미리 따지는 중`(DB에서 부수 효과 결과를 거른다) + dryRun이면 Journal 줄 생략.
@@ -424,7 +424,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 - 3요소: 문제 없음.
 
 **G6. 상태 효과 '가진 쪽 필드'의 한계**
-- 무엇: 이벤트·의도의 필드 하나가 가진 쪽 id와 같은지만 본다(`Statuses.HoldersFor`·`OnEvent`). ① 진영 페이즈 턴제는 "내 턴이 끝날 때"를 위해 유닛마다 `UnitTurnEnded`를 쏘아야 한다. ② 상태 효과 하나에 트리거 하나·가진 쪽 필드 하나라, 한 칸의 불이 "그 칸 유닛의 턴 시작(tileId)"과 "라운드 끝(필드 없음)"에 함께 반응하려면 상태 효과를 둘로 나눠 같이 건다(4-2 #5). ③ "가진 쪽의 적일 때"는 조건 Block을 따로 만든다.
+- 무엇: 이벤트·행동 직전 이벤트의 필드 하나가 가진 쪽 id와 같은지만 본다(`Statuses.HoldersFor`·`OnEvent`). ① 진영 페이즈 턴제는 "내 턴이 끝날 때"를 위해 유닛마다 `UnitTurnEnded`를 쏘아야 한다. ② 상태 효과 하나에 트리거 하나·가진 쪽 필드 하나라, 한 칸의 불이 "그 칸 유닛의 턴 시작(tileId)"과 "라운드 끝(필드 없음)"에 함께 반응하려면 상태 효과를 둘로 나눠 같이 건다(4-2 #5). ③ "가진 쪽의 적일 때"는 조건 Block을 따로 만든다.
 - 왜: 이 장르 상태 효과(독·경계·불·패시브) 거의 전부.
 - 다른 장르: 팀 단위 턴 게임 전부(보드·2인 카드), 오라.
 - 제안: 가진 쪽 필드 옆에 '가진 쪽의 이 필드와 같을 때'(예: 이벤트 `team` = 가진 쪽 `team`) 칸, 걸려 있는 동안 규칙을 `List<TriggerRule>` 모양으로(줄마다 가진 쪽 필드). 가이드 07장 6절에 "진영 페이즈면 유닛마다 턴 이벤트를 쏜다" 한 줄.
@@ -443,8 +443,8 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 - 3요소: ② 계산값이면 전송할 것이 없다. 읽을 때 비용은 가정.
 
 **G9. 범용 대상 Block**
-- 무엇: 기본 대상 Block은 `사용자 자신` 하나다. '이벤트·의도의 id 필드로 찾기'(때린 쪽·맞은 쪽·들어온 유닛), '조건으로 거르기', '무작위 n(흐름 이름)'은 장르마다 같은 것을 다시 만든다(이 게임만 해도 #4·#10·#13).
-- 제안: `이벤트의 개체`(`[FieldPath]`로 이벤트·의도 필드를 고름 → `Game.Find`), `조건으로 거르기`(후보마다 `Context.User`를 그 후보로 두고 조건 Block 평가), `무작위`(개수·흐름 이름).
+- 무엇: 기본 대상 Block은 `사용자 자신` 하나다. '이벤트·행동 직전 이벤트의 id 필드로 찾기'(때린 쪽·맞은 쪽·들어온 유닛), '조건으로 거르기', '무작위 n(흐름 이름)'은 장르마다 같은 것을 다시 만든다(이 게임만 해도 #4·#10·#13).
+- 제안: `이벤트의 개체`(`[FieldPath]`로 이벤트·행동 직전 이벤트 필드를 고름 → `Game.Find`), `조건으로 거르기`(후보마다 `Context.User`를 그 후보로 두고 조건 Block 평가), `무작위`(개수·흐름 이름).
 - 3요소: 생성 필드 읽기라 문제 없음.
 
 **G10. 상태 효과·능력의 아이콘·숨김·설명 칸**
@@ -459,7 +459,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 - 3요소: 문제 없음. 급하지 않다.
 
 **G12. 이벤트로 발동한 결과의 예외는 행동을 취소하지 않는다**
-- 무엇: `EventBus.Invoke`가 받는 쪽의 예외를 잡아 Journal에 "구독자 오류"로 남기고 계속한다(`EventBus.cs` 132~143줄). 트리거 감시(`TriggerSystem.OnEvent`)와 상태 효과 지속도 `SubscribeAll` 받는 쪽이라, 이벤트 받기로 발동한 결과·`[BindTo]`·상태 효과 결과 안에서 `Game.Fail`이나 예외가 나도 행동은 실패하지 않고, 던지기 전에 바꾼 값은 남는다. 관례 3절 "안 되는 순간 던진다(바꾼 것이 모두 취소된다)"를 이 자리에서 따르면 반쯤 바뀐 상태가 된다. 가로채기로 발동한 결과는 `Game.Intercept`를 부른 규칙 함수로 그대로 올라와 행동이 취소된다(이벤트와 다르다). 10장은 "다른 받는 쪽은 계속 불린다"만 적는다.
+- 무엇: `EventBus.Invoke`가 받는 쪽의 예외를 잡아 Journal에 "구독자 오류"로 남기고 계속한다(`EventBus.cs` 132~143줄). 트리거 감시(`TriggerSystem.OnEvent`)와 상태 효과 지속도 `SubscribeAll` 받는 쪽이라, 이벤트 받기로 발동한 결과·`[BindTo]`·상태 효과 결과 안에서 `Game.Fail`이나 예외가 나도 행동은 실패하지 않고, 던지기 전에 바꾼 값은 남는다. 관례 3절 "안 되는 순간 던진다(바꾼 것이 모두 취소된다)"를 이 자리에서 따르면 반쯤 바뀐 상태가 된다. 행동 직전 이벤트로 발동한 결과는 `Game.Intercept`를 부른 규칙 함수로 그대로 올라와 행동이 취소된다(이벤트와 다르다). 10장은 "다른 받는 쪽은 계속 불린다"만 적는다.
 - 왜: 이 게임은 이벤트로 도는 규칙이 많다(경계 사격 `UnitStepped`, 불 `UnitTurnStarted`, 맵 이벤트·증원, 승패 조건).
 - 다른 장르: 이벤트 받기 트리거를 쓰는 모든 게임(유물·퀘스트·로그).
 - 제안: 행동 안에서 이벤트로 발동한 결과를 돌릴 때 이벤트 예약처럼 저장점을 두고(29장 2-5 "그 예약이 바꾼 것만 되돌린다"와 같은 `Data.Mark`/`RollbackTo`) 실패하면 그 결과가 바꾼 것만 되돌린 뒤 경고. `GameFailure`는 바깥 행동까지 올려 보낼지 정하는 칸. 최소한 관례 3절·10장에 "이벤트로 발동한 결과 안에서는 던지지 말고 조건으로 거르거나 return" 한 줄.
@@ -476,7 +476,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 - **E7. 가이드 07장 6절 "독·기절 … 지속 = 유닛 턴 끝 N회, 가진 쪽 필드로"** — 진영 페이즈(아군 전체 → 적 전체)면 유닛마다 턴 이벤트를 쏘아야 한다는 말이 빠졌다(G6).
 - **E8. Reference 6절 "Undo 보관 수(행동 단위) 200(Bootstrap)"** — 코드 기본값은 0(무제한)이다(`GameDatabase.historyLimit`, `SessionOptions.HistoryLimit`). 200은 Guide 3절의 추천값이다. "정해진 숫자" 표에서 빼거나 "추천 200, 기본 0"으로.
 - **E9. 양식에 적 AI 칸이 없다** — 상대가 스스로 움직이는 게임(전술·카드·전략·보드)에서 큰 시스템인데 `PlanningSpec.md`에 칸이 없고 Guide 2절에도 줄이 없다. 이 명세서는 2-1에 자유 글로 넣었다. 제안: 양식 2-1에 "[필수, 상대가 스스로 움직이면] 적 행동 방식(종류·대상 고르는 기준·난이도 차이)", Guide 2절에 "적 AI → 진영 페이즈 행동 안의 규칙 함수, 난수 흐름 `ai`, 예측은 순수 함수(G2), AI 종류는 키워드 + 인스턴스 칸".
-- **E10. 관례 3절 "안 되는 순간 던진다" · 02장 2.7 "예외가 나면 전부 취소"** — 이벤트로 발동한 결과 안의 예외는 `EventBus`가 잡아 기록만 하고 행동은 계속된다(G12). 두 곳 모두 "가로채기·행동 본문 안에서만 그렇다"는 단서가 빠졌다.
+- **E10. 관례 3절 "안 되는 순간 던진다" · 02장 2.7 "예외가 나면 전부 취소"** — 이벤트로 발동한 결과 안의 예외는 `EventBus`가 잡아 기록만 하고 행동은 계속된다(G12). 두 곳 모두 "행동 직전 이벤트·행동 본문 안에서만 그렇다"는 단서가 빠졌다.
 
 ### 5-3. 성능·3요소
 
@@ -488,7 +488,7 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 ### 5-4. 문서에서 찾기 어려움(기능은 있다)
 
 - **F1. 칸·카드처럼 싸우지 않는 객체에도 상태 효과를 건다**(29장 2-1 끝) — 불타는 칸에 딱 맞다. Reference 2-2의 상태 효과 줄은 "독·화상·보호막·분노"만 적는다.
-- **F2. 유닛마다 다른 패시브(직업·무기·동료 특성) = 출격 때 거는 영구 상태 효과** — 가진 쪽 필드·가로채기·능력치 보정이 이미 다 있다. Guide 2절 '2-2 지니면 발동 = 프로젝트 고유 기능(17장)'만 보면 유물처럼 DB 종류를 새로 만들게 된다(그건 플레이어 하나가 가진 것에 맞다).
+- **F2. 유닛마다 다른 패시브(직업·무기·동료 특성) = 출격 때 거는 영구 상태 효과** — 가진 쪽 필드·행동 직전 이벤트·능력치 보정이 이미 다 있다. Guide 2절 '2-2 지니면 발동 = 프로젝트 고유 기능(17장)'만 보면 유물처럼 DB 종류를 새로 만들게 된다(그건 플레이어 하나가 가진 것에 맞다).
 - **F3. 예측 창 모양**: `Game.Preview`는 넘긴 행동 객체를 그대로 실행한다(`Actions.Preview`). 그래서 `var f = new ForecastAttack { attacker, target, fromX, fromY }; Game.Preview(f, _ => f.result)`처럼 `Run`이 행동 필드에 적은 예측을 읽기에서 꺼낼 수 있다. 예측 행동이 난수를 쓰지 않으면 결과가 새지 않고, 공격자를 옮겨 둔 것도 되돌아간다. 문서에 이 모양이 없다(33장 5-3은 실제 행동을 미리본다).
 - **F4. 패배 뒤 '이 장 다시'** = 판을 전투로 두면 `GBibleRuntime.NewRun` + `StartBattle`(06장). 판 = 캠페인이면 길이 없다(G3).
 - **F5. 막사(프로필)를 행동마다 저장** = Bootstrap '프로필도 행동마다 저장'. 가이드 07장에는 수집형·방치형 쪽에만 있다.
@@ -502,15 +502,15 @@ GBible 문서·규칙과 기획 명세서만 받은 AI가 새 프로젝트의 �
 
 GBible이 이 장르에서 바로 해 주는 것:
 - 저장·슬롯·설정·Steam·대화 — 거의 DB 설정과 기본 화면(슬롯·설정·일시정지·확인·알림·고르기 창)으로 끝난다.
-- 상태 효과(독·불·경계·패시브), 가로채기(감쇠·특효·면역·협동 100%), 가중치 표(보상 셋 중 하나), 밸런스 값 — 대표 효과 20개 중 11개가 A·B다.
+- 상태 효과(독·불·경계·패시브), 행동 직전 이벤트(감쇠·특효·면역·협동 100%), 가중치 표(보상 셋 중 하나), 밸런스 값 — 대표 효과 20개 중 11개가 A·B다.
 - 되감기의 바탕(행동 단위 Undo가 난수까지 되돌림 + `Permanent`), 패배 뒤 다시 하기(`NewRun`), 예측 창의 바탕(`Game.Preview`).
 - HUD의 값 칸(binding-path)과 버튼 → 행동(`OnClick`).
 
 하루를 넘기게 하는 것:
 - **격자가 없다**(G1). 칸 데이터·길찾기(이동 종류별 비용·지대 통제·숨은 적에서 멈춤)·사거리·범위 모양·시야 선 긋기·밀치기 방향을 규칙 쪽에서, 칸 그리기·마우스로 칸 집기·범위 칠하기·경로 표시를 화면 쪽에서 처음부터 만든다. 맵 작성 도구도 없다.
 - **맵 위 입력 흐름**(유닛 고르기 → 이동 범위 → 칸 → 행동 메뉴 → 대상 → 예측 → 확정 → 물리기)은 UI Toolkit 화면이 아니라 씬 쪽이라 기본 화면·binding-path가 닿지 않는다.
-- **공격 처리 순서와 예측 창이 같은 계산을 해야 한다.** 추격·반격·협동·밀치기·상성·지형·가로채기를 한 함수(`Rules.Forecast`)에 모아 실제 공격과 예측 창과 AI가 함께 써야 하는데, 이 모양을 문서가 알려 주지 않는다(E1·F3).
-- **적 AI**: 행동 안에서 쓸 미리보기가 없어 예측 함수 + 가로채기 약속을 직접 세운다(G2).
+- **공격 처리 순서와 예측 창이 같은 계산을 해야 한다.** 추격·반격·협동·밀치기·상성·지형·행동 직전 이벤트를 한 함수(`Rules.Forecast`)에 모아 실제 공격과 예측 창과 AI가 함께 써야 하는데, 이 모양을 문서가 알려 주지 않는다(E1·F3).
+- **적 AI**: 행동 안에서 쓸 미리보기가 없어 예측 함수 + 행동 직전 이벤트 약속을 직접 세운다(G2).
 - **연출**: 적 페이즈 한 행동 안의 이동(칸마다)·공격·반격·협동·밀치기·레벨업을 연출 대기열에 차례로 넣고 안개 속 보임을 이벤트 값으로 맞춘다. 대기열은 GBible이 주지만 장면마다의 연출 코드는 프로젝트 몫이다.
 
 하루 안에 들어가게 하려면:
@@ -525,7 +525,7 @@ GBible이 이 장르에서 바로 해 주는 것:
 | 빈틈 | 처리 |
 |---|---|
 | G1 격자 | 구현: `Grid`(거리·이웃·이동 범위·길찾기·직선·시야·범위·Ray·Cone, 36장). 보류: DB '격자 맵'·Tilemap 굽기·`GridView` — 맵은 원본 인스턴스의 rows 글자 목록 |
-| G2 행동 안의 예측(dry-run 가로채기) | 보류. 적 AI는 규칙 함수로 기대값을 계산(명세서 읽는 법 '6 적 AI' 줄) |
+| G2 행동 안의 예측(dry-run 행동 직전 이벤트) | 보류. 적 AI는 규칙 함수로 기대값을 계산(명세서 읽는 법 '6 적 AI' 줄) |
 | G3 되돌리기 지점 | 구현: `session.HistoryMark`·`UndoTo`(02장). 보류: 저장을 넘는 체크포인트 |
 | G4 이벤트 때 판 저장 | 구현: 판 저장 '이벤트를 받을 때'(06장) |
 | G5 슬롯을 넘는 저장 | 보류 |

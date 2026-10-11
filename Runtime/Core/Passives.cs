@@ -595,7 +595,7 @@ namespace GBible
 
     // 결과 '빌려 쓰기': 대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 빌려 쓴다(Blueprint·Brainstorm).
     //   Blueprint = 패시브(놓인 것마다, 조커 칸) + 이 결과(대상: 자리로 고르기 — 오른쪽). 대상의 패시브는 '일치 필드'로 찾는다.
-    [Serializable]
+    [Serializable, Element(Elements.Passive)]
     [BlockInfo("빌려 쓰기", Category = "결과", Description = "대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 한 번 더 냅니다(복사·흉내). 결과의 사용자는 원본 조각이고, 원본 자신의 쌓이는 값('필드 바꾸기')은 바꾸지 않습니다. 서로 빌리는 고리는 끊습니다.")]
     public sealed class BorrowOutcome : Outcome
     {

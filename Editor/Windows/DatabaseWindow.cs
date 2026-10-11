@@ -70,9 +70,9 @@ namespace GBible.EditorTools
             return 40;
         }
 
-        // 'DB' 그룹의 로직 종류(능력·상태 효과·패시브·가중치 표 …)는 항목이 없으면 탭을 숨긴다 — 그 프로젝트가 쓰는 것만 보인다(AI가 항목을 만들면 나타난다).
-        // 개발자가 만드는 종류(DeveloperAuthored)는 비어 있어도 보인다(첫 항목을 만들 수 있게). keep: 지금 연 탭은 비어도 남긴다.
-        const string LogicGroup = "DB";
+        // 'DB' 그룹의 로직 종류(능력·상태 효과·패시브·가중치 표 …)와 [Database(HideWhenEmpty)] 종류(도전과제·로그)는 항목이 없으면 탭을 숨긴다 —
+        // 그 프로젝트가 쓰는 것만 보인다(AI가 항목을 만들면 나타난다). 개발자가 만드는 종류(DeveloperAuthored)는 비어 있어도 보인다(첫 항목을 만들 수 있게).
+        // keep: 지금 연 탭은 비어도 남긴다.
         static int _hiddenEmpty;
 
         static bool ShowEmptyTabs
@@ -87,7 +87,7 @@ namespace GBible.EditorTools
             _hiddenEmpty = 0;
             foreach (var info in DataTypes.All.Where(i => !i.Hidden))
             {
-                if (info.Group == LogicGroup && !info.DeveloperAuthored && !ShowEmptyTabs && info.Type.FullName != keep &&
+                if (info.HideWhenEmpty && !ShowEmptyTabs && info.Type.FullName != keep &&
                     !EditorDatabase.Instance.All.Any(d => d != null && d.GetType() == info.Type))
                 {
                     _hiddenEmpty++;
@@ -1004,12 +1004,13 @@ namespace GBible.EditorTools
                         ("트리거", when != null ? Gs.Dual(when.Natural(names), when.Describe(names)) : "트리거 없음"),
                         ("결과", outcomes.Count > 0 ? string.Join(",  ", outcomes) : "없음"),
                     };
-                case AbilityData ability:
-                    var abilityOutcomes = BoundOutcomes.Has(ability.Id) ? BoundOutcomes.For(ability.Id).Select(c => "코드: " + c.Name).ToList()
-                                        : ability.ToDefinition().Outcomes.Select(o => o.Natural(names)).ToList();
+                // 선택 요소 '능력'(프로젝트의 DB 종류, 규격 IUsableData).
+                case IUsableData usable when usable.ToUsable() is AbilityDefinition ability:
+                    var abilityOutcomes = BoundOutcomes.Has(item.Id) ? BoundOutcomes.For(item.Id).Select(c => "코드: " + c.Name).ToList()
+                                        : ability.Outcomes.Select(o => o.Natural(names)).ToList();
                     return new List<(string, string)>
                     {
-                        ("트리거", ability.trigger != null ? Gs.Dual(ability.trigger.Natural(names), ability.trigger.Describe(names)) : "사용할 때"),
+                        ("트리거", ability.When != null ? Gs.Dual(ability.When.Natural(names), ability.When.Describe(names)) : "사용할 때"),
                         ("결과", abilityOutcomes.Count > 0 ? string.Join(",  ", abilityOutcomes) : "없음"),
                     };
                 case StatData stat:

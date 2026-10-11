@@ -52,7 +52,7 @@ namespace GBible
 
     // 결과 '비용 내기': 플레이어 데이터의 숫자를 낸다. 가로채기(비용 지불)를 거치고, 모자라면 행동 전체가 실패한다.
     [Serializable]
-    [BlockInfo("비용 내기", Category = "결과", Description = "플레이어 데이터의 숫자(골드·에너지 …)를 냅니다. 모자라면 실패하고 이 행동의 변경이 모두 취소됩니다. '비용 지불' 가로채기가 양을 바꿀 수 있습니다.")]
+    [BlockInfo("비용 내기", Category = "결과", Description = "플레이어 데이터의 숫자(골드·에너지 …)를 냅니다. 모자라면 실패하고 이 행동의 변경이 모두 취소됩니다. 행동 직전 이벤트 '비용 지불'을 받는 쪽이 양을 바꿀 수 있습니다.")]
     public sealed class PayOutcome : Outcome
     {
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key = "";

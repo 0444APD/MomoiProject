@@ -3,8 +3,8 @@
 발라트로(Balatro)의 조커 150개(시트 `발라트로_조커_툴팁.tsv`: 번호·조커·효과·가격·희귀도·해금 조건·유형·발동 시점)를 GBible로 옮긴다고 보고, 메인 룰(점수 파이프라인)을 먼저 세운 뒤 조커마다 효과와 해금 조건을 어떻게 만드는지 분류한 기록이다. 코드는 쓰지 않았고 문서·라이브러리는 고치지 않았다.
 
 - 읽은 문서: `AI/ProjectConventions.md` · `AI/Reference.md` · `AI/GimmickCatalog.md` · `AI/PlanningSpecGuide.md`(2·7절) · `AI/PlanningSpec.md`(2-2 표), 매뉴얼 10 · 11 · 12 · 15 · 16 · 17 · 28 · 29 · 30 · 34 · 37장.
-- 문서로 판단이 안 돼 코드를 본 곳: `Runtime/Core/Passives.cs`(빌려 쓰기·레벨 필드·놓인 것마다), `Triggers.cs`(같은 자리 패시브의 순서), `Intercepts.cs`·`Chance.cs`·`Abilities.cs`(기본 의도의 필드), `TargetBlocks.cs`, `AttributeBlocks.cs`(필드 바꾸기의 빌려 쓰기 거르기), `Runtime/Unity/PassiveData.cs`(검증)·`GameDatabase.cs`(등록 순서), `Editor/Data/EditorDatabase.cs`(ID 찾기). 5절에 "코드 확인"으로 적었다.
-- 분류: **DB**(기본 Block·DB 칸 + 메인 룰이 둔 이벤트·의도·데이터만) · **Block**(프로젝트가 만든 재사용 Block을 씀) · **BindTo**(그 조커만의 코드) · **메인 룰** · **화면** · **예외** · **문법 밖**. 섞이면 가장 깊은 층 하나로 셌다(DB < Block < BindTo < 메인 룰). Block은 다시 **Block(시)** = 시스템층에서 메인 룰과 함께 만드는 Block(동사·`이벤트의 조각이 나`)만 씀, **Block(추)** = 콘텐츠 단계에서 Block을 더 만들어야 함으로 나눴다.
+- 문서로 판단이 안 돼 코드를 본 곳: `Runtime/Core/Passives.cs`(빌려 쓰기·레벨 필드·놓인 것마다), `Triggers.cs`(같은 자리 패시브의 순서), `Intercepts.cs`·`Chance.cs`·`Abilities.cs`(기본 행동 직전 이벤트의 필드), `TargetBlocks.cs`, `AttributeBlocks.cs`(필드 바꾸기의 빌려 쓰기 거르기), `Runtime/Unity/PassiveData.cs`(검증)·`GameDatabase.cs`(등록 순서), `Editor/Data/EditorDatabase.cs`(ID 찾기). 5절에 "코드 확인"으로 적었다.
+- 분류: **DB**(기본 Block·DB 칸 + 메인 룰이 둔 이벤트·행동 직전 이벤트·데이터만) · **Block**(프로젝트가 만든 재사용 Block을 씀) · **BindTo**(그 조커만의 코드) · **메인 룰** · **화면** · **예외** · **문법 밖**. 섞이면 가장 깊은 층 하나로 셌다(DB < Block < BindTo < 메인 룰). Block은 다시 **Block(시)** = 시스템층에서 메인 룰과 함께 만드는 Block(동사·`이벤트의 조각이 나`)만 씀, **Block(추)** = 콘텐츠 단계에서 Block을 더 만들어야 함으로 나눴다.
 
 ---
 
@@ -49,20 +49,20 @@
 - 패시브 ID와 원본 인스턴스 ID는 같을 수 없어(DB ID가 종류를 넘어 하나뿐) 조각에 `card`·`joker` 두 필드를 둔다(4절 E4).
 - 메인 룰은 `Game.Attribute(stats, …)`로 손패 수·슬롯·이자·판정 스위치를 읽는다. 조커의 "+1 손패"·"네거티브 +1 칸"·"판정 스위치"가 모두 보정으로 붙는다.
 
-### 2-3. 행동 · 이벤트 · 의도
+### 2-3. 행동 · 이벤트 · 행동 직전 이벤트
 
 `PlayHand { cards }`(한 손 = 행동 하나):
 
 1. 족보 판정 `Rules.EvaluateHand` — 판정 스위치(stats의 fourFingers·shortcut·smeared·splash, `Rules.IsFace`의 pareidolia, `Rules.HasSuit`의 smeared·와일드).
-2. 보스 효과 `Rules.BossAbility` — 의도 `보스 능력`(`BossAbilityIntent`), 일어나면 `BossAbilityTriggered`.
+2. 보스 효과 `Rules.BossAbility` — 행동 직전 이벤트 `보스 능력`(`BossAbilityIntent`), 일어나면 `BossAbilityTriggered`.
 3. `HandPlayed`(On Played). 필드 `hand`(HandInfo): handType · contains(포함 족보 목록) · cards · scoringCards · scoringFaceIds · playedCount · faceScored · isFirstHand · isLastHand · isMostPlayed · timesPlayed · playedBeforeThisRound. 키가 바뀌는 값(`handPlays[이 족보]`)은 값 조건·값 틀로 읽지 못하므로 메인 룰이 이벤트에 실어 준다.
 4. 족보 레벨의 칩·배수로 `run.score`.
-5. 점수 카드 왼쪽부터: 의도 `재발동`(`RetriggerIntent { cardId, phase, index, rank, isFace, times }`, 빨간 봉인이면 times 2) 횟수만큼 → 카드 칩 → 강화·봉인·에디션(코드, 유리·행운은 `Game.Chance`) → `CardScored`(card · rank · chipValue · isFace · isFirstFace · isHeart/isDiamond/isSpade/isClub · enhancement).
+5. 점수 카드 왼쪽부터: 행동 직전 이벤트 `재발동`(`RetriggerIntent { cardId, phase, index, rank, isFace, times }`, 빨간 봉인이면 times 2) 횟수만큼 → 카드 칩 → 강화·봉인·에디션(코드, 유리·행운은 `Game.Chance`) → `CardScored`(card · rank · chipValue · isFace · isFirstFace · isHeart/isDiamond/isSpade/isClub · enhancement).
 6. 손에 든 카드 왼쪽부터: `재발동`(phase Held) 횟수만큼 → 강철 ×1.5 → `HeldCardScored`(rank · chipValue · isFace · isLowest).
 7. 조커 칸을 칸 번호로 돌며(그 순간의 칸을 읽는다): foil·holo(코드) → `JokerActivated { jokerId, hand }` → `JokerResolved { jokerId, rarity }` → polychrome(코드).
-8. 합계 → `HandScored`(after). 손이 떨어지면 의도 `패배`(`DefeatIntent { ratio, cancelled }`).
+8. 합계 → `HandScored`(after). 손이 떨어지면 행동 직전 이벤트 `패배`(`DefeatIntent { ratio, cancelled }`).
 
-그 밖: `SelectBlind`→`BlindSelected` · 첫 드로→`RoundStarted` · `DiscardCards`→`Discarded`(count·faceCount·handType·isRoyal·isFirstDiscard) + 카드마다 `CardDiscarded` · `RoundEnded`(isBoss·won·handsUsed·discardsUsed·lastHandType) · 정산→`CashedOut` · `ShopEntered`·`ShopRerolled`·`ShopLeft`·`PackOpened`·`PackSkipped`·`BlindSkipped` · `SellCard`→`CardSold { itemId, kind }`(**조각을 빼기 전에** 쏜다 — "팔면 발동"이 자기를 본다) · `UseConsumable`→`ConsumableUsed` · `CardAdded`·`CardDestroyed`·`LuckyTriggered`·`JokerAdded { count }` · `RunWon`·`RunLost`. 의도는 위 넷(`재발동`·`보스 능력`·`패배`·`상점 가격 { itemKind, itemId, price, cancelled }`)과 기본 `비용 지불`·`확률`.
+그 밖: `SelectBlind`→`BlindSelected` · 첫 드로→`RoundStarted` · `DiscardCards`→`Discarded`(count·faceCount·handType·isRoyal·isFirstDiscard) + 카드마다 `CardDiscarded` · `RoundEnded`(isBoss·won·handsUsed·discardsUsed·lastHandType) · 정산→`CashedOut` · `ShopEntered`·`ShopRerolled`·`ShopLeft`·`PackOpened`·`PackSkipped`·`BlindSkipped` · `SellCard`→`CardSold { itemId, kind }`(**조각을 빼기 전에** 쏜다 — "팔면 발동"이 자기를 본다) · `UseConsumable`→`ConsumableUsed` · `CardAdded`·`CardDestroyed`·`LuckyTriggered`·`JokerAdded { count }` · `RunWon`·`RunLost`. 행동 직전 이벤트는 위 넷(`재발동`·`보스 능력`·`패배`·`상점 가격 { itemKind, itemId, price, cancelled }`)과 기본 `비용 지불`·`확률`.
 
 ### 2-4. 시스템층 Block(메인 룰과 함께 만든다)
 
@@ -82,7 +82,7 @@ V3~V5는 효과 Block이라 대상을 `사용자 자신 → 조건으로 거르�
 **조커 쪽 공통 모양**
 
 - 독립 효과(Indep) = 발동 `JokerActivated 받기` AND `이벤트의 조각이 나`(jokerId, 빌려 쓰는 중이면 참). 아래 표에서 **차례**라 줄여 적는다. 이벤트 조건 `hand.contains 포함 pair`처럼 거른다.
-- On Scored·On Held = `CardScored`·`HeldCardScored` 받기(카드마다 조커 칸 순서로). 재발동 = 가로채기 `재발동` → 의도 고치기 `times` 더하기.
+- On Scored·On Held = `CardScored`·`HeldCardScored` 받기(카드마다 조커 칸 순서로). 재발동 = 행동 직전 이벤트 `재발동` 받기 → 행동 직전 이벤트 고치기 `times` 더하기.
 - 에디션 Negative = 패시브 `negative`(일치 필드 `edition`, 보정 jokerSlots +1 → stats). foil·holo·polychrome은 7단계 코드.
 - 디버프(Perishable·보스) = 메인 룰이 `joker`를 비운다(4절 E5).
 - 쌓이는 값 = 효과 `필드 바꾸기`(대상 `사용자 자신`). 빌려 쓰는 중에는 원본의 필드가 바뀌지 않는다.
@@ -100,7 +100,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 
 ### 2-6. 명세서 4-2에 표시할 것
 
-놓인 순서·위치가 효과를 바꾼다 · 다른 것의 능력을 빌려 쓴다 · 효과가 반복 발동한다(재발동 의도) · 판정 규칙이 바뀐다 · 자원을 다른 곳에서 낸다(빚 — 돈은 모두 `Game.Pay`) · 발동 중에 목록이 바뀐다(Dagger·Madness). 기믹 목록 3절 표에 줄이 없는 셋: **조각 한 장의 차례 안에 메인 룰 단계가 끼어든다**(에디션·Baseball) · **조각 하나를 잠시 끈다**(디버프) · **뽑기 풀 규칙이 바뀐다**(Showman).
+놓인 순서·위치가 효과를 바꾼다 · 다른 것의 능력을 빌려 쓴다 · 효과가 반복 발동한다(재발동 행동 직전 이벤트) · 판정 규칙이 바뀐다 · 자원을 다른 곳에서 낸다(빚 — 돈은 모두 `Game.Pay`) · 발동 중에 목록이 바뀐다(Dagger·Madness). 기믹 목록 3절 표에 줄이 없는 셋: **조각 한 장의 차례 안에 메인 룰 단계가 끼어든다**(에디션·Baseball) · **조각 하나를 잠시 끈다**(디버프) · **뽑기 풀 규칙이 바뀐다**(Showman).
 
 해금(조건이 있는 40개): DB › 도전과제 `unlock.<조커>`(발동만) + 희귀도 가중치 표 줄의 조건 `도전과제 달성`(30장 5-10). 누적 수는 로그(범위 누적). 전설 5개는 스펙트럴 Soul의 V4만 쓰는 표에 둔다.
 
@@ -120,10 +120,10 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 17 Joker Stencil | BindTo | 차례 → ×(`Attribute(stats.jokerSlots)` − 조커 수 + 스텐실 수). 능력치와 개수를 섞는 계산 |
 | 18 Four Fingers · 37 Pareidolia · 52 Splash · 69 Shortcut · 113 Smeared | 메인 룰 | 판정 스위치(4-2 '판정 규칙이 바뀐다'). 패시브는 보정만(stats.fourFingers +1 …), 판정 함수가 `Game.Attribute`로 본다. 트리거·보정이 없는 패시브는 검증 오류라 `Game.Owned`만 보는 모양은 못 쓴다(4절 E2) |
 | 121 Showman | 메인 룰 | 상점·팩 뽑기 함수가 stats.showman을 보고 뺄 목록이 있는 표/없는 표를 고른다(기믹 목록 2-6, 희귀도마다 표 둘). 4-2 표에 맞는 줄 없음 |
-| 19 Mime | DB | 가로채기 `재발동`(phase Held) → times +1 |
-| 36 Hack · 109 Sock and Buskin · 115 Hanging Chad | DB | 가로채기 `재발동`(Scored; rank 2~5 / isFace / index 0) → times +1 / +1 / +2 |
-| 28 Dusk | DB | 가로채기 `재발동`(Scored) AND 플레이어 데이터 검사 handsLeft 일치 0 → times +1 |
-| 20 Credit Card | DB | 가로채기 `비용 지불`(key run, path money) → floor 값으로 바꾸기 −20 |
+| 19 Mime | DB | 행동 직전 이벤트 `재발동` 받기(phase Held) → times +1 |
+| 36 Hack · 109 Sock and Buskin · 115 Hanging Chad | DB | 행동 직전 이벤트 `재발동` 받기(Scored; rank 2~5 / isFace / index 0) → times +1 / +1 / +2 |
+| 28 Dusk | DB | 행동 직전 이벤트 `재발동` 받기(Scored) AND 플레이어 데이터 검사 handsLeft 일치 0 → times +1 |
+| 20 Credit Card | DB | 행동 직전 이벤트 `비용 지불` 받기(key run, path money) → floor 값으로 바꾸기 −20 |
 | 21 Ceremonial Dagger | BindTo | `BlindSelected`: 오른쪽 조커(`Placement.Around`)의 sellValue × 2를 자기 mult에 더하고 V3 함수로 없앤다(빌려 쓰는 중이면 쌓지 않음). 차례 → V1 배수 + mult. 남의 필드를 읽어 내 필드에 |
 | 22 Banner | Block(추) | 차례 → C1 칩 30 × discardsLeft |
 | 23 Mystic Summit | Block(시) | 차례 AND 플레이어 데이터 검사 discardsLeft 일치 0 → V1 배수 +15 |
@@ -132,7 +132,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 26 8 Ball | Block(시) | `CardScored`(rank 8) AND 확률 25 → V5 타로 |
 | 27 Misprint | BindTo | 차례 → `Game.Random("misprint").Range(0, 24)`만큼 배수. 값 틀에 무작위가 없다 |
 | 29 Raised Fist | Block(시) | `HeldCardScored`(isLowest) → V1 배수 + 이벤트 필드 chipValue × 2 |
-| 30 Chaos the Clown | DB | `ShopEntered` → 사용자 자신에게 상태 효과 `freeReroll`(지속 = `ShopLeft` 1번). 그 상태 효과의 가로채기 `상점 가격`(itemKind reroll) → 막기 + 상태 효과 풀기 |
+| 30 Chaos the Clown | DB | `ShopEntered` → 사용자 자신에게 상태 효과 `freeReroll`(지속 = `ShopLeft` 1번). 그 상태 효과의 행동 직전 이벤트 `상점 가격` 받기(itemKind reroll) → 막기 + 상태 효과 풀기 |
 | 31 Fibonacci | Block(시) | `CardScored`(rank 14·2·3·5·8, OR) → V1 배수 +8 |
 | 32 Steel Joker | Block(추) | 차례 → C1 ×(1 + 0.2 × deck 중 강철 수) |
 | 33 Scary Face · 104 Smiley Face | Block(시) | `CardScored`(isFace) → V1 칩 +30 / 배수 +5 |
@@ -191,20 +191,20 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 95 Trading Card | Block(시) | `Discarded`(isFirstDiscard, count 1) → 대상 이벤트의 개체 cards → V7 없애기 + V2 $3 |
 | 99 Ancient Joker · 127 The Idol | Block(추) | C5: `CardScored` AND C2(suit = targetSuit / rank·suit = targetRank·targetSuit) → V1 ×1.5 / ×2 ; `RoundEnded` → C3(무늬 목록 / 덱 카드) |
 | 100 Ramen | Block(추) | C5: 차례 → V1 × xmult(시작 2) / `CardDiscarded` → xmult −0.01, 대상 조건 1 이하면 V3 자신 |
-| 102 Seltzer | Block(추) | C5: 가로채기 `재발동`(Scored) → times +1 / `HandScored` → counter +1, 대상 조건 이상 10이면 V3 자신 |
+| 102 Seltzer | Block(추) | C5: 행동 직전 이벤트 `재발동` 받기(Scored) → times +1 / `HandScored` → counter +1, 대상 조건 이상 10이면 V3 자신 |
 | 103 Castle | Block(추) | C5: `CardDiscarded` AND C2(suit = targetSuit) → chips +3 / `RoundEnded` → C3 targetSuit(덱 카드) / 차례 → V1 칩 + chips |
 | 105 Campfire | Block(추) | C5: `CardSold` → xmult +0.25 / `RoundEnded`(isBoss) → xmult 값으로 1 / 차례 → V1 × xmult |
 | 106 Golden Ticket · 116 Rough Gem | Block(시) | `CardScored`(enhancement gold / isDiamond) → V2 $4 / $1 |
-| 107 Mr. Bones | Block(시) | 가로채기 `패배`(ratio 이상 0.25) → 막기 + V3 자신 |
+| 107 Mr. Bones | Block(시) | 행동 직전 이벤트 `패배` 받기(ratio 이상 0.25) → 막기 + V3 자신 |
 | 108 Acrobat | Block(시) | 차례, hand.isLastHand 참 → V1 ×3 |
 | 110 Swashbuckler | Block(추) | 차례 → C1 배수 1 × 다른 조커 sellValue 합 |
 | 112 Certificate | Block(시) | `RoundStarted` → V7 카드 넣기(무작위 카드·무작위 봉인, 손패로) |
 | 114 Throwback | Block(추) | 차례 → C1 ×(1 + 0.25 × blindsSkipped) |
 | 117 Bloodstone · 118 Arrowhead · 119 Onyx Agate | Block(시) | `CardScored`(isHeart AND 확률 50 / isSpade / isClub) → V1 ×1.5 / 칩 +50 / 배수 +7 |
 | 122 Flower Pot · 128 Seeing Double | BindTo | 차례: 점수 카드에 네 무늬가 다 있나 / 클럽과 다른 무늬가 함께 있나. 와일드를 어느 무늬로 셀지 짝을 맞추는 판정(`Rules.HasSuit`) |
-| 123 Blueprint · 138 Brainstorm | Block(시) | 발동 = 차례 OR `CardScored` OR `HeldCardScored` OR `JokerResolved` OR `HandPlayed` OR `HandScored` OR `Discarded` OR `CardDiscarded` OR `BlindSelected` OR `RoundEnded` OR 상점·팩 이벤트 OR 가로채기 `재발동`. 결과 `빌려 쓰기`(자리로 고르기 오른쪽 / 목록 맨 처음). `CashedOut`·`CardSold`는 넣지 않는다(원작에서 복사되지 않는 정산 돈·팔기 효과) |
+| 123 Blueprint · 138 Brainstorm | Block(시) | 발동 = 차례 OR `CardScored` OR `HeldCardScored` OR `JokerResolved` OR `HandPlayed` OR `HandScored` OR `Discarded` OR `CardDiscarded` OR `BlindSelected` OR `RoundEnded` OR 상점·팩 이벤트 OR 행동 직전 이벤트 `재발동` 받기. 결과 `빌려 쓰기`(자리로 고르기 오른쪽 / 목록 맨 처음). `CashedOut`·`CardSold`는 넣지 않는다(원작에서 복사되지 않는 정산 돈·팔기 효과) |
 | 124 Wee Joker | Block(추) | C5: `CardScored`(rank 2) → chips +8 / 차례 → V1 칩 + chips |
-| 126 Oops! All 6s | DB | 가로채기 `확률` → probability 곱하기 2 |
+| 126 Oops! All 6s | DB | 행동 직전 이벤트 `확률` 받기 → probability 곱하기 2 |
 | 129 Matador | Block(시) | `BossAbilityTriggered` → V2 $8 |
 | 130 Hit the Road | Block(추) | C5: `CardDiscarded`(rank 11) → xmult +0.5 / `RoundEnded` → xmult 값으로 1 / 차례 → V1 × xmult |
 | 131~135 The Duo · Trio · Family · Order · Tribe | Block(시) | 차례, contains pair / threeOfAKind / fourOfAKind / straight / flush → V1 ×2 / 3 / 4 / 3 / 2 |
@@ -213,11 +213,11 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 139 Satellite | Block(추) | `CashedOut` → C1 돈 1 × planetsUsed 수 |
 | 141 Driver's License | Block(시) | 차례 AND 플레이어 데이터 검사(deck 항목 검사 count ≥ 16: enhancement 아님 none) → V1 ×3 |
 | 142 Cartomancer | Block(시) | `BlindSelected` → V5 타로 |
-| 143 Astronomer | DB | 가로채기 `상점 가격`(itemKind planet·celestialPack) → 막기 |
+| 143 Astronomer | DB | 행동 직전 이벤트 `상점 가격` 받기(itemKind planet·celestialPack) → 막기 |
 | 144 Burnt Joker | Block(시) | `Discarded`(isFirstDiscard) → V6(이벤트 handType) |
 | 147 Triboulet | Block(시) | `CardScored`(rank 13·12) → V1 ×2 |
 | 148 Yorick | Block(추) | C5: `CardDiscarded` → counter +1, 대상 조건 counter 이상 23이면 xmult +1·counter 값으로 0 / 차례 → V1 × xmult |
-| 149 Chicot | DB | 가로채기 `보스 능력` → 막기 |
+| 149 Chicot | DB | 행동 직전 이벤트 `보스 능력` 받기 → 막기 |
 | 150 Perkeo | Block(시) | `ShopLeft` → V5 복사(가진 소모품 무작위 1, 네거티브) |
 
 ### 3-2. 해금 조건
@@ -254,9 +254,9 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | E3 | 순간이 둘 이상인 조커 32개(쌓기·내기·되돌리기·소멸). 패시브는 발동 하나 + 결과 하나라 순간마다 다른 결과를 못 둔다 | 결과 Block C5 `순간별 결과`(문서에 이런 Block의 예가 없다), 안 되면 조커마다 `[BindTo]` | 패시브에 '규칙 여러 줄'(로그·퀘스트의 `List<TriggerRule>`처럼 발동·결과 쌍 목록). 그러면 C5 32개가 DB가 된다 |
 | E4 | 조커의 고정 값(가격·희귀도·시작 값)을 둘 곳. `PassiveData`에는 칸을 더할 수 없고(17장 0-5), 인스턴스로 두면 ID가 패시브와 같을 수 없어 원본 ID 필드 하나로 둘을 가리키지 못한다. 기획 명세서 읽는 법 2-2(`OwnedJoker { id, joker … }` + 인스턴스 + 일치 필드 = 원본 ID 필드)대로는 안 된다 | 인스턴스 `JokerCard`에 `passive` 칸, 조각에 `card`·`joker` 두 필드(원본의 고정 값 하나를 판 데이터에 복사) | 인스턴스(또는 프로젝트 DB 종류)에서 패시브를 정의하는 길(인스턴스 ID = 패시브 ID로 등록), 또는 패시브에 프로젝트 칸 |
 | E5 | 조각 하나를 잠시 끄기(Perishable 5라운드 뒤, 보스의 디버프). '놓인 것마다' 패시브에 요소 단위로 끄는 칸이 없다. 패시브 150개에 조건을 다 붙일 수도 없다 | 메인 룰이 `joker`를 비워 일치를 끊고 `card.passive`로 되돌린다 | 패시브 '꺼짐 필드'(요소의 bool이 참이면 발동·보정·빌려 쓰기에서 빠짐) |
-| E6 | 상점 할인·공짜(Astronomer, Chaos). 기믹 목록 2-11은 가로채기 '비용 지불'인데 `CostIntent`는 key·path·amount·floor·cancelled뿐이라 무엇을 사는지(행성·리롤)로 거를 수 없다 | 프로젝트 의도 `상점 가격 { itemKind, itemId, price }`를 상점 가격 함수에 | '비용 지불' 의도에 `what`(무엇에 내나) 글자 필드 |
+| E6 | 상점 할인·공짜(Astronomer, Chaos). 기믹 목록 2-11은 행동 직전 이벤트 '비용 지불' 받기인데 `CostIntent`는 key·path·amount·floor·cancelled뿐이라 무엇을 사는지(행성·리롤)로 거를 수 없다 | 프로젝트 행동 직전 이벤트 `상점 가격 { itemKind, itemId, price }`를 상점 가격 함수에 | '비용 지불' 행동 직전 이벤트에 `what`(무엇에 내나) 글자 필드 |
 
-값 틀의 한계도 Block을 늘렸다: 의도 고치기·필드 바꾸기의 값 틀은 `{level}`(정수)·`{stacks}`·`{balance:ID}`뿐이고 값 조건의 비교 값은 상수만 받는다. 그래서 쌓인 소수 배수·이벤트 값으로 내기(V1의 값 출처), 개수만큼(C1), 이벤트 값과 조각 필드 비교(C2)가 프로젝트 Block이 됐다. `{user:필드}`·`{event:필드}`·`{count:경로}` 같은 틀과 비교 값의 틀이 있으면 C1·C2와 V1의 값 출처가 기본 Block으로 된다(효과 쪽 Block(추) 46개 중 C1 14개가 DB로).
+값 틀의 한계도 Block을 늘렸다: 행동 직전 이벤트 고치기·필드 바꾸기의 값 틀은 `{level}`(정수)·`{stacks}`·`{balance:ID}`뿐이고 값 조건의 비교 값은 상수만 받는다. 그래서 쌓인 소수 배수·이벤트 값으로 내기(V1의 값 출처), 개수만큼(C1), 이벤트 값과 조각 필드 비교(C2)가 프로젝트 Block이 됐다. `{user:필드}`·`{event:필드}`·`{count:경로}` 같은 틀과 비교 값의 틀이 있으면 C1·C2와 V1의 값 출처가 기본 Block으로 된다(효과 쪽 Block(추) 46개 중 C1 14개가 DB로).
 
 ---
 
@@ -269,13 +269,13 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 3. 한 조각에 맞는 패시브가 둘일 때의 순서(에디션을 패시브로 둘 때 foil → 조커 → polychrome을 맞추려고) → 코드 확인: 같은 자리면 등록 순서, 등록 순서 = DB 항목 순서(`GameDatabase.All`). 11장 6-4에 "같으면 등록 순서"는 있지만 DB 항목 순서를 정하는 법이 문서에 없다. 그래서 이 길을 버리고 조커마다 이벤트를 쏘는 메인 룰로 갔다.
 4. DB ID가 종류를 넘어 하나뿐인지 → 17장 1절 한 줄뿐이라 코드 확인(`EditorDatabase.FindById`가 모든 종류에서 찾는다). E4의 원인이다.
 5. 대상 `플레이어 데이터 목록`의 경로 끝이 목록도 id 글자도 아닌 객체(run)일 때 → 16장 2-6 표에 없고 37장 5-1 예에서만 쓴다. 코드 확인: 그 객체 하나를 낸다(`DataListTarget`).
-6. 기본 의도의 필드(`CostIntent`에 무엇을 사는지가 없음) → 28장 4-14 표와 코드가 같다. 어긋난 것은 기믹 목록 2-11(E6).
+6. 기본 행동 직전 이벤트의 필드(`CostIntent`에 무엇을 사는지가 없음) → 28장 4-14 표와 코드가 같다. 어긋난 것은 기믹 목록 2-11(E6).
 
 **문서끼리 어긋난 곳**
 
 7. 기믹 목록 2-6 "판정 스위치 = `Game.Owned(패시브 ID)`" ↔ 17장 0-2 검증 "발동이나 보정이 있어야 합니다"(E2).
 8. 기획 명세서 읽는 법 2-2 "원본 클래스 + 인스턴스, 판 데이터는 원본 ID 필드, 패시브의 일치 필드 = 원본 ID 필드" ↔ ID가 종류를 넘어 하나뿐(E4). 기획 명세서 양식 2-2 표의 조커 예도 고정 값에 '희귀도·가격'을 적는데 둘 곳이 없다.
-9. 16장 3-14는 조커를 능력(`Joker { id, ability }` + `Game.TryUse`)으로, 기믹 목록·17장·37장은 패시브 '놓인 것마다'로 만든다. 17장 0-3은 점수를 의도 `점수` 가로채기로, 37장 5-1은 이벤트 `손 점수` + 플레이어 데이터로 만든다. 어느 쪽이 기본인지 한 줄이 없다.
+9. 16장 3-14는 조커를 능력(`Joker { id, ability }` + `Game.TryUse`)으로, 기믹 목록·17장·37장은 패시브 '놓인 것마다'로 만든다. 17장 0-3은 점수를 행동 직전 이벤트 `점수` 행동 직전 이벤트로, 37장 5-1은 이벤트 `손 점수` + 플레이어 데이터로 만든다. 어느 쪽이 기본인지 한 줄이 없다.
 10. 기믹 목록 2-11은 Bull 같은 돈 비례를 `[BindTo]`로 적지만, 같은 모양이 14개라 관례 0절(재사용 Block 먼저)대로면 C1이다.
 
 **문서에 없는 것**
@@ -302,7 +302,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 
 | 분류 | 개수 | 내역 |
 |---|---|---|
-| DB | 21 | 재발동 5, 보정만 5(손패·버리기·이자), 가로채기 4(빚·확률·보스·상점 가격), 상태 효과 1(Chaos), 필드 바꾸기·플레이어 데이터에 주기 6(Egg · Burglar · Hiker · Luchador · Gift Card · Diet Cola) |
+| DB | 21 | 재발동 5, 보정만 5(손패·버리기·이자), 행동 직전 이벤트 4(빚·확률·보스·상점 가격), 상태 효과 1(Chaos), 필드 바꾸기·플레이어 데이터에 주기 6(Egg · Burglar · Hiker · Luchador · Gift Card · Diet Cola) |
 | Block | 117 | Block(시) 71 — V1~V7·C4만 / Block(추) 46 — C1 14, C5 32(그중 C2·C3도 쓰는 것 5) |
 | BindTo | 6 | Joker Stencil · Ceremonial Dagger · Misprint · Vampire · Flower Pot · Seeing Double |
 | 메인 룰 | 6 | 판정 스위치 5(Four Fingers · Pareidolia · Splash · Shortcut · Smeared) + Showman |

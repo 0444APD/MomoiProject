@@ -285,7 +285,8 @@ namespace GBible.EditorTools
             if (field.IsDefined(typeof(PlayerDataRefAttribute), false)) return typeof(PlayerDataEntry);
             var attribute = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
             // [DataRef(typeof(Card))]처럼 GameData가 아닌 클래스: 종류는 인스턴스, 고를 수 있는 것은 RefClassOf로 거른다.
-            if (attribute != null) return typeof(GameData).IsAssignableFrom(attribute) ? attribute : typeof(InstanceData);
+            // [DataRef(typeof(IStatusData))]처럼 선택 요소의 규격(IDataKind): 그 규격을 붙인 DB 종류(프로젝트의 StatusData …).
+            if (attribute != null) return IsKindRef(attribute) ? attribute : typeof(InstanceData);
             // 필드 규칙(DB에서 연결): 코드에 어트리뷰트가 없어도 같은 대우를 받는다.
             var rule = RuleFor(field);
             // 규칙의 값 출처는 글자 필드(또는 string 리스트)에만 적용한다(스프라이트 필드의 규칙은 규격 그룹용).
@@ -355,8 +356,11 @@ namespace GBible.EditorTools
         {
             if (field == null) return null;
             var attribute = ((DataRefAttribute)Attribute.GetCustomAttribute(field, typeof(DataRefAttribute)))?.DataType;
-            return attribute != null && !typeof(GameData).IsAssignableFrom(attribute) ? attribute : null;
+            return attribute != null && !IsKindRef(attribute) ? attribute : null;
         }
+
+        // DB 종류를 가리키는 [DataRef] 형식인가(GameData 종류이거나 선택 요소의 규격).
+        static bool IsKindRef(Type type) => typeof(GameData).IsAssignableFrom(type) || typeof(IDataKind).IsAssignableFrom(type);
 
         // 그 항목이 이 필드에서 고를 수 있는 것인가(종류 + 인스턴스 클래스).
         public static bool MatchesRef(System.Reflection.FieldInfo field, GameData target)
@@ -374,7 +378,7 @@ namespace GBible.EditorTools
             var cls = RefClassOf(field);
             if (cls != null) return DataModel.FriendlyName(cls);
             var type = RefTypeOf(field);
-            return type == null ? "" : DataTypes.Find(type)?.DisplayName ?? type.Name;
+            return type == null ? "" : DataTypes.Label(type);
         }
 
         public static bool IsRequired(System.Reflection.FieldInfo field) => RuleFor(field)?.required ?? false;

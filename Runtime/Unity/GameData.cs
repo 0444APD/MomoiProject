@@ -48,6 +48,8 @@ namespace GBible.Data
         public bool DeveloperAuthored { get; set; }
         // 프로젝트에 하나만 두는 설정 종류(Steam 등): 그 종류가 켜져 있는데 항목이 없으면 에디터가 기본값으로 하나 만든다(시작 설정을 마친 뒤).
         public bool Single { get; set; }
+        // 항목이 없으면 사이드바에서 탭을 숨긴다(그 프로젝트가 쓰는 것만 보인다 — AI가 항목을 만들면 나타난다). 'DB' 그룹의 로직 종류는 늘 이렇다.
+        public bool HideWhenEmpty { get; set; }
 
         public DatabaseAttribute(string displayName)
         {
@@ -58,6 +60,7 @@ namespace GBible.Data
     // 문자열 필드가 어떤 데이터베이스 항목의 ID인지 표시한다. 에디터는 직접 입력 대신 그 타입 항목만 목록으로 보여 주고,
     // 검증기는 없는 ID를 찾아내며, ID 이름을 바꾸면 이 필드들의 값도 함께 바뀐다. List<string>에도 쓸 수 있다.
     // GameData가 아닌 클래스를 적으면 그 클래스의 인스턴스만 고른다: [DataRef(typeof(Card))] = DB › 인스턴스 중 값이 Card인 것.
+    // 선택 요소의 규격(IStatusData·IPassiveData·IUsableData)을 적으면 그 규격을 붙인 DB 종류(프로젝트의 StatusData …)의 항목을 고른다.
     // ([DataRef(typeof(InstanceData))]는 모든 인스턴스.)
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class DataRefAttribute : Attribute
@@ -114,10 +117,30 @@ namespace GBible.Data
         bool MigrateLegacy();
     }
 
-    // Game.Use(ID, 사용자, 대상들)로 쓸 수 있는 항목(능력, 사용 기능이 붙은 아이템 …). 런타임이 세션에 등록한다.
-    public interface IUsableData
+    // 선택 요소의 DB 종류 규격(아래 인터페이스)의 표시. [DataRef(typeof(규격))]은 그 규격을 붙인 DB 종류의 항목을 고른다.
+    public interface IDataKind
+    {
+    }
+
+    // Game.Use(ID, 사용자, 대상들)로 쓸 수 있는 항목 — 선택 요소 '능력'의 규격(프로젝트의 AbilityData가 붙인다). 런타임이 세션에 등록한다.
+    [Element(Elements.Ability)]
+    public interface IUsableData : IDataKind
     {
         // 쓸 수 없는 항목이면 null.
         AbilityDefinition ToUsable();
+    }
+
+    // 선택 요소 '상태 효과'의 규격(프로젝트의 StatusData가 붙인다). 런타임이 정의를 세션에 등록한다(Game.ApplyStatus·효과 '상태 효과 걸기').
+    [Element(Elements.Status)]
+    public interface IStatusData : IDataKind
+    {
+        StatusDefinition ToDefinition();
+    }
+
+    // 선택 요소 '패시브'의 규격(프로젝트의 PassiveData가 붙인다). 런타임이 정의를 세션에 등록한다(Game.Owned·가진 동안 보정).
+    [Element(Elements.Passive)]
+    public interface IPassiveData : IDataKind
+    {
+        PassiveDefinition ToDefinition();
     }
 }

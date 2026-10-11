@@ -19,6 +19,7 @@
 - **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
 - 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".
+- 상태 효과·패시브·능력은 선택 요소다: 쓰면 템플릿(`{{GBIBLE}}/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 들이고, 칸이 모자라면 그 클래스에 더한다(프로젝트 변경 — 묻지 않고 보고만).
 - 기믹(효과 문장)은 `{{GBIBLE}}/Documentation~/AI/GimmickCatalog.md`의 갈래로 쪼개 만든다. 조각이 놓이는 메인 룰은 그 문서 1절의 모양으로.
 - DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 '적용 전'으로 들어간다)나 CSV로 만들고, 개발자가 읽어 보고 Ctrl+S로 적용한다.
 - 응답을 끝낼 때 훅(`.claude/hooks/compile-check.ps1`)이 프로젝트 코드를 컴파일한다. 오류가 나오면 고친 뒤 끝낸다.

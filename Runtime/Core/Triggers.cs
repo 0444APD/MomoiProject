@@ -612,7 +612,7 @@ namespace GBible
             if (_depth >= MaxDepth)
             {
                 _session.Journal.Append(JournalKind.Warning, "Triggers",
-                    $"가로채기 사슬이 {MaxDepth}단계를 넘어 끊었습니다({Intents.DisplayNameOf(intent.GetType())}). 가로채는 결과가 같은 의도를 다시 만드는지 확인하세요.");
+                    $"행동 직전 이벤트 사슬이 {MaxDepth}단계를 넘어 끊었습니다({Intents.DisplayNameOf(intent.GetType())}). 받는 쪽의 결과가 같은 행동 직전 이벤트를 다시 만드는지 확인하세요.");
                 return intent;
             }
             _depth++;

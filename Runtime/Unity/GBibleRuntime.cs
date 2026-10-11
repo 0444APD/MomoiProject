@@ -400,9 +400,9 @@ namespace GBible
                 // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
                 options.Migrations.EveryLoad = SavedIdRenames.Build(database);
                 if (main) LoadProfile(session);
-                // DB › 상태 효과(Game.ApplyStatus·효과 '상태 효과 걸기').
-                foreach (var status in database.All<StatusData>()) session.Statuses.Define(status.ToDefinition());
-                foreach (var passive in database.All<PassiveData>()) session.Passives.Define(passive.ToDefinition());
+                // 선택 요소: 프로젝트가 템플릿에서 들인 상태 효과·패시브 DB 종류(규격 IStatusData·IPassiveData). 없으면 아무것도 등록하지 않는다.
+                foreach (var status in database.Entries.OfType<IStatusData>()) session.Statuses.Define(status.ToDefinition());
+                foreach (var passive in database.Entries.OfType<IPassiveData>()) session.Passives.Define(passive.ToDefinition());
                 // DB › 밸런스 값(Game.Balance)·가중치 표(Game.Roll).
                 foreach (var balance in database.All<BalanceData>()) balance.Define(session.Balance);
                 foreach (var table in database.All<WeightTableData>()) session.Tables.Define(table.ToDefinition());

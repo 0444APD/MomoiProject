@@ -13,8 +13,8 @@ namespace GBible.Tests
     // 계약 테스트: 규칙을 어긴 블록·시스템은 추가되는 순간 여기서 걸린다.
     public class BlockContractTests
     {
-        static IEnumerable<Type> ConditionTypes() => BlockTypes.ConcreteTypes(typeof(Condition));
-        static IEnumerable<Type> RewardTypes() => BlockTypes.ConcreteTypes(typeof(Reward));
+        static IEnumerable<Type> ConditionTypes() => BlockTypes.AllConcreteTypes(typeof(Condition));
+        static IEnumerable<Type> RewardTypes() => BlockTypes.AllConcreteTypes(typeof(Reward));
 
         [Test]
         public void 블록_타입이_하나_이상_있다()
@@ -38,7 +38,7 @@ namespace GBible.Tests
         }
 
         static IEnumerable<Type> AbilityBlockTypes() =>
-            BlockTypes.ConcreteTypes(typeof(Effect)).Concat(BlockTypes.ConcreteTypes(typeof(TargetSelector)));
+            BlockTypes.AllConcreteTypes(typeof(Effect)).Concat(BlockTypes.AllConcreteTypes(typeof(TargetSelector)));
 
         // 능력 Block(효과·대상): 에디터 메뉴에 나오고, 세션마다 복사되므로 직렬화돼야 한다.
         [TestCaseSource(nameof(AbilityBlockTypes))]
@@ -51,7 +51,7 @@ namespace GBible.Tests
         }
 
         static IEnumerable<Type> TriggerAndOutcomeTypes() =>
-            BlockTypes.ConcreteTypes(typeof(Trigger)).Concat(BlockTypes.ConcreteTypes(typeof(Outcome)));
+            BlockTypes.AllConcreteTypes(typeof(Trigger)).Concat(BlockTypes.AllConcreteTypes(typeof(Outcome)));
 
         // 트리거·결과 Block: 메뉴 이름·설명이 있고, 문장이 나오고, 종류를 선언하고, 세션마다 복사되므로 직렬화돼야 한다.
         [TestCaseSource(nameof(TriggerAndOutcomeTypes))]

@@ -3,7 +3,7 @@
 목표 확인: 정해진 양식의 기획 명세서 + GBible 문서·규칙만으로, 새 프로젝트에서 레벨 디자인을 뺀 모든 시스템과 화면을 AI가 하루 안에 질문 20개 이하로 만들 수 있나. 이 문서는 수집형 RPG 하나로 그것을 해 보고 **빈틈**을 적는다. 코드는 고치지 않았다.
 
 - 읽은 것: `AI/Reference.md` · `ProjectConventions.md` · `PlanningSpecGuide.md` · `PlanningSpec.md` · `PlanningSpec-CardDungeon.md`, 매뉴얼 02·06·07·11·12·14·15·16·17·28·29·30·31·35장, 가이드 07·10장. 의심스러운 곳은 코드(`Runtime/Core`·`Runtime/Unity`)를 읽어 확인했다(확인한 곳은 "코드 확인"으로 적는다).
-- 판정: **A** = DB만 · **B** = 코드 한 단위(Block 하나·`[BindTo]`·행동 하나·규칙 함수 하나) · **C** = 중간층 확장(규칙 함수·의도 필드·새 가로채기 자리) · **D** = 문법 밖. 기믹마다 "그 기믹을 처음 만들 때 필요한 가장 깊은 층"으로 판정하고, 시스템층이 생긴 뒤 같은 종류를 하나 더 만들 때의 판정을 괄호에 적는다.
+- 판정: **A** = DB만 · **B** = 코드 한 단위(Block 하나·`[BindTo]`·행동 하나·규칙 함수 하나) · **C** = 중간층 확장(규칙 함수·행동 직전 이벤트 필드·새 행동 직전 이벤트 자리) · **D** = 문법 밖. 기믹마다 "그 기믹을 처음 만들 때 필요한 가장 깊은 층"으로 판정하고, 시스템층이 생긴 뒤 같은 종류를 하나 더 만들 때의 판정을 괄호에 적는다.
 
 ---
 
@@ -231,7 +231,7 @@
 
 ### 3-3. 핵심 동사
 
-| 동사 | 규칙 함수 | 의도(필드) | 끝난 뒤 이벤트 |
+| 동사 | 규칙 함수 | 행동 직전 이벤트(필드) | 끝난 뒤 이벤트 |
 |---|---|---|---|
 | 피해 | `Rules.Damage(game, source, target, coefficient, kind)` | `DamageIntent { sourceId, targetId, amount, kind, element, advantage, isCrit, cancelled }` | `UnitDamaged { sourceId, targetId, amount, hpAfter, kind, advantage, isCrit }` |
 | 명중 | `Rules.RollHit` | `HitIntent { sourceId, targetId, chance, advantage, cancelled }` | `AttackMissed { sourceId, targetId }` |
@@ -327,17 +327,17 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 | 1 | 천장 90 · 4성 10 | 뽑기 한 번마다(행동 `Pull` 안, **한 번씩 도는 고리**) | — | 5성 확률 = 밸런스 값 `gacha.rate5`의 곡선 '표'(단계 = `count5 + 1`, 30장 2-2·5-3). 4성 = `count4 + 1 ≥ 10`이면 남은 몫 전부. → 코드 풀 `Game.Roll((gacha.pickup.X.five, p5), (….four, p4), (….three, 나머지), stream: "gacha.pickup")`(30장 4-4, 항목이 가중치 표면 그 표에서 다시 뽑음) → 횟수 갱신. `Game.Roll(표, 10)`은 열 번 사이에 횟수가 안 바뀌어 쓸 수 없다(30장 2-3: 조건은 뽑는 순간이고 한 `Roll` 안에서 상태가 그대로) | `Rules.PullOnce`, 프로필 `PityState`, 이벤트 `GachaPulled` | **B** |
 | 2 | 50% 빗나가면 다음은 픽업 확정 | 5성이 나온 순간 | — | 표 `gacha.pickup.X.five`: 줄 픽업 계약자 무게 1 + 줄 안쪽 표 `gacha.standard.five` 무게 1, 그 줄의 조건 `플레이어 데이터 검사(profile: gacha.pickup.guaranteed 거짓)`(30장 3-2·5-6) → 보장이면 픽업 줄만 남아 100%. 뽑힌 뒤 `guaranteed = (픽업 아님)`은 1의 함수 | 1과 같음 | **B**(표·조건은 A) |
 | 3 | 중복 → 돌파 재료 → 6단계면 별빛 | 계약자를 얻는 모든 곳(뽑기·선택권·보상) | 그 계약자 | `Rules.GrantCharacter`: 없으면 새 `OwnedCharacter`(`Game.NewId("char")`), 있으면 (돌파 + 재료) < 6이면 `shards + 1`, 아니면 `starlight += Balance(dupe.starlight.<등급>)`. `GainIntent`(관례 4절) + `CharacterObtained`. 돌파 행동 `Ascend`는 계약자 객체의 `shards`를 직접 빼고 `Game.Fail`(→ 빈틈 7: `Game.Pay`가 목록 속 객체를 못 가리킴) | 얻기 동사 | **B** |
-| 4 | 행동 게이지 +30% (적 −20%) | 즉시(스킬 결과) | `AllAllies`·`사용자 자신`·`FrontEnemy` | 효과 Block `ShiftGauge { ratio }`(16장 2-5) → `Rules.ShiftGauge` → `GaugeIntent`. "게이지 감소 면역" = 상태 효과 트리거 '가로채기'(GaugeIntent, 의도 조건 `ratio < 0`, 가진 쪽 필드 `targetId`) + 의도 고치기 '막기'(28장 3-3·3-4, 29장 3-1) | 턴 엔진(3-3), 게이지 의도·이벤트 | **C** (스킬 하나는 A) |
+| 4 | 행동 게이지 +30% (적 −20%) | 즉시(스킬 결과) | `AllAllies`·`사용자 자신`·`FrontEnemy` | 효과 Block `ShiftGauge { ratio }`(16장 2-5) → `Rules.ShiftGauge` → `GaugeIntent`. "게이지 감소 면역" = 상태 효과 트리거 '행동 직전 이벤트 받기'(GaugeIntent, 행동 직전 이벤트 조건 `ratio < 0`, 가진 쪽 필드 `targetId`) + 행동 직전 이벤트 고치기 '막기'(28장 3-3·3-4, 29장 3-1) | 턴 엔진(3-3), 게이지 행동 직전 이벤트·이벤트 | **C** (스킬 하나는 A) |
 | 5 | 속도 +20% 2차례 | 지속 | 사용자 자신 등 | 상태 효과 `speedUp`: 능력치 보정 `speed` 퍼센트 0.2(중첩당) · 지속 이벤트 횟수 2 · 셀 이벤트 `UnitTurnEnded` · 가진 쪽 필드 `unitId`(29장 3-1) + 효과 '상태 효과 걸기'(29장 3-2) | 턴 엔진이 최종 속도(`Game.Attribute`)를 매번 읽음 | **A** |
-| 6 | 진영 상성(피해 +30%, 회피 −15%) | 피해·명중 계산 | — | `Rules.Advantage(공격, 맞는 쪽)`(규칙 상수 불>바람>물>불) → `DamageIntent.advantage`, 배율 `Balance(element.advantageDamage)`(독립 곱 자리). `Rules.RollHit` → `HitIntent`, 회피 = `Game.Attribute(t, "evasion") − Balance(element.advantageEvasion)`, 난수 `Game.Random("battle.hit")`(07장 2.1). "유리할 때 피해 +10%" = 상태 효과 가로채기(DamageIntent, 의도 조건 `advantage 참`, 가진 쪽 필드 `sourceId`) + 의도 고치기 `amount ×1.1` | 피해·명중 의도의 `advantage`·`element` | **C** (상성 효과 하나는 A) |
+| 6 | 진영 상성(피해 +30%, 회피 −15%) | 피해·명중 계산 | — | `Rules.Advantage(공격, 맞는 쪽)`(규칙 상수 불>바람>물>불) → `DamageIntent.advantage`, 배율 `Balance(element.advantageDamage)`(독립 곱 자리). `Rules.RollHit` → `HitIntent`, 회피 = `Game.Attribute(t, "evasion") − Balance(element.advantageEvasion)`, 난수 `Game.Random("battle.hit")`(07장 2.1). "유리할 때 피해 +10%" = 상태 효과 행동 직전 이벤트(DamageIntent, 행동 직전 이벤트 조건 `advantage 참`, 가진 쪽 필드 `sourceId`) + 행동 직전 이벤트 고치기 `amount ×1.1` | 피해·명중 행동 직전 이벤트의 `advantage`·`element` | **C** (상성 효과 하나는 A) |
 | 7 | 스태미나 6분마다 1(꺼 둔 동안에도), 최대 120 | 현실 시간 | — | 프로필 `stamina { value, at }`. `Rules.SettleStamina(game, now)`: n = ⌊(now − at) ÷ 6분⌋, value = min(120, value + n), at += n × 6분(120 이상이면 at = now). 내기 = 정산 → `Game.Pay(profile, "stamina.value", 비용, what: "stamina.name")`(28장 2-4). 보이기 = 화면이 같은 순수 함수 `Rules.StaminaAt(profile, 지금)`을 1초마다(UI Toolkit `schedule`). 켜 둔 동안은 화면 쪽 감시가 다음 회복 시각에 `SyncRealTime`(07장 4.4의 `BuffTicker` 방식) | 지금 시각이 들어올 길(빈틈 1), 회복형 자원(빈틈 4) | **D** (근사하면 B) |
 | 8 | 일일 임무 4시 초기화 + 5개면 상자 | 현지 4시 뒤 첫 행동 · 켜 둔 채 4시를 넘긴 순간 | — | `Rules.EnsureDay(game, now)`: day = (현지 시각 − 4시간)의 날짜 번호. 바뀌면 `daily.*` 로그를 `session.Stats.Set(id, 0)`(15장 2-4), `daily.claimed` 비움, 충전 횟수 0, `DayStarted`. 시각을 쓰는 모든 행동이 맨 앞에서 부른다(안 그러면 어제 진행으로 센다). 임무 = 고유 DB 종류(3-5). 상자 = `ClaimDailyBox`: 조건 `daily.claimed` 개수 5 이상 → 표 `daily.box` → 재료 개수라 `GrantRolledCounts`(빈틈 8) | 지금 시각, 날짜 번호(빈틈 2), 임무 종류(빈틈 3) | **D** (+C) |
 | 9 | 픽업 배너 2주 교체 | 현실 날짜 | — | `Rules.ActiveBanner(game, now) = rotation[⌊(day − 기준일) ÷ 14⌋ mod n]`. 뽑기 행동이 지금 배너인지 확인하고, 화면 '남은 기간'도 같은 함수 | 지금 시각 | **D** |
 | 10 | 궁극기 에너지 → 자동 시전 | 발동(행동·맞음·처치) → 다음 자기 차례 | 사용자 자신 | `Rules.GainEnergy` → `EnergyIntent` → `EnergyGained`. 자기 차례에 에너지 ≥ 최대면 `Game.Use(원본.ultimate, unit, 대상…)` 후 0. "처치하면 +20" = 패시브 상태 효과: 트리거 '이벤트 받기'(UnitDied), 가진 쪽 필드 `killerId` → 효과 `GainEnergy 20` | `Rules.ChooseAction` | **C** (궁극기 하나는 A) |
 | 11 | 끼어들기 반격(체력 30% 아래, 전투당 1번) | 발동(아군이 맞은 뒤) | 대상 Block `Attacker`(`Use.Context.Event`의 `sourceId` — 상태 효과의 결과도 컨텍스트를 넘긴다, 코드 확인 `Triggers.cs` `AbilityUse.Context`) | 패시브 상태 효과 `counterReady`(영구, 전투 시작에 건다): 트리거 '이벤트 받기'(UnitDamaged) AND 조건 `DamagedAllyBelow { ratio = 0.3 }`(`Context.User` = 가진 쪽, 11장 4-2) → 효과 `InsertExtraTurn { ability = counter }` + '상태 효과 풀기 counterReady'. 고리: 반격이 다른 아군의 끼어들기를 불러도 각자 1번이라 끝난다(사슬 한도 16) | 추가 차례 큐 `battle.extraTurns` | **C** (끼어들기 하나는 A) |
 | 12 | 장비 세트 2·4 | 지속 / 발동(궁극기 뒤) | 착용자 | `StartBattle`이 세트별 착용 수를 세어 `Game.ApplyStatus(unit, set.twoPiece)`(29장 4-1). 2세트 = 상태 효과 능력치 보정 `attack` 퍼센트 0.18. 4세트 = 상태 효과 트리거 '이벤트 받기'(능력 사용 `AbilityUsed`, 가진 쪽 필드 `User`) AND `AbilityIsUltimate` → '상태 효과 걸기 speedUp'(지속 1) | 전투 시작에 거는 규칙 | **C** (세트 하나는 A) |
-| 13 | 도발 2차례 | 지속 | 도발을 건 쪽 | `Rules.PickTargets` → `TargetIntent`. 상태 효과 `taunt`: 트리거 '가로채기'(TargetIntent, 의도 조건 `single 참`) AND `SourceIsEnemyOfHolder` → 의도 `targetId`를 **가진 쪽 id로** 바꿔야 하는데 '의도 고치기'의 값은 고정 글자뿐(빈틈 6, 코드 확인 `Intercepts.cs` `ModifyIntentOutcome`) → 결과 Block `RedirectToHolder` | 대상 고르기 의도 | **C** (도발 하나는 B → 빈틈 6이 메워지면 A) |
-| 14 | 부활(전투당 1번, 체력 30%) | 발동(쓰러지기 직전) | 가진 쪽 | 상태 효과 `revive`(영구): 트리거 '가로채기'(DeathIntent), 가진 쪽 필드 `targetId` → 의도 고치기 '막기' + 효과 `HealPercent 0.3`(사용자 자신) + '상태 효과 풀기 revive' | 죽음 의도 | **A** |
+| 13 | 도발 2차례 | 지속 | 도발을 건 쪽 | `Rules.PickTargets` → `TargetIntent`. 상태 효과 `taunt`: 트리거 '행동 직전 이벤트 받기'(TargetIntent, 행동 직전 이벤트 조건 `single 참`) AND `SourceIsEnemyOfHolder` → 행동 직전 이벤트 `targetId`를 **가진 쪽 id로** 바꿔야 하는데 '행동 직전 이벤트 고치기'의 값은 고정 글자뿐(빈틈 6, 코드 확인 `Intercepts.cs` `ModifyIntentOutcome`) → 결과 Block `RedirectToHolder` | 대상 고르기 행동 직전 이벤트 | **C** (도발 하나는 B → 빈틈 6이 메워지면 A) |
+| 14 | 부활(전투당 1번, 체력 30%) | 발동(쓰러지기 직전) | 가진 쪽 | 상태 효과 `revive`(영구): 트리거 '행동 직전 이벤트 받기'(DeathIntent), 가진 쪽 필드 `targetId` → 행동 직전 이벤트 고치기 '막기' + 효과 `HealPercent 0.3`(사용자 자신) + '상태 효과 풀기 revive' | 죽음 행동 직전 이벤트 | **A** |
 | 15 | 치명타면 게이지 +10% | 발동 | 사용자 자신 | 패시브 상태 효과: 트리거 '이벤트 받기'(UnitDamaged, 필드 검사 `isCrit 참`), 가진 쪽 필드 `sourceId` → 효과 `ShiftGauge 0.1` | 피해 이벤트의 `isCrit`·`sourceId` | **A** |
 | 16 | 소탕 ×1·×10 | 즉시 | — | `SweepStage { stage, times }`: 별 3 확인 → `Rules.PayStamina(비용 × times)` → times번 `Game.Roll(stage.dropTable, 1)`(표 흐름 `table:<ID>`) → `Rules.Grant` | 얻기 동사 | **B** |
 | 17 | 5성 선택권 | 즉시(쓰기) | — | 재료 `Material.usable` → 결과 '가중치 표에서 고르기'(표 `select.fiveStar`, `key` 비움, 고른 뒤 결과 = `GrantPickedCharacters`, 30장 3-3·5-5) → 기본 고르기 창. 선택권 개수(딕셔너리)를 빼는 것은 '비용 내기'로 안 돼 행동 `UseItem`이 직접(빈틈 7) | 얻기 동사 | **B** |
@@ -345,7 +345,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 
 **판정 합계**: A 3(5·14·15) · B 6(1·2·3·16·17·18) · **C 6**(4·6·10·11·12·13) · **D 3**(7·8·9).
 
-- C 여섯은 모두 시스템층이 하루 안에 만들 몫(전투 동사의 의도·이벤트·턴 엔진)이고, 만들고 나면 같은 종류의 효과는 A다. 7절의 "시스템층에 있어야 할 것" 칸이 그대로 시스템 목록이 된다.
+- C 여섯은 모두 시스템층이 하루 안에 만들 몫(전투 동사의 행동 직전 이벤트·이벤트·턴 엔진)이고, 만들고 나면 같은 종류의 효과는 A다. 7절의 "시스템층에 있어야 할 것" 칸이 그대로 시스템 목록이 된다.
 - D 셋은 한 가지 원인(규칙에 현실 시각이 없음)이다. 질문 3·4로 근사하면 B로 내려가지만, 장르마다 같은 것을 다시 만든다(빈틈 1~4).
 
 ### 4-2. 현실 시각 · 결정론 난수 · Undo · 저장
@@ -403,7 +403,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 - 3요소: ① Bootstrap 칸이 하나 줄어든다 ② 해당 없음 ③ 없음.
 - 지금 우회: '프로필도 행동마다 저장' 켬(두 파일 사이의 아주 짧은 틈은 남는다).
 
-**6. '의도 고치기'의 값이 고정 글자다 (코드 확인)**
+**6. '행동 직전 이벤트 고치기'의 값이 고정 글자다 (코드 확인)**
 - 무엇: `ModifyIntentOutcome.value`는 `TryParse`한 고정 값뿐이라 "targetId = 가진 쪽 id"(도발·대신 맞기), "amount × (1 − 0.05 × 중첩)", "밸런스 값만큼"을 DB로 쓸 수 없다. 전투 유닛 id는 실행 중에 생겨(`unit37`) 글자로 적을 수도 없다.
 - 왜: 도발·대신 맞기·중첩 비례 감소는 RPG·전술·카드에 흔하다. PlanningSpecGuide 7절·참조 2-2는 DB로 된다고 적었다(문서 오류 1).
 - 제안: 값 칸에 `{user}`(가진 쪽·사용자 id) · `{owner}` · `{stacks}`(중첩) · `{balance:ID}`를 허용(결과를 등록할 때 한 번 나눔). 같은 규칙을 '이벤트 쏘기'의 값·'플레이어 데이터에 주기'의 양에도.
@@ -412,7 +412,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 
 **7. 객체 하나의 숫자·딕셔너리 키를 경로로 가리킬 수 없다 (코드 확인)**
 - 무엇: 필드 경로에 딕셔너리 키가 없다(11장 3-1, `FieldPaths`는 딕셔너리를 값 목록으로만). `Game.Pay(key, path)`는 뿌리 키에서의 경로라 목록 속 특정 객체(계약자의 `shards`)도, 재료 딕셔너리의 한 칸(`materials`의 `expBook`)도 낼 수 없다. 같은 이유로 DB 조건 "경험치 책 10개 이상"·binding-path로 재료 한 칸 보이기가 안 된다.
-- 왜: 레벨업·강화·돌파·선택권이 모두 재료 비용이다 → 직접 빼고 `Game.Fail`을 쓰면 비용 가로채기("강화 비용 −20%")를 건너뛴다.
+- 왜: 레벨업·강화·돌파·선택권이 모두 재료 비용이다 → 직접 빼고 `Game.Fail`을 쓰면 비용 행동 직전 이벤트("강화 비용 −20%")를 건너뛴다.
 - 다른 장르: 제작·RPG·방치형(재료가 많은 모든 게임), 전술(유닛마다 마나).
 - 제안: 경로 문법 `materials[expBook]`(조건·비용·binding-path·플레이어 데이터에 주기 공통) + `Game.Pay(object entity, string field, double amount, string what)` 오버로드(`CostIntent`에 `targetId`).
 - 3요소: ① 쉬워진다 ② 해당 없음 ③ 경로는 지금처럼 처음 한 번 나눠 둔다.
@@ -455,13 +455,13 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 
 **작은 것**
 - 개발 빌드에서만 Undo: Undo '쓰지 않음' 게임은 모니터에서 뽑기·정산을 되돌려 볼 수 없다 → Bootstrap '개발 빌드 Undo 방식'(시드 고정 칸과 같은 모양).
-- 대상 고르기 의도: 도발·은신을 붙이려면 대상 고르기에 가로채기 자리가 있어야 하는데, 관례 4절·PlanningSpecGuide 3절의 기본 동사 목록에 없다(문서 부족 11).
+- 대상 고르기 행동 직전 이벤트: 도발·은신을 붙이려면 대상 고르기에 행동 직전 이벤트 자리가 있어야 하는데, 관례 4절·PlanningSpecGuide 3절의 기본 동사 목록에 없다(문서 부족 11).
 
 ### 5-2. 문서 오류·부족
 
 | # | 어디 | 무엇 | 고칠 것 |
 |---|---|---|---|
-| 1 | `PlanningSpecGuide.md` 7절 '대신 맞기' 줄 · `Reference.md` 2-2 | "의도 고치기 `targetId` 값으로 바꾸기(자기 id)" — 값 칸이 고정 글자라 DB로 안 된다(코드 확인) | 빈틈 6을 넣거나, 그때까지 "프로젝트 결과 Block(B)"으로 |
+| 1 | `PlanningSpecGuide.md` 7절 '대신 맞기' 줄 · `Reference.md` 2-2 | "행동 직전 이벤트 고치기 `targetId` 값으로 바꾸기(자기 id)" — 값 칸이 고정 글자라 DB로 안 된다(코드 확인) | 빈틈 6을 넣거나, 그때까지 "프로젝트 결과 Block(B)"으로 |
 | 2 | 가이드 07장 6절 수집형 | "뽑기 확률은 가중치 표(`Game.Roll(표, 10)`)" — 천장이 있으면 열 번 사이에 횟수가 안 바뀌어 틀린다 | "천장이 있으면 한 번씩 뽑는 고리 + 밸런스 곡선 + 코드 풀" |
 | 3 | 가이드 07장 6절 수집형 | "뽑기는 `gacha` 흐름" — `Game.Roll(표)`는 `table:<ID>`, 코드 풀은 `pool:<stream>`을 저절로 쓴다 | 흐름 이름을 30장 2-3·4-4에 맞춤 |
 | 4 | 가이드 07장 1절 표 수집형 · `PlanningSpecGuide.md` 2절 '1 이어 하기' | 추천값 "판 저장하지 않음" — 전투가 있는 수집형은 끄는 순간 전투가 사라지고 스태미나만 나간다 | "전투가 있으면 행동마다 + 프로필도 행동마다, 판 = 전투 한 번" |
@@ -487,7 +487,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 
 **판단: 시스템층은 된다. 화면까지 하루는 빠듯하다(조건부).**
 
-- 시스템층이 되는 이유: 기믹 18개 중 문법 밖은 한 원인(현실 시각)뿐이고, 나머지는 있는 부품 — 상태 효과(가진 쪽 필드·이벤트 횟수 지속·가로채기 트리거), 가로채기 + 의도, 능력, 가중치 표(조건 줄·안쪽 표·코드 풀), 밸런스 곡선(표·거듭제곱·비율), 고유 기능, 로그·도전과제, 설정·Steam — 으로 조립된다. 질문은 4개다. 직접 짜는 것은 장르 고유의 턴 게이지 엔진·뽑기 함수·성장 계산과, 빈틈을 메우는 코드(시각 필드·날짜 번호·회복형 자원·자동 진행·재료 비용)다.
+- 시스템층이 되는 이유: 기믹 18개 중 문법 밖은 한 원인(현실 시각)뿐이고, 나머지는 있는 부품 — 상태 효과(가진 쪽 필드·이벤트 횟수 지속·행동 직전 이벤트 받기 트리거), 행동 직전 이벤트 + 행동 직전 이벤트, 능력, 가중치 표(조건 줄·안쪽 표·코드 풀), 밸런스 곡선(표·거듭제곱·비율), 고유 기능, 로그·도전과제, 설정·Steam — 으로 조립된다. 질문은 4개다. 직접 짜는 것은 장르 고유의 턴 게이지 엔진·뽑기 함수·성장 계산과, 빈틈을 메우는 코드(시각 필드·날짜 번호·회복형 자원·자동 진행·재료 비용)다.
 - 화면이 빠듯한 이유: 이 장르의 화면은 목록이 중심인데 목록 칸마다 bind 코드를 쓴다(빈틈 13). 남은 시간 표시처럼 시각에 따라 바뀌는 칸을 직접 갱신한다(빈틈 4·13). 전투 HUD의 행동 순서 막대·궁극기·카드 공개 연출은 장르 고유다. 기본 화면(확인·고르기·설정·일시정지·알림)이 덜어 주는 것은 작은 창들뿐이다.
 - 하루 안으로 당기는 것: 빈틈 1·2·4(현실 시각·주기·회복형 자원), 12(자동 진행), 13(목록 칸 binding-path). 이 다섯이 들어가면 D 셋이 B 이하로 내려가고 화면 코드의 대부분이 UXML로 옮겨 간다.
 - 하루 안에 드러나지 않는 위험: 빈틈 5(저장 어긋남·id 겹침)는 시험 플레이에서 보이지 않고 출시 뒤 강제 종료에서 나타난다. 이 프로젝트는 '프로필도 행동마다 저장'으로 피하지만, 라이브러리에서 고치는 것이 맞다.
@@ -503,7 +503,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 | 3 반복·주기 임무 종류 | 보류. 도전과제·로그 + `Game.Day` |
 | 4 회복형 자원 | 문서(패턴): 값·시각 두 필드 + 쓰기 전 정산(가이드 07장 수집형) |
 | 5 판·프로필 저장 어긋남 | 구현(고침): 판을 저장할 때 메타 구역이 바뀌었으면 프로필도 |
-| 6 의도 고치기 값 틀 | 구현: `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`(28장) |
+| 6 행동 직전 이벤트 고치기 값 틀 | 구현: `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`(28장) |
 | 7 딕셔너리·목록 하나 가리키기 | 구현: 경로 `name[키]`(11·12·28장) |
 | 8 가중치 표에서 주기 → 딕셔너리 | 구현: 딕셔너리면 개수 +1(30장) |
 | 9 천장 | 구현: 줄 '무게를 밸런스 값에서'(30장). 보류: 코드 풀의 Chances |

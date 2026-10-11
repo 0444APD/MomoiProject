@@ -1,0 +1,48 @@
+using System.Collections.Generic;
+using System.Linq;
+using GBible;
+using GBible.Data;
+using UnityEngine;
+
+namespace MomoiProject
+{
+    // 선택 요소 '능력'의 DB 종류 — GBible 템플릿(Documentation~/AI/Templates/Elements/AbilityData.cs.txt)에서 들였다.
+    // 이 클래스는 프로젝트 것이다: 칸을 마음대로 더한다(예: 마나 비용·날아가는 시간). 규격(IUsableData.ToUsable)만 지키면 엔진(Game.Use·
+    // 사용 조건·대상·효과·행동 직전 이벤트 '사용'·'효과 배율' …)이 그대로 돈다. 더한 칸은 프로젝트 규칙이 DB에서 읽는다.
+    //
+    // 스킬·버프 발동처럼 "쓰는 순간" 발동하는 것. 트리거 = 사용(+ 원하면 AND로 사용 조건), 결과 = 대상에게 효과·플레이어 데이터에 주기·코딩한 결과.
+    // 게임에서는 Game.Use("능력 ID", 사용자, 고른 대상들).
+    [Database("능력", Group = "DB", Order = 30, IdPrefix = "ability")]
+    public sealed class AbilityData : GameData, IUsableData
+    {
+        [FieldLabel("트리거"), SerializeReference, TriggerSlot(TriggerKinds.Use | TriggerKinds.Condition)] public Trigger trigger = new UseTrigger();
+        [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.Targeted | OutcomeKinds.PlayerData | OutcomeKinds.Coded)]
+        public List<Outcome> outcomes = new List<Outcome>();
+        [FieldLabel("쓸 수 없을 때 글"), Tooltip("사용 조건이 맞지 않을 때 플레이어에게 보일 글. 텍스트 키(fail.needEnergy)면 번역된 글, 아니면 그 글 그대로({ability}·{condition} 틀). 비우면 기본 글")]
+        public string failText = "";
+        [FieldLabel("아이콘")] public Sprite icon;
+
+        // 규격: 엔진이 쓰는 정의. 프로젝트가 더한 칸은 여기에 넣지 않는다(프로젝트 규칙이 이 항목에서 직접 읽는다).
+        public AbilityDefinition ToUsable()
+        {
+            var definition = new AbilityDefinition { Id = Id, DisplayName = DisplayName, When = trigger, FailText = failText };
+            definition.Outcomes.AddRange(outcomes.Where(o => o != null));
+            return definition;
+        }
+
+        public override void ValidateData(IValidationContext context)
+        {
+            if (trigger != null)
+            {
+                trigger.Validate(context);
+                if ((trigger.Kinds() & TriggerKinds.Use) == 0) context.Warning("트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다.");
+            }
+            if (outcomes.Count == 0 && !BoundOutcomes.Has(Id)) context.Warning("결과가 없습니다(써도 아무 일도 일어나지 않습니다).");
+            foreach (var outcome in outcomes)
+            {
+                if (outcome == null) context.Error("비어 있는 결과 칸이 있습니다(스크립트가 지워졌을 수 있음).");
+                else outcome.Validate(context);
+            }
+        }
+    }
+}

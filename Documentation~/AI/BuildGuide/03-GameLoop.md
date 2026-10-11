@@ -39,7 +39,7 @@
       └ Game.Do(new PlayCard { card = 덱 카드, target = 적 })
           ① 행동 시작 — card·target을 id로 지금 데이터에서 다시 찾아 넣음
           ② PlayCard.Run()
-               Game.Pay(에너지, 비용)                    ← 가로채기를 거쳐 뺀다(모자라면 실패)
+               Game.Pay(에너지, 비용)                    ← 행동 직전 이벤트를 거쳐 뺀다(모자라면 실패)
                손패 → 버린 더미
                Game.Use("fireball", 주인공, 적)           ← 행동 안의 행동
                  └ 피해 Block → Rules.Damage → DamageDealt·EnemyKilled를 쏜다
@@ -203,7 +203,7 @@ var run = Game.Data().Run;
 var data = Rules.CardData(Game, card.card);
 var battle = run.battle ?? throw Game.Fail("fail.notInBattle", "전투 중이 아닙니다.");
 if (!battle.hand.Contains(card.id)) throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.");
-Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 가로채기('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
+Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 행동 직전 이벤트('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
 
 battle.hand.Remove(card.id);
 battle.discard.Add(card.id);
@@ -231,7 +231,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > [!note]- 실패 자세히
 > - 예외가 나면 바뀐 플레이어 데이터가 모두 되돌아가고, 난수도 행동 전 상태로 돌아가고, Undo 이력에 들어가지 않는다. 예외는 `Do`를 부른 쪽으로 다시 던져진다.
 > - `Game.Fail`은 예외를 만들기만 한다. 앞에 `throw`를 붙인다. 값이 들어가는 글은 `Game.Fail("fail.frozen", "얼어 있어 {turns}턴 동안 움직일 수 없습니다.", ("turns", 2))`.
-> - `Game.Pay`는 비용 의도(`CostIntent`)를 가로채기에 통과시킨 뒤 지금 값이 모자라면 실패(키 `momoi.fail.notEnough`)를 던진다. 직접 `battle.energy -= data.cost`로 빼면 "이번 턴 비용 0" 같은 가로채기가 끼어들 자리가 없다. 화면에서 미리 볼 때는 `Game.CanPay`(가로채기 전 값)나 `Game.CanDo`(06장 2절).
+> - `Game.Pay`는 비용 행동 직전 이벤트(`CostIntent`)를 행동 직전 이벤트에 통과시킨 뒤 지금 값이 모자라면 실패(키 `momoi.fail.notEnough`)를 던진다. 직접 `battle.energy -= data.cost`로 빼면 "이번 턴 비용 0" 같은 행동 직전 이벤트가 끼어들 자리가 없다. 화면에서 미리 볼 때는 `Game.CanPay`(행동 직전 이벤트 전 값)나 `Game.CanDo`(06장 2절).
 > - 없는 ID 같은 프로그래머 실수는 `Game.Fail`이 아니라 그냥 `InvalidOperationException`으로 둔다(카드 던전의 `Rules.NewCard`). 플레이어에게 보일 글이 아니다.
 > - 검사를 앞에 두는 것은 읽기 쉽게 하려는 것이지 안전을 위해서가 아니다. 에너지를 낸 뒤에 실패해도 낸 것까지 되돌아간다.
 > - 행동 안의 행동에서 난 실패도 같다. 카드 효과의 사용 조건이 맞지 않아 `Game.Use`가 예외를 내면 `PlayCard` 전체가 취소된다.
@@ -328,7 +328,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > [!note]- 더 보기(매뉴얼)
 > - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — `Do` 안에서 일어나는 일, 실패, Undo, 지연 효과
 > - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, `ScheduleAfter`·`ScheduleOn`
-> - [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 가로채기
+> - [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 행동 직전 이벤트
 > - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Fail`·`GameFailure`
 > - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — 씬 흐름, 월드 상태
 > - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`All`·`Do`·`Use`, 씬 코드에서 쓰는 법

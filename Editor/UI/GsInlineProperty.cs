@@ -236,9 +236,9 @@ namespace GBible.EditorTools.UI
                 }
                 if (field != null && field.IsDefined(typeof(IntentTypeRefAttribute), false))
                 {
-                    if (string.IsNullOrEmpty(id)) return ("의도 선택", true, false);
+                    if (string.IsNullOrEmpty(id)) return ("행동 직전 이벤트 선택", true, false);
                     var type = TypeResolver.Find(id);
-                    return type != null ? (Intents.DisplayNameOf(type), false, false) : ($"없는 의도: {id}", false, true);
+                    return type != null ? (Intents.DisplayNameOf(type), false, false) : ($"없는 행동 직전 이벤트: {id}", false, true);
                 }
                 var fieldRef = field?.GetCustomAttribute<EventFieldRefAttribute>();
                 if (fieldRef != null)
@@ -371,7 +371,7 @@ namespace GBible.EditorTools.UI
                     ShowKeywordMenu();
                     return;
                 case SerializedPropertyType.String when DataRefType != null:
-                    ShowIdMenu(EditorDatabase.Instance.RefCandidates(_field), DataTypes.Find(DataRefType)?.DisplayName ?? DataRefType.Name);
+                    ShowIdMenu(EditorDatabase.Instance.RefCandidates(_field), DataTypes.Label(DataRefType));
                     return;
                 case SerializedPropertyType.String when Has<ClassTypeRefAttribute>():
                     ShowTypeList(ClassTypes.All(), ClassTypes.Label, ClassTypes.GroupOf, "클래스 검색");
@@ -461,8 +461,8 @@ namespace GBible.EditorTools.UI
                 var name = type.FullName;
                 return new GsDropdownItem(Intents.DisplayNameOf(type), () => SetString(name)) { Caption = type.Name, Selected = _property.stringValue == name };
             }).ToList();
-            if (items.Count == 0) items.Add(new GsDropdownItem("[Intent]가 붙은 의도 형식이 없습니다") { Disabled = true });
-            OpenMenu(items, placeholder: "의도 검색");
+            if (items.Count == 0) items.Add(new GsDropdownItem("[Intent]가 붙은 행동 직전 이벤트 형식이 없습니다") { Disabled = true });
+            OpenMenu(items, placeholder: "행동 직전 이벤트 검색");
         }
 
         void ShowEventFieldMenu()
@@ -551,7 +551,7 @@ namespace GBible.EditorTools.UI
             var dataRef = LeafDataRef(_property, attr, out var leafField);
             if (dataRef != null)
             {
-                ShowIdMenu(EditorDatabase.Instance.RefCandidates(leafField), DataTypes.Find(dataRef)?.DisplayName ?? dataRef.Name);
+                ShowIdMenu(EditorDatabase.Instance.RefCandidates(leafField), DataTypes.Label(dataRef));
                 return true;
             }
             if (type != null && type.IsEnum)

@@ -9,7 +9,11 @@ namespace GBible.EditorTools
     // 조건·보상 블록 타입 목록. 블록 클래스를 추가하면 여기서 자동으로 찾는다(TypeCache).
     public static class BlockTypes
     {
-        public static IEnumerable<Type> ConcreteTypes(Type baseType) =>
+        // 고르는 목록(+ 메뉴)에 보일 Block: 프로젝트에 없는 선택 요소(상태 효과 …)의 Block은 뺀다([Element]).
+        public static IEnumerable<Type> ConcreteTypes(Type baseType) => AllConcreteTypes(baseType).Where(DataTypes.Visible);
+
+        // 모든 Block(선택 요소의 것까지 — 계약 검사용).
+        public static IEnumerable<Type> AllConcreteTypes(Type baseType) =>
             TypeCache.GetTypesDerivedFrom(baseType)
                      .Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && t.GetConstructor(Type.EmptyTypes) != null && !IsTestAssembly(t))
                      .OrderBy(t => Category(t))

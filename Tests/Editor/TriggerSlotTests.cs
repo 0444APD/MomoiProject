@@ -87,12 +87,7 @@ namespace GBible.Tests
             Assert.IsInstanceOf<ConditionTrigger>(achievement.trigger);
             Assert.IsInstanceOf<PlayerDataReward>(achievement.outcomes.Single());
             Assert.IsNull(achievement.condition);
-
-            var ability = Make<AbilityData>("ability1");
-            ability.effects.Add(new TbDamage());
-            Assert.IsTrue(ability.MigrateLegacy());
-            Assert.IsInstanceOf<TargetedOutcome>(ability.outcomes.Single());
-            Assert.IsFalse(ability.MigrateLegacy(), "두 번째는 할 일이 없다");
+            // 능력은 선택 요소라 DB 종류가 프로젝트 템플릿에 있고, 예전 형식 옮기기는 두지 않는다(템플릿으로 새로 들이므로).
         }
 
         [Test]

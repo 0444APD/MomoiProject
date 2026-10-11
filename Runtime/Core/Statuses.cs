@@ -76,7 +76,7 @@ namespace GBible
 
     // 기본 제공 의도: 상태 효과 걸기(Game.ApplyStatus·효과 '상태 효과 걸기'가 걸기 직전에 거친다).
     //   화상 → 푸른 화상: statusId 값으로 바꾸기 blueBurn · 독 중첩 2배: stacks 곱하기 2 · 디버프 지속 +20%: length 곱하기 1.2 · 면역: 막기.
-    [Serializable, Intent("상태 효과 걸기")]
+    [Serializable, Intent("상태 효과 걸기"), Element(Elements.Status)]
     public sealed class StatusIntent
     {
         public string targetId;    // 걸릴 대상 id
@@ -122,7 +122,7 @@ namespace GBible
     }
 
     // 상태 효과가 걸렸을 때(처음·다시 걸 때 모두, stacks = 걸린 뒤의 중첩).
-    [Serializable, GameEvent("상태 효과 걸림")]
+    [Serializable, GameEvent("상태 효과 걸림"), Element(Elements.Status)]
     public sealed class StatusApplied
     {
         public string holder;
@@ -133,7 +133,7 @@ namespace GBible
     }
 
     // 상태 효과가 끝났을 때(expired: 지속이 다 됨 / 거짓이면 풀림).
-    [Serializable, GameEvent("상태 효과 끝남")]
+    [Serializable, GameEvent("상태 효과 끝남"), Element(Elements.Status)]
     public sealed class StatusEnded
     {
         public string holder;
@@ -211,7 +211,7 @@ namespace GBible
             if (intent.cancelled || intent.stacks <= 0) return null;
             if (intent.statusId != statusId)
             {
-                var changed = Find(intent.statusId) ?? throw new InvalidOperationException($"[MomoiProject] 가로채기가 바꾼 상태 효과 '{intent.statusId}'가 없습니다.");
+                var changed = Find(intent.statusId) ?? throw new InvalidOperationException($"[MomoiProject] 행동 직전 이벤트가 바꾼 상태 효과 '{intent.statusId}'가 없습니다.");
                 // 길이를 따로 정하지 않았으면 바뀐 상태 효과의 길이로.
                 if (!length.HasValue && intent.length == definition.Length) intent.length = changed.Length;
                 if (intent.maxStacks == definition.MaxStacks) intent.maxStacks = changed.MaxStacks;
@@ -224,7 +224,7 @@ namespace GBible
                 holder = _session.Game.Find(intent.targetId);
                 if (holder == null)
                 {
-                    _session.Journal.Append(JournalKind.Warning, "Status", $"상태 효과 걸기: 가로채기가 바꾼 대상 '{intent.targetId}'를 찾지 못해 걸지 않았습니다.");
+                    _session.Journal.Append(JournalKind.Warning, "Status", $"상태 효과 걸기: 행동 직전 이벤트가 바꾼 대상 '{intent.targetId}'를 찾지 못해 걸지 않았습니다.");
                     return null;
                 }
                 targetId = intent.targetId;

@@ -352,7 +352,7 @@ public class WaveTimerBar : MonoBehaviour
 
 ### 5-3. 예상 피해 — `Game.Preview`
 
-카드에 마우스를 올리면 고른 적에게 들어갈 피해를 보인다. 방어도·보호막(가로채기)·분노(Modifier)·유물까지 실제 규칙 그대로다.
+카드에 마우스를 올리면 고른 적에게 들어갈 피해를 보인다. 방어도·보호막(행동 직전 이벤트)·분노(Modifier)·유물까지 실제 규칙 그대로다.
 
 ```csharp
 using System.Linq;
@@ -516,7 +516,7 @@ public class Strike : GameAction
     }
 }
 
-// ArenaRules에 더한다: 피해 규칙 함수. 실제 게임은 여기에 가로채기 자리를 둔다(28장 5-3).
+// ArenaRules에 더한다: 피해 규칙 함수. 실제 게임은 여기에 행동 직전 이벤트 자리를 둔다(28장 5-3).
 public static void Damage(GameApi game, ArenaState arena, ArenaFoe foe, int amount)
 {
     foe.hp -= amount;
@@ -571,7 +571,7 @@ public class HeroHitbox : MonoBehaviour
 ```
 
 - 적 40마리를 한 번에 맞혀도 행동 하나·Sync 한 번·타임라인 한 줄이다. 충돌마다 `Game.Do`를 부르면 같은 장면이 행동 40개다.
-- 피해 양·등 뒤 배율은 규칙이 정한다. 화면은 판정(누구를·등 뒤였나)만 보낸다. 그래서 멀티플레이에서 화면이 값을 속일 수 없고, 가로채기·유물·상태 효과가 피해 규칙 함수의 자리에 그대로 붙는다.
+- 피해 양·등 뒤 배율은 규칙이 정한다. 화면은 판정(누구를·등 뒤였나)만 보낸다. 그래서 멀티플레이에서 화면이 값을 속일 수 없고, 행동 직전 이벤트·유물·상태 효과가 피해 규칙 함수의 자리에 그대로 붙는다.
 - 맞은 숫자·쓰러지는 모습은 `FoeHit`·`FoeKilled`를 `SubscribeAfterAction`으로 받아 `GameView.Play`로 튼다(32장 5-9).
 - 투사체는 화면 쪽 오브젝트 풀에서 꺼내고 돌려놓는다. 맞으면 같은 `StrikeReporter.Report`로 보고한다. 경험치 보석도 떨어지는 것은 화면(풀), 줍는 것은 판정 보고(`Collect { count }`)다. 규칙에는 모은 수만 있다.
 - 이어 하기에 화면 쪽 위치가 필요하면 판 저장 직전 `GBibleRuntime.Saving`(행동 밖이라 담을 때는 `Game.Do`)에서 판 데이터에 담고, 불러온 뒤 `GBibleRuntime.RunLoaded`에서 다시 놓는다. 매 프레임 담지 않는다.

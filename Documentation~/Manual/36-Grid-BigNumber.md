@@ -311,7 +311,7 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 
 ## 5. 상황별 예제
 
-5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 가로채기 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런스 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런스 값에 항목을 만들고 저장하면 생긴다.
+5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 행동 직전 이벤트 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런스 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런스 값에 항목을 만들고 저장하면 생긴다.
 
 ```csharp
 using System;

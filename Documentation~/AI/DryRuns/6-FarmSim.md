@@ -12,7 +12,7 @@ Stardew Valley 같은 농장 생활 시뮬 하나로 "명세서 + GBible 문서 
 > | 말 | 뜻 |
 > |---|---|
 > | Sync | 플레이어 데이터의 지금 값을 사본(Mirror)과 비교해 바뀐 곳만 기록하는 동작. 행동 끝·프레임 끝에 돈다(`PlayerDataStore.Sync`). |
-> | 의도(Intent) · 가로채기 | 규칙 함수가 일을 하기 직전에 만드는 값 묶음(`GrowIntent` …). DB의 '가로채기' 트리거가 그 값을 고치거나 막는다(28장). |
+> | 행동 직전 이벤트(Intent) · 행동 직전 이벤트 | 규칙 함수가 일을 하기 직전에 만드는 값 묶음(`GrowIntent` …). DB의 '행동 직전 이벤트 받기' 트리거가 그 값을 고치거나 막는다(28장). |
 > | 가진 쪽(holder) | 상태 효과가 걸린 대상. `id`가 있는 플레이어 데이터 객체면 무엇이든 된다(29장 2-1). |
 > | 셀 이벤트 | 상태 효과의 지속을 하나씩 줄이는 이벤트(29장 2-2). |
 > | 칸 키 | 맵 칸 하나를 가리키는 정수 `x + y × 1024`. |
@@ -261,9 +261,9 @@ Stardew Valley 같은 농장 생활 시뮬 하나로 "명세서 + GBible 문서 
 - 조건 Block은 인스턴스 칸에 둘 수 없다(04장 2.5 "Block 형식이 아님"). 그래서 일정·해금 조건은 Block이 아니라 평범한 칸(계절·요일·레벨 숫자)으로 둔다.
 - CSV: 작물·아이템·물고기는 인스턴스 CSV. 일정의 `stops`처럼 목록 안 목록이 CSV 칸(`schedules[0].stops[1].minute`)으로 나오는지는 확인하지 못했다(가정).
 
-### 3-3. 핵심 동사 (규칙 함수 · 의도 · 이벤트)
+### 3-3. 핵심 동사 (규칙 함수 · 행동 직전 이벤트 · 이벤트)
 
-| 함수 | 의도(필드) | 끝난 뒤 이벤트 |
+| 함수 | 행동 직전 이벤트(필드) | 끝난 뒤 이벤트 |
 |---|---|---|
 | `Rules.Till` | `TillIntent { location, x, y, cancelled }` | `SoilTilled` |
 | `Rules.Plant` | `PlantIntent { location, x, y, crop, cancelled }` | `CropPlanted` |
@@ -384,16 +384,16 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 | 3 | 현실 0.7초 = 게임 10분 | 실시간(틱) | — | `run.calendar.minute` +10, `TimeChanged` 쏨 | 고정 틱 20(33장 3-1) · `session.Ticked`(33장 2-1·5-1) · `AdvanceTime` · 밸런스 값 `tenMinutesSeconds` · 대화·화면의 `GameTime.Pause`(07장 2.6, 35장 2-1) · 4-1 | **C**(달력 하위 시스템이 GBible에 없다, 5절 G1) |
 | 4 | 새벽 2시에 그 자리에서 쓰러져 다음 날, 골드 10% | `AdvanceTime` 안(분 ≥ 1560) | 주인공 | 골드 −min(10%, 1000), `EndDay { passedOut }`, 다음 날 에너지 절반 | `Rules.LoseGold` + `GoldLossIntent` · `PassedOut` · 연출 `SubscribeAfterAction<PassedOut>` → `GameView.Present`, 씬은 `run.scene`이 바꾼다(32장 2-6) | B |
 | 5 | 아주 좋아함 +80 / 아주 싫어함 −40 | 즉시(`GiveGift`) | 고른 마을 사람 | 호감도 ± | `Rules.Befriend` + `FriendshipIntent` · `Npc.loves/hates`(+태그) · 밸런스 값 `giftLove`… · 반응 대사 `Dialogues.Play(npc.dialogue, "gift." + taste)`(24장 5.1) | B |
-| 6 | 생일이면 ×8 | 가로채기(`FriendshipIntent`) | — | `amount` ×8 | 규칙 함수의 `isBirthday` 분기 + `birthdayGiftMultiplier`. DB로도 된다: 주인공에게 건 영구 상태 효과의 가로채기(filter `isBirthday` 참 AND `kind == gift`) → 의도 고치기 곱하기 8(29장 3-1, 28장 3-4) — 상시 규칙을 둘 곳이 없어 우회(5절 G8) | B |
+| 6 | 생일이면 ×8 | 행동 직전 이벤트(`FriendshipIntent`) | — | `amount` ×8 | 규칙 함수의 `isBirthday` 분기 + `birthdayGiftMultiplier`. DB로도 된다: 주인공에게 건 영구 상태 효과의 행동 직전 이벤트(filter `isBirthday` 참 AND `kind == gift`) → 행동 직전 이벤트 고치기 곱하기 8(29장 3-1, 28장 3-4) — 상시 규칙을 둘 곳이 없어 우회(5절 G8) | B |
 | 7 | 한 사람에게 일주일에 2번 | 즉시(`GiveGift` 안) | 그 마을 사람 | 넘으면 `Game.Fail("fail.giftWeekly")` | `NpcState.giftsThisWeek` · 월요일 `DayStarted`에서 0 · 밸런스 값 `giftsPerWeek` | B |
-| 8 | 비 오는 날은 물을 준 것으로 | 하루 시작(`StartDay` 안) | 바깥 장소의 모든 밭 | 물 주기 | `Rules.Water(source = rain)` 반복 · `Location.outdoor`. DB로도 된다: 바깥 장소 객체에 상태 효과 '비'(지속 이벤트 횟수 1, 셀 이벤트 `DayStarted`) + 가로채기(`GrowIntent`, 가진 쪽 필드 `locationId`) → `watered` 값으로 바꾸기 참 | B |
+| 8 | 비 오는 날은 물을 준 것으로 | 하루 시작(`StartDay` 안) | 바깥 장소의 모든 밭 | 물 주기 | `Rules.Water(source = rain)` 반복 · `Location.outdoor`. DB로도 된다: 바깥 장소 객체에 상태 효과 '비'(지속 이벤트 횟수 1, 셀 이벤트 `DayStarted`) + 행동 직전 이벤트(`GrowIntent`, 가진 쪽 필드 `locationId`) → `watered` 값으로 바꾸기 참 | B |
 | 9 | 내일 날씨를 오늘 TV로 | 하루 시작에 뽑기 / TV는 즉시 | — | `run.weather.tomorrow` | 가중치 표 `weather`(줄 조건 = 계절, 30장 3-2) · 다이얼로그 `tv`의 선택지 + 조건 분기(`run › weather.tomorrow == rain`, 24장 2절) | A |
 | 10 | 마을 사람이 요일·날씨·시각에 따라 다른 장소 | `TimeChanged`마다(화면) | 각 마을 사람 | 머무는 곳 계산(저장 안 함) | `Npc.schedules`(우선순위·계절·요일·날씨·하트 → stops) · `Rules.WhereIs(game, npc)` · 화면 쪽 길찾기(GBible에 없음, Q4) | B |
 | 11 | 농사 레벨 3 → 스프링클러 제작법 | 읽을 때(계산) | — | 제작 목록에 보임 | `Recipe.skill`·`level` · `SkillLeveledUp` → 알림(`GameScreens.Toast`) | A |
 | 12 | 스프링클러 주변 8칸 매일 아침 물 | 하루 시작 | 조건으로 거른 칸(설치물 주변 `offsets`) | 물 주기 | `Item.placeable.sprinkler.offsets` · `StartDay`의 설치물 반복 → `Rules.Water(source = sprinkler)`. 상태 효과를 설치물마다 거는 DB 조립도 되지만 행동마다 가진 쪽 수 × 데이터 크기 비용(5절 G3) | B |
-| 13 | 출하 상자 밤 정산 | 하루 끝 | 상자의 물건 | 골드 +, `lastShipped` | `Ship` 행동 · `Rules.Sell` + `SellIntent`("토요일 +10%" = 가로채기 + `weekday` 필드, 단 상시 규칙 자리 G8) | B |
+| 13 | 출하 상자 밤 정산 | 하루 끝 | 상자의 물건 | 골드 +, `lastShipped` | `Ship` 행동 · `Rules.Sell` + `SellIntent`("토요일 +10%" = 행동 직전 이벤트 + `weekday` 필드, 단 상시 규칙 자리 G8) | B |
 | 14 | 음식: 그날 하루 이동 속도 +1·운 +1 | 사용(먹기) | 주인공 | 상태 효과 걸기 | 아이템 `usable`(16장 2-7) → 대상에게 효과 → 상태 효과 `wellFed`(지속 이벤트 횟수 1, 셀 이벤트 `DayStarted`, 능력치 보정 `speed` +1·`luck` +1, 29장 3-1) · 결과 '쓴 아이템 1개 빼기'(시스템층 Block) · 화면은 `Game.Attribute(farmer, "speed")`로 걷는다 | A |
-| 15 | 온실 작물은 시들지 않음 | 가로채기(`WitherIntent`) | 온실 칸 | 막기 | 장소 객체 `world.locations["greenhouse"]`(id 있음)에 영구 상태 효과 + 가로채기, 가진 쪽 필드 `locationId` → 의도 고치기 막기(29장 2-3). 가정: `Game.Find`가 딕셔너리 값 안의 객체도 찾는다(코드 `Mirror.FindById`가 자식 컬렉션을 훑는 것까지 확인) | A |
+| 15 | 온실 작물은 시들지 않음 | 행동 직전 이벤트(`WitherIntent`) | 온실 칸 | 막기 | 장소 객체 `world.locations["greenhouse"]`(id 있음)에 영구 상태 효과 + 행동 직전 이벤트, 가진 쪽 필드 `locationId` → 행동 직전 이벤트 고치기 막기(29장 2-3). 가정: `Game.Find`가 딕셔너리 값 안의 객체도 찾는다(코드 `Mirror.FindById`가 자식 컬렉션을 훑는 것까지 확인) | A |
 | 16 | 운이 좋을수록 채집 희귀품↑ | 하루 시작(채집물 생김) | 무작위 자리 | 채집물 생김 | 운 뽑기(`luck`) · 가중치 표 `forage.*`의 운 구간 줄(Q6) | A |
 | 17 | 축제일(일정·상점·날씨 덮기, 시각 멈춤, 나오면 22시) | `DayStarted`·`EnterFestival`·`LeaveFestival` | 모든 마을 사람·상점 | 분기 | `Festival` 원본 · `run.calendar.festival` · `WhereIs`·`ShopOpen`·날씨 뽑기·`AdvanceTime`에 "오늘 축제" 분기 | B |
 | 18 | 작물 품질(가방에서 품질이 다르면 다른 칸) | 거두기 | — | 품질 뽑기 + 칸에 품질 | `quality` 흐름 · 밸런스 곡선 · 프로젝트 가방 `BagSlot.quality`(인벤토리 모듈을 대신, Q2) | **C**(5절 G5) |
@@ -459,17 +459,17 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 - 3요소: ① 경로 글자만 ② 무관 ③ 생성 코드(`FieldAccess`)로 읽어 리플렉션 없음.
 
 **G8. 상시 규칙·개체마다 도는 트리거를 걸 주인이 없다**
-- 무엇: 늘 켜진 가로채기·이벤트 반응(생일 ×8, 토요일 판매가 +10%)을 DB에서 조립할 종류가 없다. 도전과제는 한 번·Undo 밖, 상태 효과는 가진 쪽이 필요하다. "놓인 물건마다 아침에"도 같다. 지금은 주인공·장소에 건 영구 상태 효과로 우회하거나(29장 2-1이 허락하지만 문서에 이 쓰임이 없다) 17장처럼 DB 종류를 짓는다.
+- 무엇: 늘 켜진 행동 직전 이벤트·이벤트 반응(생일 ×8, 토요일 판매가 +10%)을 DB에서 조립할 종류가 없다. 도전과제는 한 번·Undo 밖, 상태 효과는 가진 쪽이 필요하다. "놓인 물건마다 아침에"도 같다. 지금은 주인공·장소에 건 영구 상태 효과로 우회하거나(29장 2-1이 허락하지만 문서에 이 쓰임이 없다) 17장처럼 DB 종류를 짓는다.
 - 왜(빈도): 기획자가 "이번 주만 판매가 +10%" 같은 규칙을 DB로 더하고 싶을 때마다 AI가 호스트를 고민한다. 개체마다 상태 효과는 G3 비용이 붙는다.
 - 다른 장르에도: 난이도 규칙·기간 이벤트 보너스·패시브 지형 효과 — 거의 전부.
-- 제안: DB › '규칙'(`RuleData`: 켜짐 조건 + 트리거(이벤트·조건·가로채기) + 결과, 반복, 행동 안에서 돎) 기본 제공. 그 전까지 29장에 "상시 규칙 = 주인공에게 건 영구 상태 효과, 장소 규칙 = 장소 객체 + 가진 쪽 필드" 패턴과 비용을 적는다.
+- 제안: DB › '규칙'(`RuleData`: 켜짐 조건 + 트리거(이벤트·조건·행동 직전 이벤트 받기) + 결과, 반복, 행동 안에서 돎) 기본 제공. 그 전까지 29장에 "상시 규칙 = 주인공에게 건 영구 상태 효과, 장소 규칙 = 장소 객체 + 가진 쪽 필드" 패턴과 비용을 적는다.
 - 3요소: ① DB 종류 하나 ② 무관 ③ 등록은 시작할 때만.
 
 **G9. 가중치 표 무게를 값에 따라 바꿀 수 없다**
 - 무엇: 줄의 무게는 고정, 조건으로 켜고 끄기만 된다(30장 2-3). "운에 비례"는 구간 줄(Q6)이나 코드 풀이다.
 - 왜(빈도): 운·레벨·호감도에 따라 확률이 바뀌는 표가 흔하다. 코드 풀로 가면 기획자가 DB에서 못 고친다.
 - 다른 장르에도: 로그라이크(희귀 확률 +%), RPG 드롭률, 가챠 천장.
-- 제안: 항목 줄 `weightScale`(밸런스 값 ID 또는 플레이어 데이터 경로 × 계수) 또는 뽑기 가로채기 자리 `RollIntent { table, entries(item·weight) }`.
+- 제안: 항목 줄 `weightScale`(밸런스 값 ID 또는 플레이어 데이터 경로 × 계수) 또는 뽑기 행동 직전 이벤트 자리 `RollIntent { table, entries(item·weight) }`.
 - 3요소: ① DB 칸 ② 무관(난수 흐름은 그대로) ③ 생성 코드로 읽음.
 
 **G10. 다시 그리기가 키 단위다**

@@ -22,8 +22,8 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 - 데이터는 평범한 `[Serializable]` 클래스, 목록은 `List`·배열·`Dictionary`.
 - 값은 그냥 대입한다(`hero.hp -= 5;`). "바뀌었다"고 알리는 호출은 없다.
 - 여러 곳에서 쓰는 규칙은 static 함수로 두고, `GameApi game`을 매개변수로 받는다.
-- **규칙 함수에 가로채기 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 의도를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
-- **비용은 `Game.Pay`로 낸다.** `Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name")`는 비용 가로채기를 이미 거친다(`what`은 모자랄 때 실패 글에 들어갈 이름의 텍스트 키). 직접 빼면(`battle.energy -= data.cost`) "이번 턴 비용 0" 같은 효과가 끼어들 자리가 없다.
+- **규칙 함수에 행동 직전 이벤트 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 행동 직전 이벤트를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
+- **비용은 `Game.Pay`로 낸다.** `Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name")`는 비용 행동 직전 이벤트를 이미 거친다(`what`은 모자랄 때 실패 글에 들어갈 이름의 텍스트 키). 직접 빼면(`battle.energy -= data.cost`) "이번 턴 비용 0" 같은 효과가 끼어들 자리가 없다.
 - **플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`.** 글은 텍스트 표로 번역된다. 없는 ID 같은 프로그래머 실수는 그냥 `InvalidOperationException`.
 - **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런스 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전은 시작 체력·시작 골드·보상 골드를 밸런스 값 `startHp`·`startGold`·`winGold`로 읽는다([03장](03-GameLoop.md) 4절, [04장](04-AddingContent.md) 10절).
 
@@ -31,7 +31,7 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
 {
     if (target == null || target.IsDead || amount <= 0) return;
-    // 가로채기 자리: 유물·상태 효과가 피해를 바꾸거나 막을 수 있다(기믹이 늘어도 이 함수는 그대로).
+    // 행동 직전 이벤트 자리: 유물·상태 효과가 피해를 바꾸거나 막을 수 있다(기믹이 늘어도 이 함수는 그대로).
     var intent = game.Intercept(new DamageIntent { sourceId = source?.id, targetId = target.id, amount = amount });
     if (intent.cancelled || intent.amount <= 0) return;
     amount = intent.amount;
@@ -52,14 +52,14 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 > | 규칙이 여러 곳에서 쓰인다 | static 함수(카드 던전의 `Rules`)나 `GameApi` 확장 메서드 | 상태를 들고 있는 매니저 싱글턴 |
 > | 에디터 표시를 바꾼다 | 어트리뷰트(`[Hide]`·`[ShowIf]`·`[Keyword]`·`[BlockInfo]`) | 커스텀 인스펙터 |
 > | 핵심 규칙(피해·회복·죽음·비용·뽑기)을 쓴다 | 일을 하기 직전에 `Game.Intercept` 자리를 둔다 | 새 기믹이 생길 때마다 규칙 함수에 `if (hasThornArmor) …`를 더하기 |
-> | 에너지·골드 같은 비용을 낸다 | `Game.Pay(키, 필드, 양)` | `if (energy < cost) throw …; energy -= cost;`(가로채기가 비용을 고칠 수 없다) |
+> | 에너지·골드 같은 비용을 낸다 | `Game.Pay(키, 필드, 양)` | `if (energy < cost) throw …; energy -= cost;`(행동 직전 이벤트가 비용을 고칠 수 없다) |
 > | 플레이어에게 "할 수 없다"를 알린다 | `throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.")` | 한국어 글을 그대로 던지기(번역할 수 없다) |
 > | 기획자가 바꿀 숫자 | DB › 밸런스 값 + `Game.Balance(GameIds.Balance.X)` | 코드에 `70`·`99`·`+15`를 적기(바꿀 때마다 프로그래머가 필요하다) |
 > | 몇 턴 동안·몇 턴 뒤의 효과 | DB › 상태 효과 + 효과 `상태 효과 걸기`, 또는 예약(`Game.ScheduleOn`) | 데이터 클래스에 상태 목록을 두고 `EndTurn`에서 손으로 처리하기 |
 
-> [!note]- 왜 가로채기 자리를 미리 두나
-> 이벤트(`DamageDealt`)는 일이 일어난 **뒤**에 온다. "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0"처럼 **일을 고치는 효과**는 일이 일어나기 **직전**에 끼어들어야 한다. 자리를 미리 뚫어 두면 이런 기믹을 기획 단계에서 미리 알 필요가 없다. 기획자가 DB에 유물을 더하고(트리거 `가로채기` + 결과 `의도 고치기`), 규칙 함수는 그대로다.
-> - 의도는 프로젝트가 정하는 작은 클래스다. 막을 수 있게 하려면 `cancelled`를 둔다.
+> [!note]- 왜 행동 직전 이벤트 자리를 미리 두나
+> 이벤트(`DamageDealt`)는 일이 일어난 **뒤**에 온다. "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0"처럼 **일을 고치는 효과**는 일이 일어나기 **직전**에 끼어들어야 한다. 자리를 미리 뚫어 두면 이런 기믹을 기획 단계에서 미리 알 필요가 없다. 기획자가 DB에 유물을 더하고(트리거 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`), 규칙 함수는 그대로다.
+> - 행동 직전 이벤트는 프로젝트가 정하는 작은 클래스다. 막을 수 있게 하려면 `cancelled`를 둔다.
 > ```csharp
 > [Serializable, Intent("피해")]
 > public class DamageIntent
@@ -70,9 +70,9 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 >     public bool cancelled;
 > }
 > ```
-> - 가로채는 항목이 없으면 `Game.Intercept`는 바로 돌아온다. 자리를 두는 비용은 거의 없다.
-> - 행동 안에서 돌므로 Undo·저장·멀티플레이가 그대로다. 가로채는 쪽은 되도록 의도만 고친다(체력 같은 값은 규칙 함수가 바꾼다).
-> - 원래 인자가 아니라 돌려받은 의도(`intent.amount`)로 일을 한다. 원래 값을 쓰면 가로채기가 무시된다.
+> - 행동 직전 이벤트를 받는 항목이 없으면 `Game.Intercept`는 바로 돌아온다. 자리를 두는 비용은 거의 없다.
+> - 행동 안에서 돌므로 Undo·저장·멀티플레이가 그대로다. 행동 직전 이벤트를 받는 쪽은 되도록 행동 직전 이벤트만 고친다(체력 같은 값은 규칙 함수가 바꾼다).
+> - 원래 인자가 아니라 돌려받은 행동 직전 이벤트(`intent.amount`)로 일을 한다. 원래 값을 쓰면 행동 직전 이벤트가 무시된다.
 > - 예: [04장](04-AddingContent.md) 9절 가시 갑옷. 자세히: 매뉴얼 [28장](../../Manual/28-Attributes-Intercepts.md) 2-3·5장.
 
 > [!note]- 왜 `game`을 매개변수로 받나
@@ -105,7 +105,7 @@ public class PlayCard : GameAction
         var data = Rules.CardData(Game, card.card);
         var battle = run.battle ?? throw Game.Fail("fail.notInBattle", "전투 중이 아닙니다.");
         if (!battle.hand.Contains(card.id)) throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.");
-        Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 가로채기('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
+        Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 행동 직전 이벤트('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
 
         battle.hand.Remove(card.id);
         battle.discard.Add(card.id);
@@ -271,7 +271,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > | 매 프레임 바뀌는 위치·속도를 플레이어 데이터에 | 매 프레임 기록·ChangeSet이 쌓인다 | MonoBehaviour 쪽에 두고, 규칙에 필요한 칸 좌표만 데이터로 |
 > | 원본(인스턴스)을 통째로 복사해 판 데이터에 넣는다 | Sync·저장·전송이 커지고, 스프라이트는 저장되지 않으며, 원본을 고쳐도 반영되지 않는다 | 판 데이터에는 원본 ID와 바뀌는 값만(4절) |
 > | 다른 값으로 계산되는 값(합산 공격력)을 저장 | 두 값이 어긋날 수 있고 데이터가 커진다 | 읽을 때 계산(속성·함수) |
-> | 비용을 직접 뺀다(`energy -= cost`) | 비용을 고치는 가로채기(유물·상태 효과)가 무시된다 | `Game.Pay` |
+> | 비용을 직접 뺀다(`energy -= cost`) | 비용을 고치는 행동 직전 이벤트(유물·상태 효과)가 무시된다 | `Game.Pay` |
 > | 연출을 손으로 만든 대기열·`WaitForSeconds`로 튼다 | `Redraw`가 연출을 기다리지 못하고, 연출 속도·건너뛰기·`Busy`가 먹지 않는다 | `GameView.Present` + `GameView.Wait` |
 
 ## 6. 데이터 크기·성능 기준
@@ -303,7 +303,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
-- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 가로채기 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
+- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 행동 직전 이벤트 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
 - [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런스 값이다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
@@ -325,7 +325,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`All`의 비용, `NewId`, 확장 메서드
 > - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 난수 흐름, 게임 시계, Undo·저장과 함께 움직이는 방식
 > - [10. 이벤트](../../Manual/10-Events.md) — 쏘기·받기 규칙
-> - [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md) — 가로채기 자리, `Game.Pay`
+> - [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — 행동 직전 이벤트 자리, `Game.Pay`
 > - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Balance`, `Game.Fail`
 > - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`
 > - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`

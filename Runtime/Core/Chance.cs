@@ -21,7 +21,7 @@ namespace GBible
     // 조건 '확률': 이 확률로 참. 이벤트를 받는 순간·가로채는 순간·쓰는 순간에만 굴린다.
     //   '쓸 수 있나' 미리 볼 때(Game.CanUse·버튼 흐리게)는 굴리지 않고 참, 이벤트 없이 값만 보는 '조건 충족'·행동 밖에서는 거짓.
     [Serializable]
-    [BlockInfo("확률", Category = "조건", Description = "이 확률로 참입니다. 굴리기 전에 의도 '확률'을 거쳐 행운·'모든 확률 2배'가 고칩니다. 이벤트 받기·가로채기·사용 트리거와 AND로 씁니다(조건 충족만으로는 굴리지 않습니다).",
+    [BlockInfo("확률", Category = "조건", Description = "이 확률로 참입니다. 굴리기 전에 행동 직전 이벤트 '확률'을 거쳐 행운·'모든 확률 2배'가 고칩니다. 이벤트 받기·행동 직전 이벤트 받기·사용 트리거와 AND로 씁니다(조건 충족만으로는 굴리지 않습니다).",
                Sentence = "{percent}% 확률")]
     public sealed class ChanceCondition : SimpleCondition
     {

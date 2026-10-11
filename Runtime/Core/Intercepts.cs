@@ -7,19 +7,19 @@ using System.Text.RegularExpressions;
 
 namespace GBible
 {
-    // 가로채기(Intercept): 일이 일어나기 직전에 그 내용(의도, Intent)을 고치거나 막는 단계.
-    // 이벤트는 일어난 뒤에 알리고, 가로채기는 일어나기 전에 바꾼다.
+    // 행동 직전 이벤트(코드 이름 Intent·Intercept): 일(피해·비용·사용 …)이 일어나기 직전에 그 내용을 담아 쏘는 이벤트. 받는 쪽이 고치거나 막는다.
+    // 이벤트는 일어난 뒤에 알리고, 행동 직전 이벤트는 일어나기 전에 바꾼다. 플레이어 입력 한 단위인 '행동'(GameAction) 하나 안에서 여러 번 생긴다.
     //
     // 중간층 규칙 함수가 의도를 만들어 통과시키고, 돌아온 값으로 일을 한다:
     //   var hit = Game.Intercept(new DamageIntent { source = s, target = t, amount = 10 });
     //   if (hit.cancelled) return;  target.hp -= hit.amount;
-    // 가로채는 쪽은 트리거의 '가로채기' 잎(의도 형식 + 조건 + 순서)으로 등록하고, 결과 '의도 고치기'나 [BindTo] 코드로 의도를 고친다:
-    //   유물 "가시 갑옷" — 가로채기 DamageIntent → 의도 고치기 amount 더하기 -5
+    // 받는 쪽은 트리거의 '행동 직전 이벤트 받기' 잎(형식 + 조건 + 순서)으로 등록하고, 결과 '행동 직전 이벤트 고치기'나 [BindTo] 코드로 고친다:
+    //   유물 "가시 갑옷" — 행동 직전 이벤트 받기 DamageIntent → 행동 직전 이벤트 고치기 amount 더하기 -5
     //   [BindTo("undying")] static void Undying(DeathIntent i, TriggerContext c) { i.cancelled = true; … }
     // 같은 의도에 여럿이 걸리면 순서(order)가 작은 것부터, 같으면 등록 순서. 모두 행동 안에서 돌아 Undo·저장·멀티가 그대로다.
     // 가로채는 쪽은 되도록 의도만 고친다(다른 값을 바꾸려면 의도를 고친 뒤 규칙 함수가 하거나, 이벤트 받기로).
 
-    // 의도 클래스에 붙인다(DB의 '가로채기' 잎·'이벤트 쏘기'처럼 목록에 나오고, 필드 읽기 코드가 생성된다).
+    // 행동 직전 이벤트 클래스에 붙인다(DB의 '행동 직전 이벤트 받기' 잎·'이벤트 쏘기'처럼 목록에 나오고, 필드 읽기 코드가 생성된다).
     // 취소할 수 있게 하려면 public bool cancelled; 필드를 둔다.
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
     public sealed class IntentAttribute : Attribute
@@ -72,15 +72,15 @@ namespace GBible
     }
 
     [Serializable]
-    [BlockInfo("가로채기", Category = "트리거", Description = "어떤 일이 일어나기 직전입니다(의도). 결과에서 '의도 고치기'로 그 내용을 바꾸거나 막습니다. 예: 받는 피해 −5, 죽음 막기, 비용 0.",
-               Sentence = "{intentType} 가로채기")]
+    [BlockInfo("행동 직전 이벤트 받기", Category = "트리거", Description = "어떤 일이 일어나기 직전에 쏘는 행동 직전 이벤트를 받습니다. 결과에서 '행동 직전 이벤트 고치기'로 그 내용을 바꾸거나 막습니다. 예: 받는 피해 −5, 죽음 막기, 비용 0.",
+               Sentence = "{intentType} 행동 직전 이벤트 받기")]
     public sealed class InterceptTrigger : Trigger
     {
-        [IntentTypeRef, FieldPathRoot(FieldPathRootKind.EventType), FieldLabel("의도")] public string intentType;
+        [IntentTypeRef, FieldPathRoot(FieldPathRootKind.EventType), FieldLabel("행동 직전 이벤트")] public string intentType;
 #if UNITY_2020_1_OR_NEWER
         [UnityEngine.SerializeReference]
 #endif
-        [FieldLabel("의도 조건")] public ValueFilter filter;
+        [FieldLabel("행동 직전 이벤트 조건")] public ValueFilter filter;
         [FieldLabel("순서(작을수록 먼저)")] public int order;
 
         public override TriggerKinds Kind => TriggerKinds.Intercept;
@@ -106,23 +106,23 @@ namespace GBible
             return filter == null || filter.Test(intent);
         }
 
-        string Name => TypeResolver.Find(intentType) is Type t ? Intents.DisplayNameOf(t) : (string.IsNullOrEmpty(intentType) ? "(의도 없음)" : intentType);
+        string Name => TypeResolver.Find(intentType) is Type t ? Intents.DisplayNameOf(t) : (string.IsNullOrEmpty(intentType) ? "(행동 직전 이벤트 없음)" : intentType);
 
         public override string Describe(INameResolver names) => $"intercept {Name}" + (filter == null ? "" : $" where {filter.Describe()}");
-        public override string Natural(INameResolver names) => $"{Name} 가로채기" + (filter == null ? "" : $"({filter.Natural()}일 때)");
+        public override string Natural(INameResolver names) => $"{Name} 행동 직전 이벤트 받기" + (filter == null ? "" : $"({filter.Natural()}일 때)");
 
         public override void Validate(IValidationContext context)
         {
             var type = TypeResolver.Find(intentType);
             if (type == null)
             {
-                context.Error(string.IsNullOrEmpty(intentType) ? "가로채기: 의도가 선택되지 않았습니다." : $"가로채기: 의도 '{intentType}'을 찾을 수 없습니다(이름이 바뀌었는지 확인).");
+                context.Error(string.IsNullOrEmpty(intentType) ? "행동 직전 이벤트 받기: 행동 직전 이벤트가 선택되지 않았습니다." : $"행동 직전 이벤트 받기: 행동 직전 이벤트 '{intentType}'을 찾을 수 없습니다(이름이 바뀌었는지 확인).");
                 return;
             }
             if (filter == null) return;
             var problems = new List<string>();
             filter.Validate(type, problems);
-            foreach (var problem in problems) context.Error($"가로채기({Intents.DisplayNameOf(type)}) 조건: {problem}");
+            foreach (var problem in problems) context.Error($"행동 직전 이벤트 받기({Intents.DisplayNameOf(type)}) 조건: {problem}");
         }
     }
 
@@ -150,7 +150,7 @@ namespace GBible
     // 값에 틀을 쓸 수 있다: {user}(사용자·가진 쪽의 id) · {user:경로}(사용자의 필드) · {event:경로}(받은 이벤트·의도의 필드) · {data:키.경로}(플레이어 데이터) · {count:키.경로}(목록의 개수) · {owner}(이 결과를 가진 항목 ID) · {stacks}(가진 쪽의 이 상태 효과 중첩) · {level}(가진 쪽의 이 패시브 레벨) · {level:2/4/7}(레벨별 값, 1레벨부터) · {balance:ID}(밸런스 값).
     //   대신 맞기: targetId 값으로 바꾸기 {user}   도발: 공격 의도의 targetId 값으로 바꾸기 {user}   중첩만큼 피해 감소: amount 더하기 -{stacks}
     [Serializable]
-    [BlockInfo("의도 고치기", Category = "결과", Description = "가로챈 의도의 값을 바꾸거나(설정·더하기·곱하기) 막습니다(취소).")]
+    [BlockInfo("행동 직전 이벤트 고치기", Category = "결과", Description = "받은 행동 직전 이벤트의 값을 바꾸거나(설정·더하기·곱하기) 막습니다(취소).")]
     public sealed class ModifyIntentOutcome : Outcome
     {
         [FieldPath, FieldLabel("필드")] public string path = "";
@@ -227,20 +227,20 @@ namespace GBible
             var intent = context?.Event;
             if (intent == null || !context.IsIntercept)
             {
-                context?.Session?.Journal.Append(JournalKind.Warning, "Intercept", "의도 고치기: 가로채기로 발동한 것이 아니라 고칠 의도가 없습니다.");
+                context?.Session?.Journal.Append(JournalKind.Warning, "Intercept", "행동 직전 이벤트 고치기: 행동 직전 이벤트 받기로 발동한 것이 아니라 고칠 행동 직전 이벤트가 없습니다.");
                 return;
             }
             if (op == IntentOp.Cancel)
             {
                 var cancel = FieldAccess.Find(intent.GetType(), "cancelled");
-                if (cancel == null) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: {intent.GetType().Name}에 cancelled 필드가 없어 막을 수 없습니다.");
+                if (cancel == null) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"행동 직전 이벤트 고치기: {intent.GetType().Name}에 cancelled 필드가 없어 막을 수 없습니다.");
                 else cancel.Set(intent, true);
                 return;
             }
             var type = FieldPaths.TypeAt(intent.GetType(), path, out var error);
             if (type == null)
             {
-                context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: {error}");
+                context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"행동 직전 이벤트 고치기: {error}");
                 return;
             }
             // 마지막 마디는 필드나 딕셔너리의 키(byElement[fire]). 괄호 안의 점(x[forest.chest3])은 나누지 않는다.
@@ -253,7 +253,7 @@ namespace GBible
                 reached = true;
                 if (parent.GetType().IsValueType)
                 {
-                    context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'의 부모가 구조체라 고칠 수 없습니다(클래스로 바꾸세요).");
+                    context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"행동 직전 이벤트 고치기: '{path}'의 부모가 구조체라 고칠 수 없습니다(클래스로 바꾸세요).");
                     continue;
                 }
                 var unreadable = false;
@@ -264,13 +264,13 @@ namespace GBible
                     return next;
                 });
                 // 읽지 못한 값은 넣지 않고 알린다(참거짓·숫자가 아닌 글자 — 틀이 엉뚱한 값으로 펼쳐졌을 때).
-                if (unreadable) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'에 '{text}'를 넣을 수 없습니다({type.Name}).");
-                else if (!written) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'에 쓰지 못했습니다(그 필드·키가 없습니다).");
+                if (unreadable) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"행동 직전 이벤트 고치기: '{path}'에 '{text}'를 넣을 수 없습니다({type.Name}).");
+                else if (!written) context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"행동 직전 이벤트 고치기: '{path}'에 쓰지 못했습니다(그 필드·키가 없습니다).");
             }
             // 경로 중간이 비었다(info.amount의 info가 null, units[hero]의 hero가 없음): 고칠 곳이 없다 — 조용히 넘어가지 않고 알린다.
             // 요소마다 펼치는 경로([])가 빈 목록이면 고칠 것이 없는 것이 맞다.
             if (!reached && parentPath.IndexOf(FieldPaths.Each, StringComparison.Ordinal) < 0)
-                context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"의도 고치기: '{path}'의 부모가 비어 있어 쓰지 못했습니다(경로 중간의 값이 없습니다).");
+                context.Session.Journal.Append(JournalKind.Warning, "Intercept", $"행동 직전 이벤트 고치기: '{path}'의 부모가 비어 있어 쓰지 못했습니다(경로 중간의 값이 없습니다).");
         }
 
         object Compute(object current, Type type, string text)
@@ -287,18 +287,18 @@ namespace GBible
         {
             switch (op)
             {
-                case IntentOp.Cancel: return "의도 막기";
-                case IntentOp.Set: return $"의도 {path} = {value}";
-                case IntentOp.Add: return $"의도 {path} {(value.StartsWith("-") ? "" : "+")}{value}";
-                default: return $"의도 {path} ×{value}";
+                case IntentOp.Cancel: return "행동 직전 이벤트 막기";
+                case IntentOp.Set: return $"행동 직전 이벤트 {path} = {value}";
+                case IntentOp.Add: return $"행동 직전 이벤트 {path} {(value.StartsWith("-") ? "" : "+")}{value}";
+                default: return $"행동 직전 이벤트 {path} ×{value}";
             }
         }
 
         public override void Validate(IValidationContext context)
         {
             if (op == IntentOp.Cancel) return;
-            if (string.IsNullOrEmpty(path)) context.Error("의도 고치기: 필드를 고르세요.");
-            if (op != IntentOp.Set && value.IndexOf('{') < 0 && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) context.Error("의도 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{level}·{level:2/4/7}·{balance:ID} 틀)를 적으세요.");
+            if (string.IsNullOrEmpty(path)) context.Error("행동 직전 이벤트 고치기: 필드를 고르세요.");
+            if (op != IntentOp.Set && value.IndexOf('{') < 0 && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) context.Error("행동 직전 이벤트 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{level}·{level:2/4/7}·{balance:ID} 틀)를 적으세요.");
         }
     }
 }

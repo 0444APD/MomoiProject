@@ -35,7 +35,7 @@ namespace GBible
 
     // 받은 이벤트(가로채기면 의도)의 필드가 가리키는 개체. 글자면 그 id의 개체, 객체면 그대로, 목록이면 요소마다.
     [Serializable]
-    [BlockInfo("이벤트의 개체", Category = "대상", Description = "받은 이벤트(가로채기면 의도)의 필드가 가리키는 개체. 예: 피해 이벤트의 sourceId = 때린 쪽(반사), targetId = 맞은 쪽.")]
+    [BlockInfo("이벤트의 개체", Category = "대상", Description = "받은 이벤트(행동 직전 이벤트 포함)의 필드가 가리키는 개체. 예: 피해 이벤트의 sourceId = 때린 쪽(반사), targetId = 맞은 쪽.")]
     public sealed class EventFieldTarget : TargetSelector
     {
         [FieldLabel("이벤트 필드(id 또는 개체)")] public string field = "";

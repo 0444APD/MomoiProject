@@ -350,11 +350,11 @@ public static class Rarity
 - **조립할 동작 하나** → Block. 효과(무엇을)와 대상(누구에게)으로 나눈다.
 - **그 항목 하나에만 있는 예외** → `[BindTo]` 함수로 그 항목의 결과를 쓴다.
 - **여럿이 같이 쓰는 계산** → 평범한 static 함수(`Rules.Damage`, `Rules.Shuffle`).
-- **핵심 규칙 함수**(피해·회복·죽음·비용·뽑기)는 일을 하기 직전에 가로채기 자리(`Game.Intercept`)를 둔다. "받는 피해 −5" 같은 효과를 고치는 효과는 나중에 DB 항목으로 더하고, 규칙 함수는 고치지 않는다.
+- **핵심 규칙 함수**(피해·회복·죽음·비용·뽑기)는 일을 하기 직전에 행동 직전 이벤트 자리(`Game.Intercept`)를 둔다. "받는 피해 −5" 같은 효과를 고치는 효과는 나중에 DB 항목으로 더하고, 규칙 함수는 고치지 않는다.
 - **캐릭터 능력치**(공격력·방어력)는 숫자 필드 + Modifier다. 장비·버프는 효과 `능력치 보정`이나 `Game.AddModifier`로 붙이고, 읽을 때는 `Game.Attribute`.
 - **몇 턴 동안 이어지는 효과**(화상·독·보호막)는 Block을 만들지 않는다. DB › 상태 효과에 항목으로 두고, 카드에는 기본 제공 효과 `상태 효과 걸기`를 둔다.
 
-자세히: 매뉴얼 [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md).
+자세히: 매뉴얼 [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md).
 
 | 종류  | Block                                                          | 기획        |
 | --- | -------------------------------------------------------------- | --------- |
@@ -398,7 +398,7 @@ public static class CardCode
 > [!note]- 규칙 함수
 > 피해 계산(방어도가 먼저 깎임, 적이 쓰러지면 빼고 이벤트를 쏨)과 덱 섞기는 행동·Block·`[BindTo]` 함수가 모두 쓰므로 한곳에 모은다. 래퍼나 특별한 문법 없이 그냥 C#이다.
 >
-> `Rules.Damage`는 피해를 주기 직전에 의도 `DamageIntent`를 `Game.Intercept`로 통과시킨다(가로채기 자리). 유물 "가시 갑옷"([04장](04-AddingContent.md) 9절)이 여기서 피해를 줄인다. 이 습관은 [09장](09-Habits.md) 1절.
+> `Rules.Damage`는 피해를 주기 직전에 행동 직전 이벤트 `DamageIntent`를 `Game.Intercept`로 통과시킨다(행동 직전 이벤트 자리). 유물 "가시 갑옷"([04장](04-AddingContent.md) 9절)이 여기서 피해를 줄인다. 이 습관은 [09장](09-Habits.md) 1절.
 
 > [!note]- 효과의 문법 — 기획 문장을 쪼개는 틀
 > 효과 문장은 **언제 + 누구에게 + 무엇을 + 안전장치**로 쪼갤 수 있다. 이것이 만들 수 있는 효과의 천장이다. 쪼갠 부품마다 만드는 것이 정해져 있다.
@@ -412,7 +412,7 @@ public static class CardCode
 > | 누구에게 | 모든 적, 무작위 적 | 대상 Block |
 > | 무엇을 · 데이터 바꾸기 | 피해, 방어도, 회복 | 효과 Block · 플레이어 데이터에 주기 |
 > | 무엇을 · 만들기·없애기·바꾸기 | 카드 강화(다른 카드가 된다) | 행동 · 효과 Block · `[BindTo]` |
-> | 무엇을 · 가로채기 | 가시 갑옷: 받는 피해 −5 | 트리거 `가로채기` + 결과 `의도 고치기` |
+> | 무엇을 · 행동 직전 이벤트 | 가시 갑옷: 받는 피해 −5 | 트리거 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기` |
 > | 무엇을 · 선택 요구 | 손패 1장 버리기 | 선택 대기(결과 `선택 요구` · `Game.Ask`) |
 > | 무엇을 · 비용 | 카드의 에너지 비용 | `Game.Pay` · 결과 `비용 내기` |
 > | 안전장치 | 유물끼리 서로 부르는 연쇄 | 사슬 16단계에서 끊기 |
@@ -463,7 +463,7 @@ public static class CardCode
 | `Rules/Data/Keywords.cs` | 키워드 그룹 `Rarity`·`Element`·`CardTag` | 5 |
 | `Rules/Data/Model.cs` | 판: `Fighter`·`Hero`·`Enemy`·`DeckCard`·`Battle`·`RunState` / 프로필: `Profile` / 원본: `Card`·`MonsterData`·`Potion` | 1~11 |
 | `Rules/Events/Events.cs` | `CardPlayed`·`DamageDealt`·`EnemyKilled`·`TurnStarted`·`TurnEnded`·`BattleWon`·`GoldGained`·`RunEnded` | 5절 |
-| `Rules/Events/Intents.cs` | 의도 `DamageIntent`(`Rules.Damage`의 가로채기 자리) | 8절 |
+| `Rules/Events/Intents.cs` | 행동 직전 이벤트 `DamageIntent`(`Rules.Damage`의 행동 직전 이벤트 자리) | 8절 |
 | `Rules/Actions/RunActions.cs` | `StartRun`·`BuyCard`·`DrinkPotion`·`EndRun` | 1, 2, 9, 11 |
 | `Rules/Actions/BattleActions.cs` | `StartBattle`·`DrawCards`·`PlayCard`·`EndTurn`·`WinBattle` | 3~8 |
 | `Rules/Cards/CardBlocks.cs` | 효과 Block 셋, 대상 Block 둘 | 5 |
@@ -507,4 +507,4 @@ public static class CardCode
 > - [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md) — `Usable`
 > - [17. 프로젝트 고유 기능](../../Manual/17-Custom-Features.md) — DB 종류 + Trigger 감시
 > - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`NewId`
-> - [28. 능력치·Modifier·가로채기·비용](../../Manual/28-Attributes-Intercepts.md) — 능력치 계산, 가로채기 자리, 효과의 문법
+> - [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — 능력치 계산, 행동 직전 이벤트 자리, 효과의 문법

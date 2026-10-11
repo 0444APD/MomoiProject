@@ -1,20 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GBible;
+using GBible.Data;
 using UnityEngine;
 
-namespace GBible.Data
+namespace GBible.Tests
 {
-    // DB › 패시브: "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과·축복). 가진 목록(플레이어 데이터)에 이 ID가 있으면 발동 → 결과.
+    // 선택 요소 '패시브'의 DB 종류 — GBible 템플릿(Documentation~/AI/Templates/Elements/PassiveData.cs.txt)에서 들였다.
+    // 이 클래스는 프로젝트 것이다: 칸을 마음대로 더한다. 규격(IPassiveData.ToDefinition)만 지키면 엔진(가진 것 세기·놓인 것마다·
+    // 가진 동안 보정·발동 더·주기·빌려 쓰기·Game.Owned …)이 그대로 돈다. 더한 칸은 프로젝트 규칙이 DB에서 읽는다.
+    //
+    // "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과·축복). 가진 목록(플레이어 데이터)에 이 ID가 있으면 발동 → 결과.
     //   예: 닻 — 가진 목록 run › relics, 발동 '이벤트 받기 → 턴 시작(turn 일치 1)', 결과 '대상에게 효과 → 방어도'.
-    //   예: 가시 갑옷 — 발동 '가로채기 → 피해 의도', 가진 쪽 필드 targetId(가진 쪽이 hero일 때), 결과 '의도 고치기 amount −5'.
+    //   예: 가시 갑옷 — 발동 '행동 직전 이벤트 받기 → 피해', 가진 쪽 필드 targetId(가진 쪽이 hero일 때), 결과 '행동 직전 이벤트 고치기 amount −5'.
     //   예: 조커 — 가진 목록 run › jokers(객체 목록), 일치 필드 joker, 놓인 것마다 켬 → 조커 칸 왼쪽부터 차례로 발동(사용자 = 그 조커).
     //   예: 힘의 부적 — 가진 동안 능력치 보정 attack +2(레벨마다), 보정 받을 대상 hero. 트리거 없이 보정만 있어도 된다.
     // 얻기·잃기는 그 목록에 ID를 넣고 빼는 것(결과 '플레이어 데이터에 주기'·'가중치 표에서 고르기'). 몇 개 가졌나(레벨)는 Game.Owned(ID).
     // 결과를 코드로 쓰려면 이 ID에 [BindTo].
     [Database("패시브", Group = "DB", Order = 37, IdPrefix = "passive")]
-    [CreateAssetMenu(menuName = "MomoiProject/패시브", fileName = "NewPassive")]
-    public sealed class PassiveData : GameData
+    public sealed class PassiveData : GameData, IPassiveData
     {
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("가진 목록(플레이어 데이터)"), Tooltip("이 ID가 들어 있으면 가진 것")] public string ownerKey = "run";
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(목록·딕셔너리)"), Tooltip("ID 목록·id가 있는 객체 목록·ID → 레벨 딕셔너리. 앞마디에 []를 쓰면 가진 쪽이 여럿(party[].traits)")] public string ownerPath = "relics";
@@ -23,7 +28,7 @@ namespace GBible.Data
         [FieldLabel("놓인 것마다"), Tooltip("켜면 가진 쪽이 목록의 요소 하나하나입니다(결과의 사용자 = 그 요소). 같은 목록을 보는 '놓인 것마다' 패시브는 목록 순서(자리)대로 발동합니다 — 조커 칸 왼쪽부터, 보드 앞 칸부터")] public bool perElement;
         [FieldLabel("레벨 필드"), Tooltip("요소의 이 숫자 필드가 레벨입니다({level}·Game.Owned·'레벨마다' 보정). 비우면 요소 하나 = 1")] public string levelField = "";
         [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)] public Trigger trigger;
-        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두", Root = nameof(trigger)), Tooltip("이벤트·의도의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 의도의 targetId → 가진 쪽이 맞을 때만)")] public string holderField = "";
+        [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두", Root = nameof(trigger)), Tooltip("이벤트·행동 직전 이벤트의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 행동 직전 이벤트의 targetId → 가진 쪽이 맞을 때만)")] public string holderField = "";
         [FieldLabel("결과"), SerializeReference, OutcomeSlot(OutcomeKinds.All)] public List<Outcome> outcomes = new List<Outcome>();
         // [BindTo] 코드는 '결과'만 대신한다(ToDefinition) — 줄마다의 결과는 그대로 돌므로 BindTo = false(편집 화면에서 잠그지 않는다).
         [FieldLabel("발동 더(다른 순간)"), TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept), OutcomeSlot(OutcomeKinds.All, BindTo = false), Tooltip("같은 패시브가 다른 순간에 다른 결과를 낼 때 줄마다 트리거 + 결과(손을 낼 때 쌓기 · 버릴 때 빼기 · 점수 때 내기). 가진 쪽 필드·놓인 것마다 순서는 위와 같다")] public List<TriggerRule> rules = new List<TriggerRule>();
@@ -35,6 +40,7 @@ namespace GBible.Data
         [FieldLabel("여럿일 때"), Tooltip("받는 쪽 하나에 가진 쪽이 여럿일 때: 레벨을 더해 한 번 / 가진 쪽마다 값을 더함(같은 아티팩트 둘) / 가장 높은 레벨 하나만([고유])")] public PassiveStacking stacking = PassiveStacking.SumLevels;
         [FieldLabel("아이콘")] public Sprite icon;
 
+        // 규격: 엔진이 쓰는 정의. 프로젝트가 더한 칸은 여기에 넣지 않는다(프로젝트 규칙이 이 항목에서 직접 읽는다).
         public PassiveDefinition ToDefinition()
         {
             var definition = new PassiveDefinition

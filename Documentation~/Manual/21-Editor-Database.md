@@ -34,20 +34,20 @@
 | 시작 파일 | Bootstrap | 세션 옵션(GameDatabase 에셋) | 화면에서 고치면 바로 저장. **cs 열기**로 `Client/Bootstrap.cs` ([20장](20-Setup.md) 3절) |
 | 요소 | 키워드 | `[KeywordGroup]` 코드 | DB 또는 코드(코드가 원본) |
 | 요소 | 클래스 | `[Serializable]` 클래스·DB 종류 — `Assets/MomoiProject/Code` 안의 것만, 폴더 경로 없이 한 목록 | 코드만(읽기 전용) |
-| 요소 | 로그 | `StatData` | DB |
+| 요소 | 로그 | `StatData`(항목이 없으면 탭이 숨는다) | DB |
 | 요소 | 이벤트 | `[GameEvent]` 클래스(같은 범위) | 코드만(읽기 전용) |
 | 요소 | 플레이어 데이터 | `PlayerDataEntry` — 마우스를 올리면 오른쪽 **cs ↗**로 판·프로필 클래스 파일(PlayerData.cs)을 연다 | DB |
 | 요소 | 설정 | `SettingData` — 설정 화면의 칸 하나(음량·언어·전체 화면 …, [31장](31-Slots-Settings-Input.md)) | DB |
-| DB | 능력 | `AbilityData` | DB |
-| DB | 상태 효과 | `StatusData` — 버프·디버프·쿨다운([29장](29-Statuses-Schedules-Choices.md)) | DB(결과를 코드로 쓰면 `[BindTo]`) |
-| DB | 패시브 | `PassiveData` — "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과, [17장](17-Custom-Features.md) 0절) | DB(결과를 코드로 쓰면 `[BindTo]`) |
+| DB | 능력 | 선택 요소 — 프로젝트의 `AbilityData`(템플릿에서, 규격 `IUsableData`, [16장](16-Abilities-Usable.md)) | DB |
+| DB | 상태 효과 | 선택 요소 — 프로젝트의 `StatusData`(템플릿에서, 규격 `IStatusData`) — 버프·디버프·쿨다운([29장](29-Statuses-Schedules-Choices.md)) | DB(결과를 코드로 쓰면 `[BindTo]`) |
+| DB | 패시브 | 선택 요소 — 프로젝트의 `PassiveData`(템플릿에서, 규격 `IPassiveData`) — "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과, [17장](17-Custom-Features.md) 0절) | DB(결과를 코드로 쓰면 `[BindTo]`) |
 | DB | 밸런스 값 | `BalanceData` — 이름 붙은 숫자 + 곡선([30장](30-Balance-Tables.md)) | DB |
 | DB | 가중치 표 | `WeightTableData` — 확률로 뽑는 표([30장](30-Balance-Tables.md)) | DB |
 | DB | 화면 | `ScreenData` — UI Toolkit 화면 하나(UXML·층·뒤로 닫기·열 씬, [35장](35-Screens.md)) | DB |
 | DB | 인스턴스 | `InstanceData` | DB |
 | DB | 프리팹 | `PrefabData` | DB(프리팹 연결) |
 | 데이터 | (프로젝트가 만든 DB 종류) | `GameData` 상속 클래스 | DB |
-| 개발 | 도전과제 | `AchievementData` | DB |
+| 개발 | 도전과제 | `AchievementData`(항목이 없으면 탭이 숨는다) | DB |
 | 개발 | 개발 명령 | `DebugCommandData` — 모니터 › 명령 탭의 버튼 하나(결과 Block 조립, [22장](22-Monitor-Debug.md) 7절) | DB(코드가 필요하면 `[BindTo]`) |
 | 개발 | 저장 변환 | `SaveMigrationData` — 출시 후 저장 구조 변환 한 단계(필드 옮김·키 이름 바꿈·키 삭제, [06장](06-SaveLoad.md) 1.4) | DB(값을 계산하는 변환만 코드) |
 | 개발 | 화면 설정 | `ScreenSettingsData` — 모든 화면의 Panel Settings·테마 USS·글꼴, 기본 화면 켜기(항목 하나 — 없으면 저절로 생긴다, [35장](35-Screens.md)) | DB |
@@ -162,7 +162,8 @@ public sealed class MonsterData : GameData
 
 ## 2-1. 사이드바 — 빈 탭 숨기기 · Dev 폴더 탭
 
-- **빈 탭 숨기기**: 'DB' 그룹의 로직 종류(능력·상태 효과·패시브·가중치 표·밸런스 값·화면·인스턴스·프리팹)는 항목이 없으면 탭이 숨는다 — 그 프로젝트가 쓰는 것만 보인다. AI가 항목을 만들면 나타난다. 개발자가 만드는 종류와 지금 연 탭은 비어도 보인다. 바닥의 "빈 탭 N개 숨김 · 보기"로 잠깐 모두 보인다.
+- **빈 탭 숨기기**: 'DB' 그룹의 로직 종류(능력·상태 효과·패시브·가중치 표·밸런스 값·화면·인스턴스·프리팹)와 `[Database(HideWhenEmpty = true)]` 종류(도전과제·로그)는 항목이 없으면 탭이 숨는다 — 그 프로젝트가 쓰는 것만 보인다. AI가 항목을 만들면 나타난다. 개발자가 만드는 종류와 지금 연 탭은 비어도 보인다. 바닥의 "빈 탭 N개 숨김 · 보기"로 잠깐 모두 보인다.
+- **선택 요소**(상태 효과·패시브·능력): DB 종류를 GBible이 갖지 않고 프로젝트가 템플릿에서 들인다(AI 문서 Reference 4-1). 들인 클래스가 없으면 탭도, 그 요소의 기본 Block·행동 직전 이벤트·이벤트도 고르는 목록에 보이지 않는다.
 - **Dev 폴더 탭**: `Assets/Dev` 바로 아래 폴더 하나 = 'Dev' 그룹의 탭 하나. 탭은 그 폴더 안(하위 포함)의 **모든 에셋**을 보이고, 더 깊은 폴더는 탭 안의 접는 묶음이다. 줄을 누르면 고르기(인스펙터), DB 항목이면 상세 창, '열기'는 씬·프리팹·스크립트를 연다. 정리(옮기기·이름 바꾸기·지우기)는 Project 창에서 한다 — 폴더를 만들거나 옮기면 탭·묶음이 바로 따라 바뀐다.
 - **창이 낮을 때**: 탭 목록만 스크롤된다(항목 크기 그대로). 저장·검증 칸은 바닥에 늘 보인다.
 - **하나만 두는 설정**(`[Database(Single = true)]` — Steam): 그 종류가 켜져 있는데 항목이 없으면 에디터가 기본값으로 하나 만든다.
