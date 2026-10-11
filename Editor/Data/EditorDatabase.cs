@@ -342,11 +342,12 @@ namespace GBible.EditorTools
         }
 
         // 이 필드에서 고를 수 있는 항목(타입 + 키워드 그룹으로 거른다. 그룹이 비어 있으면 모든 키워드).
+        // 종류는 그 형식이거나 물려받은 형식이면 된다([DataRef(typeof(GameData))] = 모든 DB 항목 — 가중치 표 '항목'). MatchesRef·검증과 같은 기준.
         public IEnumerable<GameData> RefCandidates(System.Reflection.FieldInfo field)
         {
             var type = RefTypeOf(field);
             if (type == null) return Enumerable.Empty<GameData>();
-            return OfType(type).Where(item => MatchesRef(field, item));
+            return All.Where(item => item != null && MatchesRef(field, item));
         }
 
         // [DataRef(typeof(Card))]처럼 인스턴스 값의 클래스로 거르는 필드면 그 클래스(아니면 null).
