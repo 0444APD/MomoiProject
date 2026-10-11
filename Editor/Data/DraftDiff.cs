@@ -117,12 +117,13 @@ namespace GBible.EditorTools
             var iterator = property.Copy();
             var end = property.GetEndProperty();
             var prefix = property.propertyPath.Length;
-            var depth = property.depth;
+            var inside = property.propertyPath + ".";
             var first = true;
             do
             {
-                // 이 칸 안쪽만(빈 목록 다음의 숨은 칸 등 다음 칸의 내용이 섞이지 않게).
-                if (!first && iterator.depth <= depth) break;
+                // 이 칸 안쪽만(빈 목록 다음의 숨은 칸 등 다음 칸의 내용이 섞이지 않게). 깊이로 가리지 않는다 —
+                // Unity 6.6은 목록 칸의 안쪽(`칸.Array`)을 바깥 칸과 같은 깊이로 내서, 깊이로 끊으면 목록의 바뀐 내용을 하나도 보지 못한다.
+                if (!first && !iterator.propertyPath.StartsWith(inside, System.StringComparison.Ordinal)) break;
                 first = false;
                 builder.Append(iterator.propertyPath.Substring(System.Math.Min(prefix, iterator.propertyPath.Length))).Append('=');
                 switch (iterator.propertyType)

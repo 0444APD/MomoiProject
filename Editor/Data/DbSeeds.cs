@@ -155,7 +155,14 @@ namespace GBible.EditorTools
             }
             // 남은 것(고치기·지우기·적용하지 못한 새 항목)이 없으면 이 버전은 돈 것 — 기다리면 매번 다시 돈다.
             // 적용 전 새 항목이 남아 있으면(예전에 돌았던 스크립트가 만든 것일 수 있다) 적용될 때(Ctrl+S) 기록한다 — 버리면 다시 돌게.
-            if (edited.Count == 0 && created.Count == 0 && staging.AddedNow().Count == 0) RecordPending();
+            if (edited.Count == 0 && created.Count == 0)
+            {
+                // 이번에 돈 것은 바꾼 것이 없다: 기다리는 것이 하나도 없으면 모두 기록하고, 다른 스크립트의 고치기·새 항목이 아직 '적용 전'이면
+                // 이번 것만 기록한다(기다리는 스크립트까지 '돌았음'으로 남기면 그 고치기를 버렸을 때 다시 돌지 않는다).
+                var waiting = staging.AddedNow().Count > 0 || staging.RemovedNow().Count > 0 || staging.WorkingNow().Any(staging.HasPending);
+                if (!waiting) RecordPending();
+                else RecordOnly(ran);
+            }
             else Debug.Log($"[MomoiProject] DB 반영 스크립트 {ran.Count}개를 돌렸습니다({string.Join(", ", ran)}). " +
                            $"'적용 전'으로 남은 것(고치기·지우기 {edited.Count}개, 새 항목 {created.Count}개)을 DB에서 보고 Ctrl+S로 적용하세요.");
             return ran.Count;
@@ -201,21 +208,34 @@ namespace GBible.EditorTools
             SessionState.EraseString(PendingKey);
             if (pending.Count == 0) return;
             var record = Load();
-            foreach (var entry in pending)
-            {
-                var at = entry.LastIndexOf('@');
-                if (at <= 0) continue;
-                var key = entry.Substring(0, at);
-                var version = entry.Substring(at + 1);
-                var index = record.keys.IndexOf(key);
-                if (index < 0)
-                {
-                    record.keys.Add(key);
-                    record.versions.Add(version);
-                }
-                else record.versions[index] = version;
-            }
+            foreach (var entry in pending) Put(record, entry);
             Save(record);
+        }
+
+        // 이 스크립트들만 기록하고 '돌았음(적용 전)' 목록에서 뺀다.
+        static void RecordOnly(ICollection<string> entries)
+        {
+            var record = Load();
+            foreach (var entry in entries) Put(record, entry);
+            Save(record);
+            var rest = Pending();
+            rest.ExceptWith(entries);
+            SessionState.SetString(PendingKey, string.Join("\n", rest));
+        }
+
+        static void Put(Record record, string entry)
+        {
+            var at = entry.LastIndexOf('@');
+            if (at <= 0) return;
+            var key = entry.Substring(0, at);
+            var version = entry.Substring(at + 1);
+            var index = record.keys.IndexOf(key);
+            if (index < 0)
+            {
+                record.keys.Add(key);
+                record.versions.Add(version);
+            }
+            else record.versions[index] = version;
         }
 
         static string Recorded(Record record, string key)

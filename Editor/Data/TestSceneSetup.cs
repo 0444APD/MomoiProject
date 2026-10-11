@@ -26,6 +26,10 @@ namespace GBible.EditorTools
             }
             else
             {
+                // 저장하지 않은 새 씬이 열려 있으면 Unity가 새 씬을 덧붙여 만들지 못한다 — 까닭을 알린다(반영 스크립트면 기록되지 않아 다음 컴파일 뒤 다시 돈다).
+                var active = SceneManager.GetActiveScene();
+                if (string.IsNullOrEmpty(active.path) && active.isDirty)
+                    throw new System.InvalidOperationException("지금 열린 씬이 저장하지 않은 새 씬이라 테스트 씬을 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 'DB 반영 스크립트 › 모두 다시 돌리기') 다시 만듭니다.");
                 var fresh = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Additive);
                 EditorSceneManager.SaveScene(fresh, path);
                 EditorSceneManager.CloseScene(fresh, true);
