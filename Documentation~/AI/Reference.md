@@ -149,6 +149,7 @@ GBible.Unity
 | 하고 싶은 일 | 쓸 것 | 장 |
 |---|---|---|
 | 설정(음량·언어·화면·전투 속도) | DB › 설정(종류: 켜기/끄기·숫자·선택지·글, 적용 대상: 언어·음량·전체 화면·해상도·수직 동기화·최대 프레임) → `GameSettings.Number(id)`·`Toggle`·`Choice`·`Set`·`Changed`. 화면은 기본 설정 화면 | 31·35 |
+| AI가 Unity 상태 읽기(창을 볼 수 없으므로) | DB 검증 오류·경고·'적용 전' 변경 = `Logs/MomoiProject/DbStatus.txt`(컴파일 뒤·DB가 바뀔 때 다시 쓰임, `DbStatusReport`) · Unity 로그 = `Logs/Editor.log`(Unity 6.6은 프로젝트 안) | 관례 12 |
 | 플레이 중 값·기록 보기, 이벤트 쏴 보기, 버튼 하나로 시험 | 모니터(타임라인·데이터·행동·명령·이벤트 호출), DB › 개발 명령(결과 Block 조립 → 명령 탭 버튼) | 22 |
 | DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/MomoiProject/Code/Editor`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add·Work·Remove` → 컴파일 뒤 저절로 돈다(새 항목은 저절로 적용, 고치기·지우기는 '적용 전' → 개발자가 Ctrl+S). 이미 있는 항목은 건너뛴다 | 관례 15, 21 |
 | 개발자가 에디터에서 바꾸게(밸런싱) | 숫자 = 밸런스 값·DB 칸·인스턴스 필드, 가리키는 것 = `[DataRef(typeof(…))]` 드롭다운, 효과 = Block 문장(`[BlockInfo(Sentence = "…{필드}…")]`). DB는 구조를 잠그고 값만 연다(`EditorPolicy`) | 관례 18, 21 |

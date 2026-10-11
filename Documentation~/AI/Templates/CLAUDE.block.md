@@ -24,4 +24,5 @@
 - 기믹(효과 문장)은 `{{GBIBLE}}/Documentation~/AI/GimmickCatalog.md`의 갈래로 쪼개 만든다. 조각이 놓이는 메인 룰은 그 문서 1절의 모양으로.
 - DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 돈다)나 CSV로 만든다. 새 항목은 저절로 적용되고, 이미 있는 항목을 고치거나 지운 것만 '적용 전'으로 남아 개발자가 Ctrl+S로 적용한다.
 - 응답을 끝낼 때 훅(`.claude/hooks/compile-check.ps1`)이 프로젝트 코드를 컴파일한다. 오류가 나오면 고친 뒤 끝낸다.
+- Unity 상태는 파일로 읽는다: DB 검증·'적용 전' 변경은 `Logs/MomoiProject/DbStatus.txt`, Unity 로그(컴파일 경고·DB 반영 스크립트 결과)는 `Logs/Editor.log`.
 - 응답 끝에: 개발자가 할 일(적용할 DB 항목·넣을 에셋·돌려 볼 테스트 상황·Unity에서 볼 것) · 기록한 결정 · 확인 기다리는 것(승인 요청) · 지금 단계와 다음 할 일.
