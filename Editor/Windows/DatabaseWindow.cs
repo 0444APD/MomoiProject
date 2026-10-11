@@ -1004,6 +1004,13 @@ namespace GBible.EditorTools
                         ("트리거", when != null ? Gs.Dual(when.Natural(names), when.Describe(names)) : "트리거 없음"),
                         ("결과", outcomes.Count > 0 ? string.Join(",  ", outcomes) : "없음"),
                     };
+                // 가중치 표: 줄마다 최종 %(안쪽 표까지 곱한 전체 기준 — 조건은 맞다고, 밸런스 값은 기준값으로).
+                case WeightTableData table:
+                    var chances = table.Preview(id => names.FindById(id) as WeightTableData, id => (names.FindById(id) as BalanceData)?.value);
+                    return new List<(string, string)>
+                    {
+                        ("확률", chances.Count == 0 ? "없음" : string.Join("  ·  ", chances.Select(c => $"{new string('›', c.depth)}{(c.depth > 0 ? " " : "")}{c.label} {c.percent:0.##}%"))),
+                    };
                 // 선택 요소 '능력'(프로젝트의 DB 종류, 규격 IUsableData).
                 case IUsableData usable when usable.ToUsable() is AbilityDefinition ability:
                     var abilityOutcomes = BoundOutcomes.Has(item.Id) ? BoundOutcomes.For(item.Id).Select(c => "코드: " + c.Name).ToList()

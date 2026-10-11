@@ -12,6 +12,8 @@ namespace GBible
     //   - 진행에 따라 바뀌는 풀: 항목의 조건(맞을 때만 후보, 도전과제·해금·층 …). 뽑을 때마다 다시 보므로 업데이트로 항목이 늘어도 저장을 고칠 일이 없다.
     //   - 판에서 만들어지는 풀: 플레이어 데이터 목록 줄(그 목록의 요소마다 후보) · 뺄 목록(가진 유물·본 이벤트는 후보가 아님).
     // 다른 가중치 표를 항목으로 넣으면 그 표에서 다시 뽑는다. "꽝" 무게를 주면 그만큼 아무것도 나오지 않는다.
+    // 줄마다 '고정 %'(전체 중 그 %) 또는 '무게'(고정 %가 남긴 몫을 무게 비율로 나눔)다. 묶음(안쪽 표·목록 줄)도 줄 하나라 "이 묶음 = 전체의 n%".
+    //   조건·뺄 목록으로 줄이 빠지면 고정 % 줄은 적힌 대로, 빠진 몫은 무게 줄이 나눠 가진다. 무게 줄이 없으면 남은 고정 % 줄끼리 비율대로(Shares).
     // 표 없이 코드에서 만든 풀은 Game.Roll(풀, 개수, unique, stream)(난수 흐름 "pool:" + stream).
     // 난수는 표마다 따로인 결정론 흐름(Game.Random("table:ID"))이라 Undo하면 같은 결과, 표를 추가해도 다른 표의 결과가 바뀌지 않는다.
     // 행동 안에서 부른다(난수 상태가 행동과 함께 되돌아간다).
@@ -20,6 +22,8 @@ namespace GBible
     {
         public string item = "";
         public double weight = 1;
+        // 참이면 weight(또는 밸런스 값)는 '전체 중 %'(고정 %), 거짓이면 무게(고정 %가 남긴 몫을 무게 비율로 나눔).
+        public bool percent;
         public int minCount = 1;
         public int maxCount = 1;
         public Condition condition;
@@ -69,6 +73,8 @@ namespace GBible
     {
         public string Id;
         public double EmptyWeight;
+        // 참이면 EmptyWeight는 꽝의 고정 %.
+        public bool EmptyPercent;
         public readonly List<WeightEntry> Entries = new List<WeightEntry>();
         // 뺄 목록: 이 목록들에 있는 ID는 후보가 아니다(가진 유물·이번 판에 본 이벤트). 안쪽 표에도 적용된다.
         public readonly List<PlayerDataListRef> Exclude = new List<PlayerDataListRef>();
@@ -136,17 +142,17 @@ namespace GBible
             if (depth >= MaxDepth) throw new InvalidOperationException($"[MomoiProject] 가중치 표 '{table.Id}'가 {MaxDepth}단계 넘게 서로를 부릅니다(표끼리 돌고 있는지 확인하세요).");
             blocked = Blocked(table, blocked);
             var candidates = Candidates(table, used, blocked, depth);
-            var total = candidates.Sum(e => e.weight) + Share(table.EmptyWeight);
+            var shares = SharesOf(table, candidates, out var total);
             if (total <= 0) return;
             var random = _session.Random.Get(stream);
             var roll = random.NextDouble() * total;
             WeightEntry picked = null;
-            foreach (var entry in candidates)
+            for (int i = 0; i < candidates.Count; i++)
             {
-                roll -= entry.weight;
+                roll -= shares[i];
                 if (roll < 0)
                 {
-                    picked = entry;
+                    picked = candidates[i];
                     break;
                 }
             }
@@ -175,12 +181,14 @@ namespace GBible
                 if (source == null) continue;
                 var w = Share(WeightOf(source));
                 if (w <= 0) continue;
-                var e = w == source.weight ? source : new WeightEntry { item = source.item, weight = w, minCount = source.minCount, maxCount = source.maxCount, condition = source.condition, listKey = source.listKey, listPath = source.listPath };
+                var e = w == source.weight ? source : new WeightEntry { item = source.item, weight = w, percent = source.percent, minCount = source.minCount, maxCount = source.maxCount, condition = source.condition, listKey = source.listKey, listPath = source.listPath };
                 if (e.condition != null && !e.condition.Evaluate(_session)) continue;
                 if (!string.IsNullOrEmpty(e.listKey))
                 {
-                    foreach (var id in IdsAt(e.listKey, e.listPath).Distinct(StringComparer.Ordinal))
-                        if (Open(id, used, blocked)) list.Add(new WeightEntry { item = id, weight = e.weight, minCount = e.minCount, maxCount = e.maxCount });
+                    // 무게 줄은 요소마다 그 무게, 고정 % 줄은 줄의 %를 요소 수로 나눈다("이 목록 = 전체의 n%").
+                    var ids = IdsAt(e.listKey, e.listPath).Distinct(StringComparer.Ordinal).Where(id => Open(id, used, blocked)).ToList();
+                    foreach (var id in ids)
+                        list.Add(new WeightEntry { item = id, weight = e.percent ? e.weight / ids.Count : e.weight, percent = e.percent, minCount = e.minCount, maxCount = e.maxCount });
                     continue;
                 }
                 if (string.IsNullOrEmpty(e.item)) continue;
@@ -208,6 +216,42 @@ namespace GBible
         // 끝없이 큰 무게(∞)는 MaxWeight로 본다 — 무게 ÷ 합이 1이 되고(다른 줄·꽝은 0에 가깝다), 합이 double을 넘지 않는다.
         const double MaxWeight = 1e300;
         static double Share(double weight) => weight > 0 ? Math.Min(weight, MaxWeight) : 0;
+
+        // 후보들과 꽝의 뽑기 몫(마지막 칸 = 꽝은 돌려주지 않고 total에만 든다).
+        static double[] SharesOf(WeightTableDefinition table, List<WeightEntry> candidates, out double total)
+        {
+            var rows = new List<(double value, bool percent)>(candidates.Count + 1);
+            foreach (var e in candidates) rows.Add((e.weight, e.percent));
+            rows.Add((table.EmptyWeight, table.EmptyPercent));
+            return Shares(rows, out total);
+        }
+
+        // 줄마다의 뽑기 몫: 고정 % 줄은 적힌 %, 무게 줄은 (100 − 고정 % 합)을 무게 비율로 나눈다.
+        // 무게 줄이 없거나(무게 합 0) 고정 % 합이 100 이상이면 고정 % 줄끼리 비율대로(무게 줄은 0). 고정 % 줄이 없으면 무게 그대로(예전과 같은 결과).
+        // 0 이하·숫자가 아님은 0(후보가 아니다). total = 몫의 합(뽑기는 0 ~ total).
+        public static double[] Shares(IReadOnlyList<(double value, bool percent)> rows, out double total)
+        {
+            var shares = new double[rows.Count];
+            double fixedSum = 0, weightSum = 0;
+            var anyFixed = false;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var v = Share(rows[i].value);
+                shares[i] = v;
+                if (rows[i].percent) { fixedSum += v; anyFixed = anyFixed || v > 0; }
+                else weightSum += v;
+            }
+            if (!anyFixed)
+            {
+                total = weightSum;
+                return shares;
+            }
+            var rest = weightSum > 0 && fixedSum < 100 ? 100 - fixedSum : 0;
+            for (int i = 0; i < rows.Count; i++)
+                if (!rows[i].percent) shares[i] = rest > 0 ? rest * shares[i] / weightSum : 0;
+            total = fixedSum + rest;
+            return shares;
+        }
 
         static bool Open(string id, HashSet<string> used, HashSet<string> blocked) =>
             (used == null || !used.Contains(id)) && (blocked == null || !blocked.Contains(id));
@@ -252,19 +296,20 @@ namespace GBible
             var table = Find(id);
             if (table == null) return Array.Empty<(string, double)>();
             var candidates = Candidates(table, null, Blocked(table, null), 0);
-            var total = candidates.Sum(e => e.weight) + Share(table.EmptyWeight);
+            var shares = SharesOf(table, candidates, out var total);
             if (total <= 0) return Array.Empty<(string, double)>();
             // 항목마다 하나: 같은 항목이 여러 줄에 있으면(직접 적은 줄 + 플레이어 데이터 목록 줄) 몫을 합친다 — 한 번 뽑을 때 그 항목이 나올 확률이고,
             // 처음 나온 줄의 차례를 지킨다(사전으로 바꿔도 겹치지 않는다).
             var result = new List<(string item, double chance)>();
             var at = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var e in candidates)
+            for (int n = 0; n < candidates.Count; n++)
             {
-                if (at.TryGetValue(e.item, out var i)) result[i] = (e.item, result[i].chance + e.weight / total);
+                var e = candidates[n];
+                if (at.TryGetValue(e.item, out var i)) result[i] = (e.item, result[i].chance + shares[n] / total);
                 else
                 {
                     at[e.item] = result.Count;
-                    result.Add((e.item, e.weight / total));
+                    result.Add((e.item, shares[n] / total));
                 }
             }
             return result;

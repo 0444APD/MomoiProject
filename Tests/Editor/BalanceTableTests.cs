@@ -362,5 +362,90 @@ namespace GBible.Tests
             Assert.AreEqual(0.25, chances[1].chance, 1e-9);
             Assert.DoesNotThrow(() => chances.ToDictionary(c => c.item, c => c.chance), "사전으로 바꿔도 겹치지 않는다");
         }
+        // 고정 %: 적힌 % 그대로, 무게 줄은 남은 몫을 무게 비율로(D-166).
+        [Test]
+        public void 고정_퍼센트_줄은_전체_중_그_퍼센트다()
+        {
+            var table = new WeightTableDefinition { Id = "loot" };
+            table.Entries.Add(new WeightEntry { item = "rare", weight = 20, percent = true });
+            table.Entries.Add(new WeightEntry { item = "sword", weight = 1 });
+            table.Entries.Add(new WeightEntry { item = "shield", weight = 3 });
+            _session.Tables.Define(table);
+            var chances = _session.Tables.Chances("loot").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(0.20, chances["rare"], 1e-9);
+            Assert.AreEqual(0.20, chances["sword"], 1e-9, "남은 80%를 1:3으로");
+            Assert.AreEqual(0.60, chances["shield"], 1e-9);
+            var got = Enumerable.Range(0, 500).Count(_ => RollIn("loot", 1).Single() == "rare");
+            Assert.IsTrue(got >= 70 && got <= 130, $"20% 근처({got}/500)");
+        }
+
+        // 조건으로 빠진 고정 % 줄의 몫은 무게 줄이 나눠 가진다. 무게 줄이 없으면 고정 % 줄끼리 비율대로(D-167).
+        [Test]
+        public void 빠진_고정_퍼센트는_무게_줄이_나눠_가진다()
+        {
+            var table = new WeightTableDefinition { Id = "drop" };
+            table.Entries.Add(new WeightEntry { item = "relic", weight = 10, percent = true, condition = new DeepFloor() });
+            table.Entries.Add(new WeightEntry { item = "gem", weight = 30, percent = true });
+            table.Entries.Add(new WeightEntry { item = "coin", weight = 1 });
+            _session.Tables.Define(table);
+            var shallow = _session.Tables.Chances("drop").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(0.30, shallow["gem"], 1e-9, "고정 %는 적힌 대로");
+            Assert.AreEqual(0.70, shallow["coin"], 1e-9, "빠진 relic 10%까지 무게 줄이");
+            Game.Do(new Edit { run = g => g.Get<BtRun>("run").floor = 3 });
+            var deep = _session.Tables.Chances("drop").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(0.10, deep["relic"], 1e-9);
+            Assert.AreEqual(0.60, deep["coin"], 1e-9);
+
+            var only = new WeightTableDefinition { Id = "only" };
+            only.Entries.Add(new WeightEntry { item = "a", weight = 30, percent = true });
+            only.Entries.Add(new WeightEntry { item = "b", weight = 30, percent = true });
+            _session.Tables.Define(only);
+            var half = _session.Tables.Chances("only").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(0.5, half["a"], 1e-9, "무게 줄이 없으면 고정 % 줄끼리 비율대로");
+        }
+
+        // 목록 줄의 고정 %는 요소들이 나눠 가지고("이 묶음 = 전체의 n%"), 꽝도 고정 %가 된다.
+        [Test]
+        public void 목록_줄과_꽝도_고정_퍼센트가_된다()
+        {
+            Game.Do(new Edit { run = g => { var run = g.Get<BtRun>("run"); run.unlocked.Add("x"); run.unlocked.Add("y"); } });
+            var table = new WeightTableDefinition { Id = "mix", EmptyWeight = 50, EmptyPercent = true };
+            table.Entries.Add(new WeightEntry { listKey = "run", listPath = "unlocked", weight = 20, percent = true });
+            table.Entries.Add(new WeightEntry { item = "z", weight = 1 });
+            _session.Tables.Define(table);
+            var chances = _session.Tables.Chances("mix").ToDictionary(c => c.item, c => c.chance);
+            Assert.AreEqual(0.10, chances["x"], 1e-9, "목록 20%를 둘이 나눔");
+            Assert.AreEqual(0.10, chances["y"], 1e-9);
+            Assert.AreEqual(0.30, chances["z"], 1e-9, "꽝 50% · 목록 20% · 나머지 30%");
+        }
+
+        // 고정 % 줄이 없으면 예전과 같은 몫(무게 그대로).
+        [Test]
+        public void 고정_퍼센트가_없으면_무게_그대로다()
+        {
+            var shares = WeightTableSystem.Shares(new List<(double, bool)> { (1, false), (3, false), (0, false) }, out var total);
+            Assert.AreEqual(4, total, 1e-9);
+            CollectionAssert.AreEqual(new[] { 1.0, 3.0, 0.0 }, shares);
+        }
+        // 편집 화면 요약: 줄마다 최종 %(안쪽 표까지 곱한 전체 기준).
+        [Test]
+        public void 편집_요약은_안쪽_표까지_곱한_퍼센트를_보인다()
+        {
+            var inner = UnityEngine.ScriptableObject.CreateInstance<GBible.Data.WeightTableData>();
+            inner.EditorAssignId("rareTable");
+            inner.entries.Add(new GBible.Data.WeightTableEntry { item = "bow", weight = 1 });
+            inner.entries.Add(new GBible.Data.WeightTableEntry { item = "staff", weight = 1 });
+            var outer = UnityEngine.ScriptableObject.CreateInstance<GBible.Data.WeightTableData>();
+            outer.EditorAssignId("loot");
+            outer.entries.Add(new GBible.Data.WeightTableEntry { item = "rareTable", mode = GBible.Data.WeightMode.Percent, percent = 10 });
+            outer.entries.Add(new GBible.Data.WeightTableEntry { item = "sword", weight = 1 });
+            var lines = outer.Preview(id => id == "rareTable" ? inner : null, _ => null).ToDictionary(l => l.label, l => l.percent);
+            Assert.AreEqual(10, lines["rareTable"], 1e-9);
+            Assert.AreEqual(5, lines["bow"], 1e-9, "안쪽 표의 50% × 10%");
+            Assert.AreEqual(90, lines["sword"], 1e-9);
+            Assert.AreEqual(outer.ToDefinition().Entries[0].percent, true);
+            UnityEngine.Object.DestroyImmediate(inner);
+            UnityEngine.Object.DestroyImmediate(outer);
+        }
     }
 }
