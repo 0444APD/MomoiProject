@@ -386,6 +386,7 @@ namespace GBible.EditorTools
         {
             if (data is INestedData && property.propertyPath == "parent") return false;
             if (field == null || EditorDatabase.IsRequired(field)) return false;
+            if (field.GetCustomAttribute<DataRefAttribute>()?.Optional == true) return false;
             if (InsideBlock(property) || UI.ShowIfRules.IsSwitch(field)) return false;
             // 목록 칸(List<string>)의 요소는 그 목록 칸의 [ShowIf]를 따른다.
             return UI.ShowIfRules.Visible(property);

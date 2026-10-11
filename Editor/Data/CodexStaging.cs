@@ -587,8 +587,13 @@ namespace GBible.EditorTools
             EditorApplication.wantsToQuit += () => AskBeforeLeaving("Unity를 닫기 전에") != AskResult.Cancel;
         }
 
+        // 이번 도메인에서 맡겨 둔 것을 되찾았나. 되찾기 전에 다시 읽기가 또 오면(컴파일이 이어짐) 비어 있는 지금 모습으로 덮지 않는다 —
+        // 덮으면 DB 반영 스크립트가 고친 '적용 전' 작업본이 사라진다.
+        bool _stashLoaded;
+
         void SaveStash()
         {
+            if (!_stashLoaded && !string.IsNullOrEmpty(SessionState.GetString(StashKey, ""))) return;
             if (IsEmpty)
             {
                 SessionState.EraseString(StashKey);
@@ -618,6 +623,7 @@ namespace GBible.EditorTools
 
         void LoadStash()
         {
+            _stashLoaded = true;
             var json = SessionState.GetString(StashKey, "");
             SessionState.EraseString(StashKey);
             if (string.IsNullOrEmpty(json)) return;

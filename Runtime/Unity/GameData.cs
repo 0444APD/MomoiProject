@@ -66,6 +66,8 @@ namespace GBible.Data
     public sealed class DataRefAttribute : Attribute
     {
         public Type DataType { get; }
+        // 비워도 되는 칸(비우면 '없음' — 검증이 '선택되지 않았습니다'를 알리지 않는다). 예: 적 편성의 빈 칸, 고르지 않아도 되는 보상 표.
+        public bool Optional { get; set; }
 
         public DataRefAttribute(Type dataType)
         {

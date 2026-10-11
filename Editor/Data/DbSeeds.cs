@@ -111,6 +111,13 @@ namespace GBible.EditorTools
             if (seeds.Count == 0) return 0;
             var record = Load();
             var pending = Pending();
+            // '적용 전'으로 기다리는 것이 하나도 없는데 돌았다고만 남아 있으면(적용됐으면 기록됐을 것 — 다시 읽기 사이에 작업본을 잃음) 다시 돌린다.
+            // 반영 스크립트는 이미 있는 것을 건너뛰고 빈 칸만 채우므로 다시 돌아도 같은 결과다.
+            if (pending.Count > 0 && EditorDatabase.Staging.IsEmpty)
+            {
+                pending.Clear();
+                SessionState.EraseString(PendingKey);
+            }
             var ran = new List<string>();
             var staging = EditorDatabase.Staging;
             var addedBefore = staging.AddedNow();
