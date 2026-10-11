@@ -121,7 +121,7 @@ GBible.Unity
 | 쌓는 숫자(처치 수·최대 콤보) | DB › 로그(이벤트 받기 → 기록 규칙: 더하기·최대·마지막), `session.Stats.Get(id)` | 15 |
 | 필수 값·스프라이트 틀 | 필드 규칙(클래스 상세)·스프라이트 틀 파일(Project 창 Create › MomoiProject › 스프라이트 틀 — 용도 하나의 크기 표(이름·가로·세로), 개발자가 Dev에서 만든다) | 27 |
 | 수치 수십 개 한꺼번에 | DB 목록의 CSV(목록 칸 `entries[0].weight`) | 33 |
-| AI가 DB 항목 만들기 | DB 반영 스크립트(`Assets/MomoiProject/Code/Editor/Seeds`, `[DbSeed("버전")]` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)` → 컴파일 뒤 저절로 적용 전 → 개발자가 Ctrl+S) 또는 CSV | 관례 15절 |
+| AI가 DB 항목 만들기 | DB 반영 스크립트(`Assets/MomoiProject/Code/Editor/Seeds`, `[DbSeed("버전")]` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)` → 컴파일 뒤 저절로 돈다 — 새 항목은 저절로 적용, 고치기·지우기는 '적용 전'으로 남아 개발자가 Ctrl+S) 또는 CSV | 관례 15절 |
 
 ### 2-4. 화면 · 연출 · 소리 · 글
 
@@ -149,7 +149,7 @@ GBible.Unity
 |---|---|---|
 | 설정(음량·언어·화면·전투 속도) | DB › 설정(종류: 켜기/끄기·숫자·선택지·글, 적용 대상: 언어·음량·전체 화면·해상도·수직 동기화·최대 프레임) → `GameSettings.Number(id)`·`Toggle`·`Choice`·`Set`·`Changed`. 화면은 기본 설정 화면 | 31·35 |
 | 플레이 중 값·기록 보기, 이벤트 쏴 보기, 버튼 하나로 시험 | 모니터(타임라인·데이터·행동·명령·이벤트 호출), DB › 개발 명령(결과 Block 조립 → 명령 탭 버튼) | 22 |
-| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/MomoiProject/Code/Editor`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add·Work·Remove` → 컴파일 뒤 저절로 '적용 전', 개발자가 Ctrl+S. 이미 있는 항목은 건너뛴다 | 관례 15, 21 |
+| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/MomoiProject/Code/Editor`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add·Work·Remove` → 컴파일 뒤 저절로 돈다(새 항목은 저절로 적용, 고치기·지우기는 '적용 전' → 개발자가 Ctrl+S). 이미 있는 항목은 건너뛴다 | 관례 15, 21 |
 | 개발자가 에디터에서 바꾸게(밸런싱) | 숫자 = 밸런스 값·DB 칸·인스턴스 필드, 가리키는 것 = `[DataRef(typeof(…))]` 드롭다운, 효과 = Block 문장(`[BlockInfo(Sentence = "…{필드}…")]`). DB는 구조를 잠그고 값만 연다(`EditorPolicy`) | 관례 18, 21 |
 | 개발자가 추가·삭제하는 DB 종류(레벨 배치·대사) | `[Database("층", DeveloperAuthored = true)]` — 이 종류만 DB에서 추가·삭제·ID 바꾸기가 열린다. 인스턴스(DB › 인스턴스)는 잠겨 있으니 개발자가 배치할 레벨 데이터에 쓰지 않는다 | 관례 18, 21 |
 | 테스트 씬·패널·상황 | `TestSceneSetup.Ensure(copyFrom:, scenario:)`(반영 스크립트에서) · 컴포넌트 `TestScene`(test 슬롯·시작 상황·패널 F1) · `TestScenarios.Save·Load(session, 이름, seed)` | 관례 19, 38 |
@@ -312,7 +312,7 @@ public class PlayCard : GameAction
 | DB › 능력 (선택 요소) | 프로젝트의 `AbilityData`(규격 `IUsableData`) · `ability` | 쓰는 것(조건·대상·효과·쓸 수 없을 때 글) | `GameIds.Ability` | 16 |
 | DB › 상태 효과 (선택 요소) | 프로젝트의 `StatusData`(규격 `IStatusData`) · `status` | 버프·디버프·쿨다운(`kind` 종류·중첩·지속·주기·보정·트리거·결과·아이콘·화면에 숨김) | `GameIds.Status` | 29 |
 | DB › 패시브 (선택 요소) | 프로젝트의 `PassiveData`(규격 `IPassiveData`) · `passive` | 가지고 있으면 발동(`ownerKey`·`ownerPath` 가진 목록 · `matchField` 일치 필드 · `matchVia` 원본에서 읽기 · `perElement` 놓인 것마다 · `levelField` 레벨 필드 · `trigger` 발동 · `holderField` 가진 쪽 필드 · `outcomes` 결과 · `rules` 발동 더 · `pulse`·`pulseByLevel` 주기 · `modifiers` 가진 동안 능력치 보정 · `modifierTarget` 보정 받을 대상 · `modifierWhen` 보정 조건 · `stacking` 여럿일 때 · `icon`) | `GameIds.Passive` | 17·29 |
-| DB › 밸런스 값 | `BalanceData` · `balance` | 숫자 + 곡선 | `GameIds.Balance` | 30 |
+| DB › 밸런스 값 | `BalanceData` · `balance` | 숫자 + 곡선(쓰는 값만) · 표시 이름(`label`, 개발자가 한글로 고침)·입력 칸 주석(`hint`)·메모. 전용 탭: 접고 펼치기·마우스를 올리면 입력 칸·✎ | `GameIds.Balance` | 30 |
 | DB › 가중치 표 | `WeightTableData` · `table` | 풀 + 무게 또는 고정 %(줄마다) | `GameIds.WeightTable` | 30 |
 | DB › 화면 | `ScreenData` · `screen` | UI Toolkit 화면 | `GameIds.Screen` | 35 |
 | DB › 인스턴스 | `InstanceData` · `instance` | 원본 하나(클래스의 값) | `GameIds.Instance` | 04 |

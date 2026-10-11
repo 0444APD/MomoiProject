@@ -326,6 +326,41 @@ namespace GBible.EditorTools
         // ── 적용·되돌리기 ──────────────────────────────────────
 
         // 적용(Ctrl+S)했다·버렸다. DB 반영 스크립트가 "돌았음"을 적용했을 때만 기록하려고 받는다.
+        // 새 항목 몇 개만 적용한다 — 나머지(작업본·지우기·ID 바꾸기·다른 새 항목)는 그대로 '적용 전'으로 남긴다.
+        // DB 반영 스크립트가 만든 새 항목을 저절로 적용할 때 쓴다(DbSeeds — 고치기·지우기와 개발자가 고치던 것은 Ctrl+S를 기다린다).
+        public int CommitAdded(ICollection<GameData> items)
+        {
+            if (items == null || items.Count == 0) return 0;
+            var working = new Dictionary<GameData, GameData>(_working);
+            var origins = new Dictionary<GameData, GameData>(_originOf);
+            var removed = new List<GameData>(_removed);
+            var refs = new Dictionary<GameData, string>(_refsAt);
+            var others = _added.Where(a => !items.Contains(a)).ToList();
+            _working.Clear();
+            _originOf.Clear();
+            _removed.Clear();
+            _refsAt.Clear();
+            _added.RemoveAll(a => !items.Contains(a));
+            try
+            {
+                return Commit();
+            }
+            finally
+            {
+                foreach (var pair in working) _working[pair.Key] = pair.Value;
+                foreach (var pair in origins) _originOf[pair.Key] = pair.Value;
+                foreach (var item in removed) if (!_removed.Contains(item)) _removed.Add(item);
+                foreach (var pair in refs) _refsAt[pair.Key] = pair.Value;
+                foreach (var item in others) if (!_added.Contains(item)) _added.Add(item);
+                EditorDatabase.StagingChanged();
+            }
+        }
+
+        // DB 반영 스크립트가 돌기 전·뒤를 비교한다(무엇을 새로 만들었고, 무엇을 고치거나 지웠나).
+        internal HashSet<GameData> AddedNow() => new HashSet<GameData>(_added.Where(a => a != null));
+        internal HashSet<GameData> WorkingNow() => new HashSet<GameData>(_working.Keys.Where(k => k != null));
+        internal HashSet<GameData> RemovedNow() => new HashSet<GameData>(_removed.Where(r => r != null));
+
         public static event Action AfterCommit;
         public static event Action AfterDiscard;
 

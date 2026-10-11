@@ -231,6 +231,7 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - §6.1E 시작하기·도움말을 모든 기능에 강제 → **보류**(숨김, 가장 마지막).
 - 탭 이름 "수치" → **로그**, "상태 키" → **플레이어 데이터**, "선택지 목록" → **키워드**.
 - **2026-10-11(프로젝트 테스트 중 사용자 결정)**: ① **선택 요소** — 상태 효과·패시브·능력의 DB 종류(`StatusData`·`PassiveData`·`AbilityData`)는 라이브러리에서 뺐다. 프로젝트가 템플릿(`Documentation~/AI/Templates/Elements/*.cs.txt`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 들이고 칸을 마음대로 더한다(프로젝트 변경). 엔진(Core·기본 Block·Game 함수)은 그대로, 규격 `IStatusData`·`IPassiveData`·`IUsableData`(+ 표시 `IDataKind`)로 등록·`[DataRef(typeof(규격))]`. `[Element]`가 붙은 Block·행동 직전 이벤트·이벤트는 그 요소의 DB 종류가 없으면 고르는 목록에서 빠진다(`DataTypes.Visible`, 계약 검사는 `BlockTypes.AllConcreteTypes`). 템플릿은 `Tests/Editor/Elements`의 사본(네임스페이스만 다름)으로 컴파일·비교한다(`ElementTemplateTests`). 도전과제·로그는 라이브러리에 남기되 `[Database(HideWhenEmpty = true)]`(항목이 없으면 탭이 숨음). ② 용어 **가로채기·의도 → 행동 직전 이벤트**(화면 글·문서 — 트리거 '행동 직전 이벤트 받기', 결과 '행동 직전 이벤트 고치기'). 코드 이름(`Intercept`·`Intent`)은 그대로.
+- **2026-10-11(같은 날, 사용자 결정 L7·요청)**: ③ **DB 반영 스크립트의 새 항목은 저절로 적용**(`CodexStaging.CommitAdded` — 작업본·지우기·다른 새 항목은 그대로 남김, `DbSeeds`가 돌기 전·뒤를 비교). 고치기·지우기만 '적용 전'으로 Ctrl+S를 기다린다. 메뉴 '새 항목은 바로 적용'(`ProjectSettings/MomoiProject/DbSeedOptions.json`). ④ **DB › 밸런스 값 전용 탭**(`BalancePage`): 표시 이름(`BalanceData.label`)·입력 칸 주석(`hint`), 접고 펼치기, 마우스를 올리면 입력 칸, ✎ 편집 칸(이름·주석·메모·곡선 쓰기), 곡선은 쓰는 값만, 목록만 새 창(`BalanceListWindow`). 항목은 ID로만 식별한다는 원칙(2.3)의 예외 — 밸런스 값만 개발자용 표시 이름을 둔다(사용자 요청). ⑤ 컴파일 검사 훅이 고친 패키지 소스도 컴파일한다(Library의 옛 DLL로 없는 오류를 내던 것).
 
 ---
 

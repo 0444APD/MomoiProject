@@ -209,7 +209,7 @@ public sealed class MonsterData : GameData
 - 잠긴 종류의 헤더에는 "값을 바꿉니다(추가·삭제·구조는 AI에게)"가 보이고 **+ 새로 만들기**·**삭제**가 없다. 상세 창 제목(ID)은 고칠 수 없다.
 - 라이브러리를 고치거나 급할 때: 메뉴 **MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)**(이 컴퓨터에만, 기본 꺼짐).
 
-**DB 반영 스크립트**: `Assets/MomoiProject/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 저절로 한 번 돈다. 함수 안에서 `EditorDatabase.Staging.Add·Work·Remove`로 항목을 만들고·고치고·지우고, ID는 `Staging.Rename(항목, 새 ID)`로 바꾼다(4절) → DB에 **적용 전**으로 보이고, 개발자가 읽어 본 뒤 Ctrl+S로 적용한다. 적용했을 때만 그 버전이 돈 것으로 기록되고(`ProjectSettings/MomoiProject/DbSeeds.json` — 돌린 뒤 바뀐 것이 없으면, 곧 이미 있는 항목뿐이거나 같은 값으로 Work만 했으면 바로 기록), 버리면 다음 컴파일 뒤 다시 돈다. 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**. 예와 규칙은 AI 문서 `ProjectConventions.md` 15절.
+**DB 반영 스크립트**: `Assets/MomoiProject/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 저절로 한 번 돈다. 함수 안에서 `EditorDatabase.Staging.Add·Work·Remove`로 항목을 만들고·고치고·지우고, ID는 `Staging.Rename(항목, 새 ID)`로 바꾼다(4절) → **새 항목은 저절로 적용된다**(콘솔과 DB 창에 무엇이 들어왔는지 알린다). **이미 있는 항목을 고치거나 지운 것은 '적용 전'으로 보이고**, 개발자가 읽어 본 뒤 Ctrl+S로 적용한다. 고치기·지우기가 남았으면 적용했을 때 그 버전이 돈 것으로 기록되고(`ProjectSettings/MomoiProject/DbSeeds.json`), 버리면 다음 컴파일 뒤 다시 돈다. 남은 것이 없으면 바로 기록. 메뉴 **MomoiProject › DB 반영 스크립트 › 새 항목은 바로 적용**을 끄면 새 항목도 '적용 전'으로 둔다(`DbSeedOptions.json`). 메뉴 **MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기**. 예와 규칙은 AI 문서 `ProjectConventions.md` 15절.
 
 ---
 

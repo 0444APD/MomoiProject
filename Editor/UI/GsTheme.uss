@@ -1086,3 +1086,78 @@
 
 /* 창에 붙은 상세 패널: 테두리·둥근 모서리 없이 창을 채운다 */
 .gs-detail--docked { flex-grow: 1; border-width: 0; border-radius: 0; }
+
+/* ── DB › 밸런스 값 탭(BalancePage): 접고 펼치는 줄 · 마우스를 올리면 입력 칸 ─────── */
+.gs-bal-list { padding: 2px 0 12px 0; }
+.gs-root .gs-bal-section { margin: 12px 0 4px 10px; font-size: 11px; color: var(--gs-text-3); -unity-font-style: bold; }
+.gs-bal-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 34px;
+    padding: 5px 10px;
+    margin-bottom: 2px;
+    border-radius: 8px;
+}
+.gs-bal-row:hover { background-color: var(--gs-hover); }
+.gs-bal-row--child { min-height: 32px; }
+.gs-bal-name { flex-direction: row; align-items: center; flex-grow: 1; flex-shrink: 1; min-width: 0; cursor: link; }
+.gs-root .gs-bal-arrow { width: 16px; font-size: 10px; color: var(--gs-text-3); }
+.gs-root .gs-bal-label { font-size: 13px; flex-shrink: 1; }
+.gs-root .gs-bal-label--error { color: var(--gs-danger); }
+.gs-root .gs-bal-id { margin-left: 8px; font-size: 11px; color: var(--gs-text-3); flex-shrink: 1; }
+.gs-root .gs-bal-value { min-width: 96px; margin: 0 8px; -unity-text-align: middle-right; color: var(--gs-text-2); }
+.gs-bal-row .gs-badge { margin-left: 8px; }
+.gs-bal-input {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    width: 220px;
+    min-height: 24px;
+    margin: 0 8px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background-color: var(--gs-surface-2);
+    border-width: 1px;
+    border-color: var(--gs-border-strong);
+}
+.gs-bal-row:hover > .gs-bal-input,
+.gs-bal-row--editing > .gs-bal-input { display: flex; }
+.gs-bal-row:hover > .gs-bal-value,
+.gs-bal-row--editing > .gs-bal-value { display: none; }
+.gs-bal-input .unity-base-field { margin: 0; flex-grow: 1; }
+.gs-bal-input .unity-base-field__label { display: none; }
+.gs-bal-input .unity-base-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 0;
+    color: var(--gs-text);
+    font-size: 12px;
+}
+.gs-root .gs-bal-hint {
+    position: absolute;
+    right: 8px;
+    top: 0;
+    bottom: 0;
+    -unity-text-align: middle-right;
+    font-size: 10px;
+    color: var(--gs-text-3);
+}
+.gs-bal-edit-btn { opacity: 0.4; }
+.gs-bal-row:hover > .gs-bal-edit-btn { opacity: 1; }
+.gs-bal-children {
+    margin: 0 0 4px 24px;
+    padding-left: 6px;
+    border-left-width: 1px;
+    border-color: var(--gs-border);
+}
+.gs-root .gs-bal-subhead { margin: 6px 0 2px 10px; font-size: 11px; color: var(--gs-text-2); -unity-font-style: bold; }
+.gs-bal-edit {
+    margin: 0 10px 8px 34px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background-color: var(--gs-surface-2);
+}
+.gs-bal-edit-line { flex-direction: row; align-items: center; min-height: 28px; }
+.gs-root .gs-bal-edit-name { width: 96px; color: var(--gs-text-2); }
+.gs-bal-edit-input { flex-grow: 1; margin: 0; }
+.gs-bal-edit-input .unity-base-field__label { display: none; }

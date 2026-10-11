@@ -21,6 +21,6 @@
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".
 - 상태 효과·패시브·능력은 선택 요소다: 쓰면 템플릿(`{{GBIBLE}}/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 들이고, 칸이 모자라면 그 클래스에 더한다(프로젝트 변경 — 묻지 않고 보고만).
 - 기믹(효과 문장)은 `{{GBIBLE}}/Documentation~/AI/GimmickCatalog.md`의 갈래로 쪼개 만든다. 조각이 놓이는 메인 룰은 그 문서 1절의 모양으로.
-- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 '적용 전'으로 들어간다)나 CSV로 만들고, 개발자가 읽어 보고 Ctrl+S로 적용한다.
+- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 돈다)나 CSV로 만든다. 새 항목은 저절로 적용되고, 이미 있는 항목을 고치거나 지운 것만 '적용 전'으로 남아 개발자가 Ctrl+S로 적용한다.
 - 응답을 끝낼 때 훅(`.claude/hooks/compile-check.ps1`)이 프로젝트 코드를 컴파일한다. 오류가 나오면 고친 뒤 끝낸다.
 - 응답 끝에: 개발자가 할 일(적용할 DB 항목·넣을 에셋·돌려 볼 테스트 상황·Unity에서 볼 것) · 기록한 결정 · 확인 기다리는 것(승인 요청) · 지금 단계와 다음 할 일.
