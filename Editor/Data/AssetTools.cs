@@ -199,8 +199,20 @@ namespace GBible.EditorTools
             }
             File.Copy(externalFile, assetPath, overwrite: true);
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            SingleSprite(assetPath);
             AssetRequests.MarkDone(assetPath);
             return assetPath;
+        }
+
+        // 메타를 지킨 채 그림을 바꿨는데 '여러 개로 자르기'에 잘린 칸이 하나뿐이면(2D 프로젝트의 기본 가져오기) 한 장짜리로 바꾼다 —
+        // 그대로 두면 옛 그림 크기의 칸으로 잘려 새 그림이 어긋난다. 칸을 여럿 자른 시트는 그대로 둔다.
+        public static void SingleSprite(string assetPath)
+        {
+            if (!(AssetImporter.GetAtPath(assetPath) is TextureImporter importer)) return;
+            if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Multiple) return;
+            if (AssetDatabase.LoadAllAssetRepresentationsAtPath(assetPath).OfType<Sprite>().Count() > 1) return;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.SaveAndReimport();
         }
 
         // ── 쓰는 곳 ──────────────────────────────────────────────

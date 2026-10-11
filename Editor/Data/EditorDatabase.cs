@@ -669,9 +669,13 @@ namespace GBible.EditorTools
                 if (!Directory.EnumerateFileSystemEntries(legacy).Any()) AssetDatabase.DeleteAsset(legacy);
             }
             if (!StartSetup.IsDone) return;
+            // DB 반영 스크립트를 먼저 돌린다: 스크립트가 그 설정을 처음 채우는 중이면(새 항목 — 저절로 적용) 빈 기본값을 먼저 만들지 않게.
+            // 먼저 만들면 스크립트의 '이미 있으면 건너뛴다'에 걸려 내용이 빈 채 남거나, 고치기(Work)가 되어 Ctrl+S를 기다린다. 이미 돈 스크립트는 다시 돌지 않는다.
+            DbSeeds.RunPending(force: false);
+            var staged = Staging.AddedNow();
             foreach (var info in DataTypes.All.Where(i => i.Single))
             {
-                if (Instance.All.Any(d => d != null && d.GetType() == info.Type)) continue;
+                if (Instance.All.Any(d => d != null && d.GetType() == info.Type) || staged.Any(d => d.GetType() == info.Type)) continue;
                 // 화면 설정은 '화면 준비'와 같이(Panel Settings·테마까지).
                 if (info.Type == typeof(ScreenSettingsData)) ScreenSetup.Ensure(commit: true);
                 else Instance.Create(info.Type, info.IdPrefix);

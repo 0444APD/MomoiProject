@@ -226,6 +226,9 @@ namespace GBible.EditorTools
                 if (AssetImporter.GetAtPath(created) is TextureImporter importer)
                 {
                     importer.textureType = TextureImporterType.Sprite;
+                    // 그림 한 장 = 스프라이트 하나. 2D 프로젝트 기본(여러 개로 자르기)이면 잘린 칸이 메타에 남아,
+                    // 개발자가 크기가 다른 진짜 그림으로 바꿀 때(같은 GUID·메타 유지) 옛 칸 크기로 잘린다.
+                    importer.spriteImportMode = SpriteImportMode.Single;
                     importer.SaveAndReimport();
                 }
             });
