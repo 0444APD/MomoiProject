@@ -477,7 +477,7 @@ Game.Session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(done
 1. 화면 목록(기획 명세서 6절)에서 기본 화면으로 되는 것(고르기·확인·설정·슬롯·일시정지·알림)을 빼고 남은 화면마다:
 2. `Assets/MomoiProject/UI/Screens/<이름>.uxml`(+ 필요하면 `.uss`), 목록이 있으면 `Assets/MomoiProject/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색·크기는 테마 변수(`var(--momoi-…)`)를 쓴다. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`.
 3. 버튼·목록이 있으면 `Assets/MomoiProject/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`).
-4. DB 반영 스크립트(관례 15절)에 화면 항목을 더한다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
+4. DB 반영 스크립트(관례 15절)에 화면 항목을 더한다. 화면 코드의 `[BindTo(GameIds.Screen.X)]`는 그 항목이 저절로 적용되고 Unity가 다시 컴파일해 상수가 생긴 뒤에 컴파일된다 — UXML·반영 스크립트를 먼저 넣고 Unity가 다시 읽게 한 뒤(AI는 `RunTests.request`) 3의 화면 코드를 쓴다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
 5. 그림이 필요한 곳(카드 그림·아이콘)은 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳)`로 임시 그림과 넣을 것 목록을 만들고 UXML·USS가 그 경로를 쓴다 — 개발자가 에셋 관리에서 진짜 그림을 넣으면 그대로 바뀐다(39장).
 
 ```csharp

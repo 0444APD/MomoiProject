@@ -176,7 +176,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
 
 ## 15. DB 항목 만들기 — DB 반영 스크립트
 
-AI는 Unity 창을 누를 수 없다. DB 항목은 **DB 반영 스크립트**로 만든다: `Assets/MomoiProject/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 GBible이 저절로 한 번 돌린다. **새 항목은 저절로 적용된다**(무엇이 들어왔는지는 콘솔·DB 창 알림 — 개발자가 Ctrl+S를 누르지 않아도 GameIds 상수가 생기므로, 반영 스크립트와 그 상수를 쓰는 코드를 한 번에 쓴다). **이미 있는 항목을 고치거나(Work) 지우는(Remove) 것만 '적용 전'으로 남고**, 개발자가 읽어 보고 Ctrl+S로 적용한다 — 개발자가 만지던 항목을 말없이 바꾸지 않게. 고치기·지우기가 남았으면 적용했을 때 "이 버전은 돌았다"로 기록(버리면 다음 컴파일 뒤 다시 돈다), 남은 것이 없으면 바로 기록. 메뉴 `MomoiProject › DB 반영 스크립트 › 새 항목은 바로 적용`을 끄면 새 항목도 '적용 전'으로 둔다(`ProjectSettings/MomoiProject/DbSeedOptions.json`).
+AI는 Unity 창을 누를 수 없다. DB 항목은 **DB 반영 스크립트**로 만든다: `Assets/MomoiProject/Code/Editor`의 static 함수에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝난 뒤 GBible이 저절로 한 번 돌린다. **새 항목은 저절로 적용된다**(무엇이 들어왔는지는 콘솔·DB 창 알림 — 개발자가 Ctrl+S를 누르지 않아도 GameIds 상수가 생긴다. 단 상수는 **반영 스크립트가 돌고 Unity가 다시 컴파일한 뒤에** 생기므로, 그 상수를 쓰는 코드(화면의 `[BindTo(GameIds.Screen.X)]` 등)는 그다음에 쓴다: 반영 스크립트·UXML을 먼저 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다. 같은 응답 안의 규칙 코드는 상수 대신 `Game.Entry`나 반영 스크립트의 ID로 읽는다). **이미 있는 항목을 고치거나(Work) 지우는(Remove) 것만 '적용 전'으로 남고**, 개발자가 읽어 보고 Ctrl+S로 적용한다 — 개발자가 만지던 항목을 말없이 바꾸지 않게. 고치기·지우기가 남았으면 적용했을 때 "이 버전은 돌았다"로 기록(버리면 다음 컴파일 뒤 다시 돈다), 남은 것이 없으면 바로 기록. 메뉴 `MomoiProject › DB 반영 스크립트 › 새 항목은 바로 적용`을 끄면 새 항목도 '적용 전'으로 둔다(`ProjectSettings/MomoiProject/DbSeedOptions.json`).
 
 ```csharp
 // Assets/MomoiProject/Code/Editor/Seeds/AchievementSeeds.cs
