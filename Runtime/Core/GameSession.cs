@@ -113,6 +113,13 @@ namespace GBible
         // 보상 등은 원본이 아니라 CopyInstance의 깊은 사본을 넣는다(비교 코드가 있으면 생성 코드로, 리플렉션 없음).
         public Func<string, object> Instances;
 
+        // DB 항목(GameData — 프로젝트 DB 종류·선택 요소·밸런스 값 …)을 ID로 찾는다(없으면 null). 런타임이 데이터베이스로 채운다.
+        // 규칙이 DB 항목의 칸(적 편성의 칸·상태 효과에 프로젝트가 더한 칸 …)을 읽을 때 Game.Entry<T>(id). 테스트는 직접 넣는다.
+        // 원본이라 읽기만 한다(판 데이터에는 ID만 둔다).
+        public Func<string, object> Entries;
+        // 그 형식(물려받은 형식 포함)의 DB 항목 모두 — 하나만 두는 설정 종류를 ID 없이 찾을 때(Game.Entries<T>()).
+        public Func<Type, IEnumerable<object>> EntriesOfType;
+
         public object CopyInstance(string id)
         {
             var source = string.IsNullOrEmpty(id) ? null : Instances?.Invoke(id);

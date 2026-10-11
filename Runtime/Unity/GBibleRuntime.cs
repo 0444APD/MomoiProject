@@ -384,6 +384,13 @@ namespace GBible
                 foreach (var instance in database.All<InstanceData>())
                     if (!string.IsNullOrEmpty(instance.Id) && !instances.ContainsKey(instance.Id)) instances.Add(instance.Id, instance.value);
                 session.Instances = id => id != null && instances.TryGetValue(id, out var found) ? found : null;
+                // DB 항목: ID → 항목(Game.Entry<T> — 규칙이 프로젝트 DB 종류의 칸을 읽는다). 같은 ID가 둘이면 먼저 것.
+                var entries = new System.Collections.Generic.Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var entry in database.Entries)
+                    if (entry != null && !string.IsNullOrEmpty(entry.Id) && !entries.ContainsKey(entry.Id)) entries.Add(entry.Id, entry);
+                session.Entries = id => id != null && entries.TryGetValue(id, out var found) ? found : null;
+                var list = database.Entries.Where(e => e != null).Cast<object>().ToList();
+                session.EntriesOfType = type => list.Where(type.IsInstanceOfType);
                 // 필드 규칙의 '필수': 저장소 값에서 비면 경고하고 채워질 때까지 모니터에 남긴다.
                 foreach (var rule in database.All<FieldRuleData>())
                     if (rule.required && rule.TargetType != null) session.Data.Require(rule.TargetType, rule.field);

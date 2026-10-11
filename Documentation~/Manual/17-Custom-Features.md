@@ -454,6 +454,8 @@ public class QuestData : GameData
 
 `GameData`가 ID(`Id`)와 검증 훅(`ValidateData`)을 준다. 표시 이름 필드는 따로 두지 않는다(ID가 이름이다).
 
+**규칙에서 항목의 칸을 읽기**: 행동·규칙 함수·Block 안에서 `Game.Entry<QuestData>(id)`(없거나 형식이 다르면 null), 그 종류 모두는 `Game.Entries<QuestData>()`(하나만 두는 설정 종류는 `.FirstOrDefault()`). 런타임이 게임을 켤 때 DB 항목으로 채운다(Rules 어셈블리라 Unity 시작 방식을 몰라도 된다). 항목은 원본이다 — 읽기만 하고, 게임 중에 바뀌는 값은 플레이어 데이터에 둔다. 규칙 테스트는 세션에 직접 넣는다: `session.Entries = id => …`·`session.EntriesOfType = type => …`(4-3).
+
 ### 2-2. Trigger 칸: `[SerializeReference, TriggerSlot(…)]`
 
 ```csharp
@@ -843,6 +845,14 @@ session.Triggers.Register("bonus", when, repeat: true, fire: m => session.Trigge
 ```
 
 값을 직접 바꾼 뒤 조건 잎을 검사하게 하려면 `session.Triggers.Flush()`를 부른다(행동으로 바꾸면 자동).
+
+규칙이 `Game.Entry`·`Game.Entries`로 DB 항목을 읽으면 테스트가 항목을 넣어 준다(`ScriptableObject.CreateInstance<QuestData>()`로 만들고 칸을 채운다 — ID는 에디터 도구만 붙이므로 사전의 키로 찾게 한다):
+
+```csharp
+var quests = new Dictionary<string, object> { ["quest.first"] = firstQuest };
+session.Entries = id => id != null && quests.TryGetValue(id, out var q) ? q : null;
+session.EntriesOfType = type => quests.Values.Where(type.IsInstanceOfType);
+```
 
 ---
 

@@ -217,6 +217,11 @@ namespace GBible
         }
 
         // 단순 값(숫자·글자 등) 플레이어 데이터.
+        // DB 항목을 ID로(형식이 다르거나 없으면 null) — 규칙이 프로젝트 DB 종류·선택 요소의 칸을 읽을 때. 원본이라 읽기만 한다.
+        public T Entry<T>(string id) where T : class => string.IsNullOrEmpty(id) ? null : Session.Entries?.Invoke(id) as T;
+        // 그 형식의 DB 항목 모두(하나만 두는 설정 종류는 Entries<T>().FirstOrDefault()).
+        public IEnumerable<T> Entries<T>() where T : class => Session.EntriesOfType?.Invoke(typeof(T))?.OfType<T>() ?? Enumerable.Empty<T>();
+
         public T Get<T>(string key) => Session.Data.Get<T>(key);
         public void Set(string key, object value) => Session.Data.Set(key, value);
 
