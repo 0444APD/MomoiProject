@@ -15,6 +15,8 @@ namespace GBible.EditorTools
     // 프로젝트마다 켜고 끄는 선택 기능(다이얼로그 시스템 등) 하나.
     // 기능의 코드는 자기 어셈블리에 있고, 스크립팅 심볼(Symbol)이 있을 때만 컴파일된다(asmdef의 defineConstraints).
     // 끄면 기능의 클래스·DB 탭·메뉴가 모두 사라지고, 만들어 둔 데이터 에셋은 그대로 남아 다시 켜면 돌아온다.
+    // 켜고 끄기 = 설정 파일(ProjectSettings/MomoiProject/Features.json)의 enabled. DB의 '기능 활성화' 스위치가 쓰고, AI도 이 파일을 고쳐 켠다
+    // (명세서 6절에 켠 부가 기능 — 관례 0절). 에디터가 다시 읽을 때(컴파일 뒤) 심볼은 SyncOnLoad가, asmdef 참조는 StartSetup이 파일에 맞춘다.
     public sealed class GameFeature
     {
         public string Id;

@@ -22,6 +22,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다. 장�
   2. **재사용 Block 하나 추가**(효과·대상·조건·결과 클래스. 다른 항목도 쓸 수 있게 일반적으로)
   3. **그 항목 전용 `[BindTo]` 코드**(한 항목만의 특수한 결과)
   4. **중간층 확장**(규칙 함수·행동 직전 이벤트 필드·새 행동 직전 이벤트 자리)
+- **선택 기능(다이얼로그·인벤토리·입력·Steam)은 AI가 켠다** — 명세서 6절(부가 기능)에 켠 것이면 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 ID(`dialogue`·`inventory`·`input`·`steam`)를 더한다. Unity가 다시 컴파일할 때 GBible이 스크립팅 심볼과 프로젝트 asmdef 참조를 맞춘다(개발자가 스위치를 누를 일이 없다). 그 기능의 형식을 쓰는 코드는 Unity가 한 번 다시 컴파일한 뒤에 쓴다(그 전에는 컴파일 검사가 그 어셈블리를 찾지 못한다). 입력·Steam은 외부 패키지(Input System·Steamworks.NET)가 있어야 켜진다 — 패키지를 들이는 것은 내려받기라 먼저 묻는다.
 - GBible 자체에 없는 범용 기능이 필요하면(라이브러리를 고쳐야 하면) 고치지 않고 사람에게 알린다. 단 화면 쪽 도구(UI·입력·카메라·이동)는 알리지 않고 프로젝트에 만든다(21절). 프로젝트 코드로 우회할 수 있으면 우회하고 그 사실을 보고한다.
 - **선택 요소**(상태 효과·패시브·능력)는 DB 종류를 프로젝트가 가진다: 시스템 목록이 쓰기로 했으면 단계 1에서 템플릿(`Packages/com.momoi.gbible/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 복사한다. 그 클래스에 칸(속성·기능)이 더 필요하면 그냥 더한다 — 라이브러리 변경이 아니라 프로젝트 변경이라 묻지 않고 보고만 한다(Reference 4-1). 엔진은 규격(`IStatusData`·`IPassiveData`·`IUsableData`)만 보므로 더한 칸은 프로젝트 규칙이 DB 항목에서 읽는다.
 

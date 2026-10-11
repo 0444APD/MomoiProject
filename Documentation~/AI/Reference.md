@@ -29,7 +29,7 @@ GBible.Core (Unity 없음 — 서버·테스트에서도 돈다)
 GBible.Unity
   GBibleRuntime(시작·슬롯·저장) · DB(GameData 종류들) · GameView(다시 그리기·연출 대기열)
   GameScreens(UI Toolkit 화면) · ViewList·DataBinding(씬 오브젝트) · GameSettings · GameScenes · GameTime · GameAudio · Texts·GameLanguage
-선택 모듈(DB 사이드바의 '기능 활성화'): 다이얼로그 · 인벤토리 · 입력(키 바꾸기) · Steam
+선택 모듈(DB 사이드바의 '기능 활성화' — AI는 ProjectSettings/MomoiProject/Features.json의 enabled로 켠다, 관례 0절): 다이얼로그 · 인벤토리 · 입력(키 바꾸기) · Steam
 선택 요소(상태 효과 · 패시브 · 능력): 엔진(걸기·중첩·지속·가진 것 세기·Game.Use·기본 Block·Game 함수)은 GBible, DB 종류(데이터 칸 클래스)는 프로젝트가 템플릿에서 들인다(아래 '선택 요소')
 에디터: DB 창(MomoiProject › DB, 구조 잠금 — EditorPolicy) · 모니터(플레이 중 기록·값·명령·테스트 상황) · 에셋 관리 · 시작 설정 · DB 반영 스크립트([DbSeed]) · CSV
 테스트: 테스트 씬(TestScene) · 테스트 상황(TestScenarios) · 테스트 명령(DB › 개발 명령) · 자동 시뮬레이션

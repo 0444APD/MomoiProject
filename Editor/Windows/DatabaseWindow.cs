@@ -571,10 +571,20 @@ namespace GBible.EditorTools
 
             var errorCount = _issues.Count(i => i.Severity == ValidationSeverity.Error);
             var warningCount = _issues.Count(i => i.Severity == ValidationSeverity.Warning);
-            _sidebarFooter.Add(errorCount > 0
+            var notice = errorCount > 0
                 ? new GsNotice($"검증 오류 {errorCount}건 · 빌드가 막힙니다", GsNoticeKind.Error)
                 : warningCount > 0 ? new GsNotice($"경고 {warningCount}건", GsNoticeKind.Warning)
-                : new GsNotice("검증 통과", GsNoticeKind.Ok));
+                : new GsNotice("검증 통과", GsNoticeKind.Ok);
+            // 오류·경고가 있으면 무엇인지 보인다: 마우스를 올리면 목록, 누르면 항목으로 가는 창.
+            if (errorCount + warningCount > 0)
+            {
+                var issues = _issues.Where(i => i.Severity == ValidationSeverity.Error || i.Severity == ValidationSeverity.Warning)
+                                    .OrderBy(i => i.Severity == ValidationSeverity.Error ? 0 : 1).ToList();
+                notice.tooltip = string.Join("\n", issues.Take(15).Select(IssueLine)) + (issues.Count > 15 ? $"\n… 외 {issues.Count - 15}건" : "") + "\n\n눌러서 목록 보기";
+                notice.AddToClassList("gs-notice--link");
+                notice.RegisterCallback<ClickEvent>(_ => ShowIssues(issues));
+            }
+            _sidebarFooter.Add(notice);
 
             var unregistered = DataTypes.UnregisteredScriptableObjects().ToList();
             if (unregistered.Count > 0)
@@ -586,6 +596,51 @@ namespace GBible.EditorTools
                 hint.style.marginTop = 4;
                 _sidebarFooter.Add(hint);
             }
+        }
+
+        // 검증 오류·경고 한 줄: [종류] 항목 ID: 문구.
+        static string IssueLine(ValidationIssue issue)
+        {
+            var kind = issue.Asset != null ? DataTypes.Find(issue.Asset.GetType())?.DisplayName ?? issue.Asset.GetType().Name : "DB";
+            var id = issue.Asset != null ? issue.Asset.Id : "";
+            return $"{(issue.Severity == ValidationSeverity.Error ? "오류" : "경고")} · [{kind}] {(string.IsNullOrEmpty(id) ? "" : id + ": ")}{issue.Message}";
+        }
+
+        // 검증 오류·경고 목록 창: 줄을 누르면 그 항목의 탭으로 가서 연다.
+        void ShowIssues(List<ValidationIssue> issues)
+        {
+            var content = Gs.Col();
+            content.style.maxWidth = 640;
+            content.Add(Gs.Label($"검증 — 오류 {issues.Count(i => i.Severity == ValidationSeverity.Error)}건 · 경고 {issues.Count(i => i.Severity == ValidationSeverity.Warning)}건", "gs-title"));
+            var caption = Gs.Label("오류는 빌드를 막고, 경고는 알려 두는 것입니다. 줄을 누르면 그 항목으로 갑니다.", "gs-caption");
+            caption.style.marginTop = 4;
+            caption.style.marginBottom = 10;
+            content.Add(caption);
+            GsModal modal = null;
+            var list = new ScrollView();
+            list.style.maxHeight = 420;
+            foreach (var issue in issues)
+            {
+                var row = Gs.Row("gs-group__row");
+                var line = Gs.Label(IssueLine(issue), "gs-grow");
+                line.style.whiteSpace = WhiteSpace.Normal;
+                if (issue.Severity == ValidationSeverity.Error) line.style.color = Gs.Danger;
+                row.Add(line);
+                var target = issue.Asset;
+                if (target != null)
+                    row.RegisterCallback<ClickEvent>(_ =>
+                    {
+                        modal?.Close();
+                        Navigate(TabOf(target.GetType()), () => OpenDetail(target));
+                    });
+                list.Add(row);
+            }
+            content.Add(list);
+            var close = new GsButton("닫기", () => modal?.Close(), GsButtonKind.Primary);
+            close.style.marginTop = 10;
+            close.style.alignSelf = Align.FlexEnd;
+            content.Add(close);
+            modal = GsModal.Show(_root, content);
         }
 
         // 판·프로필 데이터 클래스 바로가기: 탭이 아니라 누르면 그 클래스의 cs 파일을 연다.

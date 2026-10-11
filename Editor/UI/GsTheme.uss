@@ -1161,3 +1161,7 @@
 .gs-root .gs-bal-edit-name { width: 96px; color: var(--gs-text-2); }
 .gs-bal-edit-input { flex-grow: 1; margin: 0; }
 .gs-bal-edit-input .unity-base-field__label { display: none; }
+
+/* 검증 알림(사이드바 아래): 오류·경고가 있으면 눌러서 목록을 본다 */
+.gs-notice--link { cursor: link; }
+.gs-notice--link:hover { opacity: 0.85; }

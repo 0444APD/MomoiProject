@@ -81,6 +81,8 @@ namespace GBible.EditorTools
                     ClaudeFiles.Sync();
                     EditorDatabase.Upkeep();
                     EnsureLinkXml(null);
+                    // 기능 설정 파일(ProjectSettings/MomoiProject/Features.json)을 AI가 고쳐 기능을 켰을 수 있다 — 심볼은 GameFeatures가 맞추고, asmdef 참조는 여기서.
+                    SyncModuleReferences();
                 };
         }
 
