@@ -32,6 +32,13 @@ if (-not (Test-Path $assets)) { exit 0 }
 $files = @(Get-ChildItem $assets -Recurse -File -Include *.cs, *.asmdef -ErrorAction SilentlyContinue)
 if ($files.Count -eq 0) { exit 0 }
 $folders = @(Get-ChildItem $assets -Recurse -Directory -ErrorAction SilentlyContinue) + @(Get-Item $assets)
+# 프로젝트 안의 패키지(Packages/<이름>/package.json — GBible처럼 고쳐 쓰는 패키지)도 본다: 패키지 코드를 고친 뒤 Unity가 아직 다시 컴파일하지 않았으면
+# Library의 옛 DLL로 검사해 없는 오류를 내므로, 소스가 그 DLL보다 새로우면 패키지 어셈블리도 여기서 컴파일한다(~ 폴더 — 문서·도구 — 는 Unity처럼 뺀다).
+$pkgRoots = @(Get-ChildItem (Join-Path $proj "Packages") -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "package.json") })
+foreach ($p in $pkgRoots) {
+    $files += @(Get-ChildItem $p.FullName -Recurse -File -Include *.cs, *.asmdef -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '~\\' })
+    $folders += @(Get-ChildItem $p.FullName -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '~(\\|$)' })
+}
 $latest = (@($files) + $folders | Measure-Object -Property LastWriteTimeUtc -Maximum).Maximum
 if (-not $Always -and (Test-Path $stamp) -and $latest -le (Get-Item $stamp).LastWriteTimeUtc) {
     Remove-Item $blocks -ErrorAction SilentlyContinue
@@ -56,12 +63,15 @@ if (-not (Test-Path $dotnet) -or -not $csc) { "MomoiProject 컴파일 검사: Un
 # asmdef: 이름 → 폴더·참조. GUID 참조도 읽는다.
 $infos = @{}
 $guidToName = @{}
-foreach ($a in @(Get-ChildItem $assets -Recurse -Filter *.asmdef -File)) {
+$asmdefFiles = @(Get-ChildItem $assets -Recurse -Filter *.asmdef -File)
+foreach ($p in $pkgRoots) { $asmdefFiles += @(Get-ChildItem $p.FullName -Recurse -Filter *.asmdef -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '~\\' }) }
+$pkgPrefix = Join-Path $proj "Packages\"
+foreach ($a in $asmdefFiles) {
     try { $json = Get-Content $a.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
     if (-not $json.name) { continue }
     $meta = "$($a.FullName).meta"
     if (Test-Path $meta) { $g = (Select-String $meta -Pattern '^guid: (\w+)').Matches; if ($g.Count -gt 0) { $guidToName[$g[0].Groups[1].Value] = $json.name } }
-    $infos[$json.name] = @{ Dir = $a.DirectoryName.TrimEnd('\') + '\'; Refs = @($json.references) }
+    $infos[$json.name] = @{ Dir = $a.DirectoryName.TrimEnd('\') + '\'; Refs = @($json.references); Package = $a.FullName.StartsWith($pkgPrefix) }
 }
 $asmDirs = @($infos.Values | ForEach-Object { $_.Dir })
 
@@ -91,16 +101,20 @@ $skipped = New-Object System.Collections.Generic.List[string]
 $script:checked = 0
 $rebuilt = New-Object System.Collections.Generic.List[string]
 
-function Invoke-Compile($name, $src) {
+function Invoke-Compile($name, $src, $package = $false) {
     if ($src.Count -eq 0) { return }
     $csproj = Join-Path $proj "$name.csproj"
-    if (-not (Test-Path $csproj)) { $skipped.Add($name); return }
+    # 패키지 어셈블리는 csproj가 없으면(꺼진 선택 기능 등) 조용히 Library의 DLL을 쓴다.
+    if (-not (Test-Path $csproj)) { if (-not $package) { $skipped.Add($name) }; return }
     [xml]$x = Get-Content $csproj -Raw -Encoding UTF8
     $deps = @($x.Project.ItemGroup.ProjectReference | Where-Object { $_ } | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Include) })
     # 소스·csproj가 지난번 결과보다 오래되었고 다시 만든 참조가 없으면 지난 결과를 쓴다.
     $dll = Join-Path $out "$name.dll"
     $newest = (@($src | ForEach-Object { Get-Item -LiteralPath $_ }) + @(Get-Item -LiteralPath $csproj) | Measure-Object -Property LastWriteTimeUtc -Maximum).Maximum
     if ((Test-Path $dll) -and (Get-Item $dll).LastWriteTimeUtc -ge $newest -and -not ($deps | Where-Object { $rebuilt.Contains($_) })) { return }
+    # 패키지 어셈블리: Unity가 이미 지금 소스로 컴파일했으면(Library의 DLL이 더 새로움) 그것을 쓴다.
+    $library = Join-Path $proj "Library\ScriptAssemblies\$name.dll"
+    if ($package -and (Test-Path $library) -and (Get-Item $library).LastWriteTimeUtc -ge $newest -and -not ($deps | Where-Object { $rebuilt.Contains($_) })) { return }
     $defines = ((@($x.Project.PropertyGroup.DefineConstants) -join ';').Split(';') | Where-Object { $_ }) -join ';'
     $lang = @($x.Project.PropertyGroup.LangVersion) | Where-Object { $_ } | Select-Object -First 1
     if (-not $lang) { $lang = "9.0" }
@@ -108,8 +122,10 @@ function Invoke-Compile($name, $src) {
         $p = $_.HintPath; if (-not [IO.Path]::IsPathRooted($p)) { $p = Join-Path $proj $p }; $p })
     foreach ($pr in @($x.Project.ItemGroup.ProjectReference | Where-Object { $_ })) {
         $rn = [IO.Path]::GetFileNameWithoutExtension($pr.Include)
+        # 여기서 만든 것과 Library의 것 중 더 새로운 쪽(패키지를 Unity가 다시 컴파일했으면 Library 쪽이 새롭다).
         $built = Join-Path $out "$rn.dll"
-        if (Test-Path $built) { $refs += $built } else { $refs += (Join-Path $proj "Library\ScriptAssemblies\$rn.dll") }
+        $library = Join-Path $proj "Library\ScriptAssemblies\$rn.dll"
+        if ((Test-Path $built) -and (-not (Test-Path $library) -or (Get-Item $built).LastWriteTimeUtc -gt (Get-Item $library).LastWriteTimeUtc)) { $refs += $built } else { $refs += $library }
     }
     $refs = @($refs | Where-Object { Test-Path $_ } | Sort-Object -Unique)
     $rsp = Join-Path $out "$name.rsp"
@@ -124,7 +140,7 @@ function Invoke-Compile($name, $src) {
     }
 }
 
-foreach ($n in $order) { Invoke-Compile $n (Get-Sources $infos[$n].Dir) }
+foreach ($n in $order) { Invoke-Compile $n (Get-Sources $infos[$n].Dir) $infos[$n].Package }
 # asmdef 밖의 코드: Plugins·Standard Assets → firstpass, Editor 폴더 → …-Editor(Unity의 미리 정한 어셈블리와 같은 나눔·순서).
 $loose = @(Get-ChildItem $assets -Recurse -Filter *.cs -File | Where-Object { $f = $_.FullName; -not ($asmDirs | Where-Object { $f.StartsWith($_) }) } | ForEach-Object FullName)
 $firstRoots = @((Join-Path $assets "Plugins\"), (Join-Path $assets "Standard Assets\"))
