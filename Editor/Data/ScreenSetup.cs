@@ -92,19 +92,35 @@ namespace GBible.EditorTools
 
         const string ProjectTheme =
 @"/* 프로젝트 테마: 모든 화면에 붙는다(DB › 화면 설정 › 테마 USS). 기본 화면(고르기·설정·슬롯·일시정지·확인·알림)도 이 변수를 쓴다.
-   값을 바꾸면 모든 화면의 색·크기가 바뀐다. 클래스(.momoi-panel · .momoi-button · .momoi-title …)를 여기서 덮어써도 된다. */
+   값을 바꾸면 모든 화면의 색·크기가 바뀐다. 클래스(.momoi-panel · .momoi-button · .momoi-title …)를 여기서 덮어써도 된다.
+   디자인 기본(GBible AI/UiGuide.md 3절): 차가운 검정 + 종이 흰색, 책·종이·폴더 느낌 — 매트·플랫(테두리 강조·그림자 없음), 창 뒤는 흐림.
+   패널은 재질 클래스 하나(.momoi-mat-paper · -folder · -cover · -stone · -colorpaper)로 색과 아주 옅은 결을 받는다. 프로젝트의 색은 아래 변수로만. */
 
 :root {
-    --momoi-text: rgb(236, 238, 244);
-    --momoi-dim: rgb(150, 156, 172);
-    --momoi-panel: rgb(30, 34, 46);
-    --momoi-button: rgb(52, 58, 78);
-    --momoi-button-hover: rgb(70, 78, 104);
-    --momoi-accent: rgb(255, 176, 64);
-    --momoi-accent-text: rgb(24, 22, 20);
-    --momoi-backdrop: rgba(0, 0, 0, 0.55);
-    --momoi-radius: 10px;
-    --momoi-font-size: 22px;
+    --momoi-paper: rgb(244, 243, 240);
+    --momoi-paper-text: rgb(38, 38, 42);
+    --momoi-paper-dim: rgb(128, 128, 134);
+    --momoi-folder: rgb(222, 221, 218);
+    --momoi-folder-text: rgb(52, 52, 56);
+    --momoi-cover: rgb(36, 37, 41);
+    --momoi-cover-text: rgb(236, 236, 238);
+    --momoi-stone: rgb(54, 56, 61);
+    --momoi-stone-text: rgb(220, 222, 226);
+    --momoi-colorpaper: rgb(206, 196, 178);
+    --momoi-colorpaper-text: rgb(48, 42, 34);
+
+    --momoi-text: rgb(236, 236, 238);
+    --momoi-dim: rgb(150, 152, 158);
+    --momoi-panel: rgb(244, 243, 240);
+    --momoi-panel-text: rgb(38, 38, 42);
+    --momoi-button: rgb(36, 37, 41);
+    --momoi-button-text: rgb(236, 236, 238);
+    --momoi-button-hover: rgb(58, 60, 66);
+    --momoi-accent: rgb(204, 184, 146);
+    --momoi-accent-text: rgb(34, 30, 24);
+    --momoi-backdrop: rgba(10, 10, 12, 0.3);
+    --momoi-radius: 6px;
+    --momoi-font-size: 18px;
 }
 ";
     }

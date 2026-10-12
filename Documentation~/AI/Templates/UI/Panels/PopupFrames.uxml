@@ -1,0 +1,36 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 팝업 틀 A~D — 팝업의 몸. 머리(PopupHeads A~D) · 내용(Lists·Details) · 발(쪽 표시·버튼)을 넣는다. 크기는 kit-popup--s·m·l.
+         층은 팝업(뒤는 흐림). 고를 수 있게 늘어놓은 조각이다. -->
+
+    <!-- A 종이: 가장 기본 -->
+    <ui:VisualElement class="kit-popup kit-popup--m momoi-mat-paper">
+        <ui:VisualElement name="head" />
+        <ui:VisualElement name="body" class="kit-popup-body" />
+        <ui:VisualElement class="kit-popup-foot">
+            <ui:Label name="page" class="kit-page" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+
+    <!-- B 책 표지 속 종이: 검정 표지가 종이를 감싼다(교환·상점·보물 상자처럼 무게 있는 창) -->
+    <ui:VisualElement class="kit-frame momoi-mat-cover">
+        <ui:VisualElement class="kit-popup kit-popup--l momoi-mat-paper">
+            <ui:VisualElement name="head" />
+            <ui:VisualElement name="body" class="kit-popup-body" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+
+    <!-- C 검정 팝업: 밝은 글(장면이 밝을 때 · 경고·확인) -->
+    <ui:VisualElement class="kit-popup kit-popup--s kit-popup--dark momoi-mat-cover">
+        <ui:VisualElement name="head" />
+        <ui:VisualElement name="body" class="kit-popup-body" />
+        <ui:VisualElement class="kit-popup-foot">
+            <ui:Button name="ok" class="kit-btn kit-btn--light" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+
+    <!-- D 모서리 깎인 종이: 카드·기록 같은 느낌(KitShape CutCorner — 결 없이 색만) -->
+    <MomoiProject.KitShape shape="CutCorner" slant="22" class="kit-popup kit-popup--m kit-popup--cut">
+        <ui:VisualElement name="head" />
+        <ui:VisualElement name="body" class="kit-popup-body" />
+    </MomoiProject.KitShape>
+</ui:UXML>

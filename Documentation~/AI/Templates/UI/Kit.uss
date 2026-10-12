@@ -1,0 +1,233 @@
+/* GBible UI 키트(AI/Templates/UI) — 프로젝트의 Assets/MomoiProject/UI/Kit/Kit.uss로 복사하고, 프로젝트 화면 USS 첫 줄에서 불러온다:
+     @import url("../Kit/Kit.uss");
+   디자인(AI/UiGuide.md 3절): 차가운 검정 + 종이 흰색 · 책·종이·폴더 · 매트·플랫(테두리 강조·그림자 없음) · 창 뒤는 흐림 · 모양은 네모만이 아니다(알약·원·아치·비스듬한 칸).
+   면(색 + 옅은 결)은 재질 클래스(.momoi-mat-paper · -folder · -cover · -stone · -colorpaper)가 준다 — 이 파일은 배치·크기·모양·상태만. 색은 테마 변수.
+   1920×1080 기준 px. 클래스는 kit- 접두어(프로젝트 화면 클래스는 프로젝트 접두어). */
+
+/* ── 화면 바탕 ───────────────────────────────────────── */
+.kit-screen { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+/* 큰 글자 무늬(배경 장식 — 아주 옅게). 밝은 화면에서 검정, 어두운 화면에서 흰색 */
+.kit-watermark { position: absolute; font-size: 120px; -unity-font-style: bold; color: rgba(0, 0, 0, 0.05); }
+.momoi-mat-cover .kit-watermark { color: rgba(255, 255, 255, 0.035); }
+.kit-watermark--side { rotate: 90deg; transform-origin: left top; }
+
+/* ── 위 막대: 왼쪽 홈 배지·제목 · 오른쪽 재화 알약·원형 버튼 ── */
+.kit-topbar { position: absolute; left: 0; right: 0; top: 0; height: 76px; padding: 0 28px; flex-direction: row; align-items: center; }
+.kit-home { width: 60px; height: 70px; margin: -6px 14px 0 0; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; align-items: center; justify-content: center; font-size: 11px; -unity-font-style: bold; }
+.kit-topbar-title { font-size: 22px; -unity-font-style: bold; }
+.kit-topbar-space { flex-grow: 1; }
+.kit-currency { height: 32px; min-width: 150px; margin-left: 10px; padding: 0 14px 0 6px; border-radius: 16px; flex-direction: row; align-items: center; }
+.kit-currency-icon { width: 22px; height: 22px; border-radius: 11px; margin-right: 8px; background-color: rgba(255, 255, 255, 0.2); -unity-background-scale-mode: scale-to-fit; }
+.kit-currency-value { flex-grow: 1; font-size: 15px; -unity-text-align: middle-right; }
+
+/* 원형 버튼(뒤로·도움말·새로 고침·아이콘 탭) */
+.kit-icon-btn { width: 44px; height: 44px; margin: 0 0 0 10px; padding: 0; border-width: 0; border-radius: 22px; font-size: 18px; -unity-text-align: middle-center; background-color: var(--momoi-button); color: var(--momoi-button-text); }
+.kit-icon-btn:hover { background-color: var(--momoi-button-hover); }
+.kit-icon-btn--light { background-color: var(--momoi-paper); color: var(--momoi-paper-text); }
+.kit-icon-btn--light:hover { background-color: var(--momoi-folder); }
+
+/* ── 알약 버튼 ── */
+.kit-btn { height: 40px; min-width: 140px; margin: 4px; padding: 0 22px; border-width: 0; border-radius: 20px; font-size: 16px; -unity-text-align: middle-center; background-color: var(--momoi-button); color: var(--momoi-button-text); }
+.kit-btn:hover { background-color: var(--momoi-button-hover); }
+.kit-btn:disabled { opacity: 0.4; }
+.kit-btn--light { background-color: var(--momoi-paper); color: var(--momoi-paper-text); }
+.kit-btn--light:hover { background-color: var(--momoi-folder); }
+.kit-btn--primary { background-color: var(--momoi-accent); color: var(--momoi-accent-text); }
+.kit-btn--primary:hover { background-color: var(--momoi-accent); opacity: 0.9; }
+.kit-btn--small { height: 30px; min-width: 80px; padding: 0 14px; border-radius: 15px; font-size: 14px; }
+
+/* ── 팝업(종이). 머리 셋 중 하나: 띠 · 제목 · 가운데 제목 ── */
+.kit-popup { min-width: 560px; max-width: 1200px; padding: 0; border-radius: 8px; }
+.kit-popup-band { height: 48px; padding: 0 10px 0 22px; border-top-left-radius: 8px; border-top-right-radius: 8px; flex-direction: row; align-items: center; }
+.kit-popup-head { padding: 20px 14px 6px 26px; flex-direction: row; align-items: center; }
+.kit-popup-head--center { padding: 18px 14px 6px 14px; justify-content: center; }
+.kit-popup-head--center .kit-popup-title { flex-grow: 1; -unity-text-align: middle-center; }
+.kit-popup-title { font-size: 22px; -unity-font-style: bold; flex-grow: 1; }
+.kit-popup-body { padding: 14px 26px 22px 26px; }
+.kit-popup-desc { font-size: 16px; white-space: normal; margin-bottom: 14px; }
+.kit-popup-foot { height: 36px; flex-direction: row; justify-content: center; align-items: center; }
+.kit-page { font-size: 13px; color: var(--momoi-paper-dim); }
+/* 닫기(✕ 글자 — 원·테두리 없음) */
+.kit-close { width: 38px; height: 38px; padding: 0; border-width: 0; border-radius: 19px; font-size: 22px; -unity-text-align: middle-center; background-color: rgba(0, 0, 0, 0); color: var(--momoi-paper-text); }
+.kit-close:hover { background-color: rgba(0, 0, 0, 0.06); }
+/* 옅은 나눔 줄 */
+.kit-rule { height: 1px; margin: 4px 26px; background-color: rgba(0, 0, 0, 0.1); }
+.momoi-mat-cover .kit-rule { background-color: rgba(255, 255, 255, 0.08); }
+/* 팝업 안의 검정 칸(그림·아이콘을 담는 면) */
+.kit-box { padding: 22px; border-radius: 6px; }
+/* 팝업 바깥: 넘기기 화살표 · 닫는 법 안내 */
+.kit-page-arrow { width: 56px; height: 56px; padding: 0; border-width: 0; background-color: rgba(0, 0, 0, 0); font-size: 30px; color: var(--momoi-text); -unity-text-outline-width: 1px; -unity-text-outline-color: rgba(0, 0, 0, 0.5); }
+.kit-dismiss { position: absolute; left: 0; right: 0; bottom: 48px; font-size: 15px; -unity-text-align: middle-center; color: var(--momoi-text); -unity-text-outline-width: 1px; -unity-text-outline-color: rgba(0, 0, 0, 0.5); }
+
+/* ── 섹션 표시: 검정 꼬리표 · 폴더 탭 · 작은 알약 꼬리표 ── */
+.kit-tag { height: 26px; padding: 0 24px 0 14px; align-self: flex-start; justify-content: center; border-top-right-radius: 13px; border-bottom-right-radius: 13px; font-size: 13px; -unity-font-style: bold; letter-spacing: 2px; }
+.kit-folder-tab { height: 28px; padding: 0 14px; border-top-left-radius: 6px; border-top-right-radius: 6px; font-size: 14px; -unity-text-align: middle-center; }
+.kit-pill-tag { height: 22px; padding: 0 10px; border-radius: 11px; font-size: 12px; -unity-text-align: middle-center; align-self: flex-start; }
+
+/* ── 카드 나열(명단·전리품·인벤토리·도감): 격자 + 칸 ── */
+.kit-grid { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+.kit-scroll { flex-grow: 1; }
+
+/* 타일(아이템·보상·재료) — 검정 정사각형, 개수는 오른쪽 아래 */
+.kit-tile { width: 88px; height: 88px; margin: 5px; padding: 0; border-width: 0; border-radius: 6px; overflow: hidden; }
+.kit-tile:hover { background-color: var(--momoi-button-hover); }
+.kit-tile-icon { position: absolute; left: 12px; top: 12px; right: 12px; bottom: 12px; -unity-background-scale-mode: scale-to-fit; }
+.kit-tile-count { position: absolute; right: 7px; bottom: 4px; font-size: 13px; color: var(--momoi-cover-text); }
+.kit-tile-corner { position: absolute; right: 0; top: 0; min-width: 20px; height: 20px; padding: 0 4px; border-bottom-left-radius: 6px; font-size: 11px; -unity-text-align: middle-center; background-color: var(--momoi-accent); color: var(--momoi-accent-text); }
+.kit-tile-strip { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
+.kit-tile-check { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.45); font-size: 30px; -unity-text-align: middle-center; color: rgb(240, 240, 242); }
+.kit-tile--picked { background-color: var(--momoi-stone); translate: 0 -3px; }
+.kit-tile--empty { background-color: rgba(0, 0, 0, 0.06); background-image: none; }
+.momoi-mat-cover .kit-tile--empty { background-color: rgba(255, 255, 255, 0.04); }
+
+/* 세로 카드(캐릭터·카드 도감) — 그림이 채우고 아래 어두운 띠에 별·이름 */
+.kit-portrait { width: 120px; height: 164px; margin: 5px; padding: 0; border-width: 0; border-radius: 6px; overflow: hidden; }
+.kit-portrait-art { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -unity-background-scale-mode: scale-and-crop; }
+.kit-portrait-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; padding: 0 8px; flex-direction: row; align-items: center; background-color: rgba(10, 10, 12, 0.6); }
+.kit-portrait-name { flex-grow: 1; font-size: 13px; color: rgb(240, 240, 242); }
+.kit-stars { font-size: 12px; color: var(--momoi-accent); letter-spacing: 1px; }
+.kit-portrait--picked { translate: 0 -6px; }
+.kit-portrait--picked .kit-portrait-foot { background-color: var(--momoi-accent); }
+.kit-portrait--picked .kit-portrait-name { color: var(--momoi-accent-text); }
+
+/* 아치 카드(편성 — 위가 둥근 큰 카드): 그림 · 레벨 띠 · 종이 바닥(별) */
+.kit-arch { width: 200px; height: 440px; margin: 0 10px; padding: 0; border-width: 0; border-top-left-radius: 100px; border-top-right-radius: 100px; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; overflow: hidden; flex-direction: column; }
+.kit-arch-art { flex-grow: 1; -unity-background-scale-mode: scale-and-crop; }
+.kit-arch-badge { position: absolute; left: 14px; top: 14px; width: 30px; height: 30px; border-radius: 15px; font-size: 13px; -unity-text-align: middle-center; }
+.kit-arch-level { height: 26px; margin: 0 22px; border-top-left-radius: 13px; border-top-right-radius: 13px; font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.kit-arch-foot { height: 46px; justify-content: center; align-items: center; }
+.kit-arch--empty { background-color: rgba(0, 0, 0, 0.06); background-image: none; }
+
+/* 가로 배너 카드(장비·추억·지역) */
+.kit-banner { width: 250px; height: 120px; margin-bottom: 10px; padding: 0; border-width: 0; border-radius: 8px; overflow: hidden; }
+.kit-banner-art { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -unity-background-scale-mode: scale-and-crop; }
+.kit-banner-tag { position: absolute; right: 8px; bottom: 8px; }
+
+/* 교환·상점 카드: 폴더 탭(분류) + 검정 몸(이름·그림) + 종이 바닥(가격) */
+.kit-offer { width: 176px; margin: 0 6px; padding: 0; border-width: 0; background-color: rgba(0, 0, 0, 0); }
+.kit-offer-body { height: 196px; padding: 10px; align-items: center; }
+.kit-offer-name { font-size: 16px; -unity-font-style: bold; margin-bottom: 8px; }
+.kit-offer-art { width: 112px; height: 112px; border-radius: 56px; background-color: rgba(255, 255, 255, 0.08); -unity-background-scale-mode: scale-and-crop; }
+.kit-offer-status { position: absolute; left: 10px; top: 40px; }
+.kit-offer-foot { height: 38px; flex-direction: row; justify-content: center; align-items: center; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; font-size: 16px; }
+.kit-offer:hover .kit-offer-body { background-color: var(--momoi-button-hover); }
+
+/* 표 줄(속성·능력치 비교) — 원 아이콘 + 이름 + 칸들 */
+.kit-row { height: 52px; padding: 0 6px; flex-direction: row; align-items: center; }
+.kit-row-icon { width: 40px; height: 40px; margin-right: 10px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.08); -unity-background-scale-mode: scale-and-crop; }
+.kit-row-name { width: 180px; font-size: 15px; white-space: normal; }
+.kit-row-cell { width: 56px; -unity-text-align: middle-center; font-size: 15px; }
+
+/* ── 상세 패널(목록 옆 — 종이): 제목 · 배너 · 등급 · 설명 · 아래 가운데 알약 버튼 ── */
+.kit-detail { width: 380px; padding: 20px 22px; border-radius: 8px; flex-direction: column; }
+.kit-detail-title { font-size: 24px; -unity-font-style: bold; margin-bottom: 10px; white-space: normal; }
+.kit-detail-banner { height: 150px; margin-bottom: 10px; border-radius: 6px; -unity-background-scale-mode: scale-and-crop; }
+.kit-detail-desc { font-size: 15px; white-space: normal; margin-top: 8px; }
+.kit-detail-foot { flex-grow: 1; justify-content: flex-end; align-items: center; }
+
+/* ── 옆 아이콘 탭(세로 원형) · 아래 탭 막대(검정 막대 + 비스듬한 칸 — KitShape) ── */
+.kit-side-tabs { position: absolute; left: 22px; top: 110px; }
+.kit-side-tab { width: 52px; height: 52px; margin-bottom: 12px; padding: 0; border-width: 0; border-radius: 26px; font-size: 18px; -unity-text-align: middle-center; background-color: var(--momoi-stone); color: var(--momoi-stone-text); }
+.kit-side-tab:hover { background-color: var(--momoi-button-hover); }
+.kit-side-tab--on { background-color: var(--momoi-paper); color: var(--momoi-paper-text); }
+.kit-tabbar { position: absolute; left: 0; bottom: 28px; height: 42px; padding: 0 30px 0 22px; flex-direction: row; align-items: center; border-top-right-radius: 21px; border-bottom-right-radius: 21px; }
+.kit-tab { width: 112px; height: 30px; margin-left: -4px; --kit-fill: rgba(0, 0, 0, 0); justify-content: center; }
+.kit-tab:hover { --kit-fill: rgba(255, 255, 255, 0.08); }
+.kit-tab-label { font-size: 16px; -unity-text-align: middle-center; color: var(--momoi-cover-text); }
+.kit-tab--on { --kit-fill: var(--momoi-paper); }
+.kit-tab--on .kit-tab-label { color: var(--momoi-paper-text); -unity-font-style: bold; }
+
+/* 제목 막대(검정 띠 — 한가운데 번호·이름) */
+.kit-titlebar { height: 34px; min-width: 320px; padding: 0 36px; align-self: center; --kit-fill: var(--momoi-cover); justify-content: center; }
+.kit-titlebar-label { font-size: 18px; -unity-font-style: bold; -unity-text-align: middle-center; color: var(--momoi-cover-text); }
+
+/* ── 패턴 배치(README의 A~E) ── */
+.kit-center { align-items: center; justify-content: center; }
+.kit-hrow { flex-direction: row; align-items: center; }
+.kit-gap { margin-top: 14px; }
+.kit-text-center { -unity-text-align: middle-center; }
+.kit-popup--s { width: 560px; }
+.kit-popup--m { width: 760px; }
+.kit-popup--l { width: 1000px; }
+.kit-box--visual { height: 260px; }
+.kit-icon-btn--tiny { width: 26px; height: 26px; margin-left: 8px; border-radius: 13px; font-size: 14px; }
+.kit-btn--folder { background-color: var(--momoi-folder); color: var(--momoi-folder-text); }
+.kit-btn--folder:hover { background-color: rgb(210, 209, 206); }
+/* D 어두운 전체 화면: 왼쪽 옆 탭 · 가운데 격자 · 오른쪽 상세 */
+.kit-collection-main { position: absolute; left: 104px; top: 96px; right: 440px; bottom: 84px; }
+.kit-collection-detail { position: absolute; right: 28px; top: 96px; bottom: 28px; }
+.kit-collection-filter { position: absolute; left: 104px; bottom: 28px; }
+/* E 밝은 전체 화면: 가운데 위 제목 막대 · 아치 카드 줄 · 오른쪽 배너 줄 · 아래 탭 막대 */
+.kit-lineup-titlebar { position: absolute; top: 88px; left: 50%; translate: -50% 0; }
+.kit-lineup-members { position: absolute; left: 0; right: 320px; top: 140px; bottom: 110px; flex-direction: row; justify-content: center; align-items: center; }
+.kit-lineup-side { position: absolute; right: 70px; top: 150px; }
+.kit-lineup-action { position: absolute; right: 40px; bottom: 28px; }
+.kit-lineup-mark { left: 230px; top: 260px; }
+
+/* ══ 형식(타입) — 같은 패널을 여러 모양으로. README의 표에서 고른다 ══════════════════ */
+
+/* 팝업 머리 D: 검정 꼬리표 머리 — 종이 위 왼쪽에 걸친 비스듬한 끝 꼬리표(KitShape SlantEnd)에 제목 */
+.kit-popup-headtag { height: 40px; margin: -14px 0 0 22px; padding: 0 40px 0 18px; align-self: flex-start; justify-content: center; --kit-fill: var(--momoi-cover); }
+.kit-popup-headtag-title { font-size: 19px; -unity-font-style: bold; color: var(--momoi-cover-text); }
+.kit-popup-headtag-row { flex-direction: row; align-items: flex-start; justify-content: space-between; padding-right: 12px; }
+
+/* 팝업 틀 B: 책 표지 속 종이 — 검정 표지가 종이를 감싼다(두꺼운 면, 테두리 선이 아님) */
+.kit-frame { padding: 14px; border-radius: 10px; }
+.kit-frame > .kit-popup { border-radius: 6px; }
+/* 팝업 틀 C: 검정 팝업(밝은 글) */
+.kit-popup--dark .kit-close { color: var(--momoi-cover-text); }
+.kit-popup--dark .kit-close:hover { background-color: rgba(255, 255, 255, 0.08); }
+.kit-popup--dark .kit-page { color: var(--momoi-dim); }
+/* 팝업 틀 D: 모서리 깎인 종이(KitShape CutCorner — 결 없이 색만) */
+.kit-popup--cut { --kit-fill: var(--momoi-paper); background-color: rgba(0, 0, 0, 0); color: var(--momoi-paper-text); }
+
+/* 상세 C: 아래 가로 정보 띠(고른 것의 그림·이름·설명·버튼을 한 줄로) */
+.kit-infobar { position: absolute; left: 104px; right: 28px; bottom: 24px; height: 120px; padding: 14px 18px; border-radius: 8px; flex-direction: row; align-items: center; }
+.kit-infobar-thumb { width: 92px; height: 92px; margin-right: 16px; border-radius: 6px; -unity-background-scale-mode: scale-and-crop; }
+.kit-infobar-text { flex-grow: 1; }
+/* 상세 D: 큰 일러 + 겹친 종이 카드(왼쪽 일러, 오른쪽 카드 — 캐릭터 고르기) */
+.kit-showcase-art { position: absolute; left: 180px; top: 90px; bottom: 250px; width: 560px; -unity-background-scale-mode: scale-to-fit; }
+.kit-showcase-card { position: absolute; right: 110px; top: 150px; width: 660px; flex-direction: row; align-items: flex-start; }
+.kit-showcase-portrait { width: 230px; height: 310px; border-radius: 8px; -unity-background-scale-mode: scale-and-crop; }
+.kit-showcase-text { flex-grow: 1; margin-left: 14px; min-height: 200px; padding: 18px 20px; border-radius: 8px; }
+
+/* 목록 C: 가로 줄(아래 명단 줄 — 한 줄로 흐른다) */
+.kit-strip { flex-direction: row; flex-wrap: nowrap; align-items: flex-end; justify-content: center; }
+.kit-strip-area { position: absolute; left: 0; right: 0; bottom: 24px; height: 214px; }
+/* 목록 D: 묶음(꼬리표마다 격자 — 도감·분류별 인벤토리) */
+.kit-section { margin-bottom: 18px; }
+.kit-section > .kit-grid { margin-top: 8px; }
+
+/* 버튼 D: 비스듬한 칸 버튼(KitShape Slant — 주된 행동을 강하게) */
+.kit-slant-btn { height: 42px; min-width: 180px; padding: 0 30px; justify-content: center; --kit-fill: var(--momoi-cover); }
+.kit-slant-btn:hover { --kit-fill: var(--momoi-button-hover); }
+.kit-slant-btn--primary { --kit-fill: var(--momoi-accent); }
+.kit-slant-btn-label { font-size: 16px; -unity-font-style: bold; -unity-text-align: middle-center; color: var(--momoi-cover-text); }
+.kit-slant-btn--primary .kit-slant-btn-label { color: var(--momoi-accent-text); }
+
+/* 탭 C: 위 폴더 탭(서류철 — 고른 탭은 아래 판과 같은 종이로 이어진다) */
+.kit-folder-tabs { flex-direction: row; align-items: flex-end; padding-left: 14px; }
+.kit-ftab { height: 34px; min-width: 110px; margin-right: 4px; padding: 0 16px; border-width: 0; border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; font-size: 15px; -unity-text-align: middle-center; background-color: var(--momoi-folder); color: var(--momoi-folder-text); }
+.kit-ftab:hover { background-color: rgb(210, 209, 206); }
+.kit-ftab--on { height: 40px; background-color: var(--momoi-paper); color: var(--momoi-paper-text); -unity-font-style: bold; }
+/* 탭 D: 글자 탭(고른 탭에 강조색 밑 띠) */
+.kit-text-tabs { flex-direction: row; align-items: flex-end; }
+.kit-ttab { height: 38px; margin-right: 22px; padding: 0 2px; border-width: 0; border-bottom-width: 3px; border-color: rgba(0, 0, 0, 0); border-radius: 0; background-color: rgba(0, 0, 0, 0); font-size: 16px; color: var(--momoi-dim); }
+.kit-ttab:hover { background-color: rgba(0, 0, 0, 0); color: var(--momoi-text); }
+.kit-ttab--on { border-color: var(--momoi-accent); color: var(--momoi-text); -unity-font-style: bold; }
+.momoi-mat-paper .kit-ttab { color: var(--momoi-paper-dim); }
+.momoi-mat-paper .kit-ttab--on, .momoi-mat-paper .kit-ttab:hover { color: var(--momoi-paper-text); }
+
+/* 배치 D: 일러·정보형 — 흐린 장면 위 어두운 막 */
+.kit-scrim { background-color: rgba(14, 14, 18, 0.72); }
+.kit-showcase-tabs { position: absolute; left: 50%; top: 24px; translate: -50% 0; }
+.kit-showcase-hint { position: absolute; left: 0; right: 0; bottom: 246px; -unity-text-align: middle-center; font-size: 14px; color: var(--momoi-dim); }
+/* 배치 E: 양옆 패널형 — 가운데 장면을 둔다 */
+.kit-sidepanel { position: absolute; top: 96px; bottom: 96px; width: 440px; padding: 16px 18px; border-radius: 8px; }
+.kit-sidepanel--left { left: 28px; }
+.kit-sidepanel--right { right: 28px; }
+.kit-sidepanel--low { bottom: 300px; }
+.kit-corner-back { position: absolute; right: 28px; top: 20px; }
+/* 검정 면 위의 ✕는 밝게 */
+.momoi-mat-cover .kit-close { color: var(--momoi-cover-text); }
+.momoi-mat-cover .kit-close:hover { background-color: rgba(255, 255, 255, 0.08); }

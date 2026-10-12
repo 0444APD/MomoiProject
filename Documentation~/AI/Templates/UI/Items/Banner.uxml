@@ -1,0 +1,7 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 가로 배너 카드(장비·추억·지역 — 250×120): 그림 · 오른쪽 아래 꼬리표 -->
+    <ui:Button name="banner" class="kit-banner momoi-mat-cover">
+        <ui:VisualElement name="art" class="kit-banner-art" picking-mode="Ignore" />
+        <ui:Label name="tag" class="kit-banner-tag kit-pill-tag momoi-mat-cover" picking-mode="Ignore" />
+    </ui:Button>
+</ui:UXML>

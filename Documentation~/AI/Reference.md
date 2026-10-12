@@ -4,10 +4,11 @@
 
 | 문서 | 맡는 것 |
 |---|---|
-| `ProjectFlow.md`(진행 매뉴얼) | **언제** 무엇을 하나: 단계 0 흡수 ~ 6 출시 준비, 질문 규칙, 예외 잡기, 결정 기록(`Docs/Decisions.md`) |
+| `ProjectFlow.md`(진행 매뉴얼) | **언제** 무엇을 하나: 단계 0 흡수 → 1 시스템층 → 2 UI·샘플, 그 뒤 요청 작업(콘텐츠·레벨·연출·밸런싱·출시), 질문 규칙, 예외 잡기, 결정 기록(`Docs/Decisions.md`) |
 | `ProjectConventions.md`(프로젝트 관례) | **어떻게** 쓰나: 폴더·이름·규칙과 화면의 경계·행동 직전 이벤트 자리·테스트·보고·DB 반영 스크립트·개발자가 읽고 바꿀 모양·테스트 씬 |
 | `PlanningSpecGuide.md`(기획 명세서 읽는 법) | 기획 명세서의 칸 → 무엇을 만들지, 질문 규칙, 진행 순서 |
 | `NamingGuide.md`(명명 가이드라인) | 개발자 화면 이름(한글)을 짓는 규칙 · 밸런스 값의 표시 이름·메모·입력 칸 주석·묶음 · 개발자가 바로잡은 이름 표(먼저 본다) |
+| `UiGuide.md`(UI 가이드) | 모든 프로젝트의 화면 문법(UXML·USS·화면 코드·목록·층·월드와 UI) · 레이아웃(1920×1080 자리·크기 표·배치 A~E) · 디자인(차가운 검정 + 종이 흰색, 책·종이·폴더, 매트·플랫, 뒤 흐림, 재질). UI 키트는 `Templates/UI/`(배치 A~E · 패널 가족마다 형식 A~D · 카드 칸 · `KitShape`) |
 | `GimmickCatalog.md`(기믹 목록) | 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아) 범위의 기믹 갈래 → GBible 부품, 메인 룰의 모양과 미리 둘 자리 |
 | 이 문서 | **무엇이** 있나: 하고 싶은 일 → 기능·API·DB 종류·Block, 매뉴얼 장 |
 
@@ -134,7 +135,7 @@ GBible.Unity
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
-| 화면 색·글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수, DB › 화면 설정 › 글꼴(한글 TTF) | 35 2-7 |
+| 화면 색·재질·글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수(재질 `--momoi-paper·folder·cover·stone·colorpaper`) · 재질 클래스 `.momoi-mat-paper`·`-folder`·`-cover`·`-stone`·`-colorpaper`(색 + GBible의 옅은 결 텍스처) · 창·팝업 뒤 흐림(`.momoi-backdrop` — `backdrop-filter`) · UI 키트 `Templates/UI/` · DB › 화면 설정 › 글꼴(한글 TTF). 규칙은 `UiGuide.md` | 35 2-7 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
 | 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy` | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |
@@ -410,4 +411,9 @@ public class PlayCard : GameAction
 42. 주고받는 클래스에 `#if UNITY_EDITOR` 필드 → 에디터와 빌드의 필드 차례가 달라 읽기가 어긋난다. 이벤트는 `[GameEvent]` 클래스(구조체는 보낼 수 없다).
 43. 데이터 클래스가 `List<T>`·`Dictionary`를 상속(`class Deck : List<Card>`) → 요소는 상속한 클래스의 안쪽 칸이라 비교 코드가 보지 못한다(예전 비교 방식·보낼 때 오류, 컴파일 경고). 상속 대신 `List<Card> cards` 필드.
 44. `Game.Set(키, new 값)` 뒤에 넘긴 객체를 계속 고쳤다 → 저장소는 넘긴 값의 내용을 지금 객체에 복사해 덮는다(넘긴 객체는 데이터 밖, 매뉴얼 1장). 이어서 고칠 것은 다시 꺼낸 값(`Game.Data().Run`)에.
-44. 상태 효과·패시브·능력의 DB 종류를 GBible에서 찾음 → 없다. 선택 요소라 템플릿을 프로젝트에 들인다(4-1). 그 클래스에 칸이 모자라 'GBible을 고칠까요'라고 물음 → 프로젝트 클래스에 칸을 더한다(프로젝트 변경, 보고만).
+45. 상태 효과·패시브·능력의 DB 종류를 GBible에서 찾음 → 없다. 선택 요소라 템플릿을 프로젝트에 들인다(4-1). 그 클래스에 칸이 모자라 'GBible을 고칠까요'라고 물음 → 프로젝트 클래스에 칸을 더한다(프로젝트 변경, 보고만).
+46. 창 UXML의 뿌리에 바로 패널을 둠 → 화면 트리는 화면 전체로 깔리므로 왼쪽 위에 붙는다. `전체 + 가운데` 감싸개 안에(UiGuide 1-6).
+47. 목록 칸(`List<T>`)의 안쪽 요소를 절대 위치로 옮김 → 뿌리가 TemplateContainer라 흐름 배치에 남는다. 뿌리에 위치·크기를(UiGuide 1-5).
+48. 코드가 글을 쓰는 Label에 `binding-path`도 달았다 → 다시 그릴 때마다 바인딩 글이 덮는다. 둘 중 하나만(UiGuide 1-3).
+49. 패널에 테두리 선 강조·그림자·빛남·그라데이션을 쓰거나 패널 자체를 반투명 유리로 만듦 → 디자인 기본(매트·플랫)과 어긋난다. 패널은 불투명한 재질 하나(`.momoi-mat-…`), 상태는 면 색으로, 흐림은 창·팝업의 뒤에만(UiGuide 3절).
+50. 장면(배경·걷는 캐릭터)을 UI 화면에 그림 → 다이얼로그의 배경 일러(월드)가 그 위를 덮지 못하고, 애니메이터를 쓸 수 없다. 장면은 월드에, 그리기 순서는 다이얼로그 배경(-100)보다 뒤(UiGuide 1-8).

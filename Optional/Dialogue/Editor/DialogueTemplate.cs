@@ -303,49 +303,49 @@ namespace GBible.EditorTools.Graph
 .dialogue-letterbox--top { top: 0; }
 .dialogue-letterbox--bottom { bottom: 0; }
 
-/* 글상자 */
+/* 글상자 — 매트한 종이 흰색(테두리·그림자 없음, 차가운 검정 + 종이 — GBible AI/UiGuide.md 3절). 결은 GBible 재질 텍스처 */
 .dialogue-box {
     position: absolute;
-    left: 6%;
-    right: 6%;
-    bottom: 4%;
-    min-height: 230px;
-    padding: 40px 52px 36px 52px;
-    border-radius: 20px;
-    background-color: rgba(14, 15, 17, 0.72);
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.14);
-    backdrop-filter: blur(14px);
+    left: 18%;
+    right: 18%;
+    bottom: 5%;
+    min-height: 120px;
+    padding: 24px 30px 22px 30px;
+    border-radius: 6px;
+    background-color: rgb(244, 243, 240);
+    background-image: resource(""MomoiProject/Materials/Paper"");
+    background-repeat: repeat;
+    background-size: 256px 256px;
     transition-property: opacity, translate;
     transition-duration: 0.2s;
 }
 
 .dialogue--staging .dialogue-box {
     opacity: 0;
-    translate: 0 16px;
+    translate: 0 12px;
 }
 
 .dialogue-name-box {
     position: absolute;
-    top: -24px;
-    left: 40px;
-    padding: 6px 20px;
-    border-radius: 12px;
-    background-color: rgb(253, 93, 131);
+    top: -16px;
+    left: 24px;
+    padding: 3px 14px;
+    border-radius: 4px;
+    background-color: rgb(36, 37, 41);
     flex-direction: row;
     align-items: center;
 }
 
 .dialogue-name {
-    font-size: 26px;
+    font-size: 17px;
     -unity-font-style: bold;
-    color: rgb(255, 255, 255);
+    color: rgb(236, 236, 238);
 }
 
 .dialogue-affiliation {
-    font-size: 18px;
-    color: rgba(255, 255, 255, 0.85);
-    margin-left: 12px;
+    font-size: 13px;
+    color: rgba(236, 236, 238, 0.75);
+    margin-left: 10px;
 }
 
 /* 추가 글이 비었으면 숨긴다(dialogue-extra-<키> 요소 공통) */
@@ -354,44 +354,43 @@ namespace GBible.EditorTools.Graph
 }
 
 .dialogue-text {
-    font-size: 30px;
-    color: rgb(242, 242, 243);
+    font-size: 19px;
+    color: rgb(38, 38, 42);
     white-space: normal;
-    margin-top: 6px;
-    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+    margin-top: 4px;
 }
 
 .dialogue--narration .dialogue-text {
     -unity-font-style: italic;
-    color: rgba(242, 242, 243, 0.82);
+    color: rgb(110, 110, 116);
 }
 
 .dialogue--thought .dialogue-text {
     -unity-font-style: italic;
-    color: rgba(190, 205, 255, 0.92);
+    color: rgb(80, 90, 120);
 }
 
 .dialogue-location {
     position: absolute;
-    left: 40px;
-    top: 32px;
-    padding: 6px 16px;
-    border-radius: 10px;
-    background-color: rgba(14, 15, 17, 0.6);
-    font-size: 20px;
-    color: rgb(242, 242, 243);
+    left: 24px;
+    top: 20px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background-color: rgb(54, 56, 61);
+    font-size: 15px;
+    color: rgb(226, 228, 232);
 }
 
 .dialogue-next {
     position: absolute;
-    right: 30px;
-    bottom: 24px;
-    width: 16px;
-    height: 16px;
+    right: 18px;
+    bottom: 14px;
+    width: 10px;
+    height: 10px;
     rotate: 45deg;
-    border-right-width: 3px;
-    border-bottom-width: 3px;
-    border-color: rgb(242, 242, 243);
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-color: rgb(38, 38, 42);
     opacity: 0;
 }
 
@@ -399,32 +398,32 @@ namespace GBible.EditorTools.Graph
     opacity: 1;
 }
 
-/* 선택지 */
+/* 선택지 — 폴더 색 카드(고르면 강조색으로 채움, 테두리 없음) */
 .dialogue-choices {
     position: absolute;
     left: 0;
     right: 0;
-    top: 12%;
-    bottom: 34%;
+    top: 14%;
+    bottom: 32%;
     align-items: center;
     justify-content: center;
 }
 
 .dialogue-choice {
-    min-width: 44%;
-    margin: 8px;
-    padding: 18px 28px;
-    border-radius: 14px;
-    background-color: rgba(22, 23, 26, 0.88);
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.14);
-    transition-property: background-color, scale;
-    transition-duration: 0.12s;
+    min-width: 40%;
+    margin: 6px;
+    padding: 12px 22px;
+    border-radius: 4px;
+    background-color: rgb(222, 221, 218);
+    background-image: resource(""MomoiProject/Materials/Paper"");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+    transition-property: background-color;
+    transition-duration: 0.1s;
 }
 
 .dialogue-choice:hover {
-    background-color: rgba(253, 93, 131, 0.35);
-    scale: 1.02 1.02;
+    background-color: rgb(210, 209, 206);
 }
 
 .dialogue-choice--locked {
@@ -432,12 +431,12 @@ namespace GBible.EditorTools.Graph
 }
 
 .dialogue-choice--picked {
-    background-color: rgba(253, 93, 131, 0.8);
+    background-color: rgb(204, 184, 146);
 }
 
 .choice-text {
-    font-size: 26px;
-    color: rgb(242, 242, 243);
+    font-size: 18px;
+    color: rgb(52, 52, 56);
     -unity-text-align: middle-center;
     white-space: normal;
 }
@@ -445,17 +444,17 @@ namespace GBible.EditorTools.Graph
 /* 대사 로그: 위에서 아래로, 내가 고른 선택지는 오른쪽 */
 .dialogue-log-button {
     position: absolute;
-    right: 24px;
-    top: 14px;
-    font-size: 18px;
-    color: rgba(242, 242, 243, 0.6);
-    padding: 2px 10px;
-    border-radius: 8px;
+    right: 12px;
+    top: 8px;
+    font-size: 13px;
+    color: rgba(38, 38, 42, 0.6);
+    padding: 2px 8px;
+    border-radius: 4px;
 }
 
 .dialogue-log-button:hover {
-    color: rgb(255, 255, 255);
-    background-color: rgba(255, 255, 255, 0.08);
+    color: rgb(38, 38, 42);
+    background-color: rgba(38, 38, 42, 0.08);
 }
 
 .dialogue-log {
@@ -464,38 +463,39 @@ namespace GBible.EditorTools.Graph
     top: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.55);
+    background-color: rgba(0, 0, 0, 0.5);
     align-items: center;
     justify-content: center;
 }
 
 .dialogue-log__panel {
-    width: 70%;
-    height: 82%;
-    padding: 20px 28px;
-    border-radius: 20px;
-    background-color: rgba(14, 15, 17, 0.92);
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.14);
+    width: 60%;
+    height: 80%;
+    padding: 18px 24px;
+    border-radius: 6px;
+    background-color: rgb(36, 37, 41);
+    background-image: resource(""MomoiProject/Materials/Cover"");
+    background-repeat: repeat;
+    background-size: 256px 256px;
 }
 
 .dialogue-log__head {
     flex-direction: row;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .dialogue-log__title {
     flex-grow: 1;
-    font-size: 26px;
+    font-size: 20px;
     -unity-font-style: bold;
-    color: rgb(255, 255, 255);
+    color: rgb(236, 236, 238);
 }
 
 .dialogue-log-close {
-    font-size: 24px;
-    color: rgba(242, 242, 243, 0.6);
-    padding: 2px 10px;
+    font-size: 18px;
+    color: rgba(236, 236, 238, 0.6);
+    padding: 2px 8px;
 }
 
 .dialogue-log__list {
@@ -505,15 +505,15 @@ namespace GBible.EditorTools.Graph
 .dialogue-log__entry {
     flex-direction: row;
     align-items: flex-start;
-    margin: 10px 0;
+    margin: 8px 0;
 }
 
 .dialogue-log__portrait {
-    width: 72px;
-    height: 72px;
+    width: 56px;
+    height: 56px;
     flex-shrink: 0;
-    margin-right: 16px;
-    border-radius: 12px;
+    margin-right: 12px;
+    border-radius: 4px;
     background-color: rgba(255, 255, 255, 0.06);
     -unity-background-scale-mode: scale-and-crop;
     background-position-y: top;
@@ -525,14 +525,14 @@ namespace GBible.EditorTools.Graph
 }
 
 .dialogue-log__name {
-    font-size: 20px;
+    font-size: 15px;
     -unity-font-style: bold;
-    color: rgb(253, 93, 131);
+    color: rgb(204, 184, 146);
 }
 
 .dialogue-log__text {
-    font-size: 24px;
-    color: rgb(242, 242, 243);
+    font-size: 17px;
+    color: rgb(236, 236, 238);
     white-space: normal;
 }
 
@@ -541,31 +541,29 @@ namespace GBible.EditorTools.Graph
 }
 
 .dialogue-log__entry--choice .dialogue-log__body {
-    padding: 10px 18px;
-    border-radius: 14px;
-    background-color: rgba(253, 93, 131, 0.25);
+    padding: 8px 14px;
+    border-radius: 4px;
+    background-color: rgba(204, 184, 146, 0.25);
 }
 
 .dialogue-log__entry--narration .dialogue-log__text,
 .dialogue-log__entry--thought .dialogue-log__text {
     -unity-font-style: italic;
-    color: rgba(242, 242, 243, 0.8);
+    color: rgba(236, 236, 238, 0.75);
 }
 
-/* 용어 툴팁 */
+/* 용어 툴팁 — 종이 */
 .dialogue-tooltip {
     position: absolute;
-    max-width: 480px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    background-color: rgba(14, 15, 17, 0.95);
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.14);
+    max-width: 420px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    background-color: rgb(244, 243, 240);
 }
 
 .dialogue-tooltip-text {
-    font-size: 22px;
-    color: rgb(242, 242, 243);
+    font-size: 16px;
+    color: rgb(38, 38, 42);
     white-space: normal;
 }
 ";

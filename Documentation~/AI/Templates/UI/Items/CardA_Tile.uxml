@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 타일(아이템·보상·재료 — 88×88 검정): 아이콘 · 등급 띠 · 개수(오른쪽 아래) · 모서리 표시(새·확률) · 받음 표시(✓ — 기본 숨김, 코드가 켠다) -->
+    <ui:Button name="tile" class="kit-tile momoi-mat-cover">
+        <ui:VisualElement name="icon" class="kit-tile-icon" picking-mode="Ignore" />
+        <ui:VisualElement name="strip" class="kit-tile-strip" picking-mode="Ignore" />
+        <ui:Label name="count" class="kit-tile-count" picking-mode="Ignore" />
+        <ui:Label name="corner" class="kit-tile-corner" picking-mode="Ignore" />
+        <ui:Label name="check" text="✓" class="kit-tile-check" picking-mode="Ignore" />
+    </ui:Button>
+</ui:UXML>

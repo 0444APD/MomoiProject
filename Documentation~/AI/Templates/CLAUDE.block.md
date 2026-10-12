@@ -1,7 +1,7 @@
 # 이 프로젝트: GBible(MomoiProject)로 만드는 Unity 게임
 
 - **역할**: 로직·DB 항목·화면·테스트 도구는 AI(너)가 코드와 DB 반영 스크립트로 만든다. 개발자는 에디터에서 읽고(DB·모니터), 밸런싱 값을 바꾸고, 다이얼로그 그래프를 만들고, 레벨을 배치하고, 에셋을 가져오고, 테스트한다. 로직 쪽 DB 항목의 추가·삭제·로직 변경은 개발자가 말로 요청한다.
-- 진행은 스킬 `/think-momoi`와 진행 매뉴얼 `{{GBIBLE}}/Documentation~/AI/ProjectFlow.md`를 따른다(단계 0 흡수 → 1 시스템층 → 2 콘텐츠 → 3 레벨 디자인 → 4 연출·UI·사운드 → 5 밸런싱·테스트 → 6 출시 준비).
+- 진행은 스킬 `/think-momoi`와 진행 매뉴얼 `{{GBIBLE}}/Documentation~/AI/ProjectFlow.md`를 따른다(단계 0 흡수 → 1 시스템층 → 2 UI·샘플 — 화면 전부와 단위 테스트를 위한 최소 로직 샘플. 그 뒤 콘텐츠·레벨·연출·밸런싱·출시는 개발자가 요청할 때).
 - **결정 기록 `Docs/Decisions.md`를 세션마다 먼저 읽는다.** 정한 것은 다시 묻지 않는다. **기획은 넘겨짚지 않는다** — 자료·답에 없는 것은 추천을 붙여 묻고, 개발자가 답하거나 승인해야 확정이다. 확정한 것은 바로 적고 채팅에도 한 줄 남긴다(답을 기다리는 추천·가안은 '확인 기다리는 것'에).
 - 기획 명세서 `Docs/PlanningSpec.md`(살아 있는 문서 — 답이 칸을 바꾸면 고치고 `(D-n)`), 자료 `Docs/Source/`. 채운 예시 `{{GBIBLE}}/Documentation~/AI/PlanningSpec-CardDungeon.md`.
 - GBible 문서: `{{GBIBLE}}/Documentation~/` — 매뉴얼 `Manual/`(장마다 기능 하나), AI 문서 `AI/`.
@@ -18,6 +18,7 @@
 - **테스트할 수 있게**: 테스트 씬·테스트 명령·테스트 상황을 함께 만든다(관례 19절).
 - **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
 - 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
+- **화면은 `{{GBIBLE}}/Documentation~/AI/UiGuide.md`대로**(모든 프로젝트 공통): 문법(클래스로만 모양 · 텍스트 키 · 창은 가운데 감싸개 · 월드 장면과 UI 나누기) · 레이아웃(1920×1080, 위 띠·아래 띠 자리, 모바일처럼 크지 않게) · 디자인(차가운 검정 + 종이 흰색, 책·종이·폴더 — 매트·플랫, 테두리 선 강조·그림자 없음, 창·팝업 뒤는 흐림, 패널마다 재질 하나, 알약·원·아치·비스듬한 칸) · UI 키트(`{{GBIBLE}}/Documentation~/AI/Templates/UI/` — 배치 A~E, 패널 가족마다 형식 A~D)를 복사해 짠다. 개발자는 화면마다 전체 레이아웃 참고 그림만 주고 세부 배치는 묻지 않는다.
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".
 - 상태 효과·패시브·능력은 선택 요소다: 쓰면 템플릿(`{{GBIBLE}}/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 들이고, 칸이 모자라면 그 클래스에 더한다(프로젝트 변경 — 묻지 않고 보고만).
 - 개발자에게 보이는 이름(DB·칸·Block·메뉴·밸런스 값)은 `{{GBIBLE}}/Documentation~/AI/NamingGuide.md`대로 짓는다 — '바로잡은 이름' 표를 먼저 본다. 밸런스 값은 표시 이름·메모·입력 칸 주석·묶음을 함께. 개발자가 이름을 바로잡으면 그 표에 더한다.

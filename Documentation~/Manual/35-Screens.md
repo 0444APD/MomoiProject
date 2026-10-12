@@ -175,7 +175,9 @@ protected override void Tick(float deltaTime)
 
 - 첫 화면을 열 때 `[MomoiProject] 화면` 오브젝트(DontDestroyOnLoad)에 UIDocument 하나를 만든다(정렬 100 — 프로젝트의 다른 UIDocument보다 위). Panel Settings는 DB › 화면 설정의 것. 없으면 경고하고 테마 없는 임시 설정으로 띄운다(기본 컨트롤 모양이 빠질 수 있다 → 3-1 화면 준비).
 - 루트에 붙는 USS 순서: 라이브러리 기본(`Resources/MomoiProject/Screens.uss`) → 테마 USS(DB › 화면 설정, 위에서부터) → 화면마다 '더할 USS'. 뒤의 것이 이긴다.
-- 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop` · `--momoi-radius` · `--momoi-font-size`. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
+- 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop` · `--momoi-radius` · `--momoi-font-size`, 재질 `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
+- **재질 클래스**: `.momoi-mat-paper`(종이) · `.momoi-mat-folder`(폴더) · `.momoi-mat-cover`(검정 표지 — 희미한 조각 결) · `.momoi-mat-stone`(거친 돌) · `.momoi-mat-colorpaper`(색종이 — 작은 표시) — 재질 변수의 색 위에 라이브러리의 아주 옅은 결 텍스처(`Resources/MomoiProject/Materials/`, 256px 타일)를 깐다. 기본 창은 종이(버튼은 검정 알약), 알림은 검정 알약.
+- **뒤 흐림**: 아래 입력을 막는 창·팝업의 바탕(`.momoi-backdrop` · `--clear`)이 `backdrop-filter: blur(…)`로 그 아래 화면을 흐린다(팝업은 조금 어둡게). 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
 - **글꼴**: DB › 화면 설정 › 글꼴에 TTF·OTF를 넣으면 모든 화면에 쓰인다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣는다).
 - 화면 크기: Panel Settings가 1920×1080 기준으로 늘이고 줄인다(가로세로 반반 맞춤). UXML은 1920×1080 기준 px로 쓴다.
 
@@ -460,22 +462,20 @@ Game.Session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(done
 
 ```css
 :root {
-    --momoi-panel: rgb(250, 244, 232);
-    --momoi-text: rgb(40, 32, 24);
-    --momoi-button: rgb(232, 220, 196);
-    --momoi-accent: rgb(214, 92, 64);
-    --momoi-accent-text: rgb(255, 255, 255);
-    --momoi-font-size: 24px;
+    --momoi-cover: rgb(30, 32, 38);        /* 검정 표지 — 조금 더 푸른 검정 */
+    --momoi-paper: rgb(246, 245, 242);     /* 종이 흰색 */
+    --momoi-panel: rgb(246, 245, 242);     /* 기본 창 = 종이와 같게 */
+    --momoi-accent: rgb(190, 176, 150);    /* 모래색 강조 하나 */
 }
-.momoi-panel { border-width: 3px; border-color: rgb(120, 90, 60); }
+.br-detail { /* 프로젝트 화면 칸에 재질 클래스를 붙이고, 같은 재질의 다른 색은 background-color만 */ }
 ```
 
-고르기 창·설정·알림을 포함해 모든 기본 화면과, 같은 변수를 쓰는 프로젝트 화면의 색이 바뀐다.
+고르기 창·설정·알림을 포함해 모든 기본 화면과, 같은 변수·재질 클래스를 쓰는 프로젝트 화면의 색이 바뀐다(결 텍스처는 그대로 따라온다). 테두리·그림자를 더해 꾸미지 않는다(`UiGuide.md` 3절).
 
 ### 5-6. AI가 화면 하나를 만드는 순서
 
 1. 화면 목록(기획 명세서 6절)에서 기본 화면으로 되는 것(고르기·확인·설정·슬롯·일시정지·알림)을 빼고 남은 화면마다:
-2. `Assets/MomoiProject/UI/Screens/<이름>.uxml`(+ 필요하면 `.uss`), 목록이 있으면 `Assets/MomoiProject/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색·크기는 테마 변수(`var(--momoi-…)`)를 쓴다. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`.
+2. `Assets/MomoiProject/UI/Screens/<이름>.uxml`(+ 필요하면 `.uss`), 목록이 있으면 `Assets/MomoiProject/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색·크기는 테마 변수(`var(--momoi-…)`)를 쓴다. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`. 문법·자리·크기·디자인(매트·플랫, 재질 클래스)은 AI 문서 `UiGuide.md`를 따른다.
 3. 버튼·목록이 있으면 `Assets/MomoiProject/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`).
 4. DB 반영 스크립트(관례 15절)에 화면 항목을 더한다. 화면 코드의 `[BindTo(GameIds.Screen.X)]`는 그 항목이 저절로 적용되고 Unity가 다시 컴파일해 상수가 생긴 뒤에 컴파일된다 — UXML·반영 스크립트를 먼저 넣고 Unity가 다시 읽게 한 뒤(AI는 `RunTests.request`) 3의 화면 코드를 쓴다 — `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/<이름>.uxml")`, 층·뒤로·열 씬을 정한다.
 5. 그림이 필요한 곳(카드 그림·아이콘)은 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳)`로 임시 그림과 넣을 것 목록을 만들고 UXML·USS가 그 경로를 쓴다 — 개발자가 에셋 관리에서 진짜 그림을 넣으면 그대로 바뀐다(39장).

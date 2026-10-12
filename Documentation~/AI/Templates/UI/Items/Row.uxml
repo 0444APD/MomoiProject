@@ -1,0 +1,8 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 표 줄(속성·능력치 비교): 원 아이콘 · 이름 · 칸들(cells 안에 kit-row-cell Label을 코드가 더한다) -->
+    <ui:VisualElement class="kit-row">
+        <ui:VisualElement name="icon" class="kit-row-icon" />
+        <ui:Label name="name" class="kit-row-name" />
+        <ui:VisualElement name="cells" class="kit-hrow" />
+    </ui:VisualElement>
+</ui:UXML>

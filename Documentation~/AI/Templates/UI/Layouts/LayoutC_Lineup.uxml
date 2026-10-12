@@ -1,0 +1,25 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Template name="CardC_Arch" src="../Items/CardC_Arch.uxml" />
+    <ui:Template name="Banner" src="../Items/Banner.uxml" />
+    <ui:Template name="Tab" src="../Items/Tab.uxml" />
+    <!-- 배치 C — 편성형(밝은 전체 화면 — 편성·덱 짜기·장비): 종이 흰 바탕 + 옆으로 누운 큰 글자 무늬(아주 옅게).
+         위 = 검정 홈 배지·제목·도움말 · 뒤로(원형) · 가운데 위 = 비스듬한 검정 제목 막대(번호·이름) · 가운데 = 아치 카드 줄 · 오른쪽 = 배너 카드 줄 ·
+         아래 = 검정 탭 막대(비스듬한 칸 — 고른 칸은 종이) · 오른쪽 아래 = 알약 버튼. 층: 창(전체). KitShape가 필요하다(README 설치 3). -->
+    <ui:VisualElement class="kit-screen momoi-mat-paper">
+        <ui:Label name="watermark" class="kit-watermark kit-watermark--side kit-lineup-mark" picking-mode="Ignore" />
+        <ui:VisualElement class="kit-topbar">
+            <ui:Button name="home" class="kit-home momoi-mat-cover" />
+            <ui:Label name="title" class="kit-topbar-title" />
+            <ui:Button name="help" text="?" class="kit-icon-btn kit-icon-btn--tiny" />
+            <ui:VisualElement class="kit-topbar-space" />
+            <ui:Button name="back" text="↩" class="kit-icon-btn" />
+        </ui:VisualElement>
+        <MomoiProject.KitShape shape="Slant" slant="14" class="kit-titlebar kit-lineup-titlebar">
+            <ui:Label name="preset" class="kit-titlebar-label" />
+        </MomoiProject.KitShape>
+        <ui:VisualElement name="members" class="kit-lineup-members" />
+        <ui:VisualElement name="side" class="kit-lineup-side" />
+        <ui:VisualElement name="tabs" class="kit-tabbar momoi-mat-cover" />
+        <ui:Button name="action" class="kit-btn kit-btn--folder kit-lineup-action" />
+    </ui:VisualElement>
+</ui:UXML>

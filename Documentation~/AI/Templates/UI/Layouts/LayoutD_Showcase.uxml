@@ -1,0 +1,27 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Template name="CardB_Portrait" src="../Items/CardB_Portrait.uxml" />
+    <!-- 배치 D — 일러·정보형(캐릭터 고르기·영입·정비): 흐린 장면 위 어두운 막 · 왼쪽 큰 일러 · 오른쪽 겹친 종이 카드(상세 D) ·
+         가운데 위 글자 탭(탭 D) · 아래 가로 명단 줄(목록 C — 세로 카드). 층 = 창(전체, 뒤 흐림). -->
+    <ui:VisualElement class="kit-screen kit-scrim">
+        <ui:VisualElement name="text-tabs" class="kit-text-tabs kit-showcase-tabs" />
+        <ui:VisualElement name="showcase-art" class="kit-showcase-art" picking-mode="Ignore" />
+        <ui:VisualElement class="kit-showcase-card">
+            <ui:VisualElement name="showcase-portrait" class="kit-showcase-portrait momoi-mat-cover" />
+            <ui:VisualElement class="kit-showcase-text momoi-mat-paper">
+                <ui:Label name="detail-title" class="kit-detail-title" />
+                <ui:Label name="detail-desc" class="kit-detail-desc" />
+                <ui:VisualElement class="kit-hrow kit-gap">
+                    <MomoiProject.KitShape shape="Slant" slant="14" name="detail-action" class="kit-slant-btn kit-slant-btn--primary">
+                        <ui:Label name="detail-action-label" class="kit-slant-btn-label" />
+                    </MomoiProject.KitShape>
+                    <ui:Button name="close" class="kit-btn kit-btn--light" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label name="hint" class="kit-showcase-hint" />
+        <ui:ScrollView mode="Horizontal" class="kit-strip-area">
+            <ui:VisualElement name="strip" class="kit-strip" />
+        </ui:ScrollView>
+        <ui:Button name="back" text="↩" class="kit-icon-btn kit-icon-btn--light kit-corner-back" />
+    </ui:VisualElement>
+</ui:UXML>

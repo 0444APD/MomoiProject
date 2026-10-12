@@ -776,7 +776,7 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 | 파일 | 하는 일 | 다시 맞출 때 |
 |---|---|---|
 | `CLAUDE.md` | Claude Code가 세션마다 읽는다. 관례(`ProjectConventions.md`)·참조(`Reference.md`)를 `@가져오기`로 불러온다 | `<!-- MomoiProject:begin -->`~`end` 칸만 다시 쓴다. 칸 밖에 쓴 것은 그대로 |
-| `.claude/skills/think-momoi/SKILL.md` | 스킬 `/think-momoi`: 진행 매뉴얼(`ProjectFlow.md`)의 단계대로 — 0 흡수(자료 → 명세서·예외 잡기·질문) → 1 시스템층 → 2 콘텐츠 → 3 레벨 디자인 지원 → 4 연출 → 5 밸런싱·테스트 → 6 출시 준비, 결정 기록을 읽고 이어 간다 | 통째로 |
+| `.claude/skills/think-momoi/SKILL.md` | 스킬 `/think-momoi`: 진행 매뉴얼(`ProjectFlow.md`)의 단계대로 — 0 흡수(자료 → 명세서·예외 잡기·질문) → 1 시스템층 → 2 UI·샘플(화면 전부 + 단위 테스트용 최소 로직 샘플), 그 뒤는 요청 작업(콘텐츠·레벨 디자인 지원·연출·밸런싱·출시 준비), 결정 기록을 읽고 이어 간다 | 통째로 |
 | `.claude/hooks/compile-check.ps1` · `.claude/settings.json` | 응답을 끝낼 때(Stop 훅) 프로젝트 코드를 컴파일한다. 오류가 있으면 Claude가 고친 뒤 다시 끝낸다 | 스크립트는 통째로, settings.json은 훅 한 줄이 없을 때만 더한다 |
 | `Docs/PlanningSpec.md` | 기획 명세서 빈 양식(AI가 자료로 채우고 질문한다, 개발자가 채워 와도 된다) | 없을 때만 |
 | `Docs/Decisions.md` | 결정 기록(개발자의 답·승인으로 확정한 것을 쌓는다 — `D-n`, 답을 기다리는 추천은 '확인 기다리는 것') | 없을 때만 |

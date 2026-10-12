@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 아래 탭 막대의 칸(비스듬한 평행사변형 — KitShape). 고른 칸은 kit-tab--on(종이) -->
+    <MomoiProject.KitShape name="tab" shape="Slant" slant="12" class="kit-tab">
+        <ui:Label name="label" class="kit-tab-label" picking-mode="Ignore" />
+    </MomoiProject.KitShape>
+</ui:UXML>
