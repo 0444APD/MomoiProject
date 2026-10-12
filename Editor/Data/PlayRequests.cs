@@ -21,7 +21,7 @@ namespace GBible.EditorTools
     //     open <화면 ID> [값]     화면 열기 · close <화면 ID> · back(뒤로 = Esc)
     //     click <화면 ID>/<요소 이름>[@n]   요소 누르기(n번째 같은 이름 — 0부터). Button은 '제출', 그 밖은 클릭 이벤트
     //     speed <배속>            게임 속도
-    //     capture <이름>          게임 화면을 Logs/MomoiProject/Captures/<이름>.png 로(게임 뷰 크기 그대로)
+    //     capture <이름> [배]     게임 화면을 Logs/MomoiProject/Captures/<이름>.png 로(게임 뷰 크기, 배 = 2~4면 그 배로 크게 — 얇은 선·작은 글을 볼 때)
     //     screens                 열린 화면 목록을 결과에 적기
     //     testpanel off|on        테스트 씬의 패널을 숨기기·보이기(찍을 때 HUD를 가리지 않게 — 기본은 숨김)
     //     record <이름> [초] [fps]  지금부터 게임 화면을 녹화해 Captures/<이름>.mp4(기본 2초 · 30fps, 너비 1280까지) — 다음 단계는 녹화와 함께 돈다.
@@ -332,15 +332,18 @@ namespace GBible.EditorTools
             return "누름";
         }
 
-        static string Capture(string name)
+        static string Capture(string arg)
         {
-            if (string.IsNullOrEmpty(name)) name = DateTime.Now.ToString("HHmmss");
+            var parts = (arg ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var name = parts.Length > 0 ? parts[0] : DateTime.Now.ToString("HHmmss");
+            var scale = parts.Length > 1 && int.TryParse(parts[1], out var s) ? Mathf.Clamp(s, 1, 4) : 1;
             Directory.CreateDirectory(CaptureFolder);
             var path = $"{CaptureFolder}/{name}.png";
             if (File.Exists(path)) File.Delete(path);
             FocusGameView();
-            ScreenCapture.CaptureScreenshot(path);
-            return "찍음 → " + path;
+            if (scale > 1) ScreenCapture.CaptureScreenshot(path, scale);
+            else ScreenCapture.CaptureScreenshot(path);
+            return "찍음 → " + path + (scale > 1 ? $" ({scale}배)" : "");
         }
 
         static void FocusGameView()
