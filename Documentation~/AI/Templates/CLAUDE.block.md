@@ -5,10 +5,10 @@
 - **결정 기록 `Docs/Decisions.md`를 세션마다 먼저 읽는다.** 정한 것은 다시 묻지 않는다. **기획은 넘겨짚지 않는다** — 자료·답에 없는 것은 추천을 붙여 묻고, 개발자가 답하거나 승인해야 확정이다. 확정한 것은 바로 적고 채팅에도 한 줄 남긴다(답을 기다리는 추천·가안은 '확인 기다리는 것'에).
 - 기획 명세서 `Docs/PlanningSpec.md`(살아 있는 문서 — 답이 칸을 바꾸면 고치고 `(D-n)`), 자료 `Docs/Source/`. 채운 예시 `{{GBIBLE}}/Documentation~/AI/PlanningSpec-CardDungeon.md`.
 - GBible 문서: `{{GBIBLE}}/Documentation~/` — 매뉴얼 `Manual/`(장마다 기능 하나), AI 문서 `AI/`.
-- 아래 두 문서가 이 프로젝트의 규칙과 기능 목록이다(늘 읽는다).
+- 늘 읽는 것은 아래 둘이다: 메뉴얼 지도(문서 목차 — 무엇을 할 때 어느 문서를 읽나)와 프로젝트 관례(모든 규칙). **코드를 쓰거나 고치는 작업을 시작할 때는 참조 `{{GBIBLE}}/Documentation~/AI/Reference.md`를 끝까지 읽는다**(있는 기능부터 쓴다). 나머지 문서는 지도를 보고 필요할 때 읽는다.
 
+@{{GBIBLE}}/Documentation~/AI/ManualMap.md
 @{{GBIBLE}}/Documentation~/AI/ProjectConventions.md
-@{{GBIBLE}}/Documentation~/AI/Reference.md
 
 ## 이 프로젝트에서 늘 지킬 것(관례의 요약)
 
@@ -16,7 +16,7 @@
 - 데이터는 DB, 동작은 코드. 플레이어 데이터를 바꾸는 일은 모두 행동(`GameAction`) 안에서.
 - **개발자가 바꿀 것은 에디터에**: 숫자는 밸런싱 값·DB 칸·인스턴스 필드, 참조는 드롭다운(`[DataRef]`). 코드에 숫자를 적지 않는다(관례 18절).
 - **테스트할 수 있게**: 테스트 씬·테스트 명령·테스트 상황을 함께 만든다(관례 19절).
-- **멀티**(명세서 0절이 있음): 4블록 규칙 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
+- **멀티**(명세서 0절이 있음): `{{GBIBLE}}/Documentation~/AI/Multiplayer.md`를 읽고 4블록 규칙대로 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
 - 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
 - **화면은 `{{GBIBLE}}/Documentation~/AI/UiGuide.md`대로**(모든 프로젝트 공통): 문법(클래스로만 모양 · 텍스트 키 · 창은 가운데 감싸개 · 월드 장면과 UI 나누기) · 레이아웃(1920×1080, 위 띠·아래 띠 자리, 모바일처럼 크지 않게) · 디자인(차가운 검정 + 종이 흰색, 책·종이·폴더 — 매트·플랫, 테두리 선 강조·그림자 없음, 창·팝업 뒤는 흐림, 패널마다 재질 하나, 알약·원·아치·비스듬한 칸) · UI 키트(`{{GBIBLE}}/Documentation~/AI/Templates/UI/` — 배치 A~E, 패널 가족마다 형식 A~D)를 복사해 짠다. 개발자는 화면마다 전체 레이아웃 참고 그림만 주고 세부 배치는 묻지 않는다.
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".
