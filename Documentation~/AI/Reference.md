@@ -135,7 +135,7 @@ GBible.Unity
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
-| 화면 색·재질·글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수(재질 `--momoi-paper·folder·cover·stone·colorpaper`) · 재질 클래스 `.momoi-mat-paper`·`-folder`·`-cover`·`-stone`·`-colorpaper`(색 + GBible의 옅은 결 텍스처) · 창·팝업 뒤 흐림(`.momoi-backdrop` — `backdrop-filter`) · UI 키트 `Templates/UI/` · DB › 화면 설정 › 글꼴(한글 TTF). 규칙은 `UiGuide.md` | 35 2-7 |
+| 화면 색·재질·글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수(재질 `--momoi-paper·folder·cover·stone·colorpaper`) · 재질 클래스 `.momoi-mat-paper`·`-folder`·`-cover`·`-stone`·`-colorpaper`(색 + GBible의 옅은 결 텍스처) · 창·팝업 뒤 흐림(`.momoi-backdrop` — `backdrop-filter`, 지금은 늘 — UiGuide 3-1 규칙은 블러를 알림에만 · 템플릿을 옮길 때 화면 항목의 뒷배경 칸으로 바꾼다) · UI 키트 `Templates/UI/` · DB › 화면 설정 › 글꼴(한글 TTF). 규칙은 `UiGuide.md` | 35 2-7 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
 | 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy` | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |
@@ -416,5 +416,5 @@ public class PlayCard : GameAction
 46. 창 UXML의 뿌리에 바로 패널을 둠 → 화면 트리는 화면 전체로 깔리므로 왼쪽 위에 붙는다. `전체 + 가운데` 감싸개 안에(UiGuide 1-6).
 47. 목록 칸(`List<T>`)의 안쪽 요소를 절대 위치로 옮김 → 뿌리가 TemplateContainer라 흐름 배치에 남는다. 뿌리에 위치·크기를(UiGuide 1-5).
 48. 코드가 글을 쓰는 Label에 `binding-path`도 달았다 → 다시 그릴 때마다 바인딩 글이 덮는다. 둘 중 하나만(UiGuide 1-3).
-49. 패널에 테두리 선 강조·그림자·빛남·그라데이션을 쓰거나 패널 자체를 반투명 유리로 만듦 → 디자인 기본(매트·플랫)과 어긋난다. 패널은 불투명한 재질 하나(`.momoi-mat-…`), 상태는 면 색으로, 흐림은 창·팝업의 뒤에만(UiGuide 3절).
+49. 패널에 그림자·빛남·그라데이션·두꺼운 테두리를 쓰거나, 패널을 기울이거나, 클립·테이프 같은 물건 소품을 붙이거나, 패널을 3중첩하거나, 일반 UI 뒤에 블러를 씀 → 디자인 기본과 어긋난다. 패널은 불투명한 단색 + 아주 옅은 조각, 모양은 4가지(직각·약간 둥근·모서리 자름·알약)와 선·둥글기·각의 변칙, 블러는 알림의 뒤에만(UiGuide 3-1).
 50. 장면(배경·걷는 캐릭터)을 UI 화면에 그림 → 다이얼로그의 배경 일러(월드)가 그 위를 덮지 못하고, 애니메이터를 쓸 수 없다. 장면은 월드에, 그리기 순서는 다이얼로그 배경(-100)보다 뒤(UiGuide 1-8).

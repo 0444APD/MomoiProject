@@ -177,7 +177,7 @@ protected override void Tick(float deltaTime)
 - 루트에 붙는 USS 순서: 라이브러리 기본(`Resources/MomoiProject/Screens.uss`) → 테마 USS(DB › 화면 설정, 위에서부터) → 화면마다 '더할 USS'. 뒤의 것이 이긴다.
 - 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop` · `--momoi-radius` · `--momoi-font-size`, 재질 `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
 - **재질 클래스**: `.momoi-mat-paper`(종이) · `.momoi-mat-folder`(폴더) · `.momoi-mat-cover`(검정 표지 — 희미한 조각 결) · `.momoi-mat-stone`(거친 돌) · `.momoi-mat-colorpaper`(색종이 — 작은 표시) — 재질 변수의 색 위에 라이브러리의 아주 옅은 결 텍스처(`Resources/MomoiProject/Materials/`, 256px 타일)를 깐다. 기본 창은 종이(버튼은 검정 알약), 알림은 검정 알약.
-- **뒤 흐림**: 아래 입력을 막는 창·팝업의 바탕(`.momoi-backdrop` · `--clear`)이 `backdrop-filter: blur(…)`로 그 아래 화면을 흐린다(팝업은 조금 어둡게). 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
+- **뒤 흐림**: 아래 입력을 막는 창·팝업의 바탕(`.momoi-backdrop` · `--clear`)이 `backdrop-filter: blur(…)`로 그 아래 화면을 흐린다(팝업은 조금 어둡게). 이것은 지금 라이브러리의 동작이고, UI 가이드의 규칙은 블러를 **알림성 화면에만** 쓴다(일반 배경 · 블러 · UI 배경 3가지 — UiGuide 3-1). 화면 항목의 뒷배경 칸은 UI 템플릿을 옮길 때 더한다. 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
 - **글꼴**: DB › 화면 설정 › 글꼴에 TTF·OTF를 넣으면 모든 화면에 쓰인다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣는다).
 - 화면 크기: Panel Settings가 1920×1080 기준으로 늘이고 줄인다(가로세로 반반 맞춤). UXML은 1920×1080 기준 px로 쓴다.
 
