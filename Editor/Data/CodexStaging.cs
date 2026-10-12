@@ -668,6 +668,8 @@ namespace GBible.EditorTools
         static void OnPlayMode(PlayModeStateChange change)
         {
             if (change != PlayModeStateChange.ExitingEditMode) return;
+            // AI의 플레이 요청은 묻지 않는다(창이 뜨면 답할 사람이 없어 Unity가 멈춘다) — 적용된 데이터로 돌고, 결과 파일에 '적용 전' 건수를 남긴다.
+            if (PlayRequests.IsStarting) return;
             if (AskBeforeLeaving("플레이하기 전에") == AskResult.Cancel) EditorApplication.isPlaying = false;
         }
 

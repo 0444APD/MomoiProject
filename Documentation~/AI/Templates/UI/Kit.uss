@@ -79,6 +79,15 @@
 .kit-tile--picked { background-color: var(--momoi-stone); translate: 0 -3px; }
 .kit-tile--empty { background-color: rgba(0, 0, 0, 0.06); background-image: none; }
 .momoi-mat-cover .kit-tile--empty { background-color: rgba(255, 255, 255, 0.04); }
+/* 검정 패널 위의 타일은 한 단계 밝은 면(같은 검정이면 칸이 보이지 않는다) */
+.momoi-mat-cover .kit-tile { background-color: var(--momoi-stone); }
+.momoi-mat-cover .kit-tile:hover { background-color: rgb(68, 70, 76); }
+.momoi-mat-cover .kit-tile--picked { background-color: rgb(80, 82, 88); border-bottom-width: 3px; border-color: var(--momoi-accent); }
+.momoi-mat-cover .kit-tile--empty { background-color: rgba(255, 255, 255, 0.04); }
+.momoi-mat-cover .momoi-mat-paper .kit-tile { background-color: var(--momoi-cover); }
+.momoi-mat-cover .momoi-mat-paper .kit-tile:hover { background-color: var(--momoi-button-hover); }
+/* 그림이 없을 때의 아이콘 샘플(KitIcon — 화면 코드가 넣는다, UiGuide 3-6) */
+.kit-icon-sample { position: absolute; left: 24%; top: 24%; right: 24%; bottom: 24%; color: rgba(236, 236, 238, 0.6); }
 
 /* 세로 카드(캐릭터·카드 도감) — 그림이 채우고 아래 어두운 띠에 별·이름 */
 .kit-portrait { width: 120px; height: 164px; margin: 5px; padding: 0; border-width: 0; border-radius: 6px; overflow: hidden; }
@@ -192,8 +201,10 @@
 .kit-showcase-text { flex-grow: 1; margin-left: 14px; min-height: 200px; padding: 18px 20px; border-radius: 8px; }
 
 /* 목록 C: 가로 줄(아래 명단 줄 — 한 줄로 흐른다) */
-.kit-strip { flex-direction: row; flex-wrap: nowrap; align-items: flex-end; justify-content: center; }
-.kit-strip-area { position: absolute; left: 0; right: 0; bottom: 24px; height: 214px; }
+.kit-strip { flex-grow: 1; flex-direction: row; flex-wrap: nowrap; align-items: flex-end; justify-content: center; }
+.kit-strip-area { position: absolute; left: 28px; right: 28px; bottom: 24px; height: 214px; }
+/* 가로 스크롤의 안쪽을 보이는 너비 이상으로(카드가 적으면 가운데) */
+.kit-strip-area .unity-scroll-view__content-container { min-width: 100%; }
 /* 목록 D: 묶음(꼬리표마다 격자 — 도감·분류별 인벤토리) */
 .kit-section { margin-bottom: 18px; }
 .kit-section > .kit-grid { margin-top: 8px; }
@@ -231,3 +242,111 @@
 /* 검정 면 위의 ✕는 밝게 */
 .momoi-mat-cover .kit-close { color: var(--momoi-cover-text); }
 .momoi-mat-cover .kit-close:hover { background-color: rgba(255, 255, 255, 0.08); }
+/* 검정 틀 안의 종이(틀 B)는 종이 쪽 색을 따른다 — 가장 가까운 재질이 이긴다 */
+.momoi-mat-cover .momoi-mat-paper .kit-close { color: var(--momoi-paper-text); }
+.momoi-mat-cover .momoi-mat-paper .kit-close:hover { background-color: rgba(0, 0, 0, 0.06); }
+.momoi-mat-cover .momoi-mat-paper .kit-rule { background-color: rgba(0, 0, 0, 0.1); }
+.momoi-mat-cover .momoi-mat-paper .kit-watermark { color: rgba(0, 0, 0, 0.05); }
+.momoi-mat-cover .momoi-mat-paper .kit-tile--empty { background-color: rgba(0, 0, 0, 0.06); }
+
+/* ══ 아이콘 · 거점 · 이벤트 · HUD · 핸드 · 보드 (2026-10-12 더함) ═════════════════════ */
+
+/* 아이콘(KitIcon — 단색 벡터, 색은 글 색). 버튼 안에서는 가운데 */
+.kit-icon { width: 20px; height: 20px; }
+.kit-icon--s { width: 16px; height: 16px; }
+.kit-icon--l { width: 28px; height: 28px; }
+.kit-icon-btn, .kit-close, .kit-side-tab { align-items: center; justify-content: center; }
+.kit-close .kit-icon { width: 18px; height: 18px; }
+
+/* 행동 버튼 줄(고른 칸에 할 일 — 옮기기·쓰기·팔기) */
+.kit-actions { flex-direction: row; justify-content: flex-end; align-items: center; margin-top: 10px; }
+.kit-actions > .kit-btn { margin: 0 0 0 8px; }
+.kit-panel-title { font-size: 18px; -unity-font-style: bold; margin-bottom: 8px; }
+
+/* ── 배치 F 거점(로비): 배경 일러 + 가운데 캐릭터 + 대사 상자 + 옆 작은 메뉴.
+      두 패널이 서로 주고받는 메뉴를 열면(kit-hub--aside) 캐릭터가 왼쪽으로 스르륵 옮기고 가운데·오른쪽에 패널이 나란히 선다 ── */
+.kit-hub-bg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -unity-background-scale-mode: scale-and-crop; }
+.kit-hub-guest { position: absolute; left: 650px; bottom: 0; width: 620px; height: 860px; -unity-background-scale-mode: scale-to-fit; transition-property: translate; transition-duration: 0.32s; transition-timing-function: ease-out-cubic; }
+.kit-hub--aside .kit-hub-guest { translate: -560px 0; }
+.kit-hub-place { position: absolute; top: 20px; left: 860px; width: 200px; height: 36px; border-radius: 18px; font-size: 17px; -unity-text-align: middle-center; }
+.kit-hub-talk { position: absolute; left: 620px; width: 680px; bottom: 70px; transition-property: opacity; transition-duration: 0.14s; }
+.kit-hub-talk-name { align-self: flex-start; margin-left: 22px; padding: 3px 14px; border-radius: 4px; font-size: 15px; }
+.kit-hub-talk-line { padding: 16px 22px; min-height: 64px; border-radius: 8px; font-size: 17px; white-space: normal; }
+.kit-hub-menu { position: absolute; right: 44px; top: 400px; width: 180px; transition-property: opacity; transition-duration: 0.14s; }
+.kit-hub-menu > .kit-btn { width: 180px; margin: 5px 0; }
+.kit-hub--aside .kit-hub-talk, .kit-hub--aside .kit-hub-menu { opacity: 0; }
+/* 두 패널(가운데·오른쪽 — 배치 F의 메뉴 · 플레이 중이면 --low로 아래 띠를 비움) */
+.kit-pair { position: absolute; top: 96px; bottom: 96px; width: 520px; padding: 18px 20px; border-radius: 8px; }
+.kit-pair--center { left: 720px; }
+.kit-pair--right { left: 1262px; }
+.kit-pair--low { bottom: 300px; }
+
+/* ── 배치 G 이벤트: 필드 = 장면 위 글 띠 + 오른쪽 선택지 줄(캐릭터·핸드를 가리지 않게) · 풀일러 = 화면을 채우는 그림 + 오른쪽에 설명(종이)과 선택지 ──
+      오른쪽 줄(kit-event-side)은 위 띠와 아래 핸드 띠(300px) 사이에서 세로 가운데. 선택지는 한 줄에 하나(번호 · 글) */
+.kit-event-band { position: absolute; left: 0; right: 0; top: 92px; padding: 16px 0; align-items: center; background-color: rgba(10, 10, 12, 0.55); }
+.kit-event-title { font-size: 22px; -unity-font-style: bold; color: var(--momoi-text); }
+.kit-event-text { margin-top: 6px; max-width: 1100px; font-size: 17px; color: var(--momoi-text); white-space: normal; -unity-text-align: middle-center; }
+.kit-event-side { position: absolute; right: 96px; width: 560px; top: 210px; bottom: 300px; justify-content: center; }
+.kit-choices { flex-direction: column; align-items: stretch; }
+.kit-choice { min-height: 62px; margin: 0 0 10px 0; padding: 12px 18px; border-width: 0; border-radius: 8px; flex-direction: row; align-items: center; }
+.kit-choice:hover { background-color: var(--momoi-button-hover); }
+.kit-choice-index { width: 28px; height: 28px; margin-right: 14px; border-radius: 14px; background-color: var(--momoi-paper); color: var(--momoi-paper-text); font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.kit-choice-text { flex-grow: 1; flex-shrink: 1; font-size: 17px; white-space: normal; -unity-text-align: middle-left; color: var(--momoi-cover-text); }
+.kit-choice--battle .kit-choice-index { background-color: var(--momoi-danger); color: rgb(244, 243, 240); }
+.kit-fullart { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: var(--momoi-cover); -unity-background-scale-mode: scale-and-crop; }
+.kit-fullart-text { margin-bottom: 14px; padding: 20px 24px; border-radius: 8px; }
+.kit-fullart-title { font-size: 22px; -unity-font-style: bold; margin-bottom: 6px; }
+
+/* ── 배치 H 플레이 HUD: 위 띠(왼쪽 상태 알약 · 가운데 진행 · 오른쪽 원형 버튼) · 오른쪽 아래 그때 버튼 · 아래 핸드·더미·자원 ── */
+.kit-hud-left { position: absolute; left: 24px; top: 18px; flex-direction: row; align-items: center; }
+.kit-hud-right { position: absolute; right: 24px; top: 16px; flex-direction: row; align-items: center; }
+.kit-hud-center { position: absolute; left: 700px; width: 520px; top: 22px; flex-direction: row; align-items: center; }
+.kit-hud-actions { position: absolute; right: 24px; bottom: 286px; align-items: flex-end; }
+.kit-hud-actions > .kit-btn { margin: 4px 0; }
+.kit-chip { height: 34px; margin-right: 8px; padding: 0 14px 0 10px; border-radius: 17px; flex-direction: row; align-items: center; }
+.kit-chip > .kit-icon { width: 18px; height: 18px; margin-right: 8px; }
+.kit-chip-value { font-size: 16px; -unity-font-style: bold; }
+.kit-chip-label { font-size: 13px; margin-left: 6px; color: var(--momoi-dim); }
+.kit-node-pill { height: 28px; padding: 0 12px; border-radius: 14px; font-size: 14px; -unity-text-align: middle-center; }
+.kit-progress { flex-grow: 1; height: 6px; margin: 0 10px; border-radius: 3px; background-color: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.kit-progress-fill { height: 100%; width: 0; background-color: var(--momoi-accent); }
+.kit-bar { height: 6px; margin-top: 3px; border-radius: 3px; background-color: rgba(0, 0, 0, 0.5); overflow: hidden; }
+.kit-bar--thin { height: 4px; }
+.kit-bar-fill { height: 100%; width: 100%; }
+.kit-bar-fill--good { background-color: var(--momoi-good); }
+.kit-bar-fill--info { background-color: var(--momoi-info); }
+.kit-bar-fill--warn { background-color: var(--momoi-warn); }
+.kit-bar-fill--danger { background-color: var(--momoi-danger); }
+
+/* 핸드(펼치기): 카드를 겹쳐 부채꼴로(기울기·높이는 화면 코드가 칸 뿌리에) — 올리면 들리고 커진다. 카드 움직임(뽑기·쓰기)은 따로 */
+.kit-hand { position: absolute; left: 0; right: 0; bottom: 46px; height: 220px; flex-direction: row; justify-content: center; align-items: flex-end; }
+.kit-hand-row { flex-direction: row; justify-content: center; align-items: flex-end; margin: 0 26px; }
+.kit-hand-card { width: 132px; height: 184px; margin: 0 -9px; padding: 0; border-width: 0; border-radius: 8px; transform-origin: 50% 100%; transition-property: translate, scale; transition-duration: 0.1s; transition-timing-function: ease-out-cubic; }
+.kit-hand-card:hover { translate: 0 -22px; scale: 1.06 1.06; background-color: var(--momoi-paper); }
+.kit-hand-card--picked { translate: 0 -30px; border-top-width: 4px; border-color: var(--momoi-accent); }
+.kit-hand-art { flex-grow: 1; margin: 7px 7px 0 7px; border-radius: 5px; background-color: rgba(0, 0, 0, 0.08); -unity-background-scale-mode: scale-and-crop; }
+.kit-hand-name { margin-top: 5px; font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; white-space: normal; }
+.kit-hand-sub { margin-bottom: 6px; font-size: 12px; color: var(--momoi-paper-dim); -unity-text-align: middle-center; }
+.kit-hand-cost { position: absolute; left: -7px; top: -7px; width: 30px; height: 30px; border-radius: 15px; background-color: var(--momoi-cover); color: var(--momoi-accent); font-size: 15px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.kit-pile { width: 78px; height: 106px; margin: 0 0 16px 0; padding: 0; border-width: 0; border-radius: 8px; align-items: center; justify-content: center; }
+.kit-pile:hover { background-color: var(--momoi-button-hover); }
+.kit-pile-count { margin-top: 6px; font-size: 14px; }
+.kit-resource { position: absolute; left: 910px; width: 100px; bottom: 4px; height: 28px; border-radius: 14px; flex-direction: row; align-items: center; justify-content: center; }
+.kit-resource > .kit-icon { width: 16px; height: 16px; margin-right: 6px; color: var(--momoi-accent); }
+.kit-resource-value { font-size: 16px; -unity-font-style: bold; color: var(--momoi-accent); }
+
+/* 보드 유닛 카드(전투 — 그림 · 아래 어두운 띠에 이름·체력·게이지). 적은 붉은 면 */
+.kit-unit { width: 140px; height: 190px; margin: 5px; padding: 0; border-width: 0; border-radius: 8px; overflow: hidden; }
+.kit-unit:hover { background-color: var(--momoi-button-hover); }
+.kit-unit--enemy { background-color: var(--momoi-danger-face); }
+.kit-unit--enemy:hover { background-color: var(--momoi-danger-face); opacity: 0.92; }
+.kit-unit-art { position: absolute; left: 0; top: 0; right: 0; bottom: 54px; -unity-background-scale-mode: scale-and-crop; }
+.kit-unit-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 54px; padding: 6px 9px; background-color: rgba(10, 10, 12, 0.55); }
+.kit-unit-name { font-size: 13px; -unity-font-style: bold; color: var(--momoi-cover-text); }
+.kit-unit-hp { position: absolute; right: 9px; top: 7px; font-size: 11px; color: var(--momoi-dim); }
+.kit-unit--empty { background-color: rgba(0, 0, 0, 0.18); background-image: none; }
+.kit-unit--empty .kit-unit-foot { display: none; }
+.kit-unit--selected { border-bottom-width: 4px; border-color: var(--momoi-accent); }
+.kit-unit--target { border-bottom-width: 4px; border-color: var(--momoi-danger); }
+.kit-unit--pick { background-color: rgb(92, 86, 72); }
+.kit-unit--down { opacity: 0.35; }

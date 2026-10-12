@@ -15,6 +15,10 @@
     --momoi-stone-text: rgb(220, 222, 226);
     --momoi-colorpaper: rgb(206, 196, 178);
     --momoi-colorpaper-text: rgb(48, 42, 34);
+    /* 결의 세기(재질 그림에 곱하는 색의 알파 — 0 = 결 없음, 1 = 그림 그대로). 검정·돌은 아주 옅게 */
+    --momoi-grain-paper: rgba(255, 255, 255, 1);
+    --momoi-grain-cover: rgba(255, 255, 255, 0.22);
+    --momoi-grain-stone: rgba(255, 255, 255, 0.45);
 
     /* 화면 공통(기본 화면이 쓴다): 기본 창 = 종이, 버튼 = 검정 표지 */
     --momoi-text: rgb(236, 236, 238);
@@ -29,12 +33,24 @@
     --momoi-backdrop: rgba(10, 10, 12, 0.3);
     --momoi-radius: 6px;
     --momoi-font-size: 18px;
+
+    /* 게임 상태 색(채도를 낮춘 것 — 막대·표시) */
+    --momoi-good: rgb(120, 172, 116);
+    --momoi-info: rgb(122, 150, 196);
+    --momoi-warn: rgb(204, 160, 92);
+    --momoi-danger: rgb(184, 92, 86);
+    --momoi-danger-face: rgb(78, 48, 50);
+    --momoi-rarity-1: rgb(150, 152, 158);
+    --momoi-rarity-2: rgb(110, 160, 130);
+    --momoi-rarity-3: rgb(110, 140, 196);
+    --momoi-rarity-4: rgb(204, 184, 146);
 }
 
 /* ── 재질: 패널·칸에 하나씩 붙인다. 결은 256px 타일(거의 투명) — 색만 바꿔도 같은 결이 따라온다 ── */
 .momoi-mat-paper {
     background-color: var(--momoi-paper);
     background-image: resource("MomoiProject/Materials/Paper");
+    -unity-background-image-tint-color: var(--momoi-grain-paper);
     background-repeat: repeat;
     background-size: 256px 256px;
     color: var(--momoi-paper-text);
@@ -51,6 +67,7 @@
 .momoi-mat-cover {
     background-color: var(--momoi-cover);
     background-image: resource("MomoiProject/Materials/Cover");
+    -unity-background-image-tint-color: var(--momoi-grain-cover);
     background-repeat: repeat;
     background-size: 256px 256px;
     color: var(--momoi-cover-text);
@@ -59,6 +76,7 @@
 .momoi-mat-stone {
     background-color: var(--momoi-stone);
     background-image: resource("MomoiProject/Materials/Stone");
+    -unity-background-image-tint-color: var(--momoi-grain-stone);
     background-repeat: repeat;
     background-size: 256px 256px;
     color: var(--momoi-stone-text);
@@ -255,4 +273,60 @@
     border-bottom-left-radius: 18px;
     border-bottom-right-radius: 18px;
     font-size: 16px;
+}
+
+/* ── 움직임(AI/UiGuide.md 3-5 · ScreenMotion): 씬 전환을 뺀 모든 움직임은 아주 짧게.
+   화면 전체는 투명도 0↔100%(나타남 0.14초 · 사라짐 0.1초). 패널(.momoi-motion)은 그와 함께 짧은 거리를 옆·아래에서 제자리로.
+   오는 쪽: 기본 아래(위로 떠오름) · --left 왼쪽에서 · --right 오른쪽에서 · --down 위에서. translate로 가운데 맞춘 요소에는 붙이지 않는다. ── */
+.momoi-screen-host > * {
+    transition-property: opacity;
+    transition-duration: 0.14s;
+    transition-timing-function: ease-out-cubic;
+}
+
+.momoi-screen--enter > *,
+.momoi-screen--leave > * {
+    opacity: 0;
+}
+
+.momoi-screen--leave > * {
+    transition-duration: 0.1s;
+    transition-timing-function: ease-in-cubic;
+}
+
+.momoi-motion {
+    transition-property: opacity, translate;
+    transition-duration: 0.14s;
+    transition-timing-function: ease-out-cubic;
+}
+
+.momoi-screen--leave .momoi-motion,
+.momoi-motion.momoi-motion--hidden {
+    transition-duration: 0.1s;
+    transition-timing-function: ease-in-cubic;
+}
+
+.momoi-screen--enter .momoi-motion,
+.momoi-screen--leave .momoi-motion,
+.momoi-motion.momoi-motion--hidden {
+    opacity: 0;
+    translate: 0 14px;
+}
+
+.momoi-screen--enter .momoi-motion--left,
+.momoi-screen--leave .momoi-motion--left,
+.momoi-motion--left.momoi-motion--hidden {
+    translate: -18px 0;
+}
+
+.momoi-screen--enter .momoi-motion--right,
+.momoi-screen--leave .momoi-motion--right,
+.momoi-motion--right.momoi-motion--hidden {
+    translate: 18px 0;
+}
+
+.momoi-screen--enter .momoi-motion--down,
+.momoi-screen--leave .momoi-motion--down,
+.momoi-motion--down.momoi-motion--hidden {
+    translate: 0 -14px;
 }

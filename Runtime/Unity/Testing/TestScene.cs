@@ -125,9 +125,12 @@ namespace GBible
         // 판을 바꾸는 쪽(Undo·새 판·테스트 상황): 서버 세션이 이 프로그램에 있으면 그것(시험 모드·방장·혼자), 남의 서버에 들어갔거나 리플레이 중이면 null.
         static GameSession Authority => GameNet.Server?.Session ?? (GameNet.Client == null && !GameNet.IsReplaying ? GBibleRuntime.Session : null);
 
+        // 참이면 테스트 패널(접힌 버튼까지)을 그리지 않는다 — AI가 화면을 찍을 때(PlayRequests의 'testpanel off').
+        public static bool Hidden;
+
         void OnGUI()
         {
-            if (!Allowed || GBibleRuntime.Session == null) return;
+            if (!Allowed || GBibleRuntime.Session == null || Hidden) return;
             // 키는 IMGUI 이벤트로 받는다(입력 방식 — 예전 Input·Input System — 과 상관없이 돈다).
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == panelKey)
             {

@@ -140,6 +140,7 @@ namespace GBible
             }
             host.Add(tree);
             _layers[(int)layer].Add(host);
+            ScreenMotion.Enter(host);   // 짧게 나타나기(UiGuide 3-5)
 
             var entry = new Entry
             {
@@ -400,7 +401,7 @@ namespace GBible
                 catch (Exception e) { Debug.LogException(e); }
             }
             foreach (var (button, handler) in clicks) button.clicked -= handler;
-            entry.Host.RemoveFromHierarchy();
+            ScreenMotion.Leave(entry.Host);   // 짧게 사라진 뒤 떼어 낸다(UiGuide 3-5)
             // 다시 열렸으면 열림 표시·시간 멈춤은 새 열림의 것이다(같은 이유 글자로 멈췄으니 여기서 풀면 새 화면이 열린 채 시간이 흐른다).
             if (!reopened)
             {

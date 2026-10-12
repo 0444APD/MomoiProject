@@ -4,7 +4,9 @@
 
 - 바탕이 된 참고(2026-10-12, 사용자): 여러 게임의 화면 — 다른 회사의 그림이라 파일은 넣지 않고, 여백·글 크기·디자인·색에서 읽은 것만 규칙(UiGuide 3절)과 이 조각으로 옮겼다. 모양은 참고보다 단순하게.
 
-- 같은 패널도 **형식 A~D** 중에서 고른다(가족마다 넷). 화면 전체의 짜임은 **배치 A~E** 중에서 고른다.
+- 같은 패널도 **형식 A~D** 중에서 고른다(가족마다 넷). 화면 전체의 짜임은 **배치 A~H** 중에서 고른다(A~E 메뉴 화면 · F 거점 · G 이벤트 · H 플레이 HUD).
+- 아이콘은 단색 벡터 샘플 `KitIcon`(그림 파일 없음 — 21개). 프로토타입에서는 뜻과 상관없이 돌려쓰고, 진짜 아이콘은 개발자가 준 것으로 같은 자리를 바꾼다(UiGuide 3-6).
+- 움직임은 짧게 하나로 통일한다: 패널은 0.14초에 나타나고 0.1초에 사라지며, 그동안 옆·아래에서 14px쯤 제자리로 온다(GBible `ScreenMotion` + 클래스 `momoi-motion` — UiGuide 3-5).
 - 한 화면 안에서는 같은 가족을 한 형식으로 맞춘다(팝업 머리는 모두 B …). 프로젝트 안에서 같은 종류의 화면은 같은 형식을 쓴다 — 고른 형식은 결정 기록에 가안으로 올린다.
 - 모양은 네모만이 아니다: 알약(버튼·꼬리표) · 원(아이콘 버튼·옆 탭·초상) · 아치(편성 카드) · 비스듬한 칸(탭 막대·제목 막대·주된 버튼) · 깎인 모서리. 둥근 것은 USS, 비스듬한 것은 `KitShape`.
 - 바탕은 검정만이 아니다: 어두운 전체 화면(검정 표지 + 희미한 조각 결)과 밝은 전체 화면(종이 흰색 + 옆으로 누운 큰 글자 무늬)을 화면 성격에 따라 고른다.
@@ -13,11 +15,11 @@
 
 1. `Kit.uss` → `Assets/MomoiProject/UI/Kit/Kit.uss`. 프로젝트 화면 USS(`UI/Screens/<프로젝트>.uss`) 첫 줄: `@import url("../Kit/Kit.uss");`
 2. `Items/*.uxml` → `Assets/MomoiProject/UI/Items/`(쓰는 것만). 화면 UXML에 `<ui:Template name="CardA_Tile" src="../Items/CardA_Tile.uxml" />`.
-3. `KitShape.cs.txt` → `Assets/MomoiProject/Code/Client/Kit/KitShape.cs`(네임스페이스가 `MomoiProject`가 아니면 UXML의 `MomoiProject.KitShape`도 함께 바꾼다). 비스듬한 칸을 쓰지 않으면 넣지 않아도 된다.
+3. `KitShape.cs.txt` → `Assets/MomoiProject/Code/Client/Kit/KitShape.cs`, `KitIcon.cs.txt` → `…/Kit/KitIcon.cs`(네임스페이스가 `MomoiProject`가 아니면 UXML의 `MomoiProject.KitShape`·`MomoiProject.KitIcon`도 함께 바꾼다). 비스듬한 칸을 쓰지 않으면 KitShape는 넣지 않아도 된다.
 4. `Layouts/`·`Panels/`는 **보고 베끼는 조각**이다(통째로 화면이 되지 않는다). 화면 UXML을 만들 때 배치 하나를 바탕으로, 가족마다 고른 형식의 조각을 끼운다.
 5. 테마(`UI/Theme.uss`)의 재질 변수 색만 프로젝트에 맞게 고른다(차가운 검정·종이 흰색 기본값에서 크게 벗어나지 않게).
 
-## 배치 A~E — 화면 전체의 짜임
+## 배치 A~H — 화면 전체의 짜임
 
 | 배치 | 짜임 | 쓰는 곳 | 파일 |
 |---|---|---|---|
@@ -25,7 +27,10 @@
 | **B 목록·상세형** | 어두운 전체 화면: 위 막대 · 왼쪽 원형 탭 · 가운데 격자 · 오른쪽 종이 상세 · 왼쪽 아래 거르기 | 인벤토리 · 캐릭터 명단 · 도감 · 소지품 | `Layouts/LayoutB_Collection.uxml` |
 | **C 편성형** | 밝은 전체 화면: 위 막대 · 비스듬한 제목 막대 · 아치 카드 줄 · 오른쪽 배너 줄 · 아래 탭 막대 | 편성 · 덱 짜기 · 장비 | `Layouts/LayoutC_Lineup.uxml` |
 | **D 일러·정보형** | 흐린 장면 위 어두운 막: 왼쪽 큰 일러 · 오른쪽 겹친 종이 카드 · 위 글자 탭 · 아래 가로 명단 줄 | 캐릭터 고르기 · 영입 · 정비 | `Layouts/LayoutD_Showcase.uxml` |
-| **E 양옆 패널형** | 가운데 장면을 그대로 두고 양옆 판(왼쪽 = 상대·보관함, 오른쪽 = 내 것) | 창고·가방·컨테이너 · 거점 메뉴 | `Layouts/LayoutE_SidePanels.uxml` |
+| **E 양옆 패널형** | 가운데 장면을 그대로 두고 양옆 판(왼쪽 = 상대·보관함, 오른쪽 = 내 것) | 장면을 가운데 두어야 하는 창고·컨테이너 | `Layouts/LayoutE_SidePanels.uxml` |
+| **F 거점** | 배경 일러가 채움 · 가운데 캐릭터 · 아래 대사 상자 · 위 장소 알약 · 오른쪽 작은 세로 메뉴. 두 패널 메뉴를 열면 캐릭터가 왼쪽으로 비키고 가운데·오른쪽에 패널(`kit-hub--aside` · `kit-pair`) | 로비·마을·기지 + 거기서 여는 창고·가방 | `Layouts/LayoutF_Hub.uxml` · `LayoutF_HubPair.uxml` |
+| **G 이벤트** | 필드 = 장면 위 글 띠 + 오른쪽 선택지 줄(캐릭터는 멈춰 섬) · 풀일러 = 그림이 채우고 오른쪽에 종이 설명 + 선택지. 모든 이벤트에 선택지 | 조우·사건·선택지 | `Layouts/LayoutG_Event.uxml` |
+| **H 플레이 HUD** | 위 띠(상태 알약 · 진행 · 원형 시스템 버튼) · 오른쪽 아래 그때 버튼 · 아래 핸드 펼치기 + 더미 + 주 자원 · 월드 오브젝트에 붙는 칸 | 런·전투 화면 | `Layouts/LayoutH_Hud.uxml` |
 
 ```
 A ┌───────────── 흐린 장면 ─────────────┐   B ┌ ⌂ 제목 ─────────── ◎123 ◎45 ↩ ┐   C ┌ ⌂ 제목 ?                     ↩ ┐
@@ -45,7 +50,9 @@ D ┌──── 탭 · 탭 · 탭 ──────────────�
   └────────────────────────────────────┘     └──────────────────────────────┘
 ```
 
-- 배치 B·C·D는 전체 화면 창, A는 팝업, E는 창(플레이 중이면 아래 입력 막기 끔). 플레이 HUD의 자리는 `UiGuide.md` 2-2.
+- 배치 B·C·D는 전체 화면 창, A는 팝업, E·F의 두 패널은 창(플레이 중이면 아래 입력 막기 끔), F 거점·G·H는 바탕. 플레이 HUD의 자리는 `UiGuide.md` 2-2.
+- **두 패널이 서로 주고받는 메뉴**(창고↔가방 · 장비↔창고)는 배치 F의 두 패널: 가운데 캐릭터(거점)나 왼쪽 큰 일러(정비)를 왼쪽으로 비우고 가운데·오른쪽에 나란히.
+- **대상을 골라야 하는 행동**(아이템을 캐릭터에게)을 창에서 시작하면 그 창을 닫고 HUD의 상태 알약이 '무엇을 누구에게', 오른쪽 아래가 취소를 보인다.
 
 ## 패널 가족 — 형식 A~D
 
@@ -76,6 +83,7 @@ D ┌──── 탭 · 탭 · 탭 ──────────────�
 | C 아치 카드 `CardC_Arch` | 200×440 · 위가 둥긂 · 원형 표시 · 레벨 띠 · 종이 바닥(별) | 편성 자리 |
 | D 교환 카드 `CardD_Offer` | 176 너비 · 폴더 탭(분류) · 검정 몸(이름·둥근 그림·상태 알약) · 종이 바닥(가격) | 교환·상점 |
 | 덧 `Banner` · `Row` · `Tab` | 가로 배너 250×120 · 표 줄 · 비스듬한 탭 칸 | 장비·지역 · 비교표 · 탭 막대 |
+| 덧 `HandCard` · `UnitCard` | 핸드 카드 132×184(종이 · 비용 원 · 그림 · 이름) · 보드 유닛 카드 140×190(검정 · 아래 띠에 이름·체력·게이지, 적은 붉은 면) | 배치 H 핸드 · 전투 보드 |
 
 ### 상세 (`Panels/Details.uxml`)
 
@@ -117,7 +125,9 @@ D ┌──── 탭 · 탭 · 탭 ──────────────�
 
 - 고름: 타일은 돌 색 + 살짝 들림, 세로 카드는 아래 띠가 강조색, 탭은 종이로 채움 — **테두리 선을 쓰지 않는다.**
 - 받음·가짐: 타일 위 반투명 검정 + ✓(`kit-tile-check`). 새것·확률: 모서리 표시(`kit-tile-corner`). 등급: 아래 띠 색(`kit-tile-strip` — 프로젝트 변수로).
-- 빈 자리: `kit-tile--empty` · `kit-arch--empty`(옅은 면, 결 없음).
+- 빈 자리: `kit-tile--empty` · `kit-arch--empty`(옅은 면, 결 없음) — 아이콘 샘플도 넣지 않는다.
+- 검정 패널 위의 타일은 한 단계 밝은 돌 면(같은 검정이면 칸이 보이지 않는다 — 키트가 맞춘다).
+- **가장 가까운 재질이 이긴다**: 검정 틀 안의 종이(팝업 틀 B)처럼 재질이 겹치면, 안쪽 재질에 맞는 색을 3단 선택자(`.momoi-mat-cover .momoi-mat-paper .kit-close`)로 다시 정한다. 재질에 기대는 규칙(`.momoi-mat-cover .x`)을 더할 때마다 짝을 함께.
 - 장면 위에 바로 놓이는 글(닫는 법 안내·넘기기 화살표)만 1px 글 외곽선.
 
 ## 코드로 채우기(예)
@@ -126,7 +136,7 @@ D ┌──── 탭 · 탭 · 탭 ──────────────�
 // 배치 B의 격자(카드 A 타일) — 고른 것은 화면 쪽 상태, 상세는 Draw에서
 var grid = List<InventorySlot>("grid", Item("CardA_Tile"), () => Bag().slots, (element, slot) =>
 {
-    Ui.Art(element.Q("icon"), Rules.Def<ItemDef>(Game, slot.item)?.icon);
+    KitIcon.Fill(element.Q("icon"), Rules.Def<ItemDef>(Game, slot.item)?.icon, slot.item);   // 그림이 없으면 샘플 아이콘(ID로 돌려씀)
     element.Q<Label>("count").text = slot.count > 1 ? Ui.T("kit.count", ("count", slot.count)) : "";
     Ui.Show(element.Q("corner"), false);
     Ui.Show(element.Q("check"), false);
@@ -137,3 +147,5 @@ grid.OnCreate = (element, slot) => element.Q<Button>("tile").clicked += () => { 
 
 - 비스듬한 탭(`Items/Tab`)은 Button이 아니라 `KitShape`라 클릭은 `element.Q("tab").RegisterCallback<ClickEvent>(…)`.
 - 큰 글자 무늬(`kit-watermark`)·제목·버튼 글은 모두 텍스트 키.
+- **UXML 주석에 `--`를 쓰지 않는다**(XML이 막는다 — 그 파일은 가져오기에 실패해 화면이 빈 채로 열린다). 변형 클래스는 주석에 `kit-hub +aside`처럼 적는다. 컴파일 검사 훅이 UXML을 XML로 읽어 보고 막는다.
+- `KitIcon.Fill(칸, 그림, 키)`: 그림이 있으면 그림, 없으면 키(ID)로 고른 샘플을 칸 안에 넣는다(`kit-icon-sample`), 키가 비면(빈 칸) 아무것도.

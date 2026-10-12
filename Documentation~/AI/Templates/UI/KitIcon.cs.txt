@@ -1,0 +1,167 @@
+// GBible UI 키트의 아이콘(AI/Templates/UI) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitIcon.cs로 복사한다(네임스페이스는 프로젝트 것).
+// 단색 벡터 아이콘 샘플: 그림 파일 없이 코드로 그린다(Painter2D). 색은 글 색(color — 상속)을 따르고, 크기는 USS의 width·height.
+// 프로토타입에서는 뜻과 상관없이 돌려쓴다(UiGuide 3-6). 진짜 아이콘이 들어오면 같은 자리에 그림(background-image)으로 바꾼다.
+// UXML: <MomoiProject.KitIcon glyph="Close" class="kit-icon" />
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitIcon : VisualElement
+    {
+        public enum Glyph { Close, Back, Home, Menu, Settings, Map, Bag, Pause, Play, Star, Shield, Sword, Heart, Coin, Gem, Plus, Check, Refresh, Info, Help, Card }
+
+        [UxmlAttribute] public Glyph glyph { get => _glyph; set { _glyph = value; MarkDirtyRepaint(); } }
+        Glyph _glyph = Glyph.Star;
+
+        public KitIcon()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(_ => MarkDirtyRepaint());
+        }
+
+        public KitIcon(Glyph glyph) : this() => _glyph = glyph;
+
+        // 아이콘 자리 채우기: 그림이 있으면 그림(배경), 없으면 키(ID)로 고른 샘플을 칸 안에(kit-icon-sample — 뜻과 상관없이 돌려쓴다),
+        // 키가 비면(빈 칸) 아무것도. 같은 키는 늘 같은 샘플.
+        static readonly Glyph[] Samples = { Glyph.Gem, Glyph.Coin, Glyph.Shield, Glyph.Sword, Glyph.Heart, Glyph.Star, Glyph.Card, Glyph.Bag };
+
+        public static void Fill(VisualElement slot, Sprite sprite, string key)
+        {
+            if (slot == null) return;
+            slot.style.backgroundImage = sprite != null ? new StyleBackground(sprite) : new StyleBackground(StyleKeyword.Null);
+            var sample = slot.Q<KitIcon>("sample");
+            if (sprite != null || string.IsNullOrEmpty(key))
+            {
+                if (sample != null) sample.style.display = DisplayStyle.None;
+                return;
+            }
+            if (sample == null)
+            {
+                sample = new KitIcon { name = "sample" };
+                sample.AddToClassList("kit-icon-sample");
+                slot.Add(sample);
+            }
+            sample.style.display = DisplayStyle.Flex;
+            var hash = 0;
+            foreach (var c in key) hash = hash * 31 + c;
+            sample.glyph = Samples[(hash & 0x7fffffff) % Samples.Length];
+        }
+
+        Vector2 _o;
+        float _s;
+        Vector2 P(float x, float y) => _o + new Vector2(x * _s, y * _s);
+
+        void Draw(MeshGenerationContext context)
+        {
+            var r = contentRect;
+            if (float.IsNaN(r.width) || r.width <= 0 || r.height <= 0) return;
+            _s = Mathf.Min(r.width, r.height);
+            _o = new Vector2(r.x + (r.width - _s) / 2, r.y + (r.height - _s) / 2);
+            var p = context.painter2D;
+            var color = resolvedStyle.color;
+            p.strokeColor = color;
+            p.fillColor = color;
+            p.lineWidth = Mathf.Max(1.5f, _s * 0.1f);
+            p.lineCap = LineCap.Round;
+            p.lineJoin = LineJoin.Round;
+            switch (_glyph)
+            {
+                case Glyph.Close: Line(p, .24f, .24f, .76f, .76f); Line(p, .76f, .24f, .24f, .76f); break;
+                case Glyph.Back: Line(p, .78f, .5f, .24f, .5f); Poly(p, false, .46f, .26f, .22f, .5f, .46f, .74f); break;
+                case Glyph.Home: Poly(p, true, .5f, .14f, .88f, .48f, .76f, .48f, .76f, .86f, .58f, .86f, .58f, .62f, .42f, .62f, .42f, .86f, .24f, .86f, .24f, .48f, .12f, .48f); break;
+                case Glyph.Menu: Line(p, .2f, .28f, .8f, .28f); Line(p, .2f, .5f, .8f, .5f); Line(p, .2f, .72f, .8f, .72f); break;
+                case Glyph.Settings: Gear(p); break;
+                case Glyph.Map:
+                    Poly(p, false, .14f, .24f, .38f, .16f, .62f, .24f, .86f, .16f, .86f, .76f, .62f, .84f, .38f, .76f, .14f, .84f, .14f, .24f);
+                    Line(p, .38f, .16f, .38f, .76f); Line(p, .62f, .24f, .62f, .84f); break;
+                case Glyph.Bag:
+                    Poly(p, true, .2f, .38f, .8f, .38f, .84f, .86f, .16f, .86f);
+                    p.BeginPath(); p.Arc(P(.5f, .38f), .17f * _s, Angle.Degrees(180), Angle.Degrees(360)); p.Stroke(); break;
+                case Glyph.Pause: Rect(p, .28f, .2f, .14f, .6f); Rect(p, .58f, .2f, .14f, .6f); break;
+                case Glyph.Play: Poly(p, true, .3f, .18f, .82f, .5f, .3f, .82f); break;
+                case Glyph.Star: Star(p, .5f, .53f, .42f, .18f); break;
+                case Glyph.Shield:
+                    p.BeginPath(); p.MoveTo(P(.5f, .1f)); p.LineTo(P(.84f, .22f)); p.BezierCurveTo(P(.84f, .58f), P(.7f, .8f), P(.5f, .92f));
+                    p.BezierCurveTo(P(.3f, .8f), P(.16f, .58f), P(.16f, .22f)); p.ClosePath(); p.Fill(); break;
+                case Glyph.Sword:
+                    Poly(p, true, .82f, .12f, .88f, .18f, .42f, .66f, .34f, .58f);
+                    Line(p, .24f, .52f, .48f, .76f); Line(p, .32f, .68f, .16f, .84f); break;
+                case Glyph.Heart:
+                    p.BeginPath(); p.MoveTo(P(.5f, .86f)); p.BezierCurveTo(P(.1f, .6f), P(.1f, .2f), P(.32f, .2f));
+                    p.BezierCurveTo(P(.42f, .2f), P(.5f, .28f), P(.5f, .36f)); p.BezierCurveTo(P(.5f, .28f), P(.58f, .2f), P(.68f, .2f));
+                    p.BezierCurveTo(P(.9f, .2f), P(.9f, .6f), P(.5f, .86f)); p.ClosePath(); p.Fill(); break;
+                case Glyph.Coin: Circle(p, .5f, .5f, .36f, false); Circle(p, .5f, .5f, .16f, true); break;
+                case Glyph.Gem: Poly(p, true, .5f, .14f, .86f, .4f, .5f, .88f, .14f, .4f); break;
+                case Glyph.Plus: Line(p, .5f, .2f, .5f, .8f); Line(p, .2f, .5f, .8f, .5f); break;
+                case Glyph.Check: Poly(p, false, .2f, .52f, .42f, .74f, .82f, .28f); break;
+                case Glyph.Refresh:
+                    p.BeginPath(); p.Arc(P(.5f, .52f), .3f * _s, Angle.Degrees(-60), Angle.Degrees(230)); p.Stroke();
+                    Poly(p, true, .66f, .12f, .84f, .3f, .6f, .34f); break;
+                case Glyph.Info: Circle(p, .5f, .5f, .38f, false); Line(p, .5f, .46f, .5f, .7f); Circle(p, .5f, .32f, .05f, true); break;
+                case Glyph.Help:
+                    Circle(p, .5f, .5f, .38f, false);
+                    p.BeginPath(); p.Arc(P(.5f, .4f), .12f * _s, Angle.Degrees(200), Angle.Degrees(400)); p.LineTo(P(.5f, .58f)); p.Stroke();
+                    Circle(p, .5f, .7f, .045f, true); break;
+                case Glyph.Card: Poly(p, false, .26f, .14f, .74f, .14f, .74f, .86f, .26f, .86f, .26f, .14f); Rect(p, .34f, .24f, .32f, .3f); break;
+            }
+        }
+
+        void Line(Painter2D p, float x1, float y1, float x2, float y2)
+        {
+            p.BeginPath(); p.MoveTo(P(x1, y1)); p.LineTo(P(x2, y2)); p.Stroke();
+        }
+
+        void Poly(Painter2D p, bool fill, params float[] xy)
+        {
+            p.BeginPath();
+            p.MoveTo(P(xy[0], xy[1]));
+            for (int i = 2; i + 1 < xy.Length; i += 2) p.LineTo(P(xy[i], xy[i + 1]));
+            if (fill) { p.ClosePath(); p.Fill(); }
+            else p.Stroke();
+        }
+
+        void Rect(Painter2D p, float x, float y, float w, float h) => Poly(p, true, x, y, x + w, y, x + w, y + h, x, y + h);
+
+        void Circle(Painter2D p, float x, float y, float radius, bool fill)
+        {
+            p.BeginPath();
+            p.Arc(P(x, y), radius * _s, Angle.Degrees(0), Angle.Degrees(360));
+            if (fill) { p.ClosePath(); p.Fill(); }
+            else p.Stroke();
+        }
+
+        void Star(Painter2D p, float cx, float cy, float outer, float inner)
+        {
+            p.BeginPath();
+            for (int i = 0; i < 10; i++)
+            {
+                var a = Mathf.Deg2Rad * (-90 + i * 36);
+                var rad = i % 2 == 0 ? outer : inner;
+                var pt = P(cx + Mathf.Cos(a) * rad, cy + Mathf.Sin(a) * rad);
+                if (i == 0) p.MoveTo(pt); else p.LineTo(pt);
+            }
+            p.ClosePath();
+            p.Fill();
+        }
+
+        void Gear(Painter2D p)
+        {
+            p.BeginPath();
+            for (int i = 0; i < 16; i++)
+            {
+                var a = Mathf.Deg2Rad * (i * 22.5f);
+                var rad = i % 2 == 0 ? .44f : .32f;
+                var pt = P(.5f + Mathf.Cos(a) * rad, .5f + Mathf.Sin(a) * rad);
+                if (i == 0) p.MoveTo(pt); else p.LineTo(pt);
+            }
+            p.ClosePath();
+            p.MoveTo(P(.64f, .5f));
+            p.Arc(P(.5f, .5f), .14f * _s, Angle.Degrees(0), Angle.Degrees(360), ArcDirection.CounterClockwise);
+            p.ClosePath();
+            p.Fill(FillRule.OddEven);
+        }
+    }
+}

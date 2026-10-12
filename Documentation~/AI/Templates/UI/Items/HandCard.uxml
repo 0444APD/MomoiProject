@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 핸드 카드(배치 H) — 종이 132×184: 왼쪽 위 비용 원 · 그림 · 이름 · 작은 글(주인·종류). 고른 카드는 kit-hand-card +picked(들림 + 위 강조 띠).
+         부채꼴 기울기·높이는 화면 코드가 칸 뿌리에(UiGuide 1-5). 뽑기·쓰기 같은 카드 움직임은 따로 만든다 -->
+    <ui:Button name="card" class="kit-hand-card momoi-mat-paper">
+        <ui:VisualElement name="art" class="kit-hand-art" picking-mode="Ignore" />
+        <ui:Label name="title" class="kit-hand-name" picking-mode="Ignore" />
+        <ui:Label name="sub" class="kit-hand-sub" picking-mode="Ignore" />
+        <ui:Label name="cost" class="kit-hand-cost" picking-mode="Ignore" />
+    </ui:Button>
+</ui:UXML>

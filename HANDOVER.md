@@ -266,6 +266,8 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 2. `powershell -File Tools/RunCoreTests.ps1` — 코어 테스트(새 코어 테스트 파일은 스크립트 목록에 등록; 대역 Shim에 `Assert.IsInstanceOf` 없음).
 3. `powershell -File Tools/Verify.ps1 [-Filter 이름] [-SkipPlayMode]` — Unity 배치 테스트. **사용자 에디터가 이 프로젝트를 열고 있으면 못 돌린다**(에디터 로그: `Logs/Editor.log`). 결과 로그 `Logs/Verify/`.
 4. 기준 결과(2026-09-30): EditMode 231 통과·7 건너뜀, PlayMode 2 통과·3 건너뜀(샘플 데이터가 없어서; `샘플 › 샘플 데이터 만들기` 후 검증됨), 코어 103 통과.
+5. **Unity를 연 채로**(프로젝트 테스트 중 — 2026-10-12): 규칙 테스트는 `Logs/MomoiProject/RunTests.request`(→ `TestResults.txt`), 화면 확인은 `Logs/MomoiProject/Play.request`(→ `PlayResults.txt` + `Captures/*.png` — 플레이에 들어가 열기·누르기·테스트 명령·찍기, 매뉴얼 38장 2-5 · `Editor/Data/PlayRequests.cs`). 둘 다 요청마다 에셋을 새로 읽는다(Unity는 창을 볼 때만 저절로 새로 읽는다). 요청 파일이 남아 있으면 에디터가 모달 창에서 멈춘 것 — 창 목록은 Win32 `EnumWindows`로 읽을 수 있다(2026-10-12: 플레이 요청이 'DB에 저장 안 된 변경' 창을 띄워 멈췄던 일 → 플레이 요청은 그 창을 건너뛰게 고침).
+   - UXML이 XML로 읽히지 않으면(주석 안의 `--`) Unity는 콘솔에 파일 이름 없이 한 번 남기고 예전 가져오기를 쓴다 — 컴파일 검사 훅(`Tools~/compile-check.ps1`)이 UXML도 XML로 읽어 막는다.
 
 ### 3.5 명명·표현 규칙
 - ID lowerCamelCase(점 허용), 새 항목 ID 제안은 접두어+번호.
