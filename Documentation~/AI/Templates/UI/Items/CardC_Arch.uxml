@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <!-- 아치 카드(편성 — 200×440, 위가 둥근 큰 카드): 그림 · 왼쪽 위 원형 표시(속성·역할) · 레벨 띠 · 종이 바닥(별). 빈 자리는 kit-arch--empty -->
+    <!-- 아치 카드(편성 — 200×440, 위가 둥근 큰 카드): 그림 · 왼쪽 위 원형 표시(속성·역할) · 레벨 띠 · 종이 바닥(별). 빈 자리는 kit-arch +empty -->
     <ui:Button name="card" class="kit-arch momoi-mat-cover">
         <ui:VisualElement name="art" class="kit-arch-art" picking-mode="Ignore" />
         <ui:Label name="badge" class="kit-arch-badge momoi-mat-cover" picking-mode="Ignore" />

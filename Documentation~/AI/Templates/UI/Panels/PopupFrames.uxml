@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <!-- 팝업 틀 A~D — 팝업의 몸. 머리(PopupHeads A~D) · 내용(Lists·Details) · 발(쪽 표시·버튼)을 넣는다. 크기는 kit-popup--s·m·l.
+    <!-- 팝업 틀 A~D — 팝업의 몸. 머리(PopupHeads A~D) · 내용(Lists·Details) · 발(쪽 표시·버튼)을 넣는다. 크기는 kit-popup +s·m·l.
          층은 팝업(뒤는 흐림). 고를 수 있게 늘어놓은 조각이다. -->
 
     <!-- A 종이: 가장 기본 -->

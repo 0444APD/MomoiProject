@@ -1,6 +1,7 @@
 ﻿# MomoiProject — 프로젝트 코드 컴파일 검사(Claude Code의 Stop 훅이 응답을 끝낼 때 부른다). Unity를 연 채로도 된다.
 # Unity가 만든 .csproj(Preferences › External Tools의 프로젝트 파일)의 참조·심볼을 빌려, Assets 아래 asmdef마다 그 폴더의 .cs를 그대로 컴파일한다
 # (방금 만든 파일도 들어간다). asmdef 밖의 코드는 Assembly-CSharp(·Editor 폴더는 Assembly-CSharp-Editor)로.
+# UXML 파일이 XML로 읽히는지도 본다(읽히지 않으면 Unity가 가져오지 못해 화면이 빈 채로 열린다).
 # 오류가 있으면 stderr에 쓰고 2로 끝난다 → Claude가 고친 뒤 다시 끝낸다. 같은 이유로 세 번 넘게 막지는 않는다.
 # 검사할 수 없으면(Unity·컴파일러·csproj가 없음) 알리고 0으로 끝난다(막지 않는다).
 # 시작 설정이 GBible 패키지의 Tools~/compile-check.ps1을 .claude/hooks/로 복사한다(직접 고치지 않는다).
@@ -26,6 +27,39 @@ try {
 
 $assets = Join-Path $proj "Assets"
 if (-not (Test-Path $assets)) { exit 0 }
+
+# 막기: 오류를 stderr에 쓰고 2로 끝낸다(같은 이유로 세 번 넘게는 막지 않는다).
+function Stop-WithErrors($list, $what) {
+    $count = 1
+    if (Test-Path $blocks) { try { $count = [int](Get-Content $blocks -Raw) + 1 } catch { $count = 1 } }
+    Set-Content $blocks $count
+    if ($hookActive -and $count -gt 3) {
+        "MomoiProject 컴파일 검사: $what $($list.Count)개가 남아 있지만 세 번 막아서 더 막지 않습니다. 보고에 남은 오류를 적으세요."
+        $list | Select-Object -First 20
+        exit 0
+    }
+    [Console]::Error.WriteLine("MomoiProject 컴파일 검사: $what $($list.Count)개. 고친 뒤 다시 끝내세요.")
+    $list | Select-Object -First 30 | ForEach-Object { [Console]::Error.WriteLine($_) }
+    exit 2
+}
+
+# UXML: XML로 읽히지 않으면 Unity가 가져오지 못해 그 화면이 빈 채로 열린다(콘솔에는 가져올 때 한 번만 남는다) — 늘 본다(빠르다).
+# 흔한 까닭은 주석 안의 '--'(XML이 막는다): 변형 클래스는 주석에 'kit-hub +aside'처럼 적는다.
+$uxmlErrors = New-Object System.Collections.Generic.List[string]
+$uxmlFiles = @(Get-ChildItem $assets -Recurse -File -Filter *.uxml -ErrorAction SilentlyContinue)
+foreach ($p in @(Get-ChildItem (Join-Path $proj "Packages") -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "package.json") })) {
+    $uxmlFiles += @(Get-ChildItem $p.FullName -Recurse -File -Filter *.uxml -ErrorAction SilentlyContinue)
+}
+foreach ($u in $uxmlFiles) {
+    try { (New-Object System.Xml.XmlDocument).Load($u.FullName) }
+    catch {
+        $e = $_.Exception
+        while ($e.InnerException) { $e = $e.InnerException }
+        $hint = if ($e.Message -match 'comment') { " (주석 안의 '--'는 쓸 수 없습니다 — 'kit-hub +aside'처럼)" } else { "" }
+        $uxmlErrors.Add(($u.FullName -replace [regex]::Escape("$proj\"), '') + ": UXML이 XML로 읽히지 않습니다 — " + $e.Message + $hint)
+    }
+}
+if ($uxmlErrors.Count -gt 0) { Stop-WithErrors $uxmlErrors "UXML 오류" }
 
 # 마지막으로 통과한 뒤 바뀐 .cs·.asmdef가 없으면 끝.
 # 폴더의 시각도 본다: 파일을 지우거나 옮기면 그 폴더의 시각이 바뀐다(지운 클래스를 쓰던 코드도 잡는다).
@@ -158,14 +192,4 @@ if ($errors.Count -eq 0) {
     exit 0
 }
 
-$count = 1
-if (Test-Path $blocks) { try { $count = [int](Get-Content $blocks -Raw) + 1 } catch { $count = 1 } }
-Set-Content $blocks $count
-if ($hookActive -and $count -gt 3) {
-    "MomoiProject 컴파일 검사: 오류 $($errors.Count)개가 남아 있지만 세 번 막아서 더 막지 않습니다. 보고에 남은 오류를 적으세요."
-    $errors | Select-Object -First 20
-    exit 0
-}
-[Console]::Error.WriteLine("MomoiProject 컴파일 검사: 컴파일 오류 $($errors.Count)개. 고친 뒤 다시 끝내세요.")
-$errors | Select-Object -First 30 | ForEach-Object { [Console]::Error.WriteLine($_) }
-exit 2
+Stop-WithErrors $errors "컴파일 오류"
