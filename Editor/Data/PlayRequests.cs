@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using GBible.Data;
 using UnityEditor;
+using UnityEditor.Media;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -23,6 +24,8 @@ namespace GBible.EditorTools
     //     capture <이름>          게임 화면을 Logs/MomoiProject/Captures/<이름>.png 로(게임 뷰 크기 그대로)
     //     screens                 열린 화면 목록을 결과에 적기
     //     testpanel off|on        테스트 씬의 패널을 숨기기·보이기(찍을 때 HUD를 가리지 않게 — 기본은 숨김)
+    //     record <이름> [초] [fps]  지금부터 게임 화면을 녹화해 Captures/<이름>.mp4(기본 2초 · 30fps, 너비 1280까지) — 다음 단계는 녹화와 함께 돈다.
+    //                             AI가 볼 수 있게 고르게 뽑은 칸 16개를 한 장으로 Captures/<이름>-frames.png(왼쪽 위부터, 시각은 결과에). 녹화 중 다음 record는 끝날 때까지 기다린다
     //   에디터가 1초마다 보고: 먼저 새로 읽고(방금 쓴 코드·UXML·USS — 새로 읽을 때 난 오류와 XML로 읽히지 않는 UXML은 결과 첫머리에),
     //   열린 씬에 저장하지 않은 변경이 있거나 플레이 중이면 시작하지 않는다(결과 파일에 까닭) —
     //   같은 콘솔 오류는 처음 한 번만 적는다.
@@ -167,6 +170,9 @@ namespace GBible.EditorTools
                     FocusGameView();
                     TestScene.Hidden = true;   // 찍은 그림을 가리지 않게(요청에서 'testpanel on'으로 다시)
                     break;
+                case PlayModeStateChange.ExitingPlayMode:
+                    if (_grabber != null) _grabber.Stop();   // 녹화 중이면 지금까지로 굽는다
+                    break;
                 case PlayModeStateChange.EnteredEditMode when State == "running" || State == "stopping":
                     UnhookLog();
                     TestScene.Hidden = false;
@@ -187,8 +193,10 @@ namespace GBible.EditorTools
             if (!_hooked) HookLog();   // 도메인을 다시 읽은 뒤
             var steps = SessionState.GetString(StepsKey, "").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var index = SessionState.GetInt(IndexKey, 0);
+            if (index < steps.Length && steps[index].StartsWith("record", StringComparison.Ordinal) && _grabber != null) return;   // 앞 녹화가 끝날 때까지
             if (index >= steps.Length)
             {
+                if (_grabber != null) return;   // 녹화가 끝난 뒤에 멈춘다
                 State = "stopping";
                 EditorApplication.ExitPlaymode();
                 return;
@@ -237,13 +245,15 @@ namespace GBible.EditorTools
                 case "capture":
                     wait = Math.Max(wait, 0.5);
                     return Capture(arg);
+                case "record":
+                    return Record(arg);
                 case "testpanel":
                     TestScene.Hidden = arg != "on";
                     return TestScene.Hidden ? "테스트 패널 숨김" : "테스트 패널 보임";
                 case "screens":
                     return "열린 화면: " + string.Join(", ", GameScreens.All.Select(s => s.Id));
                 default:
-                    return "✗ 모르는 단계(scene·scenario·wait·command·open·close·back·click·speed·capture·screens·testpanel)";
+                    return "✗ 모르는 단계(scene·scenario·wait·command·open·close·back·click·speed·capture·record·screens·testpanel)";
             }
         }
 
@@ -309,6 +319,123 @@ namespace GBible.EditorTools
         {
             var type = typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView");
             if (type != null) EditorWindow.GetWindow(type, false, null, false)?.Repaint();
+        }
+
+        // ── 녹화 ─────────────────────────────────────────────
+
+        const int RecordWidth = 1280;
+        const int SheetColumns = 4;
+        const int SheetThumbs = 16;
+        const int ThumbWidth = 480;
+        const int SheetGap = 4;
+
+        static FrameGrabber _grabber;
+        static MediaEncoder _encoder;
+        static string _recordName;
+        static int _recordFps;
+        static int _frameIndex;
+        static Dictionary<int, int> _thumbSlots;
+        static List<double> _thumbTimes;
+        static Color32[] _sheet;
+        static int _sheetWidth, _sheetHeight, _thumbHeight;
+
+        static string Record(string arg)
+        {
+            if (_grabber != null) return "✗ 이미 녹화 중";
+            var parts = arg.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var name = parts.Length > 0 ? parts[0] : DateTime.Now.ToString("HHmmss");
+            var seconds = parts.Length > 1 && float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var s) ? s : 2f;
+            var fps = parts.Length > 2 && int.TryParse(parts[2], out var f) ? Mathf.Clamp(f, 1, 60) : 30;
+            Directory.CreateDirectory(CaptureFolder);
+            var path = $"{CaptureFolder}/{name}.mp4";
+            if (File.Exists(path)) File.Delete(path);
+            FocusGameView();
+            _recordName = name;
+            _recordFps = fps;
+            _frameIndex = 0;
+            _grabber = FrameGrabber.Begin(seconds, fps, RecordWidth, OnFrame, OnRecorded);
+            _encoder = new MediaEncoder(path, new VideoTrackAttributes
+            {
+                frameRate = new MediaRational(fps),
+                width = (uint)_grabber.Width,
+                height = (uint)_grabber.Height,
+                includeAlpha = false,
+                bitRateMode = VideoBitrateMode.High,
+            });
+            // 모음 그림: 칸 16개를 고르게(처음과 끝 포함), 4열
+            var total = _grabber.Total;
+            var thumbs = Math.Min(SheetThumbs, total);
+            _thumbSlots = new Dictionary<int, int>();
+            for (int k = 0; k < thumbs; k++)
+                _thumbSlots[thumbs == 1 ? 0 : (int)Math.Round(k * (total - 1) / (double)(thumbs - 1))] = k;
+            _thumbTimes = new List<double>();
+            _thumbHeight = Mathf.Max(2, Mathf.RoundToInt(ThumbWidth * (float)_grabber.Height / _grabber.Width));
+            var rows = (thumbs + SheetColumns - 1) / SheetColumns;
+            _sheetWidth = SheetGap + Math.Min(thumbs, SheetColumns) * (ThumbWidth + SheetGap);
+            _sheetHeight = SheetGap + rows * (_thumbHeight + SheetGap);
+            _sheet = Enumerable.Repeat(new Color32(20, 20, 22, 255), _sheetWidth * _sheetHeight).ToArray();
+            return $"녹화 시작 → {path}({seconds:0.##}초 · {fps}fps · {_grabber.Width}×{_grabber.Height})";
+        }
+
+        static void OnFrame(Texture2D frame, double time)
+        {
+            try
+            {
+                _encoder?.AddFrame(frame);
+                if (_thumbSlots != null && _thumbSlots.TryGetValue(_frameIndex, out var slot))
+                {
+                    AddThumb(frame, slot);
+                    _thumbTimes.Add(time);
+                }
+            }
+            catch (Exception e)
+            {
+                Append("   [오류] 녹화: " + e.Message);
+            }
+            _frameIndex++;
+        }
+
+        static void AddThumb(Texture2D frame, int slot)
+        {
+            var source = frame.GetPixels32();
+            int w = frame.width, h = frame.height;
+            var left = SheetGap + slot % SheetColumns * (ThumbWidth + SheetGap);
+            var bottom = _sheetHeight - (SheetGap + slot / SheetColumns * (_thumbHeight + SheetGap) + _thumbHeight);   // 그림의 줄은 아래가 0
+            for (int y = 0; y < _thumbHeight; y++)
+            {
+                var sy = y * h / _thumbHeight;
+                for (int x = 0; x < ThumbWidth; x++)
+                    _sheet[(bottom + y) * _sheetWidth + left + x] = source[sy * w + x * w / ThumbWidth];
+            }
+        }
+
+        static void OnRecorded()
+        {
+            var name = _recordName;
+            var grabber = _grabber;
+            try
+            {
+                _encoder?.Dispose();
+                var sheet = new Texture2D(_sheetWidth, _sheetHeight, TextureFormat.RGBA32, false);
+                sheet.SetPixels32(_sheet);
+                sheet.Apply(false);
+                File.WriteAllBytes($"{CaptureFolder}/{name}-frames.png", sheet.EncodeToPNG());
+                UnityEngine.Object.DestroyImmediate(sheet);
+                var times = string.Join(" · ", _thumbTimes.Select(t => t.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)));
+                Append($"   녹화 끝: {CaptureFolder}/{name}.mp4 · {name}-frames.png — {grabber.Frames}칸({_recordFps}fps) · 실제로 잡은 화면 {grabber.Grabs}번" +
+                       (grabber.Grabs < grabber.Frames * 0.6 ? "(게임 프레임이 드물어 끊겨 보일 수 있음)" : "") + $" · 모음 그림 칸의 시각(초): {times}");
+            }
+            catch (Exception e)
+            {
+                Append($"   [오류] 녹화를 굽지 못했습니다({name}): {e.Message}");
+            }
+            finally
+            {
+                _encoder = null;
+                _grabber = null;
+                _sheet = null;
+                _thumbSlots = null;
+            }
         }
 
         // ── 콘솔 ─────────────────────────────────────────────
