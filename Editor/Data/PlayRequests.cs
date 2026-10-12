@@ -128,6 +128,8 @@ namespace GBible.EditorTools
                 Finish("상태: 컴파일 오류 — 플레이하지 못했습니다(콘솔의 오류를 고친 뒤 다시 요청하세요).", log: "");
                 return;
             }
+            // 컴파일 뒤 아직 돌지 않은 DB 반영 스크립트가 있으면 먼저 돌린다(새 화면·항목이 이 플레이에 들어가게 — GameIds가 바뀌면 다시 컴파일되고 다음 확인에서 이어서).
+            if (DbSeeds.RunPending(force: false) > 0) return;
             var steps = File.ReadAllLines(RequestPath).Select(l => l.Split('#')[0].Trim()).Where(l => l.Length > 0).ToList();
             var scene = steps.Where(l => l.StartsWith("scene ", StringComparison.Ordinal)).Select(l => l.Substring(6).Trim()).LastOrDefault();
             steps.RemoveAll(l => l.StartsWith("scene ", StringComparison.Ordinal));

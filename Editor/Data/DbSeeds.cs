@@ -92,7 +92,25 @@ namespace GBible.EditorTools
         {
             CodexStaging.AfterCommit += RecordPending;
             CodexStaging.AfterDiscard += () => SessionState.EraseString(PendingKey);
-            EditorApplication.delayCall += () => RunPending(force: false);
+            EditorApplication.delayCall += RunWhenReady;
+        }
+
+        // 컴파일 직후 에디터가 아직 바쁘면(컴파일·가져오기·플레이) 한가해질 때까지 미룬다 — 그 순간 한 번 건너뛰고 끝내면 다음 컴파일까지 돌지 않는다.
+        static bool _waiting;
+
+        static void RunWhenReady()
+        {
+            if (_waiting) return;
+            _waiting = true;
+            EditorApplication.update += WaitUntilIdle;
+        }
+
+        static void WaitUntilIdle()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            EditorApplication.update -= WaitUntilIdle;
+            _waiting = false;
+            RunPending(force: false);
         }
 
         [MenuItem("MomoiProject/DB 반영 스크립트/모두 다시 돌리기", priority = 61)]
