@@ -34,6 +34,7 @@ namespace GBible.EditorTools
     //   AI는 결과 파일과 PNG(그림을 읽는다)로 화면을 확인하고 고친다. 개발자가 Unity에서 작업 중이면 요청하지 않는다(플레이에 들어간다).
     //   창을 띄우지 않는다(답할 사람이 없으면 Unity가 멈춘다): DB의 '적용 전' 변경이 있어도 묻지 않고 적용된 데이터로 돌며, 결과에 그 건수를 적는다.
     //   플레이에 들어가지 못하면(다른 도구가 막음) 몇 초 뒤 결과에 까닭을 쓰고 요청을 지운다.
+    //   개발자가 다른 창을 보고 있어도 게임이 돈다(이 플레이 동안만 Run In Background — 꺼져 있으면 Unity 창이 포커스를 잃은 동안 화면이 그려지지 않는다).
     [InitializeOnLoad]
     public static class PlayRequests
     {
@@ -50,6 +51,7 @@ namespace GBible.EditorTools
         const string StartedKey = "MomoiProject.Play.StartedAt";
         const string RefreshedKey = "MomoiProject.Play.Refreshed";
         const string ImportKey = "MomoiProject.Play.ImportErrors";
+        const string BackgroundKey = "MomoiProject.Play.RunInBackground";
         const double PollInterval = 1.0;
         const double StartDelay = 1.5;    // 플레이에 들어가 첫 화면이 열릴 때까지
         const double StartTimeout = 5.0;  // 플레이에 들어가기를 기다리는 한도(넘으면 막힌 것으로 본다)
@@ -167,6 +169,9 @@ namespace GBible.EditorTools
                     State = "running";
                     _nextStep = EditorApplication.timeSinceStartup + StartDelay;
                     HookLog();
+                    // 개발자가 다른 창을 보고 있어도 게임이 돌게(Run In Background가 꺼져 있으면 Unity 창이 포커스를 잃은 동안 게임이 멈춰 화면이 그려지지 않는다 — 이 플레이에서만).
+                    SessionState.SetBool(BackgroundKey, Application.runInBackground);
+                    Application.runInBackground = true;
                     FocusGameView();
                     TestScene.Hidden = true;   // 찍은 그림을 가리지 않게(요청에서 'testpanel on'으로 다시)
                     break;
@@ -175,6 +180,7 @@ namespace GBible.EditorTools
                     break;
                 case PlayModeStateChange.EnteredEditMode when State == "running" || State == "stopping":
                     UnhookLog();
+                    Application.runInBackground = SessionState.GetBool(BackgroundKey, Application.runInBackground);
                     TestScene.Hidden = false;
                     var back = SessionState.GetString(ReturnKey, "");
                     if (!string.IsNullOrEmpty(back) && File.Exists(back)) EditorSceneManager.OpenScene(back, OpenSceneMode.Single);
