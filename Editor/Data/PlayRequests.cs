@@ -52,6 +52,8 @@ namespace GBible.EditorTools
         const string RefreshedKey = "MomoiProject.Play.Refreshed";
         const string ImportKey = "MomoiProject.Play.ImportErrors";
         const string BackgroundKey = "MomoiProject.Play.RunInBackground";
+        const string ReloadsKey = "MomoiProject.Play.Reloads";                    // 도메인을 다시 읽은 횟수(이 에디터를 켠 뒤)
+        const string ReloadsAtRefreshKey = "MomoiProject.Play.ReloadsAtRefresh";
         const double PollInterval = 1.0;
         const double StartDelay = 1.5;    // 플레이에 들어가 첫 화면이 열릴 때까지
         const double StartTimeout = 5.0;  // 플레이에 들어가기를 기다리는 한도(넘으면 막힌 것으로 본다)
@@ -63,6 +65,7 @@ namespace GBible.EditorTools
 
         static PlayRequests()
         {
+            SessionState.SetInt(ReloadsKey, SessionState.GetInt(ReloadsKey, 0) + 1);
             // 도메인을 다시 읽은 직후에는 조금 기다린다(DB의 '적용 전' 작업본이 다음 틱에 되살아난다 — 그 전에 세면 0건).
             _nextPoll = EditorApplication.timeSinceStartup + 2.0;
             EditorApplication.update += Update;
@@ -110,17 +113,34 @@ namespace GBible.EditorTools
             if (SessionState.GetString(RefreshedKey, "") != stamp)
             {
                 SessionState.SetString(RefreshedKey, stamp);
+                SessionState.SetInt(ReloadsAtRefreshKey, SessionState.GetInt(ReloadsKey, 0));
                 _importErrors.Clear();
                 Application.logMessageReceived += OnImportLog;
                 try { AssetDatabase.Refresh(); }
                 finally { Application.logMessageReceived -= OnImportLog; }
-                // Unity의 UXML 오류 글에는 파일 이름이 없어, XML로 읽히지 않는 UXML은 여기서 경로와 함께 적는다(그 화면은 빈 채로 열린다).
-                foreach (var path in Directory.GetFiles("Assets", "*.uxml", SearchOption.AllDirectories))
+                CheckUxmlXml();
+                return;
+            }
+            // 새로 읽기에서 코드가 다시 컴파일됐으면, UXML은 새 코드보다 먼저 읽혀 새 요소·속성 값(enum)을 몰랐을 수 있다(그 뒤로 저절로 다시 읽지 않는다).
+            // 프로젝트 UXML을 한 번 더 읽고, 새로 읽을 때 오류를 이번 것으로 바꿔 적는다.
+            var reloads = SessionState.GetInt(ReloadsKey, 0);
+            if (SessionState.GetInt(ReloadsAtRefreshKey, reloads) != reloads)
+            {
+                SessionState.SetInt(ReloadsAtRefreshKey, reloads);
+                _importErrors.Clear();
+                Application.logMessageReceived += OnImportLog;
+                try
                 {
-                    try { new System.Xml.XmlDocument().Load(path); }
-                    catch (System.Xml.XmlException e) { _importErrors.Insert(0, $"   {path.Replace('\\', '/')}: XML로 읽히지 않음 — {e.Message}"); }
+                    AssetDatabase.StartAssetEditing();
+                    try
+                    {
+                        foreach (var path in Directory.GetFiles("Assets", "*.uxml", SearchOption.AllDirectories))
+                            AssetDatabase.ImportAsset(path.Replace('\\', '/'), ImportAssetOptions.ForceUpdate);
+                    }
+                    finally { AssetDatabase.StopAssetEditing(); }
                 }
-                SessionState.SetString(ImportKey, string.Join("\n", _importErrors));
+                finally { Application.logMessageReceived -= OnImportLog; }
+                CheckUxmlXml();
                 return;
             }
             if (EditorUtility.scriptCompilationFailed)
@@ -473,6 +493,17 @@ namespace GBible.EditorTools
         }
 
         // 새로 읽을 때(가져오기) 난 오류·경고: 그 에셋 경로와 첫 줄.
+        // Unity의 UXML 오류 글에는 파일 이름이 없어, XML로 읽히지 않는 UXML은 여기서 경로와 함께 적는다(그 화면은 빈 채로 열린다).
+        static void CheckUxmlXml()
+        {
+            foreach (var path in Directory.GetFiles("Assets", "*.uxml", SearchOption.AllDirectories))
+            {
+                try { new System.Xml.XmlDocument().Load(path); }
+                catch (System.Xml.XmlException e) { _importErrors.Insert(0, $"   {path.Replace('\\', '/')}: XML로 읽히지 않음 — {e.Message}"); }
+            }
+            SessionState.SetString(ImportKey, string.Join("\n", _importErrors));
+        }
+
         static void OnImportLog(string message, string stack, LogType type)
         {
             if (type == LogType.Log || _importErrors.Count >= 20) return;
