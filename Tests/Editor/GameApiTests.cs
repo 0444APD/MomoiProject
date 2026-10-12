@@ -92,7 +92,7 @@ namespace GBible.Tests
         }
     }
 
-    // 첫 대상(orc1)에게 주는 도중 같은 능력을 다른 대상(orc2)에게 한 번 더 쓴다 — 같은 효과 Block 인스턴스가 안에서 다시 돈다(반격·연쇄).
+    // 첫 대상(orc1)에게 주는 도중 같은 액티브 효과를 다른 대상(orc2)에게 한 번 더 쓴다 — 같은 효과 Block 인스턴스가 안에서 다시 돈다(반격·연쇄).
     [Serializable, BlockInfo("연쇄 피해", Category = "전투")]
     public class TbChainHit : Effect<TbUnit>
     {
@@ -104,7 +104,7 @@ namespace GBible.Tests
         }
     }
 
-    // 고르는 도중 같은 능력을 다른 대상(orc2)에게 한 번 더 쓴다 — 같은 대상 Block 인스턴스가 안에서 다시 돈다.
+    // 고르는 도중 같은 액티브 효과를 다른 대상(orc2)에게 한 번 더 쓴다 — 같은 대상 Block 인스턴스가 안에서 다시 돈다.
     [Serializable, BlockInfo("연쇄 대상", Category = "대상")]
     public class TbChainPick : TargetSelector<TbUnit>
     {
@@ -123,7 +123,7 @@ namespace GBible.Tests
         protected override bool Check() => Game.All<TbUnit>().Where(u => u.team == team).All(u => u.hp <= 0);
     }
 
-    // 검사 도중 같은 조건 인스턴스가 한 번 더 검사된다(능력치의 보정 조건이 이 조건일 때처럼) — 끝난 뒤 바깥 검사의 Game이 남아야 한다.
+    // 검사 도중 같은 조건 인스턴스가 한 번 더 검사된다(스탯의 보정 조건이 이 조건일 때처럼) — 끝난 뒤 바깥 검사의 Game이 남아야 한다.
     [Serializable, BlockInfo("다시 검사", Category = "시험")]
     public class TbReentrantCheck : SimpleCondition
     {
@@ -244,7 +244,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 능력은_대상을_이어_고르고_대상마다_효과를_적용한다()
+        public void 액티브_효과는_대상을_이어_고르고_대상마다_효과를_적용한다()
         {
             var used = new List<AbilityUsed>();
             _session.Events.Subscribe<AbilityUsed>(used.Add);
@@ -257,7 +257,7 @@ namespace GBible.Tests
             Assert.AreEqual(1, used.Count);
             CollectionAssert.AreEquivalent(new[] { "orc1", "orc2" }, used[0].Targets);
 
-            Assert.IsTrue(_session.Undo(), "능력 사용 전체가 행동 하나");
+            Assert.IsTrue(_session.Undo(), "액티브 효과 사용 전체가 행동 하나");
             Assert.AreEqual(30, Hp("orc1"));
             Assert.AreEqual(30, Hp("orc2"));
         }
@@ -271,7 +271,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 행동_안에서_부른_행동과_능력은_바깥_행동_하나로_묶인다()
+        public void 행동_안에서_부른_행동과_액티브_효과는_바깥_행동_하나로_묶인다()
         {
             var heal = new AbilityDefinition { Id = "nested.self" };
             heal.Targets.Add(new SelfTarget());
@@ -279,7 +279,7 @@ namespace GBible.Tests
             _session.Abilities.Define(heal);
             var before = _session.UndoCount;
             Game.Do(new TbUseInside());
-            Assert.AreEqual(35, Hp("hero"), "안에서 쓴 능력");
+            Assert.AreEqual(35, Hp("hero"), "안에서 쓴 액티브 효과");
             Assert.AreEqual(1, Game.All<TbBoard>()[0].turn, "안에서 부른 행동");
             Assert.AreEqual(before + 1, _session.UndoCount, "Undo 단위는 하나");
             Assert.IsTrue(_session.Undo());
@@ -288,7 +288,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 효과_안에서_같은_능력을_다시_써도_바깥_효과의_사용자가_남는다()
+        public void 효과_안에서_같은_액티브_효과를_다시_써도_바깥_효과의_사용자가_남는다()
         {
             var chain = new AbilityDefinition { Id = "chain" };
             chain.Effects.Add(new TbChainHit());

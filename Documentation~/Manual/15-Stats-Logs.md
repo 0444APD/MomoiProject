@@ -4,7 +4,7 @@
 
 > 로그 탭은 항목이 없으면 DB 사이드바에서 숨는다 — 프로젝트가 항목을 더하면(AI의 DB 반영 스크립트) 나타난다.
 
-> GBible에서 "Stat"은 이 로그를 가리킨다. 캐릭터의 공격력·방어력 같은 스탯은 **능력치(Attribute)**라고 부르고, 장비·버프 보정(Modifier)과 함께 `28-Attributes-Intercepts.md`에서 다룬다.
+> GBible에서 "Stat"은 이 로그를 가리킨다. 캐릭터의 공격력·방어력 같은 스탯은 **스탯(Attribute)**라고 부르고, 장비·버프 보정(Modifier)과 함께 `28-Attributes-Intercepts.md`에서 다룬다.
 
 **언제 쓰는가**
 

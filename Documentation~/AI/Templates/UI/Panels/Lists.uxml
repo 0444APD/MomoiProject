@@ -7,7 +7,7 @@
         <ui:VisualElement name="grid" class="kit-grid" />
     </ui:ScrollView>
 
-    <!-- B 표: 표 줄(Items/Row)이 위에서 아래로(속성·능력치 비교·순위) -->
+    <!-- B 표: 표 줄(Items/Row)이 위에서 아래로(속성·스탯 비교·순위) -->
     <ui:ScrollView class="kit-scroll">
         <ui:VisualElement name="rows" />
     </ui:ScrollView>

@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace GBible.Tests
 {
     // 6장르 시험 뒤 보강한 규칙 부품: 경로의 [키], 상태 효과(이벤트·길이·줄이기·주기·그 이벤트에 건 것), 이벤트 구독자 실패,
-    // NewIds, 의도 고치기 틀, 기본 대상 Block, 밸런스 값 무게, 패시브, 원본 ID 넣기(딕셔너리).
+    // NewIds, 의도 고치기 틀, 기본 대상 Block, 밸런싱 값 무게, 패시브 효과, 원본 ID 넣기(딕셔너리).
     public class RulePartsTests
     {
         [Serializable] public class RpWallet { public int gold = 10; }
@@ -279,9 +279,9 @@ namespace GBible.Tests
             Assert.AreEqual("legend", pulls.Single(), "89번째에는 거의 확정");
         }
 
-        // 단계가 id 있는 객체의 숫자 필드면 능력치(보정 포함)로 읽는다 — 후보 수에 더할 숫자와 같은 규칙(행운 유물 +N이 확률에도 든다).
+        // 단계가 id 있는 객체의 숫자 필드면 스탯(보정 포함)으로 읽는다 — 후보 수에 더할 숫자와 같은 규칙(행운 유물 +N이 확률에도 든다).
         [Test]
-        public void 밸런스_값_무게의_단계는_보정을_포함한_능력치로_읽는다()
+        public void 밸런스_값_무게의_단계는_보정을_포함한_스탯으로_읽는다()
         {
             _session.Balance.Define("luckWeight", 0, new Curve { kind = CurveKind.Table, points = { new CurvePoint { x = 0, y = 0 }, new CurvePoint { x = 49, y = 0 }, new CurvePoint { x = 50, y = 1000000 } } });
             var table = new WeightTableDefinition { Id = "lucky" };
@@ -298,7 +298,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 패시브는_가진_쪽마다_발동하고_개수를_센다()
+        public void 패시브_효과는_가진_쪽마다_발동하고_개수를_센다()
         {
             var mark = new Mark { text = "닻" };
             var anchor = new PassiveDefinition { Id = "anchor", OwnerKey = "run", OwnerPath = "relics", When = new EventTrigger { eventType = typeof(RpTurnEnded).FullName } };

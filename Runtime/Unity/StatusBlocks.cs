@@ -62,7 +62,7 @@ namespace GBible
 
     // 조건 '상태 효과 검사': 사용자(가진 쪽)나 이벤트의 개체에 그 상태 효과가 몇 중첩 걸려 있나.
     //   상태 효과를 비우고 종류를 고르면 그 종류(디버프 …)가 몇 가지 걸려 있나.
-    //   쿨다운: 능력의 사용 조건 = '사용자·가진 쪽에게 fireballCd <= 0'(없을 때만), 결과에 '상태 효과 걸기(fireballCd, 지속 3턴)'.
+    //   쿨다운: 액티브 효과의 사용 조건 = '사용자·가진 쪽에게 fireballCd <= 0'(없을 때만), 결과에 '상태 효과 걸기(fireballCd, 지속 3턴)'.
     [Serializable, Element(Elements.Status)]
     [BlockInfo("상태 효과 검사", Category = "상태 효과", Description = "사용자(가진 쪽) 또는 이벤트의 개체에 상태 효과가 몇 중첩 걸려 있는지 봅니다. 없을 때만 = '<= 0'. 쿨다운: 사용 조건에 '쿨다운 상태 효과 <= 0'.",
                Sentence = "{who}의 {status} {op} {stacks}")]

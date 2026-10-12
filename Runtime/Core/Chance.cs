@@ -49,7 +49,7 @@ namespace GBible
 
     // 조건 '사용자 필드 검사': 사용자(가진 쪽·놓인 조각)의 필드를 비교한다 — "이 조커의 카운터가 6 이상"·"이 아티팩트의 처치 수 40 이상".
     [Serializable]
-    [BlockInfo("사용자 필드 검사", Category = "조건", Description = "사용자(가진 쪽·놓인 조각·능력을 쓴 개체)의 필드를 비교합니다. 예: 이 조커의 counter 이상 6, 이 아티팩트의 kills 이상 40. 값에 틀({event:경로}·{data:키.경로}·{level} …)을 쓸 수 있습니다.",
+    [BlockInfo("사용자 필드 검사", Category = "조건", Description = "사용자(가진 쪽·놓인 조각·액티브 효과를 쓴 개체)의 필드를 비교합니다. 예: 이 조커의 counter 이상 6, 이 아티팩트의 kills 이상 40. 값에 틀({event:경로}·{data:키.경로}·{level} …)을 쓸 수 있습니다.",
                Sentence = "사용자의 {path} {op} {value}")]
     public sealed class UserFieldCondition : SimpleCondition
     {

@@ -38,7 +38,7 @@ namespace GBible.Data
         }
 
         // 편집 화면 요약용: 줄마다 최종 %(안쪽 표까지 곱한 전체 기준, depth = 안쪽 표 깊이). 뽑기와 같은 몫 계산(WeightTableSystem.Shares)을 쓰고,
-        // 조건은 모두 맞다고, 목록 줄은 한 줄로, 밸런스 값은 기준값으로 본다. find: 다른 가중치 표, balance: 밸런스 값의 기준값(없으면 null).
+        // 조건은 모두 맞다고, 목록 줄은 한 줄로, 밸런싱 값은 기준값으로 본다. find: 다른 가중치 표, balance: 밸런싱 값의 기준값(없으면 null).
         public List<(string label, double percent, int depth)> Preview(Func<string, WeightTableData> find, Func<string, double?> balance)
         {
             var lines = new List<(string label, double percent, int depth)>();
@@ -91,11 +91,11 @@ namespace GBible.Data
             }
             if (exclude.Any(l => l == null || string.IsNullOrEmpty(l.key))) context.Error("뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다.");
             if ((emptyMode == WeightMode.Percent ? emptyPercent : emptyWeight) < 0) context.Error("꽝은 0 이상이어야 합니다.");
-            // 무게를 밸런스 값에서 읽는 줄은 뽑는 순간에 무게가 정해지므로(천장·레벨) 고정 무게 0으로 보지 않는다.
+            // 무게를 밸런싱 값에서 읽는 줄은 뽑는 순간에 무게가 정해지므로(천장·레벨) 고정 무게 0으로 보지 않는다.
             var rows = entries.Where(e => e != null).ToList();
             if (entries.Count > 0 && !rows.Any(e => !string.IsNullOrEmpty(e.weightBalance)) && rows.Sum(e => Math.Max(0, e.Value)) <= 0)
                 context.Error("무게·%가 모두 0이라 아무것도 나오지 않습니다.");
-            // 고정 %: 합이 100을 넘으면 오류(무게 줄의 몫이 없다), 무게 줄이 없는데 합이 100이 아니면 경고(비율대로 맞춰 뽑는다). 밸런스 값에서 읽는 줄은 그 순간에 정해져 보지 않는다.
+            // 고정 %: 합이 100을 넘으면 오류(무게 줄의 몫이 없다), 무게 줄이 없는데 합이 100이 아니면 경고(비율대로 맞춰 뽑는다). 밸런싱 값에서 읽는 줄은 그 순간에 정해져 보지 않는다.
             var fixedRows = rows.Where(e => e.mode == WeightMode.Percent && string.IsNullOrEmpty(e.weightBalance)).ToList();
             var fixedSum = fixedRows.Sum(e => Math.Max(0, e.percent)) + (emptyMode == WeightMode.Percent ? Math.Max(0, emptyPercent) : 0);
             var anyWeight = rows.Any(e => e.mode == WeightMode.Weight && (e.weight > 0 || !string.IsNullOrEmpty(e.weightBalance))) || (emptyMode == WeightMode.Weight && emptyWeight > 0);
@@ -130,7 +130,7 @@ namespace GBible.Data
         public WeightMode mode = WeightMode.Weight;
         [FieldLabel("무게"), ShowIf(nameof(mode), WeightMode.Weight)] public double weight = 1;
         [FieldLabel("%(전체 중)"), ShowIf(nameof(mode), WeightMode.Percent), Tooltip("전체 중 이 줄이 나올 %. 목록 줄이면 요소들이 이 %를 나눠 가진다")] public double percent = 10;
-        [FieldLabel("값을 밸런스 값에서"), DataRef(typeof(BalanceData)), Tooltip("고르면 무게(고정 %면 %) = 이 밸런스 값(곡선)의 단계 값. 천장·운·레벨·깊이에 따라 바뀌는 확률")] public string weightBalance = "";
+        [FieldLabel("값을 밸런싱 값에서"), DataRef(typeof(BalanceData)), Tooltip("고르면 무게(고정 %면 %) = 이 밸런싱 값(곡선)의 단계 값. 천장·운·레벨·깊이에 따라 바뀌는 확률")] public string weightBalance = "";
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("단계(플레이어 데이터)"), ShowIf(nameof(weightBalance)), Tooltip("곡선의 단계로 쓸 숫자. 비우면 기준값")] public string weightStepKey = "";
         // 뿌리 = 바로 위 '단계(플레이어 데이터)'(Root를 정하지 않으면 줄에서 처음 만나는 뿌리 칸인 '플레이어 데이터'(listKey)를 본다).
         [FieldPath(EmptyLabel = "값 전체", Root = nameof(weightStepKey)), FieldLabel("단계 필드"), ShowIf(nameof(weightBalance))] public string weightStepPath = "";
@@ -138,7 +138,7 @@ namespace GBible.Data
         [FieldLabel("최대 개수")] public int maxCount = 1;
         [FieldLabel("조건(맞을 때만 후보)"), SerializeReference] public Condition condition;
 
-        // 방식에 맞는 값(무게 또는 %). 밸런스 값에서 읽는 줄은 뽑는 순간에 그 값이 대신한다.
+        // 방식에 맞는 값(무게 또는 %). 밸런싱 값에서 읽는 줄은 뽑는 순간에 그 값이 대신한다.
         public double Value => mode == WeightMode.Percent ? percent : weight;
     }
 }

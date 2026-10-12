@@ -13,18 +13,18 @@ namespace GBible.Tests
     //
     // 독·화상·보호막·"3턴 뒤 폭발" 같은 버프·디버프. 걸기는 효과 Block '상태 효과 걸기' 또는 Game.ApplyStatus.
     //   중첩·다시 걸 때·지속(영구 / 이벤트 횟수 / 게임 시간)을 정하고,
-    //   걸려 있는 동안: 능력치 보정(중첩당 값) + 트리거(이벤트 받기·조건·행동 직전 이벤트 받기)로 발동하는 결과.
+    //   걸려 있는 동안: 스탯 보정(중첩당 값) + 트리거(이벤트 받기·조건·행동 직전 이벤트 받기)로 발동하는 결과.
     //   걸릴 때 결과 / 끝날 때 결과(지속이 다 돼서 끝날 때만. 풀어서 없앨 때는 돌지 않는다).
     // 결과의 컨텍스트: 사용자(User) = 가진 쪽, Owner = 이 항목 ID. 결과를 코드로 쓰려면 이 ID에 [BindTo](걸려 있는 동안의 결과를 대신한다).
     [Database("상태 효과", Group = "DB", Order = 35, IdPrefix = "status")]
     public sealed class StatusData : GameData, IStatusData
     {
         [FieldLabel("종류"), Tooltip("버프·디버프. 디버프만 풀기(정화)·디버프 개수·행동 직전 이벤트 '상태 효과 걸기'의 종류 조건에 쓰입니다")] public StatusKind kind;
-        [FieldLabel("걸린 쪽의 패시브를 끔"), Tooltip("켜면 이 상태 효과가 걸린 쪽(조커·유닛·조각)의 패시브가 발동·가진 동안 보정·레벨 모두 꺼집니다(Ink·디버프된 조커·봉인)")] public bool silencesPassives;
+        [FieldLabel("걸린 쪽의 패시브 효과를 끔"), Tooltip("켜면 이 상태 효과가 걸린 쪽(조커·유닛·조각)의 패시브 효과가 발동·가진 동안 보정·레벨 모두 꺼집니다(Ink·디버프된 조커·봉인)")] public bool silencesPassives;
         [FieldLabel("최대 중첩"), Tooltip("0이면 제한 없음")] public int maxStacks = 1;
         [FieldLabel("다시 걸 때")] public StatusReapply reapply = StatusReapply.AddStacksAndRefresh;
         [FieldLabel("지속")] public StatusDurationSettings duration = new StatusDurationSettings();
-        [FieldLabel("능력치 보정")] public List<StatusModifier> modifiers = new List<StatusModifier>();
+        [FieldLabel("스탯 보정")] public List<StatusModifier> modifiers = new List<StatusModifier>();
         [FieldLabel("걸려 있는 동안 트리거"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)]
         public Trigger trigger;
         [FieldLabel("가진 쪽 필드"), FieldPath(EmptyLabel = "가진 쪽 모두"),
@@ -66,7 +66,7 @@ namespace GBible.Tests
             if (duration.kind == StatusDuration.Permanent && onExpire.Count > 0)
                 context.Warning("지속이 영구라 끝날 때 결과가 돌지 않습니다(풀어서 없앨 때는 돌지 않습니다).");
             foreach (var modifier in modifiers)
-                if (modifier == null || string.IsNullOrWhiteSpace(modifier.attribute)) context.Error("능력치 보정: 능력치(숫자 필드 이름)를 적으세요.");
+                if (modifier == null || string.IsNullOrWhiteSpace(modifier.attribute)) context.Error("스탯 보정: 스탯(숫자 필드 이름)을 적으세요.");
             var bound = BoundOutcomes.Has(Id);
             if (trigger == null && pulse <= 0 && (outcomes.Count > 0 || bound)) context.Warning("걸려 있는 동안 트리거도 주기도 없어 결과가 돌지 않습니다.");
             if (pulse < 0) context.Error("주기는 0 이상이어야 합니다.");

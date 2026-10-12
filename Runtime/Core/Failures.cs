@@ -46,7 +46,7 @@ namespace GBible
         public const string NotACandidate = "momoi.fail.notACandidate";
         public const string ChosenTwice = "momoi.fail.chosenTwice";
         public const string ChoiceGone = "momoi.fail.choiceGone";
-        // {ability}: 능력·아이템 이름, {condition}: 사용 조건 글 — Game.Use
+        // {ability}: 액티브 효과·아이템 이름, {condition}: 사용 조건 글 — Game.Use
         public const string CannotUse = "momoi.fail.cannotUse";
         // {steps}: 되감으려는 지점 수, {marks}: 남은 지점 수 — Game.Rewind
         public const string RewindTooFar = "momoi.fail.rewindTooFar";

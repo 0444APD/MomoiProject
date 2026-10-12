@@ -87,7 +87,7 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 
 - 언제: [x] 즉시(누르기·사기) · [x] 발동(건물이 n개가 되면·도전과제를 달성하면) · [x] 지연(황금 쿠키가 1~3분 뒤 나타나고 13초 뒤 사라짐) · [x] 지속(77초 동안 생산 ×7, 13초 동안 클릭 ×777)
 - 누구에게: [x] 자신(빵집 전체) · [ ] 고른 대상 · [x] 무작위(황금 쿠키 효과) · [x] 전체(모든 건물) · [ ] 조건으로 거른 대상 — 그리고 특정 건물 하나(업그레이드 대상)
-- 무엇을: [x] 숫자 바꾸기 · [x] 능력치 보정(생산 ×2) · [x] 만들기·없애기(황금 쿠키) · [x] 다른 효과 고치기(클릭 ×777) · [ ] 효과 도중 고르기 · [x] 비용 바꾸기(가격 −5%)
+- 무엇을: [x] 숫자 바꾸기 · [x] 스탯 보정(생산 ×2) · [x] 만들기·없애기(황금 쿠키) · [x] 다른 효과 고치기(클릭 ×777) · [ ] 효과 도중 고르기 · [x] 비용 바꾸기(가격 −5%)
 - 가장 이상한 효과 세 개:
   1. 시너지: 업그레이드 '할머니의 손자'를 사면, 커서 100개마다 할머니 생산 +1%.
   2. 황금 쿠키: 1~3분마다 화면 어딘가에 13초 동안 나타나고, 누르면 효과 표에서 하나 — 프렌지(77초 동안 생산 ×7) 85, 행운(지금 쿠키의 15%와 15분치 생산 중 작은 것) 10, 클릭 프렌지(13초 동안 클릭 ×777, 첫 환생 뒤부터 나옴) 5.
@@ -152,10 +152,10 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 - 답이 없으면: 추천값으로 진행.
 
 **Q2. 1e308을 넘는 값은 어디까지인가** (문법 밖 — 큰 수)
-- 정하는 것: BigNum을 쓸 값의 범위. GBible의 숫자 칸(플레이어 데이터에 주기·비용 내기·플레이어 데이터 검사·능력치·Modifier·밸런스 값·로그·행동 직전 이벤트 고치기·binding-path·CSV)은 모두 double이라, BigNum 값에는 그 DB Block을 쓰지 못하고 프로젝트 Block으로 바꾼다.
+- 정하는 것: BigNum을 쓸 값의 범위. GBible의 숫자 칸(플레이어 데이터에 주기·비용 내기·플레이어 데이터 검사·스탯·Modifier·밸런싱 값·로그·행동 직전 이벤트 고치기·binding-path·CSV)은 모두 double이라, BigNum 값에는 그 DB Block을 쓰지 못하고 프로젝트 Block으로 바꾼다.
 - 추천값: BigNum = 쿠키·이번 판/전체 누적 생산·초당 생산·건물과 업그레이드 가격. double = 배율(업그레이드·버프·천상칩·우유), 개수, 천상칩 수, 비율. 대신 만드는 Block: '쿠키 주기'·'쿠키 검사'·'N초분 생산', 비용은 규칙 함수 `Rules.Spend`.
-- 이유: 배율이 1e308 안이면 능력치·Modifier·상태 효과 보정(DB 조립)이 그대로 산다. 가격을 double로 두면 1e300을 넘는 쿠키를 쓸 곳이 없다.
-- 답이 없으면: 추천값. 배율도 1e308을 넘는다고 하면 능력치·Modifier를 쓰지 못하고 배율 계산이 모두 코드로 간다(되돌리기 비싸서 묻는다).
+- 이유: 배율이 1e308 안이면 스탯·Modifier·상태 효과 보정(DB 조립)이 그대로 산다. 가격을 double로 두면 1e300을 넘는 쿠키를 쓸 곳이 없다.
+- 답이 없으면: 추천값. 배율도 1e308을 넘는다고 하면 스탯·Modifier를 쓰지 못하고 배율 계산이 모두 코드로 간다(되돌리기 비싸서 묻는다).
 
 **Q3. 꺼 둔 시간을 무엇으로 재나** (문법 밖 — 현실 시간)
 - 정하는 것: 오프라인 시간의 근거와 시계 조작 대책.
@@ -169,7 +169,7 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 |---|---|---|
 | Undo 방식 | 쓰지 않음 | 가이드 07장 1절(명세서 1절 빈칸) |
 | 고정 틱 | 초당 10 | 시간 규칙이 초 단위. PlanningSpecGuide 2절의 실시간 기본 30보다 낮게 |
-| 정산 간격 | 1초(밸런스 값 `settleInterval`). 쿠키를 쓰는 행동은 그 행동 안에서 먼저 정산 | 3-1 |
+| 정산 간격 | 1초(밸런싱 값 `settleInterval`). 쿠키를 쓰는 행동은 그 행동 안에서 먼저 정산 | 3-1 |
 | 오프라인 보상의 초당 생산 | 버프(상태 효과의 보정) 뺀 값. 60초 넘게 비웠을 때만 창 | 꺼 둔 동안 버프는 흐르지 않는다 |
 | 일시정지 메뉴·Steam 오버레이 | 시간을 멈추지 않는다(같은 ID 화면 항목으로 '열린 동안 게임 시간 멈춤' 끔, DB › Steam '오버레이가 열리면 일시정지' 끔) | 방치형은 메뉴를 열어도 굽는다 |
 | 창이 내려간 동안 | 계속 굽는다(Player Settings의 Run In Background 켬) | 가정. 꺼 두면 그 시간은 오프라인 50%로 계산된다(Q3의 차이 계산) |
@@ -202,7 +202,7 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
     public List<Synergy> synergies = new List<Synergy>();
     public List<GoldenCookie> goldens = new List<GoldenCookie>();
 }
-[Serializable] public class Bakery { public string id = "bakery"; public double mult = 1, clickBase = 1, clickCpsRatio, milkPower = 1; }   // 숫자 필드 = 능력치
+[Serializable] public class Bakery { public string id = "bakery"; public double mult = 1, clickBase = 1, clickCpsRatio, milkPower = 1; }   // 숫자 필드 = 스탯
 [Serializable] public class Building { public string id; public int count; public double mult = 1; }    // id = 건물 원본 ID
 [Serializable] public class Synergy { public string from, to, source; public int per = 100; public double percent = 0.01; }
 [Serializable] public class GoldenCookie { public string id; public double x, y, expiresAt; }
@@ -216,7 +216,7 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 > - 화면: 쿠키 수는 `run.cookies + run.cps × (Clock.Time − run.lastSettledAt)`로 매 프레임 보간해 그린다(화면 코드, 데이터는 바꾸지 않는다).
 > - `Update`에서 직접 더하면 행동 밖 변경이다(관례 3절·10절). 매 프레임 행동으로 더하면 4-2(3)의 비용이 든다.
 
-- 유닛 클래스: 없음. 능력치를 가진 객체는 `Bakery`(mult·clickBase·clickCpsRatio·milkPower)와 `Building`(mult).
+- 유닛 클래스: 없음. 스탯을 가진 객체는 `Bakery`(mult·clickBase·clickCpsRatio·milkPower)와 `Building`(mult).
 
 ### 3-2. 원본 종류
 
@@ -224,7 +224,7 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 |---|---|---|---|
 | 건물 | `BuildingData { double basePrice, baseCps; int order; }` · DB › 인스턴스(CSV로 채움) | `Building { id, count, mult }` | — |
 | 업그레이드 | `UpgradeData { BigNum price; int order; [SerializeReference] Usable usable; }` · DB › 인스턴스 | `run.upgrades`(ID) | 사용 기능: 사용 조건 = 해금 조건, 결과 = 효과. 사기 = `Rules.Spend` + `Game.Use(id, 빵집)` |
-| 황금 쿠키 효과 | DB › 능력 `frenzy`·`lucky`·`clickFrenzy` + DB › 가중치 표 `goldenEffects` | — | `Game.Use(뽑은 ID, 빵집)` |
+| 황금 쿠키 효과 | DB › 액티브 효과 `frenzy`·`lucky`·`clickFrenzy` + DB › 가중치 표 `goldenEffects` | — | `Game.Use(뽑은 ID, 빵집)` |
 | 버프·할인 | DB › 상태 효과 `frenzy`·`clickFrenzy`·`discount.*` | `$statuses` | 빵집에 건다 |
 | 도전과제 | DB › 도전과제 | `achievement:<ID>` | 우유 계산이 달성 수를 센다 |
 
@@ -266,7 +266,7 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 | 대상 | '건물'(`BuildingTarget`, 건물 ID) · '모든 건물'(`AllBuildings`) |
 | 조건 | '건물 개수'(`BuildingCountAtLeast`) · '쿠키 검사'(`CookiesAtLeast`: 지금 / 이번 판 누적 / 전체 누적, 값 "1e6") · '업그레이드 가짐'(`HasUpgrade`) |
 | 결과(`Reward`) | '쿠키 주기'(`GiveCookies`, "1e6") · 'N초분 생산'(`GiveProduction`, 초 · 보유 상한 비율) · '시너지'(`AddSynergy`, from · to · per · percent) |
-| 효과 | 기본 '능력치 보정'·'상태 효과 걸기'로 충분 |
+| 효과 | 기본 '스탯 보정'·'상태 효과 걸기'로 충분 |
 
 ### 3-7. DB 설정
 
@@ -278,14 +278,14 @@ GBible의 목표("정해진 양식의 기획 명세서 + GBible 문서·규칙 �
 
 Steam 켬. 다이얼로그·인벤토리·입력(키 바꾸기) 끔. 확인용 패널·샘플은 개발 중에만.
 
-### 3-9. 밸런스 값 · 가중치 표 · 로그 · 도전과제
+### 3-9. 밸런싱 값 · 가중치 표 · 로그 · 도전과제
 
 | 종류 | ID · 값 |
 |---|---|
-| 밸런스 값 | `priceGrowth` 1.15 · `settleInterval` 1 · `offlineRate` 0.5 · `offlineCapSeconds` 28800 · `offlineNoticeSeconds` 60 · `goldenMinSeconds` 60 · `goldenMaxSeconds` 180 · `goldenLifeSeconds` 13 · `chipDivisor` 1e12 · `chipPower` 0.3333 · `chipBonus` 0.01 · `milkPerAchievement` 0.04 · `autosaveSeconds` 30 |
+| 밸런싱 값 | `priceGrowth` 1.15 · `settleInterval` 1 · `offlineRate` 0.5 · `offlineCapSeconds` 28800 · `offlineNoticeSeconds` 60 · `goldenMinSeconds` 60 · `goldenMaxSeconds` 180 · `goldenLifeSeconds` 13 · `chipDivisor` 1e12 · `chipPower` 0.3333 · `chipBonus` 0.01 · `milkPerAchievement` 0.04 · `autosaveSeconds` 30 |
 | 가중치 표 | `goldenEffects`: `frenzy` 85 · `lucky` 10 · `clickFrenzy` 5(줄 조건 `profile › ascensions` 1 이상) |
-| 상태 효과 | `frenzy`(게임 시간 77초, 지속 갱신, 능력치 보정 `mult` 독립 곱 6) · `clickFrenzy`(13초, 행동 직전 이벤트 클릭 행동 직전 이벤트 → `multiplier` ×777) · `discount.<건물>`(영구, 행동 직전 이벤트 가격 행동 직전 이벤트 → ×0.95) |
-| 능력 | `frenzy`·`clickFrenzy`(사용자 자신에게 상태 효과 걸기) · `lucky`('N초분 생산' 900초, 상한 0.15) |
+| 상태 효과 | `frenzy`(게임 시간 77초, 지속 갱신, 스탯 보정 `mult` 독립 곱 6) · `clickFrenzy`(13초, 행동 직전 이벤트 클릭 행동 직전 이벤트 → `multiplier` ×777) · `discount.<건물>`(영구, 행동 직전 이벤트 가격 행동 직전 이벤트 → ×0.95) |
+| 액티브 효과 | `frenzy`·`clickFrenzy`(사용자 자신에게 상태 효과 걸기) · `lucky`('N초분 생산' 900초, 상한 0.15) |
 | 로그 | `clicks`(CookieClicked 더하기) · `goldenClicks` · `ascensions` |
 | 도전과제 | `bake.1e3` … (DB 추가 메뉴가 1e3배마다 만든다) · `own.<건물>.<n>` · `golden.7`·`golden.77`·`golden.777` · `ascend.1` |
 
@@ -317,24 +317,24 @@ Steam 켬. 다이얼로그·인벤토리·입력(키 바꾸기) 끔. 확인용 �
 
 | # | 효과 | 언제 | 누구에게 | 무엇을 | 부품(장 절) | 판정 |
 |---|---|---|---|---|---|---|
-| 1 | 초당 생산(정산) | 1초마다(`Ticked`가 시각을 보고 행동) + 쿠키를 쓰는 행동 앞 | 빵집 | 쿠키 += Cps × 지난 초 | `session.Ticked`(33장 4-1) → `Do(new Settle { utc })`, `Rules.Cps`, 얻기 행동 직전 이벤트(28장 4-7·4-8), 밸런스 값 `settleInterval`(30장 4-1) | C |
-| 2 | 오프라인 보상 | 정산 때 "현실 경과 − 게임 경과" > 0 | 빵집 | 쿠키 += 버프 뺀 Cps × min(초, 8시간) × 0.5 | 행동 필드 `utc`, 버프 뺀 배율 = `AttributeSystem.Apply`(28장 4-6)에 출처가 `$status`로 시작하는 Modifier를 빼고, 밸런스 값 `offlineRate`·`offlineCapSeconds`, 이벤트 → 팝업 | D(현실 시간) |
+| 1 | 초당 생산(정산) | 1초마다(`Ticked`가 시각을 보고 행동) + 쿠키를 쓰는 행동 앞 | 빵집 | 쿠키 += Cps × 지난 초 | `session.Ticked`(33장 4-1) → `Do(new Settle { utc })`, `Rules.Cps`, 얻기 행동 직전 이벤트(28장 4-7·4-8), 밸런싱 값 `settleInterval`(30장 4-1) | C |
+| 2 | 오프라인 보상 | 정산 때 "현실 경과 − 게임 경과" > 0 | 빵집 | 쿠키 += 버프 뺀 Cps × min(초, 8시간) × 0.5 | 행동 필드 `utc`, 버프 뺀 배율 = `AttributeSystem.Apply`(28장 4-6)에 출처가 `$status`로 시작하는 Modifier를 빼고, 밸런싱 값 `offlineRate`·`offlineCapSeconds`, 이벤트 → 팝업 | D(현실 시간) |
 | 3 | 아주 큰 수 | 늘 | — | 1e300 넘는 쿠키·가격·표시 | 프로젝트 BigNum(`[Serializable] struct`, Mirror 생성 코드 — 가정), 대체 Block 3개(3-6), `Rules.Spend`, Client `NumberText.Format`, 설정 `numberFormat`(31장 3-2) | D(double 밖) |
-| 4 | 건물 가격 기본가 × 1.15^n | 사기 | — | 비용: 가격 행동 직전 이벤트 → 쓰기 | 밸런스 값 `priceGrowth`(값만 — 곡선은 double이라 BigNum 가격에 못 씀, 30장 2-2), `Rules.Price` = basePrice × BigNum.Pow(rate, n), `PriceIntent` | C |
+| 4 | 건물 가격 기본가 × 1.15^n | 사기 | — | 비용: 가격 행동 직전 이벤트 → 쓰기 | 밸런싱 값 `priceGrowth`(값만 — 곡선은 double이라 BigNum 가격에 못 씀, 30장 2-2), `Rules.Price` = basePrice × BigNum.Pow(rate, n), `PriceIntent` | C |
 | 5 | 10개 사기·살 수 있는 만큼 | 사기 | — | 등비 합·역산 | `Rules.BulkPrice`·`MaxAffordable`(닫힌 식, '비율로'에서만 맞음) | B |
 | 6 | 시너지: A 100개마다 B +1% | 업그레이드를 사면 생기고 정산마다 계산 | 건물 B | 생산 배율 항 | 결과 Block '시너지'(12장 3-2) → `run.synergies`, `Rules.Cps`의 항 | C(시스템층 한 번) → 그 뒤 A |
-| 7 | 황금 쿠키 등장 | 지연 60~180초(흐름 `golden`) | — | 만들기: `run.goldens`에 하나(위치 = 흐름 `golden.pos`) | `Game.ScheduleAfter`(29장 4-6) + `SpawnGolden`, `Game.Random`(07장 2.1), 밸런스 값 `goldenMin/MaxSeconds` | B |
+| 7 | 황금 쿠키 등장 | 지연 60~180초(흐름 `golden`) | — | 만들기: `run.goldens`에 하나(위치 = 흐름 `golden.pos`) | `Game.ScheduleAfter`(29장 4-6) + `SpawnGolden`, `Game.Random`(07장 2.1), 밸런싱 값 `goldenMin/MaxSeconds` | B |
 | 8 | 13초 뒤 사라짐 | 지연 13초 | 그 황금 쿠키 | 없애기 | `ScheduleAfter(13, new DespawnGolden { golden })` — 먼저 누르면 대상이 없어 예약이 저절로 지워진다(29장 2-5) | B |
-| 9 | 누르면 효과 하나 | 즉시 | 빵집 | 가중치 표에서 뽑아 그 능력 사용 | `ClickGolden`(행동) + DB › 가중치 표 `goldenEffects`(30장 3-2), 줄 조건(30장 5-6), `Game.Use`(16장 2-1) | A(행동이 있으면) |
-| 10 | 프렌지: 77초 생산 ×7 | 지속 77초(게임 시간) | 빵집 | 능력치 보정 `mult` 독립 곱 6 | DB › 상태 효과 `frenzy`(29장 3-1), 능력 `frenzy`(상태 효과 걸기, 29장 3-2) | A(가정: 끝 순간 오차, 빈틈 6) |
+| 9 | 누르면 효과 하나 | 즉시 | 빵집 | 가중치 표에서 뽑아 그 액티브 효과 사용 | `ClickGolden`(행동) + DB › 가중치 표 `goldenEffects`(30장 3-2), 줄 조건(30장 5-6), `Game.Use`(16장 2-1) | A(행동이 있으면) |
+| 10 | 프렌지: 77초 생산 ×7 | 지속 77초(게임 시간) | 빵집 | 스탯 보정 `mult` 독립 곱 6 | DB › 상태 효과 `frenzy`(29장 3-1), 액티브 효과 `frenzy`(상태 효과 걸기, 29장 3-2) | A(가정: 끝 순간 오차, 빈틈 6) |
 | 11 | 클릭 프렌지: 13초 클릭 ×777 | 지속 13초 | 빵집의 클릭 | 다른 효과 고치기 | 상태 효과 `clickFrenzy`: 트리거 '행동 직전 이벤트 받기'(클릭 행동 직전 이벤트) → '행동 직전 이벤트 고치기' `multiplier` 곱하기 777(28장 3-3·3-4) | A |
 | 12 | 행운: min(쿠키 15%, 15분치) | 즉시 | 빵집 | 숫자 바꾸기(BigNum) | 결과 Block 'N초분 생산'(900초, 상한 0.15) | B |
-| 13 | 클릭 = 1 + Cps × 비율 | 즉시 | — | 숫자 바꾸기 | `Rules.Click` + `ClickIntent` + 능력치 `clickBase`·`clickCpsRatio`(28장 4-2) | C |
-| 14 | 업그레이드 "커서 생산 ×2" | 사면 | 건물 커서 | 능력치 보정 `mult` 독립 곱 1 | 인스턴스 사용 기능(04장 2.6, 16장 1-2) → '대상에게 효과' → 대상 '건물' → '능력치 보정'(28장 3-1). 이번 판 Modifier라 환생 때 저절로 사라진다(28장 2-2) | A |
+| 13 | 클릭 = 1 + Cps × 비율 | 즉시 | — | 숫자 바꾸기 | `Rules.Click` + `ClickIntent` + 스탯 `clickBase`·`clickCpsRatio`(28장 4-2) | C |
+| 14 | 업그레이드 "커서 생산 ×2" | 사면 | 건물 커서 | 스탯 보정 `mult` 독립 곱 1 | 인스턴스 사용 기능(04장 2.6, 16장 1-2) → '대상에게 효과' → 대상 '건물' → '스탯 보정'(28장 3-1). 이번 판 Modifier라 환생 때 저절로 사라진다(28장 2-2) | A |
 | 15 | 해금 "커서 25개 이상이면 상점에" | 조건 | — | 사용 조건 | 조건 Block '건물 개수'(11장 4-1). 필드 경로가 목록 원소를 id로 고르지 못한다(빈틈 9) | B → 그 뒤 A |
-| 16 | 우유: 도전과제 하나마다 +4% | 정산마다 계산 | 빵집 | 생산 배율 항 | `Rules.Cps` 항(달성 수 = `session.Achievements.Definitions`를 `IsUnlocked`로 셈), 밸런스 값 `milkPerAchievement`, 우유 고양이 = 능력치 보정 `milkPower` 퍼센트 | B |
+| 16 | 우유: 도전과제 하나마다 +4% | 정산마다 계산 | 빵집 | 생산 배율 항 | `Rules.Cps` 항(달성 수 = `session.Achievements.Definitions`를 `IsUnlocked`로 셈), 밸런싱 값 `milkPerAchievement`, 우유 고양이 = 스탯 보정 `milkPower` 퍼센트 | B |
 | 17 | 업그레이드 "커서 가격 −5%" | 걸려 있는 동안 | 커서 가격 | 비용 바꾸기 | 사용 기능 결과 '상태 효과 걸기' `discount.cursor`(영구) → 트리거 '행동 직전 이벤트 받기'(가격 행동 직전 이벤트, `item` 일치 `cursor`) → '행동 직전 이벤트 고치기' `multiplier` ×0.95 | A |
-| 18 | 환생 | 플레이어가 고를 때 | — | 판 초기화 + 천상칩 | `Ascend`, 판 끝 이벤트(06장 2.2), `GBibleRuntime.NewRun`(06장 2.3), 밸런스 값 `chipDivisor`·`chipPower` | C |
+| 18 | 환생 | 플레이어가 고를 때 | — | 판 초기화 + 천상칩 | `Ascend`, 판 끝 이벤트(06장 2.2), `GBibleRuntime.NewRun`(06장 2.3), 밸런싱 값 `chipDivisor`·`chipPower` | C |
 | 19 | 천상칩 하나마다 +1% | 늘 | 빵집 | 생산 배율 항 | `Rules.Cps` 항 (1 + chips × `chipBonus`). 영구 Modifier(28장 5-2)로도 된다 | B |
 | 20 | 도전과제 "전체 누적 1e6" | 조건 충족 | — | 달성 | DB › 도전과제(14장) + 조건 Block '쿠키 검사'. 기본 '플레이어 데이터 검사'는 BigNum을 숫자로 읽지 못한다(FieldPaths `TryNumber`) | B → 그 뒤 A |
 | 21 | 숫자 표기 "1.23e45" / "1.23 Qa" | 그릴 때 | — | 표시 | DB › 설정 선택지(31장 3-2) + Client `NumberText.Format(BigNum)`. binding-path는 서식을 고르지 못한다(빈틈 10) | B |
@@ -347,7 +347,7 @@ Steam 켬. 다이얼로그·인벤토리·입력(키 바꾸기) 끔. 확인용 �
 - double은 약 1.8e308에서 무한대가 되고 유효 숫자는 15~17자리다. GBible에서 double로 묶인 곳(코드 확인):
   - `Game.Pay`·`CanPay`: 원시 숫자 형식·decimal 필드만 받고 double로 읽고 쓴다(GameApi.cs `ReadNumber`). 실패 글의 `{have}`·`{need}`도 `"0.##"`.
   - '플레이어 데이터에 주기'(`PlayerDataReward.amount` double, `TypeResolver.IsNumeric` 형식만), '플레이어 데이터 검사'(FieldPaths `Compare` → `TryNumber`), '행동 직전 이벤트 고치기'(Intercepts.cs, 숫자 형식만).
-  - 능력치·Modifier(Attributes.cs `BaseOf` → `Convert.ToDouble`), 밸런스 값·곡선(double), 로그(`Stats` double, 저장 스키마 `Double`).
+  - 스탯·Modifier(Attributes.cs `BaseOf` → `Convert.ToDouble`), 밸런싱 값·곡선(double), 로그(`Stats` double, 저장 스키마 `Double`).
   - binding-path(ScreenBinding `Format`: double은 `"0.##"`, 그 밖에는 `IFormattable.ToString(null, Invariant)`), 텍스트 서식(`FormatNumber(double)`).
 - BigNum 구조체는 저장·Sync에는 들어간다(MirrorWeaver가 `[Serializable]` 구조체 비교 코드를 만든다 — Unity에서 확인 안 함, 가정). DB Block·CSV·DB 입력 칸은 숫자로 다루지 않는다.
 - binding-path에 BigNum을 걸면 BigNum의 `ToString`이 쓰인다. 설정의 표기를 따르게 하려면 BigNum이 전역 설정을 읽어야 하는데, 규칙 어셈블리의 static 상태라 관례 3절에 걸린다 → 화면 코드로 그린다.
@@ -380,7 +380,7 @@ Steam 켬. 다이얼로그·인벤토리·입력(키 바꾸기) 끔. 확인용 �
 ### 5-1. GBible에 없는 것
 
 **빈틈 1. 큰 수 형식이 없고, 모든 숫자 칸이 double이다**
-- 무엇: 1.8e308을 넘는 값을 담을 형식이 없다. 비용 내기·주기·검사·능력치·밸런스 값·로그·행동 직전 이벤트 고치기·CSV·DB 입력·binding-path·텍스트 서식이 모두 double(4-2(1)).
+- 무엇: 1.8e308을 넘는 값을 담을 형식이 없다. 비용 내기·주기·검사·스탯·밸런싱 값·로그·행동 직전 이벤트 고치기·CSV·DB 입력·binding-path·텍스트 서식이 모두 double(4-2(1)).
 - 왜: 방치형이면 쿠키·가격·누적이 모두 여기 걸려 매 프로젝트 BigNum과 대체 Block을 새로 만든다. 1e15를 넘으면 정수 정밀도도 잃는다.
 - 다른 장르에도: 수집형 후반 피해 인플레, 경영 시뮬의 돈, 증분 게임 전부.
 - 제안: 코어 `BigNum`(임시) `[Serializable] struct { double mantissa; long exponent; }` + 연산자(`+ − × ÷`, 비교, double과 섞기)·`Pow`·`Log10`·`Root`·`Parse("1.5e320")`·`IFormattable`("sci"·"short"). `TypeResolver.IsNumeric`류 "숫자로 보는 형식"에 넣어 '플레이어 데이터에 주기'·'비용 내기'(`Game.Pay(키, 경로, BigNum)` 오버로드)·'플레이어 데이터 검사'·로그(`StatData` 값 형식)·'행동 직전 이벤트 고치기'(곱하기)·CSV 한 칸·DB 입력 칸이 받게 한다. 그 전까지 문서(참조 6절 "정해진 숫자")에 "숫자 칸은 double, 1e308·정밀도 15자리"와 "큰 수 행동 직전 이벤트에는 double `multiplier`를 둔다"를 적는다.
@@ -494,7 +494,7 @@ Steam 켬. 다이얼로그·인벤토리·입력(키 바꾸기) 끔. 확인용 �
 ### 5-2. 문서 오류 · 부족
 
 1. **가이드 07장 1절 표의 방치형 줄**(Undo 쓰지 않음 · 판 저장 저장하지 않음 · `Meta`)이 환생이 있는 방치형과 맞지 않는다: 상태 효과·예약·이번 판 Modifier가 세션 구역이라 판을 저장하지 않으면 껐다 켤 때 사라지고, 환생 초기화도 손으로 써야 한다. 같은 장의 "프로필도 행동마다 저장"을 켜라는 말(가이드 10장 2절 표도)은 1초 정산이면 매초, 클릭 중이면 프레임마다 파일을 쓴다. → 환생이 있으면 "판 = 환생 주기, 판 저장 켬, 판 끝 이벤트 = 환생"으로.
-2. **가이드 07장 6절 방치형**의 `Game.Pay(…, (int)Game.Balance(…))`: 방치형 가격은 곧 int 범위(약 2.1e9)를 넘어 넘친다. `Game.Pay`·밸런스 값이 double이라는 한계(1e308·정밀도)도 참조 문서·관례 어디에도 없다.
+2. **가이드 07장 6절 방치형**의 `Game.Pay(…, (int)Game.Balance(…))`: 방치형 가격은 곧 int 범위(약 2.1e9)를 넘어 넘친다. `Game.Pay`·밸런싱 값이 double이라는 한계(1e308·정밀도)도 참조 문서·관례 어디에도 없다.
 3. **가이드 07장 6절**의 "마지막 정산 시각을 `DateTime` 필드로": 관례 3절은 규칙에서 `DateTime`을 쓰지 말라 한다. 현실 시각을 행동 필드로 받는 법, 켜져 있는 동안에도 시각을 갱신해야 한다는 것(아니면 켜 둔 시간도 보상), 끄기 직전 훅이 없다는 것이 빠져 있다.
 4. **PlanningSpecGuide 2절**: '1 시간' 줄(실시간 → 고정 틱 30·Undo 스냅샷)이 가이드 07장 방치형(Undo 쓰지 않음)과 부딪친다. '9 키 바꾸기'의 "실시간이면 켬"은 마우스만 쓰는 방치형에 맞지 않는다.
 5. **Reference.md 2-1**의 Undo 방식 "행동 단위·스냅샷·없음": 화면 이름은 "쓰지 않음"(BootstrapPage `HistoryNames`). 참조 문서는 "이름은 화면에 보이는 그대로"라고 한다.
@@ -511,7 +511,7 @@ Steam 켬. 다이얼로그·인벤토리·입력(키 바꾸기) 끔. 확인용 �
 
 **된다.** 세 질문의 답(또는 추천값)이 먼저 와야 한다.
 
-- 되는 쪽: 씬이 하나이고 흐름이 짧다(새 판 → 정산·클릭·사기 → 환생). 효과 대부분이 DB 조립으로 떨어진다 — 버프는 상태 효과(게임 시간 지속 + 능력치 보정), 클릭 프렌지·할인은 상태 효과의 행동 직전 이벤트 + 행동 직전 이벤트 고치기, 황금 쿠키 효과는 가중치 표 + 능력, 업그레이드는 인스턴스 사용 기능 + 능력치 보정. 환생 초기화는 판 끝 이벤트 + `NewRun`이 맡는다. 설정·확인·알림·일시정지는 기본 화면, 도전과제·로그·Steam은 있는 기능이다.
+- 되는 쪽: 씬이 하나이고 흐름이 짧다(새 판 → 정산·클릭·사기 → 환생). 효과 대부분이 DB 조립으로 떨어진다 — 버프는 상태 효과(게임 시간 지속 + 스탯 보정), 클릭 프렌지·할인은 상태 효과의 행동 직전 이벤트 + 행동 직전 이벤트 고치기, 황금 쿠키 효과는 가중치 표 + 액티브 효과, 업그레이드는 인스턴스 사용 기능 + 스탯 보정. 환생 초기화는 판 끝 이벤트 + `NewRun`이 맡는다. 설정·확인·알림·일시정지는 기본 화면, 도전과제·로그·Steam은 있는 기능이다.
 - 무거운 쪽: GBible에 없어 프로젝트가 직접 만드는 것 — BigNum과 그것을 받는 대체 Block·서식·쓰기 함수(빈틈 1·10), 현실 시각을 행동 필드로 받는 정산(빈틈 2·5), 주기 저장(빈틈 3), 이어 하기 뒤 훅 우회(빈틈 7), 매 프레임 보간 칸과 입력을 막지 않는 연출(빈틈 11·12). 모두 문법 안에서 우회되지만, 다음 방치형 프로젝트도 똑같이 다시 만든다.
 - 틀리기 쉬운 곳: 쿠키를 쓰는 행동에서 정산을 빠뜨리는 것, BigNum 필드에 기본 숫자 Block(플레이어 데이터 검사 등)을 붙이는 것(숫자로 읽지 못해 조건이 늘 거짓), 환생 버튼에서 같은 프레임 `NewRun`으로 프로필 저장이 빠지는 것(빈틈 4).
 - 빈틈 1·2·3·5가 GBible에 들어가면 이 장르의 시스템층은 거의 DB 조립과 규칙 함수 몇 개로 줄어든다.

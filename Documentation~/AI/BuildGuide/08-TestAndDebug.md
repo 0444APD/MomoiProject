@@ -85,8 +85,8 @@ static void KillAll(TriggerContext c)
 > [!note]- 왜 행동 하나로 실행하나
 > 결과 전체를 `DeveloperEditAction` 하나 안에서 실행한다. 그래서 바꾼 값이 기록(행동 탭의 "[개발] 골드 +100", 공개 범위 "개발자")에 남고 Undo된다. 명령 안에서 값을 행동 밖에서 고치면 Undo되지 않고, 그 뒤 Undo하면 덮어쓰기 경고가 난다.
 
-> [!note]- 수치는 플레이 중에 DB에서 바로 — 밸런스 값 · 가중치 표
-> 플레이 중에 DB › 밸런스 값·가중치 표를 고치면 저장(Ctrl+S) 전이라도 0.5초 안에 실행 중인 게임에 반영된다. 보상 골드 곡선·드롭 무게를 바꿔 가며 같은 판을 바로 다시 해 본다(4절의 Undo와 함께 쓰면 같은 난수에서 비교된다). 정했으면 Ctrl+S로 저장한다. 표 계산기에서 고친 값은 DB 목록 위 **CSV** 버튼으로 가져온다([04장](04-AddingContent.md) 10절).
+> [!note]- 수치는 플레이 중에 DB에서 바로 — 밸런싱 값 · 가중치 표
+> 플레이 중에 DB › 밸런싱 값·가중치 표를 고치면 저장(Ctrl+S) 전이라도 0.5초 안에 실행 중인 게임에 반영된다. 보상 골드 곡선·드롭 무게를 바꿔 가며 같은 판을 바로 다시 해 본다(4절의 Undo와 함께 쓰면 같은 난수에서 비교된다). 정했으면 Ctrl+S로 저장한다. 표 계산기에서 고친 값은 DB 목록 위 **CSV** 버튼으로 가져온다([04장](04-AddingContent.md) 10절).
 
 > [!note]- 코드로 등록하기
 > DB 항목 없이 `session.Debug.Register(묶음, 이름, 실행, 설명)`으로 등록해도 된다. 세션마다 등록되므로 `GBibleRuntime.Started`에서 한다. 출시 빌드에서는 `Register`가 아무것도 하지 않으므로 `if (Debug.isDebugBuild)`로 감싸지 않는다. 값을 바꾸는 명령은 직접 `DeveloperEditAction`으로 감싼다.
@@ -172,7 +172,7 @@ static void KillAll(TriggerContext c)
 - `Assets/MomoiProject/Code/Tests`에 테스트 파일을 둔다. asmdef는 시작 설정이 이미 만들었다.
 - Unity의 Test Runner 창(`Window › General › Test Runner` › EditMode)에서 돈다.
 
-테스트는 DB 없이 세션을 손으로 만든다. 플레이어 데이터는 `Define`으로, 밸런스 값은 `session.Balance.Define`으로, 카드·몬스터 원본은 `session.Instances`에 함수로 넣는다.
+테스트는 DB 없이 세션을 손으로 만든다. 플레이어 데이터는 `Define`으로, 밸런싱 값은 `session.Balance.Define`으로, 카드·몬스터 원본은 `session.Instances`에 함수로 넣는다.
 
 ```csharp
 [SetUp]
@@ -182,7 +182,7 @@ public void SetUp()
     _session.Data.Define(GameIds.PlayerData.Run.Id, DataZone.Session, new RunState(), "판");
     _session.Data.Define(GameIds.PlayerData.Profile.Id, DataZone.Meta, new Profile(), "프로필");
 
-    // DB › 밸런스 값 대신 코드로 넣는다.
+    // DB › 밸런싱 값 대신 코드로 넣는다.
     _session.Balance.Define(GameIds.Balance.StartHp, 70);
     _session.Balance.Define(GameIds.Balance.StartGold, 99);
     _session.Balance.Define(GameIds.Balance.WinGold, 15, new Curve { kind = CurveKind.Linear, step = 3 });
@@ -221,7 +221,7 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > - 위 코드의 `Game`은 `GameApi Game => _session.Game;` 속성이다.
 
 > [!note]- 카드의 사용 기능 넣기
-> 카드를 내면 `Game.Use(card.card, …)`가 같은 ID의 능력을 찾는다. 테스트에서는 DB의 사용 기능 대신 능력(`AbilityDefinition`)을 코드로 정의한다.
+> 카드를 내면 `Game.Use(card.card, …)`가 같은 ID의 액티브 효과를 찾는다. 테스트에서는 DB의 사용 기능 대신 액티브 효과(`AbilityDefinition`)를 코드로 정의한다.
 > ```csharp
 > void DefineCard(string id, TargetSelector target, Effect effect)
 > {
@@ -292,7 +292,7 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 - [ ] 버그를 보면 판을 저장하고, 저장 파일과 시드를 보고에 붙인다.
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
 - [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
-- [ ] 밸런스 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
+- [ ] 밸런싱 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
 - [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/MomoiProject/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
 
@@ -309,5 +309,5 @@ public void 에너지가_모자라면_아무것도_바뀌지_않는다()
 > - [06. 저장·불러오기](../../Manual/06-SaveLoad.md) — 판 저장·불러오기, 개발 중 저장 초기화
 > - [01. 플레이어 데이터](../../Manual/01-PlayerData.md) — 예전 방식 비교, 주의할 점
 > - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 선택 대기 패널, 테스트에서 정의 넣기
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — 플레이 중 바로 반영
+> - [30. 밸런싱 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — 플레이 중 바로 반영
 > - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`, DB CSV

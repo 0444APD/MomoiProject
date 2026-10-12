@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace GBible
 {
-    // 밸런스 값(DB › 밸런스 값): 기획자가 조정하는 이름 붙은 숫자(시작 에너지 3, 엘리트 확률 0.2 …). 코드는 숫자를 직접 쓰지 않고 이름으로 읽는다.
+    // 밸런싱 값(DB › 밸런싱 값): 기획자가 조정하는 이름 붙은 숫자(시작 에너지 3, 엘리트 확률 0.2 …). 코드는 숫자를 직접 쓰지 않고 이름으로 읽는다.
     //   var energy = Game.Balance(GameIds.Balance.StartEnergy);
     // 곡선(Curve)을 붙이면 단계(레벨·층·웨이브)에 따라 값이 변한다: 기준 값이 시작 단계의 값이다.
     //   var hp = Game.Balance(GameIds.Balance.EnemyHp, floor);
@@ -234,6 +234,6 @@ namespace GBible
         (double value, Curve curve) Find(string id) =>
             id != null && _values.TryGetValue(id, out var found)
                 ? found
-                : throw new InvalidOperationException($"[MomoiProject] 없는 밸런스 값 '{id}'입니다(DB › 밸런스 값).");
+                : throw new InvalidOperationException($"[MomoiProject] 없는 밸런싱 값 '{id}'입니다(DB › 밸런싱 값).");
     }
 }

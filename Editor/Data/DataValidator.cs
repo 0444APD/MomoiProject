@@ -290,8 +290,8 @@ namespace GBible.EditorTools
         }
         // 글자 칸 한 번 훑기(저장 전 변경 포함):
         //   · [Keyword(typeof(그룹))] 필드의 값이 그 그룹의 키워드인지. 비어 있는 값은 필수 검사가 본다.
-        //   · 값 틀({balance:ID}·{data:키.경로}·{count:키.경로})이 있는 밸런스 값·플레이어 데이터를 가리키는지 — ID를 바꿔도 틀 안의 글자는 따라가지 않으니 끊긴 것을 알린다
-        //     (없는 밸런스 값은 실행하면 행동이 실패하므로 오류, 없는 플레이어 데이터는 빈 글로 넘어가므로 경고).
+        //   · 값 틀({balance:ID}·{data:키.경로}·{count:키.경로})이 있는 밸런싱 값·플레이어 데이터를 가리키는지 — ID를 바꿔도 틀 안의 글자는 따라가지 않으니 끊긴 것을 알린다
+        //     (없는 밸런싱 값은 실행하면 행동이 실패하므로 오류, 없는 플레이어 데이터는 빈 글로 넘어가므로 경고).
         static void CheckStrings(GameData data, IReadOnlyList<GameData> all, Context context)
         {
             var so = new UnityEditor.SerializedObject(data);
@@ -319,9 +319,9 @@ namespace GBible.EditorTools
                 var value = match.Groups[2].Value.Trim();
                 if (kind == "balance")
                 {
-                    // 오류: 실행하면 없는 밸런스 값을 읽다가 그 행동 전체가 실패한다({data:}·{count:}는 빈 글 + 경고로 넘어가므로 경고).
+                    // 오류: 실행하면 없는 밸런싱 값을 읽다가 그 행동 전체가 실패한다({data:}·{count:}는 빈 글 + 경고로 넘어가므로 경고).
                     if (!all.OfType<BalanceData>().Any(b => b.Id == value))
-                        context.Error($"{LabelOf(field, property)}: 값 틀 '{match.Value}'의 밸런스 값 '{value}'가 없습니다 — 이대로면 이 결과가 도는 행동이 실패합니다(ID를 바꿨다면 틀의 글자도 고치세요).");
+                        context.Error($"{LabelOf(field, property)}: 값 틀 '{match.Value}'의 밸런싱 값 '{value}'가 없습니다 — 이대로면 이 결과가 도는 행동이 실패합니다(ID를 바꿨다면 틀의 글자도 고치세요).");
                     continue;
                 }
                 // {data:키.경로}·{count:키.경로}: 정의된 가장 긴 앞부분(점까지)이 플레이어 데이터 키 — 실행(ModifyIntentOutcome.DataAt)과 같다(player.inventory.gold).
@@ -379,7 +379,7 @@ namespace GBible.EditorTools
         // 빈 참조 칸을 경고할지. 비어도 되는 칸은 넘어간다:
         //   · [ShowIf]로 숨은 칸(가중치 표 줄의 종류가 '플레이어 데이터 목록'이면 '항목')
         //   · Block 안의 칸 — 고르지 않으면 안 되는 칸은 그 Block의 검증이 오류로 알린다(상태 효과 검사는 종류만 골라도 된다)
-        //   · 다른 칸의 [ShowIf] 스위치 — 비어 있으면 '끔'(무게를 밸런스 값에서)
+        //   · 다른 칸의 [ShowIf] 스위치 — 비어 있으면 '끔'(무게를 밸런싱 값에서)
         //   · 필수(필드 규칙) — 필수 검사가 오류로 알린다
         //   · 상위 그룹 — 비어 있으면 맨 위
         static bool WarnWhenEmpty(GameData data, UnityEditor.SerializedProperty property, FieldInfo field)

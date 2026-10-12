@@ -5,7 +5,7 @@ using System.Linq;
 namespace GBible
 {
     // 사용 기능: 클래스에 필드로 붙이면 그 클래스의 인스턴스를 Game.Use(인스턴스 ID, 사용자, 대상들)로 쓸 수 있다.
-    // 능력·로그·도전과제와 같은 트리거·결과 칸(트리거 = 사용 + 원하면 AND로 사용 조건).
+    // 액티브 효과·로그·도전과제와 같은 트리거·결과 칸(트리거 = 사용 + 원하면 AND로 사용 조건).
     //   [Serializable] public class Item
     //   {
     //       public string id;
@@ -28,7 +28,7 @@ namespace GBible
         public List<Outcome> then = new List<Outcome>();
         [FieldLabel("쓸 수 없을 때 글(텍스트 키 또는 글, 비우면 기본 글)")] public string failText = "";
 
-        // Game.Use로 쓰는 능력 정의(ID = 인스턴스 ID).
+        // Game.Use로 쓰는 액티브 효과 정의(ID = 인스턴스 ID).
         public AbilityDefinition ToDefinition(string id, string displayName = null)
         {
             var definition = new AbilityDefinition { Id = id, DisplayName = displayName ?? id, When = when, FailText = failText };

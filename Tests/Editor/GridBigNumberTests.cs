@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
-    // 격자(Grid)·큰 수(BigNumber)·밸런스 값 합·개수.
+    // 격자(Grid)·큰 수(BigNumber)·밸런싱 값 합·개수.
     public class GridBigNumberTests
     {
         [Serializable] public class GbRun { public BigNumber cookies; public List<BigNumber> history = new List<BigNumber>(); }

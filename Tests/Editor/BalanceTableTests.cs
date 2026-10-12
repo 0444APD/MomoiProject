@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
-    // 밸런스 값·곡선, 가중치 표, 플레이어용 실패(다국어).
+    // 밸런싱 값·곡선, 가중치 표, 플레이어용 실패(다국어).
     public class BalanceTableTests
     {
         [Serializable] public class BtCard { public string id; }
@@ -323,7 +323,7 @@ namespace GBible.Tests
             Game.Do(new Edit { run = g => picks = g.Roll(new[] { ("ghost", double.NaN), ("slime", 1.0) }, 5, stream: "nan") });
             CollectionAssert.AreEqual(new[] { "slime", "slime", "slime", "slime", "slime" }, picks, "숫자가 아닌 무게는 0 이하처럼 후보가 아니다");
 
-            // 표: 무게를 밸런스 값에서 읽었는데 숫자가 아니다
+            // 표: 무게를 밸런싱 값에서 읽었는데 숫자가 아니다
             _session.Balance.Define("brokenWeight", double.NaN);
             var table = Table("loot", 1, ("gem", 3));
             table.Entries.Add(new WeightEntry { item = "relic", weightBalance = "brokenWeight" });

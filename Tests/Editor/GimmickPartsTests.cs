@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
-    // 4게임(발라트로·와일드프로스트·매지크래프트·세피리아) 기믹을 받치는 부품: 패시브 '놓인 것마다'(자리 순서)·가진 동안 보정·{level},
+    // 4게임(발라트로·와일드프로스트·매지크래프트·세피리아) 기믹을 받치는 부품: 패시브 효과 '놓인 것마다'(자리 순서)·가진 동안 보정·{level},
     // 상태 효과 걸기 의도·종류, 확률 의도·조건, 사용 의도·TryUse, 지불 하한, 자리(Placement)·자리 Block, 다시 뽑기·후보 수, 시드 새 판, Grid.Rotate.
     public class GimmickPartsTests
     {
@@ -28,7 +28,7 @@ namespace GBible.Tests
         [Serializable, GameEvent("맞힘")] public class GpHits { public List<string> hits = new List<string>(); }
         [Serializable, Intent("피해")] public class GpDamage { public string target; public int amount; public bool cancelled; }
 
-        // 결과: 플레이어 데이터의 log에 "글:사용자" 한 줄(능력 정의는 복사되므로 테스트 객체 대신 데이터에 남긴다).
+        // 결과: 플레이어 데이터의 log에 "글:사용자" 한 줄(액티브 효과 정의는 복사되므로 테스트 객체 대신 데이터에 남긴다).
         [Serializable]
         public sealed class Log : Outcome
         {
@@ -122,7 +122,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 놓인_것마다_패시브는_등록_순서가_아니라_목록_순서로_발동한다()
+        public void 놓인_것마다_패시브_효과는_등록_순서가_아니라_목록_순서로_발동한다()
         {
             Joker("times", new TimesMult { value = 2 }, new Log { text = "곱" });
             Joker("plus", new PlusMult { value = 4 }, new Log { text = "더하기" });
@@ -153,7 +153,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 가진_동안_능력치_보정은_가질_때만_붙고_레벨마다_커진다()
+        public void 가진_동안_스탯_보정은_가질_때만_붙고_레벨마다_커진다()
         {
             var amulet = new PassiveDefinition { Id = "amulet", OwnerKey = "run", OwnerPath = "relics", ModifierTarget = "hero" };
             amulet.Modifiers.Add(new PassiveModifier { attribute = "attack", kind = ModifierKind.Flat, value = 2, perLevel = true });
@@ -175,7 +175,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 의도_고치기의_level_틀은_가진_쪽의_패시브_레벨이다()
+        public void 의도_고치기의_level_틀은_가진_쪽의_패시브_효과_레벨이다()
         {
             var thorns = new PassiveDefinition { Id = "shell", OwnerKey = "run", OwnerPath = "relics", When = new InterceptTrigger { intentType = typeof(GpDamage).FullName } };
             thorns.Outcomes.Add(new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{level}" });
@@ -188,13 +188,13 @@ namespace GBible.Tests
         [Test]
         public void id가_없는_가진_쪽에서도_상태_효과_틀과_읽기는_0이고_걸기는_알린다()
         {
-            // 가진 목록 run › relics의 가진 쪽 = run(id 없음). {stacks}는 상태 효과의 중첩이라 패시브에서는 0이다.
+            // 가진 목록 run › relics의 가진 쪽 = run(id 없음). {stacks}는 상태 효과의 중첩이라 패시브 효과에서는 0이다.
             _session.Statuses.Define(new StatusDefinition { Id = "burn" });
             var spikes = new PassiveDefinition { Id = "spikes", OwnerKey = "run", OwnerPath = "relics", When = new InterceptTrigger { intentType = typeof(GpDamage).FullName } };
             spikes.Outcomes.Add(new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{stacks}" });
             _session.Passives.Define(spikes);
             Do(g => g.Get<GpRun>("run").relics["spikes"] = 1);
-            Assert.DoesNotThrow(() => Game.Do(new Hit { target = "hero", amount = 5 }), "패시브의 {stacks}는 0");
+            Assert.DoesNotThrow(() => Game.Do(new Hit { target = "hero", amount = 5 }), "패시브 효과의 {stacks}는 0");
             Assert.AreEqual(30 - 5, Run.hero.hp);
             Assert.AreEqual(0, Game.StatusStacks(Run, "burn"));
             Assert.AreEqual(0, Game.StatusCount(Run, StatusKind.Debuff));
@@ -478,7 +478,7 @@ namespace GBible.Tests
         static PlaceTarget Neighbor(PlaceDirection direction) => new PlaceTarget { list = new PlayerDataListRef { key = "run", path = "jokers" }, direction = direction };
 
         [Test]
-        public void 빌려_쓰기는_옆_조각의_패시브를_원본_값으로_내고_쌓이는_값은_원본만_바꾼다()
+        public void 빌려_쓰기는_옆_조각의_패시브_효과를_원본_값으로_내고_쌓이는_값은_원본만_바꾼다()
         {
             Joker("plus", new PlusMult { value = 4 });
             Joker("blueprint", new BorrowOutcome { targets = { Neighbor(PlaceDirection.Right) } });

@@ -13,7 +13,7 @@ namespace GBible.Tests
         public string Label => throw new InvalidOperationException("값 읽기 실패");
     }
 
-    // 트리거·결과: 로그·도전과제·능력이 같은 두 칸(트리거 AND·OR 중첩 + 결과 목록)으로 돈다.
+    // 트리거·결과: 로그·도전과제·액티브 효과가 같은 두 칸(트리거 AND·OR 중첩 + 결과 목록)으로 돈다.
     [GameEvent("보스 처치")]
     public sealed class TgBossKilled
     {
@@ -198,7 +198,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 능력은_사용_트리거와_사용_조건을_AND로_보고_결과를_실행한다()
+        public void 액티브_효과는_사용_트리거와_사용_조건을_AND로_보고_결과를_실행한다()
         {
             var strike = new AbilityDefinition { Id = "strike", When = new AllTrigger { triggers = { new UseTrigger(), new ConditionTrigger { condition = new TgUserAlive() } } } };
             strike.Outcomes.Add(new TargetedOutcome { effects = { new TbDamage { amount = 4 } } });

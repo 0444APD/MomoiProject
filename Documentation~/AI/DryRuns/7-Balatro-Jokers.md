@@ -3,14 +3,14 @@
 발라트로(Balatro)의 조커 150개(시트 `발라트로_조커_툴팁.tsv`: 번호·조커·효과·가격·희귀도·해금 조건·유형·발동 시점)를 GBible로 옮긴다고 보고, 메인 룰(점수 파이프라인)을 먼저 세운 뒤 조커마다 효과와 해금 조건을 어떻게 만드는지 분류한 기록이다. 코드는 쓰지 않았고 문서·라이브러리는 고치지 않았다.
 
 - 읽은 문서: `AI/ProjectConventions.md` · `AI/Reference.md` · `AI/GimmickCatalog.md` · `AI/PlanningSpecGuide.md`(2·7절) · `AI/PlanningSpec.md`(2-2 표), 매뉴얼 10 · 11 · 12 · 15 · 16 · 17 · 28 · 29 · 30 · 34 · 37장.
-- 문서로 판단이 안 돼 코드를 본 곳: `Runtime/Core/Passives.cs`(빌려 쓰기·레벨 필드·놓인 것마다), `Triggers.cs`(같은 자리 패시브의 순서), `Intercepts.cs`·`Chance.cs`·`Abilities.cs`(기본 행동 직전 이벤트의 필드), `TargetBlocks.cs`, `AttributeBlocks.cs`(필드 바꾸기의 빌려 쓰기 거르기), `Runtime/Unity/PassiveData.cs`(검증)·`GameDatabase.cs`(등록 순서), `Editor/Data/EditorDatabase.cs`(ID 찾기). 5절에 "코드 확인"으로 적었다.
+- 문서로 판단이 안 돼 코드를 본 곳: `Runtime/Core/Passives.cs`(빌려 쓰기·레벨 필드·놓인 것마다), `Triggers.cs`(같은 자리 패시브 효과의 순서), `Intercepts.cs`·`Chance.cs`·`Abilities.cs`(기본 행동 직전 이벤트의 필드), `TargetBlocks.cs`, `AttributeBlocks.cs`(필드 바꾸기의 빌려 쓰기 거르기), `Runtime/Unity/PassiveData.cs`(검증)·`GameDatabase.cs`(등록 순서), `Editor/Data/EditorDatabase.cs`(ID 찾기). 5절에 "코드 확인"으로 적었다.
 - 분류: **DB**(기본 Block·DB 칸 + 메인 룰이 둔 이벤트·행동 직전 이벤트·데이터만) · **Block**(프로젝트가 만든 재사용 Block을 씀) · **BindTo**(그 조커만의 코드) · **메인 룰** · **화면** · **예외** · **문법 밖**. 섞이면 가장 깊은 층 하나로 셌다(DB < Block < BindTo < 메인 룰). Block은 다시 **Block(시)** = 시스템층에서 메인 룰과 함께 만드는 Block(동사·`이벤트의 조각이 나`)만 씀, **Block(추)** = 콘텐츠 단계에서 Block을 더 만들어야 함으로 나눴다.
 
 ---
 
 ## 1. 한 줄 결론
 
-조커 150개 중 **문법 밖 0 · 예외 0**이다(메인 룰 쪽에서 GBible 규칙과 부딪혀 우회한 곳은 6군데, 4절). 가장 큰 빈틈은 **패시브 하나에 발동·결과가 한 쌍뿐**이라는 것이다. "다른 순간에 쌓고(버림·행성 사용·라운드 끝) 자기 차례에 내는" 조커 **32개(21%)**가 문서에 없는 프로젝트 Block(`순간별 결과`)이나 조커마다 `[BindTo]`를 요구한다. 그다음은 **'가진 쪽 필드'를 쓴 패시브를 Blueprint가 빌리지 못한다**는 것이다. 그래서 조커마다 차례를 주는 메인 룰이 기본 칸 대신 프로젝트 조건 Block을 써야 한다.
+조커 150개 중 **문법 밖 0 · 예외 0**이다(메인 룰 쪽에서 GBible 규칙과 부딪혀 우회한 곳은 6군데, 4절). 가장 큰 빈틈은 **패시브 효과 하나에 발동·결과가 한 쌍뿐**이라는 것이다. "다른 순간에 쌓고(버림·행성 사용·라운드 끝) 자기 차례에 내는" 조커 **32개(21%)**가 문서에 없는 프로젝트 Block(`순간별 결과`)이나 조커마다 `[BindTo]`를 요구한다. 그다음은 **'가진 쪽 필드'를 쓴 패시브 효과를 Blueprint가 빌리지 못한다**는 것이다. 그래서 조커마다 차례를 주는 메인 룰이 기본 칸 대신 프로젝트 조건 Block을 써야 한다.
 
 ---
 
@@ -22,14 +22,14 @@
 |---|---|---|
 | 조각 | 조커, 카드 | `Joker`·`PlayingCard` 객체(고유 `id` + 원본 ID 필드) |
 | 자리 | 조커 칸(한 줄, 5칸 + 네거티브), 손패(한 줄) | `run.jokers`·`run.hand` = `List<T>`(줄 길이 0, 빼면 당긴다) |
-| 조커의 효과 | 칸 순서대로 | DB › 패시브. 가진 목록 `run › jokers`, `matchField`(일치 필드) `joker`, `perElement`(놓인 것마다) 켬 — 같은 이벤트를 받는 조커끼리 칸 왼쪽부터 섞여 돈다 |
+| 조커의 효과 | 칸 순서대로 | DB › 패시브 효과. 가진 목록 `run › jokers`, `matchField`(일치 필드) `joker`, `perElement`(놓인 것마다) 켬 — 같은 이벤트를 받는 조커끼리 칸 왼쪽부터 섞여 돈다 |
 | 순서 | 보스 → On Played → 점수 카드(카드마다 On Scored 조커, 재발동) → 손에 든 카드 → 조커 왼쪽부터(에디션 foil·holo → 독립 효과 → 다른 조커에 반응(Baseball) → polychrome) | 행동 `PlayHand`가 단계마다 이벤트를 쏜다(2-3). **조커 단계만은 조커마다 이벤트 두 번**을 쏘고 그 사이에 에디션을 코드로 넣는다(한 이벤트로는 조커 사이에 메인 룰 코드를 끼울 수 없다) |
 
 ### 2-2. 데이터 모양
 
 ```csharp
 [Serializable] public class Joker        // 조커 칸의 조각
-{ public string id, card, joker;         // card = 원본(JokerCard 인스턴스 ID), joker = 패시브 ID(일치 필드, 디버프 중이면 "")
+{ public string id, card, joker;         // card = 원본(JokerCard 인스턴스 ID), joker = 패시브 효과 ID(일치 필드, 디버프 중이면 "")
   public string edition; public int sellValue; public bool eternal, perishable, rental;
   public double chips, mult, xmult = 1; public int counter;           // 쌓이는 값(조커마다 쓰는 칸만 쓴다)
   public int targetRank; public string targetSuit, targetHand; }      // 라운드마다 바뀌는 목표(Idol·Ancient·Castle·Mail-In·To Do)
@@ -38,7 +38,7 @@
   public double startChips, startMult, startXmult = 1; public int startCounter; }
 [Serializable] public class PlayingCard { public string id, suit, enhancement, seal, edition; public int rank, bonusChips; public bool playedThisRound;
   public bool IsDark => suit == "spade" || suit == "club" || enhancement == "wild"; }   // 계산 속성(조건이 읽는다)
-[Serializable] public class RunStats     // id "stats" — 패시브 '가진 동안 능력치 보정'의 받는 쪽(modifierTarget "stats")
+[Serializable] public class RunStats     // id "stats" — 패시브 효과 '가진 동안 스탯 보정'의 받는 쪽(modifierTarget "stats")
 { public string id = "stats"; public double handSize = 8, hands = 4, discards = 3, jokerSlots = 5, consumableSlots = 2, interestPer5 = 1, interestCap = 5;
   public double fourFingers, shortcut, smeared, pareidolia, splash, showman; }    // 판정 스위치(0 = 꺼짐)
 // RunState: money, ante, round, handsLeft, discardsLeft, deck, drawPile, hand, jokers, consumables, tags,
@@ -46,7 +46,7 @@
 //   blind { isBoss, chipsNeeded, disabled }, stats, flags(grosExtinct), tarotsUsed, planetsUsed, blindsSkipped, startDeckSize
 ```
 
-- 패시브 ID와 원본 인스턴스 ID는 같을 수 없어(DB ID가 종류를 넘어 하나뿐) 조각에 `card`·`joker` 두 필드를 둔다(4절 E4).
+- 패시브 효과 ID와 원본 인스턴스 ID는 같을 수 없어(DB ID가 종류를 넘어 하나뿐) 조각에 `card`·`joker` 두 필드를 둔다(4절 E4).
 - 메인 룰은 `Game.Attribute(stats, …)`로 손패 수·슬롯·이자·판정 스위치를 읽는다. 조커의 "+1 손패"·"네거티브 +1 칸"·"판정 스위치"가 모두 보정으로 붙는다.
 
 ### 2-3. 행동 · 이벤트 · 행동 직전 이벤트
@@ -54,7 +54,7 @@
 `PlayHand { cards }`(한 손 = 행동 하나):
 
 1. 족보 판정 `Rules.EvaluateHand` — 판정 스위치(stats의 fourFingers·shortcut·smeared·splash, `Rules.IsFace`의 pareidolia, `Rules.HasSuit`의 smeared·와일드).
-2. 보스 효과 `Rules.BossAbility` — 행동 직전 이벤트 `보스 능력`(`BossAbilityIntent`), 일어나면 `BossAbilityTriggered`.
+2. 보스 효과 `Rules.BossAbility` — 행동 직전 이벤트 `보스 액티브 효과`(`BossAbilityIntent`), 일어나면 `BossAbilityTriggered`.
 3. `HandPlayed`(On Played). 필드 `hand`(HandInfo): handType · contains(포함 족보 목록) · cards · scoringCards · scoringFaceIds · playedCount · faceScored · isFirstHand · isLastHand · isMostPlayed · timesPlayed · playedBeforeThisRound. 키가 바뀌는 값(`handPlays[이 족보]`)은 값 조건·값 틀로 읽지 못하므로 메인 룰이 이벤트에 실어 준다.
 4. 족보 레벨의 칩·배수로 `run.score`.
 5. 점수 카드 왼쪽부터: 행동 직전 이벤트 `재발동`(`RetriggerIntent { cardId, phase, index, rank, isFace, times }`, 빨간 봉인이면 times 2) 횟수만큼 → 카드 칩 → 강화·봉인·에디션(코드, 유리·행운은 `Game.Chance`) → `CardScored`(card · rank · chipValue · isFace · isFirstFace · isHeart/isDiamond/isSpade/isClub · enhancement).
@@ -62,7 +62,7 @@
 7. 조커 칸을 칸 번호로 돌며(그 순간의 칸을 읽는다): foil·holo(코드) → `JokerActivated { jokerId, hand }` → `JokerResolved { jokerId, rarity }` → polychrome(코드).
 8. 합계 → `HandScored`(after). 손이 떨어지면 행동 직전 이벤트 `패배`(`DefeatIntent { ratio, cancelled }`).
 
-그 밖: `SelectBlind`→`BlindSelected` · 첫 드로→`RoundStarted` · `DiscardCards`→`Discarded`(count·faceCount·handType·isRoyal·isFirstDiscard) + 카드마다 `CardDiscarded` · `RoundEnded`(isBoss·won·handsUsed·discardsUsed·lastHandType) · 정산→`CashedOut` · `ShopEntered`·`ShopRerolled`·`ShopLeft`·`PackOpened`·`PackSkipped`·`BlindSkipped` · `SellCard`→`CardSold { itemId, kind }`(**조각을 빼기 전에** 쏜다 — "팔면 발동"이 자기를 본다) · `UseConsumable`→`ConsumableUsed` · `CardAdded`·`CardDestroyed`·`LuckyTriggered`·`JokerAdded { count }` · `RunWon`·`RunLost`. 행동 직전 이벤트는 위 넷(`재발동`·`보스 능력`·`패배`·`상점 가격 { itemKind, itemId, price, cancelled }`)과 기본 `비용 지불`·`확률`.
+그 밖: `SelectBlind`→`BlindSelected` · 첫 드로→`RoundStarted` · `DiscardCards`→`Discarded`(count·faceCount·handType·isRoyal·isFirstDiscard) + 카드마다 `CardDiscarded` · `RoundEnded`(isBoss·won·handsUsed·discardsUsed·lastHandType) · 정산→`CashedOut` · `ShopEntered`·`ShopRerolled`·`ShopLeft`·`PackOpened`·`PackSkipped`·`BlindSkipped` · `SellCard`→`CardSold { itemId, kind }`(**조각을 빼기 전에** 쏜다 — "팔면 발동"이 자기를 본다) · `UseConsumable`→`ConsumableUsed` · `CardAdded`·`CardDestroyed`·`LuckyTriggered`·`JokerAdded { count }` · `RunWon`·`RunLost`. 행동 직전 이벤트는 위 넷(`재발동`·`보스 액티브 효과`·`패배`·`상점 가격 { itemKind, itemId, price, cancelled }`)과 기본 `비용 지불`·`확률`.
 
 ### 2-4. 시스템층 Block(메인 룰과 함께 만든다)
 
@@ -72,7 +72,7 @@
 | V2 효과 `돈 주기` | V1과 같은 값 출처 | 같은 이유(연출) |
 | V3 효과 `조커 없애기` | 대상 조커를 뺀다. Eternal은 건너뛰고, 빌려 쓰는 중이면 원본 자신은 없애지 않는다(필드 바꾸기와 같은 규칙) | 목록에서 요소를 빼는 기본 Block이 없다 |
 | V4 효과 `조커 만들기·복사` | 가중치 표에서 뽑아 새 `Joker`(`Game.NewId`, 원본의 시작 값), 자리 있을 때만, 에디션 떼기 | '가중치 표에서 주기'는 새 id를 가진 조각을 만들지 못한다(30장 6절의 덱 카드와 같다) |
-| V5 효과 `소모품 만들기·복사` | 타로·행성·스펙트럴 표, 자리 있을 때만, 네거티브 | 같은 이유 + 자리 = 능력치와 개수 비교 |
+| V5 효과 `소모품 만들기·복사` | 타로·행성·스펙트럴 표, 자리 있을 때만, 네거티브 | 같은 이유 + 자리 = 스탯과 개수 비교 |
 | V6 효과 `족보 레벨 올리기` | 이벤트의 handType 레벨 +1 | 딕셔너리 키가 이벤트 값 |
 | V7 효과 `카드 넣기·복사·없애기·강화 바꾸기` | 덱 카드 동사(`CardAdded`·`CardDestroyed`를 쏜다) | 카드 객체 생성·제거 |
 | C4 조건 `이벤트의 조각이 나` | 이벤트 필드(`jokerId`·`itemId`)가 사용자 조각의 id인가. 칸 `빌려 쓰는 중이면 참` | '가진 쪽 필드'로 거르면 Blueprint가 빌리지 못한다(4절 E1) |
@@ -83,7 +83,7 @@ V3~V5는 효과 Block이라 대상을 `사용자 자신 → 조건으로 거르�
 
 - 독립 효과(Indep) = 발동 `JokerActivated 받기` AND `이벤트의 조각이 나`(jokerId, 빌려 쓰는 중이면 참). 아래 표에서 **차례**라 줄여 적는다. 이벤트 조건 `hand.contains 포함 pair`처럼 거른다.
 - On Scored·On Held = `CardScored`·`HeldCardScored` 받기(카드마다 조커 칸 순서로). 재발동 = 행동 직전 이벤트 `재발동` 받기 → 행동 직전 이벤트 고치기 `times` 더하기.
-- 에디션 Negative = 패시브 `negative`(일치 필드 `edition`, 보정 jokerSlots +1 → stats). foil·holo·polychrome은 7단계 코드.
+- 에디션 Negative = 패시브 효과 `negative`(일치 필드 `edition`, 보정 jokerSlots +1 → stats). foil·holo·polychrome은 7단계 코드.
 - 디버프(Perishable·보스) = 메인 룰이 `joker`를 비운다(4절 E5).
 - 쌓이는 값 = 효과 `필드 바꾸기`(대상 `사용자 자신`). 빌려 쓰는 중에는 원본의 필드가 바뀌지 않는다.
 
@@ -94,13 +94,13 @@ V3~V5는 효과 Block이라 대상을 `사용자 자신 → 조건으로 거르�
 | C1 효과 `개수만큼` | 점수·돈 = 단위 × (플레이어 데이터 숫자 · 목록 개수(항목 조건) · 목록 필드 합(나를 뺌)) ÷ 나눌 수 + 기준, 0 아래 없음 | 14 |
 | C2 조건 `이벤트 값 = 조각 필드` | 이벤트 필드와 사용자 조각의 필드가 같은가(값 조건의 비교 값은 상수만 받는다) | 5 |
 | C3 효과 `무작위로 다시 정하기` | 후보(값 목록·플레이어 데이터 목록의 필드)에서 하나를 골라 사용자 조각 필드에(지금 값 빼기, 빌려 쓰는 중이면 안 함) | 5 |
-| C5 결과 `순간별 결과` | 칸: 발동(트리거 하나) + 결과 목록. 지금 순간이 그 발동에 맞을 때만 결과를 낸다(`session.Triggers.Test` → `RunOutcomes`, 같은 컨텍스트). 패시브의 발동은 모든 순간의 OR, 결과에 C5를 순간마다 하나 | 32 |
+| C5 결과 `순간별 결과` | 칸: 발동(트리거 하나) + 결과 목록. 지금 순간이 그 발동에 맞을 때만 결과를 낸다(`session.Triggers.Test` → `RunOutcomes`, 같은 컨텍스트). 패시브 효과의 발동은 모든 순간의 OR, 결과에 C5를 순간마다 하나 | 32 |
 
 C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이벤트 형식으로 나누기)다.
 
 ### 2-6. 명세서 4-2에 표시할 것
 
-놓인 순서·위치가 효과를 바꾼다 · 다른 것의 능력을 빌려 쓴다 · 효과가 반복 발동한다(재발동 행동 직전 이벤트) · 판정 규칙이 바뀐다 · 자원을 다른 곳에서 낸다(빚 — 돈은 모두 `Game.Pay`) · 발동 중에 목록이 바뀐다(Dagger·Madness). 기믹 목록 3절 표에 줄이 없는 셋: **조각 한 장의 차례 안에 메인 룰 단계가 끼어든다**(에디션·Baseball) · **조각 하나를 잠시 끈다**(디버프) · **뽑기 풀 규칙이 바뀐다**(Showman).
+놓인 순서·위치가 효과를 바꾼다 · 다른 것의 액티브 효과를 빌려 쓴다 · 효과가 반복 발동한다(재발동 행동 직전 이벤트) · 판정 규칙이 바뀐다 · 자원을 다른 곳에서 낸다(빚 — 돈은 모두 `Game.Pay`) · 발동 중에 목록이 바뀐다(Dagger·Madness). 기믹 목록 3절 표에 줄이 없는 셋: **조각 한 장의 차례 안에 메인 룰 단계가 끼어든다**(에디션·Baseball) · **조각 하나를 잠시 끈다**(디버프) · **뽑기 풀 규칙이 바뀐다**(Showman).
 
 해금(조건이 있는 40개): DB › 도전과제 `unlock.<조커>`(발동만) + 희귀도 가중치 표 줄의 조건 `도전과제 달성`(30장 5-10). 누적 수는 로그(범위 누적). 전설 5개는 스펙트럴 Soul의 V4만 쓰는 표에 둔다.
 
@@ -117,8 +117,8 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 6~10 Jolly · Zany · Mad · Crazy · Droll | Block(시) | 차례, `hand.contains` 포함 pair / threeOfAKind / twoPair / straight / flush → V1 배수 +8 / 12 / 10 / 12 / 10 |
 | 11~15 Sly · Wily · Clever · Devious · Crafty | Block(시) | 같은 모양 → V1 칩 +50 / 100 / 80 / 100 / 80 |
 | 16 Half Joker | Block(시) | 차례, `hand.playedCount` 이하 3 → V1 배수 +20 |
-| 17 Joker Stencil | BindTo | 차례 → ×(`Attribute(stats.jokerSlots)` − 조커 수 + 스텐실 수). 능력치와 개수를 섞는 계산 |
-| 18 Four Fingers · 37 Pareidolia · 52 Splash · 69 Shortcut · 113 Smeared | 메인 룰 | 판정 스위치(4-2 '판정 규칙이 바뀐다'). 패시브는 보정만(stats.fourFingers +1 …), 판정 함수가 `Game.Attribute`로 본다. 트리거·보정이 없는 패시브는 검증 오류라 `Game.Owned`만 보는 모양은 못 쓴다(4절 E2) |
+| 17 Joker Stencil | BindTo | 차례 → ×(`Attribute(stats.jokerSlots)` − 조커 수 + 스텐실 수). 스탯과 개수를 섞는 계산 |
+| 18 Four Fingers · 37 Pareidolia · 52 Splash · 69 Shortcut · 113 Smeared | 메인 룰 | 판정 스위치(4-2 '판정 규칙이 바뀐다'). 패시브 효과는 보정만(stats.fourFingers +1 …), 판정 함수가 `Game.Attribute`로 본다. 트리거·보정이 없는 패시브 효과는 검증 오류라 `Game.Owned`만 보는 모양은 못 쓴다(4절 E2) |
 | 121 Showman | 메인 룰 | 상점·팩 뽑기 함수가 stats.showman을 보고 뺄 목록이 있는 표/없는 표를 고른다(기믹 목록 2-6, 희귀도마다 표 둘). 4-2 표에 맞는 줄 없음 |
 | 19 Mime | DB | 행동 직전 이벤트 `재발동` 받기(phase Held) → times +1 |
 | 36 Hack · 109 Sock and Buskin · 115 Hanging Chad | DB | 행동 직전 이벤트 `재발동` 받기(Scored; rank 2~5 / isFace / index 0) → times +1 / +1 / +2 |
@@ -179,7 +179,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 81 Erosion | Block(추) | 차례 → C1 배수 4 × (startDeckSize − deck 수) |
 | 82 Reserved Parking | Block(시) | `HeldCardScored`(isFace) AND 확률 50 → V2 $1 |
 | 83 Mail-In Rebate | Block(추) | C5: `CardDiscarded` AND C2(rank = targetRank) → V2 $5 / `RoundEnded` → C3 targetRank(덱 카드의 rank) |
-| 84 To the Moon | DB | 보정 stats.interestPer5 +1. 메인 룰의 이자 계산이 이 능력치를 읽는다 |
+| 84 To the Moon | DB | 보정 stats.interestPer5 +1. 메인 룰의 이자 계산이 이 스탯을 읽는다 |
 | 85 Hallucination | Block(시) | `PackOpened` AND 확률 50 → V5 타로 |
 | 86 Fortune Teller | Block(추) | 차례 → C1 배수 1 × tarotsUsed |
 | 87 Juggler · 88 Drunkard · 111 Troubadour · 125 Merry Andy | DB | 보정만: handSize +1 / discards +1 / handSize +2·hands −1 / discards +3·handSize −1(보정 받을 대상 stats, 트리거 없음) |
@@ -217,7 +217,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | 144 Burnt Joker | Block(시) | `Discarded`(isFirstDiscard) → V6(이벤트 handType) |
 | 147 Triboulet | Block(시) | `CardScored`(rank 13·12) → V1 ×2 |
 | 148 Yorick | Block(추) | C5: `CardDiscarded` → counter +1, 대상 조건 counter 이상 23이면 xmult +1·counter 값으로 0 / 차례 → V1 × xmult |
-| 149 Chicot | DB | 행동 직전 이벤트 `보스 능력` 받기 → 막기 |
+| 149 Chicot | DB | 행동 직전 이벤트 `보스 액티브 효과` 받기 → 막기 |
 | 150 Perkeo | Block(시) | `ShopLeft` → V5 복사(가진 소모품 무작위 1, 네거티브) |
 
 ### 3-2. 해금 조건
@@ -250,10 +250,10 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 | | 무엇이 안 되나 · 왜 | 우회 | 라이브러리에 있으면 없어지는 것 |
 |---|---|---|---|
 | E1 | 조커 차례 이벤트를 조커마다 쏘고 '가진 쪽 필드'(`jokerId`)로 거르면 **Blueprint·Brainstorm이 아무것도 빌리지 못한다**. 빌려 쓸 때 원본의 발동을 원본 조각 기준으로 다시 보는데 가진 쪽 필드도 원본 id와 비교한다(이벤트의 jokerId는 Blueprint). 또 가진 쪽 필드는 발동 전체에 걸려 다른 이벤트(버림·라운드 끝)를 함께 받는 조커에는 못 쓴다 | 시스템층 조건 `이벤트의 조각이 나`(빌려 쓰는 중이면 참). 팔기처럼 복사되면 안 되는 것만 가진 쪽 필드를 쓴다 | 기본 조건 '이벤트의 개체가 사용자'(빌려 쓰는 중 처리 옵션), 또는 빌려 쓸 때 가진 쪽 필드를 빌리는 쪽 id로 보는 옵션 |
-| E2 | 판정 스위치 조커(Four Fingers 등 6개). 기믹 목록 2-6은 "판정 함수가 `Game.Owned(패시브 ID)`를 본다"인데, 발동도 보정도 없는 패시브는 DB 검증 오류(빌드가 막힘)다 | stats의 스위치 능력치 +1 보정으로 두고 판정 함수가 `Game.Attribute`를 본다 | '가지고만 있는' 패시브 허용, 또는 기믹 목록 문구를 이 우회로 |
-| E3 | 순간이 둘 이상인 조커 32개(쌓기·내기·되돌리기·소멸). 패시브는 발동 하나 + 결과 하나라 순간마다 다른 결과를 못 둔다 | 결과 Block C5 `순간별 결과`(문서에 이런 Block의 예가 없다), 안 되면 조커마다 `[BindTo]` | 패시브에 '규칙 여러 줄'(로그·퀘스트의 `List<TriggerRule>`처럼 발동·결과 쌍 목록). 그러면 C5 32개가 DB가 된다 |
-| E4 | 조커의 고정 값(가격·희귀도·시작 값)을 둘 곳. `PassiveData`에는 칸을 더할 수 없고(17장 0-5), 인스턴스로 두면 ID가 패시브와 같을 수 없어 원본 ID 필드 하나로 둘을 가리키지 못한다. 기획 명세서 읽는 법 2-2(`OwnedJoker { id, joker … }` + 인스턴스 + 일치 필드 = 원본 ID 필드)대로는 안 된다 | 인스턴스 `JokerCard`에 `passive` 칸, 조각에 `card`·`joker` 두 필드(원본의 고정 값 하나를 판 데이터에 복사) | 인스턴스(또는 프로젝트 DB 종류)에서 패시브를 정의하는 길(인스턴스 ID = 패시브 ID로 등록), 또는 패시브에 프로젝트 칸 |
-| E5 | 조각 하나를 잠시 끄기(Perishable 5라운드 뒤, 보스의 디버프). '놓인 것마다' 패시브에 요소 단위로 끄는 칸이 없다. 패시브 150개에 조건을 다 붙일 수도 없다 | 메인 룰이 `joker`를 비워 일치를 끊고 `card.passive`로 되돌린다 | 패시브 '꺼짐 필드'(요소의 bool이 참이면 발동·보정·빌려 쓰기에서 빠짐) |
+| E2 | 판정 스위치 조커(Four Fingers 등 6개). 기믹 목록 2-6은 "판정 함수가 `Game.Owned(패시브 효과 ID)`를 본다"인데, 발동도 보정도 없는 패시브 효과는 DB 검증 오류(빌드가 막힘)다 | stats의 스위치 스탯 +1 보정으로 두고 판정 함수가 `Game.Attribute`를 본다 | '가지고만 있는' 패시브 효과 허용, 또는 기믹 목록 문구를 이 우회로 |
+| E3 | 순간이 둘 이상인 조커 32개(쌓기·내기·되돌리기·소멸). 패시브 효과는 발동 하나 + 결과 하나라 순간마다 다른 결과를 못 둔다 | 결과 Block C5 `순간별 결과`(문서에 이런 Block의 예가 없다), 안 되면 조커마다 `[BindTo]` | 패시브 효과에 '규칙 여러 줄'(로그·퀘스트의 `List<TriggerRule>`처럼 발동·결과 쌍 목록). 그러면 C5 32개가 DB가 된다 |
+| E4 | 조커의 고정 값(가격·희귀도·시작 값)을 둘 곳. `PassiveData`에는 칸을 더할 수 없고(17장 0-5), 인스턴스로 두면 ID가 패시브 효과와 같을 수 없어 원본 ID 필드 하나로 둘을 가리키지 못한다. 기획 명세서 읽는 법 2-2(`OwnedJoker { id, joker … }` + 인스턴스 + 일치 필드 = 원본 ID 필드)대로는 안 된다 | 인스턴스 `JokerCard`에 `passive` 칸, 조각에 `card`·`joker` 두 필드(원본의 고정 값 하나를 판 데이터에 복사) | 인스턴스(또는 프로젝트 DB 종류)에서 패시브 효과를 정의하는 길(인스턴스 ID = 패시브 효과 ID로 등록), 또는 패시브 효과에 프로젝트 칸 |
+| E5 | 조각 하나를 잠시 끄기(Perishable 5라운드 뒤, 보스의 디버프). '놓인 것마다' 패시브 효과에 요소 단위로 끄는 칸이 없다. 패시브 효과 150개에 조건을 다 붙일 수도 없다 | 메인 룰이 `joker`를 비워 일치를 끊고 `card.passive`로 되돌린다 | 패시브 효과 '꺼짐 필드'(요소의 bool이 참이면 발동·보정·빌려 쓰기에서 빠짐) |
 | E6 | 상점 할인·공짜(Astronomer, Chaos). 기믹 목록 2-11은 행동 직전 이벤트 '비용 지불' 받기인데 `CostIntent`는 key·path·amount·floor·cancelled뿐이라 무엇을 사는지(행성·리롤)로 거를 수 없다 | 프로젝트 행동 직전 이벤트 `상점 가격 { itemKind, itemId, price }`를 상점 가격 함수에 | '비용 지불' 행동 직전 이벤트에 `what`(무엇에 내나) 글자 필드 |
 
 값 틀의 한계도 Block을 늘렸다: 행동 직전 이벤트 고치기·필드 바꾸기의 값 틀은 `{level}`(정수)·`{stacks}`·`{balance:ID}`뿐이고 값 조건의 비교 값은 상수만 받는다. 그래서 쌓인 소수 배수·이벤트 값으로 내기(V1의 값 출처), 개수만큼(C1), 이벤트 값과 조각 필드 비교(C2)가 프로젝트 Block이 됐다. `{user:필드}`·`{event:필드}`·`{count:경로}` 같은 틀과 비교 값의 틀이 있으면 C1·C2와 V1의 값 출처가 기본 Block으로 된다(효과 쪽 Block(추) 46개 중 C1 14개가 DB로).
@@ -266,16 +266,16 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 
 1. 빌려 쓰기가 '가진 쪽 필드'를 누구 기준으로 보는지. 12장 2-4e는 "가진 쪽 필드도 본다"뿐 → 코드 확인: 원본(lender) id와 비교(`Passives.Borrow` → `HolderFieldMatches(definition, lender, …)`). E1의 원인이다.
 2. 레벨 필드가 소수를 받는지, 레벨 0인 조각도 발동하는지 → 코드 확인: 정수로 반올림(`LevelOf`), 놓인 것마다는 레벨을 보지 않고 발동(`OrderedHoldersFor`). "쌓인 값 = 레벨 필드 + `{level}`" 꼼수는 정수 값에만 된다.
-3. 한 조각에 맞는 패시브가 둘일 때의 순서(에디션을 패시브로 둘 때 foil → 조커 → polychrome을 맞추려고) → 코드 확인: 같은 자리면 등록 순서, 등록 순서 = DB 항목 순서(`GameDatabase.All`). 11장 6-4에 "같으면 등록 순서"는 있지만 DB 항목 순서를 정하는 법이 문서에 없다. 그래서 이 길을 버리고 조커마다 이벤트를 쏘는 메인 룰로 갔다.
+3. 한 조각에 맞는 패시브 효과가 둘일 때의 순서(에디션을 패시브 효과로 둘 때 foil → 조커 → polychrome을 맞추려고) → 코드 확인: 같은 자리면 등록 순서, 등록 순서 = DB 항목 순서(`GameDatabase.All`). 11장 6-4에 "같으면 등록 순서"는 있지만 DB 항목 순서를 정하는 법이 문서에 없다. 그래서 이 길을 버리고 조커마다 이벤트를 쏘는 메인 룰로 갔다.
 4. DB ID가 종류를 넘어 하나뿐인지 → 17장 1절 한 줄뿐이라 코드 확인(`EditorDatabase.FindById`가 모든 종류에서 찾는다). E4의 원인이다.
 5. 대상 `플레이어 데이터 목록`의 경로 끝이 목록도 id 글자도 아닌 객체(run)일 때 → 16장 2-6 표에 없고 37장 5-1 예에서만 쓴다. 코드 확인: 그 객체 하나를 낸다(`DataListTarget`).
 6. 기본 행동 직전 이벤트의 필드(`CostIntent`에 무엇을 사는지가 없음) → 28장 4-14 표와 코드가 같다. 어긋난 것은 기믹 목록 2-11(E6).
 
 **문서끼리 어긋난 곳**
 
-7. 기믹 목록 2-6 "판정 스위치 = `Game.Owned(패시브 ID)`" ↔ 17장 0-2 검증 "발동이나 보정이 있어야 합니다"(E2).
-8. 기획 명세서 읽는 법 2-2 "원본 클래스 + 인스턴스, 판 데이터는 원본 ID 필드, 패시브의 일치 필드 = 원본 ID 필드" ↔ ID가 종류를 넘어 하나뿐(E4). 기획 명세서 양식 2-2 표의 조커 예도 고정 값에 '희귀도·가격'을 적는데 둘 곳이 없다.
-9. 16장 3-14는 조커를 능력(`Joker { id, ability }` + `Game.TryUse`)으로, 기믹 목록·17장·37장은 패시브 '놓인 것마다'로 만든다. 17장 0-3은 점수를 행동 직전 이벤트 `점수` 행동 직전 이벤트로, 37장 5-1은 이벤트 `손 점수` + 플레이어 데이터로 만든다. 어느 쪽이 기본인지 한 줄이 없다.
+7. 기믹 목록 2-6 "판정 스위치 = `Game.Owned(패시브 효과 ID)`" ↔ 17장 0-2 검증 "발동이나 보정이 있어야 합니다"(E2).
+8. 기획 명세서 읽는 법 2-2 "원본 클래스 + 인스턴스, 판 데이터는 원본 ID 필드, 패시브 효과의 일치 필드 = 원본 ID 필드" ↔ ID가 종류를 넘어 하나뿐(E4). 기획 명세서 양식 2-2 표의 조커 예도 고정 값에 '희귀도·가격'을 적는데 둘 곳이 없다.
+9. 16장 3-14는 조커를 액티브 효과(`Joker { id, ability }` + `Game.TryUse`)로, 기믹 목록·17장·37장은 패시브 효과 '놓인 것마다'로 만든다. 17장 0-3은 점수를 행동 직전 이벤트 `점수` 행동 직전 이벤트로, 37장 5-1은 이벤트 `손 점수` + 플레이어 데이터로 만든다. 어느 쪽이 기본인지 한 줄이 없다.
 10. 기믹 목록 2-11은 Bull 같은 돈 비례를 `[BindTo]`로 적지만, 같은 모양이 14개라 관례 0절(재사용 Block 먼저)대로면 C1이다.
 
 **문서에 없는 것**
@@ -283,7 +283,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 11. 기믹 목록 1절 발라트로 줄은 조커 단계를 이벤트 하나로 보고, **에디션(foil·holo·polychrome)과 Baseball Card처럼 조커 한 장의 차례 안에 끼는 단계**를 다루지 않는다. 3절 표에도 줄이 없다(2-6의 셋).
 12. 기믹 목록 2-7 '쌓이는 값'은 쌓는 법만 있다. 쌓는 순간과 내는 순간이 다르다는 것(E3), 쌓인 소수 배수를 점수로 내는 법이 없다. 문서의 예(37장 5-2 버스)는 `[BindTo]`다.
 13. C5처럼 결과 Block 안에 발동·결과 목록을 두는 프로젝트 Block이 되는지(에디터 그리기·검증·`RunOutcomes`로 같은 컨텍스트 넘기기)가 문서에 없다. 라이브러리 결과 '가중치 표에서 고르기'의 '고른 뒤 결과'가 같은 모양이라 될 것으로 보았다.
-14. "팔면 발동"(Luchador·Diet Cola·Invisible)은 조각이 목록에 있을 때만 패시브가 돈다. 팔기 행동이 이벤트를 **빼기 전에** 쏴야 한다는 것이 문서에 없다.
+14. "팔면 발동"(Luchador·Diet Cola·Invisible)은 조각이 목록에 있을 때만 패시브 효과가 돈다. 팔기 행동이 이벤트를 **빼기 전에** 쏴야 한다는 것이 문서에 없다.
 15. `GBibleRuntime.RunLoaded`는 참조 문서 2-1에 '이벤트'로 함께 적혀 있지만 GameEvent가 아니라 도전과제 발동이 못 받는다(Throwback 해금).
 16. 해금을 도전과제로 만들면 Steam 도전과제로 모두 올라간다(34장 2-3, 항목별로 빼는 칸 없음 — Steamworks에 없으면 경고). 해금 40개가 Steam 목록과 섞인다.
 17. Blueprint의 발동에 "빌릴 조커가 받는 모든 순간"을 OR로 적어야 한다(37장 5-2). 이벤트가 20개 가까이라 하나를 더할 때마다 Blueprint·Brainstorm을 고쳐야 한다. '모든 순간' 칸이 없다.
@@ -291,7 +291,7 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 
 **이름이 헷갈린 곳**
 
-19. GBible의 '레벨'(패시브를 몇 개 가졌나·레벨 필드, 값 틀 `{level}`)과 발라트로의 '족보 레벨'이 한 프로젝트에서 부딪힌다. 쌓인 값을 레벨 필드로 읽는 꼼수까지 쓰면 더 헷갈린다.
+19. GBible의 '레벨'(패시브 효과를 몇 개 가졌나·레벨 필드, 값 틀 `{level}`)과 발라트로의 '족보 레벨'이 한 프로젝트에서 부딪힌다. 쌓인 값을 레벨 필드로 읽는 꼼수까지 쓰면 더 헷갈린다.
 20. '가진 쪽 필드'(holderField)는 "이벤트의 이 필드가 가진 쪽 id일 때만"인데 이름만 보면 가진 쪽의 필드처럼 읽힌다.
 
 ---
@@ -321,9 +321,9 @@ C5가 없으면 그 32개는 37장 5-2(버스)처럼 조커마다 `[BindTo]`(이
 4절의 우회 6은 모두 없어졌다.
 
 - E1 → 빌려 쓰기는 가진 쪽 필드를 **빌리는 쪽** 기준으로 본다(Blueprint 차례 이벤트에서 오른쪽 조커를 빌린다).
-- E2 → 발동·보정·주기가 없는 **스위치 패시브**를 허용한다(`Game.Owned`로 읽는다).
-- E3 → 패시브 `rules`(발동 더): 순간마다 한 줄(낼 때 +1 · 버릴 때 −1 · 점수 때 내기). `순간별 결과` Block이 필요 없다.
-- E4 → 패시브 `matchVia`(원본에서 읽기): 조각은 원본 ID만 담고, 원본(인스턴스)의 패시브 ID 목록에서 찾는다. 고정 값(가격·희귀도)은 원본에.
-- E5 → 상태 효과 `silencesPassives`(걸린 쪽의 패시브를 끔) 또는 레벨 필드 0(꺼짐).
+- E2 → 발동·보정·주기가 없는 **스위치 패시브 효과**를 허용한다(`Game.Owned`로 읽는다).
+- E3 → 패시브 효과 `rules`(발동 더): 순간마다 한 줄(낼 때 +1 · 버릴 때 −1 · 점수 때 내기). `순간별 결과` Block이 필요 없다.
+- E4 → 패시브 효과 `matchVia`(원본에서 읽기): 조각은 원본 ID만 담고, 원본(인스턴스)의 패시브 효과 ID 목록에서 찾는다. 고정 값(가격·희귀도)은 원본에.
+- E5 → 상태 효과 `silencesPassives`(걸린 쪽의 패시브 효과를 끔) 또는 레벨 필드 0(꺼짐).
 - E6 → `CostIntent`의 `forId`(무엇을 위한)·`userId`(내는 쪽), `Game.Pay(…, forId:)`.
 - 값 틀 → `{user:경로}`·`{event:경로}`·`{data:키.경로}`·`{count:키.경로}`, 조건 '사용자 필드 검사'(비교 값에도 틀).

@@ -75,7 +75,7 @@ namespace GBible.EditorTools
             };
         }
 
-        // 선택 요소(상태 효과·패시브·능력 — [Element]): 프로젝트에 그 규격(IStatusData …)을 붙인 DB 종류가 있으면 켜진 것.
+        // 선택 요소(상태 효과·패시브 효과·액티브 효과 — [Element]): 프로젝트에 그 규격(IStatusData …)을 붙인 DB 종류가 있으면 켜진 것.
         // 고르는 목록(+ 메뉴의 Block·행동 직전 이벤트·이벤트)은 꺼진 요소에 딸린 형식을 뺀다(엔진 코드는 그대로 있다).
         static HashSet<string> _elements;
 

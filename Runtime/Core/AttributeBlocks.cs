@@ -3,15 +3,15 @@ using System.Linq;
 
 namespace GBible
 {
-    // 기획자가 DB에서 조립하는 능력치·비용 Block.
+    // 기획자가 DB에서 조립하는 스탯·비용 Block.
 
-    // 효과 '능력치 보정': 대상의 숫자 필드에 Modifier를 붙인다. 출처는 이 효과를 가진 항목(아이템·유물·상태 효과 ID).
+    // 효과 '스탯 보정': 대상의 숫자 필드에 Modifier를 붙인다. 출처는 이 효과를 가진 항목(아이템·유물·상태 효과 ID).
     [Serializable]
-    [BlockInfo("능력치 보정", Category = "능력치", Description = "대상의 능력치(숫자 필드)에 보정을 붙입니다. 같은 칸은 더하고 칸끼리는 곱합니다(플랫 → 퍼센트 → 독립 곱).",
+    [BlockInfo("스탯 보정", Category = "스탯", Description = "대상의 스탯(숫자 필드)에 보정을 붙입니다. 같은 칸은 더하고 칸끼리는 곱합니다(플랫 → 퍼센트 → 독립 곱).",
                Sentence = "{attribute} {kind} {value}")]
     public sealed class AttributeModifierEffect : Effect
     {
-        [FieldLabel("능력치(숫자 필드 이름)")] public string attribute = "";
+        [FieldLabel("스탯(숫자 필드 이름)")] public string attribute = "";
         [FieldLabel("칸")] public ModifierKind kind = ModifierKind.Flat;
         [FieldLabel("값(퍼센트는 0.2 = +20%)")] public double value;
         [FieldLabel("영구(프로필에 남김)")] public bool permanent;
@@ -33,13 +33,13 @@ namespace GBible
 
         public override void Validate(IValidationContext context)
         {
-            if (string.IsNullOrWhiteSpace(attribute)) context.Error("능력치 보정: 능력치(숫자 필드 이름)를 적으세요.");
+            if (string.IsNullOrWhiteSpace(attribute)) context.Error("스탯 보정: 스탯(숫자 필드 이름)을 적으세요.");
         }
     }
 
-    // 효과 '능력치 보정 떼기': 대상에서 이 항목이 붙인 보정을 모두 뗀다(장비 벗기·효과 끝).
+    // 효과 '스탯 보정 떼기': 대상에서 이 항목이 붙인 보정을 모두 뗀다(장비 벗기·효과 끝).
     [Serializable]
-    [BlockInfo("능력치 보정 떼기", Category = "능력치", Description = "대상에서 이 항목이 붙인 보정을 모두 뗍니다. 출처를 적으면 그 출처의 것을 뗍니다.")]
+    [BlockInfo("스탯 보정 떼기", Category = "스탯", Description = "대상에서 이 항목이 붙인 보정을 모두 뗍니다. 출처를 적으면 그 출처의 것을 뗍니다.")]
     public sealed class RemoveModifiersEffect : Effect
     {
         [FieldLabel("출처(비우면 이 항목)")] public string source = "";
@@ -93,9 +93,9 @@ namespace GBible
 
     // 효과 '필드 바꾸기': 대상의 숫자 필드를 직접 바꾼다(저장되는 값 자체 — 보정이 아니다).
     //   조커 "이 조커 배수 +1"(대상 = 사용자 자신) · 카운터 −1 · 처치 횟수 +1(진화) · 카드 칩 +5(영구).
-    //   값에 틀: {level}(이 항목의 레벨) · {level:2/4/7} · {stacks} · {balance:ID}. 능력치를 잠깐 올리는 것은 '능력치 보정'.
+    //   값에 틀: {level}(이 항목의 레벨) · {level:2/4/7} · {stacks} · {balance:ID}. 스탯을 잠깐 올리는 것은 '스탯 보정'.
     [Serializable]
-    [BlockInfo("필드 바꾸기", Category = "필드", Description = "대상의 숫자 필드를 더하기·곱하기·값으로 바꿉니다(저장되는 값 자체). 예: 이 조커 배수 +1(대상 = 사용자 자신), 카운터 −1, 처치 횟수 +1. 잠깐 올리는 것은 '능력치 보정'.",
+    [BlockInfo("필드 바꾸기", Category = "필드", Description = "대상의 숫자 필드를 더하기·곱하기·값으로 바꿉니다(저장되는 값 자체). 예: 이 조커 배수 +1(대상 = 사용자 자신), 카운터 −1, 처치 횟수 +1. 잠깐 올리는 것은 '스탯 보정'.",
                Sentence = "{field} {change} {value}")]
     public sealed class ChangeFieldEffect : Effect
     {

@@ -49,7 +49,7 @@ namespace GBible
     {
     }
 
-    // 선택 요소(상태 효과·패시브·능력)에 딸린 형식 — Block·행동 직전 이벤트·이벤트, 그리고 그 요소의 DB 종류 규격(인터페이스).
+    // 선택 요소(상태 효과·패시브 효과·액티브 효과)에 딸린 형식 — Block·행동 직전 이벤트·이벤트, 그리고 그 요소의 DB 종류 규격(인터페이스).
     // 선택 요소의 DB 종류(데이터 칸 클래스)는 라이브러리에 없고 프로젝트가 템플릿에서 들인다(문서 AI/Templates/Elements).
     // 프로젝트에 그 요소의 DB 종류가 없으면 에디터의 고르는 목록(+ 메뉴·행동 직전 이벤트·이벤트)에서 이 형식을 뺀다. 엔진(Game 함수)은 그대로 있다.
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, Inherited = false)]

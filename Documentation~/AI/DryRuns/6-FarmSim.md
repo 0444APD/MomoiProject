@@ -97,7 +97,7 @@ Stardew Valley 같은 농장 생활 시뮬 하나로 "명세서 + GBible 문서 
 
 - [필수] 언제: [x] 즉시 · [x] 발동(하루 시작·하루 끝·계절 바뀜·시각·거두기) · [ ] 지연 · [x] 지속(음식 버프: 그날 하루)
 - [필수] 누구에게: [x] 자신 · [x] 고른 대상(마을 사람·칸) · [x] 무작위(채집 자리) · [x] 전체(모든 밭) · [x] 조건으로 거른 대상(계절이 안 맞는 작물·스프링클러 주변 8칸)
-- [필수] 무엇을: [x] 숫자 바꾸기 · [x] 능력치 보정(음식: 이동 속도·운) · [x] 만들기·없애기·바꾸기(채집물 생김·작물 시듦) · [x] 다른 효과 고치기(생일 ×8·비 = 물·온실) · [ ] 효과 도중 고르기 · [ ] 비용 바꾸기
+- [필수] 무엇을: [x] 숫자 바꾸기 · [x] 스탯 보정(음식: 이동 속도·운) · [x] 만들기·없애기·바꾸기(채집물 생김·작물 시듦) · [x] 다른 효과 고치기(생일 ×8·비 = 물·온실) · [ ] 효과 도중 고르기 · [ ] 비용 바꾸기
 - [필수] 이 게임에서 가장 이상한 효과:
   1. 작물 성장: 물을 준 날만 하루 자란다. 계절이 바뀌면 그 계절 작물이 아니면 시든다.
   2. 게임 시각: 현실 0.7초 = 게임 10분. 새벽 2시가 되면 그 자리에서 쓰러져 다음 날 아침 집에서 깬다(골드 10% 잃음, 최대 1,000).
@@ -206,7 +206,7 @@ Stardew Valley 같은 농장 생활 시뮬 하나로 "명세서 + GBible 문서 
 | 시작할 때 이어 하기 | 끔(타이틀·슬롯이 있다) | — |
 | 고정 틱 | 20 | 실시간 시각. 0.7초 간격이라 높을 필요 없다 |
 | 시각이 멈추는 화면 | 가방·상점·정산·게시판·잠 확인·일시정지(DB › 화면 '열린 동안 게임 시간 멈춤'). HUD는 흐름 | 명세서는 대화만 적었다. DB 칸 하나로 바뀐다 |
-| 하루 길이 | 밸런스 값 `tenMinutesSeconds` 0.7(하루 6:00~2:00 = 실제 84초) | 수치는 묻지 않는다. 명세서의 "약 1분 30초"와 맞다 |
+| 하루 길이 | 밸런싱 값 `tenMinutesSeconds` 0.7(하루 6:00~2:00 = 실제 84초) | 수치는 묻지 않는다. 명세서의 "약 1분 30초"와 맞다 |
 | 생일 ×8 | 싫어하는 선물에도(−40 × 8 = −320) | 규칙 한 줄, 쉽게 바뀜 |
 | 생일 선물 | 주 2회에 센다 | 같은 이유 |
 | 계절 시듦 | 새 계절 1일 아침(하루 끝 행동 안) | — |
@@ -325,9 +325,9 @@ Stardew Valley 같은 농장 생활 시뮬 하나로 "명세서 + GBible 문서 
 
 다이얼로그 켬 · 인벤토리 끔(Q2) · 입력(키 바꾸기) 켬 · Steam 켬.
 
-### 3-9. 밸런스 값 · 가중치 표
+### 3-9. 밸런싱 값 · 가중치 표
 
-- **밸런스 값**: `tenMinutesSeconds` 0.7 · `dayStartMinute` 360 · `passOutMinute` 1560 · `passOutPenaltyRate` 0.1 · `passOutPenaltyMax` 1000 · `passOutEnergyRate` 0.5 · `startGold` 500 · `maxEnergy` 270 · `toolEnergy` 2 · `talkFriendship` 20 · `giftLove` 80 · `giftLike` 45 · `giftNeutral` 20 · `giftDislike` −20 · `giftHate` −40 · `birthdayGiftMultiplier` 8 · `giftsPerWeek` 2 · `heartPoints` 250 · `skillXp`(곡선 '표': 레벨 → 누적 경험치) · `qualitySilverChance`·`qualityGoldChance`(곡선, 농사 레벨) · `luckMin` −0.1 · `luckMax` 0.1 · `daysPerSeason` 28.
+- **밸런싱 값**: `tenMinutesSeconds` 0.7 · `dayStartMinute` 360 · `passOutMinute` 1560 · `passOutPenaltyRate` 0.1 · `passOutPenaltyMax` 1000 · `passOutEnergyRate` 0.5 · `startGold` 500 · `maxEnergy` 270 · `toolEnergy` 2 · `talkFriendship` 20 · `giftLove` 80 · `giftLike` 45 · `giftNeutral` 20 · `giftDislike` −20 · `giftHate` −40 · `birthdayGiftMultiplier` 8 · `giftsPerWeek` 2 · `heartPoints` 250 · `skillXp`(곡선 '표': 레벨 → 누적 경험치) · `qualitySilverChance`·`qualityGoldChance`(곡선, 농사 레벨) · `luckMin` −0.1 · `luckMax` 0.1 · `daysPerSeason` 28.
 - **가중치 표**: `weather`(줄 조건 = 내일의 계절) · `forage.forest`·`forage.beach`(줄 조건 = 계절, 운 구간 줄 — Q6) · `fish.<장소>`(줄 조건 = 계절·시각·날씨). 축제 날 맑음은 규칙이 덮는다.
 - **난수 흐름**: `luck` · `quality` · `fishBite` · `forageSpot`(채집 자리) · 표는 저절로 `table:<표 ID>`.
 
@@ -381,18 +381,18 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 |---|---|---|---|---|---|---|
 | 1 | 물 준 날만 하루 자란다 | 하루 끝(`EndDay` 안) | 모든 밭 | `daysGrown` +1(물 줬을 때) | 핵심 동사 `Rules.Grow` + `GrowIntent.watered`(28장 2-3·4-8) | B |
 | 2 | 계절이 바뀌면 그 계절 작물이 아니면 시든다 | `SeasonChanged`(EndDay 안) | 조건으로 거른 밭(`Crop.seasons`에 새 계절 없음) | `dead = true` | `Rules.Wither` + `WitherIntent` + 키워드 `Season` | B |
-| 3 | 현실 0.7초 = 게임 10분 | 실시간(틱) | — | `run.calendar.minute` +10, `TimeChanged` 쏨 | 고정 틱 20(33장 3-1) · `session.Ticked`(33장 2-1·5-1) · `AdvanceTime` · 밸런스 값 `tenMinutesSeconds` · 대화·화면의 `GameTime.Pause`(07장 2.6, 35장 2-1) · 4-1 | **C**(달력 하위 시스템이 GBible에 없다, 5절 G1) |
+| 3 | 현실 0.7초 = 게임 10분 | 실시간(틱) | — | `run.calendar.minute` +10, `TimeChanged` 쏨 | 고정 틱 20(33장 3-1) · `session.Ticked`(33장 2-1·5-1) · `AdvanceTime` · 밸런싱 값 `tenMinutesSeconds` · 대화·화면의 `GameTime.Pause`(07장 2.6, 35장 2-1) · 4-1 | **C**(달력 하위 시스템이 GBible에 없다, 5절 G1) |
 | 4 | 새벽 2시에 그 자리에서 쓰러져 다음 날, 골드 10% | `AdvanceTime` 안(분 ≥ 1560) | 주인공 | 골드 −min(10%, 1000), `EndDay { passedOut }`, 다음 날 에너지 절반 | `Rules.LoseGold` + `GoldLossIntent` · `PassedOut` · 연출 `SubscribeAfterAction<PassedOut>` → `GameView.Present`, 씬은 `run.scene`이 바꾼다(32장 2-6) | B |
-| 5 | 아주 좋아함 +80 / 아주 싫어함 −40 | 즉시(`GiveGift`) | 고른 마을 사람 | 호감도 ± | `Rules.Befriend` + `FriendshipIntent` · `Npc.loves/hates`(+태그) · 밸런스 값 `giftLove`… · 반응 대사 `Dialogues.Play(npc.dialogue, "gift." + taste)`(24장 5.1) | B |
+| 5 | 아주 좋아함 +80 / 아주 싫어함 −40 | 즉시(`GiveGift`) | 고른 마을 사람 | 호감도 ± | `Rules.Befriend` + `FriendshipIntent` · `Npc.loves/hates`(+태그) · 밸런싱 값 `giftLove`… · 반응 대사 `Dialogues.Play(npc.dialogue, "gift." + taste)`(24장 5.1) | B |
 | 6 | 생일이면 ×8 | 행동 직전 이벤트(`FriendshipIntent`) | — | `amount` ×8 | 규칙 함수의 `isBirthday` 분기 + `birthdayGiftMultiplier`. DB로도 된다: 주인공에게 건 영구 상태 효과의 행동 직전 이벤트(filter `isBirthday` 참 AND `kind == gift`) → 행동 직전 이벤트 고치기 곱하기 8(29장 3-1, 28장 3-4) — 상시 규칙을 둘 곳이 없어 우회(5절 G8) | B |
-| 7 | 한 사람에게 일주일에 2번 | 즉시(`GiveGift` 안) | 그 마을 사람 | 넘으면 `Game.Fail("fail.giftWeekly")` | `NpcState.giftsThisWeek` · 월요일 `DayStarted`에서 0 · 밸런스 값 `giftsPerWeek` | B |
+| 7 | 한 사람에게 일주일에 2번 | 즉시(`GiveGift` 안) | 그 마을 사람 | 넘으면 `Game.Fail("fail.giftWeekly")` | `NpcState.giftsThisWeek` · 월요일 `DayStarted`에서 0 · 밸런싱 값 `giftsPerWeek` | B |
 | 8 | 비 오는 날은 물을 준 것으로 | 하루 시작(`StartDay` 안) | 바깥 장소의 모든 밭 | 물 주기 | `Rules.Water(source = rain)` 반복 · `Location.outdoor`. DB로도 된다: 바깥 장소 객체에 상태 효과 '비'(지속 이벤트 횟수 1, 셀 이벤트 `DayStarted`) + 행동 직전 이벤트(`GrowIntent`, 가진 쪽 필드 `locationId`) → `watered` 값으로 바꾸기 참 | B |
 | 9 | 내일 날씨를 오늘 TV로 | 하루 시작에 뽑기 / TV는 즉시 | — | `run.weather.tomorrow` | 가중치 표 `weather`(줄 조건 = 계절, 30장 3-2) · 다이얼로그 `tv`의 선택지 + 조건 분기(`run › weather.tomorrow == rain`, 24장 2절) | A |
 | 10 | 마을 사람이 요일·날씨·시각에 따라 다른 장소 | `TimeChanged`마다(화면) | 각 마을 사람 | 머무는 곳 계산(저장 안 함) | `Npc.schedules`(우선순위·계절·요일·날씨·하트 → stops) · `Rules.WhereIs(game, npc)` · 화면 쪽 길찾기(GBible에 없음, Q4) | B |
 | 11 | 농사 레벨 3 → 스프링클러 제작법 | 읽을 때(계산) | — | 제작 목록에 보임 | `Recipe.skill`·`level` · `SkillLeveledUp` → 알림(`GameScreens.Toast`) | A |
 | 12 | 스프링클러 주변 8칸 매일 아침 물 | 하루 시작 | 조건으로 거른 칸(설치물 주변 `offsets`) | 물 주기 | `Item.placeable.sprinkler.offsets` · `StartDay`의 설치물 반복 → `Rules.Water(source = sprinkler)`. 상태 효과를 설치물마다 거는 DB 조립도 되지만 행동마다 가진 쪽 수 × 데이터 크기 비용(5절 G3) | B |
 | 13 | 출하 상자 밤 정산 | 하루 끝 | 상자의 물건 | 골드 +, `lastShipped` | `Ship` 행동 · `Rules.Sell` + `SellIntent`("토요일 +10%" = 행동 직전 이벤트 + `weekday` 필드, 단 상시 규칙 자리 G8) | B |
-| 14 | 음식: 그날 하루 이동 속도 +1·운 +1 | 사용(먹기) | 주인공 | 상태 효과 걸기 | 아이템 `usable`(16장 2-7) → 대상에게 효과 → 상태 효과 `wellFed`(지속 이벤트 횟수 1, 셀 이벤트 `DayStarted`, 능력치 보정 `speed` +1·`luck` +1, 29장 3-1) · 결과 '쓴 아이템 1개 빼기'(시스템층 Block) · 화면은 `Game.Attribute(farmer, "speed")`로 걷는다 | A |
+| 14 | 음식: 그날 하루 이동 속도 +1·운 +1 | 사용(먹기) | 주인공 | 상태 효과 걸기 | 아이템 `usable`(16장 2-7) → 대상에게 효과 → 상태 효과 `wellFed`(지속 이벤트 횟수 1, 셀 이벤트 `DayStarted`, 스탯 보정 `speed` +1·`luck` +1, 29장 3-1) · 결과 '쓴 아이템 1개 빼기'(시스템층 Block) · 화면은 `Game.Attribute(farmer, "speed")`로 걷는다 | A |
 | 15 | 온실 작물은 시들지 않음 | 행동 직전 이벤트(`WitherIntent`) | 온실 칸 | 막기 | 장소 객체 `world.locations["greenhouse"]`(id 있음)에 영구 상태 효과 + 행동 직전 이벤트, 가진 쪽 필드 `locationId` → 행동 직전 이벤트 고치기 막기(29장 2-3). 가정: `Game.Find`가 딕셔너리 값 안의 객체도 찾는다(코드 `Mirror.FindById`가 자식 컬렉션을 훑는 것까지 확인) | A |
 | 16 | 운이 좋을수록 채집 희귀품↑ | 하루 시작(채집물 생김) | 무작위 자리 | 채집물 생김 | 운 뽑기(`luck`) · 가중치 표 `forage.*`의 운 구간 줄(Q6) | A |
 | 17 | 축제일(일정·상점·날씨 덮기, 시각 멈춤, 나오면 22시) | `DayStarted`·`EnterFestival`·`LeaveFestival` | 모든 마을 사람·상점 | 분기 | `Festival` 원본 · `run.calendar.festival` · `WhereIs`·`ShopOpen`·날씨 뽑기·`AdvanceTime`에 "오늘 축제" 분기 | B |
@@ -461,7 +461,7 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 **G8. 상시 규칙·개체마다 도는 트리거를 걸 주인이 없다**
 - 무엇: 늘 켜진 행동 직전 이벤트·이벤트 반응(생일 ×8, 토요일 판매가 +10%)을 DB에서 조립할 종류가 없다. 도전과제는 한 번·Undo 밖, 상태 효과는 가진 쪽이 필요하다. "놓인 물건마다 아침에"도 같다. 지금은 주인공·장소에 건 영구 상태 효과로 우회하거나(29장 2-1이 허락하지만 문서에 이 쓰임이 없다) 17장처럼 DB 종류를 짓는다.
 - 왜(빈도): 기획자가 "이번 주만 판매가 +10%" 같은 규칙을 DB로 더하고 싶을 때마다 AI가 호스트를 고민한다. 개체마다 상태 효과는 G3 비용이 붙는다.
-- 다른 장르에도: 난이도 규칙·기간 이벤트 보너스·패시브 지형 효과 — 거의 전부.
+- 다른 장르에도: 난이도 규칙·기간 이벤트 보너스·패시브 효과 지형 효과 — 거의 전부.
 - 제안: DB › '규칙'(`RuleData`: 켜짐 조건 + 트리거(이벤트·조건·행동 직전 이벤트 받기) + 결과, 반복, 행동 안에서 돎) 기본 제공. 그 전까지 29장에 "상시 규칙 = 주인공에게 건 영구 상태 효과, 장소 규칙 = 장소 객체 + 가진 쪽 필드" 패턴과 비용을 적는다.
 - 3요소: ① DB 종류 하나 ② 무관 ③ 등록은 시작할 때만.
 
@@ -469,7 +469,7 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 - 무엇: 줄의 무게는 고정, 조건으로 켜고 끄기만 된다(30장 2-3). "운에 비례"는 구간 줄(Q6)이나 코드 풀이다.
 - 왜(빈도): 운·레벨·호감도에 따라 확률이 바뀌는 표가 흔하다. 코드 풀로 가면 기획자가 DB에서 못 고친다.
 - 다른 장르에도: 로그라이크(희귀 확률 +%), RPG 드롭률, 가챠 천장.
-- 제안: 항목 줄 `weightScale`(밸런스 값 ID 또는 플레이어 데이터 경로 × 계수) 또는 뽑기 행동 직전 이벤트 자리 `RollIntent { table, entries(item·weight) }`.
+- 제안: 항목 줄 `weightScale`(밸런싱 값 ID 또는 플레이어 데이터 경로 × 계수) 또는 뽑기 행동 직전 이벤트 자리 `RollIntent { table, entries(item·weight) }`.
 - 3요소: ① DB 칸 ② 무관(난수 흐름은 그대로) ③ 생성 코드로 읽음.
 
 **G10. 다시 그리기가 키 단위다**
@@ -514,7 +514,7 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 
 되는 이유:
 - 질문이 6개이고 모두 추천값으로 갈 수 있다. 데이터 구조(키 넷·칸 키·리스트 NPC)와 흐름(`EndDay` 한 행동, 하루 시작 뒤 저장)이 명세서와 관례로 정해진다.
-- 행동·Undo 끔·판 저장·씬 흐름·다이얼로그(대화·선물 반응·TV 분기)·밸런스 값·가중치 표(날씨·채집·물고기)·상태 효과(음식·온실)·기본 화면(확인·슬롯·설정·일시정지·알림)이 GBible에 있어 그대로 쓴다. 기믹 19줄 중 A 5·B 11이 그 위에서 끝난다.
+- 행동·Undo 끔·판 저장·씬 흐름·다이얼로그(대화·선물 반응·TV 분기)·밸런싱 값·가중치 표(날씨·채집·물고기)·상태 효과(음식·온실)·기본 화면(확인·슬롯·설정·일시정지·알림)이 GBible에 있어 그대로 쓴다. 기믹 19줄 중 A 5·B 11이 그 위에서 끝난다.
 - GBible에 없는 셋(달력 G1, 가방 G5, 하루 끝 저장 G6)은 한 번 정하면 프로젝트 코드로 닫히는 크기다. 화면 8개는 35장의 UXML + `GameScreen` + binding-path 흐름 그대로다.
 
 어려운 이유:
@@ -537,8 +537,8 @@ GBible의 시간은 `session.Clock`(초·틱)과 `GameTime`(일시정지·배속
 | G5 인벤토리 고정 칸·칸 정보 | 보류(25장에 한계를 적음) |
 | G6 이벤트 때 판 저장 | 구현: 판 저장 '이벤트를 받을 때' |
 | G7 경로로 키·id 고르기 | 구현: `name[키]` |
-| G8 늘 켜진 규칙 | 구현: DB › 패시브 |
-| G9 가중치 표 무게 바꾸기 | 구현: 줄 '무게를 밸런스 값에서' |
+| G8 늘 켜진 규칙 | 구현: DB › 패시브 효과 |
+| G9 가중치 표 무게 바꾸기 | 구현: 줄 '무게를 밸런싱 값에서' |
 | G10 경로 앞부분 지켜보기 | 보류. 자주 바뀌는 값과 큰 목록은 키를 나눈다 |
 | G11 글자 입력 창 | 보류 |
 | G12 생활 시뮬 추천 줄·명세서 칸 | 문서: 가이드 07장 1절, 명세서 '게임 안 시계'·'맵' 칸 |

@@ -17,7 +17,7 @@ namespace GBible.EditorTools.UI
     //   숫자 → 증감만 / 글자·참거짓·enum → 값(키워드가 연결된 글자는 목록) / 클래스 → 인스턴스 중 하나(여기서 새로 만들지 않는다) /
     //   컬렉션 → '+'로 요소를 더하고, 요소마다 다시 숫자·값·인스턴스 규칙.
     // 플레이어 데이터가 아닌 보상(다이얼로그 재생 등)은 같은 목록의 '다른 보상'에서 고르고 블록 편집기로 그린다.
-    // 결과 칸(모든 기능 공용: 로그·도전과제·능력·아이템 사용 …). 위의 보상 규칙에 더해:
+    // 결과 칸(모든 기능 공용: 로그·도전과제·액티브 효과·아이템 사용 …). 위의 보상 규칙에 더해:
     //   '+ 결과 추가' 목록 = 플레이어 데이터 필드(플레이어 데이터에 주기) · 로그에 기록 · 대상에게 효과(선택 요구·빌려 쓰기) · 코딩한 결과.
     //   칸의 잠금([OutcomeSlot])에 없는 종류는 목록에 나오지 않는다. 고정 칸(로그 = 로그에 기록)은 하나만 두고 세부 칸만 고친다.
     public static class RewardListEditor
@@ -74,7 +74,7 @@ namespace GBible.EditorTools.UI
             var container = Gs.Col("gs-rewards");
             var slot = TriggerSlots.OutcomeSlotOf(list);
             // 코드로 쓴 결과가 이 항목에 연결되어 있으면([BindTo]) 고를 수 없다: 연결된 클래스를 보이고 cs를 연다.
-            // 코드가 대신하지 않는 칸(OutcomeSlot BindTo = false: 상태 효과의 걸릴 때·끝날 때, 패시브의 발동 더)은 그대로 고친다.
+            // 코드가 대신하지 않는 칸(OutcomeSlot BindTo = false: 상태 효과의 걸릴 때·끝날 때, 패시브 효과의 발동 더)은 그대로 고친다.
             if (list.serializedObject.targetObject is GBible.Data.GameData owner && BoundOutcomes.Has(owner.Id) && ReplacedByCode(list))
             {
                 container.Add(BoundView(owner.Id));

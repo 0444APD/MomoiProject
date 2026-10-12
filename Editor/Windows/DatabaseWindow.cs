@@ -70,7 +70,7 @@ namespace GBible.EditorTools
             return 40;
         }
 
-        // 'DB' 그룹의 로직 종류(능력·상태 효과·패시브·가중치 표 …)와 [Database(HideWhenEmpty)] 종류(도전과제·로그)는 항목이 없으면 탭을 숨긴다 —
+        // 'DB' 그룹의 로직 종류(액티브 효과·상태 효과·패시브 효과·가중치 표 …)와 [Database(HideWhenEmpty)] 종류(도전과제·로그)는 항목이 없으면 탭을 숨긴다 —
         // 그 프로젝트가 쓰는 것만 보인다(AI가 항목을 만들면 나타난다). 개발자가 만드는 종류(DeveloperAuthored)는 비어 있어도 보인다(첫 항목을 만들 수 있게).
         // keep: 지금 연 탭은 비어도 남긴다.
         static int _hiddenEmpty;
@@ -558,7 +558,7 @@ namespace GBible.EditorTools
             {
                 // 숨긴 빈 탭: 눌러서 보이기·다시 숨기기(이 에디터를 쓰는 동안 기억).
                 var toggle = Gs.Label(ShowEmptyTabs ? "빈 탭 숨기기" : $"빈 탭 {_hiddenEmpty}개 숨김 · 보기", "gs-caption");
-                toggle.tooltip = "항목이 없는 로직 종류(능력·상태 효과·패시브 …)의 탭. 이 프로젝트가 쓰기 시작하면(항목이 생기면) 저절로 보입니다.";
+                toggle.tooltip = "항목이 없는 로직 종류(액티브 효과·상태 효과·패시브 효과 …)의 탭. 이 프로젝트가 쓰기 시작하면(항목이 생기면) 저절로 보입니다.";
                 toggle.style.marginLeft = 12;
                 toggle.style.marginBottom = 6;
                 toggle.RegisterCallback<ClickEvent>(_ =>
@@ -1059,14 +1059,14 @@ namespace GBible.EditorTools
                         ("트리거", when != null ? Gs.Dual(when.Natural(names), when.Describe(names)) : "트리거 없음"),
                         ("결과", outcomes.Count > 0 ? string.Join(",  ", outcomes) : "없음"),
                     };
-                // 가중치 표: 줄마다 최종 %(안쪽 표까지 곱한 전체 기준 — 조건은 맞다고, 밸런스 값은 기준값으로).
+                // 가중치 표: 줄마다 최종 %(안쪽 표까지 곱한 전체 기준 — 조건은 맞다고, 밸런싱 값은 기준값으로).
                 case WeightTableData table:
                     var chances = table.Preview(id => names.FindById(id) as WeightTableData, id => (names.FindById(id) as BalanceData)?.value);
                     return new List<(string, string)>
                     {
                         ("확률", chances.Count == 0 ? "없음" : string.Join("  ·  ", chances.Select(c => $"{new string('›', c.depth)}{(c.depth > 0 ? " " : "")}{c.label} {c.percent:0.##}%"))),
                     };
-                // 선택 요소 '능력'(프로젝트의 DB 종류, 규격 IUsableData).
+                // 선택 요소 '액티브 효과'(프로젝트의 DB 종류, 규격 IUsableData).
                 case IUsableData usable when usable.ToUsable() is AbilityDefinition ability:
                     var abilityOutcomes = BoundOutcomes.Has(item.Id) ? BoundOutcomes.For(item.Id).Select(c => "코드: " + c.Name).ToList()
                                         : ability.Outcomes.Select(o => o.Natural(names)).ToList();

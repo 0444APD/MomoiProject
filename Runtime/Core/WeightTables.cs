@@ -22,7 +22,7 @@ namespace GBible
     {
         public string item = "";
         public double weight = 1;
-        // 참이면 weight(또는 밸런스 값)는 '전체 중 %'(고정 %), 거짓이면 무게(고정 %가 남긴 몫을 무게 비율로 나눔).
+        // 참이면 weight(또는 밸런싱 값)는 '전체 중 %'(고정 %), 거짓이면 무게(고정 %가 남긴 몫을 무게 비율로 나눔).
         public bool percent;
         public int minCount = 1;
         public int maxCount = 1;
@@ -31,7 +31,7 @@ namespace GBible
         // 요소 = ID 글자 또는 id가 있는 객체(그 id). 무게·개수·조건은 요소마다 같다. 같은 ID는 한 번만.
         public string listKey = "";
         public string listPath = "";
-        // 비어 있지 않으면 무게 = 밸런스 값(weightBalance)의 단계 값. 단계 = 플레이어 데이터 weightStepKey › weightStepPath의 숫자
+        // 비어 있지 않으면 무게 = 밸런싱 값(weightBalance)의 단계 값. 단계 = 플레이어 데이터 weightStepKey › weightStepPath의 숫자
         // (비우면 기준값). 천장(뽑은 횟수가 늘수록 확률이 오름)·운·레벨에 따라 바뀌는 무게.
         public string weightBalance = "";
         public string weightStepKey = "";
@@ -53,10 +53,10 @@ namespace GBible
         [PlayerDataRef, FieldPathRoot(FieldPathRootKind.PlayerDataKey), FieldLabel("플레이어 데이터")] public string key = "";
         [FieldPath(EmptyLabel = "값 전체"), FieldLabel("필드(숫자)")] public string path = "";
 
-        // 숫자 필드가 id 있는 객체의 필드면 능력치(보정 포함 — 패시브 '가진 동안 능력치 보정'으로 +1)로 읽는다.
+        // 숫자 필드가 id 있는 객체의 필드면 스탯(보정 포함 — 패시브 효과 '가진 동안 스탯 보정'으로 +1)으로 읽는다.
         public double Read(GameSession session) => ReadNumber(session, key, path);
 
-        // 플레이어 데이터 키 › 경로의 숫자(Read와 같은 규칙). 가중치 표 줄의 단계(무게를 밸런스 값에서)도 이것으로 읽는다 —
+        // 플레이어 데이터 키 › 경로의 숫자(Read와 같은 규칙). 가중치 표 줄의 단계(무게를 밸런싱 값에서)도 이것으로 읽는다 —
         // 후보 수에 더할 숫자와 단계가 같은 값을 다르게 읽지 않게(행운 유물의 보정이 확률에도 든다).
         public static double ReadNumber(GameSession session, string key, string path)
         {
@@ -203,7 +203,7 @@ namespace GBible
             return list;
         }
 
-        // 줄의 무게: 밸런스 값이 있으면 그 단계 값(단계 = 플레이어 데이터의 숫자), 없으면 적은 무게.
+        // 줄의 무게: 밸런싱 값이 있으면 그 단계 값(단계 = 플레이어 데이터의 숫자), 없으면 적은 무게.
         double WeightOf(WeightEntry entry)
         {
             if (string.IsNullOrEmpty(entry.weightBalance)) return entry.weight;

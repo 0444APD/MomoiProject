@@ -121,7 +121,7 @@
 .kit-offer-foot { height: 38px; flex-direction: row; justify-content: center; align-items: center; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; font-size: 16px; }
 .kit-offer:hover .kit-offer-body { background-color: var(--momoi-button-hover); }
 
-/* 표 줄(속성·능력치 비교) — 원 아이콘 + 이름 + 칸들 */
+/* 표 줄(속성·스탯 비교) — 원 아이콘 + 이름 + 칸들 */
 .kit-row { height: 52px; padding: 0 6px; flex-direction: row; align-items: center; }
 .kit-row-icon { width: 40px; height: 40px; margin-right: 10px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.08); -unity-background-scale-mode: scale-and-crop; }
 .kit-row-name { width: 180px; font-size: 15px; white-space: normal; }

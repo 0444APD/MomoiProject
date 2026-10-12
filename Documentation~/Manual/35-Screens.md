@@ -122,7 +122,7 @@ protected override void Tick(float deltaTime)
 - `Item("이름")`: 목록 칸 UXML을 찾는다 — DB › 화면의 '목록 칸 UXML', 또는 화면 UXML에 `<ui:Template name="CardItem" src="../Items/CardItem.uxml" />`로 적은 것.
 - `Own(구독)`: 닫을 때 `Dispose`할 것(이벤트 구독·`GameView.Redraw` …).
 - `Watch`: 다시 그릴 키. 기본(null)은 binding-path에 쓴 키들(그것도 없으면 어느 값이 바뀌어도). `new[] { GameIds.PlayerData.Run.Id }`처럼 정한다.
-- 다른 DB 항목(능력·결과)에 붙는 `[BindTo]`와 같은 어트리뷰트다. 화면에 잇는 클래스는 `GameScreen`을 상속하고 매개변수 없는 생성자가 있어야 한다(아니면 게임이 켜질 때 경고하고 코드 없는 화면으로 연다).
+- 다른 DB 항목(액티브 효과·결과)에 붙는 `[BindTo]`와 같은 어트리뷰트다. 화면에 잇는 클래스는 `GameScreen`을 상속하고 매개변수 없는 생성자가 있어야 한다(아니면 게임이 켜질 때 경고하고 코드 없는 화면으로 연다).
 
 ### 2-4. 입력 → 행동
 
@@ -375,7 +375,7 @@ public class ShopScreen : GameScreen
         var goods = List<ShopItem>("goods", Item("GoodsItem"), () => Game.Data().Run.shop, (element, item) =>
         {
             element.Q<Label>("title").text = Texts.NameOf(item.card);
-            element.Q<Label>("price").text = Price().ToString();                // 표시만: 행동과 같은 밸런스 값을 읽는다
+            element.Q<Label>("price").text = Price().ToString();                // 표시만: 행동과 같은 밸런싱 값을 읽는다
             element.EnableInClassList("goods--sold", item.sold);
         }, GameIds.PlayerData.Run.Id);
         goods.OnCreate = (element, item) => element.Q<Button>("buy").clicked +=
@@ -385,7 +385,7 @@ public class ShopScreen : GameScreen
     int Price() => (int)Game.Balance(GameIds.Balance.ShopCardPrice, Game.Data().Run.floor);
 }
 
-// 규칙 쪽(30장 5-3): 가격은 행동이 밸런스 값에서 읽는다
+// 규칙 쪽(30장 5-3): 가격은 행동이 밸런싱 값에서 읽는다
 [Serializable, BlockInfo("카드 사기")]
 public class BuyCard : GameAction
 {
@@ -403,7 +403,7 @@ public class BuyCard : GameAction
 
 DB › 화면 `shop`: 층 `창(메뉴)` · 아래 입력 막기 · 뒤로로 닫기. 골드가 모자라면 `BuyCard`의 `Game.Pay`가 알림을 띄운다.
 
-- **화면이 가격을 행동에 넣지 않는다**(`new BuyCard { source, price = … }`). 행동 필드는 보내는 쪽이 정하는 값이라 멀티플레이에서 상대가 가격 0을 보낼 수 있고, 가격 규칙이 화면 코드에 복사된다. 행동은 무엇을 할지(살 카드)만 받고, 가격은 원본·밸런스 값에서 규칙이 읽는다. 화면은 같은 값을 읽어 **보이기만** 한다(30장 5-3).
+- **화면이 가격을 행동에 넣지 않는다**(`new BuyCard { source, price = … }`). 행동 필드는 보내는 쪽이 정하는 값이라 멀티플레이에서 상대가 가격 0을 보낼 수 있고, 가격 규칙이 화면 코드에 복사된다. 행동은 무엇을 할지(살 카드)만 받고, 가격은 원본·밸런싱 값에서 규칙이 읽는다. 화면은 같은 값을 읽어 **보이기만** 한다(30장 5-3).
 - 물건마다 가격이 다르면 원본에 가격을 두고(`Rules.CardData(Game, source).price`) 행동이 그것을 읽는다. 상점이 열릴 때 정해지는 가격(무작위 할인)이면 상점을 여는 행동이 판 데이터(`run.shop[i].price`)에 적고, `BuyCard`가 판 데이터에서 그 물건을 찾아 읽는다.
 
 ### 5-3. 타이틀 — 이어 하기 · 새 게임 · 슬롯 · 설정 · 종료

@@ -117,7 +117,7 @@ Game.Do(new MoveUnit { unit = hero, x = 3, y = 4 });
 
 ---
 
-## 2-1. 트리거·결과 — 로그·도전과제·능력·아이템 공통
+## 2-1. 트리거·결과 — 로그·도전과제·액티브 효과·아이템 공통
 
 DB의 "조건 → 보상" 기능은 모두 같은 두 칸으로 이루어진다. 두 칸의 편집 화면·동작은 하나이고, 기능마다 다른 것은 **칸에서 고를 수 있는 범위(잠금)**뿐이다.
 
@@ -130,8 +130,8 @@ DB의 "조건 → 보상" 기능은 모두 같은 두 칸으로 이루어진다.
 |---|---|---|
 | 로그(`StatData.triggers`) | 이벤트 받기 | 로그에 기록 하나로 고정(세부 칸만) |
 | 도전과제(`AchievementData`) | 이벤트 받기 · 조건 충족 | 전부 |
-| 능력(`AbilityData`) | 사용 · 조건 충족(기본 `사용`, AND로 사용 조건) | 대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과 |
-| 인스턴스의 사용 기능(`Usable` 필드) | 능력과 같음 | 능력과 같음 |
+| 액티브 효과(`AbilityData`) | 사용 · 조건 충족(기본 `사용`, AND로 사용 조건) | 대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과 |
+| 인스턴스의 사용 기능(`Usable` 필드) | 액티브 효과와 같음 | 액티브 효과와 같음 |
 
 - **AND**: 이벤트를 받은 그 순간에 조건도 참이어야 발동한다(예: "보스 처치 받기 AND 골드 100 이상"). 서로 다른 이벤트 둘을 AND로 묶으면 같은 순간에 오지 않으니 검증이 경고한다.
 - **OR**: 어느 쪽이든 먼저 참이 되는 순간에 발동한다.
@@ -153,14 +153,14 @@ public class QuestData : GameData
 - 결과가 자기 트리거의 이벤트를 다시 쏘는 사슬은 16단계에서 끊기고 경고가 남는다.
 - 플레이어 데이터에 주기: 숫자는 증감, 글자·enum·참거짓은 값, 클래스는 인스턴스, 리스트·배열은 요소 넣기, **딕셔너리는 키 + 값 넣기**(숫자 값은 있던 값에 더함·없던 키는 0에서, 그 밖의 값·인스턴스는 덮어쓰기).
 - 결과를 코딩할 때: `Reward`를 상속하고 `Grant` 안에서 `Context`(트리거 순간: `Context.Event`·`Context.User`·`Context.Picked`)를 본다.
-- 조건 Block(`SimpleCondition`) 안에서도 `Context`로 트리거 순간을 본다(예: 능력의 사용 조건에서 `Context?.User as Unit`).
+- 조건 Block(`SimpleCondition`) 안에서도 `Context`로 트리거 순간을 본다(예: 액티브 효과의 사용 조건에서 `Context?.User as Unit`).
 
 ---
 
-## 3. 능력 = 아이템 사용 효과·스킬·버프 발동
+## 3. 액티브 효과 = 아이템 사용 효과·스킬·버프 발동
 
 ### `Game.Use(string ability, object user, params object[] targets)`
-- DB › 능력의 능력을 쓴다. `user`·`targets`는 객체 또는 id 문자열. 내부적으로 `UseAbility` 행동 하나라 Undo 한 번에 통째로 되돌아간다.
+- DB › 액티브 효과의 액티브 효과를 쓴다. `user`·`targets`는 객체 또는 id 문자열. 내부적으로 `UseAbility` 행동 하나라 Undo 한 번에 통째로 되돌아간다.
 - 흐름: 트리거 검사(사용 조건이 거짓이면 행동 실패) → 결과를 차례로(`대상에게 효과`: 대상 Block들을 위에서부터, 앞 결과가 다음 입력, 대상 Block이 없으면 고른 대상 그대로 → 대상마다 효과 Block) → `AbilityUsed` 이벤트.
 - 아이템도 같다: 아이템에 `사용` 기능을 붙이면 `Game.Use(아이템 ID, 사용자, 대상들)`로 쓴다(개수 줄이기는 인벤토리 쪽에서).
 
@@ -173,7 +173,7 @@ public class QuestData : GameData
 [Serializable, BlockInfo("피해", Category = "전투")]
 public class Damage : Effect<Unit>
 {
-    public int amount = 10;                                           // 에디터 칸(능력마다 값이 다르다)
+    public int amount = 10;                                           // 에디터 칸(액티브 효과마다 값이 다르다)
     protected override void Apply(Unit target) { target.hp -= amount; }
 }
 ```
@@ -181,8 +181,8 @@ public class Damage : Effect<Unit>
 |---|---|
 | `Apply(T target)` | 대상 하나에 할 일. 대상이 `T`가 아니면 불리지 않는다. 받은 객체를 그냥 고친다. |
 | `Game` | 지금 세션의 `GameApi`. |
-| `User<TUser>()` | 능력을 쓴 개체(사용자). 예: `var caster = User<Unit>();` (없거나 형식이 다르면 null) |
-| `Use` | 이번 사용 정보: `Use.Ability`(능력 정의·ID), `Use.User`, `Use.Picked`(플레이어가 고른 대상들). |
+| `User<TUser>()` | 액티브 효과를 쓴 개체(사용자). 예: `var caster = User<Unit>();` (없거나 형식이 다르면 null) |
+| `Use` | 이번 사용 정보: `Use.Ability`(액티브 효과 정의·ID), `Use.User`, `Use.Picked`(플레이어가 고른 대상들). |
 
 ### `TargetSelector<T>` — 대상 Block("누구에게")
 ```csharp
@@ -197,8 +197,8 @@ public class AddEnemiesAround : TargetSelector<Unit>
 - `Game`, `Use`도 물려받는다.
 - 기본 제공: `SelfTarget`("사용자 자신" — 나에게 부여).
 
-### 능력 데이터
-- DB › 능력(`AbilityData`): `trigger`(기본 `사용`) + `outcomes`(결과 목록)를 에디터에서 조립(2-1).
+### 액티브 효과 데이터
+- DB › 액티브 효과(`AbilityData`): `trigger`(기본 `사용`) + `outcomes`(결과 목록)를 에디터에서 조립(2-1).
 - 코드로 정의(테스트 등): `session.Abilities.Define(new AbilityDefinition { Id = "…", When = … })` 후 `Outcomes`에 결과 추가(짧은 형태 `Targets`·`Effects`도 된다).
 
 ---
@@ -215,7 +215,7 @@ public class AllEnemiesDown : SimpleCondition
 }
 ```
 - `Check()`만 쓴다. 평가할 때 읽은 플레이어 데이터를 시스템이 기록해 그것이 바뀔 때 다시 평가한다(무엇을 보는지 선언할 필요 없음).
-- 트리거 칸(도전과제·능력의 사용 조건 …)의 `조건 충족` 블럭으로 나온다. 트리거 순간은 `Context`로 본다.
+- 트리거 칸(도전과제·액티브 효과의 사용 조건 …)의 `조건 충족` 블럭으로 나온다. 트리거 순간은 `Context`로 본다.
 - 조건에서는 값을 바꾸지 않는다.
 
 ### `Condition` — 전부 직접 쓰는 형태(필요할 때만)
@@ -307,7 +307,7 @@ sub.Dispose();                                                              // �
 - `[GameEvent("이름")]`: DB › 이벤트 탭과 로그 규칙의 이벤트 목록에 나온다.
 - 로그(DB › 로그)는 이벤트를 규칙대로 집계한다(횟수·합계·최대, 이벤트 필드 조건으로 거르기). 도전과제는 그 로그를 본다.
 - 이벤트를 받는 쪽에서 플레이어 데이터를 바꾸지 않는다. 연출·UI만(상태를 바꿀 일은 행동·효과에서).
-- 기본 제공 이벤트: `AbilityUsed`(능력 ID·사용자·최종 대상들).
+- 기본 제공 이벤트: `AbilityUsed`(액티브 효과 ID·사용자·최종 대상들).
 
 ---
 
@@ -342,7 +342,7 @@ public override void ValidateData(IValidationContext context) { … } // DB 데�
 
 | 형태 | 뜻 |
 |---|---|
-| `GBibleRuntime.Start()` | 세션을 만들고 DB 데이터(플레이어 데이터·로그·도전과제·능력·인스턴스)를 등록. 이미 있으면 그것을 준다. |
+| `GBibleRuntime.Start()` | 세션을 만들고 DB 데이터(플레이어 데이터·로그·도전과제·액티브 효과·인스턴스)를 등록. 이미 있으면 그것을 준다. |
 | `GBibleRuntime.Session` / `.Game` | 지금 세션 / 그 `GameApi` |
 | `session.ExportMeta()` / `ImportMeta(json)` | 프로필(메타 구역: 계정 단위로 남는 것) 저장·불러오기 |
 | `session.ExportRun()` / `ImportRun(json)` / `NewRun()` | 이번 판(세션 구역) 저장·불러오기·새 판 |

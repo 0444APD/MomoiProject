@@ -14,7 +14,7 @@
 | `GameApi` | 게임 코드의 창구. Block 안에서는 `Game` 속성, 씬 코드에서는 `GBibleRuntime.Game`. |
 | `GameAction` | 플레이어 입력 하나(이동·사용·구매). 데이터라서 서버 전송·리플레이가 되고, 실행 한 번이 Undo 한 단위. |
 | `Block` | 에디터에서 골라 조립하는 로직 단위: `Condition`(조건), `Reward`(보상), `Effect`(효과), `TargetSelector`(대상). |
-| `Ability` | DB › 능력. 대상 Block + 효과 Block을 조립한 것(아이템 사용 효과·스킬·버프 발동). `Game.Use`로 쓴다. |
+| `Ability` | DB › 액티브 효과. 대상 Block + 효과 Block을 조립한 것(아이템 사용 효과·스킬·버프 발동). `Game.Use`로 쓴다. |
 
 ## 예제 (턴제)
 
@@ -40,7 +40,7 @@ public class MoveUnit : GameAction
     protected override void Run() { unit.x = x; unit.y = y; }      // 그냥 대입 → 행동 끝 Sync에서 기록
 }
 
-// 효과 Block: DB › 능력에서 조립하고 수치를 정한다.
+// 효과 Block: DB › 액티브 효과에서 조립하고 수치를 정한다.
 [Serializable, BlockInfo("피해", Category = "전투")]
 public class Damage : Effect<Unit>
 {

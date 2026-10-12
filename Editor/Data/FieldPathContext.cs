@@ -18,7 +18,7 @@ namespace GBible.EditorTools
             var so = property.serializedObject;
             var path = property.propertyPath;
             // 칸이 뿌리를 직접 정했으면 그 형제 칸(트리거면 받는 이벤트, 뿌리 칸이면 그 값). 그 칸이 비었으면 뿌리 없음 —
-            // 위쪽의 다른 뿌리 칸으로 넘어가지 않는다(패시브의 '가진 쪽 필드'가 발동이 없을 때 가진 목록의 필드를 보이지 않게).
+            // 위쪽의 다른 뿌리 칸으로 넘어가지 않는다(패시브 효과의 '가진 쪽 필드'가 발동이 없을 때 가진 목록의 필드를 보이지 않게).
             var own = PropertyUtil.GetField(property, out _)?.GetCustomAttribute<FieldPathAttribute>();
             if (!string.IsNullOrEmpty(own?.Root))
             {

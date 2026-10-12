@@ -90,7 +90,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 중첩만큼_능력치_보정이_붙는다()
+        public void 중첩만큼_스탯_보정이_붙는다()
         {
             var rage = new StatusDefinition { Id = "rage", MaxStacks = 3, Reapply = StatusReapply.AddStacks };
             rage.Modifiers.Add(new StatusModifier { attribute = nameof(SsUnit.attack), kind = ModifierKind.Percent, valuePerStack = 0.1 });

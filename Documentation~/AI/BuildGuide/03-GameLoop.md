@@ -111,8 +111,8 @@ public class RunDirector : MonoBehaviour
 | 턴 끝 | `EndTurn` | 턴 끝 효과(화상) → 적이 모두 쓰러졌으면 전투 승리, 아니면 적 공격 → 주인공이 쓰러지면 판 끝, 아니면 손패를 버리고 다음 턴 | 턴 끝, 턴 시작 |
 | 전투 승리 | `WinBattle` | 마지막 턴을 마감하고(턴 끝을 아직 쏘지 않았으면), 보상 골드, 다음 층 | 턴 끝, 전투 승리, 골드 획득 |
 
-> [!note]- 시작 체력·골드·보상 골드는 밸런스 값 — DB에 세 항목
-> 기획자가 바꿀 숫자는 코드에 적지 않고 DB › 밸런스 값에 둔다. 카드 던전은 세 항목을 만든다.
+> [!note]- 시작 체력·골드·보상 골드는 밸런싱 값 — DB에 세 항목
+> 기획자가 바꿀 숫자는 코드에 적지 않고 DB › 밸런싱 값에 둔다. 카드 던전은 세 항목을 만든다.
 >
 > | ID | 값 | 곡선 | 읽는 곳 |
 > |---|---|---|---|
@@ -121,8 +121,8 @@ public class RunDirector : MonoBehaviour
 > | `winGold` | 15 | 일정하게, 단계마다 +3 | `WinBattle`: 그 층 값의 ⅔~4⁄3(1층 10~20, 3층 14~28) |
 >
 > - 코드는 `Game.Balance(GameIds.Balance.StartHp)`, 층마다 커지는 값은 `Game.Balance(GameIds.Balance.WinGold, run.floor)`.
-> - 손으로 만들어도 되고, 메뉴 **MomoiProject › DB 추가 › 카드 던전 밸런스 값**을 누르면 세 항목이 적용 전으로 생긴다(예시의 `Editor/AddBalanceValues.cs`). DB에서 확인하고 Ctrl+S.
-> - 항목이 없으면 `StartRun`이 "없는 밸런스 값"으로 실패한다(새 판이 시작되지 않는다). DB에 만들고 Ctrl+S.
+> - 손으로 만들어도 되고, 메뉴 **MomoiProject › DB 추가 › 카드 던전 밸런싱 값**을 누르면 세 항목이 적용 전으로 생긴다(예시의 `Editor/AddBalanceValues.cs`). DB에서 확인하고 Ctrl+S.
+> - 항목이 없으면 `StartRun`이 "없는 밸런싱 값"으로 실패한다(새 판이 시작되지 않는다). DB에 만들고 Ctrl+S.
 > - 플레이 중에 DB에서 값을 고치면 저장 전이라도 다음 판·다음 보상부터 바로 반영된다. 테스트는 DB 대신 `session.Balance.Define`으로 넣는다([08장](08-TestAndDebug.md) 6절).
 | 판 끝 | `EndRun` | 남길 값을 프로필로 옮기고 층을 0으로 | 판 끝 |
 
@@ -241,7 +241,7 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > [!note]- 실패를 다루는 다른 방법
 > | 이럴 때 | 이렇게 |
 > |---|---|
-> | 할 수 없다는 걸 미리 보여 주고 싶다(버튼 흐리게) | `Game.CanDo(행동, out 이유)`: 행동을 해 보고 되돌려 성공하는지와 실패 글을 준다([06장](06-Presentation.md) 2절). 사용 기능·능력의 사용 조건만 볼 때는 `Game.CanUse`. |
+> | 할 수 없다는 걸 미리 보여 주고 싶다(버튼 흐리게) | `Game.CanDo(행동, out 이유)`: 행동을 해 보고 되돌려 성공하는지와 실패 글을 준다([06장](06-Presentation.md) 2절). 사용 기능·액티브 효과의 사용 조건만 볼 때는 `Game.CanUse`. |
 > | 그냥 `return`하고 싶다 | 하지 않는다. 아무것도 바꾸지 않은 행동도 Undo 이력에 한 칸 남는다. |
 
 ## 7. 화면과 시스템의 경계
@@ -328,11 +328,11 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 > [!note]- 더 보기(매뉴얼)
 > - [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) — `Do` 안에서 일어나는 일, 실패, Undo, 지연 효과
 > - [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md) — 상태 효과의 칸, `ScheduleAfter`·`ScheduleOn`
-> - [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 행동 직전 이벤트
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Fail`·`GameFailure`
+> - [28. 스탯·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — `Game.Pay`와 비용 행동 직전 이벤트
+> - [30. 밸런싱 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Fail`·`GameFailure`
 > - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — 씬 흐름, 월드 상태
 > - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`All`·`Do`·`Use`, 씬 코드에서 쓰는 법
 > - [10. 이벤트](../../Manual/10-Events.md) — 쏘기·받기, `Subscribe`와 `Dispose`
-> - [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md) — `Game.Use`의 실행 흐름, `Game.CanUse`
+> - [16. 액티브 효과와 사용 기능](../../Manual/16-Abilities-Usable.md) — `Game.Use`의 실행 흐름, `Game.CanUse`
 > - [20. 시작하기](../../Manual/20-Setup.md) — `GBibleRuntime`, 판 저장·불러오기
 > - [22. 모니터와 디버깅](../../Manual/22-Monitor-Debug.md) — 행동 탭, 타임라인 묶어 보기

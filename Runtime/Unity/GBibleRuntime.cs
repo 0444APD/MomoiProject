@@ -407,13 +407,13 @@ namespace GBible
                 // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
                 options.Migrations.EveryLoad = SavedIdRenames.Build(database);
                 if (main) LoadProfile(session);
-                // 선택 요소: 프로젝트가 템플릿에서 들인 상태 효과·패시브 DB 종류(규격 IStatusData·IPassiveData). 없으면 아무것도 등록하지 않는다.
+                // 선택 요소: 프로젝트가 템플릿에서 들인 상태 효과·패시브 효과 DB 종류(규격 IStatusData·IPassiveData). 없으면 아무것도 등록하지 않는다.
                 foreach (var status in database.Entries.OfType<IStatusData>()) session.Statuses.Define(status.ToDefinition());
                 foreach (var passive in database.Entries.OfType<IPassiveData>()) session.Passives.Define(passive.ToDefinition());
-                // DB › 밸런스 값(Game.Balance)·가중치 표(Game.Roll).
+                // DB › 밸런싱 값(Game.Balance)·가중치 표(Game.Roll).
                 foreach (var balance in database.All<BalanceData>()) balance.Define(session.Balance);
                 foreach (var table in database.All<WeightTableData>()) session.Tables.Define(table.ToDefinition());
-                // Game.Use로 쓰는 것: 능력(IUsableData)과,사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
+                // Game.Use로 쓰는 것: 액티브 효과(IUsableData)와,사용 기능(Usable 필드)이 붙은 인스턴스(아이템 등, ID = 인스턴스 ID).
                 foreach (var usable in database.Entries.OfType<IUsableData>())
                     if (usable.ToUsable() is AbilityDefinition definition) session.Abilities.Define(definition);
                 foreach (var instance in database.All<InstanceData>())
@@ -421,7 +421,7 @@ namespace GBible
                 foreach (var achievement in database.All<AchievementData>()) session.Achievements.Define(achievement.ToDefinition());
                 // DB › 개발 명령 → 모니터 › 명령 탭 버튼(개발 빌드에서만 등록된다).
                 foreach (var command in database.All<DebugCommandData>()) command.Register(session);
-                // [BindTo] ID가 DB의 어느 항목(도전과제·로그·능력·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
+                // [BindTo] ID가 DB의 어느 항목(도전과제·로그·액티브 효과·인스턴스·프로젝트 고유 기능 …)에도 없으면 알린다(오타·지운 항목).
                 var entryIds = new System.Collections.Generic.HashSet<string>(database.Entries.Where(e => e != null && !string.IsNullOrEmpty(e.Id)).Select(e => e.Id), StringComparer.Ordinal);
                 foreach (var id in BoundOutcomes.Ids)
                     if (!entryIds.Contains(id))

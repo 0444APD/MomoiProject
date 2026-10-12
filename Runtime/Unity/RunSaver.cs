@@ -110,7 +110,7 @@ namespace GBible
         {
             if (record.Nested || record.Status != ActionStatus.Done) return; // 안쪽 행동은 바깥 행동이 끝날 때 한 번에
             if (GBibleRuntime.IsSaving) return;                              // 저장 직전(Saving)에 담은 행동은 이번 저장에 들어간다
-            // 시스템 행동(상태 효과 주기·만료·예약·패시브 주기 …)은 틱마다 돌 수 있다: '행동마다' 저장은 플레이어 행동에만 —
+            // 시스템 행동(상태 효과 주기·만료·예약·패시브 효과 주기 …)은 틱마다 돌 수 있다: '행동마다' 저장은 플레이어 행동에만 —
             // 그 변경은 다음 플레이어 행동·끌 때 함께 저장된다(매 프레임 판 파일을 쓰지 않게). 'N초마다'는 간격이 있으니 그대로 센다.
             if (_mode != RunSaveMode.Interval && IsSystem(record.Action)) return;
             _dirty = true;

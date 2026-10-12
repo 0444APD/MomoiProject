@@ -126,7 +126,7 @@ namespace GBible
             foreach (var watch in Watches) watch.Dirty = true;
         }
 
-        // 모든 화면을 다음 프레임 끝에 다시 그린다(밸런스 값처럼 플레이어 데이터가 아닌 것이 바뀌었을 때).
+        // 모든 화면을 다음 프레임 끝에 다시 그린다(밸런싱 값처럼 플레이어 데이터가 아닌 것이 바뀌었을 때).
         public static void RedrawAll()
         {
             foreach (var watch in Watches) watch.Dirty = true;

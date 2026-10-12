@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace GBible
 {
-    // 트리거·결과: 로그·도전과제·퀘스트·능력·사용 아이템이 모두 같은 두 칸으로 이루어진다.
+    // 트리거·결과: 로그·도전과제·퀘스트·액티브 효과·사용 아이템이 모두 같은 두 칸으로 이루어진다.
     //   트리거(언제) — 이벤트 받기 · 조건 충족 · 사용, 그리고 AND·OR·NOT으로 중첩.
     //   결과(무엇을) — 로그에 기록 · 플레이어 데이터에 주기 · 코딩한 결과 Block · 대상에게 효과.
     // 두 칸의 화면과 동작은 모든 기능이 같이 쓴다. 기능마다 다른 것은 칸에서 고를 수 있는 범위(잠금)뿐이다:
@@ -20,7 +20,7 @@ namespace GBible
         Event = 1,
         // 플레이어 데이터 조건이 참인 동안(참이 되는 순간 발동).
         Condition = 2,
-        // 아이템·능력을 쓰는 순간(Game.Use).
+        // 아이템·액티브 효과를 쓰는 순간(Game.Use).
         Use = 4,
         // 어떤 일이 일어나기 직전(Game.Intercept로 의도를 통과시킬 때).
         Intercept = 8,
@@ -77,7 +77,7 @@ namespace GBible
     public sealed class TriggerContext
     {
         public GameSession Session;
-        // 이 트리거를 가진 항목의 ID(로그·도전과제·능력 …).
+        // 이 트리거를 가진 항목의 ID(로그·도전과제·액티브 효과 …).
         public string Owner;
         // 이벤트를 받은 순간이면 그 이벤트.
         public object Event;
@@ -89,7 +89,7 @@ namespace GBible
         public IReadOnlyList<object> Picked = Array.Empty<object>();
         // '쓸 수 있나'만 미리 보는 순간(Game.CanUse). 확률 조건이 굴리지 않는다.
         public bool IsCheck;
-        // 다른 조각의 패시브를 빌려 쓰는 순간(Blueprint). User = 빌려 준 원본 조각. '필드 바꾸기'는 이때 원본 자신의 필드를 바꾸지 않는다.
+        // 다른 조각의 패시브 효과를 빌려 쓰는 순간(Blueprint). User = 빌려 준 원본 조각. '필드 바꾸기'는 이때 원본 자신의 필드를 바꾸지 않는다.
         public bool IsBorrowed;
         // 효과 배율(의도 '효과 배율'을 거친 값, 기본 1). 기본 효과 Block이 수치에 곱하고, 프로젝트 Block은 Use.Context.Power로 읽는다.
         public double Power = 1;
@@ -268,7 +268,7 @@ namespace GBible
     }
 
     [Serializable]
-    [BlockInfo("사용", Category = "트리거", Description = "아이템·능력을 쓰는 순간입니다(게임 코드의 Game.Use).")]
+    [BlockInfo("사용", Category = "트리거", Description = "아이템·액티브 효과를 쓰는 순간입니다(게임 코드의 Game.Use).")]
     public sealed class UseTrigger : Trigger
     {
         public override TriggerKinds Kind => TriggerKinds.Use;
@@ -440,7 +440,7 @@ namespace GBible
         }
     }
 
-    // 대상 Block이 고른 객체마다 효과 Block을 실행한다(능력·사용 아이템·도전과제 등 어디서나).
+    // 대상 Block이 고른 객체마다 효과 Block을 실행한다(액티브 효과·사용 아이템·도전과제 등 어디서나).
     // 대상 Block은 위에서부터 차례로(앞 결과가 다음 입력, 비어 있으면 사용할 때 고른 대상 그대로).
     [Serializable]
     [BlockInfo("대상에게 효과", Category = "결과", Description = "대상 Block으로 누구에게 줄지 고르고, 그 대상마다 효과 Block을 실행합니다.")]
@@ -514,7 +514,7 @@ namespace GBible
     {
         sealed class Entry
         {
-            // 감시 키(Unregister·IsRegistered가 찾는 이름 — 패시브는 'passive:<ID>'처럼 종류를 붙여 겹치지 않게).
+            // 감시 키(Unregister·IsRegistered가 찾는 이름 — 패시브 효과는 'passive:<ID>'처럼 종류를 붙여 겹치지 않게).
             public string Owner;
             // 검사·발동하는 순간에 보일 '가진 항목 ID'(Context.Owner — 값 틀 {owner}·{level}·{stacks}, 확률의 source). 비우면 감시 키.
             public string Item;
@@ -578,8 +578,8 @@ namespace GBible
         // holders를 주면 가진 쪽마다 검사한다: 순간마다 holders(순간)의 각 객체를 컨텍스트의 사용자(User)로 넣어 트리거 전체(조건 포함)를
         // 따로 검사하고, 참인 가진 쪽마다 fire를 부른다(조건 Block이 Context.User로 "가진 쪽의 체력" 같은 것을 본다).
         // orderedHolders + orderGroup: 가진 쪽마다 검사하되, 같은 묶음의 다른 항목들과 섞어 가진 쪽의 자리(order)가 작은 것부터 발동한다.
-        //   이벤트 하나에 '놓인 것마다' 패시브 여럿이 걸리면 패시브 등록 순서가 아니라 목록 순서대로 돈다(가로채기는 같은 '순서' 칸끼리).
-        // item: 순간(Context.Owner)에 보일 항목 ID — 감시 키(owner)에 종류를 붙였을 때(패시브 'passive:<ID>' → <ID>). 비우면 owner.
+        //   이벤트 하나에 '놓인 것마다' 패시브 효과 여럿이 걸리면 패시브 효과 등록 순서가 아니라 목록 순서대로 돈다(가로채기는 같은 '순서' 칸끼리).
+        // item: 순간(Context.Owner)에 보일 항목 ID — 감시 키(owner)에 종류를 붙였을 때(패시브 효과 'passive:<ID>' → <ID>). 비우면 owner.
         public void Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null,
             Func<TriggerContext, IEnumerable<(object holder, int order)>> orderedHolders = null, string orderGroup = null, string item = null)
         {
@@ -746,7 +746,7 @@ namespace GBible
                     if (!entry.Live) continue;
                     if (entry.OrderGroup != null)
                     {
-                        // 같은 묶음('놓인 것마다' 패시브가 보는 같은 목록)은 처음 만난 자리에서 한꺼번에, 자리 순서로.
+                        // 같은 묶음('놓인 것마다' 패시브 효과가 보는 같은 목록)은 처음 만난 자리에서 한꺼번에, 자리 순서로.
                         done = done ?? new HashSet<string>(StringComparer.Ordinal);
                         if (!done.Add(entry.OrderGroup)) continue;
                         FireInPlaceOrder(ordered.Where(e => e.OrderGroup == entry.OrderGroup).ToList(), evt, false);

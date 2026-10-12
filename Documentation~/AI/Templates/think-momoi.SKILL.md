@@ -13,7 +13,7 @@ GBible 문서는 `{{GBIBLE}}/Documentation~/AI/`에 있다.
 | `ProjectConventions.md` | 늘(CLAUDE.md가 불러온다) — 어떻게 쓰나 |
 | `Reference.md` | 늘(CLAUDE.md가 불러온다) — 무엇이 있나 |
 | `PlanningSpecGuide.md` | 단계 0·1 — 명세서 칸 → GBible, 시스템 목록, 효과를 쪼개는 예 |
-| `NamingGuide.md` | 이름을 지을 때마다(DB·칸·Block·밸런스 값) — 바로잡은 이름 표를 먼저, 밸런스 값의 표시 이름·메모·입력 칸 주석·묶음 |
+| `NamingGuide.md` | 이름을 지을 때마다(DB·칸·Block·밸런싱 값) — 바로잡은 이름 표를 먼저, 밸런싱 값의 표시 이름·메모·입력 칸 주석·묶음 |
 | `UiGuide.md` · `Templates/UI/README.md` | 단계 2와 화면을 만들거나 고칠 때마다 — 문법 · 레이아웃(자리·크기 표·배치 A~E) · 디자인(차가운 검정 + 종이 흰색) · UI 키트(형식 A~D 조각) |
 | `GimmickCatalog.md` | 단계 0·2(샘플), 콘텐츠 요청, 변경 요청 — 기믹 갈래 → 부품, 메인 룰의 모양, 미리 둘 자리 |
 | `PlanningSpec-CardDungeon.md` | 명세서가 어떻게 채워지는지 볼 때 |

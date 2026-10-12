@@ -6,26 +6,26 @@ using System.Linq;
 
 namespace GBible
 {
-    // 패시브: "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과·축복·조커·참). 정의(DB › 패시브)는 늘 등록되어 있고,
+    // 패시브 효과: "가지고 있으면 발동"(유물·특성·패시브 스킬·장비 효과·축복·조커·참). 정의(DB › 패시브 효과)는 늘 등록되어 있고,
     // 가진 목록(플레이어 데이터의 ID 목록·객체 목록·딕셔너리)에 그 ID가 있는 쪽마다 트리거를 검사해 결과를 낸다.
     //   가진 목록 run › relics           → 가진 쪽 = run(판 하나에 하나)
     //   가진 목록 run › hero.perks       → 가진 쪽 = hero(사용자 자신 = 주인공)
     //   가진 목록 run › party[].traits   → 가진 쪽 = 그 목록을 가진 동료마다
-    // 놓인 것마다(PerElement): 가진 쪽 = 목록의 요소 하나하나(조커·참·가방의 아티팩트). 같은 목록의 '놓인 것마다' 패시브는
-    //   패시브 등록 순서가 아니라 **목록 순서(자리)대로** 발동한다 — 조커 칸 왼쪽부터, 보드 앞 칸부터.
-    // 일치 필드(MatchField): 객체 목록에서 요소의 이 필드가 패시브 ID면(글자 목록이면 그 안에 있으면) 가진 것. 비우면 요소 자신(글자)·요소의 id.
-    //   원본에서 읽기(MatchVia): 일치 필드가 원본(DB › 인스턴스) ID를 담고, 그 원본의 이 필드(글자·글자 목록)에 패시브 ID가 있으면 가진 것.
-    //     조각 { id, card = "card.foxee" } + 원본 Card { passives = [reactHit, wild] } → 조각 하나에 패시브 여럿, 판 데이터에는 원본 ID만.
+    // 놓인 것마다(PerElement): 가진 쪽 = 목록의 요소 하나하나(조커·참·가방의 아티팩트). 같은 목록의 '놓인 것마다' 패시브 효과는
+    //   패시브 효과 등록 순서가 아니라 **목록 순서(자리)대로** 발동한다 — 조커 칸 왼쪽부터, 보드 앞 칸부터.
+    // 일치 필드(MatchField): 객체 목록에서 요소의 이 필드가 패시브 효과 ID면(글자 목록이면 그 안에 있으면) 가진 것. 비우면 요소 자신(글자)·요소의 id.
+    //   원본에서 읽기(MatchVia): 일치 필드가 원본(DB › 인스턴스) ID를 담고, 그 원본의 이 필드(글자·글자 목록)에 패시브 효과 ID가 있으면 가진 것.
+    //     조각 { id, card = "card.foxee" } + 원본 Card { passives = [reactHit, wild] } → 조각 하나에 패시브 효과 여럿, 판 데이터에는 원본 ID만.
     // 몇 개 가졌나(레벨): 목록이면 그 ID가 든 횟수(레벨 필드를 고르면 그 숫자의 합), 딕셔너리면 그 키의 숫자 → Game.Owned(ID, 가진 쪽).
     //   놓인 것마다면 요소 하나의 레벨(레벨 필드, 없으면 1). 레벨이 0 이하인 요소는 꺼진 것(발동·보정 없음). 결과의 값 틀 {level}이 이것이다.
-    // 발동 여러 줄(Rules): 같은 패시브가 다른 순간마다 다른 결과(손을 낼 때 +1 쌓기 · 버릴 때 −1 · 점수 때 내기). 줄마다 트리거 + 결과.
-    // 가진 동안 능력치 보정(Modifiers): 가진 동안만 붙는 보정. 저장하지 않고 읽을 때 계산한다(얻고 잃는 순간을 따로 다루지 않는다).
+    // 발동 여러 줄(Rules): 같은 패시브 효과가 다른 순간마다 다른 결과(손을 낼 때 +1 쌓기 · 버릴 때 −1 · 점수 때 내기). 줄마다 트리거 + 결과.
+    // 가진 동안 스탯 보정(Modifiers): 가진 동안만 붙는 보정. 저장하지 않고 읽을 때 계산한다(얻고 잃는 순간을 따로 다루지 않는다).
     //   받는 쪽 = 가진 쪽(놓인 것마다면 그 요소), 또는 '보정 받을 대상' 경로(가진 목록의 플레이어 데이터 안, 예: hero). 줄마다 따로 정할 수도 있다.
     //   보정 조건(ModifierWhen): 참일 때만 붙는다(가진 쪽마다 읽을 때 검사, 사용자 = 가진 쪽) — 같은 줄에 혼자일 때·체력이 절반 이하일 때.
     //   여럿일 때(Stacking): 받는 쪽 하나에 가진 쪽이 여럿이면 레벨 합으로 한 번 / 가진 쪽마다 값을 더함 / 가장 높은 레벨 하나만.
     // 주기(Pulse, 초): 가진 동안 N초(게임 시간)마다 가진 쪽마다 결과를 낸다(레벨별 주기 가능). 트리거가 없어도 된다.
-    // 침묵: 가진 쪽에 '패시브를 끔'인 상태 효과가 걸려 있으면 그 가진 쪽의 패시브는 발동·보정·레벨이 모두 없다(Ink·디버프된 조커).
-    // 결과의 컨텍스트: User = 가진 쪽, Owner = 패시브 ID, Power = 의도 '효과 배율'. 가진 쪽 필드를 고르면 이벤트·의도의 그 필드가 가진 쪽 id일 때만.
+    // 침묵: 가진 쪽에 '패시브 효과를 끔'인 상태 효과가 걸려 있으면 그 가진 쪽의 패시브 효과는 발동·보정·레벨이 모두 없다(Ink·디버프된 조커).
+    // 결과의 컨텍스트: User = 가진 쪽, Owner = 패시브 효과 ID, Power = 의도 '효과 배율'. 가진 쪽 필드를 고르면 이벤트·의도의 그 필드가 가진 쪽 id일 때만.
     // 상태 효과와 다른 점: 지속·중첩·만료가 없고, 가진 것은 게임의 데이터(유물 목록)에 그대로 있다.
     public sealed class PassiveDefinition
     {
@@ -33,7 +33,7 @@ namespace GBible
         public string DisplayName;
         public string OwnerKey;          // 가진 목록이 든 플레이어 데이터
         public string OwnerPath;         // 그 안의 목록·딕셔너리 경로(앞마디에 []를 쓰면 가진 쪽이 여럿)
-        public string MatchField;        // 객체 목록 요소의 이 필드(글자·글자 목록)에 패시브 ID가 있으면 가진 것(비우면 요소 자신·id)
+        public string MatchField;        // 객체 목록 요소의 이 필드(글자·글자 목록)에 패시브 효과 ID가 있으면 가진 것(비우면 요소 자신·id)
         public string MatchVia;          // 일치 필드가 원본 ID일 때 그 원본에서 읽을 필드(비우면 일치 필드를 그대로 비교)
         public bool PerElement;          // 놓인 것마다: 가진 쪽 = 요소, 같은 목록끼리 목록 순서로 발동
         public string LevelField;        // 요소의 이 숫자 필드가 레벨(비우면 1개 = 1)
@@ -48,14 +48,14 @@ namespace GBible
         public readonly List<PassiveRule> Rules = new List<PassiveRule>();
         public readonly List<PassiveModifier> Modifiers = new List<PassiveModifier>();
 
-        // 같은 목록의 '놓인 것마다' 패시브를 한 줄로 세우는 이름.
+        // 같은 목록의 '놓인 것마다' 패시브 효과를 한 줄로 세우는 이름.
         internal string OrderGroup => PerElement ? "passive-list:" + OwnerKey + ":" + OwnerPath : null;
 
         // 그 레벨의 주기(초). 레벨별 주기가 있으면 그 칸(넘치면 마지막).
         public double PulseAt(int level) => PulseByLevel.Count > 0 ? PulseByLevel[Math.Max(0, Math.Min(level, PulseByLevel.Count) - 1)] : Pulse;
     }
 
-    // 패시브의 발동 한 줄(같은 패시브의 다른 순간).
+    // 패시브 효과의 발동 한 줄(같은 패시브 효과의 다른 순간).
     public sealed class PassiveRule
     {
         public Trigger When;
@@ -78,16 +78,16 @@ namespace GBible
         Highest,
     }
 
-    // 패시브의 '가진 동안 능력치 보정' 한 줄.
+    // 패시브 효과의 '가진 동안 스탯 보정' 한 줄.
     [Serializable]
     public sealed class PassiveModifier
     {
-        [FieldLabel("능력치(숫자 필드 이름)")] public string attribute = "";
+        [FieldLabel("스탯(숫자 필드 이름)")] public string attribute = "";
         [FieldLabel("칸")] public ModifierKind kind = ModifierKind.Flat;
         [FieldLabel("값(퍼센트는 0.2 = +20%)")] public double value;
         [FieldLabel("레벨마다(값 × 레벨)")] public bool perLevel;
         [FieldLabel("레벨별 값(1레벨부터, 비우면 위 값)")] public List<double> byLevel = new List<double>();
-        [FieldLabel("받을 대상(비우면 패시브의 보정 받을 대상)")] public string target = "";
+        [FieldLabel("받을 대상(비우면 패시브 효과의 보정 받을 대상)")] public string target = "";
 
         // 그 레벨의 값: 레벨별 값이 있으면 그 칸(넘치면 마지막), 아니면 값(레벨마다면 × 레벨).
         public double At(int level)
@@ -97,12 +97,12 @@ namespace GBible
         }
     }
 
-    // 기본 제공 의도: 효과 배율. 능력을 쓸 때·패시브가 발동할 때 한 번 거친다. 기본 효과 Block(상태 효과 걸기 중첩·필드 바꾸기 더하기·
-    // 능력치 보정 값)이 곱하고, 프로젝트 Block은 Use.Context.Power로 읽는다. "이 카드의 수치 2배"(Lumin)·"맨 오른쪽이면 2배"(Critical).
+    // 기본 제공 의도: 효과 배율. 액티브 효과를 쓸 때·패시브 효과가 발동할 때 한 번 거친다. 기본 효과 Block(상태 효과 걸기 중첩·필드 바꾸기 더하기·
+    // 스탯 보정 값)이 곱하고, 프로젝트 Block은 Use.Context.Power로 읽는다. "이 카드의 수치 2배"(Lumin)·"맨 오른쪽이면 2배"(Critical).
     [Serializable, Intent("효과 배율")]
     public sealed class PowerIntent
     {
-        public string ownerId;          // 능력·패시브 ID
+        public string ownerId;          // 액티브 효과·패시브 효과 ID
         public string userId;           // 사용자·가진 쪽 id
         public double multiplier = 1;   // 곱할 배율
     }
@@ -111,13 +111,13 @@ namespace GBible
     {
         readonly GameSession _session;
         readonly Dictionary<string, PassiveDefinition> _definitions = new Dictionary<string, PassiveDefinition>(StringComparer.Ordinal);
-        // 능력치 이름 → 그 능력치를 보정하는 패시브(읽을 때 빨리 건너뛰려고).
+        // 스탯 이름 → 그 스탯을 보정하는 패시브 효과(읽을 때 빨리 건너뛰려고).
         readonly Dictionary<string, List<PassiveDefinition>> _byAttribute = new Dictionary<string, List<PassiveDefinition>>(StringComparer.Ordinal);
-        // 지금 빌려 쓰는 중인 (패시브, 원본) — 서로 빌리는 고리(Blueprint ↔ Brainstorm)를 끊는다.
+        // 지금 빌려 쓰는 중인 (패시브 효과, 원본) — 서로 빌리는 고리(Blueprint ↔ Brainstorm)를 끊는다.
         readonly HashSet<(string, object)> _borrowing = new HashSet<(string, object)>();
         // 빌려 쓰는 중인 빌리는 쪽(맨 위 = 지금) — 빌려 쓰는 결과 안에서 또 빌리면(Brainstorm → Blueprint → 오른쪽) 가진 쪽 필드를 처음 빌린 조각으로 본다.
         readonly Stack<object> _borrowers = new Stack<object>();
-        // 보정 조건을 검사하는 중인 (패시브, 가진 쪽) — 조건이 같은 능력치를 읽어 다시 들어오면 그 보정은 없는 것으로 본다.
+        // 보정 조건을 검사하는 중인 (패시브 효과, 가진 쪽) — 조건이 같은 스탯을 읽어 다시 들어오면 그 보정은 없는 것으로 본다.
         readonly HashSet<(string, object)> _checking = new HashSet<(string, object)>();
         double _lastPulse = -1;
 
@@ -177,7 +177,7 @@ namespace GBible
             return total;
         }
 
-        // 그 대상에 붙는 '가진 동안 능력치 보정'(attribute를 비우면 모든 능력치). 저장된 Modifier와 같은 모양으로 돌려준다(source = 패시브 ID).
+        // 그 대상에 붙는 '가진 동안 스탯 보정'(attribute를 비우면 모든 스탯). 저장된 Modifier와 같은 모양으로 돌려준다(source = 패시브 효과 ID).
         public IEnumerable<Modifier> ModifiersFor(object target, string targetId, string attribute = null)
         {
             if (target == null && string.IsNullOrEmpty(targetId)) yield break;
@@ -296,7 +296,7 @@ namespace GBible
             return holderId != null && FieldText(moment.Event, definition.HolderField) == holderId;
         }
 
-        // 침묵: 가진 쪽에 '걸린 쪽의 패시브를 끔' 상태 효과가 있나.
+        // 침묵: 가진 쪽에 '걸린 쪽의 패시브 효과를 끔' 상태 효과가 있나.
         bool IsSilenced(object holder) => holder != null && !(holder is string) && GameApi.HasId(holder.GetType()) && _session.Statuses.Silences(holder);
 
         void Fire(PassiveDefinition definition, List<Outcome> outcomes, TriggerContext moment)
@@ -308,7 +308,7 @@ namespace GBible
                 Session = _session, Owner = definition.Id, Event = moment.Event, IsIntercept = moment.IsIntercept, IsBorrowed = moment.IsBorrowed,
                 User = holder, Picked = holder == null ? Array.Empty<object>() : new[] { holder },
             };
-            // 효과 배율을 고치는 패시브 자신은 배율을 거치지 않는다(같은 의도를 다시 만들어 끝없이 돈다).
+            // 효과 배율을 고치는 패시브 효과 자신은 배율을 거치지 않는다(같은 의도를 다시 만들어 끝없이 돈다).
             context.Power = moment.Event is PowerIntent ? 1 : PowerOf(definition.Id, holder);
             _session.Triggers.RunOutcomes(outcomes, context, "Passive");
         }
@@ -323,11 +323,11 @@ namespace GBible
             return intent.multiplier;
         }
 
-        // 빌려 쓰기(복사·흉내): 지금 순간(이벤트·의도)으로 그 패시브의 트리거를 원본(lender)을 가진 쪽으로 검사하고, 참이면 결과를 낸다.
+        // 빌려 쓰기(복사·흉내): 지금 순간(이벤트·의도)으로 그 패시브 효과의 트리거를 원본(lender)을 가진 쪽으로 검사하고, 참이면 결과를 낸다.
         //   결과의 사용자 = 원본 조각(원본의 값을 읽는다), IsBorrowed = 참 — '필드 바꾸기'는 원본 자신의 필드를 바꾸지 않는다(쌓이는 값은 원본만).
         //   가진 쪽 필드는 빌리는 쪽(지금 순간의 사용자)으로 본다 — "이 조커의 차례" 이벤트에서 Blueprint가 오른쪽 조커를 빌린다.
         //     빌려 쓰는 결과 안에서 또 빌리면(Brainstorm → Blueprint → 오른쪽) 처음 빌린 조각(그 차례의 조각)으로 본다.
-        //   발동이 여러 줄이면 맞는 줄마다. 이미 빌려 쓰는 중인 (패시브, 원본)을 다시 빌리면 거짓(고리 끊기). 결과를 냈으면 참.
+        //   발동이 여러 줄이면 맞는 줄마다. 이미 빌려 쓰는 중인 (패시브 효과, 원본)을 다시 빌리면 거짓(고리 끊기). 결과를 냈으면 참.
         //   꺼진 원본(침묵·레벨 0 이하)은 빌리지 못한다(거짓) — 직접 발동하지 않는 조각은 빌려도 발동하지 않는다.
         public bool Borrow(string id, object lender, TriggerContext moment)
         {
@@ -370,7 +370,7 @@ namespace GBible
                 if (rule?.When != null) yield return (rule.When, rule.Outcomes);
         }
 
-        // 그 조각을 가진 것으로 보는 패시브들(그 패시브의 가진 목록에 그 조각이 들어 있고 일치하는 것).
+        // 그 조각을 가진 것으로 보는 패시브 효과들(그 패시브 효과의 가진 목록에 그 조각이 들어 있고 일치하는 것).
         public IEnumerable<PassiveDefinition> MatchingFor(object element)
         {
             if (element == null) yield break;
@@ -383,9 +383,9 @@ namespace GBible
 
         // ── 주기 ─────────────────────────────────────────────
 
-        // 프레임 끝(행동 밖): 주기가 있는 패시브 중 경계를 넘은 것이 있으면 행동 하나로 낸다.
+        // 프레임 끝(행동 밖): 주기가 있는 패시브 효과 중 경계를 넘은 것이 있으면 행동 하나로 낸다.
         // 그 행동이 실패하면(결과의 비용이 모자람 등) 가진 쪽의 결과마다 저장점으로 감싸 한 번 더 낸다: 실패한 결과만 되돌리고(경고)
-        // 다른 가진 쪽·패시브의 주기는 돈다. 지난 구간은 실패해도 지난 것으로 둔다(다음 프레임에 다시 내지 않는다).
+        // 다른 가진 쪽·패시브 효과의 주기는 돈다. 지난 구간은 실패해도 지난 것으로 둔다(다음 프레임에 다시 내지 않는다).
         internal void Tick()
         {
             if (_session.Data.InTransaction) return;
@@ -412,7 +412,7 @@ namespace GBible
             try { _session.Do(new PassivePulseRun { passives = pulsing, from = from, to = now, isolate = true }); }
             catch (Exception e)
             {
-                _session.Journal.Append(JournalKind.Error, "Passive", $"패시브 주기: 결과를 하나씩 감싸 다시 냈는데도 실패했습니다 — {e.Message}");
+                _session.Journal.Append(JournalKind.Error, "Passive", $"패시브 효과 주기: 결과를 하나씩 감싸 다시 냈는데도 실패했습니다 — {e.Message}");
             }
         }
 
@@ -480,7 +480,7 @@ namespace GBible
                 _session.Data.RollbackTo(point);
                 _session.Events.RollbackEvents(events);
                 var who = holder != null && !(holder is string) && GameApi.HasId(holder.GetType()) ? GameApi.IdOf(holder) : holder as string ?? "";
-                _session.Journal.Append(JournalKind.Warning, "Passive", $"패시브 '{definition.DisplayName ?? definition.Id}'({who})의 주기 결과가 실패해 그것이 바꾼 것만 되돌렸습니다 — {e.Message}");
+                _session.Journal.Append(JournalKind.Warning, "Passive", $"패시브 효과 '{definition.DisplayName ?? definition.Id}'({who})의 주기 결과가 실패해 그것이 바꾼 것만 되돌렸습니다 — {e.Message}");
                 return false;
             }
         }
@@ -502,7 +502,7 @@ namespace GBible
                 if (parent != null) yield return (parent, FieldPaths.Resolve(parent, last).FirstOrDefault());
         }
 
-        // 요소가 이 패시브인가: 글자면 그 글자, 일치 필드가 있으면 그 필드(글자·글자 목록, 원본에서 읽기면 그 원본의 필드), 아니면 요소의 id.
+        // 요소가 이 패시브 효과인가: 글자면 그 글자, 일치 필드가 있으면 그 필드(글자·글자 목록, 원본에서 읽기면 그 원본의 필드), 아니면 요소의 id.
         bool Matches(PassiveDefinition definition, object element)
         {
             switch (element)
@@ -577,7 +577,7 @@ namespace GBible
         }
     }
 
-    // 주기가 된 패시브의 결과를 내는 행동(게임 시간 from → to 사이의 경계마다).
+    // 주기가 된 패시브 효과의 결과를 내는 행동(게임 시간 from → to 사이의 경계마다).
     [Serializable, SystemAction]
     public sealed class PassivePulseRun : GameAction, ITimeRuleAction
     {
@@ -588,15 +588,15 @@ namespace GBible
         public bool isolate;
 
         public override ActionVisibility Visibility => ActionVisibility.Developer;
-        public override string Describe() => isolate ? "패시브 주기(실패 감싸기)" : "패시브 주기";
+        public override string Describe() => isolate ? "패시브 효과 주기(실패 감싸기)" : "패시브 효과 주기";
 
         protected override void Run() => Game.Session.Passives.PulseRun(passives, from, to, isolate);
     }
 
-    // 결과 '빌려 쓰기': 대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 빌려 쓴다(Blueprint·Brainstorm).
-    //   Blueprint = 패시브(놓인 것마다, 조커 칸) + 이 결과(대상: 자리로 고르기 — 오른쪽). 대상의 패시브는 '일치 필드'로 찾는다.
+    // 결과 '빌려 쓰기': 대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브 효과를 지금 순간으로 빌려 쓴다(Blueprint·Brainstorm).
+    //   Blueprint = 패시브 효과(놓인 것마다, 조커 칸) + 이 결과(대상: 자리로 고르기 — 오른쪽). 대상의 패시브 효과는 '일치 필드'로 찾는다.
     [Serializable, Element(Elements.Passive)]
-    [BlockInfo("빌려 쓰기", Category = "결과", Description = "대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브를 지금 순간으로 한 번 더 냅니다(복사·흉내). 결과의 사용자는 원본 조각이고, 원본 자신의 쌓이는 값('필드 바꾸기')은 바꾸지 않습니다. 서로 빌리는 고리는 끊습니다.")]
+    [BlockInfo("빌려 쓰기", Category = "결과", Description = "대상 Block이 고른 조각(옆 칸·맨 왼쪽 …)의 패시브 효과를 지금 순간으로 한 번 더 냅니다(복사·흉내). 결과의 사용자는 원본 조각이고, 원본 자신의 쌓이는 값('필드 바꾸기')은 바꾸지 않습니다. 서로 빌리는 고리는 끊습니다.")]
     public sealed class BorrowOutcome : Outcome
     {
 #if UNITY_2020_1_OR_NEWER

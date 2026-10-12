@@ -11,7 +11,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools.UI
 {
-    // DB › 밸런스 값 탭: 줄마다 이름(개발자가 고치는 표시 이름, 없으면 ID) · 값. 상세 탭으로 넘어가지 않고 그 자리에서 접고 펼친다.
+    // DB › 밸런싱 값 탭: 줄마다 이름(개발자가 고치는 표시 이름, 없으면 ID) · 값. 상세 탭으로 넘어가지 않고 그 자리에서 접고 펼친다.
     //   - 이름 쪽을 누르면 펼쳐져 아래 칸(곡선 …)이 보인다. 다른 칸의 값에 따라 보이는 칸([ShowIf])은 그 값을 바꾸면 생기고 사라진다.
     //     칸은 쓰는 곳에만 보인다: 곡선을 쓰지 않는 값(방식 = 없음)은 곡선 칸을 그리지 않는다(✎ 편집 칸의 '곡선 쓰기'로 켠다). 펼칠 칸이 없으면 화살표도 없다.
     //   - 줄에 마우스를 올리면 오른쪽에 입력 칸이 뜬다(입력 칸 주석이 있으면 칸 안에 흐리게). 목록 칸만 새 창에서 고친다.
@@ -21,7 +21,7 @@ namespace GBible.EditorTools.UI
     {
         public const string PageKey = "balance";
         public override string Key => PageKey;
-        // 밸런스 값 항목은 AI가 DB 반영 스크립트로 만든다(EditorPolicy — 개발자는 값을 바꾼다). 구조 편집을 열었을 때만 만들기 버튼이 보인다.
+        // 밸런싱 값 항목은 AI가 DB 반영 스크립트로 만든다(EditorPolicy — 개발자는 값을 바꾼다). 구조 편집을 열었을 때만 만들기 버튼이 보인다.
         public override string CreateLabel => "+ 새로 만들기";
 
         // 펼친 줄 · 편집 칸을 연 줄(다시 그려도 남는다).
@@ -53,7 +53,7 @@ namespace GBible.EditorTools.UI
             var items = AllItems().Where(i => Matches(i, search)).ToList();
             if (items.Count == 0)
             {
-                list.Add(Gs.Label(search == "" ? "밸런스 값이 아직 없습니다. 바꿀 숫자는 AI가 DB 반영 스크립트로 만듭니다." : "찾는 밸런스 값이 없습니다.", "gs-caption"));
+                list.Add(Gs.Label(search == "" ? "밸런싱 값이 아직 없습니다. 바꿀 숫자는 AI가 DB 반영 스크립트로 만듭니다." : "찾는 밸런싱 값이 없습니다.", "gs-caption"));
                 return;
             }
             // 폴더 = 묶음 머리글(정리용). 폴더 없는 것이 먼저.
@@ -323,7 +323,7 @@ namespace GBible.EditorTools.UI
         }
     }
 
-    // 밸런스 값의 목록 칸(곡선의 점 …)을 고치는 창. 고친 것은 작업본에 들어가고 저장(Ctrl+S)할 때 적용한다.
+    // 밸런싱 값의 목록 칸(곡선의 점 …)을 고치는 창. 고친 것은 작업본에 들어가고 저장(Ctrl+S)할 때 적용한다.
     public sealed class BalanceListWindow : EditorWindow
     {
         BalanceData _item;

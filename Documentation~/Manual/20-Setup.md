@@ -60,7 +60,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 2. `[BindTo]` 코드 결과를 모으고, 모양이 맞지 않는 함수는 콘솔에 경고한다.
 3. `GameDatabase.Load()`로 DB 에셋을 읽고, `SessionOptions`를 만들어 DB › 시작 파일 › Bootstrap 화면의 세션 옵션과 DB › 개발 › 저장 변환 표(버전 순서, 같은 버전은 ID 글자 순서)를 넣은 뒤 `Configuring` 이벤트를 쏜다(3절). 코드가 화면 값을 바꾸면 기록에 남긴다.
 4. `new GameSession(options)`. 이때부터 경고·오류 기록을 콘솔로도 보낸다(프로필을 불러올 때의 저장 변환·읽기 실패 경고도 콘솔에 보이게). 개발 명령은 개발 빌드에서만 받도록 `session.Debug.Enabled = Debug.isDebugBuild`.
-5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·상태 효과·밸런스 값·가중치 표·능력·사용 기능이 붙은 인스턴스·도전과제·개발 명령을 세션에 등록한다. `[BindTo("ID")]`의 ID가 DB의 어느 항목에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
+5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·상태 효과·밸런싱 값·가중치 표·액티브 효과·사용 기능이 붙은 인스턴스·도전과제·개발 명령을 세션에 등록한다. `[BindTo("ID")]`의 ID가 DB의 어느 항목에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
 6. 저장 호환 검사(개발 중이면 호환되지 않는 저장 파일만 옆으로 옮긴다 — `06-SaveLoad.md` 1.1), ID 이름 바꾸기 이력 적용, 프로필(`profile.json`) 불러오기(깨졌으면 바로 전 저장 `.bak`으로, `06-SaveLoad.md` 2.3).
 7. 기본 개발 명령(저장·시간)을 등록한다.
 8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`). 슬롯을 바꿔 세션을 다시 만들어도 오브젝트는 하나다.
@@ -583,7 +583,7 @@ static class FeatureCheck
 
 **한 줄 요약.** DB의 모든 ID를 C# 상수로 만든 파일 `GameIds.cs`. 코드에서 ID를 글자로 쓰지 않고 자동완성으로 골라 오타를 컴파일 단계에서 막는다.
 
-**언제.** 게임 코드에서 플레이어 데이터·능력·도전과제·인스턴스 ID를 쓸 때마다.
+**언제.** 게임 코드에서 플레이어 데이터·액티브 효과·도전과제·인스턴스 ID를 쓸 때마다.
 
 ### 에디터에서
 
@@ -652,13 +652,13 @@ public static class AchievementRewards
 }
 ```
 
-**능력 쓰기.**
+**액티브 효과 쓰기.**
 
 ```csharp
 GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 ```
 
-(위 두 예제는 DB에 `firstHunt` 도전과제, `ability.heal` 능력, `player.gold`(int) 플레이어 데이터가 있을 때 컴파일된다.)
+(위 두 예제는 DB에 `firstHunt` 도전과제, `ability.heal` 액티브 효과, `player.gold`(int) 플레이어 데이터가 있을 때 컴파일된다.)
 
 ### 주의할 점
 

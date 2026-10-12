@@ -168,10 +168,10 @@ public static class TemplateCode
 ```
 
 > [!note]- 줄마다의 뜻
-> - `[BindTo(ID)]` — 그 ID의 DB 항목(도전과제·로그·능력·사용 기능이 붙은 인스턴스, 그리고 연결을 확인하는 프로젝트 고유 기능 — 1-8)의 결과가 이 함수가 된다. DB의 결과 칸은 잠기고 함수 이름과 `cs 열기`가 보인다. ID는 늘 `GameIds` 상수로(항목을 만들고 저장하면 생긴다).
+> - `[BindTo(ID)]` — 그 ID의 DB 항목(도전과제·로그·액티브 효과·사용 기능이 붙은 인스턴스, 그리고 연결을 확인하는 프로젝트 고유 기능 — 1-8)의 결과가 이 함수가 된다. DB의 결과 칸은 잠기고 함수 이름과 `cs 열기`가 보인다. ID는 늘 `GameIds` 상수로(항목을 만들고 저장하면 생긴다).
 > - `static void` — 필수. 접근 수준·클래스 이름은 상관없다.
 > - 매개변수는 넷 중 하나: `()` · `(이벤트 e)` · `(TriggerContext c)` · `(이벤트 e, TriggerContext c)`. 받을 이벤트는 첫 매개변수의 형식이고, 컨텍스트는 늘 마지막이다.
-> - 이벤트로 발동하는 항목이면 `(BattleWon e, TriggerContext c)`처럼 이벤트를 받는다. 조건으로 달성하는 도전과제·사용 기능·능력에는 이벤트가 없으므로 `(TriggerContext c)`만.
+> - 이벤트로 발동하는 항목이면 `(BattleWon e, TriggerContext c)`처럼 이벤트를 받는다. 조건으로 달성하는 도전과제·사용 기능·액티브 효과에는 이벤트가 없으므로 `(TriggerContext c)`만.
 > - `c.Game` — 세션의 창구. `GBibleRuntime.Game`을 쓰지 않는다(세션이 여럿일 수 있다). static 변수에 상태를 두지 않는다.
 > - 로그에 연결하면 자동 기록이 멈추므로 함수가 `c.Session.Stats.Report(c.Owner, 값)`으로 직접 기록한다.
 
@@ -357,7 +357,7 @@ static void Started(GameSession session)
 - [ ] 버그를 보면 판을 저장하고, 저장 파일과 시드를 보고에 붙인다.
 - [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
 - [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
-- [ ] 밸런스 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
+- [ ] 밸런싱 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
 - [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/MomoiProject/Code/Tests`에 테스트로 있다.
 - [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
 
@@ -373,7 +373,7 @@ static void Started(GameSession session)
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
 - [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 행동 직전 이벤트 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
-- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런스 값이다.
+- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런싱 값이다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction` → `GameView.Present`), `OnDisable`에서 `Dispose`한다.
@@ -518,7 +518,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 - 이벤트 클래스가 `IDescribable`을 구현하면(`public string Describe() => $"{cardId}: {from} → {to}";`) 기록의 문장이 그것이 된다. 필드가 많거나 리스트가 있어 기본 문장이 읽기 어려울 때 쓴다.
 - `session.Events.SubscribeAll(evt => …)` — 형식과 상관없이 모든 이벤트를 받는다. 디버그 출력·이벤트 중계·리플레이 녹화용. 기록 문장은 `EventBus.Describe(evt)`, 표시 이름은 `EventBus.DisplayNameOf(형식)`.
 - `session.Events.PublishObject(evt)` — 형식을 실행 중에만 알 때 쏜다. 콘솔 명령 같은 도구에서만 쓴다.
-- `Game.Use`가 끝나면 기본 이벤트 `AbilityUsed`("능력 사용", 필드 `Ability`·`User`·`Targets`·`Times`)를 쏜다. 카드·물약 사용 연출을 한곳에서 받을 때 쓸 수 있다.
+- `Game.Use`가 끝나면 기본 이벤트 `AbilityUsed`("액티브 효과 사용", 필드 `Ability`·`User`·`Targets`·`Times`)를 쏜다. 카드·물약 사용 연출을 한곳에서 받을 때 쓸 수 있다.
 
 → [10. 이벤트](../../Manual/10-Events.md) 2-5~2-10
 
@@ -572,7 +572,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 ### 3-12. 기믹 부품 — 사용·확률·상태 효과·자리·다시 뽑기
 
-카드 던전에는 없지만 조커 칸·보드·가방 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../GimmickCatalog.md)에 갈래별로 있다. 패시브 쪽(놓인 것마다·가진 동안 능력치 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
+카드 던전에는 없지만 조커 칸·보드·가방 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../GimmickCatalog.md)에 갈래별로 있다. 패시브 효과 쪽(놓인 것마다·가진 동안 스탯 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
 
 - **되는 조각만 쓰기**: `Game.TryUse(id, 사용자, 대상…)`. 쓸 수 있으면 쓰고 참, 사용 조건이 안 맞으면 아무것도 하지 않고 거짓이다(실패를 던지지 않는다). 보드의 유닛을 차례로 돌며 부를 때 쓴다.
 - **기본 행동 직전 이벤트 다섯**: GBible이 행동 직전 이벤트 자리를 미리 둔 동작이다. 트리거 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`로 고친다.
@@ -580,7 +580,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 | 행동 직전 이벤트 | 거치는 곳 | 고치는 예 |
 |---|---|---|
 | '사용'(`UseIntent`) | `Game.Use`·`TryUse`가 결과를 내기 직전 | `times` 더하기 1 = 한 번 더 발동, 막기 = 아무 일 없음 |
-| '효과 배율'(`PowerIntent`) | 능력을 쓸 때·패시브가 발동할 때 | `multiplier` 곱하기 2 = 이 조각의 수치 2배(Lumin). 기본 효과 Block이 곱하고, 프로젝트 Block은 `Use.Context.Power` |
+| '효과 배율'(`PowerIntent`) | 액티브 효과를 쓸 때·패시브 효과가 발동할 때 | `multiplier` 곱하기 2 = 이 조각의 수치 2배(Lumin). 기본 효과 Block이 곱하고, 프로젝트 Block은 `Use.Context.Power` |
 | '상태 효과 걸기'(`StatusIntent`) | `Game.ApplyStatus`·효과 '상태 효과 걸기' | `statusId` 값으로 바꾸기(화상 → 푸른 화상), `stacks` 곱하기 2, `length` 곱하기, `maxStacks` 더하기, `pulse` 곱하기, 막기(면역 → `ApplyStatus`가 null) |
 | '확률'(`ChanceIntent`) | `Game.Chance`·조건 '확률' | `probability` 곱하기 2 = 모든 확률 2배 |
 | '비용 지불'(`CostIntent`) | `Game.Pay`·`TryPay`·결과 '비용 내기' | `floor` 값으로 바꾸기 −20 = −20까지 빚, `key`·`path` = 다른 곳에서 내기, 거르기 `forId`(행성 카드만 공짜) |
@@ -594,12 +594,12 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 > [!note]- 자세히
 > - **확률**: 확률이 바뀌어도 난수는 한 번만 굴린다. 같은 시드면 뒤가 밀리지 않는다. 조건 '확률'(확률(%) · 난수 흐름)은 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. `Game.CanUse`(미리 보기)에서는 굴리지 않고 참, 이벤트 없는 조건 충족에서는 거짓이다.
 > - **상태 효과 종류**: DB › 상태 효과의 `kind`(없음·버프·디버프). 효과 '상태 효과 풀기'는 상태 효과를 비우고 종류를 고르면 그 종류를 모두 푼다. 조건 '상태 효과 검사'는 상태 효과를 비우고 종류를 고르면 그 가짓수를 비교한다.
-> - **값 틀**(행동 직전 이벤트 고치기·필드 바꾸기·이벤트 쏘기·사용자 필드 검사): `{level}`(이 결과를 가진 패시브의 레벨), `{level:2/4/7}`(레벨 번째 값, 넘치면 마지막, 레벨 0이면 0), `{user:경로}`(사용자의 필드)·`{event:경로}`(받은 이벤트·행동 직전 이벤트의 필드)·`{data:키.경로}`(플레이어 데이터)·`{count:키.경로}`(목록 개수), 예전부터 있던 `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`.
+> - **값 틀**(행동 직전 이벤트 고치기·필드 바꾸기·이벤트 쏘기·사용자 필드 검사): `{level}`(이 결과를 가진 패시브 효과의 레벨), `{level:2/4/7}`(레벨 번째 값, 넘치면 마지막, 레벨 0이면 0), `{user:경로}`(사용자의 필드)·`{event:경로}`(받은 이벤트·행동 직전 이벤트의 필드)·`{data:키.경로}`(플레이어 데이터)·`{count:키.경로}`(목록 개수), 예전부터 있던 `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`.
 > - **자리**: 목록 하나(`List<T>`)를 칸으로 본다. 한 줄(조커 칸·손패)은 줄 길이 0, 격자(가방·보드)는 줄 길이 = 열 수다. 칸 번호 = 목록 위치, 빈 칸 = null. 좌표는 화면 기준(x 오른쪽 +, y 아래 +)이다. DB 대상 '자리로 고르기'(옆 칸·같은 줄·주변 8칸·맨 처음, '다른 목록에서 고르기'면 맞은편 보드)와 조건 '자리 검사'(맨 아래 줄·가장자리·양옆이 빈 칸 …)로 쓰고, 코드는 `Placement.Around(run.bag, artifact, 6, PlaceDirection.Left)`·`Placement.Is(run.jokers, joker, 0, PlaceSpot.First)`·석판 무늬 `Placement.Pattern(칸, 개수, 열, 무늬, 회전)`. 회전은 `Placement.Rotate`(화면 기준), `Grid` 좌표(y 위 +)에서는 `Grid.Rotate`. 둘 다 시계 방향 90°씩이다.
 > - **후보 +1·다시 뽑기**: 결과 '가중치 표에서 고르기'의 '후보 수에 더할 숫자'(플레이어 데이터의 숫자)가 후보 수에 더해진다. 행동 안에서 `Game.RerollChoice(선택 id)`를 부르면 같은 표·같은 후보 수로 새로 뽑고 `ChoiceRequested`를 다시 쏜다. 비용·남은 횟수는 부르는 행동이 맡는다(`Game.Pay`). Undo하면 원래 후보로 돌아간다.
 > - **시드로 새 판**: `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))`([07장](07-GenreRecipes.md) 4절).
 
-→ [16. 능력과 사용 기능](../../Manual/16-Abilities-Usable.md), [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md), [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md), [36. 격자·큰 수](../../Manual/36-Grid-BigNumber.md)
+→ [16. 액티브 효과와 사용 기능](../../Manual/16-Abilities-Usable.md), [28. 스탯·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md), [29. 상태 효과·예약·선택 대기](../../Manual/29-Statuses-Schedules-Choices.md), [30. 밸런싱 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md), [36. 격자·큰 수](../../Manual/36-Grid-BigNumber.md)
 
 ---
 
@@ -755,12 +755,12 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | `BoundOutcomes.Has`·`Create` | 13 · 17 | 04 §8 |
 | `BoundOutcomes.Problems` | 13 | 12 §3-2 |
 
-### 능력치·행동 직전 이벤트·비용
+### 스탯·행동 직전 이벤트·비용
 
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
 |---|---|---|
-| 능력치(숫자 필드) + Modifier: `Game.Attribute`·`AddModifier`·`RemoveModifiers`·`Modifiers` | 28 | 02 §8(언급) |
-| 효과 '능력치 보정'·'능력치 보정 떼기' | 28 · 16 · 12 | 02 §8(언급) |
+| 스탯(숫자 필드) + Modifier: `Game.Attribute`·`AddModifier`·`RemoveModifiers`·`Modifiers` | 28 | 02 §8(언급) |
+| 효과 '스탯 보정'·'스탯 보정 떼기' | 28 · 16 · 12 | 02 §8(언급) |
 | 효과의 문법(언제 + 누구에게 + 무엇을 + 안전장치) | 28 | 02 §8(효과의 문법 칸) |
 | 행동 직전 이벤트 `[Intent]`, 규칙 함수의 행동 직전 이벤트 자리 `Game.Intercept` | 28 | 02 §8, 04 §9(가시 갑옷), 09 §1 |
 | 트리거 '행동 직전 이벤트 받기'(`InterceptTrigger`)·결과 '행동 직전 이벤트 고치기'(`ModifyIntentOutcome`) | 28 · 11 · 12 | 04 §9(가시 갑옷) |
@@ -771,7 +771,7 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
 |---|---|---|
-| DB › 상태 효과(중첩·다시 걸 때·지속·능력치 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과) | 29 | 04 §4(화상·독), 03 §8, 07 §6 |
+| DB › 상태 효과(중첩·다시 걸 때·지속·스탯 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과) | 29 | 04 §4(화상·독), 03 §8, 07 §6 |
 | 효과 '상태 효과 걸기'·'상태 효과 풀기' | 29 · 16 · 12 | 04 §4(화염구·독), 02 §8 |
 | `[BindTo(상태 효과 ID)]`, 결과 안에서 중첩 수 `Game.StatusStacks(c.User, c.Owner)` | 29 · 13 | 04 §4(독) |
 | `Game.ApplyStatus`·`RemoveStatus`·`HasStatus`·`Statuses`, 저장 키 `$statuses` | 29 | 04 §4(언급), 02 §2(언급), 08 §3 |
@@ -789,7 +789,7 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | `session.Achievements.IsUnlocked` | 14 | 12 §3-3 |
 | 로그(DB, 범위·집계) | 15 | 04 §7 |
 | `session.Stats.Report`·`Get` | 15 | 12 §1-7·§3-3 |
-| 능력(DB › 능력) | 16 | 04 §6(다른 장르라면) |
+| 액티브 효과(DB › 액티브 효과) | 16 | 04 §6(다른 장르라면) |
 | `AbilityDefinition`·`session.Abilities.Define` | 16 | 08 §6 |
 | DB 종류 `GameData`·`[Database]` | 17 · 21 | 02 §7, 04 §8 |
 | `ValidateData` | 17 | 04 §8, 05 §7 |
@@ -843,16 +843,16 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | 인벤토리 API(`TryRemove`·`slots` …) | 25 | 04 §6, 06 §8 |
 | 오디오 `GameAudio`(`PlayBgm`·`PlaySfx`·`SetVolume`·`VolumeChanged`) | 26 | 06 §7 |
 
-### 밸런스 값·가중치 표·실패
+### 밸런싱 값·가중치 표·실패
 
 | 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
 |---|---|---|
-| DB › 밸런스 값(값·곡선), `Game.Balance(id)`·`Game.Balance(id, x)` | 30 | 04 §10, 09 §1, 07 §6(수집형·방치형) |
+| DB › 밸런싱 값(값·곡선), `Game.Balance(id)`·`Game.Balance(id, x)` | 30 | 04 §10, 09 §1, 07 §6(수집형·방치형) |
 | DB › 가중치 표, `Game.Roll(id)`·`Game.Roll(id, n, unique)`, `session.Tables.Chances` | 30 | 04 §10, 07 §6(수집형) |
 | 결과 '가중치 표에서 주기' | 30 · 12 | 04 §10 |
 | 결과 '가중치 표에서 고르기'(`ChooseFromTableOutcome`) | 30 · 29 · 12 | 04 §10 |
 | 풀: 줄 종류 '플레이어 데이터 목록'·뺄 목록·코드 풀 `Game.Roll(풀, …)` | 30 | 04 §10 |
-| 플레이 중 DB 수정 바로 반영(밸런스 값·가중치 표) | 30 | 08 §2, 04 §10(언급) |
+| 플레이 중 DB 수정 바로 반영(밸런싱 값·가중치 표) | 30 | 08 §2, 04 §10(언급) |
 | 플레이어용 실패 `GameFailure`·`Game.Fail`, 라이브러리 키 `FailureKeys`(텍스트 표로 번역) | 30 · 23 | 03 §6, 06 §5, 09 §1, 12 §1-1, 08 §6(테스트) |
 
 ### 슬롯·설정·입력
@@ -887,10 +887,10 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | 되돌리기 지점 `session.HistoryMark`·`UndoTo` | 02 | 07 §6(턴제 전술) |
 | 필드 경로 `name[키]`(딕셔너리 항목·목록의 id 요소) | 11 · 12 · 28 | 07 §6(수집형) |
 | 상태 효과 주기·걸 때 길이·`ShortenStatus`·효과 '상태 효과 줄이기'·조건 '상태 효과 검사'(쿨다운)·`StatusApplied`·`StatusEnded` | 29 · 16 | 07 §6(실시간) |
-| DB › 패시브(가지고 있으면 발동), `Game.Owned` | 17 · 29 | 04 §8·§9(접힌 칸), 07 §6 |
+| DB › 패시브 효과(가지고 있으면 발동), `Game.Owned` | 17 · 29 | 04 §8·§9(접힌 칸), 07 §6 |
 | 기본 대상 Block(플레이어 데이터 목록·이벤트의 개체·조건으로 거르기·무작위 n개·정렬해서 n개) | 16 | — |
 | 값 틀 `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`(도발·대신 맞기)·`{level}`·`{level:2/4/7}`·`{user:경로}`·`{event:경로}`·`{data:키.경로}`·`{count:키.경로}` | 28·12 | 12 §3-12 |
-| 가중치 표 줄 무게를 밸런스 값에서(천장) | 30 | 07 §6(수집형) |
+| 가중치 표 줄 무게를 밸런싱 값에서(천장) | 30 | 07 §6(수집형) |
 | `Game.BalanceSum`·`BalanceCount`, `BigNumber` | 30 · 36 | 07 §6(방치형) |
 | 격자 `Grid`·`Cell` | 36 | 07 §1·§6(턴제 전술·생활 시뮬) |
 | 판정 보고 행동(화면이 판정, 결과를 행동으로) · 실시간 예산 | 33 | 07 §6(실시간·대량 실시간) |
@@ -901,8 +901,8 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 |---|---|---|
 | 기믹 목록(AI 문서 `GimmickCatalog.md`), 기획 명세서(2-3 자리·4절 메인 룰과 기믹·6절 부가 기능) | — | 00, 01 §1, 07(첫 문단), 04 §8(언급) |
 | 부가 기능(대화·달력·현실 시간·칸 맵·큰 수 …, 명세서 6절에서 켜면 붙음) | — | 07 §1 |
-| 패시브 '일치 필드'·'놓인 것마다'(목록 순서대로 발동)·'레벨 필드', `Game.Owned(id, 가진 쪽)` | 17 | 04 §8(접힌 칸) |
-| 패시브 '가진 동안 능력치 보정'·'보정 받을 대상'(읽을 때 계산, 잃으면 저절로 빠짐) | 17 · 28 | 04 §8(접힌 칸) |
+| 패시브 효과 '일치 필드'·'놓인 것마다'(목록 순서대로 발동)·'레벨 필드', `Game.Owned(id, 가진 쪽)` | 17 | 04 §8(접힌 칸) |
+| 패시브 효과 '가진 동안 스탯 보정'·'보정 받을 대상'(읽을 때 계산, 잃으면 저절로 빠짐) | 17 · 28 | 04 §8(접힌 칸) |
 | 결과 '빌려 쓰기'(복사·흉내, Blueprint), `Game.BorrowPassive` | 17 | 04 §8(접힌 칸) |
 | 효과 '필드 바꾸기'(조각마다 쌓이는 값, 값 틀 — 위 줄, 더하기는 × 효과 배율) | 12 | 04 §8(접힌 칸) |
 | 행동 직전 이벤트 '사용'(`times`·막기), `Game.TryUse`, 이벤트 `AbilityUsed`의 `Times` | 16 · 28 | 12 §3-12 |
@@ -914,10 +914,10 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | `Placement`(`CellOf`·`IndexOf`·`Around`·`Is`·`Pattern`·`Rotate`)·`Grid.Rotate` | 37·36 | 12 §3-12 |
 | '가중치 표에서 고르기'의 '후보 수에 더할 숫자'·`Game.RerollChoice` | 30 | 07 §6(대량 실시간), 12 §3-12 |
 | 시드로 새 판 `GBibleRuntime.NewRun(session, 시드)`·`session.NewRun(시드)`·`RandomStreams.SeedOf` | 06 · 07 | 07 §3·§4, 12 §3-12 |
-| 패시브 `rules`(발동 더)·`matchVia`(원본에서 읽기)·일치 필드 글자 목록·레벨 0 꺼짐·`pulse`(주기)·스위치 패시브 | 17 | 04 §8(언급) |
-| 패시브 `modifierWhen`(보정 조건)·`stacking`(여럿일 때)·보정 줄 `target`·받을 대상 `party[]` | 17 · 28 | 04 §8(언급) |
+| 패시브 효과 `rules`(발동 더)·`matchVia`(원본에서 읽기)·일치 필드 글자 목록·레벨 0 꺼짐·`pulse`(주기)·스위치 패시브 효과 | 17 | 04 §8(언급) |
+| 패시브 효과 `modifierWhen`(보정 조건)·`stacking`(여럿일 때)·보정 줄 `target`·받을 대상 `party[]` | 17 · 28 | 04 §8(언급) |
 | 행동 직전 이벤트 '효과 배율'(`PowerIntent`, `Use.Context.Power`) | 16 · 28 · 12 | — |
-| 상태 효과 '걸린 쪽의 패시브를 끔'·행동 직전 이벤트 '상태 효과 걸기'의 `maxStacks`·`pulse`·`byId`(처치 기여)·대상 '상태 효과로 거르기' | 29 · 16 | — |
+| 상태 효과 '걸린 쪽의 패시브 효과를 끔'·행동 직전 이벤트 '상태 효과 걸기'의 `maxStacks`·`pulse`·`byId`(처치 기여)·대상 '상태 효과로 거르기' | 29 · 16 | — |
 | `Game.TryPay`·비용 행동 직전 이벤트 `forId`·`userId` | 28 · 03 · 16 | — |
 | 조건 '사용자 필드 검사' | 11 | — |
 | 자리 '같은 열 …'(방향·자리)·기준 '없음'·`players[].칸` | 37 | — |

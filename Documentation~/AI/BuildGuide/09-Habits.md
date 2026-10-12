@@ -25,7 +25,7 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 - **규칙 함수에 행동 직전 이벤트 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 행동 직전 이벤트를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
 - **비용은 `Game.Pay`로 낸다.** `Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name")`는 비용 행동 직전 이벤트를 이미 거친다(`what`은 모자랄 때 실패 글에 들어갈 이름의 텍스트 키). 직접 빼면(`battle.energy -= data.cost`) "이번 턴 비용 0" 같은 효과가 끼어들 자리가 없다.
 - **플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`.** 글은 텍스트 표로 번역된다. 없는 ID 같은 프로그래머 실수는 그냥 `InvalidOperationException`.
-- **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런스 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전은 시작 체력·시작 골드·보상 골드를 밸런스 값 `startHp`·`startGold`·`winGold`로 읽는다([03장](03-GameLoop.md) 4절, [04장](04-AddingContent.md) 10절).
+- **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런싱 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전은 시작 체력·시작 골드·보상 골드를 밸런싱 값 `startHp`·`startGold`·`winGold`로 읽는다([03장](03-GameLoop.md) 4절, [04장](04-AddingContent.md) 10절).
 
 ```csharp
 public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
@@ -54,7 +54,7 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 > | 핵심 규칙(피해·회복·죽음·비용·뽑기)을 쓴다 | 일을 하기 직전에 `Game.Intercept` 자리를 둔다 | 새 기믹이 생길 때마다 규칙 함수에 `if (hasThornArmor) …`를 더하기 |
 > | 에너지·골드 같은 비용을 낸다 | `Game.Pay(키, 필드, 양)` | `if (energy < cost) throw …; energy -= cost;`(행동 직전 이벤트가 비용을 고칠 수 없다) |
 > | 플레이어에게 "할 수 없다"를 알린다 | `throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.")` | 한국어 글을 그대로 던지기(번역할 수 없다) |
-> | 기획자가 바꿀 숫자 | DB › 밸런스 값 + `Game.Balance(GameIds.Balance.X)` | 코드에 `70`·`99`·`+15`를 적기(바꿀 때마다 프로그래머가 필요하다) |
+> | 기획자가 바꿀 숫자 | DB › 밸런싱 값 + `Game.Balance(GameIds.Balance.X)` | 코드에 `70`·`99`·`+15`를 적기(바꿀 때마다 프로그래머가 필요하다) |
 > | 몇 턴 동안·몇 턴 뒤의 효과 | DB › 상태 효과 + 효과 `상태 효과 걸기`, 또는 예약(`Game.ScheduleOn`) | 데이터 클래스에 상태 목록을 두고 `EndTurn`에서 손으로 처리하기 |
 
 > [!note]- 왜 행동 직전 이벤트 자리를 미리 두나
@@ -145,7 +145,7 @@ public class PlayCard : GameAction
 > | 여러 세션이 돌 수 있다 | 값은 플레이어 데이터에, 세션은 매개변수(`c.Game`·`session`)로 | 서버는 매치마다 세션을 만든다. static 변수는 모든 세션이 나눠 쓴다 |
 
 > [!note]- 행동 안의 행동
-> 행동 안에서 다른 행동(`Game.Do`)이나 능력(`Game.Use`)을 부르면 바깥 행동의 일부로 그 자리에서 실행된다(카드 내기 안의 `Game.Use`, 턴 끝 안의 `DrawCards`). Undo·ChangeSet은 바깥 행동 하나로 묶이고, 안쪽이 실패하면 바깥 전체가 취소된다. 그래서 "한 입력 = 한 묶음"이 유지된다.
+> 행동 안에서 다른 행동(`Game.Do`)이나 액티브 효과(`Game.Use`)를 부르면 바깥 행동의 일부로 그 자리에서 실행된다(카드 내기 안의 `Game.Use`, 턴 끝 안의 `DrawCards`). Undo·ChangeSet은 바깥 행동 하나로 묶이고, 안쪽이 실패하면 바깥 전체가 취소된다. 그래서 "한 입력 = 한 묶음"이 유지된다.
 >
 > 공통 로직을 행동으로 만들지 함수로 만들지는 "혼자서도 입력이 될 수 있는가"로 정한다. 카드 뽑기는 개발 명령이나 다른 카드에서 혼자 실행될 수 있어 행동이고, 피해 계산은 입력이 아니라서 함수(`Rules.Damage`)다.
 
@@ -223,7 +223,7 @@ public class PlayCard : GameAction
 public class DeckCard
 {
     public string id;                                           // 장마다 다른 id(Game.NewId("card"))
-    [DataRef(typeof(Card))] public string card;         // 원본 인스턴스 ID(능력 이름으로도 쓴다)
+    [DataRef(typeof(Card))] public string card;         // 원본 인스턴스 ID(액티브 효과 이름으로도 쓴다)
     public bool upgraded;
 }
 
@@ -304,7 +304,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
 - [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 행동 직전 이벤트 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
-- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런스 값이다.
+- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런싱 값이다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction` → `GameView.Present`), `OnDisable`에서 `Dispose`한다.
@@ -325,8 +325,8 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - [03. Game API](../../Manual/03-GameApi.md) — `Find`·`All`의 비용, `NewId`, 확장 메서드
 > - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 난수 흐름, 게임 시계, Undo·저장과 함께 움직이는 방식
 > - [10. 이벤트](../../Manual/10-Events.md) — 쏘기·받기 규칙
-> - [28. 능력치·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — 행동 직전 이벤트 자리, `Game.Pay`
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Balance`, `Game.Fail`
+> - [28. 스탯·Modifier·행동 직전 이벤트·비용](../../Manual/28-Attributes-Intercepts.md) — 행동 직전 이벤트 자리, `Game.Pay`
+> - [30. 밸런싱 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `Game.Balance`, `Game.Fail`
 > - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`
 > - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`
 > - [../Coding.md](../../Coding.md) — 게임 코드 규칙과 Mirror 비용

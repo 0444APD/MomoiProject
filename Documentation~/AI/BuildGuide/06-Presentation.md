@@ -347,10 +347,10 @@ public void Buy(string source, int price)   // 상점 화면의 카드 버튼
 > - 대사 원문의 `{…}`에는 모든 플레이어 데이터가 ID로 넘어가고, 점으로 값 안의 필드를 읽는다. 카드 던전은 판의 값을 `run` 하나에 모았으므로 "가진 돈은 {run.gold}골드군."처럼 쓴다(이름이 점을 포함한 플레이어 데이터가 따로 있으면 그것을 먼저 쓴다).
 > - 판을 불러온 뒤 `Dialogues.ResumeSaved()`를 부르면 저장할 때 보던 대사부터 이어 간다. 이어 하기(`GBibleRuntime.LoadRun`)가 성공한 다음에 부른다.
 
-**대화가 중심인 게임(비주얼 노벨)에서 기믹을 거는 곳.** 이때도 다이얼로그는 말과 연출만 맡고, 기믹은 패시브(가진 동안 발동하는 DB › 패시브 항목)·상태 효과(걸려 있는 동안 효과가 나는 DB › 상태 효과 항목)가 맡는다. 그래프는 플레이어 데이터와 이벤트로 넘겨줄 뿐이다.
+**대화가 중심인 게임(비주얼 노벨)에서 기믹을 거는 곳.** 이때도 다이얼로그는 말과 연출만 맡고, 기믹은 패시브 효과(가진 동안 발동하는 DB › 패시브 효과 항목)·상태 효과(걸려 있는 동안 효과가 나는 DB › 상태 효과 항목)가 맡는다. 그래프는 플레이어 데이터와 이벤트로 넘겨줄 뿐이다.
 
-1. **값 바꾸기**(플레이어 데이터에 주기): 패시브의 가진 목록에 ID를 넣거나(가호 얻기), 호감도 같은 수치를 올린다.
-2. **신호 보내기**: Client 코드가 받아 행동을 `Game.Do`한다. 행동이 이벤트를 쏘고 상태 효과를 건다 → 패시브·상태 효과가 받는다.
+1. **값 바꾸기**(플레이어 데이터에 주기): 패시브 효과의 가진 목록에 ID를 넣거나(가호 얻기), 호감도 같은 수치를 올린다.
+2. **신호 보내기**: Client 코드가 받아 행동을 `Game.Do`한다. 행동이 이벤트를 쏘고 상태 효과를 건다 → 패시브 효과·상태 효과가 받는다.
 3. **조건 분기·선택지의 보일 조건**: 기믹이 바꾼 플레이어 데이터를 '플레이어 데이터 검사'로 읽는다.
 
 > [!note]- 비주얼 노벨에서 알아 둘 지금 동작
@@ -419,7 +419,7 @@ for (var i = run.potions.slots.Count; i < run.potions.capacity; i++)
 > - [10. 이벤트](../../Manual/10-Events.md) — `Subscribe`·`SubscribeAfterAction`·`Dispose`, 받는 쪽 규칙
 > - [32. 화면 연결·연출 대기열·씬 흐름·월드 상태](../../Manual/32-View-Presentation-Scenes.md) — `GameView.Present`·`Busy`·`Find`, `ViewList`, 데이터 연결
 > - [33. 고정 틱·미리보기·CSV](../../Manual/33-Tick-Preview-Csv.md) — `Game.Preview`·`CanDo`·`IsPreviewing`
-> - [30. 밸런스 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `GameFailure`·`Game.Fail`·`FailureKeys`
+> - [30. 밸런싱 값·곡선·가중치 표·플레이어용 실패](../../Manual/30-Balance-Tables.md) — `GameFailure`·`Game.Fail`·`FailureKeys`
 > - [07. 난수와 시간](../../Manual/07-Random-Time.md) — `GameTime`, 게임 시계
 > - [23. 텍스트와 현지화](../../Manual/23-Text-Localization.md) — `Texts`, 문장 틀, `GameLanguage`
 > - [24. 다이얼로그](../../Manual/24-Dialogue.md) — 그래프·신호·저장 이어 가기

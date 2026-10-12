@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace GBible.Tests
 {
     // 4게임 기믹 시험(발라트로·와일드프로스트·매지크래프트·세피리아·장르 섞기)에서 나온 빈틈을 메운 부품:
-    // 패시브 발동 여러 줄·일치 필드 목록·원본에서 읽기·레벨 0 꺼짐·침묵·보정 조건·줄마다 받을 대상·여럿일 때·주기,
+    // 패시브 효과 발동 여러 줄·일치 필드 목록·원본에서 읽기·레벨 0 꺼짐·침묵·보정 조건·줄마다 받을 대상·여럿일 때·주기,
     // 효과 배율, 상태 효과 걸기 의도의 최대 중첩·주기·건 쪽, 열 방향·기준 없음·플레이어마다 칸, 값 틀 확장, 이벤트 쏘기 틀, TryPay·비용 대상,
     // 숫자 참조가 보정을 읽음, 사용자 필드 검사, 빌려 쓰기와 가진 쪽 필드.
     public class GimmickTrialTests
@@ -86,7 +86,7 @@ namespace GBible.Tests
         static EventTrigger On<T>() => new EventTrigger { eventType = typeof(T).FullName };
 
         [Test]
-        public void 패시브_하나가_순간마다_다른_결과를_낸다_Green_Joker()
+        public void 패시브_효과_하나가_순간마다_다른_결과를_낸다_Green_Joker()
         {
             var green = Piece("green", On<TrScored>(), Self(new ChangeFieldEffect { field = "mult", value = "1" }), new AddScore());
             var discard = new PassiveRule { When = On<TrDiscarded>() };
@@ -102,7 +102,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 일치_필드가_글자_목록이거나_원본에서_읽으면_조각_하나에_패시브가_여럿이다()
+        public void 일치_필드가_글자_목록이거나_원본에서_읽으면_조각_하나에_패시브_효과가_여럿이다()
         {
             var cards = new Dictionary<string, object> { ["card.foxee"] = new TrCard { name = "Foxee", passives = { "wild", "teeth" } } };
             _session.Instances = id => cards.TryGetValue(id, out var v) ? v : null;
@@ -117,7 +117,7 @@ namespace GBible.Tests
             _session.Passives.Define(charm);
             Do(g => g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "u1", card = "card.foxee", traits = { "lamb" } }));
             Publish(new TrScored());
-            CollectionAssert.AreEquivalent(new[] { "wild:u1:1", "teeth:u1:1", "lamb:u1:1" }, Run.log, "원본의 패시브 둘 + 조각에 붙은 참 하나, spark는 없음");
+            CollectionAssert.AreEquivalent(new[] { "wild:u1:1", "teeth:u1:1", "lamb:u1:1" }, Run.log, "원본의 패시브 효과 둘 + 조각에 붙은 참 하나, spark는 없음");
         }
 
         [Test]
@@ -192,7 +192,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 주기_패시브는_N초마다_가진_쪽마다_발동한다()
+        public void 주기_패시브_효과는_N초마다_가진_쪽마다_발동한다()
         {
             var ember = Piece("ember", null, new Log { text = "ember" });
             ember.PulseByLevel.AddRange(new[] { 2.0, 1.0 });
@@ -205,7 +205,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 주기_패시브는_판을_불러오거나_시계를_되돌려도_몰아서_내거나_건너뛰지_않는다()
+        public void 주기_패시브_효과는_판을_불러오거나_시계를_되돌려도_몰아서_내거나_건너뛰지_않는다()
         {
             var ember = Piece("ember", null, new Log { text = "ember" });
             ember.Pulse = 1;
@@ -215,7 +215,7 @@ namespace GBible.Tests
             _session.EndFrame(1);                          // 1.25: 경계 1
             Assert.AreEqual(1, Run.log.Count);
             Do(g => g.Get<TrRun>("run").score++);          // 1.25초의 행동
-            _session.EndFrame(1);                          // 2.25: 경계 2(행동 '패시브 주기')
+            _session.EndFrame(1);                          // 2.25: 경계 2(행동 '패시브 효과 주기')
             Assert.AreEqual(2, Run.log.Count);
 
             // 주기(시간 규칙)와 앞의 행동을 함께 되돌리고 시계도 1.25로 — 시간이 다시 흐르면 경계 2에서 다시 낸다(건너뛰지 않는다).
@@ -311,7 +311,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 앞_가진_쪽의_결과가_없앤_가진_쪽의_패시브는_발동하지_않는다()
+        public void 앞_가진_쪽의_결과가_없앤_가진_쪽의_패시브_효과는_발동하지_않는다()
         {
             // 가진 쪽 = 칸(charms)을 가진 플레이어마다. p1의 결과가 p2를 판에서 뺀다.
             var oath = new PassiveDefinition { Id = "oath", OwnerKey = "run", OwnerPath = "players[].charms", MatchField = "card", When = On<TrScored>() };
@@ -328,7 +328,7 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 효과_배율은_능력과_패시브의_수치를_곱한다_Lumin()
+        public void 효과_배율은_액티브_효과와_패시브_효과의_수치를_곱한다_Lumin()
         {
             _session.Statuses.Define(new StatusDefinition { Id = "poison", MaxStacks = 0 });
             // p1이 가진 수치만 2배: 효과 배율 의도를 사용자 id로 거른다.
@@ -492,9 +492,9 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 패시브_트리거의_조건은_검사하는_순간에도_패시브_ID와_이_조각의_레벨을_본다()
+        public void 패시브_효과_트리거의_조건은_검사하는_순간에도_패시브_효과_ID와_이_조각의_레벨을_본다()
         {
-            // 값 틀 {owner}·{level}은 결과뿐 아니라 트리거를 검사하는 순간에도 그 패시브(등록 키 'passive:…'가 아니라)와 가진 조각의 레벨.
+            // 값 틀 {owner}·{level}은 결과뿐 아니라 트리거를 검사하는 순간에도 그 패시브 효과(등록 키 'passive:…'가 아니라)와 가진 조각의 레벨.
             var named = Piece("named", new AllTrigger { triggers = { On<TrScored>(), new ConditionTrigger { condition = new UserFieldCondition { path = "card", op = FieldOp.Equal, value = "{owner}" } } } }, new Log { text = "owner" });
             var leveled = Piece("leveled", new AllTrigger { triggers = { On<TrScored>(), new ConditionTrigger { condition = new UserFieldCondition { path = "counter", op = FieldOp.Equal, value = "{level}" } } } }, new Log { text = "level" });
             _session.Passives.Define(named);
@@ -505,7 +505,7 @@ namespace GBible.Tests
                 g.Get<TrRun>("run").pieces.Add(new TrPiece { id = "l1", card = "leveled", level = 3, counter = 3 });
             });
             Publish(new TrScored());
-            Assert.AreEqual(1, Run.log.Count(l => l.StartsWith("owner")), "{owner} = 패시브 ID");
+            Assert.AreEqual(1, Run.log.Count(l => l.StartsWith("owner")), "{owner} = 패시브 효과 ID");
             Assert.AreEqual(1, Run.log.Count(l => l.StartsWith("level")), "{level} = 이 조각의 레벨 3");
         }
 
@@ -525,7 +525,7 @@ namespace GBible.Tests
         [Test]
         public void 빌려_쓰기는_가진_쪽_필드를_빌리는_쪽으로_본다()
         {
-            // 메인 룰이 조커마다 차례 이벤트(pieceId)를 쏘고, 패시브는 가진 쪽 필드 pieceId로 "내 차례"만 받는다.
+            // 메인 룰이 조커마다 차례 이벤트(pieceId)를 쏘고, 패시브 효과는 가진 쪽 필드 pieceId로 "내 차례"만 받는다.
             var plus = Piece("plus", On<TrScored>(), new Log { text = "plus" });
             plus.HolderField = "pieceId";
             var blueprint = Piece("blueprint", On<TrScored>(), new BorrowOutcome { targets = { new PlaceTarget { list = new PlayerDataListRef { key = "run", path = "pieces" }, direction = PlaceDirection.Right } } });

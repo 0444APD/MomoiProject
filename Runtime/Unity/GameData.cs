@@ -124,7 +124,7 @@ namespace GBible.Data
     {
     }
 
-    // Game.Use(ID, 사용자, 대상들)로 쓸 수 있는 항목 — 선택 요소 '능력'의 규격(프로젝트의 AbilityData가 붙인다). 런타임이 세션에 등록한다.
+    // Game.Use(ID, 사용자, 대상들)로 쓸 수 있는 항목 — 선택 요소 '액티브 효과'의 규격(프로젝트의 AbilityData가 붙인다). 런타임이 세션에 등록한다.
     [Element(Elements.Ability)]
     public interface IUsableData : IDataKind
     {
@@ -139,7 +139,7 @@ namespace GBible.Data
         StatusDefinition ToDefinition();
     }
 
-    // 선택 요소 '패시브'의 규격(프로젝트의 PassiveData가 붙인다). 런타임이 정의를 세션에 등록한다(Game.Owned·가진 동안 보정).
+    // 선택 요소 '패시브 효과'의 규격(프로젝트의 PassiveData가 붙인다). 런타임이 정의를 세션에 등록한다(Game.Owned·가진 동안 보정).
     [Element(Elements.Passive)]
     public interface IPassiveData : IDataKind
     {

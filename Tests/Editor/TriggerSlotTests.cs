@@ -87,7 +87,7 @@ namespace GBible.Tests
             Assert.IsInstanceOf<ConditionTrigger>(achievement.trigger);
             Assert.IsInstanceOf<PlayerDataReward>(achievement.outcomes.Single());
             Assert.IsNull(achievement.condition);
-            // 능력은 선택 요소라 DB 종류가 프로젝트 템플릿에 있고, 예전 형식 옮기기는 두지 않는다(템플릿으로 새로 들이므로).
+            // 액티브 효과는 선택 요소라 DB 종류가 프로젝트 템플릿에 있고, 예전 형식 옮기기는 두지 않는다(템플릿으로 새로 들이므로).
         }
 
         [Test]

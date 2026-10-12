@@ -11,7 +11,7 @@
 
 ## 1. 한 줄 결론
 
-문법 밖 **0**, 예외 **3**(공통 2: **E1 원본 인스턴스와 패시브를 한 조각에 짝지을 수 없음**, **E2 묶음 판정 행동 안에서 MP가 모자란 연계** / 조각 1: **E3 Finite Gloves의 "일정 간격마다"** — 패시브에 주기가 없음). 가장 큰 빈틈은 **시전 계획을 규칙 쪽 어디에 두나**다. 연계(끝·명중 때 오른쪽 주문)와 명중 피해에는 쏜 순간의 계획이 규칙에 남아 있어야 하는데, 실시간 예산(33장 5-7)은 "개체 수백은 판 데이터에 두지 않는다"고 하고, 기믹 목록 1절은 해석기와 판정 보고 사이(화면 개체가 들고 다니는 규칙 계획)를 말하지 않는다.
+문법 밖 **0**, 예외 **3**(공통 2: **E1 원본 인스턴스와 패시브 효과를 한 조각에 짝지을 수 없음**, **E2 묶음 판정 행동 안에서 MP가 모자란 연계** / 조각 1: **E3 Finite Gloves의 "일정 간격마다"** — 패시브 효과에 주기가 없음). 가장 큰 빈틈은 **시전 계획을 규칙 쪽 어디에 두나**다. 연계(끝·명중 때 오른쪽 주문)와 명중 피해에는 쏜 순간의 계획이 규칙에 남아 있어야 하는데, 실시간 예산(33장 5-7)은 "개체 수백은 판 데이터에 두지 않는다"고 하고, 기믹 목록 1절은 해석기와 판정 보고 사이(화면 개체가 들고 다니는 규칙 계획)를 말하지 않는다.
 
 ---
 
@@ -25,9 +25,9 @@
 // 판 데이터(run)
 public List<Wand> wands;                  // 가진 지팡이(객체 목록). heldWand = 든 지팡이 id
 public string heldWand;
-public Dictionary<string, int> relics;    // 유물 = 패시브 ID → 레벨(17장 0-1)
-public Dictionary<string, int> sets;      // 세트 패시브 ID → 모은 개수(세트 계산이 쓴다)
-public Hero hero;                         // id "hero". 주인공 능력치 + '모든 지팡이' 전역 칸(wandMaxMp·wandRegen·wandMpCost·radius·chargeEff·wandSlots·wandLimit·summonLimit …, 기본 0)
+public Dictionary<string, int> relics;    // 유물 = 패시브 효과 ID → 레벨(17장 0-1)
+public Dictionary<string, int> sets;      // 세트 패시브 효과 ID → 모은 개수(세트 계산이 쓴다)
+public Hero hero;                         // id "hero". 주인공 스탯 + '모든 지팡이' 전역 칸(wandMaxMp·wandRegen·wandMpCost·radius·chargeEff·wandSlots·wandLimit·summonLimit …, 기본 0)
 public List<CastTemplate> templates;      // 계획 틀(2-3)
 public Room room;                         // enemies(List<Enemy{id, enemy, hp, maxHp, boss}>), summons, 상점·상자 물건
 
@@ -38,10 +38,10 @@ public Room room;                         // enemies(List<Enemy{id, enemy, hp, m
 | | 매지크래프트 | GBible |
 |---|---|---|
 | 조각 | 주문(칸 조각), 지팡이, 유물 | 주문·지팡이 = 객체 목록(고유 `id` + 원본 ID 칸). 유물 = 딕셔너리(ID → 레벨) |
-| 자리 | 지팡이 칸 한 줄 + 보조 칸 | `Wand.slots` 하나(줄 길이 0). 보조 칸은 같은 목록 뒤쪽 — 패시브 `run › wands[].slots`가 일반·보조 칸을 함께 본다 |
+| 자리 | 지팡이 칸 한 줄 + 보조 칸 | `Wand.slots` 하나(줄 길이 0). 보조 칸은 같은 목록 뒤쪽 — 패시브 효과 `run › wands[].slots`가 일반·보조 칸을 함께 본다 |
 | 원본 | 지팡이 수치, 주문 수치(레벨 1~3) | DB › 인스턴스 `WandData`(최대 MP·간격·재생·쿨다운·칸 수·보조 칸 수·퍼짐 각·동시 발사·자기 MP 비용·최종 피해·치명·`copies`·든 지팡이 칸·초당 충전·화면 플래그) · `SpellData`(종류·희귀도·최대 레벨·크기·MP·시전 지연·`levels[0..2]` 수치 줄·명중 상태 효과·연계 칸·궤도·화면 키). CSV 한 장씩(`levels[1].damage`) |
-| 동작 | 지팡이 패시브, 칸에 두면 지팡이에 붙는 주문, 유물, 세트 | DB › 패시브(E1 때문에 조각에 `passive` 칸을 하나 더 둔다) |
-| 능력치 | 지팡이 최대 MP·재생은 원본 값 + 보정 | `Rules.WandStat(w, 칸) = AttributeSystem.Apply(원본 값, Modifiers(w, 칸) ∪ Modifiers(hero, 전역 칸) ∪ 든 지팡이 칸)`(28장 4-6) |
+| 동작 | 지팡이 패시브 효과, 칸에 두면 지팡이에 붙는 주문, 유물, 세트 | DB › 패시브 효과(E1 때문에 조각에 `passive` 칸을 하나 더 둔다) |
+| 스탯 | 지팡이 최대 MP·재생은 원본 값 + 보정 | `Rules.WandStat(w, 칸) = AttributeSystem.Apply(원본 값, Modifiers(w, 칸) ∪ Modifiers(hero, 전역 칸) ∪ 든 지팡이 칸)`(28장 4-6) |
 
 ### 2-2. 순서 — 행동과 해석기
 
@@ -51,7 +51,7 @@ Ticked: held && readyAt <= Clock → Do(CastWand)   ← 시전 박자는 규칙 
 CastWand { wand }
   1. MP 정산: mp = min(최대, mp + 재생 × (지금 − mpAt)), mpAt = 지금
   2. 틀 = templates[wand, cursor, version] — 없으면 Rules.Interpret(wand, cursor)로 만든다
-  3. 노드마다 행동 직전 이벤트 '주문 시전'(SpellCastIntent) → 유물·지팡이 패시브가 고친다
+  3. 노드마다 행동 직전 이벤트 '주문 시전'(SpellCastIntent) → 유물·지팡이 패시브 효과가 고친다
   4. 뿌리 노드 MP 합: Game.Pay("run", "wands[w].mp", 합)
   5. cursor = 틀.next, readyAt = 지금 + 간격(끝에 닿았으면 + 쿨다운, cursor = 0)
   6. 이벤트 SpellCast(틀 id, 이번 시전의 count·copies·element) → 화면이 풀에서 발을 꺼낸다
@@ -99,13 +99,13 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 | 발 생성·궤도(직선·유도·마우스 추적·궤도 돌기·호버·뱀 몸)·퍼짐 각 적용·반동·비행 속도 | 무엇이 몇 발, 최종 수치(피해·치명·관통 수·튕김 수·지속·반경·속도·퍼짐 각) | `SpellCast` → 화면이 틀을 읽어 풀에서 꺼냄 |
 | 충돌: 적·벽·투사체끼리(관통·반사·튕김·벽 관통, Evil Slayer Sword·Rock'n'Ball·Guardian Sprite·Stagnant Droplet) | 피해 계산·치명 굴림·처치·명중 상태 효과·연계·MP | `SpellReport{hits, ends}` 틱마다 묶음 |
 | 범위 판정: 폭발·장판·오라·사슬(Chain of Lightning·Umbilical Cord)·끌어당김(Black Hole, Strong Traction의 반경 안 후보) | 범위 안 대상에게 줄 양, 후보에서 고르기 | 보고에 대상·후보 목록 |
-| 이동·비행·구덩이·대시·질주·엉덩방아·원격 시전 위치 | 이동 속도·몸 크기·반동 값(능력치), 비행 여부, 미터당·멈춘 초당 충전 | `MoveReport{meters, still}` |
+| 이동·비행·구덩이·대시·질주·엉덩방아·원격 시전 위치 | 이동 속도·몸 크기·반동 값(스탯), 비행 여부, 미터당·멈춘 초당 충전 | `MoveReport{meters, still}` |
 | 소환수·적 AI(추적·공격 박자·은신 무시) | 소환 한도·소환수 수치·소환수 시전 틀 | `SummonCast{summon}` |
 | 위치 | 위치를 저장하지 않는다 | 끝난 자리(x, y)만 보고 필드로 받아 자식 시전에 실어 돌려준다(한 번 정해지는 값) |
 
 ### 2-6. 명세서 4-2에 표시할 것
 
-- [x] 다른 것의 능력을 빌려 쓴다 — Mimicry Cube(레벨 한도), Autonomous Grimoire(기록)
+- [x] 다른 것의 액티브 효과를 빌려 쓴다 — Mimicry Cube(레벨 한도), Autonomous Grimoire(기록)
 - [x] 놓인 순서·위치가 효과를 바꾼다 — 왼쪽부터 읽기, 강화 → 다음 발사 주문, 연계 → 오른쪽
 - [x] 한 조각이 여러 칸을 차지한다 — Core of Flame
 - [x] 위치·조건에 따라 태그·속성이 바뀐다 — Tricolor Scepter·Radiant Bouquet·Colorful Cloak(무작위 원소)
@@ -117,23 +117,23 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 
 ## 3. 분류 표
 
-시트 상태: 지팡이 31·39·42는 패시브 글이 잘렸다. 59·81은 수치가 모두 0이고 패시브가 없다. 주문 9개(Parasite · Fusion Summon · Cadaver Explosion · Indomitability · Magic Reservoir · Tranquil Bloom · Charge Mode · Forced Cooldown · Capacity Expansion Stone)는 효과 칸도 설명도 비어 이름으로 추정했다("추정"). Meteor·Thunderstorm·Hover·Accelerator·Orbit의 `int1`·`float1`, Strong Traction Lv3의 "?verify"는 시트의 빈 값이다.
+시트 상태: 지팡이 31·39·42는 패시브 효과 글이 잘렸다. 59·81은 수치가 모두 0이고 패시브 효과가 없다. 주문 9개(Parasite · Fusion Summon · Cadaver Explosion · Indomitability · Magic Reservoir · Tranquil Bloom · Charge Mode · Forced Cooldown · Capacity Expansion Stone)는 효과 칸도 설명도 비어 이름으로 추정했다("추정"). Meteor·Thunderstorm·Hover·Accelerator·Orbit의 `int1`·`float1`, Strong Traction Lv3의 "?verify"는 시트의 빈 값이다.
 
 ### 3-1. 지팡이 97
 
-모든 지팡이: DB › 인스턴스 `WandData` 한 줄(최대 MP · 시전 간격 · MP 재생 · 쿨다운 · 칸 수). 아래는 "패시브" 칸만 나눈다.
+모든 지팡이: DB › 인스턴스 `WandData` 한 줄(최대 MP · 시전 간격 · MP 재생 · 쿨다운 · 칸 수). 아래는 "패시브 효과" 칸만 나눈다.
 
 | 번호 · 이름 | 분류 | 만드는 법 |
 |---|---|---|
-| 3·4·6·7·9·13·14·16·17·20·21·25·49·50·52·61·63·65·66·67·71·72·82·86·88·91(패시브 없음, 26) | DB | `WandData` 칸만 |
-| 59 Warlock's Satchel · 81 Collector's Staff | DB | 수치 0·패시브 없음. 원작의 특수 지팡이라 동작이 정해지면 다시 분류 |
+| 3·4·6·7·9·13·14·16·17·20·21·25·49·50·52·61·63·65·66·67·71·72·82·86·88·91(패시브 효과 없음, 26) | DB | `WandData` 칸만 |
+| 59 Warlock's Satchel · 81 Collector's Staff | DB | 수치 0·패시브 효과 없음. 원작의 특수 지팡이라 동작이 정해지면 다시 분류 |
 | 1·2·5·23·29·51·57·60·77·78(퍼짐 각만, 10) | DB | `WandData.scatter`. 규칙이 최종 각(Precise Shot −30°·Talisman of Focus까지)을 틀에 싣고, 흩뿌리는 것은 화면 |
-| 24 Venomous Bite · 28 Shamanic Dagger · 68 Asteroid · 79 Shapeshifter · 80 Rainbow Electroweb | DB | 자기 지팡이 MP 비용 ×0.8/0.7/0.9 · 최종 피해 ×0.7 · 치명 +70% = 원본 칸 `mpCost`·`finalDmg`·`crit`. 고정 값이라 패시브가 필요 없다 |
-| 8 Microcosmic Embrace · 12 Natural Convergence · 40 Deed Witness · 46 Sorcerer's Oath · 95 Shard of Time | DB | "모든 지팡이" = DB › 패시브(가진 목록 `run › wands`, `matchField` `passive`) `modifiers` → `modifierTarget` `hero`의 전역 칸(`wandMpCost` 독립 곱 −0.2 · `wandRegen` +3/+5/+8 · `radius` +0.5). 재생이 바뀌면 `Recalc`가 먼저 MP 정산. **E1** |
+| 24 Venomous Bite · 28 Shamanic Dagger · 68 Asteroid · 79 Shapeshifter · 80 Rainbow Electroweb | DB | 자기 지팡이 MP 비용 ×0.8/0.7/0.9 · 최종 피해 ×0.7 · 치명 +70% = 원본 칸 `mpCost`·`finalDmg`·`crit`. 고정 값이라 패시브 효과가 필요 없다 |
+| 8 Microcosmic Embrace · 12 Natural Convergence · 40 Deed Witness · 46 Sorcerer's Oath · 95 Shard of Time | DB | "모든 지팡이" = DB › 패시브 효과(가진 목록 `run › wands`, `matchField` `passive`) `modifiers` → `modifierTarget` `hero`의 전역 칸(`wandMpCost` 독립 곱 −0.2 · `wandRegen` +3/+5/+8 · `radius` +0.5). 재생이 바뀌면 `Recalc`가 먼저 MP 정산. **E1** |
 | 15 Novice's Grimoire | DB | 소환 주문 MP ×0.9 = 원본 칸 `summonMpCost`(해석기가 소환 노드에 곱함) |
-| 38 Sacrificial Dagger | DB | 패시브: 행동 직전 이벤트 `피해` 받기, 행동 직전 이벤트 조건 `sourceId 일치 hero` AND `targetId 일치 hero` → `amount` 곱하기 0.01. E1 |
-| 39 Energizer Wand(글 잘림) | DB | "MP 소모가 …면 피해 +50%" → 패시브: 행동 직전 이벤트 `주문 시전` 받기(`holderField` `wandId`), 행동 직전 이벤트 조건 `mpCost ≥ N` → `damageMul` 곱하기 1.5. 문턱이 최대 MP 비율이면 BindTo |
-| 10 Featherweight · 22 Frenzy Enchanter · 55 Handy Wand · 94 Clearwater Resonance | Block | 보조 칸 충전(시전마다 3·4·3·1.5): 패시브(`perElement`(놓인 것마다) `run › wands`, 이벤트 `주문 시전함`, `holderField` `wandId`) → 효과 `에너지 충전`(`Rules.Charge`). '필드 바꾸기'가 아니라 동사 Block인 이유는 Infusion Hand Seal(충전 효율)이 양을 고치기 때문(5절 6). 94의 MP ×0.3 · 최종 ×0.3 · 퍼짐 −45°는 원본 칸 |
+| 38 Sacrificial Dagger | DB | 패시브 효과: 행동 직전 이벤트 `피해` 받기, 행동 직전 이벤트 조건 `sourceId 일치 hero` AND `targetId 일치 hero` → `amount` 곱하기 0.01. E1 |
+| 39 Energizer Wand(글 잘림) | DB | "MP 소모가 …면 피해 +50%" → 패시브 효과: 행동 직전 이벤트 `주문 시전` 받기(`holderField` `wandId`), 행동 직전 이벤트 조건 `mpCost ≥ N` → `damageMul` 곱하기 1.5. 문턱이 최대 MP 비율이면 BindTo |
+| 10 Featherweight · 22 Frenzy Enchanter · 55 Handy Wand · 94 Clearwater Resonance | Block | 보조 칸 충전(시전마다 3·4·3·1.5): 패시브 효과(`perElement`(놓인 것마다) `run › wands`, 이벤트 `주문 시전함`, `holderField` `wandId`) → 효과 `에너지 충전`(`Rules.Charge`). '필드 바꾸기'가 아니라 동사 Block인 이유는 Infusion Hand Seal(충전 효율)이 양을 고치기 때문(5절 6). 94의 MP ×0.3 · 최종 ×0.3 · 퍼짐 −45°는 원본 칸 |
 | 18 777 · 44 Double Flute · 84 The Lightless | Block | 같은 모양, 이벤트 `주문 명중`(1.7 · 2.2 · 3.3) |
 | 62 Festive Wand · 73 Dormant Whisker · 87 The Faultless | Block | 이벤트 `적 처치`(`wandId`)(20 · 90 · 130) |
 | 35 Vow of Honor · 85 The Formless | Block | 이벤트 `주인공 피격`(가진 쪽 필드 없음 — 가지고 있으면)(33 · 100) |
@@ -141,19 +141,19 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 | 19 Time Stasis · 83 The Shadeless · 93 Omen of Doom | Block(+화면) | 화면이 틱마다 `MoveReport{meters}` → 이벤트 `이동함` → `에너지 충전`(미터당 2 · 5 · 7.5 × 이벤트 칸 `meters` — Block이 이벤트 칸을 읽는다) |
 | 31 Energy Reservoir · 42 Legion Banner(글 잘림) | Block | "for every …"의 조건에 따라 위 줄 중 하나. 42의 치명 +15%는 원본 칸 |
 | 11 Harmonic Resonance · 32 Trident · 45 Trichord Lute · 58 Wand of Convergence · 75 Frozen Touch · 89 The Sourceless | 메인 룰 | 동시 발사 5·3·3·2·2 / 동시 시전 3 = 원본 칸 `simultaneous`를 해석기 '동시 발사' 자리(2-2 ②)가 읽는다. 4-2 '반복' |
-| 33 Soul-Devouring Orb · 74 Siegemaker · 96 Stellar Drift · 43 Expanding Container | 메인 룰 | 동시 3·3·5·2 + 처치 충전 30(Block) / MP ×1.3·×2·치명 +20%(원본 칸) / 모든 지팡이 최대 MP ×1.3(패시브, E1) |
+| 33 Soul-Devouring Orb · 74 Siegemaker · 96 Stellar Drift · 43 Expanding Container | 메인 룰 | 동시 3·3·5·2 + 처치 충전 30(Block) / MP ×1.3·×2·치명 +20%(원본 칸) / 모든 지팡이 최대 MP ×1.3(패시브 효과, E1) |
 | 97 Quadruple Staff | 메인 룰(+화면) | 원본 칸 `copies` 4 → 행동 직전 이벤트 `주문 시전`의 `copies`. 네 방향은 화면. MP ×1.5 · 최종 ×0.5는 원본 칸 |
-| 34 Legacy of Ancestors · 76 Kingdom's Guardian · 90 The Wordless | 메인 룰 | 초마다 충전 15·35·66: 패시브에 시간 발동이 없어(E3) 원본 칸 `chargePerSecond`를 해석기가 MP처럼 지연 정산하고, 가득 찰 시각에 `Game.ScheduleAfter`로 보조 칸 시전 |
+| 34 Legacy of Ancestors · 76 Kingdom's Guardian · 90 The Wordless | 메인 룰 | 초마다 충전 15·35·66: 패시브 효과에 시간 발동이 없어(E3) 원본 칸 `chargePerSecond`를 해석기가 MP처럼 지연 정산하고, 가득 찰 시각에 `Game.ScheduleAfter`로 보조 칸 시전 |
 | 54 Book of Tranquility | 메인 룰(+화면) | 멈춘 초마다 20: 화면이 `MoveReport{still}`로 멈춤 시작·끝 → 해석기가 멈춘 시간만큼 정산. "서 있으면 반동 없음"은 화면 |
-| 37 Conch Whistle · 53 Swift Spellblade · 41 Swiftshot Staff · 70 Restless Fey · 92 Wand of Focus | 메인 룰 | '든 지팡이' 자리: 들고 있으면 이동 +20/40%, 재생 ×0.2/0.3/1.5(들 때)·×1.5/1.8/0.5(안 들 때) = 원본 칸 `holdMoveSpeed`·`regenHeld`·`regenIdle`을 `Rules.WandStat`·이동 속도 함수가 `heldWand`로 고른다. `SwitchWand`가 바꾸기 전에 모든 지팡이 MP 정산. 패시브 보정에는 조건을 달 수 없어 자리로 둔다(5절 10). 37의 미터당 3은 Block |
-| 26 Tricolor Scepter · 36 Radiant Bouquet | BindTo | 주문 색 무작위: 패시브 행동 직전 이벤트 `주문 시전` 받기(`wandId`) → `[BindTo]`가 `Game.Random("element")`로 `element`를 바꾼다(값 틀은 무작위를 못 고른다). 해석기 '태그 정하기' 단계 |
-| 56 Ripple Wand | BindTo | 이벤트 `주문 시전함` + 확률 5% → `[BindTo]`가 그 지팡이 MP를 최대로(최대가 능력치라 값 틀로 못 씀). MP ×1.5는 원본 칸 |
+| 37 Conch Whistle · 53 Swift Spellblade · 41 Swiftshot Staff · 70 Restless Fey · 92 Wand of Focus | 메인 룰 | '든 지팡이' 자리: 들고 있으면 이동 +20/40%, 재생 ×0.2/0.3/1.5(들 때)·×1.5/1.8/0.5(안 들 때) = 원본 칸 `holdMoveSpeed`·`regenHeld`·`regenIdle`을 `Rules.WandStat`·이동 속도 함수가 `heldWand`로 고른다. `SwitchWand`가 바꾸기 전에 모든 지팡이 MP 정산. 패시브 효과 보정에는 조건을 달 수 없어 자리로 둔다(5절 10). 37의 미터당 3은 Block |
+| 26 Tricolor Scepter · 36 Radiant Bouquet | BindTo | 주문 색 무작위: 패시브 효과 행동 직전 이벤트 `주문 시전` 받기(`wandId`) → `[BindTo]`가 `Game.Random("element")`로 `element`를 바꾼다(값 틀은 무작위를 못 고른다). 해석기 '태그 정하기' 단계 |
+| 56 Ripple Wand | BindTo | 이벤트 `주문 시전함` + 확률 5% → `[BindTo]`가 그 지팡이 MP를 최대로(최대가 스탯이라 값 틀로 못 씀). MP ×1.5는 원본 칸 |
 | 69 Energized Orb | BindTo | 기믹 목록 2-6: 행동 직전 이벤트 `비용 지불` 받기 → `key`·`path`를 이 지팡이로(`[BindTo]`, 모자랄 때만, 이 지팡이 MP를 먼저 정산). 연계 지불을 미리 검사로 바꾸면(E2) 해석기가 이것도 함께 본다 |
 | 27 Defiant Nature · 47 Restless Heart · 48 Witch's Broomstick | 화면 | 늘 거꾸로 쏨(퍼짐 −360°) · 반동 반대 · 들면 비행 = 원본 칸(참거짓)을 화면이 읽는다. 비행은 구덩이 충돌을 끄는 화면 일 |
 
 ### 3-2. 주문 75
 
-모든 주문: DB › 인스턴스 `SpellData`(종류 · 희귀도 · 최대 레벨 · 크기 · MP · 시전 지연 · `levels[0..2]`). 칸 조각 `Spell { id, spell, level }`. 수치형 강화를 패시브(행동 직전 이벤트 `주문 시전` 받기 + `{level:…}`)로 만드는 길도 있지만, 수치가 Block 칸에 들어가 CSV로 못 고치고 강화 하나마다 행동 직전 이벤트가 한 번 돌아 원본 칸 + 해석기 합산을 골랐다(5절 3).
+모든 주문: DB › 인스턴스 `SpellData`(종류 · 희귀도 · 최대 레벨 · 크기 · MP · 시전 지연 · `levels[0..2]`). 칸 조각 `Spell { id, spell, level }`. 수치형 강화를 패시브 효과(행동 직전 이벤트 `주문 시전` 받기 + `{level:…}`)로 만드는 길도 있지만, 수치가 Block 칸에 들어가 CSV로 못 고치고 강화 하나마다 행동 직전 이벤트가 한 번 돌아 원본 칸 + 해석기 합산을 골랐다(5절 3).
 
 | 번호 · 이름 | 분류 | 만드는 법 |
 |---|---|---|
@@ -161,10 +161,10 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 | 1 Magic Bullet · 4 Laser · 13 Meteor · 14 Rainbow · 22 Boomerang Blade | DB | 발사 주문 수치(피해 16/32/64·치명 20%·관통 5/8/11, 발 7·관통 1, 작은 운석 수, 무차별 = `damageKind`). Magic Bullet Lv2·3 "맞은 적이 받는 피해 +50/100%, 4/8초" = 명중 상태 효과 칸 → DB › 상태 효과(초 지속, 행동 직전 이벤트 `피해` 받기 `holderField` `targetId` → `amount` 곱하기 1.5/2, 레벨마다 하나). Laser의 반사 · Meteor의 튕김은 화면, "지팡이가 더 빨리 쏨"은 시전 지연 칸 |
 | 35 Slime Crystal · 45 Frost Crystal(추정 — 빙결) | DB | 명중 상태 효과 칸(레벨마다 상태 효과 ID: 이동 ×0.6/0.5/0.4 보정, 3/4/5초). "주문 비행 속도 ×0.7/0.6/0.5"는 틀의 수치를 화면이 쓴다 |
 | 54 Troll Serum · 61 Essence of Soul(설명만 — 소환 강화) | DB | 소환 주문에 붙는 강화: 소환수 체력 +40/80/160%, 초당 회복 2.5/5/10(소환수에 거는 상태 효과의 주기) |
-| 68 Magic Reservoir · 69 Tranquil Bloom(추정 — 지팡이 수치 패시브) | DB | 칸에 놓이면 그 지팡이에 붙는 패시브: 가진 목록 `run › wands[].slots`, `matchField` `passive`, `perElement` 끔(가진 쪽 = 그 지팡이), `levelField` `level`, `modifiers`(그 지팡이의 `maxMp` 등). E1 |
+| 68 Magic Reservoir · 69 Tranquil Bloom(추정 — 지팡이 수치 패시브 효과) | DB | 칸에 놓이면 그 지팡이에 붙는 패시브 효과: 가진 목록 `run › wands[].slots`, `matchField` `passive`, `perElement` 끔(가진 쪽 = 그 지팡이), `levelField` `level`, `modifiers`(그 지팡이의 `maxMp` 등). E1 |
 | 36 Venom Crystal | Block | 명중 상태 효과 `poison`(중첩 1/2/4, 3/4/5초, 주기 1초) + 결과 효과 `중첩만큼 피해`(29장 5-1의 `StackDamage`). 유물 Reaper가 행동 직전 이벤트 `상태 효과 걸기`의 `stacks`를 곱한다 |
 | 30 Pillar of Light | Block(+화면) | Lv2·3: 효과 `최대 체력 비율 피해`(40/80%, 보스 비율 칸). 적 투사체를 막는 것은 화면 |
-| 17 Adava Keravda | BindTo | 처치할수록 강해짐: 패시브(`perElement` `wands[].slots`, 이벤트 `적 처치` `holderField` `pieceId`) → '필드 바꾸기' `kills` +1, 문턱을 넘으면 `level`을 올리는 `[BindTo]`(기믹 목록 2-4 진화). 무차별은 원본 칸 |
+| 17 Adava Keravda | BindTo | 처치할수록 강해짐: 패시브 효과(`perElement` `wands[].slots`, 이벤트 `적 처치` `holderField` `pieceId`) → '필드 바꾸기' `kills` +1, 문턱을 넘으면 `level`을 올리는 `[BindTo]`(기믹 목록 2-4 진화). 무차별은 원본 칸 |
 | 18 Thunderstorm | BindTo | "한 적만 맞히면 +130/160%": 같은 낙뢰(같은 노드·같은 발)의 명중 수를 보고 묶음에서 센다 → 피해 함수의 주문별 `[BindTo]` 훅. 전도 횟수는 원본 칸 |
 | 20 Enchanting Coin | BindTo(+화면) | 시전 때 골드 20%를 `Game.Pay`(양이 규칙으로 정해짐), 동전마다 기본 피해 +10%, 끝나면 동전이 바닥에(화면, 주우면 판정 보고). 4-2 '다른 곳에서 내기' |
 | 47 Core of Thunder | BindTo | 여러 개면 낙뢰 확률은 가장 높은 것, 피해는 더함 — 칸마다 합치는 법이 다르다. 해석기 합치기에 칸별 방식(최댓값)을 두면 DB |
@@ -188,7 +188,7 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 
 ### 3-3. 유물 85
 
-모든 유물: DB › 패시브, 가진 목록 `run › relics`(ID → 레벨). 레벨 수치는 `byLevel`·`{level:…}`. 희귀도 = 희귀도별 가중치 표(뺄 목록 = 가진 것). 최대 레벨·세트 구성은 패시브에 칸이 없어 E1. 대상 `주인공`은 시스템층의 대상 Block, 보정 받을 대상은 `hero`(전역 지팡이 칸 포함).
+모든 유물: DB › 패시브 효과, 가진 목록 `run › relics`(ID → 레벨). 레벨 수치는 `byLevel`·`{level:…}`. 희귀도 = 희귀도별 가중치 표(뺄 목록 = 가진 것). 최대 레벨·세트 구성은 패시브 효과에 칸이 없어 E1. 대상 `주인공`은 시스템층의 대상 Block, 보정 받을 대상은 `hero`(전역 지팡이 칸 포함).
 
 | 번호 · 이름 | 분류 | 만드는 법 |
 |---|---|---|
@@ -202,9 +202,9 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 | 21 Endless Elixir · 26 Healing Belt · 84 Bird beak mask | DB | 이벤트 `물약 마심` + 확률 30% → 물약 +1 / 최대 HP +3·전역 최대 MP 기본 +2('필드 바꾸기', 쌓이는 값) / 물약 한도 보정 +1 · 2전투마다(숨긴 상태 효과 중첩으로 세기) 물약 +1 · 행동 직전 이벤트 `회복` 받기(`source 물약`) `amount` +5 |
 | 23 Fortune Earrings · 32 Lucky Bunny Ear · 27 Hexa-gonal Die · 42 Octagonal Die | DB | 이벤트 `유물 얻음`(`relic` 일치 자기) → `run.relicOptions`·`spellOptions` +1(가중치 표에서 고르기의 `countBonus`가 읽는 숫자) / 이벤트 `유물 얻음`·`주문 얻음` → 다시 뽑기 횟수 +`{level}`. 다시 뽑기는 시스템층(`Game.RerollChoice` + 횟수 `Game.Pay`). countBonus가 보정을 읽지 않는 점은 5절 5 |
 | 28 Hourglass of Time | DB | 행동 직전 이벤트 `죽음` 받기(`unitId hero`) → `막기` + `surviveRatio` 값으로 `{level:0.5/0.8}` + '플레이어 데이터에 주기'로 자기 값 0(가지지 않음) |
-| 57 Soulbone Armor · 58 Soulbone Crown · 59 Soulbone Mantle · 64 Treant Circlet · 66 Treant Shoulder-guards | DB | 보호막 '필드 바꾸기': 처치 + 확률 20% → `shield` +1 / 처치마다 숨긴 상태 효과 +1중첩, 그 상태 효과가 3중첩에서 `tempShield` +1 하고 풀림(유물 하나에 패시브가 하나라 세기와 N번째 결과를 함께 못 둔다 — 5절 13) / 얻을 때 +20 + 같은 카운터 / 문 들어감 → `tempShield` +15 / `{level:3/6/9/12/15}` |
-| 78 Coolant | DB | 행동 직전 이벤트 `상태 효과 걸기` 받기(`statusId`가 유물 능력 쿨다운) → `length` 곱하기 `{level:0.75/0.5/…}` |
-| 79 Swordsman Cloak | DB(+화면) | DB › 능력(스페이스 → `Game.Use`): 쿨다운 2초 + 질주 중 무적 + "한 번 공짜"(행동 직전 이벤트 `주문 시전` 받기 → `mpCost` 값으로 0, 지속 = 이벤트 `주문 시전함` 1번) 상태 효과. Evil Slayer Sword MP ×0.9 = 행동 직전 이벤트 `주문 시전` 받기(`spell` 일치). 질주 움직임은 화면 |
+| 57 Soulbone Armor · 58 Soulbone Crown · 59 Soulbone Mantle · 64 Treant Circlet · 66 Treant Shoulder-guards | DB | 보호막 '필드 바꾸기': 처치 + 확률 20% → `shield` +1 / 처치마다 숨긴 상태 효과 +1중첩, 그 상태 효과가 3중첩에서 `tempShield` +1 하고 풀림(유물 하나에 패시브 효과가 하나라 세기와 N번째 결과를 함께 못 둔다 — 5절 13) / 얻을 때 +20 + 같은 카운터 / 문 들어감 → `tempShield` +15 / `{level:3/6/9/12/15}` |
+| 78 Coolant | DB | 행동 직전 이벤트 `상태 효과 걸기` 받기(`statusId`가 유물 액티브 효과 쿨다운) → `length` 곱하기 `{level:0.75/0.5/…}` |
+| 79 Swordsman Cloak | DB(+화면) | DB › 액티브 효과(스페이스 → `Game.Use`): 쿨다운 2초 + 질주 중 무적 + "한 번 공짜"(행동 직전 이벤트 `주문 시전` 받기 → `mpCost` 값으로 0, 지속 = 이벤트 `주문 시전함` 1번) 상태 효과. Evil Slayer Sword MP ×0.9 = 행동 직전 이벤트 `주문 시전` 받기(`spell` 일치). 질주 움직임은 화면 |
 | 6 Blood-thirsty Gaze · 65 Treant Robe | Block | 효과 `회복`(주인공): 처치 + 확률 20% → 1 / 문 들어감 → 5 |
 | 47 Pros-pector's Vest | Block | 이벤트 `동전 주움` → 효과 `이벤트 양만큼 회복`(이벤트 칸 `amount`를 읽는 회복) |
 | 44 Tree Spirit Pendant | Block | 피격 + 조건 체력 < 30 → 상태 효과 '나무 재생'(주기 1초) + 효과 `회복(상한 30)`, 30이 되면 스스로 풀림 |
@@ -215,13 +215,13 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 | 20 Endless Chest | Block(+화면) | `상자 엶` + 확률 30% → 효과 `상자 만들기`(방 물건 목록에 `Game.NewId`) |
 | 45 Pros-pector's Gloves | Block(+화면) | 처치 + 조건 Block `레벨별 확률`(8/16/24%) → 이벤트 `동전 떨어짐`(화면이 바닥에 놓고, 주우면 판정 보고). 조건 '확률'은 레벨 틀을 받지 않는다(5절 4) |
 | 19 Ember-heart · 83 Druid's Horn | Block(+화면) | 화면이 반경(3m / 3~5m) 안 적·아군을 `AuraReport{source, targets}`로 보냄(규칙은 출처마다 마지막 시각을 보고 1초 안이면 버린다) → 효과 `피해`(16) / `주인공 최대 체력 비율 피해`(10…50%)·`… 회복`(5…25%) |
-| 82 Original Shape | Block(+화면) | DB › 능력(쿨다운 10초). 엉덩방아 이동·착지 반경 3m는 화면 → 착지 보고 → 효과 `최대 체력 비율 피해`(50%·보스 10%). 이벤트 `적 처치`(`source originalShape`) → 쿨다운 '상태 효과 풀기' |
+| 82 Original Shape | Block(+화면) | DB › 액티브 효과(쿨다운 10초). 엉덩방아 이동·착지 반경 3m는 화면 → 착지 보고 → 효과 `최대 체력 비율 피해`(50%·보스 10%). 이벤트 `적 처치`(`source originalShape`) → 쿨다운 '상태 효과 풀기' |
 | 35 Mask of the Hexer · 46 Pros-pector's Pickaxe · 48 Rageful Eye | BindTo | 행동 직전 이벤트 `피해` 받기(`sourceId hero`) + `[BindTo]`: 저주 수 × 10/15% · 동전 3…7개당 1…5% · 잃은 HP 2당 1%(기믹 목록 2-9 '상태에 따라 변함') |
 | 11 Pros-pector's Goblet | BindTo | `구역 들어감` → 동전 + min(10, 5%) |
 | 16 Dusty Treasure · 85 Mystical Artifact | BindTo | 최대 레벨이 아닌 유물 하나 무작위 +1, 없으면 일반 유물 / 다른 일반·희귀·에픽 유물이 모두 최대 레벨일 때 대신 나옴(유물 고르기 결과 쪽), 레벨당 최대 HP +1은 `modifiers` `perLevel`. 둘 다 유물별 최대 레벨이 필요(E1) |
 | 43 Pandora's Box · 81 Reaper | BindTo | 방 들어감 → 가방 앞 1/2/3칸 주문을 같은 희귀도 표에서 다시 뽑기 / 방 들어감 → 합칠 수 있는 주문 자동 합성. Reaper의 독 중첩 ×2/3은 DB(행동 직전 이벤트 `상태 효과 걸기` 받기 `stacks` 곱하기 `{level:2/3}`) |
 | 54 Seed of Greed | BindTo | 행동 직전 이벤트 `회복` 받기(`targetId hero`) → 막고 흡수량을 `run.relicCounters[seedOfGreed]`에 쌓음, 70이면 최대 HP +50(진화) |
-| 62 Talisman of Focus | BindTo(+화면) | 멈춘 시간(화면 보고)에 따라 쿨다운·간격·퍼짐 최대 −60% — 능력치 함수의 계산 |
+| 62 Talisman of Focus | BindTo(+화면) | 멈춘 시간(화면 보고)에 따라 쿨다운·간격·퍼짐 최대 −60% — 스탯 함수의 계산 |
 | 69 Reboot Key | BindTo | 주문·지팡이·유물·저주를 같은 희귀도로 다시 뽑고 구역 처음으로, 자기 없애기 |
 | 72 Colorful Cloak | BindTo | 행동 직전 이벤트 `주문 시전` 받기 → 무작위 원소(Tricolor Scepter와 같은 함수) |
 | 73 Ward Charm | BindTo | 방 들어감 + 확률 33% → 저주 하나를 무작위로 풀기(기본 '상태 효과 풀기'는 종류 전부만 푼다) |
@@ -233,12 +233,12 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 | 25 Guardian Sprite | 화면 | 정령 3/6/9/12/15(수 = `Game.Owned` × 3)가 적 주문을 막는다 |
 | 33 Magician's Robe | 화면(+DB) | 5m 떨어진 곳에서 시전(시전 위치). 반경 −30%는 `modifiers` |
 | 60 Sprite Wings | 화면 | 비행(구덩이 충돌 끔, 독 장판은 그대로) |
-| 80 Bi'an | 화면(+DB) | 날아간 칼을 불러들이며 경로 판정 → 판정 보고. 능력·쿨다운 5초는 DB |
-| 22 Finite Gloves | **예외(E3)** | "일정 간격마다 보스 아닌 적 절반 처치" — 패시브에 시간 발동이 없다(4절) |
+| 80 Bi'an | 화면(+DB) | 날아간 칼을 불러들이며 경로 판정 → 판정 보고. 액티브 효과·쿨다운 5초는 DB |
+| 22 Finite Gloves | **예외(E3)** | "일정 간격마다 보스 아닌 적 절반 처치" — 패시브 효과에 시간 발동이 없다(4절) |
 
 ### 3-4. 세트 5
 
-세트 계산(메인 룰, 기믹 목록 2-8): DB › 인스턴스 `SetData`(구성 유물 목록 `[DataRef(typeof(PassiveData))]` + 세트 패시브 ID)를 `Rules.Recalc`가 읽어 `run.sets`(세트 패시브 ID → 모은 개수)를 쓴다. 세트 효과는 가진 목록 `run › sets`인 패시브다.
+세트 계산(메인 룰, 기믹 목록 2-8): DB › 인스턴스 `SetData`(구성 유물 목록 `[DataRef(typeof(PassiveData))]` + 세트 패시브 효과 ID)를 `Rules.Recalc`가 읽어 `run.sets`(세트 패시브 효과 ID → 모은 개수)를 쓴다. 세트 효과는 가진 목록 `run › sets`인 패시브 효과다.
 
 | 세트 | 분류 | 만드는 법 |
 |---|---|---|
@@ -252,12 +252,12 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 
 ## 4. 예외 · 문법 밖
 
-### E1. 원본 인스턴스와 패시브를 한 조각에 짝짓기(공통)
+### E1. 원본 인스턴스와 패시브 효과를 한 조각에 짝짓기(공통)
 
-- **무엇**: 지팡이·주문은 수치가 많아 DB › 인스턴스(CSV)로 두는데, 일부는 동작(모든 지팡이 보정 · 행동 직전 이벤트 · 이벤트 충전 · 칸 주문의 지팡이 보정)이 있어 DB › 패시브도 필요하다. 패시브는 조각의 '일치 필드' 값이 패시브 ID와 같을 때 가진 것으로 보는데, DB ID는 종류를 넘어 하나뿐이라(17장 1절, 코드 `EditorDatabase.CanUseId`) 인스턴스와 패시브가 같은 ID를 가질 수 없다. 유물은 반대로 패시브뿐이라 최대 레벨 · 세트 구성 같은 고정 칸을 둘 곳이 없다(17장 0-5 "PassiveData에는 칸을 더할 수 없다").
-- **어디**: 지팡이 패시브 33(모든 지팡이 보정 6 · 행동 직전 이벤트 2 · 충전 21 · 색 2 · BindTo 2), 주문 4(Magic Reservoir · Tranquil Bloom · Adava Keravda · Arcane Barrier), 유물 최대 레벨(Dusty Treasure · Mystical Artifact · "최대 레벨이면 다시 안 나옴"), 세트 구성.
-- **우회**: ① 조각에 원본 ID 칸을 둘 둔다 — `Wand { wand, passive }`, 만들 때 원본의 `[DataRef(typeof(PassiveData))] passive`를 옮겨 적는다(참조 7절 3 "원본의 고정 값을 판 데이터에 복사하지 않는다"에 약하게 어긋난다. 이 보고서는 이것을 골랐다). ② 이름 규칙 — 패시브 `oldWand`, 인스턴스 `wand.oldWand`, 코드가 접두어로 찾는다(DataRef 검증·ID 바꾸기 추적이 끊긴다). ③ 유물 고정 칸은 인스턴스 `RelicInfo`(ID `relicInfo.X`)나 밸런스 값 `relicMax.X`.
-- **라이브러리에 있으면 없어지는 것**: 패시브 '일치 필드'가 "조각의 원본 인스턴스가 가리키는 패시브"를 따라가는 길(예: 일치 필드에 `wand → passive` 같은 원본 칸 경로), 또는 인스턴스에 붙이는 패시브 기능 필드(사용 기능 `Usable`처럼 `[SerializeReference]`로 원본 안에 패시브를 두고 ID = 인스턴스 ID).
+- **무엇**: 지팡이·주문은 수치가 많아 DB › 인스턴스(CSV)로 두는데, 일부는 동작(모든 지팡이 보정 · 행동 직전 이벤트 · 이벤트 충전 · 칸 주문의 지팡이 보정)이 있어 DB › 패시브 효과도 필요하다. 패시브 효과는 조각의 '일치 필드' 값이 패시브 효과 ID와 같을 때 가진 것으로 보는데, DB ID는 종류를 넘어 하나뿐이라(17장 1절, 코드 `EditorDatabase.CanUseId`) 인스턴스와 패시브 효과가 같은 ID를 가질 수 없다. 유물은 반대로 패시브 효과뿐이라 최대 레벨 · 세트 구성 같은 고정 칸을 둘 곳이 없다(17장 0-5 "PassiveData에는 칸을 더할 수 없다").
+- **어디**: 지팡이 패시브 효과 33(모든 지팡이 보정 6 · 행동 직전 이벤트 2 · 충전 21 · 색 2 · BindTo 2), 주문 4(Magic Reservoir · Tranquil Bloom · Adava Keravda · Arcane Barrier), 유물 최대 레벨(Dusty Treasure · Mystical Artifact · "최대 레벨이면 다시 안 나옴"), 세트 구성.
+- **우회**: ① 조각에 원본 ID 칸을 둘 둔다 — `Wand { wand, passive }`, 만들 때 원본의 `[DataRef(typeof(PassiveData))] passive`를 옮겨 적는다(참조 7절 3 "원본의 고정 값을 판 데이터에 복사하지 않는다"에 약하게 어긋난다. 이 보고서는 이것을 골랐다). ② 이름 규칙 — 패시브 효과 `oldWand`, 인스턴스 `wand.oldWand`, 코드가 접두어로 찾는다(DataRef 검증·ID 바꾸기 추적이 끊긴다). ③ 유물 고정 칸은 인스턴스 `RelicInfo`(ID `relicInfo.X`)나 밸런싱 값 `relicMax.X`.
+- **라이브러리에 있으면 없어지는 것**: 패시브 효과 '일치 필드'가 "조각의 원본 인스턴스가 가리키는 패시브 효과"를 따라가는 길(예: 일치 필드에 `wand → passive` 같은 원본 칸 경로), 또는 인스턴스에 붙이는 패시브 효과 기능 필드(사용 기능 `Usable`처럼 `[SerializeReference]`로 원본 안에 패시브 효과를 두고 ID = 인스턴스 ID).
 
 ### E2. 묶음 판정 행동 안에서 MP가 모자란 연계(공통)
 
@@ -267,9 +267,9 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 
 ### E3. 가진 동안 N초마다 — Finite Gloves(조각 1)
 
-- **무엇**: 패시브 발동은 이벤트 받기 · 조건 충족 · 행동 직전 이벤트뿐이고 주기가 없다. 기믹 목록 2-7은 "실시간 'N초마다'는 상태 효과의 주기"라 하지만, 유물을 영구 상태 효과로 걸어 두는 우회는 17장 0절 · 29장 1절이 막는다.
-- **우회**: 메인 룰이 방 시계로 1초마다 이벤트 `초 지남`을 쏜다(행동 1개/초, 실시간 예산 안). 패시브가 받고 `[BindTo]`가 간격을 세어 보스 아닌 적 절반을 무작위로 처치한다. 지팡이 '초마다 충전'(34 · 76 · 90)은 같은 이유로 메인 룰의 지연 정산으로 옮겼다(예외로 세지 않음).
-- **라이브러리에 있으면 없어지는 것**: 패시브에 `pulse`(주기(초)) 칸 — 상태 효과의 주기와 같은 규칙(가진 쪽마다, 프레임 끝 행동 하나에 묶음).
+- **무엇**: 패시브 효과 발동은 이벤트 받기 · 조건 충족 · 행동 직전 이벤트뿐이고 주기가 없다. 기믹 목록 2-7은 "실시간 'N초마다'는 상태 효과의 주기"라 하지만, 유물을 영구 상태 효과로 걸어 두는 우회는 17장 0절 · 29장 1절이 막는다.
+- **우회**: 메인 룰이 방 시계로 1초마다 이벤트 `초 지남`을 쏜다(행동 1개/초, 실시간 예산 안). 패시브 효과가 받고 `[BindTo]`가 간격을 세어 보스 아닌 적 절반을 무작위로 처치한다. 지팡이 '초마다 충전'(34 · 76 · 90)은 같은 이유로 메인 룰의 지연 정산으로 옮겼다(예외로 세지 않음).
+- **라이브러리에 있으면 없어지는 것**: 패시브 효과에 `pulse`(주기(초)) 칸 — 상태 효과의 주기와 같은 규칙(가진 쪽마다, 프레임 끝 행동 하나에 묶음).
 
 ### 문법 밖 — 0
 
@@ -281,18 +281,18 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 ## 5. 문서 빈틈
 
 1. **시전 계획을 어디에 두나(가장 큼)**. 기믹 목록 1절은 "해석기가 계획을 만들고, 화면이 쏘고, 끝남·명중을 보고한다"까지만 말한다. 명중 피해 · 연계 · Spell Absorption(낸 MP) · Duet(물려받는 피해)에는 쏜 순간의 계획이 규칙에 있어야 한다. 33장 5-7은 "피해 양은 규칙이 정한다"면서 예가 주인공 공격력 하나(아레나)라 발마다 다른 수치를 다루지 않고, 같은 절이 "개체 수백은 판 데이터에 넣지 않는다"고 한다. 시전 간격 0.05초 · 지속 +11초면 살아 있는 시전이 수백이다. 정해지지 않은 것: 계획의 보관 단위, 화면 발이 들고 다니는 참조, 끝 보고가 오지 않을 때의 정리, 발마다 상태(Echo 최소 간격 · 첫 명중). 이 보고서는 2-3의 '계획 틀'을 골랐다. 기믹 목록 1절 · 33장 5-7에 "규칙이 만든 계획을 화면 개체가 들고 다니다 끝·명중 때 되보내는 모양" 한 절이 있으면 된다.
-2. **원본 + 패시브의 ID 짝**(E1). 기믹 목록 1절 "조각 = 고유 id + 원본 ID 필드, 패시브는 일치 필드로 원본 ID 필드를 본다"는 원본 ID = 패시브 ID라고 은연중 가정한다. 원본이 인스턴스(수치)이기도 한 조각(지팡이·주문)은 어떻게 하는지 없다. (코드 확인: `EditorDatabase.CanUseId` — 모든 종류에서 ID 하나.)
-3. **능력·사용 기능에 레벨이 없다**. 28장 3-4 "`{level}`은 패시브가 아닌 곳(상태 효과·능력)에서는 0". 레벨 1~3인 주문의 명중 효과를 사용 기능(`Game.Use`)으로 만들 수 없어 레벨마다 능력을 따로 두거나 원본 칸 + 해석기 코드로 가야 한다. 관례 3절 "조각 하나하나의 효과는 DB(패시브·능력)에 두고 메인 룰 코드에 쓰지 않는다"와 부딪힌다 — 수치형 조각(강화 주문)을 원본 칸으로 두고 해석기가 합치는 것이 그 규칙 안인지 문서가 말하지 않는다. 인스턴스는 사용 기능을 하나만 가져(맨 위 `Usable` 필드 하나, 코드 확인: `GBibleRuntime.UsableOf`) 명중 · 끝 두 순간을 따로 둘 수도 없다(04장·16장 2-8의 "형식마다 한 번만 찾는다"가 "둘째 필드는 무시"인지 문장으로는 알 수 없었다).
+2. **원본 + 패시브 효과의 ID 짝**(E1). 기믹 목록 1절 "조각 = 고유 id + 원본 ID 필드, 패시브 효과는 일치 필드로 원본 ID 필드를 본다"는 원본 ID = 패시브 효과 ID라고 은연중 가정한다. 원본이 인스턴스(수치)이기도 한 조각(지팡이·주문)은 어떻게 하는지 없다. (코드 확인: `EditorDatabase.CanUseId` — 모든 종류에서 ID 하나.)
+3. **액티브 효과·사용 기능에 레벨이 없다**. 28장 3-4 "`{level}`은 패시브 효과가 아닌 곳(상태 효과·액티브 효과)에서는 0". 레벨 1~3인 주문의 명중 효과를 사용 기능(`Game.Use`)으로 만들 수 없어 레벨마다 액티브 효과를 따로 두거나 원본 칸 + 해석기 코드로 가야 한다. 관례 3절 "조각 하나하나의 효과는 DB(패시브 효과·액티브 효과)에 두고 메인 룰 코드에 쓰지 않는다"와 부딪힌다 — 수치형 조각(강화 주문)을 원본 칸으로 두고 해석기가 합치는 것이 그 규칙 안인지 문서가 말하지 않는다. 인스턴스는 사용 기능을 하나만 가져(맨 위 `Usable` 필드 하나, 코드 확인: `GBibleRuntime.UsableOf`) 명중 · 끝 두 순간을 따로 둘 수도 없다(04장·16장 2-8의 "형식마다 한 번만 찾는다"가 "둘째 필드는 무시"인지 문장으로는 알 수 없었다).
 4. **조건 '확률'이 레벨 틀을 받지 않는다**(퍼센트는 숫자 칸, 코드 확인: `ChanceCondition.percent`). 레벨마다 확률이 다른 유물(Pros-pector's Gloves 8/16/24% · Replica Gloves 25/45%)은 프로젝트 조건 Block `레벨별 확률`이 필요하다. 기믹 목록 2-5에 한 줄이면 된다.
-5. **후보 +1을 유물이 어떻게 올리나**. 기믹 목록 2-11 "후보 +1 → 후보 수에 더할 숫자(플레이어 데이터)"만 있다. `countBonus`는 필드 값을 그대로 읽어 패시브 `modifiers`(가진 동안 능력치 보정)가 붙지 않는다(코드 확인: `PlayerDataNumberRef.Read`). 얻을 때·잃을 때 숫자를 바꾸는 이벤트(`유물 얻음`·`유물 잃음`)를 시스템층이 쏴야 한다. 같은 이벤트가 세트 계산·칸 수 정산을 거는 자리이기도 한데, 유물을 결과 '가중치 표에서 고르기'로 바로 넣으면 프로젝트 코드가 끼어들 자리가 없다 — 기믹 목록 2-8의 "계산 함수"가 언제 도는지(세피리아는 "배치 행동 끝"으로 적혀 있다) 유물 쪽에는 없다.
-6. **보조 칸 충전은 동사여야 한다**. 기믹 목록 2-7 "보조 슬롯 에너지 → 숫자 필드 + '필드 바꾸기'"는 Infusion Hand Seal(충전 효율 +20%)이 있으면 고칠 자리가 없다. 같은 칸의 "7초마다 충전 → 상태 효과의 주기"는 지팡이·유물(패시브)에는 쓸 수 없다(E3).
+5. **후보 +1을 유물이 어떻게 올리나**. 기믹 목록 2-11 "후보 +1 → 후보 수에 더할 숫자(플레이어 데이터)"만 있다. `countBonus`는 필드 값을 그대로 읽어 패시브 효과 `modifiers`(가진 동안 스탯 보정)가 붙지 않는다(코드 확인: `PlayerDataNumberRef.Read`). 얻을 때·잃을 때 숫자를 바꾸는 이벤트(`유물 얻음`·`유물 잃음`)를 시스템층이 쏴야 한다. 같은 이벤트가 세트 계산·칸 수 정산을 거는 자리이기도 한데, 유물을 결과 '가중치 표에서 고르기'로 바로 넣으면 프로젝트 코드가 끼어들 자리가 없다 — 기믹 목록 2-8의 "계산 함수"가 언제 도는지(세피리아는 "배치 행동 끝"으로 적혀 있다) 유물 쪽에는 없다.
+6. **보조 칸 충전은 동사여야 한다**. 기믹 목록 2-7 "보조 슬롯 에너지 → 숫자 필드 + '필드 바꾸기'"는 Infusion Hand Seal(충전 효율 +20%)이 있으면 고칠 자리가 없다. 같은 칸의 "7초마다 충전 → 상태 효과의 주기"는 지팡이·유물(패시브 효과)에는 쓸 수 없다(E3).
 7. **'놓인 것마다' + 경로 `[]`의 조합**. 17장은 `party[].traits`(가진 쪽 = 동료마다)와 '놓인 것마다'를 따로 설명할 뿐, 함께 쓰면(`run › wands[].slots`) 모든 지팡이의 칸이 한 줄로 이어져 순서가 정해진다는 것은 코드에만 있다(코드 확인: `PassiveSystem.OrderedHoldersFor`·`Collections`). 가진 쪽 필드가 같음만 보는 것(목록 포함은 없음)도 코드로 확인했다(`HolderFieldMatches`).
-8. **원본에 기본값이 있는 능력치**. 28장 4-1 "능력치 = 조각의 숫자 필드(필드 값이 기본값)"와 참조 7절 3 "판 데이터에 원본 고정 값을 복사하지 않는다"가 지팡이 최대 MP · 재생에서 부딪힌다. `AttributeSystem.Apply(원본 값, Game.Modifiers(조각, 칸))`(28장 4-6)로 풀리지만 문서는 이것을 미리보기 용도로만 적는다.
+8. **원본에 기본값이 있는 스탯**. 28장 4-1 "스탯 = 조각의 숫자 필드(필드 값이 기본값)"와 참조 7절 3 "판 데이터에 원본 고정 값을 복사하지 않는다"가 지팡이 최대 MP · 재생에서 부딪힌다. `AttributeSystem.Apply(원본 값, Game.Modifiers(조각, 칸))`(28장 4-6)로 풀리지만 문서는 이것을 미리보기 용도로만 적는다.
 9. **초당 차오르는 값**. 33장 5-1 "시각을 적어 두고 그때만"은 끊어지는 일(웨이브)만 다룬다. MP처럼 초당 차오르는 값을 지연 정산하면, 재생 속도가 바뀌는 순간(가진 동안 보정은 읽을 때 계산이라 지난 시간에 거꾸로 적용된다, 든 지팡이 바꾸기)마다 먼저 정산해야 한다는 점이 없다.
-10. **'든 것일 때만' 보정**. 패시브 `modifiers`에는 조건을 달 수 없다. 기믹 목록 2-9에 "든 지팡이·고른 조각일 때만" 줄이 없어 메인 룰 자리로 만들었다.
-11. **보정 받을 대상은 패시브 하나에 하나**. 기믹 목록 2-9 '전체에'는 `run.stats`처럼 따로 된 객체를 예로 드는데, 한 유물이 주인공 칸과 전역 칸을 함께 고치면(Mirror of Vision: 지팡이 수 + 비행) 대상이 둘이 된다. 전역 칸을 `hero` 한 객체에 모으라고 적는 편이 맞다.
+10. **'든 것일 때만' 보정**. 패시브 효과 `modifiers`에는 조건을 달 수 없다. 기믹 목록 2-9에 "든 지팡이·고른 조각일 때만" 줄이 없어 메인 룰 자리로 만들었다.
+11. **보정 받을 대상은 패시브 효과 하나에 하나**. 기믹 목록 2-9 '전체에'는 `run.stats`처럼 따로 된 객체를 예로 드는데, 한 유물이 주인공 칸과 전역 칸을 함께 고치면(Mirror of Vision: 지팡이 수 + 비행) 대상이 둘이 된다. 전역 칸을 `hero` 한 객체에 모으라고 적는 편이 맞다.
 12. **문서끼리 어긋남**: 기획 명세서 읽는 법 7절 끝 "마지막 칸이 규칙 밖에서 정해지는 것(물리 충돌 결과, 화면 애니메이션이 끝나는 순간)이면 문법 밖" ↔ 관례 3·13절 · 28장 1절 · 기믹 목록 4절 "판정 보고 행동이면 문법 안".
-13. **카운터 기믹을 패시브 하나로**. 기믹 목록 2-7 "Loyalty Card(6번째마다) → 숫자 필드 + '필드 바꾸기' + 조건"은 발동 하나 · 결과 목록 하나인 패시브로 "세기"와 "N번째의 결과"를 함께 두는 법이 없다. 같은 조각을 두 패시브가 가질 수도 없다(일치 필드 = 패시브 ID). 이 보고서는 숨긴 상태 효과의 중첩으로 셌다(Soulbone Crown · Bird beak mask).
+13. **카운터 기믹을 패시브 효과 하나로**. 기믹 목록 2-7 "Loyalty Card(6번째마다) → 숫자 필드 + '필드 바꾸기' + 조건"은 발동 하나 · 결과 목록 하나인 패시브 효과로 "세기"와 "N번째의 결과"를 함께 두는 법이 없다. 같은 조각을 두 패시브 효과가 가질 수도 없다(일치 필드 = 패시브 효과 ID). 이 보고서는 숨긴 상태 효과의 중첩으로 셌다(Soulbone Crown · Bird beak mask).
 14. **Arcane Nova의 자리**. 기믹 목록 2-2는 Arcane Nova(×20, 피해 반)를 '효과 두 배 — 동사 행동 직전 이벤트의 `amount` 곱하기'에 두었다. 실제로는 오른쪽 첫 발사 주문의 **발 수** ×20 · MP ×5 · 피해 ×0.5로, 시전 행동 직전 이벤트(`count`·`mpCost`·`damageMul`)를 고치는 '반복' 줄이다.
 15. **37장의 주문 칸**. "언제 쓰는가"에 "주문 칸: 지팡이 칸을 왼쪽부터 읽기, 다음 칸 주문에 강화 붙이기(매지크래프트)"를 들면서 5절 예제가 없다. '자리로 고르기'의 방향에는 "오른쪽으로 처음 나오는 ○○(발사 주문)"이 없고, 방향은 줄을 넘지 않아 끝에서 처음으로 도는 읽기도 코드다. "해석기 코드로 읽는다" 한 줄이면 된다.
 16. **누르고 있는 입력**. 실시간 발사는 `OnClick`이 아니다. 35장의 실패 알림은 버튼용이고, "누르는 동안" 입력을 `SetTrigger { held }` + `Ticked`에서 행동(33장 5-1 모양)으로 만들면 실패 대신 조용히 건너뛸 수 있다는 모양이 문서에 없다.
@@ -323,8 +323,8 @@ Rules.Recalc()                                   ← 지팡이·칸·유물이 �
 
 예외 3은 모두 없어졌다.
 
-- E1 → 패시브 `matchField`가 글자 목록도 받고, `matchVia`(원본에서 읽기)로 조각의 원본 ID → 원본의 패시브 ID 목록을 본다.
+- E1 → 패시브 효과 `matchField`가 글자 목록도 받고, `matchVia`(원본에서 읽기)로 조각의 원본 ID → 원본의 패시브 효과 ID 목록을 본다.
 - E2 → `Game.TryPay`: 모자라면 바꾸지 않고 거짓(틱 묶음 행동이 취소되지 않는다).
-- E3 → 패시브 `pulse`·`pulseByLevel`(가진 동안 N초마다, 게임 시각 기준).
-- 그 밖: 값 틀 `{user:경로}`·`{event:경로}`(지팡이 레벨·주문 값), '후보 수에 더할 숫자'가 패시브 보정을 읽음, 보정 줄마다 `target`, "든 지팡이일 때만" = `modifierWhen`(보정 조건).
+- E3 → 패시브 효과 `pulse`·`pulseByLevel`(가진 동안 N초마다, 게임 시각 기준).
+- 그 밖: 값 틀 `{user:경로}`·`{event:경로}`(지팡이 레벨·주문 값), '후보 수에 더할 숫자'가 패시브 효과 보정을 읽음, 보정 줄마다 `target`, "든 지팡이일 때만" = `modifierWhen`(보정 조건).
 - 시전 계획을 둘 곳(가장 큰 빈틈)은 기믹 목록 1절 매지크래프트 줄에 적었다: 계획 틀은 칸 배치가 바뀔 때만 판 데이터에, 화면의 발은 (틀, 노드, 발 번호)만.

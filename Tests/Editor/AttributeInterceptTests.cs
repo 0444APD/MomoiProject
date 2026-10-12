@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
-    // 능력치·Modifier, 가로채기, 비용.
+    // 스탯·Modifier, 가로채기, 비용.
     public class AttributeInterceptTests
     {
         [Serializable] public class AiUnit { public string id; public double attack = 100; public int hp = 50; public int armor; }
@@ -257,7 +257,7 @@ namespace GBible.Tests
 
         [Serializable, GameEvent("턴 끝")] public class AiTurnEnded { }
 
-        // 보정을 붙이고 그 능력치를 읽은 뒤 실패하는 행동(이벤트 예약으로 돌면 그 예약이 바꾼 것만 되돌아간다).
+        // 보정을 붙이고 그 스탯을 읽은 뒤 실패하는 행동(이벤트 예약으로 돌면 그 예약이 바꾼 것만 되돌아간다).
         [Serializable]
         public sealed class BuffReadThenFail : GameAction
         {
@@ -292,13 +292,13 @@ namespace GBible.Tests
         }
 
         [Test]
-        public void 큰_수나_글자_필드도_능력치로_읽을_때_예외_없이_숫자로_본다()
+        public void 큰_수나_글자_필드도_스탯으로_읽을_때_예외_없이_숫자로_본다()
         {
             _session.Data.Define("bosses", DataZone.Session, new AiBosses
             {
                 list = { new AiBoss { id = "b1", power = 5, title = "7" }, new AiBoss { id = "b2", power = new BigNumber(2, 400), title = "x" }, new AiBoss { id = "b3", power = 40 } },
             }, "보스");
-            // "가장 강한 보스" = 정렬해서 n개(power 큰 것부터 1개). 필드 이름 하나면 능력치로 잰다.
+            // "가장 강한 보스" = 정렬해서 n개(power 큰 것부터 1개). 필드 이름 하나면 스탯으로 잰다.
             var strongest = new AbilityDefinition { Id = "strongest" };
             strongest.Outcomes.Add(new TargetedOutcome
             {

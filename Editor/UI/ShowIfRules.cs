@@ -80,7 +80,7 @@ namespace GBible.EditorTools.UI
             return depth >= MaxDepth || Holds(owner, other, depth + 1);
         }
 
-        // 이 필드가 같은 클래스의 다른 필드의 [ShowIf] 스위치인가(비어 있으면 '끔'인 선택 칸 — 예: 무게를 밸런스 값에서).
+        // 이 필드가 같은 클래스의 다른 필드의 [ShowIf] 스위치인가(비어 있으면 '끔'인 선택 칸 — 예: 무게를 밸런싱 값에서).
         public static bool IsSwitch(FieldInfo field) =>
             field?.DeclaringType != null &&
             field.DeclaringType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Any(other => Of(other)?.Field == field.Name);

@@ -5,7 +5,7 @@
 **언제 쓰는가**
 
 - 명중·치명타·드롭·맵 생성 같은 규칙의 무작위
-- "25% 확률로"처럼 유물·패시브가 바꿀 수 있는 확률(`Game.Chance`, DB 조건 '확률')
+- "25% 확률로"처럼 유물·패시브 효과가 바꿀 수 있는 확률(`Game.Chance`, DB 조건 '확률')
 - 시드 입력("ABCD1234")·일일 도전(오늘은 모두 같은 판)
 - 쿨다운·지속 시간처럼 게임 시간 기준의 값
 - 메뉴·대화창이 열렸을 때 게임 멈추기, 슬로우 모션, 개발 중 프레임 단위 진행
@@ -73,7 +73,7 @@ ulong raw = damage.NextULong();
 | `Name` | 스트림 이름 |
 | `GetState()` · `SetState(ulong[4])` · `Reseed(seed)` | 상태 꺼내기·넣기·다시 시드(도구·테스트용) |
 
-`rng.Chance(p)`는 행동 직전 이벤트를 거치지 않는다. 유물·패시브("모든 확률 2배", 행운)가 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15)로 굴린다.
+`rng.Chance(p)`는 행동 직전 이벤트를 거치지 않는다. 유물·패시브 효과("모든 확률 2배", 행운)가 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15)로 굴린다.
 
 ### 2.3 시드 정하기: `SessionOptions.Seed`
 
@@ -253,7 +253,7 @@ bool lucky = Game.Chance(0.1, user: hero);                                 // �
 |---|---|
 | `probability` | 0~1. 1 이상이면 반드시 성공, 0 이하면 늘 실패 |
 | `stream` | 난수 흐름 이름(기본 `"chance"`, 비워도 `"chance"`) |
-| `source` | 굴리는 쪽의 항목 ID(패시브·능력). 행동 직전 이벤트의 `sourceId` |
+| `source` | 굴리는 쪽의 항목 ID(패시브 효과·액티브 효과). 행동 직전 이벤트의 `sourceId` |
 | `user` | 사용자·가진 쪽(객체 또는 id). 행동 직전 이벤트의 `userId` |
 
 1. 굴리기 전에 행동 직전 이벤트 **'확률'**(`ChanceIntent { probability, stream, sourceId, userId, cancelled }`)을 행동 직전 이벤트에 보인다.

@@ -8,7 +8,7 @@ namespace GBible
     // 상태 효과(Status): 대상에게 걸리는 버프·디버프. 정의(StatusDefinition, DB › 상태 효과)와 걸린 것(ActiveStatus, 플레이어 데이터)으로 나뉜다.
     //   중첩: 최대 중첩 수, 다시 걸 때의 규칙(중첩 더하기 / 지속 갱신 / 둘 다 / 무시).
     //   지속: 영구 / 이벤트 N회(예: 턴 끝 3번) / 게임 시간 N초. 끝나면 '끝날 때 결과'(지연 효과 "3턴 뒤 폭발"도 이것으로).
-    //   걸려 있는 동안: 능력치 Modifier(중첩당 값, 출처 = 걸린 것 하나의 id), 그리고 트리거(이벤트 받기·가로채기 …)로 발동하는 결과.
+    //   걸려 있는 동안: 스탯 Modifier(중첩당 값, 출처 = 걸린 것 하나의 id), 그리고 트리거(이벤트 받기·가로채기 …)로 발동하는 결과.
     //     가진 쪽 필드: 이벤트·의도의 그 필드가 가진 쪽 id일 때만 발동한다(예: DamageIntent.targetId → "내가 맞을 때만").
     //     트리거 안의 조건도 가진 쪽마다 따로 검사한다(조건 Block의 Context.User = 가진 쪽 → "가진 쪽 체력이 절반 이하일 때").
     //   결과의 컨텍스트: User = 가진 쪽 객체, Owner = 상태 효과 ID. 중첩 수는 Game.StatusStacks(c.User, c.Owner).
@@ -83,7 +83,7 @@ namespace GBible
         public string statusId;    // 상태 효과 ID(바꾸면 그 상태 효과가 걸린다)
         public int stacks;         // 걸 중첩
         public double length;      // 지속 길이(이벤트 횟수·초, 처음에는 그 상태 효과의 길이)
-        public string sourceId;    // 건 항목(능력·패시브·상태 효과 ID)
+        public string sourceId;    // 건 항목(액티브 효과·패시브 효과·상태 효과 ID)
         public string byId;        // 건 개체 id(사용자 — 처치 기여: "마지막에 건 쪽")
         public StatusKind kind;    // 그 상태 효과의 종류(버프·디버프)
         public int maxStacks;      // 최대 중첩(처음 = 정의의 최대 중첩, 0 = 제한 없음) — "화상 중첩 +1"
@@ -94,7 +94,7 @@ namespace GBible
     [Serializable]
     public sealed class StatusModifier
     {
-        [FieldLabel("능력치(숫자 필드 이름)")] public string attribute = "";
+        [FieldLabel("스탯(숫자 필드 이름)")] public string attribute = "";
         [FieldLabel("칸")] public ModifierKind kind = ModifierKind.Flat;
         [FieldLabel("중첩당 값")] public double valuePerStack;
     }
@@ -118,7 +118,7 @@ namespace GBible
         public double Pulse;                        // 0보다 크면 걸려 있는 동안 이 초(게임 시간)마다 Outcomes를 낸다
         public bool Hidden;                         // 화면에 보이지 않는 상태 효과(쿨다운·표시용 아닌 규칙)
         public StatusKind Kind;                     // 버프·디버프(묶어서 풀기·세기·가로채기 조건)
-        public bool Silences;                       // 걸린 쪽의 패시브를 끈다(발동·보정 없음 — Ink·디버프된 조커)
+        public bool Silences;                       // 걸린 쪽의 패시브 효과를 끈다(발동·보정 없음 — Ink·디버프된 조커)
     }
 
     // 상태 효과가 걸렸을 때(처음·다시 걸 때 모두, stacks = 걸린 뒤의 중첩).
@@ -168,7 +168,7 @@ namespace GBible
 
         readonly GameSession _session;
         readonly Dictionary<string, StatusDefinition> _definitions = new Dictionary<string, StatusDefinition>(StringComparer.Ordinal);
-        bool _anySilences;   // 패시브를 끄는 상태 효과가 하나라도 정의돼 있나(없으면 침묵 검사를 건너뛴다)
+        bool _anySilences;   // 패시브 효과를 끄는 상태 효과가 하나라도 정의돼 있나(없으면 침묵 검사를 건너뛴다)
         // 이번 행동에서 새로 걸린 것 → 걸 때의 기록 원인(그 이벤트를 받는 도중에 걸렸는지 가린다).
         readonly Dictionary<string, long> _appliedUnder = new Dictionary<string, long>(StringComparer.Ordinal);
 
@@ -556,7 +556,7 @@ namespace GBible
         // 걸린 것의 주기(초): 걸 때 의도가 바꾼 값, 없으면 정의의 주기.
         static double PulseOf(StatusDefinition definition, ActiveStatus active) => active.pulse > 0 ? active.pulse : definition.Pulse;
 
-        // 그 가진 쪽에 '걸린 쪽의 패시브를 끔' 상태 효과가 걸려 있나(Ink·디버프).
+        // 그 가진 쪽에 '걸린 쪽의 패시브 효과를 끔' 상태 효과가 걸려 있나(Ink·디버프).
         public bool Silences(object target)
         {
             if (!_anySilences || !Exists()) return false;

@@ -7,7 +7,7 @@
 - 실시간 아레나·디펜스처럼 시간이 흐르는 게임에서 웨이브·재생·쿨다운 같은 시간 규칙이 기기마다 같게 돌아야 할 때(고정 틱).
 - 카드·스킬에 마우스를 올리면 "예상 피해 12", "처치"를 보일 때(미리보기 실행).
 - 버튼을 흐리게 하고 "에너지가 모자랍니다"처럼 안 되는 이유를 보일 때(`CanDo`).
-- 밸런스 값·카드 비용·몬스터 체력 수십 줄을 시트에서 고칠 때(CSV).
+- 밸런싱 값·카드 비용·몬스터 체력 수십 줄을 시트에서 고칠 때(CSV).
 - 휘두르기 한 번에 적 수십 마리, 투사체 수백 발, 1초에 맞음 수십 번인 실시간 액션을 느려지지 않게 만들 때(실시간 예산).
 
 이 문서에서 쓰는 용어:
@@ -154,7 +154,7 @@
 
 ### 3-2. CSV 내보내기 · 가져오기
 
-1. `MomoiProject → DB`에서 탭을 고른다(밸런스 값 · 가중치 표 · 인스턴스 · 능력 · 로그 · 상태 효과 · 설정 · 프로젝트의 DB 종류 …). 키워드·클래스·이벤트처럼 전용 화면을 쓰는 탭에는 없다.
+1. `MomoiProject → DB`에서 탭을 고른다(밸런싱 값 · 가중치 표 · 인스턴스 · 액티브 효과 · 로그 · 상태 효과 · 설정 · 프로젝트의 DB 종류 …). 키워드·클래스·이벤트처럼 전용 화면을 쓰는 탭에는 없다.
 2. 목록 맨 위 폴더 줄(종류 이름 줄)에 마우스를 올리면 도구 버튼이 나온다. **CSV**(툴팁 "CSV로 내보내기·가져오기(구글 시트·엑셀에서 수치를 한꺼번에 고칠 때). 가져온 것은 적용 전으로 들어간다")를 누른다.
 3. 메뉴:
 
@@ -235,7 +235,7 @@ if (!Game.IsPreviewing) Telemetry.Send("kill");
 | `IEnumerable<Type> InstanceClasses()` | 인스턴스 값의 클래스들(이름순) |
 
 ```csharp
-// 메뉴 하나로 밸런스 값을 정해 둔 경로에 내보낸다(Assets/MomoiProject/Code/Editor/BalanceExport.cs)
+// 메뉴 하나로 밸런싱 값을 정해 둔 경로에 내보낸다(Assets/MomoiProject/Code/Editor/BalanceExport.cs)
 using System.IO;
 using System.Text;
 using GBible.Data;
@@ -244,7 +244,7 @@ using UnityEditor;
 
 static class BalanceExport
 {
-    [MenuItem("Tools/밸런스 값 CSV 내보내기")]
+    [MenuItem("Tools/밸런싱 값 CSV 내보내기")]
     static void Export() => File.WriteAllText("Balance/balance.csv", DataCsv.Export(typeof(BalanceData)), new UTF8Encoding(true));
 }
 ```
@@ -261,7 +261,7 @@ static class BalanceExport
 
 - DB › 시작 파일 › Bootstrap: Undo 방식 "스냅샷"(간격 `0.5`초, 보관 수 `20` = 최근 10초), 고정 틱 초당 틱 수 `30`, 판 저장 "N초마다 저장(실시간·방치형)"(5-7).
 - DB › 플레이어 데이터 `arena`: 구역 `Session`, 값 형식 `ArenaState`(아래 클래스).
-- DB › 밸런스 값 `waveInterval` `10`, `waveSize` `3`(곡선 `일정하게` +1/웨이브, 30장).
+- DB › 밸런싱 값 `waveInterval` `10`, `waveSize` `3`(곡선 `일정하게` +1/웨이브, 30장).
 
 **규칙** — `Assets/MomoiProject/Code/Rules/Arena.cs`. 순수 C#이다(`UnityEngine`도 Unity 시작 방식도 쓰지 않는다 → 서버·테스트에서 그대로 돈다).
 
@@ -319,7 +319,7 @@ static void Started(GameSession session)
 - 규칙 파일에 `[RuntimeInitializeOnLoadMethod]`와 `GBibleRuntime.Started +=`를 따로 두지 않는다. 연결이 파일마다 흩어지고, 서버·테스트는 세션을 직접 만든 뒤 `ArenaRules.Register(session)`을 부를 길이 없어진다.
 - 웨이브는 30fps 기기와 144fps 기기에서 같은 틱에 나온다. 되감기(스냅샷)·판 저장도 시계와 `nextWaveAt`이 함께 돌아가 맞는다.
 - 같은 일은 시간 예약으로도 된다: `SpawnWave.Run` 끝에 `Game.ScheduleAfter(간격, new SpawnWave())`(29장 2-5). 시간 예약도 틱마다 확인되므로 결과가 같다. 틱 받는 쪽은 "체력이 절반 이하면 분노"처럼 조건을 매 틱 보는 규칙에 맞다.
-- 적의 움직임은 화면 코드가 `Update`에서 한다. 적이 주인공에게 닿으면 `Game.Do(new HitHero { foeId = foe.Id })`처럼 누가 닿았는지만 행동으로 보낸다. 피해 양은 행동이 밸런스 값에서 읽는다(판정 보고 행동, 5-7).
+- 적의 움직임은 화면 코드가 `Update`에서 한다. 적이 주인공에게 닿으면 `Game.Do(new HitHero { foeId = foe.Id })`처럼 누가 닿았는지만 행동으로 보낸다. 피해 양은 행동이 밸런싱 값에서 읽는다(판정 보고 행동, 5-7).
 - 틱마다 행동을 실행하면(재생 +1을 매 틱) 행동이 1초에 30개씩 쌓인다. "1초마다 1 회복"은 시각을 적어 두고 그 시각이 됐을 때만 행동을 실행한다(위와 같은 모양).
 
 ### 5-2. 남은 시간 막대 — `TickAlpha` 보간
@@ -447,7 +447,7 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 
 ### 5-6. CSV로 수치 한꺼번에 고치기
 
-**밸런스 값**(30장 5-9)과 같은 흐름으로 인스턴스도 고친다. 예: 몬스터 체력·공격 표.
+**밸런싱 값**(30장 5-9)과 같은 흐름으로 인스턴스도 고친다. 예: 몬스터 체력·공격 표.
 
 1. DB › 인스턴스 탭 → 맨 위 폴더 줄 **CSV** → **MonsterData 내보내기…** → `MonsterData.csv`.
 2. 시트에서 연다. 칸은 `MonsterData`의 단순 필드(`title` · `maxHp` · `element` …)와 공격 패턴(`attackPattern`, 숫자 목록)의 줄마다 칸(`attackPattern[0]` …)이다. 초상화(스프라이트)는 나오지 않는다.
@@ -487,7 +487,7 @@ slime,슬라임,14,4,4,,neutral
 | 연출 | `GameView.Present`는 차례로 하나씩 돌고 그동안 `Busy`라 입력이 막힌다. 실시간은 `GameView.Play`(32장 2-2·5-9) |
 | Undo | 스냅샷 방식(5-1) |
 
-**에디터**: DB › 밸런스 값 `heroAttack` `5`.
+**에디터**: DB › 밸런싱 값 `heroAttack` `5`.
 
 **규칙** — 5-1의 `Rules/Arena.cs`에 더한다.
 
@@ -594,7 +594,7 @@ public class HeroHitbox : MonoBehaviour
 | 실시간 게임이 행동이 많은 순간마다 끊김 | 판 저장이 '행동마다 저장'이라 행동이 끝난 프레임마다 파일을 쓴다. 'N초마다 저장(실시간·방치형)'으로(5-7). |
 | 투사체·보석이 많아지면 느려짐 | 투사체·보석을 판 데이터의 목록에 넣었다(Sync·저장이 개수만큼). 화면 쪽 오브젝트 풀로 옮기고 규칙에는 수와 결과만(5-7). |
 | 실시간인데 입력이 자꾸 막힘 | 연출을 `GameView.Present`로 넣었다. 대기열이 차례로 도는 동안 `Busy`라 입력 창구가 막는다. `GameView.Play`로(32장 2-2). |
-| 화면이 보낸 피해 양이 그대로 들어감 | 판정 보고 행동에 양(`amount`)을 넣었다. 화면은 누구를 맞혔나만 보내고 양은 규칙이 밸런스 값에서 정한다(5-7). |
+| 화면이 보낸 피해 양이 그대로 들어감 | 판정 보고 행동에 양(`amount`)을 넣었다. 화면은 누구를 맞혔나만 보내고 양은 규칙이 밸런싱 값에서 정한다(5-7). |
 | 일시정지했는데 웨이브 시간이 흐름 | 시각을 `Time.time`으로 쟀다. 게임 시계(`session.Clock.Time`)로 적는다(07장). |
 | 막대가 계단처럼 움직임 | 틱마다 뛰는 게임 시계를 그대로 그렸다. `TickAlpha`로 보간한다(5-2). |
 | `Game.Preview`가 "행동 안에서는 미리보기를 할 수 없습니다" | 행동·`[BindTo]`·Block 안에서 불렀다. 화면 코드에서 부른다. |

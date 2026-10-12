@@ -4,9 +4,9 @@ using System.Linq;
 
 namespace GBible
 {
-    // 능력치(Attribute)와 Modifier: 캐릭터의 공격력·방어력 같은 숫자 필드에 붙는 보정.
+    // 스탯(Attribute)과 Modifier: 캐릭터의 공격력·방어력 같은 숫자 필드에 붙는 보정.
     //
-    // 능력치는 따로 선언하지 않는다. id가 있는 객체(유닛·카드 …)의 숫자 필드가 곧 기본값이다(public double attack;).
+    // 스탯은 따로 선언하지 않는다. id가 있는 객체(유닛·카드 …)의 숫자 필드가 곧 기본값이다(public double attack;).
     // Modifier는 (대상 id, 필드 이름, 칸, 값, 출처) 한 줄이고, 플레이어 데이터에 저장된다(Undo·저장·멀티 그대로).
     // 최종값 = (기본값 + 플랫 합) × (1 + 퍼센트 합) × Π(1 + 독립 곱 하나하나)
     //   같은 칸은 더하고(합연산) 칸끼리는 곱한다 — 스탯을 10% 올리면 결과도 10% 오르고(가치 보존), 퍼센트를 많이 쌓아도 폭주하지 않는다.
@@ -70,7 +70,7 @@ namespace GBible
         }
 
         // 최종값. entity는 객체 또는 id. 숫자 필드가 없으면 0.
-        // 패시브의 '가진 동안 능력치 보정'도 더한다(저장하지 않고 읽을 때 계산 — 얻고 잃는 순간을 따로 다루지 않는다).
+        // 패시브 효과의 '가진 동안 스탯 보정'도 더한다(저장하지 않고 읽을 때 계산 — 얻고 잃는 순간을 따로 다루지 않는다).
         public double Get(object entity, string attribute)
         {
             var target = Resolve(entity, out var id);
@@ -100,7 +100,7 @@ namespace GBible
         // Modifier를 붙이고 그 id를 돌려준다. 행동 안에서 부른다(Undo·저장·멀티에 기록된다).
         public string Add(object entity, string attribute, ModifierKind kind, double value, string source, bool permanent = false)
         {
-            if (string.IsNullOrEmpty(attribute)) throw new ArgumentException("[MomoiProject] 능력치 이름이 비어 있습니다.", nameof(attribute));
+            if (string.IsNullOrEmpty(attribute)) throw new ArgumentException("[MomoiProject] 스탯 이름이 비어 있습니다.", nameof(attribute));
             var target = Resolve(entity, out var id);
             if (target != null && !IsNumericField(target.GetType(), attribute))
                 throw new InvalidOperationException($"[MomoiProject] {target.GetType().Name}에 숫자 필드 '{attribute}'가 없어 Modifier를 붙일 수 없습니다.");
@@ -121,7 +121,7 @@ namespace GBible
 
         public bool Remove(string modifierId) => RemoveWhere(m => m.id == modifierId) > 0;
 
-        // 대상의 Modifier들(필드를 주면 그 필드 것만). 패시브의 '가진 동안 능력치 보정'도 같은 모양으로 들어 있다(source = 패시브 ID).
+        // 대상의 Modifier들(필드를 주면 그 필드 것만). 패시브 효과의 '가진 동안 스탯 보정'도 같은 모양으로 들어 있다(source = 패시브 효과 ID).
         public IReadOnlyList<Modifier> Of(object entity, string attribute = null)
         {
             string id;

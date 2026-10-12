@@ -1,6 +1,6 @@
 # 37. 자리(Placement)
 
-**한 줄 요약**: 조각이 칸에 놓이는 게임(조커 칸·지팡이 칸·손패·가방·보드)은 판 데이터의 **목록 하나**(`List<T>`)를 칸으로 본다. 감싸는 형식은 없다. 칸 번호 = 목록 위치이고, 빈 칸 = `null`이다. 한 줄이면 줄 길이 0, 격자면 줄 길이 = 열 수다. `Placement`의 함수가 옆 칸·같은 줄·주변 8칸·맨 앞·맞은편과 가장자리·맨 아래 줄·양옆이 빈 칸 같은 자리를 계산한다. DB에서는 대상 **'자리로 고르기'**와 조건 **'자리 검사'**로 코드 없이 쓴다. 플레이어·지팡이마다 둔 칸(`players[].charms`·`wands[].slots`)은 기준이 든 목록에서 본다. 놓인 순서대로 발동하는 조각은 패시브의 '놓인 것마다'(`perElement`, 17장)가, 옆 조각을 흉내 내는 조각은 결과 '빌려 쓰기'가 맡는다. 석판처럼 칸 무늬를 돌려 덮는 계산은 `Placement.Pattern`이다. 개체가 칸 위를 걸어 다니는 맵은 36장 `Grid`다.
+**한 줄 요약**: 조각이 칸에 놓이는 게임(조커 칸·지팡이 칸·손패·가방·보드)은 판 데이터의 **목록 하나**(`List<T>`)를 칸으로 본다. 감싸는 형식은 없다. 칸 번호 = 목록 위치이고, 빈 칸 = `null`이다. 한 줄이면 줄 길이 0, 격자면 줄 길이 = 열 수다. `Placement`의 함수가 옆 칸·같은 줄·주변 8칸·맨 앞·맞은편과 가장자리·맨 아래 줄·양옆이 빈 칸 같은 자리를 계산한다. DB에서는 대상 **'자리로 고르기'**와 조건 **'자리 검사'**로 코드 없이 쓴다. 플레이어·지팡이마다 둔 칸(`players[].charms`·`wands[].slots`)은 기준이 든 목록에서 본다. 놓인 순서대로 발동하는 조각은 패시브 효과의 '놓인 것마다'(`perElement`, 17장)가, 옆 조각을 흉내 내는 조각은 결과 '빌려 쓰기'가 맡는다. 석판처럼 칸 무늬를 돌려 덮는 계산은 `Placement.Pattern`이다. 개체가 칸 위를 걸어 다니는 맵은 36장 `Grid`다.
 
 **언제 쓰는가**
 
@@ -23,7 +23,7 @@
 | 열 우선 보드 | 목록 순서가 "앞 칸 위→아래, 다음 칸"인 보드(와일드프로스트). 줄 길이 = 레인 수로 담으면 원작의 레인이 여기의 **열**이다(5-3). |
 | 여러 목록 (`[]`) | 목록 경로의 `[]`(`players[].charms`). 플레이어·지팡이마다 칸 한 줄씩이다. 자리는 기준이 든 목록에서 센다(2-4). |
 | 좌표 (`Cell`) | 칸의 (x, y). x = 열(오른쪽 +), y = 줄(아래 +). 화면 기준이다. "위"는 앞 줄이다. `Cell`은 36장의 칸 구조체를 그대로 쓴다. |
-| 원본 ID 필드 | 조각 객체가 무엇인지 적는 필드(`joker`·`item`). 패시브의 '일치 필드'(`matchField`)가 이것을 본다(17장). |
+| 원본 ID 필드 | 조각 객체가 무엇인지 적는 필드(`joker`·`item`). 패시브 효과의 '일치 필드'(`matchField`)가 이것을 본다(17장). |
 | 기준 | 자리를 셀 때 출발하는 조각(사용자·앞의 대상·이벤트의 개체). |
 | 방향 (`PlaceDirection`) | 기준에서 어느 칸을 고를지(왼쪽·같은 줄·주변 8칸·맨 앞 …). |
 | 자리 (`PlaceSpot`) | 기준이 어떤 칸에 있는지(맨 위 줄·가장자리·양옆이 빈 칸 …). |
@@ -37,18 +37,18 @@
 
 | 기획 문장 | 만드는 것 |
 |---|---|
-| "조커는 왼쪽부터 발동한다(+4 배수 다음 ×2 배수)" | 패시브 '놓인 것마다'(17장) + 조각 목록 = 객체 목록(5-1) |
+| "조커는 왼쪽부터 발동한다(+4 배수 다음 ×2 배수)" | 패시브 효과 '놓인 것마다'(17장) + 조각 목록 = 객체 목록(5-1) |
 | "라운드 끝에 오른쪽 조커의 배수 +2" | 대상 '자리로 고르기'(오른쪽) + 효과 '필드 바꾸기'(5-1) |
 | "오른쪽 조커를 없앤다(단검)" | `[BindTo]` + `Placement.Around`(5-1) |
-| "오른쪽 조커의 능력을 복사(Blueprint)" · "맨 왼쪽 조커를 복사(Brainstorm)" | 결과 '빌려 쓰기' + '자리로 고르기'(오른쪽 · 목록 맨 처음)(5-2) |
+| "오른쪽 조커의 액티브 효과를 복사(Blueprint)" · "맨 왼쪽 조커를 복사(Brainstorm)" | 결과 '빌려 쓰기' + '자리로 고르기'(오른쪽 · 목록 맨 처음)(5-2) |
 | "맞은편 같은 레인 맨 앞의 적을 공격" | 보드를 열 우선으로 담고 '자리로 고르기'(같은 열 맨 앞, 다른 목록 = 적 보드)(5-3) |
 | "적 먼저, 앞 칸 위→아래 → 다음 칸, 카운터가 0이면 발동" | 턴 행동이 칸 번호 순서로 돌며 `Game.TryUse`(5-3) |
-| "같은 레인에 혼자면 공격 +3"(Fury) | 패시브 보정 + `modifierWhen`(보정 조건) '자리 검사'(같은 열에 혼자)(5-3) |
+| "같은 레인에 혼자면 공격 +3"(Fury) | 패시브 효과 보정 + `modifierWhen`(보정 조건) '자리 검사'(같은 열에 혼자)(5-3) |
 | "가방 맨 아래 줄일 때만" · "가장자리면" · "양옆이 빈 칸이면" · "손패 맨 오른쪽이면" | 조건 '자리 검사'(5-4) |
 | "손패 맨 오른쪽 카드에"(누가 쓰든) | '자리로 고르기' 기준 없음 + 목록 맨 끝(2-2) |
 | "주변 8칸의 아티팩트마다" | '자리로 고르기'(주변 8칸), 코드 `Placement.Around` |
 | "석판: 무늬 칸의 레벨 +1, 돌릴 수 있다" · "제약이 안 맞으면 꺼진다" | 배치 행동 끝의 계산 함수가 조각의 레벨 필드에 최종 레벨(꺼지면 0) + `Placement.Pattern`(5-5) |
-| "지팡이마다 칸 한 줄, 다음 칸 주문을 한 번 더" | 목록 `wands[].slots` + 패시브 '놓인 것마다' + '빌려 쓰기'(5-6) |
+| "지팡이마다 칸 한 줄, 다음 칸 주문을 한 번 더" | 목록 `wands[].slots` + 패시브 효과 '놓인 것마다' + '빌려 쓰기'(5-6) |
 | "협동: 내 참 줄의 오른쪽 참" | 목록 `players[].charms`(2-4) |
 
 > **규칙: 자리는 판 데이터의 목록 하나.** 칸 수만큼 요소를 두고 빈 칸은 `null`로 둔다(가방 34칸 = 요소 34개). 감싸는 형식·칸 객체를 따로 만들지 않는다. 평범한 목록이라 Undo·저장·Mirror가 그대로 따라온다. 양편 보드는 편마다 목록 하나다.
@@ -172,24 +172,24 @@ y=5     30   31   32   33               ← 맨 아래 줄(덜 찬 마지막 줄
 
 - `Grid.Rotate`(36장)는 y가 위로 늘어나는 좌표에서 시계 방향이다. 같은 무늬를 넣어도 두 함수의 결과가 다르다. 목록 칸에는 `Placement.Rotate`를 쓴다.
 
-### 2-6. 놓인 순서 — 패시브 '놓인 것마다'
+### 2-6. 놓인 순서 — 패시브 효과 '놓인 것마다'
 
-- 패시브의 **`perElement`(놓인 것마다)**를 켜면 가진 쪽이 목록의 요소 하나하나다(17장). 결과의 사용자 = 그 조각이다. 그래서 '자리로 고르기'·'자리 검사'의 기준 '사용자'가 곧 그 조각의 자리다.
-- 같은 목록(같은 `ownerKey`·`ownerPath`)을 보는 '놓인 것마다' 패시브끼리는 **패시브 등록 순서가 아니라 목록 순서**로 섞여 발동한다. 조커 칸은 왼쪽부터, 보드는 칸 번호 순서다(열 우선으로 담은 보드면 앞 칸 위→아래, 다음 칸, 5-3).
+- 패시브 효과의 **`perElement`(놓인 것마다)**를 켜면 가진 쪽이 목록의 요소 하나하나다(17장). 결과의 사용자 = 그 조각이다. 그래서 '자리로 고르기'·'자리 검사'의 기준 '사용자'가 곧 그 조각의 자리다.
+- 같은 목록(같은 `ownerKey`·`ownerPath`)을 보는 '놓인 것마다' 패시브 효과끼리는 **패시브 효과 등록 순서가 아니라 목록 순서**로 섞여 발동한다. 조커 칸은 왼쪽부터, 보드는 칸 번호 순서다(열 우선으로 담은 보드면 앞 칸 위→아래, 다음 칸, 5-3).
 - 가진 목록이 여러 목록(`wands[].slots`·`players[].charms`)이면 **모든 목록이 한 줄로 이어진 순서**다. 첫 지팡이(1P)의 칸 전부 → 둘째 지팡이(2P)의 칸.
 - 발동 도중에 앞 칸의 결과가 목록에서 뺀 조각은 발동하지 않는다. 그 순간 목록에 남은 것만 발동한다.
-- 같은 조각이 둘이면 각자 발동한다. '놓인 것마다'를 끈 패시브는 가진 쪽(목록을 품은 객체, 예: `run`)마다 한 번이다. 이때 사용자 = `run`이라 자리 Block의 기준 '사용자'가 목록에 없다.
+- 같은 조각이 둘이면 각자 발동한다. '놓인 것마다'를 끈 패시브 효과는 가진 쪽(목록을 품은 객체, 예: `run`)마다 한 번이다. 이때 사용자 = `run`이라 자리 Block의 기준 '사용자'가 목록에 없다.
 - 메인 룰이 조각을 직접 차례로 발동할 때(카운터가 차면 발동)는 행동이 칸 번호 순서로 돌며 `Game.TryUse`(16장)를 부른다(5-3).
 
 ### 2-7. 빌려 쓰기 — 결과 '빌려 쓰기'
 
-- 결과 **'빌려 쓰기'**는 대상 Block이 고른 조각의 패시브를 지금 순간(받은 이벤트·받은 행동 직전 이벤트)으로 한 번 더 낸다. Blueprint·Brainstorm이 이것이다.
-- 고른 조각의 패시브는 `matchField`(일치 필드)로 찾는다. 그 패시브의 가진 목록에 그 조각 객체가 들어 있어야 한다.
+- 결과 **'빌려 쓰기'**는 대상 Block이 고른 조각의 패시브 효과를 지금 순간(받은 이벤트·받은 행동 직전 이벤트)으로 한 번 더 낸다. Blueprint·Brainstorm이 이것이다.
+- 고른 조각의 패시브 효과는 `matchField`(일치 필드)로 찾는다. 그 패시브 효과의 가진 목록에 그 조각 객체가 들어 있어야 한다.
 - 자기 자신은 빼고 빌린다.
-- 빌린 패시브의 발동(트리거)을 원본 조각을 가진 쪽으로 다시 검사한다. 지금 순간에 맞지 않으면 아무 일도 없다. 점수 단계에 발동하는 조커를 라운드 끝에 빌리면 없다.
+- 빌린 패시브 효과의 발동(트리거)을 원본 조각을 가진 쪽으로 다시 검사한다. 지금 순간에 맞지 않으면 아무 일도 없다. 점수 단계에 발동하는 조커를 라운드 끝에 빌리면 없다.
 - 결과의 사용자 = **원본 조각**이다. 원본의 값(`mult`·레벨)을 읽는다.
 - 효과 '필드 바꾸기'는 빌려 쓰는 중에 **원본 조각 자신의 필드를 바꾸지 않는다**. 쌓이는 값은 원본이 직접 발동할 때만 쌓인다. 다른 대상(카드 등)의 필드는 바꾼다.
-- 서로 빌리는 고리(Blueprint ↔ Brainstorm)는 끊는다. 이미 빌려 쓰는 중인 같은 패시브·같은 원본은 다시 빌리지 않는다.
+- 서로 빌리는 고리(Blueprint ↔ Brainstorm)는 끊는다. 이미 빌려 쓰는 중인 같은 패시브 효과·같은 원본은 다시 빌리지 않는다.
 - 빌려 쓰는 동안 컨텍스트의 `IsBorrowed`가 참이다. 코드로 쓴 결과는 이것으로 쌓기를 거른다(5-2).
 
 ---
@@ -210,8 +210,8 @@ y=5     30   31   32   33               ← 맨 아래 줄(덜 찬 마지막 줄
 | `distance` | 거리(왼쪽·오른쪽·위·아래) | 기본 1 |
 | `other` | 다른 목록에서 고르기(비우면 같은 목록) | 맞은편 보드(`run` › `enemies`). 기준의 칸 번호로 그 목록에서 고른다 |
 
-- `origin` '사용자': 능력이면 쓴 개체, 상태 효과·패시브면 가진 쪽(놓인 것마다면 그 조각)이다.
-- `origin` '앞의 대상': 위 대상 Block이 낸 대상마다 센다. 맨 위에 두면 고른 대상(패시브면 가진 쪽)에서 출발한다.
+- `origin` '사용자': 액티브 효과면 쓴 개체, 상태 효과·패시브 효과면 가진 쪽(놓인 것마다면 그 조각)이다.
+- `origin` '앞의 대상': 위 대상 Block이 낸 대상마다 센다. 맨 위에 두면 고른 대상(패시브 효과면 가진 쪽)에서 출발한다.
 - `origin`이 '앞의 대상'이 아니면 앞 대상을 버리고 새로 고른다. 이어서 '조건으로 거르기'·'무작위 n개'로 줄인다(16장 2-6).
 - 기준이 여럿이면 각자 고른 것을 모으고, 겹치는 것은 한 번만 낸다.
 - `origin` '없음': 기준 없이 목록 전체에서 고른다(2-2). 앞 대상은 버린다.
@@ -231,13 +231,13 @@ y=5     30   31   32   33               ← 맨 아래 줄(덜 찬 마지막 줄
 | `index` | n(n번째 칸) | `spot`이 'n번째 칸(0부터)'일 때만 보인다 |
 | `not` | 아닐 때 참 | 켜면 그 자리가 아닐 때 참 |
 
-- 사용자는 그 순간의 사용자다. 놓인 것마다 패시브면 그 조각, 능력이면 쓴 개체다. 패시브의 `modifierWhen`(보정 조건)에 두면 보정을 읽을 때마다 가진 쪽(그 조각)으로 검사한다(5-3 Fury).
+- 사용자는 그 순간의 사용자다. 놓인 것마다 패시브 효과면 그 조각, 액티브 효과면 쓴 개체다. 패시브 효과의 `modifierWhen`(보정 조건)에 두면 보정을 읽을 때마다 가진 쪽(그 조각)으로 검사한다(5-3 Fury).
 - 사용자가 목록에 없으면 거짓이다. **`not`(아닐 때 참)을 켜도 거짓이다.**
 - 검증 오류: "자리 검사: 목록(플레이어 데이터)을 고르세요." / "자리 검사: 이벤트 필드를 적으세요." / "자리 검사: 누구는 사용자나 이벤트의 개체만 됩니다."
 
 ### 3-3. 결과 '빌려 쓰기'
 
-패시브의 결과 칸에 **빌려 쓰기**(분류 "결과")를 넣는다.
+패시브 효과의 결과 칸에 **빌려 쓰기**(분류 "결과")를 넣는다.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
@@ -246,12 +246,12 @@ y=5     30   31   32   33               ← 맨 아래 줄(덜 찬 마지막 줄
 - 요약은 "빌려 쓰기: " 뒤에 대상 Block이 화살표로 이어진다.
 - 검증 오류: "빌려 쓰기: 빌릴 조각을 고르는 대상 Block을 넣으세요(예: 자리로 고르기 — 오른쪽)." / "빌려 쓰기: 비어 있는 Block이 있습니다(스크립트가 지워졌을 수 있음)."
 
-패시브 쪽 칸(17장)은 `ownerKey`·`ownerPath`(가진 목록) · `matchField`(일치 필드) · `perElement`(놓인 것마다) · `levelField`(레벨 필드) · `trigger`(발동) · `holderField`(가진 쪽 필드) · `outcomes`(결과) · `modifiers`(가진 동안 능력치 보정) · `modifierTarget`(보정 받을 대상) · `modifierWhen`(보정 조건) · `stacking`(여럿일 때)이다. 5절 예제는 이 이름으로 적는다.
+패시브 효과 쪽 칸(17장)은 `ownerKey`·`ownerPath`(가진 목록) · `matchField`(일치 필드) · `perElement`(놓인 것마다) · `levelField`(레벨 필드) · `trigger`(발동) · `holderField`(가진 쪽 필드) · `outcomes`(결과) · `modifiers`(가진 동안 스탯 보정) · `modifierTarget`(보정 받을 대상) · `modifierWhen`(보정 조건) · `stacking`(여럿일 때)이다. 5절 예제는 이 이름으로 적는다.
 
 ### 3-4. 모니터에서 확인하기
 
 - **데이터** 탭: 자리 목록(`run › jokers`, `run › bag`)의 요소 번호가 칸 번호다. 요소를 넣고 빼며 시험한다.
-- **타임라인** 탭: 패시브의 결과는 "결과: …"(출처 `Passive`)로 남는다. 놓인 것마다 패시브는 목록 순서대로 쌓인다. 빌려 쓴 결과도 같은 출처로 남는다.
+- **타임라인** 탭: 패시브 효과의 결과는 "결과: …"(출처 `Passive`)로 남는다. 놓인 것마다 패시브 효과는 목록 순서대로 쌓인다. 빌려 쓴 결과도 같은 출처로 남는다.
 - 자리 Block은 값을 바꾸지 않는다. 고른 대상이 이상하면 줄 길이와 목록 경로를 먼저 본다.
 
 ---
@@ -319,13 +319,13 @@ var rightmost = new PlaceTarget { origin = PlaceOrigin.None, list = new PlayerDa
 
 | 멤버 | 뜻 |
 |---|---|
-| `bool Game.BorrowPassive(string passiveId, object lender)` | 지금 순간으로 그 패시브를 원본 `lender`의 것으로 한 번 더 낸다(결과 '빌려 쓰기'와 같다). 결과를 냈으면 참. 트리거가 맞지 않거나, 같은 패시브·원본을 이미 빌려 쓰는 중이거나, 지금 순간이 없으면(트리거 결과·`[BindTo]` 밖) 거짓 |
+| `bool Game.BorrowPassive(string passiveId, object lender)` | 지금 순간으로 그 패시브 효과를 원본 `lender`의 것으로 한 번 더 낸다(결과 '빌려 쓰기'와 같다). 결과를 냈으면 참. 트리거가 맞지 않거나, 같은 패시브 효과·원본을 이미 빌려 쓰는 중이거나, 지금 순간이 없으면(트리거 결과·`[BindTo]` 밖) 거짓 |
 | `bool session.Passives.Borrow(string id, object lender, TriggerContext moment)` | 순간을 직접 준다 |
-| `IEnumerable<PassiveDefinition> session.Passives.MatchingFor(object element)` | 그 조각을 가진 것으로 보는 패시브들. 패시브의 가진 목록에 그 조각 **객체 자신**이 들어 있고 일치해야 한다(id만 같은 다른 객체는 아니다) |
+| `IEnumerable<PassiveDefinition> session.Passives.MatchingFor(object element)` | 그 조각을 가진 것으로 보는 패시브 효과들. 패시브 효과의 가진 목록에 그 조각 **객체 자신**이 들어 있고 일치해야 한다(id만 같은 다른 객체는 아니다) |
 | `TriggerContext.IsBorrowed` | 빌려 쓰는 중이면 참 |
 
 ```csharp
-// 흉내: 나를 뺀 켜진 아티팩트 중 레벨이 가장 높은 것의 패시브를 빌린다(5-5의 가방, 레벨 0 = 꺼짐·석판)
+// 흉내: 나를 뺀 켜진 아티팩트 중 레벨이 가장 높은 것의 패시브 효과를 빌린다(5-5의 가방, 레벨 0 = 꺼짐·석판)
 [BindTo(GameIds.Passive.Mimic)]
 static void Mimic(TriggerContext c)
 {
@@ -348,9 +348,9 @@ using System.Linq;
 using GBible;
 using GBible.Ids;
 
-[Serializable] public class Joker { public string id; public string joker; public int mult; }      // joker = 원본 ID(패시브 ID), mult = 이 조커에 쌓인 배수
-[Serializable] public class BoardUnit { public string id; public string ability; public List<string> traits = new List<string>(); public int attack = 3; public int hp = 10; public int counter = 3; public int maxCounter = 3; }   // traits = 특성 패시브 ID들
-[Serializable] public class BagPiece { public string id; public string item; public int turns; public int level; }   // item = 원본 ID(아티팩트 = 패시브 ID, 석판 = 인스턴스 ID), turns = 돌린 횟수, level = 최종 레벨(5-5가 쓴다)
+[Serializable] public class Joker { public string id; public string joker; public int mult; }      // joker = 원본 ID(패시브 효과 ID), mult = 이 조커에 쌓인 배수
+[Serializable] public class BoardUnit { public string id; public string ability; public List<string> traits = new List<string>(); public int attack = 3; public int hp = 10; public int counter = 3; public int maxCounter = 3; }   // traits = 특성 패시브 효과 ID들
+[Serializable] public class BagPiece { public string id; public string item; public int turns; public int level; }   // item = 원본 ID(아티팩트 = 패시브 효과 ID, 석판 = 인스턴스 ID), turns = 돌린 횟수, level = 최종 레벨(5-5가 쓴다)
 
 // RunState에 더한다
 public List<Joker> jokers = new List<Joker>();                            // 조커 칸(한 줄, 줄 길이 0). 빈 칸 없이 앞으로 당긴다
@@ -366,10 +366,10 @@ public int mult = 1;                                                      // 이
 
 **에디터**
 
-1. DB › 패시브 `plusMult`(+4 배수): `ownerKey` `run`, `ownerPath` `jokers`, `matchField`(일치 필드) `joker`, `perElement`(놓인 것마다) 켬. `trigger`(발동) `이벤트 받기` → `손 점수`. `outcomes`(결과) `플레이어 데이터에 주기` → `key` `run`, `path` `mult`, `amount`(증감) `4`.
-2. DB › 패시브 `timesMult`(×2 배수): `ownerKey`·`ownerPath`·`matchField`·`perElement`·`trigger`는 1과 같다. `outcomes` `대상에게 효과` → `targets` `플레이어 데이터 목록`(`key` `run`, `path` 비움 = 값 전체) → `effects` `필드 바꾸기`(`field` `mult`, `change`(방법) `곱하기`, `value` `2`).
-3. DB › 패시브 `cheerleader`(라운드 끝에 오른쪽 조커의 배수 +2): 1과 같고 `trigger` `이벤트 받기` → `라운드 끝`. `outcomes` `대상에게 효과` → `targets` `자리로 고르기`(`origin` 사용자(가진 쪽), `list` `run` › `jokers`, `columns` `0`, `direction` 오른쪽) → `effects` `필드 바꾸기`(`field` `mult`, `change` 더하기, `value` `2`).
-4. DB › 패시브 `dagger`(손 점수 때 오른쪽 조커를 없앤다): 1과 같고 결과는 코드다.
+1. DB › 패시브 효과 `plusMult`(+4 배수): `ownerKey` `run`, `ownerPath` `jokers`, `matchField`(일치 필드) `joker`, `perElement`(놓인 것마다) 켬. `trigger`(발동) `이벤트 받기` → `손 점수`. `outcomes`(결과) `플레이어 데이터에 주기` → `key` `run`, `path` `mult`, `amount`(증감) `4`.
+2. DB › 패시브 효과 `timesMult`(×2 배수): `ownerKey`·`ownerPath`·`matchField`·`perElement`·`trigger`는 1과 같다. `outcomes` `대상에게 효과` → `targets` `플레이어 데이터 목록`(`key` `run`, `path` 비움 = 값 전체) → `effects` `필드 바꾸기`(`field` `mult`, `change`(방법) `곱하기`, `value` `2`).
+3. DB › 패시브 효과 `cheerleader`(라운드 끝에 오른쪽 조커의 배수 +2): 1과 같고 `trigger` `이벤트 받기` → `라운드 끝`. `outcomes` `대상에게 효과` → `targets` `자리로 고르기`(`origin` 사용자(가진 쪽), `list` `run` › `jokers`, `columns` `0`, `direction` 오른쪽) → `effects` `필드 바꾸기`(`field` `mult`, `change` 더하기, `value` `2`).
+4. DB › 패시브 효과 `dagger`(손 점수 때 오른쪽 조커를 없앤다): 1과 같고 결과는 코드다.
 
 ```csharp
 [BindTo(GameIds.Passive.Dagger)]
@@ -388,7 +388,7 @@ static void Dagger(TriggerContext c)
 | +4 · 단검 · +4 · +4 | 1 + 4 + 4 = 9. 셋째 칸은 단검이 없애 발동하지 않는다 |
 | +4 · +4 | 1 + 4 + 4 = 9. 같은 조커 둘은 각자 발동한다 |
 
-- 넷 다 같은 목록(`run › jokers`)을 보는 '놓인 것마다' 패시브라 패시브를 만든 차례와 상관없이 칸 순서로 발동한다(2-6).
+- 넷 다 같은 목록(`run › jokers`)을 보는 '놓인 것마다' 패시브 효과라 패시브 효과를 만든 차례와 상관없이 칸 순서로 발동한다(2-6).
 - `cheerleader`가 맨 오른쪽이면 오른쪽 조커가 없어 아무 일도 없다.
 - 조커를 팔거나 없애면 `Remove`로 뺀다. 조커 칸은 당기는 것이 맞다. 가방·보드처럼 칸이 고정이면 `null`로 비운다(5-3).
 
@@ -396,10 +396,10 @@ static void Dagger(TriggerContext c)
 
 **에디터**
 
-1. DB › 패시브 `blueprint`: `ownerKey` `run`, `ownerPath` `jokers`, `matchField` `joker`, `perElement` 켬.
+1. DB › 패시브 효과 `blueprint`: `ownerKey` `run`, `ownerPath` `jokers`, `matchField` `joker`, `perElement` 켬.
    - `trigger`(발동): 빌려 올 조커가 발동하는 순간을 모두 담는다. `|| OR` 안에 `이벤트 받기` → `손 점수`, `이벤트 받기` → `라운드 끝` ….
    - `outcomes`(결과): `빌려 쓰기` → `targets`(빌릴 조각) `자리로 고르기`(`origin` 사용자(가진 쪽), `list` `run` › `jokers`, `columns` `0`, `direction` 오른쪽).
-2. DB › 패시브 `brainstorm`: 1과 같고 `direction`만 목록 맨 처음(차 있는 첫 칸).
+2. DB › 패시브 효과 `brainstorm`: 1과 같고 `direction`만 목록 맨 처음(차 있는 첫 칸).
 
 쌓이는 조커 `bus`(손 점수마다 자기 `mult` +1, 그다음 자기 `mult`만큼 배수 +)를 코드로 쓰면 빌려 쓰는 중인지 본다.
 
@@ -429,7 +429,7 @@ static void Bus(TriggerContext c)
 
 보드는 편마다 레인(가로줄) 2개 × 3칸이고, 차례는 적 먼저, 각 보드에서 **앞 칸 위→아래 → 가운데 칸 → 뒤 칸**이다(열 우선). 보드 목록을 이 차례대로 담는다(**열 우선으로 담기**, 줄 길이 = 레인 수 2).
 
-- 목록 순서 = 턴 순서다. 칸 번호로 도는 턴 행동도, '놓인 것마다' 패시브의 차례(2-6)도 원작과 같다.
+- 목록 순서 = 턴 순서다. 칸 번호로 도는 턴 행동도, '놓인 것마다' 패시브 효과의 차례(2-6)도 원작과 같다.
 - 자리 계산의 '줄'(y)은 앞뒤 깊이(y = 0이 앞 칸, '위(앞 줄)' = 한 칸 앞), '열'(x)은 레인(x = 0 위 레인, x = 1 아래 레인)이다. **원작의 '같은 줄'(레인)은 여기의 '같은 열'**이다.
 - 화면은 칸 번호를 원작 모양(레인이 가로줄, 적 보드는 좌우 뒤집기)으로 그린다.
 
@@ -443,10 +443,10 @@ static void Bus(TriggerContext c)
 
 **에디터**
 
-1. DB › 능력 `allyStrike`: 결과 `대상에게 효과` → `targets` `자리로 고르기`(`origin` 사용자(가진 쪽), `list` `run` › `board`, `columns` `2`, `direction` 같은 열 맨 앞(차 있는 첫 칸, 위부터), `other` `run` › `enemies`) → `effects` `피해`(3).
-2. DB › 능력 `enemyStrike`: 1과 같고 `list` `run` › `enemies`, `other` `run` › `board`.
+1. DB › 액티브 효과 `allyStrike`: 결과 `대상에게 효과` → `targets` `자리로 고르기`(`origin` 사용자(가진 쪽), `list` `run` › `board`, `columns` `2`, `direction` 같은 열 맨 앞(차 있는 첫 칸, 위부터), `other` `run` › `enemies`) → `effects` `피해`(3).
+2. DB › 액티브 효과 `enemyStrike`: 1과 같고 `list` `run` › `enemies`, `other` `run` › `board`.
 3. 유닛 원본의 `ability`에 이 ID를 넣는다.
-4. DB › 패시브 `fury`(같은 레인에 혼자면 공격 +3): `ownerKey` `run`, `ownerPath` `board`, `matchField`(일치 필드) `traits`(글자 목록), `perElement`(놓인 것마다) 켬. `modifiers`(가진 동안 능력치 보정) `attack` 플랫 `3`(받을 대상 비움 = 그 유닛). `modifierWhen`(보정 조건) `조건 충족` → `자리 검사`(`who` 사용자(가진 쪽), `list` `run` › `board`, `columns` `2`, `spot` 같은 열에 혼자).
+4. DB › 패시브 효과 `fury`(같은 레인에 혼자면 공격 +3): `ownerKey` `run`, `ownerPath` `board`, `matchField`(일치 필드) `traits`(글자 목록), `perElement`(놓인 것마다) 켬. `modifiers`(가진 동안 스탯 보정) `attack` 플랫 `3`(받을 대상 비움 = 그 유닛). `modifierWhen`(보정 조건) `조건 충족` → `자리 검사`(`who` 사용자(가진 쪽), `list` `run` › `board`, `columns` `2`, `spot` 같은 열에 혼자).
 
 **규칙**
 
@@ -505,9 +505,9 @@ public class FrontTarget : TargetSelector<BoardUnit>
 
 ### 5-4. 가방 — 맨 아래 줄 · 가장자리 · 양옆이 빈 칸
 
-아티팩트 패시브의 가진 목록은 가방 목록 자체(`run › bag`)다. 석판·제약으로 레벨이 바뀌면 5-5처럼 `levelField`(레벨 필드)를 `level`로 정한다.
+아티팩트 패시브 효과의 가진 목록은 가방 목록 자체(`run › bag`)다. 석판·제약으로 레벨이 바뀌면 5-5처럼 `levelField`(레벨 필드)를 `level`로 정한다.
 
-**에디터** — 셋 다 DB › 패시브, `ownerKey` `run`, `ownerPath` `bag`, `matchField` `item`, `perElement` 켬.
+**에디터** — 셋 다 DB › 패시브 효과, `ownerKey` `run`, `ownerPath` `bag`, `matchField` `item`, `perElement` 켬.
 
 1. 은접시 `silverPlate`(맨 아래 줄이면 방에 들어갈 때 보호막 +5): `trigger` `&& AND` → `이벤트 받기` → `방 입장`, `조건 충족` → `condition` `자리 검사`(`who` 사용자(가진 쪽), `list` `run` › `bag`, `columns` `6`, `spot` 맨 아래 줄). `outcomes` `플레이어 데이터에 주기` → `key` `run`, `path` `hero.shield`, `amount` `5`.
 2. 차가운 자물쇠 `coldLock`(양옆이 빈 칸이면 주인공의 피해 +5): `trigger` `&& AND` → `행동 직전 이벤트 받기` → `intentType` `피해`(`filter` `sourceId` 일치 `hero`), `조건 충족` → `자리 검사`(1과 같고 `spot` 양옆이 빈 칸). `outcomes` `행동 직전 이벤트 고치기` → `path` `amount`, `op` 더하기, `value` `5`.
@@ -522,12 +522,12 @@ public class FrontTarget : TargetSelector<BoardUnit>
 
 - 사용자 = 그 아티팩트다(놓인 것마다). 같은 아티팩트가 둘이면 각자의 자리로 따로 검사한다.
 - 손패도 같다. "손패 맨 오른쪽 카드를 낼 때 피해 2배" = `자리 검사`(`who` 이벤트의 개체, `eventField` `card`, `list` `run` › `hand`, `columns` `0`, `spot` 목록 맨 끝(차 있는 것 중)).
-- 위치에 따라 늘 붙는 능력치(맨 아래 줄이면 공격 +3)는 가진 동안 능력치 보정 + `modifierWhen`(보정 조건) `자리 검사`(맨 아래 줄)다. 보정만 자리에 따라 켜지고 꺼진다(5-3 Fury와 같다).
-- **세피리아식 제약**("가장자리에 있어야 작동" — 맞지 않으면 그 아티팩트의 발동·보정이 **모두** 꺼진다)은 패시브마다 조건을 붙이지 않는다. 5-5의 계산 함수가 그 조각의 최종 레벨을 0으로 쓴다. 레벨 0 이하인 조각은 꺼진 것이다(17장 0-1).
+- 위치에 따라 늘 붙는 스탯(맨 아래 줄이면 공격 +3)은 가진 동안 스탯 보정 + `modifierWhen`(보정 조건) `자리 검사`(맨 아래 줄)다. 보정만 자리에 따라 켜지고 꺼진다(5-3 Fury와 같다).
+- **세피리아식 제약**("가장자리에 있어야 작동" — 맞지 않으면 그 아티팩트의 발동·보정이 **모두** 꺼진다)은 패시브 효과마다 조건을 붙이지 않는다. 5-5의 계산 함수가 그 조각의 최종 레벨을 0으로 쓴다. 레벨 0 이하인 조각은 꺼진 것이다(17장 0-1).
 
 ### 5-5. 석판 — 무늬·회전으로 레벨 계산
 
-석판은 무늬 칸에 있는 아티팩트의 레벨을 올린다. 석판을 돌리면 무늬도 돈다. 배치가 바뀌는 행동 끝에서 계산 함수가 조각마다 **최종 레벨**을 다시 계산해 그 조각의 `level` 필드에 쓴다(제약이 안 맞으면 0 = 꺼짐). 아티팩트 패시브는 가방 목록 자체를 가진 목록으로 삼고 그 필드를 레벨 필드로 본다.
+석판은 무늬 칸에 있는 아티팩트의 레벨을 올린다. 석판을 돌리면 무늬도 돈다. 배치가 바뀌는 행동 끝에서 계산 함수가 조각마다 **최종 레벨**을 다시 계산해 그 조각의 `level` 필드에 쓴다(제약이 안 맞으면 0 = 꺼짐). 아티팩트 패시브 효과는 가방 목록 자체를 가진 목록으로 삼고 그 필드를 레벨 필드로 본다.
 
 > 켜진 아티팩트만 담은 목록을 계산할 때마다 새로 만들면 조각에 쌓인 값(처치 수·카운터)이 새 객체에 없어 사라진다. 그래서 목록을 따로 만들지 않고 가방 조각에 최종 레벨을 쓴다.
 
@@ -535,7 +535,7 @@ public class FrontTarget : TargetSelector<BoardUnit>
 
 - DB › 인스턴스 `slateLine`: `SlateData`, `pattern` `(1, 0)` `(2, 0)`(오른쪽 두 칸), `bonus` `1`.
 - DB › 인스턴스 `slateCross`: `pattern` `(0, -1)` `(1, 0)` `(0, 1)` `(-1, 0)`(상하좌우), `bonus` `1`, `edgeOnly` 켬(가장자리에 놓였을 때만).
-- DB › 패시브 `ember`(불씨): `ownerKey` `run`, `ownerPath` `bag`, `matchField` `item`, `perElement` 켬, `levelField`(레벨 필드) `level`. `modifiers`(가진 동안 능력치 보정) 한 줄: `attribute` `attack` · `kind`(칸) 플랫 · `byLevel`(레벨별 값) `2` `3` `4` `6`. `modifierTarget`(보정 받을 대상) `hero`.
+- DB › 패시브 효과 `ember`(불씨): `ownerKey` `run`, `ownerPath` `bag`, `matchField` `item`, `perElement` 켬, `levelField`(레벨 필드) `level`. `modifiers`(가진 동안 스탯 보정) 한 줄: `attribute` `attack` · `kind`(칸) 플랫 · `byLevel`(레벨별 값) `2` `3` `4` `6`. `modifierTarget`(보정 받을 대상) `hero`.
 - 세피리아는 ★0부터 센다. **레벨 필드 = ★ + 1(꺼지면 0)**로 두면 ★0이 레벨 1이고 `byLevel`(레벨별 값)의 첫 칸이 ★0의 값이다.
 
 **규칙**
@@ -609,7 +609,7 @@ public class RotatePiece : GameAction
 - 화면이 "돌리면 어떻게 되나"를 미리 보려면 `Game.Preview(new RotatePiece { piece = p }, g => g.Data().Run.bag.Where(a => a != null).Select(a => (a.id, a.level)).ToList())`(33장)로 해 보고 값을 복사해 읽는다. 계산을 화면 코드에 복사하지 않는다.
 - 가진 목록이 가방 자체라 '자리 검사'(목록 `run` › `bag`)가 그대로 그 조각의 자리를 보고, 조각에 쌓인 값(`kills` 같은 필드)도 계산과 상관없이 남는다.
 - `modifierTarget`(보정 받을 대상)을 정하면 받는 쪽(`hero`) 하나에 가진 쪽(불씨)이 여럿이다. `stacking`(여럿일 때)이 기본 `레벨을 더해 한 번`이면 불씨 둘(레벨 1·2)이 레벨 3의 값 4, `가진 쪽마다 값을 더함`이면 2 + 3 = 5, `가장 높은 레벨 하나만`이면 3이다(17장 0-1).
-- 콤보(같은 태그 N개면 단계 효과)는 같은 계산 함수가 태그 → 개수 딕셔너리를 판 데이터에 쓰고, 그것을 가진 목록으로 삼는 패시브(레벨별 값)로 만든다.
+- 콤보(같은 태그 N개면 단계 효과)는 같은 계산 함수가 태그 → 개수 딕셔너리를 판 데이터에 쓰고, 그것을 가진 목록으로 삼는 패시브 효과(레벨별 값)로 만든다.
 - 크기가 여러 칸인 조각은 목록에 머리 칸만 두고 나머지 칸은 '차지됨' 표시로 둔다. 계산 함수가 셀 때 그 칸을 반영한다.
 
 ### 5-6. 지팡이 칸 — 지팡이마다 `slots` 한 줄(매지크래프트)
@@ -618,7 +618,7 @@ public class RotatePiece : GameAction
 
 ```csharp
 [Serializable] public class Wand { public string id; public string wand; public double mp = 100, maxMp = 100; public List<Spell> slots = new List<Spell>(); }   // slots = 일반 칸 + 보조 칸, 빈 칸 = null
-[Serializable] public class Spell { public string id; public string spell; public int level = 1; }   // spell = 원본 ID(패시브 ID)
+[Serializable] public class Spell { public string id; public string spell; public int level = 1; }   // spell = 원본 ID(패시브 효과 ID)
 [GameEvent("주문 시전")] public class SpellCast { public string wandId, pieceId; }
 // RunState에 더한다: public List<Wand> wands = new List<Wand>();
 
@@ -638,14 +638,14 @@ public class CastWand : GameAction
 }
 ```
 
-**에디터**(DB › 패시브, 모두 `ownerKey` `run`, `ownerPath` `wands[].slots`, `matchField` `spell`):
+**에디터**(DB › 패시브 효과, 모두 `ownerKey` `run`, `ownerPath` `wands[].slots`, `matchField` `spell`):
 
 1. 주문마다(`spark` …): `perElement`(놓인 것마다) 켬, `levelField` `level`. `trigger` `이벤트 받기` → `주문 시전`, `holderField`(가진 쪽 필드) `pieceId`(내 칸 차례만). `outcomes`는 주문의 효과.
 2. 메아리 `echo`(다음 칸 주문을 한 번 더): 1과 같고 `outcomes` `빌려 쓰기` → `자리로 고르기`(`origin` 사용자(가진 쪽), `list` `run` › `wands[].slots`, `direction` 오른쪽).
-3. 마나 저장소 `reservoir`(칸에 두면 그 지팡이 최대 MP +20): `perElement` 끔 → 가진 쪽 = 그 칸 목록을 품은 지팡이. `modifiers`(가진 동안 능력치 보정) `maxMp` 플랫 `20`(받을 대상 비움 = 그 지팡이). 규칙·화면은 `Game.Attribute(wand, nameof(Wand.maxMp))`로 읽는다(28장 4-2).
+3. 마나 저장소 `reservoir`(칸에 두면 그 지팡이 최대 MP +20): `perElement` 끔 → 가진 쪽 = 그 칸 목록을 품은 지팡이. `modifiers`(가진 동안 스탯 보정) `maxMp` 플랫 `20`(받을 대상 비움 = 그 지팡이). 규칙·화면은 `Game.Attribute(wand, nameof(Wand.maxMp))`로 읽는다(28장 4-2).
 
 - 경로에 `[]`가 있어 메아리는 **자기가 든 지팡이의 줄**에서 오른쪽을 고른다. 다른 지팡이의 칸과 섞이지 않는다(2-4).
-- 빌린 패시브의 `holderField`(가진 쪽 필드)는 빌리는 쪽 기준이다. 메아리 차례(`pieceId` = 메아리)에 오른쪽 주문이 한 번 더 나고, 그 주문은 자기 차례에 또 난다(17장 0-1). 메아리 둘이 이어지면 첫 메아리 차례에 둘째 메아리가 빌린 오른쪽 주문도 난다(빌린 결과 안에서 또 빌리면 처음 빌린 조각 기준).
+- 빌린 패시브 효과의 `holderField`(가진 쪽 필드)는 빌리는 쪽 기준이다. 메아리 차례(`pieceId` = 메아리)에 오른쪽 주문이 한 번 더 나고, 그 주문은 자기 차례에 또 난다(17장 0-1). 메아리 둘이 이어지면 첫 메아리 차례에 둘째 메아리가 빌린 오른쪽 주문도 난다(빌린 결과 안에서 또 빌리면 처음 빌린 조각 기준).
 - 모든 주문이 같은 이벤트를 받으면(방 입장) '놓인 것마다' 차례는 첫 지팡이의 칸 전부 → 둘째 지팡이의 칸이다(2-6).
 - MP는 `Game.TryPay`(28장 2-4): 모자라면 아무것도 바꾸지 않고 거짓이라 그 시전만 멈추고 행동은 계속된다. `forId`(무엇을 위한 비용) = 주문 원본 ID라 "불 주문 MP 반값"이 행동 직전 이벤트 조건 `forId`로 거른다.
 - 보조 칸의 충전(시전마다 에너지 +3, 차면 보조 칸 주문 시전)은 프로젝트 동사로 둔다: 효과 Block `에너지 충전`이 규칙 함수 `Rules.Charge`를 부르고, 그 안에 행동 직전 이벤트 자리(프로젝트 행동 직전 이벤트)를 둔다. "충전 효율 +20%" 같은 기믹이 양을 고쳐야 하므로 '필드 바꾸기'로 바로 더하지 않는다(28장 2-3 규칙).
@@ -659,7 +659,7 @@ public class CastWand : GameAction
 | 조각 하나를 뺐더니 다른 조각의 자리가 바뀜 | `Remove`는 뒤 칸을 당긴다. 칸이 고정인 자리(가방·보드)는 `list[i] = null`로 비운다. 당기는 것이 맞는 자리(조커 칸·손패)만 `Remove`한다. |
 | 가방에 놓으려는 칸이 없음 | 목록을 칸 수만큼 미리 채우지 않았다. `new List<BagPiece>(new BagPiece[34])`. 칸이 늘면 행동이 `Add(null)`로 늘린다. |
 | 같은 조커 둘 중 둘째가 첫째의 자리로 계산됨 | 조각 목록이 ID 글자 목록이다. 같은 ID면 앞의 것을 찾는다(2-4). 고유 id를 가진 객체 목록 + `matchField`(일치 필드)로 바꾼다. |
-| '자리로 고르기'가 아무도 고르지 않음 | 기준이 그 목록에 없다(`perElement`를 끈 패시브는 사용자가 `run`이다 — 누가 쓰든 맨 끝을 고르려면 기준 `없음`), `columns`(줄 길이)가 목록과 다르다, 기준 자신이 맨 앞이라 '같은 줄 맨 앞'·'목록 맨 처음'이 비었다(2-2), 고른 칸이 모두 빈 칸이다. |
+| '자리로 고르기'가 아무도 고르지 않음 | 기준이 그 목록에 없다(`perElement`를 끈 패시브 효과는 사용자가 `run`이다 — 누가 쓰든 맨 끝을 고르려면 기준 `없음`), `columns`(줄 길이)가 목록과 다르다, 기준 자신이 맨 앞이라 '같은 줄 맨 앞'·'목록 맨 처음'이 비었다(2-2), 고른 칸이 모두 빈 칸이다. |
 | 보드의 차례가 원작과 다름(레인마다 앞→뒤로 돎) | 보드를 줄 우선(레인 = 줄)으로 담았다. 차례가 "앞 칸 위→아래, 다음 칸"이면 그 순서로 담고(줄 길이 = 레인 수) 레인 쪽 방향·자리는 `같은 열 …`을 쓴다(5-3). |
 | 2P의 조각이 1P 줄을 기준으로 고름 | 목록 경로에 `[]`를 쓰지 않고 한 사람의 목록을 적었다. `players[].charms`처럼 적으면 기준이 든 목록에서 본다(2-4). |
 | 석판·제약을 다시 계산할 때마다 조각에 쌓인 값이 사라짐 | 켜진 아티팩트 목록을 새 객체로 다시 만들었다. 가방 목록 자체를 가진 목록으로 두고 최종 레벨을 조각 필드에 쓴다(꺼지면 0, 5-5). |
@@ -669,10 +669,10 @@ public class CastWand : GameAction
 | 줄 끝의 오른쪽이 다음 줄 첫 칸이 아님 | 정상이다. 방향은 줄을 넘지 않는다. 목록 순서의 다음 칸이 필요하면 칸 번호 + 1을 코드로 본다. |
 | 아래가 비었는데 '맨 아래 줄'이 거짓 | 마지막 줄이 덜 찼다. 맨 아래 줄은 목록의 마지막 줄이다(34칸이면 30~33번). 그 위 줄의 오른쪽 칸은 '가장자리'로 잡는다(2-3). |
 | 석판 무늬가 반대로 돈다 | `Grid.Rotate`(y 위 +)를 썼다. 목록 칸은 `Placement.Rotate`·`Pattern`(화면 기준)을 쓴다. |
-| 조커가 칸 순서가 아니라 패시브를 만든 차례로 발동 | `perElement`(놓인 것마다)가 꺼져 있거나, 패시브마다 가진 목록(`ownerKey`·`ownerPath`)이 다르다. 같은 목록끼리만 한 줄로 선다(2-6). |
+| 조커가 칸 순서가 아니라 패시브 효과를 만든 차례로 발동 | `perElement`(놓인 것마다)가 꺼져 있거나, 패시브 효과마다 가진 목록(`ownerKey`·`ownerPath`)이 다르다. 같은 목록끼리만 한 줄로 선다(2-6). |
 | 앞에서 쓰러진 유닛이 차례에 또 발동 | 목록을 `ToList()`로 복사해 돌았다. 칸 번호로 돌며 그 순간의 칸을 읽는다(5-3). |
-| Blueprint가 아무것도 하지 않음 | Blueprint의 발동에 그 순간(이벤트·행동 직전 이벤트)이 없다, 오른쪽 조커의 발동이 그 순간에 맞지 않는다, 오른쪽 조커의 패시브가 그 조커를 가진 것으로 보지 않는다(`ownerKey`·`ownerPath`·`matchField`를 확인한다). |
+| Blueprint가 아무것도 하지 않음 | Blueprint의 발동에 그 순간(이벤트·행동 직전 이벤트)이 없다, 오른쪽 조커의 발동이 그 순간에 맞지 않는다, 오른쪽 조커의 패시브 효과가 그 조커를 가진 것으로 보지 않는다(`ownerKey`·`ownerPath`·`matchField`를 확인한다). |
 | Blueprint가 빌리면 원본 조커의 쌓인 값이 두 번 오름 | 쌓기를 코드로 썼다. `c.IsBorrowed`면 쌓지 않는다(5-2). '필드 바꾸기'는 저절로 거른다. |
-| `Game.BorrowPassive`가 늘 거짓 | 트리거 결과·`[BindTo]` 밖에서 불렀다(지금 순간이 없다). 또는 원본이 그 패시브의 가진 목록에 든 객체 자신이 아니다(id만 같은 사본은 안 된다). |
+| `Game.BorrowPassive`가 늘 거짓 | 트리거 결과·`[BindTo]` 밖에서 불렀다(지금 순간이 없다). 또는 원본이 그 패시브 효과의 가진 목록에 든 객체 자신이 아니다(id만 같은 사본은 안 된다). |
 | 석판 레벨이 Undo 뒤 어긋남 | 계산 결과를 화면 코드(행동 밖)에서 썼다. 배치를 바꾸는 행동 안에서 `Bag.Recalculate`를 부른다. |
 | `Placement`·`Cell`이 없다는 컴파일 오류 | `using GBible;`이 없다. 프로젝트에 같은 이름의 클래스가 있으면 `GBible.Placement`로 쓰거나 프로젝트 쪽 이름을 바꾼다. |

@@ -28,7 +28,7 @@
 | 맵 | 칸마다의 지형. 바뀌지 않는 맵은 원본 인스턴스(DB › 인스턴스)의 `rows`(글자 목록, 글자 하나 = 칸 하나), 판에서 바뀌는 칸은 플레이어 데이터의 딕셔너리(칸 키 → 값). |
 | 큰 수 (`BigNumber`) | 1e300 아래는 double 값 그대로(`m` = 값, `e` = 0), 그 위는 가수 `m`(1 ≤ \|m\| < 10, double) × 10^`e`(지수, long). `[Serializable]` 구조체. |
 | 유효 숫자 | 정확히 담기는 자릿수. 1e300 아래는 double과 같다(정수는 2^53까지 정확). 그 위는 가수가 double이라 약 15자리다. |
-| 가격 곡선 | 곡선을 붙인 밸런스 값(30장)에서 단계 = 이미 산 개수인 것. |
+| 가격 곡선 | 곡선을 붙인 밸런싱 값(30장)에서 단계 = 이미 산 개수인 것. |
 
 ---
 
@@ -46,7 +46,7 @@
 | "방향키로 한 칸, 몬스터가 다가온다, 본 칸만 밝다" | `Grid.Path`의 첫 칸 · `Grid.Area` + `Visible`(5-5) |
 | "밭 칸마다 작물, 물뿌리개 3×3" | 칸 키 딕셔너리(`Grid.Key`) · `Grid.Area(…, Chebyshev)`(5-6) |
 | "쿠키 1e60개, 초당 생산" | `BigNumber` 필드(5-7) |
-| "건물 가격 ×1.15씩, 10개 사기·살 수 있는 만큼" | 밸런스 값 곡선 + `Game.BalanceSum` · `Game.BalanceCount`(5-7) |
+| "건물 가격 ×1.15씩, 10개 사기·살 수 있는 만큼" | 밸런싱 값 곡선 + `Game.BalanceSum` · `Game.BalanceCount`(5-7) |
 
 > **규칙: 맵은 데이터, `Grid`는 계산.** 맵 모양은 원본 인스턴스(`rows`)나 판 데이터에 두고, `Grid` 함수에는 그 맵을 읽는 비용·막힘 함수를 넘긴다. 같은 규칙 함수(`Board.MoveRange`)를 행동도 화면(범위 칠하기)도 부른다. 화면 코드에 계산을 복사하지 않는다.
 
@@ -153,7 +153,7 @@
 
 - `Game.BalanceSum(ID, from, count)`: 단계 `from`, `from + 1`, … 의 값 `count`개를 더한다. "10개 사기" = `BalanceSum(가격, 가진 수, 10)`.
 - `Game.BalanceCount(ID, from, budget)`: `budget`으로 단계 `from`부터 차례로 몇 개를 살 수 있나("살 수 있는 만큼"). 다음 하나를 더하면 넘을 때 멈춘다. 많아야 10000개까지 센다.
-- 둘 다 double이다(밸런스 값이 double). 큰 수 예산은 `run.cookies.ToDouble()`로 넘긴다. 가격 자체가 1e308을 넘을 만큼 오르면 곡선 대신 `BigNumber.Pow`로 계산한다(5-7).
+- 둘 다 double이다(밸런싱 값이 double). 큰 수 예산은 `run.cookies.ToDouble()`로 넘긴다. 가격 자체가 1e308을 넘을 만큼 오르면 곡선 대신 `BigNumber.Pow`로 계산한다(5-7).
 - 곡선의 반올림(30장 2-2)은 단계마다 먼저 적용된 뒤 더한다.
 - 가격이 0 이하(또는 숫자가 아님)가 되는 단계에서 멈춘다(그 단계부터는 사지 못하고 더하지 않는다, 30장 4-1).
 
@@ -193,7 +193,7 @@
 
 - **좌표**: 칸 (x, y)의 글자 = `rows[y][x]`. y = 0이 첫 줄이다. `Grid.Up`(y + 1)은 rows로 보면 **다음 줄**(아래)이다. Tilemap에 그릴 때는 `new Vector3Int(x, -y, 0)`처럼 y를 뒤집어 그리면 글자 모양 그대로 보인다.
 - 줄 길이가 달라도 된다. 짧은 줄의 오른쪽은 맵 밖(벽)으로 본다(5절의 `Board.TileAt`).
-- 글자의 뜻(비용·시야)은 코드 한 곳(`Board.TerrainCost`·`BlocksSight`)에 둔다. 기획자가 비용을 고치게 하려면 글자마다 밸런스 값을 두고 읽는다(`Game.Balance("forestCost")`).
+- 글자의 뜻(비용·시야)은 코드 한 곳(`Board.TerrainCost`·`BlocksSight`)에 둔다. 기획자가 비용을 고치게 하려면 글자마다 밸런싱 값을 두고 읽는다(`Game.Balance("forestCost")`).
 - **판에서 바뀌는 칸**(부서진 벽·연 문·갈아 둔 밭)은 원본을 고치지 않는다(원본은 읽기만, 04장 2.7). 판 데이터에 `Dictionary<string, char>`(칸 키 → 바뀐 글자)를 두고, `TileAt`이 그것을 먼저 본다.
 - 맵이 아주 크거나 Tilemap에서 그리고 싶으면 Tilemap → `rows`로 굽는 에디터 메뉴를 프로젝트가 만든다(DB 추가 메뉴, 관례 15절).
 
@@ -311,7 +311,7 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 
 ## 5. 상황별 예제
 
-5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 행동 직전 이벤트 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런스 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런스 값에 항목을 만들고 저장하면 생긴다.
+5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 행동 직전 이벤트 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런싱 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런싱 값에 항목을 만들고 저장하면 생긴다.
 
 ```csharp
 using System;
@@ -516,7 +516,7 @@ public class Shoot : GameAction
 
 "붙은 적을 1칸 민다. 벽·물·다른 유닛에 부딪히면 피해 +2."
 
-**에디터**: DB › 밸런스 값 `shoveDamage` `1`, `shoveCrash` `2`.
+**에디터**: DB › 밸런싱 값 `shoveDamage` `1`, `shoveCrash` `2`.
 
 ```csharp
 [Serializable, BlockInfo("밀쳐 내기")]
@@ -700,7 +700,7 @@ foreach (var pair in GBibleRuntime.Game.Data().Run.farm.crops)
 
 **에디터**
 
-- DB › 밸런스 값 `cursorPrice`: `value` `15`, 곡선 `비율로(×단계마다)`, `startX` `0`(단계 = 가진 수, 0개일 때 15), `rate` `1.15`, `rounding` `올림`(30장).
+- DB › 밸런싱 값 `cursorPrice`: `value` `15`, 곡선 `비율로(×단계마다)`, `startX` `0`(단계 = 가진 수, 0개일 때 15), `rate` `1.15`, `rounding` `올림`(30장).
 - DB › 인스턴스 `cursor`: `BuildingData`, `cps` `0.1`, `price` `cursorPrice`.
 - DB › 시작 파일 › Bootstrap: 판 저장 "N초마다 저장(실시간·방치형)"(33장 5-7).
 
@@ -711,7 +711,7 @@ foreach (var pair in GBibleRuntime.Game.Data().Run.farm.crops)
 public BigNumber cookies;                                                   // 큰 수: 연산자는 평소처럼
 public Dictionary<string, int> buildings = new Dictionary<string, int>();   // 건물 원본 ID → 가진 수
 
-[Serializable] public class BuildingData { public double cps; public string price; }   // 원본: 초당 생산 · 가격 곡선(밸런스 값 ID)
+[Serializable] public class BuildingData { public double cps; public string price; }   // 원본: 초당 생산 · 가격 곡선(밸런싱 값 ID)
 
 public static class Bakery
 {
@@ -789,7 +789,7 @@ koreanLabel.text = $"{run.cookies:ko}개";                    // "1.23억개"
 - 꺼 둔 동안의 생산은 켤 때 첫 정산 행동이 `Game.Now - profile.lastSeen`으로 계산한다(07장 2.11).
 - DB 조건으로 "쿠키 1조 개를 모았다" 같은 도전과제를 만들려면 규칙이 자릿수 필드를 함께 둔다(`run.cookieDigits = run.cookies.IsZero ? 0 : (int)Math.Floor(run.cookies.Log10()) + 1`, 1조 = 13자리). 쿠키를 바꾸는 곳을 규칙 함수 하나로 모으고 거기서 함께 고친다. DB의 숫자 비교는 그 `int` 필드를 본다.
 
-**가격이 1e308을 넘을 때** — 밸런스 값은 double이라 `BalanceSum`이 무한대가 되면 `BigNumber`로 담을 수 없다(2-7). 그만큼 오르는 곡선이면 같은 식을 큰 수로 계산한다. 기준·비율은 그대로 밸런스 값에서 읽는다.
+**가격이 1e308을 넘을 때** — 밸런싱 값은 double이라 `BalanceSum`이 무한대가 되면 `BigNumber`로 담을 수 없다(2-7). 그만큼 오르는 곡선이면 같은 식을 큰 수로 계산한다. 기준·비율은 그대로 밸런싱 값에서 읽는다.
 
 ```csharp
 // 단계 n의 가격 = 기준 × 비율^n

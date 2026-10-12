@@ -58,14 +58,14 @@ namespace GBible
         }
     }
 
-    // 시스템이 스스로 실행하는 행동(예약·상태 효과 주기·패시브 주기·선택 효과·개발자 편집)에 붙인다.
+    // 시스템이 스스로 실행하는 행동(예약·상태 효과 주기·패시브 효과 주기·선택 효과·개발자 편집)에 붙인다.
     // 멀티플레이 서버는 클라이언트가 보낸 이 행동을 실행하지 않는다(플레이어 입력이 아니다).
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public sealed class SystemActionAttribute : Attribute
     {
     }
 
-    // 게임 시각이 되어 시스템이 실행하는 행동(상태 효과 주기·만료, 시간 예약, 패시브 주기).
+    // 게임 시각이 되어 시스템이 실행하는 행동(상태 효과 주기·만료, 시간 예약, 패시브 효과 주기).
     // 행동 방식 Undo가 이것만 되돌리면 시각이 이미 지난 값이 돌아와 다음 프레임에 그대로 다시 실행된다 → 앞의 행동과 함께 되돌린다(GameSession.Undo).
     internal interface ITimeRuleAction
     {

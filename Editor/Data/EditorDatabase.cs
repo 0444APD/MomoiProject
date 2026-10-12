@@ -568,7 +568,7 @@ namespace GBible.EditorTools
                 AssetDatabase.SaveAssetIfDirty(data);
                 _all = null;
             }
-            // 예전 저장 형식(로그의 반영 규칙 한 줄, 도전과제의 조건·보상, 능력의 대상·효과)을 트리거·결과로 옮긴다.
+            // 예전 저장 형식(로그의 반영 규칙 한 줄, 도전과제의 조건·보상, 액티브 효과의 대상·효과)을 트리거·결과로 옮긴다.
             foreach (var data in Committed.OfType<ILegacyData>().ToList())
             {
                 if (!data.MigrateLegacy()) continue;

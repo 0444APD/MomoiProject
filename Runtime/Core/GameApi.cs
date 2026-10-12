@@ -42,7 +42,7 @@ namespace GBible
         public ActionRecord Do(GameAction action) => Session.Do(action);
 
         // 쓰기 직전에 의도 '사용'(UseIntent)을 거친다 — 가로채기가 횟수를 바꾸거나(두 번 발동) 막는다.
-        // 능력(DB › 능력)을 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열).
+        // 액티브 효과(DB › 액티브 효과)를 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열).
         public ActionRecord Use(string ability, object user, params object[] targets) =>
             Session.Do(new UseAbility
             {
@@ -65,7 +65,7 @@ namespace GBible
             return action.used;
         }
 
-        // 지금 쓸 수 있는지(능력·사용 아이템의 트리거 = 사용 조건만 본다. 아무것도 바꾸지 않는다). 버튼을 미리 흐리게 할 때.
+        // 지금 쓸 수 있는지(액티브 효과·사용 아이템의 트리거 = 사용 조건만 본다. 아무것도 바꾸지 않는다). 버튼을 미리 흐리게 할 때.
         //   if (!Game.CanUse("ability.heal", hero, out var why)) button.tooltip = why;
         public bool CanUse(string ability, object user, params object[] targets) => CanUse(ability, user, targets, out _);
 
@@ -77,7 +77,7 @@ namespace GBible
             var definition = Session.Abilities.Get(ability);
             if (definition == null)
             {
-                reason = $"'{ability}'은(는) 쓸 수 있는 능력·아이템이 아닙니다.";
+                reason = $"'{ability}'은(는) 쓸 수 있는 액티브 효과·아이템이 아닙니다.";
                 return false;
             }
             var who = user is string userId ? Find(userId) : user;
@@ -225,8 +225,8 @@ namespace GBible
         public T Get<T>(string key) => Session.Data.Get<T>(key);
         public void Set(string key, object value) => Session.Data.Set(key, value);
 
-        // ── 능력치·Modifier ─────────────────────────────────────
-        // 능력치 = id가 있는 객체의 숫자 필드. 최종값 = (기본 + 플랫 합) × (1 + 퍼센트 합) × Π(1 + 독립 곱).
+        // ── 스탯·Modifier ─────────────────────────────────────
+        // 스탯 = id가 있는 객체의 숫자 필드. 최종값 = (기본 + 플랫 합) × (1 + 퍼센트 합) × Π(1 + 독립 곱).
         //   var attack = Game.Attribute(hero, nameof(Hero.attack));
         public double Attribute(object entity, string attribute) => Session.Attributes.Get(entity, attribute);
 
@@ -261,9 +261,9 @@ namespace GBible
         public int StatusCount(object target, StatusKind kind) => Session.Statuses.CountOfKind(target, kind);
         public int RemoveStatuses(object target, StatusKind kind) => Session.Statuses.RemoveKind(target, kind);
 
-        // 빌려 쓰기: 지금 순간으로 그 패시브를 원본(lender)의 것으로 한 번 더 낸다(Blueprint를 코드로). 결과 '빌려 쓰기'와 같다.
+        // 빌려 쓰기: 지금 순간으로 그 패시브 효과를 원본(lender)의 것으로 한 번 더 낸다(Blueprint를 코드로). 결과 '빌려 쓰기'와 같다.
         public bool BorrowPassive(string passiveId, object lender) => Session.Passives.Borrow(passiveId, lender, Session.Triggers.Current);
-        // 패시브(DB › 패시브)를 몇 개 가졌나(레벨). holder를 비우면 모든 가진 쪽의 합. 놓인 것마다 패시브면 holder = 그 요소(그 요소의 레벨).
+        // 패시브 효과(DB › 패시브 효과)를 몇 개 가졌나(레벨). holder를 비우면 모든 가진 쪽의 합. 놓인 것마다 패시브 효과면 holder = 그 요소(그 요소의 레벨).
         public int Owned(string passiveId, object holder = null) => Session.Passives.Owned(passiveId, holder);
 
         // ── 예약 ───────────────────────────────────────────────
@@ -286,8 +286,8 @@ namespace GBible
         public GameFailure Fail(string key, params (string name, object value)[] args) => new GameFailure(key, TextArgs.From(args));
         public GameFailure Fail(string key, string fallback, params (string name, object value)[] args) => new GameFailure(key, TextArgs.From(args), fallback);
 
-        // ── 밸런스 값·가중치 표 ─────────────────────────────────
-        // 이름 붙은 숫자(DB › 밸런스 값). x를 주면 곡선으로 그 단계의 값.
+        // ── 밸런싱 값·가중치 표 ─────────────────────────────────
+        // 이름 붙은 숫자(DB › 밸런싱 값). x를 주면 곡선으로 그 단계의 값.
         //   var energy = Game.Balance(GameIds.Balance.StartEnergy);     var hp = Game.Balance(GameIds.Balance.EnemyHp, floor);
         public double Balance(string id) => Session.Balance.Get(id);
         public double Balance(string id, double x) => Session.Balance.Get(id, x);
@@ -664,7 +664,7 @@ namespace GBible
 
         protected abstract bool Check();
 
-        // 안에서 같은 조건이 다시 검사돼도(조건이 읽는 능력치의 보정 조건이 이 조건 — 패시브 modifierWhen) 끝나면 바깥 검사로 돌아간다.
+        // 안에서 같은 조건이 다시 검사돼도(조건이 읽는 스탯의 보정 조건이 이 조건 — 패시브 효과 modifierWhen) 끝나면 바깥 검사로 돌아간다.
         public override bool Evaluate(GameSession session)
         {
             var previous = _game;

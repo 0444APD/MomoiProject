@@ -41,9 +41,9 @@
 
 | 종류 | 예 | 고정 값 | 판마다 바뀌는 값 | 하는 일 |
 |---|---|---|---|---|
-| 계약자 | 플레임 퀸·바람의 척후·조수의 사제·방패병 | 이름·등급(3·4·5성)·진영·역할·기본 수치·스킬 3개(기본·스킬·궁극기)·패시브 1~2개·그림 | 레벨·경험치·돌파 단계·남은 돌파 재료·장비 4칸 | 전투에서 저절로 스킬, 패시브는 지니면 발동 |
-| 몬스터 | 슬라임·화염 골렘·보스 바다뱀 | 이름·진영·기본 수치·스킬·패시브 | (전투 중 체력·게이지) | 저절로 행동 |
-| 장비 | 불꽃 검·바람 망토 | 이름·칸(무기·갑옷·장신구·유물)·등급·주 능력치·세트 | 강화 단계(0~10), 누가 꼈나 | 끼면 능력치 + 세트 효과 |
+| 계약자 | 플레임 퀸·바람의 척후·조수의 사제·방패병 | 이름·등급(3·4·5성)·진영·역할·기본 수치·스킬 3개(기본·스킬·궁극기)·패시브 효과 1~2개·그림 | 레벨·경험치·돌파 단계·남은 돌파 재료·장비 4칸 | 전투에서 저절로 스킬, 패시브 효과는 지니면 발동 |
+| 몬스터 | 슬라임·화염 골렘·보스 바다뱀 | 이름·진영·기본 수치·스킬·패시브 효과 | (전투 중 체력·게이지) | 저절로 행동 |
+| 장비 | 불꽃 검·바람 망토 | 이름·칸(무기·갑옷·장신구·유물)·등급·주 스탯·세트 | 강화 단계(0~10), 누가 꼈나 | 끼면 스탯 + 세트 효과 |
 | 장비 세트 | 화염 세트·질풍 세트 | 2개 효과·4개 효과 | — | 같은 세트를 2·4개 끼면 |
 | 스테이지 | 1-1 … 5-10 | 장·순서·스태미나 비용·적 웨이브·드롭 표·첫 클리어 보상·별 조건 3개 | 별 기록 | 전투 |
 | 뽑기 배너 | 상시·픽업(플레임 퀸) | 픽업 대상·확률 표·비용 | — | 뽑기 |
@@ -89,18 +89,18 @@
 
 - 언제: [x] 즉시 · [x] 발동(맞으면·쓰러지면·치명타·궁극기를 쓰면·자기 차례가 끝나면·전투 시작) · [ ] 지연 · [x] 지속(N차례 동안 버프·디버프, 중첩)
 - 누구에게: [x] 자신 · [ ] 플레이어가 고른 대상(자동이라 없음) · [x] 무작위 · [x] 전체 · [x] 조건으로 거른 대상(체력이 가장 낮은 아군, 맨 앞 적)
-- 무엇을: [x] 숫자 바꾸기 · [x] 능력치 보정 · [ ] 만들기·없애기·바꾸기 · [x] 다른 효과 고치기(도발·부활·피해 감소) · [x] 효과 도중 고르기(5성 선택권) · [ ] 비용 바꾸기
+- 무엇을: [x] 숫자 바꾸기 · [x] 스탯 보정 · [ ] 만들기·없애기·바꾸기 · [x] 다른 효과 고치기(도발·부활·피해 감소) · [x] 효과 도중 고르기(5성 선택권) · [ ] 비용 바꾸기
 - 이상한 효과(셋보다 많다):
   1. 천장: 5성이 89번 안 나오면 90번째는 반드시 5성. 픽업 배너에서 5성이 픽업이 아니면(50%) 다음 5성은 픽업 확정. 4성 이상은 10번마다 확정.
   2. 중복 계약자는 그 계약자의 돌파 재료로 바뀐다. 돌파가 6단계까지 찼으면 별빛(화폐)으로.
   3. 속도 기반 턴 순서: 속도가 높을수록 게이지가 빨리 찬다. "아군 전체 게이지 +30%", "적 하나 게이지 −20%", "속도 +20% 2차례".
   4. 진영 상성: 불 > 바람 > 물 > 불. 유리하면 주는 피해 +30%, 맞는 쪽 회피 −15%.
   5. 궁극기 에너지: 행동하면 +20, 맞으면 +10, 적을 쓰러뜨리면 +20. 100이 되면 다음 자기 차례에 궁극기를 저절로.
-  6. 끼어들기(바람의 척후 패시브): 아군이 맞아 체력이 30% 아래로 떨어지면 그 차례가 끝난 직후 끼어들어 때린 적을 반격(전투당 1번).
+  6. 끼어들기(바람의 척후 패시브 효과): 아군이 맞아 체력이 30% 아래로 떨어지면 그 차례가 끝난 직후 끼어들어 때린 적을 반격(전투당 1번).
   7. 장비 세트: 화염 2세트 = 공격력 +18%, 4세트 = 궁극기를 쓴 뒤 속도 +20% 1차례.
   8. 도발(방패병 스킬): 2차례 동안 적의 단일 공격은 도발을 건 쪽을 노린다.
-  9. 부활(사제 패시브): 전투당 한 번, 쓰러질 때 체력 30%로 일어난다.
-  10. 치명타를 내면 게이지 +10%(척후 패시브).
+  9. 부활(사제 패시브 효과): 전투당 한 번, 쓰러질 때 체력 30%로 일어난다.
+  10. 치명타를 내면 게이지 +10%(척후 패시브 효과).
 - [선택] 고리: (비움)
 
 ### 5. 문법에 안 맞는 기믹
@@ -123,7 +123,7 @@
 - 레벨 1~60, 다음 레벨까지 경험치 = 100 × 레벨^1.6. 기본 수치는 레벨마다 ×1.04.
 - 돌파 단계마다 모든 수치 +5%.
 - 적 수치는 스테이지 레벨마다 ×1.06.
-- 장비 주 능력치는 강화 단계마다 +10%(원래 값 기준), 강화 비용 ×1.3/단계.
+- 장비 주 스탯은 강화 단계마다 +10%(원래 값 기준), 강화 비용 ×1.3/단계.
 - 뽑기: 5성 0.6%, 4성 5.1%, 3성 94.3%. 천장 90(5성)·10(4성 이상). 픽업 5성 50%, 픽업 4성(3명) 50%.
 - 드롭: 스테이지마다 표(경험치 책·강화석·장비), 일일 상자 표.
 - 풀이 바뀌나: 픽업 배너가 현실 날짜로 바뀜, 상시 표는 업데이트로 계약자가 늘어남.
@@ -147,7 +147,7 @@
 
 ### 11. 기획자가 직접 하고 싶은 것
 
-- 계약자·몬스터·장비·스테이지·임무의 수치와 스킬·패시브 조합은 DB. 새로운 종류의 효과만 코드.
+- 계약자·몬스터·장비·스테이지·임무의 수치와 스킬·패시브 효과 조합은 DB. 새로운 종류의 효과만 코드.
 
 ---
 
@@ -209,7 +209,7 @@
 
 - **`run`(RunState, Session)**: `scene`(""=타이틀 · "Lobby" · "Battle"), `battle`(로비면 `null`): `Battle { stage, wave, turns, allies, enemies, extraTurns(List<string>), result, stars, rewards }`.
 - **`profile`(Profile, Meta)**: `gems`·`gold`·`starlight` · `stamina { value, at(DateTime UTC) }` · `materials`(Dictionary<string, int>) · `characters`(List<OwnedCharacter { id, character, level, exp, ascension, shards, gear(List<string> 4칸) }>) · `gear`(List<OwnedGear { id, gear, level, equippedBy }>) · `gacha { pickup, standard }`(PityState { count5, count4, guaranteed }) · `stages`(List<StageRecord { stage, stars }>) · `party`(List<string> 5칸) · `daily { day, claimed(List<string>), boxClaimed, staminaBuys }` · `clock { lastSeenUtc }`(시계 되감김 확인).
-- **유닛**: `BattleUnit { id, side, slot, source, owned, level, hp, maxHp, attack, defense, speed, critRate, critDamage, evasion, element, gauge, energy, maxEnergy, cooldown }`. 숫자 필드가 곧 능력치(28장 4-1). 전투 시작 때 프로필의 계약자에서 계산해 넣고(`Rules.BuildUnit`: 원본 × 레벨 곡선 × 돌파 + 장비), 전투 중 버프는 이 객체에 Modifier.
+- **유닛**: `BattleUnit { id, side, slot, source, owned, level, hp, maxHp, attack, defense, speed, critRate, critDamage, evasion, element, gauge, energy, maxEnergy, cooldown }`. 숫자 필드가 곧 스탯(28장 4-1). 전투 시작 때 프로필의 계약자에서 계산해 넣고(`Rules.BuildUnit`: 원본 × 레벨 곡선 × 돌파 + 장비), 전투 중 버프는 이 객체에 Modifier.
 - **id**: 계약자 `Game.NewId("char")`, 장비 `gear`, 전투 유닛 `unit`(번호는 메타 구역, 03장).
 
 ### 3-2. 원본 종류
@@ -223,8 +223,8 @@
 | 스테이지 | `Stage { chapter, order, stamina, waves, dropTable, firstClear, requires }` + 별 조건 3칸(`[SerializeReference, TriggerSlot(Condition)] Trigger star1·star2·star3`) · 인스턴스 | `StageRecord` | — |
 | 배너 | `Banner { kind(pickup/standard), pickups, fiveTable, fourTable, threeTable, rotationOrder }` · 인스턴스 | (프로필 `gacha`) | — |
 | 재료·아이템 | `Material { kind }` · 인스턴스 | `materials`의 개수 | 선택권만 `[SerializeReference] Usable usable`(16장 1-2) |
-| 스킬 | DB › 능력(16장) | — | — |
-| 패시브·버프·디버프·세트 효과 | DB › 상태 효과(29장). 패시브 = 전투 시작 때 거는 영구 상태 효과 | `$statuses` | — |
+| 스킬 | DB › 액티브 효과(16장) | — | — |
+| 패시브 효과·버프·디버프·세트 효과 | DB › 상태 효과(29장). 패시브 효과 = 전투 시작 때 거는 영구 상태 효과 | `$statuses` | — |
 | 일일 임무 | 고유 DB 종류 `DailyMissionData`(3-5) | `daily.claimed` | — |
 
 키워드: `Rarity`(r3·r4·r5) · `Element`(fire·wind·water) · `Role` · `GearSlot`.
@@ -241,7 +241,7 @@
 | 에너지 | `Rules.GainEnergy` | `EnergyIntent { targetId, amount, reason, cancelled }` | `EnergyGained` |
 | 대상 고르기 | `Rules.PickTargets(game, user, ability)` | `TargetIntent { sourceId, targetId, single, cancelled }` | — |
 | 차례 | `Rules.NextActor` · `Rules.TakeTurn` · `Rules.InsertExtraTurn` | `ExtraTurnIntent { unitId, reason, cancelled }` | `UnitTurnStarted`·`UnitTurnEnded { unitId, side, extra }` |
-| 스킬 사용 | `Game.Use(능력, 유닛, 대상…)`(16장 2-1) | — | `AbilityUsed`(라이브러리) |
+| 스킬 사용 | `Game.Use(액티브 효과, 유닛, 대상…)`(16장 2-1) | — | `AbilityUsed`(라이브러리) |
 | 비용 | `Game.Pay`(28장 2-4) · `Rules.PayStamina(game, n, now)` | `CostIntent`(라이브러리) | `StaminaSpent { amount }` |
 | 얻기 | `Rules.Grant(game, itemId, count, reason)` | `GainIntent { itemId, amount, reason, cancelled }` | `ItemGained` |
 | 계약자 얻기 | `Rules.GrantCharacter(game, characterId, reason)` | `GainIntent` | `CharacterObtained { characterId, isNew, shards, starlight }` |
@@ -257,7 +257,7 @@
 - 씬 흐름: `run` › `scene`, 빈 값 = `Title`. 행동이 필드만 바꾼다(32장 2-6).
 - 타이틀: '시작' → 판 저장이 있으면 `GBibleRuntime.LoadRun`(전투 중이었으면 전투로), 없으면 `EnterLobby`. 켤 때 `SyncRealTime`.
 - 로비 행동: `SyncRealTime { utcTicks, offsetMinutes }` · `Pull { banner, count, … }` · `LevelUp { character, book, count }` · `Ascend { character }` · `EquipGear { character, gear }` · `UnequipGear` · `EnhanceGear` · `SetParty { slot, character }` · `ClaimDailyMission { mission }` · `ClaimDailyBox` · `BuyStamina` · `UseItem { item }`(선택권 → 선택 대기) · `SweepStage { stage, times }`.
-- 전투 행동: `StartBattle { stage }`(스태미나 → 유닛 만들기 → 패시브·세트 상태 효과 걸기 → scene = Battle) → `AdvanceBattle` 되풀이(차례 하나, 웨이브 넘김, 끝이면 `EndBattle` → `BattleEnded`) → 결과 화면 '확인' `LeaveBattle`(battle = null, scene = Lobby). 포기 `RetreatBattle`.
+- 전투 행동: `StartBattle { stage }`(스태미나 → 유닛 만들기 → 패시브 효과·세트 상태 효과 걸기 → scene = Battle) → `AdvanceBattle` 되풀이(차례 하나, 웨이브 넘김, 끝이면 `EndBattle` → `BattleEnded`) → 결과 화면 '확인' `LeaveBattle`(battle = null, scene = Lobby). 포기 `RetreatBattle`.
 - 반복 단위의 이벤트: `UnitTurnEnded`가 상태 효과의 셀 이벤트(가진 쪽 필드 `unitId`).
 
 ### 3-5. 프로젝트 고유 기능
@@ -282,9 +282,9 @@
 
 Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 개수 딕셔너리, 마우스).
 
-### 3-9. 밸런스 값·가중치 표·로그·도전과제 이름
+### 3-9. 밸런싱 값·가중치 표·로그·도전과제 이름
 
-- 밸런스 값: `expToNext`(거듭제곱 100·1.6, 반올림) · `charStatGrowth`(비율로 ×1.04) · `ascensionBonus`(일정하게 +0.05, 시작 단계 0) · `enemyStatScale`(비율로 ×1.06) · `gearMainStatScale`(일정하게 +0.1, 시작 단계 0) · `gearEnhanceCost`(비율로 ×1.3) · `staminaMax`(120) · `staminaIntervalMinutes`(6) · `staminaBuyAmount`(60) · `staminaBuyCost`(표, 횟수마다) · `staminaBuyLimit`(6) · `defeatStaminaCost`(1) · `gacha.cost`(160) · `gacha.rate5`(표: (1, 0.006)·(89, 0.006)·(90, 1)) · `gacha.rate4`(0.051) · `gacha.pity4`(10) · `dupe.starlight.r5`·`r4`·`r3` · `element.advantageDamage`(0.3) · `element.advantageEvasion`(0.15) · `energy.perAction`(20)·`perHit`(10)·`perKill`(20) · `battle.turnLimit`(150) · `daily.resetHour`(4) · `daily.boxNeed`(5) · `banner.rotationDays`(14).
+- 밸런싱 값: `expToNext`(거듭제곱 100·1.6, 반올림) · `charStatGrowth`(비율로 ×1.04) · `ascensionBonus`(일정하게 +0.05, 시작 단계 0) · `enemyStatScale`(비율로 ×1.06) · `gearMainStatScale`(일정하게 +0.1, 시작 단계 0) · `gearEnhanceCost`(비율로 ×1.3) · `staminaMax`(120) · `staminaIntervalMinutes`(6) · `staminaBuyAmount`(60) · `staminaBuyCost`(표, 횟수마다) · `staminaBuyLimit`(6) · `defeatStaminaCost`(1) · `gacha.cost`(160) · `gacha.rate5`(표: (1, 0.006)·(89, 0.006)·(90, 1)) · `gacha.rate4`(0.051) · `gacha.pity4`(10) · `dupe.starlight.r5`·`r4`·`r3` · `element.advantageDamage`(0.3) · `element.advantageEvasion`(0.15) · `energy.perAction`(20)·`perHit`(10)·`perKill`(20) · `battle.turnLimit`(150) · `daily.resetHour`(4) · `daily.boxNeed`(5) · `banner.rotationDays`(14).
 - 가중치 표: `gacha.standard.five`·`.four`·`.three` · 배너마다 `gacha.pickup.<배너>.five`(픽업 1 + 안쪽 표 `gacha.standard.five` 1, 그 줄의 조건 = 보장이 아님)·`.four` · `drop.<스테이지>` · `daily.box` · `select.fiveStar`.
 - 로그: `pulls`·`wins`·`kills`(누적), `daily.battles`·`daily.pulls`·`daily.levelUps`·`daily.sweeps`·`daily.kills`·`daily.staminaSpent`(누적, 날마다 0).
 - 도전과제: `firstFiveStar`(이벤트 받기 `GachaPulled`, `rarity` = r5) · `pityHit`(`pityHit` 참) · `chapter3Clear` · `collect30`(플레이어 데이터 검사 `characters` 개수 30 이상) · `ascension6`.
@@ -296,7 +296,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 | 타이틀 | 바탕(씬 Title) | 시작 · 설정 · 종료 | 설정은 기본 |
 | 로비 | 바탕(씬 Lobby) | 재화 줄(스태미나 n/120 + 다음 회복까지, 보석·골드·별빛) · 메뉴 | — |
 | 계약자 목록 | 창 | 보유 목록(진영·등급 거르기, 레벨 정렬) | — |
-| 계약자 상세 | 창 | 최종 능력치 · 레벨·경험치 · 돌파 n/6·남은 재료 · 스킬·패시브 글 · 장비 4칸 → 레벨업·돌파·장비 칸 | — |
+| 계약자 상세 | 창 | 최종 스탯 · 레벨·경험치 · 돌파 n/6·남은 재료 · 스킬·패시브 효과 글 · 장비 4칸 → 레벨업·돌파·장비 칸 | — |
 | 장비 고르기 | 팝업 | 그 칸 장비 목록·세트 · 장착·해제·강화 | — |
 | 편성 | 창 | 5칸 + 보유 목록 · 진영 분포 | — |
 | 지도 | 창 | 장 탭 · 스테이지(별·잠김) | — |
@@ -324,21 +324,21 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 
 | # | 기믹·효과 | 언제 | 누구에게 | 무엇을 — 부품(장·절) | 시스템층에 있어야 할 것 | 판정 |
 |---|---|---|---|---|---|---|
-| 1 | 천장 90 · 4성 10 | 뽑기 한 번마다(행동 `Pull` 안, **한 번씩 도는 고리**) | — | 5성 확률 = 밸런스 값 `gacha.rate5`의 곡선 '표'(단계 = `count5 + 1`, 30장 2-2·5-3). 4성 = `count4 + 1 ≥ 10`이면 남은 몫 전부. → 코드 풀 `Game.Roll((gacha.pickup.X.five, p5), (….four, p4), (….three, 나머지), stream: "gacha.pickup")`(30장 4-4, 항목이 가중치 표면 그 표에서 다시 뽑음) → 횟수 갱신. `Game.Roll(표, 10)`은 열 번 사이에 횟수가 안 바뀌어 쓸 수 없다(30장 2-3: 조건은 뽑는 순간이고 한 `Roll` 안에서 상태가 그대로) | `Rules.PullOnce`, 프로필 `PityState`, 이벤트 `GachaPulled` | **B** |
+| 1 | 천장 90 · 4성 10 | 뽑기 한 번마다(행동 `Pull` 안, **한 번씩 도는 고리**) | — | 5성 확률 = 밸런싱 값 `gacha.rate5`의 곡선 '표'(단계 = `count5 + 1`, 30장 2-2·5-3). 4성 = `count4 + 1 ≥ 10`이면 남은 몫 전부. → 코드 풀 `Game.Roll((gacha.pickup.X.five, p5), (….four, p4), (….three, 나머지), stream: "gacha.pickup")`(30장 4-4, 항목이 가중치 표면 그 표에서 다시 뽑음) → 횟수 갱신. `Game.Roll(표, 10)`은 열 번 사이에 횟수가 안 바뀌어 쓸 수 없다(30장 2-3: 조건은 뽑는 순간이고 한 `Roll` 안에서 상태가 그대로) | `Rules.PullOnce`, 프로필 `PityState`, 이벤트 `GachaPulled` | **B** |
 | 2 | 50% 빗나가면 다음은 픽업 확정 | 5성이 나온 순간 | — | 표 `gacha.pickup.X.five`: 줄 픽업 계약자 무게 1 + 줄 안쪽 표 `gacha.standard.five` 무게 1, 그 줄의 조건 `플레이어 데이터 검사(profile: gacha.pickup.guaranteed 거짓)`(30장 3-2·5-6) → 보장이면 픽업 줄만 남아 100%. 뽑힌 뒤 `guaranteed = (픽업 아님)`은 1의 함수 | 1과 같음 | **B**(표·조건은 A) |
 | 3 | 중복 → 돌파 재료 → 6단계면 별빛 | 계약자를 얻는 모든 곳(뽑기·선택권·보상) | 그 계약자 | `Rules.GrantCharacter`: 없으면 새 `OwnedCharacter`(`Game.NewId("char")`), 있으면 (돌파 + 재료) < 6이면 `shards + 1`, 아니면 `starlight += Balance(dupe.starlight.<등급>)`. `GainIntent`(관례 4절) + `CharacterObtained`. 돌파 행동 `Ascend`는 계약자 객체의 `shards`를 직접 빼고 `Game.Fail`(→ 빈틈 7: `Game.Pay`가 목록 속 객체를 못 가리킴) | 얻기 동사 | **B** |
 | 4 | 행동 게이지 +30% (적 −20%) | 즉시(스킬 결과) | `AllAllies`·`사용자 자신`·`FrontEnemy` | 효과 Block `ShiftGauge { ratio }`(16장 2-5) → `Rules.ShiftGauge` → `GaugeIntent`. "게이지 감소 면역" = 상태 효과 트리거 '행동 직전 이벤트 받기'(GaugeIntent, 행동 직전 이벤트 조건 `ratio < 0`, 가진 쪽 필드 `targetId`) + 행동 직전 이벤트 고치기 '막기'(28장 3-3·3-4, 29장 3-1) | 턴 엔진(3-3), 게이지 행동 직전 이벤트·이벤트 | **C** (스킬 하나는 A) |
-| 5 | 속도 +20% 2차례 | 지속 | 사용자 자신 등 | 상태 효과 `speedUp`: 능력치 보정 `speed` 퍼센트 0.2(중첩당) · 지속 이벤트 횟수 2 · 셀 이벤트 `UnitTurnEnded` · 가진 쪽 필드 `unitId`(29장 3-1) + 효과 '상태 효과 걸기'(29장 3-2) | 턴 엔진이 최종 속도(`Game.Attribute`)를 매번 읽음 | **A** |
+| 5 | 속도 +20% 2차례 | 지속 | 사용자 자신 등 | 상태 효과 `speedUp`: 스탯 보정 `speed` 퍼센트 0.2(중첩당) · 지속 이벤트 횟수 2 · 셀 이벤트 `UnitTurnEnded` · 가진 쪽 필드 `unitId`(29장 3-1) + 효과 '상태 효과 걸기'(29장 3-2) | 턴 엔진이 최종 속도(`Game.Attribute`)를 매번 읽음 | **A** |
 | 6 | 진영 상성(피해 +30%, 회피 −15%) | 피해·명중 계산 | — | `Rules.Advantage(공격, 맞는 쪽)`(규칙 상수 불>바람>물>불) → `DamageIntent.advantage`, 배율 `Balance(element.advantageDamage)`(독립 곱 자리). `Rules.RollHit` → `HitIntent`, 회피 = `Game.Attribute(t, "evasion") − Balance(element.advantageEvasion)`, 난수 `Game.Random("battle.hit")`(07장 2.1). "유리할 때 피해 +10%" = 상태 효과 행동 직전 이벤트(DamageIntent, 행동 직전 이벤트 조건 `advantage 참`, 가진 쪽 필드 `sourceId`) + 행동 직전 이벤트 고치기 `amount ×1.1` | 피해·명중 행동 직전 이벤트의 `advantage`·`element` | **C** (상성 효과 하나는 A) |
 | 7 | 스태미나 6분마다 1(꺼 둔 동안에도), 최대 120 | 현실 시간 | — | 프로필 `stamina { value, at }`. `Rules.SettleStamina(game, now)`: n = ⌊(now − at) ÷ 6분⌋, value = min(120, value + n), at += n × 6분(120 이상이면 at = now). 내기 = 정산 → `Game.Pay(profile, "stamina.value", 비용, what: "stamina.name")`(28장 2-4). 보이기 = 화면이 같은 순수 함수 `Rules.StaminaAt(profile, 지금)`을 1초마다(UI Toolkit `schedule`). 켜 둔 동안은 화면 쪽 감시가 다음 회복 시각에 `SyncRealTime`(07장 4.4의 `BuffTicker` 방식) | 지금 시각이 들어올 길(빈틈 1), 회복형 자원(빈틈 4) | **D** (근사하면 B) |
 | 8 | 일일 임무 4시 초기화 + 5개면 상자 | 현지 4시 뒤 첫 행동 · 켜 둔 채 4시를 넘긴 순간 | — | `Rules.EnsureDay(game, now)`: day = (현지 시각 − 4시간)의 날짜 번호. 바뀌면 `daily.*` 로그를 `session.Stats.Set(id, 0)`(15장 2-4), `daily.claimed` 비움, 충전 횟수 0, `DayStarted`. 시각을 쓰는 모든 행동이 맨 앞에서 부른다(안 그러면 어제 진행으로 센다). 임무 = 고유 DB 종류(3-5). 상자 = `ClaimDailyBox`: 조건 `daily.claimed` 개수 5 이상 → 표 `daily.box` → 재료 개수라 `GrantRolledCounts`(빈틈 8) | 지금 시각, 날짜 번호(빈틈 2), 임무 종류(빈틈 3) | **D** (+C) |
 | 9 | 픽업 배너 2주 교체 | 현실 날짜 | — | `Rules.ActiveBanner(game, now) = rotation[⌊(day − 기준일) ÷ 14⌋ mod n]`. 뽑기 행동이 지금 배너인지 확인하고, 화면 '남은 기간'도 같은 함수 | 지금 시각 | **D** |
-| 10 | 궁극기 에너지 → 자동 시전 | 발동(행동·맞음·처치) → 다음 자기 차례 | 사용자 자신 | `Rules.GainEnergy` → `EnergyIntent` → `EnergyGained`. 자기 차례에 에너지 ≥ 최대면 `Game.Use(원본.ultimate, unit, 대상…)` 후 0. "처치하면 +20" = 패시브 상태 효과: 트리거 '이벤트 받기'(UnitDied), 가진 쪽 필드 `killerId` → 효과 `GainEnergy 20` | `Rules.ChooseAction` | **C** (궁극기 하나는 A) |
-| 11 | 끼어들기 반격(체력 30% 아래, 전투당 1번) | 발동(아군이 맞은 뒤) | 대상 Block `Attacker`(`Use.Context.Event`의 `sourceId` — 상태 효과의 결과도 컨텍스트를 넘긴다, 코드 확인 `Triggers.cs` `AbilityUse.Context`) | 패시브 상태 효과 `counterReady`(영구, 전투 시작에 건다): 트리거 '이벤트 받기'(UnitDamaged) AND 조건 `DamagedAllyBelow { ratio = 0.3 }`(`Context.User` = 가진 쪽, 11장 4-2) → 효과 `InsertExtraTurn { ability = counter }` + '상태 효과 풀기 counterReady'. 고리: 반격이 다른 아군의 끼어들기를 불러도 각자 1번이라 끝난다(사슬 한도 16) | 추가 차례 큐 `battle.extraTurns` | **C** (끼어들기 하나는 A) |
-| 12 | 장비 세트 2·4 | 지속 / 발동(궁극기 뒤) | 착용자 | `StartBattle`이 세트별 착용 수를 세어 `Game.ApplyStatus(unit, set.twoPiece)`(29장 4-1). 2세트 = 상태 효과 능력치 보정 `attack` 퍼센트 0.18. 4세트 = 상태 효과 트리거 '이벤트 받기'(능력 사용 `AbilityUsed`, 가진 쪽 필드 `User`) AND `AbilityIsUltimate` → '상태 효과 걸기 speedUp'(지속 1) | 전투 시작에 거는 규칙 | **C** (세트 하나는 A) |
+| 10 | 궁극기 에너지 → 자동 시전 | 발동(행동·맞음·처치) → 다음 자기 차례 | 사용자 자신 | `Rules.GainEnergy` → `EnergyIntent` → `EnergyGained`. 자기 차례에 에너지 ≥ 최대면 `Game.Use(원본.ultimate, unit, 대상…)` 후 0. "처치하면 +20" = 패시브 효과 상태 효과: 트리거 '이벤트 받기'(UnitDied), 가진 쪽 필드 `killerId` → 효과 `GainEnergy 20` | `Rules.ChooseAction` | **C** (궁극기 하나는 A) |
+| 11 | 끼어들기 반격(체력 30% 아래, 전투당 1번) | 발동(아군이 맞은 뒤) | 대상 Block `Attacker`(`Use.Context.Event`의 `sourceId` — 상태 효과의 결과도 컨텍스트를 넘긴다, 코드 확인 `Triggers.cs` `AbilityUse.Context`) | 패시브 효과 상태 효과 `counterReady`(영구, 전투 시작에 건다): 트리거 '이벤트 받기'(UnitDamaged) AND 조건 `DamagedAllyBelow { ratio = 0.3 }`(`Context.User` = 가진 쪽, 11장 4-2) → 효과 `InsertExtraTurn { ability = counter }` + '상태 효과 풀기 counterReady'. 고리: 반격이 다른 아군의 끼어들기를 불러도 각자 1번이라 끝난다(사슬 한도 16) | 추가 차례 큐 `battle.extraTurns` | **C** (끼어들기 하나는 A) |
+| 12 | 장비 세트 2·4 | 지속 / 발동(궁극기 뒤) | 착용자 | `StartBattle`이 세트별 착용 수를 세어 `Game.ApplyStatus(unit, set.twoPiece)`(29장 4-1). 2세트 = 상태 효과 스탯 보정 `attack` 퍼센트 0.18. 4세트 = 상태 효과 트리거 '이벤트 받기'(액티브 효과 사용 `AbilityUsed`, 가진 쪽 필드 `User`) AND `AbilityIsUltimate` → '상태 효과 걸기 speedUp'(지속 1) | 전투 시작에 거는 규칙 | **C** (세트 하나는 A) |
 | 13 | 도발 2차례 | 지속 | 도발을 건 쪽 | `Rules.PickTargets` → `TargetIntent`. 상태 효과 `taunt`: 트리거 '행동 직전 이벤트 받기'(TargetIntent, 행동 직전 이벤트 조건 `single 참`) AND `SourceIsEnemyOfHolder` → 행동 직전 이벤트 `targetId`를 **가진 쪽 id로** 바꿔야 하는데 '행동 직전 이벤트 고치기'의 값은 고정 글자뿐(빈틈 6, 코드 확인 `Intercepts.cs` `ModifyIntentOutcome`) → 결과 Block `RedirectToHolder` | 대상 고르기 행동 직전 이벤트 | **C** (도발 하나는 B → 빈틈 6이 메워지면 A) |
 | 14 | 부활(전투당 1번, 체력 30%) | 발동(쓰러지기 직전) | 가진 쪽 | 상태 효과 `revive`(영구): 트리거 '행동 직전 이벤트 받기'(DeathIntent), 가진 쪽 필드 `targetId` → 행동 직전 이벤트 고치기 '막기' + 효과 `HealPercent 0.3`(사용자 자신) + '상태 효과 풀기 revive' | 죽음 행동 직전 이벤트 | **A** |
-| 15 | 치명타면 게이지 +10% | 발동 | 사용자 자신 | 패시브 상태 효과: 트리거 '이벤트 받기'(UnitDamaged, 필드 검사 `isCrit 참`), 가진 쪽 필드 `sourceId` → 효과 `ShiftGauge 0.1` | 피해 이벤트의 `isCrit`·`sourceId` | **A** |
+| 15 | 치명타면 게이지 +10% | 발동 | 사용자 자신 | 패시브 효과 상태 효과: 트리거 '이벤트 받기'(UnitDamaged, 필드 검사 `isCrit 참`), 가진 쪽 필드 `sourceId` → 효과 `ShiftGauge 0.1` | 피해 이벤트의 `isCrit`·`sourceId` | **A** |
 | 16 | 소탕 ×1·×10 | 즉시 | — | `SweepStage { stage, times }`: 별 3 확인 → `Rules.PayStamina(비용 × times)` → times번 `Game.Roll(stage.dropTable, 1)`(표 흐름 `table:<ID>`) → `Rules.Grant` | 얻기 동사 | **B** |
 | 17 | 5성 선택권 | 즉시(쓰기) | — | 재료 `Material.usable` → 결과 '가중치 표에서 고르기'(표 `select.fiveStar`, `key` 비움, 고른 뒤 결과 = `GrantPickedCharacters`, 30장 3-3·5-5) → 기본 고르기 창. 선택권 개수(딕셔너리)를 빼는 것은 '비용 내기'로 안 돼 행동 `UseItem`이 직접(빈틈 7) | 얻기 동사 | **B** |
 | 18 | 스태미나 충전 하루 6번 | 즉시 | — | `BuyStamina`: `EnsureDay` → `daily.staminaBuys < 6` → `Game.Pay(profile, "gems", Balance(staminaBuyCost, 횟수 + 1), what: "gems.name")` → `stamina.value += 60`(상한을 넘어도 됨). `GameScreens.Confirm` | 지금 시각 | **B** (+D 공유) |
@@ -404,7 +404,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 - 지금 우회: '프로필도 행동마다 저장' 켬(두 파일 사이의 아주 짧은 틈은 남는다).
 
 **6. '행동 직전 이벤트 고치기'의 값이 고정 글자다 (코드 확인)**
-- 무엇: `ModifyIntentOutcome.value`는 `TryParse`한 고정 값뿐이라 "targetId = 가진 쪽 id"(도발·대신 맞기), "amount × (1 − 0.05 × 중첩)", "밸런스 값만큼"을 DB로 쓸 수 없다. 전투 유닛 id는 실행 중에 생겨(`unit37`) 글자로 적을 수도 없다.
+- 무엇: `ModifyIntentOutcome.value`는 `TryParse`한 고정 값뿐이라 "targetId = 가진 쪽 id"(도발·대신 맞기), "amount × (1 − 0.05 × 중첩)", "밸런싱 값만큼"을 DB로 쓸 수 없다. 전투 유닛 id는 실행 중에 생겨(`unit37`) 글자로 적을 수도 없다.
 - 왜: 도발·대신 맞기·중첩 비례 감소는 RPG·전술·카드에 흔하다. PlanningSpecGuide 7절·참조 2-2는 DB로 된다고 적었다(문서 오류 1).
 - 제안: 값 칸에 `{user}`(가진 쪽·사용자 id) · `{owner}` · `{stacks}`(중첩) · `{balance:ID}`를 허용(결과를 등록할 때 한 번 나눔). 같은 규칙을 '이벤트 쏘기'의 값·'플레이어 데이터에 주기'의 양에도.
 - 3요소: ① DB만 ② 해당 없음 ③ 없음.
@@ -426,13 +426,13 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 **9. 뽑기 천장(횟수에 따른 확률 상승·확정)을 표만으로 못 쓴다**
 - 무엇: 줄 무게가 고정 숫자다. "N번째부터 확률 상승·확정"은 밸런스 곡선 + 코드 풀로 짠다. `session.Tables.Chances`는 코드 풀·곡선을 모른다(30장 2-3).
 - 다른 장르: 로그라이크의 희귀 보상 보정(안 나올수록 희귀 확률이 오름), 드롭 보정.
-- 제안: 가중치 표 줄에 '무게를 밸런스 값에서'(`weightBalance` + 단계 = 플레이어 데이터의 숫자 경로) → 확률 상승·확정을 DB로. `Chances(풀)` 코드 풀 오버로드(안쪽 표를 곱해 펼침). 횟수 갱신은 그대로 코드(B).
+- 제안: 가중치 표 줄에 '무게를 밸런싱 값에서'(`weightBalance` + 단계 = 플레이어 데이터의 숫자 경로) → 확률 상승·확정을 DB로. `Chances(풀)` 코드 풀 오버로드(안쪽 표를 곱해 펼침). 횟수 갱신은 그대로 코드(B).
 - 3요소: 모두 해당 없음.
 
-**10. 계산된 기본값을 능력치로 쓸 길이 없다 (코드 확인)**
-- 무엇: 능력치 = 객체의 숫자 필드(28장 4-1). 계약자의 공격력은 원본 × 레벨 곡선 × 돌파라 필드가 없다. 영구 Modifier(장비)를 계약자에 붙이면 `AttributeSystem.Add`가 대상을 찾은 뒤 그 숫자 필드를 검사해 예외를 낸다 → 덧없는 필드를 두거나(값이 낡는다), 장비 합산을 `AttributeSystem.Apply`로 따로 계산한다.
+**10. 계산된 기본값을 스탯으로 쓸 길이 없다 (코드 확인)**
+- 무엇: 스탯 = 객체의 숫자 필드(28장 4-1). 계약자의 공격력은 원본 × 레벨 곡선 × 돌파라 필드가 없다. 영구 Modifier(장비)를 계약자에 붙이면 `AttributeSystem.Add`가 대상을 찾은 뒤 그 숫자 필드를 검사해 예외를 낸다 → 덧없는 필드를 두거나(값이 낡는다), 장비 합산을 `AttributeSystem.Apply`로 따로 계산한다.
 - 다른 장르: 레벨제 RPG 전부, 로그라이트 영구 강화.
-- 제안(이름 가안): 클래스에 붙이는 `[Attributes("attack", "defense", …)]`(계산형 능력치 이름 선언) + `Game.Attribute(entity, name, baseValue)` 오버로드. 28장에 "원본 × 레벨 곡선" 예.
+- 제안(이름 가안): 클래스에 붙이는 `[Attributes("attack", "defense", …)]`(계산형 스탯 이름 선언) + `Game.Attribute(entity, name, baseValue)` 오버로드. 28장에 "원본 × 레벨 곡선" 예.
 - 3요소: ① 어트리뷰트 ② 해당 없음 ③ 시작 때 한 번 모은다.
 
 **11. 메타 중심 게임의 난수 상태가 저장되지 않는다**
@@ -471,7 +471,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 | 8 | 매뉴얼 06장 2.2 · 가이드 10장 2절 | 판 '행동마다' + 프로필 '끌 때' 조합이 강제 종료에서 어긋난다는 주의가 없다(빈틈 5) | 주의 한 줄 |
 | 9 | 가이드 10장 2절 | "난수 상태도 함께 저장되므로 껐다 켜서 결과를 다시 뽑을 수 없다" — 판 밖(로비) 뽑기에는 맞지 않는다(07장 3절 표) | "판 밖 뽑기는 프로필도 행동마다 저장으로 막는다(빈틈 11)" |
 | 10 | `PlanningSpec.md` 1절 · `PlanningSpecGuide.md` 2절 | 양식이 '한 판'을 전제한다. 판 밖에서 하는 일(뽑기·성장·편성·소탕)을 적을 칸이 없어 기획자가 "판 없음"이라고 쓴다 | 양식에 "1-2. 판 밖에서 하는 일(로비·메타)", 가이드 2절에 "판 밖 행동 → 프로필을 바꾸는 행동 목록, 판이 약하면 판 = 한 전투" |
-| 11 | `PlanningSpecGuide.md` 2절 '2-2 지니면 발동' · 3절 기본 동사 | 유닛의 패시브는 "전투 시작에 거는 영구 상태 효과(가진 쪽 필드)"가 고유 DB 종류보다 가볍다는 말이 없다. 자동 전투·전술의 '대상 고르기'·'차례(게이지)' 동사가 기본 동사에 없다 | 두 줄 더함 |
+| 11 | `PlanningSpecGuide.md` 2절 '2-2 지니면 발동' · 3절 기본 동사 | 유닛의 패시브 효과는 "전투 시작에 거는 영구 상태 효과(가진 쪽 필드)"가 고유 DB 종류보다 가볍다는 말이 없다. 자동 전투·전술의 '대상 고르기'·'차례(게이지)' 동사가 기본 동사에 없다 | 두 줄 더함 |
 | 12 | 매뉴얼 28장 | 레벨 곡선으로 계산되는 기본값·영구 Modifier가 대상 객체의 필드 검사를 받는다는 점과 예가 없다(빈틈 10) | 5절 예 하나 |
 | 13 | `Reference.md` 2-3 '확률 공개' | `Chances`가 코드 풀·천장을 반영하지 않는다는 말이 없다(30장 2-3에만) | 한 줄 |
 
@@ -487,7 +487,7 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 
 **판단: 시스템층은 된다. 화면까지 하루는 빠듯하다(조건부).**
 
-- 시스템층이 되는 이유: 기믹 18개 중 문법 밖은 한 원인(현실 시각)뿐이고, 나머지는 있는 부품 — 상태 효과(가진 쪽 필드·이벤트 횟수 지속·행동 직전 이벤트 받기 트리거), 행동 직전 이벤트 + 행동 직전 이벤트, 능력, 가중치 표(조건 줄·안쪽 표·코드 풀), 밸런스 곡선(표·거듭제곱·비율), 고유 기능, 로그·도전과제, 설정·Steam — 으로 조립된다. 질문은 4개다. 직접 짜는 것은 장르 고유의 턴 게이지 엔진·뽑기 함수·성장 계산과, 빈틈을 메우는 코드(시각 필드·날짜 번호·회복형 자원·자동 진행·재료 비용)다.
+- 시스템층이 되는 이유: 기믹 18개 중 문법 밖은 한 원인(현실 시각)뿐이고, 나머지는 있는 부품 — 상태 효과(가진 쪽 필드·이벤트 횟수 지속·행동 직전 이벤트 받기 트리거), 행동 직전 이벤트 + 행동 직전 이벤트, 액티브 효과, 가중치 표(조건 줄·안쪽 표·코드 풀), 밸런스 곡선(표·거듭제곱·비율), 고유 기능, 로그·도전과제, 설정·Steam — 으로 조립된다. 질문은 4개다. 직접 짜는 것은 장르 고유의 턴 게이지 엔진·뽑기 함수·성장 계산과, 빈틈을 메우는 코드(시각 필드·날짜 번호·회복형 자원·자동 진행·재료 비용)다.
 - 화면이 빠듯한 이유: 이 장르의 화면은 목록이 중심인데 목록 칸마다 bind 코드를 쓴다(빈틈 13). 남은 시간 표시처럼 시각에 따라 바뀌는 칸을 직접 갱신한다(빈틈 4·13). 전투 HUD의 행동 순서 막대·궁극기·카드 공개 연출은 장르 고유다. 기본 화면(확인·고르기·설정·일시정지·알림)이 덜어 주는 것은 작은 창들뿐이다.
 - 하루 안으로 당기는 것: 빈틈 1·2·4(현실 시각·주기·회복형 자원), 12(자동 진행), 13(목록 칸 binding-path). 이 다섯이 들어가면 D 셋이 B 이하로 내려가고 화면 코드의 대부분이 UXML로 옮겨 간다.
 - 하루 안에 드러나지 않는 위험: 빈틈 5(저장 어긋남·id 겹침)는 시험 플레이에서 보이지 않고 출시 뒤 강제 종료에서 나타난다. 이 프로젝트는 '프로필도 행동마다 저장'으로 피하지만, 라이브러리에서 고치는 것이 맞다.
@@ -506,8 +506,8 @@ Steam 켬. 다이얼로그·인벤토리·입력 끔(대화 없음, 재료는 �
 | 6 행동 직전 이벤트 고치기 값 틀 | 구현: `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`(28장) |
 | 7 딕셔너리·목록 하나 가리키기 | 구현: 경로 `name[키]`(11·12·28장) |
 | 8 가중치 표에서 주기 → 딕셔너리 | 구현: 딕셔너리면 개수 +1(30장) |
-| 9 천장 | 구현: 줄 '무게를 밸런스 값에서'(30장). 보류: 코드 풀의 Chances |
-| 10 계산되는 기본 능력치 | 보류 |
+| 9 천장 | 구현: 줄 '무게를 밸런싱 값에서'(30장). 보류: 코드 풀의 Chances |
+| 10 계산되는 기본 스탯 | 보류 |
 | 11 메타 중심 게임의 난수 상태 | 문서: 로비 뽑기는 '프로필도 행동마다 저장'(가이드 10장). 보류: 프로필에 저장할 난수 흐름 |
 | 12 자동 진행 | 보류 |
 | 13 목록 칸 binding-path·남은 시간 | 구현(일부): `GameScreen.Tick`. 보류: 항목 기준 경로 |

@@ -41,7 +41,7 @@
   - 서버가 거절하면 `NetClient.ActionFailed`(예외가 아니다). Unity에서는 `GameScreens.ShowFailure`로 알림이 뜬다.
   - 받은 바뀐 곳은 **행동 밖 변경**으로 적용된다 → `Data.Changed`·`DataChanged`·화면 연결(binding-path)이 싱글과 똑같이 알림을 받는다.
   - 받은 이벤트는 **`SubscribeAfterAction`으로 받는 쪽에만** 온다(`EventBus.PublishRemote`). `Subscribe`·`SubscribeAll`(규칙 쪽)에는 오지 않는다 — 규칙은 서버에서 이미 돌았다.
-  - 하지 않는 것: Undo(경고만), 조건 판정(트리거·도전과제), 시간 규칙(상태 효과·패시브 주기·예약). 시계는 받은 묶음의 서버 시각으로 맞춘다.
+  - 하지 않는 것: Undo(경고만), 조건 판정(트리거·도전과제), 시간 규칙(상태 효과·패시브 효과 주기·예약). 시계는 받은 묶음의 서버 시각으로 맞춘다.
   - `Game.Preview`(미리보기)는 이쪽 데이터로 돈다(난수 시드가 서버와 달라 확률은 어긋날 수 있다).
   - 이벤트 안의 객체 필드는 **이쪽 데이터의 같은 객체**를 가리킨다(서버가 객체 번호로 보낸다). 이쪽이 받지 못한 데이터(숨긴 키)의 객체면 `null`.
 - **서버·방장**(`SessionRole.Server`)

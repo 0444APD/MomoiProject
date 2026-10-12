@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace GBible.Tests
 {
-    // 선택 요소(상태 효과·패시브·능력)의 DB 종류는 라이브러리에 없고 프로젝트가 템플릿(Documentation~/AI/Templates/Elements)에서 들인다.
+    // 선택 요소(상태 효과·패시브 효과·액티브 효과)의 DB 종류는 라이브러리에 없고 프로젝트가 템플릿(Documentation~/AI/Templates/Elements)에서 들인다.
     // 템플릿은 컴파일되지 않는 글이라, 이 폴더에 같은 글(네임스페이스만 GBible.Tests)을 두어 테스트가 컴파일한다 — 템플릿이 깨지면 여기서 잡힌다.
     public class ElementTemplateTests
     {

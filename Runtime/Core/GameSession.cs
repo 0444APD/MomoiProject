@@ -65,13 +65,13 @@ namespace GBible
         public GameClock Clock { get; }
         public RandomStreams Random { get; }
         public ActionDispatcher Actions { get; }
-        // 트리거 감시(로그·도전과제·능력 … 공용): 이벤트 받기·조건 충족·사용을 검사해 발동한다.
+        // 트리거 감시(로그·도전과제·액티브 효과 … 공용): 이벤트 받기·조건 충족·사용을 검사해 발동한다.
         public TriggerSystem Triggers { get; }
         public StatSystem Stats { get; }
         public AchievementSystem Achievements { get; }
-        // 능력(DB › 능력): 아이템 사용 효과·스킬 등. Game.Use로 쓴다.
+        // 액티브 효과(DB › 액티브 효과): 아이템 사용 효과·스킬 등. Game.Use로 쓴다.
         public AbilitySystem Abilities { get; }
-        // 능력치 Modifier(Game.Attribute·AddModifier의 저장소).
+        // 스탯 Modifier(Game.Attribute·AddModifier의 저장소).
         public AttributeSystem Attributes { get; }
         // 상태 효과(Game.ApplyStatus)와 예약(Game.ScheduleAfter·ScheduleOn).
         public StatusSystem Statuses { get; }
@@ -79,7 +79,7 @@ namespace GBible
         public ScheduleSystem Schedules { get; }
         // 선택 대기(Game.Ask·Answer).
         public ChoiceSystem Choices { get; }
-        // 밸런스 값(Game.Balance)·가중치 표(Game.Roll). 런타임이 DB로 채운다.
+        // 밸런싱 값(Game.Balance)·가중치 표(Game.Roll). 런타임이 DB로 채운다.
         public BalanceSystem Balance { get; }
         public WeightTableSystem Tables { get; }
         // 월드 상태(Game.World·SetWorld).
@@ -95,7 +95,7 @@ namespace GBible
         // 멀티플레이 역할(NetServer·NetClient가 정한다). Client면:
         //   · Do는 행동을 실행하지 않고 서버로 보낸다(결과는 서버가 보내는 바뀐 곳·이벤트로 온다).
         //   · Undo는 하지 않는다(멀티에서 되돌리기는 서버만 — 기믹·개발자 시험).
-        //   · 트리거·도전과제·시간 규칙(상태 효과·패시브 주기·예약)이 스스로 돌지 않는다. 미리보기(Game.Preview)는 이쪽 데이터로 돈다.
+        //   · 트리거·도전과제·시간 규칙(상태 효과·패시브 효과 주기·예약)이 스스로 돌지 않는다. 미리보기(Game.Preview)는 이쪽 데이터로 돈다.
         public SessionRole Role { get; internal set; }
         public bool IsClient => Role == SessionRole.Client;
         // Client일 때 Do가 행동을 넘기는 곳(NetClient가 정한다).
@@ -113,7 +113,7 @@ namespace GBible
         // 보상 등은 원본이 아니라 CopyInstance의 깊은 사본을 넣는다(비교 코드가 있으면 생성 코드로, 리플렉션 없음).
         public Func<string, object> Instances;
 
-        // DB 항목(GameData — 프로젝트 DB 종류·선택 요소·밸런스 값 …)을 ID로 찾는다(없으면 null). 런타임이 데이터베이스로 채운다.
+        // DB 항목(GameData — 프로젝트 DB 종류·선택 요소·밸런싱 값 …)을 ID로 찾는다(없으면 null). 런타임이 데이터베이스로 채운다.
         // 규칙이 DB 항목의 칸(적 편성의 칸·상태 효과에 프로젝트가 더한 칸 …)을 읽을 때 Game.Entry<T>(id). 테스트는 직접 넣는다.
         // 원본이라 읽기만 한다(판 데이터에는 ID만 둔다).
         public Func<string, object> Entries;
@@ -283,7 +283,7 @@ namespace GBible
             }
         }
 
-        // 행동 방식 Undo 한 번. 시간 규칙이 낸 행동(상태 효과 주기·만료, 시간 예약, 패시브 주기)만 되돌리면 시각이 이미 지난 값이
+        // 행동 방식 Undo 한 번. 시간 규칙이 낸 행동(상태 효과 주기·만료, 시간 예약, 패시브 효과 주기)만 되돌리면 시각이 이미 지난 값이
         // 돌아와 다음 프레임에 그대로 다시 실행된다(Undo가 막힌다). 그래서 그 앞의 행동까지 함께 되돌리고 시계도 그 행동이 시작한 때로
         // 돌린다 — 되돌린 사이의 시간 규칙은 시간이 다시 흐르면 다시 실행된다. floor(이력 번호) 이하는 되돌리지 않는다(UndoTo의 지점).
         bool UndoActions(long floor)
@@ -309,7 +309,7 @@ namespace GBible
             return undone;
         }
 
-        // 게임 시계를 되돌리거나 불러온 판의 시각으로 옮긴 뒤: 메모리에만 있는 시간 기준(패시브 주기의 지난 경계·조건 폴링 시각)을 새 시각에 맞춘다.
+        // 게임 시계를 되돌리거나 불러온 판의 시각으로 옮긴 뒤: 메모리에만 있는 시간 기준(패시브 효과 주기의 지난 경계·조건 폴링 시각)을 새 시각에 맞춘다.
         // 새 시각까지의 시간 규칙은 이미 돈 것으로 본다(되돌린 시각 뒤의 규칙은 시간이 다시 흐르면 다시 돈다). 맞추지 않으면 앞으로 크게 옮긴 뒤
         // 밀린 주기를 한꺼번에 내고(최대 8번), 뒤로 돌린 뒤에는 예전 시각까지 주기·폴링을 건너뛴다.
         void ClockMoved()
@@ -512,7 +512,7 @@ namespace GBible
             try { Statuses.Tick(); }
             catch (Exception e) { FrameEndFailed("상태 효과(주기·만료)", e); }
             try { Passives.Tick(); }
-            catch (Exception e) { FrameEndFailed("패시브 주기", e); }
+            catch (Exception e) { FrameEndFailed("패시브 효과 주기", e); }
             try { Schedules.Tick(); }
             catch (Exception e) { FrameEndFailed("시간 예약", e); }
             try { Ticked?.Invoke(step); }

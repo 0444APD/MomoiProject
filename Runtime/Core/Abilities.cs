@@ -4,9 +4,9 @@ using System.Linq;
 
 namespace GBible
 {
-    // 능력: 스킬·사용 아이템처럼 "쓰는 순간" 발동하는 것. 다른 기능과 같은 트리거·결과 두 칸으로 이루어진다(Triggers.cs).
+    // 액티브 효과: 스킬·사용 아이템처럼 "쓰는 순간" 발동하는 것. 다른 기능과 같은 트리거·결과 두 칸으로 이루어진다(Triggers.cs).
     //   트리거 = 사용(고정) + 원하면 AND로 사용 조건(조건 충족). 결과 = 대상에게 효과·플레이어 데이터에 주기·코딩한 결과.
-    // 기획자는 DB › 능력에서 Block을 조립하고 수치를 정하고, 프로그래머는 새 동작이 필요할 때만 Block 클래스를 하나 만든다.
+    // 기획자는 DB › 액티브 효과에서 Block을 조립하고 수치를 정하고, 프로그래머는 새 동작이 필요할 때만 Block 클래스를 하나 만든다.
     //   Game.Use("ability.splash", 사용자, 고른 대상들)
     //   → 트리거 검사(사용 조건이 거짓이면 실패) → 결과를 차례로(대상에게 효과: 대상 Block → 대상마다 효과 Block)
     //   → AbilityUsed 이벤트(로그·도전과제가 반응). 전체가 행동 하나라 Undo 한 번에 되돌아간다.
@@ -17,11 +17,11 @@ namespace GBible
     {
         [NonSerialized] AbilityUse _use;
 
-        // 지금 실행 중인 능력 사용(사용자·고른 대상·능력 ID).
+        // 지금 실행 중인 액티브 효과 사용(사용자·고른 대상·액티브 효과 ID).
         protected AbilityUse Use => _use;
         protected GameApi Game => _use?.Game;
 
-        // 안에서 같은 Block이 다시 돌아도(효과가 같은 능력을 다시 씀 — 반격·연쇄) 끝나면 바깥 사용으로 돌아간다.
+        // 안에서 같은 Block이 다시 돌아도(효과가 같은 액티브 효과를 다시 씀 — 반격·연쇄) 끝나면 바깥 사용으로 돌아간다.
         internal void Run(AbilityUse use, object target)
         {
             var previous = _use;
@@ -100,7 +100,7 @@ namespace GBible
 
     // 기본 대상: 사용자 자신(나에게 부여).
     [Serializable]
-    [BlockInfo("사용자 자신", Category = "대상", Description = "능력을 쓴 개체 자신을 대상으로 합니다(고른 대상은 버립니다).")]
+    [BlockInfo("사용자 자신", Category = "대상", Description = "액티브 효과를 쓴 개체 자신을 대상으로 합니다(고른 대상은 버립니다).")]
     public sealed class SelfTarget : TargetSelector
     {
         protected override IEnumerable<object> Select(IEnumerable<object> targets) =>
@@ -111,7 +111,7 @@ namespace GBible
     public sealed class AbilityUse
     {
         public GameApi Game;
-        // 능력에서 실행 중이면 그 능력(도전과제 등 다른 기능의 결과면 null).
+        // 액티브 효과에서 실행 중이면 그 액티브 효과(도전과제 등 다른 기능의 결과면 null).
         public AbilityDefinition Ability;
         public object User;
         public IReadOnlyList<object> Picked;
@@ -133,7 +133,7 @@ namespace GBible
         public readonly List<Effect> Effects = new List<Effect>();
     }
 
-    // 세션의 능력 목록. 정의를 복사해 두므로(Block 인스턴스가 세션마다 따로) 여러 세션이 동시에 돌아도 섞이지 않는다.
+    // 세션의 액티브 효과 목록. 정의를 복사해 두므로(Block 인스턴스가 세션마다 따로) 여러 세션이 동시에 돌아도 섞이지 않는다.
     public sealed class AbilitySystem
     {
         readonly Dictionary<string, AbilityDefinition> _definitions = new Dictionary<string, AbilityDefinition>(StringComparer.Ordinal);
@@ -141,7 +141,7 @@ namespace GBible
         public void Define(AbilityDefinition definition)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
-            if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[MomoiProject] 능력 ID가 비어 있습니다.");
+            if (string.IsNullOrEmpty(definition.Id)) throw new ArgumentException("[MomoiProject] 액티브 효과 ID가 비어 있습니다.");
             var copy = new AbilityDefinition
             {
                 Id = definition.Id,
@@ -149,7 +149,7 @@ namespace GBible
                 When = definition.When == null ? null : (Trigger)DataModel.Clone(definition.When, null),
                 FailText = definition.FailText,
             };
-            // 코드로 쓴 결과가 연결되어 있으면([BindTo]) 그것이 이 능력의 결과다(에디터에서 고른 결과 대신).
+            // 코드로 쓴 결과가 연결되어 있으면([BindTo]) 그것이 이 액티브 효과의 결과다(에디터에서 고른 결과 대신).
             if (BoundOutcomes.Has(definition.Id)) copy.Outcomes.AddRange(BoundOutcomes.Create(definition.Id));
             else copy.Outcomes.AddRange(definition.Outcomes.Where(o => o != null).Select(o => (Outcome)DataModel.Clone(o, null)));
             // 연결된 코드가 결과 전체다: 예전 짧은 형식(대상·효과)도 쓰지 않는다.
@@ -168,13 +168,13 @@ namespace GBible
     [Serializable, Intent("사용")]
     public sealed class UseIntent
     {
-        public string ability;   // 능력·사용 아이템 ID
+        public string ability;   // 액티브 효과·사용 아이템 ID
         public string userId;    // 사용자 id
         public int times = 1;    // 결과를 몇 번 내나(0이면 내지 않는다)
         public bool cancelled;   // 참이면 쓰지 않는다
     }
 
-    // 능력 사용 = 행동 하나(데이터: 능력 ID·사용자 id·대상 id들 → 서버 전송·리플레이 가능).
+    // 액티브 효과 사용 = 행동 하나(데이터: 액티브 효과 ID·사용자 id·대상 id들 → 서버 전송·리플레이 가능).
     [Serializable]
     public sealed class UseAbility : GameAction
     {
@@ -196,12 +196,12 @@ namespace GBible
         // 실제로 썼나(결과를 냈나). Game.TryUse가 읽는다.
         [NonSerialized] public bool used;
 
-        public override string Describe() => $"능력 사용: {ability}" + (string.IsNullOrEmpty(user) ? "" : $" ({user})");
+        public override string Describe() => $"액티브 효과 사용: {ability}" + (string.IsNullOrEmpty(user) ? "" : $" ({user})");
 
         protected override void Run()
         {
             var game = Game;
-            var definition = game.Session.Abilities.Get(ability) ?? throw new InvalidOperationException($"[MomoiProject] 능력 '{ability}'이(가) 없습니다.");
+            var definition = game.Session.Abilities.Get(ability) ?? throw new InvalidOperationException($"[MomoiProject] 액티브 효과 '{ability}'이(가) 없습니다.");
             var picked = (targets ?? new List<string>()).Select(game.Find).Where(t => t != null).ToList();
             var triggers = game.Session.Triggers;
             if (!triggers.CanUse(ability, definition.When, game.Find(user), picked, out var moment))
@@ -242,7 +242,7 @@ namespace GBible
         }
     }
 
-    [GameEvent("능력 사용")]
+    [GameEvent("액티브 효과 사용")]
     public sealed class AbilityUsed
     {
         public string Ability;

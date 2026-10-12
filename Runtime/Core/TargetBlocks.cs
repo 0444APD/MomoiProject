@@ -100,9 +100,9 @@ namespace GBible
         public override string Describe() => $"무작위 {count}개";
     }
 
-    // 앞의 대상을 숫자로 정렬해 앞에서 n개. 필드 이름 하나면 능력치(Modifier 포함), 경로면 그 값.
+    // 앞의 대상을 숫자로 정렬해 앞에서 n개. 필드 이름 하나면 스탯(Modifier 포함), 경로면 그 값.
     [Serializable]
-    [BlockInfo("정렬해서 n개", Category = "대상", Description = "앞의 대상을 숫자 필드로 정렬해 앞에서 n개를 남깁니다(0이면 모두). 예: hp 작은 것부터 1개 = 체력이 가장 낮은 적. 필드 이름 하나면 능력치(보정 포함)로 잽니다.")]
+    [BlockInfo("정렬해서 n개", Category = "대상", Description = "앞의 대상을 숫자 필드로 정렬해 앞에서 n개를 남깁니다(0이면 모두). 예: hp 작은 것부터 1개 = 체력이 가장 낮은 적. 필드 이름 하나면 스탯(보정 포함)으로 잽니다.")]
     public sealed class SortTarget : TargetSelector
     {
         [FieldLabel("숫자 필드")] public string path = "";

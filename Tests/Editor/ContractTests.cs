@@ -40,9 +40,9 @@ namespace GBible.Tests
         static IEnumerable<Type> AbilityBlockTypes() =>
             BlockTypes.AllConcreteTypes(typeof(Effect)).Concat(BlockTypes.AllConcreteTypes(typeof(TargetSelector)));
 
-        // 능력 Block(효과·대상): 에디터 메뉴에 나오고, 세션마다 복사되므로 직렬화돼야 한다.
+        // 액티브 효과 Block(효과·대상): 에디터 메뉴에 나오고, 세션마다 복사되므로 직렬화돼야 한다.
         [TestCaseSource(nameof(AbilityBlockTypes))]
-        public void 능력_블록_계약(Type type)
+        public void 액티브_효과_블록_계약(Type type)
         {
             Assert.IsTrue(type.IsDefined(typeof(SerializableAttribute), false), $"{type.Name}: [Serializable]이 필요합니다");
             Assert.IsNotNull(type.GetCustomAttribute<BlockInfoAttribute>(), $"{type.Name}: [BlockInfo]가 필요합니다(메뉴 이름)");
