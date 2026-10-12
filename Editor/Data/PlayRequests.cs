@@ -21,7 +21,7 @@ namespace GBible.EditorTools
     //     open <화면 ID> [값]     화면 열기 · close <화면 ID> · back(뒤로 = Esc)
     //     click <화면 ID>/<요소 이름>[@n]   요소 누르기(n번째 같은 이름 — 0부터). Button은 '제출', 그 밖은 클릭 이벤트
     //     speed <배속>            게임 속도
-    //     capture <이름> [배]     게임 화면을 Logs/MomoiProject/Captures/<이름>.png 로(게임 뷰 크기, 배 = 2~4면 그 배로 크게 — 얇은 선·작은 글을 볼 때)
+    //     capture <이름> [배]     게임 화면을 Logs/MomoiProject/Captures/<이름>.png 로(게임 뷰 크기. 배 = 2~4면 UI를 그 배수 해상도로 다시 그려 찍는다 — 얇은 선·작은 글을 볼 때, 월드 장면은 빠짐)
     //     screens                 열린 화면 목록을 결과에 적기
     //     testpanel off|on        테스트 씬의 패널을 숨기기·보이기(찍을 때 HUD를 가리지 않게 — 기본은 숨김)
     //     record <이름> [초] [fps]  지금부터 게임 화면을 녹화해 Captures/<이름>.mp4(기본 2초 · 30fps, 너비 1280까지) — 다음 단계는 녹화와 함께 돈다.
@@ -199,6 +199,7 @@ namespace GBible.EditorTools
                     break;
                 case PlayModeStateChange.ExitingPlayMode:
                     if (_grabber != null) _grabber.Stop();   // 녹화 중이면 지금까지로 굽는다
+                    if (_uiCapture != null) FinishUiCapture(force: true);   // 크게 찍던 중이면 화면 설정을 되돌린다
                     break;
                 case PlayModeStateChange.EnteredEditMode when State == "running" || State == "stopping":
                     UnhookLog();
@@ -341,9 +342,74 @@ namespace GBible.EditorTools
             var path = $"{CaptureFolder}/{name}.png";
             if (File.Exists(path)) File.Delete(path);
             FocusGameView();
-            if (scale > 1) ScreenCapture.CaptureScreenshot(path, scale);
-            else ScreenCapture.CaptureScreenshot(path);
-            return "찍음 → " + path + (scale > 1 ? $" ({scale}배)" : "");
+            if (scale > 1 && StartUiCapture(path, scale)) return $"찍음 → {path} (UI를 {scale}배 해상도로 다시 그림 — 월드 장면은 빠짐)";
+            ScreenCapture.CaptureScreenshot(path);
+            return "찍음 → " + path;
+        }
+
+        // 크게 찍기: 게임 화면을 늘리면 UI가 흐릿하게 커질 뿐이라, UI 패널을 그 배수의 RenderTexture에 다시 그려 읽는다(얇은 선·작은 글을 실제 해상도로).
+        // 패널 설정(PanelSettings)의 출력을 잠깐 바꿨다가 몇 프레임 뒤 읽고 되돌린다. 월드(카메라) 장면은 들어가지 않는다.
+        sealed class UiCapture
+        {
+            public RenderTexture Texture;
+            public List<(PanelSettings settings, RenderTexture old)> Restore;
+            public string Path;
+            public int StartFrame;
+        }
+        static UiCapture _uiCapture;
+
+        static bool StartUiCapture(string path, int scale)
+        {
+            if (_uiCapture != null) FinishUiCapture(force: true);
+            var panels = UnityEngine.Object.FindObjectsByType<UIDocument>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)
+                .Select(d => d.panelSettings).Where(p => p != null && p.targetTexture == null).Distinct().ToList();
+            if (panels.Count == 0) return false;
+            var texture = new RenderTexture(Screen.width * scale, Screen.height * scale, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
+            texture.Create();
+            var previous = RenderTexture.active;
+            RenderTexture.active = texture;
+            GL.Clear(true, true, Color.black);
+            RenderTexture.active = previous;
+            _uiCapture = new UiCapture { Texture = texture, Path = path, StartFrame = Time.frameCount, Restore = panels.Select(p => (p, p.targetTexture)).ToList() };
+            foreach (var p in panels) p.targetTexture = texture;
+            EditorApplication.update += WaitUiCapture;
+            return true;
+        }
+
+        static void WaitUiCapture()
+        {
+            if (_uiCapture == null) { EditorApplication.update -= WaitUiCapture; return; }
+            if (Time.frameCount < _uiCapture.StartFrame + 3) return;   // 새 크기로 다시 배치·그릴 때까지
+            FinishUiCapture(force: false);
+        }
+
+        static void FinishUiCapture(bool force)
+        {
+            EditorApplication.update -= WaitUiCapture;
+            var capture = _uiCapture;
+            _uiCapture = null;
+            if (capture == null) return;
+            try
+            {
+                if (!force)
+                {
+                    var previous = RenderTexture.active;
+                    RenderTexture.active = capture.Texture;
+                    var image = new Texture2D(capture.Texture.width, capture.Texture.height, TextureFormat.RGBA32, false);
+                    image.ReadPixels(new Rect(0, 0, capture.Texture.width, capture.Texture.height), 0, 0);
+                    image.Apply(false);
+                    RenderTexture.active = previous;
+                    File.WriteAllBytes(capture.Path, image.EncodeToPNG());
+                    UnityEngine.Object.DestroyImmediate(image);
+                }
+            }
+            finally
+            {
+                foreach (var (settings, old) in capture.Restore)
+                    if (settings != null) settings.targetTexture = old;
+                capture.Texture.Release();
+                UnityEngine.Object.DestroyImmediate(capture.Texture);
+            }
         }
 
         static void FocusGameView()
