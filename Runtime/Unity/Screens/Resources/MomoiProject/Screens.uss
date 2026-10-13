@@ -1,9 +1,9 @@
 /* MomoiProject 화면 기본 모양. 프로젝트는 DB › 화면 설정의 테마 USS에서 아래 변수와 클래스를 덮어쓴다(이 파일은 고치지 않는다).
-   디자인 기본(AI/UiGuide.md 3절): 차가운 검정 + 종이 흰색, 책·종이·폴더 느낌. 패널은 매트·플랫(테두리 강조·그림자 없음, 패널 자체는 불투명),
-   창·팝업 뒤는 흐림으로 나눈다. 패널마다 재질 하나 — 종이 · 폴더 · 검정 표지 · 거친 돌 · 색종이(작은 표시). 강조색은 하나. */
+   디자인 기본(AI/UiGuide.md 3절): 차가운 검정 + 종이 흰색, 매트·플랫(테두리 강조·그림자 없음). 패널 면은 단색 + 아주 옅은 조각 — 조각은 UI 키트의 KitPanel이 그린다.
+   뒷배경은 DB › 화면의 '뒷배경'(일반 · 블러 = 알림만 · UI 배경). 강조색은 하나. */
 
 :root {
-    /* 재질(색 + 위에 깔리는 아주 옅은 결) */
+    /* 면 색(옛 이름 '재질' — 결 텍스처는 2026-10-13에 뺐다. 새 화면은 UI 키트의 KitPanel 색 클래스) */
     --momoi-paper: rgb(244, 243, 240);
     --momoi-paper-text: rgb(38, 38, 42);
     --momoi-paper-dim: rgb(128, 128, 134);
@@ -15,10 +15,6 @@
     --momoi-stone-text: rgb(220, 222, 226);
     --momoi-colorpaper: rgb(206, 196, 178);
     --momoi-colorpaper-text: rgb(48, 42, 34);
-    /* 결의 세기(재질 그림에 곱하는 색의 알파 — 0 = 결 없음, 1 = 그림 그대로). 검정·돌은 아주 옅게 */
-    --momoi-grain-paper: rgba(255, 255, 255, 1);
-    --momoi-grain-cover: rgba(255, 255, 255, 0.22);
-    --momoi-grain-stone: rgba(255, 255, 255, 0.45);
 
     /* 화면 공통(기본 화면이 쓴다): 기본 창 = 종이, 버튼 = 검정 표지 */
     --momoi-text: rgb(236, 236, 238);
@@ -30,7 +26,8 @@
     --momoi-button-hover: rgb(58, 60, 66);
     --momoi-accent: rgb(204, 184, 146);
     --momoi-accent-text: rgb(34, 30, 24);
-    --momoi-backdrop: rgba(10, 10, 12, 0.3);
+    --momoi-backdrop: rgba(12, 12, 16, 0.22);   /* 블러 뒷배경의 옅은 어둡게 */
+    --momoi-ui-backdrop: rgb(222, 220, 214);    /* UI 배경(화면 전체 단색 — 조각은 화면 UXML의 KitPanel) */
     --momoi-radius: 6px;
     --momoi-font-size: 18px;
 
@@ -46,64 +43,30 @@
     --momoi-rarity-4: rgb(204, 184, 146);
 }
 
-/* ── 재질: 패널·칸에 하나씩 붙인다. 결은 256px 타일(거의 투명) — 색만 바꿔도 같은 결이 따라온다 ── */
-.momoi-mat-paper {
-    background-color: var(--momoi-paper);
-    background-image: resource("MomoiProject/Materials/Paper");
-    -unity-background-image-tint-color: var(--momoi-grain-paper);
-    background-repeat: repeat;
-    background-size: 256px 256px;
-    color: var(--momoi-paper-text);
-}
-
-.momoi-mat-folder {
-    background-color: var(--momoi-folder);
-    background-image: resource("MomoiProject/Materials/Paper");
-    background-repeat: repeat;
-    background-size: 256px 256px;
-    color: var(--momoi-folder-text);
-}
-
-.momoi-mat-cover {
-    background-color: var(--momoi-cover);
-    background-image: resource("MomoiProject/Materials/Cover");
-    -unity-background-image-tint-color: var(--momoi-grain-cover);
-    background-repeat: repeat;
-    background-size: 256px 256px;
-    color: var(--momoi-cover-text);
-}
-
-.momoi-mat-stone {
-    background-color: var(--momoi-stone);
-    background-image: resource("MomoiProject/Materials/Stone");
-    -unity-background-image-tint-color: var(--momoi-grain-stone);
-    background-repeat: repeat;
-    background-size: 256px 256px;
-    color: var(--momoi-stone-text);
-}
-
-.momoi-mat-colorpaper {
-    background-color: var(--momoi-colorpaper);
-    background-image: resource("MomoiProject/Materials/ColorPaper");
-    background-repeat: repeat;
-    background-size: 256px 256px;
-    color: var(--momoi-colorpaper-text);
-}
+/* ── 면 색(옛 '재질' 클래스 — 이름만 남긴 단색. 새 화면은 UI 키트의 KitPanel 색 클래스를 쓴다) ── */
+.momoi-mat-paper { background-color: var(--momoi-paper); color: var(--momoi-paper-text); }
+.momoi-mat-folder { background-color: var(--momoi-folder); color: var(--momoi-folder-text); }
+.momoi-mat-cover { background-color: var(--momoi-cover); color: var(--momoi-cover-text); }
+.momoi-mat-stone { background-color: var(--momoi-stone); color: var(--momoi-stone-text); }
+.momoi-mat-colorpaper { background-color: var(--momoi-colorpaper); color: var(--momoi-colorpaper-text); }
 
 .momoi-root {
     color: var(--momoi-text);
     font-size: var(--momoi-font-size);
 }
 
-/* 창·팝업 뒤: 흐리게 나눈다(팝업은 조금 어둡게). 아래 입력을 막는 창에만 생긴다 */
-.momoi-backdrop {
-    background-color: var(--momoi-backdrop);
-    backdrop-filter: blur(12px);
+/* 뒷배경 3가지(DB › 화면 '뒷배경', UiGuide 3-1): 일반 = 장면이 그대로(투명) · 블러 = 알림성만 · UI 배경 = 화면 전체 단색. 입력을 막는 화면이면 아래를 덮는다 */
+.momoi-backdrop--plain {
+    background-color: rgba(0, 0, 0, 0);
 }
 
-.momoi-backdrop--clear {
-    background-color: rgba(10, 10, 12, 0.08);
-    backdrop-filter: blur(8px);
+.momoi-backdrop--blur {
+    background-color: var(--momoi-backdrop);
+    backdrop-filter: blur(10px);
+}
+
+.momoi-backdrop--ui {
+    background-color: var(--momoi-ui-backdrop);
 }
 
 .momoi-center {
@@ -115,9 +78,6 @@
 /* 기본 창(고르기·설정·슬롯·일시정지·확인) = 종이 */
 .momoi-panel {
     background-color: var(--momoi-panel);
-    background-image: resource("MomoiProject/Materials/Paper");
-    background-repeat: repeat;
-    background-size: 256px 256px;
     color: var(--momoi-panel-text);
     border-width: 0;
     border-top-left-radius: var(--momoi-radius);

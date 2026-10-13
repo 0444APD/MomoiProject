@@ -130,11 +130,14 @@ namespace GBible
             var host = new VisualElement { name = id, pickingMode = PickingMode.Ignore };
             host.AddToClassList("momoi-screen-host");
             Fill(host);
-            if (block)
+            var backdropKind = data?.backdrop ?? spec.Value.backdrop;
+            if (block || backdropKind != ScreenBackdrop.Plain)
             {
-                // 아래 층을 누르지 못하게 덮는다(팝업은 어둡게).
+                // 뒷배경(UiGuide 3-1): 일반 = 투명(장면이 그대로) · 블러 = 흐림 + 아주 옅게 어둡게(알림만) · UI 배경 = 화면 전체 단색. 입력을 막는 화면이면 아래를 누르지 못하게 덮는다.
                 var backdrop = new VisualElement();
-                backdrop.AddToClassList(layer == ScreenLayer.Popup ? "momoi-backdrop" : "momoi-backdrop--clear");
+                backdrop.AddToClassList("momoi-backdrop");
+                backdrop.AddToClassList(backdropKind == ScreenBackdrop.Blur ? "momoi-backdrop--blur" : backdropKind == ScreenBackdrop.Ui ? "momoi-backdrop--ui" : "momoi-backdrop--plain");
+                if (!block) backdrop.pickingMode = PickingMode.Ignore;
                 Fill(backdrop);
                 host.Add(backdrop);
             }
@@ -521,7 +524,8 @@ namespace GBible
             if (_settings != null)
                 foreach (var sheet in _settings.theme)
                     if (sheet != null) root.styleSheets.Add(sheet);
-            if (_settings != null && _settings.font != null) root.style.unityFontDefinition = FontDefinition.FromFont(_settings.font);
+            if (_settings != null && _settings.fontAsset != null) root.style.unityFontDefinition = FontDefinition.FromSDFFont(_settings.fontAsset);   // 굵기 표가 있는 글꼴 에셋이 먼저
+            else if (_settings != null && _settings.font != null) root.style.unityFontDefinition = FontDefinition.FromFont(_settings.font);
             root.AddToClassList("momoi-root");
             _layers = new VisualElement[4];
             for (int i = 0; i < _layers.Length; i++)
@@ -601,15 +605,17 @@ namespace GBible
             }
         }
 
-        static (ScreenLayer layer, bool closeOnBack, bool pause, bool block)? BuiltInSpec(string id)
+        // 기본 화면의 뒷배경(개발자 2026-10-13, UiGuide 3-1): 확인 = 블러(알림성) · 고르기 · 일시정지 · 설정 · 세이브 슬롯 = 일반.
+        // (설정 · 세이브 슬롯은 화면을 나누는 배치 + UI 배경으로 다시 짜기로 했다 — 그때 Ui로 바꾼다.)
+        static (ScreenLayer layer, bool closeOnBack, bool pause, bool block, ScreenBackdrop backdrop)? BuiltInSpec(string id)
         {
             switch (id)
             {
-                case Choice: return (ScreenLayer.Popup, false, _settings != null && _settings.pauseWhileChoosing, true);
-                case Confirmation: return (ScreenLayer.Popup, true, false, true);
-                case Settings: return (ScreenLayer.Window, true, false, true);
-                case Slots: return (ScreenLayer.Window, true, false, true);
-                case Pause: return (ScreenLayer.Window, true, true, true);
+                case Choice: return (ScreenLayer.Popup, false, _settings != null && _settings.pauseWhileChoosing, true, ScreenBackdrop.Plain);
+                case Confirmation: return (ScreenLayer.Popup, true, false, true, ScreenBackdrop.Blur);
+                case Settings: return (ScreenLayer.Window, true, false, true, ScreenBackdrop.Plain);
+                case Slots: return (ScreenLayer.Window, true, false, true, ScreenBackdrop.Plain);
+                case Pause: return (ScreenLayer.Window, true, true, true, ScreenBackdrop.Plain);
                 default: return null;
             }
         }

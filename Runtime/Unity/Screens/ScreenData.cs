@@ -13,6 +13,14 @@ namespace GBible.Data
         [InspectorName("알림(입력을 막지 않음)")] Toast,
     }
 
+    // 화면 뒤에 까는 것(AI/UiGuide.md 3-1 — 뒷배경 3가지). 아래 입력을 막는 화면은 셋 모두 아래를 누를 수 없게 덮는다.
+    public enum ScreenBackdrop
+    {
+        [InspectorName("일반 배경(흐림 없음 — 작은 팝업)")] Plain,
+        [InspectorName("블러(알림성 정보만)")] Blur,
+        [InspectorName("UI 배경(화면을 나눠 채우는 정보형)")] Ui,
+    }
+
     // DB › 화면: UI Toolkit 화면 하나 — UXML, 뜨는 층, 아래 입력을 막나, 뒤로(Esc)로 닫히나, 어느 씬에서 저절로 열리나.
     // 코드는 [BindTo(GameIds.Screen.X)] class X : GameScreen. 값을 보이기만 하는 칸은 코드 없이 UXML의 binding-path로(ScreenBinding).
     // 여는 법: GameScreens.Open(GameIds.Screen.X) · 열 씬 · 게임이 켜지면 열기.
@@ -24,6 +32,7 @@ namespace GBible.Data
         [FieldLabel("더할 USS"), Tooltip("이 화면에만 붙는 USS. 모든 화면에 붙는 것은 DB › 화면 설정의 테마")] public List<StyleSheet> styles = new List<StyleSheet>();
         [FieldLabel("목록 칸 UXML"), Tooltip("목록 한 칸의 UXML(Assets/MomoiProject/UI/Items/…). 코드는 Item(\"파일 이름\")으로 찾는다. 화면 UXML에 <ui:Template>로 적은 것도 찾는다")] public List<VisualTreeAsset> items = new List<VisualTreeAsset>();
         [FieldLabel("층")] public ScreenLayer layer = ScreenLayer.Window;
+        [FieldLabel("뒷배경"), Tooltip("일반 배경: 뒤의 장면이 그대로 보인다(정보가 적은 작은 팝업). 블러: 뒤를 흐리고 아주 옅게 어둡게 — 알림성 정보만, 일반 UI에는 쓰지 않는다. UI 배경: 화면 전체를 덮는 단색 배경 — 화면을 나눠 영역을 꽉 채우는 정보형 UI에만(가운데 팝업 하나만 두지 않는다)")] public ScreenBackdrop backdrop;
         [FieldLabel("아래 입력 막기"), Tooltip("창: 켜면 열린 동안 아래 층 화면을 누를 수 없습니다. 팝업은 늘 막고, 바탕·알림은 막지 않습니다")] public bool blockInput = true;
         [FieldLabel("뒤로(Esc)로 닫기")] public bool closeOnBack = true;
         [FieldLabel("열린 동안 게임 시간 멈춤")] public bool pauseTime;

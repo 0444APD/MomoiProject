@@ -313,9 +313,6 @@ namespace GBible.EditorTools.Graph
     padding: 24px 30px 22px 30px;
     border-radius: 6px;
     background-color: rgb(244, 243, 240);
-    background-image: resource(""MomoiProject/Materials/Paper"");
-    background-repeat: repeat;
-    background-size: 256px 256px;
     transition-property: opacity, translate;
     transition-duration: 0.2s;
 }
@@ -415,9 +412,6 @@ namespace GBible.EditorTools.Graph
     padding: 12px 22px;
     border-radius: 4px;
     background-color: rgb(222, 221, 218);
-    background-image: resource(""MomoiProject/Materials/Paper"");
-    background-repeat: repeat;
-    background-size: 256px 256px;
     transition-property: background-color;
     transition-duration: 0.1s;
 }
@@ -474,9 +468,6 @@ namespace GBible.EditorTools.Graph
     padding: 18px 24px;
     border-radius: 6px;
     background-color: rgb(36, 37, 41);
-    background-image: resource(""MomoiProject/Materials/Cover"");
-    background-repeat: repeat;
-    background-size: 256px 256px;
 }
 
 .dialogue-log__head {

@@ -93,8 +93,8 @@ namespace GBible.EditorTools
         const string ProjectTheme =
 @"/* 프로젝트 테마: 모든 화면에 붙는다(DB › 화면 설정 › 테마 USS). 기본 화면(고르기·설정·슬롯·일시정지·확인·알림)도 이 변수를 쓴다.
    값을 바꾸면 모든 화면의 색·크기가 바뀐다. 클래스(.momoi-panel · .momoi-button · .momoi-title …)를 여기서 덮어써도 된다.
-   디자인 기본(GBible AI/UiGuide.md 3절): 차가운 검정 + 종이 흰색, 책·종이·폴더 느낌 — 매트·플랫(테두리 강조·그림자 없음), 창 뒤는 흐림.
-   패널은 재질 클래스 하나(.momoi-mat-paper · -folder · -cover · -stone · -colorpaper)로 색과 아주 옅은 결을 받는다. 프로젝트의 색은 아래 변수로만. */
+   디자인 기본(GBible AI/UiGuide.md 3절): 차가운 검정 + 종이 흰색, 매트·플랫(테두리 강조·그림자 없음). 패널 면은 단색 + 아주 옅은 조각(UI 키트 KitPanel).
+   뒷배경은 DB › 화면의 '뒷배경'(일반 · 블러 = 알림만 · UI 배경). 프로젝트의 색은 아래 변수로만. */
 
 :root {
     --momoi-paper: rgb(244, 243, 240);
@@ -118,7 +118,8 @@ namespace GBible.EditorTools
     --momoi-button-hover: rgb(58, 60, 66);
     --momoi-accent: rgb(204, 184, 146);
     --momoi-accent-text: rgb(34, 30, 24);
-    --momoi-backdrop: rgba(10, 10, 12, 0.3);
+    --momoi-backdrop: rgba(12, 12, 16, 0.22);
+    --momoi-ui-backdrop: rgb(222, 220, 214);
     --momoi-radius: 6px;
     --momoi-font-size: 18px;
 }
