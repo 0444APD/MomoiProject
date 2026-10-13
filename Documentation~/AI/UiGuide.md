@@ -294,8 +294,8 @@ GBible로 만드는 **모든 프로젝트의 화면**에서 AI가 지키는 문�
 - `translate`로 가운데 맞춘 요소에는 `momoi-motion`을 붙이지 않는다(움직이는 동안 translate를 덮는다 — margin으로 맞춘다).
 - 카드 움직임(뽑기·쓰기·버리기)은 이 규칙 밖의 연출로 따로 만든다(`GameView.Present`·`Play`).
 - 시간·거리는 `ScreenMotion`의 값과 Screens.uss의 움직임 클래스가 같다. 바꿀 때는 둘을 함께.
-- **목록이 칸마다 차례로 나타나기** — 보상 · 결과를 공개할 때만 칸마다 0.03초 늦춘다(최대 5칸). 평소 목록은 한꺼번에(개발자 2026-10-13 — 시도).
-- 곡선(나타남 · 사라짐)과 나머지 움직임(올림 · 누름 · 고름 · 탭 · 도움말 · 알림 · 값 변화 · 끌어 놓기 · 같은 층 교차 · 자리 옮김 · 차례로 나타나기)은 실험실 움직임 견본(`lab.motion`)에서 개발자가 확인 중 — 정해지면 이 표와 `ScreenMotion` · Screens.uss를 함께 고친다. USS 곡선에는 quad가 없다(`ease-out-quad`는 경고와 함께 무시) — 쓸 수 있는 것은 ease · ease-in · ease-out · ease-in-out · linear와 sine · cubic · circ · back · elastic · bounce의 in · out · in-out.
+- **목록이 칸마다 차례로 나타나기** — 보상 · 결과를 공개할 때만 칸마다 0.03초 늦춘다(최대 5칸). 평소 목록은 한꺼번에(개발자 2026-10-13 — 시도). **USS `transition-delay`로 늦추지 않는다** — 지연 중인 칸이 페이드 없이 바로 떠 버린다(Unity 6.6). 칸마다 '나타나기 전' 클래스를 떼는 때를 미룬다(`schedule.Execute(…).StartingIn`).
+- 실험실 움직임 견본(`lab.motion` — 올림 · 누름 · 고름 · 탭 · 도움말 · 알림 · 값 변화 · 끌어 놓기 · 같은 층 교차 · 자리 옮김 · 차례로 나타나기)은 **모두 좋음**(개발자 2026-10-13). 남은 것: 팝업 곡선(가안 — 나타남 ease-out-sine · 사라짐은 투명도만 ease-in-sine, 시간 1.5배 0.21초 · 0.15초 — 영상 확인 중) · 차례로 나타나기 간격(0.03 · 0.06 · 0.1초 견줌). 정해지면 이 표와 `ScreenMotion` · Screens.uss를 함께 고친다. USS 곡선에는 quad가 없다(`ease-out-quad`는 경고와 함께 무시) — 쓸 수 있는 것은 ease · ease-in · ease-out · ease-in-out · linear와 sine · cubic · circ · back · elastic · bounce의 in · out · in-out.
 
 ### 3-6. 아이콘 — 단색 벡터
 
