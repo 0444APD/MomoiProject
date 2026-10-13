@@ -1,0 +1,37 @@
+// GBible UI 키트 견본 — 순간 연출 부르기(Samples/Effects.uxml와 짝). 보고 베끼는 예다: 프로젝트 화면 코드에 [BindTo(GameIds.Screen.…)]를 붙여 쓴다.
+// 실제 게임에서는 값을 바꾸는 것은 행동이고, 연출은 그 뒤 — session.Events.SubscribeAfterAction<이벤트>(e => …)에서 부른다(관례 6절).
+// 색은 Kit.uss의 --kit-fx-* 변수, 시간 · 크기는 각 함수의 매개변수.
+using GBible;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    public class EffectsSample : GameScreen
+    {
+        protected override void OnOpen()
+        {
+            var fx = Q<KitFx>("fx");                 // 화면 맨 위 연출 층
+            var behind = Q<KitFx>("fx-behind");      // 빛살을 아이템 뒤에 그릴 층
+            OnClick("reward-go", () => fx.Reward(Q("reward-item")));
+            OnClick("reveal-go", () => fx.Reveal(Q("reveal-item"), behind));
+
+            var stat = Q<Label>("buff-stat");
+            var attack = 1;
+            OnClick("buff-go", () => fx.Buff(Q("buff-icon"), default, 56f, () =>
+            {
+                attack += 6;                          // 실제로는 행동이 바꾼 값을 읽는다
+                stat.text = attack.ToString();
+                fx.NumberPop(stat);
+            }));
+
+            var sheen = Q<KitSheen>("sheen");
+            var badge = Q("pulse-badge");
+            IVisualElementScheduledItem pulse = null;
+            OnClick("sheen-go", () =>
+            {
+                sheen.Play();
+                pulse ??= KitGlow.Pulse(badge, fx.GlowColor);   // 끌 때는 pulse.Pause() + KitGlow.Clear(badge)
+            });
+        }
+    }
+}

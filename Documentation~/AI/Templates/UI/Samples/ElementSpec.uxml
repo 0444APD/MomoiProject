@@ -4,16 +4,16 @@
          라인 디자인(KitOutline): 앞 선(안쪽 10px — 오른쪽 · 왼쪽 일부 끊음, 아이콘 칸 둘레 8px는 비켜 감 = kit-ol-block) · 뒤 선(왼쪽 위로 8px 치우친 상자, 얇게, 모서리 십자).
          일반 배경 앞(뒤 선은 장면 위라 kit-ol-on-scene) -->
     <ui:VisualElement class="kit-center" picking-mode="Ignore">
-        <MomoiProject.KitPanel shape="Round" corners="tr:48 bl:48" pattern="Shards" seed="151" class="kit-spec-card kit-pn-paper">
-            <ui:VisualElement class="kit-spec-glow" picking-mode="Ignore" />
+        <MomoiProject.KitPanel shape="Round" corners="tr:48 bl:48" pattern="Shards" seed="151" class="sample-spec-card kit-pn-paper">
+            <ui:VisualElement class="sample-spec-glow" picking-mode="Ignore" />
             <MomoiProject.KitOutline layer="Front" gap="10" cut="right:0.66-0.79 left:0.21-1" class="kit-outline kit-ol-on-paper" />
             <MomoiProject.KitOutline layer="Back" gap="8" skew="TopLeft" weight="Light" marks="tl:cross:on" class="kit-outline kit-ol-on-scene" />
-            <ui:VisualElement class="kit-spec-slot kit-spec-slot--1 kit-ol-block"><MomoiProject.KitSpark class="kit-spec-slot-mark" /></ui:VisualElement>
-            <ui:VisualElement class="kit-spec-slot kit-spec-slot--2 kit-ol-block"><MomoiProject.KitSpark class="kit-spec-slot-mark" /></ui:VisualElement>
-            <MomoiProject.KitPanel shape="Chamfer" pattern="None" class="kit-spec-hex kit-pn-dark">
-                <ui:Label text="불씨의 심장" class="kit-spec-hex-text" />
+            <ui:VisualElement class="sample-spec-slot sample-spec-slot--1 kit-ol-block"><MomoiProject.KitSpark class="sample-spec-slot-mark" /></ui:VisualElement>
+            <ui:VisualElement class="sample-spec-slot sample-spec-slot--2 kit-ol-block"><MomoiProject.KitSpark class="sample-spec-slot-mark" /></ui:VisualElement>
+            <MomoiProject.KitPanel shape="Chamfer" pattern="None" class="sample-spec-hex kit-pn-dark">
+                <ui:Label text="불씨의 심장" class="sample-spec-hex-text" />
             </MomoiProject.KitPanel>
-            <ui:Label text="기본 공격이 적중하면 대상에게 화상을 2 중첩 겁니다. 화상에 걸린 적을 처치하면 다음 스킬이 빨리 돌아옵니다." class="kit-spec-desc" />
+            <ui:Label text="기본 공격이 적중하면 대상에게 화상을 2 중첩 겁니다. 화상에 걸린 적을 처치하면 다음 스킬이 빨리 돌아옵니다." class="sample-spec-desc" />
         </MomoiProject.KitPanel>
     </ui:VisualElement>
 </ui:UXML>

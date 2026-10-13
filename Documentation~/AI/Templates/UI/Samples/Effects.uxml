@@ -1,0 +1,44 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 견본 · 순간 연출(코드 EffectsSample.cs.txt가 부른다): 보상 펑 · 희귀 공개 · 버프(자체 발광 아이콘이 떠올라 사라짐 → 수치 펑) · 훑는 빛 · 발광 맥박.
+         연출 층 KitFx(class kit-fx)는 화면 맨 끝(맨 위)에 깐다. 빛살을 아이템 뒤에 두려면 그 칸 안에 KitFx를 하나 더(아이템보다 앞 줄에).
+         버프 아이콘은 무엇이든(진짜 아이콘 그림 · KitIcon) — 흰 면이 빛의 가운데가 된다. 처음엔 투명(opacity 0). 색은 Kit.uss 맨 위의 연출 색 변수(kit-fx-…) -->
+    <ui:VisualElement class="kit-fill" picking-mode="Ignore">
+        <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="501" pieces="20" class="kit-fill kit-pn-dark kit-pn-faint" picking-mode="Ignore" />
+        <ui:VisualElement class="kit-center" picking-mode="Ignore">
+            <ui:VisualElement class="sample-fx-row">
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="502" class="sample-fx-card kit-pn-stone kit-pn-c12">
+                    <ui:Label text="보상 펑" class="kit-t-heading sample-fx-title" />
+                    <ui:VisualElement class="sample-fx-stage"><ui:VisualElement name="reward-item" class="sample-fx-item"><MomoiProject.KitIcon glyph="Gem" class="sample-fx-item-icon" /></ui:VisualElement></ui:VisualElement>
+                    <ui:Button name="reward-go" text="펑" class="kit-bt kit-bt--pill kit-bt--sand kit-bt--small" />
+                </MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="503" class="sample-fx-card kit-pn-stone kit-pn-c12">
+                    <ui:Label text="희귀 공개" class="kit-t-heading sample-fx-title" />
+                    <ui:VisualElement class="sample-fx-stage"><MomoiProject.KitFx name="fx-behind" class="kit-fx" /><ui:VisualElement name="reveal-item" class="sample-fx-item"><MomoiProject.KitIcon glyph="Star" class="sample-fx-item-icon" /></ui:VisualElement></ui:VisualElement>
+                    <ui:Button name="reveal-go" text="공개" class="kit-bt kit-bt--pill kit-bt--sand kit-bt--small" />
+                </MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="504" class="sample-fx-card kit-pn-stone kit-pn-c12">
+                    <ui:Label text="버프 — 자체 발광 아이콘" class="kit-t-heading sample-fx-title" />
+                    <ui:VisualElement class="sample-fx-stage">
+                        <ui:VisualElement class="sample-fx-unit">
+                            <ui:VisualElement class="sample-fx-unit-art" />
+                            <ui:Label name="buff-stat" text="1" class="sample-fx-stat" />
+                            <MomoiProject.KitIcon name="buff-icon" glyph="Sword" class="sample-fx-buff" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Button name="buff-go" text="공격 +6" class="kit-bt kit-bt--pill kit-bt--sand kit-bt--small" />
+                </MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="505" class="sample-fx-card kit-pn-stone kit-pn-c12">
+                    <ui:Label text="훑는 빛 · 발광 맥박" class="kit-t-heading sample-fx-title" />
+                    <ui:VisualElement class="sample-fx-stage">
+                        <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="506" class="sample-fx-sheen-card kit-pn-dark kit-pn-c12">
+                            <ui:Label name="pulse-badge" text="새로" class="sample-fx-badge" />
+                            <MomoiProject.KitSheen name="sheen" class="kit-sheen" />
+                        </MomoiProject.KitPanel>
+                    </ui:VisualElement>
+                    <ui:Button name="sheen-go" text="훑기 · 맥박" class="kit-bt kit-bt--pill kit-bt--sand kit-bt--small" />
+                </MomoiProject.KitPanel>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <MomoiProject.KitFx name="fx" class="kit-fx" />
+    </ui:VisualElement>
+</ui:UXML>

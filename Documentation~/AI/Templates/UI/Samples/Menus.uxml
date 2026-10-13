@@ -5,48 +5,48 @@
     <ui:VisualElement class="kit-fill" picking-mode="Ignore">
         <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="140" pieces="20" class="kit-fill kit-pn-paper kit-pn-faint" picking-mode="Ignore" />
         <ui:VisualElement class="kit-center" picking-mode="Ignore">
-            <ui:VisualElement class="kit-sample-col">
-                <ui:Label text="B3 · 기본 — 긴 막대 + 고른 것만 흰 안쪽 판" class="kit-sample-menu-label" />
+            <ui:VisualElement class="sample-col">
+                <ui:Label text="B3 · 기본 — 긴 막대 + 고른 것만 흰 안쪽 판" class="sample-menu-label" />
                 <MomoiProject.KitPanel shape="Pill" pattern="None" class="kit-menu">
                     <ui:Label text="전체" class="kit-menu-item" />
                     <MomoiProject.KitPanel shape="Pill" pattern="None" class="kit-menu-on"><ui:Label text="패시브 효과" class="kit-menu-item" /></MomoiProject.KitPanel>
                     <ui:Label text="액티브 효과" class="kit-menu-item" /><ui:Label text="세트" class="kit-menu-item" /><ui:Label text="잠김" class="kit-menu-item" />
                 </MomoiProject.KitPanel>
-                <ui:Label text="B3 · 변칙 자름(그 화면이 자름을 쓸 때)" class="kit-sample-menu-label" />
+                <ui:Label text="B3 · 변칙 자름(그 화면이 자름을 쓸 때)" class="sample-menu-label" />
                 <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="None" class="kit-menu">
                     <ui:Label text="전체" class="kit-menu-item" />
                     <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="None" class="kit-menu-on"><ui:Label text="패시브 효과" class="kit-menu-item" /></MomoiProject.KitPanel>
                     <ui:Label text="액티브 효과" class="kit-menu-item" /><ui:Label text="세트" class="kit-menu-item" /><ui:Label text="잠김" class="kit-menu-item" />
                 </MomoiProject.KitPanel>
-                <ui:Label text="B3 · 변칙 잎(그 화면이 잎을 쓸 때)" class="kit-sample-menu-label" />
+                <ui:Label text="B3 · 변칙 잎(그 화면이 잎을 쓸 때)" class="sample-menu-label" />
                 <MomoiProject.KitPanel shape="Square" corners="tl br" pattern="None" class="kit-menu">
                     <ui:Label text="전체" class="kit-menu-item" />
                     <MomoiProject.KitPanel shape="Square" corners="tl br" pattern="None" class="kit-menu-on"><ui:Label text="패시브 효과" class="kit-menu-item" /></MomoiProject.KitPanel>
                     <ui:Label text="액티브 효과" class="kit-menu-item" /><ui:Label text="세트" class="kit-menu-item" /><ui:Label text="잠김" class="kit-menu-item" />
                 </MomoiProject.KitPanel>
-                <ui:Label text="A · 글만 나열 — 고른 것에 판" class="kit-sample-menu-label" />
-                <ui:VisualElement class="kit-tabs">
-                    <ui:Label text="전체" class="kit-tabs-item kit-tabs-item--dark" />
-                    <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="None" class="kit-tabs-on kit-pn-dark kit-pn-c12"><ui:Label text="패시브 효과" class="kit-tabs-item kit-tabs-item--light" /></MomoiProject.KitPanel>
-                    <ui:Label text="액티브 효과" class="kit-tabs-item kit-tabs-item--dark" /><ui:Label text="세트" class="kit-tabs-item kit-tabs-item--dark" /><ui:Label text="잠김" class="kit-tabs-item kit-tabs-item--dark" />
+                <ui:Label text="A · 글만 나열 — 고른 것에 판" class="sample-menu-label" />
+                <ui:VisualElement class="sample-tabs">
+                    <ui:Label text="전체" class="sample-tabs-item sample-tabs-item--dark" />
+                    <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="None" class="sample-tabs-on kit-pn-dark kit-pn-c12"><ui:Label text="패시브 효과" class="sample-tabs-item sample-tabs-item--light" /></MomoiProject.KitPanel>
+                    <ui:Label text="액티브 효과" class="sample-tabs-item sample-tabs-item--dark" /><ui:Label text="세트" class="sample-tabs-item sample-tabs-item--dark" /><ui:Label text="잠김" class="sample-tabs-item sample-tabs-item--dark" />
                 </ui:VisualElement>
-                <ui:Label text="B1 · 긴 막대 — 고른 곳은 막대를 비움" class="kit-sample-menu-label" />
-                <ui:VisualElement class="kit-tabs">
-                    <ui:Label text="전체" class="kit-tabs-item kit-tabs-item--dim kit-tabs-seg kit-tabs-seg--first" />
-                    <ui:Label text="패시브 효과" class="kit-tabs-item kit-tabs-item--dark kit-tabs-item--bold" />
-                    <ui:Label text="액티브 효과" class="kit-tabs-item kit-tabs-item--dim kit-tabs-seg" /><ui:Label text="세트" class="kit-tabs-item kit-tabs-item--dim kit-tabs-seg" /><ui:Label text="잠김" class="kit-tabs-item kit-tabs-item--dim kit-tabs-seg kit-tabs-seg--last" />
+                <ui:Label text="B1 · 긴 막대 — 고른 곳은 막대를 비움" class="sample-menu-label" />
+                <ui:VisualElement class="sample-tabs">
+                    <ui:Label text="전체" class="sample-tabs-item sample-tabs-item--dim sample-tabs-seg sample-tabs-seg--first" />
+                    <ui:Label text="패시브 효과" class="sample-tabs-item sample-tabs-item--dark sample-tabs-item--bold" />
+                    <ui:Label text="액티브 효과" class="sample-tabs-item sample-tabs-item--dim sample-tabs-seg" /><ui:Label text="세트" class="sample-tabs-item sample-tabs-item--dim sample-tabs-seg" /><ui:Label text="잠김" class="sample-tabs-item sample-tabs-item--dim sample-tabs-seg sample-tabs-seg--last" />
                 </ui:VisualElement>
-                <ui:Label text="B2 · 긴 막대 — 고른 것 위에 작은 표시" class="kit-sample-menu-label" />
-                <ui:VisualElement class="kit-tabs kit-tabs--bar">
-                    <ui:Label text="전체" class="kit-tabs-item kit-tabs-item--dim" />
-                    <ui:VisualElement class="kit-tabs-mark-host"><ui:Label text="패시브 효과" class="kit-tabs-item kit-tabs-item--light kit-tabs-item--bold" /><MomoiProject.KitSpark class="kit-tabs-mark" /></ui:VisualElement>
-                    <ui:Label text="액티브 효과" class="kit-tabs-item kit-tabs-item--dim" /><ui:Label text="세트" class="kit-tabs-item kit-tabs-item--dim" /><ui:Label text="잠김" class="kit-tabs-item kit-tabs-item--dim" />
+                <ui:Label text="B2 · 긴 막대 — 고른 것 위에 작은 표시" class="sample-menu-label" />
+                <ui:VisualElement class="sample-tabs sample-tabs--bar">
+                    <ui:Label text="전체" class="sample-tabs-item sample-tabs-item--dim" />
+                    <ui:VisualElement class="sample-tabs-mark-host"><ui:Label text="패시브 효과" class="sample-tabs-item sample-tabs-item--light sample-tabs-item--bold" /><MomoiProject.KitSpark class="sample-tabs-mark" /></ui:VisualElement>
+                    <ui:Label text="액티브 효과" class="sample-tabs-item sample-tabs-item--dim" /><ui:Label text="세트" class="sample-tabs-item sample-tabs-item--dim" /><ui:Label text="잠김" class="sample-tabs-item sample-tabs-item--dim" />
                 </ui:VisualElement>
-                <ui:Label text="B4 · 긴 막대 — 고른 것 아래 짧은 선" class="kit-sample-menu-label" />
-                <ui:VisualElement class="kit-tabs kit-tabs--bar">
-                    <ui:Label text="전체" class="kit-tabs-item kit-tabs-item--dim" />
-                    <ui:VisualElement class="kit-tabs-mark-host"><ui:Label text="패시브 효과" class="kit-tabs-item kit-tabs-item--light kit-tabs-item--bold" /><MomoiProject.KitRule kind="Solid" class="kit-tabs-underline" /></ui:VisualElement>
-                    <ui:Label text="액티브 효과" class="kit-tabs-item kit-tabs-item--dim" /><ui:Label text="세트" class="kit-tabs-item kit-tabs-item--dim" /><ui:Label text="잠김" class="kit-tabs-item kit-tabs-item--dim" />
+                <ui:Label text="B4 · 긴 막대 — 고른 것 아래 짧은 선" class="sample-menu-label" />
+                <ui:VisualElement class="sample-tabs sample-tabs--bar">
+                    <ui:Label text="전체" class="sample-tabs-item sample-tabs-item--dim" />
+                    <ui:VisualElement class="sample-tabs-mark-host"><ui:Label text="패시브 효과" class="sample-tabs-item sample-tabs-item--light sample-tabs-item--bold" /><MomoiProject.KitRule kind="Solid" class="sample-tabs-underline" /></ui:VisualElement>
+                    <ui:Label text="액티브 효과" class="sample-tabs-item sample-tabs-item--dim" /><ui:Label text="세트" class="sample-tabs-item sample-tabs-item--dim" /><ui:Label text="잠김" class="sample-tabs-item sample-tabs-item--dim" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

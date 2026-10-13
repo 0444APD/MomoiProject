@@ -1,0 +1,119 @@
+/* 견본 화면(Samples/*.uxml) 전용 모양 — 키트(Kit.uss)와 함께 붙인다. 프로젝트 화면은 이것을 그대로 쓰지 않고 보고 베껴 프로젝트 USS에 옮긴다. */
+
+/* 가로 메뉴의 다른 방식(견본 Menus — A 글 + 고른 것에 판 · B1 비우기 · B2 위 표시 · B4 밑줄). 프로젝트가 이 방식을 고르면 프로젝트 USS로 옮긴다 */
+.sample-tabs { flex-direction: row; align-items: center; height: 52px; align-self: flex-start; }
+.sample-tabs-item { height: 52px; margin: 0; padding: 0 28px; font-size: 17px; -unity-text-align: middle-center; }
+.sample-tabs-item--dark { color: rgb(44, 44, 48); }
+.sample-tabs-item--light { color: rgb(240, 240, 242); }
+.sample-tabs-item--dim { color: rgb(170, 172, 180); }
+.sample-tabs-item--bold { -unity-font-style: bold; }
+.sample-tabs-on { height: 52px; justify-content: center; }
+.sample-tabs-seg { background-color: rgb(40, 41, 46); }
+.sample-tabs-seg--first { border-top-left-radius: 26px; border-bottom-left-radius: 26px; padding-left: 36px; }
+.sample-tabs-seg--last { border-top-right-radius: 26px; border-bottom-right-radius: 26px; padding-right: 36px; }
+.sample-tabs--bar { background-color: rgb(40, 41, 46); border-radius: 26px; padding: 0 8px; }
+.sample-tabs-mark-host { position: relative; }
+.sample-tabs-mark { position: absolute; top: -18px; left: 50%; width: 10px; height: 10px; margin-left: -5px; --spark-color: rgb(150, 132, 104); }
+.sample-tabs-underline { position: absolute; left: 28px; right: 28px; bottom: 9px; height: 4px; --rule-color: rgb(214, 200, 176); --rule-width: 1; }
+
+/* ── 작은 팝업(일반 배경 앞 — 화면 일부만, 장면이 그대로): 검정 틀 + 모래색 머리 + 종이 안판 + 뒤 상자 선 포인트 ── */
+.sample-pop-pos { position: absolute; right: 96px; top: 150px; }
+.sample-pop { width: 540px; padding: 12px; }
+.sample-pop-head { height: 52px; flex-direction: row; align-items: center; padding: 0 20px; }
+.sample-pop-head > Label { margin-left: 12px; font-size: 19px; -unity-font-style: bold; }
+.sample-pop-spark { width: 14px; height: 14px; --spark-color: rgba(48, 40, 30, 0.75); }
+.sample-pop-inner { margin-top: 8px; padding: 20px 24px 24px 24px; }
+.sample-pop-section { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.sample-pop-section > Label { margin-left: 8px; font-size: 16px; -unity-font-style: bold; }
+.sample-pop-section-spark { width: 12px; height: 12px; --spark-color: rgb(36, 36, 40); }
+.sample-pop-rewards { flex-direction: row; margin-bottom: 20px; }
+.sample-pop-reward { width: 68px; height: 68px; margin-right: 8px; border-radius: 6px; background-color: rgb(48, 49, 55); align-items: center; justify-content: center; }
+.sample-pop-reward-mark { width: 26px; height: 26px; --spark-color: rgba(255, 255, 255, 0.3); }
+.sample-pop-reward-count { position: absolute; right: 6px; bottom: 2px; font-size: 12px; -unity-font-style: bold; color: rgb(236, 236, 238); }
+.sample-pop-line { flex-direction: row; align-items: center; height: 28px; padding-left: 20px; }
+.sample-pop-bullet { width: 5px; height: 5px; border-radius: 3px; background-color: rgb(80, 80, 86); margin-right: 12px; }
+.sample-pop-line > Label { font-size: 15px; color: rgb(70, 70, 74); }
+.sample-pop-foot { flex-direction: row; align-items: center; padding: 12px 4px 0 8px; }
+.sample-pop-tries { flex-grow: 1; font-size: 14px; color: rgb(170, 172, 180); }
+
+/* ── 알림(블러 앞 — 화면 항목의 뒷배경 '블러'): 종이 판 + 원 표지 + 글 ── */
+.sample-notice { width: 760px; padding: 28px 32px 24px 28px; flex-direction: row; align-items: center; }
+.sample-notice-emblem { width: 96px; height: 96px; border-radius: 48px; background-color: rgb(34, 35, 40); align-items: center; justify-content: center; }
+.sample-notice-emblem-mark { width: 48px; height: 48px; --spark-color: rgba(255, 255, 255, 0.9); }
+.sample-notice-text { flex-grow: 1; margin-left: 28px; }
+.sample-notice-caption { color: rgb(140, 136, 128); }
+.sample-notice-msg { margin-top: 8px; font-size: 20px; -unity-font-style: bold; white-space: normal; }
+.sample-notice-sub { margin-top: 4px; color: rgb(110, 108, 104); }
+.sample-notice-foot { margin-top: 16px; }
+
+/* ── 나눈 화면(UI 배경 — 화면 항목의 뒷배경 'UI 배경'): 왼쪽 목록 | 가운데 칸 판 | 오른쪽 상세 ── */
+.sample-split-money { position: absolute; right: 112px; top: 36px; }
+.sample-split-grid { position: absolute; left: 372px; top: 128px; width: 760px; bottom: 48px; padding: 28px; }
+.sample-split-grid-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.sample-split-dim { font-size: 14px; color: rgb(110, 108, 104); }
+.sample-split-cards { flex-direction: row; flex-wrap: wrap; }
+.sample-split-grid-foot { position: absolute; left: 28px; bottom: 24px; flex-direction: row; }
+.sample-split-detail { position: absolute; left: 1156px; right: 48px; top: 128px; bottom: 48px; }
+
+/* ── 요소 규격 예(카드 — 흰 메인 패널 · 아래 20% 포인트 그라데이션 · 검은 육각 제목 · 아이콘 칸 · 앞 선 끊김 · 뒤 선 치우침) ── */
+.sample-spec-card { width: 540px; height: 760px; }
+.sample-spec-glow { position: absolute; left: 0; right: 0; top: 438px; height: 109px; background-image: url("../Textures/gradient_up.png"); -unity-background-scale-mode: stretch-to-fill; -unity-background-image-tint-color: rgba(226, 120, 52, 0.4); }
+.sample-spec-hex { position: absolute; left: 64px; right: 64px; top: 516px; height: 64px; justify-content: center; align-items: center; --panel-corner: 999; }
+.sample-spec-hex-text { font-size: 22px; -unity-font-style: bold; color: rgb(240, 240, 242); }
+.sample-spec-desc { position: absolute; left: 56px; right: 56px; top: 616px; font-size: 15px; white-space: normal; -unity-text-align: upper-center; color: rgb(80, 79, 76); }
+.sample-spec-slot { position: absolute; left: 464px; width: 52px; height: 52px; border-radius: 26px; background-color: rgb(40, 41, 46); align-items: center; justify-content: center; }
+.sample-spec-slot--1 { top: 24px; }
+.sample-spec-slot--2 { top: 124px; }
+.sample-spec-slot-mark { width: 22px; height: 22px; --spark-color: rgba(214, 200, 176, 0.9); }
+
+/* ── 견본판(Samples — 보고 베끼는 화면에만) ── */
+.sample-head { position: absolute; left: 48px; top: 32px; right: 48px; height: 64px; flex-direction: row; align-items: center; }
+.sample-title { margin: 0; padding: 0; font-size: 44px; -unity-font-style: bold; color: rgb(36, 36, 40); }
+.sample-sub { flex-shrink: 1; margin: 0 0 0 24px; padding: 0; font-size: 14px; color: rgb(110, 108, 104); white-space: normal; }
+.sample-side { position: absolute; top: 128px; bottom: 48px; width: 888px; padding: 32px; }
+.sample-side--left { left: 48px; }
+.sample-side--right { right: 48px; }
+.sample-side-title { margin: 0; padding: 0; font-size: 28px; -unity-font-style: bold; }
+.kit-on-paper .sample-side-title { color: rgb(36, 36, 40); }
+.kit-on-dark .sample-side-title { color: rgb(236, 236, 238); }
+.sample-label { margin: 24px 0 8px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(140, 134, 124); }
+.kit-on-dark .sample-label { color: rgb(150, 152, 160); }
+.sample-row { flex-direction: row; align-items: center; }
+.sample-row--head { height: 24px; }
+.sample-row--n { height: 60px; }
+.sample-row--s { height: 44px; }
+.sample-rowname { width: 72px; margin: 0; padding: 0; font-size: 14px; color: rgb(90, 88, 84); }
+.kit-on-dark .sample-rowname { color: rgb(170, 172, 180); }
+.sample-colname { margin: 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 1px; -unity-text-align: middle-center; color: rgb(140, 134, 124); }
+.kit-on-dark .sample-colname { color: rgb(150, 152, 160); }
+.sample-cell { align-items: center; justify-content: center; }
+.sample-col--circle { width: 88px; }
+.sample-col--wide { width: 164px; }
+.sample-grid { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 1500px; }
+.sample-box { margin: 12px; padding: 20px 24px; justify-content: flex-end; }
+.sample-box--shape { width: 320px; height: 220px; }
+.sample-box--pill { width: 320px; height: 96px; justify-content: center; align-items: center; }
+.sample-box--accent { width: 300px; height: 220px; margin: 16px; padding: 28px 32px; }
+.sample-name { font-size: 18px; -unity-font-style: bold; }
+.sample-note { margin-top: 4px; font-size: 13px; opacity: 0.66; }
+.sample-rowlabel { width: 1500px; margin: 24px 0 4px 24px; font-size: 13px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(110, 108, 104); }
+.sample-col { width: 1000px; }
+.sample-menu-label { margin: 28px 0 28px 4px; font-size: 13px; -unity-font-style: bold; letter-spacing: 1px; color: rgb(110, 108, 104); }
+.sample-caption { margin: 0 0 16px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(140, 134, 124); }
+.sample-slots { width: 640px; margin-top: 24px; flex-direction: row; flex-wrap: wrap; }
+.sample-gap { height: 24px; }
+.sample-foot { flex-grow: 1; flex-direction: row; justify-content: flex-end; align-items: flex-end; }
+
+/* ── 순간 연출 견본(Effects.uxml) ── */
+.sample-fx-row { flex-direction: row; }
+.sample-fx-card { width: 300px; height: 340px; margin: 0 12px; padding: 24px; align-items: center; }
+.sample-fx-title { margin: 0; padding: 0; align-self: flex-start; color: var(--kit-light); }
+.sample-fx-stage { flex-grow: 1; width: 100%; align-items: center; justify-content: center; }
+.sample-fx-item { width: 96px; height: 96px; border-radius: 8px; background-color: var(--kit-white); align-items: center; justify-content: center; }
+.sample-fx-item-icon { width: 44px; height: 44px; color: var(--kit-ink); }
+.sample-fx-unit { width: 140px; height: 180px; padding: 10px 10px 34px 10px; border-radius: 8px; background-color: var(--kit-paper); }
+.sample-fx-unit-art { flex-grow: 1; border-radius: 6px; background-color: var(--kit-stone); }
+.sample-fx-stat { position: absolute; left: -12px; bottom: -12px; width: 40px; height: 40px; margin: 0; padding: 0; border-radius: 20px; background-color: rgb(184, 92, 86); color: var(--kit-white); font-size: 18px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.sample-fx-buff { position: absolute; left: 34px; top: 30px; width: 72px; height: 72px; color: var(--kit-white-hover); opacity: 0; }
+.sample-fx-sheen-card { width: 220px; height: 130px; padding: 16px; overflow: hidden; align-items: flex-start; }
+.sample-fx-badge { height: 30px; margin: 0; padding: 0 14px; border-radius: 15px; background-color: var(--kit-sand); color: var(--kit-sand-ink); font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; }

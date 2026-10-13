@@ -2,28 +2,28 @@
     <!-- 견본 · 뒷배경 1 일반 배경 앞 작은 팝업(DB › 화면: 층 팝업 · 뒷배경 일반 배경). 정보가 적어 화면 일부만 차지하고 뒤의 월드 장면이 그대로 보인다.
          검정 틀(A, 모서리 자름) + 모래색 머리 띠 + 종이 안판(B) · 선 포인트는 이 팝업 하나(뒤 상자). 버튼은 검정 판 위라 모래색 -->
     <ui:VisualElement class="kit-fill" picking-mode="Ignore">
-        <ui:VisualElement class="kit-pop-pos">
-            <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="31" class="kit-pop kit-pn-dark kit-pn-c18">
+        <ui:VisualElement class="sample-pop-pos">
+            <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="31" class="sample-pop kit-pn-dark kit-pn-c18">
                 <MomoiProject.KitAccent kind="BackBox" side="Left" inset="6" class="kit-accent kit-ac-on-dark" />
-                <MomoiProject.KitPanel shape="Chamfer" corners="tr" pattern="None" class="kit-pop-head kit-pn-sand kit-pn-c12">
-                    <MomoiProject.KitSpark class="kit-pop-spark" />
+                <MomoiProject.KitPanel shape="Chamfer" corners="tr" pattern="None" class="sample-pop-head kit-pn-sand kit-pn-c12">
+                    <MomoiProject.KitSpark class="sample-pop-spark" />
                     <ui:Label text="북쪽 성벽의 의뢰" />
                 </MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="32" class="kit-pop-inner kit-pn-paper kit-pn-c6">
-                    <ui:VisualElement class="kit-pop-section"><MomoiProject.KitSpark class="kit-pop-section-spark" /><ui:Label text="보상 미리보기" /></ui:VisualElement>
-                    <ui:VisualElement class="kit-pop-rewards">
-                        <ui:VisualElement class="kit-pop-reward"><MomoiProject.KitSpark class="kit-pop-reward-mark" /><ui:Label text="x5" class="kit-pop-reward-count" /></ui:VisualElement>
-                        <ui:VisualElement class="kit-pop-reward"><MomoiProject.KitSpark class="kit-pop-reward-mark" /><ui:Label text="x1000" class="kit-pop-reward-count" /></ui:VisualElement>
-                        <ui:VisualElement class="kit-pop-reward"><MomoiProject.KitSpark class="kit-pop-reward-mark" /><ui:Label text="x3" class="kit-pop-reward-count" /></ui:VisualElement>
-                        <ui:VisualElement class="kit-pop-reward"><MomoiProject.KitSpark class="kit-pop-reward-mark" /><ui:Label text="x1" class="kit-pop-reward-count" /></ui:VisualElement>
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="32" class="sample-pop-inner kit-pn-paper kit-pn-c6">
+                    <ui:VisualElement class="sample-pop-section"><MomoiProject.KitSpark class="sample-pop-section-spark" /><ui:Label text="보상 미리보기" /></ui:VisualElement>
+                    <ui:VisualElement class="sample-pop-rewards">
+                        <ui:VisualElement class="sample-pop-reward"><MomoiProject.KitSpark class="sample-pop-reward-mark" /><ui:Label text="x5" class="sample-pop-reward-count" /></ui:VisualElement>
+                        <ui:VisualElement class="sample-pop-reward"><MomoiProject.KitSpark class="sample-pop-reward-mark" /><ui:Label text="x1000" class="sample-pop-reward-count" /></ui:VisualElement>
+                        <ui:VisualElement class="sample-pop-reward"><MomoiProject.KitSpark class="sample-pop-reward-mark" /><ui:Label text="x3" class="sample-pop-reward-count" /></ui:VisualElement>
+                        <ui:VisualElement class="sample-pop-reward"><MomoiProject.KitSpark class="sample-pop-reward-mark" /><ui:Label text="x1" class="sample-pop-reward-count" /></ui:VisualElement>
                     </ui:VisualElement>
-                    <ui:VisualElement class="kit-pop-section"><MomoiProject.KitSpark class="kit-pop-section-spark" /><ui:Label text="달성 기준" /></ui:VisualElement>
-                    <ui:VisualElement class="kit-pop-line"><ui:VisualElement class="kit-pop-bullet" /><ui:Label text="모든 적 처치" /></ui:VisualElement>
-                    <ui:VisualElement class="kit-pop-line"><ui:VisualElement class="kit-pop-bullet" /><ui:Label text="10턴 안에 승리" /></ui:VisualElement>
-                    <ui:VisualElement class="kit-pop-line"><ui:VisualElement class="kit-pop-bullet" /><ui:Label text="아군이 쓰러지지 않음" /></ui:VisualElement>
+                    <ui:VisualElement class="sample-pop-section"><MomoiProject.KitSpark class="sample-pop-section-spark" /><ui:Label text="달성 기준" /></ui:VisualElement>
+                    <ui:VisualElement class="sample-pop-line"><ui:VisualElement class="sample-pop-bullet" /><ui:Label text="모든 적 처치" /></ui:VisualElement>
+                    <ui:VisualElement class="sample-pop-line"><ui:VisualElement class="sample-pop-bullet" /><ui:Label text="10턴 안에 승리" /></ui:VisualElement>
+                    <ui:VisualElement class="sample-pop-line"><ui:VisualElement class="sample-pop-bullet" /><ui:Label text="아군이 쓰러지지 않음" /></ui:VisualElement>
                 </MomoiProject.KitPanel>
-                <ui:VisualElement class="kit-pop-foot kit-on-dark">
-                    <ui:Label text="도전 2 / 3" class="kit-pop-tries" />
+                <ui:VisualElement class="sample-pop-foot kit-on-dark">
+                    <ui:Label text="도전 2 / 3" class="sample-pop-tries" />
                     <ui:Button text="시작" class="kit-bt kit-bt--pill kit-bt--sand" />
                 </ui:VisualElement>
             </MomoiProject.KitPanel>

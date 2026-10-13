@@ -3,17 +3,17 @@
     <ui:VisualElement class="kit-fill" picking-mode="Ignore">
         <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="12" pieces="21" class="kit-fill kit-pn-paper kit-pn-faint" picking-mode="Ignore" />
         <ui:VisualElement class="kit-center" picking-mode="Ignore">
-            <ui:VisualElement class="kit-sample-grid" picking-mode="Ignore">
-                <ui:Label text="검정" class="kit-sample-rowlabel" />
-                <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="1" class="kit-sample-box kit-sample-box--shape kit-pn-dark"><ui:Label text="직각" class="kit-sample-name" /><ui:Label text="모서리 없음" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="2" class="kit-sample-box kit-sample-box--shape kit-pn-dark kit-pn-c12"><ui:Label text="약간 둥근" class="kit-sample-name" /><ui:Label text="반지름 12" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="3" class="kit-sample-box kit-sample-box--shape kit-pn-dark kit-pn-c18"><ui:Label text="모서리 자름" class="kit-sample-name" /><ui:Label text="오른쪽 위 · 왼쪽 아래 18" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Pill" pattern="Shards" seed="4" class="kit-sample-box kit-sample-box--pill kit-pn-dark"><ui:Label text="알약" class="kit-sample-name" /><ui:Label text="높이의 반" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <ui:Label text="모래 · 회색" class="kit-sample-rowlabel" />
-                <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="5" class="kit-sample-box kit-sample-box--shape kit-pn-sand"><ui:Label text="직각" class="kit-sample-name" /><ui:Label text="모서리 없음" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="6" class="kit-sample-box kit-sample-box--shape kit-pn-gray kit-pn-c12"><ui:Label text="약간 둥근" class="kit-sample-name" /><ui:Label text="반지름 12" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Chamfer" pattern="Shards" seed="7" class="kit-sample-box kit-sample-box--shape kit-pn-gray kit-pn-c12"><ui:Label text="모서리 자름" class="kit-sample-name" /><ui:Label text="네 모서리 12" class="kit-sample-note" /></MomoiProject.KitPanel>
-                <MomoiProject.KitPanel shape="Pill" pattern="Shards" seed="8" class="kit-sample-box kit-sample-box--pill kit-pn-sand"><ui:Label text="알약" class="kit-sample-name" /><ui:Label text="높이의 반" class="kit-sample-note" /></MomoiProject.KitPanel>
+            <ui:VisualElement class="sample-grid" picking-mode="Ignore">
+                <ui:Label text="검정" class="sample-rowlabel" />
+                <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="1" class="sample-box sample-box--shape kit-pn-dark"><ui:Label text="직각" class="sample-name" /><ui:Label text="모서리 없음" class="sample-note" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="2" class="sample-box sample-box--shape kit-pn-dark kit-pn-c12"><ui:Label text="약간 둥근" class="sample-name" /><ui:Label text="반지름 12" class="sample-note" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="3" class="sample-box sample-box--shape kit-pn-dark kit-pn-c18"><ui:Label text="모서리 자름" class="sample-name" /><ui:Label text="오른쪽 위 · 왼쪽 아래 18" class="sample-note" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Pill" pattern="Shards" seed="4" class="sample-box sample-box--pill kit-pn-dark"><ui:Label text="알약" class="sample-name" /><ui:Label text="높이의 반" class="sample-note" /></MomoiProject.KitPanel>
+                <ui:Label text="모래 · 회색" class="sample-rowlabel" />
+                <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="5" class="sample-box sample-box--shape kit-pn-sand"><ui:Label text="직각" class="sample-name" /><ui:Label text="모서리 없음" class="sample-note" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="6" class="sample-box sample-box--shape kit-pn-gray kit-pn-c12"><ui:Label text="약간 둥근" class="sample-name" /><ui:Label text="반지름 12" class="sample-note" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Chamfer" pattern="Shards" seed="7" class="sample-box sample-box--shape kit-pn-gray kit-pn-c12"><ui:Label text="모서리 자름" class="sample-name" /><ui:Label text="네 모서리 12" class="sample-note" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Pill" pattern="Shards" seed="8" class="sample-box sample-box--pill kit-pn-sand"><ui:Label text="알약" class="sample-name" /><ui:Label text="높이의 반" class="sample-note" /></MomoiProject.KitPanel>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

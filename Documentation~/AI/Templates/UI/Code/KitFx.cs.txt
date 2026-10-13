@@ -1,0 +1,519 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitFx.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitFx · KitSheen도).
+// UI 키트 — UI 연출(순간 연출: 획득 · 공개 · 강화 · 수치 · 누름). 그림 파일 · 셰이더 없이 UI Toolkit만(메시 + filter drop-shadow).
+// 범용 기능만 둔다 — 색은 USS(연출 층의 --fx-* 변수, Kit.uss의 kit-fx), 시간 · 크기 · 모양은 매개변수로 언제든 바꾼다. 아이콘 그림은 무엇이든(Image · KitIcon · 진짜 그림).
+//   KitFx(연출 층 — 화면 맨 위에 class="kit-fx"로 깐다, 누르기는 받지 않음)
+//     · 바탕: Burst(불티) · Ring(빛 고리 — squash < 1이면 납작한 타원) · Rays(빛살) · Clear. 색을 안 주면(Color.clear) 층의 --fx-* 색.
+//     · 묶음: PopIn(튀어 오름) · Reward(펑 — 튀어 오름 + 고리 + 불티 + 한 번 빛남) · Reveal(희귀 공개 — 빛살 + 떠오르는 불티 + 빛난 채)
+//             · Buff(자체 발광 아이콘이 떠올라 사라짐 — 가운데에 peak 콜백) · NumberPop(수치 펑) · Tap(누른 자리 팡).
+//   KitGlow: 빛 번짐 — Set(한 겹) · Neon(두 겹: 가까운 빛 진하게 + 넓은 번짐 옅게 = 자체 발광) · Flash(확 빛났다 잦아듦) · Pulse(숨쉬기) · Clear.
+//   KitSheen: 훑는 빛(카드 안에 class="kit-sheen"으로 깔고 Play — 카드에 overflow: hidden). 색 --sheen-color.
+//   KitTween: 연출의 시간 흐름 — Run(owner, 초, t => …, 끝, 느리게).
+// 패널 자체는 매트 · 플랫 그대로 — 빛 · 파티클은 순간 연출에만(UiGuide 3-5). 메시는 시계 방향 삼각형만 그려진다.
+// 느리게 보기: KitFx.Slowdown(2면 두 배 느리게) — 묶음 연출 · 불티 모두 따른다.
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitFx : VisualElement
+    {
+        public enum Shape { Dot, Spark, Shard }
+
+        // 한 번의 터짐 모양. 색(colorA · colorB)이 둘 다 Color.clear면 층의 --fx-core · --fx-color를 쓴다.
+        public struct BurstSpec
+        {
+            public int count;
+            public float speed;          // px/초(평균)
+            public float spread;         // 0~1 — 속도의 흩어짐
+            public float gravity;        // px/초² (음수면 위로 떠오름)
+            public float drag;           // 1/초
+            public float life;           // 초(평균)
+            public float size;           // px(평균 반지름)
+            public Color colorA, colorB; // 둘 사이에서 고른다
+            public Shape shape;
+            public float sparkShare;     // 0~1 — Spark로 바꿀 비율(나머지는 shape)
+            public float angle, arc;     // 쏘는 방향(도, 0 = 오른쪽, -90 = 위)과 폭(360 = 사방)
+            public float radius;         // 처음 퍼져 있는 반지름
+
+            // 사방으로 터져 떨어짐(획득).
+            public static BurstSpec Pop => new BurstSpec
+            {
+                count = 28, speed = 420f, spread = 0.6f, gravity = 520f, drag = 2.2f, life = 0.75f, size = 5f,
+                shape = Shape.Dot, sparkShare = 0.45f, angle = -90f, arc = 360f, radius = 8f,
+            };
+
+            // 위로 떠오름(공개).
+            public static BurstSpec Rise => new BurstSpec
+            {
+                count = 18, speed = 90f, spread = 0.7f, gravity = -160f, drag = 0.6f, life = 1.3f, size = 4f,
+                shape = Shape.Dot, sparkShare = 0.5f, angle = -90f, arc = 120f, radius = 60f,
+            };
+
+            // 작게 튐(수치 · 누름).
+            public static BurstSpec Small => new BurstSpec
+            {
+                count = 10, speed = 220f, spread = 0.6f, gravity = 360f, drag = 2.2f, life = 0.5f, size = 3.5f,
+                shape = Shape.Dot, sparkShare = 0.45f, angle = -90f, arc = 360f, radius = 12f,
+            };
+        }
+
+        // 층의 색(USS). 비우면 아래 기본값(따뜻한 금빛 — 개발자 2026-10-13, 프로젝트마다 바꾼다).
+        static readonly CustomStyleProperty<Color> CoreProperty = new CustomStyleProperty<Color>("--fx-core");
+        static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--fx-color");
+        static readonly CustomStyleProperty<Color> RingProperty = new CustomStyleProperty<Color>("--fx-ring");
+        static readonly CustomStyleProperty<Color> RaysProperty = new CustomStyleProperty<Color>("--fx-rays");
+        static readonly CustomStyleProperty<Color> GlowProperty = new CustomStyleProperty<Color>("--fx-glow");
+
+        public Color CoreColor { get; private set; } = new Color(1f, 0.95f, 0.85f, 1f);    // 불티의 밝은 쪽
+        public Color MainColor { get; private set; } = new Color(1f, 0.84f, 0.55f, 1f);    // 불티의 색 쪽
+        public Color RingColor { get; private set; } = new Color(1f, 0.95f, 0.85f, 1f);
+        public Color RaysColor { get; private set; } = new Color(1f, 0.86f, 0.6f, 0.32f);
+        public Color GlowColor { get; private set; } = new Color(1f, 0.84f, 0.55f, 1f);
+
+        public float Slowdown = 1f;
+
+        struct Particle
+        {
+            public Vector2 pos, vel;
+            public float age, life, size, spin, angle, drag, gravity;
+            public Color color;
+            public Shape shape;
+        }
+
+        struct RingFx { public Vector2 at; public float age, life, from, to, width, squash; public Color color; }
+        struct RaysFx { public Vector2 at; public float age, life, radius, width, spin; public int count; public Color color; }
+
+        readonly List<Particle> _particles = new List<Particle>();
+        readonly List<RingFx> _rings = new List<RingFx>();
+        readonly List<RaysFx> _rays = new List<RaysFx>();
+        readonly System.Random _random = new System.Random(7);
+        readonly List<Vertex> _vertices = new List<Vertex>();
+        readonly List<ushort> _indices = new List<ushort>();
+        IVisualElementScheduledItem _tick;
+
+        public KitFx()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                var s = e.customStyle;
+                if (s.TryGetValue(CoreProperty, out var core)) CoreColor = core;
+                if (s.TryGetValue(ColorProperty, out var main)) MainColor = main;
+                if (s.TryGetValue(RingProperty, out var ring)) RingColor = ring;
+                if (s.TryGetValue(RaysProperty, out var rays)) RaysColor = rays;
+                if (s.TryGetValue(GlowProperty, out var glow)) GlowColor = glow;
+            });
+        }
+
+        // 요소의 가운데를 이 층의 좌표로.
+        public Vector2 CenterOf(VisualElement target) => this.WorldToLocal(target.worldBound.center);
+
+        // ── 바탕 ──
+
+        public void Burst(Vector2 at, BurstSpec spec)
+        {
+            var a0 = spec.colorA;
+            var b0 = spec.colorB;
+            if (a0.a <= 0f && b0.a <= 0f) { a0 = CoreColor; b0 = MainColor; }
+            for (var i = 0; i < spec.count; i++)
+            {
+                var a = (spec.angle + (Rand() - 0.5f) * spec.arc) * Mathf.Deg2Rad;
+                var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                var shape = Rand() < spec.sparkShare ? Shape.Spark : spec.shape;
+                _particles.Add(new Particle
+                {
+                    pos = at + dir * spec.radius * Rand(),
+                    vel = dir * spec.speed * (1f + (Rand() - 0.5f) * 2f * spec.spread),
+                    life = spec.life * (0.7f + 0.6f * Rand()),
+                    size = spec.size * (shape == Shape.Spark ? 1.8f : 1f) * (0.6f + 0.8f * Rand()),
+                    spin = (Rand() - 0.5f) * 6f,
+                    angle = Rand() * Mathf.PI,
+                    drag = spec.drag,
+                    gravity = spec.gravity,
+                    color = Color.Lerp(a0, b0, Rand()),
+                    shape = shape,
+                });
+            }
+            Run();
+        }
+
+        public void Ring(Vector2 at, float from, float to, float seconds, Color color = default, float width = 3f, float squash = 1f)
+        {
+            _rings.Add(new RingFx { at = at, from = from, to = to, life = seconds, color = color.a <= 0f ? RingColor : color, width = width, squash = squash });
+            Run();
+        }
+
+        public void Rays(Vector2 at, float radius, float seconds, Color color = default, int count = 14, float width = 0.1f, float spin = 0.6f)
+        {
+            _rays.Add(new RaysFx { at = at, radius = radius, life = seconds, color = color.a <= 0f ? RaysColor : color, count = count, width = width, spin = spin });
+            Run();
+        }
+
+        public void Clear()
+        {
+            _particles.Clear();
+            _rings.Clear();
+            _rays.Clear();
+            MarkDirtyRepaint();
+        }
+
+        // ── 묶음 연출(시간 · 크기는 매개변수, 색은 층의 색) ──
+
+        // 튀어 오름: from 배에서 1배로(ease-out-back), 투명도 0 → 1.
+        public void PopIn(VisualElement e, float seconds = 0.32f, float from = 0.6f)
+        {
+            KitTween.Run(e, seconds, t =>
+            {
+                var s = Mathf.LerpUnclamped(from, 1f, EaseOutBack(t));
+                e.style.scale = new Scale(new Vector3(s, s, 1f));
+                e.style.opacity = Mathf.Clamp01(t / 0.4f);
+            }, () => { e.style.scale = StyleKeyword.Null; e.style.opacity = StyleKeyword.Null; }, Slowdown);
+        }
+
+        // 획득(펑): 튀어 오름 + 빛 고리 + 사방 불티 + 한 번 빛남.
+        public void Reward(VisualElement item, float ringTo = 150f)
+        {
+            KitGlow.Clear(item);
+            PopIn(item);
+            var at = CenterOf(item);
+            Ring(at, 36f, ringTo, 0.5f);
+            Burst(at, BurstSpec.Pop);
+            KitGlow.Flash(item, GlowColor, 28f, 0f, 0.7f, Slowdown);
+        }
+
+        // 희귀 공개: 튀어 오름 + 빛살(behind 층이 있으면 그 층에 — 아이템 뒤) + 고리 + 떠오르는 불티 + 빛난 채 남음.
+        public void Reveal(VisualElement item, KitFx behind = null, float raysRadius = 180f)
+        {
+            KitGlow.Clear(item);
+            PopIn(item);
+            var at = CenterOf(item);
+            var rays = behind ?? this;
+            rays.Slowdown = Slowdown;
+            rays.Rays(rays.CenterOf(item), raysRadius, 1.8f);
+            Ring(at, 44f, 130f, 0.6f, default, 2f);
+            Burst(at, BurstSpec.Rise);
+            KitGlow.Flash(item, GlowColor, 34f, 14f, 0.9f, Slowdown);
+        }
+
+        // 버프(자체 발광 아이콘): 0.1초에 떠오르고(0.85 → 1배) · 두 겹 빛이 번지고 · 0.12초에 납작한 빛 고리 · 0.35초부터 rise px 오르며 사라진다(0.85초).
+        // peak는 0.5초에 부른다(수치 바꾸기 → NumberPop). 아이콘은 무엇이든 — 흰 면이 빛의 가운데가 된다.
+        public void Buff(VisualElement icon, Color glow = default, float rise = 56f, System.Action peak = null)
+        {
+            if (glow.a <= 0f) glow = GlowColor;
+            const float total = 0.85f;
+            var slow = Slowdown;
+            KitTween.Run(icon, total, t =>
+            {
+                var s = t * total;
+                var alpha = s < 0.1f ? s / 0.1f : s < 0.35f ? 1f : 1f - (s - 0.35f) / 0.5f;
+                var scale = s < 0.1f ? Mathf.Lerp(0.85f, 1f, s / 0.1f) : 1f;
+                var up = s < 0.35f ? 0f : 0.5f - 0.5f * Mathf.Cos((s - 0.35f) / 0.5f * Mathf.PI);
+                var spread = Mathf.Clamp01((s - 0.08f) / 0.22f);
+                icon.style.opacity = alpha;
+                icon.style.scale = new Scale(new Vector3(scale, scale, 1f));
+                icon.style.translate = new Translate(0f, -rise * up);
+                KitGlow.Neon(icon, new Color(glow.r, glow.g, glow.b, glow.a * alpha), Mathf.Lerp(2f, 6f, spread), Mathf.Lerp(3f, 26f, spread));
+            }, () =>
+            {
+                icon.style.opacity = 0f;
+                icon.style.scale = StyleKeyword.Null;
+                icon.style.translate = StyleKeyword.Null;
+                KitGlow.Clear(icon);
+            }, slow);
+            var ringSize = Mathf.Max(icon.layout.width, 24f);
+            icon.schedule.Execute(() => Ring(CenterOf(icon) + new Vector2(0f, -icon.layout.height * 0.08f), ringSize * 0.25f, ringSize * 1.6f, 0.65f, default, 2.5f, 0.32f)).StartingIn((long)(120 * slow));
+            if (peak != null) icon.schedule.Execute(peak).StartingIn((long)(500 * slow));
+        }
+
+        // 수치 펑: from 배에서 내려앉고(ease-out-back 0.28초) 빛 색에서 제 색으로 + 작은 불티.
+        public void NumberPop(VisualElement label, float from = 1.35f, Color flash = default)
+        {
+            if (flash.a <= 0f) flash = GlowColor;
+            var original = label.resolvedStyle.color;
+            KitTween.Run(label, 0.3f, t =>
+            {
+                var s = Mathf.LerpUnclamped(from, 1f, EaseOutBack(Mathf.Clamp01(t / 0.93f)));
+                label.style.scale = new Scale(new Vector3(s, s, 1f));
+                label.style.color = Color.Lerp(flash, original, t);   // 끝나면 인라인 색을 비운다
+            }, () => { label.style.scale = StyleKeyword.Null; label.style.color = StyleKeyword.Null; }, Slowdown);
+            label.style.color = flash;
+            Burst(CenterOf(label), BurstSpec.Small);
+        }
+
+        // 누른 자리 팡: 작은 불티 + 작은 고리.
+        public void Tap(Vector2 at)
+        {
+            var spec = BurstSpec.Small;
+            spec.gravity = 0f; spec.drag = 5f; spec.life = 0.4f; spec.size = 3f; spec.speed = 200f; spec.radius = 4f;
+            Burst(at, spec);
+            Ring(at, 6f, 40f, 0.3f, default, 2f);
+        }
+
+        static float EaseOutBack(float t)
+        {
+            const float c1 = 1.70158f, c3 = c1 + 1f;
+            var u = t - 1f;
+            return 1f + c3 * u * u * u + c1 * u * u;
+        }
+
+        // ── 그리기 ──
+
+        float Rand() => (float)_random.NextDouble();
+
+        void Run()
+        {
+            if (_tick == null) _tick = schedule.Execute(Step).Every(16);
+            else _tick.Resume();
+            MarkDirtyRepaint();
+        }
+
+        void Step(TimerState t)
+        {
+            var dt = Mathf.Min(t.deltaTime / 1000f, 0.05f) / Mathf.Max(0.01f, Slowdown);
+            for (var i = _particles.Count - 1; i >= 0; i--)
+            {
+                var p = _particles[i];
+                p.age += dt;
+                if (p.age >= p.life) { _particles.RemoveAt(i); continue; }
+                p.vel *= Mathf.Max(0f, 1f - p.drag * dt);
+                p.vel.y += p.gravity * dt;
+                p.pos += p.vel * dt;
+                p.angle += p.spin * dt;
+                _particles[i] = p;
+            }
+            for (var i = _rings.Count - 1; i >= 0; i--)
+            {
+                var r = _rings[i]; r.age += dt;
+                if (r.age >= r.life) _rings.RemoveAt(i); else _rings[i] = r;
+            }
+            for (var i = _rays.Count - 1; i >= 0; i--)
+            {
+                var r = _rays[i]; r.age += dt;
+                if (r.age >= r.life) _rays.RemoveAt(i); else _rays[i] = r;
+            }
+            MarkDirtyRepaint();
+            if (_particles.Count == 0 && _rings.Count == 0 && _rays.Count == 0) _tick.Pause();
+        }
+
+        void Draw(MeshGenerationContext context)
+        {
+            _vertices.Clear();
+            _indices.Clear();
+            foreach (var r in _rays) AddRays(r);
+            foreach (var p in _particles) AddParticle(p);
+            if (_vertices.Count > 0)
+            {
+                var mesh = context.Allocate(_vertices.Count, _indices.Count);
+                mesh.SetAllVertices(_vertices.ToArray());
+                mesh.SetAllIndices(_indices.ToArray());
+            }
+            var painter = context.painter2D;
+            foreach (var r in _rings)
+            {
+                var t = r.age / r.life;
+                var e = 1f - (1f - t) * (1f - t);   // ease-out
+                var radius = Mathf.Lerp(r.from, r.to, e);
+                painter.strokeColor = new Color(r.color.r, r.color.g, r.color.b, r.color.a * (1f - t));
+                painter.lineWidth = Mathf.Max(0.5f, r.width * (1f - t));
+                painter.BeginPath();
+                if (r.squash >= 0.999f) painter.Arc(r.at, radius, 0f, 360f);
+                else
+                {
+                    for (var k = 0; k <= 48; k++)
+                    {
+                        var a = k * Mathf.PI * 2f / 48f;
+                        var q = r.at + new Vector2(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius * r.squash);
+                        if (k == 0) painter.MoveTo(q); else painter.LineTo(q);
+                    }
+                    painter.ClosePath();
+                }
+                painter.Stroke();
+            }
+        }
+
+        void AddParticle(Particle p)
+        {
+            var t = p.age / p.life;
+            var alpha = p.color.a * (1f - t * t);
+            var size = p.size * (t < 0.15f ? Mathf.Lerp(0.4f, 1f, t / 0.15f) : 1f - 0.5f * t);
+            var center = new Color(p.color.r, p.color.g, p.color.b, alpha);
+            var rim = new Color(p.color.r, p.color.g, p.color.b, 0f);
+            switch (p.shape)
+            {
+                case Shape.Dot: Fan(p.pos, size, size, 0f, 12, center, rim); break;                         // 부드러운 불티
+                case Shape.Spark: Fan(p.pos, size, size * 0.22f, p.angle, 8, center, new Color(p.color.r, p.color.g, p.color.b, alpha * 0.35f)); break;   // 네 갈래 반짝임
+                case Shape.Shard: Fan(p.pos, size, size * 0.45f, p.angle, 4, center, center); break;        // 작은 마름모
+            }
+        }
+
+        // 가운데 꼭짓점 + 둘레 n개(짝수 번째는 r1, 홀수 번째는 r2) — 시계 방향 부채꼴(UI Toolkit은 반대 방향 삼각형을 그리지 않는다).
+        void Fan(Vector2 c, float r1, float r2, float rotation, int n, Color inner, Color outer)
+        {
+            var start = _vertices.Count;
+            _vertices.Add(new Vertex { position = new Vector3(c.x, c.y, Vertex.nearZ), tint = inner });
+            for (var i = 0; i < n; i++)
+            {
+                var a = rotation + i * Mathf.PI * 2f / n;
+                var r = (i % 2 == 0) ? r1 : r2;
+                _vertices.Add(new Vertex { position = new Vector3(c.x + Mathf.Cos(a) * r, c.y + Mathf.Sin(a) * r, Vertex.nearZ), tint = outer });
+            }
+            for (var i = 0; i < n; i++)
+            {
+                _indices.Add((ushort)start);
+                _indices.Add((ushort)(start + 1 + i));
+                _indices.Add((ushort)(start + 1 + (i + 1) % n));
+            }
+        }
+
+        void AddRays(RaysFx r)
+        {
+            var t = r.age / r.life;
+            var fade = t < 0.2f ? t / 0.2f : t > 0.7f ? (1f - t) / 0.3f : 1f;
+            var inner = new Color(r.color.r, r.color.g, r.color.b, r.color.a * fade);
+            var outer = new Color(r.color.r, r.color.g, r.color.b, 0f);
+            var turn = r.spin * r.age;
+            for (var k = 0; k < r.count; k++)
+            {
+                var a = turn + k * Mathf.PI * 2f / r.count;
+                var start = _vertices.Count;
+                _vertices.Add(new Vertex { position = new Vector3(r.at.x, r.at.y, Vertex.nearZ), tint = inner });
+                _vertices.Add(new Vertex { position = new Vector3(r.at.x + Mathf.Cos(a - r.width) * r.radius, r.at.y + Mathf.Sin(a - r.width) * r.radius, Vertex.nearZ), tint = outer });
+                _vertices.Add(new Vertex { position = new Vector3(r.at.x + Mathf.Cos(a + r.width) * r.radius, r.at.y + Mathf.Sin(a + r.width) * r.radius, Vertex.nearZ), tint = outer });
+                _indices.Add((ushort)start);
+                _indices.Add((ushort)(start + 1));
+                _indices.Add((ushort)(start + 2));
+            }
+        }
+    }
+
+    // 빛 번짐(자체 발광처럼): 요소에 filter drop-shadow(어긋남 0 · 흐림 · 빛 색)를 건다 — 요소 모양(그림 · 글 · 아이콘) 그대로 둘레가 빛난다.
+    public static class KitGlow
+    {
+        static FilterFunction Shadow(Color color, float blur)
+        {
+            var f = new FilterFunction(FilterFunctionType.DropShadow);
+            f.AddParameter(new FilterParameter(0f));
+            f.AddParameter(new FilterParameter(0f));
+            f.AddParameter(new FilterParameter(Mathf.Max(0.01f, blur)));
+            f.AddParameter(new FilterParameter(color));
+            return f;
+        }
+
+        public static void Set(VisualElement e, Color color, float blur) =>
+            e.style.filter = new StyleList<FilterFunction>(new List<FilterFunction> { Shadow(color, blur) });
+
+        // 두 겹 빛(네온 · 자체 발광): 가까운 빛(inner — 진하게) 위에 넓은 번짐(outer — 옅게). 가운데는 요소의 흰 면 그대로.
+        public static void Neon(VisualElement e, Color color, float inner, float outer) =>
+            e.style.filter = new StyleList<FilterFunction>(new List<FilterFunction>
+            {
+                Shadow(color, inner),
+                Shadow(new Color(color.r, color.g, color.b, color.a * 0.75f), outer),
+            });
+
+        public static void Clear(VisualElement e) => e.style.filter = StyleKeyword.Null;
+
+        // 한 번 확 빛났다가(peak) 잦아든다(rest — 0이면 사라짐). seconds 동안.
+        public static void Flash(VisualElement e, Color color, float peak, float rest, float seconds, float slowdown = 1f)
+        {
+            KitTween.Run(e, seconds, t =>
+            {
+                const float up = 0.18f;
+                var blur = t < up ? Mathf.Lerp(0f, peak, t / up) : Mathf.Lerp(peak, rest, (t - up) / (1f - up));
+                var a = t < up ? t / up : Mathf.Lerp(1f, rest > 0f ? 0.8f : 0f, (t - up) / (1f - up));
+                Set(e, new Color(color.r, color.g, color.b, color.a * a), blur);
+            }, () => { if (rest <= 0f) Clear(e); }, slowdown);
+        }
+
+        // 숨쉬기: period초마다 빛이 커졌다 줄어든다(Pause로 멈추고 Clear로 지운다).
+        public static IVisualElementScheduledItem Pulse(VisualElement e, Color color, float minBlur = 4f, float maxBlur = 18f, float period = 1.4f, float slowdown = 1f)
+        {
+            var start = Time.realtimeSinceStartup;
+            return e.schedule.Execute(() =>
+            {
+                var phase = (Time.realtimeSinceStartup - start) / (period * slowdown);
+                var wave = 0.5f - 0.5f * Mathf.Cos(phase * Mathf.PI * 2f);
+                Set(e, new Color(color.r, color.g, color.b, color.a * Mathf.Lerp(0.45f, 0.95f, wave)), Mathf.Lerp(minBlur, maxBlur, wave));
+            }).Every(16);
+        }
+    }
+
+    // 훑는 빛: 카드 위로 비스듬한 빛 띠가 한 번 지나간다. 카드 안에 절대 위치로 꽉 채워 넣고(카드에 overflow: hidden) Play()를 부른다. 색 --sheen-color.
+    [UxmlElement]
+    public partial class KitSheen : VisualElement
+    {
+        static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--sheen-color");
+        Color _color = new Color(1f, 0.96f, 0.86f, 0.42f);
+        float _t = -1f;            // 0~1 지나간 정도(음수면 안 보임)
+        float _seconds = 0.6f, _start;
+        IVisualElementScheduledItem _tick;
+
+        public float Slowdown = 1f;
+
+        public KitSheen()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e => { if (e.customStyle.TryGetValue(ColorProperty, out var c)) _color = c; });
+        }
+
+        public void Play(float seconds = 0.6f)
+        {
+            _seconds = seconds * Slowdown;
+            _start = Time.realtimeSinceStartup;
+            _t = 0f;
+            if (_tick == null) _tick = schedule.Execute(Step).Every(16); else _tick.Resume();
+        }
+
+        void Step()
+        {
+            _t = (Time.realtimeSinceStartup - _start) / _seconds;
+            if (_t >= 1f) { _t = -1f; _tick.Pause(); }
+            MarkDirtyRepaint();
+        }
+
+        void Draw(MeshGenerationContext context)
+        {
+            if (_t < 0f) return;
+            var size = layout.size;
+            var band = Mathf.Max(40f, size.x * 0.28f);
+            var slant = size.y * 0.5f;                       // 위가 오른쪽으로 기운 띠
+            var e = _t * _t * (3f - 2f * _t);                // 부드럽게 들어가 부드럽게 나감
+            var x = Mathf.Lerp(-band - slant, size.x + band, e);
+            var clear = new Color(_color.r, _color.g, _color.b, 0f);
+            var mesh = context.Allocate(6, 12);
+            mesh.SetNextVertex(V(x, size.y, clear));
+            mesh.SetNextVertex(V(x + slant, 0f, clear));
+            mesh.SetNextVertex(V(x + band * 0.5f, size.y, _color));
+            mesh.SetNextVertex(V(x + band * 0.5f + slant, 0f, _color));
+            mesh.SetNextVertex(V(x + band, size.y, clear));
+            mesh.SetNextVertex(V(x + band + slant, 0f, clear));
+            ushort[] idx = { 0, 1, 2, 2, 1, 3, 2, 3, 4, 4, 3, 5 };
+            foreach (var i in idx) mesh.SetNextIndex(i);
+        }
+
+        static Vertex V(float x, float y, Color c) => new Vertex { position = new Vector3(x, y, Vertex.nearZ), tint = c };
+    }
+
+    // 연출의 시간 흐름: seconds 동안 매 프레임 step(0 → 1)을 부르고 끝나면 done. slowdown 배만큼 느리게.
+    public static class KitTween
+    {
+        public static IVisualElementScheduledItem Run(VisualElement owner, float seconds, System.Action<float> step, System.Action done = null, float slowdown = 1f)
+        {
+            var start = Time.realtimeSinceStartup;
+            var total = Mathf.Max(0.01f, seconds * slowdown);
+            IVisualElementScheduledItem item = null;
+            item = owner.schedule.Execute(() =>
+            {
+                var t = Mathf.Clamp01((Time.realtimeSinceStartup - start) / total);
+                step(t);
+                if (t < 1f) return;
+                item.Pause();
+                done?.Invoke();
+            }).Every(16);
+            return item;
+        }
+    }
+}
