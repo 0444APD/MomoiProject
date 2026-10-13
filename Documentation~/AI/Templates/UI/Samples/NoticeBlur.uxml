@@ -1,0 +1,17 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 견본 · 뒷배경 2 블러 앞 알림(DB › 화면: 층 팝업 · 뒷배경 블러). 알림성 정보만 — 흐림은 GBible이 화면 뒤에 깐다(일반 UI에는 쓰지 않는다).
+         종이 판(약간 둥근, 오른쪽 아래만 크게) + 안쪽 얇은 선 + 원 표지. 버튼은 종이 판 위라 검정 -->
+    <ui:VisualElement class="kit-center" picking-mode="Ignore">
+        <MomoiProject.KitPanel shape="Round" corners="br" pattern="Shards" seed="41" line="Inset" class="kit-notice kit-pn-paper kit-pn-c28 kit-pn-line-dark kit-pn-gap6 kit-on-paper">
+            <ui:VisualElement class="kit-notice-emblem"><MomoiProject.KitSpark class="kit-notice-emblem-mark" /></ui:VisualElement>
+            <ui:VisualElement class="kit-notice-text">
+                <ui:Label text="새 유물" class="kit-t-caption kit-notice-caption" />
+                <ui:Label text="불씨의 심장을 얻었습니다." class="kit-notice-msg" />
+                <ui:Label text="유물 칸에서 장착할 수 있습니다." class="kit-t-small kit-notice-sub" />
+                <ui:VisualElement class="kit-bt-row kit-notice-foot">
+                    <ui:Button text="확인" class="kit-bt kit-bt--pill kit-bt--black" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </MomoiProject.KitPanel>
+    </ui:VisualElement>
+</ui:UXML>

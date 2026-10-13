@@ -1,0 +1,527 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitPanel.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitPanel도).
+// UI 템플릿 — 패널(그림 파일 없이 코드로 그린다): 단색 면 + 명도가 아주 조금 다른 불규칙한 폴리곤 조각(적은 수) + 간단한 선.
+// 모양 4가지: 직각(Square) · 약간 둥근(Round) · 모서리 자름(Chamfer) · 알약(Pill). 둥근·자른 모서리는 corners로 고른다("tl tr br bl" 중 — 비우면 모두).
+// 조각(Shards): 흩어진 점을 잇는 삼각형 몇 개를 볼록한 다각형으로 합친 것 — 꼭짓점마다 아무 각도로 만나고, 한 직선이 길게 이어지지 않는다.
+//   크기·꼭짓점 수가 제각각이다. 조각 수는 pieces(적게 — 많으면 지저분하다). 경계에 선을 긋지 않는다.
+// 선(line): None · Inset(안쪽으로 gap만큼 들어온 얇은 테두리) · Outer(바깥으로 gap만큼 나간 얇은 테두리) · Double(두 겹 — 가장자리 굵게 + 안쪽 gap에 얇게, 아웃라인 버튼) — 테두리 전체라 '한 면 끝에서 끝까지' 규칙을 지킨다.
+//   다른 선 포인트(두 면 · 한쪽 면 · 끊긴 테두리 · 2선 · 원호 모서리 · 바깥 옆선 …)는 KitAccent. 한 화면에 선 포인트는 하나.
+// 색·크기는 USS 커스텀 속성(단위 없는 숫자): --panel-fill(면) · --panel-shard(조각 명암 차 — 0.014가 최대, 0이면 조각 없음) · --panel-corner(둥근·자른 크기)
+//   · --panel-line(선 색) · --panel-line-gap(선의 거리) · --panel-line-width(선 두께) · --panel-line-inner(두 겹의 안쪽 두께).
+// 그리는 것은 이 요소의 바탕뿐이고 안쪽 요소(글·그림·다른 패널)는 그 위에 그대로 놓인다. 이 요소에는 background-color를 주지 않는다.
+// UXML: <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="3" class="kit-pn-dark"> … </MomoiProject.KitPanel>
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitPanel : VisualElement
+    {
+        public enum Shape { Square, Round, Chamfer, Pill }
+        public enum Pattern { None, Shards }
+        public enum Edge { None, Inset, Outer, Double }
+
+        static readonly CustomStyleProperty<Color> FillProperty = new CustomStyleProperty<Color>("--panel-fill");
+        static readonly CustomStyleProperty<float> ShardProperty = new CustomStyleProperty<float>("--panel-shard");
+        static readonly CustomStyleProperty<float> CornerProperty = new CustomStyleProperty<float>("--panel-corner");
+        static readonly CustomStyleProperty<Color> LineProperty = new CustomStyleProperty<Color>("--panel-line");
+        static readonly CustomStyleProperty<float> GapProperty = new CustomStyleProperty<float>("--panel-line-gap");
+        static readonly CustomStyleProperty<float> LineWidthProperty = new CustomStyleProperty<float>("--panel-line-width");
+        static readonly CustomStyleProperty<float> InnerWidthProperty = new CustomStyleProperty<float>("--panel-line-inner");
+
+        [UxmlAttribute] public Shape shape { get => _shape; set { _shape = value; Dirty(); } }
+        [UxmlAttribute] public string corners { get => _corners; set { _corners = value; Dirty(); } }
+        [UxmlAttribute] public Pattern pattern { get => _pattern; set { _pattern = value; Dirty(); } }
+        [UxmlAttribute] public int seed { get => _seed; set { _seed = value; Dirty(); } }
+        [UxmlAttribute] public int pieces { get => _pieces; set { _pieces = value; Dirty(); } }
+        [UxmlAttribute] public Edge line { get => _line; set { _line = value; Dirty(); } }
+
+        Shape _shape = Shape.Round;
+        string _corners = "";
+        Pattern _pattern = Pattern.Shards;
+        int _seed = 1;
+        int _pieces = 14;
+        Edge _line = Edge.None;
+
+        Color _fill = new Color(0.15f, 0.155f, 0.175f, 1f);
+        float _shard = 0.009f;
+        float _corner = 10f;
+        Color _lineColor = new Color(1f, 1f, 1f, 0f);
+        float _gap = 6f;
+        float _lineWidth = 1f;
+        float _innerWidth = 0.5f;
+
+        // 조각은 크기·모양·씨앗이 같으면 다시 계산하지 않는다(다시 그릴 때마다 계산하지 않게).
+        string _cacheKey;
+        readonly List<(List<Vector2> poly, float shade)> _cells = new List<(List<Vector2>, float)>();
+
+        public KitPanel()
+        {
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                var style = e.customStyle;
+                if (style.TryGetValue(FillProperty, out var fill)) _fill = fill;
+                if (style.TryGetValue(ShardProperty, out var shard)) _shard = shard;
+                if (style.TryGetValue(CornerProperty, out var corner)) _corner = corner;
+                if (style.TryGetValue(LineProperty, out var lineColor)) _lineColor = lineColor;
+                if (style.TryGetValue(GapProperty, out var gap)) _gap = gap;
+                if (style.TryGetValue(LineWidthProperty, out var width)) _lineWidth = width;
+                if (style.TryGetValue(InnerWidthProperty, out var inner)) _innerWidth = inner;
+                Dirty();
+            });
+            RegisterCallback<GeometryChangedEvent>(_ => MarkDirtyRepaint());
+        }
+
+        void Dirty()
+        {
+            _cacheKey = null;
+            MarkDirtyRepaint();
+        }
+
+        void Draw(MeshGenerationContext context)
+        {
+            var size = layout.size;
+            if (float.IsNaN(size.x) || size.x <= 1 || size.y <= 1) return;
+            var rect = new Rect(Vector2.zero, size);
+            var corners = Corners;
+            var outline = KitGeometry.Outline(rect, corners);
+            var p = context.painter2D;
+
+            // 면
+            p.fillColor = _fill;
+            KitGeometry.Fill(p, outline);
+
+            // 조각: 면 색에서 명도만 아주 조금 다르게(밝게·어둡게 섞어서). 경계에 선을 긋지 않는다.
+            if (_pattern == Pattern.Shards && _shard > 0.0001f)
+            {
+                BuildCells(rect, outline, corners);
+                foreach (var (poly, shade) in _cells)
+                {
+                    if (Mathf.Abs(shade) < 0.0001f) continue;
+                    var d = shade * _shard;
+                    p.fillColor = new Color(Mathf.Clamp01(_fill.r + d), Mathf.Clamp01(_fill.g + d), Mathf.Clamp01(_fill.b + d), _fill.a);
+                    KitGeometry.Fill(p, poly);
+                }
+            }
+
+            // 선
+            if (_line == Edge.None || _lineColor.a <= 0.001f) return;
+            p.strokeColor = _lineColor;
+            p.lineWidth = _lineWidth;
+            p.lineJoin = LineJoin.Miter;
+            p.lineCap = LineCap.Butt;
+            switch (_line)
+            {
+                case Edge.Inset:
+                    KitGeometry.Stroke(p, KitGeometry.Outline(KitGeometry.Grow(rect, -_gap), KitGeometry.GrowCorners(corners, -_gap)));
+                    break;
+                case Edge.Outer:
+                    KitGeometry.Stroke(p, KitGeometry.Outline(KitGeometry.Grow(rect, _gap), KitGeometry.GrowCorners(corners, _gap)));
+                    break;
+                case Edge.Double:   // 두 겹(아웃라인 버튼): 바깥은 가장자리에 굵게(--panel-line-width), 안쪽은 gap만큼 들어와 얇게(--panel-line-inner)
+                    var half = _lineWidth / 2f;
+                    KitGeometry.Stroke(p, KitGeometry.Outline(KitGeometry.Grow(rect, -half), KitGeometry.GrowCorners(corners, -half)));
+                    p.lineWidth = _innerWidth;
+                    KitGeometry.Stroke(p, KitGeometry.Outline(KitGeometry.Grow(rect, -_gap), KitGeometry.GrowCorners(corners, -_gap)));
+                    break;
+            }
+        }
+
+        // 꼭짓점마다의 마감(왼쪽 위 · 오른쪽 위 · 오른쪽 아래 · 왼쪽 아래). corners 칸: "tr bl"(기본 크기) · "tr:24 bl:72"(모서리마다 크기)
+        //   · 크기 뒤 r(둥글게) · c(자르기)로 그 모서리만 다르게("br:18c"). 비우면 네 모서리 모두 기본 크기. 알약은 짧은 변의 반.
+        public KitGeometry.CornerSpec[] Corners
+        {
+            get
+            {
+                var style = _shape == Shape.Chamfer ? KitGeometry.CornerStyle.Cut : _shape == Shape.Square ? KitGeometry.CornerStyle.Square : KitGeometry.CornerStyle.Round;
+                var specs = new KitGeometry.CornerSpec[4];
+                if (_shape == Shape.Pill)
+                {
+                    for (int i = 0; i < 4; i++) specs[i] = new KitGeometry.CornerSpec { style = KitGeometry.CornerStyle.Round, size = 99999f };
+                    return specs;
+                }
+                var text = (_corners ?? "").Trim().ToLowerInvariant();
+                if (text.Length == 0 || text == "all")
+                {
+                    for (int i = 0; i < 4; i++) specs[i] = new KitGeometry.CornerSpec { style = style, size = _corner };
+                    return specs;
+                }
+                string[] names = { "tl", "tr", "br", "bl" };
+                foreach (var token in text.Split(new[] { ' ', ',' }, System.StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var parts = token.Split(':');
+                    var index = System.Array.IndexOf(names, parts[0]);
+                    if (index < 0) continue;
+                    var cornerStyle = style == KitGeometry.CornerStyle.Square ? KitGeometry.CornerStyle.Round : style;
+                    var size = _corner;
+                    if (parts.Length > 1)
+                    {
+                        var value = parts[1];
+                        if (value.EndsWith("c")) { cornerStyle = KitGeometry.CornerStyle.Cut; value = value.Substring(0, value.Length - 1); }
+                        else if (value.EndsWith("r")) { cornerStyle = KitGeometry.CornerStyle.Round; value = value.Substring(0, value.Length - 1); }
+                        if (float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)) size = parsed;
+                    }
+                    specs[index] = new KitGeometry.CornerSpec { style = cornerStyle, size = size };
+                }
+                return specs;
+            }
+        }
+
+        // ── 조각: 흩어진 점의 들로네 삼각형 → 이웃 몇 개를 볼록한 다각형으로 합침 → 패널 윤곽으로 자름 ─────
+
+        void BuildCells(Rect rect, List<Vector2> outline, KitGeometry.CornerSpec[] corners)
+        {
+            var key = $"{rect.width:F0}x{rect.height:F0}|{KitGeometry.Key(corners)}|{_seed}|{_pieces}";
+            if (key == _cacheKey) return;
+            _cacheKey = key;
+            _cells.Clear();
+            var random = new System.Random(_seed * 7919 + 17);
+            foreach (var polygon in KitGeometry.Shards(rect, _pieces, random))
+            {
+                var cell = KitGeometry.ClipConvex(polygon, outline);
+                if (cell.Count < 3) continue;
+                // 밝게·어둡게를 섞고, 몇 칸은 면 색 그대로 둔다(조각이 너무 또렷하지 않게).
+                var roll = random.NextDouble();
+                var shade = roll < 0.25 ? 0f : (float)(0.4 + 0.6 * random.NextDouble()) * (random.Next(2) == 0 ? 1f : -1f);
+                _cells.Add((cell, shade));
+            }
+        }
+    }
+
+    // 패널·선 포인트가 함께 쓰는 도형 계산(그림을 그리는 것만 — 데이터를 바꾸지 않는다).
+    public static class KitGeometry
+    {
+        public static Rect Grow(Rect r, float by) => new Rect(r.x - by, r.y - by, r.width + by * 2, r.height + by * 2);
+
+        public enum CornerStyle { Square, Round, Cut }
+        public struct CornerSpec { public CornerStyle style; public float size; }
+
+        public static string Key(CornerSpec[] c) => $"{c[0].style}{c[0].size:F1},{c[1].style}{c[1].size:F1},{c[2].style}{c[2].size:F1},{c[3].style}{c[3].size:F1}";
+
+        // 윤곽을 평행하게 grow만큼 옮길 때의 모서리 크기(둥근 것은 반지름 ± grow, 45° 자름은 (2 − √2)배).
+        public static CornerSpec[] GrowCorners(CornerSpec[] c, float grow)
+        {
+            var result = new CornerSpec[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var size = c[i].style == CornerStyle.Cut ? c[i].size + grow * 0.5858f : c[i].style == CornerStyle.Round ? c[i].size + grow : 0;
+                result[i] = new CornerSpec { style = size <= 0.01f ? CornerStyle.Square : c[i].style, size = Mathf.Max(0, size) };
+            }
+            return result;
+        }
+
+        // 모서리마다 다른 마감의 볼록한 윤곽(시계 방향, 왼쪽 위부터). 크기는 짧은 변의 반을 넘지 않는다.
+        public static List<Vector2> Outline(Rect r, CornerSpec[] c)
+        {
+            var points = new List<Vector2>();
+            if (r.width <= 0 || r.height <= 0) return points;
+            var limit = Mathf.Min(r.width, r.height) / 2;
+            Vector2[] p = { new Vector2(r.xMin, r.yMin), new Vector2(r.xMax, r.yMin), new Vector2(r.xMax, r.yMax), new Vector2(r.xMin, r.yMax) };
+            for (int i = 0; i < 4; i++)
+            {
+                var size = Mathf.Min(c[i].size, limit);
+                if (c[i].style == CornerStyle.Square || size <= 0.01f) { points.Add(p[i]); continue; }
+                var dirIn = (p[i] - p[(i + 3) % 4]).normalized;
+                var dirOut = (p[(i + 1) % 4] - p[i]).normalized;
+                if (c[i].style == CornerStyle.Cut)
+                {
+                    points.Add(p[i] - dirIn * size);
+                    points.Add(p[i] + dirOut * size);
+                    continue;
+                }
+                var center = p[i] - dirIn * size + dirOut * size;
+                var steps = Mathf.Clamp(Mathf.CeilToInt(size / 2.5f), 3, 24);
+                for (int s = 0; s <= steps; s++)
+                {
+                    var t = s / (float)steps * Mathf.PI / 2;
+                    points.Add(center - dirOut * size * Mathf.Cos(t) + dirIn * size * Mathf.Sin(t));
+                }
+            }
+            return points;
+        }
+
+        // 볼록한 윤곽 안인가(경계에서 margin만큼 안쪽까지).
+        public static bool Inside(List<Vector2> outline, Vector2 q, float margin = 0f)
+        {
+            if (outline.Count < 3) return false;
+            var centroid = Vector2.zero;
+            foreach (var v in outline) centroid += v;
+            centroid /= outline.Count;
+            for (int i = 0; i < outline.Count; i++)
+            {
+                var a = outline[i];
+                var b = outline[(i + 1) % outline.Count];
+                var edge = b - a;
+                if (edge.sqrMagnitude < 1e-6f) continue;
+                var nrm = new Vector2(edge.y, -edge.x).normalized;
+                if (Vector2.Dot(nrm, centroid - a) > 0) nrm = -nrm;   // 바깥쪽
+                if (Vector2.Dot(nrm, q - a) > -margin) return false;
+            }
+            return true;
+        }
+
+        // 볼록한 윤곽(시계 방향). 둥근 모서리는 짧은 선분으로 나눠 조각을 자를 때도 같은 윤곽을 쓴다.
+        public static List<Vector2> Outline(Rect r, KitPanel.Shape shape, float corner, bool[] mask)
+        {
+            var points = new List<Vector2>();
+            if (r.width <= 0 || r.height <= 0) return points;
+            var c = shape == KitPanel.Shape.Pill ? Mathf.Min(r.width, r.height) / 2 : Mathf.Min(corner, Mathf.Min(r.width, r.height) / 2);
+            Vector2[] p = { new Vector2(r.xMin, r.yMin), new Vector2(r.xMax, r.yMin), new Vector2(r.xMax, r.yMax), new Vector2(r.xMin, r.yMax) };
+            for (int i = 0; i < 4; i++)
+            {
+                if (shape == KitPanel.Shape.Square || !mask[i] || c <= 0.01f) { points.Add(p[i]); continue; }
+                var dirIn = (p[i] - p[(i + 3) % 4]).normalized;
+                var dirOut = (p[(i + 1) % 4] - p[i]).normalized;
+                if (shape == KitPanel.Shape.Chamfer)
+                {
+                    points.Add(p[i] - dirIn * c);
+                    points.Add(p[i] + dirOut * c);
+                    continue;
+                }
+                var center = p[i] - dirIn * c + dirOut * c;
+                var steps = Mathf.Clamp(Mathf.CeilToInt(c / 2.5f), 3, 20);
+                for (int s = 0; s <= steps; s++)
+                {
+                    var t = s / (float)steps * Mathf.PI / 2;
+                    points.Add(center - dirOut * c * Mathf.Cos(t) + dirIn * c * Mathf.Sin(t));
+                }
+            }
+            return points;
+        }
+
+        public static void Fill(Painter2D p, List<Vector2> poly)
+        {
+            if (poly.Count < 3) return;
+            p.BeginPath();
+            p.MoveTo(poly[0]);
+            for (int i = 1; i < poly.Count; i++) p.LineTo(poly[i]);
+            p.ClosePath();
+            p.Fill();
+        }
+
+        public static void Stroke(Painter2D p, List<Vector2> poly)
+        {
+            if (poly.Count < 2) return;
+            p.BeginPath();
+            p.MoveTo(poly[0]);
+            for (int i = 1; i < poly.Count; i++) p.LineTo(poly[i]);
+            p.ClosePath();
+            p.Stroke();
+        }
+
+        // ── 조각 ─────────────────────────────────────────────
+
+        // 흩어진 점(모서리 넷 · 가장자리 몇 개 · 안쪽 몇 개)의 들로네 삼각형을 만들고, 이웃한 삼각형을 합쳐도 볼록하면 합친다.
+        // 결과는 3~5각형이 섞인, 크기가 제각각인 조각들 — 꼭짓점마다 아무 각도로 만나 긴 직선이 생기지 않는다.
+        public static List<List<Vector2>> Shards(Rect r, int pieces, System.Random random)
+        {
+            var points = new List<Vector2>
+            {
+                new Vector2(r.xMin, r.yMin), new Vector2(r.xMax, r.yMin), new Vector2(r.xMax, r.yMax), new Vector2(r.xMin, r.yMax),
+            };
+            // 가장자리 점: 변마다 1~2개, 살짝 바깥에(한 줄에 세 점이 놓이지 않게 — 납작한 삼각형을 막는다).
+            for (int side = 0; side < 4; side++)
+            {
+                var a = points[side];
+                var b = points[(side + 1) % 4];
+                var outward = new Vector2((b - a).y, -(b - a).x).normalized * 2f;   // 시계 방향 윤곽에서 이 방향이 바깥
+                var count = 1 + random.Next(2);
+                for (int k = 0; k < count; k++)
+                {
+                    var t = 0.15f + 0.7f * (float)random.NextDouble();
+                    points.Add(Vector2.Lerp(a, b, t) + outward * (1f + (float)random.NextDouble()));
+                }
+            }
+            // 안쪽 점: 고르지 않게(가까운 점끼리 너무 붙지만 않게).
+            var diag = new Vector2(r.width, r.height).magnitude;
+            var minDistance = diag * 0.07f;
+            var inner = Mathf.Clamp(pieces / 2, 3, 16);
+            for (int n = 0; n < inner; n++)
+            {
+                for (int attempt = 0; attempt < 24; attempt++)
+                {
+                    var candidate = new Vector2(r.xMin + r.width * (0.04f + 0.92f * (float)random.NextDouble()), r.yMin + r.height * (0.04f + 0.92f * (float)random.NextDouble()));
+                    var ok = true;
+                    foreach (var q in points) if ((q - candidate).magnitude < minDistance) { ok = false; break; }
+                    if (!ok) continue;
+                    points.Add(candidate);
+                    break;
+                }
+            }
+            var triangles = Delaunay(points);
+
+            // 이웃 찾기(변을 같이 쓰는 삼각형)
+            var byEdge = new Dictionary<long, List<int>>();
+            long EdgeKey(int a, int b) => a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+            for (int t = 0; t < triangles.Count; t++)
+                for (int e = 0; e < 3; e++)
+                {
+                    var key = EdgeKey(triangles[t][e], triangles[t][(e + 1) % 3]);
+                    if (!byEdge.TryGetValue(key, out var list)) byEdge[key] = list = new List<int>();
+                    list.Add(t);
+                }
+
+            var group = new int[triangles.Count];
+            for (int t = 0; t < group.Length; t++) group[t] = -1;
+            var groups = new List<HashSet<int>>();
+            var order = new List<int>();
+            for (int t = 0; t < triangles.Count; t++) order.Add(t);
+            for (int i = order.Count - 1; i > 0; i--) { var j = random.Next(i + 1); (order[i], order[j]) = (order[j], order[i]); }
+            foreach (var t in order)
+            {
+                if (group[t] >= 0) continue;
+                var vertices = new HashSet<int>(triangles[t]);
+                var members = new List<int> { t };
+                var target = random.NextDouble() < 0.6 ? (random.NextDouble() < 0.35 ? 3 : 2) : 1;
+                while (members.Count < target)
+                {
+                    var neighbors = new List<int>();
+                    foreach (var m in members)
+                        for (int e = 0; e < 3; e++)
+                            foreach (var other in byEdge[EdgeKey(triangles[m][e], triangles[m][(e + 1) % 3])])
+                                if (other != m && group[other] < 0 && !members.Contains(other)) neighbors.Add(other);
+                    var merged = false;
+                    while (neighbors.Count > 0 && !merged)
+                    {
+                        var pick = neighbors[random.Next(neighbors.Count)];
+                        neighbors.Remove(pick);
+                        var union = new HashSet<int>(vertices);
+                        union.UnionWith(triangles[pick]);
+                        if (!IsConvexSet(points, union)) continue;
+                        vertices = union;
+                        members.Add(pick);
+                        merged = true;
+                    }
+                    if (!merged) break;
+                }
+                var index = groups.Count;
+                foreach (var m in members) group[m] = index;
+                groups.Add(vertices);
+            }
+
+            var pieces2 = new List<List<Vector2>>();
+            foreach (var g in groups)
+            {
+                var hull = new List<Vector2>();
+                foreach (var v in g) hull.Add(points[v]);
+                pieces2.Add(ConvexHull(hull));
+            }
+            return pieces2;
+        }
+
+        static bool IsConvexSet(List<Vector2> points, HashSet<int> set)
+        {
+            var list = new List<Vector2>();
+            foreach (var v in set) list.Add(points[v]);
+            return ConvexHull(list).Count == list.Count;
+        }
+
+        // 볼록 껍질(단조 사슬). 한 줄에 놓인 점은 뺀다.
+        public static List<Vector2> ConvexHull(List<Vector2> input)
+        {
+            var pts = new List<Vector2>(input);
+            pts.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+            if (pts.Count < 3) return pts;
+            float Cross(Vector2 o, Vector2 a, Vector2 b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+            var hull = new List<Vector2>();
+            for (int pass = 0; pass < 2; pass++)
+            {
+                var start = hull.Count;
+                for (int i = 0; i < pts.Count; i++)
+                {
+                    var q = pass == 0 ? pts[i] : pts[pts.Count - 1 - i];
+                    while (hull.Count >= start + 2 && Cross(hull[hull.Count - 2], hull[hull.Count - 1], q) <= 0.0001f) hull.RemoveAt(hull.Count - 1);
+                    hull.Add(q);
+                }
+                hull.RemoveAt(hull.Count - 1);
+            }
+            return hull;
+        }
+
+        // 들로네 삼각분할(보이어–왓슨). 점 수가 적어(수십 개) 단순한 방법으로 충분하다.
+        static List<int[]> Delaunay(List<Vector2> input)
+        {
+            var points = new List<Vector2>(input);
+            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+            foreach (var q in points) { minX = Mathf.Min(minX, q.x); minY = Mathf.Min(minY, q.y); maxX = Mathf.Max(maxX, q.x); maxY = Mathf.Max(maxY, q.y); }
+            var span = Mathf.Max(maxX - minX, maxY - minY) * 20f;
+            var mid = new Vector2((minX + maxX) / 2, (minY + maxY) / 2);
+            var n = points.Count;
+            points.Add(mid + new Vector2(-span, -span));
+            points.Add(mid + new Vector2(span, -span));
+            points.Add(mid + new Vector2(0, span));
+            var triangles = new List<int[]> { new[] { n, n + 1, n + 2 } };
+            for (int i = 0; i < n; i++)
+            {
+                var q = points[i];
+                var bad = new List<int[]>();
+                foreach (var t in triangles) if (InCircumcircle(points[t[0]], points[t[1]], points[t[2]], q)) bad.Add(t);
+                var edges = new List<(int a, int b)>();
+                foreach (var t in bad)
+                    for (int e = 0; e < 3; e++)
+                    {
+                        int a = t[e], b = t[(e + 1) % 3];
+                        var shared = false;
+                        foreach (var other in bad)
+                        {
+                            if (other == t) continue;
+                            for (int f = 0; f < 3; f++)
+                                if ((other[f] == a && other[(f + 1) % 3] == b) || (other[f] == b && other[(f + 1) % 3] == a)) { shared = true; break; }
+                            if (shared) break;
+                        }
+                        if (!shared) edges.Add((a, b));
+                    }
+                foreach (var t in bad) triangles.Remove(t);
+                foreach (var (a, b) in edges) triangles.Add(new[] { a, b, i });
+            }
+            triangles.RemoveAll(t => t[0] >= n || t[1] >= n || t[2] >= n);
+            return triangles;
+        }
+
+        static bool InCircumcircle(Vector2 a, Vector2 b, Vector2 c, Vector2 p)
+        {
+            double ax = a.x - p.x, ay = a.y - p.y, bx = b.x - p.x, by = b.y - p.y, cx = c.x - p.x, cy = c.y - p.y;
+            var det = (ax * ax + ay * ay) * (bx * cy - cx * by) - (bx * bx + by * by) * (ax * cy - cx * ay) + (cx * cx + cy * cy) * (ax * by - bx * ay);
+            var orient = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            return orient > 0 ? det > 0 : det < 0;
+        }
+
+        // dot(n, x) <= d 쪽만 남긴다(서덜랜드–호지먼).
+        public static List<Vector2> ClipHalf(List<Vector2> poly, Vector2 n, float d)
+        {
+            var result = new List<Vector2>(poly.Count + 2);
+            for (int i = 0; i < poly.Count; i++)
+            {
+                var a = poly[i];
+                var b = poly[(i + 1) % poly.Count];
+                var da = Vector2.Dot(n, a) - d;
+                var db = Vector2.Dot(n, b) - d;
+                if (da <= 0) result.Add(a);
+                if ((da < 0 && db > 0) || (da > 0 && db < 0)) result.Add(a + (b - a) * (da / (da - db)));
+            }
+            return result;
+        }
+
+        // 볼록한 윤곽 안쪽만 남긴다.
+        public static List<Vector2> ClipConvex(List<Vector2> poly, List<Vector2> outline)
+        {
+            if (outline.Count < 3) return poly;
+            var centroid = Vector2.zero;
+            foreach (var v in outline) centroid += v;
+            centroid /= outline.Count;
+            for (int i = 0; i < outline.Count && poly.Count >= 3; i++)
+            {
+                var a = outline[i];
+                var b = outline[(i + 1) % outline.Count];
+                var edge = b - a;
+                if (edge.sqrMagnitude < 1e-6f) continue;
+                var n = new Vector2(edge.y, -edge.x);
+                if (Vector2.Dot(n, centroid - a) > 0) n = -n;
+                poly = ClipHalf(poly, n, Vector2.Dot(n, a));
+            }
+            return poly;
+        }
+    }
+}

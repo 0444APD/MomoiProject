@@ -15,7 +15,7 @@
 
 | 용어 | 뜻 |
 |---|---|
-| 화면 | DB › 화면의 항목 하나(`ScreenData`): UXML · 더할 USS · 목록 칸 UXML · 층 · 아래 입력 막기 · 뒤로로 닫기 · 시간 멈춤 · 열 씬 · 게임이 켜지면 열기. ID 상수는 `GameIds.Screen.X`. |
+| 화면 | DB › 화면의 항목 하나(`ScreenData`): UXML · 더할 USS · 목록 칸 UXML · 층 · 뒷배경 · 아래 입력 막기 · 뒤로로 닫기 · 시간 멈춤 · 열 씬 · 게임이 켜지면 열기. ID 상수는 `GameIds.Screen.X`. |
 | 화면 코드 (`GameScreen`) | 화면 하나의 C# 코드. `[BindTo(GameIds.Screen.X)]`로 잇는다. 열 때 `OnOpen`, 데이터·언어가 바뀌면 `Draw`, 열려 있는 동안 매 프레임 `Tick`, 닫을 때 `OnClose`. 없어도 된다(`PlainScreen`). |
 | 층 (`ScreenLayer`) | 화면이 뜨는 자리: 바탕(HUD) · 창(메뉴) · 팝업(위에 뜨는 창) · 알림. 위의 층이 아래를 덮는다. 같은 층에서는 나중에 연 것이 위. |
 | 연결 글 (binding-path) | UXML 칸의 `binding-path` 속성에 적는 글. `키:경로`(플레이어 데이터의 값) · `@텍스트키`(번역된 글) · 둘 다(`키:경로@텍스트키`, 값을 틀에 넣어서). `ScreenBinding`이 읽는다. |
@@ -59,7 +59,8 @@ Esc(뒤로) → GameScreens.Back: 맨 위 창·팝업을 닫는다(뒤로로 닫
 - `GameScreens.Open(id)`는 그 화면을 열고 화면 코드를 돌려준다. **이미 열려 있으면 그대로** 돌려준다(같은 화면이 둘 열리지 않는다). 다시 열려면 닫고 연다.
 - DB에 없는 ID면 `InvalidOperationException`("[MomoiProject] 없는 화면 'shp'입니다(DB › 화면).").
 - **층**: 바탕(HUD) · 창(메뉴) · 팝업 · 알림 순으로 위다. 같은 층에서는 나중에 연 것이 위다.
-- **아래 입력 막기**: 팝업은 늘 어두운 덮개로 아래를 막는다. 창은 '아래 입력 막기'가 켜져 있으면 투명한 덮개로 막는다. 바탕·알림은 막지 않는다. 화면의 빈 곳(배경이 없는 곳)은 클릭이 아래로 지나간다.
+- **뒷배경**(`ScreenBackdrop`, UiGuide 3-1): 일반 배경(기본 — 덮개가 투명해 뒤의 장면이 그대로) · 블러(뒤를 흐리고 아주 옅게 어둡게 — 알림성 화면만) · UI 배경(화면 전체 단색 `--momoi-ui-backdrop` — 화면을 나눠 채우는 정보형만, 옅은 조각은 화면 UXML의 KitPanel). 기본 화면은 확인 = 블러, 나머지 = 일반.
+- **아래 입력 막기**: 팝업은 늘 덮개(뒷배경)로 아래를 막는다. 창은 '아래 입력 막기'가 켜져 있으면 덮개로 막는다. 바탕·알림은 막지 않는다. 화면의 빈 곳(배경이 없는 곳)은 클릭이 아래로 지나간다.
 - **뒤로(Esc)**: `GameScreens.Back()`이 맨 위의 창·팝업 하나를 닫는다. 그 화면의 '뒤로로 닫기'가 꺼져 있으면 아무것도 하지 않는다(고르기 창). 닫을 창·팝업이 없고 DB › 화면 설정 'Esc로 일시정지 메뉴'가 켜져 있으면 일시정지 메뉴를 연다. Esc 키(이전 입력 관리자를 쓸 때)와 UI의 취소 이벤트가 `Back`을 부른다. 입력(키 바꾸기) 기능의 "뒤로" 동작에도 `GameScreens.Back()`을 잇는다. Esc를 다른 뜻(키 바꾸기의 취소처럼)으로 쓰는 동안은 `using (GameScreens.HoldBack()) { … }`(또는 받은 것을 나중에 `Dispose`)로 뒤로를 막는다 — 놓은 그 프레임까지 막혀, 같은 Esc가 창을 닫거나 일시정지 메뉴를 열지 않는다(`GameInput.Rebind`가 이렇게 한다).
 - **시간 멈춤**: '열린 동안 게임 시간 멈춤'이면 열 때 `GameTime.Pause("화면 ID")`, 닫을 때 `Resume`. 일시정지 메뉴가 이것이다.
 - **열 씬**: 씬이 바뀌면(Single) 그 씬이 목록에 있는 화면을 열고, 없는 화면을 닫는다. 목록이 빈 화면은 씬과 상관없다.
@@ -146,7 +147,7 @@ protected override void Tick(float deltaTime)
 | `Pause` (`momoi.pause`) | 창 · 닫기 · 시간 멈춤 | 계속하기 · 설정 · 타이틀로(`GameScreens.QuitToTitle`이 있을 때) · 게임 종료 | `Open(GameScreens.Pause)` 또는 Esc('Esc로 일시정지 메뉴') |
 | (알림) | 알림 | 아래쪽 한 줄, 2.5초. 최대 4줄 | `GameScreens.Toast(글)` |
 
-- 모양은 테마 USS의 변수(2-7)와 클래스로 바꾼다: `.momoi-panel`(가운데 판) · `.momoi-title` · `.momoi-hint` · `.momoi-section` · `.momoi-message` · `.momoi-row` · `.momoi-button` · `.momoi-button--primary` · `.momoi-options` · `.momoi-option` · `.momoi-option--selected` · `.momoi-option__desc` · `.momoi-setting` · `.momoi-value` · `.momoi-slot` · `.momoi-toast` · `.momoi-backdrop`. 화면마다 판에 `.momoi-choice` · `.momoi-confirm` · `.momoi-settings` · `.momoi-slots` · `.momoi-pause`가 붙는다.
+- 모양은 테마 USS의 변수(2-7)와 클래스로 바꾼다: `.momoi-panel`(가운데 판) · `.momoi-title` · `.momoi-hint` · `.momoi-section` · `.momoi-message` · `.momoi-row` · `.momoi-button` · `.momoi-button--primary` · `.momoi-options` · `.momoi-option` · `.momoi-option--selected` · `.momoi-option__desc` · `.momoi-setting` · `.momoi-value` · `.momoi-slot` · `.momoi-toast` · `.momoi-backdrop`(`--plain` · `--blur` · `--ui`). 화면마다 판에 `.momoi-choice` · `.momoi-confirm` · `.momoi-settings` · `.momoi-slots` · `.momoi-pause`가 붙는다.
 - **고르기 창의 설명 글**: 후보마다 텍스트 표에 `<후보 id>.desc`를 넣으면 버튼 안 이름 아래에 보인다(레벨업 특성 "불꽃 칼날" + "공격에 화상 1"). 키가 없으면 이름만 보인다. 이름은 선택 대기의 보일 글이다(비우면 `<id>.name`, 29장).
 - **고르는 동안 게임 시간 멈춤**(DB › 화면 설정, 기본 끔): 켜면 기본 고르기 창이 떠 있는 동안 `GameTime.Pause`로 게임 시간을 멈춘다. 실시간 게임의 레벨업 선택에서 켠다(고르는 동안 적이 움직이지 않는다). `Time.timeScale`이라 시간 예약·초 지속·고정 틱과 함께 **연출도 멈춘다** → 턴제는 끈다. 화면 코드의 `Tick`(실제 시간)은 계속 돈다.
 - **바꾸기**: 같은 ID로 DB › 화면 항목을 만들면 그 항목이 쓰인다. `[BindTo("momoi.settings")]` 클래스가 없으면 기본 코드가 그 UXML 위에 그린다(USS만 바꾸고 싶을 때). 통째로 바꾸려면 `[BindTo]`로 코드도 잇는다.
@@ -175,10 +176,10 @@ protected override void Tick(float deltaTime)
 
 - 첫 화면을 열 때 `[MomoiProject] 화면` 오브젝트(DontDestroyOnLoad)에 UIDocument 하나를 만든다(정렬 100 — 프로젝트의 다른 UIDocument보다 위). Panel Settings는 DB › 화면 설정의 것. 없으면 경고하고 테마 없는 임시 설정으로 띄운다(기본 컨트롤 모양이 빠질 수 있다 → 3-1 화면 준비).
 - 루트에 붙는 USS 순서: 라이브러리 기본(`Resources/MomoiProject/Screens.uss`) → 테마 USS(DB › 화면 설정, 위에서부터) → 화면마다 '더할 USS'. 뒤의 것이 이긴다.
-- 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop` · `--momoi-radius` · `--momoi-font-size`, 재질 `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
-- **재질 클래스**: `.momoi-mat-paper`(종이) · `.momoi-mat-folder`(폴더) · `.momoi-mat-cover`(검정 표지 — 희미한 조각 결) · `.momoi-mat-stone`(거친 돌) · `.momoi-mat-colorpaper`(색종이 — 작은 표시) — 재질 변수의 색 위에 라이브러리의 아주 옅은 결 텍스처(`Resources/MomoiProject/Materials/`, 256px 타일)를 깐다. 기본 창은 종이(버튼은 검정 알약), 알림은 검정 알약.
-- **뒤 흐림**: 아래 입력을 막는 창·팝업의 바탕(`.momoi-backdrop` · `--clear`)이 `backdrop-filter: blur(…)`로 그 아래 화면을 흐린다(팝업은 조금 어둡게). 이것은 지금 라이브러리의 동작이고, UI 가이드의 규칙은 블러를 **알림성 화면에만** 쓴다(일반 배경 · 블러 · UI 배경 3가지 — UiGuide 3-1). 화면 항목의 뒷배경 칸은 UI 템플릿을 옮길 때 더한다. 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
-- **글꼴**: DB › 화면 설정 › 글꼴에 TTF·OTF를 넣으면 모든 화면에 쓰인다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣는다).
+- 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop`(블러의 옅은 어둡게) · `--momoi-ui-backdrop`(UI 배경 색) · `--momoi-radius` · `--momoi-font-size`, 면 색 `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
+- **면 색 클래스**(옛 이름 '재질'): `.momoi-mat-paper` · `-folder` · `-cover` · `-stone` · `-colorpaper` — 2026-10-13부터 결 텍스처 없이 단색만 깐다(이름은 옛 화면을 위해 남김). 새 화면의 패널은 UI 키트 `KitPanel`(단색 + 아주 옅은 조각, `kit-pn-*`). 기본 창은 종이(버튼은 검정 알약), 알림은 검정 알약.
+- **뒷배경**: 화면 뒤의 덮개(`.momoi-backdrop` + `--plain` · `--blur` · `--ui`)를 DB › 화면의 '뒷배경'이 고른다(2-1). 블러는 `backdrop-filter: blur(10px)`. 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
+- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣거나, 개발자가 허락하면 AI가 받는다).
 - 화면 크기: Panel Settings가 1920×1080 기준으로 늘이고 줄인다(가로세로 반반 맞춤). UXML은 1920×1080 기준 px로 쓴다.
 
 ---
@@ -221,6 +222,7 @@ protected override void Tick(float deltaTime)
 | `styles` | 더할 USS | 이 화면에만 붙는 USS |
 | `items` | 목록 칸 UXML | 목록 한 칸 UXML들(코드 `Item("파일 이름")`) |
 | `layer` | 층 | `바탕(HUD)` / `창(메뉴)`(기본) / `팝업(위에 뜨는 창)` / `알림(입력을 막지 않음)` |
+| `backdrop` | 뒷배경 | `일반 배경`(기본) / `블러(알림성 정보만)` / `UI 배경(화면을 나눠 채우는 정보형)` |
 | `blockInput` | 아래 입력 막기 | 창일 때. 기본 켬 |
 | `closeOnBack` | 뒤로(Esc)로 닫기 | 기본 켬. HUD는 끈다 |
 | `pauseTime` | 열린 동안 게임 시간 멈춤 | 기본 끔 |

@@ -1,0 +1,66 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Template name="InfoBody" src="InfoBody.uxml" />
+    <!-- 견본 · 뒷배경 3 UI 배경 위의 나눈 화면(DB › 화면: 층 창 · 뒷배경 UI 배경). 화면을 나눠 영역을 꽉 채우는 정보형에만 — 가운데 팝업 하나만 두지 않는다.
+         왼쪽 목록(배경 위 글) | 가운데 칸 판(회색 판 A → 칸 B → 그림, 여럿 늘어서는 칸이라 베젤 없이) | 오른쪽 상세(검정 틀 A → 종이 안판 B).
+         선 포인트는 상세의 머리 띠 선 하나. UI 배경의 옅은 조각은 맨 아래 KitPanel(kit-pn-faint) -->
+    <ui:VisualElement class="kit-fill" picking-mode="Ignore">
+        <MomoiProject.KitPanel shape="Square" pattern="Shards" seed="52" pieces="20" class="kit-fill kit-pn-paper kit-pn-faint" picking-mode="Ignore" />
+        <ui:VisualElement class="kit-head">
+            <ui:VisualElement class="kit-head-home"><MomoiProject.KitSpark class="kit-head-home-mark" /></ui:VisualElement>
+            <ui:Label text="유물 보관함" class="kit-head-title" />
+        </ui:VisualElement>
+        <ui:VisualElement class="kit-split-money"><ui:VisualElement class="kit-money"><ui:VisualElement class="kit-money-icon" /><ui:Label text="1,250" class="kit-money-value" /></ui:VisualElement></ui:VisualElement>
+        <ui:VisualElement class="kit-head-back" />
+        <ui:VisualElement class="kit-nav">
+            <ui:VisualElement class="kit-nav-item"><ui:VisualElement class="kit-nav-dot" /><ui:Label text="전체" class="kit-nav-text" /></ui:VisualElement>
+            <MomoiProject.KitPanel shape="Chamfer" corners="tr" pattern="None" class="kit-nav-item--on kit-pn-dark kit-pn-c12">
+                <MomoiProject.KitSpark class="kit-nav-spark" /><ui:Label text="패시브 효과" class="kit-nav-text" />
+            </MomoiProject.KitPanel>
+            <ui:VisualElement class="kit-nav-item"><ui:VisualElement class="kit-nav-dot" /><ui:Label text="액티브 효과" class="kit-nav-text" /></ui:VisualElement>
+            <ui:VisualElement class="kit-nav-item"><ui:VisualElement class="kit-nav-dot" /><ui:Label text="세트" class="kit-nav-text" /></ui:VisualElement>
+            <ui:VisualElement class="kit-nav-item"><ui:VisualElement class="kit-nav-dot" /><ui:Label text="잠김" class="kit-nav-text" /></ui:VisualElement>
+        </ui:VisualElement>
+        <MomoiProject.KitPanel shape="Round" pattern="Shards" seed="55" class="kit-split-grid kit-pn-gray kit-pn-c12">
+            <ui:VisualElement class="kit-split-grid-head">
+                <ui:Label text="패시브 효과" class="kit-t-heading" />
+                <ui:Label text="보유 9 / 20" class="kit-split-dim" />
+            </ui:VisualElement>
+            <ui:VisualElement class="kit-split-cards">
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--on"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="불씨의 심장" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="서리 결정" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="바람의 깃" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="낡은 나침반" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="은빛 방패" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="붉은 실" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="고요한 종" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="별 조각" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card"><ui:VisualElement class="kit-card-art"><MomoiProject.KitSpark class="kit-card-mark" /></ui:VisualElement><ui:Label text="푸른 잉크" class="kit-card-name" /></MomoiProject.KitPanel>
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--empty" />
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--empty" />
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--empty" />
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--empty" />
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--empty" />
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-card kit-card--empty" />
+            </ui:VisualElement>
+            <ui:VisualElement class="kit-split-grid-foot">
+                <ui:Label text="등급순" class="kit-tag kit-tag--on" />
+                <ui:Label text="얻은 순" class="kit-tag" />
+            </ui:VisualElement>
+        </MomoiProject.KitPanel>
+        <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="53" class="kit-split-detail kit-frame kit-pn-dark kit-pn-c18">
+            <ui:VisualElement class="kit-frame-head">
+                <MomoiProject.KitSpark class="kit-frame-spark" />
+                <ui:Label text="유물 상세" class="kit-frame-title" />
+                <MomoiProject.KitRule kind="Solid" class="kit-frame-rule" />
+                <ui:Label text="01 / 09" class="kit-frame-count" />
+            </ui:VisualElement>
+            <MomoiProject.KitPanel shape="Chamfer" corners="tr bl" pattern="Shards" seed="54" class="kit-frame-inner kit-pn-paper kit-pn-c12 kit-no-third">
+                <ui:Instance template="InfoBody" />
+            </MomoiProject.KitPanel>
+            <ui:VisualElement class="kit-frame-foot kit-on-dark">
+                <ui:Button class="kit-bt kit-bt--pill kit-bt--line"><MomoiProject.KitPanel shape="Pill" pattern="None" line="Double" class="kit-bt-face" picking-mode="Ignore" /><ui:Label text="버리기" class="kit-bt-text" picking-mode="Ignore" /></ui:Button>
+                <ui:Button text="장착" class="kit-bt kit-bt--pill kit-bt--white" />
+            </ui:VisualElement>
+        </MomoiProject.KitPanel>
+    </ui:VisualElement>
+</ui:UXML>

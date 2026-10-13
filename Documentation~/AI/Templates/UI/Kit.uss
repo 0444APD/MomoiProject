@@ -1,0 +1,302 @@
+/* GBible UI 키트(AI/Templates/UI) — UiGuide 3절의 디자인을 클래스로 옮긴 것(2026-10-13, 실험실에서 개발자가 승인한 것만).
+   프로젝트의 Assets/MomoiProject/UI/Kit/Kit.uss로 복사하고, 프로젝트 화면 USS 첫 줄에서 @import url("../Kit/Kit.uss");
+   패널 면은 코드 KitPanel(단색 + 아주 옅은 조각)이 그린다 — 색 · 둥글기는 아래 kit-pn-* 클래스의 커스텀 속성(단위 없는 숫자).
+   1920×1080 기준 px · 간격은 4의 배수 · 글은 6단계 · 선은 1px(굵게) · 0.5px(얇게). 움직임은 GBible(ScreenMotion · momoi-motion)이 맡는다. */
+
+/* ── 글 단계(UiGuide 2-4) ── */
+.kit-t-display { font-size: 44px; -unity-font-style: bold; }
+.kit-t-title { font-size: 28px; -unity-font-style: bold; }
+.kit-t-heading { font-size: 20px; -unity-font-style: bold; }
+.kit-t-body { font-size: 16px; white-space: normal; }
+.kit-t-small { font-size: 14px; white-space: normal; }
+.kit-t-caption { font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; }
+
+/* ── 패널 색(KitPanel이 읽는다). 조각 명암 차 기본 0.009(패널) · 0.005(UI 배경 — kit-pn-faint) · 최대 0.014 ── */
+.kit-pn-dark { --panel-fill: rgb(40, 41, 46); --panel-shard: 0.009; color: rgb(236, 236, 238); }
+.kit-pn-paper { --panel-fill: rgb(244, 242, 238); --panel-shard: 0.009; color: rgb(36, 36, 40); }
+.kit-pn-gray { --panel-fill: rgb(222, 220, 214); --panel-shard: 0.009; color: rgb(44, 44, 48); }
+.kit-pn-stone { --panel-fill: rgb(62, 64, 70); --panel-shard: 0.009; color: rgb(228, 230, 234); }
+.kit-pn-sand { --panel-fill: rgb(206, 192, 170); --panel-shard: 0.009; color: rgb(48, 40, 30); }
+.kit-pn-max { --panel-shard: 0.014; }
+.kit-pn-faint { --panel-shard: 0.005; }
+.kit-pn-flat { --panel-shard: 0; }
+.kit-pn-c6 { --panel-corner: 6; }
+.kit-pn-c12 { --panel-corner: 12; }
+.kit-pn-c18 { --panel-corner: 18; }
+.kit-pn-c28 { --panel-corner: 28; }
+.kit-pn-line-light { --panel-line: rgba(255, 255, 255, 0.22); }
+.kit-pn-line-dark { --panel-line: rgba(0, 0, 0, 0.16); }
+.kit-pn-gap6 { --panel-line-gap: 6; }
+
+/* ── 바탕 ── */
+.kit-fill { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.kit-center { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
+
+/* ── 라인 디자인(KitOutline — 요소 규격) · 선 포인트(KitAccent) · 나누는 선 · 반짝임. 색은 판에 맞춘다 ── */
+.kit-outline { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.kit-ol-on-dark { --outline-color: rgba(206, 206, 212, 0.78); --outline-strong: 1; --outline-light: 0.5; }
+.kit-ol-on-paper { --outline-color: rgba(40, 41, 46, 0.7); --outline-strong: 1; --outline-light: 0.5; }
+.kit-ol-on-scene { --outline-color: rgba(222, 222, 228, 0.7); --outline-strong: 1; --outline-light: 0.5; }
+.kit-ol-block { flex-shrink: 0; }   /* 라인 디자인이 둘레 8px를 비켜 가는 칸(KitOutline이 이 클래스로 찾는다) */
+.kit-accent { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.kit-ac-on-dark { --accent-color: rgba(214, 200, 176, 0.9); --accent-thin: rgba(214, 200, 176, 0.8); --accent-width: 1; --accent-thin-width: 0.5; }
+.kit-ac-on-paper { --accent-color: rgba(40, 41, 46, 0.8); --accent-thin: rgba(40, 41, 46, 0.7); --accent-width: 1; --accent-thin-width: 0.5; }
+.kit-spark { width: 14px; height: 14px; --spark-color: rgba(0, 0, 0, 0.5); }
+.kit-icon { width: 24px; height: 24px; }
+
+/* ── 화면 머리(UI 배경 위): 집 · 화면 이름 · 재화 · 뒤로 ── */
+.kit-head { position: absolute; left: 48px; top: 28px; flex-direction: row; align-items: center; }
+.kit-head-home { width: 56px; height: 56px; border-radius: 28px; background-color: rgb(34, 35, 40); align-items: center; justify-content: center; }
+.kit-head-home-mark { width: 22px; height: 22px; --spark-color: rgba(255, 255, 255, 0.85); }
+.kit-head-title { margin-left: 16px; font-size: 22px; -unity-font-style: bold; color: rgb(36, 36, 40); }
+.kit-head-back { position: absolute; right: 48px; top: 32px; width: 48px; height: 48px; border-radius: 24px; background-color: rgb(34, 35, 40); }
+.kit-money { height: 40px; min-width: 200px; padding: 0 16px 0 4px; border-radius: 20px; background-color: rgb(40, 41, 46); flex-direction: row; align-items: center; }
+.kit-money-icon { width: 32px; height: 32px; border-radius: 16px; background-color: rgb(206, 192, 170); }
+.kit-money-value { flex-grow: 1; color: rgb(240, 240, 242); font-size: 16px; -unity-font-style: bold; -unity-text-align: middle-right; }
+
+/* ── 왼쪽 세로 목록(UI 배경 위) — 고른 것에만 판 ── */
+.kit-nav { position: absolute; left: 0; top: 150px; width: 340px; }
+.kit-nav-item { height: 48px; flex-direction: row; align-items: center; padding-left: 72px; }
+.kit-nav-dot { width: 6px; height: 6px; border-radius: 3px; background-color: rgb(60, 60, 66); margin-right: 16px; }
+.kit-nav-text { font-size: 18px; color: rgb(60, 60, 66); }
+.kit-nav-item--on { height: 48px; padding-left: 64px; margin: 4px 0; flex-direction: row; align-items: center; }
+.kit-nav-item--on .kit-nav-text { color: rgb(240, 240, 242); -unity-font-style: bold; }
+.kit-nav-spark { width: 14px; height: 14px; margin-right: 12px; --spark-color: rgb(240, 240, 242); }
+
+/* ── 정보 정리(팝업 · 상세 안): 머리(꼬리표 · 제목 | 등급) → 줄 → 몸(그림 | 스탯) → 설명 → 꼬리표 ── */
+.kit-info-head { flex-direction: row; align-items: flex-start; }
+.kit-info-head-text { flex-grow: 1; }
+.kit-info-eyebrow { margin-bottom: 8px; color: rgb(140, 136, 128); }
+.kit-info-badge { height: 26px; margin-top: 2px; padding: 0 12px; border-radius: 13px; background-color: rgb(30, 31, 35); color: rgb(150, 182, 232); font-size: 13px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.kit-info-rule { height: 4px; margin: 16px 0 16px 0; --rule-color: rgba(0, 0, 0, 0.32); }
+.kit-info-main { flex-direction: row; }
+.kit-info-art { width: 152px; height: 152px; border-radius: 6px; background-color: rgb(48, 49, 55); align-items: center; justify-content: center; }
+.kit-info-art-mark { width: 44px; height: 44px; --spark-color: rgba(255, 255, 255, 0.24); }
+.kit-info-side { flex-grow: 1; margin-left: 24px; }
+.kit-info-label { height: 28px; padding-left: 12px; margin-bottom: 8px; background-color: rgb(30, 31, 35); color: rgb(240, 240, 242); font-size: 13px; -unity-font-style: bold; -unity-text-align: middle-left; }
+.kit-info-stats { padding: 4px 16px; --panel-fill: rgb(234, 231, 224); --panel-shard: 0; --panel-corner: 6; }
+.kit-info-stat { height: 32px; flex-direction: row; justify-content: space-between; align-items: center; border-bottom-width: 1px; border-color: rgba(0, 0, 0, 0.07); }
+.kit-info-stat--last { border-bottom-width: 0; }
+.kit-info-stat-name { font-size: 15px; color: rgb(98, 96, 92); }
+.kit-info-stat-value { font-size: 16px; -unity-font-style: bold; }
+.kit-info-up { color: rgb(70, 120, 76); }
+.kit-info-desc { margin-top: 20px; color: rgb(58, 57, 56); }
+.kit-info-tags { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
+.kit-tag { height: 26px; margin: 0 8px 8px 0; padding: 0 12px; border-radius: 13px; background-color: rgba(0, 0, 0, 0.07); color: rgb(80, 78, 74); font-size: 13px; -unity-text-align: middle-center; }
+.kit-tag--on { background-color: rgb(40, 41, 46); color: rgb(240, 240, 242); }
+/* 검정 판 위에 바로 놓일 때 */
+.kit-on-dark .kit-info-eyebrow { color: rgb(150, 152, 160); }
+.kit-on-dark .kit-info-rule { --rule-color: rgba(255, 255, 255, 0.32); }
+.kit-on-dark .kit-info-art { background-color: rgb(24, 25, 29); }
+.kit-on-dark .kit-info-label { background-color: rgb(232, 229, 222); color: rgb(30, 31, 35); }
+.kit-on-dark .kit-info-stats { --panel-fill: rgb(54, 55, 61); }
+.kit-on-dark .kit-info-stat { border-color: rgba(255, 255, 255, 0.08); }
+.kit-on-dark .kit-info-stat-name { color: rgb(172, 174, 182); }
+.kit-on-dark .kit-info-up { color: rgb(132, 190, 136); }
+.kit-on-dark .kit-info-desc { color: rgb(220, 222, 226); }
+.kit-on-dark .kit-tag { background-color: rgba(255, 255, 255, 0.09); color: rgb(212, 214, 220); }
+.kit-on-dark .kit-info-badge { background-color: rgb(232, 229, 222); color: rgb(64, 96, 160); }
+/* 틀(A) 안에 안판(B)이 이미 있으면 스탯 상자는 판으로 그리지 않는다 — 3중첩 금지 */
+.kit-no-third .kit-info-stats { --panel-fill: rgba(0, 0, 0, 0); padding: 0; }
+
+/* ── 버튼(요소 규격): 흰색 · 모래색(기본 UI의 노란색) · 검정 · 끔(옅은 회색) × 동글이 · 알약 · 네모 · 변칙(자름 · 잎).
+      판과 같은 색의 면 버튼 대신 반전색 아웃라인(두 겹 — 바깥 1px · 안쪽 0.5px)이나 글자만. 변칙은 한 화면에 한 가지.
+      올림 = 면 색만 0.08초 · 누름 = 0.97배로 0.06초(놓으면 0.1초). 판 맥락 클래스 kit-on-paper · kit-on-dark가 아웃라인 · 글자만의 색을 정한다 ── */
+.kit-bt-row { flex-direction: row; justify-content: flex-end; align-items: center; }
+.kit-bt { height: 40px; min-width: 140px; margin: 0 0 0 8px; padding: 0 24px; border-width: 0; font-size: 15px; -unity-font-style: bold; -unity-text-align: middle-center; transition-property: background-color, scale; transition-duration: 0.08s, 0.1s; transition-timing-function: ease-out-cubic, ease-out-cubic; }
+.kit-bt:active { scale: 0.97 0.97; transition-duration: 0.08s, 0.06s; }
+.kit-bt--pill { border-radius: 20px; }
+.kit-bt--square { border-radius: 0; }
+.kit-bt--circle { width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 22px; align-items: center; justify-content: center; }
+.kit-bt--cut, .kit-bt--leaf { height: 42px; padding: 0; align-items: center; justify-content: center; }
+.kit-bt-face { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.kit-bt--cut .kit-bt-face { --panel-corner: 10; }
+.kit-bt--leaf .kit-bt-face { --panel-corner: 16; }
+.kit-bt-text { margin: 0; padding: 0 24px; font-size: 15px; -unity-font-style: bold; }
+.kit-bt-mark { width: 16px; height: 16px; }
+.kit-bt--small { height: 30px; min-width: 80px; padding: 0 16px; font-size: 13px; }
+.kit-bt--small.kit-bt--pill { border-radius: 15px; }
+.kit-bt--small.kit-bt--circle { width: 28px; height: 28px; min-width: 28px; padding: 0; border-radius: 14px; }
+.kit-bt--small.kit-bt--cut, .kit-bt--small.kit-bt--leaf { height: 30px; padding: 0; }
+.kit-bt--small .kit-bt-text { padding: 0 16px; font-size: 13px; }
+.kit-bt--small.kit-bt--cut .kit-bt-face { --panel-corner: 7; }
+.kit-bt--small.kit-bt--leaf .kit-bt-face { --panel-corner: 11; }
+.kit-bt--small .kit-bt-mark { width: 12px; height: 12px; }
+/* 면이 그림(KitPanel)인 버튼 · 아웃라인 · 글자만은 버튼 바탕을 비운다 */
+.kit-bt.kit-bt--cut, .kit-bt.kit-bt--leaf, .kit-bt.kit-bt--line, .kit-bt.kit-bt--text,
+.kit-bt.kit-bt--cut:hover, .kit-bt.kit-bt--leaf:hover, .kit-bt.kit-bt--line:hover, .kit-bt.kit-bt--text:hover,
+.kit-bt.kit-bt--cut:active, .kit-bt.kit-bt--leaf:active, .kit-bt.kit-bt--line:active, .kit-bt.kit-bt--text:active,
+.kit-bt.kit-bt--cut:hover:active, .kit-bt.kit-bt--leaf:hover:active, .kit-bt.kit-bt--line:hover:active, .kit-bt.kit-bt--text:hover:active { background-color: rgba(0, 0, 0, 0); }
+.kit-bt--line, .kit-bt--text { padding: 0; align-items: center; justify-content: center; }
+/* 색 */
+.kit-bt--white { background-color: rgb(247, 245, 241); color: rgb(36, 36, 40); }
+.kit-bt--white:hover, .kit-bt--white:active, .kit-bt--white:hover:active { background-color: rgb(255, 255, 255); }
+.kit-bt--white .kit-bt-face { --panel-fill: rgb(247, 245, 241); }
+.kit-bt--white:hover .kit-bt-face { --panel-fill: rgb(255, 255, 255); }
+.kit-bt--white .kit-bt-text { color: rgb(36, 36, 40); }
+.kit-bt--white .kit-bt-mark { --spark-color: rgba(36, 36, 40, 0.6); }
+.kit-bt--sand { background-color: rgb(214, 200, 176); color: rgb(40, 34, 26); }
+.kit-bt--sand:hover, .kit-bt--sand:active, .kit-bt--sand:hover:active { background-color: rgb(228, 216, 194); }
+.kit-bt--sand .kit-bt-face { --panel-fill: rgb(214, 200, 176); }
+.kit-bt--sand:hover .kit-bt-face { --panel-fill: rgb(228, 216, 194); }
+.kit-bt--sand .kit-bt-text { color: rgb(40, 34, 26); }
+.kit-bt--sand .kit-bt-mark { --spark-color: rgba(40, 34, 26, 0.55); }
+.kit-bt--black { background-color: rgb(34, 35, 40); color: rgb(240, 240, 242); }
+.kit-bt--black:hover, .kit-bt--black:active, .kit-bt--black:hover:active { background-color: rgb(56, 58, 64); }
+.kit-bt--black .kit-bt-face { --panel-fill: rgb(34, 35, 40); }
+.kit-bt--black:hover .kit-bt-face { --panel-fill: rgb(56, 58, 64); }
+.kit-bt--black .kit-bt-text { color: rgb(240, 240, 242); }
+.kit-bt--black .kit-bt-mark { --spark-color: rgba(255, 255, 255, 0.7); }
+.kit-bt--off, .kit-bt--off:hover, .kit-bt--off:active, .kit-bt--off:hover:active { background-color: rgb(214, 212, 207); color: rgb(150, 148, 142); }
+.kit-bt.kit-bt--off:active { scale: 1 1; }
+.kit-bt--off .kit-bt-face, .kit-bt--off:hover .kit-bt-face { --panel-fill: rgb(214, 212, 207); }
+.kit-bt--off .kit-bt-text { color: rgb(150, 148, 142); }
+.kit-bt--off .kit-bt-mark { --spark-color: rgba(0, 0, 0, 0.22); }
+/* 반전색 아웃라인(KitPanel line="Double") · 글자만 — 판과 반대 색, 올리면 아주 옅게 물든다 */
+.kit-bt--line .kit-bt-face { --panel-line-width: 1; --panel-line-inner: 0.5; --panel-line-gap: 3; }
+.kit-bt--small.kit-bt--line .kit-bt-face { --panel-line-gap: 2.5; }
+.kit-on-paper .kit-bt--line .kit-bt-face, .kit-on-paper .kit-bt--text .kit-bt-face { --panel-fill: rgba(36, 36, 40, 0); --panel-line: rgb(36, 36, 40); }
+.kit-on-paper .kit-bt--line:hover .kit-bt-face, .kit-on-paper .kit-bt--text:hover .kit-bt-face { --panel-fill: rgba(36, 36, 40, 0.07); }
+.kit-on-paper .kit-bt--line .kit-bt-text, .kit-on-paper .kit-bt--text .kit-bt-text { color: rgb(36, 36, 40); }
+.kit-on-paper .kit-bt--line .kit-bt-mark, .kit-on-paper .kit-bt--text .kit-bt-mark { --spark-color: rgba(36, 36, 40, 0.75); }
+.kit-on-dark .kit-bt--line .kit-bt-face, .kit-on-dark .kit-bt--text .kit-bt-face { --panel-fill: rgba(255, 255, 255, 0); --panel-line: rgb(236, 236, 238); }
+.kit-on-dark .kit-bt--line:hover .kit-bt-face, .kit-on-dark .kit-bt--text:hover .kit-bt-face { --panel-fill: rgba(255, 255, 255, 0.08); }
+.kit-on-dark .kit-bt--line .kit-bt-text, .kit-on-dark .kit-bt--text .kit-bt-text { color: rgb(236, 236, 238); }
+.kit-on-dark .kit-bt--line .kit-bt-mark, .kit-on-dark .kit-bt--text .kit-bt-mark { --spark-color: rgba(255, 255, 255, 0.8); }
+
+/* ── 가로 메뉴(토글) — 프로젝트마다 한 방식으로 고정, 기본 B3: 긴 막대(KitPanel) + 고른 것만 흰 안쪽 판(KitPanel). 변칙은 막대 · 안쪽 판에도 같게 ── */
+.kit-menu { height: 44px; padding: 0 4px; flex-direction: row; align-items: center; align-self: flex-start; --panel-fill: rgb(40, 41, 46); --panel-shard: 0; --panel-corner: 12; }
+.kit-menu-item { height: 36px; margin: 0; padding: 0 20px; border-width: 0; background-color: rgba(0, 0, 0, 0); font-size: 15px; color: rgb(170, 172, 180); -unity-text-align: middle-center; }
+.kit-menu-on { height: 36px; justify-content: center; --panel-fill: rgb(247, 245, 241); --panel-shard: 0; --panel-corner: 10; }
+.kit-menu-on .kit-menu-item { color: rgb(36, 36, 40); -unity-font-style: bold; }
+/* 다른 방식(견본 Menus — A 글 + 고른 것에 판 · B1 비우기 · B2 위 표시 · B4 밑줄) */
+.kit-tabs { flex-direction: row; align-items: center; height: 52px; align-self: flex-start; }
+.kit-tabs-item { height: 52px; margin: 0; padding: 0 28px; font-size: 17px; -unity-text-align: middle-center; }
+.kit-tabs-item--dark { color: rgb(44, 44, 48); }
+.kit-tabs-item--light { color: rgb(240, 240, 242); }
+.kit-tabs-item--dim { color: rgb(170, 172, 180); }
+.kit-tabs-item--bold { -unity-font-style: bold; }
+.kit-tabs-on { height: 52px; justify-content: center; }
+.kit-tabs-seg { background-color: rgb(40, 41, 46); }
+.kit-tabs-seg--first { border-top-left-radius: 26px; border-bottom-left-radius: 26px; padding-left: 36px; }
+.kit-tabs-seg--last { border-top-right-radius: 26px; border-bottom-right-radius: 26px; padding-right: 36px; }
+.kit-tabs--bar { background-color: rgb(40, 41, 46); border-radius: 26px; padding: 0 8px; }
+.kit-tabs-mark-host { position: relative; }
+.kit-tabs-mark { position: absolute; top: -18px; left: 50%; width: 10px; height: 10px; margin-left: -5px; --spark-color: rgb(150, 132, 104); }
+.kit-tabs-underline { position: absolute; left: 28px; right: 28px; bottom: 9px; height: 4px; --rule-color: rgb(214, 200, 176); --rule-width: 1; }
+
+/* ── 제목 막대(KitPanel — 변칙은 그 화면의 것) ── */
+.kit-titlebar { height: 56px; padding: 0 24px; flex-direction: row; align-items: center; justify-content: space-between; --panel-fill: rgb(40, 41, 46); --panel-shard: 0; --panel-corner: 14; }
+.kit-titlebar-text { margin: 0; padding: 0; font-size: 20px; -unity-font-style: bold; color: rgb(240, 240, 242); }
+.kit-titlebar-count { margin: 0; padding: 0; font-size: 14px; color: rgb(170, 172, 180); }
+
+/* ── 칸(여럿 늘어서는 요소 — 베젤 없는 판, 중첩 · 선 최소, 라인 디자인 없음) ── */
+.kit-slot { width: 88px; height: 88px; margin: 0 16px 16px 0; border-radius: 6px; background-color: rgb(228, 226, 221); align-items: center; justify-content: center; }
+.kit-on-dark .kit-slot { background-color: rgb(54, 56, 62); }
+.kit-slot-mark { width: 18px; height: 18px; --spark-color: rgba(0, 0, 0, 0.2); }
+.kit-on-dark .kit-slot-mark { --spark-color: rgba(255, 255, 255, 0.3); }
+/* 그림 + 이름 칸(KitPanel pattern="None") */
+.kit-card { width: 132px; height: 160px; margin: 0 8px 8px 0; padding: 12px 8px; align-items: center; color: rgb(228, 230, 234); --panel-fill: rgb(62, 64, 70); --panel-shard: 0; --panel-corner: 6; }
+.kit-card--on { --panel-fill: rgb(214, 200, 176); color: rgb(40, 34, 26); }
+.kit-card--empty { --panel-fill: rgba(0, 0, 0, 0.06); }
+.kit-card-art { width: 88px; height: 88px; border-radius: 6px; background-color: rgb(28, 29, 33); align-items: center; justify-content: center; }
+.kit-card-mark { width: 32px; height: 32px; --spark-color: rgba(255, 255, 255, 0.3); }
+.kit-card-name { margin-top: 12px; font-size: 13px; -unity-font-style: bold; }
+
+/* ── 상세 틀: 검정 틀(A) + 머리 띠(안판이 없는 자리에만 선) + 종이 안판(B) + 버튼 줄 ── */
+.kit-frame { padding: 12px; }
+.kit-frame-head { height: 44px; flex-direction: row; align-items: center; padding: 0 12px 0 16px; }
+.kit-frame-spark { width: 14px; height: 14px; --spark-color: rgb(206, 192, 170); }
+.kit-frame-title { margin-left: 12px; font-size: 18px; -unity-font-style: bold; }
+.kit-frame-rule { flex-grow: 1; height: 4px; margin: 0 16px; --rule-color: rgba(214, 200, 176, 0.75); --rule-width: 1; }
+.kit-frame-count { font-size: 13px; color: rgb(150, 152, 160); -unity-text-align: middle-right; }
+.kit-frame-inner { flex-grow: 1; padding: 24px 28px; }
+.kit-frame-foot { flex-direction: row; justify-content: flex-end; padding: 12px 4px 0 4px; }
+
+/* ── 작은 팝업(일반 배경 앞 — 화면 일부만, 장면이 그대로): 검정 틀 + 모래색 머리 + 종이 안판 + 뒤 상자 선 포인트 ── */
+.kit-pop-pos { position: absolute; right: 96px; top: 150px; }
+.kit-pop { width: 540px; padding: 12px; }
+.kit-pop-head { height: 52px; flex-direction: row; align-items: center; padding: 0 20px; }
+.kit-pop-head > Label { margin-left: 12px; font-size: 19px; -unity-font-style: bold; }
+.kit-pop-spark { width: 14px; height: 14px; --spark-color: rgba(48, 40, 30, 0.75); }
+.kit-pop-inner { margin-top: 8px; padding: 20px 24px 24px 24px; }
+.kit-pop-section { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.kit-pop-section > Label { margin-left: 8px; font-size: 16px; -unity-font-style: bold; }
+.kit-pop-section-spark { width: 12px; height: 12px; --spark-color: rgb(36, 36, 40); }
+.kit-pop-rewards { flex-direction: row; margin-bottom: 20px; }
+.kit-pop-reward { width: 68px; height: 68px; margin-right: 8px; border-radius: 6px; background-color: rgb(48, 49, 55); align-items: center; justify-content: center; }
+.kit-pop-reward-mark { width: 26px; height: 26px; --spark-color: rgba(255, 255, 255, 0.3); }
+.kit-pop-reward-count { position: absolute; right: 6px; bottom: 2px; font-size: 12px; -unity-font-style: bold; color: rgb(236, 236, 238); }
+.kit-pop-line { flex-direction: row; align-items: center; height: 28px; padding-left: 20px; }
+.kit-pop-bullet { width: 5px; height: 5px; border-radius: 3px; background-color: rgb(80, 80, 86); margin-right: 12px; }
+.kit-pop-line > Label { font-size: 15px; color: rgb(70, 70, 74); }
+.kit-pop-foot { flex-direction: row; align-items: center; padding: 12px 4px 0 8px; }
+.kit-pop-tries { flex-grow: 1; font-size: 14px; color: rgb(170, 172, 180); }
+
+/* ── 알림(블러 앞 — 화면 항목의 뒷배경 '블러'): 종이 판 + 원 표지 + 글 ── */
+.kit-notice { width: 760px; padding: 28px 32px 24px 28px; flex-direction: row; align-items: center; }
+.kit-notice-emblem { width: 96px; height: 96px; border-radius: 48px; background-color: rgb(34, 35, 40); align-items: center; justify-content: center; }
+.kit-notice-emblem-mark { width: 48px; height: 48px; --spark-color: rgba(255, 255, 255, 0.9); }
+.kit-notice-text { flex-grow: 1; margin-left: 28px; }
+.kit-notice-caption { color: rgb(140, 136, 128); }
+.kit-notice-msg { margin-top: 8px; font-size: 20px; -unity-font-style: bold; white-space: normal; }
+.kit-notice-sub { margin-top: 4px; color: rgb(110, 108, 104); }
+.kit-notice-foot { margin-top: 16px; }
+
+/* ── 나눈 화면(UI 배경 — 화면 항목의 뒷배경 'UI 배경'): 왼쪽 목록 | 가운데 칸 판 | 오른쪽 상세 ── */
+.kit-split-money { position: absolute; right: 112px; top: 36px; }
+.kit-split-grid { position: absolute; left: 372px; top: 128px; width: 760px; bottom: 48px; padding: 28px; }
+.kit-split-grid-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.kit-split-dim { font-size: 14px; color: rgb(110, 108, 104); }
+.kit-split-cards { flex-direction: row; flex-wrap: wrap; }
+.kit-split-grid-foot { position: absolute; left: 28px; bottom: 24px; flex-direction: row; }
+.kit-split-detail { position: absolute; left: 1156px; right: 48px; top: 128px; bottom: 48px; }
+
+/* ── 요소 규격 예(카드 — 흰 메인 패널 · 아래 20% 포인트 그라데이션 · 검은 육각 제목 · 아이콘 칸 · 앞 선 끊김 · 뒤 선 치우침) ── */
+.kit-spec-card { width: 540px; height: 760px; }
+.kit-spec-glow { position: absolute; left: 0; right: 0; top: 438px; height: 109px; background-image: url("Textures/gradient_up.png"); -unity-background-scale-mode: stretch-to-fill; -unity-background-image-tint-color: rgba(226, 120, 52, 0.4); }
+.kit-spec-hex { position: absolute; left: 64px; right: 64px; top: 516px; height: 64px; justify-content: center; align-items: center; --panel-corner: 999; }
+.kit-spec-hex-text { font-size: 22px; -unity-font-style: bold; color: rgb(240, 240, 242); }
+.kit-spec-desc { position: absolute; left: 56px; right: 56px; top: 616px; font-size: 15px; white-space: normal; -unity-text-align: upper-center; color: rgb(80, 79, 76); }
+.kit-spec-slot { position: absolute; left: 464px; width: 52px; height: 52px; border-radius: 26px; background-color: rgb(40, 41, 46); align-items: center; justify-content: center; }
+.kit-spec-slot--1 { top: 24px; }
+.kit-spec-slot--2 { top: 124px; }
+.kit-spec-slot-mark { width: 22px; height: 22px; --spark-color: rgba(214, 200, 176, 0.9); }
+
+/* ── 견본판(Samples — 보고 베끼는 화면에만) ── */
+.kit-sample-head { position: absolute; left: 48px; top: 32px; right: 48px; height: 64px; flex-direction: row; align-items: center; }
+.kit-sample-title { margin: 0; padding: 0; font-size: 44px; -unity-font-style: bold; color: rgb(36, 36, 40); }
+.kit-sample-sub { flex-shrink: 1; margin: 0 0 0 24px; padding: 0; font-size: 14px; color: rgb(110, 108, 104); white-space: normal; }
+.kit-sample-side { position: absolute; top: 128px; bottom: 48px; width: 888px; padding: 32px; }
+.kit-sample-side--left { left: 48px; }
+.kit-sample-side--right { right: 48px; }
+.kit-sample-side-title { margin: 0; padding: 0; font-size: 28px; -unity-font-style: bold; }
+.kit-on-paper .kit-sample-side-title { color: rgb(36, 36, 40); }
+.kit-on-dark .kit-sample-side-title { color: rgb(236, 236, 238); }
+.kit-sample-label { margin: 24px 0 8px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(140, 134, 124); }
+.kit-on-dark .kit-sample-label { color: rgb(150, 152, 160); }
+.kit-sample-row { flex-direction: row; align-items: center; }
+.kit-sample-row--head { height: 24px; }
+.kit-sample-row--n { height: 60px; }
+.kit-sample-row--s { height: 44px; }
+.kit-sample-rowname { width: 72px; margin: 0; padding: 0; font-size: 14px; color: rgb(90, 88, 84); }
+.kit-on-dark .kit-sample-rowname { color: rgb(170, 172, 180); }
+.kit-sample-colname { margin: 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 1px; -unity-text-align: middle-center; color: rgb(140, 134, 124); }
+.kit-on-dark .kit-sample-colname { color: rgb(150, 152, 160); }
+.kit-sample-cell { align-items: center; justify-content: center; }
+.kit-sample-col--circle { width: 88px; }
+.kit-sample-col--wide { width: 164px; }
+.kit-sample-grid { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 1500px; }
+.kit-sample-box { margin: 12px; padding: 20px 24px; justify-content: flex-end; }
+.kit-sample-box--shape { width: 320px; height: 220px; }
+.kit-sample-box--pill { width: 320px; height: 96px; justify-content: center; align-items: center; }
+.kit-sample-box--accent { width: 300px; height: 220px; margin: 16px; padding: 28px 32px; }
+.kit-sample-name { font-size: 18px; -unity-font-style: bold; }
+.kit-sample-note { margin-top: 4px; font-size: 13px; opacity: 0.66; }
+.kit-sample-rowlabel { width: 1500px; margin: 24px 0 4px 24px; font-size: 13px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(110, 108, 104); }
+.kit-sample-col { width: 1000px; }
+.kit-sample-menu-label { margin: 28px 0 28px 4px; font-size: 13px; -unity-font-style: bold; letter-spacing: 1px; color: rgb(110, 108, 104); }
+.kit-sample-caption { margin: 0 0 16px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(140, 134, 124); }
+.kit-sample-slots { width: 640px; margin-top: 24px; flex-direction: row; flex-wrap: wrap; }
+.kit-sample-gap { height: 24px; }
+.kit-sample-foot { flex-grow: 1; flex-direction: row; justify-content: flex-end; align-items: flex-end; }

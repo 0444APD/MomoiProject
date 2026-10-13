@@ -1,0 +1,377 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitOutline.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitOutline도).
+// UI 템플릿 — 라인 디자인(규격): 부모 패널(KitPanel)의 외곽을 따라 두르는 선. 개발자 양식(2026-10-13)을 그대로 칸으로 옮겼다.
+//   layer: Front(앞 — 패널 안쪽에서 외곽을 따라) · Back(뒤 — 패널 바깥에서 외곽을 따라). gap = 패널 외곽과의 간격(비우면 앞 10 · 뒤 6).
+//   skew(뒤 선만): None(사방을 두름) · TopLeft·TopRight·BottomRight·BottomLeft(그쪽으로 gap만큼 밀린 상자 — 패널에 가려지는 곳은 그리지 않는다).
+//   weight: Strong(강 1px) · Light(약 0.5px). doubled: 두 겹(두 번째 겹은 gap 쪽으로 4px 더 — 약).
+//   cut: 변마다 빼는 구간 "left:0.2-1 right:0.66-0.78"(변의 시계 방향 비율 0~1 — 위 변은 왼→오, 오른 변은 위→아래, 아래 변은 오→왼, 왼 변은 아래→위).
+//        "bottom"처럼 변 이름만 쓰면 그 변 전체를 뺀다.
+//   split: 불규칙 분할 "right:0.1,30,15,7" — 값은 선들의 길이(그 변 길이의 %), 사이는 적당히 끊는다(12px). 마지막 뒤 나머지도 선.
+//   marks: 8지점(tl·tc·tr·rc·br·bc·bl·lc) 장식 "tr:dot:cut tl:cross:on bc:star:in"
+//          종류 dot(점) · cross(같은 두께 선의 +) · star(두께감 있는 둥근 + 별) · xstar(X형 별) · tick(모서리 짧은 ㄱ — 모서리만)
+//          · 자리 on(선 위) · cut(선을 끊고 그 자리) · in(안쪽) · out(바깥쪽).
+//   선이 지나갈 수 없는 자리: 같은 패널 안의 형제 요소 중 클래스 kit-ol-block(안쪽 패널 · 아이콘 칸 …) 둘레 8px에서는 선을 그리지 않는다.
+// 패널 안에 자식으로 넣고 클래스 kit-outline(패널 전체를 덮는 절대 위치)로 깐다. 색 --outline-color. 판에 맞춘 색은 kit-ol-on-dark · kit-ol-on-paper · kit-ol-on-scene. 누르기는 받지 않는다.
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitOutline : VisualElement
+    {
+        public enum Layer { Front, Back }
+        public enum Skew { None, TopLeft, TopRight, BottomRight, BottomLeft }
+        public enum Weight { Strong, Light }
+
+        static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--outline-color");
+        static readonly CustomStyleProperty<float> StrongProperty = new CustomStyleProperty<float>("--outline-strong");
+        static readonly CustomStyleProperty<float> LightProperty = new CustomStyleProperty<float>("--outline-light");
+
+        [UxmlAttribute] public Layer layer { get => _layer; set { _layer = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public float gap { get => _gap; set { _gap = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public Skew skew { get => _skew; set { _skew = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public Weight weight { get => _weight; set { _weight = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public bool doubled { get => _doubled; set { _doubled = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public string cut { get => _cut; set { _cut = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public string split { get => _split; set { _split = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public string marks { get => _marks; set { _marks = value; MarkDirtyRepaint(); } }
+
+        Layer _layer = Layer.Front;
+        float _gap = -1f;
+        Skew _skew = Skew.None;
+        Weight _weight = Weight.Strong;
+        bool _doubled;
+        string _cut = "";
+        string _split = "";
+        string _marks = "";
+        Color _color = new Color(0.8f, 0.8f, 0.82f, 0.8f);
+        float _strong = 1f;
+        float _light = 0.5f;
+
+        const float DoubleGap = 4f;
+        const float MarkCutRadius = 9f;   // 선을 끊고 장식을 둘 때 장식 둘레로 비우는 반지름
+        const float OffPath = 14f;        // 안쪽·바깥쪽 장식이 선에서 떨어지는 거리
+
+        public KitOutline()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                var style = e.customStyle;
+                if (style.TryGetValue(ColorProperty, out var color)) _color = color;
+                if (style.TryGetValue(StrongProperty, out var strong)) _strong = strong;
+                if (style.TryGetValue(LightProperty, out var light)) _light = light;
+                MarkDirtyRepaint();
+            });
+            RegisterCallback<GeometryChangedEvent>(_ => MarkDirtyRepaint());
+        }
+
+        void Draw(MeshGenerationContext context)
+        {
+            var size = layout.size;
+            if (float.IsNaN(size.x) || size.x <= 1 || size.y <= 1) return;
+            var full = new Rect(Vector2.zero, size);
+            var corners = parent is KitPanel panel ? panel.Corners : SquareCorners();
+            var panelOutline = KitGeometry.Outline(full, corners);
+            var d = _gap >= 0 ? _gap : (_layer == Layer.Front ? 10f : 8f);
+            var p = context.painter2D;
+            p.strokeColor = _color;
+            p.fillColor = _color;
+            p.lineCap = LineCap.Butt;
+            p.lineJoin = LineJoin.Miter;
+
+            CollectBlockers();
+            var reference = Reference(full, d, 0f);
+            var markPoints = MarkPoints(reference, PathOf(full, corners, d, 0f));
+            DrawPath(p, PathOf(full, corners, d, 0f), reference, panelOutline, markPoints, _weight == Weight.Strong ? _strong : _light);
+            if (_doubled)
+            {
+                DrawPath(p, PathOf(full, corners, d, DoubleGap), Reference(full, d, DoubleGap), panelOutline, markPoints, _light);
+            }
+            DrawMarks(p, markPoints);
+        }
+
+        static KitGeometry.CornerSpec[] SquareCorners() => new KitGeometry.CornerSpec[4];
+
+        // 선이 지나갈 수 없는 자리(같은 패널 안의 kit-ol-block 요소, 이 요소 좌표로 · 둘레 8px).
+        readonly List<Rect> _blockers = new List<Rect>();
+        const float BlockMargin = 8f;
+
+        void CollectBlockers()
+        {
+            _blockers.Clear();
+            if (parent == null) return;
+            foreach (var child in parent.Children())
+            {
+                if (child == this || !child.ClassListContains("kit-ol-block")) continue;
+                var r = child.layout;
+                if (float.IsNaN(r.width)) continue;
+                _blockers.Add(KitGeometry.Grow(new Rect(r.x - layout.x, r.y - layout.y, r.width, r.height), BlockMargin));
+            }
+        }
+
+        // 선이 지나는 상자(앞은 안으로 d, 뒤는 밖으로 d — 치우치면 그 방향으로 d만큼 민 같은 크기). extra = 두 번째 겹.
+        Rect Reference(Rect full, float d, float extra)
+        {
+            if (_layer == Layer.Front) return KitGeometry.Grow(full, -(d + extra));
+            if (_skew == Skew.None) return KitGeometry.Grow(full, d + extra);
+            var shift = SkewDirection() * (d + extra);
+            return new Rect(full.x + shift.x, full.y + shift.y, full.width, full.height);
+        }
+
+        List<Vector2> PathOf(Rect full, KitGeometry.CornerSpec[] corners, float d, float extra)
+        {
+            var r = Reference(full, d, extra);
+            if (_layer == Layer.Front) return KitGeometry.Outline(r, KitGeometry.GrowCorners(corners, -(d + extra)));
+            if (_skew == Skew.None) return KitGeometry.Outline(r, KitGeometry.GrowCorners(corners, d + extra));
+            return KitGeometry.Outline(r, SquareCorners());   // 치우친 상자는 직각(대부분 패널에 가려지고 보이는 모서리는 직각)
+        }
+
+        Vector2 SkewDirection()
+        {
+            switch (_skew)
+            {
+                case Skew.TopLeft: return new Vector2(-1, -1);
+                case Skew.TopRight: return new Vector2(1, -1);
+                case Skew.BottomLeft: return new Vector2(-1, 1);
+                default: return new Vector2(1, 1);
+            }
+        }
+
+        // ── 선 ─────────────────────────────────────────────
+
+        void DrawPath(Painter2D p, List<Vector2> path, Rect reference, List<Vector2> panelOutline, List<(Vector2 at, string kind, string place, Vector2 normal)> markPoints, float width)
+        {
+            if (path.Count < 2) return;
+            p.lineWidth = width;
+            var dense = Densify(path, 3f);
+            var visible = new bool[dense.Count];
+            for (int i = 0; i < dense.Count; i++) visible[i] = Visible(dense[i], reference, panelOutline, markPoints);
+            // 보이는 점이 이어진 구간마다 한 붓으로(닫힌 길이라 끝과 처음을 잇는다).
+            var start = System.Array.IndexOf(visible, false);
+            if (start < 0)
+            {
+                KitGeometry.Stroke(p, dense);
+                return;
+            }
+            var run = new List<Vector2>();
+            for (int k = 1; k <= dense.Count; k++)
+            {
+                var i = (start + k) % dense.Count;
+                if (visible[i]) { run.Add(dense[i]); continue; }
+                StrokeRun(p, run);
+                run.Clear();
+            }
+            StrokeRun(p, run);
+        }
+
+        static void StrokeRun(Painter2D p, List<Vector2> run)
+        {
+            if (run.Count < 2) return;
+            p.BeginPath();
+            p.MoveTo(run[0]);
+            for (int i = 1; i < run.Count; i++) p.LineTo(run[i]);
+            p.Stroke();
+        }
+
+        static List<Vector2> Densify(List<Vector2> path, float step)
+        {
+            var result = new List<Vector2>();
+            for (int i = 0; i < path.Count; i++)
+            {
+                var a = path[i];
+                var b = path[(i + 1) % path.Count];
+                var count = Mathf.Max(1, Mathf.CeilToInt((b - a).magnitude / step));
+                for (int k = 0; k < count; k++) result.Add(Vector2.Lerp(a, b, k / (float)count));
+            }
+            return result;
+        }
+
+        bool Visible(Vector2 q, Rect reference, List<Vector2> panelOutline, List<(Vector2 at, string kind, string place, Vector2 normal)> markPoints)
+        {
+            if (_layer == Layer.Back && KitGeometry.Inside(panelOutline, q, 0.5f)) return false;   // 패널 뒤로 가려지는 곳
+            var (side, fraction) = SideOf(q, reference);
+            if (InCut(side, fraction)) return false;
+            if (InSplitGap(side, fraction, reference)) return false;
+            foreach (var b in _blockers) if (b.Contains(q)) return false;
+            foreach (var m in markPoints)
+                if (m.place == "cut" && (q - m.at).magnitude < MarkCutRadius) return false;
+            return true;
+        }
+
+        // 가장 가까운 변과 그 변의 시계 방향 비율.
+        static (string side, float fraction) SideOf(Vector2 q, Rect r)
+        {
+            var dTop = Mathf.Abs(q.y - r.yMin);
+            var dRight = Mathf.Abs(q.x - r.xMax);
+            var dBottom = Mathf.Abs(q.y - r.yMax);
+            var dLeft = Mathf.Abs(q.x - r.xMin);
+            var min = Mathf.Min(Mathf.Min(dTop, dRight), Mathf.Min(dBottom, dLeft));
+            if (min == dTop) return ("top", Mathf.Clamp01((q.x - r.xMin) / r.width));
+            if (min == dRight) return ("right", Mathf.Clamp01((q.y - r.yMin) / r.height));
+            if (min == dBottom) return ("bottom", Mathf.Clamp01((r.xMax - q.x) / r.width));
+            return ("left", Mathf.Clamp01((r.yMax - q.y) / r.height));
+        }
+
+        static string SideName(string token)
+        {
+            switch (token)
+            {
+                case "t": case "top": return "top";
+                case "r": case "right": return "right";
+                case "b": case "bottom": return "bottom";
+                case "l": case "left": return "left";
+                default: return token;
+            }
+        }
+
+        bool InCut(string side, float fraction)
+        {
+            foreach (var token in (_cut ?? "").ToLowerInvariant().Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = token.Split(':');
+                if (SideName(parts[0]) != side) continue;
+                if (parts.Length == 1) return true;
+                foreach (var range in parts[1].Split(','))
+                {
+                    var ends = range.Split('-');
+                    if (ends.Length != 2) continue;
+                    if (float.TryParse(ends[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var a) &&
+                        float.TryParse(ends[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var b) &&
+                        fraction >= a && fraction <= b) return true;
+                }
+            }
+            return false;
+        }
+
+        const float SplitGap = 12f;   // 불규칙 분할에서 선 사이를 끊는 길이
+
+        // 불규칙 분할: 값은 선들의 길이(변 길이의 %), 선 사이는 SplitGap만큼 끊고, 마지막 뒤 나머지도 선.
+        bool InSplitGap(string side, float fraction, Rect reference)
+        {
+            foreach (var token in (_split ?? "").ToLowerInvariant().Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = token.Split(':');
+                if (parts.Length < 2 || SideName(parts[0]) != side) continue;
+                var length = side == "top" || side == "bottom" ? reference.width : reference.height;
+                var gap = length > 0 ? SplitGap / length : 0f;
+                var at = 0f;
+                foreach (var piece in parts[1].Split(','))
+                {
+                    if (!float.TryParse(piece, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)) continue;
+                    at += percent / 100f;                         // 선
+                    if (fraction < at) return false;
+                    if (fraction < at + gap) return true;         // 끊김
+                    at += gap;
+                }
+                return false;                                     // 나머지도 선
+            }
+            return false;
+        }
+
+        // ── 장식 ─────────────────────────────────────────────
+
+        // 8지점: 모서리는 그 모서리에 가장 가까운 선 위의 점, 변 중앙은 변 가운데에 가장 가까운 선 위의 점.
+        List<(Vector2 at, string kind, string place, Vector2 normal)> MarkPoints(Rect r, List<Vector2> path)
+        {
+            var result = new List<(Vector2, string, string, Vector2)>();
+            var center = r.center;
+            foreach (var token in (_marks ?? "").ToLowerInvariant().Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = token.Split(':');
+                if (parts.Length < 2) continue;
+                Vector2 target;
+                switch (parts[0])
+                {
+                    case "tl": target = new Vector2(r.xMin, r.yMin); break;
+                    case "tc": target = new Vector2(center.x, r.yMin); break;
+                    case "tr": target = new Vector2(r.xMax, r.yMin); break;
+                    case "rc": target = new Vector2(r.xMax, center.y); break;
+                    case "br": target = new Vector2(r.xMax, r.yMax); break;
+                    case "bc": target = new Vector2(center.x, r.yMax); break;
+                    case "bl": target = new Vector2(r.xMin, r.yMax); break;
+                    case "lc": target = new Vector2(r.xMin, center.y); break;
+                    default: continue;
+                }
+                var on = Nearest(Densify(path, 1f), target);
+                // 바깥 방향(화면 좌표는 아래가 +y): 모서리는 대각선, 변 중앙은 그 변의 바깥.
+                Vector2 outward;
+                switch (parts[0])
+                {
+                    case "tc": outward = new Vector2(0, -1); break;
+                    case "bc": outward = new Vector2(0, 1); break;
+                    case "lc": outward = new Vector2(-1, 0); break;
+                    case "rc": outward = new Vector2(1, 0); break;
+                    default: outward = new Vector2(Mathf.Sign(target.x - center.x), Mathf.Sign(target.y - center.y)).normalized; break;
+                }
+                var place = parts.Length > 2 ? parts[2] : "on";
+                var at = place == "in" ? on - outward * OffPath : place == "out" ? on + outward * OffPath : on;
+                result.Add((at, parts[1], place, outward));
+            }
+            return result;
+        }
+
+        static Vector2 Nearest(List<Vector2> points, Vector2 target)
+        {
+            var best = points.Count > 0 ? points[0] : target;
+            var bestDistance = float.MaxValue;
+            foreach (var q in points)
+            {
+                var distance = (q - target).sqrMagnitude;
+                if (distance < bestDistance) { bestDistance = distance; best = q; }
+            }
+            return best;
+        }
+
+        void DrawMarks(Painter2D p, List<(Vector2 at, string kind, string place, Vector2 normal)> markPoints)
+        {
+            foreach (var m in markPoints)
+            {
+                switch (m.kind)
+                {
+                    case "dot":
+                        p.BeginPath();
+                        p.Arc(m.at, 3f, Angle.Degrees(0f), Angle.Degrees(360f));
+                        p.Fill();
+                        break;
+                    case "cross":
+                        p.lineWidth = _weight == Weight.Strong ? _strong : _light;
+                        StrokeRun(p, new List<Vector2> { m.at + new Vector2(-5, 0), m.at + new Vector2(5, 0) });
+                        StrokeRun(p, new List<Vector2> { m.at + new Vector2(0, -5), m.at + new Vector2(0, 5) });
+                        break;
+                    case "star":
+                        Star(p, m.at, 6.5f, 0f);
+                        break;
+                    case "xstar":
+                        Star(p, m.at, 6.5f, 45f);
+                        break;
+                    case "tick":
+                        if (m.normal.x == 0 || m.normal.y == 0) break;   // 모서리에만
+                        p.lineWidth = _weight == Weight.Strong ? _strong : _light;
+                        var sx = Mathf.Sign(m.normal.x);
+                        var sy = Mathf.Sign(m.normal.y);
+                        StrokeRun(p, new List<Vector2> { m.at - new Vector2(0, sy) * 14f, m.at, m.at - new Vector2(sx, 0) * 14f });   // 두 팔은 안쪽으로
+                        break;
+                }
+            }
+        }
+
+        // 두께감 있는 둥근 + 별(네 갈래, 허리가 잘록).
+        static void Star(Painter2D p, Vector2 c, float r, float rotation)
+        {
+            var w = r * 0.22f;
+            var rot = Quaternion.Euler(0, 0, rotation);
+            Vector2 R(Vector2 v) => c + (Vector2)(rot * v);
+            p.BeginPath();
+            p.MoveTo(R(new Vector2(0, -r)));
+            p.QuadraticCurveTo(R(new Vector2(w, -w)), R(new Vector2(r, 0)));
+            p.QuadraticCurveTo(R(new Vector2(w, w)), R(new Vector2(0, r)));
+            p.QuadraticCurveTo(R(new Vector2(-w, w)), R(new Vector2(-r, 0)));
+            p.QuadraticCurveTo(R(new Vector2(-w, -w)), R(new Vector2(0, -r)));
+            p.ClosePath();
+            p.Fill();
+        }
+    }
+}

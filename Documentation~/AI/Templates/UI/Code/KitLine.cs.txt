@@ -1,0 +1,104 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitLine.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitLine도).
+// UI 템플릿 — 간단한 선과 반짝임(그림 파일 없이 코드로 그린다). 패널 모양의 변칙(선 · 둥글기 · 각) 중 '선'과 작은 표시.
+//   KitRule: 나누는 선 — 실선(Solid) · 점선(Dotted) · 끊긴 선(Dashed). 넓으면 가로, 높으면 세로로 긋는다. 색 --rule-color, 두께 --rule-width.
+//   KitSpark: 네 갈래 반짝임(✦) — 버튼 양 끝 · 제목 앞 · 구역 표시. 색 --spark-color.
+// UXML: <MomoiProject.KitRule kind="Dotted" class="kit-info-rule" /> · <MomoiProject.KitSpark class="kit-spark" />
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitRule : VisualElement
+    {
+        public enum Kind { Solid, Dotted, Dashed }
+
+        static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--rule-color");
+        static readonly CustomStyleProperty<float> WidthProperty = new CustomStyleProperty<float>("--rule-width");
+
+        [UxmlAttribute] public Kind kind { get => _kind; set { _kind = value; MarkDirtyRepaint(); } }
+        Kind _kind = Kind.Solid;
+        Color _color = new Color(0f, 0f, 0f, 0.25f);
+        float _width = 1f;
+
+        public KitRule()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                if (e.customStyle.TryGetValue(ColorProperty, out var color)) _color = color;
+                if (e.customStyle.TryGetValue(WidthProperty, out var width)) _width = width;
+                MarkDirtyRepaint();
+            });
+        }
+
+        void Draw(MeshGenerationContext context)
+        {
+            var size = layout.size;
+            if (float.IsNaN(size.x) || size.x <= 0 || size.y <= 0) return;
+            var horizontal = size.x >= size.y;
+            var length = horizontal ? size.x : size.y;
+            Vector2 At(float t) => horizontal ? new Vector2(t, size.y / 2) : new Vector2(size.x / 2, t);
+            var p = context.painter2D;
+            p.strokeColor = _color;
+            p.lineWidth = _width;
+            p.lineCap = LineCap.Butt;
+            if (_kind == Kind.Solid)
+            {
+                p.BeginPath();
+                p.MoveTo(At(0));
+                p.LineTo(At(length));
+                p.Stroke();
+                return;
+            }
+            float dash = _kind == Kind.Dotted ? _width * 1.6f : _width * 6f;
+            float gap = _kind == Kind.Dotted ? _width * 2.4f : _width * 4f;
+            for (float t = 0; t < length; t += dash + gap)
+            {
+                p.BeginPath();
+                p.MoveTo(At(t));
+                p.LineTo(At(Mathf.Min(length, t + dash)));
+                p.Stroke();
+            }
+        }
+    }
+
+    [UxmlElement]
+    public partial class KitSpark : VisualElement
+    {
+        static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--spark-color");
+        Color _color = new Color(0f, 0f, 0f, 0.5f);
+
+        public KitSpark()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                if (e.customStyle.TryGetValue(ColorProperty, out var color)) _color = color;
+                MarkDirtyRepaint();
+            });
+        }
+
+        // 네 꼭짓점이 뾰족하고 허리가 잘록한 별.
+        void Draw(MeshGenerationContext context)
+        {
+            var size = layout.size;
+            if (float.IsNaN(size.x) || size.x <= 0 || size.y <= 0) return;
+            var c = size / 2;
+            var r = Mathf.Min(size.x, size.y) / 2;
+            var waist = r * 0.18f;
+            var p = context.painter2D;
+            p.fillColor = _color;
+            p.BeginPath();
+            p.MoveTo(c + new Vector2(0, -r));
+            p.QuadraticCurveTo(c + new Vector2(waist, -waist), c + new Vector2(r, 0));
+            p.QuadraticCurveTo(c + new Vector2(waist, waist), c + new Vector2(0, r));
+            p.QuadraticCurveTo(c + new Vector2(-waist, waist), c + new Vector2(-r, 0));
+            p.QuadraticCurveTo(c + new Vector2(-waist, -waist), c + new Vector2(0, -r));
+            p.ClosePath();
+            p.Fill();
+        }
+    }
+}

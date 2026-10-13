@@ -1,4 +1,4 @@
-// GBible UI 키트의 아이콘(AI/Templates/UI) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitIcon.cs로 복사한다(네임스페이스는 프로젝트 것).
+// GBible UI 키트(AI/Templates/UI/Code) — 아이콘. 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitIcon.cs로 복사한다(네임스페이스는 프로젝트 것).
 // 단색 벡터 아이콘 샘플: 그림 파일 없이 코드로 그린다(Painter2D). 색은 글 색(color — 상속)을 따르고, 크기는 USS의 width·height.
 // 프로토타입에서는 뜻과 상관없이 돌려쓴다(UiGuide 3-6). 진짜 아이콘이 들어오면 같은 자리에 그림(background-image)으로 바꾼다.
 // UXML: <MomoiProject.KitIcon glyph="Close" class="kit-icon" />

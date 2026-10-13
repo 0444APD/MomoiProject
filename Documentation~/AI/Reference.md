@@ -8,7 +8,7 @@
 | `ProjectConventions.md`(프로젝트 관례) | **어떻게** 쓰나: 폴더·이름·규칙과 화면의 경계·행동 직전 이벤트 자리·테스트·보고·DB 반영 스크립트·개발자가 읽고 바꿀 모양·테스트 씬 |
 | `PlanningSpecGuide.md`(기획 명세서 읽는 법) | 기획 명세서의 칸 → 무엇을 만들지, 질문 규칙, 진행 순서 |
 | `NamingGuide.md`(명명 가이드라인) | 개발자 화면 이름(한글)을 짓는 규칙 · 밸런싱 값의 표시 이름·메모·입력 칸 주석·묶음 · 개발자가 바로잡은 이름 표(먼저 본다) |
-| `UiGuide.md`(UI 가이드) | 모든 프로젝트의 화면 문법(UXML·USS·화면 코드·목록·층·월드와 UI) · 레이아웃(1920×1080 자리·크기 표·배치 A~E) · 디자인(차가운 검정 + 종이 흰색, 책·종이·폴더, 매트·플랫, 뒤 흐림, 재질). UI 키트는 `Templates/UI/`(배치 A~E · 패널 가족마다 형식 A~D · 카드 칸 · `KitShape`) |
+| `UiGuide.md`(UI 가이드) | 모든 프로젝트의 화면 문법(UXML·USS·화면 코드·목록·층·월드와 UI) · 레이아웃(1920×1080 자리·크기 표·짜임 — 뒷배경으로) · 디자인(차가운 검정 + 종이 흰색, 매트·플랫, 패널 면은 단색 + 옅은 조각, 뒷배경 3가지, 선 포인트 · 요소 규격, 버튼 · 가로 메뉴 · 변칙, 움직임). UI 키트는 `Templates/UI/`(`Kit.uss` · 코드 `KitPanel` · `KitOutline` · `KitAccent` · `KitLine` · `KitIcon` · 견본 `Samples/`) |
 | `GimmickCatalog.md`(기믹 목록) | 네 게임(발라트로·와일드프로스트·매지크래프트·세피리아) 범위의 기믹 갈래 → GBible 부품, 메인 룰의 모양과 미리 둘 자리 |
 | 이 문서 | **무엇이** 있나: 하고 싶은 일 → 기능·API·DB 종류·Block, 매뉴얼 장 |
 
@@ -135,7 +135,7 @@ GBible.Unity
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
-| 화면 색·재질·글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수(재질 `--momoi-paper·folder·cover·stone·colorpaper`) · 재질 클래스 `.momoi-mat-paper`·`-folder`·`-cover`·`-stone`·`-colorpaper`(색 + GBible의 옅은 결 텍스처) · 창·팝업 뒤 흐림(`.momoi-backdrop` — `backdrop-filter`, 지금은 늘 — UiGuide 3-1 규칙은 블러를 알림에만 · 템플릿을 옮길 때 화면 항목의 뒷배경 칸으로 바꾼다) · UI 키트 `Templates/UI/` · DB › 화면 설정 › 글꼴(한글 TTF). 규칙은 `UiGuide.md` | 35 2-7 |
+| 화면 색 · 뒷배경 · 글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수 · 패널 면은 UI 키트 `KitPanel` + `kit-pn-*`(옛 재질 클래스 `.momoi-mat-*`는 이름만 남긴 단색) · 뒷배경은 DB › 화면의 '뒷배경'(`ScreenBackdrop` — 일반 배경 · 블러 · UI 배경, 클래스 `.momoi-backdrop--plain · --blur · --ui`, 변수 `--momoi-backdrop` · `--momoi-ui-backdrop`) · DB › 화면 설정 › 글꼴(TTF) 또는 글꼴 에셋(TextCore — 굵기 표, 먼저 쓴다). 규칙은 `UiGuide.md` | 35 2-7 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
 | 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy` | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |

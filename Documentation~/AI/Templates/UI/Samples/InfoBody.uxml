@@ -1,0 +1,33 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 견본 조각 · 정보 정리(팝업 · 상세 안에 넣는다): 머리(꼬리표 · 제목 | 등급) → 줄 → 몸(그림 | 스탯) → 설명 → 꼬리표.
+         그림은 정보(패널로 세지 않음), 스탯 상자는 B 패널 — 틀(A) 안에 안판(B)이 이미 있으면 바깥에 kit-no-third를 붙여 상자를 그리지 않는다(3중첩 금지).
+         글은 견본이라 바로 적었다 — 프로젝트에서는 텍스트 키(binding-path 또는 코드) -->
+    <ui:VisualElement>
+        <ui:VisualElement class="kit-info-head">
+            <ui:VisualElement class="kit-info-head-text">
+                <ui:Label text="유물 · 패시브 효과" class="kit-t-caption kit-info-eyebrow" />
+                <ui:Label text="불씨의 심장" class="kit-t-title" />
+            </ui:VisualElement>
+            <ui:Label text="희귀" class="kit-info-badge" />
+        </ui:VisualElement>
+        <MomoiProject.KitRule kind="Dotted" class="kit-info-rule" />
+        <ui:VisualElement class="kit-info-main">
+            <ui:VisualElement class="kit-info-art"><MomoiProject.KitSpark class="kit-info-art-mark" /></ui:VisualElement>
+            <ui:VisualElement class="kit-info-side">
+                <ui:Label text="스탯" class="kit-info-label" />
+                <MomoiProject.KitPanel shape="Round" pattern="None" class="kit-info-stats">
+                    <ui:VisualElement class="kit-info-stat"><ui:Label text="공격력" class="kit-info-stat-name" /><ui:Label text="+12" class="kit-info-stat-value kit-info-up" /></ui:VisualElement>
+                    <ui:VisualElement class="kit-info-stat"><ui:Label text="치명타 확률" class="kit-info-stat-name" /><ui:Label text="+5%" class="kit-info-stat-value kit-info-up" /></ui:VisualElement>
+                    <ui:VisualElement class="kit-info-stat"><ui:Label text="불 속성 피해" class="kit-info-stat-name" /><ui:Label text="+15%" class="kit-info-stat-value kit-info-up" /></ui:VisualElement>
+                    <ui:VisualElement class="kit-info-stat kit-info-stat--last"><ui:Label text="재사용 대기시간" class="kit-info-stat-name" /><ui:Label text="-1초" class="kit-info-stat-value" /></ui:VisualElement>
+                </MomoiProject.KitPanel>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label text="기본 공격이 적중하면 대상에게 &lt;b&gt;화상&lt;/b&gt;을 2 중첩 겁니다. 화상에 걸린 적을 처치하면 다음 스킬의 재사용 대기시간이 1초 줄어듭니다." class="kit-t-body kit-info-desc" />
+        <ui:VisualElement class="kit-info-tags">
+            <ui:Label text="불 속성" class="kit-tag" />
+            <ui:Label text="화상" class="kit-tag" />
+            <ui:Label text="적중 시" class="kit-tag" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

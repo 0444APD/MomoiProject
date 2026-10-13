@@ -1,0 +1,250 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitAccent.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitAccent도).
+// UI 템플릿 — 선 포인트(패널 위에 얹는 얇은 선 장식, 코드로 그린다). 개발자 규칙(2026-10-12):
+//   · 선 포인트는 한 화면에 하나(그 패널 하나만 포인트, 나머지 패널은 순수 정보성에 가깝게 깔끔하게) · A 패널에만 · 패널 하나에 한 종류.
+//   · 선 디자인이 주인공이 되면 안 된다 — 심플하게. 선 수 · 겹 · 교차를 아낀다. 나란한 2선이 마지노선.
+//   · 선 한 흐름은 최소한 한쪽 면의 끝에서 끝까지(면의 반만 잇는 짧은 선은 힘이 없다). 모서리의 짧은 ㄱ은 선이 아니라 점·별빛 같은 표시.
+//   · 안쪽 패널이 있는 자리는 선이 지나갈 수 없는 통로 — 선을 넣으려고 안쪽 패널을 좁히지 않는다. 선은 안쪽 패널이 없는 위·아래 자리에만, 또는 안쪽 패널의 끝에서 시작하는 모양으로.
+//   · 요소를 촘촘히 붙이지 않는다: 선·점과 다른 요소 사이 최소 8px(좁은 틈에 선을 넣지 않는다). 패널 밖의 선은 패널에서 6px 안팎(멀면 따로 논다).
+//   · 끝 점은 두 면(자른 모서리면 직선 면과 45° 면)에서 같은 거리에 두고, 선은 점 앞에서 끊는다.
+//   · 두께는 두꺼운 선(--accent-width, 1px)과 얇은 선(--accent-thin-width, 0.5px) 둘.
+//   · 선의 흐름은 직선 · 대각선(45°) · 원(원호)만. 선 끊기 · 점 · 십자(+) · X형 별빛은 되고, 한 자리에 아이콘 여럿은 안 된다.
+// 패널(KitPanel) 안에 자식으로 넣고 클래스 kit-accent(패널 전체를 덮는 절대 위치)로 깐다. 누르기는 받지 않는다.
+// UXML: <MomoiProject.KitAccent kind="BrokenFrame" class="kit-accent kit-ac-on-dark" />  (inset = 패널 가장자리에서 들어온 거리, side = 한쪽 면 종류의 면)
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitAccent : VisualElement
+    {
+        public enum Kind
+        {
+            CornerMarks,   // 네 모서리의 짧은 ㄱ — 선이 아니라 점·별빛 같은 표시
+            CornerMarksTwo,// 마주 보는 두 모서리(왼쪽 위 · 오른쪽 아래)의 짧은 ㄱ
+            TwoSides,      // 위 · 왼쪽 두 면을 잇는 ㄱ(두꺼운 선) — 끝에 점 하나
+            OppositeL,     // 위·왼쪽 ㄱ(두꺼운 선)과 아래·오른쪽 ㄱ(얇은 선), 오른쪽 위·왼쪽 아래 모서리는 비움
+            BrokenFrame,   // 얇은 테두리, 위·아래 가운데를 끊고 별빛 하나씩(끊긴 흐름마다 한 면 이상을 잇는다)
+            ArcFrame,      // 얇은 테두리, 모서리를 안쪽으로 파인 원호로 + 한 모서리에 X 별빛
+            BackBox,       // 패널 뒤로 6px 밀린 선 상자 — 보이는 것은 옆 · 아래 두 면과 패널에 닿는 짧은 꺾임(직각), 바깥 모서리에 십자
+        }
+        public enum Side { Left, Right, Top, Bottom }
+
+        static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--accent-color");
+        static readonly CustomStyleProperty<Color> ThinColorProperty = new CustomStyleProperty<Color>("--accent-thin");
+        static readonly CustomStyleProperty<float> WidthProperty = new CustomStyleProperty<float>("--accent-width");
+        static readonly CustomStyleProperty<float> ThinWidthProperty = new CustomStyleProperty<float>("--accent-thin-width");
+
+        [UxmlAttribute] public Kind kind { get => _kind; set { _kind = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public float inset { get => _inset; set { _inset = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public Side side { get => _side; set { _side = value; MarkDirtyRepaint(); } }
+        // 패널이 모서리 자름(Chamfer)이면 그 모서리("tr bl" …)와 패널의 자름 크기 — 선이 직선 면의 끝에서 멈추고, 지나가는 모서리에서는 45°로 꺾는다.
+        [UxmlAttribute] public string cut { get => _cut; set { _cut = value; MarkDirtyRepaint(); } }
+        [UxmlAttribute] public float cutSize { get => _cutSize; set { _cutSize = value; MarkDirtyRepaint(); } }
+
+        const float DotGap = 7f;   // 끝 점과 선 사이
+        Kind _kind = Kind.TwoSides;
+        float _inset = 10f;
+        Side _side = Side.Left;
+        string _cut = "";
+        float _cutSize = 18f;
+        Color _color = new Color(0f, 0f, 0f, 0.7f);
+        Color _thin = new Color(0f, 0f, 0f, 0.5f);
+        float _width = 1f;
+        float _thinWidth = 0.5f;
+
+        public KitAccent()
+        {
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                var style = e.customStyle;
+                if (style.TryGetValue(ColorProperty, out var color)) _color = color;
+                if (style.TryGetValue(ThinColorProperty, out var thin)) _thin = thin;
+                if (style.TryGetValue(WidthProperty, out var width)) _width = width;
+                if (style.TryGetValue(ThinWidthProperty, out var thinWidth)) _thinWidth = thinWidth;
+                MarkDirtyRepaint();
+            });
+            RegisterCallback<GeometryChangedEvent>(_ => MarkDirtyRepaint());
+        }
+
+        void Draw(MeshGenerationContext context)
+        {
+            var size = layout.size;
+            if (float.IsNaN(size.x) || size.x <= 1 || size.y <= 1) return;
+            var full = new Rect(Vector2.zero, size);
+            var r = KitGeometry.Grow(full, -_inset);
+            var p = context.painter2D;
+            p.lineCap = LineCap.Butt;
+            p.lineJoin = LineJoin.Miter;
+            var tl = new Vector2(r.xMin, r.yMin);
+            var tr = new Vector2(r.xMax, r.yMin);
+            var br = new Vector2(r.xMax, r.yMax);
+            var bl = new Vector2(r.xMin, r.yMax);
+            switch (_kind)
+            {
+                case Kind.CornerMarks:
+                case Kind.CornerMarksTwo:
+                {
+                    var arm = Mathf.Clamp(Mathf.Min(r.width, r.height) * 0.08f, 12f, 24f);
+                    Main(p);
+                    Vector2[] c = { tl, tr, br, bl };
+                    for (int i = 0; i < 4; i++)
+                    {
+                        if (_kind == Kind.CornerMarksTwo && (i == 1 || i == 3)) continue;
+                        var dirIn = (c[i] - c[(i + 3) % 4]).normalized;
+                        var dirOut = (c[(i + 1) % 4] - c[i]).normalized;
+                        Path(p, c[i] - dirIn * arm, c[i], c[i] + dirOut * arm);
+                    }
+                    break;
+                }
+                case Kind.TwoSides:
+                {
+                    Main(p);
+                    var route = Route(r, null, new[] { 1, 0, 3 }, null);
+                    var dot = route[0];   // 두 면(자른 모서리면 직선 면과 45° 면)에서 같은 거리 — 안으로 들어온 윤곽이 꺾이는 점
+                    route[0] += (route[1] - route[0]).normalized * DotGap;
+                    Path(p, route.ToArray());
+                    Dot(p, dot, 2f);
+                    break;
+                }
+                case Kind.OppositeL:
+                {
+                    const float open = 14f;   // 비워 둔 모서리 쪽의 끊김
+                    Main(p);
+                    var first = Route(r, null, new[] { 1, 0, 3 }, null);
+                    first[0] += (first[1] - first[0]).normalized * open;
+                    first[first.Count - 1] += (first[first.Count - 2] - first[first.Count - 1]).normalized * open;
+                    Path(p, first.ToArray());
+                    Thin(p);
+                    var second = Route(r, null, new[] { 1, 2, 3 }, null);
+                    second[0] += (second[1] - second[0]).normalized * open;
+                    second[second.Count - 1] += (second[second.Count - 2] - second[second.Count - 1]).normalized * open;
+                    Path(p, second.ToArray());
+                    break;
+                }
+                case Kind.BrokenFrame:
+                {
+                    const float gap = 20f;
+                    var cx = r.center.x;
+                    Thin(p);
+                    Path(p, Route(r, new Vector2(cx - gap, r.yMin), new[] { 0, 3 }, new Vector2(cx - gap, r.yMax)).ToArray());
+                    Path(p, Route(r, new Vector2(cx + gap, r.yMin), new[] { 1, 2 }, new Vector2(cx + gap, r.yMax)).ToArray());
+                    Main(p);
+                    Star(p, new Vector2(cx, r.yMin), 6f, 0f);
+                    Star(p, new Vector2(cx, r.yMax), 6f, 0f);
+                    break;
+                }
+                case Kind.ArcFrame:
+                {
+                    var radius = Mathf.Clamp(Mathf.Min(r.width, r.height) * 0.07f, 10f, 22f);
+                    Thin(p);
+                    Vector2[] c = { tl, tr, br, bl };
+                    p.BeginPath();
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var dirIn = (c[i] - c[(i + 3) % 4]).normalized;
+                        var dirOut = (c[(i + 1) % 4] - c[i]).normalized;
+                        for (int s = 0; s <= 10; s++)   // 모서리를 중심으로 한 원의 4분의 1(안쪽으로 파임)
+                        {
+                            var t = s / 10f * Mathf.PI / 2;
+                            var point = c[i] - dirIn * radius * Mathf.Cos(t) + dirOut * radius * Mathf.Sin(t);
+                            if (i == 0 && s == 0) p.MoveTo(point); else p.LineTo(point);
+                        }
+                    }
+                    p.ClosePath();
+                    p.Stroke();
+                    Main(p);
+                    Star(p, tl, radius * 0.55f, 45f);
+                    break;
+                }
+                case Kind.BackBox:
+                {
+                    // inset을 밀린 거리로 쓴다. side = Right면 오른쪽 아래로, Left면 왼쪽 아래로 민 상자.
+                    var d = Mathf.Abs(_inset);
+                    var w = full.width;
+                    var h = full.height;
+                    Main(p);
+                    if (_side == Side.Left)
+                    {
+                        Path(p, new Vector2(0, d), new Vector2(-d, d), new Vector2(-d, h + d), new Vector2(w - d, h + d), new Vector2(w - d, h));
+                        Cross(p, new Vector2(-d - 9, h + d + 9), 4f);
+                    }
+                    else
+                    {
+                        Path(p, new Vector2(w, d), new Vector2(w + d, d), new Vector2(w + d, h + d), new Vector2(d, h + d), new Vector2(d, h));
+                        Cross(p, new Vector2(w + d + 9, h + d + 9), 4f);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 모서리(0 왼쪽 위 · 1 오른쪽 위 · 2 오른쪽 아래 · 3 왼쪽 아래)를 차례로 지나는 길. 자른 모서리에서 끝나면 직선 면의 끝에서 멈추고,
+        // 지나가면 45°로 꺾는다. start·end는 모서리가 아닌 끝점(없으면 첫·끝 모서리가 끝점).
+        System.Collections.Generic.List<Vector2> Route(Rect r, Vector2? start, int[] corners, Vector2? end)
+        {
+            Vector2[] c = { new Vector2(r.xMin, r.yMin), new Vector2(r.xMax, r.yMin), new Vector2(r.xMax, r.yMax), new Vector2(r.xMin, r.yMax) };
+            var text = " " + (_cut ?? "").ToLowerInvariant() + " ";
+            bool[] isCut = { text.Contains(" tl "), text.Contains(" tr "), text.Contains(" br "), text.Contains(" bl ") };
+            var size = Mathf.Max(0, _cutSize - _inset * 0.5858f);   // 안으로 들어온 만큼 자름이 줄어든다
+            var route = new System.Collections.Generic.List<Vector2>();
+            if (start.HasValue) route.Add(start.Value);
+            for (int k = 0; k < corners.Length; k++)
+            {
+                var i = corners[k];
+                var point = c[i];
+                Vector2? prev = k > 0 ? c[corners[k - 1]] : start;
+                Vector2? next = k < corners.Length - 1 ? c[corners[k + 1]] : end;
+                if (!isCut[i] || size <= 0.01f) { route.Add(point); continue; }
+                if (prev.HasValue) route.Add(point + (prev.Value - point).normalized * size);
+                if (next.HasValue) route.Add(point + (next.Value - point).normalized * size);
+            }
+            if (end.HasValue) route.Add(end.Value);
+            return route;
+        }
+
+        void Main(Painter2D p) { p.strokeColor = _color; p.fillColor = _color; p.lineWidth = _width; }
+        void Thin(Painter2D p) { p.strokeColor = _thin; p.fillColor = _thin; p.lineWidth = _thinWidth; }
+
+        static void Path(Painter2D p, params Vector2[] points)
+        {
+            p.BeginPath();
+            p.MoveTo(points[0]);
+            for (int i = 1; i < points.Length; i++) p.LineTo(points[i]);
+            p.Stroke();
+        }
+
+
+
+        static void Dot(Painter2D p, Vector2 at, float radius)
+        {
+            p.BeginPath();
+            p.Arc(at, radius, Angle.Degrees(0f), Angle.Degrees(360f));
+            p.Fill();
+        }
+
+        static void Cross(Painter2D p, Vector2 at, float half)
+        {
+            Path(p, at + new Vector2(-half, 0), at + new Vector2(half, 0));
+            Path(p, at + new Vector2(0, -half), at + new Vector2(0, half));
+        }
+
+        // 네 갈래 별빛(허리가 잘록한). rotation 45 = X형.
+        static void Star(Painter2D p, Vector2 at, float radius, float rotation)
+        {
+            var waist = radius * 0.2f;
+            var rot = Quaternion.Euler(0, 0, rotation);
+            Vector2 R(Vector2 v) => at + (Vector2)(rot * v);
+            p.BeginPath();
+            p.MoveTo(R(new Vector2(0, -radius)));
+            p.QuadraticCurveTo(R(new Vector2(waist, -waist)), R(new Vector2(radius, 0)));
+            p.QuadraticCurveTo(R(new Vector2(waist, waist)), R(new Vector2(0, radius)));
+            p.QuadraticCurveTo(R(new Vector2(-waist, waist)), R(new Vector2(-radius, 0)));
+            p.QuadraticCurveTo(R(new Vector2(-waist, -waist)), R(new Vector2(0, -radius)));
+            p.ClosePath();
+            p.Fill();
+        }
+    }
+}
