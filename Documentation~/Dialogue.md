@@ -53,7 +53,7 @@ runner.Start("shopIntro");
 
 **애니메이션.** UI Toolkit 요소는 Animator·AnimationClip으로 움직이지 않는다. 대신 두 층을 쓴다. 나타나기·사라지기·색 변화처럼 '상태가 바뀌면 부드럽게'는 USS 전환(`transition`)과 루트의 상태 클래스(`dialogue--open`·`--staging`·`--typing`·`--waiting`·`--choosing`·`--narration`·`--speaker-<ID>`)로 USS 안에서 끝낸다(참조 연결 없음). 키프레임·반복·스프라이트 프레임 애니메이션은 **UI 모션** 에셋(`Create › MomoiProject › 다이얼로그 시스템 › UI 모션`: 투명도·이동·크기·회전·색 곡선, 프레임 목록, 한 번/반복/왕복)을 만들어 `DialogueUI`의 모션 칸(순간 × 요소 이름 × 모션)에 넣는다. 순간은 열림·닫힘·줄 시작·화자 바뀜·클릭 대기·선택지 나타남·선택지 고름이다. 다이얼로그 그래프에서도 'UI 모션' 효과 노드로 원하는 순간에 어느 요소든 모션을 재생할 수 있다(체인에 들어간다).
 
-**스탠딩.** 캐릭터의 '스탠딩 프리팹'이 비어 있으면 표정 스프라이트 두 장을 겹쳐 크로스페이드한다(`SpriteStandingView`, 높이는 `standingHeight`). 스파인은 프리팹에 `SpineStandingView`를 붙인다: 스파인 런타임을 직접 참조하지 않고 이름으로 찾아(`SkeletonAnimation`·`SkeletonGraphic`·`SkeletonMecanim`) 표정 ID와 같은 이름의 애니메이션을 재생하고(다르면 짝 목록), 밝기·투명도는 스켈레톤 색으로 준다(이름으로 찾는 일은 붙일 때 한 번만 — 매 프레임 리플렉션 없음). 다른 방식(Live2D 등)은 `StandingView`를 상속한다.
+**스탠딩.** 캐릭터의 '스탠딩 프리팹'이 비어 있으면 표정 스프라이트 두 장을 겹쳐 크로스페이드한다(`SpriteStandingView`, 높이는 `standingHeight`). 스파인은 프리팹에 `SpineStandingView`를 붙인다(스파인 런타임 들이기는 매뉴얼 39장 5절): 스파인 런타임을 직접 참조하지 않고 이름으로 찾아(`SkeletonAnimation`·`SkeletonGraphic`·`SkeletonMecanim`) 표정 ID와 같은 이름의 애니메이션을 재생하고(다르면 짝 목록), 밝기·투명도는 스켈레톤 색으로 준다(이름으로 찾는 일은 붙일 때 한 번만 — 매 프레임 리플렉션 없음). 다른 방식(Live2D 등)은 `StandingView`를 상속한다.
 
 **멈추지 않는 시간.** `DialoguePlayer.pauseGame`(기본 켬)은 게임 시간(`Time.timeScale`)을 멈춘다. 다이얼로그 연출은 멈추지 않는 시간으로 돌고, 다이얼로그가 만든 스탠딩 프리팹·이펙트 프리팹의 파티클(`useUnscaledTime`)·애니메이터(Unscaled Time)·스파인 스켈레톤(`unscaledTime`)도 멈추지 않는 시간으로 바꿔 둔다. 프로젝트 효과(`CreatePlayer`)가 만든 것은 그 효과가 맞춘다.
 

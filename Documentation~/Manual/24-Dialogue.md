@@ -31,7 +31,7 @@
 3. DB › **스탠딩 프로필**에서 화자를 만든다.
    - **expressions**: 스탠딩 목록(**스탠딩 ID** · **스프라이트**, 기본 `default` 하나).
    - **defaultExpression**: 기본 스탠딩 ID(비우면 첫 스탠딩).
-   - **nameColor**: 이름 색. **standingPrefab**: 스파인 등 `StandingView`가 붙은 프리팹(비우면 스프라이트로 그린다). **standingScale**: 크기 배율. **logIcon**: 대사 로그 얼굴(정사각형 권장, 스파인이면 꼭 넣는다). **extras**: 추가 글(키 · 글).
+   - **nameColor**: 이름 색. **standingPrefab**: 스파인 등 `StandingView`가 붙은 프리팹(비우면 스프라이트로 그린다 — 스파인 런타임 들이기는 39장 5절). **standingScale**: 크기 배율. **logIcon**: 대사 로그 얼굴(정사각형 권장, 스파인이면 꼭 넣는다). **extras**: 추가 글(키 · 글).
    - 화면에 보일 이름은 텍스트 `<프로필 ID>.name`(`23-Text-Localization.md`).
 4. DB › **장소**: **background**(배경 이미지), **extras**(추가 글). 이름은 텍스트 `<장소 ID>.name`.
 

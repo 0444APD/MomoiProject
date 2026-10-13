@@ -29,7 +29,25 @@
 > [!note]- '안 쓰는 것'에 쓰는 에셋이 보일 때
 > 코드가 경로 글자로 불러오는 에셋(Resources 밖)은 연결이 보이지 않아 안 쓰는 것으로 나올 수 있다. 옮기기 전에 '위치'로 확인하고, 애매하면 AI에게 묻는다.
 
+## 스파인 캐릭터 넣기
+
+1. 스파인 에디터에서 내보낸다(아래 설정). 에디터가 없으면 받은 파일 그대로 둔다.
+2. 내보낸 폴더를 AI에게 알려 준다. AI가 파일 버전을 읽고 맞는 스파인 런타임을 들인다(받기 전에 무엇을 받는지 묻는다).
+3. AI가 `Assets/Dev/Art/Spine/<이름>/`에 넣고 가져오기 설정(알파 방식)을 맞춘 뒤, 띄워 본 그림을 보낸다.
+
+> [!note]- 내보내기 설정(스파인 메뉴 › Export… · Ctrl+E)
+> - 형식: 게임용은 `Binary`이고 `Extension`을 `.skel.bytes`로 둔다. 확인용은 `JSON`이다.
+> - `Nonessential data`는 켜고, `Animation cleanup`은 끈다.
+> - `Texture Atlas`의 `Pack`을 켜고 `Attachments`를 고른다.
+> - `Pack Settings`에서 `Atlas extension`은 `.atlas.txt`로 둔다. `Premultiply alpha`는 끄고 `Bleed`는 켠다(4.3 런타임 기준).
+> - 새 빈 폴더에 내보낸다. 나오는 파일은 `이름.skel.bytes`(또는 `.json`) · `이름.atlas.txt` · `이름.png`(장마다)이다.
+
+> [!note]- 꼭 맞춰야 하는 것
+> - **버전**: 런타임은 스파인 에디터(파일) 버전의 앞 두 자리(4.2 · 4.3)에 맞춘다.
+> - **알파**: 내보낼 때 Premultiply alpha를 켰는지 껐는지에 Unity 가져오기를 맞춘다. 어긋나면 가장자리가 검거나 하얗게 뜬다.
+> - **라이선스**: 스파인 런타임을 넣은 게임은 스파인 에디터 라이선스가 있어야 한다.
+
 ## 더 보기
 
-- 에셋 관리: 매뉴얼 [39장](../Manual/39-Assets.md)
+- 에셋 관리: 매뉴얼 [39장](../Manual/39-Assets.md)(스파인 들이기는 5절)
 - 스프라이트 틀: 매뉴얼 [27장](../Manual/27-Field-Rules-Sprites.md)
