@@ -143,6 +143,13 @@ Unity 6.6은 `Object.GetInstanceID()`를 오류로 막았다(`CS0619 … Use Get
     - 상한은 '눈동자가 눈 안에서 움직이는 거리'로 정한다. 흰자와 눈동자의 폭 차이(아틀라스 크기 ÷ 아틀라스 `scale`)의 반쪽 안에서 70% 정도가 알맞다.
     - 예: CH0334는 여유가 한쪽 13px이고, 상한 4는 37px로 눈이 돌아갔다. 상한 1이면 9px이다.
   - 예: UI 실험실 `Code/Client/Lab/Spine/SpineDrag.cs`. 테스트 명령 `spine.drag.face` · `hand` · `eye`로 마우스 없이 확인하고, `spine.drag.sweep`(`.old`)로 좌우 왕복 시 뼈마다 프레임당 이동을 비교한다.
+  - **조종 뼈 표시를 켜 두고 맞춘다**(실험실 `SpineDragMarkers` · `spine.markers`로 켜고 끔). 화면 px 크기로, 캐릭터 위에 그린다.
+    - 점: 뼈의 지금 자리
+    - 십자: 가운데
+    - 고리: 목표
+    - 선 · 타원: 범위
+    - 흐린 원: 조이스틱 반지름
+    - 뼈가 목표를 얼마나 늦게 따라가는지, 포인터가 반지름 밖인지, 범위가 IK가 꺾이는 자리에 닿는지가 보인다.
 - 기본 셰이더 `Spine/Skeleton`은 URP에서도 그린다(빛을 받지 않음). 빛을 받게 하려면 URP 셰이더 패키지(`com.esotericsoftware.spine.urp-shaders`).
 - 화면(UI Toolkit) 안에 그리려면 4.3의 UI Toolkit 확장(`com.esotericsoftware.spine.ui-toolkit`, Unity 6000.4)이 있다 — 아직 써 보지 않았다. 4.2는 UI Toolkit을 지원하지 않는다: 월드 장면에 두거나 `SkeletonGraphic`(UGUI)인데, UI 가이드는 UGUI를 들이지 않으므로 그때 묻는다.
 - 확인: 테스트 명령으로 띄우고 플레이 요청 `capture`로 찍는다(38장 2-5). 카메라는 데이터의 범위(`SkeletonData.X · Y · Width · Height` × 크기)에 맞춘다. 데이터 안에 카메라 뼈가 있는 장면형(로비 일러스트)은 애니메이션이 화면을 확대 · 이동한다 — 오류가 아니다.
