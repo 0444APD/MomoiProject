@@ -275,13 +275,14 @@
     font-size: 16px;
 }
 
-/* ── 움직임(AI/UiGuide.md 3-5 · ScreenMotion): 씬 전환을 뺀 모든 움직임은 아주 짧게.
-   화면 전체는 투명도 0↔100%(나타남 0.14초 · 사라짐 0.1초). 패널(.momoi-motion)은 그와 함께 짧은 거리를 옆·아래에서 제자리로.
-   오는 쪽: 기본 아래(위로 떠오름) · --left 왼쪽에서 · --right 오른쪽에서 · --down 위에서. translate로 가운데 맞춘 요소에는 붙이지 않는다. ── */
+/* ── 움직임(AI/UiGuide.md 3-5 · ScreenMotion): 씬 전환을 뺀 모든 움직임은 짧게 한 모양으로(개발자 2026-10-13 — 실험실 견본에서 고름).
+   화면 전체는 투명도 0↔100% — 나타남 0.189초 ease-out-sine · 사라짐 0.135초 ease-in-sine. 패널(.momoi-motion)은 나타날 때만 짧은 거리를 옆·아래에서 제자리로,
+   사라질 때는 미끄러지지 않고 투명도만. 오는 쪽: 기본 아래(위로 떠오름) · --left 왼쪽에서 · --right 오른쪽에서 · --down 위에서.
+   USS 곡선에는 quad가 없다(sine이 가장 가깝다). translate로 가운데 맞춘 요소에는 붙이지 않는다. ── */
 .momoi-screen-host > * {
     transition-property: opacity;
-    transition-duration: 0.14s;
-    transition-timing-function: ease-out-cubic;
+    transition-duration: 0.189s;
+    transition-timing-function: ease-out-sine;
 }
 
 .momoi-screen--enter > *,
@@ -290,43 +291,43 @@
 }
 
 .momoi-screen--leave > * {
-    transition-duration: 0.1s;
-    transition-timing-function: ease-in-cubic;
+    transition-duration: 0.135s;
+    transition-timing-function: ease-in-sine;
 }
 
 .momoi-motion {
     transition-property: opacity, translate;
-    transition-duration: 0.14s;
-    transition-timing-function: ease-out-cubic;
+    transition-duration: 0.189s;
+    transition-timing-function: ease-out-sine;
 }
 
-.momoi-screen--leave .momoi-motion,
-.momoi-motion.momoi-motion--hidden {
-    transition-duration: 0.1s;
-    transition-timing-function: ease-in-cubic;
-}
-
-.momoi-screen--enter .momoi-motion,
+/* 사라짐: 투명도만 */
 .momoi-screen--leave .momoi-motion,
 .momoi-motion.momoi-motion--hidden {
     opacity: 0;
+    transition-duration: 0.135s;
+    transition-timing-function: ease-in-sine;
+}
+
+/* 나타나기 전(시간 0): 오는 쪽에 둔다 — 화면이 처음 그려질 때(--enter)와 ScreenMotion.Show(--pre) */
+.momoi-screen--enter .momoi-motion,
+.momoi-motion.momoi-motion--pre {
+    opacity: 0;
     translate: 0 14px;
+    transition-duration: 0s;
 }
 
 .momoi-screen--enter .momoi-motion--left,
-.momoi-screen--leave .momoi-motion--left,
-.momoi-motion--left.momoi-motion--hidden {
+.momoi-motion--left.momoi-motion--pre {
     translate: -18px 0;
 }
 
 .momoi-screen--enter .momoi-motion--right,
-.momoi-screen--leave .momoi-motion--right,
-.momoi-motion--right.momoi-motion--hidden {
+.momoi-motion--right.momoi-motion--pre {
     translate: 18px 0;
 }
 
 .momoi-screen--enter .momoi-motion--down,
-.momoi-screen--leave .momoi-motion--down,
-.momoi-motion--down.momoi-motion--hidden {
+.momoi-motion--down.momoi-motion--pre {
     translate: 0 -14px;
 }
