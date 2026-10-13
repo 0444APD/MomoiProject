@@ -3,7 +3,7 @@
    뒷배경은 DB › 화면의 '뒷배경'(일반 · 블러 = 알림만 · UI 배경). 강조색은 하나. */
 
 :root {
-    /* 면 색(옛 이름 '재질' — 결 텍스처는 2026-10-13에 뺐다. 새 화면은 UI 키트의 KitPanel 색 클래스) */
+    /* 면 색(기본 화면이 쓴다 — 프로젝트 화면의 패널 면은 UI 키트의 KitPanel) */
     --momoi-paper: rgb(244, 243, 240);
     --momoi-paper-text: rgb(38, 38, 42);
     --momoi-paper-dim: rgb(128, 128, 134);
@@ -42,13 +42,6 @@
     --momoi-rarity-3: rgb(110, 140, 196);
     --momoi-rarity-4: rgb(204, 184, 146);
 }
-
-/* ── 면 색(옛 '재질' 클래스 — 이름만 남긴 단색. 새 화면은 UI 키트의 KitPanel 색 클래스를 쓴다) ── */
-.momoi-mat-paper { background-color: var(--momoi-paper); color: var(--momoi-paper-text); }
-.momoi-mat-folder { background-color: var(--momoi-folder); color: var(--momoi-folder-text); }
-.momoi-mat-cover { background-color: var(--momoi-cover); color: var(--momoi-cover-text); }
-.momoi-mat-stone { background-color: var(--momoi-stone); color: var(--momoi-stone-text); }
-.momoi-mat-colorpaper { background-color: var(--momoi-colorpaper); color: var(--momoi-colorpaper-text); }
 
 .momoi-root {
     color: var(--momoi-text);

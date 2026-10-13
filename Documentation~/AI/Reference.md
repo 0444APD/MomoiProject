@@ -135,7 +135,7 @@ GBible.Unity
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
-| 화면 색 · 뒷배경 · 글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수 · 패널 면은 UI 키트 `KitPanel` + `kit-pn-*`(옛 재질 클래스 `.momoi-mat-*`는 이름만 남긴 단색) · 뒷배경은 DB › 화면의 '뒷배경'(`ScreenBackdrop` — 일반 배경 · 블러 · UI 배경, 클래스 `.momoi-backdrop--plain · --blur · --ui`, 변수 `--momoi-backdrop` · `--momoi-ui-backdrop`) · DB › 화면 설정 › 글꼴(TTF) 또는 글꼴 에셋(TextCore — 굵기 표, 먼저 쓴다). 규칙은 `UiGuide.md` | 35 2-7 |
+| 화면 색 · 뒷배경 · 글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수 · 패널 면은 UI 키트 `KitPanel` + `kit-pn-*` · 뒷배경은 DB › 화면의 '뒷배경'(`ScreenBackdrop` — 일반 배경 · 블러 · UI 배경, 클래스 `.momoi-backdrop--plain · --blur · --ui`, 변수 `--momoi-backdrop` · `--momoi-ui-backdrop`) · DB › 화면 설정 › 글꼴(TTF) 또는 글꼴 에셋(TextCore — 굵기 표, 먼저 쓴다). 규칙은 `UiGuide.md` | 35 2-7 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
 | 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy` | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |
