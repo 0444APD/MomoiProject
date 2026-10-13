@@ -126,12 +126,14 @@ Unity 6.6은 `Object.GetInstanceID()`를 오류로 막았다(`CS0619 … Use Get
 - **조종 뼈를 마우스로 끌기**(시선 · 손 따라가기 같은 조종용 뼈 — 다른 뼈가 IK · transform 제약으로 그 뼈를 따른다):
   1. 데이터에서 찾는다: 제약의 `target`이 되는 뼈(예: 눈 · 머리카락 · 얼굴 IK가 따르는 `Touch_Point`)와, 그 제약의 세기(mix)를 올리고 내리는 애니메이션(예: `Look_01_M` · `LookEnd_01_M`).
   2. 누르면 위 트랙(1번)에 세기를 올리는 애니메이션을 켠다.
-  3. 포인터 자리는 `camera.ScreenToWorldPoint` → `transform.InverseTransformPoint`로 스켈레톤 공간으로 바꾸고, 제자리에서 얼마나 떨어졌나를 구해 거리를 제한한다.
+  3. 포인터 자리는 `camera.ScreenToWorldPoint` → `transform.InverseTransformPoint`로 스켈레톤 공간으로 바꾸고, 제자리에서 얼마나 떨어졌나를 구한다. 거리는 뼈마다 상한을 두고, 끝에서 딱 멈추지 않게 부드럽게 다가가게 한다(`상한 × tanh(거리 / 상한)`).
   4. 그 오프셋을 **셋업 자세에서 한 번 잡아 둔** 부모 행렬(`skeleton.SetToSetupPose()` → `UpdateWorldTransform(Physics.None)` → `parent.GetWorldToLocalMatrix`)로 로컬 오프셋으로 바꿔, 매 프레임 애니메이션이 적용된 뒤(`SkeletonAnimation.UpdateLocal`) 뼈의 로컬 x · y에 더한다. 애니메이션이 키를 준 뼈는 그 값에, 키가 없는 뼈는 처음 값에 더한다.
      - **지금 자세로 화면 자리를 고정하면(`bone.SetPositionSkeletonSpace`) 튄다.** 조종 뼈가 머리의 자식이면, 그 뼈가 IK로 머리를 돌리고 머리가 다시 그 뼈를 옮기는 되먹임이 생긴다. 그래서 그 뼈를 따르는 뼈(머리 장식 등)가 한 프레임에 크게 튄다. 실험실에서 잰 값은 평균의 35배였고, 셋업 행렬 방식은 튀지 않았다.
   5. 놓으면 끝 애니메이션 + `AddEmptyAnimation`을 틀고, 오프셋을 0으로 부드럽게 줄인 뒤 원래 값으로 되돌린다. 애니메이션이 키를 주지 않는 뼈는 옮긴 값이 그대로 남기 때문이다.
   6. 화면(UI) 칸 위에서 누른 것은 보내지 않는다(관례 21절).
-  - **시선 뼈**(눈동자 · 눈썹이 따르는 뼈 — 예: `Touch_Eye`)는 누르지 않아도 포인터를 따라가게 둔다. 제약의 세기가 셋업에 이미 들어 있어서 애니메이션이 필요 없다.
+  - **시선 뼈**(눈동자 · 눈썹이 따르는 뼈 — 예: `Touch_Eye`)는 잡지 않아도, 누르고 있는 동안 어디서든 포인터를 따라가게 한다(개발자 2026-10-14). 제약의 세기가 셋업에 이미 들어 있어서 애니메이션이 필요 없다.
+    - 상한은 '눈동자가 눈 안에서 움직이는 거리'로 정한다. 흰자와 눈동자의 폭 차이(아틀라스 크기 ÷ 아틀라스 `scale`)의 반쪽 안에서 70% 정도가 알맞다.
+    - 예: CH0334는 여유가 한쪽 13px이고, 상한 4는 37px로 눈이 돌아갔다. 상한 1이면 9px이다.
   - 예: UI 실험실 `Code/Client/Lab/Spine/SpineDrag.cs`. 테스트 명령 `spine.drag.face` · `hand` · `eye`로 마우스 없이 확인하고, `spine.drag.sweep`(`.old`)로 좌우 왕복 시 뼈마다 프레임당 이동을 비교한다.
 - 기본 셰이더 `Spine/Skeleton`은 URP에서도 그린다(빛을 받지 않음). 빛을 받게 하려면 URP 셰이더 패키지(`com.esotericsoftware.spine.urp-shaders`).
 - 화면(UI Toolkit) 안에 그리려면 4.3의 UI Toolkit 확장(`com.esotericsoftware.spine.ui-toolkit`, Unity 6000.4)이 있다 — 아직 써 보지 않았다. 4.2는 UI Toolkit을 지원하지 않는다: 월드 장면에 두거나 `SkeletonGraphic`(UGUI)인데, UI 가이드는 UGUI를 들이지 않으므로 그때 묻는다.
