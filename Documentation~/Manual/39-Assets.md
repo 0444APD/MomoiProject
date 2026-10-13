@@ -125,12 +125,13 @@ Unity 6.6은 `Object.GetInstanceID()`를 오류로 막았다(`CS0619 … Use Get
 - 띄우기 `SkeletonAnimation.NewSkeletonAnimationGameObject(skeletonDataAsset)`, 재생 `AnimationState.SetAnimation(트랙, 이름, 반복)` · 이어서 `AddAnimation`, 애니메이션 목록 `skeletonDataAsset.GetSkeletonData(true).Animations`.
 - **조종 뼈를 마우스로 끌기**(시선 · 손 따라가기 같은 조종용 뼈 — 다른 뼈가 IK · transform 제약으로 그 뼈를 따른다):
   1. 데이터에서 찾는다: 제약의 `target`이 되는 뼈(예: 눈 · 머리카락 · 얼굴 IK가 따르는 `Touch_Point`)와, 그 제약의 세기(mix)를 올리고 내리는 애니메이션(예: `Look_01_M` · `LookEnd_01_M`).
-  2. 누르면 위 트랙(1번)에 세기를 올리는 애니메이션을 켠다.
+  2. 누르면 위 트랙(1번)에 세기를 올리는 애니메이션을 **섞어서** 켠다. 트랙이 비어 있으면 `SetEmptyAnimation(트랙, 0)` → `AddAnimation(…).MixDuration = 0.3`이다. 그냥 `SetAnimation`하면 IK 세기가 한 프레임에 0에서 값으로 올라, 잡는 순간 고개가 확 돈다(실험실에서 잡는 순간 90°/초 → 섞으면 7°/초).
   3. 포인터 자리는 `camera.ScreenToWorldPoint` → `transform.InverseTransformPoint`로 스켈레톤 공간으로 바꾸고, 조이스틱처럼 바꾼다(개발자 2026-10-14).
      - 가운데는 뼈의 제자리다. 포인터까지의 거리를 **화면 px 반지름**(예: 160px — 정사영 카메라면 `Screen.height / (orthographicSize × 2)`로 유닛 환산)으로 나누고, 1보다 길면 1로 자른다(원 테두리).
      - 그 값에 뼈가 움직일 거리를 곱한다. 방향마다 다르게 둘 수 있다: 좌우 · 위 `reach`, 아래 `reachDown`.
      - 반지름을 뼈의 움직임 거리(스켈레톤 유닛)로 그대로 두면 화면에서 몇 px만 움직여도 끝까지 가서, 테두리 근처에서 좌우로 조금만 움직여도 방향이 확 바뀐다.
   4. 그 오프셋을 **셋업 자세에서 한 번 잡아 둔** 부모 행렬(`skeleton.SetToSetupPose()` → `UpdateWorldTransform(Physics.None)` → `parent.GetWorldToLocalMatrix`)로 로컬 오프셋으로 바꿔, 매 프레임 애니메이션이 적용된 뒤(`SkeletonAnimation.UpdateLocal`) 뼈의 로컬 x · y에 더한다. 애니메이션이 키를 준 뼈는 그 값에, 키가 없는 뼈는 처음 값에 더한다.
+     - 오프셋은 목표로 바로 옮기지 않는다. `Vector2.SmoothDamp(현재, 목표, ref 속도, 0.25초, 최고 속도)`로 가속 · 감속하며 따라가게 하고, 뼈마다 최고 속도(얼굴 1.2 유닛/초)를 둔다. 그래야 마우스를 확 움직여도 고개가 그만큼 빨리 돌지 않는다. 6시 왕복에서 115°/초가 9°/초로 줄었다.
      - **지금 자세로 화면 자리를 고정하면(`bone.SetPositionSkeletonSpace`) 튄다.** 조종 뼈가 머리의 자식이면, 그 뼈가 IK로 머리를 돌리고 머리가 다시 그 뼈를 옮기는 되먹임이 생긴다. 그래서 그 뼈를 따르는 뼈(머리 장식 등)가 한 프레임에 크게 튄다. 실험실에서 잰 값은 평균의 35배였고, 셋업 행렬 방식은 튀지 않았다.
   5. 놓으면 끝 애니메이션 + `AddEmptyAnimation`을 틀고, 오프셋을 0으로 부드럽게 줄인 뒤 원래 값으로 되돌린다. 애니메이션이 키를 주지 않는 뼈는 옮긴 값이 그대로 남기 때문이다.
   6. 화면(UI) 칸 위에서 누른 것은 보내지 않는다(관례 21절).
