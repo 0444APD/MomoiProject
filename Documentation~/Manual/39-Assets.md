@@ -123,6 +123,13 @@ Unity 6.6은 `Object.GetInstanceID()`를 오류로 막았다(`CS0619 … Use Get
 
 - 스파인을 부르는 프로젝트 코드는 asmdef 참조에 `spine-unity` · `spine-csharp`를 더한다(`MomoiProject.Client` — 선택 기능 동기화는 GBible 모듈 참조만 고쳐 지워지지 않는다). 다이얼로그 스탠딩(`SpineStandingView`)은 참조 없이 이름으로 찾는다(24장).
 - 띄우기 `SkeletonAnimation.NewSkeletonAnimationGameObject(skeletonDataAsset)`, 재생 `AnimationState.SetAnimation(트랙, 이름, 반복)` · 이어서 `AddAnimation`, 애니메이션 목록 `skeletonDataAsset.GetSkeletonData(true).Animations`.
+- **조종 뼈를 마우스로 끌기**(시선 · 손 따라가기 같은 조종용 뼈 — 다른 뼈가 IK · transform 제약으로 그 뼈를 따른다):
+  1. 데이터에서 찾는다: 제약의 `target`이 되는 뼈(예: 눈 · 머리카락 · 얼굴 IK가 따르는 `Touch_Point`)와, 그 제약의 세기(mix)를 올리고 내리는 애니메이션(예: `Look_01_M` · `LookEnd_01_M`).
+  2. 누르면 위 트랙(1번)에 세기를 올리는 애니메이션을 켠다.
+  3. 매 프레임 애니메이션이 적용된 뒤(`SkeletonAnimation.UpdateLocal`) `bone.SetPositionSkeletonSpace(제자리 + 오프셋)`으로 옮긴다. 포인터 자리는 `camera.ScreenToWorldPoint` → `transform.InverseTransformPoint`로 바꾸고, 제자리에서의 거리는 제한한다.
+  4. 놓으면 끝 애니메이션 + `AddEmptyAnimation`을 틀고, 뼈를 셋업 자리로 되돌린다. 애니메이션이 키를 주지 않는 뼈는 옮긴 값이 그대로 남기 때문이다.
+  5. 화면(UI) 칸 위에서 누른 것은 보내지 않는다(관례 21절).
+  - 예: UI 실험실 `Code/Client/Lab/Spine/SpineDrag.cs`(테스트 명령 `spine.drag.face` · `hand`로 마우스 없이 확인).
 - 기본 셰이더 `Spine/Skeleton`은 URP에서도 그린다(빛을 받지 않음). 빛을 받게 하려면 URP 셰이더 패키지(`com.esotericsoftware.spine.urp-shaders`).
 - 화면(UI Toolkit) 안에 그리려면 4.3의 UI Toolkit 확장(`com.esotericsoftware.spine.ui-toolkit`, Unity 6000.4)이 있다 — 아직 써 보지 않았다. 4.2는 UI Toolkit을 지원하지 않는다: 월드 장면에 두거나 `SkeletonGraphic`(UGUI)인데, UI 가이드는 UGUI를 들이지 않으므로 그때 묻는다.
 - 확인: 테스트 명령으로 띄우고 플레이 요청 `capture`로 찍는다(38장 2-5). 카메라는 데이터의 범위(`SkeletonData.X · Y · Width · Height` × 크기)에 맞춘다. 데이터 안에 카메라 뼈가 있는 장면형(로비 일러스트)은 애니메이션이 화면을 확대 · 이동한다 — 오류가 아니다.
