@@ -160,7 +160,7 @@ GBible.Unity
 | 테스트 명령(주입·발동) | DB › 개발 명령(결과 Block, `category`로 묶음) — 반영 스크립트로 만든다. 코드면 `session.Debug.Register` | 22, 38 |
 | 승률·평균 턴(자동 시뮬레이션) | `TestScenarios.Simulate(session, 상황, runs, step, measure)` → `TestReport`(`ToText`·`ToCsv`·`SaveReport`) | 38 |
 | 그림·소리 자리와 넣을 것 목록 | `AssetRequests.Sprite(path, w, h, 쓰는 곳)`·`Audio(path, 쓰는 곳, seconds)`·`Request(path, 쓰는 곳)`(반영 스크립트에서) → 개발자가 에셋 관리 › 넣을 것에서 진짜 파일을 넣는다(같은 자리·GUID 유지) | 관례 18, 39 |
-| 스파인 캐릭터 | 런타임 = 파일 버전(앞 두 자리) · manifest git 두 줄 · Unity 6.3+에서 4.2는 들여와 고침 · 알파(PMA/스트레이트)는 넣기 전 `SpineSettings.asset` · `Assets/Dev/Art/Spine/<이름>/`에 `.skel.bytes`·`.atlas.txt`·`.png` → `SkeletonAnimation.NewSkeletonAnimationGameObject` | 39 5절 |
+| 스파인 캐릭터 | 런타임 = 파일 버전(앞 두 자리) · 지원 Unity는 다운로드 페이지에서 확인 · manifest git 두 줄(`#<버전>`) · 지원 범위 밖 Unity면 들여와 새 브랜치처럼 고침 · 알파(PMA/스트레이트)는 넣기 전 `SpineSettings.asset` · `Assets/Dev/Art/Spine/<이름>/`에 `.skel.bytes`·`.atlas.txt`·`.png` → `SkeletonAnimation.NewSkeletonAnimationGameObject` · 조종 뼈는 조이스틱식(고개는 작게) | 39 5절 |
 | 결정 기록 | `Docs/Decisions.md`(세션마다 먼저 읽기, 개발자의 답·추천 승인을 `D-n`으로 — 기획은 넘겨짚지 않는다, 답을 기다리는 것은 '확인 기다리는 것'에) | 진행 매뉴얼 2 |
 | 규칙 테스트(Unity 없이) | `new GameSession(new SessionOptions { Seed = 1 })` → `Data.Define` → `Game.Do` → 단언. 플레이어용 실패는 `Assert.Throws<GameFailure>` | 관례 12절 |
 | AI가 Unity를 연 채로 테스트 돌리기 | `Logs/MomoiProject/RunTests.request`를 만든다(비우면 프로젝트 테스트, `all`이면 GBible 것까지, 줄마다 어셈블리 이름) → 에디터가 새로 읽고(컴파일) EditMode 테스트를 돌려 `Logs/MomoiProject/TestResults.txt`에 결과를 쓰고 요청을 지운다. 배치 모드는 Unity가 열려 있으면 쓰지 않는다 | 38 |

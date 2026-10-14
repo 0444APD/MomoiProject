@@ -55,24 +55,47 @@ static void Art()
 
 ## 5. 스파인 들이기(Spine — 외부 런타임)
 
-스파인 캐릭터는 개발자가 스파인 에디터에서 내보낸 파일로 들어온다. AI는 런타임 패키지를 들이고(내려받기라 먼저 묻는다 — 관례 0절) 가져오기 설정을 맞춘 뒤 띄워 확인한다. 스파인 에디터가 없어도 내보낸 파일만으로 재생 · 섞기 · 스킨 · 부착물 바꾸기 · 이벤트 · 뼈 따라가기는 된다. 뼈 · 메시 · 키를 고치거나 다시 내보내는 일(버전 · 알파 방식 · 아틀라스 다시 묶기)은 에디터가 있어야 한다. 아래는 2026-10-13 UI 실험실(Unity 6000.6.3 · 스파인 4.2 파일)에서 실제로 해 본 순서다.
+스파인 캐릭터는 개발자가 스파인 에디터에서 내보낸 파일로 들어온다. AI는 런타임 패키지를 들이고(내려받기라 먼저 묻는다 — 관례 0절), 가져오기 설정을 맞추고, 띄워서 확인한다.
 
-### 5-1. 버전 — 파일에 맞춘다
+스파인 에디터가 없어도 내보낸 파일만으로 할 수 있는 것: 재생 · 섞기 · 스킨 · 부착물 바꾸기 · 이벤트 · 뼈 따라가기 · 조종 뼈 움직이기.
 
-- 런타임과 내보낸 파일은 **앞 두 자리(4.2 · 4.3)가 같아야** 한다. 파일 버전: JSON은 맨 앞 `"skeleton": { … "spine": "4.2.43" }`, 바이너리는 머리 몇 바이트 뒤의 글자(`4.2.33`).
-- 공식 지원 Unity(2026-10 다운로드 페이지): 4.3 = 6000.4까지, 4.2 = 6000.3까지. Unity 6.3 이상에서 4.2를 쓰면 고쳐야 컴파일된다(5-3).
-- 개발자가 스파인 에디터를 가졌으면 4.3으로 내보내 4.3 런타임을 쓰는 것이 가장 쉽다(고칠 것 없음 · 스트레이트 알파가 기본). 파일만 있으면 파일 버전을 따른다.
+에디터가 있어야 하는 것: 뼈 · 메시 · 키 고치기, 다시 내보내기(버전 · 알파 방식 · 아틀라스).
+
+아래의 버전 숫자는 **2026-10 기준 예**다. 버전이 바뀌면 굵은 글씨의 규칙을 따르고, 숫자는 그때 다시 확인한다.
+
+### 5-1. 버전 호환 — 규칙은 그대로, 숫자는 바뀐다
+
+- **런타임은 파일과 앞 두 자리(major.minor)가 같아야 한다.**
+  - 파일 버전은 JSON 맨 앞 `"skeleton": { … "spine": "4.2.43" }`에서 본다. 바이너리는 머리 몇 바이트 뒤의 글자(`4.2.33`)다.
+  - 끝자리(patch)는 달라도 된다.
+- **런타임마다 지원하는 Unity 범위가 다르다.** 받기 전에 공식 다운로드 페이지(`esotericsoftware.com/spine-unity-download`)에서 그 런타임의 지원 범위와 최신 날짜를 확인한다.
+- **고르는 순서:**
+  1. 파일 버전의 런타임이 프로젝트의 Unity를 지원하면 그것을 쓴다.
+  2. 지원하지 않으면, 개발자가 스파인 에디터로 지원되는 버전으로 다시 내보낼 수 있는지 묻는다. 그러면 고칠 것이 없다.
+  3. 파일만 있으면 그 런타임을 들여와 고친다(5-3).
+- **런타임 버전마다 기본값이 다르다**(알파 방식 등). 넣을 때마다 5-4로 확인한다.
+- **버전을 올릴 때:**
+  - 파일을 새 에디터로 다시 내보내고, manifest 주소 끝(`#x.y`)을 바꾼다.
+  - 5-3으로 고친 사본(`Packages/` 안)이 있으면, 새 버전이 그 Unity를 지원하는지 보고 사본을 지운 뒤 git 주소로 되돌린다.
+- 기록(2026-10, 다운로드 페이지와 실험실 확인):
+
+| 런타임 | 공식 지원 Unity | 알파 기본 | Unity 6000.6에서 |
+|---|---|---|---|
+| 4.3 | 6000.4까지 | 스트레이트 | 확인 안 함 |
+| 4.2 | 6000.3까지 | PMA | 4.2.120은 컴파일 오류 → 5-3으로 고쳐 씀(UI 실험실) |
 
 ### 5-2. 설치(AI)
 
-1. 묻는다: 받을 것(git 주소 두 개 — 저장소 전체는 600MB 남짓, 실험실에서는 40초 안에 받았다) · 버전 · 넣을 프로젝트.
-2. `Packages/manifest.json`의 `dependencies`에 두 줄(4.3이면 끝을 `#4.3`):
+1. 먼저 묻는다: 받을 것(git 주소 두 개) · 버전 · 넣을 프로젝트.
+2. `Packages/manifest.json`의 `dependencies`에 두 줄을 넣는다(`<버전>` = `4.2` · `4.3` …):
    ```json
-   "com.esotericsoftware.spine.spine-csharp": "https://github.com/EsotericSoftware/spine-runtimes.git?path=spine-csharp/src#4.2",
-   "com.esotericsoftware.spine.spine-unity": "https://github.com/EsotericSoftware/spine-runtimes.git?path=spine-unity/Assets/Spine#4.2",
+   "com.esotericsoftware.spine.spine-csharp": "https://github.com/EsotericSoftware/spine-runtimes.git?path=spine-csharp/src#<버전>",
+   "com.esotericsoftware.spine.spine-unity": "https://github.com/EsotericSoftware/spine-runtimes.git?path=spine-unity/Assets/Spine#<버전>",
    ```
-   unitypackage도 있지만 `Assets/Spine` · `Assets/Spine Examples`가 생겨 쓰지 않는다(Assets 바로 아래 폴더 — 관례 2절).
-3. **Unity가 manifest를 다시 읽게 한다.** Unity 창이 뒤에 있으면 요청 파일의 새로 읽기(`AssetDatabase.Refresh`)만으로는 패키지를 다시 풀지 않는다. 프로젝트 `Code/Editor`에 아래 도구를 두면 컴파일 뒤 manifest가 lock 파일보다 새로울 때 다시 푼다. 컴파일이 깨져 있으면 도메인이 다시 읽히지 않아 이 도구도 돌지 않는다 — 개발자에게 Unity 창을 한 번 눌러 달라고 한다(창이 앞으로 오면 Unity가 다시 푼다).
+   unitypackage는 쓰지 않는다. `Assets/Spine` · `Assets/Spine Examples`가 생기기 때문이다(관례 2절).
+3. **Unity가 manifest를 다시 읽게 한다.** Unity 창이 뒤에 있으면 요청 파일의 새로 읽기(`AssetDatabase.Refresh`)만으로는 패키지를 다시 풀지 않는다.
+   - 프로젝트 `Code/Editor`에 아래 도구를 둔다. 컴파일 뒤 manifest가 lock 파일보다 새로우면 다시 푼다.
+   - 컴파일이 깨져 있으면 이 도구도 돌지 않는다. 그때는 개발자에게 Unity 창을 한 번 눌러 달라고 한다.
    ```csharp
    [InitializeOnLoadMethod]
    static void ResolveIfManifestChanged()
@@ -83,74 +106,102 @@ static void Art()
        UnityEditor.PackageManager.Client.Resolve();
    }
    ```
-4. `Library/PackageCache`에 두 패키지가 생기고 `Logs/Editor.log`에 `error CS`가 없는지 본다.
-5. 스파인이 처음 돌 때 설정 파일 `Assets/Editor/SpineSettings.asset`을 만든다. 경로가 스파인 코드에 고정돼 있어 옮기지 않는다(관례의 예외 — 프로젝트와 함께 커밋).
+4. `Logs/Editor.log`에 `error CS`가 없는지 본다. 있으면 5-3.
+5. 스파인은 처음 돌 때 `Assets/Editor/SpineSettings.asset`을 만든다. 경로가 스파인 코드에 고정돼 있어 옮기지 않는다(관례의 예외 — 프로젝트와 함께 커밋).
 
-### 5-3. Unity 6.3 이상에서 4.2를 쓸 때 — 패키지를 들여와 고친다
+### 5-3. 지원 범위 밖 Unity에서 옛 런타임을 쓸 때 — 들여와 고친다
 
-Unity 6.6은 `Object.GetInstanceID()`를 오류로 막았다(`CS0619 … Use GetEntityId instead`). spine-unity 4.2(4.2.120)는 이것을 쓰고, 4.3은 `#if`로 고쳐 두었다. 4.2를 써야 하면 4.3과 같은 방식으로 고친다.
+1. `Library/PackageCache/com.esotericsoftware.spine.spine-unity@…`를 `Packages/com.esotericsoftware.spine.spine-unity`로 복사한다(embedded 패키지 — 프로젝트와 함께 커밋). manifest에서 그 줄을 지우고 다시 푼다(5-2의 3).
+2. **`error CS`만 고친다**(경고는 둔다). 대개 Unity가 오류로 막은 옛 API다(`CS0619 … obsolete`).
+3. **고치는 법은 직접 짓지 않는다.** 같은 저장소의 새 버전 브랜치가 같은 줄을 어떻게 바꿨는지 보고 그대로 따른다. 새 줄은 `#if UNITY_xxxx_OR_NEWER` 쪽에, 옛 줄은 `#else` 쪽에 남긴다.
+4. 다시 컴파일한다. spine-csharp(런타임 핵심)는 Unity API를 쓰지 않아 대개 고칠 것이 없으니 git 그대로 둔다.
+5. 이 사본은 git으로 저절로 바뀌지 않는다. 버전을 올릴 때는 5-1을 따른다.
 
-1. `Library/PackageCache/com.esotericsoftware.spine.spine-unity@…`를 `Packages/com.esotericsoftware.spine.spine-unity`로 복사하고(embedded 패키지 — 프로젝트와 함께 커밋, 그 뒤 git으로 저절로 바뀌지 않는다) manifest의 spine-unity 줄을 지운다. spine-csharp는 고칠 것이 없어 git 그대로 둔다. 다시 푼다(5-2의 3).
-2. 아래를 고친다. 옛 줄은 `#else` 쪽에 남긴다.
+예(2026-10 · Unity 6000.6 · spine-unity 4.2.120 — `Object.GetInstanceID()`가 오류로 막힘, 4.3 브랜치를 따라 고침):
 
-| 파일(`Runtime/spine-unity/…` · `Editor/spine-unity/Editor/…`) | 고칠 것 |
+| 파일(`Runtime/spine-unity/…` · `Editor/spine-unity/Editor/…`) | 고친 것 |
 |---|---|
-| `Components/SkeletonMecanim.cs` | `AnimationClipEqualityComparer`: `#if UNITY_6000_3_OR_NEWER` → `x.GetEntityId() == y.GetEntityId()` · `o.GetHashCode()` |
-| `Asset Types/SpineAtlasAssetInspector.cs`(2곳) · `Components/SkeletonGraphicInspector.cs` | `AssetDatabase.GetAssetPath(texture.GetInstanceID())` → `AssetDatabase.GetAssetPath(texture)` |
-| `Utility/AssetUtility.cs` | `#if UNITY_6000_3_OR_NEWER` → `var skeletonGraphicID = skeletonGraphic.GetEntityId()` · `….GetEntityId().IsValid()` · `EditorUtility.EntityIdToObject(….GetEntityId())` |
-| `Utility/DataReloadHandler.cs` | 표 `Dictionary<EntityId, string>` · `EntityId sgID = skeletonGraphic.GetEntityId()` |
-| `Utility/SpineEditorUtilities.cs` | 맨 위 `#if UNITY_6000_4_OR_NEWER` `#define HIERARCHY_WINDOW_ENTITY_ID_CALLBACK`, 네임스페이스 안 `using EntityIdType = EntityId;`(아니면 `System.Int32`). 하이어라키 아이콘 표 4개의 키 `EntityIdType` · `IconsOnGUI(EntityIdType …)` · `hierarchyWindowItemByEntityIdOnGUI` · 끌어 놓기 `DragAndDrop.AddDropHandlerV2`/`RemoveDropHandlerV2` + `HandleDragAndDrop(EntityId …)`(본문은 `EditorUtility.EntityIdToObject`) · `gameObject.GetEntityOrInstanceId()` 확장 함수(파일 끝 `EntityIdExtensions`) |
+| `Components/SkeletonMecanim.cs` | `AnimationClipEqualityComparer` → `GetEntityId()` 비교 · `GetHashCode()` |
+| `Asset Types/SpineAtlasAssetInspector.cs`(2곳) · `Components/SkeletonGraphicInspector.cs` | `GetAssetPath(texture.GetInstanceID())` → `GetAssetPath(texture)` |
+| `Utility/AssetUtility.cs` | `GetEntityId()` · `GetEntityId().IsValid()` · `EditorUtility.EntityIdToObject` |
+| `Utility/DataReloadHandler.cs` | 표 키 `EntityId` · `GetEntityId()` |
+| `Utility/SpineEditorUtilities.cs` | `HIERARCHY_WINDOW_ENTITY_ID_CALLBACK`(6000.4+) · `EntityIdType` 별칭 · 하이어라키 아이콘 표 키 · `hierarchyWindowItemByEntityIdOnGUI` · `DragAndDrop.AddDropHandlerV2` + `HandleDragAndDrop(EntityId …)` · `GetEntityOrInstanceId()` 확장 함수 |
 
-3. 다시 컴파일해 `error CS`가 없는지 본다. 이 개발 환경에서는 UI 실험실(`UITemplateLab`)의 `Packages/com.esotericsoftware.spine.spine-unity`가 고친 사본(4.2.120)이다 — 같은 버전이면 그것을 복사해도 된다.
+이 개발 환경에서는 UI 실험실(`UITemplateLab`)의 `Packages/com.esotericsoftware.spine.spine-unity`가 이렇게 고친 4.2.120 사본이다. 같은 버전이면 복사해 쓴다.
 
 ### 5-4. 알파 — PMA인지 스트레이트인지
 
-- 텍스처가 PMA(premultiplied alpha)인지 스트레이트인지에 가져오기를 맞춘다. 어긋나면 가장자리가 검거나 하얗게 뜬다. 런타임 기본은 **4.3 = 스트레이트, 4.2 = PMA**.
-- 아는 법: 4.x 아틀라스(`.atlas.txt`)에 `pma:true` 줄이 있으면 PMA, 없으면 스트레이트. 밖에서 받은 파일은 픽셀로 확인한다 — 반투명 픽셀에서 RGB가 알파보다 큰 칸이 많으면 스트레이트(PMA는 늘 RGB ≤ 알파).
-- **파일을 넣기 전에** `Assets/Editor/SpineSettings.asset`을 고친다 — 설정은 .meta가 없는 새 텍스처를 가져올 때만 적용된다.
-  - 스트레이트: `textureSettingsReference: Packages/com.esotericsoftware.spine.spine-unity/Editor/spine-unity/Editor/ImporterPresets/StraightAlphaPreset.preset`, `blendModeMaterialMultiply` · `Screen` · `Additive`에 `SkeletonStraightMultiply` · `Screen` · `Additive.mat`(패키지 `Runtime/spine-unity/SkeletonDataModifierAssets/BlendModeMaterials/` — `{fileID: 2100000, guid: <.meta의 guid>, type: 2}`).
-  - PMA: `textureSettingsReference`를 비우고(또는 `PMATexturePreset.preset`) 블렌드 머티리얼은 `SkeletonPMA…`.
-- 확인: 생긴 머티리얼의 `_StraightAlphaInput: 1`(스트레이트) · 텍스처 .meta의 `sRGBTexture: 1` · `alphaIsTransparency: 1`. 이미 잘못 들어왔으면 생긴 `_Atlas` · 머티리얼 · `_SkeletonData`와 텍스처 .meta를 지우고 다시 넣는다.
+텍스처의 알파 방식과 가져오기 설정이 어긋나면 가장자리가 검거나 하얗게 뜬다. 기본값은 런타임 버전마다 다르다(5-1 기록).
+
+- **아는 법:**
+  - 4.x 아틀라스(`.atlas.txt`)에 `pma:true` 줄이 있으면 PMA, 없으면 스트레이트다.
+  - 밖에서 받은 파일은 픽셀로 확인한다. 반투명 픽셀에서 RGB가 알파보다 큰 칸이 많으면 스트레이트다(PMA는 늘 RGB ≤ 알파).
+- **파일을 넣기 전에** `Assets/Editor/SpineSettings.asset`을 고친다. 이 설정은 .meta가 없는 새 텍스처를 가져올 때만 적용된다.
+  - 스트레이트:
+    - `textureSettingsReference` = 패키지의 `Editor/spine-unity/Editor/ImporterPresets/StraightAlphaPreset.preset` 경로
+    - `blendModeMaterialMultiply` · `Screen` · `Additive` = 패키지 `Runtime/spine-unity/SkeletonDataModifierAssets/BlendModeMaterials/`의 `SkeletonStraight…` 머티리얼(`{fileID: 2100000, guid: <.meta의 guid>, type: 2}`)
+  - PMA: `textureSettingsReference`를 비우고(또는 `PMATexturePreset.preset`), 블렌드 머티리얼은 `SkeletonPMA…`.
+- **확인:**
+  - 스트레이트면 생긴 머티리얼에 `_StraightAlphaInput: 1`, 텍스처 .meta에 `sRGBTexture: 1` · `alphaIsTransparency: 1`이 있다.
+  - 잘못 들어왔으면 생긴 에셋과 텍스처 .meta를 지우고 다시 넣는다.
 
 ### 5-5. 파일 넣기
 
-- 개발자의 내보내기 설정(가이드 06): 바이너리 `.skel.bytes`(또는 JSON `.json`) · 아틀라스 확장자 `.atlas.txt` · `Animation cleanup` 끔 · `Nonessential data` 켬 · 4.3이면 `Premultiply alpha` 끔 + `Bleed` 켬.
-- 자리: `Assets/Dev/Art/Spine/<이름>/`에 뼈대 데이터 **하나**(`.skel.bytes` 또는 `.json` — 둘 다 넣으면 `_SkeletonData`가 두 벌) · `.atlas.txt` · `.png`(아틀라스 장마다). `.spine`(에디터 프로젝트 파일)은 넣지 않는다. 확장자만 다르면(`.skel` · `.atlas`) 이름을 바꿔 넣는다 — 그대로면 읽지 못한다.
-- 새로 읽으면 `<이름>_Atlas` · 장마다 머티리얼 · `<이름>_SkeletonData`가 저절로 생긴다(크기 0.01 — 스파인 1px = 0.01 유닛).
+개발자의 내보내기 설정은 가이드 06에 있다.
+
+- 자리는 `Assets/Dev/Art/Spine/<이름>/`이다.
+- 뼈대 데이터는 **하나만** 넣는다(`.skel.bytes` 또는 `.json`). 둘 다 넣으면 `_SkeletonData`가 두 벌 생긴다.
+- 확장자가 `.skel` · `.atlas`면 `.skel.bytes` · `.atlas.txt`로 바꿔 넣는다. 그대로면 읽지 못한다.
+- `.spine`(에디터 프로젝트 파일)은 넣지 않는다.
 - 밖에서 받은 자료(다른 게임에서 나온 파일 등)는 저장소에 넣지 않는다(`.gitignore`).
 
-### 5-6. 코드에서 쓰기 · 확인
+### 5-6. 조종 뼈 — 조이스틱식
 
-- 스파인을 부르는 프로젝트 코드는 asmdef 참조에 `spine-unity` · `spine-csharp`를 더한다(`MomoiProject.Client` — 선택 기능 동기화는 GBible 모듈 참조만 고쳐 지워지지 않는다). 다이얼로그 스탠딩(`SpineStandingView`)은 참조 없이 이름으로 찾는다(24장).
-- 띄우기 `SkeletonAnimation.NewSkeletonAnimationGameObject(skeletonDataAsset)`, 재생 `AnimationState.SetAnimation(트랙, 이름, 반복)` · 이어서 `AddAnimation`, 애니메이션 목록 `skeletonDataAsset.GetSkeletonData(true).Animations`.
-- **조종 뼈를 마우스로 끌기**(시선 · 손 따라가기 같은 조종용 뼈 — 다른 뼈가 IK · transform 제약으로 그 뼈를 따른다):
-  1. 데이터에서 찾는다: 제약의 `target`이 되는 뼈(예: 눈 · 머리카락 · 얼굴 IK가 따르는 `Touch_Point`)와, 그 제약의 세기(mix)를 올리고 내리는 애니메이션(예: `Look_01_M` · `LookEnd_01_M`).
-  2. 누르면 위 트랙(1번)에 세기를 올리는 애니메이션을 **섞어서** 켠다. 트랙이 비어 있으면 `SetEmptyAnimation(트랙, 0)` → `AddAnimation(…).MixDuration = 0.3`이다. 그냥 `SetAnimation`하면 IK 세기가 한 프레임에 0에서 값으로 올라, 잡는 순간 고개가 확 돈다(실험실에서 잡는 순간 90°/초 → 섞으면 7°/초).
-  3. 포인터 자리는 `camera.ScreenToWorldPoint` → `transform.InverseTransformPoint`로 스켈레톤 공간으로 바꾸고, 조이스틱처럼 바꾼다(개발자 2026-10-14).
-     - 가운데는 뼈의 제자리다. 포인터까지의 거리를 **화면 px 반지름**(예: 160px — 정사영 카메라면 `Screen.height / (orthographicSize × 2)`로 유닛 환산)으로 나누고, 1보다 길면 1로 자른다(원 테두리).
-     - 그 값에 뼈가 움직일 거리를 곱한다. 방향마다 다르게 둘 수 있다: 좌우 · 위 `reach`, 아래 `reachDown`.
-     - 반지름을 뼈의 움직임 거리(스켈레톤 유닛)로 그대로 두면 화면에서 몇 px만 움직여도 끝까지 가서, 테두리 근처에서 좌우로 조금만 움직여도 방향이 확 바뀐다.
-  4. 그 오프셋을 **셋업 자세에서 한 번 잡아 둔** 부모 행렬(`skeleton.SetToSetupPose()` → `UpdateWorldTransform(Physics.None)` → `parent.GetWorldToLocalMatrix`)로 로컬 오프셋으로 바꿔, 매 프레임 애니메이션이 적용된 뒤(`SkeletonAnimation.UpdateLocal`) 뼈의 로컬 x · y에 더한다. 애니메이션이 키를 준 뼈는 그 값에, 키가 없는 뼈는 처음 값에 더한다.
-     - 오프셋은 목표로 바로 옮기지 않는다. `Vector2.SmoothDamp(현재, 목표, ref 속도, 0.25초, 최고 속도)`로 가속 · 감속하며 따라가게 하고, 뼈마다 최고 속도(얼굴 1.2 유닛/초)를 둔다. 그래야 마우스를 확 움직여도 고개가 그만큼 빨리 돌지 않는다. 6시 왕복에서 115°/초가 9°/초로 줄었다.
-     - **지금 자세로 화면 자리를 고정하면(`bone.SetPositionSkeletonSpace`) 튄다.** 조종 뼈가 머리의 자식이면, 그 뼈가 IK로 머리를 돌리고 머리가 다시 그 뼈를 옮기는 되먹임이 생긴다. 그래서 그 뼈를 따르는 뼈(머리 장식 등)가 한 프레임에 크게 튄다. 실험실에서 잰 값은 평균의 35배였고, 셋업 행렬 방식은 튀지 않았다.
-  5. 놓으면 끝 애니메이션 + `AddEmptyAnimation`을 틀고, 오프셋을 0으로 부드럽게 줄인 뒤 원래 값으로 되돌린다. 애니메이션이 키를 주지 않는 뼈는 옮긴 값이 그대로 남기 때문이다.
-  6. 화면(UI) 칸 위에서 누른 것은 보내지 않는다(관례 21절).
-  - **상한은 IK가 뒤집히는 자리 전까지.** 조종 뼈를 멀리 옮기면 IK 목표가 목 · 머리 회전축 둘레를 넘어가, 고개가 갑자기 크게 꺾이거나 반대로 뒤집힌다. 그 경계를 오가면 '뚝뚝 끊김'이 된다.
-    - 정하는 법: 방향마다 자리를 옮겨 가며 고개 각도를 재고(실험실 `spine.drag.profile`), 각도가 갑자기 뛰기 전 거리로 상한을 정한다.
-    - 예: CH0334 얼굴 뼈는 좌우는 매끄럽지만(최대 +6° / −3°), 아래로 1.1 유닛을 넘으면 +18°로 꺾이고 더 내려가면 −18°로 뒤집힌다. 처음에는 모든 방향 1로 두었지만, 6시(아래)에서 좌우로 움직이면 아직 끊겼다(목 IK 목표가 회전축 가까이 붙어 방향이 민감하다). 그래서 아래만 0.5로 좁혔다(타원).
-    - 6시 아래 좌우 왕복에서 잰 값: 둥근 원(아래 1)은 고개 −6~+7°에 가장 빠른 회전 215°/초, 타원(아래 0.5)은 ±4°에 81°/초였다. 둥글게 돌릴 때는 20°/초였다.
-  - **시선 뼈**(눈동자 · 눈썹이 따르는 뼈 — 예: `Touch_Eye`)는 잡지 않아도, 누르고 있는 동안 어디서든 포인터를 따라가게 한다(개발자 2026-10-14). 제약의 세기가 셋업에 이미 들어 있어서 애니메이션이 필요 없다.
-    - 상한은 '눈동자가 눈 안에서 움직이는 거리'로 정한다. 흰자와 눈동자의 폭 차이(아틀라스 크기 ÷ 아틀라스 `scale`)의 반쪽 안에서 70% 정도가 알맞다.
-    - 예: CH0334는 여유가 한쪽 13px이고, 상한 4는 37px로 눈이 돌아갔다. 상한 1이면 9px이다.
-  - 예: UI 실험실 `Code/Client/Lab/Spine/SpineDrag.cs`. 테스트 명령 `spine.drag.face` · `hand` · `eye`로 마우스 없이 확인하고, `spine.drag.sweep`(`.old`)로 좌우 왕복 시 뼈마다 프레임당 이동을 비교한다.
-  - **조종 뼈 표시를 켜 두고 맞춘다**(실험실 `SpineDragMarkers` · `spine.markers`로 켜고 끔). 화면 px 크기로, 캐릭터 위에 그린다.
-    - 점: 뼈의 지금 자리
-    - 십자: 가운데
-    - 고리: 목표
-    - 선 · 타원: 범위
-    - 흐린 원: 조이스틱 반지름
-    - 뼈가 목표를 얼마나 늦게 따라가는지, 포인터가 반지름 밖인지, 범위가 IK가 꺾이는 자리에 닿는지가 보인다.
-- 기본 셰이더 `Spine/Skeleton`은 URP에서도 그린다(빛을 받지 않음). 빛을 받게 하려면 URP 셰이더 패키지(`com.esotericsoftware.spine.urp-shaders`).
-- 화면(UI Toolkit) 안에 그리려면 4.3의 UI Toolkit 확장(`com.esotericsoftware.spine.ui-toolkit`, Unity 6000.4)이 있다 — 아직 써 보지 않았다. 4.2는 UI Toolkit을 지원하지 않는다: 월드 장면에 두거나 `SkeletonGraphic`(UGUI)인데, UI 가이드는 UGUI를 들이지 않으므로 그때 묻는다.
-- 확인: 테스트 명령으로 띄우고 플레이 요청 `capture`로 찍는다(38장 2-5). 카메라는 데이터의 범위(`SkeletonData.X · Y · Width · Height` × 크기)에 맞춘다. 데이터 안에 카메라 뼈가 있는 장면형(로비 일러스트)은 애니메이션이 화면을 확대 · 이동한다 — 오류가 아니다.
-- 라이선스: 스파인 런타임을 넣은 제품은 사용자마다 스파인 에디터 라이선스가 있어야 한다(Spine Runtimes License). 출시 전에 개발자에게 알린다.
+조종 뼈는 다른 뼈들이 IK · transform 제약으로 따라가는 뼈다. 예: 고개와 얼굴이 따라가는 `Touch_Point`, 눈동자가 따라가는 `Touch_Eye`, 손이 따라가는 `HandFollow`. 이 뼈를 마우스로 움직인다.
+
+**원칙: 고개는 훨씬 덜 돌린다**(개발자 2026-10-15).
+- 조종 뼈의 범위를 작게 잡아 고개가 몇 도만 돌게 한다.
+- 범위를 크게 잡으면 IK 목표가 목 · 머리 회전축을 넘어가는 자리에 닿는다. 그러면 고개가 갑자기 꺾이거나 뒤집힌다.
+
+1. **데이터에서 찾는다.**
+   - 조종 뼈: 제약의 `target`이 되는 뼈.
+   - 그 제약의 세기(mix)를 올리고 내리는 애니메이션(예: `Look_01_M` · `LookEnd_01_M`).
+   - 세기가 셋업에 이미 들어 있는 뼈(시선)는 애니메이션이 필요 없다.
+2. **입력 — 조이스틱.**
+   - 가운데는 조종 뼈의 셋업 자리다.
+   - 포인터까지의 거리를 **화면 px 반지름**(예: 160px)으로 나누고, 길이가 1을 넘으면 1로 자른다(원 테두리). 정사영 카메라면 `Screen.height / (orthographicSize × 2)`로 px를 유닛으로 바꾼다.
+   - 그 값에 뼈가 움직일 범위를 곱한다. 범위는 방향마다 다르게 둘 수 있다(좌우 · 위 `reach`, 아래 `reachDown`). IK가 꺾이는 쪽만 좁힌다.
+   - 반지름을 화면 px로 잡지 않으면 몇 px만 움직여도 끝까지 가서, 테두리 근처에서 방향이 확 바뀐다.
+3. **출력 — 셋업 행렬로 로컬에 더한다.**
+   - 시작할 때 `skeleton.SetToSetupPose()` → `UpdateWorldTransform(Physics.None)` → `parent.GetWorldToLocalMatrix`로 부모 행렬을 한 번 잡아 둔다.
+   - 매 프레임 애니메이션이 적용된 뒤(`SkeletonAnimation.UpdateLocal`), 오프셋을 그 행렬로 바꿔 뼈의 로컬 x · y에 더한다. 애니메이션이 키를 준 뼈는 그 값에, 키가 없는 뼈는 처음 값에 더한다.
+   - **지금 자세로 화면 자리를 고정하면(`bone.SetPositionSkeletonSpace`) 튄다.** 조종 뼈가 머리의 자식이면, 그 뼈가 IK로 머리를 돌리고 머리가 다시 그 뼈를 옮기는 되먹임이 생기기 때문이다.
+4. **움직임 — 부드럽게, 섞어서.**
+   - 오프셋은 `Vector2.SmoothDamp(현재, 목표, ref 속도, smoothTime, maxSpeed)`로 따라가게 하고, 뼈마다 최고 속도를 둔다.
+   - 누르면 조종 애니메이션을 위 트랙에 **섞어서** 켠다. 트랙이 비어 있으면 `SetEmptyAnimation(트랙, 0)` → `AddAnimation(…).MixDuration = mixTime`이다. 그냥 `SetAnimation`하면 IK 세기가 한 프레임에 올라 잡는 순간 고개가 확 돈다.
+5. **놓으면** 끝 애니메이션 + `AddEmptyAnimation`(같은 섞임 시간)을 튼다. 오프셋이 0으로 돌아오면 뼈를 원래 값으로 되돌린다(키가 없는 뼈는 옮긴 값이 남기 때문이다).
+6. **범위 정하기.**
+   - 고개 뼈: 방향마다 자리를 옮겨 가며 고개 각도를 재고, 각도가 갑자기 뛰기 전까지로 정한다. 그 안에서 원칙대로 작게 잡는다.
+   - 시선 뼈: 눈동자가 눈 안에서 움직이는 거리로 정한다. 흰자와 눈동자의 폭 차이(아틀라스 크기 ÷ 아틀라스 `scale`)의 반쪽에서 70% 정도다.
+7. **시선 뼈는 잡지 않는다.** 누르고 있는 동안 어디서든 포인터를 따라가고, 놓으면 돌아온다(개발자 2026-10-14).
+8. 화면(UI) 칸 위의 포인터는 보내지 않는다(관례 21절).
+
+- 예: UI 실험실 `Code/Client/Lab/Spine/`
+  - `SpineDrag.cs`(구현)
+  - `SpineDragMarkers.cs`(조종 뼈 표시 — 점 = 지금 자리, 십자 = 가운데, 고리 = 목표, 타원 = 범위, 흐린 원 = 조이스틱 반지름)
+  - `SpineLab.cs`(테스트 명령 `spine.drag.*` · `spine.markers`)
+  - **값을 맞출 때는 표시를 켜고 본다.**
+- CH0334 값: 조이스틱 반지름 160px · `smoothTime` 0.25 · `mixTime` 0.3. 얼굴은 `reach` 1 · `reachDown` 0.5 · `maxSpeed` 1.2(고개 약 ±5°)이고, 시선은 `reach` 1(눈동자 약 9px)이다. 고개를 더 덜 돌리려면 얼굴 `reach` · `reachDown`을 줄인다.
+
+### 5-7. 그 밖
+
+- **코드에서 부르기:**
+  - 스파인을 부르는 프로젝트 코드는 asmdef 참조에 `spine-unity` · `spine-csharp`를 더한다. 선택 기능 동기화는 GBible 모듈 참조만 고치므로 지워지지 않는다.
+  - 다이얼로그 스탠딩(`SpineStandingView`)은 참조 없이 이름으로 찾는다(24장).
+- **URP:** 기본 셰이더 `Spine/Skeleton`은 URP에서도 그린다(빛을 받지 않음). 빛을 받으려면 URP 셰이더 패키지(`com.esotericsoftware.spine.urp-shaders`)를 쓴다.
+- **화면(UI Toolkit) 안에 그리기:** 4.3부터 UI Toolkit 확장(`com.esotericsoftware.spine.ui-toolkit`)이 있다(2026-10 기준 Unity 6000.4). 아직 써 보지 않았다. 확장이 없는 버전이면 월드 장면에 둔다. `SkeletonGraphic`(UGUI)은 UI 가이드가 UGUI를 들이지 않으므로 그때 묻는다.
+- **확인:**
+  - 테스트 명령으로 띄우고 플레이 요청 `capture`로 찍는다(38장 2-5).
+  - 카메라는 데이터 범위(`SkeletonData.X · Y · Width · Height` × 크기)에 맞춘다.
+  - 카메라 뼈가 든 장면형 데이터(로비 일러스트)는 애니메이션이 화면을 확대 · 이동한다. 오류가 아니다.
+- **라이선스:** 스파인 런타임을 넣은 제품은 사용자마다 스파인 에디터 라이선스가 있어야 한다(Spine Runtimes License). 출시 전에 개발자에게 알린다.

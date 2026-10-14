@@ -39,11 +39,12 @@
 > - 형식: 게임용은 `Binary`이고 `Extension`을 `.skel.bytes`로 둔다. 확인용은 `JSON`이다.
 > - `Nonessential data`는 켜고, `Animation cleanup`은 끈다.
 > - `Texture Atlas`의 `Pack`을 켜고 `Attachments`를 고른다.
-> - `Pack Settings`에서 `Atlas extension`은 `.atlas.txt`로 둔다. `Premultiply alpha`는 끄고 `Bleed`는 켠다(4.3 런타임 기준).
+> - `Pack Settings`에서 `Atlas extension`은 `.atlas.txt`로 둔다.
+> - `Premultiply alpha`와 `Bleed`는 쓰는 런타임의 기본 알파 방식에 맞춘다. 2026-10 기준 4.3이면 `Premultiply alpha`는 끄고 `Bleed`는 켠다. 버전마다 다를 수 있어 AI가 그때 알려 준다.
 > - 새 빈 폴더에 내보낸다. 나오는 파일은 `이름.skel.bytes`(또는 `.json`) · `이름.atlas.txt` · `이름.png`(장마다)이다.
 
 > [!note]- 꼭 맞춰야 하는 것
-> - **버전**: 런타임은 스파인 에디터(파일) 버전의 앞 두 자리(4.2 · 4.3)에 맞춘다.
+> - **버전**: 런타임은 스파인 에디터(파일) 버전의 앞 두 자리(4.2 · 4.3 …)에 맞춘다. 런타임마다 지원하는 Unity 범위가 달라서, 맞지 않으면 AI가 다시 내보낼 수 있는지 묻는다.
 > - **알파**: 내보낼 때 Premultiply alpha를 켰는지 껐는지에 Unity 가져오기를 맞춘다. 어긋나면 가장자리가 검거나 하얗게 뜬다.
 > - **라이선스**: 스파인 런타임을 넣은 게임은 스파인 에디터 라이선스가 있어야 한다.
 
