@@ -71,7 +71,9 @@ namespace GBible
             var label = new Label(title);
             label.AddToClassList("momoi-split-title");
             head.Add(label);
-            Button(split, Text("momoi.ui.close", "닫기"), close).AddToClassList("momoi-split-close");
+            var closeButton = Button(split, Text("momoi.ui.close", "닫기"), close);
+            closeButton.name = "close";
+            closeButton.AddToClassList("momoi-split-close");
             var nav = Element(split, "momoi-split-nav", "momoi-motion", "momoi-motion--left");
             var frame = Element(split, "momoi-split-frame", "momoi-motion");
             var frameHead = Element(frame, "momoi-split-frame-head");
@@ -88,10 +90,10 @@ namespace GBible
             return new SplitLayout { Nav = nav, FrameTitle = frameTitle, FrameCount = count, Body = inner, Foot = foot };
         }
 
-        // 왼쪽 목록의 한 줄(글 + 아래 작은 글). 고른 줄은 검정 판.
-        public static Button NavItem(VisualElement nav, string text, string sub, bool on, Action click)
+        // 왼쪽 목록의 한 줄(글 + 아래 작은 글). 고른 줄은 검정 판. name은 요소 이름(플레이 요청의 click 화면/이름).
+        public static Button NavItem(VisualElement nav, string text, string sub, bool on, Action click, string name = null)
         {
-            var item = new Button(click);
+            var item = new Button(click) { name = name };
             item.AddToClassList("momoi-nav-item");
             if (on) item.AddToClassList("momoi-nav-item--on");
             Element(item, "momoi-nav-dot");
@@ -316,6 +318,7 @@ namespace GBible
                     GameSettings.ResetAll();
                     Draw();
                 }));
+            reset.name = "reset";
             reset.AddToClassList("momoi-button--line");
         }
 
@@ -342,7 +345,7 @@ namespace GBible
                 {
                     _category = key;
                     Draw();
-                });
+                }, "nav-" + groups.IndexOf(group));
             }
             var current = groups.First(g => g.Key == _category);
             _layout.FrameTitle.text = Name(_category);
@@ -471,7 +474,7 @@ namespace GBible
                 {
                     _selected = name;
                     Draw();
-                });
+                }, "slot-" + name);
                 if (name == GBibleRuntime.Slot) item.AddToClassList("momoi-nav-item--current");
             }
 
@@ -494,13 +497,19 @@ namespace GBible
 
             var target = _selected;
             if (_request.allowDelete && !selected.IsEmpty && !isCurrent)
-                ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.delete", "지우기"), () =>
+            {
+                var delete = ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.delete", "지우기"), () =>
                     GameScreens.Confirm(ScreenUi.Text("momoi.ui.deleteSlotAsk", "슬롯 {slot}을(를) 지울까요?", ("slot", target)), () =>
                     {
                         GBibleRuntime.DeleteSlot(target);
                         Draw();
-                    })).AddToClassList("momoi-button--line");
-            ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.useSlot", "이 슬롯으로"), () => Pick(target)).AddToClassList("momoi-button--light");
+                    }));
+                delete.name = "delete";
+                delete.AddToClassList("momoi-button--line");
+            }
+            var use = ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.useSlot", "이 슬롯으로"), () => Pick(target));
+            use.name = "use";
+            use.AddToClassList("momoi-button--light");
         }
 
         static string SlotName(string name) => ScreenUi.Text("momoi.ui.slotName", "슬롯 {slot}", ("slot", name));
