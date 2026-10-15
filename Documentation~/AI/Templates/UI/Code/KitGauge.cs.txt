@@ -196,19 +196,15 @@ namespace MomoiProject
                 {
                     var c = size / 2f;
                     var r = Mathf.Min(size.x, size.y) / 2f;
-                    if (_frame == Frame.Outline) { Disc(p, c, r, _fill); Disc(p, c, r - outline, _track); }
-                    else Disc(p, c, r, _track);
+                    Disc(p, c, r, _track);
+                    if (_frame == Frame.Outline) Stroke(p, c, r - outline / 2f, outline, 0f, 1f, _fill);   // 테는 뒤 판 위에 선으로(반투명 뒤 판이 테 색과 섞이지 않게)
                     break;
                 }
                 default:
                     foreach (var box in Boxes(size))
                     {
-                        if (_frame == Frame.Outline)
-                        {
-                            Fill(p, ShapeOf(box, size, 0f), _fill);
-                            Fill(p, ShapeOf(box, size, outline), _track);
-                        }
-                        else Fill(p, ShapeOf(box, size, 0f), _track);
+                        Fill(p, ShapeOf(box, size, 0f), _track);
+                        if (_frame == Frame.Outline) Outline(p, ShapeOf(box, size, outline / 2f), outline, _fill);   // 테는 뒤 판 위에 선으로
                     }
                     break;
             }
@@ -438,6 +434,19 @@ namespace MomoiProject
             for (var i = 1; i < points.Count; i++) p.LineTo(points[i]);
             p.ClosePath();
             p.Fill();
+        }
+
+        static void Outline(Painter2D p, List<Vector2> points, float width, Color color)
+        {
+            if (points.Count < 3 || width <= 0f) return;
+            p.strokeColor = color;
+            p.lineWidth = width;
+            p.lineJoin = LineJoin.Miter;
+            p.BeginPath();
+            p.MoveTo(points[0]);
+            for (var i = 1; i < points.Count; i++) p.LineTo(points[i]);
+            p.ClosePath();
+            p.Stroke();
         }
 
         static void Disc(Painter2D p, Vector2 c, float r, Color color)
