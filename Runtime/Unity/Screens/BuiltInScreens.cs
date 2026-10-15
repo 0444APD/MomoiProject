@@ -60,6 +60,72 @@ namespace GBible
             var time = TimeSpan.FromSeconds(Math.Max(0, seconds));
             return time.TotalHours >= 1 ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}" : $"{time.Minutes}:{time.Seconds:00}";
         }
+
+        // 나눈 화면(UI 배경 위 — UiGuide 2-3 · UI 키트 견본 SplitScreen): 왼쪽 위 제목 · 오른쪽 위 닫기 · 왼쪽 목록(배경 위 글, 고른 것만 검정 판) ·
+        // 오른쪽 틀(검정 틀 → 종이 안판 — 2중첩, 머리 띠 선 하나 · 아래 버튼 줄). 정보가 많은 기본 화면(설정 · 세이브 슬롯)이 쓴다.
+        public static SplitLayout Split(VisualElement root, string title, Action close)
+        {
+            var split = Element(root, "momoi-split");
+            var head = Element(split, "momoi-split-head");
+            Element(head, "momoi-split-home");
+            var label = new Label(title);
+            label.AddToClassList("momoi-split-title");
+            head.Add(label);
+            Button(split, Text("momoi.ui.close", "닫기"), close).AddToClassList("momoi-split-close");
+            var nav = Element(split, "momoi-split-nav", "momoi-motion", "momoi-motion--left");
+            var frame = Element(split, "momoi-split-frame", "momoi-motion");
+            var frameHead = Element(frame, "momoi-split-frame-head");
+            Element(frameHead, "momoi-split-mark");
+            var frameTitle = new Label();
+            frameTitle.AddToClassList("momoi-split-frame-title");
+            frameHead.Add(frameTitle);
+            Element(frameHead, "momoi-split-rule");
+            var count = new Label();
+            count.AddToClassList("momoi-split-count");
+            frameHead.Add(count);
+            var inner = Element(frame, "momoi-split-inner");
+            var foot = Element(frame, "momoi-split-foot");
+            return new SplitLayout { Nav = nav, FrameTitle = frameTitle, FrameCount = count, Body = inner, Foot = foot };
+        }
+
+        // 왼쪽 목록의 한 줄(글 + 아래 작은 글). 고른 줄은 검정 판.
+        public static Button NavItem(VisualElement nav, string text, string sub, bool on, Action click)
+        {
+            var item = new Button(click);
+            item.AddToClassList("momoi-nav-item");
+            if (on) item.AddToClassList("momoi-nav-item--on");
+            Element(item, "momoi-nav-dot");
+            var texts = Element(item, "momoi-nav-texts");
+            var label = new Label(text);
+            label.AddToClassList("momoi-nav-text");
+            texts.Add(label);
+            if (!string.IsNullOrEmpty(sub))
+            {
+                var subLabel = new Label(sub);
+                subLabel.AddToClassList("momoi-nav-sub");
+                texts.Add(subLabel);
+            }
+            nav.Add(item);
+            return item;
+        }
+
+        static VisualElement Element(VisualElement parent, params string[] classes)
+        {
+            var element = new VisualElement();
+            foreach (var name in classes) element.AddToClassList(name);
+            parent.Add(element);
+            return element;
+        }
+    }
+
+    // ScreenUi.Split이 만든 나눈 화면의 자리.
+    public sealed class SplitLayout
+    {
+        public VisualElement Nav;        // 왼쪽 목록(ScreenUi.NavItem)
+        public Label FrameTitle;         // 오른쪽 틀의 제목
+        public Label FrameCount;         // 오른쪽 틀 머리 띠 끝의 작은 글
+        public VisualElement Body;       // 종이 안판
+        public VisualElement Foot;       // 틀 아래 버튼 줄(오른쪽 정렬)
     }
 
     // 고르기 창: 지금 기다리는 선택(Game.Choice)을 보이고 답한다. 선택 대기가 생기면 저절로 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로').
@@ -229,55 +295,65 @@ namespace GBible
         }
     }
 
-    // 설정: DB › 설정 항목을 분류마다 묶어 그린다(켜기/끄기 = 토글, 숫자 = 슬라이더, 선택지 = 드롭다운, 글 = 입력칸). 바꾸면 바로 GameSettings.Set.
+    // 설정: 나눈 화면(UI 배경) — 왼쪽 = DB › 설정 항목의 분류, 오른쪽 = 고른 분류의 항목(켜기/끄기 = 토글, 숫자 = 슬라이더, 선택지 = 드롭다운, 글 = 입력칸).
+    // 바꾸면 바로 GameSettings.Set. 분류가 비어 있는 항목은 '일반'.
     public sealed class SettingsWindow : GameScreen
     {
-        VisualElement _body;
+        SplitLayout _layout;
+        string _category;
 
         protected internal override string[] Watch => new[] { "$momoi.settings" };   // 플레이어 데이터가 아니다: 열 때와 언어가 바뀔 때만 다시 만든다
         protected internal override bool WaitForPresentation => false;
 
         protected internal override void OnOpen()
         {
-            var panel = ScreenUi.Panel(Root, ScreenUi.Text("momoi.ui.settings", "설정"));
-            panel.AddToClassList("momoi-settings");
-            var scroll = new ScrollView();
-            scroll.AddToClassList("momoi-scroll");
-            panel.Add(scroll);
-            _body = scroll.contentContainer;
-            var row = ScreenUi.Row(panel);
-            ScreenUi.Button(row, ScreenUi.Text("momoi.ui.resetAll", "기본값으로"), () =>
+            _layout = ScreenUi.Split(Root, ScreenUi.Text("momoi.ui.settings", "설정"), Close);
+            _layout.Body.AddToClassList("momoi-settings");
+            _category = null;
+            var reset = ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.resetAll", "기본값으로"), () =>
                 GameScreens.Confirm(ScreenUi.Text("momoi.ui.resetAllAsk", "모든 설정을 기본값으로 되돌릴까요?"), () =>
                 {
                     GameSettings.ResetAll();
                     Draw();
                 }));
-            ScreenUi.Button(row, ScreenUi.Text("momoi.ui.close", "닫기"), Close, primary: true);
+            reset.AddToClassList("momoi-button--line");
         }
 
         protected internal override void OnClose() => GameSettings.Flush();
 
         protected internal override void Draw()
         {
-            if (_body == null) return;
-            _body.Clear();
-            var settings = GameSettings.All;
-            if (settings.Count == 0)
+            if (_layout == null) return;
+            _layout.Nav.Clear();
+            _layout.Body.Clear();
+            var groups = GameSettings.All.GroupBy(s => s.category ?? "").ToList();
+            if (groups.Count == 0)
             {
-                _body.Add(new Label(ScreenUi.Text("momoi.ui.noSettings", "설정 항목이 없습니다(DB › 설정).")));
+                _layout.FrameTitle.text = ScreenUi.Text("momoi.ui.settings", "설정");
+                _layout.FrameCount.text = "";
+                _layout.Body.Add(new Label(ScreenUi.Text("momoi.ui.noSettings", "설정 항목이 없습니다(DB › 설정).")));
                 return;
             }
-            foreach (var group in settings.GroupBy(s => s.category ?? ""))
+            if (_category == null || groups.All(g => g.Key != _category)) _category = groups[0].Key;
+            foreach (var group in groups)
             {
-                if (group.Key.Length > 0)
+                var key = group.Key;
+                ScreenUi.NavItem(_layout.Nav, Name(key), null, key == _category, () =>
                 {
-                    var header = new Label(ScreenUi.Text(group.Key));
-                    header.AddToClassList("momoi-section");
-                    _body.Add(header);
-                }
-                foreach (var setting in group) _body.Add(Control(setting));
+                    _category = key;
+                    Draw();
+                });
             }
+            var current = groups.First(g => g.Key == _category);
+            _layout.FrameTitle.text = Name(_category);
+            _layout.FrameCount.text = $"{groups.IndexOf(current) + 1} / {groups.Count}";
+            var scroll = new ScrollView();
+            scroll.AddToClassList("momoi-split-scroll");
+            _layout.Body.Add(scroll);
+            foreach (var setting in current) scroll.Add(Control(setting));
         }
+
+        static string Name(string category) => category.Length == 0 ? ScreenUi.Text("momoi.ui.general", "일반") : ScreenUi.Text(category);
 
         static VisualElement Control(SettingData setting)
         {
@@ -356,11 +432,13 @@ namespace GBible
         public bool allowDelete = true;
     }
 
-    // 슬롯: 슬롯마다 요약(GBibleRuntime.SlotSummary)·플레이 시간·저장한 때를 보이고, 고르면 그 슬롯으로 바꾼다. 지우기는 확인을 거친다.
+    // 세이브 슬롯: 나눈 화면(UI 배경) — 왼쪽 = 슬롯 목록(이름 + 요약), 오른쪽 = 고른 슬롯의 요약(GBibleRuntime.SlotSummary) · 플레이 시간 · 저장한 때 +
+    // '이 슬롯으로'(그 슬롯으로 바꾼다) · '지우기'(확인을 거친다 — 지금 슬롯 · 빈 슬롯은 지우지 않는다). 처음 고른 줄은 지금 슬롯.
     public sealed class SlotsWindow : GameScreen
     {
-        VisualElement _body;
+        SplitLayout _layout;
         SlotsRequest _request;
+        string _selected;
 
         protected internal override string[] Watch => new[] { "$momoi.slots" };   // 열 때와 언어가 바뀔 때만 다시 만든다
         protected internal override bool WaitForPresentation => false;
@@ -368,40 +446,76 @@ namespace GBible
         protected internal override void OnOpen()
         {
             _request = Argument as SlotsRequest ?? new SlotsRequest();
-            var panel = ScreenUi.Panel(Root, ScreenUi.Text("momoi.ui.slots", "슬롯"));
-            panel.AddToClassList("momoi-slots");
-            _body = new VisualElement();
-            panel.Add(_body);
-            ScreenUi.Button(ScreenUi.Row(panel), ScreenUi.Text("momoi.ui.close", "닫기"), Close);
+            _layout = ScreenUi.Split(Root, ScreenUi.Text("momoi.ui.slots", "세이브 슬롯"), Close);
+            _layout.Body.AddToClassList("momoi-slots");
+            _selected = null;
         }
 
         protected internal override void Draw()
         {
-            if (_body == null) return;
-            _body.Clear();
+            if (_layout == null) return;
+            _layout.Nav.Clear();
+            _layout.Body.Clear();
+            _layout.Foot.Clear();
+            var names = new List<string>();
             for (int i = 0; i < Math.Max(1, _request.count); i++)
+                names.Add(_request.names != null && i < _request.names.Count ? _request.names[i] : (i + 1).ToString(CultureInfo.InvariantCulture));
+            if (_selected == null || !names.Contains(_selected)) _selected = names.Contains(GBibleRuntime.Slot) ? GBibleRuntime.Slot : names[0];
+
+            foreach (var name in names)
             {
-                var name = _request.names != null && i < _request.names.Count ? _request.names[i] : (i + 1).ToString(CultureInfo.InvariantCulture);
                 var info = GBibleRuntime.SlotInfoOf(name);
-                var row = ScreenUi.Row(_body);
-                row.AddToClassList("momoi-slot");
-                // 지금 슬롯의 플레이 시간은 저장된 값이 아니라 지금까지(저장 뒤에 흐른 시간 포함).
-                var current = name == GBibleRuntime.Slot;
-                var playTime = current ? Math.Max(info.PlayTime, GBibleRuntime.PlayTime) : info.PlayTime;
-                var saved = info.SavedAt == default ? "" : info.SavedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-                var text = info.IsEmpty
-                    ? ScreenUi.Text("momoi.ui.emptySlot", "{slot} — 빈 슬롯", ("slot", name))
-                    : ScreenUi.Text("momoi.ui.slotLine", "{slot} — {summary} ({time}) {saved}", ("slot", name), ("summary", info.Summary), ("time", ScreenUi.Duration(playTime)), ("saved", saved));
-                var pick = ScreenUi.Button(row, text, () => Pick(name), primary: name == GBibleRuntime.Slot);
-                pick.style.flexGrow = 1;
-                if (_request.allowDelete && !info.IsEmpty && name != GBibleRuntime.Slot)
-                    ScreenUi.Button(row, ScreenUi.Text("momoi.ui.delete", "지우기"), () =>
-                        GameScreens.Confirm(ScreenUi.Text("momoi.ui.deleteSlotAsk", "슬롯 {slot}을(를) 지울까요?", ("slot", name)), () =>
-                        {
-                            GBibleRuntime.DeleteSlot(name);
-                            Draw();
-                        }));
+                var sub = info.IsEmpty ? ScreenUi.Text("momoi.ui.emptySlotShort", "빈 슬롯") : info.Summary;
+                if (name == GBibleRuntime.Slot) sub = ScreenUi.Text("momoi.ui.currentSlot", "지금 슬롯") + (string.IsNullOrEmpty(sub) ? "" : " · " + sub);
+                var item = ScreenUi.NavItem(_layout.Nav, SlotName(name), sub, name == _selected, () =>
+                {
+                    _selected = name;
+                    Draw();
+                });
+                if (name == GBibleRuntime.Slot) item.AddToClassList("momoi-nav-item--current");
             }
+
+            var selected = GBibleRuntime.SlotInfoOf(_selected);
+            var isCurrent = _selected == GBibleRuntime.Slot;
+            _layout.FrameTitle.text = SlotName(_selected);
+            _layout.FrameCount.text = $"{names.IndexOf(_selected) + 1} / {names.Count}";
+            var summary = new Label(selected.IsEmpty ? ScreenUi.Text("momoi.ui.emptySlotShort", "빈 슬롯") : string.IsNullOrEmpty(selected.Summary) ? SlotName(_selected) : selected.Summary);
+            summary.AddToClassList("momoi-slot-summary");
+            _layout.Body.Add(summary);
+            if (selected.IsEmpty)
+                Fact(ScreenUi.Text("momoi.ui.slotState", "상태"), ScreenUi.Text("momoi.ui.notSavedYet", "아직 저장하지 않았습니다"));
+            else
+            {
+                // 지금 슬롯의 플레이 시간은 저장된 값이 아니라 지금까지(저장 뒤에 흐른 시간 포함).
+                var playTime = isCurrent ? Math.Max(selected.PlayTime, GBibleRuntime.PlayTime) : selected.PlayTime;
+                Fact(ScreenUi.Text("momoi.ui.playTime", "플레이 시간"), ScreenUi.Duration(playTime));
+                if (selected.SavedAt != default) Fact(ScreenUi.Text("momoi.ui.savedAt", "저장한 때"), selected.SavedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+            }
+
+            var target = _selected;
+            if (_request.allowDelete && !selected.IsEmpty && !isCurrent)
+                ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.delete", "지우기"), () =>
+                    GameScreens.Confirm(ScreenUi.Text("momoi.ui.deleteSlotAsk", "슬롯 {slot}을(를) 지울까요?", ("slot", target)), () =>
+                    {
+                        GBibleRuntime.DeleteSlot(target);
+                        Draw();
+                    })).AddToClassList("momoi-button--line");
+            ScreenUi.Button(_layout.Foot, ScreenUi.Text("momoi.ui.useSlot", "이 슬롯으로"), () => Pick(target)).AddToClassList("momoi-button--light");
+        }
+
+        static string SlotName(string name) => ScreenUi.Text("momoi.ui.slotName", "슬롯 {slot}", ("slot", name));
+
+        void Fact(string name, string value)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("momoi-slot-fact");
+            var nameLabel = new Label(name);
+            nameLabel.AddToClassList("momoi-slot-fact-name");
+            row.Add(nameLabel);
+            var valueLabel = new Label(value);
+            valueLabel.AddToClassList("momoi-slot-fact-value");
+            row.Add(valueLabel);
+            _layout.Body.Add(row);
         }
 
         void Pick(string name)

@@ -605,16 +605,15 @@ namespace GBible
             }
         }
 
-        // 기본 화면의 뒷배경(개발자 2026-10-13, UiGuide 3-1): 확인 = 블러(알림성) · 고르기 · 일시정지 · 설정 · 세이브 슬롯 = 일반.
-        // (설정 · 세이브 슬롯은 화면을 나누는 배치 + UI 배경으로 다시 짜기로 했다 — 그때 Ui로 바꾼다.)
+        // 기본 화면의 뒷배경(개발자 2026-10-13, UiGuide 3-1): 확인 = 블러(알림성) · 고르기 · 일시정지 = 일반 · 설정 · 세이브 슬롯 = UI 배경(나눈 화면 — ScreenUi.Split).
         static (ScreenLayer layer, bool closeOnBack, bool pause, bool block, ScreenBackdrop backdrop)? BuiltInSpec(string id)
         {
             switch (id)
             {
                 case Choice: return (ScreenLayer.Popup, false, _settings != null && _settings.pauseWhileChoosing, true, ScreenBackdrop.Plain);
                 case Confirmation: return (ScreenLayer.Popup, true, false, true, ScreenBackdrop.Blur);
-                case Settings: return (ScreenLayer.Window, true, false, true, ScreenBackdrop.Plain);
-                case Slots: return (ScreenLayer.Window, true, false, true, ScreenBackdrop.Plain);
+                case Settings: return (ScreenLayer.Window, true, false, true, ScreenBackdrop.Ui);
+                case Slots: return (ScreenLayer.Window, true, false, true, ScreenBackdrop.Ui);
                 case Pause: return (ScreenLayer.Window, true, true, true, ScreenBackdrop.Plain);
                 default: return null;
             }
