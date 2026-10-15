@@ -149,5 +149,6 @@
 .sample-gauges-xp { position: absolute; left: 48px; right: 48px; bottom: 28px; flex-direction: row; align-items: center; }
 .sample-gauges-level { margin: 0 16px 0 0; padding: 0; }
 .sample-gauges-xp-bar { flex-grow: 1; }
-.sample-gauges-controls { position: absolute; right: 48px; top: 300px; width: 220px; }
+.sample-gauges-controls { position: absolute; right: 48px; top: 232px; width: 240px; }
+.sample-gauges-control-title { margin: 8px 0 8px 0; padding: 0; font-size: 12px; color: var(--kit-dim); }
 .sample-gauges-controls .kit-bt { margin: 0 0 8px 0; }

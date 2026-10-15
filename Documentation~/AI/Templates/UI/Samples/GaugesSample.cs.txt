@@ -1,7 +1,10 @@
 // GBible UI 키트 견본 코드 — 견본 Gauges.uxml을 띄운 화면에서 게이지(KitGauge)를 부르는 법(복사해 [BindTo(GameIds.Screen.X)]만 붙이면 돈다).
-// 실제 게임에서 값을 바꾸는 것은 행동이고, 화면은 바뀐 값을 읽어 Set한다(맞는 순간의 연출은 session.Events.SubscribeAfterAction<이벤트>(e => …)).
-// 예상 구간은 Game.Preview(행동, g => 읽기)로 계산한 양을 Preview(-양 / 최대)로 — 마우스를 올렸을 때 보이고, 내리면 Preview(0).
-// 시간에 따라 줄어드는 게이지(버프 지속 · 로딩)는 Tick에서 Set(값, animate: false).
+// 실제 게임에서 값을 바꾸는 것은 행동이고, 화면은 바뀐 값을 읽어 게이지를 움직인다(맞는 순간의 연출은 session.Events.SubscribeAfterAction<이벤트>(e => …)).
+// 움직임은 단계마다 따로 이을 수 있다:
+//   찰 때 — Raise(값, fill: false)로 어두운 뒷 게이지를 미리 띄워 두고(예: 보상 미리보기), 확정되면 FillUp().
+//   줄 때 — Drop(값, follow: false)로 메인만 깎아 두고(예: 연출 도중), 원하는 순간 Follow()로 밝은 뒷 게이지가 따라 준다.
+//   지름길 — Set(값): 줄면 Drop → 잠시 뒤 Follow, 늘면 Raise → 잠시 뒤 FillUp.
+// 잃을 몫 표시는 Game.Preview(행동, g => 읽기)로 계산한 양을 Preview(-양 / 최대)로. 시간에 따라 줄어드는 게이지(버프 지속 · 로딩)는 Tick에서 Set(값, animate: false).
 using System.Collections.Generic;
 using GBible;
 using UnityEngine;
@@ -17,11 +20,10 @@ namespace MomoiProject
         KitGauge _hp, _enemy, _load;
         Label _hint, _loadText;
         float _loading = -1f;
-        bool _previewing;
 
         protected override void OnOpen()
         {
-            Root.Query<KitGauge>(className: "sample-gauges-demo").ForEach(_demo.Add);   // 줄이기 · 늘리기 · 예상을 함께 걸 게이지
+            Root.Query<KitGauge>(className: "sample-gauges-demo").ForEach(_demo.Add);   // 버튼을 함께 걸 게이지
             _hp = Q<KitGauge>("hp");
             _enemy = Q<KitGauge>("enemy");
             _load = Q<KitGauge>("load");
@@ -29,29 +31,37 @@ namespace MomoiProject
             _hint = Q<Label>("enemy-hint");
             _loadText = Q<Label>("load-text");
 
-            OnClick("damage", () => Change(-0.15f));
-            OnClick("heal", () => Change(0.15f));
+            // 지름길
+            OnClick("damage", () => All(g => g.Set(Wrap(g.value - 0.15f))));
+            OnClick("heal", () => All(g => g.Set(Mathf.Min(1f, g.value + 0.15f))));
+            // 찰 때 — 따로: 어두운 뒷 게이지만 띄워 두고, 채우기는 따로
+            OnClick("raise", () => All(g => g.Raise(Mathf.Min(1f, (g.HasPendingGain ? g.BackValue : g.value) + 0.2f), fill: false)));
+            OnClick("fill", () => All(g => g.FillUp()));
+            // 줄 때 — 따로: 메인만 깎아 두고, 밝은 뒷 게이지가 따라 주는 것은 따로
+            OnClick("drop", () => All(g => g.Drop(Mathf.Max(0f, g.value - 0.2f), follow: false)));
+            OnClick("follow", () => All(g => g.Follow()));
+            // 잃을 몫 표시(예상 피해)
             OnClick("preview", () =>
             {
-                _previewing = !_previewing;
-                foreach (var gauge in _demo) gauge.Preview(_previewing ? -Mathf.Min(0.2f, gauge.value) : 0f);   // 잃을 몫을 미리
-                _hint.text = _previewing ? $"−{Mathf.RoundToInt(Mathf.Min(0.2f, _enemy.value) * 200f)}" : "";   // 글만 놓이는 강조 숫자(kit-t-number)
+                var showing = _enemy.preview < 0f;
+                foreach (var gauge in _demo) gauge.Preview(showing ? 0f : -Mathf.Min(0.2f, gauge.value));
+                _hint.text = showing ? "" : $"−{Mathf.RoundToInt(Mathf.Min(0.2f, _enemy.value) * 200f)}";   // 글만 놓이는 강조 숫자(kit-t-number)
             });
             OnClick("loading", () => _loading = 0f);
         }
 
-        void Change(float amount)
+        void All(System.Action<KitGauge> act)
         {
-            _previewing = false;
             _hint.text = "";
             foreach (var gauge in _demo)
             {
                 gauge.Preview(0f);
-                var next = gauge.value + amount;
-                gauge.Set(next <= 0.001f ? 1f : Mathf.Min(1f, next));   // 견본: 다 비면 다시 가득
+                act(gauge);
             }
             _hp.Text = $"{Mathf.RoundToInt(_hp.value * MaxHp)} / {MaxHp}";
         }
+
+        static float Wrap(float next) => next <= 0.001f ? 1f : next;   // 견본: 다 비면 다시 가득
 
         protected override void Tick(float deltaTime)
         {
@@ -61,6 +71,8 @@ namespace MomoiProject
                 var left = _buffs[i].value - deltaTime / (6f + i * 3f);
                 _buffs[i].Set(left <= 0f ? 1f : left, animate: false);
             }
+            // 체력 글은 채우는 동안에도 메인 게이지를 따라간다.
+            _hp.Text = $"{Mathf.RoundToInt(_hp.value * MaxHp)} / {MaxHp}";
             // 로딩: 2초 동안 0 → 100%.
             if (_loading < 0f) return;
             _loading = Mathf.Min(1f, _loading + deltaTime / 2f);

@@ -42,25 +42,11 @@
     --kit-fx-rays: rgba(255, 219, 153, 0.32);
     --kit-fx-glow: rgb(255, 214, 140);       /* 빛 번짐(묶음 연출의 기본) */
     --kit-sheen: rgba(255, 244, 220, 0.42);  /* 훑는 빛 */
-    /* 게이지(KitGauge — 체력 · 마나 · 경험치 · 로딩 · 버프 지속, 개발자 2026-10-15). 게이지 · 그라데이션 끝 · 줄 때 자국 · 늘 때 몫을 종류마다 따로 */
-    --kit-gauge-track: rgba(18, 19, 22, 0.62);   /* 뒤 판(장면 위에서도 보이게 반투명 검정) */
+    /* 게이지(KitGauge, 개발자 2026-10-15) — 색은 게이지마다 UXML 속성 color(또는 USS --gauge-fill)로 원하는 대로. 여기는 기본값만 */
+    --kit-gauge-fill: rgb(200, 96, 88);           /* 게이지 기본 색(뒷 게이지 색은 이 색에서 — 줄 때 더 밝게 · 찰 때 더 어둡게) */
+    --kit-gauge-track: rgb(24, 25, 29);           /* 단색 뒤 판 */
     --kit-gauge-tick: rgba(0, 0, 0, 0.4);         /* 눈금 */
-    --kit-gauge-hp: rgb(200, 96, 88);
-    --kit-gauge-hp-end: rgb(236, 150, 112);
-    --kit-gauge-hp-loss: rgba(255, 240, 226, 0.85);
-    --kit-gauge-hp-gain: rgba(150, 214, 150, 0.85);
-    --kit-gauge-mp: rgb(108, 148, 212);
-    --kit-gauge-mp-end: rgb(150, 200, 255);
-    --kit-gauge-mp-loss: rgba(224, 236, 255, 0.85);
-    --kit-gauge-mp-gain: rgba(190, 220, 255, 0.85);
-    --kit-gauge-xp: rgb(214, 200, 176);
-    --kit-gauge-xp-end: rgb(255, 236, 190);
-    --kit-gauge-load: rgb(240, 240, 242);
-    --kit-gauge-buff: rgb(150, 196, 140);
-    --kit-gauge-loss: rgba(255, 244, 228, 0.8);     /* 줄 때 남는 자국(기본) */
-    --kit-gauge-gain: rgba(150, 214, 150, 0.8);     /* 늘 때 먼저 보이는 몫(기본) */
-    --kit-gauge-preview-loss: rgba(255, 255, 255, 0.55);
-    --kit-gauge-preview-gain: rgba(150, 214, 150, 0.7);
+    --kit-gauge-preview: rgba(255, 255, 255, 0.55); /* 잃을 몫 표시 */
     /* 강조 숫자(kit-t-number — 장면 위에 홀로 놓이는 숫자는 판 대신 글꼴의 외곽선 · 그림자로, 개발자 2026-10-15) */
     --kit-number: rgb(250, 248, 244);
     --kit-number-outline: rgba(20, 21, 24, 0.92);
@@ -268,20 +254,11 @@
 .kit-sheen { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --sheen-color: var(--kit-sheen); }
 
 /* ── 게이지(KitGauge — 슬라이더): 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 모두 이 하나로(개발자 2026-10-15). 장면 위에 판 없이 놓는다(UiGuide 3-1 · 3-7).
-   모양 · 종류 · 틀은 속성(shape Rect · Slant · Diamond / kind Line · Orb · Ring · Units / frame Flush · Outline) — 둥근 모양은 쓰지 않는다, 모서리만 아주 약간(radius).
-   여기서는 크기(굵기 = 기본 12 · --thin 6 · --thick 20, 원형 = 72 정사각)와 색(--gauge-*)만. 색 종류 = --hp · --mp · --xp · --load · --buff, 특수 = gradient 속성 + kit-gauge--glow ── */
-.kit-gauge { height: 12px; min-width: 40px; --gauge-track: var(--kit-gauge-track); --gauge-tick: var(--kit-gauge-tick); --gauge-fill: var(--kit-gauge-hp); --gauge-fill-end: var(--kit-gauge-hp-end); --gauge-loss: var(--kit-gauge-loss); --gauge-gain: var(--kit-gauge-gain); --gauge-preview-loss: var(--kit-gauge-preview-loss); --gauge-preview-gain: var(--kit-gauge-preview-gain); }
+   모양 · 종류 · 틀 · 색 · 특수는 속성(shape · kind · frame Flush · Inset · color · end-color · track-color · loss-color · gain-color · gradient · glow) — 둥근 모양은 쓰지 않는다.
+   여기서는 크기(굵기 = 기본 12 · --thin 6 · --thick 20, 원형 = 72 정사각)와 기본 색만 ── */
+.kit-gauge { height: 12px; min-width: 40px; --gauge-fill: var(--kit-gauge-fill); --gauge-track: var(--kit-gauge-track); --gauge-tick: var(--kit-gauge-tick); --gauge-preview: var(--kit-gauge-preview); }
 .kit-gauge--thin { height: 6px; }
 .kit-gauge--thick { height: 20px; }
 .kit-gauge--units { height: 16px; }
 .kit-gauge--orb, .kit-gauge--ring { width: 72px; height: 72px; min-width: 0; }
 .kit-gauge-text { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; padding: 0; -unity-text-align: middle-center; font-size: 13px; -unity-font-style: bold; color: var(--kit-light); -unity-text-outline-width: 1px; -unity-text-outline-color: var(--kit-number-outline); }
-.kit-gauge--hp { --gauge-fill: var(--kit-gauge-hp); --gauge-fill-end: var(--kit-gauge-hp-end); --gauge-loss: var(--kit-gauge-hp-loss); --gauge-gain: var(--kit-gauge-hp-gain); }
-.kit-gauge--mp { --gauge-fill: var(--kit-gauge-mp); --gauge-fill-end: var(--kit-gauge-mp-end); --gauge-loss: var(--kit-gauge-mp-loss); --gauge-gain: var(--kit-gauge-mp-gain); }
-.kit-gauge--xp { --gauge-fill: var(--kit-gauge-xp); --gauge-fill-end: var(--kit-gauge-xp-end); }
-.kit-gauge--load { --gauge-fill: var(--kit-gauge-load); --gauge-fill-end: var(--kit-gauge-load); }
-.kit-gauge--buff { --gauge-fill: var(--kit-gauge-buff); --gauge-fill-end: var(--kit-gauge-buff); }
-/* 발광(특수 게이지): 게이지 층에만 빛 번짐 — 색은 종류마다 */
-.kit-gauge--glow .kit-gauge-layer--fill { filter: drop-shadow(0px 0px 6px rgba(255, 200, 150, 0.9)); }
-.kit-gauge--glow.kit-gauge--mp .kit-gauge-layer--fill { filter: drop-shadow(0px 0px 6px rgba(140, 186, 255, 0.95)); }
-.kit-gauge--glow.kit-gauge--xp .kit-gauge-layer--fill { filter: drop-shadow(0px 0px 6px rgba(255, 228, 170, 0.95)); }
