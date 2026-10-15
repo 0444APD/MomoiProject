@@ -271,7 +271,7 @@
 .kit-bar-preview--loss { background-color: var(--kit-bar-loss); }
 .kit-bar-preview--gain { background-color: var(--kit-bar-gain); }
 .kit-bar-ticks { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
-.kit-bar-text { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; padding: 0; -unity-text-align: middle-center; font-size: 13px; -unity-font-style: bold; color: var(--kit-light); }
+.kit-bar-text { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; padding: 0; -unity-text-align: middle-center; font-size: 13px; -unity-font-style: bold; color: var(--kit-light); -unity-text-outline-width: 1px; -unity-text-outline-color: var(--kit-number-outline); }
 .kit-bar--hp .kit-bar-fill { background-color: var(--kit-bar-hp); }
 .kit-bar--mp .kit-bar-fill { background-color: var(--kit-bar-mp); }
 .kit-bar--xp .kit-bar-fill { background-color: var(--kit-bar-xp); }

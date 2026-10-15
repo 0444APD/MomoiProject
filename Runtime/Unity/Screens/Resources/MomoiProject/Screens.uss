@@ -525,3 +525,61 @@
 .momoi-motion--down.momoi-motion--pre {
     translate: 0 -14px;
 }
+
+/* 설정 항목의 Unity 기본 컨트롤을 테마 색으로(종이 안판 위): 슬라이더 · 드롭다운 · 토글 · 입력칸 */
+.momoi-settings .unity-base-slider__tracker {
+    height: 4px;
+    margin-top: -2px;
+    border-width: 0;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+    background-color: var(--momoi-folder);
+}
+
+.momoi-settings .unity-base-slider__dragger {
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    border-width: 0;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    background-color: var(--momoi-cover);
+}
+
+.momoi-settings .unity-base-slider__dragger-border {
+    display: none;
+}
+
+.momoi-settings .unity-base-popup-field__input,
+.momoi-settings .unity-base-text-field__input {
+    min-height: 36px;
+    padding: 0 12px;
+    border-width: 0;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: var(--momoi-folder);
+    color: var(--momoi-paper-text);
+}
+
+.momoi-settings .unity-toggle__checkmark {
+    width: 22px;
+    height: 22px;
+    border-width: 0;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: var(--momoi-folder);
+    -unity-background-image-tint-color: rgba(0, 0, 0, 0);
+}
+
+.momoi-settings .unity-toggle__input:checked > .unity-toggle__checkmark {
+    background-color: var(--momoi-cover);
+    -unity-background-image-tint-color: var(--momoi-cover-text);
+}
