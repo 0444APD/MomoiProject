@@ -32,7 +32,7 @@
 | 화면 머리 · 목록 | `kit-head-*` · `kit-money-*` · `kit-nav-*` | UI 배경 위 나눈 화면 |
 | 틀 | `kit-frame-*`(검정 틀 + 머리 띠 + 종이 안판) | 작은 팝업 · 알림의 안쪽 모양은 견본(`sample-pop-*` · `sample-notice-*`) |
 | 순간 연출 | 연출 층 `<MomoiProject.KitFx class="kit-fx" />`(화면 맨 끝) · 훑는 빛 `<MomoiProject.KitSheen class="kit-sheen" />`(카드 안) | 코드: `fx.Reward(칸)` · `fx.Reveal(칸, 뒤 층)` · `fx.Buff(아이콘, 색, 오름, 가운데에 할 일)` · `fx.NumberPop(글)` · `fx.Tap(자리)` · `fx.Burst · Ring · Rays` · `KitGlow.Set · Neon · Flash · Pulse` · `KitTween.Run`. 빛 색은 `--kit-fx-…`(기본 금빛), 시간 · 크기는 매개변수. 예: `Samples/EffectsSample.cs.txt` |
-| 게이지(슬라이더) | `<MomoiProject.KitGauge kind="Line" shape="Slant" frame="Outline" value="0.7" class="kit-gauge kit-gauge--hp" />` — `kind` Line · Orb(원형 패널) · Ring(원 테두리) · Units(도형 나열) · `shape` Rect · Slant(평행사변형) · Diamond(도형 나열) · `frame` Flush(꽉 채움) · Inset(단색 뒤 판이 더 두껍게) · 색 `color` · `end-color` · `track-color`(뒷 게이지 `loss-color` · `gain-color`는 비우면 게이지 색에서) · `segments`(눈금) · `units` · `gradient` · `from-right` · `text` | 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 이 하나로, **둥근 모양 없음**(개발자 2026-10-15 — UiGuide 3-7). 크기 `kit-gauge--thin` · 기본 · `--thick`, 특수 `gradient` · `glow`. 코드: 깎일 때 `Drop(값)` → `Follow()`(밝은 뒷 게이지가 따라 줆), 찰 때 `Raise(값)` → `FillUp()`(어두운 뒷 게이지가 먼저), 지름길 `Set(값)` · 잃을 몫 표시 `Preview(-양)` · `Text`. 예: `Samples/GaugesSample.cs.txt` |
+| 게이지(슬라이더) | `<MomoiProject.KitGauge kind="Line" shape="Slant" frame="Inset" value="0.7" color="#C86058" class="kit-gauge kit-gauge--thick" />` — `kind` Line · Orb(원형 패널) · Ring(원 테두리) · Units(도형 나열) · `shape` Rect · Slant(평행사변형) · Diamond(도형 나열) · `frame` Flush(꽉 채움) · Inset(단색 뒤 판이 더 두껍게) · 색 `color` · `end-color` · `track-color`(뒷 게이지 `loss-color` · `gain-color`는 비우면 게이지 색에서) · `segments`(눈금) · `units` · `from-right` · `text` · 그라데이션 `gradient` Along(색이 0~100 자리에 붙음) · ByValue(전체가 지금 값의 색) + `stops="0:#C86058, 50:#E0C060, 100:#78B070"`(비우면 `color` → `end-color`) · `glow` | 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 이 하나로, **둥근 모양 없음**(개발자 2026-10-15 — UiGuide 3-7). 크기 `kit-gauge--thin` · 기본 · `--thick`. 코드에서 그라데이션을 통째로 주려면 `Gradient`(Unity `Gradient`). 코드: 깎일 때 `Drop(값)` → `Follow()`(밝은 뒷 게이지가 따라 줆), 찰 때 `Raise(값)` → `FillUp()`(어두운 뒷 게이지가 먼저), 지름길 `Set(값)` · 잃을 몫 표시 `Preview(-양)` · `Text`. 예: `Samples/GaugesSample.cs.txt` |
 | 아이콘 | `<MomoiProject.KitIcon glyph="Close" class="kit-icon" />` | 진짜 아이콘이 오면 같은 자리를 그림으로(UiGuide 3-6) |
 
 - 버튼 · 메뉴 · 제목 막대의 **변칙(모서리 자름 · 잎)은 한 화면에 한 가지**를 골라 그 화면 전체에 같게 쓴다(견본 VariantSet).
@@ -53,7 +53,7 @@
 | `Buttons.uxml` | 버튼 — 종이 판 위 · 검정 판 위, 보통 · 작게 | — |
 | `VariantSet.uxml` | 변칙 돌려쓰기 — 한 화면에 한 변칙(제목 막대 · 메뉴 막대 · 버튼), 가운데 칸은 베젤 없이 | — |
 | `Effects.uxml` + `EffectsSample.cs.txt` | 순간 연출 — 보상 펑 · 희귀 공개(빛살은 아이템 뒤 층) · 버프(자체 발광 아이콘이 떠올라 사라짐 → 수치 펑) · 훑는 빛 · 발광 맥박. 화면 코드에서 부르는 법 | — |
-| `Gauges.uxml` + `GaugesSample.cs.txt` | 게이지의 경우의 수 전부(직선 사각 · 평행사변형 × 꽉 채움 · 뒤 판 두껍게, 눈금, 그라데이션 + 발광, 원형 패널, 원 테두리, 도형 나열) + 장면 위 상태 UI의 쓰는 법(묶는 패널 없이 여백 · 초상 · 아이콘 칸만 패널 · 강조 숫자). 버튼으로 지름길 · 찰 때(뒷 게이지만 → 채우기) · 줄 때(깎기만 → 따라 줄기) · 잃을 몫 표시 | — |
+| `Gauges.uxml` + `GaugesSample.cs.txt` | 게이지의 경우의 수 전부(직선 사각 · 평행사변형 × 꽉 채움 · 뒤 판 두껍게, 눈금, 그라데이션 + 발광, 원형 패널, 원 테두리, 0~100 그라데이션 자리 · 값, 도형 나열) + 장면 위 상태 UI의 쓰는 법(묶는 패널 없이 여백 · 초상 · 아이콘 칸만 패널 · 강조 숫자). 버튼으로 지름길 · 찰 때(뒷 게이지만 → 채우기) · 줄 때(깎기만 → 따라 줄기) · 잃을 몫 표시 | — |
 
 - 플레이 화면(HUD) · 거점 · 이벤트의 짜임은 아직 새 견본이 없다 — UiGuide 2-2(자리) · 3절(디자인)대로 짜고, 만든 화면을 견본으로 올려 승인받는다.
 - 견본의 글은 바로 적혀 있다. 프로젝트 화면에서는 텍스트 키(`binding-path` 또는 코드)로 바꾼다.

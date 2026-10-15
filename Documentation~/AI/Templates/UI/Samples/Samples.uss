@@ -137,7 +137,7 @@
 .sample-gauges-enemy-bar { width: 420px; }
 .sample-gauges-hint { margin: 8px 0 0 0; padding: 0; -unity-text-align: middle-right; }
 .sample-gauges-catalog { position: absolute; left: 48px; top: 240px; width: 1300px; }
-.sample-gauges-row { flex-direction: row; align-items: flex-end; margin-bottom: 32px; }
+.sample-gauges-row { flex-direction: row; align-items: flex-end; margin-bottom: 24px; }
 .sample-gauges-row-title { width: 140px; margin: 0; padding: 0 0 4px 0; font-size: 14px; -unity-font-style: bold; color: var(--kit-light); }
 .sample-gauges-cell { width: 260px; margin-right: 32px; }
 .sample-gauges-caption { margin: 0 0 8px 0; padding: 0; font-size: 12px; color: var(--kit-dim); }

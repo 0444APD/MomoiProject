@@ -6,7 +6,9 @@
 //   frame : Flush 게이지가 뒤 판을 꽉 채움 · Inset 단색 뒤 판이 게이지보다 inset(px)만큼 더 크게 둘러쌈(별도 테가 아니다).
 //   색    : UXML 속성 color(게이지) · end-color(그라데이션 끝) · track-color(뒤 판) · loss-color · gain-color — 비우면 USS(--gauge-fill · --gauge-fill-end ·
 //           --gauge-track · --gauge-loss · --gauge-gain) → 기본. 뒷 게이지 색은 비우면 게이지 색에서 만든다(줄 때 = 더 밝게, 찰 때 = 더 어둡게).
-//           특수: gradient(게이지 색 → end-color) · glow(게이지 색으로 빛 번짐).
+//           그라데이션(gradient): Along = 0~100 자리에 색을 고정(차는 만큼 드러남) · ByValue = 게이지 전체가 지금 값의 색(예: 체력이 줄면 초록 → 빨강).
+//           색 지점은 color → end-color 둘, 또는 stops="0:#C86058, 50:#E0C060, 100:#78B070"(0~100 또는 0~1), 코드에서는 Gradient(Unity Gradient).
+//           glow = 빛 번짐(지금 값 끝의 색으로).
 //   움직임: 메인 게이지 뒤에 뒷 게이지 하나.
 //           줄 때 — Drop(값): 메인이 바로 깎이고 밝은 뒷 게이지가 남는다 → Follow(): 뒷 게이지가 따라 준다(Drop의 follow가 참이면 followDelay 뒤 저절로).
 //           찰 때 — Raise(값): 어두운 뒷 게이지가 먼저 뜬다 → FillUp(): 메인이 차오른다(Raise의 fill이 참이면 fillDelay 뒤 저절로).
@@ -15,6 +17,7 @@
 // UXML: <MomoiProject.KitGauge kind="Line" shape="Slant" frame="Inset" value="0.7" color="#C86058" class="kit-gauge" />
 // 코드: gauge.Set(hp / (float)maxHp); · gauge.Raise(next, fill: false); … gauge.FillUp(); · gauge.Text = $"{hp} / {maxHp}";
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -26,6 +29,7 @@ namespace MomoiProject
         public enum Kind { Line, Orb, Ring, Units }
         public enum Shape { Rect, Slant, Diamond }
         public enum Frame { Flush, Inset }
+        public enum Coloring { None, Along, ByValue }
         enum Back { None, Loss, Gain }
 
         static readonly CustomStyleProperty<Color> FillProperty = new CustomStyleProperty<Color>("--gauge-fill");
@@ -41,7 +45,7 @@ namespace MomoiProject
         Color _tickColor = new Color(0f, 0f, 0f, 0.4f), _previewColor = new Color(1f, 1f, 1f, 0.55f);
         Color _color = Color.clear, _endColor = Color.clear, _trackColor = Color.clear, _lossColor = Color.clear, _gainColor = Color.clear;
 
-        readonly VisualElement _backLayer, _fillLayer, _overLayer;
+        readonly VisualElement _backLayer, _glowLayer, _fillLayer, _overLayer;
         readonly Label _label;
         Kind _kind;
         Shape _shape;
@@ -51,7 +55,11 @@ namespace MomoiProject
         float _followWait = -1f, _fillWait = -1f;      // 0 이상이면 그만큼 뒤 저절로 시작
         bool _following, _filling;
         int _segments, _units = 5;
-        bool _fromRight, _gradient, _glow;
+        bool _fromRight, _glow;
+        Coloring _gradient;
+        string _stops = "";
+        Gradient _custom, _built;
+        Color _glowColor = Color.clear;
         IVisualElementScheduledItem _tick;
         double _lastTime;
 
@@ -62,10 +70,11 @@ namespace MomoiProject
         [UxmlAttribute] public int segments { get => _segments; set { _segments = Mathf.Max(0, value); Repaint(); } }
         [UxmlAttribute] public int units { get => _units; set { _units = Mathf.Max(1, value); Repaint(); } }
         [UxmlAttribute] public bool fromRight { get => _fromRight; set { _fromRight = value; Repaint(); } }
-        [UxmlAttribute] public bool gradient { get => _gradient; set { _gradient = value; Glow(); Repaint(); } }
+        [UxmlAttribute] public Coloring gradient { get => _gradient; set { _gradient = value; _built = null; Glow(); Repaint(); } }
+        [UxmlAttribute] public string stops { get => _stops; set { _stops = value ?? ""; _built = null; Glow(); Repaint(); } }
         [UxmlAttribute] public bool glow { get => _glow; set { _glow = value; Glow(); } }
-        [UxmlAttribute] public Color color { get => _color; set { _color = value; Glow(); Repaint(); } }
-        [UxmlAttribute] public Color endColor { get => _endColor; set { _endColor = value; Glow(); Repaint(); } }
+        [UxmlAttribute] public Color color { get => _color; set { _color = value; _built = null; Glow(); Repaint(); } }
+        [UxmlAttribute] public Color endColor { get => _endColor; set { _endColor = value; _built = null; Glow(); Repaint(); } }
         [UxmlAttribute] public Color trackColor { get => _trackColor; set { _trackColor = value; Repaint(); } }
         [UxmlAttribute] public Color lossColor { get => _lossColor; set { _lossColor = value; Repaint(); } }
         [UxmlAttribute] public Color gainColor { get => _gainColor; set { _gainColor = value; Repaint(); } }
@@ -86,18 +95,22 @@ namespace MomoiProject
         public bool HasPendingGain => _backKind == Back.Gain && _back > _main && !_filling;
         public float BackValue => _back;
         public float preview => _preview;
+        // 그라데이션 색 지점(코드에서 Unity Gradient로 — 넣으면 color · end-color · stops보다 먼저).
+        public Gradient Gradient { get => Colors(); set { _custom = value; _built = null; Glow(); Repaint(); } }
 
         Color Fill => _color.a > 0f ? _color : _ussFill ?? new Color(0.78f, 0.38f, 0.35f);
         Color FillEnd => _endColor.a > 0f ? _endColor : _ussFillEnd ?? Color.Lerp(Fill, Color.white, 0.35f);
         Color Track => _trackColor.a > 0f ? _trackColor : _ussTrack ?? new Color(0.094f, 0.098f, 0.114f);
-        Color Loss => _lossColor.a > 0f ? _lossColor : _ussLoss ?? Color.Lerp(Fill, Color.white, 0.55f);    // 메인보다 밝게
-        Color Gain => _gainColor.a > 0f ? _gainColor : _ussGain ?? Color.Lerp(Fill, Color.black, 0.45f);    // 메인보다 어둡게
+        Color Current => _gradient == Coloring.None ? Fill : Colors().Evaluate(_main);   // 지금 값 끝의 색
+        Color Loss => _lossColor.a > 0f ? _lossColor : _ussLoss ?? Color.Lerp(Current, Color.white, 0.55f);    // 메인보다 밝게
+        Color Gain => _gainColor.a > 0f ? _gainColor : _ussGain ?? Color.Lerp(Current, Color.black, 0.45f);    // 메인보다 어둡게
 
         public KitGauge()
         {
             AddToClassList("kit-gauge");
             generateVisualContent += DrawTrack;
             _backLayer = Layer("kit-gauge-layer--back", DrawBack);
+            _glowLayer = Layer("kit-gauge-layer--glow", DrawGlow);   // 빛 번짐은 단색 층에(필터는 그라데이션 칠하기와 함께 그려지지 않는다)
             _fillLayer = Layer("kit-gauge-layer--fill", DrawFill);
             _overLayer = Layer("kit-gauge-layer--over", DrawOver);
             _label = new Label { pickingMode = PickingMode.Ignore };
@@ -114,6 +127,7 @@ namespace MomoiProject
                 _ussGain = s.TryGetValue(GainProperty, out c) ? c : (Color?)null;
                 if (s.TryGetValue(TickProperty, out c)) _tickColor = c;
                 if (s.TryGetValue(PreviewProperty, out c)) _previewColor = c;
+                _built = null;
                 Glow();
                 Repaint();
             });
@@ -242,22 +256,26 @@ namespace MomoiProject
         {
             MarkDirtyRepaint();
             _backLayer?.MarkDirtyRepaint();
+            _glowLayer?.MarkDirtyRepaint();
             _fillLayer?.MarkDirtyRepaint();
             _overLayer?.MarkDirtyRepaint();
+            if (_glow && _gradient != Coloring.None) Glow();   // 값에 따라 빛 색이 바뀐다
         }
 
-        // 빛 번짐: 메인 게이지 층에만, 게이지 색(그라데이션이면 끝 색)으로.
+        // 빛 번짐: 메인 게이지 아래의 단색 층에만, 지금 값 끝의 색으로(색이 바뀔 때만 다시 건다).
         void Glow()
         {
-            if (_fillLayer == null) return;
-            if (!_glow) { _fillLayer.style.filter = StyleKeyword.Null; return; }
-            var light = _gradient ? FillEnd : Fill;
+            if (_glowLayer == null) return;
+            if (!_glow) { _glowLayer.style.filter = StyleKeyword.Null; _glowColor = Color.clear; return; }
+            var light = Current;
+            if (_glowColor.a > 0f && Mathf.Abs(light.r - _glowColor.r) + Mathf.Abs(light.g - _glowColor.g) + Mathf.Abs(light.b - _glowColor.b) < 0.01f) return;
+            _glowColor = light;
             var shadow = new FilterFunction(FilterFunctionType.DropShadow);
             shadow.AddParameter(new FilterParameter(0f));
             shadow.AddParameter(new FilterParameter(0f));
             shadow.AddParameter(new FilterParameter(glowSize));
             shadow.AddParameter(new FilterParameter(new Color(light.r, light.g, light.b, 0.9f)));
-            _fillLayer.style.filter = new List<FilterFunction> { shadow };
+            _glowLayer.style.filter = new List<FilterFunction> { shadow };
         }
 
         void DrawTrack(MeshGenerationContext context)
@@ -282,12 +300,63 @@ namespace MomoiProject
             Range(context.painter2D, size, _main, _back, _backKind == Back.Gain ? Gain : Loss);
         }
 
+        void DrawGlow(MeshGenerationContext context)
+        {
+            if (!_glow || !Ready(out var size) || _main <= 0f) return;
+            Range(context.painter2D, size, 0f, _main, Current);
+        }
+
         void DrawFill(MeshGenerationContext context)
         {
             if (!Ready(out var size) || _main <= 0f) return;
             var p = context.painter2D;
-            if (_gradient) UseGradient(p, size);
-            Range(p, size, 0f, _main, Fill);
+            if (_gradient == Coloring.Along)
+            {
+                if (_kind == Kind.Ring) { RingAlong(p, size, 0f, _main); return; }
+                UseGradient(p, size);
+            }
+            // 자리 그라데이션이면 칠하기 색을 건드리지 않는다(fillColor를 넣으면 fillGradient가 지워진다).
+            Range(p, size, 0f, _main, _gradient == Coloring.Along ? (Color?)null : _gradient == Coloring.ByValue ? Current : Fill);
+        }
+
+        // 원 테두리의 자리 그라데이션: 0~100 자리마다 색이 고정되도록 잘게 나눠 긋는다(이음새가 보이지 않게 살짝 겹친다).
+        void RingAlong(Painter2D p, Vector2 size, float from, float to)
+        {
+            var r = Mathf.Min(size.x, size.y) / 2f;
+            var width = thickness - 2f * Inner;
+            if (width <= 0f) return;
+            var colors = Colors();
+            const float Step = 1f / 120f;
+            for (var a = from; a < to; a += Step)
+            {
+                var b = Mathf.Min(to, a + Step);
+                Stroke(p, size / 2f, r - thickness / 2f, width, a, Mathf.Min(to, b + 0.002f), colors.Evaluate((a + b) / 2f));
+            }
+        }
+
+        // 그라데이션 색 지점: 코드의 Gradient → stops → color · end-color 둘.
+        Gradient Colors()
+        {
+            if (_custom != null) return _custom;
+            if (_built != null) return _built;
+            var points = new List<(float t, Color c)>();
+            if (!string.IsNullOrWhiteSpace(_stops))
+            {
+                foreach (var part in _stops.Split(','))
+                {
+                    var pair = part.Split(':');
+                    if (pair.Length == 2 && float.TryParse(pair[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var t) && ColorUtility.TryParseHtmlString(pair[1].Trim(), out var c))
+                        points.Add((t, c));
+                }
+                if (points.Exists(point => point.t > 1f)) for (var i = 0; i < points.Count; i++) points[i] = (points[i].t / 100f, points[i].c);   // 0~100으로 적었으면
+                points.Sort((x, y) => x.t.CompareTo(y.t));
+                if (points.Count > 8) points.RemoveRange(8, points.Count - 8);   // Unity Gradient는 색 지점 8개까지
+            }
+            if (points.Count < 2) points = new List<(float, Color)> { (0f, Fill), (1f, FillEnd) };
+            _built = new Gradient();
+            _built.SetKeys(points.ConvertAll(point => new GradientColorKey(point.c, Mathf.Clamp01(point.t))).ToArray(),
+                points.ConvertAll(point => new GradientAlphaKey(point.c.a, Mathf.Clamp01(point.t))).ToArray());
+            return _built;
         }
 
         void DrawOver(MeshGenerationContext context)
@@ -320,7 +389,7 @@ namespace MomoiProject
         float Inner => _frame == Frame.Inset ? inset : 0f;
 
         // 게이지의 from~to(0~1) 몫을 종류에 맞게 그린다.
-        void Range(Painter2D p, Vector2 size, float from, float to, Color color)
+        void Range(Painter2D p, Vector2 size, float from, float to, Color? color)
         {
             if (to - from <= 0.0005f) return;
             switch (_kind)
@@ -329,7 +398,7 @@ namespace MomoiProject
                 {
                     var r = Mathf.Min(size.x, size.y) / 2f;
                     var width = thickness - 2f * Inner;
-                    if (width > 0f) Stroke(p, size / 2f, r - thickness / 2f, width, from, to, color);
+                    if (width > 0f) Stroke(p, size / 2f, r - thickness / 2f, width, from, to, color ?? Fill);
                     break;
                 }
                 case Kind.Orb:
@@ -464,31 +533,27 @@ namespace MomoiProject
 
         static float HalfWidth(Vector2 c, float r, float y) => Mathf.Sqrt(Mathf.Max(0f, r * r - (y - c.y) * (y - c.y)));
 
+        // 자리 그라데이션(직선 · 도형 나열 = 가로 0~100, 원형 패널 = 아래 0 → 위 100). 원 테두리는 RingAlong.
         void UseGradient(Painter2D p, Vector2 size)
         {
-            switch (_kind)
+            if (_kind == Kind.Orb)
             {
-                case Kind.Ring:
-                    var gradient = new Gradient();
-                    gradient.SetKeys(new[] { new GradientColorKey(Fill, 0f), new GradientColorKey(FillEnd, 1f) },
-                        new[] { new GradientAlphaKey(Fill.a, 0f), new GradientAlphaKey(FillEnd.a, 1f) });
-                    p.strokeGradient = gradient;
-                    break;
-                case Kind.Orb:
-                    p.fillGradient = FillGradient.MakeLinearGradient(Fill, FillEnd, new Vector2(size.x / 2f, size.y), new Vector2(size.x / 2f, 0f), AddressMode.Clamp);
-                    break;
-                default:
-                    var start = new Vector2(_fromRight ? size.x : 0f, size.y / 2f);
-                    var end = new Vector2(_fromRight ? 0f : size.x, size.y / 2f);
-                    p.fillGradient = FillGradient.MakeLinearGradient(Fill, FillEnd, start, end, AddressMode.Clamp);
-                    break;
+                var r = Mathf.Min(size.x, size.y) / 2f - Inner;
+                p.fillGradient = FillGradient.MakeLinearGradient(Colors(), new Vector2(size.x / 2f, size.y / 2f + r), new Vector2(size.x / 2f, size.y / 2f - r), AddressMode.Clamp);
+                return;
             }
+            var boxes = Boxes(size);
+            float left = boxes[0].xMin + Inner, right = boxes[boxes.Count - 1].xMax - Inner;
+            var start = new Vector2(_fromRight ? right : left, size.y / 2f);
+            var end = new Vector2(_fromRight ? left : right, size.y / 2f);
+            p.fillGradient = FillGradient.MakeLinearGradient(Colors(), start, end, AddressMode.Clamp);
         }
 
-        static void Paint(Painter2D p, List<Vector2> points, Color color)
+        // color가 null이면 칠하기 상태(그라데이션)를 그대로 쓴다.
+        static void Paint(Painter2D p, List<Vector2> points, Color? color)
         {
             if (points.Count < 3) return;
-            p.fillColor = color;
+            if (color.HasValue) p.fillColor = color.Value;
             p.BeginPath();
             p.MoveTo(points[0]);
             for (var i = 1; i < points.Count; i++) p.LineTo(points[i]);
