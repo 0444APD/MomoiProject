@@ -1,0 +1,90 @@
+// GBible UI 키트 견본 코드 — 견본 Bars.uxml을 띄운 화면에서 막대(KitBar)를 부르는 법(복사해 [BindTo(GameIds.Screen.X)]만 붙이면 돈다).
+// 실제 게임에서 값을 바꾸는 것은 행동이고, 화면은 바뀐 값을 읽어 Set한다(맞는 순간의 연출은 session.Events.SubscribeAfterAction<이벤트>(e => …)).
+// 예상 구간은 Game.Preview(행동, g => 읽기)로 계산한 양을 Preview(-양 / 최대)로 — 마우스를 올렸을 때 보이고, 내리면 Preview(0).
+// 시간에 따라 줄어드는 막대(버프 지속 · 로딩)는 Tick에서 Set(값, animate: false).
+using GBible;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    public class BarsSample : GameScreen
+    {
+        const int MaxHp = 120, MaxMana = 10, EnemyMax = 200, Hit = 40;
+        int _hp = 86, _mana = 6, _enemy = 180, _exp = 35, _level = 12;
+        float _loading = -1f;
+        KitBar _hpBar, _mpBar, _enemyBar, _xpBar, _loadBar;
+        readonly KitBar[] _buffs = new KitBar[3];
+        Label _hint, _levelText, _loadText;
+
+        protected override void OnOpen()
+        {
+            _hpBar = Q<KitBar>("hp");
+            _mpBar = Q<KitBar>("mp");
+            _enemyBar = Q<KitBar>("enemy");
+            _xpBar = Q<KitBar>("xp");
+            _loadBar = Q<KitBar>("load");
+            for (var i = 0; i < _buffs.Length; i++) _buffs[i] = Q<KitBar>("buff-" + (i + 1));
+            _hint = Q<Label>("enemy-hint");
+            _levelText = Q<Label>("level");
+            _loadText = Q<Label>("load-text");
+
+            OnClick("damage", () => { _hp = Mathf.Max(0, _hp - 18); ShowHp(); });
+            OnClick("heal", () => { _hp = Mathf.Min(MaxHp, _hp + 12); ShowHp(); });
+            OnClick("preview", () =>
+            {
+                var showing = _enemyBar.preview != 0f;
+                _enemyBar.Preview(showing ? 0f : -Mathf.Min(Hit, _enemy) / (float)EnemyMax);   // 잃을 양을 미리
+                _hint.text = showing ? "" : $"예상 피해 {Mathf.Min(Hit, _enemy)}";
+            });
+            OnClick("attack", () =>
+            {
+                _enemy -= Mathf.Min(Hit, _enemy);
+                if (_enemy <= 0) _enemy = EnemyMax;                    // 견본: 쓰러지면 다시 가득
+                _enemyBar.Preview(0f);
+                _hint.text = "";
+                _enemyBar.Set(_enemy / (float)EnemyMax);
+            });
+            OnClick("mana", () =>
+            {
+                _mana = _mana == 0 ? MaxMana : Mathf.Max(0, _mana - 3);
+                _mpBar.Set(_mana / (float)MaxMana);
+            });
+            OnClick("exp", () =>
+            {
+                _exp += 30;
+                if (_exp >= 100)                                       // 레벨 업: 끝까지 채우지 않고 남은 만큼부터 다시
+                {
+                    _exp -= 100;
+                    _level++;
+                    _levelText.text = $"Lv {_level}";
+                    _xpBar.Set(0f, animate: false);
+                }
+                _xpBar.Set(_exp / 100f);
+            });
+            OnClick("loading", () => _loading = 0f);
+        }
+
+        void ShowHp()
+        {
+            _hpBar.Set(_hp / (float)MaxHp);
+            _hpBar.Text = $"{_hp} / {MaxHp}";
+        }
+
+        protected override void Tick(float deltaTime)
+        {
+            // 버프 지속: 시간에 따라 줄고, 다 되면(견본) 다시 가득.
+            for (var i = 0; i < _buffs.Length; i++)
+            {
+                var left = _buffs[i].value - deltaTime / (6f + i * 3f);
+                _buffs[i].Set(left <= 0f ? 1f : left, animate: false);
+            }
+            // 로딩: 2초 동안 0 → 100%.
+            if (_loading < 0f) return;
+            _loading = Mathf.Min(1f, _loading + deltaTime / 2f);
+            _loadBar.Set(_loading, animate: false);
+            _loadText.text = $"{Mathf.RoundToInt(_loading * 100f)}%";
+            if (_loading >= 1f) _loading = -1f;
+        }
+    }
+}

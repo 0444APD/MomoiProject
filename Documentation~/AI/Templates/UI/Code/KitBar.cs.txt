@@ -1,0 +1,167 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitBar.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitBar도).
+// UI 템플릿 — 막대: 체력 · 마나 · 경험치 · 로딩 · 버프 지속처럼 0~1을 채우는 것(개발자 2026-10-15 — 막대는 이 하나로).
+// 기능만 둔다. 굵기 · 모양 · 색은 Kit.uss의 kit-bar-* 클래스와 --kit-bar-* 변수로 바꾼다.
+//   value    : 채운 양(0~1). 코드는 Set(값) — 늘 때는 짧게 차오르고, 줄 때는 채움이 바로 줄고 자국(trail)이 잠시 남았다가 따라온다.
+//   preview  : 예상 구간(-1~1). 음수 = 잃을 양(채움 끝에서 왼쪽으로), 양수 = 얻을 양(채움 끝에서 오른쪽으로). 0이면 없음 — 예상 피해 · 회복을 미리 보일 때.
+//   segments : 칸 나눔 눈금 수(0 = 없음) — 마나 10칸처럼. 눈금 색 --bar-tick.
+//   text     : 막대 위 글(굵은 막대에서 "86 / 120" 따위). 비우면 없음.
+//   fromRight: 오른쪽에서 채운다(마주 보는 적의 체력처럼).
+//   trail    : 줄 때 자국을 남긴다(끄면 바로). 시간은 trailDelay(초) 뒤 trailSeconds(초) 동안, 차오름은 fillSeconds(초).
+// UXML: <MomoiProject.KitBar value="0.7" segments="10" class="kit-bar kit-bar--mp" />
+// 코드: Q<KitBar>("hp").Set(hp / (float)maxHp); · bar.Preview(-damage / (float)maxHp); · bar.Text = $"{hp} / {maxHp}";
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitBar : VisualElement
+    {
+        static readonly CustomStyleProperty<Color> TickColorProperty = new CustomStyleProperty<Color>("--bar-tick");
+
+        readonly VisualElement _trail, _fill, _preview;
+        readonly VisualElement _ticks;
+        readonly Label _label;
+        float _value = 1f, _shown = 1f, _trailValue = 1f, _previewValue;
+        float _trailWait;
+        bool _fromRight;
+        int _segments;
+        Color _tickColor = new Color(0f, 0f, 0f, 0.35f);
+        IVisualElementScheduledItem _tick;
+        double _lastTime;
+
+        [UxmlAttribute] public float value { get => _value; set { _value = Mathf.Clamp01(value); _shown = _trailValue = _value; Layout(); } }
+        [UxmlAttribute] public float preview { get => _previewValue; set { _previewValue = Mathf.Clamp(value, -1f, 1f); Layout(); } }
+        [UxmlAttribute] public int segments { get => _segments; set { _segments = Mathf.Max(0, value); _ticks.MarkDirtyRepaint(); } }
+        [UxmlAttribute] public string text { get => _label.text; set { _label.text = value ?? ""; _label.style.display = string.IsNullOrEmpty(value) ? DisplayStyle.None : DisplayStyle.Flex; } }
+        [UxmlAttribute] public bool fromRight { get => _fromRight; set { _fromRight = value; Layout(); } }
+        [UxmlAttribute] public bool trail { get; set; } = true;
+        [UxmlAttribute] public float trailDelay { get; set; } = 0.35f;
+        [UxmlAttribute] public float trailSeconds { get; set; } = 0.4f;
+        [UxmlAttribute] public float fillSeconds { get; set; } = 0.15f;
+
+        public string Text { get => text; set => text = value; }
+
+        public KitBar()
+        {
+            AddToClassList("kit-bar");
+            _trail = Part("kit-bar-trail");
+            _fill = Part("kit-bar-fill");
+            _preview = Part("kit-bar-preview");
+            _ticks = Part("kit-bar-ticks");
+            _ticks.generateVisualContent += DrawTicks;
+            _label = new Label();
+            _label.AddToClassList("kit-bar-text");
+            _label.pickingMode = PickingMode.Ignore;
+            _label.style.display = DisplayStyle.None;
+            Add(_label);
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                if (e.customStyle.TryGetValue(TickColorProperty, out var color)) _tickColor = color;
+                _ticks.MarkDirtyRepaint();
+            });
+            RegisterCallback<GeometryChangedEvent>(_ => _ticks.MarkDirtyRepaint());
+            RegisterCallback<DetachFromPanelEvent>(_ => Stop());
+            Layout();
+        }
+
+        // 채운 양을 바꾼다(0~1). animate가 거짓이면 자국 · 차오름 없이 바로.
+        public void Set(float target, bool animate = true)
+        {
+            target = Mathf.Clamp01(target);
+            if (!animate || panel == null)
+            {
+                value = target;
+                return;
+            }
+            if (target < _value)
+            {
+                _shown = target;                                   // 줄 때: 채움은 바로
+                if (trail) { _trailValue = Mathf.Max(_trailValue, _value); _trailWait = trailDelay; }
+                else _trailValue = target;
+            }
+            _value = target;
+            Layout();
+            Start();
+        }
+
+        // 예상 구간(-1~1, 0 = 지움): 음수 = 잃을 양 · 양수 = 얻을 양.
+        public void Preview(float amount) => preview = amount;
+
+        VisualElement Part(string className)
+        {
+            var part = new VisualElement { pickingMode = PickingMode.Ignore };
+            part.AddToClassList(className);
+            Add(part);
+            return part;
+        }
+
+        void Start()
+        {
+            _lastTime = Time.realtimeSinceStartupAsDouble;
+            _tick ??= schedule.Execute(Step).Every(16);
+            _tick.Resume();
+        }
+
+        void Stop() => _tick?.Pause();
+
+        void Step()
+        {
+            var now = Time.realtimeSinceStartupAsDouble;
+            var dt = (float)(now - _lastTime);
+            _lastTime = now;
+            var done = true;
+            if (_shown < _value)                                   // 늘 때: 짧게 차오른다
+            {
+                _shown = Mathf.Min(_value, _shown + dt / Mathf.Max(fillSeconds, 0.01f));
+                done = false;
+            }
+            if (_trailValue < _shown) _trailValue = _shown;
+            if (_trailValue > _shown)                              // 줄 때: 잠시 뒤 자국이 따라온다
+            {
+                if (_trailWait > 0f) _trailWait -= dt;
+                else _trailValue = Mathf.Max(_shown, _trailValue - dt / Mathf.Max(trailSeconds, 0.01f));
+                done = false;
+            }
+            Layout();
+            if (done) Stop();
+        }
+
+        void Layout()
+        {
+            Place(_fill, 0f, _shown);
+            Place(_trail, 0f, _trailValue);
+            if (_previewValue < 0f) Place(_preview, Mathf.Max(0f, _shown + _previewValue), _shown);
+            else if (_previewValue > 0f) Place(_preview, _shown, Mathf.Min(1f, _shown + _previewValue));
+            _preview.style.display = _previewValue == 0f ? DisplayStyle.None : DisplayStyle.Flex;
+            _preview.EnableInClassList("kit-bar-preview--loss", _previewValue < 0f);
+            _preview.EnableInClassList("kit-bar-preview--gain", _previewValue > 0f);
+        }
+
+        // 막대의 from~to(0~1) 구간에 둔다(오른쪽에서 채우면 뒤집는다).
+        void Place(VisualElement part, float from, float to)
+        {
+            var start = _fromRight ? 1f - to : from;
+            part.style.left = Length.Percent(start * 100f);
+            part.style.width = Length.Percent(Mathf.Max(0f, to - from) * 100f);
+        }
+
+        void DrawTicks(MeshGenerationContext context)
+        {
+            if (_segments < 2) return;
+            var size = _ticks.layout.size;
+            if (float.IsNaN(size.x) || size.x <= 0f || size.y <= 0f) return;
+            var p = context.painter2D;
+            p.strokeColor = _tickColor;
+            p.lineWidth = 1f;
+            for (var i = 1; i < _segments; i++)
+            {
+                var x = Mathf.Round(size.x * i / _segments) + 0.5f;
+                p.BeginPath();
+                p.MoveTo(new Vector2(x, 0f));
+                p.LineTo(new Vector2(x, size.y));
+                p.Stroke();
+            }
+        }
+    }
+}

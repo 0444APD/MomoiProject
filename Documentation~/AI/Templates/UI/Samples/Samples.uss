@@ -117,3 +117,30 @@
 .sample-fx-buff { position: absolute; left: 34px; top: 30px; width: 72px; height: 72px; color: var(--kit-white-hover); opacity: 0; }
 .sample-fx-sheen-card { width: 220px; height: 130px; padding: 16px; overflow: hidden; align-items: flex-start; }
 .sample-fx-badge { height: 30px; margin: 0; padding: 0 14px; border-radius: 15px; background-color: var(--kit-sand); color: var(--kit-sand-ink); font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; }
+
+/* ── 견본 Bars: 장면 위 UI — 묶는 패널 없이 여백으로, 스프라이트(초상 · 아이콘)만 패널. 장면 자리는 월드 장면 대신의 단색 ── */
+.sample-bars-scene { background-color: rgb(58, 70, 84); }
+.sample-bars-me { position: absolute; left: 48px; top: 40px; flex-direction: row; }
+.sample-bars-portrait { width: 88px; height: 88px; padding: 8px; }
+.sample-bars-portrait-art { flex-grow: 1; border-radius: 6px; background-color: rgb(28, 29, 33); }
+.sample-bars-me-info { margin-left: 16px; width: 320px; }
+.sample-bars-name { margin: 0 0 8px 0; padding: 0; font-size: 16px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-bars-name--right { -unity-text-align: middle-right; }
+.sample-bars-hp { width: 320px; }
+.sample-bars-mp { width: 320px; margin-top: 8px; }
+.sample-bars-buffs { flex-direction: row; margin-top: 16px; }
+.sample-bars-buff { width: 44px; margin-right: 8px; }
+.sample-bars-buff-icon { width: 44px; height: 44px; align-items: center; justify-content: center; }
+.sample-bars-buff-glyph { width: 24px; height: 24px; color: var(--kit-light); }
+.sample-bars-buff-bar { width: 44px; margin-top: 4px; }
+.sample-bars-enemy { position: absolute; right: 48px; top: 40px; width: 420px; }
+.sample-bars-enemy-bar { width: 420px; }
+.sample-bars-hint { margin: 8px 0 0 0; padding: 0; font-size: 14px; color: var(--kit-dim); -unity-text-align: middle-right; }
+.sample-bars-load { position: absolute; left: 720px; top: 500px; width: 480px; align-items: center; }
+.sample-bars-load-bar { width: 480px; }
+.sample-bars-load-text { margin: 8px 0 0 0; padding: 0; font-size: 14px; color: var(--kit-light); }
+.sample-bars-xp { position: absolute; left: 48px; right: 48px; bottom: 28px; flex-direction: row; align-items: center; }
+.sample-bars-level { margin: 0 16px 0 0; padding: 0; font-size: 14px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-bars-xp-bar { flex-grow: 1; }
+.sample-bars-controls { position: absolute; right: 48px; top: 300px; width: 220px; }
+.sample-bars-controls .kit-bt { margin: 0 0 8px 0; }
