@@ -118,29 +118,36 @@
 .sample-fx-sheen-card { width: 220px; height: 130px; padding: 16px; overflow: hidden; align-items: flex-start; }
 .sample-fx-badge { height: 30px; margin: 0; padding: 0 14px; border-radius: 15px; background-color: var(--kit-sand); color: var(--kit-sand-ink); font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; }
 
-/* ── 견본 Bars: 장면 위 UI — 묶는 패널 없이 여백으로, 스프라이트(초상 · 아이콘)만 패널. 장면 자리는 월드 장면 대신의 단색 ── */
-.sample-bars-scene { background-color: rgb(58, 70, 84); }
-.sample-bars-me { position: absolute; left: 48px; top: 40px; flex-direction: row; }
-.sample-bars-portrait { width: 88px; height: 88px; padding: 8px; }
-.sample-bars-portrait-art { flex-grow: 1; border-radius: 6px; background-color: rgb(28, 29, 33); }
-.sample-bars-me-info { margin-left: 16px; width: 320px; }
-.sample-bars-name { margin: 0 0 8px 0; padding: 0; font-size: 16px; -unity-font-style: bold; color: var(--kit-light); }
-.sample-bars-name--right { -unity-text-align: middle-right; }
-.sample-bars-hp { width: 320px; }
-.sample-bars-mp { width: 320px; margin-top: 8px; }
-.sample-bars-buffs { flex-direction: row; margin-top: 16px; }
-.sample-bars-buff { width: 44px; margin-right: 8px; }
-.sample-bars-buff-icon { width: 44px; height: 44px; align-items: center; justify-content: center; }
-.sample-bars-buff-glyph { width: 24px; height: 24px; color: var(--kit-light); }
-.sample-bars-buff-bar { width: 44px; margin-top: 4px; }
-.sample-bars-enemy { position: absolute; right: 48px; top: 40px; width: 420px; }
-.sample-bars-enemy-bar { width: 420px; }
-.sample-bars-hint { margin: 8px 0 0 0; padding: 0; -unity-text-align: middle-right; }
-.sample-bars-load { position: absolute; left: 720px; top: 500px; width: 480px; align-items: center; }
-.sample-bars-load-bar { width: 480px; }
-.sample-bars-load-text { margin: 8px 0 0 0; padding: 0; }
-.sample-bars-xp { position: absolute; left: 48px; right: 48px; bottom: 28px; flex-direction: row; align-items: center; }
-.sample-bars-level { margin: 0 16px 0 0; padding: 0; }
-.sample-bars-xp-bar { flex-grow: 1; }
-.sample-bars-controls { position: absolute; right: 48px; top: 300px; width: 220px; }
-.sample-bars-controls .kit-bt { margin: 0 0 8px 0; }
+/* ── 견본 Gauges: 왼쪽 위 = 장면 위 상태 UI(묶는 패널 없이 여백, 초상 · 아이콘 칸만 패널), 가운데 = 게이지 경우의 수. 장면 자리는 월드 장면 대신의 단색 ── */
+.sample-gauges-scene { background-color: rgb(58, 70, 84); }
+.sample-gauges-me { position: absolute; left: 48px; top: 40px; flex-direction: row; }
+.sample-gauges-portrait { width: 88px; height: 88px; padding: 8px; }
+.sample-gauges-portrait-art { flex-grow: 1; border-radius: 4px; background-color: rgb(28, 29, 33); }
+.sample-gauges-me-info { margin-left: 16px; width: 320px; }
+.sample-gauges-name { margin: 0 0 8px 0; padding: 0; font-size: 16px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-gauges-name--right { -unity-text-align: middle-right; }
+.sample-gauges-hp { width: 320px; }
+.sample-gauges-mp { width: 320px; margin-top: 8px; }
+.sample-gauges-buffs { flex-direction: row; margin-top: 16px; }
+.sample-gauges-buff { width: 44px; margin-right: 8px; }
+.sample-gauges-buff-icon { width: 44px; height: 44px; align-items: center; justify-content: center; }
+.sample-gauges-buff-glyph { width: 24px; height: 24px; color: var(--kit-light); }
+.sample-gauges-buff-bar { width: 44px; min-width: 0; margin-top: 4px; }
+.sample-gauges-enemy { position: absolute; right: 48px; top: 40px; width: 420px; }
+.sample-gauges-enemy-bar { width: 420px; }
+.sample-gauges-hint { margin: 8px 0 0 0; padding: 0; -unity-text-align: middle-right; }
+.sample-gauges-catalog { position: absolute; left: 48px; top: 240px; width: 1300px; }
+.sample-gauges-row { flex-direction: row; align-items: flex-end; margin-bottom: 32px; }
+.sample-gauges-row-title { width: 140px; margin: 0; padding: 0 0 4px 0; font-size: 14px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-gauges-cell { width: 260px; margin-right: 32px; }
+.sample-gauges-caption { margin: 0 0 8px 0; padding: 0; font-size: 12px; color: var(--kit-dim); }
+.sample-gauges-line { width: 240px; }
+.sample-gauges-units { width: 200px; height: 24px; }
+.sample-gauges-load { position: absolute; right: 48px; bottom: 96px; width: 440px; align-items: center; }
+.sample-gauges-load-bar { width: 440px; height: 14px; }
+.sample-gauges-load-text { margin: 8px 0 0 0; padding: 0; }
+.sample-gauges-xp { position: absolute; left: 48px; right: 48px; bottom: 28px; flex-direction: row; align-items: center; }
+.sample-gauges-level { margin: 0 16px 0 0; padding: 0; }
+.sample-gauges-xp-bar { flex-grow: 1; }
+.sample-gauges-controls { position: absolute; right: 48px; top: 300px; width: 220px; }
+.sample-gauges-controls .kit-bt { margin: 0 0 8px 0; }

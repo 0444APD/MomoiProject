@@ -1,0 +1,88 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!-- 견본 · 게이지(KitGauge)와 장면 위 UI(UiGuide 3-1 · 3-7, 개발자 2026-10-15).
+         왼쪽 위 = 장면 위 상태 UI의 쓰는 법(묶는 패널 없이 여백으로 · 초상 · 아이콘 칸만 패널 · 글만 놓이는 것은 강조 숫자).
+         가운데 = 게이지의 경우의 수 전부: 직선(사각 · 평행사변형 × 꽉 채움 · 테) · 눈금 · 특수(그라데이션 + 발광) · 원형 패널 · 원 테두리 · 도형 나열.
+         둥근 모양은 쓰지 않는다(모서리만 아주 약간). 코드 GaugesSample.cs.txt가 버튼으로 줄이기 · 늘리기 · 예상을 걸어 본다. 장면 자리(sample-gauges-scene)는 월드 장면 대신 -->
+    <ui:VisualElement class="kit-fill sample-gauges-scene" picking-mode="Ignore">
+        <ui:VisualElement class="sample-gauges-me">
+            <MomoiProject.KitPanel shape="Round" pattern="None" class="sample-gauges-portrait kit-pn-dark kit-pn-c6"><ui:VisualElement class="sample-gauges-portrait-art" /></MomoiProject.KitPanel>
+            <ui:VisualElement class="sample-gauges-me-info">
+                <ui:Label text="리라" class="sample-gauges-name" />
+                <MomoiProject.KitGauge name="hp" kind="Line" shape="Slant" frame="Flush" value="0.72" text="86 / 120" class="kit-gauge kit-gauge--thick kit-gauge--hp sample-gauges-demo sample-gauges-hp" />
+                <MomoiProject.KitGauge name="mp" kind="Line" shape="Rect" frame="Flush" value="0.6" segments="10" class="kit-gauge kit-gauge--mp sample-gauges-demo sample-gauges-mp" />
+                <ui:VisualElement class="sample-gauges-buffs">
+                    <ui:VisualElement class="sample-gauges-buff">
+                        <MomoiProject.KitPanel shape="Round" pattern="None" class="sample-gauges-buff-icon kit-pn-dark kit-pn-c6"><MomoiProject.KitIcon glyph="Sword" class="sample-gauges-buff-glyph" /></MomoiProject.KitPanel>
+                        <MomoiProject.KitGauge name="buff-1" value="0.8" trail="false" class="kit-gauge kit-gauge--thin kit-gauge--buff sample-gauges-buff-bar" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="sample-gauges-buff">
+                        <MomoiProject.KitPanel shape="Round" pattern="None" class="sample-gauges-buff-icon kit-pn-dark kit-pn-c6"><MomoiProject.KitIcon glyph="Shield" class="sample-gauges-buff-glyph" /></MomoiProject.KitPanel>
+                        <MomoiProject.KitGauge name="buff-2" value="0.45" trail="false" class="kit-gauge kit-gauge--thin kit-gauge--buff sample-gauges-buff-bar" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="sample-gauges-buff">
+                        <MomoiProject.KitPanel shape="Round" pattern="None" class="sample-gauges-buff-icon kit-pn-dark kit-pn-c6"><MomoiProject.KitIcon glyph="Heart" class="sample-gauges-buff-glyph" /></MomoiProject.KitPanel>
+                        <MomoiProject.KitGauge name="buff-3" value="0.2" trail="false" class="kit-gauge kit-gauge--thin kit-gauge--buff sample-gauges-buff-bar" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="sample-gauges-enemy">
+            <ui:Label text="녹슨 수호자" class="sample-gauges-name sample-gauges-name--right" />
+            <MomoiProject.KitGauge name="enemy" kind="Line" shape="Slant" frame="Outline" value="0.9" from-right="true" segments="4" class="kit-gauge kit-gauge--thick kit-gauge--hp sample-gauges-demo sample-gauges-enemy-bar" />
+            <ui:Label name="enemy-hint" text="" class="kit-t-heading kit-t-number sample-gauges-hint" />
+        </ui:VisualElement>
+
+        <ui:VisualElement class="sample-gauges-catalog">
+            <ui:VisualElement class="sample-gauges-row">
+                <ui:Label text="직선" class="sample-gauges-row-title" />
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="사각 · 꽉 채움" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Rect" frame="Flush" value="0.7" class="kit-gauge kit-gauge--thick kit-gauge--hp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="사각 · 테" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Rect" frame="Outline" value="0.7" class="kit-gauge kit-gauge--thick kit-gauge--hp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="평행사변형 · 꽉 채움" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Slant" frame="Flush" value="0.7" class="kit-gauge kit-gauge--thick kit-gauge--mp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="평행사변형 · 테" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Slant" frame="Outline" value="0.7" class="kit-gauge kit-gauge--thick kit-gauge--mp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="sample-gauges-row">
+                <ui:Label text="눈금 · 특수" class="sample-gauges-row-title" />
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="사각 · 눈금 10" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Rect" frame="Flush" value="0.6" segments="10" class="kit-gauge kit-gauge--thick kit-gauge--mp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="평행사변형 · 테 · 눈금 5" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Slant" frame="Outline" value="0.6" segments="5" class="kit-gauge kit-gauge--thick kit-gauge--hp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="그라데이션 + 발광" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Rect" frame="Flush" value="0.6" gradient="true" class="kit-gauge kit-gauge--thick kit-gauge--xp kit-gauge--glow sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="평행사변형 · 그라데이션 + 발광" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Line" shape="Slant" frame="Outline" value="0.6" gradient="true" class="kit-gauge kit-gauge--thick kit-gauge--mp kit-gauge--glow sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="sample-gauges-row">
+                <ui:Label text="원형 패널" class="sample-gauges-row-title" />
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="꽉 채움" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Orb" frame="Flush" value="0.65" class="kit-gauge kit-gauge--hp sample-gauges-demo" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="테" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Orb" frame="Outline" value="0.65" class="kit-gauge kit-gauge--mp sample-gauges-demo" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="그라데이션 + 발광" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Orb" frame="Flush" value="0.65" gradient="true" class="kit-gauge kit-gauge--mp kit-gauge--glow sample-gauges-demo" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="테 · 그라데이션 · 글" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Orb" frame="Outline" value="0.65" gradient="true" text="65" class="kit-gauge kit-gauge--xp sample-gauges-demo" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="sample-gauges-row">
+                <ui:Label text="원 테두리" class="sample-gauges-row-title" />
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="꽉 채움" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Ring" frame="Flush" value="0.65" class="kit-gauge kit-gauge--hp sample-gauges-demo" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="테" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Ring" frame="Outline" value="0.65" thickness="12" class="kit-gauge kit-gauge--mp sample-gauges-demo" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="그라데이션 + 발광" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Ring" frame="Flush" value="0.65" gradient="true" class="kit-gauge kit-gauge--xp kit-gauge--glow sample-gauges-demo" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="테 · 글" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Ring" frame="Outline" value="0.65" thickness="12" text="3s" class="kit-gauge kit-gauge--buff sample-gauges-demo" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="sample-gauges-row">
+                <ui:Label text="도형 나열" class="sample-gauges-row-title" />
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="사각 5칸" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Units" shape="Rect" frame="Flush" units="5" value="0.66" class="kit-gauge kit-gauge--hp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="평행사변형 5칸 · 테" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Units" shape="Slant" frame="Outline" units="5" value="0.66" class="kit-gauge kit-gauge--mp sample-gauges-demo sample-gauges-line" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="마름모 5칸" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Units" shape="Diamond" frame="Flush" units="5" value="0.66" class="kit-gauge kit-gauge--xp sample-gauges-demo sample-gauges-units" /></ui:VisualElement>
+                <ui:VisualElement class="sample-gauges-cell"><ui:Label text="마름모 5칸 · 테" class="sample-gauges-caption" /><MomoiProject.KitGauge kind="Units" shape="Diamond" frame="Outline" units="5" value="0.66" class="kit-gauge kit-gauge--buff sample-gauges-demo sample-gauges-units" /></ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement class="sample-gauges-load">
+            <MomoiProject.KitGauge name="load" kind="Line" shape="Rect" frame="Outline" value="0" trail="false" class="kit-gauge kit-gauge--load sample-gauges-load-bar" />
+            <ui:Label name="load-text" text="0%" class="kit-t-heading kit-t-number sample-gauges-load-text" />
+        </ui:VisualElement>
+        <ui:VisualElement class="sample-gauges-xp">
+            <ui:Label text="Lv 12" class="kit-t-heading kit-t-number sample-gauges-level" />
+            <MomoiProject.KitGauge kind="Line" shape="Rect" frame="Flush" value="0.35" class="kit-gauge kit-gauge--thin kit-gauge--xp sample-gauges-xp-bar" />
+        </ui:VisualElement>
+        <ui:VisualElement class="sample-gauges-controls">
+            <ui:Button name="damage" text="줄이기 −15%" class="kit-bt kit-bt--pill kit-bt--black kit-bt--small" />
+            <ui:Button name="heal" text="늘리기 +15%" class="kit-bt kit-bt--pill kit-bt--black kit-bt--small" />
+            <ui:Button name="preview" text="예상 −20% 보기" class="kit-bt kit-bt--pill kit-bt--black kit-bt--small" />
+            <ui:Button name="loading" text="로딩" class="kit-bt kit-bt--pill kit-bt--black kit-bt--small" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

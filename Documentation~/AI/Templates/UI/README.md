@@ -12,7 +12,7 @@
 ## 설치(단계 2를 시작할 때 한 번)
 
 1. `Kit.uss` → `Assets/MomoiProject/UI/Kit/Kit.uss`. 프로젝트 화면 USS(`UI/Screens/<프로젝트>.uss`) 첫 줄: `@import url("../Kit/Kit.uss");` 프로젝트 색은 `Kit.uss` 맨 위 변수 블록에서 바꾼다(또는 프로젝트 USS에서 같은 이름의 변수를 다시 정한다).
-2. `Code/*.cs.txt` → `Assets/MomoiProject/Code/Client/Kit/<이름>.cs` — `KitPanel`(패널 + 모서리 기하 `KitGeometry`) · `KitOutline`(라인 디자인 — 요소 규격) · `KitAccent`(선 포인트 7가지) · `KitLine`(`KitRule` 나누는 선 · `KitSpark` 반짝임) · `KitFx`(순간 연출 — `KitFx` 연출 층 · `KitGlow` 빛 · `KitSheen` 훑는 빛 · `KitTween` 시간 흐름) · `KitIcon`(단색 벡터 아이콘 샘플 21개) · `KitBar`(막대). 네임스페이스가 `MomoiProject`가 아니면 UXML의 `MomoiProject.Kit…`도 함께 바꾼다.
+2. `Code/*.cs.txt` → `Assets/MomoiProject/Code/Client/Kit/<이름>.cs` — `KitPanel`(패널 + 모서리 기하 `KitGeometry`) · `KitOutline`(라인 디자인 — 요소 규격) · `KitAccent`(선 포인트 7가지) · `KitLine`(`KitRule` 나누는 선 · `KitSpark` 반짝임) · `KitFx`(순간 연출 — `KitFx` 연출 층 · `KitGlow` 빛 · `KitSheen` 훑는 빛 · `KitTween` 시간 흐름) · `KitIcon`(단색 벡터 아이콘 샘플 21개) · `KitGauge`(게이지 — 직선 · 원형 패널 · 원 테두리 · 도형 나열). 네임스페이스가 `MomoiProject`가 아니면 UXML의 `MomoiProject.Kit…`도 함께 바꾼다.
 3. `Samples/`는 **보고 베끼는 견본 화면**이다(그대로 화면이 되지 않는다). 견본을 띄워 볼 때는 `Kit.uss`와 `Samples/Samples.uss`를 함께 붙인다(`ElementSpec`의 그라데이션은 `Textures/gradient_up.png`). 화면 UXML을 만들 때 가장 가까운 견본을 바탕으로 짜고, 견본 전용 모양(`sample-…`)은 프로젝트 USS로 옮겨 프로젝트 접두어로 바꾸고, 글은 텍스트 키로 바꾼다.
 4. 테마(`UI/Theme.uss`)의 `--momoi-…` 변수(기본 화면의 색)도 키트 색과 맞춘다.
 
@@ -32,7 +32,7 @@
 | 화면 머리 · 목록 | `kit-head-*` · `kit-money-*` · `kit-nav-*` | UI 배경 위 나눈 화면 |
 | 틀 | `kit-frame-*`(검정 틀 + 머리 띠 + 종이 안판) | 작은 팝업 · 알림의 안쪽 모양은 견본(`sample-pop-*` · `sample-notice-*`) |
 | 순간 연출 | 연출 층 `<MomoiProject.KitFx class="kit-fx" />`(화면 맨 끝) · 훑는 빛 `<MomoiProject.KitSheen class="kit-sheen" />`(카드 안) | 코드: `fx.Reward(칸)` · `fx.Reveal(칸, 뒤 층)` · `fx.Buff(아이콘, 색, 오름, 가운데에 할 일)` · `fx.NumberPop(글)` · `fx.Tap(자리)` · `fx.Burst · Ring · Rays` · `KitGlow.Set · Neon · Flash · Pulse` · `KitTween.Run`. 빛 색은 `--kit-fx-…`(기본 금빛), 시간 · 크기는 매개변수. 예: `Samples/EffectsSample.cs.txt` |
-| 막대 | `<MomoiProject.KitBar value="0.7" segments="10" class="kit-bar kit-bar--mp" />` — 굵기 `kit-bar--thin` · 기본 · `--thick`, 모양 `--square`, 색 `--hp` · `--mp` · `--xp` · `--load` · `--buff` | 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 이 하나로(개발자 2026-10-15). 코드 `Set(0~1)`(줄 때 자국이 잠시 남음) · `Preview(-1~1)`(예상 잃을 · 얻을 양) · `Text` · 속성 `segments` · `from-right` · `trail`. 장면 위에 판 없이 놓는다(UiGuide 3-1). 예: `Samples/BarsSample.cs.txt` |
+| 게이지(슬라이더) | `<MomoiProject.KitGauge kind="Line" shape="Slant" frame="Outline" value="0.7" class="kit-gauge kit-gauge--hp" />` — `kind` Line · Orb(원형 패널) · Ring(원 테두리) · Units(도형 나열) · `shape` Rect · Slant(평행사변형) · Diamond(도형 나열) · `frame` Flush(꽉 채움) · Outline(테 — 같은 색) · `segments`(눈금) · `units` · `gradient` · `from-right` · `text` | 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 이 하나로, **둥근 모양 없음**(개발자 2026-10-15 — UiGuide 3-7). 크기 `kit-gauge--thin` · 기본 · `--thick`, 색 `--hp` · `--mp` · `--xp` · `--load` · `--buff`(게이지 · 그라데이션 끝 · 줄 때 · 늘 때 색은 `--kit-gauge-*`), 발광 `kit-gauge--glow`. 코드 `Set(0~1)` · `Preview(-1~1)` · `Text`. 예: `Samples/GaugesSample.cs.txt` |
 | 아이콘 | `<MomoiProject.KitIcon glyph="Close" class="kit-icon" />` | 진짜 아이콘이 오면 같은 자리를 그림으로(UiGuide 3-6) |
 
 - 버튼 · 메뉴 · 제목 막대의 **변칙(모서리 자름 · 잎)은 한 화면에 한 가지**를 골라 그 화면 전체에 같게 쓴다(견본 VariantSet).
@@ -53,7 +53,7 @@
 | `Buttons.uxml` | 버튼 — 종이 판 위 · 검정 판 위, 보통 · 작게 | — |
 | `VariantSet.uxml` | 변칙 돌려쓰기 — 한 화면에 한 변칙(제목 막대 · 메뉴 막대 · 버튼), 가운데 칸은 베젤 없이 | — |
 | `Effects.uxml` + `EffectsSample.cs.txt` | 순간 연출 — 보상 펑 · 희귀 공개(빛살은 아이템 뒤 층) · 버프(자체 발광 아이콘이 떠올라 사라짐 → 수치 펑) · 훑는 빛 · 발광 맥박. 화면 코드에서 부르는 법 | — |
-| `Bars.uxml` + `BarsSample.cs.txt` | 막대와 장면 위 UI — 묶는 패널 없이 여백으로, 초상 · 아이콘 칸만 패널. 체력(굵게 · 글 · 자국) · 마나(10칸) · 버프 지속(얇게, 아이콘 밑) · 적 체력(오른쪽에서 · 예상 피해) · 로딩 · 경험치. 버튼으로 값을 바꿔 본다 | — |
+| `Gauges.uxml` + `GaugesSample.cs.txt` | 게이지의 경우의 수 전부(직선 사각 · 평행사변형 × 꽉 채움 · 테, 눈금, 그라데이션 + 발광, 원형 패널, 원 테두리, 도형 나열) + 장면 위 상태 UI의 쓰는 법(묶는 패널 없이 여백 · 초상 · 아이콘 칸만 패널 · 강조 숫자). 버튼으로 줄이기 · 늘리기 · 예상 | — |
 
 - 플레이 화면(HUD) · 거점 · 이벤트의 짜임은 아직 새 견본이 없다 — UiGuide 2-2(자리) · 3절(디자인)대로 짜고, 만든 화면을 견본으로 올려 승인받는다.
 - 견본의 글은 바로 적혀 있다. 프로젝트 화면에서는 텍스트 키(`binding-path` 또는 코드)로 바꾼다.

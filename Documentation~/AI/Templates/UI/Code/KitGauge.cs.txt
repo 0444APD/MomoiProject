@@ -1,0 +1,465 @@
+// GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitGauge.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitGauge도).
+// UI 템플릿 — 게이지(슬라이더): 체력 · 마나 · 경험치 · 로딩 · 버프 지속처럼 0~1을 채우는 것은 모두 이 하나로(개발자 2026-10-15 — 이것이 경우의 수 전부).
+//   kind  : Line 직선 · Orb 원형 패널에 아래에서 차오름 · Ring 원 테두리를 12시부터 시계 방향으로 360° · Units 도형 나열(한 칸이 다 차야 다음 칸).
+//           직선에 눈금만 치려면 segments.
+//   shape : Rect 사각형 · Slant 평행사변형(차오르는 앞면도 같은 기울기) · Diamond 마름모(도형 나열만). 둥근 모양은 쓰지 않는다 — 모서리만 아주 약간(radius).
+//   frame : Flush 게이지가 뒤 판을 꽉 채움 · Outline 게이지 색 테를 남기고 간격 안쪽을 채움(테와 게이지는 같은 색).
+//   색    : USS 커스텀 속성 — --gauge-fill(게이지) · --gauge-fill-end(그라데이션 끝, gradient일 때) · --gauge-loss(줄 때 남는 자국) · --gauge-gain(늘 때 먼저 보이는 몫) ·
+//           --gauge-track(뒤 판) · --gauge-tick(눈금) · --gauge-preview-loss · --gauge-preview-gain. 발광은 USS(kit-gauge--glow — 게이지 층에만 filter).
+//   값    : value 0~1 · Set(값) — 줄면 게이지가 바로 줄고 자국이 trailDelay 뒤 trailSeconds 동안 따라오고, 늘면 늘 몫이 gainDelay 동안 먼저 보인 뒤 fillSeconds 동안 차오른다.
+//           preview -1~1(음수 = 잃을 몫 · 양수 = 얻을 몫) · text(가운데 글) · fromRight(직선 · 도형 나열을 오른쪽부터).
+// UXML: <MomoiProject.KitGauge kind="Line" shape="Slant" frame="Outline" value="0.7" class="kit-gauge kit-gauge--hp" />
+// 코드: gauge.Set(hp / (float)maxHp); · gauge.Preview(-damage / (float)maxHp); · gauge.Text = $"{hp} / {maxHp}";
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    [UxmlElement]
+    public partial class KitGauge : VisualElement
+    {
+        public enum Kind { Line, Orb, Ring, Units }
+        public enum Shape { Rect, Slant, Diamond }
+        public enum Frame { Flush, Outline }
+
+        static readonly CustomStyleProperty<Color> FillProperty = new CustomStyleProperty<Color>("--gauge-fill");
+        static readonly CustomStyleProperty<Color> FillEndProperty = new CustomStyleProperty<Color>("--gauge-fill-end");
+        static readonly CustomStyleProperty<Color> LossProperty = new CustomStyleProperty<Color>("--gauge-loss");
+        static readonly CustomStyleProperty<Color> GainProperty = new CustomStyleProperty<Color>("--gauge-gain");
+        static readonly CustomStyleProperty<Color> TrackProperty = new CustomStyleProperty<Color>("--gauge-track");
+        static readonly CustomStyleProperty<Color> TickProperty = new CustomStyleProperty<Color>("--gauge-tick");
+        static readonly CustomStyleProperty<Color> PreviewLossProperty = new CustomStyleProperty<Color>("--gauge-preview-loss");
+        static readonly CustomStyleProperty<Color> PreviewGainProperty = new CustomStyleProperty<Color>("--gauge-preview-gain");
+
+        Color _fill = new Color(0.78f, 0.38f, 0.35f), _fillEnd = new Color(0.95f, 0.6f, 0.45f);
+        Color _loss = new Color(1f, 0.96f, 0.9f, 0.85f), _gain = new Color(0.6f, 0.85f, 0.6f, 0.9f);
+        Color _track = new Color(0.07f, 0.075f, 0.09f, 0.62f), _tickColor = new Color(0f, 0f, 0f, 0.4f);
+        Color _previewLoss = new Color(1f, 1f, 1f, 0.55f), _previewGain = new Color(0.6f, 0.85f, 0.6f, 0.7f);
+
+        readonly VisualElement _trailLayer, _fillLayer, _overLayer;
+        readonly Label _label;
+        Kind _kind;
+        Shape _shape;
+        Frame _frame;
+        float _value = 1f, _shown = 1f, _trail = 1f, _preview;
+        float _trailWait, _gainWait;
+        int _segments, _units = 5;
+        bool _fromRight, _gradient;
+        IVisualElementScheduledItem _tick;
+        double _lastTime;
+
+        [UxmlAttribute] public Kind kind { get => _kind; set { _kind = value; Classes(); Repaint(); } }
+        [UxmlAttribute] public Shape shape { get => _shape; set { _shape = value; Repaint(); } }
+        [UxmlAttribute] public Frame frame { get => _frame; set { _frame = value; Repaint(); } }
+        [UxmlAttribute] public float value { get => _value; set { _value = _shown = _trail = Mathf.Clamp01(value); Repaint(); } }
+        [UxmlAttribute] public float preview { get => _preview; set { _preview = Mathf.Clamp(value, -1f, 1f); Repaint(); } }
+        [UxmlAttribute] public int segments { get => _segments; set { _segments = Mathf.Max(0, value); Repaint(); } }
+        [UxmlAttribute] public int units { get => _units; set { _units = Mathf.Max(1, value); Repaint(); } }
+        [UxmlAttribute] public bool fromRight { get => _fromRight; set { _fromRight = value; Repaint(); } }
+        [UxmlAttribute] public bool gradient { get => _gradient; set { _gradient = value; Repaint(); } }
+        [UxmlAttribute] public string text { get => _label.text; set { _label.text = value ?? ""; _label.style.display = string.IsNullOrEmpty(value) ? DisplayStyle.None : DisplayStyle.Flex; } }
+        [UxmlAttribute] public float slant { get; set; } = 8f;          // 평행사변형의 위 변이 오른쪽으로 밀린 거리(px)
+        [UxmlAttribute] public float radius { get; set; } = 2f;         // 모서리(아주 약간)
+        [UxmlAttribute] public float outline { get; set; } = 1.5f;      // 테 두께(Outline)
+        [UxmlAttribute] public float gap { get; set; } = 2f;            // 테와 게이지 사이(Outline)
+        [UxmlAttribute] public float unitGap { get; set; } = 4f;        // 도형 사이
+        [UxmlAttribute] public float thickness { get; set; } = 8f;      // 원 테두리 두께(Ring)
+        [UxmlAttribute] public bool trail { get; set; } = true;
+        [UxmlAttribute] public float trailDelay { get; set; } = 0.35f;
+        [UxmlAttribute] public float trailSeconds { get; set; } = 0.4f;
+        [UxmlAttribute] public float gainDelay { get; set; } = 0.25f;
+        [UxmlAttribute] public float fillSeconds { get; set; } = 0.3f;
+
+        public string Text { get => text; set => text = value; }
+
+        public KitGauge()
+        {
+            AddToClassList("kit-gauge");
+            generateVisualContent += DrawTrack;
+            _trailLayer = Layer("kit-gauge-layer--trail", DrawTrail);
+            _fillLayer = Layer("kit-gauge-layer--fill", DrawFill);
+            _overLayer = Layer("kit-gauge-layer--over", DrawOver);
+            _label = new Label { pickingMode = PickingMode.Ignore };
+            _label.AddToClassList("kit-gauge-text");
+            _label.style.display = DisplayStyle.None;
+            Add(_label);
+            RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                var s = e.customStyle;
+                if (s.TryGetValue(FillProperty, out var c)) _fill = c;
+                if (s.TryGetValue(FillEndProperty, out c)) _fillEnd = c;
+                if (s.TryGetValue(LossProperty, out c)) _loss = c;
+                if (s.TryGetValue(GainProperty, out c)) _gain = c;
+                if (s.TryGetValue(TrackProperty, out c)) _track = c;
+                if (s.TryGetValue(TickProperty, out c)) _tickColor = c;
+                if (s.TryGetValue(PreviewLossProperty, out c)) _previewLoss = c;
+                if (s.TryGetValue(PreviewGainProperty, out c)) _previewGain = c;
+                Repaint();
+            });
+            RegisterCallback<DetachFromPanelEvent>(_ => _tick?.Pause());
+            Classes();
+        }
+
+        // 채운 양을 바꾼다(0~1). animate가 거짓이면 자국 · 늘 몫 · 차오름 없이 바로.
+        public void Set(float target, bool animate = true)
+        {
+            target = Mathf.Clamp01(target);
+            if (!animate || panel == null) { value = target; return; }
+            if (target < _shown)
+            {
+                if (trail) { _trail = Mathf.Max(_trail, _shown); _trailWait = trailDelay; }
+                _shown = target;
+            }
+            else if (target > _shown && _value <= _shown) _gainWait = trail ? gainDelay : 0f;   // 새로 늘기 시작할 때만 기다린다
+            _value = target;
+            Repaint();
+            _lastTime = Time.realtimeSinceStartupAsDouble;
+            _tick ??= schedule.Execute(Step).Every(16);
+            _tick.Resume();
+        }
+
+        // 예상 구간(-1~1, 0 = 지움): 음수 = 잃을 몫 · 양수 = 얻을 몫.
+        public void Preview(float amount) => preview = amount;
+
+        VisualElement Layer(string className, System.Action<MeshGenerationContext> draw)
+        {
+            var layer = new VisualElement { pickingMode = PickingMode.Ignore };
+            layer.AddToClassList("kit-gauge-layer");
+            layer.AddToClassList(className);
+            layer.style.position = Position.Absolute;
+            layer.style.left = layer.style.top = layer.style.right = layer.style.bottom = 0;
+            layer.generateVisualContent += draw;
+            Add(layer);
+            return layer;
+        }
+
+        void Classes()
+        {
+            EnableInClassList("kit-gauge--orb", _kind == Kind.Orb);
+            EnableInClassList("kit-gauge--ring", _kind == Kind.Ring);
+            EnableInClassList("kit-gauge--units", _kind == Kind.Units);
+        }
+
+        void Repaint()
+        {
+            MarkDirtyRepaint();
+            _trailLayer?.MarkDirtyRepaint();
+            _fillLayer?.MarkDirtyRepaint();
+            _overLayer?.MarkDirtyRepaint();
+        }
+
+        void Step()
+        {
+            var now = Time.realtimeSinceStartupAsDouble;
+            var dt = (float)(now - _lastTime);
+            _lastTime = now;
+            var done = true;
+            if (_shown < _value)                                   // 늘 때: 늘 몫을 잠시 보인 뒤 차오른다
+            {
+                if (_gainWait > 0f) _gainWait -= dt;
+                else _shown = Mathf.Min(_value, _shown + dt / Mathf.Max(fillSeconds, 0.01f));
+                done = false;
+            }
+            if (_trail < _shown) _trail = _shown;
+            if (_trail > _shown)                                   // 줄 때: 잠시 뒤 자국이 따라온다
+            {
+                if (_trailWait > 0f) _trailWait -= dt;
+                else _trail = Mathf.Max(_shown, _trail - dt / Mathf.Max(trailSeconds, 0.01f));
+                done = false;
+            }
+            Repaint();
+            if (done) _tick.Pause();
+        }
+
+        // ── 층마다 그리기: 뒤 판(이 요소) → 자국 · 늘 몫 → 게이지(그라데이션 · 발광) → 예상 · 눈금 ──
+
+        void DrawTrack(MeshGenerationContext context)
+        {
+            if (!Ready(out var size)) return;
+            var p = context.painter2D;
+            switch (_kind)
+            {
+                case Kind.Ring:
+                {
+                    var c = size / 2f;
+                    var r = Mathf.Min(size.x, size.y) / 2f;
+                    Stroke(p, c, r - thickness / 2f, thickness, 0f, 1f, _track);
+                    if (_frame == Frame.Outline)
+                    {
+                        Stroke(p, c, r - outline / 2f, outline, 0f, 1f, _fill);
+                        Stroke(p, c, r - thickness + outline / 2f, outline, 0f, 1f, _fill);
+                    }
+                    break;
+                }
+                case Kind.Orb:
+                {
+                    var c = size / 2f;
+                    var r = Mathf.Min(size.x, size.y) / 2f;
+                    if (_frame == Frame.Outline) { Disc(p, c, r, _fill); Disc(p, c, r - outline, _track); }
+                    else Disc(p, c, r, _track);
+                    break;
+                }
+                default:
+                    foreach (var box in Boxes(size))
+                    {
+                        if (_frame == Frame.Outline)
+                        {
+                            Fill(p, ShapeOf(box, size, 0f), _fill);
+                            Fill(p, ShapeOf(box, size, outline), _track);
+                        }
+                        else Fill(p, ShapeOf(box, size, 0f), _track);
+                    }
+                    break;
+            }
+        }
+
+        void DrawTrail(MeshGenerationContext context)
+        {
+            if (!Ready(out var size)) return;
+            var p = context.painter2D;
+            if (_trail > _shown) Range(p, size, _shown, _trail, _loss);
+            if (_value > _shown) Range(p, size, _shown, _value, _gain);
+        }
+
+        void DrawFill(MeshGenerationContext context)
+        {
+            if (!Ready(out var size) || _shown <= 0f) return;
+            var p = context.painter2D;
+            if (_gradient) UseGradient(p, size);
+            Range(p, size, 0f, _shown, _fill);
+        }
+
+        void DrawOver(MeshGenerationContext context)
+        {
+            if (!Ready(out var size)) return;
+            var p = context.painter2D;
+            if (_preview < 0f) Range(p, size, Mathf.Max(0f, _shown + _preview), _shown, _previewLoss);
+            else if (_preview > 0f) Range(p, size, _shown, Mathf.Min(1f, _shown + _preview), _previewGain);
+            if (_kind == Kind.Line && _segments >= 2)
+            {
+                var box = Boxes(size)[0];
+                var inner = Inset(box, Inner);
+                p.strokeColor = _tickColor;
+                p.lineWidth = 1f;
+                for (var i = 1; i < _segments; i++)
+                {
+                    var x = Mathf.Round(Mathf.Lerp(inner.xMin, inner.xMax, i / (float)_segments)) + 0.5f;
+                    p.BeginPath();
+                    p.MoveTo(Shear(new Vector2(x, inner.yMin), size));
+                    p.LineTo(Shear(new Vector2(x, inner.yMax), size));
+                    p.Stroke();
+                }
+            }
+        }
+
+        bool Ready(out Vector2 size)
+        {
+            size = contentRect.size;
+            return !float.IsNaN(size.x) && size.x > 0f && size.y > 0f;
+        }
+
+        float Inner => _frame == Frame.Outline ? outline + gap : 0f;
+
+        // 게이지의 from~to(0~1) 몫을 종류에 맞게 그린다.
+        void Range(Painter2D p, Vector2 size, float from, float to, Color color)
+        {
+            if (to - from <= 0.0005f) return;
+            switch (_kind)
+            {
+                case Kind.Ring:
+                {
+                    var r = Mathf.Min(size.x, size.y) / 2f;
+                    var width = _frame == Frame.Outline ? thickness - 2f * Inner : thickness;
+                    if (width > 0f) Stroke(p, size / 2f, r - thickness / 2f, width, from, to, color);
+                    break;
+                }
+                case Kind.Orb:
+                {
+                    var c = size / 2f;
+                    var r = Mathf.Min(size.x, size.y) / 2f - Inner;
+                    if (r > 0f) Fill(p, Band(c, r, from, to), color);
+                    break;
+                }
+                default:
+                {
+                    // 가로 몫(fromRight면 뒤집는다)을 도형마다 나눈다 — 도형 나열은 한 칸씩 차례로.
+                    float a = _fromRight ? 1f - to : from, b = _fromRight ? 1f - from : to;
+                    var boxes = Boxes(size);
+                    for (var i = 0; i < boxes.Count; i++)
+                    {
+                        float u0 = i / (float)boxes.Count, u1 = (i + 1) / (float)boxes.Count;
+                        float s = Mathf.Max(a, u0), e = Mathf.Min(b, u1);
+                        if (e - s <= 0.0005f) continue;
+                        var inner = Inset(boxes[i], Inner);
+                        var x0 = Mathf.Lerp(inner.xMin, inner.xMax, (s - u0) / (u1 - u0));
+                        var x1 = Mathf.Lerp(inner.xMin, inner.xMax, (e - u0) / (u1 - u0));
+                        var shapePoints = ShapeOf(boxes[i], size, Inner, unshearedOnly: true);
+                        var clipped = ClipX(ClipX(shapePoints, x0, true), x1, false);
+                        if (clipped.Count < 3) continue;
+                        if (_shape != Shape.Diamond) for (var k = 0; k < clipped.Count; k++) clipped[k] = Shear(clipped[k], size);
+                        Fill(p, clipped, color);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 직선은 상자 하나, 도형 나열은 units개(가로로, 사이 unitGap). 상자는 기울이기 전(unsheared) 좌표.
+        List<Rect> Boxes(Vector2 size)
+        {
+            var sheared = _shape == Shape.Slant ? Mathf.Min(slant, size.x * 0.25f) : 0f;
+            var width = size.x - sheared;
+            var list = new List<Rect>();
+            if (_kind != Kind.Units) { list.Add(new Rect(0f, 0f, width, size.y)); return list; }
+            var unit = (width - unitGap * (_units - 1)) / _units;
+            for (var i = 0; i < _units; i++) list.Add(new Rect(i * (unit + unitGap), 0f, unit, size.y));
+            return list;
+        }
+
+        static Rect Inset(Rect box, float d) => new Rect(box.x + d, box.y + d, Mathf.Max(0f, box.width - 2f * d), Mathf.Max(0f, box.height - 2f * d));
+
+        // 상자를 d만큼 안으로 줄인 도형의 점들(시계 방향). 사각 · 평행사변형은 모서리를 radius만큼 둥글리고 기울인다, 마름모는 기울이지 않는다.
+        List<Vector2> ShapeOf(Rect box, Vector2 size, float d, bool unshearedOnly = false)
+        {
+            var points = new List<Vector2>();
+            if (_shape == Shape.Diamond)
+            {
+                var inner = Inset(box, d * 1.4f);
+                var c = inner.center;
+                var corner = Mathf.Min(radius, inner.width * 0.2f);
+                AddBevel(points, new Vector2(c.x, inner.yMin), new Vector2(inner.xMax, c.y), new Vector2(inner.xMin, c.y), corner);
+                AddBevel(points, new Vector2(inner.xMax, c.y), new Vector2(c.x, inner.yMax), new Vector2(c.x, inner.yMin), corner);
+                AddBevel(points, new Vector2(c.x, inner.yMax), new Vector2(inner.xMin, c.y), new Vector2(inner.xMax, c.y), corner);
+                AddBevel(points, new Vector2(inner.xMin, c.y), new Vector2(c.x, inner.yMin), new Vector2(c.x, inner.yMax), corner);
+                return points;
+            }
+            var r = Inset(box, d);
+            var round = Mathf.Min(radius, r.width / 2f, r.height / 2f);
+            AddCorner(points, new Vector2(r.xMin + round, r.yMin + round), round, 180f);
+            AddCorner(points, new Vector2(r.xMax - round, r.yMin + round), round, 270f);
+            AddCorner(points, new Vector2(r.xMax - round, r.yMax - round), round, 0f);
+            AddCorner(points, new Vector2(r.xMin + round, r.yMax - round), round, 90f);
+            if (!unshearedOnly) for (var i = 0; i < points.Count; i++) points[i] = Shear(points[i], size);
+            return points;
+        }
+
+        static void AddCorner(List<Vector2> points, Vector2 center, float r, float startDegrees)
+        {
+            if (r <= 0.01f) { points.Add(center); return; }
+            for (var i = 0; i <= 3; i++)
+            {
+                var a = (startDegrees + i * 30f) * Mathf.Deg2Rad;
+                points.Add(center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r);
+            }
+        }
+
+        // 꼭짓점 corner를 이웃 점 쪽으로 cut만큼 잘라 낸 두 점(아주 약간의 둥글림 대신).
+        static void AddBevel(List<Vector2> points, Vector2 corner, Vector2 next, Vector2 previous, float cut)
+        {
+            if (cut <= 0.01f) { points.Add(corner); return; }
+            points.Add(corner + (previous - corner).normalized * cut);
+            points.Add(corner + (next - corner).normalized * cut);
+        }
+
+        // 평행사변형: 아래 변을 기준으로 위로 갈수록 오른쪽으로 민다.
+        Vector2 Shear(Vector2 point, Vector2 size)
+        {
+            if (_shape != Shape.Slant) return point;
+            var sheared = Mathf.Min(slant, size.x * 0.25f);
+            return new Vector2(point.x + sheared * (size.y - point.y) / size.y, point.y);
+        }
+
+        // 볼록 다각형을 세로선 x로 자른다(keepRight = 그 오른쪽을 남김).
+        static List<Vector2> ClipX(List<Vector2> polygon, float x, bool keepRight)
+        {
+            var result = new List<Vector2>();
+            for (var i = 0; i < polygon.Count; i++)
+            {
+                var a = polygon[i];
+                var b = polygon[(i + 1) % polygon.Count];
+                var aIn = keepRight ? a.x >= x : a.x <= x;
+                var bIn = keepRight ? b.x >= x : b.x <= x;
+                if (aIn) result.Add(a);
+                if (aIn != bIn) result.Add(Vector2.Lerp(a, b, (x - a.x) / (b.x - a.x)));
+            }
+            return result;
+        }
+
+        // 원 안의 from~to 높이 띠(아래에서 위로 차오름).
+        static List<Vector2> Band(Vector2 c, float r, float from, float to)
+        {
+            var bottom = c.y + r - from * 2f * r;
+            var top = c.y + r - to * 2f * r;
+            var points = new List<Vector2>();
+            const int Steps = 24;
+            for (var i = 0; i <= Steps; i++)
+            {
+                var y = Mathf.Lerp(top, bottom, i / (float)Steps);
+                points.Add(new Vector2(c.x + HalfWidth(c, r, y), y));
+            }
+            for (var i = Steps; i >= 0; i--)
+            {
+                var y = Mathf.Lerp(top, bottom, i / (float)Steps);
+                points.Add(new Vector2(c.x - HalfWidth(c, r, y), y));
+            }
+            return points;
+        }
+
+        static float HalfWidth(Vector2 c, float r, float y) => Mathf.Sqrt(Mathf.Max(0f, r * r - (y - c.y) * (y - c.y)));
+
+        void UseGradient(Painter2D p, Vector2 size)
+        {
+            switch (_kind)
+            {
+                case Kind.Ring:
+                    var gradient = new Gradient();
+                    gradient.SetKeys(new[] { new GradientColorKey(_fill, 0f), new GradientColorKey(_fillEnd, 1f) },
+                        new[] { new GradientAlphaKey(_fill.a, 0f), new GradientAlphaKey(_fillEnd.a, 1f) });
+                    p.strokeGradient = gradient;
+                    break;
+                case Kind.Orb:
+                    p.fillGradient = FillGradient.MakeLinearGradient(_fill, _fillEnd, new Vector2(size.x / 2f, size.y), new Vector2(size.x / 2f, 0f), AddressMode.Clamp);
+                    break;
+                default:
+                    var start = new Vector2(_fromRight ? size.x : 0f, size.y / 2f);
+                    var end = new Vector2(_fromRight ? 0f : size.x, size.y / 2f);
+                    p.fillGradient = FillGradient.MakeLinearGradient(_fill, _fillEnd, start, end, AddressMode.Clamp);
+                    break;
+            }
+        }
+
+        static void Fill(Painter2D p, List<Vector2> points, Color color)
+        {
+            if (points.Count < 3) return;
+            p.fillColor = color;
+            p.BeginPath();
+            p.MoveTo(points[0]);
+            for (var i = 1; i < points.Count; i++) p.LineTo(points[i]);
+            p.ClosePath();
+            p.Fill();
+        }
+
+        static void Disc(Painter2D p, Vector2 c, float r, Color color)
+        {
+            if (r <= 0f) return;
+            p.fillColor = color;
+            p.BeginPath();
+            p.Arc(c, r, Angle.Degrees(0f), Angle.Degrees(360f));
+            p.ClosePath();
+            p.Fill();
+        }
+
+        // 원 테두리의 from~to 몫(12시부터 시계 방향).
+        static void Stroke(Painter2D p, Vector2 c, float r, float width, float from, float to, Color color)
+        {
+            if (r <= 0f || width <= 0f) return;
+            p.strokeColor = color;
+            p.lineWidth = width;
+            p.lineCap = LineCap.Butt;
+            p.BeginPath();
+            p.Arc(c, r, Angle.Degrees(-90f + from * 360f), Angle.Degrees(-90f + to * 360f), ArcDirection.Clockwise);
+            p.Stroke();
+        }
+    }
+}

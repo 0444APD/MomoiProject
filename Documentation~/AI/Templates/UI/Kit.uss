@@ -42,17 +42,25 @@
     --kit-fx-rays: rgba(255, 219, 153, 0.32);
     --kit-fx-glow: rgb(255, 214, 140);       /* 빛 번짐(묶음 연출의 기본) */
     --kit-sheen: rgba(255, 244, 220, 0.42);  /* 훑는 빛 */
-    /* 막대(KitBar — 체력 · 마나 · 경험치 · 로딩 · 버프 지속, 개발자 2026-10-15) */
-    --kit-bar-track: rgba(18, 19, 22, 0.62);     /* 빈 자리(장면 위에서도 보이게 반투명 검정) */
-    --kit-bar-hp: rgb(200, 96, 88);
-    --kit-bar-mp: rgb(108, 148, 212);
-    --kit-bar-xp: rgb(214, 200, 176);
-    --kit-bar-load: rgb(240, 240, 242);
-    --kit-bar-buff: rgb(150, 196, 140);
-    --kit-bar-trail: rgba(255, 244, 228, 0.8);   /* 줄 때 남는 자국 */
-    --kit-bar-loss: rgba(255, 255, 255, 0.55);   /* 예상 — 잃을 양 */
-    --kit-bar-gain: rgba(150, 214, 150, 0.7);    /* 예상 — 얻을 양 */
-    --kit-bar-tick: rgba(0, 0, 0, 0.4);          /* 칸 나눔 눈금 */
+    /* 게이지(KitGauge — 체력 · 마나 · 경험치 · 로딩 · 버프 지속, 개발자 2026-10-15). 게이지 · 그라데이션 끝 · 줄 때 자국 · 늘 때 몫을 종류마다 따로 */
+    --kit-gauge-track: rgba(18, 19, 22, 0.62);   /* 뒤 판(장면 위에서도 보이게 반투명 검정) */
+    --kit-gauge-tick: rgba(0, 0, 0, 0.4);         /* 눈금 */
+    --kit-gauge-hp: rgb(200, 96, 88);
+    --kit-gauge-hp-end: rgb(236, 150, 112);
+    --kit-gauge-hp-loss: rgba(255, 240, 226, 0.85);
+    --kit-gauge-hp-gain: rgba(150, 214, 150, 0.85);
+    --kit-gauge-mp: rgb(108, 148, 212);
+    --kit-gauge-mp-end: rgb(150, 200, 255);
+    --kit-gauge-mp-loss: rgba(224, 236, 255, 0.85);
+    --kit-gauge-mp-gain: rgba(190, 220, 255, 0.85);
+    --kit-gauge-xp: rgb(214, 200, 176);
+    --kit-gauge-xp-end: rgb(255, 236, 190);
+    --kit-gauge-load: rgb(240, 240, 242);
+    --kit-gauge-buff: rgb(150, 196, 140);
+    --kit-gauge-loss: rgba(255, 244, 228, 0.8);     /* 줄 때 남는 자국(기본) */
+    --kit-gauge-gain: rgba(150, 214, 150, 0.8);     /* 늘 때 먼저 보이는 몫(기본) */
+    --kit-gauge-preview-loss: rgba(255, 255, 255, 0.55);
+    --kit-gauge-preview-gain: rgba(150, 214, 150, 0.7);
     /* 강조 숫자(kit-t-number — 장면 위에 홀로 놓이는 숫자는 판 대신 글꼴의 외곽선 · 그림자로, 개발자 2026-10-15) */
     --kit-number: rgb(250, 248, 244);
     --kit-number-outline: rgba(20, 21, 24, 0.92);
@@ -259,21 +267,21 @@
 .kit-fx { position: absolute; left: 0; top: 0; right: 0; bottom: 0; filter: drop-shadow(0px 0px 6px rgba(255, 214, 140, 0.85)); --fx-core: var(--kit-fx-core); --fx-color: var(--kit-fx-color); --fx-ring: var(--kit-fx-core); --fx-rays: var(--kit-fx-rays); --fx-glow: var(--kit-fx-glow); }   /* filter의 빛 색은 변수가 닿지 않아 여기서 함께 바꾼다 */
 .kit-sheen { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --sheen-color: var(--kit-sheen); }
 
-/* ── 막대(KitBar): 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 이 하나로(개발자 2026-10-15). 장면 위에 판 없이 놓는다(UiGuide 3-1).
-   굵기 = 기본 12 · --thin 6 · --thick 20, 모양 = 기본 알약 · --square 직각, 색 = --hp · --mp · --xp · --load · --buff(위 변수). 채움 · 자국 · 예상은 막대 모양을 따라 잘린다 ── */
-.kit-bar { height: 12px; min-width: 40px; overflow: hidden; border-radius: 6px; background-color: var(--kit-bar-track); --bar-tick: var(--kit-bar-tick); }
-.kit-bar--thin { height: 6px; border-radius: 3px; }
-.kit-bar--thick { height: 20px; border-radius: 10px; }
-.kit-bar--square { border-radius: 0; }
-.kit-bar-fill, .kit-bar-trail, .kit-bar-preview { position: absolute; top: 0; bottom: 0; }
-.kit-bar-fill { background-color: var(--kit-bar-hp); }
-.kit-bar-trail { background-color: var(--kit-bar-trail); }
-.kit-bar-preview--loss { background-color: var(--kit-bar-loss); }
-.kit-bar-preview--gain { background-color: var(--kit-bar-gain); }
-.kit-bar-ticks { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
-.kit-bar-text { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; padding: 0; -unity-text-align: middle-center; font-size: 13px; -unity-font-style: bold; color: var(--kit-light); -unity-text-outline-width: 1px; -unity-text-outline-color: var(--kit-number-outline); }
-.kit-bar--hp .kit-bar-fill { background-color: var(--kit-bar-hp); }
-.kit-bar--mp .kit-bar-fill { background-color: var(--kit-bar-mp); }
-.kit-bar--xp .kit-bar-fill { background-color: var(--kit-bar-xp); }
-.kit-bar--load .kit-bar-fill { background-color: var(--kit-bar-load); }
-.kit-bar--buff .kit-bar-fill { background-color: var(--kit-bar-buff); }
+/* ── 게이지(KitGauge — 슬라이더): 체력 · 마나 · 경험치 · 로딩 · 버프 지속은 모두 이 하나로(개발자 2026-10-15). 장면 위에 판 없이 놓는다(UiGuide 3-1 · 3-7).
+   모양 · 종류 · 틀은 속성(shape Rect · Slant · Diamond / kind Line · Orb · Ring · Units / frame Flush · Outline) — 둥근 모양은 쓰지 않는다, 모서리만 아주 약간(radius).
+   여기서는 크기(굵기 = 기본 12 · --thin 6 · --thick 20, 원형 = 72 정사각)와 색(--gauge-*)만. 색 종류 = --hp · --mp · --xp · --load · --buff, 특수 = gradient 속성 + kit-gauge--glow ── */
+.kit-gauge { height: 12px; min-width: 40px; --gauge-track: var(--kit-gauge-track); --gauge-tick: var(--kit-gauge-tick); --gauge-fill: var(--kit-gauge-hp); --gauge-fill-end: var(--kit-gauge-hp-end); --gauge-loss: var(--kit-gauge-loss); --gauge-gain: var(--kit-gauge-gain); --gauge-preview-loss: var(--kit-gauge-preview-loss); --gauge-preview-gain: var(--kit-gauge-preview-gain); }
+.kit-gauge--thin { height: 6px; }
+.kit-gauge--thick { height: 20px; }
+.kit-gauge--units { height: 16px; }
+.kit-gauge--orb, .kit-gauge--ring { width: 72px; height: 72px; min-width: 0; }
+.kit-gauge-text { position: absolute; left: 0; top: 0; right: 0; bottom: 0; margin: 0; padding: 0; -unity-text-align: middle-center; font-size: 13px; -unity-font-style: bold; color: var(--kit-light); -unity-text-outline-width: 1px; -unity-text-outline-color: var(--kit-number-outline); }
+.kit-gauge--hp { --gauge-fill: var(--kit-gauge-hp); --gauge-fill-end: var(--kit-gauge-hp-end); --gauge-loss: var(--kit-gauge-hp-loss); --gauge-gain: var(--kit-gauge-hp-gain); }
+.kit-gauge--mp { --gauge-fill: var(--kit-gauge-mp); --gauge-fill-end: var(--kit-gauge-mp-end); --gauge-loss: var(--kit-gauge-mp-loss); --gauge-gain: var(--kit-gauge-mp-gain); }
+.kit-gauge--xp { --gauge-fill: var(--kit-gauge-xp); --gauge-fill-end: var(--kit-gauge-xp-end); }
+.kit-gauge--load { --gauge-fill: var(--kit-gauge-load); --gauge-fill-end: var(--kit-gauge-load); }
+.kit-gauge--buff { --gauge-fill: var(--kit-gauge-buff); --gauge-fill-end: var(--kit-gauge-buff); }
+/* 발광(특수 게이지): 게이지 층에만 빛 번짐 — 색은 종류마다 */
+.kit-gauge--glow .kit-gauge-layer--fill { filter: drop-shadow(0px 0px 6px rgba(255, 200, 150, 0.9)); }
+.kit-gauge--glow.kit-gauge--mp .kit-gauge-layer--fill { filter: drop-shadow(0px 0px 6px rgba(140, 186, 255, 0.95)); }
+.kit-gauge--glow.kit-gauge--xp .kit-gauge-layer--fill { filter: drop-shadow(0px 0px 6px rgba(255, 228, 170, 0.95)); }

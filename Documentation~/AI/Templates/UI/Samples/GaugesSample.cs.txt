@@ -1,0 +1,72 @@
+// GBible UI 키트 견본 코드 — 견본 Gauges.uxml을 띄운 화면에서 게이지(KitGauge)를 부르는 법(복사해 [BindTo(GameIds.Screen.X)]만 붙이면 돈다).
+// 실제 게임에서 값을 바꾸는 것은 행동이고, 화면은 바뀐 값을 읽어 Set한다(맞는 순간의 연출은 session.Events.SubscribeAfterAction<이벤트>(e => …)).
+// 예상 구간은 Game.Preview(행동, g => 읽기)로 계산한 양을 Preview(-양 / 최대)로 — 마우스를 올렸을 때 보이고, 내리면 Preview(0).
+// 시간에 따라 줄어드는 게이지(버프 지속 · 로딩)는 Tick에서 Set(값, animate: false).
+using System.Collections.Generic;
+using GBible;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    public class GaugesSample : GameScreen
+    {
+        const int MaxHp = 120;
+        readonly List<KitGauge> _demo = new List<KitGauge>();
+        readonly KitGauge[] _buffs = new KitGauge[3];
+        KitGauge _hp, _enemy, _load;
+        Label _hint, _loadText;
+        float _loading = -1f;
+        bool _previewing;
+
+        protected override void OnOpen()
+        {
+            Root.Query<KitGauge>(className: "sample-gauges-demo").ForEach(_demo.Add);   // 줄이기 · 늘리기 · 예상을 함께 걸 게이지
+            _hp = Q<KitGauge>("hp");
+            _enemy = Q<KitGauge>("enemy");
+            _load = Q<KitGauge>("load");
+            for (var i = 0; i < _buffs.Length; i++) _buffs[i] = Q<KitGauge>("buff-" + (i + 1));
+            _hint = Q<Label>("enemy-hint");
+            _loadText = Q<Label>("load-text");
+
+            OnClick("damage", () => Change(-0.15f));
+            OnClick("heal", () => Change(0.15f));
+            OnClick("preview", () =>
+            {
+                _previewing = !_previewing;
+                foreach (var gauge in _demo) gauge.Preview(_previewing ? -Mathf.Min(0.2f, gauge.value) : 0f);   // 잃을 몫을 미리
+                _hint.text = _previewing ? $"−{Mathf.RoundToInt(Mathf.Min(0.2f, _enemy.value) * 200f)}" : "";   // 글만 놓이는 강조 숫자(kit-t-number)
+            });
+            OnClick("loading", () => _loading = 0f);
+        }
+
+        void Change(float amount)
+        {
+            _previewing = false;
+            _hint.text = "";
+            foreach (var gauge in _demo)
+            {
+                gauge.Preview(0f);
+                var next = gauge.value + amount;
+                gauge.Set(next <= 0.001f ? 1f : Mathf.Min(1f, next));   // 견본: 다 비면 다시 가득
+            }
+            _hp.Text = $"{Mathf.RoundToInt(_hp.value * MaxHp)} / {MaxHp}";
+        }
+
+        protected override void Tick(float deltaTime)
+        {
+            // 버프 지속: 시간에 따라 줄고, 다 되면(견본) 다시 가득.
+            for (var i = 0; i < _buffs.Length; i++)
+            {
+                var left = _buffs[i].value - deltaTime / (6f + i * 3f);
+                _buffs[i].Set(left <= 0f ? 1f : left, animate: false);
+            }
+            // 로딩: 2초 동안 0 → 100%.
+            if (_loading < 0f) return;
+            _loading = Mathf.Min(1f, _loading + deltaTime / 2f);
+            _load.Set(_loading, animate: false);
+            _loadText.text = $"{Mathf.RoundToInt(_loading * 100f)}%";
+            if (_loading >= 1f) _loading = -1f;
+        }
+    }
+}
