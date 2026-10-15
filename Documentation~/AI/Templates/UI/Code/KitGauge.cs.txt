@@ -14,8 +14,11 @@
 //           찰 때 — Raise(값): 어두운 뒷 게이지가 먼저 뜬다 → FillUp(): 메인이 차오른다(Raise의 fill이 참이면 fillDelay 뒤 저절로).
 //           Set(값)은 둘을 저절로 이어 부르는 지름길. Raise(값, fill: false)로 찰 몫을 미리 보여 두고 원할 때 FillUp — 단계마다 코드에 따로 잇는다.
 //           Preview(음수)는 잃을 몫을 메인 위에 표시(얻을 몫의 미리보기는 Raise(값, fill: false)).
+//           타격 — Hit(값): 한 번의 호출로 타격감 있게 깎는다(메인이 hitCut초에 빠르게 깎임 · 깎인 몫이 하얗게 번쩍 · 게이지가 흔들림 →
+//           followDelay 뒤 밝은 뒷 게이지가 부드럽게 따라 줆). 연타면 뒷 게이지는 첫 타 자리에 남아 있다가 마지막 타 뒤에 한꺼번에 따라 준다.
+//           따라 주기 · 채우기는 모두 부드럽게(따라 주기 ease-in-out · 채우기 ease-out). 숫자 · 불티를 띄울 자리는 PointOf(값)(화면 좌표).
 // UXML: <MomoiProject.KitGauge kind="Line" shape="Slant" frame="Inset" value="0.7" color="#C86058" class="kit-gauge" />
-// 코드: gauge.Set(hp / (float)maxHp); · gauge.Raise(next, fill: false); … gauge.FillUp(); · gauge.Text = $"{hp} / {maxHp}";
+// 코드: gauge.Set(hp / (float)maxHp); · gauge.Hit(hp / (float)maxHp); · gauge.Raise(next, fill: false); … gauge.FillUp(); · gauge.Text = $"{hp} / {maxHp}";
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
@@ -54,6 +57,10 @@ namespace MomoiProject
         Back _backKind;
         float _followWait = -1f, _fillWait = -1f;      // 0 이상이면 그만큼 뒤 저절로 시작
         bool _following, _filling;
+        float _followFrom, _followTime, _fillFrom, _fillTime;
+        float _cutFrom = -1f, _cutTo, _cutTime;         // 타격: 메인이 _cutFrom → _cutTo로 깎이는 중(0 이상이면)
+        float _flash, _flashFrom, _flashTo;             // 타격: 깎인 몫의 번쩍임(1 → 0)
+        float _shakeTime = -1f, _shakePower;            // 타격: 흔들림(0 이상이면)
         int _segments, _units = 5;
         bool _fromRight, _glow;
         Coloring _gradient;
@@ -66,7 +73,21 @@ namespace MomoiProject
         [UxmlAttribute] public Kind kind { get => _kind; set { _kind = value; Classes(); Repaint(); } }
         [UxmlAttribute] public Shape shape { get => _shape; set { _shape = value; Repaint(); } }
         [UxmlAttribute] public Frame frame { get => _frame; set { _frame = value; Repaint(); } }
-        [UxmlAttribute] public float value { get => _main; set { _main = _back = Mathf.Clamp01(value); _backKind = Back.None; _following = _filling = false; _followWait = _fillWait = -1f; Repaint(); } }
+        [UxmlAttribute] public float value
+        {
+            get => _cutFrom >= 0f ? _cutTo : _main;   // 타격으로 깎이는 중이면 깎일 끝
+            set
+            {
+                _main = _back = Mathf.Clamp01(value);
+                _backKind = Back.None;
+                _following = _filling = false;
+                _followWait = _fillWait = -1f;
+                _cutFrom = -1f;
+                _flash = 0f;
+                StopShake();
+                Repaint();
+            }
+        }
         [UxmlAttribute] public int segments { get => _segments; set { _segments = Mathf.Max(0, value); Repaint(); } }
         [UxmlAttribute] public int units { get => _units; set { _units = Mathf.Max(1, value); Repaint(); } }
         [UxmlAttribute] public bool fromRight { get => _fromRight; set { _fromRight = value; Repaint(); } }
@@ -89,6 +110,10 @@ namespace MomoiProject
         [UxmlAttribute] public float followSeconds { get; set; } = 0.4f;
         [UxmlAttribute] public float fillDelay { get; set; } = 0.25f;   // 찰 때: 뒷 게이지가 먼저 떠 있는 시간
         [UxmlAttribute] public float fillSeconds { get; set; } = 0.3f;
+        [UxmlAttribute] public float hitCut { get; set; } = 0.08f;      // 타격: 메인이 깎이는 시간(초, ease-out)
+        [UxmlAttribute] public float hitFlash { get; set; } = 0.22f;    // 타격: 깎인 몫이 하얗게 번쩍였다 잦아드는 시간(초)
+        [UxmlAttribute] public float hitShake { get; set; } = 7f;       // 타격: 흔들림 크기(px — 세기 1일 때)
+        [UxmlAttribute] public float hitShakeSeconds { get; set; } = 0.32f;
 
         public string Text { get => text; set => text = value; }
         // 미리보기(Raise(값, fill: false))로 띄워 둔 찰 몫이 있는가 · 뒷 게이지의 끝.
@@ -131,7 +156,7 @@ namespace MomoiProject
                 Glow();
                 Repaint();
             });
-            RegisterCallback<DetachFromPanelEvent>(_ => _tick?.Pause());
+            RegisterCallback<DetachFromPanelEvent>(_ => { _tick?.Pause(); StopShake(); });
             Classes();
         }
 
@@ -142,6 +167,7 @@ namespace MomoiProject
         {
             target = Mathf.Clamp01(target);
             if (!animate || panel == null) { value = target; return; }
+            Settle();
             if (target < _main) Drop(target);
             else if (target > _main) Raise(target);
             else if (_backKind == Back.Gain) { _back = _main; _backKind = Back.None; _filling = false; _fillWait = -1f; Repaint(); }
@@ -151,6 +177,7 @@ namespace MomoiProject
         public void Drop(float target, bool follow = true)
         {
             target = Mathf.Clamp01(target);
+            Settle();
             if (target >= _main) return;
             var from = _backKind == Back.Loss ? Mathf.Max(_back, _main) : _main;
             _main = target;
@@ -163,19 +190,80 @@ namespace MomoiProject
             Run();
         }
 
-        // 줄 때 ②: 밝은 뒷 게이지가 메인까지 따라 준다(followSeconds 동안).
+        // 줄 때 ②: 밝은 뒷 게이지가 메인까지 따라 준다(followSeconds 동안, ease-in-out).
         public void Follow()
         {
-            if (_backKind != Back.Loss || _back <= _main) return;
+            if (_backKind != Back.Loss || _back <= value) return;
             _followWait = -1f;
-            _following = true;
+            StartFollow();
             Run();
+        }
+
+        // 타격: 한 번의 호출로 — 메인이 hitCut초에 빠르게 깎이고(ease-out) · 깎인 몫이 하얗게 번쩍였다 밝은 뒷 게이지로 남고 · 게이지가 흔들린 뒤
+        // followDelay 뒤 뒷 게이지가 부드럽게 따라 준다(follow가 거짓이면 Follow()를 부를 때까지 남는다).
+        // power: 흔들림 세기(1 = hitShake px). 음수면 깎인 양에서 저절로(조금 = 약하게 · 많이 = 세게). 늘어나는 값이면 아무것도 하지 않는다(Set · Raise).
+        public void Hit(float target, float power = -1f, bool follow = true)
+        {
+            target = Mathf.Clamp01(target);
+            var logical = value;
+            if (target >= logical) return;
+            if (panel == null) { value = target; return; }
+            if (power < 0f) power = Mathf.Clamp(0.35f + (logical - target) * 4f, 0.4f, 1.6f);
+            var top = _backKind == Back.Loss ? Mathf.Max(_back, _main) : _main;   // 연타: 뒷 게이지는 첫 타 자리에 남는다
+            _flashFrom = target;
+            _flashTo = _main;
+            _flash = 1f;
+            _cutFrom = _main;
+            _cutTo = target;
+            _cutTime = 0f;
+            _back = top;
+            _backKind = Back.Loss;
+            _filling = false;
+            _fillWait = -1f;
+            _following = false;
+            _followWait = follow ? followDelay : -1f;
+            _shakeTime = 0f;
+            _shakePower = power;
+            Run();
+        }
+
+        // 게이지의 값 at(0~1) 자리(화면 좌표 — 끝의 가운데). 타격 숫자 · 불티를 띄울 곳: fx.WorldToLocal(gauge.PointOf(값)).
+        public Vector2 PointOf(float at)
+        {
+            if (!Ready(out var size)) return worldBound.center;
+            at = Mathf.Clamp01(at);
+            var c = size / 2f;
+            var r = Mathf.Min(size.x, size.y) / 2f;
+            Vector2 local;
+            switch (_kind)
+            {
+                case Kind.Ring:
+                    var angle = (-90f + at * 360f) * Mathf.Deg2Rad;
+                    local = c + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (r - thickness / 2f);
+                    break;
+                case Kind.Orb:
+                    local = new Vector2(c.x, c.y + (r - Inner) * (1f - 2f * at));
+                    break;
+                default:
+                {
+                    var a = _fromRight ? 1f - at : at;
+                    var boxes = Boxes(size);
+                    var i = Mathf.Clamp(Mathf.FloorToInt(a * boxes.Count), 0, boxes.Count - 1);
+                    float u0 = i / (float)boxes.Count, u1 = (i + 1) / (float)boxes.Count;
+                    var inner = Rect(boxes[i], Inner);
+                    local = new Vector2(Mathf.Lerp(inner.xMin, inner.xMax, Mathf.Clamp01((a - u0) / (u1 - u0))), c.y);
+                    if (_shape != Shape.Diamond) local = Shear(local, size);
+                    break;
+                }
+            }
+            return this.LocalToWorld(local);
         }
 
         // 찰 때 ①: 어두운 뒷 게이지를 먼저 target까지 띄운다. fill이 참이면 fillDelay 뒤 저절로 FillUp, 거짓이면 FillUp을 부를 때까지 미리보기로 남는다.
         public void Raise(float target, bool fill = true)
         {
             target = Mathf.Clamp01(target);
+            Settle();
             if (target <= _main) return;
             _back = target;
             _backKind = Back.Gain;
@@ -186,12 +274,12 @@ namespace MomoiProject
             Run();
         }
 
-        // 찰 때 ②: 메인이 어두운 뒷 게이지까지 차오른다(fillSeconds 동안).
+        // 찰 때 ②: 메인이 어두운 뒷 게이지까지 차오른다(fillSeconds 동안, ease-out).
         public void FillUp()
         {
             if (_backKind != Back.Gain || _back <= _main) return;
             _fillWait = -1f;
-            _filling = true;
+            StartFill();
             Run();
         }
 
@@ -210,26 +298,69 @@ namespace MomoiProject
             _tick.Resume();
         }
 
+        void StartFollow() { _following = true; _followFrom = _back; _followTime = 0f; }
+        void StartFill() { _filling = true; _fillFrom = _main; _fillTime = 0f; }
+
+        // 타격으로 깎이는 중이면 끝까지 깎아 둔다(다른 움직임을 시작하기 전에).
+        void Settle()
+        {
+            if (_cutFrom < 0f) return;
+            _main = _cutTo;
+            _cutFrom = -1f;
+        }
+
+        void StopShake()
+        {
+            _shakeTime = -1f;
+            style.translate = StyleKeyword.Null;
+        }
+
         void Step()
         {
             var now = Time.realtimeSinceStartupAsDouble;
             var dt = (float)(now - _lastTime);
             _lastTime = now;
-            if (_followWait >= 0f) { _followWait -= dt; if (_followWait < 0f) { _followWait = -1f; _following = true; } }
-            if (_fillWait >= 0f) { _fillWait -= dt; if (_fillWait < 0f) { _fillWait = -1f; _filling = true; } }
+            if (_cutFrom >= 0f)
+            {
+                _cutTime += dt;
+                var t = Mathf.Clamp01(_cutTime / Mathf.Max(hitCut, 0.01f));
+                _main = Mathf.Lerp(_cutFrom, _cutTo, EaseOutCubic(t));
+                if (t >= 1f) _cutFrom = -1f;
+            }
+            if (_flash > 0f) _flash = Mathf.Max(0f, _flash - dt / Mathf.Max(hitFlash, 0.01f));
+            if (_shakeTime >= 0f)
+            {
+                _shakeTime += dt;
+                var u = _shakeTime / Mathf.Max(hitShakeSeconds, 0.01f);
+                if (u >= 1f) StopShake();
+                else
+                {
+                    var amount = hitShake * _shakePower * (1f - u) * (1f - u);   // 처음에 세게, 빠르게 잦아든다
+                    style.translate = new Translate(amount * Mathf.Sin(_shakeTime * 2f * Mathf.PI * 22f), amount * 0.35f * Mathf.Sin(_shakeTime * 2f * Mathf.PI * 17f + 1.3f));
+                }
+            }
+            if (_followWait >= 0f) { _followWait -= dt; if (_followWait < 0f) { _followWait = -1f; StartFollow(); } }
+            if (_fillWait >= 0f) { _fillWait -= dt; if (_fillWait < 0f) { _fillWait = -1f; StartFill(); } }
             if (_following)
             {
-                _back = Mathf.Max(_main, _back - dt / Mathf.Max(followSeconds, 0.01f));
-                if (_back <= _main) { _following = false; _backKind = Back.None; }
+                _followTime += dt;
+                var t = Mathf.Clamp01(_followTime / Mathf.Max(followSeconds, 0.01f));
+                _back = Mathf.Lerp(_followFrom, value, EaseInOutCubic(t));
+                if (t >= 1f) { _following = false; _backKind = Back.None; _back = _main; }
             }
             if (_filling)
             {
-                _main = Mathf.Min(_back, _main + dt / Mathf.Max(fillSeconds, 0.01f));
-                if (_main >= _back) { _filling = false; _backKind = Back.None; }
+                _fillTime += dt;
+                var t = Mathf.Clamp01(_fillTime / Mathf.Max(fillSeconds, 0.01f));
+                _main = Mathf.Lerp(_fillFrom, _back, EaseOutCubic(t));
+                if (t >= 1f) { _filling = false; _backKind = Back.None; _main = _back; }
             }
             Repaint();
-            if (!_following && !_filling && _followWait < 0f && _fillWait < 0f) _tick.Pause();
+            if (!_following && !_filling && _followWait < 0f && _fillWait < 0f && _cutFrom < 0f && _flash <= 0f && _shakeTime < 0f) _tick.Pause();
         }
+
+        static float EaseOutCubic(float t) { var u = 1f - t; return 1f - u * u * u; }
+        static float EaseInOutCubic(float t) => t < 0.5f ? 4f * t * t * t : 1f - Mathf.Pow(-2f * t + 2f, 3f) / 2f;
 
         // ── 그리기: 뒤 판(이 요소) → 뒷 게이지 → 메인 게이지(그라데이션 · 빛 번짐) → 잃을 몫 표시 · 눈금 ──
 
@@ -363,6 +494,12 @@ namespace MomoiProject
         {
             if (!Ready(out var size)) return;
             var p = context.painter2D;
+            if (_flash > 0f)
+            {
+                var a = _flash * _flash;   // 확 번쩍이고 빠르게 잦아든다
+                Range(p, size, 0f, _main, new Color(1f, 1f, 1f, 0.2f * a));                      // 게이지 전체가 살짝
+                Range(p, size, _flashFrom, _flashTo, new Color(1f, 1f, 1f, 0.9f * a));           // 깎인 몫은 하얗게
+            }
             if (_preview < 0f) Range(p, size, Mathf.Max(0f, _main + _preview), _main, _previewColor);
             if (_kind == Kind.Line && _segments >= 2)
             {

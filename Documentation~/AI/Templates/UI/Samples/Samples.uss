@@ -152,3 +152,21 @@
 .sample-gauges-controls { position: absolute; right: 48px; top: 232px; width: 240px; }
 .sample-gauges-control-title { margin: 8px 0 8px 0; padding: 0; font-size: 12px; color: var(--kit-dim); }
 .sample-gauges-controls .kit-bt { margin: 0 0 8px 0; }
+
+/* ── 게이지 타격(GaugeHit — KitGauge.Hit) ── */
+.sample-hit-scene { background-color: rgb(58, 70, 84); }
+.sample-hit-boss { position: absolute; left: 480px; right: 480px; top: 72px; }
+.sample-hit-name { margin: 0 0 8px 0; padding: 0; font-size: 18px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-hit-hp-text { margin: 8px 0 0 0; padding: 0; font-size: 16px; -unity-text-align: middle-right; }   /* 타격 숫자는 위로 뜨므로 체력 글은 아래 */
+.sample-hit-boss-bar { height: 24px; }
+.sample-hit-row { position: absolute; left: 260px; right: 260px; top: 340px; flex-direction: row; align-items: flex-end; justify-content: center; }
+.sample-hit-row-title { width: 180px; margin: 0; padding: 0 0 4px 0; font-size: 14px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-hit-cell { width: 240px; margin-right: 32px; align-items: flex-start; }
+.sample-hit-caption { margin: 0 0 8px 0; padding: 0; font-size: 12px; color: var(--kit-dim); }
+.sample-hit-units { width: 200px; }
+.sample-hit-line { width: 220px; }
+.sample-hit-controls { position: absolute; left: 0; right: 0; bottom: 96px; flex-direction: row; justify-content: center; }
+.sample-hit-controls .kit-bt { margin: 0 6px; }
+.sample-hit-number { position: absolute; margin: 0; padding: 0; font-size: 26px; translate: -50% -100%; }
+.sample-hit-number--big { font-size: 38px; }
+.sample-hit-fx { filter: drop-shadow(0px 0px 5px rgba(255, 150, 128, 0.8)); }   /* 타격 불티는 붉은 빛 */

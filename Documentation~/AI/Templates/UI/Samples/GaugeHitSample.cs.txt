@@ -1,0 +1,118 @@
+// GBible UI 키트 견본 코드 — 견본 GaugeHit.uxml을 띄운 화면에서 게이지 타격(KitGauge.Hit)을 부르는 법(복사해 [BindTo(GameIds.Screen.X)]만 붙이면 돈다).
+// 실제 게임에서는 피해를 주는 것이 행동이고, 맞는 순간의 연출은 행동이 끝난 뒤에 부른다:
+//   session.Events.SubscribeAfterAction<DamageDealt>(e => { gauge.Hit(e.hp / (float)e.maxHp); Number(e.amount, …); });
+// 타격 한 번 = gauge.Hit(값) 하나(깎임 · 번쩍 · 흔들림 · 뒷 게이지 따라 줆이 한 덩어리). 숫자 · 불티는 gauge.PointOf(값)의 자리에 띄운다.
+using System.Collections.Generic;
+using GBible;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace MomoiProject
+{
+    public class GaugeHitSample : GameScreen
+    {
+        const int MaxHp = 1200;
+        readonly List<KitGauge> _others = new List<KitGauge>();
+        KitGauge _boss;
+        KitFx _fx;
+        VisualElement _numbers;
+        Label _hpText;
+        int _hp = MaxHp;
+
+        protected override void OnOpen()
+        {
+            _boss = Q<KitGauge>("boss");
+            _fx = Q<KitFx>("fx");
+            _numbers = Q<VisualElement>("numbers");
+            _hpText = Q<Label>("hp-text");
+            Root.Query<KitGauge>(className: "sample-hit-other").ForEach(_others.Add);
+
+            OnClick("light", () => Strike(70));
+            OnClick("heavy", () => Strike(260));
+            OnClick("combo", () =>
+            {
+                for (var i = 0; i < 5; i++) Root.schedule.Execute(() => Strike(45)).StartingIn(i * 110);   // 연타: 뒷 게이지는 첫 타 자리에 남는다
+            });
+            OnClick("heal", () => Heal(300));
+            OnClick("reset", () =>
+            {
+                _hp = MaxHp;
+                _boss.value = 1f;
+                foreach (var gauge in _others) gauge.value = 1f;
+                _hpText.text = $"{_hp} / {MaxHp}";
+            });
+        }
+
+        void Strike(int damage)
+        {
+            if (_hp <= 0) return;
+            var before = _hp / (float)MaxHp;
+            _hp = Mathf.Max(0, _hp - damage);
+            var after = _hp / (float)MaxHp;
+            _boss.Hit(after);   // 이것 하나가 타격 한 덩어리
+            foreach (var gauge in _others) gauge.Hit(Mathf.Max(0f, gauge.value - (before - after)));
+            _hpText.text = $"{_hp} / {MaxHp}";
+
+            var heavy = damage >= 200;
+            Number($"−{damage}", _boss.PointOf((before + after) / 2f), heavy);
+            Sparks(_boss.PointOf(after), heavy);
+            if (_hp == 0) Root.schedule.Execute(() => Heal(MaxHp)).StartingIn(1200);   // 견본: 다 깎이면 잠시 뒤 다시 가득
+        }
+
+        void Heal(int amount)
+        {
+            _hp = Mathf.Min(MaxHp, _hp + amount);
+            _boss.Set(_hp / (float)MaxHp);   // 찰 때는 지름길(어두운 뒷 게이지가 먼저 → 차오름)
+            foreach (var gauge in _others) gauge.Set(Mathf.Min(1f, gauge.value + amount / (float)MaxHp));
+            _hpText.text = $"{_hp} / {MaxHp}";
+        }
+
+        // 타격 숫자: 강조 숫자(kit-t-number)가 크게 떴다 내려앉고(ease-out-back) · 잠시 머문 뒤 · 오르며 사라진다.
+        void Number(string text, Vector2 world, bool heavy)
+        {
+            var label = new Label(text) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("kit-t-number");
+            label.AddToClassList("sample-hit-number");
+            if (heavy) label.AddToClassList("sample-hit-number--big");
+            var lift = 16f * (_numbers.childCount % 3);   // 연타: 떠 있는 숫자가 있으면 한 칸씩 위로 쌓는다(겹치지 않게)
+            var at = _numbers.WorldToLocal(world) + new Vector2(Random.Range(-10f, 10f), -12f - lift);
+            label.style.left = at.x;
+            label.style.top = at.y;
+            _numbers.Add(label);
+            const float Total = 0.9f;
+            KitTween.Run(label, Total, t =>
+            {
+                var s = t * Total;
+                var pop = Mathf.Clamp01(s / 0.2f);
+                var scale = Mathf.LerpUnclamped(heavy ? 1.9f : 1.6f, 1f, EaseOutBack(pop));
+                label.style.scale = new Scale(new Vector3(scale, scale, 1f));
+                var leave = Mathf.Clamp01((s - 0.55f) / 0.35f);
+                label.style.top = at.y - 18f * leave * (2f - leave);
+                label.style.opacity = 1f - leave;
+            }, () => label.RemoveFromHierarchy());
+        }
+
+        // 깎인 자리의 불티 + 작은 빛 고리.
+        void Sparks(Vector2 world, bool heavy)
+        {
+            var at = _fx.WorldToLocal(world);
+            var spec = KitFx.BurstSpec.Small;
+            spec.colorA = Color.white;
+            spec.colorB = new Color(1f, 0.55f, 0.48f);
+            spec.count = heavy ? 18 : 10;
+            spec.speed = heavy ? 340f : 240f;
+            spec.gravity = 720f;
+            spec.arc = 150f;
+            spec.radius = 4f;
+            _fx.Burst(at, spec);
+            _fx.Ring(at, 4f, heavy ? 40f : 26f, 0.22f, Color.white, 2f);
+        }
+
+        static float EaseOutBack(float t)
+        {
+            const float c1 = 1.70158f, c3 = c1 + 1f;
+            var u = t - 1f;
+            return 1f + c3 * u * u * u + c1 * u * u;
+        }
+    }
+}
