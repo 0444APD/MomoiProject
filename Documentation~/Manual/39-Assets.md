@@ -93,19 +93,7 @@ static void Art()
    "com.esotericsoftware.spine.spine-unity": "https://github.com/EsotericSoftware/spine-runtimes.git?path=spine-unity/Assets/Spine#<버전>",
    ```
    unitypackage는 쓰지 않는다. `Assets/Spine` · `Assets/Spine Examples`가 생기기 때문이다(관례 2절).
-3. **Unity가 manifest를 다시 읽게 한다.** Unity 창이 뒤에 있으면 요청 파일의 새로 읽기(`AssetDatabase.Refresh`)만으로는 패키지를 다시 풀지 않는다.
-   - 프로젝트 `Code/Editor`에 아래 도구를 둔다. 컴파일 뒤 manifest가 lock 파일보다 새로우면 다시 푼다.
-   - 컴파일이 깨져 있으면 이 도구도 돌지 않는다. 그때는 개발자에게 Unity 창을 한 번 눌러 달라고 한다.
-   ```csharp
-   [InitializeOnLoadMethod]
-   static void ResolveIfManifestChanged()
-   {
-       var manifest = new FileInfo("Packages/manifest.json");
-       var lockFile = new FileInfo("Packages/packages-lock.json");
-       if (!manifest.Exists || (lockFile.Exists && lockFile.LastWriteTimeUtc >= manifest.LastWriteTimeUtc)) return;
-       UnityEditor.PackageManager.Client.Resolve();
-   }
-   ```
+3. **패키지는 GBible이 저절로 받는다**(`PackageSync`). Unity는 창이 앞에 있을 때만 manifest를 다시 읽는데, GBible이 manifest가 lock 파일보다 새로우면 창이 뒤에 있어도 다시 푼다(몇 초마다 · 요청 파일을 처리하기 전 — 38장 2-4·2-5). 프로젝트 코드가 컴파일되지 않아도 돈다. 다 들어왔는지는 `Logs/Editor.log`의 `[MomoiProject] … 패키지를 다시 풉니다`와 `Packages/packages-lock.json`에 새 줄이 생겼는지로 본다.
 4. `Logs/Editor.log`에 `error CS`가 없는지 본다. 있으면 5-3.
 5. 스파인은 처음 돌 때 `Assets/Editor/SpineSettings.asset`을 만든다. 경로가 스파인 코드에 고정돼 있어 옮기지 않는다(관례의 예외 — 프로젝트와 함께 커밋).
 
@@ -155,7 +143,23 @@ static void Art()
 - `.spine`(에디터 프로젝트 파일)은 넣지 않는다.
 - 밖에서 받은 자료(다른 게임에서 나온 파일 등)는 저장소에 넣지 않는다(`.gitignore`).
 
-### 5-6. 조종 뼈 — 조이스틱식
+### 5-6. 띄우기 · 재생 · 애니메이션 맵핑
+
+- **띄우기.** 파일을 넣으면 `<이름>_SkeletonData.asset`이 생긴다.
+  - 게임에서는 화면 · DB 칸 · 씬 오브젝트가 이 에셋을 참조로 가진다. 경로 글자로 찾지 않는다.
+  - 코드로 띄울 때는 `SkeletonAnimation.NewSkeletonAnimationGameObject(데이터)`를 쓴다. 씬에 둘 때는 에셋을 하이어라키로 끌어 놓는다.
+  - 월드 장면에 두는 것이다. 화면(UI Toolkit) 안에 그리는 것은 5-8.
+- **트랙.**
+  - 0번 트랙은 바탕이다. 시작을 한 번 틀고 기본 반복을 잇는다: `SetAnimation(0, 시작, false)` → `AddAnimation(0, 반복, true, 0)`.
+  - 1번 위 트랙은 덧입히기다(조종 · 표정 · 반응). 켜고 끌 때는 섞는다(`SetEmptyAnimation` · `AddEmptyAnimation` + `MixDuration`). 그냥 바꾸면 한 프레임에 튄다.
+- **애니메이션 맵핑 — 이름은 데이터.**
+  - 코드는 역할(시작 · 기본 반복 · 조종 시작 · 조종 끝 · 반응 …)만 알고, 역할마다 어느 애니메이션을 쓸지는 캐릭터의 DB 칸에 둔다(관례 18절 — 개발자가 이름을 바꾸거나 다른 애니메이션으로 갈아 끼운다).
+  - 애니메이션 · 뼈 · 스킨 이름은 데이터에서 읽는다: `데이터.GetSkeletonData(true)`의 `Animations` · `Bones` · `Skins`. 없는 이름이면 경고하고 첫 애니메이션으로 넘어간다.
+  - 조종 뼈의 맵핑(뼈 → 따라가는 제약 → 세기를 올리고 내리는 애니메이션 → 범위)도 같은 칸에 둔다(5-7의 1).
+- **확인용 테스트 명령.** 애니메이션마다 명령 하나를 저절로 만든다(`spine.play.<이름>` — 데이터의 `Animations`를 돌며 `session.Debug.Register`). 개발자가 이름을 몰라도 테스트 패널에서 모두 틀어 본다.
+- 예: UI 실험실 `Code/Client/Lab/Spine/SpineLab.cs`(띄우기 · 시작 → 반복 · 애니메이션마다 명령 · 카메라 맞추기).
+
+### 5-7. 조종 뼈 — 조이스틱식
 
 조종 뼈는 다른 뼈들이 IK · transform 제약으로 따라가는 뼈다. 예: 고개와 얼굴이 따라가는 `Touch_Point`, 눈동자가 따라가는 `Touch_Eye`, 손이 따라가는 `HandFollow`. 이 뼈를 마우스로 움직인다.
 
@@ -193,7 +197,7 @@ static void Art()
   - **값을 맞출 때는 표시를 켜고 본다.**
 - CH0334 값: 조이스틱 반지름 160px · `smoothTime` 0.25 · `mixTime` 0.3. 얼굴은 `reach` 1 · `reachDown` 0.5 · `maxSpeed` 1.2(고개 약 ±5°)이고, 시선은 `reach` 1(눈동자 약 9px)이다. 고개를 더 덜 돌리려면 얼굴 `reach` · `reachDown`을 줄인다.
 
-### 5-7. 그 밖
+### 5-8. 그 밖
 
 - **코드에서 부르기:**
   - 스파인을 부르는 프로젝트 코드는 asmdef 참조에 `spine-unity` · `spine-csharp`를 더한다. 선택 기능 동기화는 GBible 모듈 참조만 고치므로 지워지지 않는다.

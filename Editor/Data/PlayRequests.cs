@@ -108,6 +108,8 @@ namespace GBible.EditorTools
             _nextPoll = EditorApplication.timeSinceStartup + PollInterval;
             if (!File.Exists(RequestPath)) return;
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            // manifest.json이 바뀌었으면 패키지부터 다시 푼다(창이 뒤에 있으면 Unity가 저절로 풀지 않는다 — 다 들어온 뒤 다음 확인에서 이어서).
+            if (PackageSync.ResolveIfChanged()) return;
             // 요청 하나에 한 번: 방금 쓴 코드·UXML·USS를 먼저 새로 읽는다(Unity는 창을 볼 때만 저절로 새로 읽는다 — 컴파일되면 도메인을 다시 읽고 다음 확인에서 이어서).
             var stamp = File.GetLastWriteTimeUtc(RequestPath).Ticks.ToString();
             if (SessionState.GetString(RefreshedKey, "") != stamp)
