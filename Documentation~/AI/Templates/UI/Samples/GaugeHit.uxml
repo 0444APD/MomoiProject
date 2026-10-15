@@ -1,14 +1,12 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <!-- 견본 · 게이지 타격(KitGauge.Hit — 한 번의 호출로 타격감 있게 깎기). 코드 GaugeHitSample.cs.txt.
          위 = 보스 체력 게이지(맞으면 메인이 빠르게 깎이고 · 깎인 몫이 하얗게 번쩍 · 흔들림 · 잠시 뒤 밝은 뒷 게이지가 부드럽게 따라 줆)
-         + 타격 숫자(강조 숫자 kit-t-number가 펑 하고 떴다가 오르며 사라짐) + 깎인 자리의 불티(KitFx).
+         + 타격 숫자(강조 숫자 kit-t-number가 펑 하고 떴다가 오르며 사라짐) + 깎인 끝 변을 따라 베기(샥 — KitFx.Slash, KitGauge.EdgeOf) · 불티 조금.
          가운데 = 다른 종류도 같은 호출(원형 패널 · 원 테두리 · 도형 나열 · 값 그라데이션).
          아래 버튼 = 약한 타격 · 강한 타격 · 연타(뒷 게이지가 첫 타 자리에 남았다가 마지막 타 뒤에 한꺼번에) · 회복 · 처음으로. -->
     <ui:VisualElement class="kit-fill sample-hit-scene" picking-mode="Ignore">
         <ui:VisualElement class="sample-hit-boss">
-            <ui:Label text="녹슨 수호자" class="sample-hit-name" />
-            <MomoiProject.KitGauge name="boss" kind="Line" shape="Slant" frame="Inset" value="1" segments="10" color="#C86058" class="kit-gauge kit-gauge--thick sample-hit-boss-bar" />
-            <ui:Label name="hp-text" text="1200 / 1200" class="kit-t-number sample-hit-hp-text" />
+            <MomoiProject.KitGauge name="boss" kind="Line" shape="Slant" frame="Inset" value="1" segments="10" text="1200 / 1200" color="#C86058" class="kit-gauge kit-gauge--thick sample-hit-boss-bar" />
         </ui:VisualElement>
 
         <ui:VisualElement class="sample-hit-row">

@@ -156,8 +156,6 @@
 /* ── 게이지 타격(GaugeHit — KitGauge.Hit) ── */
 .sample-hit-scene { background-color: rgb(58, 70, 84); }
 .sample-hit-boss { position: absolute; left: 480px; right: 480px; top: 72px; }
-.sample-hit-name { margin: 0 0 8px 0; padding: 0; font-size: 18px; -unity-font-style: bold; color: var(--kit-light); }
-.sample-hit-hp-text { margin: 8px 0 0 0; padding: 0; font-size: 16px; -unity-text-align: middle-right; }   /* 타격 숫자는 위로 뜨므로 체력 글은 아래 */
 .sample-hit-boss-bar { height: 24px; }
 .sample-hit-row { position: absolute; left: 260px; right: 260px; top: 340px; flex-direction: row; align-items: flex-end; justify-content: center; }
 .sample-hit-row-title { width: 180px; margin: 0; padding: 0 0 4px 0; font-size: 14px; -unity-font-style: bold; color: var(--kit-light); }

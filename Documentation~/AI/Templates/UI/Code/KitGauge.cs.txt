@@ -16,7 +16,7 @@
 //           Preview(음수)는 잃을 몫을 메인 위에 표시(얻을 몫의 미리보기는 Raise(값, fill: false)).
 //           타격 — Hit(값): 한 번의 호출로 타격감 있게 깎는다(메인이 hitCut초에 빠르게 깎임 · 깎인 몫이 하얗게 번쩍 · 게이지가 흔들림 →
 //           followDelay 뒤 밝은 뒷 게이지가 부드럽게 따라 줆). 연타면 뒷 게이지는 첫 타 자리에 남아 있다가 마지막 타 뒤에 한꺼번에 따라 준다.
-//           따라 주기 · 채우기는 모두 부드럽게(따라 주기 ease-in-out · 채우기 ease-out). 숫자 · 불티를 띄울 자리는 PointOf(값)(화면 좌표).
+//           따라 주기 · 채우기는 모두 부드럽게(따라 주기 ease-in-out · 채우기 ease-out). 숫자 · 불티를 띄울 자리는 PointOf(값), 베기를 그을 끝 변은 EdgeOf(값)(화면 좌표).
 // UXML: <MomoiProject.KitGauge kind="Line" shape="Slant" frame="Inset" value="0.7" color="#C86058" class="kit-gauge" />
 // 코드: gauge.Set(hp / (float)maxHp); · gauge.Hit(hp / (float)maxHp); · gauge.Raise(next, fill: false); … gauge.FillUp(); · gauge.Text = $"{hp} / {maxHp}";
 using System.Collections.Generic;
@@ -257,6 +257,51 @@ namespace MomoiProject
                 }
             }
             return this.LocalToWorld(local);
+        }
+
+        // 값 at(0~1)에서 게이지가 끊기는 변의 두 끝(화면 좌표 — 직선 · 도형 나열 = 앞면의 위 → 아래(평행사변형은 기울기 그대로),
+        // 원형 패널 = 수면의 왼쪽 → 오른쪽, 원 테두리 = 안 → 바깥). 깎인 끝 변을 따라 베기를 그을 때: fx.Slash(…EdgeOf(값)…).
+        public (Vector2 from, Vector2 to) EdgeOf(float at)
+        {
+            if (!Ready(out var size)) return (worldBound.center, worldBound.center);
+            at = Mathf.Clamp01(at);
+            var c = size / 2f;
+            var r = Mathf.Min(size.x, size.y) / 2f;
+            Vector2 a, b;
+            switch (_kind)
+            {
+                case Kind.Ring:
+                {
+                    var angle = (-90f + at * 360f) * Mathf.Deg2Rad;
+                    var dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                    a = c + dir * (r - thickness + Inner);
+                    b = c + dir * (r - Inner);
+                    break;
+                }
+                case Kind.Orb:
+                {
+                    var inner = r - Inner;
+                    var y = c.y + inner * (1f - 2f * at);
+                    var half = HalfWidth(c, inner, y);
+                    a = new Vector2(c.x - half, y);
+                    b = new Vector2(c.x + half, y);
+                    break;
+                }
+                default:
+                {
+                    var u = _fromRight ? 1f - at : at;
+                    var boxes = Boxes(size);
+                    var i = Mathf.Clamp(Mathf.FloorToInt(u * boxes.Count), 0, boxes.Count - 1);
+                    float u0 = i / (float)boxes.Count, u1 = (i + 1) / (float)boxes.Count;
+                    var inner = Rect(boxes[i], Inner);
+                    var x = Mathf.Lerp(inner.xMin, inner.xMax, Mathf.Clamp01((u - u0) / (u1 - u0)));
+                    a = new Vector2(x, inner.yMin);
+                    b = new Vector2(x, inner.yMax);
+                    if (_shape != Shape.Diamond) { a = Shear(a, size); b = Shear(b, size); }
+                    break;
+                }
+            }
+            return (this.LocalToWorld(a), this.LocalToWorld(b));
         }
 
         // 찰 때 ①: 어두운 뒷 게이지를 먼저 target까지 띄운다. fill이 참이면 fillDelay 뒤 저절로 FillUp, 거짓이면 FillUp을 부를 때까지 미리보기로 남는다.

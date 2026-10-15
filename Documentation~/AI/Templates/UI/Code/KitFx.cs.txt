@@ -2,7 +2,8 @@
 // UI 키트 — UI 연출(순간 연출: 획득 · 공개 · 강화 · 수치 · 누름). 그림 파일 · 셰이더 없이 UI Toolkit만(메시 + filter drop-shadow).
 // 범용 기능만 둔다 — 색은 USS(연출 층의 --fx-* 변수, Kit.uss의 kit-fx), 시간 · 크기 · 모양은 매개변수로 언제든 바꾼다. 아이콘 그림은 무엇이든(Image · KitIcon · 진짜 그림).
 //   KitFx(연출 층 — 화면 맨 위에 class="kit-fx"로 깐다, 누르기는 받지 않음)
-//     · 바탕: Burst(불티) · Ring(빛 고리 — squash < 1이면 납작한 타원) · Rays(빛살) · Clear. 색을 안 주면(Color.clear) 층의 --fx-* 색.
+//     · 바탕: Burst(불티) · Ring(빛 고리 — squash < 1이면 납작한 타원) · Rays(빛살) · Slash(베기 — 칼질 한 줄이 샥 그어지고 같은 방향으로 사라짐) · Clear.
+//             색을 안 주면(Color.clear) 층의 --fx-* 색.
 //     · 묶음: PopIn(튀어 오름) · Reward(펑 — 튀어 오름 + 고리 + 불티 + 한 번 빛남) · Reveal(희귀 공개 — 빛살 + 떠오르는 불티 + 빛난 채)
 //             · Buff(자체 발광 아이콘이 떠올라 사라짐 — 가운데에 peak 콜백) · NumberPop(수치 펑) · Tap(누른 자리 팡).
 //   KitGlow: 빛 번짐 — Set(한 겹) · Neon(두 겹: 가까운 빛 진하게 + 넓은 번짐 옅게 = 자체 발광) · Flash(확 빛났다 잦아듦) · Pulse(숨쉬기) · Clear.
@@ -84,10 +85,12 @@ namespace MomoiProject
 
         struct RingFx { public Vector2 at; public float age, life, from, to, width, squash; public Color color; }
         struct RaysFx { public Vector2 at; public float age, life, radius, width, spin; public int count; public Color color; }
+        struct SlashFx { public Vector2 from, to; public float age, life, width; public Color color; }
 
         readonly List<Particle> _particles = new List<Particle>();
         readonly List<RingFx> _rings = new List<RingFx>();
         readonly List<RaysFx> _rays = new List<RaysFx>();
+        readonly List<SlashFx> _slashes = new List<SlashFx>();
         readonly System.Random _random = new System.Random(7);
         readonly List<Vertex> _vertices = new List<Vertex>();
         readonly List<ushort> _indices = new List<ushort>();
@@ -152,11 +155,20 @@ namespace MomoiProject
             Run();
         }
 
+        // 베기(샥): from → to로 날 선 한 줄이 빠르게 그어지고(앞 35%) 꼬리가 같은 방향으로 따라가며 가늘어져 사라진다.
+        // 가운데가 두껍고 양 끝이 뾰족한 날 — 바깥은 color(비우면 --fx-color), 가운데 심은 --fx-core. 예: 게이지가 깎인 끝 변을 따라(KitGauge.EdgeOf).
+        public void Slash(Vector2 from, Vector2 to, float seconds = 0.2f, Color color = default, float width = 5f)
+        {
+            _slashes.Add(new SlashFx { from = from, to = to, life = seconds, color = color.a <= 0f ? MainColor : color, width = width });
+            Run();
+        }
+
         public void Clear()
         {
             _particles.Clear();
             _rings.Clear();
             _rays.Clear();
+            _slashes.Clear();
             MarkDirtyRepaint();
         }
 
@@ -294,8 +306,13 @@ namespace MomoiProject
                 var r = _rays[i]; r.age += dt;
                 if (r.age >= r.life) _rays.RemoveAt(i); else _rays[i] = r;
             }
+            for (var i = _slashes.Count - 1; i >= 0; i--)
+            {
+                var s = _slashes[i]; s.age += dt;
+                if (s.age >= s.life) _slashes.RemoveAt(i); else _slashes[i] = s;
+            }
             MarkDirtyRepaint();
-            if (_particles.Count == 0 && _rings.Count == 0 && _rays.Count == 0) _tick.Pause();
+            if (_particles.Count == 0 && _rings.Count == 0 && _rays.Count == 0 && _slashes.Count == 0) _tick.Pause();
         }
 
         void Draw(MeshGenerationContext context)
@@ -303,6 +320,7 @@ namespace MomoiProject
             _vertices.Clear();
             _indices.Clear();
             foreach (var r in _rays) AddRays(r);
+            foreach (var s in _slashes) AddSlash(s);
             foreach (var p in _particles) AddParticle(p);
             if (_vertices.Count > 0)
             {
@@ -366,6 +384,38 @@ namespace MomoiProject
                 _indices.Add((ushort)(start + 1 + i));
                 _indices.Add((ushort)(start + 1 + (i + 1) % n));
             }
+        }
+
+        void AddSlash(SlashFx s)
+        {
+            const float Stroke = 0.35f;   // 앞 35%: 그어짐 · 나머지: 꼬리가 따라가며 사라짐
+            var t = s.age / s.life;
+            var head = t < Stroke ? 1f - Mathf.Pow(1f - t / Stroke, 3f) : 1f;
+            var u = t < Stroke ? 0f : (t - Stroke) / (1f - Stroke);
+            var tail = u * u;
+            if (head - tail <= 0.01f) return;
+            var a = Vector2.Lerp(s.from, s.to, tail);
+            var b = Vector2.Lerp(s.from, s.to, head);
+            var width = s.width * (1f - 0.7f * u);
+            var fade = t < 0.75f ? 1f : (1f - t) / 0.25f;
+            Blade(a, b, width, new Color(s.color.r, s.color.g, s.color.b, s.color.a * 0.85f * fade));
+            Blade(a, b, width * 0.38f, new Color(CoreColor.r, CoreColor.g, CoreColor.b, CoreColor.a * fade));
+        }
+
+        // a → b의 날: 양 끝이 뾰족하고 앞쪽(62%)이 가장 두껍다(시계 방향 삼각형 둘).
+        void Blade(Vector2 a, Vector2 b, float width, Color color)
+        {
+            var d = b - a;
+            if (d.sqrMagnitude < 0.01f) return;
+            var n = new Vector2(-d.y, d.x).normalized * (width / 2f);
+            var m = Vector2.Lerp(a, b, 0.62f);
+            var start = _vertices.Count;
+            _vertices.Add(new Vertex { position = new Vector3(a.x, a.y, Vertex.nearZ), tint = color });
+            _vertices.Add(new Vertex { position = new Vector3(m.x - n.x, m.y - n.y, Vertex.nearZ), tint = color });
+            _vertices.Add(new Vertex { position = new Vector3(b.x, b.y, Vertex.nearZ), tint = color });
+            _vertices.Add(new Vertex { position = new Vector3(m.x + n.x, m.y + n.y, Vertex.nearZ), tint = color });
+            _indices.Add((ushort)start); _indices.Add((ushort)(start + 1)); _indices.Add((ushort)(start + 2));
+            _indices.Add((ushort)start); _indices.Add((ushort)(start + 2)); _indices.Add((ushort)(start + 3));
         }
 
         void AddRays(RaysFx r)

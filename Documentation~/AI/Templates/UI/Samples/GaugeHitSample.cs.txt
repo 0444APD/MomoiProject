@@ -1,7 +1,7 @@
 // GBible UI 키트 견본 코드 — 견본 GaugeHit.uxml을 띄운 화면에서 게이지 타격(KitGauge.Hit)을 부르는 법(복사해 [BindTo(GameIds.Screen.X)]만 붙이면 돈다).
 // 실제 게임에서는 피해를 주는 것이 행동이고, 맞는 순간의 연출은 행동이 끝난 뒤에 부른다:
 //   session.Events.SubscribeAfterAction<DamageDealt>(e => { gauge.Hit(e.hp / (float)e.maxHp); Number(e.amount, …); });
-// 타격 한 번 = gauge.Hit(값) 하나(깎임 · 번쩍 · 흔들림 · 뒷 게이지 따라 줆이 한 덩어리). 숫자 · 불티는 gauge.PointOf(값)의 자리에 띄운다.
+// 타격 한 번 = gauge.Hit(값) 하나(깎임 · 번쩍 · 흔들림 · 뒷 게이지 따라 줆이 한 덩어리). 숫자는 gauge.PointOf(값), 베기(샥)는 깎인 끝 변 gauge.EdgeOf(값)을 따라 KitFx.Slash.
 using System.Collections.Generic;
 using GBible;
 using UnityEngine;
@@ -16,7 +16,6 @@ namespace MomoiProject
         KitGauge _boss;
         KitFx _fx;
         VisualElement _numbers;
-        Label _hpText;
         int _hp = MaxHp;
 
         protected override void OnOpen()
@@ -24,7 +23,6 @@ namespace MomoiProject
             _boss = Q<KitGauge>("boss");
             _fx = Q<KitFx>("fx");
             _numbers = Q<VisualElement>("numbers");
-            _hpText = Q<Label>("hp-text");
             Root.Query<KitGauge>(className: "sample-hit-other").ForEach(_others.Add);
 
             OnClick("light", () => Strike(70));
@@ -39,7 +37,7 @@ namespace MomoiProject
                 _hp = MaxHp;
                 _boss.value = 1f;
                 foreach (var gauge in _others) gauge.value = 1f;
-                _hpText.text = $"{_hp} / {MaxHp}";
+                _boss.Text = $"{_hp} / {MaxHp}";   // 수치는 게이지 안 글(text)
             });
         }
 
@@ -51,11 +49,11 @@ namespace MomoiProject
             var after = _hp / (float)MaxHp;
             _boss.Hit(after);   // 이것 하나가 타격 한 덩어리
             foreach (var gauge in _others) gauge.Hit(Mathf.Max(0f, gauge.value - (before - after)));
-            _hpText.text = $"{_hp} / {MaxHp}";
+            _boss.Text = $"{_hp} / {MaxHp}";   // 수치는 게이지 안 글(text)
 
             var heavy = damage >= 200;
             Number($"−{damage}", _boss.PointOf((before + after) / 2f), heavy);
-            Sparks(_boss.PointOf(after), heavy);
+            Cut(_boss, after, heavy);
             if (_hp == 0) Root.schedule.Execute(() => Heal(MaxHp)).StartingIn(1200);   // 견본: 다 깎이면 잠시 뒤 다시 가득
         }
 
@@ -64,7 +62,7 @@ namespace MomoiProject
             _hp = Mathf.Min(MaxHp, _hp + amount);
             _boss.Set(_hp / (float)MaxHp);   // 찰 때는 지름길(어두운 뒷 게이지가 먼저 → 차오름)
             foreach (var gauge in _others) gauge.Set(Mathf.Min(1f, gauge.value + amount / (float)MaxHp));
-            _hpText.text = $"{_hp} / {MaxHp}";
+            _boss.Text = $"{_hp} / {MaxHp}";   // 수치는 게이지 안 글(text)
         }
 
         // 타격 숫자: 강조 숫자(kit-t-number)가 크게 떴다 내려앉고(ease-out-back) · 잠시 머문 뒤 · 오르며 사라진다.
@@ -92,20 +90,26 @@ namespace MomoiProject
             }, () => label.RemoveFromHierarchy());
         }
 
-        // 깎인 자리의 불티 + 작은 빛 고리.
-        void Sparks(Vector2 world, bool heavy)
+        // 베기(샥): 깎인 끝 변을 따라 위 → 아래로 칼질 한 줄(변보다 길게 뻗음) + 베인 자리에서 튀는 불티 조금.
+        void Cut(KitGauge gauge, float at, bool heavy)
         {
-            var at = _fx.WorldToLocal(world);
+            var (top, bottom) = gauge.EdgeOf(at);
+            var a = _fx.WorldToLocal(top);
+            var b = _fx.WorldToLocal(bottom);
+            var middle = (a + b) / 2f;
+            var reach = (b - a) * (heavy ? 2.1f : 1.6f);   // 변 길이의 몇 배로 뻗나(가운데에서 양쪽으로)
+            _fx.Slash(middle - reach, middle + reach, heavy ? 0.24f : 0.2f, new Color(1f, 0.5f, 0.42f), heavy ? 7f : 5f);
+
             var spec = KitFx.BurstSpec.Small;
             spec.colorA = Color.white;
             spec.colorB = new Color(1f, 0.55f, 0.48f);
-            spec.count = heavy ? 18 : 10;
-            spec.speed = heavy ? 340f : 240f;
+            spec.count = heavy ? 12 : 7;
+            spec.speed = heavy ? 300f : 220f;
             spec.gravity = 720f;
-            spec.arc = 150f;
-            spec.radius = 4f;
-            _fx.Burst(at, spec);
-            _fx.Ring(at, 4f, heavy ? 40f : 26f, 0.22f, Color.white, 2f);
+            spec.angle = -60f;    // 위로, 베인 몫 쪽(오른쪽)으로 조금
+            spec.arc = 110f;
+            spec.radius = 3f;
+            _fx.Burst(middle, spec);
         }
 
         static float EaseOutBack(float t)
