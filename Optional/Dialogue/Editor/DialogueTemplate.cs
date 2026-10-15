@@ -14,14 +14,6 @@ namespace GBible.EditorTools.Graph
     {
         const string Root = EditorDatabase.DataRoot + "/DialogueUI";
 
-        [MenuItem("MomoiProject/다이얼로그 시스템/UI 템플릿 만들기", priority = 7)]
-        static void CreateMenu()
-        {
-            var prefab = Create();
-            Selection.activeObject = prefab;
-            EditorGUIUtility.PingObject(prefab);
-            Debug.Log($"[다이얼로그 UI] 템플릿을 만들었습니다: {AssetDatabase.GetAssetPath(prefab)}\n씬에 끌어 놓고 DialoguePlayer.Play(\"다이얼로그 ID\")로 재생합니다. 한글이 네모로 보이면 UI 오브젝트의 DialogueUI > font에 한글 폰트(TTF)를 넣으세요.");
-        }
 
         // 새 폴더에 템플릿 한 벌을 만들고 프리팹을 돌려준다(이미 있으면 'DialogueUI 1' …).
         public static GameObject Create(string folder = null, bool registerAsDefault = true)

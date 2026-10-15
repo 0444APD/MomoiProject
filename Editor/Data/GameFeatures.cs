@@ -25,6 +25,8 @@ namespace GBible.EditorTools
         public string Symbol;
         // 기능의 게임 쪽 어셈블리 이름(이 안의 DB 종류가 기능의 클래스다).
         public string[] Assemblies = Array.Empty<string>();
+        // 기능의 에디터 어셈블리(프로젝트 Editor asmdef만 참조한다 — DB 반영 스크립트가 기능의 에디터 도구를 부를 수 있게. 예: DialogueTemplate.Create).
+        public string[] EditorAssemblies = Array.Empty<string>();
         // 꺼져 있을 때 DB 사이드바에 흐리게 보일 탭 이름(켜면 실제 탭으로 바뀐다).
         public string[] TabNames = Array.Empty<string>();
         // 기능의 데이터 클래스(DB 종류가 아닌 것) 가운데 프로젝트가 직접 쓰는 것의 전체 이름.
@@ -74,6 +76,7 @@ namespace GBible.EditorTools
                 Description = "노드 그래프로 만드는 다이얼로그: 대사·선택지·조건 분기, 연출(배경·스탠딩·카메라·음악) 체인, 연출 프리셋, UI 템플릿, 대사 로그, 진행 저장.",
                 Symbol = "GBIBLE_DIALOGUE",
                 Assemblies = new[] { "GBible.Dialogue" },
+                EditorAssemblies = new[] { "GBible.Dialogue.Editor" },
                 TabNames = new[] { "스탠딩 프로필", "장소" },
             },
             new GameFeature

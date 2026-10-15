@@ -130,7 +130,7 @@ GBible.Unity
 
 | 하고 싶은 일 | 쓸 것 | 장 |
 |---|---|---|
-| HUD·상점·타이틀 같은 화면 | `Assets/MomoiProject/UI/Screens/X.uxml` + DB › 화면(층·뒤로로 닫기·열 씬) + `[BindTo(GameIds.Screen.X)] class X : GameScreen`. 먼저 메뉴 '화면 준비' | 35 |
+| HUD·상점·타이틀 같은 화면 | `Assets/MomoiProject/UI/Screens/X.uxml` + DB › 화면(층·뒤로로 닫기·열 씬) + `[BindTo(GameIds.Screen.X)] class X : GameScreen`. 먼저 반영 스크립트에서 `ScreenSetup.Ensure()`(에디터를 열 때도 저절로) | 35 |
 | 값을 보이기만 하는 칸 | UXML `binding-path="run:gold"`·`"run:gold@hud.gold"`(텍스트 틀)·`"@hud.endTurn"`(번역 글). 코드 없음 | 35 2-2 |
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |

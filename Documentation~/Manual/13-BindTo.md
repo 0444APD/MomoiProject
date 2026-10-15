@@ -81,7 +81,7 @@ public static class AchievementLogic
 }
 ```
 
-- `GameIds`(`MomoiProject → 식별자 코드 다시 만들기`로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·액티브 효과·인스턴스·개발 명령·상태 효과 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`, `GameIds.DebugCommand.X`, `GameIds.Status.X`.
+- `GameIds`(DB를 저장하면 저절로 생성, 네임스페이스 `GBible.Ids`)의 도전과제·로그·액티브 효과·인스턴스·개발 명령·상태 효과 ID는 `const string`이라 어트리뷰트 인자로 쓸 수 있다: `GameIds.Achievement.X`, `GameIds.Stat.X`, `GameIds.Ability.X`, `GameIds.Instance.X`, `GameIds.DebugCommand.X`, `GameIds.Status.X`.
 - 글자를 직접 쓰면 오타나 ID 이름 바꾸기가 연결을 끊는다(게임이 켜질 때 콘솔에 "[BindTo("id")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고). 상수를 쓰면 컴파일 오류로 먼저 드러난다.
 
 ### 2-3. 함수의 모양

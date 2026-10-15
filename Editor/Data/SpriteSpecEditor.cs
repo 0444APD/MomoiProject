@@ -429,14 +429,6 @@ namespace GBible.EditorTools
             };
         }
 
-        // 지금 맞춤 그대로 모두 다시 굽는다(크기가 바뀌지 않은 예외 촬영은 '확인 필요'로 만들지 않는다).
-        [MenuItem("MomoiProject/스프라이트 틀 모두 다시 굽기", priority = 31)]
-        static void RebakeAllMenu()
-        {
-            if (ExistingRegistry == null) return;
-            var (rebaked, _, _) = RebakeStale(all: true, checkFiles: TakeUndoCheck());
-            Debug.Log($"[MomoiProject] 스프라이트 {rebaked}개를 다시 구웠습니다.");
-        }
 
         // 틀의 크기 이름을 바꿀 때: 구운 기록·예외 촬영·필드 규칙의 미리보기 크기를 함께 바꾼다(구운 파일은 새 이름으로 다시 굽고 예전 파일은 백업으로).
         // undo: Ctrl+Z로 되돌릴 수 있게 남긴다(틀 인스펙터). 예전 형식 옮기기는 남기지 않는다(옮긴 파일은 되돌아오지 않는다).

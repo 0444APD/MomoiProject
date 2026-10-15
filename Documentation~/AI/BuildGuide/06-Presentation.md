@@ -21,7 +21,7 @@
 
 > [!note]- 새 프로젝트의 화면은 DB › 화면으로(UXML + 화면 코드)
 > 카드 던전의 전투 화면은 씬의 UIDocument에 MonoBehaviour를 붙여 만들었다(아래). 새 프로젝트는 매뉴얼 [35장](../../Manual/35-Screens.md)의 **화면**으로 만든다. 인스펙터에서 연결할 것이 없어 AI가 파일만으로 끝낸다.
-> 1. 메뉴 `MomoiProject › 화면 › 화면 준비`(한 번) → Ctrl+S.
+> 1. DB 반영 스크립트에서 `ScreenSetup.Ensure()`(에디터를 열 때도 저절로 — 메뉴는 없다).
 > 2. `Assets/MomoiProject/UI/Screens/BattleHud.uxml`: 값 칸은 `binding-path`만 적는다 — `<ui:Label binding-path="run:gold@hud.gold" />`(텍스트 `hud.gold` = "골드 {value}"). 코드 없이 바뀐다.
 > 3. DB › 화면 `battleHud`: UXML · 층 `바탕(HUD)` · 열 씬 `Battle`.
 > 4. 버튼·손패만 코드로: `[BindTo(GameIds.Screen.BattleHud)] class BattleHud : GameScreen` 안에서 `OnClick("end-turn", () => new EndTurn())`(연출·선택 중이면 무시, "에너지가 모자랍니다"는 알림으로 저절로).
@@ -308,7 +308,7 @@ _hand.Add(new Button(() => Play(picked)) { text = Texts.Get("card.button", ("car
 
 에디터에서:
 
-1. DB 사이드바 "다이얼로그 시스템"의 **기능 활성화**로 켜고, `MomoiProject → 다이얼로그 시스템 → UI 템플릿 만들기`를 한 번 한다.
+1. DB 사이드바 "다이얼로그 시스템"의 **기능 활성화**로 켜고, DB 반영 스크립트에서 `DialogueTemplate.Create()`를 한 번 부른다.
 2. DB › **스탠딩 프로필**에 상점 주인(`merchant`)을 만들고 스탠딩 그림을 넣는다. 이름은 텍스트 `merchant.name`.
 3. `MomoiProject → 다이얼로그 시스템 → 그래프`에서 다이얼로그 `shopkeeper`를 만든다. 시작 → 대사("어서 와, 모험가.", 화자 `merchant`) → 선택지 "구경한다" → **신호 보내기**(`openShop`) → 끝, 선택지 "나간다" → 끝.
 4. 같은 그래프에 시작 노드를 하나 더 두고 시작 ID를 `noGold`로 한다(대사 "돈이 모자라는군.").

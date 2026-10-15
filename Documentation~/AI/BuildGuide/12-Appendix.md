@@ -407,7 +407,7 @@ static void Started(GameSession session)
 - [ ] DB 사이드바 아래가 "검증 통과"다.
 - [ ] 콘솔에 "예전 방식(리플렉션)"·"저장할 수 없는 참조입니다"·`[BindTo]` 연결 경고가 없다(있다면 이유를 안다).
 - [ ] 저장 값 안의 DB 항목 ID 필드에 `[DataRef(종류)]`가 붙어 있다.
-- [ ] `MomoiProject → 출시됨 (저장 호환 유지)`에 체크가 있다.
+- [ ] `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`에 체크가 있다.
 - [ ] 출시 뒤 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(값 계산이 필요하면 `Configure`에 `Migrations.Add`)는 것을 팀이 안다.
 
 > [!note]- 출시 전 더 볼 것
@@ -554,7 +554,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 ### 3-10. 에디터 설정과 도구
 
-- **MomoiProject › 내 코드 범위** — 클래스를 고르는 목록(값 형식·인스턴스 형식·필드 규칙)에 보일 폴더·네임스페이스. 플러그인 폴더의 클래스가 목록에 섞이거나 내 클래스가 안 보일 때 고친다(`ProjectSettings/MomoiProject/ProjectCode.json`).
+- **내 코드 범위**(창 없음 — `ProjectSettings/MomoiProject/ProjectCode.json`) — 클래스를 고르는 목록(값 형식·인스턴스 형식·필드 규칙)에 보일 폴더·네임스페이스. 플러그인 폴더의 클래스가 목록에 섞이거나 내 클래스가 안 보일 때 고친다(`ProjectSettings/MomoiProject/ProjectCode.json`).
 - **DB › 프리팹** — 프리팹을 DB에 등록해 컴포넌트 필드를 탐색기로 고친다. 수정은 바로 적용된다(작업본을 거치지 않는다).
 - **`GameFeatures`**(에디터 코드, `GBible.EditorTools`) — 선택 기능이 켜졌는지 에디터 도구에서 확인한다: `GameFeatures.IsActive(GameFeatures.Find("dialogue"))`.
 - **`TextCatalog`** — 테스트·도구에서 텍스트 표를 따로 만들어 문장 틀을 시험한다: `new TextCatalog { SourceLanguage = "ko", Language = "ko" }` → `SetTable` → `Get`.
@@ -628,7 +628,7 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | `CaptureSnapshot` | 02 | 07 §2·§6, 08 §8(다른 장르라면) |
 | `Started` | 20 | 01 §4 |
 | `Stopped` | 20 | 12 §3-8 |
-| `GameIds` 생성(식별자 코드 다시 만들기), `PlayerDataKey<T>` | 20 · 01 | 01 §3, 06 §1(`.Id`) |
+| `GameIds` 생성(DB 저장 때 저절로), `PlayerDataKey<T>` | 20 · 01 | 01 §3, 06 §1(`.Id`) |
 | `Game.Data()` | 01 · 03 | 01 §3 |
 | `GameDatabase.Load()`·`All<T>()` | 20 | 04 §8 |
 | `GameFeatures`(에디터 API) | 20 | 12 §3-10 |
@@ -832,10 +832,10 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 | `Texts.Get`·`Texts.NameOf`·문장 틀(조사·복수·용어) | 23 | 06 §5 |
 | `GameLanguage`(`Changed`) | 23 | 06 §5 |
 | `LocalizedText` | 23 | 06 §5(언급) |
-| 다국어 › DB 이름 키 채우기 · 번역 검사 | 23 | 05 §9, 08 §7(대응표) |
+| 다국어 › 번역 검사 · 이름 키 채우기(`TextSheetTools.FillCodexNames`) | 23 | 05 §9, 08 §7(대응표) |
 | 시트(CSV) 내보내기·가져오기 | 23 | 05 §9(다른 장르라면, 언급) |
 | `TextCatalog` | 23 | 12 §3-10 |
-| 다이얼로그 그래프·스탠딩 프로필·UI 템플릿 만들기 | 24 | 06 §6 |
+| 다이얼로그 그래프·스탠딩 프로필·UI 템플릿(`DialogueTemplate.Create`) | 24 | 06 §6 |
 | `Dialogues.Play`·`Signaled`·`IsPlaying`·`ResumeSaved` | 24 | 06 §6 |
 | `DialogueUIExtension` | 24 | 06 §6(다른 장르라면) |
 | 결과 '다이얼로그 재생' | 24 | 12 §3-10 |

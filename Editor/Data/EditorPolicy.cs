@@ -63,7 +63,7 @@ namespace GBible.EditorTools
             return result;
         }
 
-        [MenuItem(MenuPath, priority = 900)]
+        [MenuItem(MenuPath, priority = 980)]
         static void Toggle()
         {
             Authoring = !Authoring;

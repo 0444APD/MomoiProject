@@ -25,14 +25,14 @@
 
 ### 에디터에서
 
-1. 메뉴 `MomoiProject → 다국어 → 설정 열기`. 설정이 없으면 `Assets/MomoiProject/Data/Resources/MomoiProject/LocalizationSettings.asset`과 원문 표 `Assets/MomoiProject/Data/Texts/Texts_ko.asset`을 만들고 선택한다.
+1. 설정은 시작 설정이 만든다: `Assets/MomoiProject/Data/Resources/MomoiProject/LocalizationSettings.asset`과 원문 표 `Assets/MomoiProject/Data/Texts/Texts_ko.asset`(코드 `TextSheetTools.EnsureSettings()`). Project 창에서 골라 연다.
 2. 인스펙터에서 고친다.
    - **termStyles**: 용어 모양(3.8절).
    - **sourceLanguage**: 원문 언어(기본 `ko`).
    - **languages**: 언어마다 **code**(BCP-47: `ko`, `en`, `ja`, `zh-Hans`, `zh-Hant`, `pt-BR` …), **nativeName**(언어 선택 화면에 보일 그 언어의 이름: 한국어, English, 日本語), **fallbacks**(이 언어에 없는 문장을 찾을 언어들, 쉼표로), **table**(텍스트 표).
 3. 언어를 더하고 표를 비워 두면, 시트 내보내기·가져오기 때 `Texts_<code>.asset`이 자동으로 만들어져 연결된다.
 4. 표(`TextTable`)는 **language**와 **entries**(key · text) 목록이다. 인스펙터에서 직접 고치거나 시트로 주고받는다. 직접 만들려면 `Create → MomoiProject → 다국어 → 텍스트 표`(설정은 `… → 다국어 설정`).
-5. 메뉴 `MomoiProject → 다국어 → DB 이름 키 채우기`: DB 항목마다 `<ID>.name` 키를 원문 표에 더한다(값은 ID). 콘솔 "[다국어] 원문 표에 이름 키 n개를 더했습니다(값은 ID, 원문 표에서 이름으로 바꿔 주세요)." 그다음 원문 표에서 값을 실제 이름으로 고친다.
+5. DB 이름 키 채우기(AI — DB 반영 스크립트에서 `TextSheetTools.FillCodexNames(TextSheetTools.EnsureSettings())`, 메뉴는 없다): DB 항목마다 `<ID>.name` 키를 원문 표에 더한다(값은 ID). 그다음 원문 표에서 값을 실제 이름으로 고친다.
 
 ### 코드로 쓰는 법
 

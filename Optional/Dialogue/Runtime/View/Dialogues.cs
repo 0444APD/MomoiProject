@@ -84,7 +84,7 @@ namespace GBible.Dialogue
                 var settings = SettingsSource();
                 if (settings == null || settings.playerPrefab == null)
                 {
-                    Debug.LogWarning("[다이얼로그] 다이얼로그 재생기가 없습니다. 씬에 다이얼로그 UI 프리팹을 두거나 'MomoiProject › 다이얼로그 시스템 › UI 템플릿 만들기'로 설정을 만드세요.");
+                    Debug.LogWarning("[다이얼로그] 다이얼로그 재생기가 없습니다. 씬에 다이얼로그 UI 프리팹을 두세요(AI가 DialogueTemplate.Create로 만든다).");
                     return null;
                 }
                 var instance = UnityEngine.Object.Instantiate(settings.playerPrefab);

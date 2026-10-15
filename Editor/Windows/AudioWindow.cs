@@ -16,7 +16,7 @@ namespace GBible.EditorTools
 
         Label _status;
 
-        [MenuItem("MomoiProject/오디오", priority = 8)]
+        [MenuItem("MomoiProject/오디오", priority = 3)]
         public static void Open()
         {
             var window = GsWindows.Get<AudioWindow>();

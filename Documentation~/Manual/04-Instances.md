@@ -471,7 +471,7 @@ public class ApplyBuff : GameAction
 | 원본 값이 게임 중에 바뀜 | `session.Instances`로 받은 원본을 고쳤다. 늘 `CopyInstance`의 사본을 쓴다. |
 | 같은 아이템 두 개가 서로 값을 공유 | 같은 사본을 두 곳에 넣었다. 넣을 때마다 `CopyInstance`를 따로 부른다. |
 | `Game.Find`가 엉뚱한 사본을 찾음 | 사본은 원본의 `id` 값까지 복사한다. 사본마다 `Game.NewId`로 id를 새로 준다. |
-| 형식 목록에 내 클래스가 없음 | `[Serializable]`이 없거나, 추상 클래스이거나, 공개가 아니거나, 담을 수 없는 필드(함수·`object`·다차원 배열)가 있거나, 내 코드 범위(**MomoiProject › 내 코드 범위**) 밖이다. |
+| 형식 목록에 내 클래스가 없음 | `[Serializable]`이 없거나, 추상 클래스이거나, 공개가 아니거나, 담을 수 없는 필드(함수·`object`·다차원 배열)가 있거나, 내 코드 범위(`ProjectSettings/MomoiProject/ProjectCode.json`) 밖이다. |
 | **+ 기능** 버튼이 안 보임 | 비어 있는 기능 필드가 없다. 필드에 `[SerializeReference]`가 있는지, 리스트·글자·Block 형식이 아닌지 확인한다. |
 | **+ 기능** 목록에 원하는 형식이 없음 | 그 형식이 추상이거나 인자 없는 생성자가 없다. |
 | `[ShowIf]`가 늘 보임 | 조건 필드 이름이 틀렸다(찾지 못하면 늘 보인다). `nameof`로 쓴다. 값 비교는 글자 비교이므로 enum은 이름과 같아야 한다. |

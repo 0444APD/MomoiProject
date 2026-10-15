@@ -23,7 +23,7 @@ namespace GBible.EditorTools
         public const string CodeRoot = ProjectFolders.Code;
         public const string Prefix = "MomoiProject";
         public const string MarkerPath = "ProjectSettings/MomoiProject/StartSetup.json";
-        public const string MenuPath = "MomoiProject/시작 설정";
+        public const string MenuPath = "MomoiProject/개발/시작 설정";
 
         public static readonly string[] Parts = { "Rules", "Client", "Editor", "Tests" };
 
@@ -313,11 +313,12 @@ namespace GBible.EditorTools
 
         // ── asmdef ───────────────────────────────────────────
 
-        // 켠 모듈의 어셈블리(Rules에는 데이터 클래스를 내놓는 모듈만 — 규칙은 화면 모듈을 모른다).
-        static IEnumerable<string> ModuleAssemblies(bool rulesOnly) =>
-            GameFeatures.All.Where(f => GameFeatures.IsEnabled(f) && f.Installed && (!rulesOnly || f.DataClasses.Length > 0)).SelectMany(f => f.Assemblies);
+        // 켠 모듈의 어셈블리(Rules에는 데이터 클래스를 내놓는 모듈만 — 규칙은 화면 모듈을 모른다. Editor에는 모듈의 에디터 어셈블리도).
+        static IEnumerable<string> ModuleAssemblies(bool rulesOnly, bool editor = false) =>
+            GameFeatures.All.Where(f => GameFeatures.IsEnabled(f) && f.Installed && (!rulesOnly || f.DataClasses.Length > 0))
+                .SelectMany(f => editor ? f.Assemblies.Concat(f.EditorAssemblies) : f.Assemblies);
 
-        static IEnumerable<string> AllModuleAssemblies => GameFeatures.All.SelectMany(f => f.Assemblies);
+        static IEnumerable<string> AllModuleAssemblies => GameFeatures.All.SelectMany(f => f.Assemblies.Concat(f.EditorAssemblies));
 
         static List<string> ReferencesOf(string part)
         {
@@ -325,7 +326,7 @@ namespace GBible.EditorTools
             {
                 case "Rules": return new List<string> { "GBible.Core", "GBible.Unity" }.Concat(ModuleAssemblies(true)).ToList();
                 case "Client": return new List<string> { AssemblyOf("Rules"), "GBible.Core", "GBible.Unity" }.Concat(ModuleAssemblies(false)).ToList();
-                case "Editor": return new List<string> { AssemblyOf("Rules"), AssemblyOf("Client"), "GBible.Core", "GBible.Unity", "GBible.Editor" }.Concat(ModuleAssemblies(false)).ToList();
+                case "Editor": return new List<string> { AssemblyOf("Rules"), AssemblyOf("Client"), "GBible.Core", "GBible.Unity", "GBible.Editor" }.Concat(ModuleAssemblies(false, editor: true)).ToList();
                 default: return new List<string> { AssemblyOf("Rules"), "GBible.Core", "GBible.Unity", "UnityEngine.TestRunner", "UnityEditor.TestRunner" }.Concat(ModuleAssemblies(true)).ToList();
             }
         }
@@ -364,7 +365,7 @@ namespace GBible.EditorTools
                 var json = MiniJson.Deserialize(text) as Dictionary<string, object>;
                 if (json == null || !(json.TryGetValue("references", out var raw) && raw is List<object> list)) continue;
                 var references = list.Select(r => r as string).Where(r => r != null).ToList();
-                var wanted = new HashSet<string>(ModuleAssemblies(part == "Rules" || part == "Tests"), StringComparer.Ordinal);
+                var wanted = new HashSet<string>(ModuleAssemblies(part == "Rules" || part == "Tests", editor: part == "Editor"), StringComparer.Ordinal);
                 var next = references.Where(r => !AllModuleAssemblies.Contains(r) || wanted.Contains(r)).ToList();
                 foreach (var module in wanted)
                     if (!next.Contains(module)) next.Add(module);

@@ -188,9 +188,9 @@ namespace GBible.EditorTools
 
         public static bool IsReleased => AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath)?.IsReleased ?? false;
 
-        internal const string ReleasedMenu = "MomoiProject/출시됨 (저장 호환 유지)";
+        internal const string ReleasedMenu = "MomoiProject/개발/출시됨 (저장 호환 유지)";
 
-        [MenuItem(ReleasedMenu, priority = 40)]
+        [MenuItem(ReleasedMenu, priority = 901)]
         static void ToggleReleased()
         {
             var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(DatabaseAssetPath);
@@ -676,7 +676,7 @@ namespace GBible.EditorTools
             foreach (var info in DataTypes.All.Where(i => i.Single))
             {
                 if (Instance.All.Any(d => d != null && d.GetType() == info.Type) || staged.Any(d => d.GetType() == info.Type)) continue;
-                // 화면 설정은 '화면 준비'와 같이(Panel Settings·테마까지).
+                // 화면 설정은 ScreenSetup.Ensure로(Panel Settings·테마까지).
                 if (info.Type == typeof(ScreenSettingsData)) ScreenSetup.Ensure(commit: true);
                 else Instance.Create(info.Type, info.IdPrefix);
                 Debug.Log($"[MomoiProject] DB › {info.DisplayName} 항목을 기본값으로 만들었습니다(프로젝트에 하나만 두는 설정).");

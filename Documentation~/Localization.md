@@ -11,7 +11,7 @@ GameLanguage.Set("en");                                             // 바꾸고
 
 ## 구성
 
-`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/MomoiProject), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject → 다국어`(설정 열기, 시트 내보내기·가져오기, 번역 검사, DB 이름 키 채우기)다.
+`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/MomoiProject), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject → 다국어`(시트 내보내기·가져오기, 번역 검사)다. 설정은 시작 설정이 만들고, DB 이름 키 채우기는 AI가 `TextSheetTools.FillCodexNames`로 한다.
 
 ## 문장 틀 문법
 

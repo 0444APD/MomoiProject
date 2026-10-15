@@ -14,7 +14,7 @@ namespace GBible.EditorTools
     //  · 어셈블리: Unity·패키지(Packages/)·이 라이브러리(GBible.*)·플러그인(Assets/Plugins, *-firstpass)은 뺀다.
     //  · 네임스페이스: 흔한 외부 라이브러리(DG·Sirenix·Spine·TMPro …)는 뺀다.
     //  · 종류: 컴포넌트·ScriptableObject(DB 종류 제외)·어트리뷰트·예외·정적 유틸 클래스·인터페이스는 뺀다.
-    // 프로젝트마다 다르면 ProjectSettings/MomoiProject/ProjectCode.json(창: MomoiProject › 내 코드 범위)에서 폴더·네임스페이스를 더한다.
+    // 프로젝트마다 다르면 ProjectSettings/MomoiProject/ProjectCode.json에 폴더·네임스페이스를 더한다(창은 없다 — 기본 규칙으로 충분하다).
     public static class ProjectCode
     {
         [Serializable]

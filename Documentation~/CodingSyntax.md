@@ -55,7 +55,7 @@ Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 �
 - `Game.Find(Type, id)`: 형식을 실행 중에 정할 때(행동의 참조 필드를 다시 찾을 때 시스템이 쓰는 것). `GameApi.HasId(Type)`은 그 형식에 `string id`가 있는지 알려 준다.
 
 ### `GameIds` (자동 생성 상수)
-- DB의 ID가 코드 상수로 생성된다(`MomoiProject > 식별자 코드 다시 만들기`, 네임스페이스 `GBible.Ids`).
+- DB의 ID가 코드 상수로 생성된다(DB를 저장하면 저절로, 네임스페이스 `GBible.Ids`).
   - 이름은 ID를 파스칼 표기로 바꾼 것(`player.gold` → `PlayerGold`, `ability.splash` → `AbilitySplash`)
   - `GameIds.PlayerData.PlayerGold` → `PlayerDataKey<int>` (형식이 붙은 플레이어 데이터 키, `.Id`가 ID 문자열)
   - `GameIds.Ability.AbilitySplash`, `GameIds.Achievement.FirstHunt` … → ID 문자열

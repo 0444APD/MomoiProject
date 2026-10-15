@@ -13,7 +13,7 @@ namespace GBible.EditorTools
         StartSetup.Choices _choices;
         VisualElement _root;
 
-        [MenuItem(StartSetup.MenuPath, priority = 30)]
+        [MenuItem(StartSetup.MenuPath, priority = 900)]
         public static void Open()
         {
             var window = GsWindows.Get<StartSetupWindow>();

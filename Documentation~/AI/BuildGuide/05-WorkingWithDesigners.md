@@ -205,7 +205,7 @@ public override void Validate(IValidationContext context)
 코드에는 ID 문자열 대신 늘 `GameIds` 상수를 쓴다. ID가 바뀌면 상수 이름이 바뀌어 컴파일 오류로 고칠 곳이 드러난다.
 
 > [!note]- 출시 뒤 ID 바꾸기
-> 출시 상태(`MomoiProject → 출시됨 (저장 호환 유지)`)를 켠 뒤의 ID 변경은 이력으로 남고, 예전 저장을 불러올 때 저절로 이어진다.
+> 출시 상태(`MomoiProject → 개발 → 출시됨 (저장 호환 유지)`)를 켠 뒤의 ID 변경은 이력으로 남고, 예전 저장을 불러올 때 저절로 이어진다.
 > - **플레이어 데이터·로그·도전과제**: 예전 ID로 저장된 값을 새 ID가 이어받는다.
 > - **저장 파일 안에 글자로 들어간 DB 항목 ID**(덱의 `DeckCard.card`, `relics`, `unlocked`, 물약 칸의 `item`): `[DataRef]`가 붙은 칸이면 불러올 때 새 ID로 바뀐다.
 > - `[DataRef]`도 없고 필드 규칙(값 출처 "DB 항목")으로 연결하지도 않은 `string` 칸은 바뀌지 않는다. 그래서 판 데이터의 ID 칸에도 빠짐없이 `[DataRef]`를 붙인다(4절).
@@ -220,7 +220,7 @@ public override void Validate(IValidationContext context)
 
 - **저장**: DB에서 바꾼 것은 작업본에 모였다가 **저장  Ctrl+S**에서 한 번에 쓰인다. 저장 전 항목은 플레이에도 `GameIds`에도 없다(플레이를 시작하면 DB가 저장할지 묻는다).
 - **검증 오류 찾기**: 사이드바 아래 "검증 오류 n건 · 빌드가 막힙니다"가 보이면 검색 칸에 `invalid`를 넣어 문제 항목만 본다.
-- **이름 텍스트**: 플레이어에게 보일 이름은 항목의 칸이 아니라 텍스트 `<ID>.name`이다. `MomoiProject → 다국어 → DB 이름 키 채우기`로 키를 만들고 원문 표에서 이름을 적는다([06장](06-Presentation.md)).
+- **이름 텍스트**: 플레이어에게 보일 이름은 항목의 칸이 아니라 텍스트 `<ID>.name`이다. AI가 `TextSheetTools.FillCodexNames`로 키를 만들고(DB 반영 스크립트) 원문 표에서 이름을 적는다([06장](06-Presentation.md)).
 - **시험**: 만든 유물·도전과제가 발동하는지 모니터의 **이벤트 호출**·**트리거로 달성**으로 본다([04장](04-AddingContent.md) 11절, [08장](08-TestAndDebug.md)).
 - **바꾸면 안 되는 ID**: 출시 뒤 `[DataRef]` 없이 저장 파일에 글자로 들어가는 ID가 있으면 공유한다(8절).
 

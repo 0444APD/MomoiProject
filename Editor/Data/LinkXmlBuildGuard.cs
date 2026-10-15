@@ -38,7 +38,7 @@ namespace GBible.EditorTools
         {
             if (!File.Exists(path))
                 return $"{path}가 없어 리플렉션으로만 찾는 게임 코드([BindTo] 함수·Reward·화면 코드·DB가 이름으로 가리키는 행동·이벤트)가 지워질 수 있습니다(빌드에서만 조용히 망가짐). " +
-                       "에디터를 다시 열거나 MomoiProject › 시작 설정에서 적용하면 만들어집니다.";
+                       "에디터를 다시 열거나 MomoiProject › 개발 › 시작 설정에서 적용하면 만들어집니다.";
             HashSet<string> listed;
             try { listed = Listed(File.ReadAllText(path)); }
             catch (XmlException e) { return $"{path}를 읽지 못했습니다({e.Message}). 고치거나, 지운 뒤 에디터를 다시 여세요(다시 만들어집니다)."; }

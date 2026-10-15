@@ -29,7 +29,7 @@ namespace GBible.EditorTools
                 // 저장하지 않은 새 씬이 열려 있으면 Unity가 새 씬을 덧붙여 만들지 못한다 — 까닭을 알린다(반영 스크립트면 기록되지 않아 다음 컴파일 뒤 다시 돈다).
                 var active = SceneManager.GetActiveScene();
                 if (string.IsNullOrEmpty(active.path) && active.isDirty)
-                    throw new System.InvalidOperationException("지금 열린 씬이 저장하지 않은 새 씬이라 테스트 씬을 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 'DB 반영 스크립트 › 모두 다시 돌리기') 다시 만듭니다.");
+                    throw new System.InvalidOperationException("지금 열린 씬이 저장하지 않은 새 씬이라 테스트 씬을 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 '개발 › DB 반영 스크립트 모두 다시 돌리기') 다시 만듭니다.");
                 var fresh = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Additive);
                 EditorSceneManager.SaveScene(fresh, path);
                 EditorSceneManager.CloseScene(fresh, true);
@@ -48,37 +48,16 @@ namespace GBible.EditorTools
             return true;
         }
 
-        [MenuItem("MomoiProject/테스트/지금 씬을 복사해 테스트 씬 만들기", priority = 70)]
-        static void FromActiveScene()
-        {
-            var active = SceneManager.GetActiveScene();
-            if (File.Exists(DefaultPath))
-            {
-                EditorUtility.DisplayDialog("테스트 씬", $"{DefaultPath}가 이미 있습니다. 메뉴 '테스트 씬 열기'로 엽니다.", "확인");
-                return;
-            }
-            if (active.isDirty && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-            Ensure(DefaultPath, string.IsNullOrEmpty(active.path) ? null : active.path);
-            EditorUtility.DisplayDialog("테스트 씬", $"{DefaultPath}를 만들었습니다. 열고 플레이하면 테스트 패널(F1)이 뜹니다.", "확인");
-        }
-
-        [MenuItem("MomoiProject/테스트/테스트 씬 열기", priority = 71)]
+        [MenuItem("MomoiProject/테스트 씬 열기", priority = 40)]
         static void Open()
         {
             if (!File.Exists(DefaultPath))
             {
-                EditorUtility.DisplayDialog("테스트 씬", $"{DefaultPath}가 없습니다. AI에게 테스트 씬을 만들어 달라고 하거나 메뉴 '지금 씬을 복사해 테스트 씬 만들기'.", "확인");
+                EditorUtility.DisplayDialog("테스트 씬", $"{DefaultPath}가 없습니다. AI에게 테스트 씬을 만들어 달라고 하세요(DB 반영 스크립트의 TestSceneSetup.Ensure).", "확인");
                 return;
             }
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             EditorSceneManager.OpenScene(DefaultPath);
-        }
-
-        [MenuItem("MomoiProject/테스트/테스트 상황 폴더 열기", priority = 72)]
-        static void RevealScenarios()
-        {
-            Directory.CreateDirectory(TestScenarios.Folder);
-            EditorUtility.RevealInFinder(TestScenarios.Folder);
         }
     }
 

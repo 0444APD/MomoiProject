@@ -29,7 +29,7 @@ namespace GBible.EditorTools
         List<string> _unused;
         readonly HashSet<string> _openUsers = new HashSet<string>();
 
-        [MenuItem("MomoiProject/에셋 관리", priority = 9)]
+        [MenuItem("MomoiProject/에셋 관리", priority = 2)]
         public static void Open()
         {
             var window = GsWindows.Get<AssetWindow>();

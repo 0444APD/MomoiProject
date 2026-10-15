@@ -340,7 +340,7 @@ namespace GBible.EditorTools.Graph
     // 다이얼로그 그래프 창.
     public sealed class DialogueGraphWindow : GraphAssetWindow
     {
-        [MenuItem("MomoiProject/다이얼로그 시스템/그래프", priority = 5)]
+        [MenuItem("MomoiProject/다이얼로그 시스템/그래프", priority = 20)]
         public static void Open() => OpenWith(null);
 
         public static DialogueGraphWindow OpenWith(string id)
@@ -400,7 +400,7 @@ namespace GBible.EditorTools.Graph
     // 연출 프리셋 창: 효과 노드로 프리셋을 만든다. 다이얼로그 그래프에서는 '연출 프리셋' 노드 하나로 쓴다.
     public sealed class EffectPresetWindow : GraphAssetWindow
     {
-        [MenuItem("MomoiProject/다이얼로그 시스템/연출 프리셋", priority = 6)]
+        [MenuItem("MomoiProject/다이얼로그 시스템/연출 프리셋", priority = 21)]
         public static void Open() => OpenWith(null);
 
         public static EffectPresetWindow OpenWith(string id)

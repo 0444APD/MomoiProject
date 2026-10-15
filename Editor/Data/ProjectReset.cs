@@ -16,7 +16,7 @@ namespace GBible.EditorTools
     // 되돌리기:
     //   기록에 없는 파일은 치우고, 바뀐 파일은 기록의 것으로 되돌리고, 지워진 파일은 다시 만든다. 저장 파일(persistentDataPath/MomoiProject 전체)·PlayerPrefs도 지운다.
     //   프로젝트 폴더 바로 아래의 시스템 파일(CLAUDE.md · .claude/ · Docs/PlanningSpec.md · Docs/Decisions.md · steam_appid.txt)도 치운다 — AI가 예전 결정을 따르지 않게.
-    //   (Docs/Source 등 Docs의 다른 파일은 그대로. 'Claude Code 파일 › 맞추지 않기'를 켠 프로젝트의 CLAUDE.md·.claude·Docs는 사람이 쓴 것이라 그대로.)
+    //   (Docs/Source 등 Docs의 다른 파일은 그대로. '개발 › Claude Code 파일 맞추지 않기'를 켠 프로젝트의 CLAUDE.md·.claude·Docs는 사람이 쓴 것이라 그대로.)
     //   열린 씬·DB의 저장 안 된 변경은 먼저 묻는다(저장·버리기·취소).
     //   치우거나 덮어쓴 것은 모두 MomoiProjectBackups/<시각>/에 옮겨 두므로 되돌리기를 되돌릴 수 있다(영구 삭제 없음).
     //   끝나면 Unity를 다시 연다(ProjectSettings·패키지를 깨끗이 다시 읽도록).
@@ -25,8 +25,8 @@ namespace GBible.EditorTools
     {
         public const string BaselineFolder = "MomoiProjectBaseline";
         public const string BackupFolder = "MomoiProjectBackups";
-        const string MenuReset = "MomoiProject/처음 상태로 되돌리기…";
-        const string MenuCapture = "MomoiProject/지금 상태를 처음 상태로 기록";
+        const string MenuReset = "MomoiProject/개발/처음 상태로 되돌리기…";
+        const string MenuCapture = "MomoiProject/개발/지금 상태를 처음 상태로 기록";
         const string GBiblePackage = "Packages/com.momoi.gbible";
 
         static readonly string[] Areas = { "Assets", "ProjectSettings", "Packages" };
@@ -45,7 +45,7 @@ namespace GBible.EditorTools
 
         // ── 처음 상태 기록 ─────────────────────────────────────
 
-        [MenuItem(MenuCapture, priority = 32)]
+        [MenuItem(MenuCapture, priority = 961)]
         static void CaptureFromMenu()
         {
             var message = HasBaseline
@@ -64,7 +64,7 @@ namespace GBible.EditorTools
             try
             {
                 Capture();
-                Debug.Log($"[MomoiProject] 처음 상태를 기록했습니다(메뉴 '처음 상태로 되돌리기'가 이 상태로 돌아옵니다): {BaselineFolder}");
+                Debug.Log($"[MomoiProject] 처음 상태를 기록했습니다(메뉴 '개발 › 처음 상태로 되돌리기'가 이 상태로 돌아옵니다): {BaselineFolder}");
             }
             catch (Exception e)
             {
@@ -89,7 +89,7 @@ namespace GBible.EditorTools
 
         // ── 되돌리기 ───────────────────────────────────────────
 
-        [MenuItem(MenuReset, priority = 31)]
+        [MenuItem(MenuReset, priority = 960)]
         static void ResetFromMenu()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -158,7 +158,7 @@ namespace GBible.EditorTools
                 .Where(p => Directory.Exists(p)).Distinct().ToList();
             var rootItems = RootItems();
             var message =
-                "처음 상태 기록이 없습니다(깨끗한 프로젝트를 처음 열 때 저절로 남거나, 메뉴 '지금 상태를 처음 상태로 기록'으로 남깁니다).\n\n" +
+                "처음 상태 기록이 없습니다(깨끗한 프로젝트를 처음 열 때 저절로 남거나, 메뉴 '개발 › 지금 상태를 처음 상태로 기록'으로 남깁니다).\n\n" +
                 "대신 시스템이 만든 것만 치울 수 있습니다:\n" +
                 string.Join("\n", targets.Select(t => "  " + t + "/")) + (targets.Count > 0 ? "\n" : "") +
                 string.Join("\n", rootItems.Select(r => "  " + RootLabel(r))) + (rootItems.Count > 0 ? "\n" : "") +
@@ -265,7 +265,7 @@ namespace GBible.EditorTools
         // ── 프로젝트 폴더 바로 아래의 시스템 파일(Assets 밖) ─────────────
         // Claude Code 파일(CLAUDE.md · .claude/)·기획 명세서·결정 기록(ClaudeFiles가 만든다)과 Steam App ID 파일(Steam 모듈이 만든다).
         // 남겨 두면 되돌린 뒤에도 AI가 예전 결정·명세를 따른다. Docs/Source(자료)와 Docs의 다른 파일은 개발자 것이라 건드리지 않는다.
-        // 'Claude Code 파일 › 맞추지 않기'를 켠 프로젝트(라이브러리 개발 등)의 CLAUDE.md·.claude·Docs는 시스템이 만든 것이 아니므로 그대로 둔다.
+        // '개발 › Claude Code 파일 맞추지 않기'를 켠 프로젝트(라이브러리 개발 등)의 CLAUDE.md·.claude·Docs는 시스템이 만든 것이 아니므로 그대로 둔다.
         static readonly string[] ClaudeItems = { "CLAUDE.md", ".claude", "Docs/PlanningSpec.md", "Docs/Decisions.md" };
         const string SteamAppIdFile = "steam_appid.txt";
 

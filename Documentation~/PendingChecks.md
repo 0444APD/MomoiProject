@@ -8,7 +8,7 @@ GBible의 동작(규칙·저장·에디터 흐름·멀티의 주고받기)은 �
 
 ## 단계 0 — 준비
 
-전제: `D:\Unity\Projects\UnitySystemProject`(Unity 6000.6.3f1)를 '처음 상태로 되돌리기'(설치 직후)로 돌린 뒤 시작 설정을 한 상태. 선택 기능은 입력(키 바꾸기)·Steam만 켜져 있고(다이얼로그 꺼짐), 언어는 한국어만, DB에는 플레이어 데이터 run·profile, 화면 설정 `screenSettings`(글꼴 빔), Steam(App ID 480)과 예전 스프라이트 규격 파일(`Assets/Dev/Spp/AA/NewSpritePreset.asset` · 그룹 `aa` — 에디터를 열면 틀 `aa`의 크기 줄로 옮겨진다, 1절 '스프라이트 틀' 1)뿐이다. 게임 씬은 `Assets/Dev/Scenes/SampleScene.unity` 하나, 테스트 씬은 아직 없다. 0-1~0-5를 먼저 하고, 빌드가 필요한 항목은 0-6.
+전제: `D:\Unity\Projects\UnitySystemProject`(Unity 6000.6.3f1)를 '개발 › 처음 상태로 되돌리기'(설치 직후)로 돌린 뒤 시작 설정을 한 상태. 선택 기능은 입력(키 바꾸기)·Steam만 켜져 있고(다이얼로그 꺼짐), 언어는 한국어만, DB에는 플레이어 데이터 run·profile, 화면 설정 `screenSettings`(글꼴 빔), Steam(App ID 480)과 예전 스프라이트 규격 파일(`Assets/Dev/Spp/AA/NewSpritePreset.asset` · 그룹 `aa` — 에디터를 열면 틀 `aa`의 크기 줄로 옮겨진다, 1절 '스프라이트 틀' 1)뿐이다. 게임 씬은 `Assets/Dev/Scenes/SampleScene.unity` 하나, 테스트 씬은 아직 없다. 0-1~0-5를 먼저 하고, 빌드가 필요한 항목은 0-6.
 
 ### 0-1. 자주 쓰는 창
 - **DB**: 메뉴 `MomoiProject › DB`(창 이름 'DB'). 왼쪽 사이드바 그룹(시작 파일 · 요소 · 개발 · DEV · 선택 기능 그룹 — 'DB' 그룹은 그 종류의 항목이 생겨야 보인다)에서 탭을 고르고, 항목 줄을 누르면 '상세' 창에 열린다. 칸 이름표는 코드 변수 이름(`font`)이고 마우스를 올리면 한글 이름(글꼴)이 보인다. 바꾼 것은 사이드바 아래 '저장  Ctrl+S'를 눌러야 에셋에 적용된다. 사이드바 맨 아래에 '검증 통과' / '경고 N건' / '검증 오류 N건 · 빌드가 막힙니다'.
@@ -20,8 +20,8 @@ GBible의 동작(규칙·저장·에디터 흐름·멀티의 주고받기)은 �
 
 ### 0-2. 테스트 씬·테스트 패널
 1. `Assets/Dev/Scenes/SampleScene.unity`를 연다.
-2. 메뉴 `MomoiProject › 테스트 › 지금 씬을 복사해 테스트 씬 만들기` → 창 '…Test.unity를 만들었습니다…' → '확인'.
-3. 메뉴 `MomoiProject › 테스트 › 테스트 씬 열기`.
+2. (테스트 씬이 없으면) AI에게 테스트 씬을 만들어 달라고 한다(`TestSceneSetup.Ensure`).
+3. 메뉴 `MomoiProject › 테스트 씬 열기`.
 4. Play → Game 창 왼쪽 위를 본다. Game 창을 한 번 누른 뒤 F1을 두 번(접기·펴기).
 - 정상: 왼쪽 위에 '테스트 패널'이 펼쳐져 있다(맨 위 "슬롯 'test' · 시각 N초" · '접기', 그 아래 시간(×0.5 ×1 ×2 ×4 · '멈춤') · 'Undo (N)' · '새 판' · 멀티 · 리플레이 · 테스트 상황 · 테스트 명령 묶음(세션·저장·시간·Steam …), 길면 스크롤). F1(또는 '접기')로 접으면 '테스트(F1)' 버튼만 남고, 다시 F1(또는 그 버튼)로 편다. 아래 항목의 '패널'은 이 창이다. 멀티 설정은 Hierarchy '[테스트]' › 테스트 씬 컴포넌트(Multiplayer · Latency · Port · Address · Player Name …).
 - 이상하면: Console 첫 줄.
@@ -93,7 +93,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 
 ### 게임 화면 — 언어를 바꾸면 열린 기본 화면 글자도 바로 바뀐다
 준비: 0-2·0-4·0-5.
-1. 메뉴 `MomoiProject › 시작 설정` → 언어에서 'English (en)' 체크 → '적용'(→ `Assets/MomoiProject/Data/Texts/Texts_en.asset`).
+1. 메뉴 `MomoiProject › 개발 › 시작 설정` → 언어에서 'English (en)' 체크 → '적용'(→ `Assets/MomoiProject/Data/Texts/Texts_en.asset`).
 2. Project 창에서 `Texts_en`을 골라 Inspector › Entries에 여섯 줄(Key · Text)을 더하고 Ctrl+S: `momoi.ui.settings` Settings · `momoi.ui.resetAll` Reset All · `momoi.ui.close` Close · `momoi.ui.pause` Pause · `momoi.ui.resume` Resume · `momoi.ui.quit` Quit.
 3. 테스트 씬 Play → Esc → '설정' → language 드롭다운에서 'English'.
 4. 'Close'.
@@ -157,7 +157,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 ### 다이얼로그 — 준비(한 번)
 준비: 0-2. 구조 편집은 켜지 않는다(다이얼로그 그래프는 개발자가 짜는 데이터라 선택지 줄의 '+ 추가'가 늘 보여야 한다).
 1. DB › 사이드바 '다이얼로그 시스템' › '기능 활성화' → '켜기' → 다시 컴파일되면 '스탠딩 프로필'·'장소' 탭과 메뉴 `MomoiProject › 다이얼로그 시스템`이 생긴다.
-2. 메뉴 `MomoiProject › 다이얼로그 시스템 › UI 템플릿 만들기`(→ `Assets/MomoiProject/Data/DialogueUI/DialogueSystem.prefab` 등).
+2. AI에게 다이얼로그 UI 템플릿을 만들어 달라고 한다(`DialogueTemplate.Create()` → `Assets/MomoiProject/Data/DialogueUI/DialogueSystem.prefab` 등).
 3. `Assets\Dev\Art\Check`에 그림을 넣는다: 배경 1장(예: `C:\Windows\Web\Wallpaper\Windows\img0.jpg`), 캐릭터 1장, 이미지 창 1장, 게임 화면용 1장, 창 모드용 같은 크기 PNG 2장(예: 400×500 — ① 테두리만 있고 가운데 투명 ② 꽉 찬 흰 사각형). 2D 프로젝트라 스프라이트로 들어온다.
 4. DB › 다이얼로그 시스템 › 스탠딩 프로필 → '+ 새로 만들기' → ID `hero` → `expressions` 첫 줄의 `sprite` = 캐릭터 그림.
 5. DB › 다이얼로그 시스템 › 장소 → '+ 새로 만들기' → ID `office` → `background` = 배경 그림 → '저장  Ctrl+S'. (이름을 보이려면 `Texts_ko` Entries에 `hero.name` 주인공 · `office.name` 사무실 — 없으면 ID가 보인다.)
@@ -242,7 +242,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 
 ### 다이얼로그 — 시트를 '모든 언어'로 가져와도 이름 줄이 들어간다
 준비: 다이얼로그 — 준비(스탠딩 프로필 `hero`까지).
-1. 메뉴 `MomoiProject › 다국어 › DB 이름 키 채우기` → Console의 '[다국어] 원문 표에 이름 키 N개를 더했습니다…'.
+1. AI에게 DB 이름 키를 채워 달라고 한다(`TextSheetTools.FillCodexNames`) → 원문 표에 `<ID>.name` 키가 생긴다.
 2. `MomoiProject › 다국어 › 시트 내보내기 (CSV)` → `D:\Builds\texts.csv`로 저장.
 3. 메모장으로 그 파일을 열어 `hero.name` 줄의 ko 칸을 `주인공`으로 바꾼다. 대사 줄(그래프의 대사)이 있으면 그 ko 칸도 하나 바꾼다 → UTF-8로 저장.
 4. `MomoiProject › 다국어 › 시트 가져오기 (CSV)` → 그 파일 → 창에서 '모든 언어'.
@@ -264,7 +264,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 10. (크기 바꾸면 다시 굽기) 표의 cardFront 세로를 800으로 → Enter. 이어서 img0 줄 '맞추기' → 'icon'을 다른 곳으로(예외) → '적용' → 표의 icon을 '▾' › 64×64.
 11. (크기 이름 바꾸기·빼기) icon 이름을 `thumb`로 → Enter → thumb 줄 '✕' → 확인 창 '빼기' → Ctrl+Z.
 12. (필드에 연결된 칸) Ctrl+S(부록 B가 만든 적용 전 항목 적용) → DB › 요소 › 클래스 → CheckCard → 클래스 상세의 `art` 줄을 본다 → DB 사이드바 'DB' › 인스턴스 › `checkCard` → 상세의 `art` 칸에 img0을 끌어 놓는다 → 열린 맞춤 창에서 '적용 (모든 크기 굽기)'.
-13. (모두 다시 굽기) 메뉴 `MomoiProject › 스프라이트 틀 모두 다시 굽기`.
+13. (모두 다시 굽기) 틀 인스펙터 '이 틀로 자른 원본'의 **모두 다시 굽기**.
 14. (잘못된 값 동안 남기기) DB 창에서 Ctrl+S(12에서 바꾼 art 칸을 적용해 둔다) → Project 창에서 cardFrame을 고른다 → 표의 thumb 가로를 5로 → Enter → 2초 기다린 뒤 다시 64로 → Enter.
 15. (맞춤 적용 되돌리기) img0의 cardFront png를 Project 창에서 한 번 보아 둔다 → cardFrame을 고른다 → img0 줄 '맞추기' → '공통'에서 캔버스의 먼 곳을 누른다 → '적용' → 맞춤 창이 닫히면 다른 것을 고르지 말고 바로 Ctrl+Z(고르기도 Ctrl+Z에 들어간다) → img0 줄 '맞추기'를 열어 중심을 본 뒤 '취소' → cardFront png를 다시 본다.
 16. (크기 바꾸기 되돌리기) 표의 cardFront 세로를 700으로 → Enter → Ctrl+Z → img0의 cardFront png를 본다.
@@ -387,7 +387,7 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 ### 시작 설정 — 다시 적용해도 겹치지 않는다
 준비: 시작 설정을 마친 이 프로젝트(단계 0 전제). Play 멈춤.
 1. Project 창 `Assets/MomoiProject/Code/Rules/PlayerData.cs`를 고르고 F2 → 이름 `RunData` → Enter(안의 클래스를 다른 파일로 옮긴 것과 같다) → 컴파일이 끝날 때까지 기다린다.
-2. 메뉴 `MomoiProject › 시작 설정` → '적용'.
+2. 메뉴 `MomoiProject › 개발 › 시작 설정` → '적용'.
 3. 컴파일이 끝나면 Console과 Project 창 `Assets/MomoiProject/Code/Rules` 폴더, DB › 요소 › 플레이어 데이터를 본다.
 4. `RunData`의 이름을 다시 `PlayerData`로 바꾼다.
 - 정상: 3에 `PlayerData.cs`가 새로 생기지 않고(`RunData.cs` 하나), Console에 컴파일 오류('… 이미 정의되어 있습니다' CS0101)가 없다. 플레이어 데이터는 `run`·`profile` 그대로이고 새 줄이 생기지 않는다.
@@ -532,8 +532,8 @@ GBible에는 고르기 창·슬롯 화면·연출·씬 전환 페이드·키 바
 
 ## 확인이 끝나면
 
-- 시험하느라 만든 항목·스크립트(`Assets/Dev/Checks`(Editor 포함) · `Assets/Dev/Art`·`Audio`·`Fonts`·`Misc`의 시험 파일 · 스프라이트 틀 `cardFrame`과 `Assets/MomoiProject/Data/Sprites` · DB 설정 넷·`scene`·`hero`·`office`·`checkCard`·`rule.checkCard.art`·`checkStatus`·`checkBigHits` · `Texts_en` · 테스트 상황 `check` · `D:\Builds`의 `status.csv`·`texts.csv` · Test.unity·CheckB · 빌드 씬 목록 · Run In Background · Scripting Backend · Managed Stripping Level · 다이얼로그 기능)는 지우거나, 메뉴 `MomoiProject › 처음 상태로 되돌리기…`로 처음 상태(설치 직후)로 돌린다(저장 파일·PlayerPrefs도 지운다). 그 뒤 시작 설정을 다시 한다.
-- (되돌리기를 고를 때 한 번 — 옮기지 못하는 파일) 되돌리기 전에 `D:\Builds\status.csv`를 탐색기로 `Assets\Dev\Checks`에 복사하고 엑셀로 열어 둔 채(닫지 않는다) `MomoiProject › 처음 상태로 되돌리기…` → 창이 뜨면 '확인' → Unity가 다시 열리면 엑셀을 닫고 `처음 상태로 되돌리기…`를 한 번 더.
+- 시험하느라 만든 항목·스크립트(`Assets/Dev/Checks`(Editor 포함) · `Assets/Dev/Art`·`Audio`·`Fonts`·`Misc`의 시험 파일 · 스프라이트 틀 `cardFrame`과 `Assets/MomoiProject/Data/Sprites` · DB 설정 넷·`scene`·`hero`·`office`·`checkCard`·`rule.checkCard.art`·`checkStatus`·`checkBigHits` · `Texts_en` · 테스트 상황 `check` · `D:\Builds`의 `status.csv`·`texts.csv` · Test.unity·CheckB · 빌드 씬 목록 · Run In Background · Scripting Backend · Managed Stripping Level · 다이얼로그 기능)는 지우거나, 메뉴 `MomoiProject › 개발 › 처음 상태로 되돌리기…`로 처음 상태(설치 직후)로 돌린다(저장 파일·PlayerPrefs도 지운다). 그 뒤 시작 설정을 다시 한다.
+- (되돌리기를 고를 때 한 번 — 옮기지 못하는 파일) 되돌리기 전에 `D:\Builds\status.csv`를 탐색기로 `Assets\Dev\Checks`에 복사하고 엑셀로 열어 둔 채(닫지 않는다) `MomoiProject › 개발 › 처음 상태로 되돌리기…` → 창이 뜨면 '확인' → Unity가 다시 열리면 엑셀을 닫고 `처음 상태로 되돌리기…`를 한 번 더.
   - 정상: 첫 번째에 창 '파일 1개를 옮기지 못해 그대로 두었습니다(다른 프로그램이 열어 두었을 수 있습니다)…'와 그 파일 경로가 뜨고, 나머지는 다 옮겨진 채 Unity가 다시 열린다(중간에 멈추지 않는다). 첫 번째 백업 폴더 `MomoiProjectBackups/<시각>/README.txt`에 '옮기지 못해 프로젝트에 그대로 둔 파일 1개'와 그 경로가 적혀 있다. 두 번째에는 창 없이 남은 것만 옮겨지고, 새 백업 폴더에 `Assets/Dev/Checks/status.csv`가 있다.
   - 이상하면: 창 글, 다시 열린 뒤 Console 첫 줄, `Assets/Dev`에 남은 것.
 - 구조 편집을 켰으면 메뉴 `MomoiProject › 개발 › 구조 편집 열기(라이브러리 개발용)`로 다시 끈다(이 컴퓨터 설정이라 되돌리기로 꺼지지 않는다).

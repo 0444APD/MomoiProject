@@ -104,7 +104,7 @@ GBible로 만드는 **모든 프로젝트의 화면**에서 AI가 지키는 문�
 
 ### 1-10. 다이얼로그 화면
 
-- 모듈의 UI 템플릿(`Assets/MomoiProject/Data/DialogueUI/`)을 반영 스크립트에서 한 번 만든다(메뉴 '다이얼로그 시스템 › UI 템플릿 만들기'와 같음 — `EditorApplication.ExecuteMenuItem`). 요소 이름은 지키고 USS를 이 문서의 재질·크기로 고친다(템플릿 USS 끝에 프로젝트 절을 덧붙인다).
+- 모듈의 UI 템플릿(`Assets/MomoiProject/Data/DialogueUI/`)을 반영 스크립트에서 한 번 만든다(`GBible.EditorTools.Graph.DialogueTemplate.Create()` — 메뉴는 없다. 다이얼로그를 켜면 프로젝트 Editor asmdef가 `GBible.Dialogue.Editor`를 저절로 참조한다). 요소 이름은 지키고 USS를 이 문서의 재질·크기로 고친다(템플릿 USS 끝에 프로젝트 절을 덧붙인다).
 - 다이얼로그는 자기 Panel Settings를 쓴다 — 프로젝트 테마 변수가 닿지 않으므로 색은 값으로 적는다(테마와 같은 값).
 
 ---

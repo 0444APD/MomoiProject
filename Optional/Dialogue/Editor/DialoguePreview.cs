@@ -88,7 +88,7 @@ namespace GBible.EditorTools.Graph
                 .FirstOrDefault(p => p != null && p.GetComponent<DialoguePlayer>() != null);
             if (prefab == null)
             {
-                Debug.LogWarning("[다이얼로그 미리보기] 씬에 DialoguePlayer가 없고 다이얼로그 UI 프리팹도 없습니다. 'MomoiProject › 다이얼로그 시스템 › UI 템플릿 만들기'를 먼저 하세요.");
+                Debug.LogWarning("[다이얼로그 미리보기] 씬에 DialoguePlayer가 없고 다이얼로그 UI 프리팹도 없습니다. AI에게 다이얼로그 화면을 만들어 달라고 하세요(DialogueTemplate.Create).");
                 return null;
             }
             if (Camera.main == null)

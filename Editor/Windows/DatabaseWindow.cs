@@ -129,26 +129,6 @@ namespace GBible.EditorTools
         [MenuItem("MomoiProject/DB", priority = 0)]
         public static void Open() => OpenWindow();
 
-        // 탭마다 옮기는 데 걸린 시간(본문 그리기까지)을 콘솔에 남긴다. 느린 탭을 찾을 때 쓴다.
-        [MenuItem("Tests/DB 탭 전환 시간 재기", priority = 60)]
-        static void MeasureTabs()
-        {
-            var window = OpenWindow();
-            var back = window._selectedType;
-            var lines = new List<string>();
-            var watch = new System.Diagnostics.Stopwatch();
-            watch.Restart();
-            window.RefreshAll();
-            lines.Add($"전체 새로 그리기(검증·사이드바·본문): {watch.Elapsed.TotalMilliseconds:0.0}ms");
-            foreach (var tab in Tabs().Where(t => t.DisabledReason == null))
-            {
-                watch.Restart();
-                window.Navigate(tab.Key);
-                lines.Add($"{tab.Group} › {tab.Label}: {watch.Elapsed.TotalMilliseconds:0.0}ms");
-            }
-            window.Navigate(back);
-            Debug.Log("[MomoiProject] DB 탭 전환 시간\n" + string.Join("\n", lines));
-        }
 
         static DatabaseWindow OpenWindow()
         {

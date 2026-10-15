@@ -544,7 +544,7 @@ namespace GBible
 
         static PanelSettings FallbackPanel()
         {
-            Debug.LogWarning("[MomoiProject] DB › 화면 설정의 Panel Settings가 없어 테마 없는 임시 설정으로 화면을 띄웁니다. 메뉴 MomoiProject › 화면 › 화면 준비를 한 번 누르세요.");
+            Debug.LogWarning("[MomoiProject] DB › 화면 설정의 Panel Settings가 없어 테마 없는 임시 설정으로 화면을 띄웁니다. 에디터를 다시 열면 저절로 만들어집니다(ScreenSetup.Ensure).");
             var panel = ScriptableObject.CreateInstance<PanelSettings>();
             panel.scaleMode = PanelScaleMode.ScaleWithScreenSize;
             panel.referenceResolution = new Vector2Int(1920, 1080);

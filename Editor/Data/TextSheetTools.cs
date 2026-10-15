@@ -62,12 +62,6 @@ namespace GBible.EditorTools
             AssetDatabase.SaveAssetIfDirty(asset);
         }
 
-        [MenuItem(Menu + "설정 열기", priority = 40)]
-        static void OpenSettings()
-        {
-            Selection.activeObject = EnsureSettings();
-            EditorGUIUtility.PingObject(Selection.activeObject);
-        }
 
         // 설정의 모든 언어에 표가 있게 한다(새로 추가한 언어).
         static void FillTables(LocalizationSettings settings)
@@ -81,7 +75,7 @@ namespace GBible.EditorTools
             if (changed) Save(settings);
         }
 
-        [MenuItem(Menu + "시트 내보내기 (CSV)", priority = 41)]
+        [MenuItem(Menu + "시트 내보내기 (CSV)", priority = 60)]
         static void ExportMenu()
         {
             var settings = EnsureSettings();
@@ -130,7 +124,7 @@ namespace GBible.EditorTools
                 yield return row;
         }
 
-        [MenuItem(Menu + "시트 가져오기 (CSV)", priority = 42)]
+        [MenuItem(Menu + "시트 가져오기 (CSV)", priority = 61)]
         static void ImportMenu()
         {
             var settings = EnsureSettings();
@@ -176,7 +170,7 @@ namespace GBible.EditorTools
             return summary;
         }
 
-        [MenuItem(Menu + "번역 검사", priority = 43)]
+        [MenuItem(Menu + "번역 검사", priority = 62)]
         static void CheckMenu()
         {
             var settings = EnsureSettings();
@@ -209,12 +203,7 @@ namespace GBible.EditorTools
             }
         }
 
-        [MenuItem(Menu + "DB 이름 키 채우기", priority = 44)]
-        static void FillNamesMenu()
-        {
-            var added = FillCodexNames(EnsureSettings());
-            Debug.Log(added == 0 ? "[다국어] 새로 채울 이름 키가 없습니다." : $"[다국어] 원문 표에 이름 키 {added}개를 더했습니다(값은 ID, 원문 표에서 이름으로 바꿔 주세요).");
-        }
+
 
         // DB 항목마다 '<id>.name' 키가 원문 표에 있게 한다(없으면 ID를 값으로 더한다).
         public static int FillCodexNames(LocalizationSettings settings)

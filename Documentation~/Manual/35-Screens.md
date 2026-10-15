@@ -187,9 +187,9 @@ protected override void Tick(float deltaTime)
 
 ## 3. 에디터에서 쓰는 법
 
-### 3-1. 화면 준비 — `MomoiProject › 화면 › 화면 준비`
+### 3-1. 화면 준비 — `ScreenSetup.Ensure()`
 
-한 번 누르면 만든다(이미 있으면 건너뛴다):
+AI가 화면 DB 반영 스크립트 맨 앞에서 부르고, 시작 설정을 마친 프로젝트는 에디터를 열 때도 저절로 돈다(메뉴는 없다). 이미 있으면 건너뛴다:
 
 | 만드는 것 | 뜻 |
 |---|---|
@@ -197,7 +197,7 @@ protected override void Tick(float deltaTime)
 | `Assets/MomoiProject/UI/PanelSettings.asset` | 1920×1080 기준 화면 맞춤 + 위 테마 |
 | `Assets/MomoiProject/UI/Theme.uss` | 프로젝트 테마(2-7의 변수). 색·크기를 여기서 고친다 |
 | `Assets/MomoiProject/UI/Screens/` · `Assets/MomoiProject/UI/Items/` | 화면 UXML·USS, 목록 칸 UXML을 둘 폴더 |
-| DB › 화면 설정 `screenSettings`(적용 전) | 위 Panel Settings·테마가 연결된 항목 → Ctrl+S |
+| DB › 화면 설정 `screenSettings` | 위 Panel Settings·테마가 연결된 항목(새 항목이라 저절로 적용) |
 
 ### 3-2. DB › 화면 설정(사이드바 개발 그룹 — 항목 하나, 없으면 에디터가 '화면 준비'와 같이 저절로 만든다)
 
@@ -510,7 +510,7 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 
 | 증상 | 원인 · 고치는 법 |
 |---|---|
-| 경고 "Panel Settings가 없어 테마 없는 임시 설정으로…", 슬라이더·토글 모양이 없음 | 화면 준비(3-1)를 하지 않았다. 메뉴를 누르고 Ctrl+S. |
+| 경고 "Panel Settings가 없어 테마 없는 임시 설정으로…", 슬라이더·토글 모양이 없음 | 화면 준비(3-1)가 안 됐다. 에디터를 다시 열거나 AI에게 `ScreenSetup.Ensure()`를 부탁한다. |
 | 한글이 □로 보인다 | DB › 화면 설정 › 글꼴에 한글 글꼴이 없다. |
 | "[MomoiProject] 없는 화면 'shp'입니다" | ID 오타. `GameIds.Screen` 상수를 쓴다. 저장(Ctrl+S) 전이면 상수가 아직 없다. |
 | "화면 'shop'의 UXML에 이름(name)이 'buy'인 Button이(가) 없습니다" | UXML의 `name`과 코드의 이름이 다르다. 목록 칸 안의 버튼은 `Q`가 아니라 `element.Q<Button>()`(칸 안에서 찾기). |

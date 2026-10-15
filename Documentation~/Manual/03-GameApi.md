@@ -120,7 +120,7 @@ Game.Data().PlayerGold += 100;                         // 단순 값: get/set
 Game.Data().PlayerInventory.items.Add(new Item());     // 클래스 값: 실제 객체
 ```
 
-`MomoiProject › 식별자 코드 다시 만들기`(DB를 저장하면 자동)로 생기는 확장 메서드다. 이름은 플레이어 데이터 ID의 파스칼 표기다.
+DB를 저장하면 저절로 만들어지는 식별자 코드(`GameIds.cs`)의 확장 메서드다. 이름은 플레이어 데이터 ID의 파스칼 표기다.
 
 ### 2.8 `Game.Do(action)` — 행동 실행
 

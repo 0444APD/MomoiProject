@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 namespace GBible.EditorTools
 {
     // 화면(UI Toolkit) 준비: Assets/UI에 기본 테마(.tss)·Panel Settings·프로젝트 테마 USS를 만들고, DB › 화면 설정 항목을 적용 전으로 만든다.
-    // 이미 있는 파일·항목은 건너뛴다(사람이 고친 것을 덮지 않는다). 시작 설정·DB 추가 메뉴에서도 부른다(ScreenSetup.Ensure()).
+    // 이미 있는 파일·항목은 건너뛴다(사람이 고친 것을 덮지 않는다). AI의 DB 반영 스크립트 · 에디터 정리(Upkeep)가 부른다(ScreenSetup.Ensure()).
     // 폴더: Assets/MomoiProject/UI/Screens(화면 UXML·USS), Assets/MomoiProject/UI/Items(목록 한 칸 UXML). 화면 코드는 Assets/MomoiProject/Code/Client/Screens.
     public static class ScreenSetup
     {
@@ -18,14 +18,6 @@ namespace GBible.EditorTools
         public const string PanelFile = Folder + "/PanelSettings.asset";
         public const string ProjectThemeFile = Folder + "/Theme.uss";
 
-        [MenuItem("MomoiProject/화면/화면 준비", priority = 60)]
-        static void Prepare()
-        {
-            var made = Ensure();
-            DatabaseWindow.Open();
-            EditorUtility.DisplayDialog("화면 준비",
-                made.Count == 0 ? "화면 준비가 이미 되어 있습니다." : "만든 것:\n- " + string.Join("\n- ", made) + "\n\nDB › 화면 설정을 확인하고 Ctrl+S로 적용하세요.", "확인");
-        }
 
         // 만든 것의 목록을 돌려준다(없으면 빈 목록). commit: DB 항목을 작업본이 아니라 바로 저장한다(에디터가 저절로 만들 때 — EditorDatabase.Upkeep).
         public static List<string> Ensure(bool commit = false)

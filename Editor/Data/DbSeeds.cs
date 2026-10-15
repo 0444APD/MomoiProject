@@ -12,7 +12,7 @@ namespace GBible.EditorTools
     //   함수 안에서 EditorDatabase.Staging.Add·Work·Remove로 항목을 만들고·고치고·지운다.
     //   **새 항목은 저절로 적용한다**(새로 들어온 것만 — 무엇이 들어왔는지는 콘솔과 DB 창 알림으로). 개발자가 Ctrl+S를 누르지 않아도 GameIds가 생긴다.
     //   **고치기·지우기·ID 바꾸기는 '적용 전'으로 남고**, 개발자가 읽어 본 뒤 Ctrl+S로 적용한다(개발자가 만지던 항목을 말없이 바꾸지 않게).
-    //   메뉴 'MomoiProject › DB 반영 스크립트 › 새 항목은 바로 적용'을 끄면 예전처럼 새 항목도 '적용 전'으로 둔다.
+    //   메뉴 'MomoiProject › 개발 › DB 반영 스크립트 — 새 항목은 바로 적용'을 끄면 예전처럼 새 항목도 '적용 전'으로 둔다.
     //   고치기·지우기가 남았으면 적용했을 때 "이 버전은 돌았다"로 기록한다(버리면 다음 컴파일 뒤 다시 돈다). 남은 것이 없으면 바로 기록.
     //   돌린 뒤 바뀐 것이 없으면(이미 있는 항목뿐 · 같은 값으로 Work만 함) 바로 기록한다. 숨은 칸([HideInInspector])만 바꿔도 바뀐 것으로 본다.
     //   내용을 바꾸면 버전을 올린다("1" → "2"). 이미 있는 항목은 건너뛰고(개발자가 맞춘 값을 덮지 않는다), 고쳐야 할 때만 Work.
@@ -27,7 +27,7 @@ namespace GBible.EditorTools
     //           …
     //       }
     //   }
-    // 기록: ProjectSettings/MomoiProject/DbSeeds.json(팀과 공유). 메뉴 'MomoiProject › DB 반영 스크립트 › 모두 다시 돌리기'.
+    // 기록: ProjectSettings/MomoiProject/DbSeeds.json(팀과 공유). 메뉴 'MomoiProject › 개발 › DB 반영 스크립트 모두 다시 돌리기'.
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class DbSeedAttribute : Attribute
     {
@@ -46,7 +46,7 @@ namespace GBible.EditorTools
         // 돌렸지만 아직 적용(Ctrl+S)하지 않은 것(컴파일 사이에는 유지, Unity를 닫으면 사라진다 → 다음에 다시 돈다).
         static readonly string PendingKey = LegacyNames.Session("GBible.DbSeeds.Pending");
         public const string OptionsPath = "ProjectSettings/MomoiProject/DbSeedOptions.json";
-        const string MenuAutoApply = "MomoiProject/DB 반영 스크립트/새 항목은 바로 적용";
+        const string MenuAutoApply = "MomoiProject/개발/DB 반영 스크립트 — 새 항목은 바로 적용";
         // 새 항목을 저절로 적용하는 동안: 적용 뒤의 기록(AfterCommit)은 여기서 따로 정한다.
         static bool _autoApplying;
 
@@ -71,7 +71,7 @@ namespace GBible.EditorTools
             }
         }
 
-        [MenuItem(MenuAutoApply, priority = 62)]
+        [MenuItem(MenuAutoApply, priority = 921)]
         static void ToggleAutoApply() => AutoApplyNew = !AutoApplyNew;
 
         [MenuItem(MenuAutoApply, true)]
@@ -113,7 +113,7 @@ namespace GBible.EditorTools
             RunPending(force: false);
         }
 
-        [MenuItem("MomoiProject/DB 반영 스크립트/모두 다시 돌리기", priority = 61)]
+        [MenuItem("MomoiProject/개발/DB 반영 스크립트 모두 다시 돌리기", priority = 920)]
         static void RunAllMenu()
         {
             var count = RunPending(force: true);

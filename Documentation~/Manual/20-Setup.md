@@ -194,7 +194,7 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 
 게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 
-출시 여부는 메뉴 `MomoiProject → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
+출시 여부는 메뉴 `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
 
 - 개발 중(체크 해제, 기본): 데이터 구조가 호환되지 않게 바뀌면 저장을 변환하지 않고 초기화한다 — 맞지 않는 그 파일만 `이름.reset-<시각>.json`으로 옆에 옮긴다(지우지 않는다). 기록에 "개발 중 데이터 구조가 바뀌어 run.json을(를) 초기화했습니다: …" 경고가 남는다(`06-SaveLoad.md` 1.1).
 - 출시됨(체크): 저장을 초기화하지 않는다. ID 이름 바꾸기 이력을 남겨 예전 이름으로 저장된 값을 이어받고, 구조 변경은 저장 버전 변환(DB › 개발 › 저장 변환 표, 또는 코드의 `Migrations`)으로 처리한다.
@@ -588,7 +588,7 @@ static class FeatureCheck
 ### 에디터에서
 
 - 자동: DB 변경을 저장(Ctrl+S)하면 다시 만든다. 내용이 같으면 파일을 건드리지 않는다.
-- 수동: 메뉴 `MomoiProject → 식별자 코드 다시 만들기`. 콘솔에 "[MomoiProject] 식별자 코드를 만들었습니다: 경로"가 찍힌다.
+- 수동 메뉴는 없다. 코드에서 다시 만들려면 `GameIdsGenerator.Generate(force: true)`(에디터).
 - 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다). 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProject/Generated/`. `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다.
 
 ### 코드로 쓰는 법
@@ -720,14 +720,14 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 
 ## 10. 처음 상태로 되돌리기
 
-**한 줄 요약.** 메뉴 `MomoiProject → 처음 상태로 되돌리기…`는 프로젝트를 "막 만들고 Momoi Project와 필요한 에셋만 설치한" 상태로 되돌린다. 개발자가 더하고 바꾼 것은 모두 백업 폴더로 옮겨지고, Unity가 다시 열린다.
+**한 줄 요약.** 메뉴 `MomoiProject → 개발 → 처음 상태로 되돌리기…`는 프로젝트를 "막 만들고 Momoi Project와 필요한 에셋만 설치한" 상태로 되돌린다. 개발자가 더하고 바꾼 것은 모두 백업 폴더로 옮겨지고, Unity가 다시 열린다.
 
 **언제.** 시험 삼아 이것저것 만들어 본 프로젝트를 깨끗하게 다시 시작할 때.
 
 ### 처음 상태 기록
 - 프로젝트 폴더 바로 아래 `MomoiProjectBaseline/`에 Assets·ProjectSettings·Packages(GBible 자신은 빼고)의 사본을 둔다. Assets 밖이라 Unity가 읽지 않는다.
 - **저절로 남는 때:** 시스템이 아직 아무것도 만들지 않은 깨끗한 프로젝트(`Assets/MomoiProject`·`Assets/Dev`·시작 설정 표시가 없음)를 처음 열 때, 시작 설정 창이 뜨기 전에 남긴다. 콘솔에 "처음 상태를 기록했습니다"가 나온다.
-- **직접 남기기:** 메뉴 `MomoiProject → 지금 상태를 처음 상태로 기록`. 이미 있으면 덮어쓴다. 프로젝트를 막 만든 깨끗한 때에만 한다(예: Odin 같은 필수 에셋까지 설치한 직후).
+- **직접 남기기:** 메뉴 `MomoiProject → 개발 → 지금 상태를 처음 상태로 기록`. 이미 있으면 덮어쓴다. 프로젝트를 막 만든 깨끗한 때에만 한다(예: Odin 같은 필수 에셋까지 설치한 직후).
 
 ### 되돌리기가 하는 일
 | 대상 | 처리 |
@@ -736,7 +736,7 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 | 기록과 내용이 다른 파일(바꾼 설정·씬) | 기록의 것으로 되돌린다 |
 | 기록에는 있는데 지운 파일 | 다시 만든다 |
 | 저장 파일(`persistentDataPath/MomoiProject` 전체 — 슬롯 `slots/`·`Replays/`·`server/`·`Tests/` 포함) | 치운다 |
-| 프로젝트 폴더의 시스템 파일(`CLAUDE.md`·`.claude/`·`Docs/PlanningSpec.md`·`Docs/Decisions.md`·`steam_appid.txt`) | 치운다(AI가 예전 결정을 따르지 않게). 'Claude Code 파일 › 맞추지 않기'를 켰으면 Claude 파일은 그대로. `Docs/Source` 등 Docs의 다른 파일은 그대로 |
+| 프로젝트 폴더의 시스템 파일(`CLAUDE.md`·`.claude/`·`Docs/PlanningSpec.md`·`Docs/Decisions.md`·`steam_appid.txt`) | 치운다(AI가 예전 결정을 따르지 않게). '개발 › Claude Code 파일 맞추지 않기'를 켰으면 Claude 파일은 그대로. `Docs/Source` 등 Docs의 다른 파일은 그대로 |
 | PlayerPrefs | 모두 지운다 |
 | 그대로 두는 것 | `Packages/com.momoi.gbible`(시스템 자신), `ProjectSettings/ProjectVersion.txt`, `Library`·`UserSettings` |
 
@@ -771,7 +771,7 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 
 ## 11. Claude Code 파일
 
-**한 줄 요약.** 시작 설정을 적용하면 프로젝트 루트에 AI(Claude Code)가 쓸 파일을 만든다. 에디터를 열 때마다 패키지 경로·템플릿이 바뀌었으면 다시 맞춘다(메뉴 `MomoiProject → Claude Code 파일 → 지금 맞추기`).
+**한 줄 요약.** 시작 설정을 적용하면 프로젝트 루트에 AI(Claude Code)가 쓸 파일을 만든다. 에디터를 열 때마다 패키지 경로·템플릿이 바뀌었으면 다시 맞춘다(메뉴 `MomoiProject → 개발 → Claude Code 파일 지금 맞추기`).
 
 | 파일 | 하는 일 | 다시 맞출 때 |
 |---|---|---|
@@ -783,5 +783,5 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 
 - 템플릿은 패키지 `Documentation~/AI/Templates`, 컴파일 검사는 `Tools~/compile-check.ps1`이다. `{{GBIBLE}}` 자리에 프로젝트에서 본 패키지 경로(`Packages/com.momoi.gbible` 또는 `Library/PackageCache/com.momoi.gbible@…`)가 들어간다.
 - **컴파일 검사**: Unity가 만든 `.csproj`(Preferences › External Tools의 프로젝트 파일)의 참조·심볼을 빌려 `Assets` 아래 asmdef마다 그 폴더의 `.cs`를 직접 컴파일한다(Unity를 연 채로도, 방금 만든 파일도). 마지막으로 통과한 뒤 바뀐 파일·폴더가 없으면 바로 끝난다. Unity 설치 폴더는 `ProjectVersion.txt`의 버전으로 Hub 폴더에서 찾는다(못 찾으면 환경 변수 `MOMOI_UNITY_EDITOR_DATA`에 `…\Editor\Data`). csproj가 아직 없는 어셈블리는 건너뛰고 알린다. **UXML도 본다**: `Assets`·패키지 아래 모든 `.uxml`을 XML로 읽어 보고, 읽히지 않으면(흔히 주석 안의 `--`) 경로·줄과 함께 막는다 — 그런 UXML은 Unity가 가져오지 못해 화면이 예전 모습이나 빈 채로 열리고, 콘솔에는 가져올 때 한 번만(파일 이름 없이) 남는다. 같은 오류로 세 번 넘게 막지는 않는다. 손으로: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/compile-check.ps1 -Always`.
-- **맞추지 않기**: 메뉴 `MomoiProject → Claude Code 파일 → 맞추지 않기`(표시 `ProjectSettings/MomoiProject/ClaudeFiles.off`). 켜면 만들지도 고치지도 않는다. 이미 있는 파일은 그대로다.
+- **맞추지 않기**: 메뉴 `MomoiProject → 개발 → Claude Code 파일 맞추지 않기`(표시 `ProjectSettings/MomoiProject/ClaudeFiles.off`). 켜면 만들지도 고치지도 않는다. 이미 있는 파일은 그대로다.
 - `.claude/settings.json`을 읽지 못하면(손으로 쓴 JSON 오류) 건드리지 않고 콘솔에 경고한다. 그때는 `hooks.Stop`에 위 명령을 직접 넣는다.

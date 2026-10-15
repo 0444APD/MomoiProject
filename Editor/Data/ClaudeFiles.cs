@@ -49,12 +49,12 @@ namespace GBible.EditorTools
 
         // 이 파일이 있으면 맞추지 않는다(라이브러리 개발 프로젝트처럼 게임 규칙을 Claude에 넣지 않을 곳).
         public const string OffMarker = "ProjectSettings/MomoiProject/ClaudeFiles.off";
-        const string MenuSync = "MomoiProject/Claude Code 파일/지금 맞추기";
-        const string MenuOff = "MomoiProject/Claude Code 파일/맞추지 않기";
+        const string MenuSync = "MomoiProject/개발/Claude Code 파일 지금 맞추기";
+        const string MenuOff = "MomoiProject/개발/Claude Code 파일 맞추지 않기";
 
         public static bool IsOff => File.Exists(Path.Combine(ProjectRoot, OffMarker));
 
-        [MenuItem(MenuSync, priority = 70)]
+        [MenuItem(MenuSync, priority = 940)]
         static void SyncMenu()
         {
             if (IsOff)
@@ -68,7 +68,7 @@ namespace GBible.EditorTools
         }
 
         // 켜면 시작 설정·에디터 열기에서 Claude Code 파일을 만들지도 고치지도 않는다(이미 있는 파일은 그대로 둔다).
-        [MenuItem(MenuOff, priority = 71)]
+        [MenuItem(MenuOff, priority = 941)]
         static void ToggleOff()
         {
             var path = Path.Combine(ProjectRoot, OffMarker);
@@ -76,7 +76,7 @@ namespace GBible.EditorTools
             else
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(path, "Claude Code 파일(CLAUDE.md·.claude)을 맞추지 않는다. 메뉴 MomoiProject › Claude Code 파일 › 맞추지 않기로 끈다.\n", new UTF8Encoding(false));
+                File.WriteAllText(path, "Claude Code 파일(CLAUDE.md·.claude)을 맞추지 않는다. 메뉴 MomoiProject › 개발 › Claude Code 파일 맞추지 않기로 끈다.\n", new UTF8Encoding(false));
             }
         }
 

@@ -6,12 +6,12 @@ namespace GBible.EditorTools
 {
     // MomoiProject 창을 여는 공통 방법.
     // 기본은 유틸리티 창: Unity의 탭 막대 없이 떠 있는 창(제목은 OS 창 제목줄에). 도킹은 안 되고 Unity 메인 창 위에 뜬다.
-    // 메뉴 'MomoiProject/창 탭 막대 숨기기'를 끄면 예전처럼 도킹되는 탭 창으로 연다.
+    // 메뉴 'MomoiProject › 개발 › 창 탭 막대 숨기기'를 끄면 예전처럼 도킹되는 탭 창으로 연다.
     // 이미 도킹된 탭으로 열려 있던 창은 그대로 쓰므로, 바꾼 뒤에는 한 번 닫고 다시 연다.
     public static class GsWindows
     {
         const string PrefKey = "GBible.UtilityWindows";
-        const string MenuPath = "MomoiProject/창 탭 막대 숨기기";
+        const string MenuPath = "MomoiProject/개발/창 탭 막대 숨기기";
 
         public static bool Utility
         {
@@ -34,7 +34,7 @@ namespace GBible.EditorTools
             return window;
         }
 
-        [MenuItem(MenuPath, priority = 900)]
+        [MenuItem(MenuPath, priority = 981)]
         static void Toggle()
         {
             Utility = !Utility;
