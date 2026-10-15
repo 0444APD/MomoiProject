@@ -35,7 +35,7 @@ namespace MomoiProject
             {
                 var showing = _enemyBar.preview != 0f;
                 _enemyBar.Preview(showing ? 0f : -Mathf.Min(Hit, _enemy) / (float)EnemyMax);   // 잃을 양을 미리
-                _hint.text = showing ? "" : $"예상 피해 {Mathf.Min(Hit, _enemy)}";
+                _hint.text = showing ? "" : $"−{Mathf.Min(Hit, _enemy)}";      // 글만 놓이는 강조 숫자(kit-t-number)
             });
             OnClick("attack", () =>
             {

@@ -135,12 +135,12 @@
 .sample-bars-buff-bar { width: 44px; margin-top: 4px; }
 .sample-bars-enemy { position: absolute; right: 48px; top: 40px; width: 420px; }
 .sample-bars-enemy-bar { width: 420px; }
-.sample-bars-hint { margin: 8px 0 0 0; padding: 0; font-size: 14px; color: var(--kit-dim); -unity-text-align: middle-right; }
+.sample-bars-hint { margin: 8px 0 0 0; padding: 0; -unity-text-align: middle-right; }
 .sample-bars-load { position: absolute; left: 720px; top: 500px; width: 480px; align-items: center; }
 .sample-bars-load-bar { width: 480px; }
-.sample-bars-load-text { margin: 8px 0 0 0; padding: 0; font-size: 14px; color: var(--kit-light); }
+.sample-bars-load-text { margin: 8px 0 0 0; padding: 0; }
 .sample-bars-xp { position: absolute; left: 48px; right: 48px; bottom: 28px; flex-direction: row; align-items: center; }
-.sample-bars-level { margin: 0 16px 0 0; padding: 0; font-size: 14px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-bars-level { margin: 0 16px 0 0; padding: 0; }
 .sample-bars-xp-bar { flex-grow: 1; }
 .sample-bars-controls { position: absolute; right: 48px; top: 300px; width: 220px; }
 .sample-bars-controls .kit-bt { margin: 0 0 8px 0; }

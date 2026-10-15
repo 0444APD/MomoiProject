@@ -20,7 +20,7 @@
 
 | 요소 | 쓰는 것 | 메모 |
 |---|---|---|
-| 글 | `kit-t-display`(44 굵게 — 화면 이름) · `-title`(28) · `-heading`(20) · `-body`(16) · `-small`(14) · `-caption`(12 굵게, 자간 2) | 글 색은 본문 · 흐린 글 · 꼬리표 세 단계 |
+| 글 | `kit-t-display`(44 굵게 — 화면 이름) · `-title`(28) · `-heading`(20) · `-body`(16) · `-small`(14) · `-caption`(12 굵게, 자간 2) | 글 색은 본문 · 흐린 글 · 꼬리표 세 단계. **강조 숫자** `kit-t-number`(글 단계 클래스와 함께) — 장면 위에 글만 놓이는 숫자(피해 · 재화 · 레벨 · %)는 판 대신 글꼴의 외곽선 · 그림자로(개발자 2026-10-15). 색 `--kit-number-*`, 숫자 전용 글꼴 에셋이 있으면 `-unity-font-definition`으로 바꿔 끼운다 |
 | 패널 | `<MomoiProject.KitPanel shape="Round" pattern="Shards" seed="n" class="kit-pn-dark kit-pn-c12">` | 색 `kit-pn-dark · paper · gray · stone · sand`, 조각 `kit-pn-faint`(0.005 — UI 배경) · 기본 0.009 · `kit-pn-max`(0.014), 모서리 `kit-pn-c6 · c12 · c18 · c28`, 모서리마다 `corners="tr:24 bl:24"`(r 둥글게 · c 자르기), 선 `line="Inset · Outer · Double"` |
 | 라인 디자인 | `<MomoiProject.KitOutline layer="Front" gap="10" cut="…" split="…" marks="tl:cross:on" class="kit-outline kit-ol-on-paper" />` | 요소 규격(UiGuide 3-1): 앞 · 뒤, 치우침 `skew`, 끊기 `cut`, 불규칙 분할 `split`, 두 겹 `doubled`, 약 · 강 `weight`, 8지점 장식 `marks`. 비켜 갈 칸에 `kit-ol-block` |
 | 선 포인트 | `<MomoiProject.KitAccent kind="BackBox" class="kit-accent kit-ac-on-dark" />` | 7가지(네 모서리 ㄱ · 두 모서리 ㄱ · 두 면 · 마주 보는 ㄱ · 끊긴 테두리 · 원호 모서리 · 뒤 상자). **한 화면에 포인트 패널 하나** |

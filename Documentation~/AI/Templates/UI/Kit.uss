@@ -53,6 +53,10 @@
     --kit-bar-loss: rgba(255, 255, 255, 0.55);   /* 예상 — 잃을 양 */
     --kit-bar-gain: rgba(150, 214, 150, 0.7);    /* 예상 — 얻을 양 */
     --kit-bar-tick: rgba(0, 0, 0, 0.4);          /* 칸 나눔 눈금 */
+    /* 강조 숫자(kit-t-number — 장면 위에 홀로 놓이는 숫자는 판 대신 글꼴의 외곽선 · 그림자로, 개발자 2026-10-15) */
+    --kit-number: rgb(250, 248, 244);
+    --kit-number-outline: rgba(20, 21, 24, 0.92);
+    --kit-number-shadow: rgba(0, 0, 0, 0.45);
 }
 
 /* ── 글 단계(UiGuide 2-4) ── */
@@ -62,6 +66,8 @@
 .kit-t-body { font-size: 16px; white-space: normal; }
 .kit-t-small { font-size: 14px; white-space: normal; }
 .kit-t-caption { font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; }
+/* 강조 숫자: 장면 위에 글만 놓일 때(피해 숫자 · 재화 · 레벨 · % · 예상 수치). 크기는 글 단계 클래스와 함께. 숫자 전용 글꼴 에셋이 있으면 -unity-font-definition으로 바꿔 끼운다 */
+.kit-t-number { -unity-font-style: bold; color: var(--kit-number); -unity-text-outline-width: 1.5px; -unity-text-outline-color: var(--kit-number-outline); text-shadow: 0px 2px 3px var(--kit-number-shadow); }
 
 /* ── 패널 색(KitPanel이 읽는다). 조각 명암 차 기본 0.009(패널) · 0.005(UI 배경 — kit-pn-faint) · 최대 0.014 ── */
 .kit-pn-dark { --panel-fill: var(--kit-dark); --panel-shard: 0.009; color: var(--kit-light); }

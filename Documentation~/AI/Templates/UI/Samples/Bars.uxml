@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <!-- 견본 · 막대(KitBar)와 장면 위 UI(UiGuide 3-1, 개발자 2026-10-15): 패널로 정보를 전하는 창이 아니면 묶는 패널 없이 여백으로만 정리하고,
          스프라이트를 품은 요소(초상 · 아이콘 칸)만 패널로 가둔다. 막대는 굵기(thin · 기본 · thick) · 색(hp · mp · xp · load · buff 클래스) · 칸 나눔 · 자국 · 예상만 바꾼다.
-         코드 BarsSample.cs.txt가 버튼으로 값을 바꿔 본다(실제 게임은 행동이 바꾼 값을 읽어 Set). 장면 자리(sample-bars-scene)는 월드 장면 대신 -->
+         글만 홀로 놓이는 것은 강조 숫자(레벨 · % · 예상 피해)뿐 — kit-t-number(글꼴의 외곽선 · 그림자). 코드 BarsSample.cs.txt가 버튼으로 값을 바꿔 본다(실제 게임은 행동이 바꾼 값을 읽어 Set). 장면 자리(sample-bars-scene)는 월드 장면 대신 -->
     <ui:VisualElement class="kit-fill sample-bars-scene" picking-mode="Ignore">
         <ui:VisualElement class="sample-bars-me">
             <MomoiProject.KitPanel shape="Round" pattern="None" class="sample-bars-portrait kit-pn-dark kit-pn-c12"><ui:VisualElement class="sample-bars-portrait-art" /></MomoiProject.KitPanel>
@@ -28,14 +28,14 @@
         <ui:VisualElement class="sample-bars-enemy">
             <ui:Label text="녹슨 수호자" class="sample-bars-name sample-bars-name--right" />
             <MomoiProject.KitBar name="enemy" value="0.9" from-right="true" segments="4" class="kit-bar kit-bar--thick kit-bar--hp sample-bars-enemy-bar" />
-            <ui:Label name="enemy-hint" text="" class="sample-bars-hint" />
+            <ui:Label name="enemy-hint" text="" class="kit-t-heading kit-t-number sample-bars-hint" />
         </ui:VisualElement>
         <ui:VisualElement class="sample-bars-load">
             <MomoiProject.KitBar name="load" value="0" trail="false" class="kit-bar kit-bar--thin kit-bar--load sample-bars-load-bar" />
-            <ui:Label name="load-text" text="0%" class="sample-bars-load-text" />
+            <ui:Label name="load-text" text="0%" class="kit-t-heading kit-t-number sample-bars-load-text" />
         </ui:VisualElement>
         <ui:VisualElement class="sample-bars-xp">
-            <ui:Label name="level" text="Lv 12" class="sample-bars-level" />
+            <ui:Label name="level" text="Lv 12" class="kit-t-heading kit-t-number sample-bars-level" />
             <MomoiProject.KitBar name="xp" value="0.35" class="kit-bar kit-bar--thin kit-bar--xp sample-bars-xp-bar" />
         </ui:VisualElement>
         <ui:VisualElement class="sample-bars-controls">
