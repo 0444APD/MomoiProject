@@ -109,7 +109,7 @@ string line = Texts.Get("reward.gain", ("item", "dragonArmor"), ("count", 3));
 // → "용의 비늘 갑옷을 3개 얻었습니다."
 ```
 
-**`Texts.Get(키, new { … })`** — 익명 객체로.
+**`Texts.Get(키, new { … })`** — 익명 객체로. 부를 때마다 리플렉션으로 값을 읽으므로 [필수] 게임이 도는 동안 부르는 곳(화면 · 규칙 · 연출)에서는 쓰지 않고 튜플 판(위)을 쓴다(실행 중 리플렉션 금지 — 관례 첫머리). 에디터 도구 · 한 번만 부르는 곳에서만.
 
 ```csharp
 string same = Texts.Get("reward.gain", new { item = "dragonArmor", count = 3 });
