@@ -148,6 +148,31 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 투영하면_사람마다_보이는_요소만_같은_키_이름으로_받고_서버의_찾기는_원본을_본다()
+        {
+            var rig = new Rig();
+            // 1번은 체력 9 이상만, 2번은 a를 뺀 것만 본다(안개 속 유닛).
+            rig.Server.Project<NtParty>("party", (player, all) => new NtParty { units = all.units.Where(u => player == 1 ? u.hp >= 9 : u.id != "a").ToList() });
+            var first = rig.Join("철수");
+            var second = rig.Join("영희");
+            CollectionAssert.AreEqual(new[] { "a" }, first.Session.Data.Get<NtParty>("party").units.Select(u => u.id).ToArray(), "1번: a(10)만");
+            CollectionAssert.AreEqual(new[] { "b" }, second.Session.Data.Get<NtParty>("party").units.Select(u => u.id).ToArray(), "2번: b만");
+
+            // 2번이 b를 친다 → 서버는 원본 b를 찾아 고치고(사본이 아니라), 투영이 다시 만들어진다.
+            second.Session.Do(new NtStrike { unit = second.Session.Data.Get<NtParty>("party").units[0], damage = 3 });
+            rig.Pump();
+            Assert.AreEqual(5, UnitOf(rig.ServerSession, "b").hp, "서버의 원본이 바뀌었다");
+            Assert.AreSame(UnitOf(rig.ServerSession, "b"), rig.ServerSession.Game.Find<NtUnit>("b"), "찾기는 투영 사본을 보지 않는다");
+            Assert.AreEqual(5, second.Session.Data.Get<NtParty>("party").units[0].hp, "2번의 모습도 따라온다");
+            CollectionAssert.AreEqual(new[] { "a" }, first.Session.Data.Get<NtParty>("party").units.Select(u => u.id).ToArray(), "1번에는 여전히 b가 없다");
+
+            // a의 체력이 9 아래로 내려가면 1번에게서도 사라진다.
+            rig.ServerSession.Do(new NtStrike { unit = UnitOf(rig.ServerSession, "a"), damage = 5 });
+            rig.Pump();
+            Assert.AreEqual(0, first.Session.Data.Get<NtParty>("party").units.Count);
+        }
+
+        [Test]
         public void 실패한_행동의_되돌림은_객체_번호를_바꾸지_않는다()
         {
             var rig = new Rig();

@@ -107,6 +107,7 @@ namespace GBible
             session.Events.Retracted += OnRetracted;
             session.Actions.Executed += OnExecuted;
             session.Actions.TransactionAborted += OnAborted;
+            session.Actions.Committing += UpdateProjections;
         }
 
         public GameSession Session => _session;
@@ -143,6 +144,76 @@ namespace GBible
             PlayerJoined?.Invoke(player);
             BroadcastPlayers();
             return player;
+        }
+
+        // ── 객체 단위 공개(투영) ─────────────────────────────────
+        // 키 하나를 플레이어마다 다르게 보이게 한다(안개 속 유닛 · 상대의 숨긴 칸): view(플레이어 번호, 원래 값)가 그 사람에게 보일 모습을 만든다
+        // (새 객체 — 원래 값을 고치지 않는다. 안에 원래 값의 요소를 넣어도 된다 — 저장소가 복사한다).
+        // 서버는 바깥 행동이 끝나기 직전(그 행동 안 — Undo도 같이)마다 '<키>@<번호>'(그 사람만 보는 키)를 다시 만들고, 보낼 때는 원래 이름 <키>로 보낸다 —
+        // 클라이언트 코드는 싱글과 똑같이 <키>를 읽는다. 원래 키는 서버만 안다. 방장(서버와 같은 프로그램)은 서버 세션을 그대로 쓰므로 다 본다.
+        // 등록은 서버 규칙 자리에서(GameNet.ServerStarted · RoomStarting): server.Project<Army>(GameIds.PlayerData.Units.Id, (player, all) => 보일 모습);
+        public void Project(string key, Func<int, object, object> view)
+        {
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 투영할 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
+            _projections[key] = view ?? throw new ArgumentNullException(nameof(view));
+            if (_session.Data.IsDefined(key)) _session.Data.SetVisibility(key, DataVisibility.Server);
+            foreach (var player in _players.Where(p => !p.IsLocal)) RefreshProjection(key, player.Id);
+        }
+
+        public void Project<T>(string key, Func<int, T, T> view) where T : class => Project(key, (player, value) => view(player, value as T));
+
+        // 상태 효과($statuses) · 이번 판 보정($modifiers)도 그 사람에게 보이는 가진 쪽 것만 보낸다 — 숨긴 유닛에 걸린 것 · 쓴 순간(쿨다운)이 새지 않게.
+        //   server.HideStatuses((player, holderId) => Sees(server.Session, player, holderId));
+        public void HideStatuses(Func<int, string, bool> visibleHolder)
+        {
+            if (visibleHolder == null) throw new ArgumentNullException(nameof(visibleHolder));
+            Project<StatusList>(StatusSystem.Key, (player, all) => new StatusList { items = (all?.items ?? new List<ActiveStatus>()).Where(s => s != null && visibleHolder(player, s.target)).ToList() });
+            Project<ModifierList>(AttributeSystem.SessionKey, (player, all) => new ModifierList { items = (all?.items ?? new List<Modifier>()).Where(m => m != null && visibleHolder(player, m.target)).ToList() });
+        }
+
+        readonly Dictionary<string, Func<int, object, object>> _projections = new Dictionary<string, Func<int, object, object>>(StringComparer.Ordinal);
+
+        static string ProjectionKey(string key, int player) => key + "@" + player.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        // 보낼 때의 이름: 투영 키('<키>@<번호>')면 원래 키 이름.
+        string WireName(string key)
+        {
+            if (_projections.Count == 0 || key == null) return key;
+            var at = key.LastIndexOf('@');
+            return at > 0 && _projections.ContainsKey(key.Substring(0, at)) && int.TryParse(key.Substring(at + 1), out _) ? key.Substring(0, at) : key;
+        }
+
+        bool IsProjectionKey(string key) => WireName(key) != key;
+
+        // 행동이 끝나기 직전: 투영 키를 모두 다시 만든다(원래 키가 아직 없으면 건너뛴다 — 생기면 그때).
+        void UpdateProjections()
+        {
+            if (_projections.Count == 0) return;
+            foreach (var key in _projections.Keys.ToList())
+                foreach (var player in _players.Where(p => !p.IsLocal))
+                    RefreshProjection(key, player.Id);
+        }
+
+        void RefreshProjection(string key, int player)
+        {
+            var data = _session.Data;
+            if (!data.IsDefined(key)) return;
+            if (data.VisibilityOf(key, out _) != DataVisibility.Server) data.SetVisibility(key, DataVisibility.Server);
+            var projected = ProjectionKey(key, player);
+            if (!data.IsDefined(projected))
+            {
+                data.DefineOfType(projected, data.ZoneOf(key), data.TypeOf(key), null, data.LabelOf(key));
+                data.MarkDerived(projected);
+                data.SetVisibility(projected, DataVisibility.Owner, player);
+            }
+            object view;
+            try { view = _projections[key](player, data.Get(key)); }
+            catch (Exception e)
+            {
+                _session.Journal.Append(JournalKind.Error, "Net", $"투영 '{key}'(플레이어 {player}) 중 오류: {e.Message}");
+                return;
+            }
+            if (view != null) data.Set(projected, view);
         }
 
         public NetPlayer FindPlayer(int id) => _players.FirstOrDefault(p => p.Id == id);
@@ -336,6 +407,7 @@ namespace GBible
             _session.Events.Retracted -= OnRetracted;
             _session.Actions.Executed -= OnExecuted;
             _session.Actions.TransactionAborted -= OnAborted;
+            _session.Actions.Committing -= UpdateProjections;
             foreach (var peer in _peers.Values.ToList())
             {
                 if (peer.Recorder != null) continue;
@@ -451,6 +523,8 @@ namespace GBible
             peer.Joined = true;
             peer.NeedsScan = true;
             _session.Journal.Append(JournalKind.System, "Net", $"{player}이(가) 들어왔습니다.");
+            // 투영 키는 들어오는 사람 몫을 만들어 둔다(처음 모습이 다음 묶음에 간다).
+            foreach (var key in _projections.Keys.ToList()) RefreshProjection(key, player.Id);
             PlayerJoined?.Invoke(player);
             BroadcastPlayers();
             Flush();
@@ -718,7 +792,7 @@ namespace GBible
                 {
                     if (!peer.Known.Contains(record.Key) || fresh.Contains(record.Key)) continue;
                     w.Byte((byte)record.Kind);
-                    w.Str(record.Key);
+                    w.Str(WireName(record.Key));
                     if (record.Kind == NetRecord.Reset) WriteKeyInfo(w, record.Key);
                     NetProtocol.WriteBlock(w, record.Data, 0, record.Data.Length);
                     count++;
@@ -767,7 +841,10 @@ namespace GBible
             var count = 0;
             foreach (var key in data.Keys.ToArray())
             {
-                var visible = peer.SeeAll ? data.VisibilityOf(key, out _) != DataVisibility.Server : data.IsVisibleTo(key, peer.Player.Id);
+                // 녹화 관람자(SeeAll)는 투영 전의 원래 키를 보고 투영 키는 받지 않는다(같은 이름이 둘이 되지 않게).
+                var visible = peer.SeeAll
+                    ? (_projections.ContainsKey(key) || (data.VisibilityOf(key, out _) != DataVisibility.Server && !IsProjectionKey(key)))
+                    : data.IsVisibleTo(key, peer.Player.Id);
                 if (visible && !peer.Known.Contains(key))
                 {
                     if (!WriteInitial(w, key, snapshots)) continue;
@@ -777,8 +854,10 @@ namespace GBible
                 }
                 else if (!visible && peer.Known.Remove(key))
                 {
+                    // 투영으로 바뀐 원래 키는 숨기지 않는다 — 같은 이름으로 그 사람 몫(투영 키)의 처음 모습이 간다(차례에 따라 지워지지 않게).
+                    if (_projections.ContainsKey(key) && !peer.SeeAll) continue;
                     w.Byte((byte)NetRecord.Hide);
-                    w.Str(key);
+                    w.Str(WireName(key));
                     count++;
                 }
             }
@@ -801,7 +880,7 @@ namespace GBible
             if (!snapshots.TryGetValue(key, out var snapshot)) snapshots[key] = snapshot = data.Snapshot(key);
             if (snapshot == null) return false;
             w.Byte((byte)NetRecord.Reset);
-            w.Str(key);
+            w.Str(WireName(key));
             WriteKeyInfo(w, key);
             NetProtocol.WriteBlock(w, snapshot, 0, snapshot.Length);
             return true;
@@ -817,7 +896,7 @@ namespace GBible
         void WriteValue(MirrorWriter w, string key)
         {
             w.Byte((byte)NetRecord.Value);
-            w.Str(key);
+            w.Str(WireName(key));
             WriteKeyInfo(w, key);
             NetProtocol.WriteScalar(w, _session.Data.Get(key));
         }
@@ -826,7 +905,7 @@ namespace GBible
         {
             var data = _session.Data;
             w.Byte((byte)NetRecord.Tree);
-            w.Str(key);
+            w.Str(WireName(key));
             WriteKeyInfo(w, key);
             w.Str(data.TypeOf(key)?.FullName ?? "");
             w.Str(MiniJson.Serialize(data.ExportTree(key)));

@@ -1479,6 +1479,12 @@ namespace GBible
 
         readonly Dictionary<string, (DataVisibility visibility, int owner)> _visibility = new Dictionary<string, (DataVisibility, int)>(StringComparer.Ordinal);
 
+        // 다른 키에서 만들어진 사본 키(멀티 서버의 투영 '<키>@<번호>'): 개체 찾기(Game.Find · All)에서 뺀다 — 같은 id가 둘이 되지 않게.
+        readonly HashSet<string> _derived = new HashSet<string>(StringComparer.Ordinal);
+        public void MarkDerived(string key) { if (!string.IsNullOrEmpty(key)) _derived.Add(key); }
+        public bool IsDerived(string key) => key != null && _derived.Contains(key);
+        public int DerivedCount => _derived.Count;
+
         // 공개 범위를 정한다(키 단위). owner는 Owner일 때의 플레이어 번호(행동의 actorId와 같은 번호).
         public void SetVisibility(string key, DataVisibility visibility, int owner = 0)
         {

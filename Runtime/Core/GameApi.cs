@@ -638,14 +638,18 @@ namespace GBible
         // 데이터 키 목록(이름순). 정의가 늘 때만 다시 만든다.
         List<string> _dataKeys;
         int _dataKeyCount = -1;
+        int _derivedCount = -1;
 
+        // 사본 키(투영 — IsDerived)는 빼고(같은 id가 둘이 되지 않게).
         List<string> DataKeys()
         {
             var count = Session.Data.KeyCount;
-            if (_dataKeys == null || count != _dataKeyCount)
+            var derived = Session.Data.DerivedCount;
+            if (_dataKeys == null || count != _dataKeyCount || derived != _derivedCount)
             {
-                _dataKeys = Session.Data.Keys.Where(Session.Data.IsData).OrderBy(k => k, StringComparer.Ordinal).ToList();
+                _dataKeys = Session.Data.Keys.Where(k => Session.Data.IsData(k) && !Session.Data.IsDerived(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
                 _dataKeyCount = count;
+                _derivedCount = derived;
             }
             return _dataKeys;
         }
