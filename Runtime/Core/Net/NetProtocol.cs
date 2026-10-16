@@ -52,7 +52,7 @@ namespace GBible
     public static class NetProtocol
     {
         // 메시지 규격 버전. 바뀌면 서로 다른 버전은 Hello에서 거절한다.
-        public const int Version = 1;
+        public const int Version = 2;   // 2: Hello에 기기(Device)
 
         // ── 덩어리(길이 + 바이트) ──────────────────────────────
 
@@ -220,6 +220,8 @@ namespace GBible
         // 입장 표(가짜 인증이면 비어도 된다. Steam 인증이면 인증 티켓 등).
         public string Token;
         public string GameVersion;
+        // 기기 번호(이 기기에 한 번 만들어 두는 무작위 글자 — GameNet이 넣는다). 입장 확인이 계정을 정하지 않으면 기기 + 이름이 계정 키다.
+        public string Device;
     }
 
     // 입장 확인 결과.

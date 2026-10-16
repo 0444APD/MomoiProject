@@ -141,8 +141,14 @@ namespace GBible
             SteamMatchmaking.SetLobbyData(lobby, HostKey, SteamUser.GetSteamID().m_SteamID.ToString());
             var transport = new SteamServerTransport();
             var server = GameNet.Host(transport, _playerName ?? GameSteam.PlayerName, GameNet.ServerOptions(_maxPlayers));
-            // 같은 Steam 계정이면 이름이 바뀌어도 같은 자리로 잇는다(다시 접속).
-            server.Admit = hello => transport.SteamIdOf(hello.Connection) is ulong id && id != 0 ? NetAdmission.Accept("steam:" + id, hello.Name) : NetAdmission.Accept();
+            // 같은 Steam 계정이면 이름이 바뀌어도 같은 자리로 잇는다(다시 접속). 게임이 ServerStarted에서 건 입장 확인(던전 중 막기 등)은 먼저 돌린다(덮어쓰지 않는다).
+            var project = server.Admit;
+            server.Admit = hello =>
+            {
+                var verdict = project?.Invoke(hello) ?? NetAdmission.Accept();
+                if (!verdict.Accepted) return verdict;
+                return transport.SteamIdOf(hello.Connection) is ulong id && id != 0 ? NetAdmission.Accept("steam:" + id, string.IsNullOrEmpty(verdict.Name) ? hello.Name : verdict.Name) : verdict;
+            };
             Entered?.Invoke(Current);
         }
 

@@ -49,7 +49,8 @@ namespace GBible
             {
                 if (!GameNet.IsOnline) return true;
                 var local = GBibleRuntime.Session?.LocalPlayer ?? 0;
-                return owner == local || (owner == 0 && GameNet.Server != null && !GameNet.IsTestMode);
+                // 주인 0(방장 · 서버가 모는 것 — 적 · 움직이는 함정)은 방장 화면이 움직인다. 시험 모드에서는 이 화면(서버와 같은 프로그램의 클라이언트)이 방장 대신 움직인다.
+                return owner == local || (owner == 0 && GameNet.Server != null && (!GameNet.IsTestMode || GameNet.Client != null));
             }
         }
 

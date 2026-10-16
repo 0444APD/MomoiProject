@@ -62,6 +62,8 @@ namespace GBible
         public string Name { get; }
         // 입장 표(가짜 인증이면 비어도 된다 — Steam이면 인증 티켓). 접속 전에 바꿔도 된다(Hello를 보낼 때 읽는다).
         public string Token { get; set; }
+        // 기기 번호(Hello에 실린다 — 서버가 계정 키를 기기 + 이름으로). GameNet이 이 기기의 번호를 넣는다. 비우면 이름만.
+        public string Device { get; set; } = "";
         public string GameVersion { get; }
         // 서버가 거절했거나 서버가 끊었다(다시 접속해도 소용없다). 거짓인데 끊겼으면 네트워크 문제 — 다시 접속해 볼 만하다.
         public bool ServerClosed { get; private set; }
@@ -250,6 +252,7 @@ namespace GBible
             w.Str(Name);
             w.Str(Token);
             w.Str(GameVersion);
+            w.Str(Device ?? "");
             NetProtocol.WriteStrings(w, Mirror.TypeTable());
             _transport.Send(w.Data, w.Length);
         }

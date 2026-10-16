@@ -66,6 +66,10 @@ namespace GBible.Tests
             CollectionAssert.Contains(FieldOps.For(typeof(BigNumber)), FieldOp.AtLeast, "DB의 비교 고르기에도 숫자 비교가 나온다");
             Assert.IsTrue(FieldOps.TryValidateValue(typeof(BigNumber), FieldOp.AtLeast, "1e400", out _));
             Assert.IsFalse(BigNumber.TryParse("NaN", out _), "담을 수 없는 글자는 던지지 않고 거짓");
+            Do(g => new PlayerDataReward { key = "run", path = "gems", value = "3" }.Grant(g.Session));
+            Assert.AreEqual(3, Run.gems, 1e-9, "'값'을 적으면 숫자도 그 값으로 정한다(증감 대신)");
+            Do(g => new PlayerDataReward { key = "run", path = "cookies", value = "2e400" }.Grant(g.Session));
+            Assert.AreEqual(BigNumber.Parse("2e400"), Run.cookies);
         }
 
         [Serializable] public struct BcWallet { public BigNumber coins; }

@@ -115,10 +115,15 @@ namespace GBible
             foreach (var watch in Watches) watch.Dirty = true;
         }
 
+        // 플레이어마다 데이터: 'bag:2'(이 화면 플레이어의 몫)가 바뀌면 'bag'을 지켜보는 다시 그리기도 그린다.
         static void OnChanged(string key)
         {
+            string shared = null;
+            var colon = key?.LastIndexOf(':') ?? -1;
+            if (colon > 0 && _session != null && _session.Data.IsPerPlayer(key.Substring(0, colon)) && PlayerDataStore.KeyFor(key.Substring(0, colon), _session.LocalPlayer) == key)
+                shared = key.Substring(0, colon);
             foreach (var watch in Watches)
-                if (watch.Keys == null || watch.Keys.Contains(key)) watch.Dirty = true;
+                if (watch.Keys == null || watch.Keys.Contains(key) || (shared != null && watch.Keys.Contains(shared))) watch.Dirty = true;
         }
 
         static void OnLanguage()

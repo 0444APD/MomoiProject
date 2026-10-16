@@ -251,7 +251,7 @@ namespace GBible
                 case NetMessage.Hello when who.State == LobbyState.Authenticating && who.Hello == null:
                 {
                     var version = (int)r.UVar();
-                    var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Connection = who.Connection };
+                    var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Device = r.Str(), Connection = who.Connection };
                     if (version != NetProtocol.Version) { Refuse(who, $"멀티플레이 규격 버전이 다릅니다(서버 {NetProtocol.Version}, 클라이언트 {version})."); return; }
                     if (!string.IsNullOrEmpty(Options.GameVersion) && hello.GameVersion != Options.GameVersion) { Refuse(who, $"게임 버전이 다릅니다(서버 {Options.GameVersion}, 클라이언트 {hello.GameVersion})."); return; }
                     who.Hello = hello;

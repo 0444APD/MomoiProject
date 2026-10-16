@@ -37,8 +37,9 @@ namespace GBible
         public void Authenticate(NetHello hello, Action<NetAdmission> done)
         {
             // 입장 표는 보지 않는다 — Steam 티켓처럼 접속마다 바뀌는 표가 와도 같은 이름이면 같은 계정(다시 접속하면 같은 자리).
+            // 기기 번호가 오면 기기 + 이름(다른 컴퓨터의 같은 이름 — 기본 이름 "플레이어" 둘 — 이 한 계정이 되지 않게).
             var name = string.IsNullOrWhiteSpace(hello.Name) ? "플레이어" : hello.Name.Trim();
-            done(NetAdmission.Accept("name:" + name, name));
+            done(NetAdmission.Accept(string.IsNullOrEmpty(hello.Device) ? "name:" + name : "name:" + name + "@" + hello.Device, name));
         }
     }
 

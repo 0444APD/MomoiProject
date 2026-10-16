@@ -113,6 +113,10 @@ namespace GBible
         public GameSession Session => _session;
         public NetServerOptions Options { get; }
         public IReadOnlyList<NetPlayer> Players => _players;
+
+        // 방 주인: 방장(이 프로그램의 플레이어)이 있으면 방장, 없으면(시험 모드 · 화면 없는 서버) 들어와 있는 사람 가운데 번호가 가장 작은 사람.
+        // "방장만 하는 행동"(던전 시작 · 강퇴)의 검사: server.Validate = (p, a) => a is StartDungeon && p != server.Owner ? "방장만 시작할 수 있습니다." : null;
+        public NetPlayer Owner => _players.FirstOrDefault(p => p.IsLocal) ?? _players.Where(p => p.Connected).OrderBy(p => p.Id).FirstOrDefault();
         public string Address => _transport.Address;
         public bool IsRunning => _started;
 
@@ -481,7 +485,7 @@ namespace GBible
         {
             if (peer.Joined) return;
             var version = (int)r.UVar();
-            var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Connection = peer.Connection };
+            var hello = new NetHello { Name = NetProtocol.CleanName(r.Str()), Token = r.Str(), GameVersion = r.Str(), Device = r.Str(), Connection = peer.Connection };
             var table = NetProtocol.ReadStrings(r, NetProtocol.MaxTypeTable);
             if (version != NetProtocol.Version) { Refuse(peer, $"멀티플레이 규격 버전이 다릅니다(서버 {NetProtocol.Version}, 클라이언트 {version})."); return; }
             if (!string.IsNullOrEmpty(Options.GameVersion) && hello.GameVersion != Options.GameVersion) { Refuse(peer, $"게임 버전이 다릅니다(서버 {Options.GameVersion}, 클라이언트 {hello.GameVersion})."); return; }
@@ -492,7 +496,8 @@ namespace GBible
             if (!admission.Accepted) { Refuse(peer, admission.Reason ?? "입장이 거절됐습니다."); return; }
 
             var name = !string.IsNullOrEmpty(admission.Name) ? admission.Name : string.IsNullOrEmpty(hello.Name) ? "플레이어" : hello.Name;
-            var account = !string.IsNullOrEmpty(admission.Account) ? admission.Account : name;
+            // 계정 키(입장 확인이 정하지 않았으면): 기기 + 이름 — 다른 컴퓨터의 같은 이름(기본 이름 "플레이어" 둘)이 한 자리로 잇지 않게. 같은 기기 · 같은 이름이면 다시 접속해 같은 자리.
+            var account = !string.IsNullOrEmpty(admission.Account) ? admission.Account : string.IsNullOrEmpty(hello.Device) ? name : "device:" + hello.Device + "/" + name;
             // 같은 계정이 다시 오면 같은 플레이어(번호·데이터)로 잇는다.
             var player = _players.FirstOrDefault(p => p.Account == account);
             if (player != null && player.Connected)
@@ -683,7 +688,8 @@ namespace GBible
             }
             var command = _session.Debug.All.FirstOrDefault(c => c.Group == group && c.Name == name);
             if (command == null) return;
-            try { command.Execute(); }
+            // 누른 사람으로 돈다(플레이어마다 데이터 'bag'은 그 사람의 몫).
+            try { using (_session.ActingAs(peer.Player.Id)) command.Execute(); }
             catch (Exception e) { _session.Journal.Append(JournalKind.Error, "Net", $"개발 명령 '{group} › {name}' 실패: {e.Message}"); }
             Flush();
         }

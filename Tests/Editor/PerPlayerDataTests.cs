@@ -165,6 +165,40 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 다른_기기의_같은_이름은_다른_자리이고_개발_명령은_누른_사람으로_돈다()
+        {
+            var session = NewSession();
+            var net = new MemoryNetwork { Manual = true, Latency = 0.01 };
+            var server = new NetServer(session, net.Server(), new NetServerOptions { AllowDeveloperCommands = true });
+            server.Start();
+            session.Debug.Register("시험", "금화 +1", () => session.Do(new Edit { run = g => g.Get<PpArmy>("army").gold += 1 }));
+            var a = new NetClient(NewSession(), net.Client(), "플레이어") { Device = "pcA" };
+            var b = new NetClient(NewSession(), net.Client(), "플레이어") { Device = "pcB" };
+            a.Connect();
+            b.Connect();
+            void Pump()
+            {
+                for (var i = 0; i < 20; i++)
+                {
+                    net.Advance(0.01);
+                    server.Update(0.01);
+                    a.Update(0.01);
+                    b.Update(0.01);
+                }
+            }
+            Pump();
+            Assert.AreEqual(2, server.Players.Count, "기본 이름이 같아도 기기가 다르면 두 사람");
+            Assert.AreEqual(a.PlayerId, server.Owner.Id, "방장이 없으면 먼저 들어온 사람이 방 주인");
+            b.RunDeveloperCommand("시험", "금화 +1");
+            Pump();
+            Assert.AreEqual(1, session.Data.Get<PpArmy>(PlayerDataStore.KeyFor("army", b.PlayerId)).gold, "누른 사람의 몫");
+            Assert.AreEqual(0, session.Data.Get<PpArmy>(PlayerDataStore.KeyFor("army", a.PlayerId)).gold);
+            a.Dispose();
+            b.Dispose();
+            server.Dispose();
+        }
+
+        [Test]
         public void 계정_값은_형식이_맞을_때만_들이고_프로필_구역은_받지_않는다()
         {
             _session.Data.DefinePerPlayer("gems", DataZone.Session, typeof(int), 0, "보석", account: true);

@@ -302,6 +302,17 @@ namespace GBible
         {
             if (kind == GrantKind.Number)
             {
+                // 값을 적었으면 그 값으로 정한다(증감은 보지 않는다 — "천장 89로" · "스태미나 0으로"). 문장도 'X를 N(으)로'로 보인다.
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    if ((Nullable.GetUnderlyingType(type) ?? type) == typeof(BigNumber))
+                    {
+                        if (BigNumber.TryParse(value, out var bigSet)) return bigSet;
+                    }
+                    else if (double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var set)) return PlayerDataGrants.ToNumber(set, type);
+                    WarnStatic(session, $"'{value}'는 숫자가 아니라 값으로 정하지 않았습니다");
+                    return current;
+                }
                 // 큰 수 칸은 큰 수로 더한다(1e308을 넘어도).
                 if ((Nullable.GetUnderlyingType(type) ?? type) == typeof(BigNumber)) return (current is BigNumber big ? big : BigNumber.Zero) + amount;
                 var before = current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture);
@@ -453,7 +464,15 @@ namespace GBible
                     errors.Add($"{DataModel.FriendlyName(target)}은(는) 보상으로 줄 수 없는 형식입니다.");
                     return;
                 case GrantKind.Number:
-                    if (amount == 0) errors.Add("증감이 0입니다.");
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        // 값으로 정하기
+                        var isBig = (Nullable.GetUnderlyingType(target) ?? target) == typeof(BigNumber);
+                        if (isBig ? !BigNumber.TryParse(value, out _) : !double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                            errors.Add($"'{value}'는 숫자가 아닙니다(값으로 정하기 — 비우면 증감).");
+                        return;
+                    }
+                    if (amount == 0) errors.Add("증감이 0입니다(값으로 정하려면 '값'에 숫자를).");
                     return;
                 case GrantKind.Value:
                     if (!PlayerDataGrants.TryParse(target, value, out _, out var parseError)) errors.Add(parseError);

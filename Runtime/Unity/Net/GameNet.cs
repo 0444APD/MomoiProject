@@ -378,9 +378,24 @@ namespace GBible
             return created;
         }
 
+        // 이 기기의 번호(처음 쓸 때 무작위로 만들어 설정 파일에 둔다 — 슬롯과 상관없이 기기마다 하나). 서버가 계정 키를 기기 + 이름으로 정한다.
+        public static string DeviceId
+        {
+            get
+            {
+                var id = GameSettings.Raw(DeviceKey);
+                if (!string.IsNullOrEmpty(id)) return id;
+                id = Guid.NewGuid().ToString("N").Substring(0, 12);
+                GameSettings.SetRaw(DeviceKey, id);
+                return id;
+            }
+        }
+
+        const string DeviceKey = "momoi.device";
+
         static NetClient CreateClient(GameSession session, INetClientTransport transport, Link link, bool resume)
         {
-            var client = new NetClient(session, transport, link.Name, null, link.Version) { ClearOnJoin = resume };
+            var client = new NetClient(session, transport, link.Name, null, link.Version) { ClearOnJoin = resume, Device = DeviceId };
             // 시험 모드는 서버 쪽 녹화가 맡는다(같은 녹화에 두 번 쌓이지 않게).
             if (RecordReplays && !IsTestMode) client.StartRecording(resume ? _recording : null);
             if (!resume) RemapDeveloperCommands(session);
