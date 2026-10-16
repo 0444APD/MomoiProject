@@ -193,12 +193,12 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 저장 간격(초)(N초마다일 때) | 마지막 저장에서 이만큼 지났고 그사이 행동이 있었으면 판을 저장(실제 시간, 1 이상) | 30 |
 | 판 저장 이벤트(이벤트를 받을 때일 때) | 이 이벤트를 쏜 행동이 끝난 프레임 끝에 판을 저장(행동이 실패하면 저장하지 않음) | 없음 |
 | 판 끝 이벤트 | 받은 행동이 끝나면 판 저장을 지우고 프로필을 바로 저장 | 없음 |
-| 프로필도 행동마다 저장 | 바깥 행동이 끝난 프레임 끝마다 프로필도 저장 — 판 저장이 'N초마다'여도 **간격을 기다리지 않는다**(그래서 1초마다 정산 행동이 도는 방치형은 끈다, 06장 2.2). 끄더라도 판을 저장할 때 프로필이 바뀌었으면 함께 저장한다 | 끔 |
+| 프로필도 행동마다 저장 | 프로필(메타 구역)을 바꾼 바깥 행동이 끝난 프레임 끝에 프로필을 저장(바꾸지 않은 행동 — 판 안의 전투 행동 — 에서는 쓰지 않는다). 판 저장이 'N초마다'여도 **간격을 기다리지 않으므로** 프로필을 매초 바꾸는 행동이 있으면 끈다(06장 2.2). 끄더라도 판을 저장할 때 프로필이 바뀌었으면 함께 저장한다. 판 밖에서 프로필을 바꾸는 게임(수집형·로비 뽑기·마을)은 켠다 | 끔 |
 | 시작할 때 이어 하기 + 새 판 행동(선택) | `Started` 뒤 `LoadRun`, 없으면 `session.Do(new 새 판 행동())` | 끔 |
 | 고정 틱(실시간) › 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
 | 씬 흐름(선택) › 플레이어 데이터 · 필드(씬 이름이 든 글자) · 빈 값일 때 씬 | `Started` 직전 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)` | 쓰지 않음 |
 
-**AI가 이 값을 정할 때**(결정에 따른 판 저장·고정 틱·새 판 행동 …): 화면을 누를 수 없으므로 DB 반영 스크립트에서 `GameDatabase.Load()`의 `EditorSet…` 함수(`EditorSetSessionOptions` · `EditorSetSaveOptions` · `EditorSetSaveTiming` · `EditorSetFlowOptions` · `EditorSetTickRate` · `EditorSetSceneFlow`, 에디터 전용)로 넣고 `EditorUtility.SetDirty` + `AssetDatabase.SaveAssetIfDirty`로 저장한다(DB 항목이 아니라 '적용 전'이 없다). 칸의 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다 — 다르면 개발자(또는 시작 설정)가 고른 값이므로 그대로 두고 보고에 적는다(관례 15절).
+**AI가 이 값을 정할 때**(결정에 따른 판 저장·고정 틱·새 판 행동 …): 화면을 누를 수 없으므로 DB 반영 스크립트에서 `GameDatabase.Load()`의 `EditorSet…` 함수(`EditorSetSessionOptions` · `EditorSetSaveOptions` · `EditorSetSaveTiming` · `EditorSetFlowOptions` · `EditorSetTickRate` · `EditorSetSceneFlow`, 에디터 전용)로 넣고(Undo 방식 하나만 바꿀 때는 `EditorSetHistory(Undo 방식, 보관 수 = null)` — 다른 칸은 그대로. 묶음 함수는 묶인 칸을 모두 넘기므로 나머지는 읽기 속성 `History` · `HistoryLimit` · `SnapshotInterval` · `SnapshotLimit` · `FixSeedInDevelopment` · `DevelopmentSeed` · `RunSave` · `RunEndEvent` · `SaveProfileEachAction` · `RunSaveInterval` · `RunSaveEvent` · `UndoBoundaryEvent` · `ContinueOnStart` · `NewRunAction` · `TickRate` · `SceneKey` · `ScenePath` · `EmptyScene`으로 읽어 그대로 넘긴다) `EditorUtility.SetDirty` + `AssetDatabase.SaveAssetIfDirty`로 저장한다(DB 항목이 아니라 '적용 전'이 없다). 칸의 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다 — 다르면 개발자(또는 시작 설정)가 고른 값이므로 그대로 두고 보고에 적는다(관례 15절).
 
 게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 
@@ -419,7 +419,7 @@ public sealed class AchievementList : MonoBehaviour
 using GBible.Data;
 using System.Linq;
 
-var potion = GameDatabase.Load().All<InstanceData>().First(i => i.Id == "instance.potion");
+var potion = GameDatabase.Load().All<InstanceData>().First(i => i.Id == "potion");
 var copy = potion.CreateInstance();   // 깊은 사본
 ```
 
@@ -540,7 +540,7 @@ namespace GBible.Ids
 }
 ```
 
-- **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `instance.potion` → `InstancePotion`). 이미 있던 상수는 지난 파일의 이름을 그대로 쓴다(새 항목이 생겨도 기존 상수가 다른 ID를 가리키지 않게).
+- **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `seoa.talk1` → `SeoaTalk1`). 이미 있던 상수는 지난 파일의 이름을 그대로 쓴다(새 항목이 생겨도 기존 상수가 다른 ID를 가리키지 않게).
 - **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`, `StatusData` → `Status`, `BalanceData` → `Balance`, `WeightTableData` → `WeightTable`, `SettingData` → `Setting`). 플레이어 데이터만 `PlayerData`. 짧은 이름이 같은 종류가 둘이면(프로젝트의 `LocationData`와 다이얼로그 모듈의 `LocationData` 등 — 네임스페이스만 다름) 전체 이름 순으로 뒤의 것에 `_2`를 붙인다(`Location_2`). `GameIds`·`SpriteSize`(스프라이트 틀이 있을 때)도 피한다.
 - **플레이어 데이터 = `PlayerDataKey<T>`**: 값 형식이 붙은 키. `.Id`가 ID 글자이고, `string`으로 바로 바뀐다(암시 변환).
 - **그 밖의 항목 = `const string`**: `[BindTo(...)]` 같은 어트리뷰트 인자에도 쓸 수 있다.

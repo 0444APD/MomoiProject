@@ -4,7 +4,7 @@
 
 **언제 쓰는가**
 
-- 장비를 끼면 공격력 +30, 버프 동안 +20%, 벗거나 끝나면 원래대로(Modifier).
+- 장비를 끼면 공격력 +30, 버프 동안 +20%, 벗거나 끝나면 원래대로(Modifier). 붙이는 곳은 셋이다: 장비·유물처럼 가진 동안은 DB › 패시브 효과의 가진 동안 스탯 보정(17장 0-1), N턴 버프는 상태 효과의 스탯 보정(29장), 그 둘로 안 되는 것만 코드가 붙이고 떼는 `Game.AddModifier`(5-1).
 - 판이 끝나도 남는 영구 강화(영구 Modifier).
 - "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0", "다음 스킬 2회", "이 카드의 수치 2배"처럼 **효과를 고치는 효과**(행동 직전 이벤트).
 - 에너지·마나·골드를 내고, 모자라면 아무것도 바뀌지 않게 할 때(비용).
@@ -305,7 +305,7 @@ var armor  = Game.Attribute("goblin1", nameof(Unit.armor));      // id 글자로
 ### 4-3. `Game.AddModifier` — 붙이기
 
 ```csharp
-string id = Game.AddModifier(hero, nameof(Unit.attack), ModifierKind.Flat, 30, "ironSword");
+string id = Game.AddModifier(hero, nameof(Unit.attack), ModifierKind.Flat, 30, "bond");
 Game.AddModifier(hero, nameof(Unit.attack), ModifierKind.Percent, 0.2, "rage");
 Game.AddModifier("hero", nameof(Unit.attack), ModifierKind.Flat, 5, "smith", permanent: true);
 ```
@@ -327,7 +327,7 @@ Game.AddModifier("hero", nameof(Unit.attack), ModifierKind.Flat, 5, "smith", per
 ### 4-4. `Game.RemoveModifiers` · `Game.Modifiers` — 떼기·보기
 
 ```csharp
-int removed = Game.RemoveModifiers("ironSword", hero);   // hero에서 ironSword가 붙인 것만
+int removed = Game.RemoveModifiers("bond", hero);        // hero에서 bond가 붙인 것만
 Game.RemoveModifiers("aura");                              // 모든 대상에서 aura가 붙인 것
 IReadOnlyList<Modifier> all    = Game.Modifiers(hero);                          // hero의 전부
 IReadOnlyList<Modifier> attack = Game.Modifiers(hero, nameof(Unit.attack));     // attack 것만
@@ -372,12 +372,14 @@ Modifier 하나만 떼려면 `session.Attributes.Remove(modifierId)`(4-6).
 | `static Apply(baseValue, modifiers)` | 기본값에 Modifier 목록을 적용한 값(2-1의 공식). 저장소를 건드리지 않는다 |
 | `SessionKey` · `MetaKey` | `"$modifiers"` · `"$modifiers.meta"` |
 
-`Apply`는 미리보기에 쓴다: "이 장비로 갈아 끼우면 공격력이 얼마가 되나".
+`Apply`는 저장소를 건드리지 않고 공식만 계산할 때 쓴다: "이 보정 하나를 빼고 하나를 더하면 얼마가 되나".
 
 ```csharp
-var others = Game.Modifiers(hero, nameof(Unit.attack)).Where(m => m.source != oldGear.id);
-var preview = AttributeSystem.Apply(hero.attack, others.Append(new Modifier { kind = ModifierKind.Flat, value = newGear.attack }));
+var others = Game.Modifiers(hero, nameof(Unit.attack)).Where(m => m.source != "bond");
+var preview = AttributeSystem.Apply(hero.attack, others.Append(new Modifier { kind = ModifierKind.Flat, value = 40 }));
 ```
+
+"이 장비로 갈아 끼우면 공격력이 얼마가 되나"처럼 행동이 바꿀 결과는 그 행동을 미리 해 본다 — `Game.Preview(new Equip { … }, g => g.Attribute(hero, nameof(Unit.attack)))`(33장). 패시브 효과의 장비 보정까지 그대로 센다.
 
 ### 4-7. 행동 직전 이벤트 클래스 — `[Intent]`
 
@@ -636,44 +638,37 @@ public class Battle
 
 ### 5-1. 장비 착용·해제 — Modifier를 출처로 붙이고 뗀다
 
-장비마다 다른 id를 출처로 쓴다. 같은 반지 두 개를 끼어도 하나만 뗄 수 있다.
+**장비는 이 방식으로 만들지 않는다.** 장비 효과는 DB › 패시브 효과의 `modifiers`(가진 동안 스탯 보정)이고, 가진 목록 = 장비 칸(`battle › units[].gear` — 착용 = 그 목록에 넣는 행동, 해제 = 빼는 행동)이다(17장 0-1). 붙이고 떼는 코드가 없어 벗으면 저절로 빠지고 Undo·저장이 가진 목록을 따라온다. 같은 반지 둘은 일치하는 요소 둘(레벨 2)이라 `perLevel`(레벨마다)을 켜면 하나를 벗을 때 그 몫만 빠진다. 아이템마다 굴린 수치(무작위 접사)는 접사 종류마다 패시브 효과를 두고, 아이템의 레벨 필드에 굴린 값(정수)을 넣고, 보정 값 1(퍼센트면 0.01) + `perLevel`로 나른다(AI 문서 Reference 7-24).
+
+`Game.AddModifier`·`Game.RemoveModifiers`로 출처를 붙이고 떼는 것은 **코드가 잠깐 거는 보정**이다 — 가진 동안(패시브 효과)·N턴 동안(상태 효과)으로 나타낼 수 없고, 한 행동이 계산해 붙이고 다른 행동이 출처로 떼는 것. 예: 전투 시작 순간의 아군 수로 정해지는 결속 보너스(아군이 쓰러져도 그 전투 동안 그대로).
 
 ```csharp
-[Serializable, BlockInfo("장비 착용")]
-public class Equip : GameAction
+[Serializable, BlockInfo("결속 걸기")]
+public class ApplyBond : GameAction                     // 전투 시작 행동 안에서 부른다
 {
-    public Unit unit;
-    public Gear gear;                    // 가방(party.bag) 안의 장비
-
     protected override void Run()
     {
-        if (unit.gear.Contains(gear.id)) throw new InvalidOperationException("이미 착용한 장비입니다.");
-        unit.gear.Add(gear.id);
-        if (gear.attack != 0) Game.AddModifier(unit, nameof(Unit.attack), ModifierKind.Flat, gear.attack, gear.id);
-        if (gear.attackPercent != 0) Game.AddModifier(unit, nameof(Unit.attack), ModifierKind.Percent, gear.attackPercent, gear.id);
+        var allies = Game.Get<Battle>("battle").units.Where(u => u.team == "ally").ToList();
+        var bonus = allies.Count * Game.Balance(GameIds.Balance.BondAttackPerAlly);   // 이 순간의 아군 수로 정한다
+        foreach (var unit in allies)
+            Game.AddModifier(unit, nameof(Unit.attack), ModifierKind.Flat, bonus, "bond");
     }
 }
 
-[Serializable, BlockInfo("장비 해제")]
-public class Unequip : GameAction
+[Serializable, BlockInfo("결속 풀기")]
+public class ClearBond : GameAction                     // 전투 끝 행동 안에서 부른다
 {
-    public Unit unit;
-    public Gear gear;
-
-    protected override void Run()
-    {
-        if (!unit.gear.Remove(gear.id)) throw new InvalidOperationException("착용하지 않은 장비입니다.");
-        Game.RemoveModifiers(gear.id, unit);          // 이 장비가 붙인 보정을 모두 뗀다
-    }
+    protected override void Run() => Game.RemoveModifiers("bond");   // 모든 대상에서 bond가 붙인 것
 }
 
-// 화면: 최종값과 내역
+// 화면: 최종값과 내역(패시브 효과의 장비 보정도 같은 목록에 보인다 — source = 패시브 효과 ID)
 attackText.text = $"{Game.Attribute(hero, nameof(Unit.attack)):0}";
 attackTooltip.text = string.Join("\n", Game.Modifiers(hero, nameof(Unit.attack)).Select(m => $"{m.source}: {m.kind} {m.value}"));
 ```
 
-- 착용·해제가 행동이라 Undo 한 번에 장비 목록과 Modifier가 함께 돌아간다.
-- 장비 데이터(`gear.attack`)를 고쳐도 이미 붙은 Modifier는 그대로다. 다시 끼면 새 값으로 붙는다.
+- 걸기·풀기가 행동이라 Undo 한 번에 Modifier가 함께 돌아간다.
+- 값은 붙이는 순간에 정해진다. 늘 지금 값을 따라야 하면(아군 수가 줄면 함께 준다) 코드 보정이 아니라 패시브 효과의 `modifierWhen`·레벨로 만든다(17장 0-1).
+- 같은 출처를 한 대상에 두 번 붙이면 `RemoveModifiers(출처, 대상)`가 둘 다 뗀다. 따로 떼야 하면 붙일 때마다 다른 출처(`Game.NewId`)를 쓴다.
 - "쓰면 붙고 나중에 떼는" 버프는 코드 없이 액티브 효과의 `스탯 보정`·`스탯 보정 떼기`로 조립한다(→ `16-Abilities-Usable.md` 3-10). 그때 출처는 항목 ID라서, 같은 항목을 한 유닛에 두 번 붙이면 떼기도 함께 된다. 몇 턴 동안만 붙었다가 저절로 떨어지는 버프는 상태 효과의 스탯 보정으로 만든다(→ `29-Statuses-Schedules-Choices.md` 5-2).
 
 ### 5-2. 영구 강화 — 대장간
@@ -1059,8 +1054,7 @@ target.hp -= hit.amount;
 | 장비를 꼈는데 공격력 표시가 그대로 | 기본값 필드(`hero.attack`)를 읽었다. 최종값은 `Game.Attribute(hero, nameof(Unit.attack))`. |
 | `Game.Attribute`가 0 | 필드 이름 오타이거나 id로 대상을 찾지 못했다. 이때 읽기는 예외 없이 기본값을 0으로 본다. 필드 이름은 `nameof`로 쓴다. |
 | 스탯 보정이 든 액티브 효과를 썼더니 행동이 실패("…숫자 필드 '…'가 없어…") | 에디터 칸 `attribute`의 오타, 또는 그 대상 형식에 숫자 필드가 없다. 칸이 글자라 DB 검증이 잡지 못한다. |
-| 장비 하나를 벗었는데 같은 장비 둘의 보정이 다 빠짐 | 출처가 같다. 에디터의 스탯 보정은 출처가 항목 ID다. 같은 것을 여럿 끼는 게임은 장비마다 다른 id(`Game.NewId`)를 출처로 코드에서 붙인다(5-1). |
-| 퍼센트 30을 적었더니 31배 | 퍼센트·독립 곱 값은 비율이다. +30%는 `0.3`. |
+| 장비 하나를 벗었는데 같은 장비 둘의 보정이 다 빠짐 | 장비 보정을 `Game.AddModifier`(또는 효과 `스탯 보정`)로 같은 출처에 붙였다. 장비 효과는 패시브 효과의 가진 동안 스탯 보정으로 만든다 — 같은 장비 둘은 가진 목록의 요소 둘이고, `perLevel`(레벨마다)을 켜면 하나를 벗을 때 그 몫만 빠진다(5-1, 17장 0-1). || 퍼센트 30을 적었더니 31배 | 퍼센트·독립 곱 값은 비율이다. +30%는 `0.3`. |
 | 강화가 곱으로 불어남 | 독립 곱(`Multiply`)을 흔하게 썼다. 기본은 퍼센트(같은 칸 합). 독립 곱은 드문 강한 효과에만. |
 | 피해 증폭 둘이 곱해짐 | 증폭 스탯(기본 0)에 퍼센트를 썼다. 증폭은 플랫(0.1 = 10%)으로 쌓아야 합이 된다(5-3). |
 | 영구 강화가 다음 판에 안 보임 | 영구 Modifier는 대상 id로 붙는다. 판마다 id가 바뀌는 개체(`Game.NewId`로 만든 적 등)에 붙였다. 판마다 같은 id(`"hero"`)에 붙인다. |

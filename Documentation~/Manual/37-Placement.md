@@ -65,6 +65,17 @@
 | 회전 | `Grid.Rotate` | `Placement.Rotate` |
 | 맞는 게임 | SRPG·로그라이크 던전·농장 | 조커 칸·핸드·가방·보드 |
 
+**둘을 잇기 — 놓는 보드에서 걷는 전투 마당으로**(오토배틀러: 준비 때는 보드 칸에 놓고, 전투 때는 유닛이 마당을 걷는다). 전투 시작 행동이 보드 조각마다 **전투 유닛 사본**을 만들어 전투 데이터(`battle › fighters`)에 넣고, 좌표를 한 번 바꾼다. 전투는 사본만 바꾸므로(체력·위치·전투 중 보정) 보드는 다음 준비 때 그대로다. 사본에는 새 id(`Game.NewId`)와 보드 조각 id(`pieceId`)를 둔다 — 전투 결과(별 · 경험치)를 보드 조각에 돌려줄 때 찾는다.
+
+```csharp
+var at = Placement.CellOf(i, columns);                                 // 보드 칸 i → (x, y), y는 아래로 +(앞 줄 = 0)
+fighters.Add(new Fighter { id = Game.NewId("fighter"), pieceId = piece.id, unit = piece.unit, x = at.x, y = rows - 1 - at.y });   // Grid는 y가 위로 + → 뒤집는다
+// 상대 보드는 180° 돌려 맞은편에 둔다: x = columns - 1 - at.x, y = rows + gap + at.y
+```
+
+- 보드의 칸 수·줄 수는 보드의 모양(규칙 상수 또는 밸런싱 값), 두 진영 사이 간격(`gap`)도 같은 곳에 둔다.
+- 전투 유닛이 원본에서 읽는 패시브 효과는 전투 데이터의 목록을 가진 목록으로 둔다(`battle › fighters`, `matchField` `unit`, 17장 0-1). 보드 조각(`run › board`)을 가진 목록으로 둔 패시브 효과는 전투 중에도 보드를 본다.
+
 ---
 
 ## 2. 동작 규칙

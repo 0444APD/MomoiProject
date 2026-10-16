@@ -457,7 +457,7 @@ public class GoldEarned { public int amount; }
 
 **에디터에서**
 
-1. 항목은 AI가 DB 반영 스크립트로 만든다(접두어 `instance`, 예: `instance.potion`, 3-1). 레벨 배치처럼 개발자가 늘리고 줄일 데이터는 인스턴스가 아니라 `DeveloperAuthored` 종류로 둔다(관례 18절).
+1. 항목은 AI가 DB 반영 스크립트로 만든다(3-1). ID는 lowerCamelCase 이름 하나다(`potion`, `ironSword` — 종류 접두어 `instance.`를 붙이지 않는다. 접두어 `instance`는 DB 창이 제안하는 번호 ID `instance1`에만 쓰인다). DB ID는 모든 종류를 통틀어 하나이므로, 같은 대상에 딸린 다른 종류의 항목(그 아이템의 패시브 효과 등)은 `potion.fx`처럼 대표 ID 뒤에 갈래를 붙인다(AI 문서 `NamingGuide.md`). 레벨 배치처럼 개발자가 늘리고 줄일 데이터는 인스턴스가 아니라 `DeveloperAuthored` 종류로 둔다(관례 18절).
 2. **instanceType**(형식)을 고르면 그 클래스의 빈 객체가 **value**(값)에 만들어진다. 값을 채운다.
 3. 필드 보이기: 클래스의 `[Hide]`는 항상 숨김, `[ShowIf(필드[, 값…])]`은 조건부(값을 여러 개 적으면 그중 하나일 때).
 4. 기능 필드(비어 있을 수 있는 `[SerializeReference]` 클래스 필드)는 비어 있으면 **+ 기능**으로 붙이고, 붙어 있으면 줄의 빼기로 뗀다 — 구조라 잠겨 있다(AI가 반영 스크립트로, 3-1). 개발자는 붙은 기능 안의 값을 바꾼다.

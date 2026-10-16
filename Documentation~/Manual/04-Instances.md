@@ -228,7 +228,7 @@ foreach (var (id, weapon) in Game.InstancesOf<Weapon>())     // DB › 인스턴
 
 `Game.Entries<InstanceData>()`를 걸러 쓰지 않는다(인스턴스 원본을 훑는 길은 이것 하나). ID 목록만은 `session.InstanceIds`(`Func<IEnumerable<string>>`, 런타임이 채운다).
 
-**규칙 테스트**(세션을 직접 만든다)는 `session.DefineInstance(id, 원본)`으로 원본을 넣는다 — `Instances`·`InstanceIds`를 함께 채우므로 `CopyInstance`·`InstancesOf`가 런타임처럼 돈다. `session.Instances = …`를 직접 넣으면 `InstancesOf`가 빈 목록이다.
+**규칙 테스트**(세션을 직접 만든다)는 `session.DefineInstance(id, 원본)`으로 원본을 넣는다 — `Instances`·`InstanceIds`를 함께 채우므로 `CopyInstance`·`InstancesOf`가 런타임처럼 돈다. 사용 기능(`Usable` 필드)이 붙은 원본이면 `Game.Use(인스턴스 ID, …)`로 쓸 수 있게 함께 등록한다(런타임과 같다 — 16장). `session.Instances = …`를 직접 넣으면 `InstancesOf`가 빈 목록이고 사용 기능도 등록되지 않는다.
 
 ```csharp
 session.DefineInstance("ironSword", new Item { name = "철검", price = 120 });   // 정의한 차례가 InstancesOf의 차례

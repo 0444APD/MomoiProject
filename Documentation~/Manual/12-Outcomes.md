@@ -6,7 +6,7 @@
 
 **언제 쓰는가**
 
-- 숫자·글자·리스트처럼 플레이어 데이터의 필드 하나를 정해진 값만큼 바꿀 때 → 플레이어 데이터에 주기(프로젝트 코드 없이 Block 하나).
+- 숫자·글자·리스트처럼 플레이어 데이터의 필드 하나를 정해진 값만큼 바꿀 때 → 플레이어 데이터에 주기(프로젝트 코드 없이 Block 하나). **단 핵심 동사가 바꾸는 값**(규칙 함수가 행동 직전 이벤트를 거쳐 바꾸는 값 — 피해·회복·호감도·획득 …)은 아니다: 이 결과는 필드를 바로 바꿔 행동 직전 이벤트·이벤트를 건너뛰므로 기믹(두 배·막기·반응)이 붙지 않는다. 그 규칙 함수를 부르는 코딩한 결과를 만든다(3-2 끝).
 - 유닛 같은 개체를 골라 그 개체를 바꿀 때 → 대상에게 효과(대상 Block + 효과 Block. 기본 제공 Block으로 되면 코드 없이, 아니면 프로젝트 Block을 코드로 만든다(3-5·3-6)).
 - 고른 개체의 숫자 필드 하나를 바꿀 때("이 조커 배수 +1", "카운터 −1", "처치 횟수 +1") → 대상에게 효과 + 효과 `필드 바꾸기`(코드 없이, 2-4a).
 - 옆 칸 조각의 패시브 효과를 한 번 더 낼 때(복사·흉내, "오른쪽 조커의 액티브 효과를 복사") → 빌려 쓰기(2-4e).
@@ -331,6 +331,21 @@ public class GiveGold : Reward
 8. (선택) **`Natural(INameResolver)`** — 자연어 요약. 없으면 `Describe`.
 9. (선택) **`Validate(IValidationContext context)`** — 에디터 검증. `context.Error("…")`는 빌드를 막고, `context.Warning("…")`은 표시만.
 10. **`Context`**(protected) — 발동한 순간의 `TriggerContext`. Trigger 밖에서 직접 `Grant`를 부르면 `null`.
+
+**핵심 동사의 값은 규칙 함수로.** 행동 직전 이벤트를 거쳐 바뀌어야 하는 값(관례 4절 — 피해·회복·호감도·획득 …)을 DB(액티브 효과·패시브 효과·다이얼로그의 값 바꾸기·개발 명령)에서 바꿀 때는 '플레이어 데이터에 주기'로 필드를 바로 고치지 않고, 그 규칙 함수를 부르는 코딩한 결과를 하나 만든다. 계산·행동 직전 이벤트·이벤트가 규칙 함수 한 곳에만 있어 기믹("선물 호감도 두 배")이 DB 결과에도 붙는다.
+
+```csharp
+[Serializable, BlockInfo("호감도 바꾸기", Category = "관계", Description = "공략 대상의 호감도를 바꿉니다(행동 직전 이벤트 '호감도'를 거칩니다).", Sentence = "{heroine} 호감도 {amount}")]
+public class ChangeAffectionReward : Reward
+{
+    [FieldLabel("공략 대상"), DataRef(typeof(Heroine))] public string heroine = "";   // GBible.Data — 인스턴스 Heroine만 고른다
+    [FieldLabel("양")] public int amount = 5;
+
+    public override RewardEffect Effect => RewardEffect.Reversible;
+    public override void Grant(GameSession session) => Rules.ChangeAffection(session.Game, heroine, amount);   // 행동 직전 이벤트 → 바꾸기 → 이벤트
+    public override string Describe(INameResolver names) => $"{heroine} 호감도 {amount}";
+}
+```
 
 ### 3-3. `TriggerContext` — 결과가 읽는 순간 정보
 

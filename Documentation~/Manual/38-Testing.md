@@ -203,6 +203,19 @@ session.Advance(10.5);                                 // 315틱을 다 돈다 �
 Assert.AreEqual(2, session.Game.Data().Arena.wave);    // 첫 틱과 10초 뒤에 한 번씩
 ```
 
+**규칙 테스트의 세션 준비** — 게임에서는 런타임이 DB로 채우는 것을, 세션을 직접 만든 테스트(`new GameSession(…)`)는 손으로 넣는다. 넣지 않은 것은 없는 것이다(없는 밸런싱 값·가중치 표·상태 효과를 쓰면 "[MomoiProject] 없는 … '…'입니다" 예외, 정의하지 않은 패시브 효과는 발동하지 않는다).
+
+| 넣을 것 | 테스트에서 | 자세히 |
+|---|---|---|
+| 플레이어 데이터 | `session.Data.Define(키, 구역, 처음 값)` | 01장 2.9 |
+| 밸런싱 값 | `session.Balance.Define(id, 값, 곡선 = null)` | 30장 4-2 |
+| 상태 효과 | `session.Statuses.Define(StatusDefinition)` — DB 항목이 있으면 그 `ToDefinition()` | 29장 4-4 |
+| 패시브 효과 | `session.Passives.Define(PassiveDefinition)` | 17장 0-4 |
+| 가중치 표 | `session.Tables.Define(WeightTableDefinition)` | 30장 4-5 |
+| 액티브 효과 | `session.Abilities.Define(AbilityDefinition)` | 16장 |
+| 인스턴스 원본 | `session.DefineInstance(id, 원본)` — `Instances`·`InstanceIds`를 함께 채우고, 사용 기능(`Usable` 필드)이 붙은 원본은 `Game.Use(인스턴스 ID, …)`로 쓸 수 있게 액티브 효과로도 등록한다(런타임과 같다) | 04장 |
+| DB 항목의 프로젝트 칸(`Game.Entry<T>(id)` — 상태 효과의 `stopsActing` 같은 칸) | `session.Entries = id => …`(그 ID의 항목 객체를 돌려준다 — `ScriptableObject.CreateInstance`로 만든 항목, 17장 4-3의 예) | 29장 4-2 |
+
 테스트 명령은 22장(개발 명령). 결과 Block으로 조립하고 `category`로 묶는다(예: "판", "조각", "적", "상황"). 개발자가 값(몇 개·어느 인스턴스)을 바꿔야 하는 명령은 `[BindTo]`가 아니라 결과 Block으로(22장 7절 — `[BindTo]` 명령에는 값 칸이 없다).
 
 ## 5. 상황별 예제

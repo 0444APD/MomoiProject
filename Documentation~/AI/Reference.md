@@ -51,10 +51,11 @@ GBible.Unity
 | 값을 바꾸기 | **행동 안에서** 필드를 그냥 고친다(Mirror·Sync가 기록). 행동 밖에서 바꾸지 않는다 | 01·02 |
 | 플레이어 입력 하나 | `class X : GameAction { 필드 = 입력; protected override void Run() { … } }` → `Game.Do(new X { … })`. 하나 = Undo 한 단위 = 네트워크 한 묶음 | 02 |
 | 되돌리기 | `session.Undo()`(Bootstrap Undo 방식: 행동 단위·스냅샷·쓰지 않음, 보관 수 — 새 DB 기본 200). 이번 턴만이면 Bootstrap 'Undo 끊는 이벤트'. "이번 턴 처음으로"·"되감기 3회"는 `session.HistoryMark`·`UndoTo(지점)` | 02 |
-| id로 객체 찾기·새 id | `Game.Find<T>(id)`·`Game.All<T>()`. id가 있는 클래스(`public string id`). 새 id는 행동 안에서 `Game.NewId("card")`, 여럿이면 `Game.NewIds("bat", 30)` | 03 |
+| id로 객체 찾기·새 id | `Game.Find<T>(id)`·`Game.All<T>()`·`Game.All<T>(키)`. id가 있는 클래스(`public string id`). 새 id는 행동 안에서 `Game.NewId("card")`, 여럿이면 `Game.NewIds("bat", 30)`. `Find`는 그 형식을 담을 수 있는 키를 모두 훑는다 — 틱마다 여러 번 찾을 일(자동 전투의 유닛 수십)은 목록을 한 번 꺼내 그 안에서 찾는다(행동 안에서 id → 객체 사전을 한 번 만들기 · 키를 좁히는 `All<T>(키)`) | 03 |
+| 다른 키로 객체 옮기기(판 ↔ 프로필 — 탈출해서 창고로, 창고에서 꺼내 판으로) | 한 행동 안에서 한 키의 목록에서 빼고 다른 키의 목록에 넣는다 — 같은 객체 · 같은 id 그대로(Undo하면 제자리로, 옮긴 뒤 고친 값도 새 키에서 Undo, 저장에는 새 키 쪽에만). 금지는 두 키가 동시에 같은 객체를 가리키는 것(관례 3절). 같은 원본에서 새 개체가 필요하면 옮기기가 아니라 `CopyInstance` + `Game.NewId` | 01 |
 | 행동 필드에 객체 넣기 | 넣어도 된다: 기록·전송에는 id만 남고 실행 직전에 다시 찾는다(Undo·불러오기 뒤에도 맞다). 보낸 사이 대상이 사라졌으면 플레이어용 실패 `momoi.fail.targetGone`("대상이 이미 없습니다." — 아무것도 바뀌지 않는다). 판정 보고 묶음(`Strike { hits }`)의 대상은 id 글자로 두고 없는 것은 건너뛴다(관례 3절) | 02 |
 | 행동이 끝나기 직전에 다시 계산(시야·합계 같은 파생 데이터) | `session.Actions.Committing += () => …`(바깥 행동이 끝나기 직전 — 아직 그 행동 안이라 `session.Game`으로 고친 값이 그 행동의 Undo에 든다. 미리보기에서도 온다). 등록은 Rules의 등록 함수 → `Bootstrap.RegisterRules`. 행동마다 같은 재계산을 손으로 부르지 않는다 | 02 |
-| 판을 이어 하기·저장 | Bootstrap '판 저장'(행동마다·끌 때·저장 안 함·N초마다·이벤트를 받을 때)·'판 끝 이벤트'·'프로필도 행동마다 저장'(끄면 프로필은 끌 때·판 끝에만). 저장 코드는 쓰지 않는다. `GBibleRuntime.SaveRun`(`Saving` → 프로필 → 판 — 프로필도 함께)·`LoadRun`(깨졌으면 `.bak`으로)·`HasSavedRun`, 저장 직전·불러온 뒤·끄기 직전 이벤트 `Saving`·`RunLoaded`·`Stopping`. 새 판은 **행동 밖**(버튼)에서 `GBibleRuntime.NewRun(session, 시드)`(판 값을 처음으로 + 판 저장 파일 지움 — 행동 안에서 부르면 예외) 또는 `StartNewRun`(그 뒤 Bootstrap '새 판 행동'까지) | 06 · 구현 가이드 10 |
+| 판을 이어 하기·저장 | Bootstrap '판 저장'(행동마다·끌 때·저장 안 함·N초마다·이벤트를 받을 때)·'판 끝 이벤트'·'프로필도 행동마다 저장'(켜면 프로필(메타 구역)을 바꾼 행동마다 프로필을 저장 — 바꾸지 않은 행동에서는 쓰지 않으므로 판 안의 전투 행동이 잦아도 된다. 끄면 끌 때·판 끝·판을 저장할 때 그사이 바뀌었으면). `[SystemAction]` 행동(상태 효과 주기·예약·자동 전투 틱)은 '행동마다'의 계기가 아니다(다음 플레이어 행동·끌 때 함께 — 'N초마다'는 센다). 저장 코드는 쓰지 않는다. `GBibleRuntime.SaveRun`(`Saving` → 프로필 → 판 — 프로필도 함께)·`LoadRun`(깨졌으면 `.bak`으로)·`HasSavedRun`, 저장 직전·불러온 뒤·끄기 직전 이벤트 `Saving`·`RunLoaded`·`Stopping`. 새 판은 **행동 밖**(버튼)에서 `GBibleRuntime.NewRun(session, 시드)`(판 값을 처음으로 + 판 저장 파일 지움 — 행동 안에서 부르면 예외) 또는 `StartNewRun`(그 뒤 Bootstrap '새 판 행동'까지) | 06 · 구현 가이드 10 |
 | 출시 뒤 저장 구조 변경 | DB › 개발 › 저장 변환(필드 옮김·키 이름 바꿈·키 삭제), 계산이 필요하면 `options.Migrations.Add` | 06 |
 | 결정론 난수 | `Game.Random("흐름 이름").Range(최소, 최대 + 1)`·`NextDouble()`. 흐름은 쓰는 곳마다 이름. 행동 안에서만. 확률은 아래 `Game.Chance` | 07 |
 | N% 확률(행운·"확률 2배"가 고침) | `Game.Chance(0.25, "흐름", source)`·조건 '확률'(이벤트 받기·행동 직전 이벤트 받기·사용 트리거와 AND, 미리 보기에서는 굴리지 않음). 행동 직전 이벤트 '확률'(`probability`)을 받아 고치면 모든 확률이 바뀐다 | 07·11 |
@@ -66,17 +67,18 @@ GBible.Unity
 |---|---|---|
 | 일이 일어났다고 알리기 | `[Serializable, GameEvent("이름")] class X { … }` → `Game.Events.Publish(new X { … })`. 받기 `Subscribe<X>`(규칙)·`SubscribeAfterAction<X>`(연출) | 10 |
 | 핵심 동사(피해·회복·사용·이동 …) | 규칙 함수(`Rules.Damage`) 하나 + 행동 직전 이벤트(`[Serializable, Intent("피해")] class DamageIntent { sourceId, targetId, amount, cancelled }`)를 `Game.Intercept(행동 직전 이벤트)`로 통과 + 끝난 뒤 이벤트 | 28, 관례 4절 |
+| 핵심 동사가 다루는 값(호감도·체력)을 다이얼로그 · DB 결과가 바꾸기 | 결과 '플레이어 데이터에 주기'로 필드를 직접 고치지 않는다(행동 직전 이벤트를 건너뛰어 그 값에 붙인 기믹 — "호감도 두 배" — 이 붙지 않는다). 그 규칙 함수를 부르는 프로젝트 결과 Block(`Reward` — `ChangeAffection { character, amount }`가 `Rules.ChangeAffection`)을 Rules에 두고, 다이얼로그 그래프의 값 바꾸기 · DB 결과에서 그것을 고른다 | 12·24, 관례 4절 |
 | "받는 피해 −5"·"막기"·"두 배"·"대신 맞기" | DB에서 트리거 '행동 직전 이벤트 받기'(행동 직전 이벤트 형식) + 결과 '행동 직전 이벤트 고치기'(값으로 바꾸기·더하기·곱하기·막기) | 28 |
 | 도발·대신 맞기·중첩·레벨만큼·조각의 값만큼 | 값 틀('행동 직전 이벤트 고치기'·'필드 바꾸기'·'이벤트 쏘기'·'사용자 필드 검사'): `{user}`(사용자 id) · `{user:경로}`(사용자의 필드) · `{event:경로}`(받은 이벤트·행동 직전 이벤트의 필드) · `{data:키.경로}` · `{count:키.경로}`(목록 개수) · `{owner}` · `{stacks}` · `{level}` · `{level:2/4/7}` · `{balance:ID}`. 예: `targetId` 값으로 바꾸기 `{user}`, `amount` 더하기 `-{stacks}` | 28 |
 | GBible이 행동 직전 이벤트 자리를 둔 동작 | 행동 직전 이벤트 '사용'(`times`·막기) · '효과 배율'(`multiplier` — 액티브 효과를 쓸 때·패시브 효과가 발동할 때, 기본 효과 Block이 곱함, 프로젝트 Block은 `Use.Context.Power`) · '비용 지불'(`amount`·`floor` = 빚 하한·`key`/`path` = 낼 곳·막기 = 공짜, 거르기 `forId` 무엇을 위한·`userId` 내는 쪽) · '상태 효과 걸기'(`statusId` 바꾸기·`stacks`·`length`·`maxStacks`·`pulse`·`kind`·`byId`·막기) · '확률'(`probability`) | 28·29 |
 | 물리·충돌·투사체·미니게임 판정 | **판정 보고 행동**: 화면(MonoBehaviour)이 판정하고 결과(누가 누구를·성공)를 행동 하나로 보낸다(실시간은 틱마다 `Strike { hits }` — 대상은 id 글자, 행동 안에서 없는 것은 건너뛴다). 규칙은 결과만. 위치·속도는 화면 쪽 | 33 |
-| 스탯(공격력·방어)과 보정 | 숫자 필드 = 스탯. `Game.Attribute(대상, "attack")`(보정 포함 값), `Game.AddModifier(대상, "attack", ModifierKind.Percent, 0.2, 출처)`·`RemoveModifiers(출처)`. 같은 칸은 더하고 칸끼리 곱(플랫 → 퍼센트 → 독립 곱) | 28 |
+| 스탯(공격력·방어)과 보정 | 숫자 필드 = 스탯. `Game.Attribute(대상, "attack")`(보정 포함 값). 같은 칸은 더하고 칸끼리 곱(플랫 → 퍼센트 → 독립 곱). 보정을 거는 곳: 장비 · 유물(가진 동안) = 패시브 효과 '가진 동안 스탯 보정', 버프 · 디버프 = 상태 효과의 스탯 보정, 그 밖에 코드가 잠깐 거는 것만 `Game.AddModifier(대상, "attack", ModifierKind.Percent, 0.2, 출처)`·`RemoveModifiers(출처)`(장비에 쓰지 않는다 — 7절 24) | 28 |
 | 비용 내기 | `Game.Pay(키, "battle.energy", 2, what: "energy.name", forId: 카드ID, user: 내는쪽)`(모자라면 플레이어용 실패, 행동 직전 이벤트 '비용 지불' 받기로 공짜·할인) · `Game.TryPay(…)`(모자라면 바꾸지 않고 거짓 — 틱 묶음 안의 "되면 낸다") · `Game.CanPay`(행동 직전 이벤트 전, 화면 미리 보기용). DB 결과 '비용 내기' | 28 |
 | 플레이어에게 보일 실패 | `throw Game.Fail("fail.frozen", "얼어 있어 움직일 수 없습니다", ("turns", 2))`. 행동 전체 취소, 메시지는 읽을 때 지금 언어 | 30 |
 | 언제 · 누구에게 · 무엇을(효과 조립) | 트리거(이벤트 받기·조건 충족·사용·행동 직전 이벤트 받기) → 결과(대상에게 효과(대상 Block → 효과 Block) · 플레이어 데이터에 주기 · 로그에 기록 · 이벤트 쏘기(값 틀) · 선택 요구 …) | 11·12, 기획 명세서 읽는 법 7절 |
 | 조건("보스를 잡았고 골드 100 이상") | 조건 Block(필드 검사·플레이어 데이터 검사·배열 검사·AND/OR/NOT·로그 비교), 코드 조건은 `SimpleCondition` | 11 |
 | 그 항목만의 특별한 결과 | `[BindTo(GameIds.X.Y)] static void F(이벤트 e, TriggerContext c)` 또는 `Reward` 클래스 | 13 |
-| 스킬·아이템 쓰기 | 사용 기능 필드(`[SerializeReference] Usable usable`) 또는 DB › 액티브 효과 → `Game.Use(id, 사용자, 대상…)`·`Game.CanUse(…, out 이유)`. 조건이 안 맞을 때 글은 '쓸 수 없을 때 글' | 16 |
+| 스킬·아이템 쓰기 | 사용 기능 필드(`[SerializeReference] Usable usable`) 또는 DB › 액티브 효과 → `Game.Use(id, 사용자, 대상…)`·`Game.CanUse(…, out 이유)`. 조건이 안 맞을 때 글은 '쓸 수 없을 때 글'. 규칙 테스트의 `session.DefineInstance(id, 원본)`도 사용 기능이 붙은 원본을 `Game.Use(인스턴스 ID, …)`로 쓸 수 있게 등록한다 | 16 |
 | 독·화상·보호막·분노(중첩·지속) | DB › 상태 효과(종류·중첩·다시 걸 때·지속(영구/이벤트 횟수/초)·스탯 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과), 효과 '상태 효과 걸기'·`Game.ApplyStatus`·`RemoveStatus`·`StatusStacks`·`HasStatus`·`Statuses` | 29 |
 | 화상 → 푸른 화상·독 중첩 2배·면역·디버프 지속 +·최대 중첩 +·틱 속도 + | 행동 직전 이벤트 '상태 효과 걸기' 받기 + 행동 직전 이벤트 고치기(`statusId` 값으로·`stacks` 곱하기·막기·`length` 곱하기·`maxStacks` 더하기·`pulse` 곱하기) | 29 |
 | 처치 기여(마지막에 건 쪽)·걸린 것으로 대상 거르기 | 걸린 것의 `by`(건 개체 id, 다시 걸면 바뀜 — 효과 '상태 효과 걸기'는 사용자, 코드 `ApplyStatus(…, by:)`) · 대상 '상태 효과로 거르기'(중첩·종류 가짓수 비교) | 29 |
@@ -89,6 +91,7 @@ GBible.Unity
 | 한 패시브 효과가 순간마다 다른 결과(쌓기·빼기·내기·N번째마다) | 패시브 효과 `rules`(발동 더 — 줄마다 트리거 + 결과) + 조건 '사용자 필드 검사'(조각의 카운터) | 17·11 |
 | 가진 동안 N초마다 | 패시브 효과 `pulse`·`pulseByLevel`(주기, 게임 시각 기준 — 멈추기·리셋은 필드 + 틱 행동) | 17 |
 | 가진 동안 +N(유물 공격 +2, 레벨마다 다름) | 패시브 효과 `modifiers`(가진 동안 스탯 보정 — 줄마다 `attribute`·`kind`·`value`·`perLevel` 레벨마다·`byLevel` 레벨별 값 3/6/10/14·`target` 받을 대상) · `modifierTarget`(보정 받을 대상, `party[]`면 그 모두) · `modifierWhen`(보정 조건 — 같은 줄에 혼자·체력 절반 이하) · `stacking`(여럿일 때 — 레벨 합·사본마다 값·가장 높은 하나). 저장하지 않고 읽을 때 계산 → 잃으면 저절로 빠짐. 트리거가 없어도 된다 | 17·28 |
+| 장비 스탯 · 아이템마다 굴린 수치(무작위 접사) | 장비 = 같은 '가진 동안 스탯 보정'(가진 목록 = 장비 칸 — 벗으면 저절로 빠짐). 접사 = **레벨로 값을 나른다**: 접사 종류마다 패시브 효과 하나 + 아이템의 접사 객체 `{ id, affix, level }`(`level` = 굴린 값, 1 이상 정수) → `levelField` = `level`, 보정 줄 `perLevel` 값 1(퍼센트면 0.01). 자세히는 기믹 목록 2-9 | 17 |
 | 대상의 숫자 필드를 바꾸기(이 조커 배수 +1·카운터 −1·처치 횟수 +1) | 효과 '필드 바꾸기'(더하기·곱하기·값으로 바꾸기, 값 틀, 0 아래로 내리지 않음, 더하기는 × 효과 배율) | 12 |
 | 다른 조각의 패시브 효과를 빌려 쓰기(Blueprint·Brainstorm) | 결과 '빌려 쓰기'(빌릴 조각 = 대상 Block, 예: 자리로 고르기 — 오른쪽). 원본 값을 읽고, 원본 자신의 쌓이는 값은 바꾸지 않고, 고리는 끊는다. 가진 쪽 필드는 빌리는 쪽 기준(빌린 결과 안에서 또 빌리면 처음 빌린 조각 — Brainstorm → Blueprint). 코드 `Game.BorrowPassive(ID, 원본)` | 17 |
 | 조각을 차례로 쓰기(되는 것만) | `Game.TryUse(id, 사용자, 대상…)`(조건이 안 맞으면 실패 없이 거짓). 한 번 더 발동은 행동 직전 이벤트 '사용'의 `times` | 16 |
@@ -130,14 +133,14 @@ GBible.Unity
 
 | 하고 싶은 일 | 쓸 것 | 장 |
 |---|---|---|
-| HUD·상점·타이틀 같은 화면 | `Assets/MomoiProject/UI/Screens/X.uxml` + DB › 화면(층·뒤로로 닫기·열 씬) + `[BindTo(GameIds.Screen.X)] class X : GameScreen`. 먼저 반영 스크립트에서 `ScreenSetup.Ensure()`(에디터를 열 때도 저절로) | 35 |
-| 값을 보이기만 하는 칸 | UXML `binding-path="run:gold"`·`"run:gold@hud.gold"`(텍스트 틀)·`"@hud.endTurn"`(번역 글). 코드 없음 | 35 2-2 |
+| HUD·상점·타이틀 같은 화면 | `Assets/MomoiProject/UI/Screens/X.uxml` + DB › 화면(층·뒤로로 닫기·열 씬) + `[BindTo(GameIds.Screen.X)] class X : GameScreen`. 먼저 반영 스크립트에서 `ScreenSetup.Ensure()`(에디터를 열 때도 저절로). '열 씬'의 이름 끝 `*`는 앞부분이 같은 씬 모두(`Dungeon*` — 던전을 더해도 항목을 고치지 않는다), 테스트 씬에서는 그 씬이 복사해 온 게임 씬 이름(`TestScene.sourceScene` — `TestSceneSetup.Ensure(copyFrom:)`이 넣는다)으로도 맞춘다 | 35 |
+| 값을 보이기만 하는 칸 | UXML `binding-path="run:gold"`·`"run:gold@hud.gold"`(텍스트 틀)·`"@hud.endTurn"`(번역 글). 코드 없음. enum 값은 텍스트 표에 `<enum 형식 이름>.<값>`(`TimeOfDay.Morning`)이 있으면 그 글(지금 언어), 없으면 코드 이름 | 35 2-2 |
 | 버튼 → 행동 | `OnClick("이름", () => new 행동())`(Busy면 무시, 실패는 알림)·`GameScreens.Do(…)` | 35 2-4 |
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
 | 화면 색 · 뒷배경 · 글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수 · 패널 면은 UI 키트 `KitPanel` + `kit-pn-*` · 뒷배경은 DB › 화면의 '뒷배경'(`ScreenBackdrop` — 일반 배경 · 블러 · UI 배경, 클래스 `.momoi-backdrop--plain · --blur · --ui`, 변수 `--momoi-backdrop` · `--momoi-ui-backdrop`) · DB › 화면 설정 › 글꼴(TTF) 또는 글꼴 에셋(TextCore — 굵기 표, 먼저 쓴다). 규칙은 `UiGuide.md` | 35 2-7 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
-| 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy` | 32 |
+| 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy`(연출 중 · 선택 대기 · 대사가 열려 있음 · `GameView.AddBusy(() => 조건)`으로 더한 때 — 더하기는 `AfterAssembliesLoaded`에서, 플레이마다 비워진다) | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |
 | 쿨다운 원·타이머처럼 시간에 따라 바뀌는 칸 | `GameScreen.Tick(초)` | 35 |
 | 연출을 UI 칸 위에 | `GameView.FindElement(id)` + `GameScreens.Overlay` | 35 5-4 |
@@ -153,9 +156,9 @@ GBible.Unity
 | 설정(음량·언어·화면·전투 속도) | DB › 설정(종류: 켜기/끄기·숫자·선택지·글, 적용 대상: 언어·음량·전체 화면·해상도·수직 동기화·최대 프레임) → `GameSettings.Number(id)`·`Toggle`·`Choice`·`Set`·`Changed`. 화면은 기본 설정 화면 | 31·35 |
 | AI가 Unity 상태 읽기(창을 볼 수 없으므로) | DB 검증 오류·경고·'적용 전' 변경 = `Logs/MomoiProject/DbStatus.txt`(컴파일 뒤·DB가 바뀔 때 다시 쓰임, `DbStatusReport`) · Unity 로그 = `Logs/Editor.log`(Unity 6.6은 프로젝트 안) | 관례 12 |
 | 플레이 중 값·기록 보기, 이벤트 쏴 보기, 버튼 하나로 시험 | 모니터(타임라인·데이터·행동·명령·이벤트 호출), DB › 개발 명령(결과 Block 조립 → 명령 탭 버튼) | 22 |
-| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/MomoiProject/Code/Editor/Seeds`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)`·`Work(항목)`·`Remove(항목)`·`Rename(항목, 새 ID)`(가리키는 `[DataRef]` 칸도 함께 바뀐다) → 컴파일 뒤 저절로 돈다(새 항목은 저절로 적용, 고치기·지우기·ID 바꾸기는 '적용 전' → 개발자가 Ctrl+S). DB › 시작 파일 › Bootstrap 칸은 항목이 아니라 DB 에셋이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)` → 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`)일 때만 결정한 값으로 `EditorSet…`(3-8 — 기본값이 아니면 개발자가 고른 것이라 그대로 두고 보고, 관례 15절) → `EditorUtility.SetDirty`·`AssetDatabase.SaveAssetIfDirty`('적용 전'을 거치지 않는다). Run In Background는 같은 곳에서 `PlayerSettings.runInBackground = true`(실시간·방치형·멀티). 이미 있는 항목은 건너뛴다(`EditorDatabase.Instance.FindById(id) != null`). 새 항목의 `GameIds` 상수는 반영 스크립트가 돈 뒤 Unity가 다시 컴파일해야 생긴다 — 한 응답 안에서 두 박자(형식·반영 스크립트 → 새로 읽기 → 상수를 쓰는 코드, 관례 15절) | 관례 15, 21 |
+| DB 항목 만들기·고치기·지우기(AI) | DB 반영 스크립트: `Assets/MomoiProject/Code/Editor/Seeds`의 `[DbSeed("버전")] static void F()` 안에서 `EditorDatabase.Staging.Add(typeof(X), id)`·`Work(항목)`·`Remove(항목)`·`Rename(항목, 새 ID)`(가리키는 `[DataRef]` 칸도 함께 바뀐다) → 컴파일 뒤 저절로 돈다(새 항목은 저절로 적용, 고치기·지우기·ID 바꾸기는 '적용 전' → 개발자가 Ctrl+S). DB › 시작 파일 › Bootstrap 칸은 항목이 아니라 DB 에셋이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)` → 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`)일 때만 결정한 값으로 `EditorSet…`(3-8 — 기본값이 아니면 개발자가 고른 것이라 그대로 두고 보고, 관례 15절) → `EditorUtility.SetDirty`·`AssetDatabase.SaveAssetIfDirty`('적용 전'을 거치지 않는다). Run In Background는 같은 곳에서 `PlayerSettings.runInBackground = true`(실시간·방치형·멀티). 이미 있는 항목은 건너뛴다(`EditorDatabase.Instance.FindById(id) != null`). using은 `GBible` · `GBible.Data` · `GBible.EditorTools`(효과 '필드 바꾸기'의 `FieldChange`와 겹치지 않는다 — 에디터 쪽은 `DraftFieldChange`). 새 항목의 `GameIds` 상수는 반영 스크립트가 돈 뒤 Unity가 다시 컴파일해야 생긴다 — 한 응답 안에서 박자로(기능 켜기 → 형식·반영 스크립트 → 새로 읽기 → 상수를 쓰는 코드 → 필요하면 새로 읽기 한 번 더 → 테스트, 진행 매뉴얼 6절 박자 표) | 관례 15, 21 |
 | 개발자가 에디터에서 바꾸게(밸런싱) | 숫자 = 밸런싱 값·DB 칸·인스턴스 필드, 가리키는 것 = `[DataRef(typeof(…))]` 드롭다운, 효과 = Block 문장(`[BlockInfo(Sentence = "…{필드}…")]`). DB는 구조를 잠그고 값만 연다(`EditorPolicy`) | 관례 18, 21 |
-| 개발자가 추가·삭제하는 DB 종류(레벨 배치·대사) | `[Database("층", DeveloperAuthored = true)]` — 이 종류만 DB에서 추가·삭제·ID 바꾸기가 열린다. 인스턴스(DB › 인스턴스)는 잠겨 있으니 개발자가 배치할 레벨 데이터에 쓰지 않는다 | 관례 18, 21 |
+| 개발자가 추가·삭제하는 DB 종류(레벨 배치·대사) | `[Database("층", DeveloperAuthored = true)]` — 이 종류만 DB에서 추가·삭제·ID 바꾸기가 열린다. 인스턴스(DB › 인스턴스)는 잠겨 있으니 개발자가 배치할 레벨 데이터에 쓰지 않는다. 대화 중심 게임의 레벨 배치 = 이 종류의 이벤트 표 + 다이얼로그 그래프(진행 매뉴얼 9절) | 관례 18, 21 |
 | 게임 씬·테스트 씬·패널·상황 | 한 반영 스크립트에서 게임 씬 `GameSceneSetup.Ensure(경로, firstInBuild: true)`(없을 때만 빈 씬 + 빌드 목록, 있으면 빌드 목록만) → 이어 `TestSceneSetup.Ensure(copyFrom: 그 경로, scenario:)` · 컴포넌트 `TestScene`(test 슬롯·시작 상황·패널 F1) · `TestScenarios.Save·Load(session, 이름, seed)`(저장한 순간의 현실 시각 `realNow`도 남기고 불러올 때 맞춘다) | 관례 19, 38 |
 | 테스트 명령(주입·발동) | DB › 개발 명령(결과 Block, `category`로 묶음) — 반영 스크립트로 만든다. Block이 없는 것(프로젝트 행동 실행)만 그 항목의 `[BindTo]`나 코드 `session.Debug.Register`(`Bootstrap.RegisterRules`에서, 값을 바꾸면 안에서 행동으로 — 20장 4절). 둘 다 개발자가 바꿀 값 칸이 없으므로 값이 필요한 명령은 결과 Block으로 | 22, 38 |
 | 꺼 둔 시간·날짜 넘김 시험(현실 시각 옮기기) | 개발 명령 '시간 › 현실 시각 +1시간 / +1일 / 지금으로'(`TestClock` — 개발 빌드·에디터에서만 `Game.Now`에 얹힌다, 플레이를 멈추면 돌아온다). 규칙은 `TestClock`을 읽지 않는다(`Game.Now`·`Game.Day`만) | 07·38 |
@@ -163,7 +166,7 @@ GBible.Unity
 | 그림·소리 자리와 넣을 것 목록 | `AssetRequests.Sprite(path, w, h, 쓰는 곳)`·`Audio(path, 쓰는 곳, seconds)`·`Request(path, 쓰는 곳)`(반영 스크립트에서) → 개발자가 에셋 관리 › 넣을 것에서 진짜 파일을 넣는다(같은 자리·GUID 유지) | 관례 18, 39 |
 | 스파인 캐릭터 | 런타임 버전·설치(manifest git)·알파(PMA/스트레이트)·넣을 파일(`Assets/Dev/Art/Spine/<이름>/`의 `.skel.bytes`·`.atlas.txt`·`.png`)·조종 뼈는 39장 5절대로 | 39 5절 |
 | 결정 기록 | `Docs/Decisions.md`(세션마다 먼저 읽기, 개발자의 답·추천 승인을 `D-n`으로 — 기획은 넘겨짚지 않는다, 답을 기다리는 것은 '확인 기다리는 것'에) | 진행 매뉴얼 2 |
-| 규칙 테스트(Unity 없이) | `new GameSession(new SessionOptions { Seed = 1 })` → `Data.Define`·`DefineInstance(id, 값)` → `Game.Do` → 단언. 시간은 `session.Advance(초)`(고정 틱이면 한 틱씩 끝까지 — `EndFrame(1.0)`은 8틱에서 잘린다). 플레이어용 실패는 `Assert.Throws<GameFailure>` | 관례 12절 |
+| 규칙 테스트(Unity 없이) | `new GameSession(new SessionOptions { Seed = 1 })` → `Data.Define`·`Balance.Define`·`Statuses.Define`·`Passives.Define`·`Tables.Define`(DB 항목 객체면 `ToDefinition()`)·`Abilities.Define(항목.ToUsable())`·`DefineInstance(id, 값)`(사용 기능이 붙은 원본은 `Game.Use`용으로도 등록) → `Game.Do` → 단언(목록 전부는 관례 12절). 시간은 `session.Advance(초)`(고정 틱이면 한 틱씩 끝까지 — `EndFrame(1.0)`은 8틱에서 잘린다). 플레이어용 실패는 `Assert.Throws<GameFailure>` | 관례 12절 |
 | AI가 Unity를 연 채로 테스트 돌리기 | `Logs/MomoiProject/RunTests.request`를 만든다(비우면 프로젝트 테스트, `all`이면 GBible 것까지, 줄마다 어셈블리 이름) → 에디터가 새로 읽고(컴파일) EditMode 테스트를 돌려 `Logs/MomoiProject/TestResults.txt`에 결과를 쓰고 요청을 지운다. 배치 모드는 Unity가 열려 있으면 쓰지 않는다 | 38 |
 | AI가 Unity를 플레이해 화면을 보고 고치기 | `Logs/MomoiProject/Play.request`에 단계(`wait`·`command`·`open`·`close`·`click 화면/요소[@n]`·`capture 이름`·`screens` …)를 적는다 → 에디터가 새로 읽고 테스트 씬으로 플레이해 단계를 돌리고 `PlayResults.txt`(단계 결과·콘솔 오류) + `Captures/<이름>.png`(AI가 그림으로 읽는다)를 쓴다. 움직임은 `record 이름 [초] [fps]` → `Captures/<이름>.mp4` + 칸 16개 모음 그림 `<이름>-frames.png`. 창을 띄우지 않는다('적용 전' DB 변경은 묻지 않고 적용된 데이터로) | 38 2-5 |
 | 멀티 시작(혼자 시험·직접 접속·친구 방·매칭큐) | 시험 모드 `GameNet.StartTestMode(latency)` · 직접 접속 `GameNet.HostDirect(포트)`·`JoinDirect(주소)` · 친구 방 `GameNet.CreateRoom(4)`·`InviteToRoom()`·`JoinRoom(대상)`(Steam이 준비되면 Steam 로비, 아니면 직접 접속 — `GameNet.Rooms`) · 매칭큐 서버 `GameNet.StartMatchServer(포트, 인원)` + `FindMatch(주소)` → `Client.Queue()`·`AnswerMatch(true)` · 화면 없는 서버 `StartDedicated`(명령줄 `-momoi-server`·`-momoi-matchserver`) · 테스트 씬 › 멀티플레이 · 다시 접속 `GameNet.AutoReconnect`·`Reconnecting`·`Reconnected` · 리플레이 `GameNet.RecordReplays`·`LastReplay`·`SaveReplay()`·`PlayReplay(…)`·`Replay.Seek(초)`·`StopReplay()` · 숨길 이벤트 `IOwnedEvent`·`[GameEvent(ServerOnly = true)]` · 실제 서비스 자리 `GameNet.TokenSource`·`Rooms`·`INetAuthenticator`·`INetMatchmaker`·`INetPlayerStore` | 관례 20, 40 |
@@ -177,15 +180,15 @@ GBible.Unity
 
 | 부가 기능 | 쓸 것 | 장 |
 |---|---|---|
-| 대사·컷신 | 선택 기능 다이얼로그: 그래프 창, `Dialogues.Play(id)`·`Signaled`·`ResumeSaved`. 대화가 중심인 게임이면 24장의 지금 동작(대사 진행은 행동 밖·되감기 없음 등)을 먼저 본다 | 24 |
-| 겹치는 가방 | 선택 기능 인벤토리: 필드 `Inventory { capacity }` → `Add`·`Remove`·`CountOf`·`Has`. 고정 칸·칸 정보가 필요하면 자리(`List<T>` + `Placement`) | 25 |
+| 대사·컷신 | 선택 기능 다이얼로그: 그래프 창, `Dialogues.Play(id)`·`Signaled`·`ResumeSaved`. 행동이 연 다이얼로그(결과 '다이얼로그 재생')는 이미 열린 대사가 있으면 **기다렸다가 차례로** 열리고(`Dialogues.WaitingCount`), 코드에서 바로 부른 `Dialogues.Play`는 지금 대사를 바꾼다. 대사가 열려 있는 동안 `GameView.Busy`가 참이라 화면 버튼의 행동이 막힌다(걸으면서 듣는 대사면 `Dialogues.BlocksInput = false`). 대화가 중심인 게임이면 24장의 지금 동작(대사 진행은 행동 밖·되감기 없음 등)을 먼저 본다 | 24 |
+| 겹치는 가방 | 선택 기능 인벤토리(같은 원본을 개수로 겹친다): 필드 `Inventory { capacity }` → `Add`·`Remove`·`CountOf`·`Has`. 고정 칸·칸 정보가 필요하면 자리(`List<T>` + `Placement`). 아이템이 하나하나 다르면(무작위 접사 · 내구도) 이 기능 대신 판 데이터의 객체 목록 + 규칙 함수(관례 21절) | 25 |
 | 게임 안 달력·시각 | 판 데이터에 날짜·시각, 하루 넘김 행동이 이벤트를 쏜다 | 구현 가이드 07 |
 | 현실 시각(오프라인 보상·스태미나·일일 초기화) | `Game.Now`(UTC, 행동에 기록되어 Undo·멀티에서 같다) · `Game.Day(초기화 시각)` · `Game.Week()`. 규칙에서 `DateTime.Now`를 쓰지 않는다. 꺼 둔 시간 = `Game.Now − 마지막 정산 시각`(시각 필드는 정산해 더하는 값과 같은 구역에 — 방치형은 판, 스태미나는 프로필. 켤 때 정산은 판을 불러온 뒤 `GBibleRuntime.RunLoaded`·새 판 행동에서 — `Started`는 판을 불러오기 전). 시험은 개발 명령 '현실 시각 +1시간'(2-5) | 07 |
 | 시드 입력·일일 도전 | `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))`(같은 글자 = 같은 판, 일일은 날짜 글자. 행동 밖에서 — 2-1 '판을 이어 하기·저장') | 07 |
 | 칸 단위 맵(전술·던전·농장) | `Grid`: `Distance`·`Neighbors`·`Reachable`(이동 범위)·`Path`(길찾기 — 기본은 늘 가장 싼 길, `minCost`는 모든 칸 비용 이하일 때만 빨라지는 힌트)·`Line`·`Visible`(시야)·`Area`·`Ray`·`Cone`·`Rotate`, `Cell`·`Grid.Key(x, y)`. 맵은 원본 인스턴스(rows 글자 목록) 또는 `Dictionary<string, …>`(키 "x,y") | 36 |
 | 1e308을 넘는 수 | `BigNumber`(필드 하나만, 연산자 그대로, "1.23Qa"·"1.23억" 표기 — `ToString("ko")`·`"sci"`·`"full"`). 1e300 아래는 double 그대로라 정수·0.5를 쌓아도 오차가 없다. 비용 검사는 코드 | 36 |
 | 되감기("이번 턴 처음으로") | `session.HistoryMark`·`UndoTo(지점)`(행동 단위 Undo) | 02 |
-| 세이브 슬롯 1·2·3 | `GBibleRuntime.UseSlot(이름)`·`SlotInfoOf`·`DeleteSlot`·`CopySlot`·`SlotSummary`(한 줄 요약 함수), 기본 슬롯 화면 | 31·35 |
+| 세이브 슬롯 1·2·3 | `GBibleRuntime.UseSlot(이름)`·`SlotInfoOf`·`DeleteSlot`·`CopySlot`·`SlotSummary`(한 줄 요약 함수), 기본 슬롯 화면. 슬롯 하나 = 프로필 + 판 묶음이라 칸마다 프로필이 따로다 — 판이 끝나도 남는 것(앨범 · 해금 · 본 엔딩)이 칸을 넘어 함께여야 하면 질문으로 올린다(관례 8절) | 31·35 |
 | 키 바꾸기 | 선택 기능 입력: `GameInput.Use(actions)`·`Rebind`·`ResetBindings`·`BindingText` | 31 |
 | Steam | 선택 기능 Steam + DB › Steam(App ID): 자동 초기화·도전과제·로그 → 통계·`GameSteam.SetPresence`·Cloud(Auto-Cloud 안내). 리더보드·친구 초대는 없다(필요하면 질문) | 34 |
 
@@ -212,7 +215,7 @@ GBible.Unity
 
 ### 3-2. `GameSession` · `SessionOptions`
 
-- `Do(행동)` · `Undo()` · `UndoCount` · `HistoryMark`·`UndoTo(지점)` · `Data` · `Events` · `Clock`(게임 시간) · `Journal`(`Append(JournalKind, 시스템, 글)`) · `Stats`(`Get`·`Report`) · `Achievements`(`IsUnlocked`·`Unlock`) · `Triggers`(`Register(주인, 트리거, repeat, fire)`) · `Tables`·`Balance`·`Statuses`·`Passives`·`Schedules`·`Choices`·`World`·`Attributes`·`Rewind` · `Debug`(`Register(분류, 이름, 할 일, 설명)` — 모니터 명령 탭) · `Instances`·`InstanceIds`·`CopyInstance(id)` · `DefineInstance(id, 값)`(테스트 — 런타임은 DB로 채운다) · `Actions.Committing`(바깥 행동이 끝나기 직전, 2-1) · `Advance(초)`(테스트 — 시간을 틱 한도 없이 흘린다) · `Ticked`(이벤트)·`TickAlpha` · `LocalPlayer`(멀티의 내 번호) · `ExportRun()`·`ImportRun(json)`.
+- `Do(행동)` · `Undo()` · `UndoCount` · `HistoryMark`·`UndoTo(지점)` · `Data` · `Events` · `Clock`(게임 시간) · `Journal`(`Append(JournalKind, 시스템, 글)`) · `Stats`(`Get`·`Report`) · `Achievements`(`IsUnlocked`·`Unlock`) · `Triggers`(`Register(주인, 트리거, repeat, fire)`) · `Tables`·`Balance`·`Statuses`·`Passives`·`Schedules`·`Choices`·`World`·`Attributes`·`Rewind` · `Debug`(`Register(분류, 이름, 할 일, 설명)` — 모니터 명령 탭) · `Instances`·`InstanceIds`·`CopyInstance(id)` · `DefineInstance(id, 값)`(테스트 — 런타임은 DB로 채운다. 사용 기능이 붙은 원본이면 `Abilities`에도 등록) · `Actions.Committing`(바깥 행동이 끝나기 직전, 2-1) · `Advance(초)`(테스트 — 시간을 틱 한도 없이 흘린다) · `Ticked`(이벤트)·`TickAlpha` · `LocalPlayer`(멀티의 내 번호) · `ExportRun()`·`ImportRun(json)`.
 - `SessionOptions`: `Seed` · `History`(`Actions`·`Snapshots`·`None` — DB 이름 '쓰지 않음') · `RealClock`(Game.Now의 출처) · `TimeZone`(Day·Week) · `HistoryLimit` · `SnapshotInterval`·`SnapshotLimit` · `TickRate` · `SaveVersion` · `Migrations` · `JournalCapacity` · `DetectUntrackedChanges`. Unity에서는 DB › Bootstrap이 채우고, 코드가 바꿀 것만 `GBibleRuntime.Configuring += o => …`.
 
 ### 3-3. 행동 `GameAction`
@@ -276,12 +279,14 @@ public class PlayCard : GameAction
 | `[PlayerDataRef]` · `[FieldPathRoot]` · `[FieldPath]` | 글자 필드 | 플레이어 데이터 키 · 필드 경로 고르기 |
 | `[Database("이름", Group, Order, IdPrefix)]` | `GameData` 상속 클래스 | 프로젝트 DB 종류 |
 
+- 네임스페이스: `[DataRef]` · `[Database]` · `GameData` · `InstanceData` · `GameDatabase`와 DB 종류(`BalanceData` · `WeightTableData` · `ScreenData` · `DebugCommandData` · `PrefabData` …)는 **`GBible.Data`**, 나머지 어트리뷰트(`[BindTo]` · `[BlockInfo]` · `[FieldLabel]` · `[KeywordGroup]` · `[Hide]` …)와 `Game` · `GameView` · `GameScreens`는 `GBible`. DB 종류를 쓰는 파일은 `using GBible.Data;`를 빼면 CS0246.
+
 ### 3-8. Unity 쪽
 
 | 형식 | 멤버 |
 |---|---|
 | `GBibleRuntime` | `Session` · `Game` · `Start()` · `CreateSession()`(화면에 묶이지 않은 세션 — 시험 모드 서버·매칭 방) · 이벤트 `Configuring` · `SessionCreated`(모든 세션 — 규칙 등록) · `Started`(화면 세션에만 — 화면 연결) · `Stopped`·`Saving`·`RunLoaded`·`Stopping` · `Slot`·`UseSlot`·`SlotInfoOf`·`Slots()`·`DeleteSlot`·`CopySlot`·`SlotSummary`·`PlayTime` · `SaveProfile`·`SaveRun`·`LoadRun`·`NewRun(session, 시드)`·`StartNewRun(session, 시드)`(+ '새 판 행동')·`DeleteRun`·`HasSavedRun`·`AutoSaveRun` |
-| `GameView` | `Redraw(그리기, [waitForPresentation,] 키…)` · `Present(코루틴 / done => … / 초)` · `Play(코루틴 / done => …)`(대기열 밖) · `IsPresenting` · `Busy` · `Wait(초)` · `DeltaTime` · `PresentationSpeed` · `SkipPresentation` · `ClearPresentation` · `Register`·`Find<T>(id)`(GameObject) · `RegisterElement`·`FindElement(id)`(UI 칸) |
+| `GameView` | `Redraw(그리기, [waitForPresentation,] 키…)` · `Present(코루틴 / done => … / 초)` · `Play(코루틴 / done => …)`(대기열 밖) · `IsPresenting` · `Busy`(연출 중 · 선택 대기 · 더한 조건) · `AddBusy(Func<bool>)`(모듈 · 프로젝트가 '입력을 막을 때'를 더한다 — `[RuntimeInitializeOnLoadMethod(AfterAssembliesLoaded)]`에서, 플레이마다 비워진다) · `Wait(초)` · `DeltaTime` · `PresentationSpeed` · `SkipPresentation` · `ClearPresentation` · `Register`·`Find<T>(id)`(GameObject) · `RegisterElement`·`FindElement(id)`(UI 칸) |
 | `ViewList<항목, 컴포넌트>` | `(프리팹, 부모, () => 목록, (뷰, 항목) => …, 키…)` · `OnCreate` · `OnRemove` · `ViewOf(id)` |
 | `GameScreens` | `Open(id, 값)` · `Close` · `CloseAll` · `IsOpen` · `Get` · `All` · `Back()` · `HoldBack()`(Esc를 다른 뜻으로 쓰는 동안 뒤로 막기) · `Do(() => 행동, whileChoosing)` · `Reroll`(고르기 창의 다시 뽑기 행동) · `Toast` · `Confirm` · `Overlay` · `QuitToTitle` · `Quit()` · `Opened`·`Closed` · ID `Choice`·`Confirmation`·`Settings`·`Slots`·`Pause` |
 | `GameScreen` | `OnOpen`·`Draw`·`OnClose`·`Tick(초)` · `Watch`(다시 그릴 플레이어 데이터 키 — null = binding-path의 키들) · `WaitForPresentation` — 기반 선언이 `protected internal virtual`이라 프로젝트 화면(다른 어셈블리)에서는 `protected override string[] Watch => new[] { … };`처럼 `protected override`로 쓴다(`public`·`protected internal`이면 CS0507) · `Q<T>(이름)` · `OnClick(이름, () => 행동 / 할 일)` · `List<T>(…)` · `Item(이름)` · `Own(…)` · `Close()` · `Root`·`Argument`·`Data` |
@@ -293,14 +298,15 @@ public class PlayCard : GameAction
 | `Texts` · `GameLanguage` | `Texts.Get(키, (이름, 값)…)` · `NameOf(id)` · `Has(키)` · `Language` / `GameLanguage.Set(code)` · `Available` |
 | `TestScenarios` · `TestScene` · `TestReport` · `TestClock` | `Save(session, 이름)`·`Load(session, 이름, seed)`(저장한 순간의 현실 시각으로 `TestClock`을 맞춘다)·`Delete`·`Names()`·`Simulate(session, 상황, runs, step, measure, maxSteps, firstSeed)`·`SaveReport` · 컴포넌트 `TestScene`(scenario·seed·separateSlot·speed·showPanel·panelKey) · `TestReport.Average·Min·Max·ToText·ToCsv` · `TestClock.Offset`·`Now`·`Shift(시간)`·`SetNow(utc)`·`Reset()`(개발 빌드에서 `Game.Now`에 얹히는 현실 시각 옮기기 — 화면·도구용, 규칙은 읽지 않는다) |
 | `GameNet` · `NetTransformSync` | `StartTestMode(latency, jitter, extraClients, 이름, prepareServer)` · `Host(전송, 이름)`·`HostDirect(포트, 이름)` · `Join(전송, 이름)`·`JoinDirect(주소, 이름)` · `StartDedicated(포트)` · `StartMatchServer(포트, 인원, auth, matchmaker, store)` · `FindMatch(주소, 이름)` · `Leave()` · `Server`·`Client`·`Hub`·`IsHost`·`IsClient`·`IsTestMode`·`TestNetwork`·`Sessions` · 이벤트 `ServerStarted`·`RoomStarting`·`RoomReady`·`Joined`·`Closed`·`PlayersChanged` · 컴포넌트 `NetTransformSync`(entityId·owner·sendRate·delay·syncRotation) |
-| 에디터(GBible.EditorTools) | `[DbSeed("버전")]`·`DbSeeds.RunPending` · `EditorDatabase.Staging.Add·Work·Remove·Rename(항목, 새 ID)` · Bootstrap 칸(DB 에셋 `GameDatabase`, `#if UNITY_EDITOR`) `EditorSetSessionOptions(Undo 방식, 보관 수, 스냅샷 간격, 스냅샷 보관 수, 시드 고정, 시드)`·`EditorSetSaveOptions(판 저장, 판 끝 이벤트, 프로필도 행동마다)`·`EditorSetSaveTiming(N초, 판 저장 이벤트)`·`EditorSetFlowOptions(Undo 끊는 이벤트, 시작할 때 이어 하기, 새 판 행동)`·`EditorSetTickRate`·`EditorSetSceneFlow(키, 필드, 빈 값일 때 씬)`·`EditorSetAdvanced(기록 줄 수, Modify 누락 검사)` — 이벤트·행동은 `typeof(X).FullName`(구현 가이드 01 4절) · `EditorPolicy.CanEditStructure·CanAddRemove(형식)` · `GameSceneSetup.Ensure(path, firstInBuild)`(게임 씬 — 없을 때만 빈 씬, 빌드 목록에 넣기·맨 앞으로) · `TestSceneSetup.Ensure(path, copyFrom, scenario)` · `AssetRequests.Sprite·Audio·Request·MarkDone` · `AssetTools.Import·Replace·UsedBy·Unused·MoveToUnused·Misplaced·Tidy·FolderFor` |
+| `GameDatabase`(DB 에셋 — DB › 시작 파일 › Bootstrap의 값, `GBible.Data`) | 읽기: `History`·`HistoryLimit`·`SnapshotInterval`·`SnapshotLimit`·`FixSeedInDevelopment`·`DevelopmentSeed`·`RunSave`·`RunEndEvent`·`RunSaveInterval`·`RunSaveEvent`·`SaveProfileEachAction`·`UndoBoundaryEvent`·`ContinueOnStart`·`NewRunAction`·`TickRate`·`SceneKey`·`ScenePath`·`EmptyScene`·`JournalCapacity`·`DetectUntrackedChanges`·`IsReleased`(반영 스크립트가 기본값과 비교할 때 — 관례 15절). 쓰기는 아래 에디터 줄의 `EditorSet…` |
+| 에디터(GBible.EditorTools) | `[DbSeed("버전")]`·`DbSeeds.RunPending` · `EditorDatabase.Staging.Add·Work·Remove·Rename(항목, 새 ID)` · Bootstrap 칸(DB 에셋 `GameDatabase`, `#if UNITY_EDITOR`) `EditorSetHistory(Undo 방식, 보관 수 = 그대로)`(Undo 방식 하나만 바꿀 때 — 나머지 칸은 그대로) · `EditorSetSessionOptions(Undo 방식, 보관 수, 스냅샷 간격, 스냅샷 보관 수, 시드 고정, 시드)`(여섯 칸을 함께 — 바꾸지 않을 칸은 위 읽기 값을 넘긴다)·`EditorSetSaveOptions(판 저장, 판 끝 이벤트, 프로필도 행동마다)`·`EditorSetSaveTiming(N초, 판 저장 이벤트)`·`EditorSetFlowOptions(Undo 끊는 이벤트, 시작할 때 이어 하기, 새 판 행동)`·`EditorSetTickRate`·`EditorSetSceneFlow(키, 필드, 빈 값일 때 씬)`·`EditorSetAdvanced(기록 줄 수, Modify 누락 검사)` — 이벤트·행동은 `typeof(X).FullName`(구현 가이드 01 4절) · `EditorPolicy.CanEditStructure·CanAddRemove(형식)` · `GameSceneSetup.Ensure(path, firstInBuild)`(게임 씬 — 없을 때만 빈 씬, 빌드 목록에 넣기·맨 앞으로) · `TestSceneSetup.Ensure(path, copyFrom, scenario)` · `AssetRequests.Sprite·Audio·Request·MarkDone` · `AssetTools.Import·Replace·UsedBy·Unused·MoveToUnused·Misplaced·Tidy·FolderFor` |
 
 ### 3-9. 선택 모듈
 
 | 모듈(기능 활성화) | 멤버 |
 |---|---|
-| 다이얼로그 | 그래프 창(`MomoiProject › 다이얼로그 시스템 › 그래프`), DB › 스탠딩 프로필·장소, `Dialogues.Play(id, 시작 ID)` · `Advance` · `Choose(i)` · `Stop` · `IsPlaying` · `ResumeSaved()` · 이벤트 `Started`·`Ended`·`Signaled`(그래프의 신호 보내기), 결과 '다이얼로그 재생' |
-| 인벤토리 | `Inventory { capacity, slots }` 필드 · `Add(id, 개수, 최대 겹침)` · `Remove` · `TryRemove` · `CountOf` · `Has` · `RoomFor` |
+| 다이얼로그 | 그래프 창(`MomoiProject › 다이얼로그 시스템 › 그래프`), DB › 스탠딩 프로필·장소, `Dialogues.Play(id, 시작 ID)`(지금 대사를 바로 바꾼다) · `Advance` · `Choose(i)` · `Stop`(기다리는 줄도 비운다) · `IsPlaying` · `WaitingCount`(행동이 연 다이얼로그가 앞 대사를 기다리는 수) · `BlocksInput`(기본 참 — 대사가 열려 있는 동안 `GameView.Busy`) · `ResumeSaved()` · 이벤트 `Started`(`Action<string>` 다이얼로그 ID)·`Ended`(`Action` — 인자 없음)·`Signaled`(`Action<string>` — 그래프의 신호 보내기), 결과 '다이얼로그 재생'(행동이 성공한 뒤 그 플레이어 화면에서, 열린 대사가 있으면 끝난 뒤 차례로) |
+| 인벤토리 | `Inventory { capacity, slots }` 필드(슬롯 = 원본 ID + 개수 — 하나하나 다른 아이템은 담지 못한다, 2-6) · `Add(id, 개수, 최대 겹침)` · `Remove` · `TryRemove` · `CountOf` · `Has` · `RoomFor` |
 | 입력(키 바꾸기) | `GameInput.Use(InputActionAsset)` · `Find(이름)` · `Rebind(동작, i, done)` · `CancelRebind` · `ResetBindings` · `BindingText` (설정 파일에 저장) |
 | Steam | DB › Steam · `GameSteam.IsReady` · `SetPresence(키, 값)` · `ClearPresence` · `StoreNow` (도전과제·통계는 저절로) · 친구 방 `SteamLobby.Create(인원)`·`Invite()`·`Join(로비)`·`Leave()`·`Current`·`IsHost`(화면은 보통 `GameNet.CreateRoom` — Steam이 준비되면 `SteamRoomProvider`가 들어간다) · 인증 티켓 `SteamTickets.Request`(GameNet.TokenSource에 저절로) · 전송 `SteamServerTransport`·`SteamClientTransport` |
 
@@ -393,7 +399,7 @@ public class PlayCard : GameAction
 21. 확률을 `Game.Random(…)`으로 직접 굴렸다 → "확률 2배"·행운이 붙지 않는다. `Game.Chance`·조건 '확률'.
 22. 조각(조커·참·아티팩트) 목록을 ID 글자 목록으로 → 같은 조각 둘·조각마다 쌓이는 값을 둘 수 없다. 객체 목록(고유 id + 원본 ID 필드) + 패시브 효과 '일치 필드'.
 23. 놓인 순서가 결과를 바꾸는 조각을 보통 패시브 효과로 → 패시브 효과 등록 순서로 발동한다. '놓인 것마다'를 켠다.
-24. 가진 동안 +N을 얻을 때 보정 붙이기·잃을 때 떼기로 → 놓치면 남는다. 패시브 효과 '가진 동안 스탯 보정'(읽을 때 계산).
+24. 가진 동안 +N을 얻을 때 보정 붙이기·잃을 때 떼기로(장비를 낄 때 `Game.AddModifier`, 벗을 때 `RemoveModifiers`) → 놓치면 남는다. 패시브 효과 '가진 동안 스탯 보정'(읽을 때 계산 — 장비면 가진 목록 = 장비 칸). 아이템마다 굴린 수치(접사)는 레벨로 나른다(기믹 목록 2-9). `AddModifier`·`RemoveModifiers`는 코드가 잠깐 거는 보정에만(28장).
 25. 켜진 조각 목록(세피리아 계산 결과)을 계산할 때마다 새로 만들었다 → 조각에 쌓인 값이 사라진다. 원래 목록을 가진 목록으로 두고, 꺼짐은 레벨 필드 0.
 26. 프로젝트 효과 Block이 수치를 그대로 썼다 → Lumin·Critical(효과 배율)이 붙지 않는다. 수치에 `Use.Context.Power`를 곱한다.
 27. 틱 묶음 행동 안에서 `Game.Pay` → 모자라면 묶음 전체가 취소된다. "되면 낸다"는 `Game.TryPay`.
@@ -421,3 +427,7 @@ public class PlayCard : GameAction
 49. 패널에 그림자·빛남·그라데이션·두꺼운 테두리를 쓰거나, 패널을 기울이거나, 클립·테이프 같은 물건 소품을 붙이거나, 패널을 3중첩하거나, 일반 UI 뒤에 블러를 씀 → 디자인 기본과 어긋난다(UiGuide 3-1).
 50. 장면(배경·걷는 캐릭터)을 UI 화면에 그림 → 다이얼로그의 배경 일러(월드)가 그 위를 덮지 못하고, 애니메이터를 쓸 수 없다. 장면은 월드에, 그리기 순서는 다이얼로그 배경(-100)보다 뒤(UiGuide 1-8).
 51. 규칙 등록(행동 처리기·감시·틱 규칙·규칙이 받는 이벤트)을 `Started`에 둠 → 화면 세션에만 와서 시험 모드 서버·매칭 방 세션에서 규칙이 빠진다. `Bootstrap.RegisterRules`(`SessionCreated` — 모든 세션)에 두고, 안에서는 `GBibleRuntime.Session`·`GBibleRuntime.Game` 대신 받은 `session`을 쓴다(그때 `GBibleRuntime.Session`은 아직 그 세션이 아니다). `ServerStarted`·`RoomStarting`에서 같은 등록을 또 부르지 않는다(두 번 발동).
+52. 호감도처럼 핵심 동사가 다루는 값을 다이얼로그 · DB 결과 '플레이어 데이터에 주기'로 고침 → 행동 직전 이벤트를 건너뛰어 그 값의 기믹이 붙지 않는다. 그 규칙 함수를 부르는 프로젝트 결과 Block(2-2).
+53. 하나하나 다른 아이템(접사 · 내구도)을 인벤토리 선택 기능에 → 슬롯은 원본 ID + 개수뿐이라 담지 못한다. 판 데이터의 객체 목록 + 규칙 함수(관례 21절).
+54. `Features.json`만 고치고 새로 읽기를 부름 · 그 기능의 형식을 쓰는 코드를 같은 박자에 넣음 → 도메인을 다시 읽지 않아 심볼이 켜지지 않는다. 진행 매뉴얼 6절 박자 0.
+55. 같은 개념의 인스턴스와 패시브 효과(또는 캐릭터와 스탠딩 프로필)에 같은 ID → DB ID는 종류를 통틀어 하나라 둘째의 `Staging.Add`가 예외를 던지거나, 반영 스크립트의 `FindById(id) == null` 검사에 걸려 말없이 건너뛴다. 대표 `sword` + 딸린 `sword.fx`(명명 가이드라인 1-1).

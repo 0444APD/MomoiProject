@@ -6,7 +6,7 @@
 
 | 말 | 뜻 |
 |---|---|
-| 텍스트 키 | 문장 하나의 이름. 예: `ui.start`, `reward.gain`. DB 항목의 이름은 `<ID>.name`(예: `instance.potion.name`). |
+| 텍스트 키 | 문장 하나의 이름. 예: `ui.start`, `reward.gain`. DB 항목의 이름은 `<ID>.name`(예: `potion.name`). |
 | 문장 틀 | 키에 들어 있는 글. `{item:을} {count}개 얻었습니다.`처럼 값 자리·조사·복수형을 문법으로 적는다. ICU MessageFormat(업계 공통 규격)의 주요 부분 + 한국어 조사 + 용어. |
 | 원문 언어 | 작가가 쓰는 언어(기본 `ko`). 모든 언어의 마지막 대체 언어다. |
 | 텍스트 표 | 한 언어의 키 → 문장 틀 목록(`TextTable` 에셋). |
@@ -56,6 +56,28 @@ static void HudTexts()
 }
 ```
 
+**AI가 출시 언어를 더할 때**(명세서에 정한 언어 — `en`·`ja` …): 다국어 설정도 DB 항목이 아니라 바로 저장된다. **없는 언어만** 더한다(개발자가 고친 대체 언어·이름은 덮지 않는다). 표는 `TextSheetTools.EnsureTable(code)`가 `Texts_<code>.asset`을 만들어 준다(시작 설정이 언어를 더할 때와 같은 방법).
+
+```csharp
+[DbSeed("1")]
+static void Languages()
+{
+    var settings = TextSheetTools.EnsureSettings();
+    var changed = false;
+    foreach (var (code, name) in new[] { ("en", "English"), ("ja", "日本語") })
+    {
+        if (settings.Find(code) != null) continue;
+        settings.languages.Add(new LocalizationSettings.Language { code = code, nativeName = name, table = TextSheetTools.EnsureTable(code) });
+        changed = true;
+    }
+    if (!changed) return;
+    EditorUtility.SetDirty(settings);
+    AssetDatabase.SaveAssetIfDirty(settings);
+}
+```
+
+`fallbacks`(대체 언어)는 비우면 원문 언어로 간다. `zh-Hant`에 없는 문장을 `zh-Hans`에서 찾게 하려면 그 언어의 `fallbacks = "zh-Hans"`.
+
 ### 주의할 점
 
 - 표는 그 언어를 처음 쓸 때 읽는다(안 쓰는 언어의 문장을 메모리에 올리지 않는다).
@@ -98,7 +120,7 @@ string same = Texts.Get("reward.gain", new { item = "dragonArmor", count = 3 });
 **`Texts.NameOf(id)`** — DB ID의 현재 언어 이름(`<id>.name`). 없으면 ID 그대로.
 
 ```csharp
-string potion = Texts.NameOf("instance.potion");
+string potion = Texts.NameOf("potion");
 ```
 
 **`Texts.Has(키)`** — 키가 대체 순서 어디에든 있는지.
@@ -141,7 +163,7 @@ throw Game.Fail("fail.frozen", "얼어 있어 {turns}턴 동안 움직일 수 �
 | `{item} 획득` | `item = "dragonArmor"` | 용의 비늘 갑옷 획득 |
 
 - 숫자는 **문장을 찾은 언어**의 천 단위 표기(ko·en `1,234,567.5`, de `1.234.567,5`), 소수 셋째 자리까지. 0으로 반올림되는 음수(`-0.0001`, `{n, number, integer}`의 `-0.3`)는 `-0`이 아니라 `0`이다(서식 모두 같다).
-- 값이 **ID 형식의 글자**(`dragonArmor`, `instance.potion`)이고 그 언어에 `<값>.name` 텍스트가 있으면 이름으로 바뀐다. 이름 텍스트에도 같은 값들이 넘어가므로 이름이 `{count, plural, …}`로 단수·복수를 가를 수 있다.
+- 값이 **ID 형식의 글자**(`dragonArmor`, `potion`)이고 그 언어에 `<값>.name` 텍스트가 있으면 이름으로 바뀐다. 이름 텍스트에도 같은 값들이 넘어가므로 이름이 `{count, plural, …}`로 단수·복수를 가를 수 있다.
 - 참거짓은 `true`/`false`, 날짜는 짧은 날짜.
 
 ### 3.2 서식 `{n, number}` · `{d, date}` · `{t, time}`

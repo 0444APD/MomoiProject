@@ -21,11 +21,13 @@
 
 **한 줄 요약.** 기능을 켜고, 아이템 클래스를 코드로 쓰고, 인스턴스를 만들고, 인벤토리를 둘 곳(판·프로필 필드 또는 플레이어 데이터)을 정한다.
 
+**이 기능이 맞는 때**: 같은 원본의 아이템이 모두 같아서 **ID와 개수로 겹쳐 담을 수 있을 때**(물약 ×12, 재료 ×30). 아이템이 하나하나 다르면(무작위 접사 · 내구도 · 강화 수치 · 품질) 이 기능을 켜지 않는다 — 슬롯에는 ID와 개수만 있다(5절 '한계'). 대신 판 데이터에 객체 목록(`List<GearItem>` — `{ id, item: "ironSword", affixes, durability }`, id는 `Game.NewId`)을 두고 슬롯 수·겹치기·장비 칸은 규칙 함수로 만든다(관례 21절 — 명세서에 없으면 묻는다). 한 게임에 둘이 섞이면(겹치는 재료 + 하나하나 다른 장비) 재료만 이 기능, 장비는 객체 목록으로 나눈다. 장비 효과는 DB › 패시브 효과의 가진 동안 스탯 보정(17장 0-1)이다.
+
 ### 에디터에서
 
 1. **켜기**(선택 기능 ID `inventory`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `inventory`를 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "인벤토리 시스템" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_INVENTORY`와 프로젝트 asmdef 참조(`GBible.Inventory` — 선택 기능 중 이것만 Rules·Tests에도 들어간다)가 저절로 맞춰진다(`20-Setup.md` 6절). `Inventory` 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다. 이 기능은 탭을 만들지 않는다.
 2. 아이템 클래스를 코드로 쓴다(2절). 저장·컴파일하면 DB › 클래스에 보인다.
-3. DB › **인스턴스**에 아이템마다 항목을 만든다: ID(예: `instance.potion`), **instanceType** = 아이템 클래스, **value** = 값. AI는 DB 반영 스크립트로 만든다(관례 15절).
+3. DB › **인스턴스**에 아이템마다 항목을 만든다: ID(예: `potion`), **instanceType** = 아이템 클래스, **value** = 값. AI는 DB 반영 스크립트로 만든다(관례 15절).
 4. 인벤토리를 둘 곳을 정한다.
    - **판·프로필 클래스의 필드**(`RunState`에 `public Inventory bag = new Inventory();`, 4.6): 키를 따로 만들지 않는다. 판에만 있는 인벤토리는 `RunState`, 판이 끝나도 남는 창고는 `Profile`(관례 8절).
    - **플레이어 데이터 키 하나**: DB › **플레이어 데이터**에 ID(예: `player.inventory`), **zone**(이번 판이면 `Session`, 계정에 남으면 `Meta`), **valueType** = `GBible.InventorySystem.Inventory`(기능을 켜면 목록에 나온다). 반영 스크립트가 돌고 Unity가 다시 컴파일하면 `GameIds.PlayerData.PlayerInventory`(`PlayerDataKey<Inventory>`)가 생긴다.
@@ -112,7 +114,7 @@ var inventory = Game.Get<Inventory>("player.inventory");
 행동 밖에서 고치는 `Modify`는 Undo 단위가 없고 멀티에서 서버로 가지 않으므로, 개발 도구·테스트 준비에서만 쓴다(한 번의 변경으로 기록된다).
 
 ```csharp
-GBibleRuntime.Session.Data.Modify<Inventory>("player.inventory", inv => inv.Add("instance.potion", 1, 99));
+GBibleRuntime.Session.Data.Modify<Inventory>("player.inventory", inv => inv.Add("potion", 1, 99));
 ```
 
 ### 3.3 `CountOf(itemId)` · `Has(itemId, count = 1)`
@@ -120,8 +122,8 @@ GBibleRuntime.Session.Data.Modify<Inventory>("player.inventory", inv => inv.Add(
 모든 슬롯의 개수 합 / 그만큼 있는지.
 
 ```csharp
-int potions = inventory.CountOf("instance.potion");
-bool canPay = inventory.Has("instance.goblinEar", 5);
+int potions = inventory.CountOf("potion");
+bool canPay = inventory.Has("goblinEar", 5);
 ```
 
 ### 3.4 `Add(itemId, count, maxStack)` → 남은 개수
@@ -129,7 +131,7 @@ bool canPay = inventory.Has("instance.goblinEar", 5);
 같은 아이템의 덜 찬 슬롯부터 채우고, 남으면 새 슬롯을 만든다. 슬롯이 모자라 못 넣은 개수를 돌려준다(다 들어가면 0).
 
 ```csharp
-int left = inventory.Add("instance.potion", 150, 99);   // 99 + 51 두 슬롯, left = 0
+int left = inventory.Add("potion", 150, 99);   // 99 + 51 두 슬롯, left = 0
 ```
 
 ### 3.5 `RoomFor(itemId, maxStack)` — 넣을 수 있는 개수
@@ -137,7 +139,7 @@ int left = inventory.Add("instance.potion", 150, 99);   // 99 + 51 두 슬롯, l
 값을 바꾸지 않고 미리 센다. 슬롯 수 제한이 없으면 `int.MaxValue`.
 
 ```csharp
-if (inventory.RoomFor("instance.ironSword", 1) < 1) { /* 인벤토리가 가득 참 */ }
+if (inventory.RoomFor("ironSword", 1) < 1) { /* 인벤토리가 가득 참 */ }
 ```
 
 ### 3.6 `capacity` — 슬롯 수 제한
@@ -153,7 +155,7 @@ inventory.capacity = (int)Game.Balance(GameIds.Balance.BagSlots);   // 행동의
 뒤쪽 슬롯부터 줄이고 빈 슬롯은 없앤다. 모자라면 있는 만큼만 뺀다.
 
 ```csharp
-int removed = inventory.Remove("instance.potion", 3);
+int removed = inventory.Remove("potion", 3);
 ```
 
 ### 3.8 `TryRemove(itemId, count = 1)` → 성공 여부
@@ -161,7 +163,7 @@ int removed = inventory.Remove("instance.potion", 3);
 다 있을 때만 빼고, 모자라면 아무것도 바꾸지 않는다(값을 치를 때).
 
 ```csharp
-if (!inventory.TryRemove("instance.goblinEar", 5)) { /* 재료 부족 */ }
+if (!inventory.TryRemove("goblinEar", 5)) { /* 재료 부족 */ }
 ```
 
 ### 3.9 아이템 정보 읽기
@@ -182,6 +184,7 @@ var copy = GBibleRuntime.Session.CopyInstance(slot.item) as Item;         // 깊
 ```csharp
 using System;
 using GBible;
+using GBible.Data;               // DataRef · InstanceData
 using GBible.InventorySystem;
 
 [Serializable]
@@ -205,7 +208,7 @@ public sealed class BuyItem : GameAction
 }
 
 // 화면 코드(GameScreen.OnOpen): 누르면 행동을 보내고, 플레이어용 실패(GameFailure)의 글은 알림으로 뜬다(35장 2-4).
-OnClick("buy", () => new BuyItem { item = "instance.potion", count = 3 });
+OnClick("buy", () => new BuyItem { item = "potion", count = 3 });
 ```
 
 - 안 될 때 조용히 `return`하지 않고 던진다. 행동이 실패하면 그때까지 바꾼 것이 모두 취소되므로(인벤토리에 넣은 뒤 골드가 모자라도 인벤토리가 돌아간다) 검사 순서를 맞출 필요가 없고, 플레이어는 이유를 본다. 조용히 끝내면 행동이 "성공"으로 남아 Undo 한 칸을 차지하고 아무 글도 뜨지 않는다.
@@ -216,9 +219,10 @@ OnClick("buy", () => new BuyItem { item = "instance.potion", count = 3 });
 ```csharp
 using System;
 using GBible;
+using GBible.Data;               // DataRef · InstanceData
 using GBible.InventorySystem;
 
-[GameEvent("아이템 떨어짐")]
+[Serializable, GameEvent("아이템 떨어짐")]
 public class ItemDropped { public string item; public int count; }
 
 [Serializable]
@@ -274,9 +278,9 @@ public static class ItemButtons
     public static void UsePotion(string heroId)
     {
         var game = GBibleRuntime.Game;
-        if (!game.Get<Inventory>("player.inventory").Has("instance.potion")) return;
-        if (!game.CanUse("instance.potion", heroId, out var why)) { UnityEngine.Debug.Log(why); return; }
-        game.Use("instance.potion", heroId, heroId);
+        if (!game.Get<Inventory>("player.inventory").Has("potion")) return;
+        if (!game.CanUse("potion", heroId, out var why)) { UnityEngine.Debug.Log(why); return; }
+        game.Use("potion", heroId, heroId);
     }
 }
 ```
@@ -289,7 +293,7 @@ using GBible.InventorySystem;
 
 public static class PotionLogic
 {
-    [BindTo("instance.potion")]
+    [BindTo("potion")]
     static void Drink(TriggerContext c)
     {
         c.Session.Data.Modify<Inventory>("player.inventory", inv => inv.Remove(c.Owner, 1));
@@ -303,12 +307,13 @@ public static class PotionLogic
 ```csharp
 using System;
 using GBible;
+using GBible.Data;               // DataRef · InstanceData
 using GBible.InventorySystem;
 
 [Serializable]
 public sealed class DeliverQuestItems : GameAction
 {
-    [DataRef(typeof(InstanceData))] public string item = "instance.goblinEar";
+    [DataRef(typeof(InstanceData))] public string item = "goblinEar";
     public int count = 5;
     public int rewardGold = 300;
 

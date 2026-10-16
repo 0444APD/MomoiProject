@@ -198,6 +198,35 @@
 - 조건은 그 항목 줄을 후보로 볼지만 정한다. 조건이 거짓인 줄은 확률 계산(분모)에서도 빠진다(고정 % 줄이 빠지면 그 몫은 무게 줄이 나눠 가진다).
 - 밸런싱 값에서 읽은 무게가 0 이하(또는 숫자가 아님)인 단계에서는 그 줄이 후보가 아니다. 그 줄의 `weight`·`percent`는 쓰지 않으므로 기본값 그대로 둔다. 밸런싱 값을 쓰는 줄이 있으면 "무게·%가 모두 0" 검사는 하지 않고, 고정 % 합 검사는 그 줄을 세지 않는다(뽑는 순간에 정해진다).
 
+**반영 스크립트로 만들 때**(AI): DB 항목은 `WeightTableData`, 줄은 **`WeightTableEntry`**(둘 다 `GBible.Data` — 위 표의 칸이 필드 이름 그대로다). 코드로 정의를 등록할 때 쓰는 `WeightEntry`(4-5, 테스트·서버)와 다른 형식이다. 항목이 하나도 없는 표는 검증 오류("항목이 없습니다.")이므로 표를 만들 때 줄을 함께 넣는다. 5-4의 `eliteDrop`:
+
+```csharp
+// Assets/MomoiProject/Code/Editor/Seeds/TableSeeds.cs
+using GBible;              // PlayerDataListRef
+using GBible.Data;         // WeightTableData · WeightTableEntry · WeightMode · WeightEntrySource
+using GBible.EditorTools;  // DbSeed · EditorDatabase
+
+static class TableSeeds
+{
+    [DbSeed("1")]
+    static void Drops()
+    {
+        if (EditorDatabase.Instance.FindById("eliteDrop") != null) return;      // 개발자가 맞춘 값을 덮지 않는다
+        var table = (WeightTableData)EditorDatabase.Staging.Add(typeof(WeightTableData), "eliteDrop");
+        table.EditorAssignFolder("드롭");
+        table.entries.Add(new WeightTableEntry { item = "relicPool", weight = 6 });                          // 안쪽 표
+        table.entries.Add(new WeightTableEntry { item = "healPotion", weight = 3, minCount = 1, maxCount = 2 });
+        // 다른 모양의 줄: 고정 % — new WeightTableEntry { item = "dragonScale", mode = WeightMode.Percent, percent = 2 }
+        //                 판의 목록 — new WeightTableEntry { source = WeightEntrySource.List, listKey = "run", listPath = "relics" }
+        //                 무게를 밸런싱 값에서 — new WeightTableEntry { item = "ssr", weightBalance = "ssrRate", weightStepKey = "profile", weightStepPath = "pity" }
+        table.emptyWeight = 1;                                                                            // 꽝
+        table.exclude.Add(new PlayerDataListRef { key = "run", path = "relics" });                       // 가진 유물은 뽑지 않는다
+    }
+}
+```
+
+`item`은 DB에 있는 ID여야 한다(없으면 검증 오류 — 안쪽 표 `relicPool`·인스턴스 `healPotion`도 반영 스크립트로 함께 만든다). 줄의 조건(`condition`)에는 조건 Block 객체를 넣는다(5-6의 코드 줄과 같은 모양).
+
 ### 3-3. 결과 `가중치 표에서 주기` · `가중치 표에서 고르기`
 
 `+ 결과 추가` → 그룹 **결과** → `가중치 표에서 주기`. 결과 종류가 플레이어 데이터(`OutcomeKinds.PlayerData`)라서, `플레이어 데이터에 주기`를 고를 수 있는 칸(도전과제·액티브 효과·사용 기능·상태 효과·개발 명령 …)이면 나온다.

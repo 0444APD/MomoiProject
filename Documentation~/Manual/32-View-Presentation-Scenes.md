@@ -22,7 +22,7 @@
 | 연출 대기열 | 연출을 차례로 하나씩 재생하는 줄(`GameView.Present`). 하나가 끝나야 다음이 시작한다. |
 | 연출 하나 | 대기열의 한 칸: 코루틴(`IEnumerator`) · 완료 콜백(`done`을 부르면 끝) · 쉬기(초). |
 | 대기열 밖 연출 (`GameView.Play`) | 대기열에 넣지 않고 바로 트는 연출. 여럿이 동시에 돌고 `Busy`·다시 그리기와 상관없다(입력을 막지 않는다). 실시간 게임용. |
-| `Busy` | 연출이 남아 있거나 선택을 기다리는 중. 이때 입력을 막는다. |
+| `Busy` | 연출이 남아 있거나 선택을 기다리는 중, 또는 모듈·프로젝트가 더한 때(대사가 열려 있는 동안 — 24장). 이때 입력을 막는다. |
 | 화면 오브젝트 등록 | 데이터 개체의 id ↔ 화면의 GameObject(`GameView.Register`·`Find`). 연출이 "그 적의 그림"을 찾을 때 쓴다. |
 | ViewList | 데이터 목록 ↔ 화면 오브젝트 목록. 항목(id)마다 프리팹 하나를 만들고·없애고·순서를 맞추고·다시 그린다. |
 | 데이터 연결 (`DataBinding`) | 컴포넌트 '데이터 연결'. 플레이어 데이터의 필드 하나를 글자·숫자·참거짓 이벤트로 보낸다(코드 없음). |
@@ -77,7 +77,7 @@
 | 완료 콜백 `Present(done => …)` | 연출 코드가 `done()`을 부를 때(트윈 라이브러리의 완료 콜백 등). 제한 시간(기본 실제 30초) 안에 `done()`이 오지 않으면 콘솔에 경고하고 다음으로 넘어간다 |
 | 쉬기 `Present(초)` | 그 시간이 지날 때(속도 반영) |
 
-- **남아 있는 동안**(재생 중 포함) `IsPresenting`이 참이다. `Busy`는 연출이 남아 있거나 선택을 기다리는 중(`Game.IsWaiting`, 29장)이면 참이다. 화면 입력(`OnClick`·`GameScreens.Do`)이 `Busy`면 행동을 보내지 않는다(5-5). `Game.Do` 자체는 막지 않는다.
+- **남아 있는 동안**(재생 중 포함) `IsPresenting`이 참이다. `Busy`는 연출이 남아 있거나 선택을 기다리는 중(`Game.IsWaiting`, 29장)이거나 `GameView.AddBusy`로 더한 검사가 참이면(다이얼로그 모듈: 대사가 열려 있는 동안, 24장 5.1) 참이다. 화면 입력(`OnClick`·`GameScreens.Do`)이 `Busy`면 행동을 보내지 않는다(5-5). `Game.Do` 자체는 막지 않는다.
 - 대기열이 비면(마지막 연출이 끝난 순간) `Presented` 이벤트를 쏜다.
 - **속도**: `PresentationSpeed`(기본 1, 2 = 두 배). 연출 코드는 시간을 `GameView.DeltaTime`(= `Time.deltaTime` × 속도, 건너뛰기 중이면 ×10)이나 `GameView.Wait(초)`로 잰다. 그래야 속도·건너뛰기가 먹는다. `WaitForSeconds`·`Time.deltaTime`으로 잰 연출은 속도를 따르지 않는다.
 - **건너뛰기**: `SkipPresentation()`은 남은 연출을 ×10으로 돌린다. 대기열이 비면 원래 속도로 돌아온다. 연출이 없을 때 부르면 아무 일도 없다.
@@ -256,7 +256,8 @@ GameView.Play(ShowHit(e));                                // 대기열 밖: 바�
 | `void Play(IEnumerator routine)` | 대기열 밖에서 바로 튼다(`null`이면 무시). `IsPresenting`·`Busy`·다시 그리기와 상관없다(2-2). 게임이 시작되기 전이면 경고하고 틀지 않는다 |
 | `void Play(Action<Action> step, float timeout = 30f)` | 완료 콜백 연출을 대기열 밖에서. `timeout`은 `Present`와 같다 |
 | `bool IsPresenting` | 남은 연출이 있다(재생 중 포함). `Play`로 튼 것은 세지 않는다 |
-| `bool Busy` | `IsPresenting` 또는 `Game.IsWaiting`. 입력을 막을 때 |
+| `bool Busy` | `IsPresenting` 또는 `Game.IsWaiting` 또는 `AddBusy`로 더한 검사 하나라도 참. 입력을 막을 때 |
+| `void AddBusy(Func<bool> busy)` | '입력을 막아야 하는 때'를 더한다(모듈·프로젝트 — 예: 프로젝트의 컷신이 도는 동안 `() => Cutscene.IsPlaying`). 플레이를 시작할 때마다 비워지므로 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]` 함수에서 더한다. 같은 대리자를 두 번 더해도 한 번이다. 검사가 예외를 던지면 콘솔에 남기고 그 검사는 거짓으로 본다 |
 | `event Action Presented` | 대기열이 비었을 때 |
 | `float PresentationSpeed` | 연출 속도(기본 1). 매 플레이 시작 때 1로 돌아간다 |
 | `float DeltaTime` | 이번 프레임의 연출 시간(속도·건너뛰기 반영) |
@@ -726,6 +727,44 @@ GameScenes.Transition = SceneFade.Fade;
 - 씬마다 배경음: `GameScenes.Loaded += scene => GameAudio.PlayBgm(…)`.
 - 전투가 끝난 뒤 Undo로 전투 씬에 돌아가지 않게 하려면 DB › Bootstrap의 'Undo 끊는 이벤트'를 `전투 승리`로 둔다(20장 3절).
 
+**타이틀로(판을 둔 채 나감)** — 씬은 판의 씬 필드를 따르므로 화면 코드가 `Title`을 직접 열지 않는다(판 값과 어긋나고, 씬 흐름이 다음에 씬 필드를 볼 때 판 값의 씬으로 되돌린다 — 관례 6절). 판을 끝내지 않고 타이틀로 가려면 행동 쌍으로 씬 필드를 비우고, 이어 할 씬은 다른 필드에 둔다.
+
+```csharp
+// RunState에: public string resumeScene = "";   // 타이틀로 나갈 때의 씬(비면 나간 판이 없다)
+[Serializable, BlockInfo("타이틀로")]
+public class SuspendRun : GameAction
+{
+    protected override void Run()
+    {
+        var run = Game.Data().Run;
+        run.resumeScene = run.scene;     // 판은 그대로 둔다(판 끝 이벤트를 쏘지 않는다)
+        run.scene = "";                  // 빈 값 → Title
+    }
+}
+
+[Serializable, BlockInfo("이어 하기")]
+public class ResumeRun : GameAction
+{
+    protected override void Run()
+    {
+        var run = Game.Data().Run;
+        if (string.IsNullOrEmpty(run.resumeScene)) throw new InvalidOperationException("타이틀로 나간 판이 없습니다.");
+        run.scene = run.resumeScene;
+        run.resumeScene = "";
+    }
+}
+
+// 타이틀 화면(35장 5-3)의 '이어 하기'
+OnClick("continue", () =>
+{
+    if (string.IsNullOrEmpty(Game.Data().Run.resumeScene)) GBibleRuntime.LoadRun(Game.Session);   // 이번 실행에서 나간 판이 없으면 파일에서
+    if (!string.IsNullOrEmpty(Game.Data().Run.resumeScene)) GameScreens.Do(() => new ResumeRun());  // 타이틀로 나간 판이면 그 씬으로
+});
+```
+
+- 나간 판은 살아 있는 판이라 판 저장 설정대로 저장된다(06장 2.2). 끄고 다시 켜 `LoadRun`하면 씬 필드가 빈 채로 불러와 타이틀에 머물고, `ResumeRun`이 그 씬을 연다. 싸우던 중 꺼서 씬 필드가 차 있는 저장이면 `LoadRun`만으로 그 씬이 열린다. '이어 하기' 버튼은 `resumeScene`이 있거나 `GBibleRuntime.HasSavedRun`일 때 켠다(판 저장이 '끌 때'면 나간 판이 아직 파일에 없을 수 있다).
+- '새 게임'은 그대로 `NewRun` → `StartRun`(나간 판은 지워진다). 판을 끝낸 것으로 칠 일(보상·기록)은 판 끝 행동만 한다.
+
 ### 5-8. 월드 상태 — 상자 · 보스 · 스위치
 
 맵 씬에 상자·보스 방·동굴 레버가 있다고 본다.
@@ -793,6 +832,64 @@ public class MapInput : MonoBehaviour
 - 상자를 열면 뚜껑은 드롭 연출이 끝난 뒤 바뀐다(연결도 연출을 기다린다). 맵 씬을 떠났다 돌아와도, 판을 저장하고 이어 해도 열린 채다. Undo하면 닫힌다.
 - 레버를 끄면(`SetWorld(이름, false)`) 판 값이 지워진다. 같은 이름에 프로필 값(`permanent`)이 있으면 대신 `"false"`가 들어가 이번 판에서는 꺼진 채다(2-7).
 - 새 판이면 상자·보스·레버는 처음 모습으로 돌아오고, 마을 문은 열린 채다.
+
+**씬에 놓은 것을 규칙 데이터로(레벨 읽기)** — 개발자가 씬에 놓는 스폰 지점·상자 내용처럼 규칙이 알아야 하는 배치(관례 18절 '레벨 데이터')는, 씬이 열릴 때 화면 쪽이 모아 **보고 행동 하나**로 보낸다(관례 3절 '판정 보고 행동'과 같은 모양). 규칙은 그 행동으로 판 데이터에 개체를 만들고, 읽은 레벨을 판 데이터에 표시해 **한 번만** 읽는다(씬에 돌아오거나 이어 하기로 다시 열려도 두 번 만들지 않는다).
+
+```csharp
+// Client/SpawnPoint.cs — 개발자가 씬에 놓는 컴포넌트
+public class SpawnPoint : MonoBehaviour
+{
+    public string foe = "goblin";        // 적 원본(DB › 인스턴스) ID — 인스펙터는 글자 칸이라 없는 ID는 레벨 읽기가 오류로 알린다
+    public int count = 1;
+}
+
+// Client/LevelReporter.cs — 레벨 씬마다 하나
+public class LevelReporter : MonoBehaviour
+{
+    void Start()                         // 씬이 열린 뒤(이어 하기면 판을 불러온 뒤)
+    {
+        var game = GBibleRuntime.Game;
+        var test = FindFirstObjectByType<TestScene>();                                  // 테스트 씬이면 복사해 온 게임 씬 이름으로(38장)
+        var scene = test != null && !string.IsNullOrEmpty(test.sourceScene) ? test.sourceScene : gameObject.scene.name;
+        if (game == null || game.Data().Run.loadedLevels.Contains(scene)) return;   // 이미 읽은 레벨
+        var spawns = FindObjectsByType<SpawnPoint>(FindObjectsSortMode.None)
+            .OrderBy(p => p.name)                                                      // 늘 같은 차례(같은 id)
+            .Select(p => new LevelSpawn { foe = p.foe, count = p.count, x = p.transform.position.x, y = p.transform.position.y })
+            .ToList();
+        game.Do(new LoadLevel { scene = scene, spawns = spawns });
+    }
+}
+
+// Rules/LevelActions.cs
+[Serializable] public class LevelSpawn { public string foe; public int count; public float x, y; }
+
+[Serializable, BlockInfo("레벨 읽기")]
+public class LoadLevel : GameAction
+{
+    public string scene;
+    public List<LevelSpawn> spawns = new List<LevelSpawn>();
+
+    protected override void Run()
+    {
+        var run = Game.Data().Run;
+        if (run.loadedLevels.Contains(scene)) throw new InvalidOperationException($"이미 읽은 레벨입니다: {scene}");
+        run.loadedLevels.Add(scene);                                   // RunState: public List<string> loadedLevels
+        foreach (var spawn in spawns)
+            for (var i = 0; i < spawn.count; i++)
+            {
+                var foe = Game.Session.CopyInstance(spawn.foe) as Foe
+                          ?? throw new InvalidOperationException($"[레벨 {scene}] 없는 적 원본 '{spawn.foe}'입니다.");
+                foe.id = Game.NewId("foe");
+                foe.x = spawn.x; foe.y = spawn.y;                      // 한 번 정해지는 값이라 행동 필드로 넘긴다
+                run.foes.Add(foe);
+            }
+    }
+}
+```
+
+- 자리는 판 데이터가 된 뒤로 규칙의 것이다. 적이 움직이는 실시간 게임이면 처음 자리만 넘기고 그 뒤 위치는 화면 쪽(관례 3절)이다.
+- 상자 내용(어느 가중치 표에서 뽑나)·사건 칸도 같은 행동의 필드로 함께 보낸다. 열림 여부만이면 월드 상태로 충분하다(위).
+- 테스트 씬(38장)은 게임 씬을 복사한 것이라 같은 `LevelReporter`가 돈다. 레벨 이름은 복사해 온 게임 씬 이름(`TestScene.sourceScene`)이고, 판 데이터의 표시로 거르므로 그 레벨을 이미 읽은 테스트 상황을 불러와도 두 번 만들지 않는다.
 
 ### 5-9. 실시간 — 대기열 밖 연출(`GameView.Play`)
 

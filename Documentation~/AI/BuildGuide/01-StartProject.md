@@ -168,7 +168,7 @@ run.gold += 10;              // 행동 안이면 그냥 고친다 — 행동이 
 
 > [!note]- `Game.Data().Run`이라는 이름과 GameIds가 생기는 때
 > - `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`는 DB가 바뀌어 적용될 때(개발자의 Ctrl+S, 반영 스크립트의 새 항목 자동 적용) 다시 만들어진다. 직접 고치지 않는다.
-> - 새 상수는 **그 뒤 Unity가 다시 컴파일해야** 코드에서 보인다. 그래서 반영 스크립트와 그 상수를 쓰는 코드를 한꺼번에 넣지 않고 한 응답 안에서 두 박자로 나눈다: 형식·반영 스크립트를 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다(관례 15절 — Unity가 닫혀 있으면 첫 박자에서 멈추고 열어 달라고 한다).
+> - 새 상수는 **그 뒤 Unity가 다시 컴파일해야** 코드에서 보인다. 그래서 반영 스크립트와 그 상수를 쓰는 코드를 한꺼번에 넣지 않고 한 응답 안에서 박자로 나눈다: 형식·반영 스크립트를 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다. 선택 기능을 켜는 박자 · 새로 읽기를 한 번 더 도는 때는 진행 매뉴얼 6절 박자 표(Unity가 닫혀 있으면 첫 박자에서 멈추고 열어 달라고 한다).
 > - 이름은 ID의 첫 글자를 대문자로, 점으로 나뉜 조각을 이어 붙인다: `run` → `Run`, `bestFloor` → `BestFloor`, `boss.dragon` → `BossDragon`. 다른 이름을 원하면 ID를 바꾼다(05장 8절).
 > - 구역은 저장 파일과 같다. `Session`은 이번 판(`run.json`), `Meta`는 프로필(`profile.json`). 무엇을 어느 쪽에 둘지는 [02장](02-DesignToCode.md) 3절.
 
@@ -205,7 +205,7 @@ static void Bootstrap()
 ```
 
 > [!note]- 설정 함수와 칸 자세히
-> - 함수: `EditorSetSessionOptions(Undo 방식, 보관 수, 스냅샷 간격, 스냅샷 보관 수, 시드 고정, 시드)` · `EditorSetSaveOptions(판 저장, 판 끝 이벤트, 프로필도 행동마다)` · `EditorSetSaveTiming(N초, 저장 이벤트)` · `EditorSetFlowOptions(Undo 끊는 이벤트, 시작할 때 이어 하기, 새 판 행동)` · `EditorSetTickRate(초당 틱 수)` · `EditorSetSceneFlow(키, 필드, 빈 값일 때 씬)`. 이벤트·행동은 형식 전체 이름(`typeof(X).FullName`)이다.
+> - 함수: `EditorSetHistory(Undo 방식, 보관 수 = 그대로)`(Undo 방식 하나만 — 나머지 칸은 그대로) · `EditorSetSessionOptions(Undo 방식, 보관 수, 스냅샷 간격, 스냅샷 보관 수, 시드 고정, 시드)`(여섯 칸을 함께 — 바꾸지 않을 칸은 지금 값 `database.SnapshotInterval`·`DevelopmentSeed` …를 넘긴다) · `EditorSetSaveOptions(판 저장, 판 끝 이벤트, 프로필도 행동마다)` · `EditorSetSaveTiming(N초, 저장 이벤트)` · `EditorSetFlowOptions(Undo 끊는 이벤트, 시작할 때 이어 하기, 새 판 행동)` · `EditorSetTickRate(초당 틱 수)` · `EditorSetSceneFlow(키, 필드, 빈 값일 때 씬)`. 이벤트·행동은 형식 전체 이름(`typeof(X).FullName`)이다. 지금 값은 `GameDatabase`의 읽기 속성(`History`·`HistoryLimit`·`RunSave`·`SaveProfileEachAction`·`TickRate` … — 참조 3-8)으로 읽는다.
 > - Undo 방식을 "스냅샷"으로 두면 보관 수 대신 스냅샷 간격(초)·스냅샷 보관 수를 쓴다. 간격 × 개수 = 되감을 수 있는 시간.
 > - 시드는 개발 빌드에서만 고정된다. 에디터 플레이는 개발 빌드로 친다. 출시 빌드는 늘 지금 시각을 시드로 쓴다. 같은 시드에 같은 행동이면 `Game.Random`의 결과가 같다.
 > - 판 저장·판 끝 이벤트는 [10장](10-SaveAndRelease.md). 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.

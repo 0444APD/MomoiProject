@@ -38,6 +38,34 @@
 ### 주의할 점
 
 - 다이얼로그(`DialogueData`)와 연출 프리셋은 DB 사이드바에 없다. 그래프 창에서 만들고 고친다.
+- **자리용 다이얼로그**(AI): 샘플·이벤트 표의 '다이얼로그 재생'이 가리킬 다이얼로그가 없으면 DB 검증이 오류를 낸다. 대사 내용은 개발자 몫이므로(관례 18절) AI는 DB 반영 스크립트로 빈 자리만 만든다 — 그래프 창 **+ 새로**와 같은 모양(시작 노드 → 대사 노드 하나). 개발자가 그래프 창에서 채운다. 이 스크립트는 `dialogue` 기능이 켜져 Editor 어셈블리가 `GBible.Dialogue`를 참조한 뒤에 쓴다(1).
+
+```csharp
+// Assets/MomoiProject/Code/Editor/Seeds/DialogueSeeds.cs
+using GBible.Data;          // DialogueData
+using GBible.Dialogue;      // StartNode · LineNode · GraphNode
+using GBible.EditorTools;   // DbSeed · EditorDatabase
+using UnityEngine;
+
+static class DialogueSeeds
+{
+    [DbSeed("1")]
+    static void Placeholders()
+    {
+        foreach (var id in new[] { "seoa.talk1", "endingGood" })
+        {
+            if (EditorDatabase.Instance.FindById(id) != null) continue;          // 개발자가 채운 것은 건드리지 않는다
+            var dialogue = (DialogueData)EditorDatabase.Staging.Add(typeof(DialogueData), id);
+            var start = new StartNode { position = Vector2.zero };               // 시작 ID "start"
+            var line = new LineNode { position = new Vector2(320, 0), text = "(대사 자리)" };
+            dialogue.graph.Add(start);
+            dialogue.graph.Add(line);
+            dialogue.graph.Connect(start.guid, StartNode.NextPort, line.guid, GraphNode.FlowInPort);
+        }
+    }
+}
+```
+
 - 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI › font`에 한글 TTF를(SDF 폰트 에셋이면 `fontAsset`) 넣는다.
 
 ---
@@ -122,7 +150,8 @@
 **값 바꾸기 + 신호.** 선택지 "받는다" → 값 바꾸기(플레이어 데이터에 주기: 골드 +100) → 신호 보내기 `openShop` → 대사.
 
 **기믹 걸기(대화가 중심인 게임).** 그래프는 기믹을 직접 돌리지 않는다. 플레이어 데이터와 이벤트로 넘기면 패시브 효과·상태 효과(DB › 패시브 효과·상태 효과)가 받는다.
-- 값 바꾸기(플레이어 데이터에 주기): 패시브 효과의 가진 목록(`run › relics` 등)에 ID를 넣으면 그때부터 가진 것이다(선택지 "가호를 받는다" → 패시브 효과 얻기). 호감도 같은 수치를 올리면 '조건 충족' 발동·`modifierWhen`(보정 조건)이 읽는다.
+- 값 바꾸기(플레이어 데이터에 주기): 패시브 효과의 가진 목록(`run › relics` 등)에 ID를 넣으면 그때부터 가진 것이다(선택지 "가호를 받는다" → 패시브 효과 얻기). 바뀐 값은 '조건 충족' 발동·`modifierWhen`(보정 조건)이 읽는다.
+- 값 바꾸기(프로젝트 `Reward`): **호감도처럼 규칙 함수가 행동 직전 이벤트를 거쳐 바꾸는 값**(핵심 동사 — 관례 4절)은 '플레이어 데이터에 주기'로 바꾸지 않는다. 필드를 바로 고쳐 행동 직전 이벤트·이벤트를 건너뛰므로 "선물 호감도 두 배" 같은 기믹이 붙지 않는다. 그 규칙 함수를 부르는 프로젝트 `Reward`(예: `ChangeAffectionReward` — `12-Outcomes.md` 3-2 끝)를 두고 그래프는 그것을 고른다.
 - 신호 보내기: Client 코드가 받아 행동을 `Game.Do`한다. 행동이 이벤트를 쏘거나 `Game.ApplyStatus`로 상태 효과를 걸면, 패시브 효과·상태 효과의 '이벤트 받기'가 받는다.
 - 조건 분기·선택지의 보일 조건: 기믹이 바꾼 플레이어 데이터를 '플레이어 데이터 검사'로 읽는다(사용자를 보는 조건은 쓰지 못한다, 8절).
 
@@ -189,9 +218,13 @@ Dialogues.Play("shopIntro");
 Dialogues.Play("shopIntro", "afterBuy");
 ```
 
-**`Dialogues.IsPlaying`**, **`Dialogues.Advance()`**(클릭), **`Dialogues.Choose(번호)`**(선택지, `Choices` 순서), **`Dialogues.SkipToChoice()`**, **`Dialogues.Stop()`**.
+**`Dialogues.IsPlaying`**, **`Dialogues.Advance()`**(클릭), **`Dialogues.Choose(번호)`**(선택지, `Choices` 순서), **`Dialogues.SkipToChoice()`**, **`Dialogues.Stop()`**(지금 대사를 닫고 기다리는 줄도 비운다).
 
-**`Dialogues.Started`**(`Action<string>`, 다이얼로그 ID) · **`Ended`** · **`Signaled`**(`Action<string>`, 신호 이름) — 받는다. 셋은 플레이를 시작할 때 비워지므로 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]` 함수에서 `+=`한다(Client). 신호를 받은 코드는 데이터를 직접 바꾸지 않고 행동(`GameScreens.Do(() => …)`)이나 화면 열기로 넘긴다.
+**열기가 겹칠 때**: 코드에서 바로 부른 `Dialogues.Play`는 지금 대사를 끊고 새것을 연다(끊긴 쪽의 `Ended`는 오지 않는다). **행동이 연 다이얼로그**(결과 '다이얼로그 재생', 5.5)는 이미 열린 대사가 있으면 **기다렸다가 차례로** 연다 — 한 행동이 대화를 둘 요청해도(마지막 칸 이벤트 + 엔딩) 앞 대화가 끝난 뒤 다음 것이 열린다. 기다리는 수는 **`Dialogues.WaitingCount`**.
+
+**`Dialogues.BlocksInput`**(`bool`, 기본 참) — 대사가 열려 있는 동안 `GameView.Busy`가 참이 되어 화면 버튼의 행동(`OnClick(이름, () => new 행동())`)이 무시된다(화면 일 `OnClick(이름, Action)`은 돈다 — 35장). 걸으면서 듣는 대사처럼 막지 않을 게임은 `AfterAssembliesLoaded` 함수에서 거짓으로 둔다(플레이를 시작할 때 참으로 돌아간다).
+
+**`Dialogues.Started`**(`Action<string>`, 다이얼로그 ID) · **`Ended`**(`Action` — 인자 없음. 어느 다이얼로그였는지는 `Started`에서 받아 둔다) · **`Signaled`**(`Action<string>`, 신호 이름) — 받는다. 셋은 플레이를 시작할 때 비워지므로 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]` 함수에서 `+=`한다(Client). 신호를 받은 코드는 데이터를 직접 바꾸지 않고 행동(`GameScreens.Do(() => …)`)이나 화면 열기로 넘긴다.
 
 ```csharp
 Dialogues.Signaled += signal =>
@@ -285,7 +318,7 @@ public static class ContinueGame
 
 ### 5.5 코드 없이 열기 — 결과 블록 "다이얼로그 재생"
 
-도전과제·액티브 효과 등의 결과(코딩한 결과 목록)와 대사 그래프의 '값 바꾸기'에 **다이얼로그 재생**(분류 "다이얼로그 시스템") 블록이 있다. 칸: `dialogue`(다이얼로그) · `entryId`(시작 ID). 예: 도전과제 달성 연출. 코드 형식은 `PlayDialogueReward`. 규칙 안에서 바로 열지 않고 요청 이벤트 `DialoguePlayRequested`를 쏘며, 다이얼로그 관리자가 `SubscribeAfterAction`으로 받아 연다: 행동이 성공한 뒤에 열리고(미리보기·`CanDo`·실패한 행동에서는 열리지 않는다), 멀티에서는 그 행동을 한 플레이어 화면에서만 열리고(`IOwnedEvent`), 스냅샷 되감기가 도전과제 보상을 다시 줄 때는 다시 열지 않는다. 행동 밖에서 준 보상(조건 충족으로 행동 뒤에 달성한 도전과제 등)은 플레이어를 알 수 없어 모두의 화면에서 열린다. 다이얼로그 안에서 다른 다이얼로그로 넘길 때는 '다른 다이얼로그로' 노드가 그래프에서 흐름이 보여 알기 쉽다(값 바꾸기의 '다이얼로그 재생'도 새 다이얼로그가 흐름을 이어받는다).
+도전과제·액티브 효과 등의 결과(코딩한 결과 목록)와 대사 그래프의 '값 바꾸기'에 **다이얼로그 재생**(분류 "다이얼로그 시스템") 블록이 있다. 칸: `dialogue`(다이얼로그) · `entryId`(시작 ID). 예: 도전과제 달성 연출. 코드 형식은 `PlayDialogueReward`. 규칙 안에서 바로 열지 않고 요청 이벤트 `DialoguePlayRequested`를 쏘며, 다이얼로그 관리자가 `SubscribeAfterAction`으로 받아 연다: 행동이 성공한 뒤에 열리고(미리보기·`CanDo`·실패한 행동에서는 열리지 않는다), 멀티에서는 그 행동을 한 플레이어 화면에서만 열리고(`IOwnedEvent`), 스냅샷 되감기가 도전과제 보상을 다시 줄 때는 다시 열지 않는다. 행동 밖에서 준 보상(조건 충족으로 행동 뒤에 달성한 도전과제 등)은 플레이어를 알 수 없어 모두의 화면에서 열린다. 이미 대사가 열려 있으면 그 대사가 끝난 뒤 차례로 열린다(5.1 — 끊지 않는다). 그래서 다이얼로그 안의 값 바꾸기에 둔 '다이얼로그 재생'은 지금 다이얼로그가 끝난 뒤에 열린다 — 바로 넘기려면 '다른 다이얼로그로' 노드를 쓴다(그래프에서 흐름도 보인다).
 
 ### 5.6 프로젝트 전용 노드
 
@@ -388,7 +421,7 @@ public sealed class AffinityGauge : DialogueUIExtension
 - **값 바꾸기는 행동 하나다**: 대사의 '값 바꾸기'는 `DialogueSetAction` 행동으로 실행되어 Undo 한 단위가 된다(행동 탭에 "다이얼로그 값 바꾸기 (다이얼로그 ID)"). 프로젝트 코드가 행동 안에서 연 다이얼로그면 그 행동 안에서 바로 바뀐다('다이얼로그 재생' 보상은 행동이 끝난 뒤에 열므로 여기에 들지 않는다). 행동에 기록되는 것은 다이얼로그 ID·노드뿐이고, 기록만 받아 다시 실행할 때(다시 돌리기·멀티플레이)는 DB의 그 노드에서 바꿀 값을 다시 찾는다. 노드를 지웠거나 다이얼로그 ID가 바뀌었으면 아무것도 바꾸지 않고 경고를 남긴다.
 - **값 바꾸기가 실패하면 그 대사에 머문다**(6절): 미리 해 보고 실패하면 떠나지 않는다. 선택지 없는 대사 뒤의 값 바꾸기가 실패할 수 있으면(돈을 내는 일 등) 그 앞에 조건 분기나 선택지 조건을 둔다 — 클릭할 때마다 실패 알림만 뜨고 넘어가지 않는다. 시작 흐름(첫 대사 전)의 값 바꾸기가 실패하면 다이얼로그를 열지 않는다.
 - **값 바꾸기에는 `Reward`만**: '바꿀 값'에는 코딩한 결과(`Reward`)만 고른다 — 기본은 '플레이어 데이터에 주기'·'다이얼로그 재생' 둘, 나머지는 프로젝트 `Reward`. '대상에게 효과'·'이벤트 쏘기'·'선택 요구'·'가중치 표에서 주기'는 고를 수 없다. 그 블록의 `Context`(트리거 순간)는 비어 있다.
-- **다이얼로그 안에서 '다이얼로그 재생'·신호**: 값 바꾸기의 '다이얼로그 재생'이나 신호를 받은 코드가 다른 다이얼로그를 열면(또는 멈추면) 끊긴 쪽의 흐름은 거기서 멈추고 새 다이얼로그가 이어 간다.
+- **다이얼로그 안에서 '다이얼로그 재생'·신호**: 값 바꾸기의 '다이얼로그 재생'은 지금 다이얼로그가 끝난 뒤에 열린다(5.1 대기열). 신호를 받은 코드가 `Dialogues.Play`로 다른 다이얼로그를 열면(또는 멈추면) 끊긴 쪽의 흐름은 거기서 멈추고 새 다이얼로그가 이어 간다.
 - **씬에 재생기도 설정도 없음**: "[다이얼로그] 다이얼로그 재생기가 없습니다. 씬에 다이얼로그 UI 프리팹을 두세요(AI가 DialogueTemplate.Create로 만든다)." → DB 반영 스크립트에서 UI 템플릿을 만든다(1절 2).
 - **시작 ID가 없음**: "[다이얼로그] '…'에 시작 ID '…'가 없습니다." → 시작 노드의 시작 ID를 확인한다. 다이얼로그 ID가 없으면 "[다이얼로그] 다이얼로그 '…'가 없습니다(시작 ID '…')."
 - **멀티플레이**(40장): 클라이언트의 값 바꾸기는 서버로 보내고, 결과가 올 때까지 흐름을 멈춘다(그동안 클릭·선택을 받지 않는다 — `WaitingForServer`). 결과가 오면 서버가 바꾼 값으로 뒤의 조건 분기·`{값}`을 보고, 거절되면 그 대사로 돌아온다(실패 알림은 `GameNet`이 낸다). 진행 기록은 플레이어마다 `dialogue.progress:<번호>`(그 플레이어만 보는 칸)에 서버가 남긴다(5.4). 서버는 받은 '값 바꾸기'가 그 플레이어가 마지막으로 알린 대사(또는 시작)에서 서버 값으로 실제로 닿는 노드인지 보고, 앞의 값 바꾸기를 건너뛰거나 같은 것을 다시 보내면 거절한다(텍스트 키 `momoi.dialogue.outOfStep`). 방장 자신의 행동은 보지 않는다. 한계: 다이얼로그를 여는 것(어느 다이얼로그·시작 ID)은 게임 코드가 정하므로 서버가 확인하지 않고, 진행 기록(자리)도 클라이언트가 보낸 것을 믿는다 — 중요한 보상은 서버 쪽 규칙(행동의 `Validate`·보상 `Reward` 안의 검사)으로 한 번 더 지킨다.
@@ -397,12 +430,12 @@ public sealed class AffinityGauge : DialogueUIExtension
 
 ### 현재 동작 — 대화가 중심인 게임에서 알아 둘 것
 
-- **대사 진행은 행동 밖이다**: 클릭·선택지 고르기는 행동이 아니다. Undo는 대사 위치를 되돌리지 않는다(값 바꾸기 행동을 Undo하면 값만 돌아간다). 다이얼로그 선택지는 선택 대기(`Game.Ask`)가 아니라서 `Game.IsWaiting`·`GameView.Busy`가 참이 되지 않는다 — 다이얼로그 중에 게임 입력을 막으려면 `Dialogues.IsPlaying`도 본다.
+- **대사 진행은 행동 밖이다**: 클릭·선택지 고르기는 행동이 아니다. Undo는 대사 위치를 되돌리지 않는다(값 바꾸기 행동을 Undo하면 값만 돌아간다). 다이얼로그 선택지는 선택 대기(`Game.Ask`)가 아니라서 `Game.IsWaiting`은 거짓이다. 대신 대사가 열려 있는 동안 `GameView.Busy`가 참이다(`Dialogues.BlocksInput`, 5.1) — 화면 버튼의 행동은 막히고, 화면 일(`OnClick(이름, Action)` — 메뉴 열기·저장 버튼)은 막히지 않는다.
 - **진행 저장 시점**: 진행 기록(`dialogue.progress`, 5.4)은 시작할 때·대사에 들어갈 때·끝날 때 행동 밖에서 바뀐다(멀티에서는 행동 `DialogueProgressAction`으로 서버가 남긴다). 판 저장(행동마다·N초마다·이벤트 때)은 행동·이벤트가 계기라서 대사만 넘긴 진행은 다음 저장(다음 행동 뒤, 또는 끌 때)에 함께 들어간다. 그사이 강제 종료되면 넘긴 대사는 남지 않는다. 더 자주 남기려면 화면 코드가 행동 밖에서 `GBibleRuntime.SaveRun(session)`을 부른다(장면이 바뀔 때 등).
 - **이전 대사로 되감기는 없다**: `Resume(snapshot)`은 그 줄의 화면 상태를 바로 적용하고 그 줄부터 다시 띄울 뿐이다. 그 뒤에 값 바꾸기가 바꾼 값은 되돌리지 않는다. 스냅샷에는 지나온 길(분기·선택)이 없어 이어 간 대화는 진행 기록(5.4)을 남기지 않는다(판 저장의 진행 칸이 비워진다 — 저장 이어 가기는 `Dialogues.ResumeSaved()`). 대사 로그는 보기만 한다.
-- **다이얼로그 대기열은 없다**: 재생 중에 `Dialogues.Play`를 부르면 지금 다이얼로그를 끊고 새것을 연다(끊긴 쪽의 `Ended`는 오지 않는다). 차례로 열려면 `Dialogues.IsPlaying`을 보고 `Dialogues.Ended`를 받아 다음 것을 연다.
+- **다이얼로그 대기열은 행동이 연 것만이다**: 결과 '다이얼로그 재생'(행동이 연 것)은 열린 대사가 끝난 뒤 차례로 열린다. 코드에서 바로 부른 `Dialogues.Play`는 지금 다이얼로그를 끊고 새것을 연다(끊긴 쪽의 `Ended`는 오지 않는다 — 5.1). 그래서 규칙이 정하는 대화(하루 끝 이벤트·엔딩)는 행동의 결과 '다이얼로그 재생'으로 열고, 화면 코드가 직접 `Play`하지 않는다.
 - **신호 보내기·`Game.Ask`는 대화를 멈추지 않는다**: 신호를 보낸 뒤 흐름은 바로 다음 노드로 간다. 신호를 받은 코드가 상점을 열거나 `Game.Ask`로 고르기를 요구해도 다이얼로그는 기다리지 않는다. 기다려야 하면 신호 다음을 '끝'으로 두고, 게임 쪽 일이 끝난 뒤 다른 시작 ID로 다시 연다(`Dialogues.Play("shopIntro", "afterShop")`).
 - **선택지 조건은 선택지를 보일 때 한 번 본다**: 글이 다 나와 선택지가 뜰 때 평가하고, 고르는 동안 값이 바뀌어도 다시 보지 않는다. 조건 분기는 흐름이 지나갈 때 평가한다. 저장 이어 가기(5.4)에서는 둘 다 다시 보지 않고 저장할 때의 결정을 따른다.
 - **그래프의 조건에는 트리거 순간이 없다**: 조건 분기·선택지 조건은 이벤트·사용자 없이 평가한다. 조건 '확률'은 늘 거짓이다. 사용자·이벤트를 보는 조건은 '상태 효과 검사'가 중첩 0으로 비교하고('<= 0'이면 늘 참), '사용자 필드 검사'·'자리 검사'는 거짓이다. 무작위로 가르려면 값 바꾸기의 프로젝트 `Reward`가 행동 안에서 `Game.Random`으로 뽑아 플레이어 데이터에 적고, 조건 분기가 그 값을 본다.
 - **읽은 대사 기록은 없다**: 이미 읽은 대사만 건너뛰기는 없다(`SkipToChoice`는 읽었는지와 상관없이 선택지까지 간다). 대사 로그(`Log`)는 지금 재생 중인 것만 들고 저장하지 않는다.
-- **슬롯을 넘는 저장은 없다**: 비주얼 노벨의 세이브 30칸처럼 프로필 하나에 판 저장을 여러 칸 두는 기능은 없다. 슬롯은 프로필·판을 함께 묶으므로(31장) 칸마다 슬롯을 쓰면 해금·갤러리 같은 프로필 값도 칸마다 따로 논다. 판만 칸마다 두려면 게임 코드가 `session.ExportRun()`·`ImportRun`(06장 2.4)으로 직접 다룬다.
+- **슬롯을 넘는 저장은 없다**: 비주얼 노벨의 세이브 30칸처럼 프로필 하나에 판 저장을 여러 칸 두는 기능은 없다. 슬롯은 프로필·판을 함께 묶으므로(31장) 칸마다 슬롯을 쓰면 해금·갤러리 같은 프로필 값도 칸마다 따로 논다. 판만 칸마다 두려면 게임 코드가 `session.ExportRun()`·`ImportRun`으로 직접 다룬다 — 불러올 때의 차례(열린 대사 닫기 → `ImportRun` → `NotifyRunLoaded` → `SaveRun` → `ResumeSaved`)는 06장 2.4. 대사 중에 저장해도 진행이 판에 함께 들어간다(5.4).

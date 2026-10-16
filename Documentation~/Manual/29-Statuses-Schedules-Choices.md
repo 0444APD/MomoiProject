@@ -72,6 +72,7 @@
 | "디버프를 모두 푼다" · "디버프가 2가지 이상이면" | 상태 효과의 `kind`(종류) `디버프` + 효과 `상태 효과 풀기`(`kind`(종류 전부)) · 조건 `상태 효과 검사`(`kind`(종류))(5-17) |
 | "화상 최대 중첩 +2" · "화상 틱 속도 +50%" | 행동 직전 이벤트 `상태 효과 걸기` 받기 + 행동 직전 이벤트 고치기 `maxStacks` 더하기 2 · `pulse` 곱하기 `0.6667`(= 1/1.5)(5-15) |
 | "잉크: 걸린 유닛의 패시브 효과가 꺼진다, 턴마다 1씩 준다" | 상태 효과 `silencesPassives`(걸린 쪽의 패시브 효과를 끔) + 트리거 `턴 끝` + 결과 `상태 효과 풀기` 1(5-18) |
+| "기절: 걸린 동안 행동하지 못한다" · "빙결" · "수면" | 프로젝트 `StatusData`(템플릿 사본)에 칸 `stopsActing`(행동 못 함)을 더하고, 메인 룰(차례를 도는 행동·전투 틱)이 그 칸을 읽어 건너뛴다(4-2 끝). 상태 효과마다 ID로 거르지 않는다(새 기절류를 더할 때 코드를 고치지 않게) |
 | "버섯: 턴 끝마다 중첩만큼 피해, 그리고 1 준다" | 상태 효과(지속 영구) + 트리거 `턴 끝` + 결과 피해·`상태 효과 풀기` 1(5-18) |
 | "독에 걸린 적 모두에게 3" · "디버프가 없는 아군" | 대상 `상태 효과로 거르기`(3-4b) |
 | "보상 다시 뽑기(남은 횟수 1 소모)" | 비용을 내는 행동 + `Game.RerollChoice`(4-10b, 30장 5-13) |
@@ -499,6 +500,23 @@ foreach (var s in Game.Statuses(run.hero))
 ```
 
 DB 없이 정의만 있으면 `session.Statuses.Find(id).Hidden`(아이콘은 엔진 정의에 없고 DB 항목에만 있다).
+
+**상태 효과 플래그 — 행동 못 함(기절)** — 엔진에 '행동 못 함' 칸은 없다(엔진이 보는 것은 `IStatusData` 규격뿐). 프로젝트 `StatusData`에 칸을 더하고(프로젝트 변경 — 묻지 않고 보고만, AI 문서 Reference 4-1) 규칙이 DB 항목에서 읽는다. 기절류 상태 효과를 더할 때는 DB에서 칸만 켠다.
+
+```csharp
+// Rules/Elements/StatusData.cs(템플릿 사본)에 한 줄
+[FieldLabel("행동 못 함"), Tooltip("켜면 걸린 쪽은 자기 차례에 행동하지 못합니다(기절·빙결·수면)")] public bool stopsActing;
+
+// Rules/Rules.cs — 메인 룰이 차례마다 부른다
+public static bool CanAct(GameApi game, object unit)
+{
+    foreach (var s in game.Statuses(unit))
+        if (game.Entry<StatusData>(s.status)?.stopsActing == true) return false;
+    return true;
+}
+```
+
+규칙 테스트는 세션을 직접 만들므로 `session.Entries`에 그 `StatusData` 항목을 넣어야 `Game.Entry`가 찾는다(38장).
 
 ### 4-3. 결과를 코드로 — `[BindTo(상태 효과 ID)]`
 

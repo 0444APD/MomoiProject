@@ -60,7 +60,8 @@
 | 글자 필드 하나 | `run › hero.weaponPassive` | 같으면 1 |
 
 - **`matchField`(일치 필드)**: 객체 목록에서 요소의 어느 필드에 패시브 효과 ID가 있는지 정한다. 조커 칸 `run › jokers`의 요소가 `{ id: "j1", joker: "plusMult" }`이면 일치 필드 `joker`다. 그 필드가 **글자 목록**이면 그 안에 패시브 효과 ID가 있을 때 가진 것이다. 유닛의 `traits` = `["teeth", "wild"]`, 참(Charm)이 조각에 붙인 키워드처럼 조각 하나가 패시브 효과 여럿을 가진다. 비우면 요소 자신(ID 글자)이나 요소의 `id`가 패시브 효과 ID여야 한다. 같은 조커 둘을 놓으려면 조각마다 `id`가 달라야 하므로, 조각 목록은 고유 `id` + 원본 ID 필드로 두고 일치 필드를 쓴다.
-- **`matchVia`(원본에서 읽기)**: 일치 필드가 원본(DB › 인스턴스) ID를 담을 때 쓴다. 그 원본의 이 필드(글자·글자 목록)에 패시브 효과 ID가 있으면 가진 것이다. 판 데이터의 조각은 `{ id, card: "card.foxee" }`만 두고, 패시브 효과 목록·가격·등급 같은 고정 값은 원본 `Card`(`passives = [wild, teeth]`)에 둔다(0-3). 원본은 `GameSession.Instances`(원본 ID → 원본 객체)로 찾는다. 게임(Unity)에서는 런타임이 DB › 인스턴스로 채우고, 서버·테스트처럼 세션을 직접 만들면 직접 넣는다.
+- **`matchVia`(원본에서 읽기)**: 일치 필드가 원본(DB › 인스턴스) ID를 담을 때 쓴다. 그 원본의 이 필드(글자·글자 목록)에 패시브 효과 ID가 있으면 가진 것이다. 판 데이터의 조각은 `{ id, card: "foxee" }`만 두고, 패시브 효과 목록·가격·등급 같은 고정 값은 원본 `Card`(`passives = [wild, teeth]`)에 둔다(0-3). 원본은 `GameSession.Instances`(원본 ID → 원본 객체)로 찾는다. 게임(Unity)에서는 런타임이 DB › 인스턴스로 채우고, 서버·테스트처럼 세션을 직접 만들면 직접 넣는다(`session.DefineInstance`, 38장).
+  - **ID 글자 목록에는 쓰이지 않는다.** 가진 목록의 요소가 글자면(`List<string>` — `inventory = ["sword", "shield"]`) 그 글자가 패시브 효과 ID와 같을 때만 가진 것이고, `matchField`·`matchVia`는 보지 않는다. 가진 것이 원본(인스턴스) ID 목록이고 패시브 효과는 원본에 적어 두려면 요소를 객체로 둔다: `List<OwnedItem>`(`{ id, item: "sword" }`) + `matchField` `item` + `matchVia` `passives`.
 - **`levelField`(레벨 필드)**: 요소의 이 숫자 필드가 그 요소의 레벨이다(`{ joker: "plusMult", level: 3 }`). 비우면 요소 하나 = 1. ID 목록·딕셔너리에는 쓰지 않는다(딕셔너리는 값이 곧 레벨).
 - **레벨이 0 이하인 요소는 꺼진 것이다.** 발동도 보정도 없고 `Game.Owned`에서 0이며, 빌려 쓰기로도 빌리지 못한다. 제약으로 잠깐 꺼지는 조각을 레벨 0으로 둔다. 그래서 원작 레벨이 ★0부터인 게임은 레벨 필드 = ★ + 1(꺼지면 0)로 둔다.
 - **가진 쪽** = 그 목록을 품은 객체. `run › relics`면 `run`(판 하나에 하나), `run › hero.perks`면 `hero`, 앞마디에 `[]`를 쓴 `run › party[].traits`면 그 목록을 가진 동료마다다.
@@ -341,9 +342,9 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 [Serializable] public class Unit { public string id; public string card; public int hp; public List<string> traits = new List<string>(); }   // 판 데이터의 조각
 ```
 
-1. DB › 인스턴스 `card.foxee`: 형식 `Card`, `passives` = `wild`, `teeth`.
+1. DB › 인스턴스 `foxee`: 형식 `Card`, `passives` = `wild`, `teeth`.
 2. DB › 패시브 효과 `wild`·`teeth`: 가진 목록 `run › board`, `matchField` `card`, `matchVia` `passives`, `perElement` 켬. 발동·결과는 패시브 효과마다.
-3. 카드를 놓을 때 `run.board`에 `new Unit { id = Game.NewId("unit"), card = "card.foxee" }`만 넣는다.
+3. 카드를 놓을 때 `run.board`에 `new Unit { id = Game.NewId("unit"), card = "foxee" }`만 넣는다.
 
 - 조각 하나에 패시브 효과 둘이 붙는다. 원본의 `passives`를 고치면 이미 놓인 조각도 따른다(판 데이터에 복사하지 않았으므로).
 - 가격·등급 같은 고정 값도 원본에 둔다(0-5).
