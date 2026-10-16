@@ -202,6 +202,8 @@ namespace GBible
             World = new WorldStateSystem(this);
             Rewind = new RewindSystem(this);
             // 처리를 클래스 안에 쓴 행동(Run)은 등록 없이 실행한다. 실행 직전에 참조 필드(id가 있는 객체)를 지금 데이터의 객체로 다시 찾는다.
+            // 플레이어마다 따로인 플레이어 데이터('army' → 'army:<번호>')의 번호: 행동 안이면 그 행동을 한 사람, 밖이면 이 화면의 플레이어.
+            Data.CurrentPlayer = () => Actions.CurrentActor != 0 ? Actions.CurrentActor : LocalPlayer;
             Actions.SelfRun = action => action.RunIn(Game);
             Actions.Prepare = action => ActionReferences.Resolve(action, Game);
 

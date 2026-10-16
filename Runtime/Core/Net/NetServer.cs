@@ -141,6 +141,7 @@ namespace GBible
             var player = new NetPlayer { Id = _nextPlayerId++, Name = string.IsNullOrEmpty(name) ? "방장" : name, Account = "local:" + name, Connection = -1, Connected = true, IsLocal = true };
             _players.Add(player);
             _session.LocalPlayer = player.Id;
+            _session.Data.AddPlayer(player.Id);
             PlayerJoined?.Invoke(player);
             BroadcastPlayers();
             return player;
@@ -523,7 +524,8 @@ namespace GBible
             peer.Joined = true;
             peer.NeedsScan = true;
             _session.Journal.Append(JournalKind.System, "Net", $"{player}이(가) 들어왔습니다.");
-            // 투영 키는 들어오는 사람 몫을 만들어 둔다(처음 모습이 다음 묶음에 간다).
+            // 플레이어마다 따로인 데이터 · 투영 키는 들어오는 사람 몫을 만들어 둔다(처음 모습이 다음 묶음에 간다).
+            _session.Data.AddPlayer(player.Id);
             foreach (var key in _projections.Keys.ToList()) RefreshProjection(key, player.Id);
             PlayerJoined?.Invoke(player);
             BroadcastPlayers();

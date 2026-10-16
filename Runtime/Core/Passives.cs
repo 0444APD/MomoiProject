@@ -214,13 +214,16 @@ namespace GBible
             var path = string.IsNullOrEmpty(m.target) ? definition.ModifierTarget : m.target;
             // 받는 쪽 = 경로의 객체(정해져 있으면, 가진 쪽 전부가 그 객체에 보탠다 — party[]처럼 []면 그 모두가 받는다) 또는 가진 쪽 자신.
             var toPath = !string.IsNullOrEmpty(path);
+            // 받을 대상 경로가 있으면 그 경로가 대상을 품은 가진 목록(플레이어마다 따로인 키면 그 플레이어 몫)의 가진 쪽만 보탠다.
+            string inKey = null;
             if (toPath)
             {
-                if (string.IsNullOrEmpty(definition.OwnerKey) || !_session.Data.IsDefined(definition.OwnerKey)) return null;
-                if (!FieldPaths.Resolve(_session.Data.Get(definition.OwnerKey), path).Any(r => IsTarget(r, target, targetId))) return null;
+                if (string.IsNullOrEmpty(definition.OwnerKey)) return null;
+                inKey = _session.Data.KeysOfAllPlayers(definition.OwnerKey).FirstOrDefault(k => FieldPaths.Resolve(_session.Data.Get(k), path).Any(r => IsTarget(r, target, targetId)));
+                if (inKey == null) return null;
             }
             var levels = new List<int>();
-            foreach (var (holder, level) in ActiveHolders(definition))
+            foreach (var (holder, level) in ActiveHolders(definition, inKey))
             {
                 if (!toPath && !IsTarget(holder, target, targetId)) continue;
                 if (!ModifierConditionHolds(definition, holder)) continue;
@@ -255,9 +258,9 @@ namespace GBible
         }
 
         // 켜진 가진 쪽과 그 레벨(놓인 것마다면 요소마다, 아니면 목록을 품은 객체마다). 침묵·레벨 0 이하는 뺀다.
-        IEnumerable<(object holder, int level)> ActiveHolders(PassiveDefinition definition)
+        IEnumerable<(object holder, int level)> ActiveHolders(PassiveDefinition definition, string onlyKey = null)
         {
-            foreach (var (parent, collection) in Collections(definition).ToList())
+            foreach (var (parent, collection) in Collections(definition, onlyKey).ToList())
             {
                 if (!definition.PerElement)
                 {
@@ -505,19 +508,23 @@ namespace GBible
 
         // ── 가진 목록 읽기 ───────────────────────────────────
 
-        // 가진 쪽(목록을 품은 객체)과 그 목록.
-        IEnumerable<(object parent, object collection)> Collections(PassiveDefinition definition)
+        // 가진 쪽(목록을 품은 객체)과 그 목록. 가진 목록이 플레이어마다 따로인 키(army)면 모든 플레이어 몫(army:1 · army:2 …)을 훑는다(onlyKey면 그 키만).
+        IEnumerable<(object parent, object collection)> Collections(PassiveDefinition definition, string onlyKey = null)
         {
-            if (string.IsNullOrEmpty(definition.OwnerKey) || !_session.Data.IsDefined(definition.OwnerKey)) yield break;
-            var root = _session.Data.Get(definition.OwnerKey);
+            if (string.IsNullOrEmpty(definition.OwnerKey)) yield break;
             FieldPaths.SplitLast(definition.OwnerPath ?? "", out var parentPath, out var last);
-            if (string.IsNullOrEmpty(last))
+            foreach (var key in _session.Data.KeysOfAllPlayers(definition.OwnerKey).ToList())
             {
-                yield return (root, root);
-                yield break;
+                if (onlyKey != null && key != onlyKey) continue;
+                var root = _session.Data.Get(key);
+                if (string.IsNullOrEmpty(last))
+                {
+                    yield return (root, root);
+                    continue;
+                }
+                foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
+                    if (parent != null) yield return (parent, FieldPaths.Resolve(parent, last).FirstOrDefault());
             }
-            foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
-                if (parent != null) yield return (parent, FieldPaths.Resolve(parent, last).FirstOrDefault());
         }
 
         // 요소가 이 패시브 효과인가: 글자면 그 글자, 일치 필드가 있으면 그 필드(글자·글자 목록, 원본에서 읽기면 그 원본의 필드), 아니면 요소의 id.

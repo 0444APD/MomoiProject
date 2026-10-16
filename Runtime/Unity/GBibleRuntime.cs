@@ -294,6 +294,8 @@ namespace GBible
             var asClient = StartAsClient;
             StartAsClient = null;
             var session = BuildSession(database, main: true);
+            // 플레이어마다 따로인 플레이어 데이터: 싱글은 이 화면의 플레이어 몫을 만든다(멀티 클라이언트는 서버가 보낸다 · 서버는 들어올 때마다).
+            if (asClient == null) session.Data.AddPlayer(session.LocalPlayer);
 
             // 판 저장(DB › 시작 파일 › Bootstrap): 행동마다 저장·판 끝 이벤트.
             _runSaveMode = database?.RunSave ?? RunSaveMode.OnQuit;

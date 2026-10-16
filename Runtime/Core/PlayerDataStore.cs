@@ -332,7 +332,65 @@ namespace GBible
             return kind == DataKind.Object || kind == DataKind.List || kind == DataKind.Array || kind == DataKind.Dictionary || kind == DataKind.Collection;
         }
 
-        public bool IsDefined(string key) => key != null && _slots.ContainsKey(key);
+        public bool IsDefined(string key) => key != null && _slots.ContainsKey(Resolve(key));
+
+        // ── 플레이어마다 따로인 플레이어 데이터 ─────────────────
+        // 이름 하나(army)를 플레이어마다 따로 둔다: 실제 키는 'army:<번호>'. 게임 코드 · DB Block이 'army'를 읽고 쓰면
+        // 지금 행동을 한 플레이어(행동 밖이면 이 화면의 플레이어 — CurrentPlayer)의 키로 바뀐다. 특정 플레이어 것은 'army:2'처럼 직접.
+        // 키는 AddPlayer가 만든다(싱글 = 이 화면의 플레이어 하나, 멀티 서버 = 들어올 때마다). ownerOnly면 그 사람에게만 보낸다(손패).
+        sealed class PerPlayerTemplate
+        {
+            public DataZone Zone;
+            public Type Type;
+            public object Default;
+            public string Label;
+            public bool OwnerOnly;
+        }
+
+        readonly Dictionary<string, PerPlayerTemplate> _perPlayer = new Dictionary<string, PerPlayerTemplate>(StringComparer.Ordinal);
+
+        // 지금 플레이어 번호(행동 안이면 그 행동을 한 사람). GameSession이 정한다.
+        public Func<int> CurrentPlayer;
+
+        public void DefinePerPlayer(string key, DataZone zone, Type type, object defaultValue, string label = null, bool ownerOnly = false)
+        {
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
+            _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly };
+        }
+
+        public bool IsPerPlayer(string key) => key != null && _perPlayer.ContainsKey(key);
+
+        public IEnumerable<string> PerPlayerKeys => _perPlayer.Keys;
+
+        // 그 플레이어 몫의 실제 키 이름.
+        public static string KeyFor(string key, int player) => key + ":" + player.ToString(CultureInfo.InvariantCulture);
+
+        // 플레이어마다 따로인 키의 그 플레이어 몫을 만든다(이미 있으면 그대로). 행동 밖에서도 된다(들어올 때).
+        public void AddPlayer(int player)
+        {
+            foreach (var pair in _perPlayer)
+            {
+                var concrete = KeyFor(pair.Key, player);
+                if (_slots.ContainsKey(concrete)) continue;
+                var template = pair.Value;
+                var value = template.Default == null ? null : DataModel.Clone(template.Default, null);
+                DefineOfType(concrete, template.Zone, template.Type, value, $"{template.Label} #{player}");
+                if (template.OwnerOnly) SetVisibility(concrete, DataVisibility.Owner, player);
+            }
+        }
+
+        // 그 이름의 모든 플레이어 몫(army:1 · army:2 …, 번호순).
+        public IEnumerable<string> KeysOfAllPlayers(string key)
+        {
+            if (!IsPerPlayer(key)) return IsDefined(key) ? new[] { key } : Array.Empty<string>();
+            var prefix = key + ":";
+            return _slots.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal) && int.TryParse(k.Substring(prefix.Length), out _))
+                .OrderBy(k => int.Parse(k.Substring(prefix.Length), CultureInfo.InvariantCulture)).ToList();
+        }
+
+        // 'army' → 지금 플레이어의 'army:<번호>'. 그 밖의 키는 그대로.
+        public string Resolve(string key) =>
+            key != null && _perPlayer.Count > 0 && _perPlayer.ContainsKey(key) ? KeyFor(key, CurrentPlayer?.Invoke() ?? 0) : key;
 
         // 이 안에서는 Changed·DataChanged·Synced를 알리지 않는다(미리보기: 바뀌었다가 그대로 돌아오는 변경이라 화면·전송이 알 필요가 없다).
         // 안에서 새로 붙인 받는 쪽은 그대로 남는다. 캐시를 가진 쪽은 되돌림(TransactionAborted)으로 비운다.
@@ -375,20 +433,26 @@ namespace GBible
         // 불러온 저장에서 아직 정의되지 않고 기다리는 키들(키 이름 규칙으로 찾는 기능 — 플레이어별 선택 대기 등).
         internal IEnumerable<string> PendingKeys => _preloaded.Keys;
 
-        public bool IsData(string key) => key != null && _slots.TryGetValue(key, out var slot) && slot.DataType != null;
+        public bool IsData(string key) => key != null && _slots.TryGetValue(Resolve(key), out var slot) && slot.DataType != null;
 
         // 등록된 타입(데이터 값은 클래스·컬렉션 타입, 단순 값은 선언 타입 또는 null).
-        public Type TypeOf(string key) => key != null && _slots.TryGetValue(key, out var slot) ? slot.DataType ?? slot.ValueType : null;
+        public Type TypeOf(string key)
+        {
+            if (key == null) return null;
+            if (_slots.TryGetValue(Resolve(key), out var slot)) return slot.DataType ?? slot.ValueType;
+            return _perPlayer.TryGetValue(key, out var template) ? template.Type : null;   // 아직 몫이 없는 플레이어마다 키(형식은 틀에서)
+        }
 
-        public DataZone ZoneOf(string key) => GetSlot(key).Zone;
+        public DataZone ZoneOf(string key) => GetSlot(Resolve(key)).Zone;
 
-        public string LabelOf(string key) => _slots.TryGetValue(key, out var slot) ? slot.Label : key;
+        public string LabelOf(string key) => key != null && _slots.TryGetValue(Resolve(key), out var slot) ? slot.Label : key;
 
         // ── 읽기 ───────────────────────────────────────────────
         // 데이터 값은 저장소가 관리하는 실제 인스턴스를 돌려준다(읽기는 자유, 수정은 Modify).
 
         public object Get(string key)
         {
+            key = Resolve(key);
             var slot = GetSlot(key);
             Note(key, slot);
             return slot.Value;
@@ -396,6 +460,7 @@ namespace GBible
 
         public T Get<T>(string key)
         {
+            key = Resolve(key);
             var slot = GetSlot(key);
             Note(key, slot);
             return Convert<T>(key, slot.Value);
@@ -403,7 +468,7 @@ namespace GBible
 
         public T Get<T>(PlayerDataKey<T> key) => Get<T>(key.Id);
 
-        public long LastEntryId(string key) => key != null && _lastEntry.TryGetValue(key, out var id) ? id : 0;
+        public long LastEntryId(string key) => key != null && _lastEntry.TryGetValue(Resolve(key), out var id) ? id : 0;
 
         public double GetNumber(string key)
         {
@@ -444,6 +509,7 @@ namespace GBible
         // 값을 통째로 바꾼다. 클래스·컬렉션은 내용을 복사해 넣으므로 게임 코드가 쥔 인스턴스는 그대로 유지된다.
         public void Set(string key, object value)
         {
+            key = Resolve(key);
             var slot = GetSlot(key);
             if (slot.DataType != null)
             {
@@ -482,6 +548,7 @@ namespace GBible
         public void Modify<T>(string key, Action<T> change) where T : class
         {
             if (change == null) throw new ArgumentNullException(nameof(change));
+            key = Resolve(key);
             var slot = GetSlot(key);
             if (slot.DataType == null)
                 throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{key}'는 단순 값입니다. Set으로 바꾸세요.");
@@ -660,7 +727,7 @@ namespace GBible
         // 이후 Synced로 오는 변경을 MirrorReceiver.Apply로 적용한다. 예전 방식 데이터(Mirror가 아님)면 null.
         public byte[] Snapshot(string key)
         {
-            var mirror = SyncedMirror(key);
+            var mirror = SyncedMirror(Resolve(key));
             return mirror == null ? null : Mirror.Snapshot(mirror);
         }
 

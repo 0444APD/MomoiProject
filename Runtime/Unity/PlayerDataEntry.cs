@@ -14,6 +14,8 @@ namespace GBible.Data
         [FieldLabel("값 형식"), DataTypeRef] public string valueType = typeof(double).FullName;
         // 숫자·참거짓·글자·enum·날짜 같은 단순 값만. 클래스·컬렉션은 그 클래스의 초기값(필드 초기화·생성자)을 쓴다.
         [FieldLabel("기본값")] public string defaultValue = "";
+        [FieldLabel("플레이어마다"), Tooltip("멀티: 플레이어마다 따로 둔다(실제 키 'ID:번호'). 게임 코드 · DB Block이 이 ID를 읽고 쓰면 지금 행동을 한 플레이어의 것. 싱글은 이 화면의 플레이어 하나")] public bool perPlayer;
+        [FieldLabel("그 사람에게만 보임"), ShowIf(nameof(perPlayer)), Tooltip("켜면 그 플레이어에게만 보낸다(손패 · 숨긴 편성). 끄면 모두에게")] public bool ownerOnly;
 
         public Type ValueType => TypeResolver.Find(valueType);
 
@@ -22,6 +24,11 @@ namespace GBible.Data
         {
             var type = ValueType ?? throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{Id}'의 값 형식 '{valueType}'을 찾을 수 없습니다.");
             if (!TryParseDefault(type, out var value, out var error)) throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{Id}': {error}");
+            if (perPlayer)
+            {
+                store.DefinePerPlayer(Id, zone, type, value ?? (DataModel.Of(type).Kind == DataKind.Scalar || DataModel.Of(type).Kind == DataKind.Enum ? null : DataModel.Create(type)), DisplayName, ownerOnly);
+                return;
+            }
             store.DefineOfType(Id, zone, type, value, DisplayName);
         }
 
