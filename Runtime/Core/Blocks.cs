@@ -22,6 +22,13 @@ namespace GBible
         }
     }
 
+    // 데이터 줄: Block 칸(조건 등)을 품고 있어도 목록에 줄을 더하고 빼는 것은 개발자가 한다(값 — 가중치 표의 후보 줄).
+    // 줄 안의 Block 칸은 여전히 잠겨 있다(조건 붙이기 · 바꾸기는 AI). 붙이지 않으면 Block 칸을 품은 형식의 목록은 줄 추가 · 삭제도 잠긴다.
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class DataRowAttribute : Attribute
+    {
+    }
+
     // 편집 화면에 보일 필드 이름. 없으면 필드 이름을 사람이 읽기 쉽게 바꿔 쓴다.
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class FieldLabelAttribute : Attribute

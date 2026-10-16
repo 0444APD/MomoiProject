@@ -191,6 +191,9 @@ namespace GBible
         public string ability;
         public string user;
         public List<string> targets = new List<string>();
+        // 칸 대상(id가 없는 값 — 돌진할 칸 · 조명탄을 던질 칸). 고른 대상(Picked)의 개체들 뒤에 Cell 값으로 들어간다.
+        // 칸을 읽는 효과는 프로젝트 결과 Block · [BindTo]에서 c.Picked.OfType<Cell>()(Effect<T>는 개체만 받는다).
+        public List<Cell> cells = new List<Cell>();
         // 참이면 사용 조건이 안 맞을 때 실패를 던지지 않고 그냥 끝난다(Game.TryUse).
         public bool quiet;
         // 실제로 썼나(결과를 냈나). Game.TryUse가 읽는다.
@@ -203,6 +206,7 @@ namespace GBible
             var game = Game;
             var definition = game.Session.Abilities.Get(ability) ?? throw new InvalidOperationException($"[MomoiProject] 액티브 효과 '{ability}'이(가) 없습니다.");
             var picked = (targets ?? new List<string>()).Select(game.Find).Where(t => t != null).ToList();
+            if (cells != null) picked.AddRange(cells.Cast<object>());
             var triggers = game.Session.Triggers;
             if (!triggers.CanUse(ability, definition.When, game.Find(user), picked, out var moment))
             {
@@ -236,7 +240,7 @@ namespace GBible
             {
                 Ability = ability,
                 User = user,
-                Targets = final.Select(t => GameApi.IdOf(t)).ToList(),
+                Targets = final.Select(t => t is Cell cell ? Grid.Key(cell) : GameApi.IdOf(t)).ToList(),   // 칸은 "x,y"
                 Times = use.times,
             });
         }

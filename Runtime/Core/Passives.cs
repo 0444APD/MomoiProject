@@ -80,6 +80,7 @@ namespace GBible
 
     // 패시브 효과의 '가진 동안 스탯 보정' 한 줄.
     [Serializable]
+    [DataRow]   // 줄 추가 · 삭제는 개발자(값), 줄 안의 받는 쪽 조건 붙이기는 AI(구조)
     public sealed class PassiveModifier
     {
         [FieldLabel("스탯(숫자 필드 이름)")] public string attribute = "";
@@ -88,6 +89,12 @@ namespace GBible
         [FieldLabel("레벨마다(값 × 레벨)")] public bool perLevel;
         [FieldLabel("레벨별 값(1레벨부터, 비우면 위 값)")] public List<double> byLevel = new List<double>();
         [FieldLabel("받을 대상(비우면 패시브 효과의 보정 받을 대상)")] public string target = "";
+        // 받는 쪽 조건: 받을 대상(여럿이면 하나하나) 가운데 참인 것만 이 줄을 받는다(사용자 = 받는 쪽). 시너지 "기사만 +20" · "모든 적 −20"
+        // (받을 대상 = 모든 유닛 units[], 조건 = 사용자 필드 검사 tags에 knight · team이 적). 비우면 받을 대상 모두. 조건 붙이기는 AI(구조), 줄 추가는 개발자(값).
+#if UNITY_2020_1_OR_NEWER
+        [UnityEngine.SerializeReference]
+#endif
+        [FieldLabel("받는 쪽 조건(참인 대상만 받음 — 비우면 모두)"), TriggerSlot(TriggerKinds.Condition)] public Trigger receiverWhen;
 
         // 그 레벨의 값: 레벨별 값이 있으면 그 칸(넘치면 마지막), 아니면 값(레벨마다면 × 레벨).
         public double At(int level)
@@ -203,6 +210,7 @@ namespace GBible
         // 보정 한 줄이 target에 주는 값(받는 쪽이 아니거나 조건이 거짓이면 null).
         double? ValueOnTarget(PassiveDefinition definition, PassiveModifier m, object target, string targetId)
         {
+            if (m.receiverWhen != null && !ReceiverHolds(definition, m, target ?? (string.IsNullOrEmpty(targetId) ? null : _session.Game.Find(targetId)))) return null;
             var path = string.IsNullOrEmpty(m.target) ? definition.ModifierTarget : m.target;
             // 받는 쪽 = 경로의 객체(정해져 있으면, 가진 쪽 전부가 그 객체에 보탠다 — party[]처럼 []면 그 모두가 받는다) 또는 가진 쪽 자신.
             var toPath = !string.IsNullOrEmpty(path);
@@ -225,6 +233,16 @@ namespace GBible
                 case PassiveStacking.Highest: return m.At(levels.Max());
                 default: return m.At(levels.Sum());
             }
+        }
+
+        // 받는 쪽 조건(보정 줄마다): 받는 쪽을 사용자로 검사한다(조건이 다시 이 스탯을 읽으면 그동안은 거짓 — 고리 막기).
+        bool ReceiverHolds(PassiveDefinition definition, PassiveModifier m, object receiver)
+        {
+            if (receiver == null) return false;
+            var key = (definition.Id + "#receiver", receiver);
+            if (!_checking.Add(key)) return false;
+            try { return _session.Triggers.Test(m.receiverWhen, new TriggerContext { Session = _session, Owner = definition.Id, User = receiver, Picked = new[] { receiver } }); }
+            finally { _checking.Remove(key); }
         }
 
         bool ModifierConditionHolds(PassiveDefinition definition, object holder)

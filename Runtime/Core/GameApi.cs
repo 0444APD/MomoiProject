@@ -42,25 +42,27 @@ namespace GBible
         public ActionRecord Do(GameAction action) => Session.Do(action);
 
         // 쓰기 직전에 의도 '사용'(UseIntent)을 거친다 — 가로채기가 횟수를 바꾸거나(두 번 발동) 막는다.
-        // 액티브 효과(DB › 액티브 효과)를 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열).
+        // 액티브 효과(DB › 액티브 효과)를 쓴다. 사용자·대상은 id 필드가 있는 객체(또는 id 문자열), 대상에는 격자 칸(Cell)도 된다(돌진 · 조명탄).
         public ActionRecord Use(string ability, object user, params object[] targets) =>
-            Session.Do(new UseAbility
+            Session.Do(UseAction(ability, user, targets, quiet: false));
+
+        static UseAbility UseAction(string ability, object user, object[] targets, bool quiet)
+        {
+            var all = targets ?? Array.Empty<object>();
+            return new UseAbility
             {
-                ability = ability,
+                ability = ability, quiet = quiet,
                 user = user as string ?? IdOf(user),
-                targets = (targets ?? Array.Empty<object>()).Select(t => t as string ?? IdOf(t)).ToList(),
-            });
+                targets = all.Where(t => !(t is Cell)).Select(t => t as string ?? IdOf(t)).ToList(),
+                cells = all.OfType<Cell>().ToList(),
+            };
+        }
 
         // 쓸 수 있으면 쓰고 참, 사용 조건이 안 맞으면 아무것도 하지 않고 거짓(실패를 던지지 않는다).
         // 조커·참·보드 유닛을 차례로 돌며 "되는 것만 발동"할 때. 조건을 한 번만 검사한다(확률 조건도 한 번 굴린다).
         public bool TryUse(string ability, object user, params object[] targets)
         {
-            var action = new UseAbility
-            {
-                ability = ability, quiet = true,
-                user = user as string ?? IdOf(user),
-                targets = (targets ?? Array.Empty<object>()).Select(t => t as string ?? IdOf(t)).ToList(),
-            };
+            var action = UseAction(ability, user, targets, quiet: true);
             Session.Do(action);
             return action.used;
         }

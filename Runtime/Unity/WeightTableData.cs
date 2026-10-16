@@ -118,7 +118,7 @@ namespace GBible.Data
         [InspectorName("플레이어 데이터 목록")] List,
     }
 
-    [Serializable]
+    [Serializable, DataRow]
     public sealed class WeightTableEntry
     {
         [FieldLabel("줄 종류"), Tooltip("항목 하나: DB 항목 하나. 플레이어 데이터 목록: 판에서 만들어진 목록의 요소마다 후보(무게·개수·조건은 요소마다 같다)")]

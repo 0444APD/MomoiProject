@@ -153,6 +153,30 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 보정_대상_경로는_필드로_고르고_받는_쪽_조건이_맞는_대상만_받는다()
+        {
+            // 경로 [필드=값]: id가 아니라 필드로 여럿을 고른다(원본별 보정 — 같은 원본의 건물 모두).
+            var lens = new PassiveDefinition { Id = "lens", OwnerKey = "run", OwnerPath = "relics", ModifierTarget = "board[hp=10]" };
+            lens.Modifiers.Add(new PassiveModifier { attribute = "attack", value = 5 });
+            _session.Passives.Define(lens);
+            Do(g => { g.Get<GpRun>("run").relics["lens"] = 1; g.Get<GpRun>("run").board[2].hp = 7; });
+            Assert.AreEqual(2 + 5, Game.Attribute("a", "attack"), "hp 10인 a는 받는다");
+            Assert.AreEqual(2, Game.Attribute("b", "attack"), "hp 7인 b는 경로에 걸리지 않는다");
+
+            // 받는 쪽 조건: 받을 대상(적 모두) 가운데 조건이 참인 것만 받는다(시너지 '기사만').
+            var curse = new PassiveDefinition { Id = "curse", OwnerKey = "run", OwnerPath = "relics", ModifierTarget = "enemies[]" };
+            curse.Modifiers.Add(new PassiveModifier
+            {
+                attribute = "attack", value = -1,
+                receiverWhen = new ConditionTrigger { condition = new UserFieldCondition { path = "hp", op = FieldOp.AtLeast, value = "10" } },
+            });
+            _session.Passives.Define(curse);
+            Do(g => { g.Get<GpRun>("run").relics["curse"] = 1; g.Get<GpRun>("run").enemies[2].hp = 4; });
+            Assert.AreEqual(2 - 1, Game.Attribute("e1", "attack"), "hp 10 — 조건 참");
+            Assert.AreEqual(2, Game.Attribute("e2", "attack"), "hp 4 — 조건 거짓이라 받지 않는다");
+        }
+
+        [Test]
         public void 가진_동안_스탯_보정은_가질_때만_붙고_레벨마다_커진다()
         {
             var amulet = new PassiveDefinition { Id = "amulet", OwnerKey = "run", OwnerPath = "relics", ModifierTarget = "hero" };

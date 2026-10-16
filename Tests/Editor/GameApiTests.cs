@@ -15,6 +15,11 @@ namespace GBible.Tests
 
         [BindTo("fn.use")]
         static void Use(TriggerContext c) => User = c.User;
+
+        public static List<object> Picked;
+
+        [BindTo("fn.dash")]
+        static void Dash(TriggerContext c) => Picked = c.Picked.ToList();
     }
 
     public static class TbRules
@@ -286,6 +291,15 @@ namespace GBible.Tests
             Assert.IsTrue(_session.Undo(), "액티브 효과 사용 전체가 행동 하나");
             Assert.AreEqual(30, Hp("orc1"));
             Assert.AreEqual(30, Hp("orc2"));
+        }
+
+        [Test]
+        public void 칸도_액티브_효과의_대상으로_받는다()
+        {
+            _session.Abilities.Define(new AbilityDefinition { Id = "fn.dash" });
+            Game.Use("fn.dash", "hero", Game.Find("hero"), new Cell(2, 3));
+            Assert.AreSame(Game.Find("hero"), TbBoundUse.Picked[0], "개체 대상이 먼저");
+            Assert.AreEqual(new Cell(2, 3), TbBoundUse.Picked[1], "칸은 Cell 값으로");
         }
 
         [Test]

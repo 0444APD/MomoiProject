@@ -134,6 +134,9 @@ namespace GBible
             public bool Many;
             // name[키]: 딕셔너리의 그 키 · 목록에서 id가 그 키인 요소(없으면 null).
             public string Select;
+            // name[필드=값]: 목록 · 딕셔너리 값에서 그 필드가 그 값인 요소 모두(원본 ID로 고르기 — buildings[template=lens]).
+            public string FilterField;
+            public string FilterValue;
         }
 
         static readonly Dictionary<string, Step[]> Parsed = new Dictionary<string, Step[]>(StringComparer.Ordinal);
@@ -153,7 +156,18 @@ namespace GBible
         {
             if (raw.EndsWith(Each, StringComparison.Ordinal)) return new Step { Name = raw.Substring(0, raw.Length - Each.Length), Many = true };
             var open = raw.IndexOf('[');
-            if (open >= 0 && raw.EndsWith("]", StringComparison.Ordinal)) return new Step { Name = raw.Substring(0, open), Select = raw.Substring(open + 1, raw.Length - open - 2) };
+            if (open >= 0 && raw.EndsWith("]", StringComparison.Ordinal))
+            {
+                var select = raw.Substring(open + 1, raw.Length - open - 2);
+                var step = new Step { Name = raw.Substring(0, open), Select = select };
+                var equal = select.IndexOf('=');
+                if (equal > 0)
+                {
+                    step.FilterField = select.Substring(0, equal).Trim();
+                    step.FilterValue = select.Substring(equal + 1).Trim();
+                }
+                return step;
+            }
             return new Step { Name = raw };
         }
 
@@ -193,7 +207,7 @@ namespace GBible
         {
             if (parent == null || string.IsNullOrEmpty(last)) return false;
             var step = ToStep(last);
-            if (step.Many) return false;
+            if (step.Many || step.FilterField != null) return false;   // 여럿을 고르는 마디에는 쓰지 않는다
             if (step.Select == null)
             {
                 var access = FieldAccess.Find(parent.GetType(), step.Name);
@@ -268,7 +282,12 @@ namespace GBible
                 {
                     var value = step.Name.Length == 0 ? node : Read(node, step.Name);
                     if (value == null) continue;
-                    if (step.Select != null)
+                    if (step.FilterField != null)
+                    {
+                        foreach (var item in Items(value))
+                            if (Matches(item, step.FilterField, step.FilterValue)) next.Add(item);
+                    }
+                    else if (step.Select != null)
                     {
                         var picked = Pick(value, step.Select);
                         if (picked != null) next.Add(picked);
@@ -282,6 +301,14 @@ namespace GBible
         }
 
         public static object Read(object target, string name) => FieldAccess.Read(target, name);
+
+        // [필드=값] 고르기: 요소의 그 필드 글자가 값과 같은가(enum은 이름, 숫자는 그 글자).
+        static bool Matches(object item, string field, string value)
+        {
+            if (item == null || item is string) return false;
+            var read = FieldAccess.Read(item, field);
+            return read != null && string.Equals(Convert.ToString(read, CultureInfo.InvariantCulture), value, StringComparison.Ordinal);
+        }
 
         static void AddItems(object collection, List<object> into)
         {

@@ -55,6 +55,12 @@ namespace GBible.EditorTools
         {
             if (type == null) return false;
             if (StructuralCache.TryGetValue(type, out var known)) return known;
+            // 데이터 줄([DataRow] — 가중치 표의 후보 줄)은 Block 칸을 품어도 줄 추가 · 삭제가 열려 있다(안의 Block 칸은 잠긴 채).
+            if (type.IsDefined(typeof(DataRowAttribute), false))
+            {
+                StructuralCache[type] = false;
+                return false;
+            }
             var result = typeof(Trigger).IsAssignableFrom(type) || typeof(Condition).IsAssignableFrom(type) || typeof(Outcome).IsAssignableFrom(type)
                 || typeof(Effect).IsAssignableFrom(type) || typeof(TargetSelector).IsAssignableFrom(type) || typeof(ValueFilter).IsAssignableFrom(type)
                 || typeof(TriggerRule).IsAssignableFrom(type) || typeof(StatRule).IsAssignableFrom(type)
