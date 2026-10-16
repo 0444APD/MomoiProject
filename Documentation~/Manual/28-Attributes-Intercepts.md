@@ -141,7 +141,9 @@
 
 없는 플레이어 데이터·없는 필드·숫자가 아닌 필드는 "모자랍니다"가 아니라 프로그래머 실수(`InvalidOperationException`)다.
 
-경로(필드 경로, 11장 3-1)로 낼 곳은 **숫자 하나**다.
+경로(필드 경로, 11장 3-1)로 낼 곳은 **숫자 하나**다(기본 숫자 형식 또는 `BigNumber`).
+
+**큰 수 비용**(방치형): 낼 곳이 `BigNumber` 필드이거나 양이 `BigNumber`면(`Game.Pay(…, BigNumber 양)`) 큰 수로 계산한다 — 1e308을 넘어도 된다. 할인·두 배 같은 비용 기믹은 `CostIntent.multiplier`(곱할 배율, 기본 1 — 할인 0.8 · 두 배 2)를 고친다. `amount`는 double이라 1e308을 넘으면 무한대이므로 큰 수 비용에서는 `amount` 대신 `multiplier`로 고친다. 큰 수 양을 직접 바꿀 때만 `big`. 실패 글의 값도 큰 수 표기(`1.23K`·`1.5e400`)다.
 
 - 딕셔너리의 키 하나: `stock[gold]` = `stock`(`Dictionary<string, int>`)의 `gold` 키. 재화·재료를 딕셔너리 하나에 모아 두는 게임이 그대로 쓴다. 없는 키는 0으로 보므로 양이 0보다 크면 "모자랍니다"로 실패한다(프로그래머 실수가 아니다).
 - 목록에서 id로 고른 요소의 필드: `units[hero].mana`.
@@ -504,7 +506,8 @@ Game.Pay("party", "stock[gold]", 100, what: "gold.name"); // 딕셔너리의 키
 | `void Pay(string key, string path, double amount, string what = null, string forId = null, object user = null)` | 2-4의 순서로 낸다. 낸 뒤 값이 하한(`floor`)보다 작으면 `GameFailure`(`FailureKeys.NotEnough`). 메시지의 앞부분 `{what}`은 `what`(텍스트 키면 번역된 글, 글자면 그대로). 비우면 플레이어 데이터의 이름 › 필드("전투 › energy이(가) 모자랍니다(1 / 2)."). `forId`·`user`(객체 또는 id)는 행동 직전 이벤트의 `forId`·`userId`가 된다 |
 | `bool TryPay(string key, string path, double amount, string forId = null, object user = null)` | 같은 순서로 내되, 모자라면 아무것도 내지 않고 `false`(실패를 던지지 않는다). 냈거나 행동 직전 이벤트가 공짜로 만들었으면 `true` |
 | `bool CanPay(string key, string path, double amount)` | 지금 값 ≥ 양. 행동 직전 이벤트를 거치지 않는다(비용 0·빚 하한을 모른다) |
-| `CostIntent` | 기본 제공 행동 직전 이벤트 "비용 지불": `key`·`path`·`amount`·`floor`·`forId`·`userId`·`cancelled`(4-14) |
+| `Pay` · `TryPay` · `CanPay`의 `BigNumber amount` 판 | 큰 수 비용(2-4). 낼 곳은 `BigNumber` 필드든 숫자 필드든 된다 |
+| `CostIntent` | 기본 제공 행동 직전 이벤트 "비용 지불": `key`·`path`·`amount`·`multiplier`(곱할 배율, 기본 1)·`big`(큰 수 양)·`floor`·`forId`·`userId`·`cancelled`(4-14) |
 | `PayOutcome` | 결과 '비용 내기'(`key`·`path`·`amount`·`what`). `Run`이 `Game.Pay`를 부른다(`forId` = 이 결과를 가진 항목, `user` = 사용자) |
 
 - `path`를 비우면 값 전체(숫자 플레이어 데이터)를 낸다.

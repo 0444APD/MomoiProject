@@ -66,6 +66,7 @@
 - **마지막으로 쓴 슬롯을 기억한다.** `UseSlot`이 설정 파일(원시 값 `momoi.slot`, 2-3)에 남기고, 다음에 게임을 켜면 그 슬롯으로 시작한다. 처음 켤 때는 기본 슬롯이다.
 - **플레이 시간**은 실제 시간이다(일시정지·배속과 상관없이 흐른다). 세션이 있는 동안 쌓이고 `slot.json`에 저장된다. 슬롯을 바꾸면 그 슬롯에 저장된 값부터 이어 센다.
 - `SavePath`·`RunSavePath`·`HasSavedRun`·`SaveProfile`·`SaveRun`·`LoadRun`·`NewRun`(06장)은 모두 **지금 슬롯**의 파일을 쓴다.
+- **프로필 하나 + 판 N칸**: DB › 시작 파일 › Bootstrap의 '세이브 슬롯이 프로필을 함께 씀'(`slotsShareProfile`)을 켜면 프로필은 기본 슬롯 자리(`MomoiProject/profile.json`) 하나를 모든 슬롯이 함께 쓰고, 슬롯마다는 판(`run.json`)과 요약(`slot.json`)만 따로다 — 판이 끝나도 남는 것(앨범·해금·본 엔딩)이 칸을 넘어 함께인 게임. 그때 `DeleteSlot`·`CopySlot`은 프로필을 지우거나 덮지 않고, `SlotInfo.HasProfile`은 거짓이다. 기본 세이브 화면·요약·플레이 시간은 그대로다. 테스트 씬(`TestScene`)의 따로 슬롯은 프로필도 따로 쓴다(`UseSlot(슬롯, ownProfile: true)` — 시험이 플레이어의 프로필을 건드리지 않게).
 
 ### 2-2. 슬롯 바꾸기 · 지우기 · 복사
 
@@ -188,7 +189,8 @@ GBibleRuntime.UseSlot("2");                                   // 지금 슬롯�
 | 멤버 | 뜻 |
 |---|---|
 | `string Slot` | 지금 슬롯 이름(기본 `""`) |
-| `void UseSlot(string slot)` | 슬롯을 바꾼다(2-2). `null`이면 기본 슬롯 |
+| `void UseSlot(string slot, bool remember = true, bool ownProfile = false)` | 슬롯을 바꾼다(2-2). `null`이면 기본 슬롯. `remember`: 다음에 켤 때 이 슬롯으로. `ownProfile`: 프로필을 함께 쓰는 설정이어도 이 슬롯의 프로필을 따로(테스트 슬롯) |
+| `bool SharesProfile` | 지금 슬롯이 함께 쓰는 프로필을 쓰나(2-1 '프로필 하나 + 판 N칸') |
 | `SlotInfo SlotInfoOf(string slot)` | 그 슬롯의 요약. 저장이 없으면 `IsEmpty`가 참 |
 | `IReadOnlyList<SlotInfo> Slots()` | 저장이 있는 슬롯들(기본 슬롯 제외, 이름순). `slots/` 안의 폴더 중 슬롯 이름으로 쓸 수 없는 것(플레이어가 탐색기로 만든 "1 - 복사본" 등)은 건너뛴다 |
 | `void DeleteSlot(string slot)` | 그 슬롯의 저장을 지운다(2-2) |

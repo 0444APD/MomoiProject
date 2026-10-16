@@ -79,9 +79,10 @@ void OnClickById()                          => Game.Use("fireball", "hero", "orc
 |---|---|
 | `ability` | 액티브 효과 ID 또는 사용 기능이 붙은 인스턴스 ID |
 | `user` | 사용자 객체 또는 id 문자열. 객체면 `id` 필드가 있어야 한다 |
-| `targets` (`params object[]`) | 고른 대상들(객체 또는 id 문자열) |
+| `targets` (`params object[]`) | 고른 대상들(객체 또는 id 문자열). 격자 칸 `Cell`(36장)도 된다 — 돌진할 칸·조명탄을 던질 칸 |
 
 - 돌려주는 값은 행동 기록(`ActionRecord`)이다.
+- **칸 대상**: `Game.Use("dash", hero, new Cell(2, 3))`. 칸은 id가 없으므로 고른 대상(`Picked`)의 개체들 **뒤에** `Cell` 값으로 들어간다. 기본 효과 Block(`Effect<T>`)은 개체만 받으므로, 칸을 읽는 효과는 프로젝트 결과 Block·`[BindTo]`에서 `c.Picked.OfType<Cell>()`로 읽는다. 이벤트 `AbilityUsed`의 대상 id에는 `"x,y"`로 남는다.
 - 내부에서 `UseAbility` 행동 하나를 `Game.Do`한다. 다른 행동 안에서 부르면 그 행동의 일부로 그 자리에서 실행된다(Undo 한 단위 = 바깥 행동).
 - 실패하면 예외를 던지고 **아무것도 바뀌지 않는다**:
   - 없는 ID: `InvalidOperationException` "[MomoiProject] 액티브 효과 '…'이(가) 없습니다."(프로그래머 실수)
