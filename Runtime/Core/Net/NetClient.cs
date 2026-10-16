@@ -405,6 +405,23 @@ namespace GBible
             _transport.Send(w.Data, w.Length);
         }
 
+        // 매칭큐: 로비에서 내 계정 방을 연다(1인 서버 세션 — 상점 · 덱 편성 · 컬렉션처럼 매치 밖에서 서버 데이터를 바꾸는 화면).
+        // 들어가면 매치처럼 Joined(행동은 그 방 서버가 검사 · 실행 · 계정에 씀). 나올 때는 LeaveRoom → 로비.
+        public void OpenAccountRoom()
+        {
+            if (State != NetClientState.Lobby) return;
+            var w = NetProtocol.Begin(NetMessage.AccountRoom);
+            _transport.Send(w.Data, w.Length);
+        }
+
+        // 계정 방에서 나온다(매치 방에서는 아무 일도 없다 — 매치는 서버가 끝낸다).
+        public void LeaveRoom()
+        {
+            if (State != NetClientState.Joined && State != NetClientState.Joining) return;
+            var w = NetProtocol.Begin(NetMessage.LeaveRoom);
+            _transport.Send(w.Data, w.Length);
+        }
+
         public void CancelQueue()
         {
             if (State != NetClientState.Queued) return;

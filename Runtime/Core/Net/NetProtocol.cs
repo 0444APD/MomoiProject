@@ -36,6 +36,9 @@ namespace GBible
         MatchCancelled = 18,
         MatchEnded = 19,
         CancelQueue = 20,
+        // 매칭큐: 로비에서 내 계정 방(1인 — 상점 · 덱 편성)을 연다 / 계정 방에서 나온다.
+        AccountRoom = 21,
+        LeaveRoom = 22,
     }
 
     // Batch 안의 기록 종류.
@@ -52,7 +55,7 @@ namespace GBible
     public static class NetProtocol
     {
         // 메시지 규격 버전. 바뀌면 서로 다른 버전은 Hello에서 거절한다.
-        public const int Version = 2;   // 2: Hello에 기기(Device)
+        public const int Version = 3;   // 2: Hello에 기기(Device) · 3: 계정 방(AccountRoom · LeaveRoom)
 
         // ── 덩어리(길이 + 바이트) ──────────────────────────────
 

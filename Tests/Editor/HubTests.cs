@@ -630,6 +630,36 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 로비에서_계정_방을_열어_서버_데이터를_바꾸고_나오면_로비로_돌아간다()
+        {
+            using (var rig = new Rig(makeSession: WalletSession))
+            {
+                var saved = new NetAccount { id = "name:철수", name = "철수" };
+                saved.values["wallet"] = "{\"gems\":7}";
+                rig.Store.Save(saved);
+                var a = rig.Connect("철수");
+                a.OpenAccountRoom();
+                rig.Pump();
+                Assert.IsTrue(a.IsJoined, "계정 방에 들어갔다");
+                var room = rig.Hub.Rooms.Single();
+                Assert.AreEqual(NetHub.AccountMode, room.Mode);
+                Assert.AreEqual(7, room.Session.Data.Get<HbWallet>("wallet:1").gems, "계정에서 읽었다");
+
+                room.Session.Do(new HbEarn { actorId = 1, gems = 3 });
+                Assert.AreEqual(10, WalletOf(rig.Store.Load("name:철수")).gems, "행동마다 계정에 바로 쓴다");
+
+                a.LeaveRoom();
+                rig.Pump();
+                Assert.AreEqual(NetClientState.Lobby, a.State, "나오면 로비로");
+                Assert.AreEqual(0, rig.Hub.Rooms.Count, "방은 닫힌다");
+                Assert.AreEqual(10, WalletOf(rig.Store.Load("name:철수")).gems);
+                a.Queue();
+                rig.Pump();
+                Assert.AreEqual(NetClientState.Queued, a.State, "다시 줄을 설 수 있다");
+            }
+        }
+
+        [Test]
         public void 방을_열_때_계정_값을_읽지_못한_계정은_매치가_끝나도_계정_값을_덮어쓰지_않는다()
         {
             using (var rig = new Rig(makeSession: WalletSession))

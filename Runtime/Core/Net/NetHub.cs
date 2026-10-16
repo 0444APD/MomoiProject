@@ -61,6 +61,11 @@ namespace GBible
     //            정원이 다 들어와야 RoomReady · 계정·점수는 서버 저장소에만.
     public sealed class NetHub : IDisposable
     {
+        // 계정 방의 종류(room.Mode): 로비에서 연 1인 방 — 매치 밖에서 서버 데이터를 바꾸는 자리(상점 · 덱 편성 · 컬렉션).
+        // 방의 행동 · 서버 검사(Validate) · 계정 값 읽기를 그대로 쓰고, 행동마다 계정에 쓴다(나오거나 끊기면 닫는다 — 이어 열지 않는다).
+        // RoomStarting · RoomReady에서 room.Mode == NetHub.AccountMode면 매치를 시작하지 않고 그 화면에 맞는 서버 규칙(상점 목록 갱신 등)을 건다.
+        public const string AccountMode = "$account";
+
         enum LobbyState
         {
             Authenticating,
@@ -201,6 +206,12 @@ namespace GBible
                     who.LastHeard = Now;
                     if (who.State == LobbyState.InRoom && who.Room?.Transport != null)
                     {
+                        // 계정 방에서 나오기: 방을 닫고(계정에 쓰고) 로비로. 매치 방에서는 무시한다(매치는 EndMatch로만 끝난다).
+                        if (NetProtocol.KindOf(e.Data, e.Length) == NetMessage.LeaveRoom)
+                        {
+                            if (who.Room.Mode == AccountMode) EndMatch(who.Room, null);
+                            return;
+                        }
                         who.Room.Transport.Enqueue(e);
                         return;
                     }
@@ -270,6 +281,9 @@ namespace GBible
                     Send(who.Connection, NetMessage.Queued, w => w.Str(mode ?? ""));
                     break;
                 }
+                case NetMessage.AccountRoom when who.State == LobbyState.Lobby:
+                    OpenAccountRoom(who);
+                    break;
                 case NetMessage.CancelQueue when who.State == LobbyState.Queued:
                     _matchmaker.Cancel(who.Account.id);
                     who.State = LobbyState.Lobby;
@@ -359,6 +373,8 @@ namespace GBible
                     break;
                 case LobbyState.InRoom:
                     who.Room?.Transport?.Enqueue(new NetEvent { Kind = NetEventKind.Disconnected, Connection = connection, Reason = reason });
+                    // 계정 방은 끊기면 닫는다(계정에 쓴다 — 다시 접속하면 로비부터).
+                    if (who.Room?.Mode == AccountMode) EndMatch(who.Room, null);
                     break;
             }
         }
@@ -439,6 +455,45 @@ namespace GBible
             }
         }
 
+        // 로비에서 계정 방을 연다(정원 1 · 수락 없음).
+        void OpenAccountRoom(Lobbyist who)
+        {
+            var room = new NetRoom { MatchId = "account-" + Guid.NewGuid().ToString("N").Substring(0, 12), Mode = AccountMode, CreatedAt = Now };
+            room.Accounts.Add(who.Account.id);
+            if (!OpenRoom(room, new List<(string account, string name)> { (who.Account.id, who.Account.name) }, null))
+            {
+                Send(who.Connection, NetMessage.MatchCancelled, w =>
+                {
+                    w.Str("계정 방을 열지 못했습니다(서버 오류).");
+                    w.Bool(false);
+                });
+                return;
+            }
+            EnterRoom(who, room);
+        }
+
+        // 계정 방: 행동마다 그 사람 계정에 바로 쓴다(서버가 꺼져도 산 것 · 바꾼 덱이 남게).
+        void WriteRoomAccounts(NetRoom room)
+        {
+            if (_store == null || room.Session == null) return;
+            foreach (var player in room.Server.Players)
+            {
+                if (string.IsNullOrEmpty(player.Account)) continue;
+                try
+                {
+                    var account = _store.Load(player.Account) ?? new NetAccount { id = player.Account, name = player.Name };
+                    WriteAccountValues(room, player, account);
+                    _store.Save(account);
+                    var holder = _lobby.Values.FirstOrDefault(l => l.Account?.id == account.id);
+                    if (holder != null) holder.Account = account;
+                }
+                catch (Exception e)
+                {
+                    Say($"계정 방 {room.MatchId}: 계정 {player.Account}의 계정 값을 저장하지 못했습니다: {e.Message}");
+                }
+            }
+        }
+
         // 방을 연다. savedRun이 있으면 그 판으로(서버를 다시 켰을 때 이어 하기).
         // savedAccounts: 이어 열 때 저장해 둔 계정 값(플레이어 번호 → 키 → JSON). 없으면 계정 저장소에서 읽는다.
         bool OpenRoom(NetRoom room, List<(string account, string name)> players, string savedRun, Dictionary<string, object> savedAccounts = null)
@@ -471,7 +526,13 @@ namespace GBible
             if (savedRun != null && savedAccounts != null) RestoreAccounts(room, savedAccounts);
             room.Server.Start();
             _rooms.Add(room);
-            if (Options.SaveMatchEachAction && _store != null)
+            if (room.Mode == AccountMode && _store != null)
+                session.Actions.Executed += record =>
+                {
+                    if (record.Nested || record.Status != ActionStatus.Done || room.Ended) return;
+                    WriteRoomAccounts(room);
+                };
+            else if (Options.SaveMatchEachAction && _store != null)
                 session.Actions.Executed += record =>
                 {
                     if (record.Nested || record.Status != ActionStatus.Done || room.Ended) return;
@@ -725,7 +786,8 @@ namespace GBible
 
         void SaveRoom(NetRoom room)
         {
-            if (_store == null || room.Server == null) return;
+            // 계정 방은 이어 열지 않는다(행동마다 계정에 바로 쓴다).
+            if (_store == null || room.Server == null || room.Mode == AccountMode) return;
             room.SaveDirty = false;
             room.LastSaved = Now;
             try
