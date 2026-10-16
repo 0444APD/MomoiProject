@@ -70,9 +70,10 @@
 | `$schedule`(예약) · `$rewind`(Undo 지점) | `Server` |
 
 - 정하기: `session.Data.SetVisibility("hand:2", DataVisibility.Owner, owner: 2)`. 공개 범위는 **키 단위**다. 숨기는 길은 둘이다.
-- **플레이어마다 데이터**(사람마다 따로인 것 — 핸드·편성·지갑): DB › 플레이어 데이터의 '플레이어마다'(`perPlayer`)를 켜면 실제 키가 `hand:1`·`hand:2` …로 나뉜다. '그 사람에게만 보임'(`ownerOnly`)을 켜면 그 사람에게만 간다(Owner).
-  - 게임 코드·DB Block은 **`hand` 그대로** 읽고 쓴다: 행동 안이면 그 행동을 한 플레이어(`actorId`)의 몫, 행동 밖이면 이 화면의 플레이어(`LocalPlayer`)의 몫이다. 특정 플레이어의 몫은 `PlayerDataStore.KeyFor("hand", 2)`(= `"hand:2"`), 모든 몫은 `session.Data.KeysOfAllPlayers("hand")`(번호순).
-  - 몫은 플레이어가 들어올 때 생긴다: 혼자 하기는 시작할 때 0번 하나, 서버는 들어오는 사람마다(방장 포함). 혼자 하기 세션이 방이 되면(방장·화면 없는 서버) 0번 몫은 지운다.
+- **플레이어마다 데이터**(사람마다 따로인 것 — 핸드·편성·지갑): DB › 플레이어 데이터의 '플레이어마다'(`perPlayer`)를 켜면 실제 키가 `hand:1`·`hand:2` …로 나뉜다. '그 사람에게만 보임'(`ownerOnly`)을 켜면 그 사람에게만 간다(Owner). **판(Session) 구역만 된다** — 프로필은 기기마다 하나라 각자 자기 프로필을 쓰고, 매치가 끝나도 남길 값은 '매칭 계정에 남김'(1-6).
+  - 게임 코드·DB Block은 **`hand` 그대로** 읽고 쓴다: 행동 안이면 그 행동을 한 플레이어(`actorId`)의 몫, 행동 밖이면 이 화면의 플레이어(`LocalPlayer`)의 몫이다. 서버 검사(`Validate`) 안에서는 보낸 사람의 몫, 패시브 효과의 결과는 그 가진 쪽 플레이어의 몫이다(남의 유물이 발동해도 금화는 그 주인에게). 잠시 다른 플레이어로 읽으려면 `using (session.ActingAs(2)) { … }`. 특정 플레이어의 몫은 `PlayerDataStore.KeyFor("hand", 2)`(= `"hand:2"`), 모든 몫은 `session.Data.KeysOfAllPlayers("hand")`(번호순).
+  - 몫은 플레이어가 들어올 때 생긴다: 혼자 하기는 시작할 때 0번 하나, 서버는 들어오는 사람마다. 혼자 하기 세션이 방장이 되면 방장이 0번 몫을 이어받고(방장 번호의 몫으로 옮김), 방을 닫으면 다시 0번으로 돌아온다(남의 몫은 지운다). 화면 없는 서버는 첫 사람이 들어올 때 0번 몫을 지운다. 혼자 하기 녹화는 몫을 건드리지 않는다.
+  - 행동 밖에서 도는 규칙(조건 충족 트리거·도전과제·상태 효과 주기·예약)은 이 화면의 플레이어 몫을 본다. 서버에서 플레이어마다 조건이 필요하면 이벤트 트리거 + 가진 쪽 필드(17장)나 행동 안의 규칙으로.
   - 그래서 몫을 채우는 일(카드 나누기·처음 편성)은 모두 들어온 뒤에 한다 — 매칭큐는 `RoomReady`, 친구 방은 방장이 누르는 판 시작 행동이나 `server.PlayerJoined`(행동 밖이라 `server.Session.Do(행동)`). 시스템 행동·서버 쪽 코드는 지금 플레이어가 없으므로(0번) 몫을 적는다(`KeyFor`·`KeysOfAllPlayers`). 매칭 방의 새 판 행동처럼 들어오기 전에 도는 곳에서 `hand`를 쓰면 "플레이어마다 키 'hand'의 플레이어 0 몫이 아직 없습니다" 오류다.
   - 패시브 효과의 가진 목록이 플레이어마다 데이터(`army › relics`)면 모든 플레이어의 몫을 훑고, 가진 동안 스탯 보정은 **같은 몫 안의** 대상에게만 보탠다(남의 유물이 내 유닛에 붙지 않는다, 17장).
 - **객체 단위 공개(투영)** — 한 키 안의 일부만 숨길 때(안개 속 적 유닛·덮어 둔 카드): 서버 규칙 자리(`ServerStarted`·`RoomStarting`)에서 `server.Project<Board>("board", (player, all) => 그 사람에게 보일 모습)`.
@@ -122,11 +123,11 @@
 - `EndMatch`를 같은 방에 두 번 불러도 한 번만 반영한다(결과에 같은 사람이 두 번 들어와도 한 번만 센다).
 - `GameNet.StartMatchServer`가 만드는 방 세션은 Undo 이력과 바뀐 곳의 사람용 문장(기록·모니터용)을 만들지 않는다(`Data.RecordHistory`·`DescribeChanges`를 끔 — 서버 한 대가 방 수십 개를 돌린다). 되감기 기믹(1-4)은 이력이 아니라 지점 데이터를 쓰므로 그대로 된다.
 - 점수: Elo(K=32, 여럿이면 둘씩 짝지어 나눔). 같은 등수 = 무승부.
-- **계정 값**(재화·해금·로스터 — 매치가 끝나도 남는 그 사람의 값): DB › 플레이어 데이터에서 '플레이어마다' + '매칭 계정에 남김'(`onAccount`)을 켠다(구역은 판 `Session`이 보통이다).
+- **계정 값**(재화·해금·로스터 — 매치가 끝나도 남는 그 사람의 값): DB › 플레이어 데이터에서 '플레이어마다' + '매칭 계정에 남김'(`onAccount`)을 켠다(구역은 판 `Session`).
   - 방이 열릴 때 그 사람 계정(`NetAccount.values[ID]` = 그 몫의 저장 트리 JSON)에서 읽어 그 사람 몫에 넣는다(없으면 처음 값). 매치가 끝나면(`EndMatch` — 결과에 없는 사람도) 그 몫을 계정에 다시 쓴다.
   - 규칙은 다른 플레이어 데이터처럼 행동 안에서 읽고 쓴다. 클라이언트는 행동만 보내므로 값을 고칠 수 없다.
   - 매치 도중과 취소된 매치(정원이 다 오지 않음)는 계정에 쓰지 않는다. 서버를 다시 켜면 매치 저장에 든 값(그동안 바뀐 것)으로 이어 간다.
-  - 방을 열 때 계정 값을 읽지 못한 계정(저장소 오류·깨진 값)은 그 매치가 끝나도 계정 값을 쓰지 않는다(처음 값으로 덮어 잃지 않게 — 점수·전적은 반영한다).
+  - 방을 열 때(이어 열 때도) 계정 값을 읽지 못한 계정(저장소 오류·깨진 값·형식이 맞지 않는 값)은 그 매치가 끝나도 계정 값을 쓰지 않는다(처음 값으로 덮어 잃지 않게 — 점수·전적은 반영한다). 들일 때 요소 번호는 버리고 새 객체로 들인다(다른 계정의 객체와 섞이지 않게).
   - 매치 밖(로비)에서 계정 값을 바꾸는 길(상점·구매)은 아직 없다. 그런 게임이면 묻는다.
 
 | 창구 | 가짜(지금) | 진짜(출시, 계정 준비 뒤) |
@@ -286,7 +287,7 @@ hub.ResumeOpenMatches();
 | `NetHubOptions` | `AcceptSeconds` · `GameVersion` · `AllowDeveloperCommands` · `SaveMatchEachAction` · `MatchSaveSeconds` · `ReadySeconds` · `TimeoutSeconds` |
 | `session.Data.SetVisibility(키, 범위, 주인)` · `VisibilityOf` · `IsVisibleTo` | 공개 범위 |
 | `NetServer.Project(키, view)` · `Project<T>` · `HideStatuses(보이나)` | 객체 단위 공개(투영, 1-2) |
-| `session.Data.KeysOfAllPlayers(키)` · `PlayerDataStore.KeyFor(키, 번호)` · `IsPerPlayer` · `DefinePerPlayer(…, ownerOnly, account)` · `AddPlayer` · `RemovePlayer` · `AccountKeys` | 플레이어마다 데이터(1-2) · 계정 값(1-6). 정의·몫 만들기는 DB 칸과 서버가 하므로 보통 앞의 둘만 쓴다 |
+| `session.Data.KeysOfAllPlayers(키)` · `PlayerDataStore.KeyFor(키, 번호)` · `session.ActingAs(번호)` · `PlayerOfKey` · `IsPerPlayer` · `Resolve` · `DefinePerPlayer(…, ownerOnly, account)` · `AddPlayer` · `RemovePlayer` · `MovePlayer` · `AccountKeys` | 플레이어마다 데이터(1-2) · 계정 값(1-6). 정의·몫 만들기·옮기기는 DB 칸과 서버가 하므로 보통 앞의 셋만 쓴다 |
 | `Ghosts.Store` · `IGhostStore`(`Upload` · `Pick`) · `GhostRecord` · `FileGhostStore` | 고스트(1-13) |
 | `session.Role` · `IsClient` · `LocalPlayer` · `session.Actions.CurrentActor` | 역할·내 번호 · 지금 도는 바깥 행동의 `actorId`(행동 밖·시스템 행동이면 0) |
 | `Game.MarkRewind` · `Rewind` · `RewindKey` · `RewindEntity` · `RewindMarks` | 되감기 |
