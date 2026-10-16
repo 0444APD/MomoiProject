@@ -31,19 +31,30 @@ namespace GBible
         // 보일 이름(글 또는 텍스트 키). 비우면 보여 주는 쪽이 그때 언어로 Texts.NameOf(id)('<id>.name', 없으면 id)를 읽는다 —
         // 고르기를 요구한 순간의 번역을 넣어 두면 언어를 바꾼 뒤·불러온 뒤·다른 언어의 서버에서 그 언어로 굳는다.
         public string label;
+        // 설명(글 또는 텍스트 키 — 레벨마다 다른 설명은 'dagger.lv3.desc'처럼 키로). 비우면 보여 주는 쪽이 '<id>.desc'(있을 때만)를 읽는다.
+        public string detail;
 
         public ChoiceCandidate()
         {
         }
 
-        public ChoiceCandidate(string id, string label = null)
+        public ChoiceCandidate(string id, string label = null, string detail = null)
         {
             this.id = id;
             this.label = label;
+            this.detail = detail;
         }
 
         // 화면에 보일 글(지금 언어).
         public string DisplayText() => string.IsNullOrEmpty(label) ? Texts.NameOf(id ?? "") : Texts.Has(label) ? Texts.Get(label) : label;
+
+        // 화면에 보일 설명(지금 언어). 없으면 빈 글.
+        public string DetailText()
+        {
+            if (!string.IsNullOrEmpty(detail)) return Texts.Has(detail) ? Texts.Get(detail) : detail;
+            var key = (id ?? "") + ".desc";
+            return Texts.Has(key) ? Texts.Get(key) : "";
+        }
     }
 
     [Serializable]

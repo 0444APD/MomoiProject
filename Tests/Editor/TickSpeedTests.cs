@@ -20,6 +20,17 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void Advance는_틱_한도에_잘리지_않고_시간을_끝까지_흘린다()
+        {
+            var session = NewSession(30);
+            var ticks = 0;
+            session.Ticked += _ => ticks++;
+            session.Advance(1.0);   // EndFrame(1.0) 한 번이면 8틱에서 잘린다
+            Assert.AreEqual(30, ticks);
+            Assert.AreEqual(1.0, session.Clock.Time, 1e-6);
+        }
+
+        [Test]
         public void 배속을_알리지_않으면_한도는_그대로_8틱이다()
         {
             var session = NewSession(60);

@@ -310,6 +310,9 @@ namespace GBible
             session.Debug.Register("시간", "배속 0.25", () => GameTime.SetSpeed(0.25f));
             session.Debug.Register("시간", "배속 1", () => GameTime.SetSpeed(1f));
             session.Debug.Register("시간", "배속 2", () => GameTime.SetSpeed(2f));
+            session.Debug.Register("시간", "현실 시각 +1시간", () => TestClock.Shift(TimeSpan.FromHours(1)), "Game.Now를 한 시간 뒤로(꺼 둔 동안의 보상 · 시간 제한을 시험) — 플레이를 멈추면 돌아온다.");
+            session.Debug.Register("시간", "현실 시각 +1일", () => TestClock.Shift(TimeSpan.FromDays(1)), "Game.Now를 하루 뒤로(일일 초기화 · 날짜 넘김을 시험) — 플레이를 멈추면 돌아온다.");
+            session.Debug.Register("시간", "현실 시각 지금으로", TestClock.Reset, "옮긴 현실 시각을 되돌린다.");
 
             Session = session;
             // 숨기지 않는다: 하이어라키의 DontDestroyOnLoad 아래에서 보이는 편이 상태 확인에 낫다. 슬롯을 바꿔 다시 시작해도 하나만 둔다.
@@ -362,6 +365,12 @@ namespace GBible
                 foreach (var migration in database.All<SaveMigrationData>().OrderBy(m => m.version)) migration.Register(options.Migrations);
             var fromDatabase = (options.History, options.HistoryLimit, options.SnapshotInterval, options.SnapshotLimit, options.Seed);
             InvokeEach(Configuring, options);
+            // 개발 빌드·에디터: 테스트용 현실 시각 옮기기(TestClock — 개발 명령 '현실 시각 +1일' · 테스트 상황 불러오기)를 프로젝트의 시계 위에 얹는다.
+            if (Debug.isDebugBuild)
+            {
+                var clock = options.RealClock;
+                options.RealClock = () => (clock?.Invoke() ?? DateTime.UtcNow) + TestClock.Offset;
+            }
             var session = new GameSession(options);
             // 오류·경고를 콘솔에도 — 프로필을 불러올 때(저장 변환·읽기 실패)의 것도 보이게 불러오기 전에 붙인다.
             if (main) session.Journal.Appended += ForwardToConsole;
@@ -389,6 +398,8 @@ namespace GBible
                 foreach (var instance in database.All<InstanceData>())
                     if (!string.IsNullOrEmpty(instance.Id) && !instances.ContainsKey(instance.Id)) instances.Add(instance.Id, instance.value);
                 session.Instances = id => id != null && instances.TryGetValue(id, out var found) ? found : null;
+                var instanceIds = database.All<InstanceData>().Where(i => !string.IsNullOrEmpty(i.Id)).Select(i => i.Id).Distinct(StringComparer.Ordinal).ToList();
+                session.InstanceIds = () => instanceIds;
                 // DB 항목: ID → 항목(Game.Entry<T> — 규칙이 프로젝트 DB 종류의 칸을 읽는다). 같은 ID가 둘이면 먼저 것.
                 var entries = new System.Collections.Generic.Dictionary<string, object>(StringComparer.Ordinal);
                 foreach (var entry in database.Entries)

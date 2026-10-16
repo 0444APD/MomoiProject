@@ -52,5 +52,7 @@ namespace GBible
         public const string RewindTooFar = "momoi.fail.rewindTooFar";
         // 다른 플레이어에게 온 선택에 답하려 함(멀티플레이)
         public const string NotYourChoice = "momoi.fail.notYourChoice";
+        // {what}: 행동의 참조 필드가 가리키던 것(형식 이름) — 보낸 사이에 사라졌다(실시간 · 멀티: 같은 틱에 다른 판정이 먼저 처치 등)
+        public const string TargetGone = "momoi.fail.targetGone";
     }
 }

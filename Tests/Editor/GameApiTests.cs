@@ -218,12 +218,26 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void InstancesOf는_그_클래스의_원본만_정의한_차례로_준다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            session.DefineInstance("orc", new TbUnit { id = "orc", hp = 20 });
+            session.DefineInstance("board", new TbBoard());
+            session.DefineInstance("elf", new TbUnit { id = "elf", hp = 12 });
+            var units = session.Game.InstancesOf<TbUnit>().ToList();
+            CollectionAssert.AreEqual(new[] { "orc", "elf" }, units.Select(u => u.id).ToArray());
+            Assert.AreEqual(12, units[1].value.hp);
+            Assert.AreEqual(20, ((TbUnit)session.CopyInstance("orc")).hp);
+        }
+
+        [Test]
         public void 찾지_못한_참조는_행동_실패로_변경이_없다()
         {
+            // 보낸 사이에 사라진 대상(실시간 · 멀티의 엇갈림)은 플레이어용 실패 — 화면이 알림으로 보이고 콘솔 오류가 아니다.
             var hero = Game.Find<TbUnit>("hero");
             var x = hero.x;
-            var e = Assert.Throws<InvalidOperationException>(() => Game.Do(new TbMove { unit = new TbUnit { id = "nobody" }, x = 9 }));
-            StringAssert.Contains("nobody", e.Message);
+            var e = Assert.Throws<GameFailure>(() => Game.Do(new TbMove { unit = new TbUnit { id = "nobody" }, x = 9 }));
+            Assert.AreEqual(FailureKeys.TargetGone, e.Key);
             Assert.AreEqual(x, hero.x);
         }
 

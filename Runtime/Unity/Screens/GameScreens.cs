@@ -303,9 +303,10 @@ namespace GBible
             else Debug.LogWarning("[MomoiProject] " + message);
         }
 
-        // 기본 고르기 창의 '다시 뽑기' 버튼: 프로젝트가 정하면 '가중치 표에서 고르기'로 만든 선택에 버튼이 보인다.
-        //   행동이 비용·남은 횟수를 내고 Game.RerollChoice(choice.id)를 부른다. null을 돌려주면 버튼을 숨긴다(다시 뽑을 수 없음).
-        //   GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;
+        // 기본 고르기 창의 '다시 뽑기' 버튼: 프로젝트가 정하고 그 선택에 행동을 돌려주면 버튼이 보인다.
+        //   표로 만든 선택('가중치 표에서 고르기'): 행동이 비용·남은 횟수를 내고 Game.RerollChoice(choice.id)를 부른다. null을 돌려주면 버튼을 숨긴다(다시 뽑을 수 없음).
+        //   GameScreens.Reroll = choice => !string.IsNullOrEmpty(choice.table) && Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;
+        //   표로 만들지 않은 선택(코드 풀 — Game.Ask)도 행동을 돌려주면 버튼이 보인다: 그 행동이 Game.CancelChoice 뒤 새 후보로 다시 Game.Ask.
         public static Func<PendingChoice, GameAction> Reroll;
 
         // 화면 맨 위의 겹침 층(입력을 막지 않음): 피해 숫자처럼 화면 위에 잠깐 띄우는 연출 요소를 여기에 둔다.

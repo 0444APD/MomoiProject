@@ -366,8 +366,9 @@ namespace GBible
             var id = GameApi.IdOf(item);
             if (string.IsNullOrEmpty(id))
                 throw new InvalidOperationException($"[MomoiProject] 행동 '{action.GetType().Name}'의 '{field.Name}': id가 비어 있는 {item.GetType().Name}입니다. 데이터 안의 객체를 넣으세요(새 객체는 행동 안에서 만든다).");
+            // 지금 데이터에 없으면 플레이어용 실패(변경 없음) — 보낸 사이에 사라진 것(실시간 · 멀티의 엇갈림)이지 코드 실수가 아니다.
             return game.Find(field.ElementType, id)
-                ?? throw new InvalidOperationException($"[MomoiProject] {field.ElementType.Name} '{id}'을(를) 찾을 수 없습니다(행동 '{action.GetType().Name}'의 '{field.Name}').");
+                ?? throw game.Fail(FailureKeys.TargetGone, "대상이 이미 없습니다.", ("what", field.ElementType.Name));
         }
 
         static string SafeId(object item)

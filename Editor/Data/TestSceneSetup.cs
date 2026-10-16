@@ -26,13 +26,7 @@ namespace GBible.EditorTools
             }
             else
             {
-                // 저장하지 않은 새 씬이 열려 있으면 Unity가 새 씬을 덧붙여 만들지 못한다 — 까닭을 알린다(반영 스크립트면 기록되지 않아 다음 컴파일 뒤 다시 돈다).
-                var active = SceneManager.GetActiveScene();
-                if (string.IsNullOrEmpty(active.path) && active.isDirty)
-                    throw new System.InvalidOperationException("지금 열린 씬이 저장하지 않은 새 씬이라 테스트 씬을 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 '개발 › DB 반영 스크립트 모두 다시 돌리기') 다시 만듭니다.");
-                var fresh = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Additive);
-                EditorSceneManager.SaveScene(fresh, path);
-                EditorSceneManager.CloseScene(fresh, true);
+                NewEmptyScene(path, "테스트 씬");
             }
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
             if (!scene.GetRootGameObjects().Any(g => g.GetComponentInChildren<TestScene>(true) != null))
@@ -48,6 +42,21 @@ namespace GBible.EditorTools
             return true;
         }
 
+        // 빈 씬(카메라 · 빛)을 path에 만든다. 지금 열린 씬은 그대로 둔다(저장하지 않은 새 씬이 열려 있으면 그 자리에 만든다).
+        internal static void NewEmptyScene(string path, string what)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? "Assets");
+            var active = SceneManager.GetActiveScene();
+            var untitled = string.IsNullOrEmpty(active.path);
+            // 저장하지 않은 새 씬에 바뀐 것이 있으면 Unity가 새 씬을 덧붙이지 못한다 — 까닭을 알린다(반영 스크립트면 기록되지 않아 다음 컴파일 뒤 다시 돈다).
+            if (untitled && active.isDirty)
+                throw new System.InvalidOperationException($"지금 열린 씬이 저장하지 않은 새 씬이라 {what}을(를) 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 '개발 › DB 반영 스크립트 모두 다시 돌리기') 다시 만듭니다.");
+            // 빈 새 씬(바뀐 것 없음)이면 그 자리에 연다 — 저장하지 않은 씬 옆에는 덧붙일 수 없다.
+            var fresh = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, untitled ? NewSceneMode.Single : NewSceneMode.Additive);
+            EditorSceneManager.SaveScene(fresh, path);
+            if (!untitled) EditorSceneManager.CloseScene(fresh, true);
+        }
+
         [MenuItem("MomoiProject/테스트 씬 열기", priority = 40)]
         static void Open()
         {
@@ -58,6 +67,47 @@ namespace GBible.EditorTools
             }
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             EditorSceneManager.OpenScene(DefaultPath);
+        }
+    }
+
+    // 게임 씬 만들기(관례 2절 — 게임 씬은 Assets/Dev/Scenes, AI가 처음 한 번만 만들고 그 뒤 배치는 개발자 몫). DB 반영 스크립트에서:
+    //   [DbSeed("1")] static void Scenes()
+    //   {
+    //       GameSceneSetup.Ensure("Assets/Dev/Scenes/Battle.unity", firstInBuild: true);         // 게임이 켜질 때 여는 씬
+    //       TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/Battle.unity");                   // 그 씬을 복사한 테스트 씬
+    //   }
+    // 없을 때만 빈 씬(카메라 · 빛)을 만들고(있으면 건드리지 않는다 — 개발자가 배치한 씬), 빌드 목록(Build Settings)에 없으면 더한다.
+    // firstInBuild면 빌드 목록 맨 앞으로(게임이 켜질 때 여는 씬). 씬 흐름(DB › Bootstrap)을 쓰면 그 뒤로는 흐름이 씬을 연다.
+    public static class GameSceneSetup
+    {
+        public static bool Ensure(string path, bool firstInBuild = false)
+        {
+            if (string.IsNullOrEmpty(path)) throw new System.ArgumentException("[MomoiProject] 게임 씬 경로가 비었습니다(예: Assets/Dev/Scenes/Battle.unity).");
+            var created = false;
+            if (!File.Exists(path))
+            {
+                TestSceneSetup.NewEmptyScene(path, "게임 씬");
+                AssetDatabase.Refresh();
+                created = true;
+                Debug.Log($"[MomoiProject] 게임 씬을 만들었습니다: {path}(빈 씬 — 배치는 개발자).");
+            }
+            var scenes = EditorBuildSettings.scenes.ToList();
+            var index = scenes.FindIndex(s => s.path == path);
+            var changed = false;
+            if (index < 0)
+            {
+                scenes.Insert(firstInBuild ? 0 : scenes.Count, new EditorBuildSettingsScene(path, true));
+                changed = true;
+            }
+            else if (firstInBuild && index > 0)
+            {
+                var entry = scenes[index];
+                scenes.RemoveAt(index);
+                scenes.Insert(0, entry);
+                changed = true;
+            }
+            if (changed) EditorBuildSettings.scenes = scenes.ToArray();
+            return created;
         }
     }
 

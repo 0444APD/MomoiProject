@@ -219,6 +219,16 @@ namespace GBible
         // 단순 값(숫자·글자 등) 플레이어 데이터.
         // DB 항목을 ID로(형식이 다르거나 없으면 null) — 규칙이 프로젝트 DB 종류·선택 요소의 칸을 읽을 때. 원본이라 읽기만 한다.
         public T Entry<T>(string id) where T : class => string.IsNullOrEmpty(id) ? null : Session.Entries?.Invoke(id) as T;
+        // 원본 클래스 T의 인스턴스 원본 모두(DB › 인스턴스, DB 목록 차례 — 읽기만). 상점 진열 · 보상 후보 · 모든 무기처럼 그 클래스 전부를 훑을 때.
+        // 하나를 ID로 찾을 때는 Session.Instances(id), 판에 넣을 사본은 Session.CopyInstance(id).
+        public IEnumerable<(string id, T value)> InstancesOf<T>() where T : class
+        {
+            var ids = Session.InstanceIds?.Invoke();
+            if (ids == null) yield break;
+            foreach (var id in ids)
+                if (Session.Instances?.Invoke(id) is T value) yield return (id, value);
+        }
+
         // 그 형식의 DB 항목 모두(하나만 두는 설정 종류는 Entries<T>().FirstOrDefault()).
         public IEnumerable<T> Entries<T>() where T : class => Session.EntriesOfType?.Invoke(typeof(T))?.OfType<T>() ?? Enumerable.Empty<T>();
 

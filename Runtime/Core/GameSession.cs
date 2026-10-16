@@ -112,6 +112,28 @@ namespace GBible
         // 인스턴스(DB › 인스턴스에서 만든 인스턴스: 아이템 A, 버프 B …)의 원본을 ID로 찾는다. 런타임이 데이터베이스로 채운다.
         // 보상 등은 원본이 아니라 CopyInstance의 깊은 사본을 넣는다(비교 코드가 있으면 생성 코드로, 리플렉션 없음).
         public Func<string, object> Instances;
+        // 인스턴스 ID 모두(DB 목록 차례). Game.InstancesOf<T>()가 그 클래스의 원본을 훑을 때. 런타임이 채우고, 테스트는 DefineInstance로 채운다.
+        public Func<IEnumerable<string>> InstanceIds;
+
+        // 테스트·도구용: 인스턴스 원본 하나를 더한다(Instances · InstanceIds를 함께 채운다 — 런타임은 DB로 채우므로 부르지 않는다).
+        public void DefineInstance(string id, object value)
+        {
+            if (string.IsNullOrEmpty(id)) throw new ArgumentException("[MomoiProject] 인스턴스 ID가 비었습니다.");
+            if (_testInstances == null)
+            {
+                _testInstances = new Dictionary<string, object>(StringComparer.Ordinal);
+                _testInstanceIds = new List<string>();
+                var before = Instances;
+                Instances = found => found != null && _testInstances.TryGetValue(found, out var v) ? v : before?.Invoke(found);
+                var beforeIds = InstanceIds;
+                InstanceIds = () => (beforeIds?.Invoke() ?? Enumerable.Empty<string>()).Concat(_testInstanceIds);
+            }
+            if (!_testInstances.ContainsKey(id)) _testInstanceIds.Add(id);
+            _testInstances[id] = value;
+        }
+
+        Dictionary<string, object> _testInstances;
+        List<string> _testInstanceIds;
 
         // DB 항목(GameData — 프로젝트 DB 종류·선택 요소·밸런싱 값 …)을 ID로 찾는다(없으면 null). 런타임이 데이터베이스로 채운다.
         // 규칙이 DB 항목의 칸(적 편성의 칸·상태 효과에 프로젝트가 더한 칸 …)을 읽을 때 Game.Entry<T>(id). 테스트는 직접 넣는다.
@@ -458,6 +480,21 @@ namespace GBible
         public int TickLimit => (int)Math.Min(MaxTicksPerFrameAtSpeed, MaxTicksPerFrame * (HostSpeed > 1 ? Math.Ceiling(Math.Min(HostSpeed, MaxTicksPerFrameAtSpeed)) : 1));
 
         double _tickCarry;
+
+        // 규칙 테스트 · 도구용: 게임 시간을 seconds만큼 흘린다. 고정 틱이면 한 틱씩 끝까지(EndFrame 한 번은 프레임당 틱 한도 TickLimit에서 잘린다 —
+        // EndFrame(1.0)은 30틱이 아니라 8틱). 시간 규칙(예약 · 상태 효과 주기 · 패시브 효과 pulse · Ticked)이 실제 플레이처럼 돈다.
+        public void Advance(double seconds)
+        {
+            if (!(seconds > 0)) return;
+            var step = Options.TickRate > 0 ? 1.0 / Options.TickRate : seconds;
+            var left = seconds;
+            while (left > step * 1e-6)
+            {
+                var dt = Math.Min(step, left);
+                EndFrame(dt);
+                left -= dt;
+            }
+        }
 
         // 호스트(Unity 등)가 매 프레임 호출한다.
         public void EndFrame(double deltaTime)

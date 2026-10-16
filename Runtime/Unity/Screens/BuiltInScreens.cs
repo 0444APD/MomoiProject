@@ -204,18 +204,19 @@ namespace GBible
                 var id = option.id;
                 var button = ScreenUi.Button(_options, option.DisplayText(), () => Pick(id));
                 button.AddToClassList("momoi-option");
-                // 설명 글: 텍스트 표의 '<id>.desc'(있을 때만).
-                if (Texts.Has(id + ".desc"))
+                // 설명 글: 후보의 detail(글 또는 텍스트 키), 비었으면 텍스트 표의 '<id>.desc'(있을 때만).
+                var detail = option.DetailText();
+                if (detail.Length > 0)
                 {
-                    var description = new Label(Texts.Get(id + ".desc"));
+                    var description = new Label(detail);
                     description.AddToClassList("momoi-option__desc");
                     button.Add(description);
                 }
                 if (_picked.Contains(id)) button.AddToClassList("momoi-option--selected");
             }
             _skip.style.display = choice.min == 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            // 다시 뽑기: 표로 만든 선택이고 프로젝트가 GameScreens.Reroll을 정했고 그 행동이 있을 때만.
-            _reroll.style.display = !string.IsNullOrEmpty(choice.table) && GameScreens.Reroll?.Invoke(choice) != null ? DisplayStyle.Flex : DisplayStyle.None;
+            // 다시 뽑기: 프로젝트가 GameScreens.Reroll을 정했고 그 선택에 행동을 돌려줄 때만(표로 만든 선택은 Game.RerollChoice, 코드로 만든 선택은 그 행동이 CancelChoice 뒤 다시 Ask).
+            _reroll.style.display = GameScreens.Reroll?.Invoke(choice) != null ? DisplayStyle.Flex : DisplayStyle.None;
             _confirm.style.display = single ? DisplayStyle.None : DisplayStyle.Flex;
             _confirm.SetEnabled(_picked.Count >= choice.min && _picked.Count <= choice.max);
         }

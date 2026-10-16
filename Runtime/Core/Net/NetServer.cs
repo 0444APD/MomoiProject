@@ -522,8 +522,17 @@ namespace GBible
                     action.utc = 0;
                     action.tick = 0;
                     // 검사 코드의 오류도 거절로 돌려준다(결과가 오지 않으면 클라이언트가 그 행동을 끝없이 기다린다).
-                    string refused;
-                    try { refused = Validate?.Invoke(peer.Player, action); }
+                    string refused = null;
+                    try
+                    {
+                        if (Validate != null)
+                        {
+                            // 받은 행동의 참조 필드(유닛 · 카드 …)는 id만 든 껍데기다 — 검사 코드가 주인 · 칸 같은 값을 읽게 지금 서버 데이터의 객체로 먼저 바꿔 넣는다.
+                            ActionReferences.Resolve(action, _session.Game);
+                            refused = Validate(peer.Player, action);
+                        }
+                    }
+                    catch (GameFailure failure) { refused = failure.Message; }
                     catch (Exception e) { refused = "행동 검사 중 오류: " + e.Message; }
                     if (refused != null) failMessage = refused;
                     else

@@ -76,6 +76,8 @@ namespace GBible
                 ["kind"] = Kind,
                 ["name"] = name.Trim(),
                 ["savedAt"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                // 그 순간의 게임 속 현실 시각(Game.Now — 옮긴 시각 포함). 불러오면 시계를 이 순간으로 맞춘다(며칠 뒤 열어도 꺼 둔 시간 · 날짜가 같다).
+                ["realNow"] = session.Game.Now.ToString("o", CultureInfo.InvariantCulture),
                 ["run"] = session.ExportRun(),
                 ["meta"] = session.ExportMeta(),
             };
@@ -132,7 +134,15 @@ namespace GBible
                 return false;
             }
             if (seed.HasValue) session.Random.Reseed(seed.Value);
-            session.Journal.Append(JournalKind.System, "Test", $"테스트 상황 불러옴: {name}" + (seed.HasValue ? $" (시드 {seed.Value})" : ""));
+            // 저장한 순간의 현실 시각으로(옛 상황 파일에는 없다 — 그때는 지금 시각 그대로).
+            var realNote = "";
+            if (root.TryGetValue("realNow", out var realNow) && realNow is string realText
+                && DateTime.TryParse(realText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var saved))
+            {
+                TestClock.SetNow(saved.ToUniversalTime());
+                realNote = $" · 현실 시각 {saved.ToUniversalTime():yyyy-MM-dd HH:mm} UTC로 맞춤";
+            }
+            session.Journal.Append(JournalKind.System, "Test", $"테스트 상황 불러옴: {name}" + (seed.HasValue ? $" (시드 {seed.Value})" : "") + realNote);
             GBibleRuntime.NotifyRunLoaded(session);
             return true;
         }
