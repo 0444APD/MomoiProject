@@ -9,10 +9,10 @@
 - 버튼 입력을 행동으로 실행할 때
 - 행동·효과·조건 Block 안에서 다른 객체를 찾거나 난수를 쓸 때
 
-**꼭 지킬 것**(자세히는 괄호의 절)
+**지킬 것**(앞에 [필수]가 붙은 줄은 예외 없이 · 나머지는 기본 — 자세히는 괄호의 절)
 
-- 데이터를 바꾸는 멤버(`Set`·`Use`·`Pay`·`ApplyStatus`·`NewId` …)는 행동 안에서 쓴다. 화면 코드는 읽기(`Find`·`All`·`CanUse`·`Preview`)와 `Do`만 쓴다(02장).
-- 난수는 `Game.Random(흐름)`, 기믹이 고칠 수 있어야 하는 확률은 `Game.Chance`, 현실 시각은 `Game.Now` — `UnityEngine.Random`·`DateTime.Now`를 규칙에 쓰지 않는다(2.11·2.16).
+- [필수] 데이터를 바꾸는 멤버(`Set`·`Use`·`Pay`·`ApplyStatus`·`NewId` …)는 행동 안에서 쓴다. 화면 코드는 읽기(`Find`·`All`·`CanUse`·`Preview`)와 `Do`만 쓴다(02장).
+- [필수] 난수는 `Game.Random(흐름)`, 기믹이 고칠 수 있어야 하는 확률은 `Game.Chance`, 현실 시각은 `Game.Now` — `UnityEngine.Random`·`DateTime.Now`를 규칙에 쓰지 않는다(2.11·2.16).
 - `Find`·`All`은 부를 때마다 데이터를 훑는다. 한 행동 안에서 같은 객체를 여러 번 찾지 않고, 칸마다·객체마다 반복하지 않는다(2.15·3절).
 - 오래 들고 있을 것은 객체가 아니라 id로 들고 `Find`로 다시 찾는다(5절).
 - 이벤트를 화면에서 받을 때는 `SubscribeAfterAction`(2.13).
@@ -212,7 +212,7 @@ IDisposable sub = Game.Events.SubscribeAfterAction<EnemyKilled>(e => PlayHitEffe
 sub.Dispose();                                                                                   // 그만 받는다
 ```
 
-`session.Events`(`EventBus`)와 같다. 받는 길은 둘이다: 화면 연출·UI는 `SubscribeAfterAction`(행동이 성공한 뒤에 받는다, 데이터를 바꾸지 않는다), 규칙은 `Subscribe`(행동 안에서 바로 받는다 — 거기서 바꾼 값은 그 행동의 변경, 던지면 행동 전체가 취소). 반응하는 기능(유물·도전과제·로그)은 코드로 받지 않고 DB 트리거로 만든다(11장). 자세히는 [10-Events.md](10-Events.md) 2-7.
+`session.Events`(`EventBus`)와 같다. 받는 길은 둘이다: 화면 연출·UI는 `SubscribeAfterAction`(행동이 성공한 뒤에 받는다, 데이터를 바꾸지 않는다), 규칙은 `Subscribe`(행동 안에서 바로 받는다 — 거기서 바꾼 값은 그 행동의 변경, 던지면 행동 전체가 취소). 반응하는 기능(유물·도전과제·로그)은 보통 코드로 받지 않고 DB 트리거로 만든다(11장). 자세히는 [10-Events.md](10-Events.md) 2-7.
 
 ### 2.14 `GameApi.IdOf(item)`
 

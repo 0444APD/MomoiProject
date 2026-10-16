@@ -365,7 +365,7 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
             if (zone != DataZone.Session)
-                throw new ArgumentException($"[MomoiProject] 플레이어마다 데이터 '{key}'는 판(Session) 구역만 됩니다. 프로필은 기기마다 하나라 각자 자기 프로필을 쓰고, 매치가 끝나도 남길 값은 '매칭 계정에 남김'으로 둡니다.", nameof(zone));
+                throw new ArgumentException($"[MomoiProject] 플레이어마다 데이터 '{key}'는 판(Session) 구역만 됩니다. 사람마다 남는 값은 '서버 계정에 남김'(account)으로 둡니다(멀티의 데이터는 서버 것 — 기기에는 설정만).", nameof(zone));
             _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly, Account = account, ServerOnly = serverOnly };
         }
 

@@ -15,7 +15,7 @@
 
 ## 1. 템플릿
 
-모두 카드 던전에 맞춘 이름이다. 복사한 뒤 이름과 내용을 바꾼다. 줄마다의 뜻은 뼈대 아래 접힌 칸에 있다.
+모두 카드 던전에 맞춘 예시다. 복사한 뒤 이름과 내용을 바꾼다(GBible API 이름·서명·호출 차례는 그대로). 줄마다의 뜻은 뼈대 아래 접힌 칸에 있다.
 
 ### 1-1. 행동 — 대상이 있을 때
 
@@ -171,7 +171,7 @@ public static class TemplateCode
 > - `static void` — 필수. 접근 수준·클래스 이름은 상관없다.
 > - 매개변수는 넷 중 하나: `()` · `(이벤트 e)` · `(TriggerContext c)` · `(이벤트 e, TriggerContext c)`. 받을 이벤트는 첫 매개변수의 형식이고, 컨텍스트는 늘 마지막이다.
 > - 이벤트로 발동하는 항목이면 `(BattleWon e, TriggerContext c)`처럼 이벤트를 받는다. 조건으로 달성하는 도전과제·사용 기능·액티브 효과에는 이벤트가 없으므로 `(TriggerContext c)`만.
-> - `c.Game` — 세션의 창구. `GBibleRuntime.Game`을 쓰지 않는다(세션이 여럿일 수 있다). static 변수에 상태를 두지 않는다.
+> - `c.Game` — 세션의 창구. [필수] `GBibleRuntime.Game`을 쓰지 않는다(세션이 여럿일 수 있다). static 변수에 상태를 두지 않는다.
 > - 로그에 연결하면 자동 기록이 멈추므로 함수가 `c.Session.Stats.Report(c.Owner, 값)`으로 직접 기록한다.
 
 ### 1-8. 프로젝트 고유 기능(Trigger → 결과)
@@ -224,7 +224,7 @@ BlessingRules.Register(session, GameDatabase.Load()?.All<BlessingData>());
 ```
 
 > [!note]- 런타임 쪽 줄마다의 뜻
-> - 나누는 까닭 — 등록 함수(`BlessingRules.Register`)는 규칙이라 Rules에 두고, Unity 시작에 거는 연결은 Client의 `Bootstrap.RegisterRules` 한 줄로 한다([04장](04-AddingContent.md) 8절의 `RelicRules`). `RegisterRules`는 `GBibleRuntime.SessionCreated`에 연결되어 모든 세션(화면 세션·멀티 서버·시험 모드·매칭 방)에 오므로 서버 세션에서도 감시가 돈다. `Started`(화면 세션에만 온다)에 두지 않고, `GameNet.ServerStarted`·`RoomStarting`에서 다시 부르지도 않는다(두 번 등록하면 두 번 발동한다).
+> - 나누는 까닭 — 등록 함수(`BlessingRules.Register`)는 규칙이라 Rules에 두고, Unity 시작에 거는 연결은 Client의 `Bootstrap.RegisterRules` 한 줄로 한다([04장](04-AddingContent.md) 8절의 `RelicRules`). `RegisterRules`는 `GBibleRuntime.SessionCreated`에 연결되어 모든 세션(화면 세션·멀티 서버·시험 모드·매칭 방)에 오므로 서버 세션에서도 감시가 돈다. [필수] `Started`(화면 세션에만 온다)에 두지 않고, `GameNet.ServerStarted`·`RoomStarting`에서 다시 부르지도 않는다(두 번 등록하면 두 번 발동한다).
 > - `GameDatabase.Load()` — 런타임 데이터 목록. `All<T>()`로 그 종류의 항목만 넘긴다.
 > - `BoundOutcomes.Has/Create` — 기본 기능과 달리 프로젝트 기능은 `[BindTo]` 연결을 스스로 확인해야 한다. 빼먹으면 에디터는 결과 칸을 잠가 보이는데 실제로는 숨은 예전 결과가 돈다.
 > - `session.Triggers.Register(owner, when, repeat, fire)` — Trigger를 감시하다 참이 되는 순간 `fire`를 부른다. `repeat: false`면 한 번 발동하고 끝난다.
@@ -265,7 +265,7 @@ static void Started(GameSession session)
 
 > [!note]- 줄마다의 뜻
 > - `AfterAssembliesLoaded` — `GBibleRuntime`은 첫 씬을 불러오기 전에 세션을 만든다. 그보다 먼저 연결해야 하므로 이 시점이다. `Awake`에서는 늦다.
-> - `Configuring` — 세션을 만들기 직전(세션은 아직 없다). 쓰는 곳은 둘이다. 출시 뒤 저장 변환 등록(`options.Migrations`, [10장](10-SaveAndRelease.md) 7절)과 조건에 따른 덮어쓰기(데모 빌드는 Undo 끄기, 게임 전체 시드 고정 — [07장](07-GenreRecipes.md) 2·4절. 일일 도전처럼 판마다 시드를 정하면 `GBibleRuntime.NewRun(session, 시드)`). 저장 변환은 반드시 여기서 등록한다(프로필을 곧바로 불러오므로). 저장 버전은 등록한 변환 중 가장 높은 번호를 따라 저절로 정해진다.
+> - `Configuring` — 세션을 만들기 직전(세션은 아직 없다). 쓰는 곳은 보통 둘이다. 출시 뒤 저장 변환 등록(`options.Migrations`, [10장](10-SaveAndRelease.md) 7절)과 조건에 따른 덮어쓰기(데모 빌드는 Undo 끄기, 게임 전체 시드 고정 — [07장](07-GenreRecipes.md) 2·4절. 일일 도전처럼 판마다 시드를 정하면 `GBibleRuntime.NewRun(session, 시드)`). 저장 변환은 반드시 여기서 등록한다(프로필을 곧바로 불러오므로). 저장 버전은 등록한 변환 중 가장 높은 번호를 따라 저절로 정해진다.
 > - 코드가 화면 값을 바꾸면 코드가 이기고, 모니터 타임라인에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 화면 칸과 `SessionOptions`의 대응은 [07장](07-GenreRecipes.md) 2절.
 > - `RegisterRules`(`SessionCreated`) — **모든 세션**(화면 세션 · 멀티 서버 · 시험 모드의 서버와 봇 · 매칭 방 · 서버 빌드)이 DB로 만들어진 직후(DB 정의 등록·프로필 불러오기 뒤, 새 판 행동보다 먼저). 규칙 쪽 등록 전부: 프로젝트 기능의 감시 등록 함수(Rules의 `…Rules.Register`), 행동 처리기, 규칙이 받는 이벤트, 틱 규칙, 데이터를 바꾸는 코드 개발 명령. 받은 `session`만 쓴다(`GBibleRuntime.Session`은 아직 그 세션이 아니다). 개발 명령은 되도록 DB › 개발 › 개발 명령에 둔다(출시 빌드에서는 저절로 빠진다). DB에 있는 플레이어 데이터는 이미 정의되어 있으므로 `Define`하지 않는다.
 > - `Started` — **화면 세션에만**, 준비가 끝난 뒤(`RegisterRules` → 기본 개발 명령·씬 흐름·화면 준비 다음, 시작할 때 이어 하기의 판 불러오기보다 먼저). 화면 쪽 연결: 화면 세션 전체의 연출 받기(`SubscribeAfterAction` → `GameView.Present`), `GameScreens.Reroll`·`GameSettings.Changed`·`GameInput.Use`, 화면 세션에서 한 번 할 일. 세이브 슬롯을 바꾸면(`UseSlot`) 세션이 새로 만들어져 둘 다 다시 온다 — 세션이 아닌 정적 알림(`GameSettings.Changed`)에 걸 때는 두 번 걸리지 않게 `-=` 뒤 `+=`.

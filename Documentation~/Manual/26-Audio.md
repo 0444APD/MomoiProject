@@ -77,7 +77,7 @@ GameAudio.StopBgm(0f);                                     // 바로 멈춤
 ### 3.2 목소리 `PlayVoice` / `StopVoice`
 
 ```csharp
-GameAudio.PlayVoice(voiceClip);           // 이전 목소리는 짧게 사라진다
+GameAudio.PlayVoice(voiceClip);           // 이전 목소리는 voiceFade(기본 0.15초) 동안 사라진다
 bool speaking = GameAudio.IsVoicePlaying;
 GameAudio.StopVoice();
 ```
@@ -218,11 +218,11 @@ GameAudio.PlayVoice(bossLine);
 
 ## 6. 주의할 점 / 자주 하는 실수
 
-- **규칙에서 부르지 않는다**: `GameAudio`는 화면 쪽 기능이라 행동·Block·`[BindTo]` 안에서 부르지 않고 Client 코드에서 부른다(관례 1절). 행동 결과의 효과음(맞음·획득)은 행동이 끝난 뒤의 연출(`SubscribeAfterAction` → `GameView.Present`·`Play`, 32장) 안에서 튼다 — 실패한 행동·미리보기에서는 소리가 나지 않는다.
-- **클립 자리**: 소리 파일은 개발자가 넣는다. AI는 DB 반영 스크립트에서 `AssetRequests.Audio(경로, 쓰는 곳, 초)`로 임시 무음 파일과 넣을 것을 만들고, 그 경로의 클립을 DB 칸에 넣어 코드가 읽게 한다(39장 3절).
+- [필수] **규칙에서 부르지 않는다**: `GameAudio`는 화면 쪽 기능이라 행동·Block·`[BindTo]` 안에서 부르지 않고 Client 코드에서 부른다(관례 1절). 행동 결과의 효과음(맞음·획득)은 행동이 끝난 뒤의 연출(`SubscribeAfterAction` → `GameView.Present`·`Play`, 32장) 안에서 튼다 — 실패한 행동·미리보기에서는 소리가 나지 않는다.
+- [필수] **클립 자리**: 소리 파일은 개발자가 넣는다. AI는 DB 반영 스크립트에서 `AssetRequests.Audio(경로, 쓰는 곳, 초)`로 임시 무음 파일과 넣을 것을 만들고, 그 경로의 클립을 DB 칸에 넣어 코드가 읽게 한다(39장 3절).
 - **클립이 `null`**: 재생 함수는 아무것도 하지 않고 `null`을 돌려준다. 손잡이를 쓸 때 `?.`로 받는다.
 - **오래된 손잡이**: 병렬 채널은 끝난 자리를 다시 쓴다. 끝난 소리의 손잡이로 `Stop`해도 다른 소리를 멈추지 않는다(`IsPlaying`이 `false`).
-- **`handle.Source`의 `clip`·`loop`·`pitch`를 바꾸지 않는다**: 자리가 끝나는 시점은 재생을 시작할 때 클립 길이·피치로 정해진다. 바꾸면 소리가 끊기거나 자리가 다른 소리에 넘어간다. 3D 거리 같은 공간 설정만 만진다.
+- [필수] **`handle.Source`의 `clip`·`loop`·`pitch`를 바꾸지 않는다**: 자리가 끝나는 시점은 재생을 시작할 때 클립 길이·피치로 정해진다. 바꾸면 소리가 끊기거나 자리가 다른 소리에 넘어간다. 3D 거리 같은 공간 설정만 만진다.
 - **음소거는 저장되지 않는다**: `SetMuted`는 기기에 남지 않는다. 게임 설정으로 남기려면 DB › 설정에 켜기/끄기 칸(적용 대상 없음)을 두고 `GameSettings.Changed`에서 `SetMuted`를 부른다(`31-Slots-Settings-Input.md` 5-3과 같은 모양). 음량(`SetVolume`)은 저장된다.
 - **음량 설정과 같이 쓰기**: DB › 설정에 그 채널의 음량 칸이 있으면 게임이 켜질 때 설정 값으로 맞춰진다. 저장된 PlayerPrefs 음량은 쓰이지 않는다(4.2).
 - **게임 시간과 무관**: `GameTime.Pause`로 게임을 멈춰도 소리는 계속 난다. 멈추려면 `Stop`·음소거를 쓴다.

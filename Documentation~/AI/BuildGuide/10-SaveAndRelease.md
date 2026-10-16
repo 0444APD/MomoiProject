@@ -58,7 +58,7 @@ protected override void Run()
 
 > [!note]- 설정 — DB › 설정과 `GameSettings`(기기마다 하나)
 > DB › **설정**에 항목 하나 = 설정 칸 하나다(분류 · 값의 종류와 기본값 · 적용 대상). **적용 대상**(언어·음량·전체 화면·해상도·수직 동기화·최대 프레임)을 고르면 라이브러리가 바로 적용하고, "없음(게임 코드)"이면 게임이 `GameSettings.Number(GameIds.Setting.BattleSpeed)`·`Toggle`·`Choice`·`Text`로 읽는다. 설정 화면은 기본 화면을 쓴다(관례 6절).
-> - 값은 `MomoiProject/settings.json` 하나다. 슬롯을 바꿔도, Undo해도, 판을 새로 열어도 그대로다. 그래서 게임 규칙에 영향을 주는 값(난이도처럼 판마다 다를 수 있는 것)은 설정이 아니라 판 데이터에 둔다.
+> - 값은 `MomoiProject/settings.json` 하나다. 슬롯을 바꿔도, Undo해도, 판을 새로 열어도 그대로다. [필수] 그래서 게임 규칙에 영향을 주는 값(난이도처럼 판마다 다를 수 있는 것)은 설정이 아니라 판 데이터에 둔다.
 > - API(`Set`·`Reset`·`All`·`Label`·`ChoicesOf`·`Changed`)는 매뉴얼 [31장](../../Manual/31-Slots-Settings-Input.md).
 
 > [!note]- 입력 — 키 바꾸기(선택 기능 '입력')
@@ -187,7 +187,7 @@ protected override void Draw() => Q<Button>("continue").SetEnabled(GBibleRuntime
 
 ## 4. 저장되지 않는 값
 
-스프라이트 같은 에셋 참조는 판 저장에 들어가지 않는다. 플레이어 데이터에는 ID를 두고(`[DataRef]` 글자 필드), 그림·소리는 DB·인스턴스의 원본에서 읽는다 — 핸드 화면은 `Rules.CardData(Game, deckCard.card).art`([09장](09-Habits.md) 4절).
+스프라이트 같은 에셋 참조는 판 저장에 들어가지 않는다. [필수] 플레이어 데이터에는 ID를 두고(`[DataRef]` 글자 필드), 그림·소리는 DB·인스턴스의 원본에서 읽는다 — 핸드 화면은 `Rules.CardData(Game, deckCard.card).art`([09장](09-Habits.md) 4절).
 
 > [!note]- 왜 이어 하기에서만 드러나나
 > - 에셋 참조는 DB 항목(`GameData`)이 아니면 저장 파일에 들어가지 않는다. 판 데이터에 들어 있으면 저장할 때 "저장할 수 없는 참조입니다" 경고가 나고, 이어 한 뒤에는 비어 있다.
@@ -295,7 +295,7 @@ protected override void Draw() => Q<Button>("continue").SetEnabled(GBibleRuntime
 
 > [!note]- 불러올 때 일어나는 일과 번호 규칙
 > - 저장 파일의 버전부터 게임 버전까지 변환이 차례로 돌고, 하나마다 기록에 "저장 데이터 변환 v1 → v2: run: hero.gold → gold"처럼 남는다. 게임보다 새 버전의 저장 파일은 거부한다.
-> - 한 번 출시한 변환(표의 줄이든 코드든)은 고치거나 지우지 않는다. 그 버전의 저장을 가진 플레이어가 아직 있을 수 있다.
+> - [필수] 한 번 출시한 변환(표의 줄이든 코드든)은 고치거나 지우지 않는다. 그 버전의 저장을 가진 플레이어가 아직 있을 수 있다.
 > - 번호는 2부터다(1이 처음 출시). 한 업데이트에서 여러 변환을 같은 번호로 등록해도 된다. `options.SaveVersion`은 따로 올리지 않는다(더 높게 적으면 그 값이 저장 버전이 된다).
 
 ## 8. 체크리스트

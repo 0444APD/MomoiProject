@@ -38,7 +38,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 | `Assets/MomoiProject/link.xml` | 코드 줄이기 보호(시작 설정이 만든다, 8절) |
 | `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`(켠 기능, 6절), `Ids.json`(7절), `DbSeeds.json`(DB 반영 스크립트가 돈 버전, 21장 3-1), `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
 
-**게임 씬 만들기 — `GameSceneSetup.Ensure(경로, firstInBuild)`**(`GBible.EditorTools`, 에디터 전용). 시작 설정은 게임 씬을 만들지 않는다. 게임 씬은 `Assets/Dev/Scenes`에 두고(관례 2절) AI가 단계 1에서 DB 반영 스크립트로 **처음 한 번만** 만든다 — 그 뒤 배치는 개발자 몫이다. 없을 때만 빈 씬(카메라 · 빛)을 만들고(있으면 건드리지 않는다), 빌드 목록(Build Settings)에 없으면 더한다. `firstInBuild: true`면 빌드 목록 맨 앞(게임이 켜질 때 여는 씬)으로 옮긴다. 돌려주는 값은 새로 만들었는지다. 같은 스크립트에서 이어 `TestSceneSetup.Ensure(copyFrom: 그 경로)`가 방금 만든 씬을 복사해 테스트 씬을 만든다(38장 4절).
+**게임 씬 만들기 — `GameSceneSetup.Ensure(경로, firstInBuild)`**(`GBible.EditorTools`, 에디터 전용). 시작 설정은 게임 씬을 만들지 않는다. 게임 씬은 `Assets/Dev/Scenes`에 둔다(관례 2절). [필수] AI는 단계 1에서 DB 반영 스크립트로 **처음 한 번만** 만들고, 그 뒤 배치는 개발자 몫이다. 없을 때만 빈 씬(카메라 · 빛)을 만들고(있으면 건드리지 않는다), 빌드 목록(Build Settings)에 없으면 더한다. `firstInBuild: true`면 빌드 목록 맨 앞(게임이 켜질 때 여는 씬)으로 옮긴다. 돌려주는 값은 새로 만들었는지다. 같은 스크립트에서 이어 `TestSceneSetup.Ensure(copyFrom: 그 경로)`가 방금 만든 씬을 복사해 테스트 씬을 만든다(38장 4절).
 
 ```csharp
 // Assets/MomoiProject/Code/Editor/Seeds/SceneSeeds.cs — DB 반영 스크립트(관례 15절)
@@ -55,7 +55,7 @@ static void Scenes()
 
 ### 주의할 점
 
-- 패키지 폴더 안에는 게임 코드를 두지 않는다. DB의 요소 탭(클래스·이벤트)은 `Assets/MomoiProject/Code` 안의 스크립트만 보인다(폴더 경로는 보이지 않는다).
+- [필수] 패키지 폴더 안에는 게임 코드를 두지 않는다. DB의 요소 탭(클래스·이벤트)은 `Assets/MomoiProject/Code` 안의 스크립트만 보인다(폴더 경로는 보이지 않는다).
 - 런타임이 `GameDatabase`를 찾지 못하면 기록(Journal)에 경고 "GameDatabase를 찾을 수 없습니다. 에디터에서 DB 창을 한 번 열면 자동으로 만들어집니다."가 남고, DB 데이터 없이 빈 세션으로 시작한다.
 
 ---
@@ -168,7 +168,7 @@ public static class Checkpoint
 
 - 씬 코드의 `Awake`·`Start`가 불릴 때는 세션이 이미 만들어져 있다(첫 씬을 불러오기 전에 시작하므로). 그때 `GBibleRuntime.Session`을 바로 써도 된다.
 - 도메인 리로드를 끈 설정(Enter Play Mode Options)에서도 이전 플레이의 세션·이벤트 연결이 남지 않도록 `SubsystemRegistration` 시점에 모두 비운다. 그래서 이벤트 연결은 아래 3·4절처럼 매 플레이마다 다시 한다.
-- `GBibleRuntime.Game`은 클라이언트 편의용 정적 입구다. 서버·시뮬레이션 코드는 정적 입구 대신 세션마다 `session.Game`을 쓴다(멀티플레이를 위해).
+- `GBibleRuntime.Game`은 클라이언트 편의용 정적 입구다. [필수] 서버·시뮬레이션 코드는 정적 입구 대신 세션마다 `session.Game`을 쓴다(멀티플레이를 위해).
 
 ---
 
@@ -198,7 +198,7 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 고정 틱(실시간) › 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
 | 씬 흐름(선택) › 플레이어 데이터 · 필드(씬 이름이 든 글자) · 빈 값일 때 씬 | `Started` 직전 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)` | 쓰지 않음 |
 
-**AI가 이 값을 정할 때**(결정에 따른 판 저장·고정 틱·새 판 행동 …): 화면을 누를 수 없으므로 DB 반영 스크립트에서 `GameDatabase.Load()`의 `EditorSet…` 함수(`EditorSetSessionOptions` · `EditorSetSaveOptions` · `EditorSetSaveTiming` · `EditorSetFlowOptions` · `EditorSetTickRate` · `EditorSetSceneFlow`, 에디터 전용)로 넣고(Undo 방식 하나만 바꿀 때는 `EditorSetHistory(Undo 방식, 보관 수 = null)` — 다른 칸은 그대로. 묶음 함수는 묶인 칸을 모두 넘기므로 나머지는 읽기 속성 `History` · `HistoryLimit` · `SnapshotInterval` · `SnapshotLimit` · `FixSeedInDevelopment` · `DevelopmentSeed` · `RunSave` · `RunEndEvent` · `SaveProfileEachAction` · `RunSaveInterval` · `RunSaveEvent` · `UndoBoundaryEvent` · `ContinueOnStart` · `NewRunAction` · `TickRate` · `SceneKey` · `ScenePath` · `EmptyScene`으로 읽어 그대로 넘긴다) `EditorUtility.SetDirty` + `AssetDatabase.SaveAssetIfDirty`로 저장한다(DB 항목이 아니라 '적용 전'이 없다). 칸의 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다 — 다르면 개발자(또는 시작 설정)가 고른 값이므로 그대로 두고 보고에 적는다(관례 15절).
+**AI가 이 값을 정할 때**(결정에 따른 판 저장·고정 틱·새 판 행동 …): 화면을 누를 수 없으므로 DB 반영 스크립트에서 `GameDatabase.Load()`의 `EditorSet…` 함수(`EditorSetSessionOptions` · `EditorSetSaveOptions` · `EditorSetSaveTiming` · `EditorSetFlowOptions` · `EditorSetTickRate` · `EditorSetSceneFlow`, 에디터 전용)로 넣고(Undo 방식 하나만 바꿀 때는 `EditorSetHistory(Undo 방식, 보관 수 = null)` — 다른 칸은 그대로. 묶음 함수는 묶인 칸을 모두 넘기므로 나머지는 읽기 속성 `History` · `HistoryLimit` · `SnapshotInterval` · `SnapshotLimit` · `FixSeedInDevelopment` · `DevelopmentSeed` · `RunSave` · `RunEndEvent` · `SaveProfileEachAction` · `RunSaveInterval` · `RunSaveEvent` · `UndoBoundaryEvent` · `ContinueOnStart` · `NewRunAction` · `TickRate` · `SceneKey` · `ScenePath` · `EmptyScene`으로 읽어 그대로 넘긴다) `EditorUtility.SetDirty` + `AssetDatabase.SaveAssetIfDirty`로 저장한다(DB 항목이 아니라 '적용 전'이 없다). [필수] 칸의 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다 — 다르면 개발자(또는 시작 설정)가 고른 값이므로 그대로 두고 보고에 적는다(관례 15절).
 
 게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 
@@ -452,7 +452,7 @@ var copy = potion.CreateInstance();   // 깊은 사본
 3. 확인 창("기능 켜기" / "기능 끄기")에서 **켜기** 또는 **끄기**를 누른다.
 4. Unity가 다시 컴파일한다. 컴파일이 끝나면 탭·메뉴가 열린다. 꺼진 기능의 탭은 사이드바에 흐리게 보이고 들어갈 수 없다(마우스를 올리면 "'다이얼로그 시스템' 기능이 꺼져 있습니다. 위의 '기능 활성화'를 눌러 켜면 열립니다.").
 
-켜짐 상태는 `ProjectSettings/MomoiProject/Features.json`(`{ "enabled": ["dialogue", "inventory", "input", "steam"] }` — 켠 기능의 ID만)에 저장되어 팀이 함께 쓴다. **AI는 스위치 대신 이 파일의 `enabled`에 ID를 더해 켠다**(관례 0절). 에디터가 스크립트를 다시 읽을 때(컴파일 뒤의 도메인 다시 읽기 — 파일만 고쳐서는 일어나지 않는다) 심볼과 프로젝트 asmdef 참조가 이 파일에 맞춰지고, 심볼이 바뀌면 한 번 더 컴파일된다. 그 기능의 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다 — 먼저 쓰면 컴파일이 실패해 도메인을 다시 읽지 않으므로 심볼도 맞춰지지 않는다. 입력·Steam은 외부 패키지가 있어야 컴파일된다(위 표 — 패키지를 들이는 것은 내려받기라 먼저 묻는다). 심볼은 지금 고른 플랫폼, 지금 빌드 대상의 플랫폼, PC(Standalone), 서버(Dedicated Server — 심볼 칸이 PC와 따로다)에 자동으로 넣고 빼며, 다른 플랫폼으로 바꾸는 순간 그 플랫폼에도 맞춘다.
+켜짐 상태는 `ProjectSettings/MomoiProject/Features.json`(`{ "enabled": ["dialogue", "inventory", "input", "steam"] }` — 켠 기능의 ID만)에 저장되어 팀이 함께 쓴다. **AI는 스위치 대신 이 파일의 `enabled`에 ID를 더해 켠다**(관례 0절). 에디터가 스크립트를 다시 읽을 때(컴파일 뒤의 도메인 다시 읽기 — 파일만 고쳐서는 일어나지 않는다) 심볼과 프로젝트 asmdef 참조가 이 파일에 맞춰지고, 심볼이 바뀌면 한 번 더 컴파일된다. 그 기능의 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다 — 먼저 쓰면 컴파일이 실패해 도메인을 다시 읽지 않으므로 심볼도 맞춰지지 않는다. 입력·Steam은 외부 패키지가 있어야 컴파일된다(위 표). [필수] 패키지를 들이는 것은 내려받기라 먼저 묻는다. 심볼은 지금 고른 플랫폼, 지금 빌드 대상의 플랫폼, PC(Standalone), 서버(Dedicated Server — 심볼 칸이 PC와 따로다)에 자동으로 넣고 빼며, 다른 플랫폼으로 바꾸는 순간 그 플랫폼에도 맞춘다.
 
 ### 코드로 쓰는 법
 
@@ -590,7 +590,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 
 ### 주의할 점
 
-- 생성 파일은 직접 고치지 않는다(다시 만들면 덮인다).
+- [필수] 생성 파일은 직접 고치지 않는다(다시 만들면 덮인다).
 - 적용하지 않은('적용 전') DB 항목은 생성 코드에 없다. 적용한 뒤 컴파일이 끝나야 새 상수가 보인다(위 '에디터에서'의 차례).
 - 값 형식을 이 위치에서 참조할 수 없으면(예: 다른 asmdef의 클래스) 그 플레이어 데이터는 `PlayerDataKey<T>` 대신 `const string`으로 만들어지고 `Game.Data()`에도 빠진다. `Ids.json`의 `folder`를 그 형식의 asmdef 쪽으로 바꾸면 형식이 붙는다.
 - 키워드는 `GameIds`에 없다. 키워드 그룹 코드(`[KeywordGroup] static class`)의 상수가 곧 ID다.

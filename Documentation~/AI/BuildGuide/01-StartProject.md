@@ -25,7 +25,7 @@
 
 > [!note]- 설치 자세히
 > - Unity가 `package.json`을 읽고 `com.unity.nuget.mono-cecil`을 함께 설치한다. 이것이 있어야 플레이어 데이터 비교 코드가 생긴다. 없으면 "'…'은(는) 예전 방식(리플렉션)으로 비교합니다" 경고가 남는다.
-> - AI는 GBible 라이브러리 코드를 고치지 않는다(관례 14절). 범용 기능이 모자라면 사람에게 알린다. 게임 코드는 이 폴더에 두지 않는다.
+> - [필수] AI는 GBible 라이브러리 코드를 고치지 않는다(관례 14절). 범용 기능이 모자라면 사람에게 알린다. 게임 코드는 이 폴더에 두지 않는다.
 
 > [!note]- 시작 설정이 만드는 것
 > ```
@@ -78,7 +78,7 @@
 
 `Assets/MomoiProject/Code` 아래 네 폴더로 나뉜다(관례 1절).
 
-- **Rules**: 게임 규칙 — 데이터 클래스·행동·이벤트·Block·`[BindTo]` 함수. 화면 API(`MonoBehaviour`·씬·입력·`Time`·`UnityEngine.Random`)를 쓰지 않는다. 서버·테스트에서도 같은 코드가 돈다.
+- **Rules**: 게임 규칙 — 데이터 클래스·행동·이벤트·Block·`[BindTo]` 함수. [필수] 화면 API(`MonoBehaviour`·씬·입력·`Time`·`UnityEngine.Random`)를 쓰지 않는다. 서버·테스트에서도 같은 코드가 돈다.
 - **Client**: Unity에 붙는 코드 — 화면(`Client/Screens`)·입력·연출, 그리고 Bootstrap.
 - **Editor**: DB 반영 스크립트(`Editor/Seeds/<주제>Seeds.cs`)와 에디터 도구.
 - **Tests**: 규칙 테스트(Rules만 참조). 규칙을 만들거나 고치면 하나 이상 둔다(관례 12절, [08장](08-TestAndDebug.md)).
@@ -140,7 +140,7 @@ public class Profile
 }
 ```
 
-코드에서는 이렇게 읽고 고친다. **고치는 것은 행동의 `Run` 안에서만**이다([03장](03-GameLoop.md)).
+코드에서는 이렇게 읽고 고친다. [필수] **고치는 것은 행동의 `Run` 안에서만**이다([03장](03-GameLoop.md)).
 
 ```csharp
 using GBible.Ids;
@@ -150,7 +150,7 @@ run.gold += 10;              // 행동 안이면 그냥 고친다 — 행동이 
 ```
 
 > [!note]- RunState·Profile은 무엇인가
-> GBible이 주는 타입이 아니라 시작 설정이 이름만 잡아 둔 **프로젝트의 평범한 클래스**다. 상속이나 래퍼 없이 `[Serializable]`만 붙는다. 필드 초기값(`new Hero()`, 빈 리스트)이 새 판의 시작 상태가 된다. 개발자가 바꿀 시작 숫자(체력·골드·슬롯 수)는 초기값에 적지 않고 판을 여는 행동(`StartRun`)이 밸런싱 값에서 넣는다(관례 18절, [03장](03-GameLoop.md) 4절).
+> GBible이 주는 타입이 아니라 시작 설정이 이름만 잡아 둔 **프로젝트의 평범한 클래스**다. 상속이나 래퍼 없이 `[Serializable]`만 붙는다. 필드 초기값(`new Hero()`, 빈 리스트)이 새 판의 시작 상태가 된다. [필수] 개발자가 바꿀 시작 숫자(체력·골드·슬롯 수)는 초기값에 적지 않고 판을 여는 행동(`StartRun`)이 밸런싱 값에서 넣는다(관례 18절, [03장](03-GameLoop.md) 4절).
 > - 판 데이터에는 ID와 게임 중에 바뀌는 값만 둔다. 카드 이름·비용·그림은 DB의 원본에서 읽는다([02장](02-DesignToCode.md)).
 > - 파일 위치는 자유다. 카드 던전은 `Hero`·`DeckCard`·`Battle`과 함께 두려고 `Rules/Data/Model.cs`로 옮겼다. 시작 설정은 같은 클래스가 이미 있으면 `PlayerData.cs`를 다시 만들지 않는다.
 > - 클래스 이름을 바꾸면 DB › 플레이어 데이터에서 그 항목의 값 형식도 바꾼다.
@@ -167,7 +167,7 @@ run.gold += 10;              // 행동 안이면 그냥 고친다 — 행동이 
 > 그래서 게임 코드에서 따로 정의(`session.Data.Define`)하지 않는다. `Define`은 DB 없이 세션을 손으로 만드는 규칙 테스트([08장](08-TestAndDebug.md))에서 쓴다. DB로 정의하면 `GameIds` 접근자, ID 이름 변경 이력, 저장 호환 검사가 따라온다.
 
 > [!note]- `Game.Data().Run`이라는 이름과 GameIds가 생기는 때
-> - `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`는 DB가 바뀌어 적용될 때(개발자의 Ctrl+S, 반영 스크립트의 새 항목 자동 적용) 다시 만들어진다. 직접 고치지 않는다.
+> - `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`는 DB가 바뀌어 적용될 때(개발자의 Ctrl+S, 반영 스크립트의 새 항목 자동 적용) 다시 만들어진다. [필수] 직접 고치지 않는다.
 > - 새 상수는 **그 뒤 Unity가 다시 컴파일해야** 코드에서 보인다. 그래서 반영 스크립트와 그 상수를 쓰는 코드를 한꺼번에 넣지 않고 한 응답 안에서 박자로 나눈다: 형식·반영 스크립트를 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다. 선택 기능을 켜는 박자 · 새로 읽기를 한 번 더 도는 때는 진행 매뉴얼 6절 박자 표(Unity가 닫혀 있으면 첫 박자에서 멈추고 열어 달라고 한다).
 > - 이름은 ID의 첫 글자를 대문자로, 점으로 나뉜 조각을 이어 붙인다: `run` → `Run`, `bestFloor` → `BestFloor`, `boss.dragon` → `BossDragon`. 다른 이름을 원하면 ID를 바꾼다(05장 8절).
 > - 구역은 저장 파일과 같다. `Session`은 이번 판(`run.json`), `Meta`는 프로필(`profile.json`). 무엇을 어느 쪽에 둘지는 [02장](02-DesignToCode.md) 3절.
@@ -186,7 +186,7 @@ Bootstrap은 게임이 켜질 때 가장 먼저 도는 곳이다. 설정과 코�
 | 판 저장 | 행동마다 저장(턴제) | 이어 하기용 판 파일을 언제 쓰나([10장](10-SaveAndRelease.md)) |
 | 판 끝 이벤트 | `RunEnded` | 받으면 판 저장을 지우고 프로필을 바로 저장 |
 
-AI는 이 값을 반영 스크립트에서 정한다. DB 에셋을 꺼내 `EditorSet…` 함수로 **결정한 값**(결정 기록·장르 추천)을 넣는다. 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 모두 다시 돌리기`도 개발자 값을 덮지 않는다(관례 15절).
+AI는 이 값을 반영 스크립트에서 정한다. DB 에셋을 꺼내 `EditorSet…` 함수로 **결정한 값**(결정 기록·장르 추천)을 넣는다. [필수] 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 모두 다시 돌리기`도 개발자 값을 덮지 않는다(관례 15절).
 
 ```csharp
 [DbSeed("1")]
@@ -222,7 +222,7 @@ static void Bootstrap()
 | `RegisterRules` | `GBibleRuntime.SessionCreated` | **모든 세션**(화면 세션 · 멀티 서버 · 시험 모드의 서버와 봇 · 매칭 방 · 서버 빌드)이 DB로 만들어진 직후. DB 정의 등록·프로필 불러오기 뒤, 새 판 행동보다 먼저 |
 | `Started` | `GBibleRuntime.Started` | **화면 세션에만**, 준비가 끝난 뒤(`RegisterRules` 다음). `GBibleRuntime.CreateSession()`으로 따로 만든 세션(시험 모드의 서버·봇, 매칭 방)에는 오지 않는다 |
 
-기준은 하나다: **규칙 쪽 등록은 `RegisterRules`, 화면 쪽 연결은 `Started`.** 규칙 등록을 `Started`에 두면 멀티 서버 세션에서 그 규칙이 빠진다.
+[필수] 기준은 하나다: **규칙 쪽 등록은 `RegisterRules`, 화면 쪽 연결은 `Started`.** 규칙 등록을 `Started`에 두면 멀티 서버 세션에서 그 규칙이 빠진다.
 
 | `RegisterRules`에서 하는 일(규칙 쪽) | 예 |
 |---|---|
@@ -251,7 +251,7 @@ static void RegisterRules(GameSession session)
 이미 시작 설정을 한 프로젝트의 `Bootstrap.cs`에 `RegisterRules`가 없으면 매뉴얼 [20장](../../Manual/20-Setup.md) 4절대로 더한다.
 
 > [!note]- `Configure`는 언제 쓰나
-> DB에서 정할 수 있는 값은 DB(Bootstrap)에서 정한다. 코드가 필요한 경우는 둘뿐이다.
+> DB에서 정할 수 있는 값은 DB(Bootstrap)에서 정한다. 코드가 필요한 경우는 보통 둘이다.
 > - 출시 뒤 저장 구조를 바꿨을 때, 값을 계산해 고치는 변환(`options.Migrations.Add`, [10장](10-SaveAndRelease.md) 7절). 필드 옮김·키 이름 바꿈·키 삭제는 코드 없이 DB › 개발 › **저장 변환** 표에 적는다. 저장 버전은 등록한 변환을 따라 저절로 올라간다.
 > - 조건에 따라 바꿀 때. 예: "데모 빌드는 Undo를 끈다".
 > ```csharp
@@ -267,7 +267,7 @@ static void RegisterRules(GameSession session)
 > - 세 함수는 `[RuntimeInitializeOnLoadMethod(AfterAssembliesLoaded)]`인 `Hook`에서 `GBibleRuntime.Configuring`·`SessionCreated`·`Started`에 연결되어 있다(시작 설정이 만든 파일 그대로). `GBibleRuntime`은 첫 씬을 불러오기 전에 세션을 만들므로 `MonoBehaviour.Awake`에서 연결하면 늦다. 기능마다 따로 `Hook`을 두지 않고 이 세 함수 안에 더한다.
 > - 순서(화면 세션): `Configure` → 세션 만들기(DB 정의 등록·프로필 불러오기) → `RegisterRules` → 기본 개발 명령·씬 흐름·화면 준비 → `Started` → (시작할 때 이어 하기면) 판 불러오기 또는 새 판 행동. `GBibleRuntime.CreateSession()`으로 따로 만든 세션(시험 모드의 서버·봇, 매칭 방)은 `RegisterRules`까지만 오고, 서버면 그 뒤 새 판 행동이 돈다. 방장·서버 빌드(`StartDedicated`)는 화면 세션을 서버로 열므로 `Started`도 온다. 세이브 슬롯을 바꾸거나(`UseSlot`) 멀티에 들어가면 화면 세션이 새로 만들어져 `RegisterRules`·`Started`가 다시 온다 — 세션이 아닌 정적 알림(`GameSettings.Changed`)에 걸 때는 두 번 걸리지 않게 `-=` 뒤 `+=`.
 > - `RegisterRules`에서는 받은 `session`만 쓴다. 이때 `GBibleRuntime.Session`·`GBibleRuntime.Game`은 아직 그 세션이 아니다(화면 세션이면 아직 null, 따로 만든 서버 세션이면 화면 세션).
-> - 같은 세션에 두 번 등록하면 두 번 발동한다. 멀티의 `GameNet.ServerStarted`·`RoomStarting`에서 등록 함수를 다시 부르지 않는다(거기서는 서버 객체가 필요한 서버 규칙만 — [11장](11-MultiplayerReady.md) 2절).
+> - [필수] 같은 세션에 두 번 등록하면 두 번 발동한다. 멀티의 `GameNet.ServerStarted`·`RoomStarting`에서 등록 함수를 다시 부르지 않는다(거기서는 서버 객체가 필요한 서버 규칙만 — [11장](11-MultiplayerReady.md) 2절).
 > - Bootstrap은 Unity의 게임 시작에 붙는 코드라 Client에 있다. 그래서 등록 내용(무엇을 감시하고 무엇을 할지)은 Rules에 두고 여기서는 한 줄로 부른다 — 규칙 테스트는 손으로 만든 세션에 같은 함수를 부른다. `GameDatabase`를 쓰려면 `using GBible.Data;`.
 > - `RegisterRules`·`Started` 어디에서도 하지 않는 것: DB에 있는 플레이어 데이터 정의(DB가 했다), 처음 값 넣기(판을 여는 행동 `StartRun`이나 클래스 초기값, [03장](03-GameLoop.md)), DB › 개발 › 개발 명령의 항목 등록(저절로 된다), 패시브 효과·상태 효과·액티브 효과 등록(DB 항목이라 저절로).
 

@@ -40,7 +40,7 @@
 | "전투 연출 속도 ×1~×3" | 설정(적용 대상 없음) + `GameSettings.Changed`(5-3) |
 | "키 바꾸기, 겹치면 알림, 기본으로" | `GameInput.Rebind` · `RebindResult.Conflict` · `ResetBindings`(5-5) |
 
-> **규칙: 설정은 플레이어 데이터가 아니다.** 음량·언어·키는 그 기기의 사람이 정하는 값이라 슬롯을 바꿔도, Undo해도, 판을 불러와도, 멀티플레이 상대가 바꿔도 그대로여야 한다. 그래서 행동이 아니라 `GameSettings.Set`으로 바로 바꾼다. 게임 규칙에 영향을 주는 값(난이도처럼 결과를 바꾸는 것)은 설정이 아니라 플레이어 데이터(프로필)에 두고 행동으로 바꾼다.
+> **규칙: 설정은 플레이어 데이터가 아니다.** 음량·언어·키는 그 기기의 사람이 정하는 값이라 슬롯을 바꿔도, Undo해도, 판을 불러와도, 멀티플레이 상대가 바꿔도 그대로여야 한다. 그래서 행동이 아니라 `GameSettings.Set`으로 바로 바꾼다. [필수] 게임 규칙에 영향을 주는 값(난이도처럼 결과를 바꾸는 것)은 설정이 아니라 플레이어 데이터(프로필)에 두고 행동으로 바꾼다.
 
 ---
 
@@ -164,7 +164,7 @@
 
 ### 3-3. 선택 기능 '입력(키 바꾸기)' 켜기
 
-1. Input System 패키지(`com.unity.inputsystem`)를 들인다(`Packages/manifest.json` — 내려받기라 AI는 먼저 묻는다, 관례 0절).
+1. Input System 패키지(`com.unity.inputsystem`)를 들인다(`Packages/manifest.json`). [필수] 내려받기라 AI는 먼저 묻는다(관례 0절).
 2. **켜기**(선택 기능 ID `input`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `input`을 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "입력(키 바꾸기)" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_INPUT`과 프로젝트 asmdef 참조(Client·Editor에 `GBible.Input`)가 저절로 맞춰진다(`20-Setup.md` 6절).
 3. 그 컴파일이 끝난 뒤 `GameInput`을 쓴다. `InputAction`·`InputActionAsset` 같은 Input System 형식을 직접 쓰는 asmdef(보통 `MomoiProject.Client`)의 references에는 `Unity.InputSystem`을 손으로 더한다(저절로 더하지 않는다).
 
@@ -392,7 +392,7 @@ public static class BattleSpeedSetting
 
 ### 5-5. 키 바꾸기 화면
 
-**켤 때 한 번** — 동작 에셋은 Input System의 **프로젝트 전체 동작**(`InputSystem.actions` — Project Settings › Input System Package의 Project-wide Actions, 보통 `Assets/InputSystem_Actions.inputactions`)을 쓴다. 씬 오브젝트 · 인스펙터 연결이 필요 없다(관례 6절). `Client/InputBoot.cs`:
+**켤 때 한 번** — 동작 에셋은 기본으로 Input System의 **프로젝트 전체 동작**(`InputSystem.actions` — Project Settings › Input System Package의 Project-wide Actions, 보통 `Assets/InputSystem_Actions.inputactions`)을 쓴다. 씬 오브젝트 · 인스펙터 연결이 필요 없다(관례 6절). 예: `Client/InputBoot.cs`:
 
 ```csharp
 #if GBIBLE_INPUT

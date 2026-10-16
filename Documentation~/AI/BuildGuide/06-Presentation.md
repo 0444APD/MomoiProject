@@ -1,6 +1,6 @@
 # 06. 화면과 연출
 
-화면은 플레이어 데이터를 **읽기만** 하고, 값을 바꾸는 입력은 모두 행동으로 보낸다. 데이터는 행동이 끝나는 순간 최종 모습이 되고, 연출(피해 숫자·소리·대사)은 그 뒤를 시간을 두고 따라간다. 이 장의 코드는 모두 **Client 폴더**에 둔다(카드 던전은 `Client/Screens`·`Client/Presentation`).
+[필수] 화면은 플레이어 데이터를 **읽기만** 하고, 값을 바꾸는 입력은 모두 행동으로 보낸다. 데이터는 행동이 끝나는 순간 최종 모습이 되고, 연출(피해 숫자·소리·대사)은 그 뒤를 시간을 두고 따라간다. 이 장의 코드는 모두 **Client 폴더**에 둔다(카드 던전은 `Client/Screens`·`Client/Presentation`).
 
 화면의 문법·레이아웃·디자인은 **`UiGuide.md`**(UI 가이드)와 UI 키트(`Templates/UI/`)가, 화면 기능의 모든 칸·API는 매뉴얼 [35장](../../Manual/35-Screens.md)(화면)·[32장](../../Manual/32-View-Presentation-Scenes.md)(씬 오브젝트·연출 대기열)이 맡는다. 이 장은 카드 던전으로 흐름과 습관만 보인다.
 
@@ -146,7 +146,7 @@ hand.OnCreate = (element, id) => OnClick(element.Q<Button>("card"),
 
 - 규칙이 쏜 이벤트를 받아 연출을 튼다. 카드 던전은 `Rules.Damage`가 쏘는 `DamageDealt`·`EnemyKilled`를 받는다.
 - 연출은 `session.Events.SubscribeAfterAction<T>`로 받는다. 행동이 **성공한 뒤에만**, 쏜 순서대로 온다. 실패해 취소된 행동의 이벤트는 오지 않는다.
-- 받은 이벤트는 연출 대기열(`GameView.Present`)에 넣는다(4절). 받는 쪽에서는 플레이어 데이터를 바꾸지 않는다.
+- 받은 이벤트는 연출 대기열(`GameView.Present`)에 넣는다(4절). [필수] 받는 쪽에서는 플레이어 데이터를 바꾸지 않는다.
 
 ```csharp
 protected override void OnOpen()   // 화면 코드: Own에 맡기면 닫을 때 정리된다(MonoBehaviour면 OnDisable에서 Dispose)
@@ -167,6 +167,8 @@ protected override void OnOpen()   // 화면 코드: Own에 맡기면 닫을 때
 > - 미리보기(`Game.Preview`, 2절)에서 쏜 이벤트는 오지 않는다.
 
 > [!note]- 연출에서 하지 않는 것
+> 이 표는 모두 [필수].
+>
 > | 하지 않는 것 | 이유 |
 > |---|---|
 > | 받는 쪽에서 플레이어 데이터를 고친다 | 행동 밖 변경이 되어 Undo·저장·멀티플레이에서 빠진다 |
@@ -194,7 +196,7 @@ IEnumerator ShowDamage(DamageDealt hit)
 > 화염구로 고블린을 잡으면 `PlayCard`가 끝나는 순간 데이터는 최종 모습이다. 고블린은 `battle.enemies`에서 빠졌고, 남은 적의 체력은 깎였고, 전투에서 이겼다면 `battle`이 `null`이 되고 층이 올랐다. 화면이 그 프레임에 데이터대로 그리면 고블린이 피해 숫자도 없이 바로 사라진다.
 > - 그래서 다시 그리기는 기본으로 연출 대기열이 빌 때까지 기다린다(화면 `WaitForPresentation`, `GameView.Redraw`의 `waitForPresentation`). 피해 숫자 → 쓰러짐 연출이 끝난 다음 프레임 끝에 고블린이 화면에서 빠진다.
 > - 사라지는 순간 자체를 연출하려면 `ViewList`·`ElementList`의 `OnRemove`(1절).
-> - 체력 게이지는 다시 그릴 때 데이터 값으로 곧장 바꿔도 되고, 보이는 값을 데이터 값 쪽으로 몇 프레임에 걸쳐 따라가게 해도 된다(UiGuide 3-7 `KitGauge`). 어느 쪽이든 데이터는 건드리지 않는다.
+> - 체력 게이지는 다시 그릴 때 데이터 값으로 곧장 바꿔도 되고, 보이는 값을 데이터 값 쪽으로 시간을 두고 따라가게 해도 된다(`KitGauge` 기본 — 줄 때 0.35초 뒤 0.4초 동안, 찰 때 0.25초 뒤 0.3초 동안, UiGuide 3-7). 어느 쪽이든 데이터는 건드리지 않는다.
 
 > [!note]- 연출 대기열 자세히
 > | 이럴 때 | 이것 |
@@ -255,7 +257,7 @@ element.Q<Label>("title").text = Texts.Get("card.button", ("card", deckCard.card
 
 ## 6. 다이얼로그
 
-상점 층에 들어가면 상점 주인이 말을 걸고, "구경한다"를 고르면 상점 화면이 열린다. 대사·그래프는 **개발자 몫**이고(관례 18절), 코드는 **열기와 신호 받기**만 한다.
+상점 층에 들어가면 상점 주인이 말을 걸고, "구경한다"를 고르면 상점 화면이 열린다. [필수] 대사·그래프는 **개발자 몫**이다(관례 18절). 코드는 **열기와 신호 받기**만 한다.
 
 1. (AI) 다이얼로그를 켠다: `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `dialogue`(01장 1절). 다시 컴파일된 뒤 반영 스크립트에서 다이얼로그 UI 템플릿 `GBible.EditorTools.Graph.DialogueTemplate.Create()`를 한 번 부른다(부를 때마다 새 폴더를 만드므로 한 번만 도는 반영 스크립트 버전 하나에).
 2. (개발자) DB › **스탠딩 프로필**에 상점 주인(`merchant`)과 스탠딩 그림을 넣고, `MomoiProject › 다이얼로그 시스템 › 그래프`에서 다이얼로그 `shopkeeper`를 만든다: 시작 → 대사("어서 와, 모험가.", 화자 `merchant`) → 선택지 "구경한다" → **신호 보내기**(`openShop`) → 끝, 선택지 "나간다" → 끝. 시작 노드를 하나 더 두고 시작 ID를 `noGold`로 한다(대사 "돈이 모자라는군."). 다이얼로그·스탠딩 프로필은 개발자가 추가·삭제하는 종류다.
@@ -291,7 +293,7 @@ void Buy(string card)   // 상점 화면의 카드 버튼 — 돈이 모자라�
 
 > [!note]- 알아 둘 점
 > - 다이얼로그가 열려 있는 동안 재생기가 `GameTime.Pause`로 게임 시간을 멈춘다. 전투 연출도 함께 멈춘다. `GameView.Busy`도 참이라 화면 버튼의 행동이 막힌다(걸으면서 듣는 대사면 `Dialogues.BlocksInput = false`).
-> - 행동이 연 다이얼로그(결과 '다이얼로그 재생')는 이미 열린 대사가 있으면 끝난 뒤 차례로 열린다(한 행동이 대사를 둘 열어도 끊기지 않는다 — `Dialogues.WaitingCount`). 위 코드처럼 `Dialogues.Play`를 바로 부르면 지금 대사를 바꾼다. `Dialogues.Stop`은 기다리는 줄도 비운다.
+> - 대사는 한 채널이다(매뉴얼 24장 5.1): 열린 대사가 있을 때 다른 행동 · 코드(위 `Dialogues.Play`)가 열면 끼어들었다가 끝나면 그 대사로 돌아오고, 같은 행동이 한꺼번에 연 것은 차례로 열린다. `Dialogues.Stop`은 기다리던 것 · 돌아갈 곳도 비운다.
 > - 대사 원문의 `{…}`에는 모든 플레이어 데이터가 ID로 넘어가고, 점으로 값 안의 필드를 읽는다. "가진 돈은 {run.gold}골드군."
 > - 판을 불러온 뒤 `Dialogues.ResumeSaved()`를 부르면 저장할 때 보던 대사부터 이어 간다. 이어 하기(`GBibleRuntime.LoadRun`)가 성공한 다음에 부른다.
 > - 다이얼로그 화면(UXML·USS)은 프로젝트에 맞게 고치고, 필요한 동작은 `DialogueUIExtension`을 붙여 더한다. 코드는 요소를 이름(`dialogue-root`·`dialogue-text` …)으로만 찾으므로 모양은 자유롭게 바꿔도 된다. 다이얼로그의 배경 일러는 월드 쪽이다(UiGuide 1-8).

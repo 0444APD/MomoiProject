@@ -27,13 +27,13 @@
 > | Block 조합으로 나타내기 어려운 그 항목만의 결과 | AI | `[BindTo]` 함수 |
 > | 데이터 모양(어떤 칸이 있는가)·플레이어 입력 | AI | 클래스·행동 |
 > | 플레이어에게 보일 이름·글 | 원문은 명세서·개발자, 키는 AI | 텍스트 표(`<ID>.name`) |
-> | 레벨 배치·다이얼로그 그래프 | 개발자(AI는 데이터 모양과 연결만, 요청받으면 예시 하나) | `DeveloperAuthored` DB 종류·씬·그래프 창 |
+> | 레벨 배치·다이얼로그 그래프 | [필수] 개발자(AI는 데이터 모양과 연결만, 요청받으면 예시 하나) | `DeveloperAuthored` DB 종류·씬·그래프 창 |
 >
 > Block과 `[BindTo]`의 기준은 [04장](04-AddingContent.md) 2절.
 
 ## 2. 고르는 값은 키워드로
 
-등급·속성·카드 종류처럼 목록에서 고르는 칸은 enum 대신 키워드 그룹으로 둔다. Rules에 그룹을 쓰고, 필드에 `[Keyword]`를 붙인다.
+등급·속성·카드 종류처럼 목록에서 고르는 칸은 보통 키워드 그룹으로 둔다(규칙 코드가 값마다 다르게 도는 닫힌 목록은 enum도 된다 — 관례 18절). Rules에 그룹을 쓰고, 필드에 `[Keyword]`를 붙인다.
 
 ```csharp
 [KeywordGroup("등급")]
@@ -95,7 +95,7 @@ public bool upgradable;
 
 ## 4. 다른 항목을 가리키는 칸은 `[DataRef]`
 
-다른 DB 항목의 ID를 담는 `string`(또는 `List<string>`) 칸에는 모두 `[DataRef(typeof(종류))]`를 붙인다. 원본 클래스와 판 데이터 클래스 둘 다다.
+[필수] 다른 DB 항목의 ID를 담는 `string`(또는 `List<string>`) 칸에는 모두 `[DataRef(typeof(종류))]`를 붙인다. 원본 클래스와 판 데이터 클래스 둘 다다.
 
 | 칸 | 붙인 것 |
 |---|---|
@@ -232,7 +232,7 @@ public override void Validate(IValidationContext context)
 ## 10. 체크리스트
 
 - [ ] AI가 만들 것과 개발자가 바꿀 것을 나눠 알렸다.
-- [ ] 고르는 값은 모두 키워드 그룹이고 필드에 `[Keyword]`가 있다(enum 칸이 없다).
+- [ ] 고르는 값은 키워드 그룹이고 필드에 `[Keyword]`가 있다(enum은 규칙 코드가 값마다 다르게 도는 닫힌 목록만).
 - [ ] 게임이 채우는 칸은 `[Hide]`, 조건부 칸은 `[ShowIf]`, 뜻이 모자란 칸은 `[FieldLabel]`로 정리했다.
 - [ ] 다른 DB 항목을 가리키는 칸(원본·판 데이터 모두)에 `[DataRef]`가 있고, 비워도 되는 칸만 `Optional = true`다.
 - [ ] 모든 Block에 `[BlockInfo]` 이름·분류·설명이 있고, 칸이 있는 Block에는 `Sentence`가 있다.

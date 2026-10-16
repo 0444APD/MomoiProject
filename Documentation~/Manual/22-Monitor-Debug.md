@@ -200,7 +200,7 @@ var evt = EventSimulator.Create(typeof(EnemyKilled), new System.Collections.Gene
 
 ### 코드로 쓰는 법
 
-게임 코드에서는 행동 안에서 `Game.Events.Publish(이벤트)`로 쏜다(행동 밖에서 쏘면 그 이벤트로 바뀐 로그·값이 Undo되지 않는다). 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
+[필수] 게임 코드에서는 행동 안에서 `Game.Events.Publish(이벤트)`로 쏜다(행동 밖에서 쏘면 그 이벤트로 바뀐 로그·값이 Undo되지 않는다). 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
 
 ```csharp
 using GBible;
@@ -218,7 +218,7 @@ public sealed class KillPopup : MonoBehaviour
 ### 주의할 점
 
 - 매개변수 없는 생성자가 없는 이벤트 클래스는 만들 수 없다: "이벤트 '…'에 매개변수 없는 생성자가 없어 테스트로 만들 수 없습니다."
-- `SubscribeAfterAction`으로 받는 쪽(연출·UI)에서는 플레이어 데이터를 바꾸지 않는다. 값을 바꾸는 반응은 트리거·결과나 `Subscribe`로 받는 규칙에서 한다(`10-Events.md` 2-7).
+- [필수] `SubscribeAfterAction`으로 받는 쪽(연출·UI)에서는 플레이어 데이터를 바꾸지 않는다. 값을 바꾸는 반응은 트리거·결과나 `Subscribe`로 받는 규칙에서 한다(`10-Events.md` 2-7).
 
 ---
 
@@ -318,7 +318,7 @@ DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해진다. S
 
 **코드가 필요한 명령 — DB 항목 + `[BindTo]`.** 규칙 함수를 거쳐야 하는 명령(예: 적 모두 처치 — 피해 규칙을 거쳐야 처치 이벤트·로그가 게임과 같게 돈다)은 DB 항목을 만들고 그 ID에 `[BindTo]`를 붙인다. 결과 칸은 잠기고 이 함수가 결과가 된다. 실행은 똑같이 행동 하나라 Undo된다(`13-BindTo.md`). 행동을 실행하는 명령도 이것이다 — '행동 실행' 결과 Block은 없으므로 함수 안에서 `c.Game.Do(new 행동 { … })`(그 명령 행동의 일부로 돈다).
 
-**`[BindTo]` 명령에는 값 칸이 없다.** 결과 칸이 잠기고 개발 명령 항목(`DebugCommandData`)에는 버튼 이름·분류·설명뿐이라, 개발자가 바꿀 값(몇 개·어느 인스턴스·어느 대상)을 둘 곳이 없다. **값이 필요한 명령은 결과 Block으로 조립한다**: 기본 Block(플레이어 데이터에 주기·이벤트 쏘기·대상에게 효과 …)으로 되면 그것을, 안 되면 그 동작을 값 칸이 있는 재사용 결과 Block(프로젝트 `Outcome`, `12-Outcomes.md`)으로 만들어 명령의 결과 칸에 넣는다 — 문장 안의 값을 개발자가 DB에서 바꾼다(관례 18절). 코드에 숫자를 적은 `[BindTo]` 명령은 값이 늘 같은 것(적 모두 처치)만.
+**`[BindTo]` 명령에는 값 칸이 없다.** 결과 칸이 잠기고 개발 명령 항목(`DebugCommandData`)에는 버튼 이름·분류·설명뿐이라, 개발자가 바꿀 값(몇 개·어느 인스턴스·어느 대상)을 둘 곳이 없다. **값이 필요한 명령은 결과 Block으로 조립한다**: 기본 Block(플레이어 데이터에 주기·이벤트 쏘기·대상에게 효과 …)으로 되면 그것을, 안 되면 그 동작을 값 칸이 있는 재사용 결과 Block(프로젝트 `Outcome`, `12-Outcomes.md`)으로 만들어 명령의 결과 칸에 넣는다 — 문장 안의 값을 개발자가 DB에서 바꾼다(관례 18절). [필수] 코드에 숫자를 적은 `[BindTo]` 명령은 값이 늘 같은 것(적 모두 처치)만 만든다.
 
 ```csharp
 using System.Linq;
@@ -336,7 +336,7 @@ public static class DebugCode
 }
 ```
 
-**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 등록 자리는 `Client/Bootstrap.cs`(`20-Setup.md` 4절): 판 데이터를 바꾸는 명령은 `RegisterRules`(`GBibleRuntime.SessionCreated` — 멀티 서버 세션에도 온다), 화면만 쓰는 명령(시간 배속·봇 조종 등)은 `Started`(화면 세션에만). 동작은 그대로 불리므로, 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 불러야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
+**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 등록 자리는 `Client/Bootstrap.cs`(`20-Setup.md` 4절): 판 데이터를 바꾸는 명령은 `RegisterRules`(`GBibleRuntime.SessionCreated` — 멀티 서버 세션에도 온다), 화면만 쓰는 명령(시간 배속·봇 조종 등)은 `Started`(화면 세션에만). 동작은 그대로 불린다. [필수] 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 부른다 — 그래야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
 
 **멀티에서 명령이 도는 곳**(40장 3-1): `Started`에서 등록한 명령은 이 화면(클라이언트)에서 돈다 — 서버로 넘기지 않는다(서버 세션에는 `Started`가 오지 않아 같은 명령이 없다). `RegisterRules`에서 등록한 명령과 DB › 개발 명령은 클라이언트가 누르면 서버에서 **누른 사람으로**(`ActingAs`) 돈다 — DB 결과 Block과 코드가 쓰는 플레이어마다 이름(`bag`)도 누른 사람의 몫이다. 시험 모드의 봇에게 시키는 명령은 `Started`에서 `GameNet.ExtraClients[0].Session.Do(…)`(봇의 번호로 서버에 간다).
 

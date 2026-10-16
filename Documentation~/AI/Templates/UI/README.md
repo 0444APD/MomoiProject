@@ -7,7 +7,7 @@
 - 패널 면은 **단색 + 아주 옅은 폴리곤 조각** — 그림 파일 없이 코드 `KitPanel`이 그린다. 모양은 4가지(직각 · 약간 둥근 · 모서리 자름 · 알약), 변칙은 선 · 둥글기 · 각으로만.
 - 뒷배경은 **DB › 화면의 '뒷배경' 칸**(일반 배경 · 블러 = 알림만 · UI 배경)이 깐다 — 화면 UXML에 흐림 · 어둡게 막을 직접 넣지 않는다. UI 배경의 옅은 조각만 화면 UXML 맨 아래에 `KitPanel`(`kit-pn-faint`)로.
 - 움직임은 GBible이 맡는다(화면 열고 닫기 · `momoi-motion` · `ScreenMotion.Show` — 나타남 0.189초 · 사라짐 0.135초, UiGuide 3-5). 버튼 · 칸의 올림 · 누름은 키트 USS에 있다.
-- 글꼴: DB › 화면 설정의 '글꼴 에셋'(TextCore Font Asset — 굵기 표에 Bold를 이어 둔 것)을 쓴다. 한글 고딕(예: Pretendard, OFL)은 개발자가 승인하면 AI가 받아 `Assets/Dev/Fonts/`에 넣는다(내려받기라 먼저 묻는다).
+- 글꼴: DB › 화면 설정의 '글꼴 에셋'(TextCore Font Asset — 굵기 표에 Bold를 이어 둔 것)을 쓴다. [필수] 한글 고딕(예: Pretendard, OFL)은 개발자가 승인하면 AI가 받아 `Assets/Dev/Fonts/`에 넣는다(내려받기라 먼저 묻는다).
 
 ## 설치(단계 2를 시작할 때 한 번)
 

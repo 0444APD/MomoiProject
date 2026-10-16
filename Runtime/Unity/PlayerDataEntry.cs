@@ -17,7 +17,7 @@ namespace GBible.Data
         [FieldLabel("플레이어마다"), Tooltip("멀티: 플레이어마다 따로 둔다(실제 키 'ID:번호'). 게임 코드 · DB Block이 이 ID를 읽고 쓰면 지금 행동을 한 플레이어의 것. 싱글은 이 화면의 플레이어 하나")] public bool perPlayer;
         [FieldLabel("그 사람에게만 보임"), ShowIf(nameof(perPlayer)), Tooltip("켜면 그 플레이어에게만 보낸다(손패 · 숨긴 편성). 끄면 모두에게")] public bool ownerOnly;
         [FieldLabel("서버만(그 사람에게도 숨김)"), ShowIf(nameof(perPlayer)), Tooltip("켜면 아무에게도 보내지 않는다 — 서버 규칙만 읽는다(덱 순서 · 뽑을 카드). '그 사람에게만 보임'보다 먼저")] public bool serverOnly;
-        [FieldLabel("매칭 계정에 남김"), ShowIf(nameof(perPlayer)), Tooltip("매칭큐 서버: 방이 열릴 때 그 사람 계정에서 읽고, 매치가 끝나면 계정에 다시 쓴다(재화 · 해금 · 로스터 — 클라이언트가 고칠 수 없다). 취소된 매치는 쓰지 않는다. 싱글 · 사설 서버에서는 보통 플레이어 데이터")] public bool onAccount;
+        [FieldLabel("서버 계정에 남김"), ShowIf(nameof(perPlayer)), Tooltip("멀티의 사람마다 남는 값(재화 · 해금 · 로스터 · 컬렉션 — 멀티의 데이터는 서버 것): 서버의 그 사람 계정에 둔다. 매칭큐는 방이 열릴 때 읽고 매치가 끝나면 쓴다(취소된 매치는 쓰지 않음, 계정 방은 행동마다), 사설 서버(방장 · 화면 없는 서버)는 들어올 때 읽고 나갈 때 · 몇 초마다 · 닫을 때 쓴다. 판 저장 · 새 판에는 들지 않는다. 클라이언트가 고칠 수 없다")] public bool onAccount;
 
         public Type ValueType => TypeResolver.Find(valueType);
 
@@ -73,7 +73,7 @@ namespace GBible.Data
             foreach (var problem in DataModel.Validate(type)) context.Error("담을 수 없는 필드: " + problem);
             if (!TryParseDefault(type, out _, out var error)) context.Error(error);
             if (perPlayer && zone != DataZone.Session)
-                context.Error("'플레이어마다'는 판(Session) 구역만 됩니다 — 프로필은 기기마다 하나라 각자 자기 프로필을 씁니다(매치가 끝나도 남길 값은 '매칭 계정에 남김').");
+                context.Error("'플레이어마다'는 판(Session) 구역만 됩니다 — 사람마다 남는 값은 '서버 계정에 남김'으로(멀티의 데이터는 서버 것, 기기에는 설정만).");
             var kind = DataModel.Of(type).Kind;
             if (kind != DataKind.Scalar && kind != DataKind.Enum && !string.IsNullOrEmpty(defaultValue))
                 context.Warning("클래스·컬렉션 형식은 기본값 글자를 쓰지 않습니다(클래스의 초기값을 씁니다).");

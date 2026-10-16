@@ -48,9 +48,9 @@
        └ OnRemove → 대기열에 "죽는 모습" → 끝나면 그 적의 오브젝트를 없앤다
 ```
 
-> **규칙: 화면은 데이터를 읽기만 한다.** 입력은 행동을 보내고(`OnClick`·`GameScreens.Do` → `Game.Do`), 그림은 데이터에서 그린다. 화면이 데이터를 직접 고치면 Undo·저장·멀티플레이가 그 변경을 모른다.
+> [필수] **규칙: 화면은 데이터를 읽기만 한다.** 입력은 행동을 보내고(`OnClick`·`GameScreens.Do` → `Game.Do`), 그림은 데이터에서 그린다. 화면이 데이터를 직접 고치면 Undo·저장·멀티플레이가 그 변경을 모른다.
 
-> **규칙: 연출은 `SubscribeAfterAction` → `Present`.** 행동이 성공한 뒤에만 받으므로 실패해 취소된 행동의 피해 숫자가 뜨지 않는다. 바로 받는 쪽(`Events.Subscribe`)은 규칙용이다. 실패한 행동·미리보기 실행(33장)에서도 불린다.
+> **규칙: 연출은 `SubscribeAfterAction` → `Present`(실시간은 → `Play`, 2-2).** 행동이 성공한 뒤에만 받으므로 실패해 취소된 행동의 피해 숫자가 뜨지 않는다. 바로 받는 쪽(`Events.Subscribe`)은 규칙용이다. 실패한 행동·미리보기 실행(33장)에서도 불린다.
 
 ---
 
@@ -145,7 +145,7 @@
   - 글자는 씬 이름(`Battle`)이나 경로(`Assets/…/Battle.unity`)다. 지금 씬과 같으면 아무 일도 없다.
   - 비어 있으면 '빈 값일 때 씬'을 연다(그것도 비면 그대로).
   - Build Settings의 씬 목록에 없는 씬이면 열지 않고 타임라인에 경고 "씬 'Battel'을(를) 열 수 없습니다(Build Settings의 씬 목록에 있는지 확인)."를 남긴다.
-- **규칙은 행동 안에서 그 필드만 바꾼다**(`run.scene = "Battle"`). 씬을 직접 열지 않는다. 그래서:
+- [필수] **규칙은 행동 안에서 그 필드만 바꾼다**(`run.scene = "Battle"`). 씬을 직접 열지 않는다. 그래서:
   - 이어 하기로 판을 불러오면 그 판의 씬이 열린다.
   - 새 판·판 끝으로 값이 비면 '빈 값일 때 씬'(보통 타이틀)이 열린다.
   - Undo로 값이 돌아가면 씬도 돌아간다.
@@ -163,7 +163,7 @@
 - `Game.WorldFlag(이름)`: 값이 있고 `"false"`·`"0"`이 아니면 참.
 - `Game.SetWorld(이름, true)`는 `"true"`를 넣고, `Game.SetWorld(이름, false)`(또는 값 `null`)는 그 구역의 값을 지운다. 단 판 값을 끌 때 같은 이름의 프로필 값이 있으면 지우는 대신 `"false"`를 둔다. 그래서 이번 판에서는 확실히 꺼지고, 새 판이 되면 프로필 값이 다시 보인다.
 - `Game.ClearWorld(이름)`: 판 값과 프로필 값을 모두 지운다.
-- 행동 안에서 바꾼다. 플레이어 데이터라서 Undo·판 저장·멀티플레이가 그대로다. 처음 바꿀 때 키가 저절로 정의된다.
+- [필수] 행동 안에서 바꾼다. 플레이어 데이터라서 Undo·판 저장·멀티플레이가 그대로다. 처음 바꿀 때 키가 저절로 정의된다.
 - 새 판이면 판 값은 사라지고 프로필 값은 남는다.
 - 이름이 비면 `ArgumentException`("[MomoiProject] 월드 상태 이름이 비어 있습니다."). 이름은 **"씬 이름.오브젝트 이름"**(`Map.chest3`)을 권한다. 씬마다 같은 오브젝트 이름이 있어도 겹치지 않는다.
 
@@ -498,7 +498,7 @@ public class CardView : MonoBehaviour
 }
 ```
 
-- `Pointer`는 Input System 패키지다(Player Settings › Active Input Handling이 새 Input System만이면 `UnityEngine.Input`은 예외를 낸다). 프로젝트 Client asmdef는 패키지를 저절로 참조하지 않으므로 `references`에 `"Unity.InputSystem"`을 더한다(GBible이 맞추는 모듈 참조와 따로 남는다). 패키지가 없으면 들이기 전에 묻는다(내려받기 — 관례 0절).
+- `Pointer`는 Input System 패키지다(Player Settings › Active Input Handling이 새 Input System만이면 `UnityEngine.Input`은 예외를 낸다). 프로젝트 Client asmdef는 패키지를 저절로 참조하지 않으므로 `references`에 `"Unity.InputSystem"`을 더한다(GBible이 맞추는 모듈 참조와 따로 남는다). [필수] 패키지가 없으면 들이기 전에 묻는다(내려받기 — 관례 0절).
 - `cd-pop`(강조 숫자 — `position: absolute`, `translate: -50% -100%`, 글꼴 외곽선 · 그림자, UiGuide 3-1)은 **테마 USS**(DB › 화면 설정 › 테마)에 둔다 — 겹침 층(`Overlay`) 요소의 예외(UiGuide 1-2 USS 줄): 화면 트리 밖이라 화면 항목에 붙인 USS(키트 · `UI/Screens/<프로젝트>.uss`)가 닿지 않고, 루트의 라이브러리 기본 · 테마 USS만 닿는다(35장 2-7).
 - 카드의 이름 · 비용, 적의 이름 · 체력 게이지처럼 월드 오브젝트에 붙는 글 · 칸은 UI Toolkit 칸이 화면 코드의 `Tick`에서 그 오브젝트를 따라간다(UiGuide 1-8). 핸드처럼 움직이지 않는 카드는 통째로 UI 목록(35장 5-1 `ElementList`)이어도 된다 — 이 장의 핸드는 월드 쪽 모양이다.
 
@@ -526,7 +526,7 @@ public class DamagePopups : MonoBehaviour
 
 - 마지막 적을 쓰러뜨리는 카드도 피해 숫자가 그 적의 그림 위에 뜬다. 적은 데이터에서 이미 빠졌지만, 적 목록의 다시 그리기가 연출을 기다리므로 그림은 아직 있다(5-2).
 - 독 피해처럼 턴 끝에 여러 번 들어오는 피해도 차례로 하나씩 뜬다. 사이를 띄우려면 `GameView.Present(0.1f)`를 함께 넣는다.
-- 게임 규칙의 난수(`Game.Random`)를 연출에 쓰지 않는다. 연출의 무작위는 `UnityEngine.Random`(07장).
+- [필수] 게임 규칙의 난수(`Game.Random`)를 연출에 쓰지 않는다. 연출의 무작위는 `UnityEngine.Random`(07장).
 - 턴제의 모양이다. 실시간 게임이면 `Present` 대신 `Play`로 튼다(5-9). 대기열에 쌓이면 숫자가 줄을 서서 늦게 뜨고 그동안 입력이 막힌다(2-2).
 
 ### 5-2. 적 목록 — ViewList + 죽는 연출(`OnRemove`)

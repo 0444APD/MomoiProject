@@ -1,6 +1,6 @@
 # 07. 난수와 시간
 
-**한 줄 요약**: 게임 로직의 난수는 `Game.Random("이름")`(결정론 난수 스트림), 게임 로직의 시간은 `session.Clock`(게임 시계)을 쓴다. 둘 다 Undo·스냅샷 되감기·판 저장에 함께 따라간다. 일시정지·배속은 `GameTime`이 `Time.timeScale`로 한꺼번에 조절한다. 꺼 둔 동안에도 흐르는 현실 시각(오프라인 보상·일일 초기화)은 `Game.Now`·`Game.Day`를 쓴다. 행동에 찍혀 다시 돌려도 같다. 행운·"모든 확률 2배"가 고칠 수 있는 확률은 `Game.Chance`로 굴린다. 시드 입력·일일 도전은 시드를 주고 새 판을 연다(`GBibleRuntime.NewRun(session, seed)`).
+**한 줄 요약**: [필수] 게임 로직의 난수는 `Game.Random("이름")`(결정론 난수 스트림), 게임 로직의 시간은 `session.Clock`(게임 시계)을 쓴다(규칙에서 `UnityEngine.Random`·`System.Random`·`DateTime.Now`·`Time`은 쓰지 않는다). 둘 다 Undo·스냅샷 되감기·판 저장에 함께 따라간다. 일시정지·배속은 `GameTime`이 `Time.timeScale`로 한꺼번에 조절한다. 꺼 둔 동안에도 흐르는 현실 시각(오프라인 보상·일일 초기화)은 `Game.Now`·`Game.Day`를 쓴다. 행동에 찍혀 다시 돌려도 같다. 행운·"모든 확률 2배"가 고칠 수 있는 확률은 `Game.Chance`로 굴린다. 시드 입력·일일 도전은 시드를 주고 새 판을 연다(`GBibleRuntime.NewRun(session, seed)`).
 
 **언제 쓰는가**
 
@@ -115,7 +115,7 @@ double now = Game.Session.Clock.Time;    // 게임 시간(초)
 - 일시정지 중(`deltaTime`이 0)에는 `EndFrame`을 부르지 않는다. 시계가 멈추고 스냅샷도 찍히지 않지만, 플레이어 데이터 Sync와 조건 평가는 계속한다.
 - 세션을 직접 만들었다면 `session.EndFrame(deltaTime)`을 직접 부른다.
 - 행동을 실행하면 그때의 `Tick`이 행동의 `tick` 필드에 적힌다. 기록(Journal)의 각 줄도 틱을 갖는다.
-- 쿨다운·지속 시간처럼 되감기·저장에 따라가야 하는 시각은 `Time.time`이 아니라 `Clock.Time` 기준으로 플레이어 데이터에 적는다.
+- [필수] 쿨다운·지속 시간처럼 되감기·저장에 따라가야 하는 시각은 `Time.time`이 아니라 `Clock.Time` 기준으로 플레이어 데이터에 적는다.
 
 ### 2.6 일시정지: `GameTime.Pause` · `Resume`
 
@@ -185,9 +185,9 @@ TimeSpan away = Game.Now - profile.lastSeen;               // 꺼 둔 시간(오
 - 이미 `utc`가 있는 행동(멀티플레이로 받은 행동, 기록에서 다시 돌리는 행동)은 그 값을 그대로 쓴다. 그래서 어디서 언제 다시 돌려도 결과가 같다.
 - 미리보기(`Game.Preview`·`CanDo`)도 시각을 찍고, 끝나면 지운다(같은 객체를 나중에 `Do`하면 그때 시각).
 - 행동 밖(씬 코드)에서는 부를 때의 지금 시각이다. 화면의 "남은 시간" 표시에 쓴다.
-- 규칙(행동·Block·트리거 결과)에서는 `DateTime.Now`·`DateTime.UtcNow`를 쓰지 않는다. `Game.Now`를 쓴다.
+- [필수] 규칙(행동·Block·트리거 결과)에서는 `DateTime.Now`·`DateTime.UtcNow`를 쓰지 않는다. `Game.Now`를 쓴다.
 - 플레이어 데이터에 시각을 적을 때는 `DateTime` 필드(또는 `long` 밀리초)에 `Game.Now`를 넣는다. 저장·Undo가 그대로 따라간다.
-- **기간 한정(이벤트 시작·끝 날짜)**: DB에는 날짜 칸이 없다. DB 종류에 UTC 글자 칸(`2026-11-01T00:00:00Z`)을 두고, 규칙이 `DateTime.Parse(글자, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)`로 읽어 `Game.Now`와 비교한다. 형식 검사는 그 DB 종류의 `ValidateData(IValidationContext context)`에서 한다(읽지 못하면 `context.Error(…)` — 개발자가 잘못 적으면 DB 검증에 뜬다).
+- **기간 한정(이벤트 시작·끝 날짜)**: DB에는 날짜 칸이 없다. 기본은 DB 종류에 UTC 글자 칸(`2026-11-01T00:00:00Z`)을 두고, 규칙이 `DateTime.Parse(글자, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)`로 읽어 `Game.Now`와 비교한다. 형식 검사는 그 DB 종류의 `ValidateData(IValidationContext context)`에서 한다(읽지 못하면 `context.Error(…)` — 개발자가 잘못 적으면 DB 검증에 뜬다).
 
 ### 2.12 날짜 번호: `Game.Day` · `Game.Week`
 
@@ -230,8 +230,8 @@ public static class ClockSetup
 | `RealClock` (`Func<DateTime>`) | 비움 = 이 컴퓨터의 시계(`DateTime.UtcNow`) | 현실 시각의 출처. UTC(`DateTimeKind.Utc`)를 돌려준다. 시험에서는 고정 시각(4.9), 서버·Steam 시각을 쓸 때는 그것 |
 | `TimeZone` (`TimeZoneInfo`) | 비움 = 싱글은 이 컴퓨터의 시간대, 멀티(서버·클라이언트)는 UTC | `Day`·`Week`를 셀 시간대 |
 
-- 비우면 싱글 게임은 플레이어마다 자기 지역 시각으로 날이 바뀐다(싱글은 이대로 둔다). 멀티플레이(세션이 서버·클라이언트)는 서버·클라이언트 모두 UTC로 세고(판정과 미리보기가 다른 날을 세지 않게), 처음 셀 때 타임라인에 경고를 한 번 남긴다 — 멀티는 시간대를 정한다.
-- 모든 플레이어가 같은 순간에 초기화돼야 하면(서버 이벤트·랭킹) 시간대를 정한다. 시간대 이름(`FindSystemTimeZoneById`)은 Windows·모바일이 달라서, 위처럼 고정 차이로 만든다.
+- 비우면 싱글 게임은 플레이어마다 자기 지역 시각으로 날이 바뀐다(싱글은 보통 이대로 둔다). 멀티플레이(세션이 서버·클라이언트)는 서버·클라이언트 모두 UTC로 세고(판정과 미리보기가 다른 날을 세지 않게), 처음 셀 때 타임라인에 경고를 한 번 남긴다 — 멀티는 시간대를 정한다.
+- 모든 플레이어가 같은 순간에 초기화돼야 하면(서버 이벤트·랭킹) 시간대를 정한다. 시간대 이름(`FindSystemTimeZoneById`)은 Windows·모바일이 달라서, 보통 위처럼 고정 차이로 만든다.
 - DB › Bootstrap에 칸은 없다. `Configuring`에서, 세션을 직접 만들면 `new SessionOptions { … }`에서 정한다.
 - 개발 빌드·에디터에서는 `GBibleRuntime`이 `Configuring` 뒤에 이 시계 위로 테스트용 옮김(`TestClock.Offset` — 개발 명령 '시간 › 현실 시각 +1시간 / +1일 / 지금으로', 4.7)을 더한다(출시 빌드에서는 얹지 않는다). 규칙은 `TestClock`을 직접 읽지 않는다(`Game.Now`·`Game.Day`만).
 
@@ -279,7 +279,7 @@ GBibleRuntime.NewRun(session);                                       // 시드 �
 - `GBibleRuntime.NewRun(session, seed)` · `session.NewRun(seed)`: 판 값을 처음 값으로 되돌린 뒤 마스터 시드를 그 시드로 바꾸고 모든 스트림을 처음 상태로 맞춘다(`session.Random.Reseed`). 같은 시드 = 같은 판이다. 시드를 주지 않으면 스트림은 앞 판에서 이어서 흐른다.
 - `RandomStreams.SeedOf(글자)`: 앞뒤 빈칸을 떼고 대문자로 맞춘 뒤 숫자 시드로 바꾼다. `" abcd1234 "`와 `"ABCD1234"`는 같은 판이다.
 - 일일 도전 = 날짜 글자를 시드로 쓴다. 모두 같은 날 같은 판을 받는다.
-- 같은 시드여도 판을 여는 행동이 난수를 뽑는 차례가 같아야 같은 판이다. 덱·맵은 `NewRun` 바로 뒤의 새 판 행동에서 만든다.
+- 같은 시드여도 판을 여는 행동이 난수를 뽑는 차례가 같아야 같은 판이다. 기본은 덱·맵을 `NewRun` 바로 뒤의 새 판 행동에서 만든다.
 - 시드로 연 판도 판 저장에 마스터 시드·스트림 상태가 들어간다. 이어 하면 그 시드 그대로다(3절).
 - 새 판 자체의 규칙(행동 밖에서 부른다, 판 저장 파일 삭제)은 06장 2.3이다.
 
@@ -298,13 +298,13 @@ GBibleRuntime.NewRun(session);                                       // 시드 �
 | 프로필(`ExportMeta`) | 저장하지 않는다 | 저장하지 않는다 | 저장하지 않는다 |
 | 새 판(`NewRun(seed)`) | 시드를 주면 마스터 시드를 바꾸고 모든 스트림을 처음 상태로. 주지 않으면 그대로 이어서 | 그대로 | — |
 
-**주의 — Undo는 "모든 스트림"을 행동 직전으로 되돌린다.** 그 행동 뒤에 행동 밖에서 같은 세션의 난수를 뽑았다면(씬 코드의 연출 등) 그 소비도 함께 되돌아간다. 연출용 무작위(파티클 흔들림, 대사 고르기 등)는 `UnityEngine.Random`을 쓰고, `Game.Random`은 규칙 계산에만 쓴다.
+**주의 — Undo는 "모든 스트림"을 행동 직전으로 되돌린다.** 그 행동 뒤에 행동 밖에서 같은 세션의 난수를 뽑았다면(씬 코드의 연출 등) 그 소비도 함께 되돌아간다. [필수] `Game.Random`은 규칙 계산에만 쓴다. 연출용 무작위(파티클 흔들림, 대사 고르기 등)는 `UnityEngine.Random`을 쓴다.
 
 ---
 
 ## 4. 상황별 예제
 
-예제는 문법을 보이려고 숫자(명중률·8시간·새벽 4시)를 코드에 적었다. 프로젝트에서는 바꿀 숫자를 DB › 밸런싱 값(`Game.Balance`, 30장)에서 읽고, 피해·회복은 규칙 함수(행동 직전 이벤트 자리, 관례 4절)를 거친다.
+예제는 문법을 보이려고 숫자(명중률·8시간·새벽 4시)를 코드에 적었다. [필수] 프로젝트에서는 바꿀 숫자를 DB › 밸런싱 값(`Game.Balance`, 30장)에서 읽는다. 피해·회복은 규칙 함수(행동 직전 이벤트 자리, 관례 4절)를 거친다.
 
 ### 4.1 턴제: 명중·치명타·피해
 

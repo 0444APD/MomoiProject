@@ -23,7 +23,7 @@
 | 기본 화면 | 라이브러리에 들어 있는 범용 화면: 고르기 창 · 확인 · 설정 · 슬롯 · 일시정지(+ 알림). 코드로 만들고 테마 USS로 모양을 바꾼다. |
 | 테마 USS | 모든 화면에 붙는 USS(DB › 화면 설정 › 테마 USS, 기본 `Assets/MomoiProject/UI/Theme.uss`). 색·글자 크기 변수(`--momoi-…`)와 클래스(`.momoi-button` …). |
 | Panel Settings | UI Toolkit의 패널 설정(화면 크기 맞춤·기본 테마). `Assets/MomoiProject/UI/PanelSettings.asset`. |
-| 알림 (Toast) | 화면 아래쪽에 잠깐 뜨는 한 줄. 입력을 막지 않는다. |
+| 알림 (Toast) | 화면 아래쪽에 잠깐(기본 2.5초) 뜨는 한 줄. 입력을 막지 않는다. |
 
 ---
 
@@ -46,7 +46,7 @@ Esc(뒤로) → GameScreens.Back: 맨 위 창·팝업을 닫는다(뒤로로 닫
 선택 대기가 생김(Game.Ask·선택 요구·가중치 표에서 고르기) → 기본 고르기 창이 저절로 → 답하면 닫힘
 ```
 
-> **규칙: 화면은 읽기만, 바꾸기는 행동.** 버튼이 플레이어 데이터를 직접 고치지 않는다(Undo·저장·멀티가 깨진다). 토글·슬라이더에 binding-path를 붙이면 값을 **보이기만** 하고, 플레이어가 바꾼 값은 `RegisterValueChangedCallback`에서 행동으로 보낸다. 설정(기기마다의 값)은 플레이어 데이터가 아니라 `GameSettings.Set`이다(기본 설정 화면이 한다).
+> [필수] **규칙: 화면은 읽기만, 바꾸기는 행동.** 버튼이 플레이어 데이터를 직접 고치지 않는다(Undo·저장·멀티가 깨진다). 토글·슬라이더에 binding-path를 붙이면 값을 **보이기만** 하고, 플레이어가 바꾼 값은 `RegisterValueChangedCallback`에서 행동으로 보낸다. 설정(기기마다의 값)은 플레이어 데이터가 아니라 `GameSettings.Set`이다(기본 설정 화면이 한다).
 
 > **규칙: 값 칸은 binding-path, 코드는 그다음.** 체력·골드처럼 값 하나를 글로 보이는 칸은 화면 코드에 쓰지 않는다. 화면 코드는 버튼·목록·계산이 필요한 칸만 맡는다.
 
@@ -59,7 +59,7 @@ Esc(뒤로) → GameScreens.Back: 맨 위 창·팝업을 닫는다(뒤로로 닫
 - `GameScreens.Open(id)`는 그 화면을 열고 화면 코드를 돌려준다. **이미 열려 있으면 그대로** 돌려준다(같은 화면이 둘 열리지 않는다). 다시 열려면 닫고 연다.
 - DB에 없는 ID면 `InvalidOperationException`("[MomoiProject] 없는 화면 'shp'입니다(DB › 화면).").
 - **층**: 바탕(HUD) · 창(메뉴) · 팝업 · 알림 순으로 위다. 같은 층에서는 나중에 연 것이 위다.
-- **뒷배경**(`ScreenBackdrop`, UiGuide 3-1): 일반 배경(기본 — 덮개가 투명해 뒤의 장면이 그대로) · 블러(뒤를 흐리고 아주 옅게 어둡게 — 알림성 화면만) · UI 배경(화면 전체 단색 `--momoi-ui-backdrop` — 화면을 나눠 채우는 정보형만, 옅은 조각은 화면 UXML의 KitPanel). 기본 화면은 확인 = 블러, 설정 · 세이브 슬롯 = UI 배경, 고르기 · 일시정지 = 일반.
+- **뒷배경**(`ScreenBackdrop`, UiGuide 3-1): 일반 배경(기본 — 덮개가 투명해 뒤의 장면이 그대로) · 블러(뒤를 `blur(10px)`로 흐리고 `--momoi-backdrop`으로 아주 옅게 어둡게 — 알림성 화면만) · UI 배경(화면 전체 단색 `--momoi-ui-backdrop` — 화면을 나눠 채우는 정보형만, 옅은 조각은 화면 UXML의 KitPanel). 기본 화면은 확인 = 블러, 설정 · 세이브 슬롯 = UI 배경, 고르기 · 일시정지 = 일반.
 - **아래 입력 막기**: 팝업은 늘 덮개(뒷배경)로 아래를 막는다. 창은 '아래 입력 막기'가 켜져 있으면 덮개로 막는다. 바탕·알림은 막지 않는다. 화면의 빈 곳(배경이 없는 곳)은 클릭이 아래로 지나간다.
 - **뒤로(Esc)**: `GameScreens.Back()`이 맨 위의 창·팝업 하나를 닫는다. 그 화면의 '뒤로로 닫기'가 꺼져 있으면 아무것도 하지 않는다(고르기 창). 닫을 창·팝업이 없고 DB › 화면 설정 'Esc로 일시정지 메뉴'가 켜져 있으면 일시정지 메뉴를 연다. Esc 키(이전 입력 관리자를 쓸 때, 또는 Input System 패키지가 있고 새 입력만 쓸 때)와 UI의 취소 이벤트가 `Back`을 부른다(같은 프레임에 두 번 와도 한 번만). 입력(키 바꾸기) 기능의 "뒤로" 동작에도 `GameScreens.Back()`을 잇는다. Esc를 다른 뜻(키 바꾸기의 취소처럼)으로 쓰는 동안은 `using (GameScreens.HoldBack()) { … }`(또는 받은 것을 나중에 `Dispose`)로 뒤로를 막는다 — 놓은 그 프레임까지 막혀, 같은 Esc가 창을 닫거나 일시정지 메뉴를 열지 않는다(`GameInput.Rebind`가 이렇게 한다).
 - **시간 멈춤**: '열린 동안 게임 시간 멈춤'이면 열 때 `GameTime.Pause("화면 ID")`, 닫을 때 `Resume`. 일시정지 메뉴가 이것이다.
@@ -109,7 +109,7 @@ public class ShopScreen : GameScreen
 ```
 
 - `Root`(이 화면의 트리), `Id`, `Argument`(`Open(id, 값)`으로 넘긴 것), `Data`(DB 항목), `Game`.
-- **`Draw`와 `Tick`**: `Draw`는 값이 바뀔 때(프레임 끝에 한 번), `Tick`은 시간이 흐를 때(열려 있는 동안 매 프레임 끝)다. 쿨다운 원·남은 시간 타이머·버프 남은 초처럼 데이터는 그대로인데 시간에 따라 바뀌는 칸은 `Tick`에서 그린다. `deltaTime`은 실제 시간(초, `Time.unscaledDeltaTime`)이라 게임 일시정지·배속과 상관없다. 게임 시간으로 남은 시간을 보이려면 `deltaTime`을 쌓지 말고 그때마다 게임 시계(`Game.Session.Clock.Time`)를 읽는다. **`Tick`에서 데이터를 바꾸지 않는다**(바꾸려면 행동). 예외가 나면 콘솔에 찍히고 다른 화면은 계속 돈다.
+- **`Draw`와 `Tick`**: `Draw`는 값이 바뀔 때(프레임 끝에 한 번), `Tick`은 시간이 흐를 때(열려 있는 동안 매 프레임 끝)다. 쿨다운 원·남은 시간 타이머·버프 남은 초처럼 데이터는 그대로인데 시간에 따라 바뀌는 칸은 `Tick`에서 그린다. `deltaTime`은 실제 시간(초, `Time.unscaledDeltaTime`)이라 게임 일시정지·배속과 상관없다. 게임 시간으로 남은 시간을 보이려면 `deltaTime`을 쌓지 말고 그때마다 게임 시계(`Game.Session.Clock.Time`)를 읽는다. [필수] **`Tick`에서 데이터를 바꾸지 않는다**(바꾸려면 행동). 예외가 나면 콘솔에 찍히고 다른 화면은 계속 돈다.
 
 ```csharp
 Label _dash;
@@ -190,9 +190,9 @@ protected override string[] Watch => new[] { GameIds.PlayerData.Run.Id };
 
 - 첫 화면을 열 때 `[MomoiProject] 화면` 오브젝트(DontDestroyOnLoad)에 UIDocument 하나를 만든다(정렬 100 — 프로젝트의 다른 UIDocument보다 위). Panel Settings는 DB › 화면 설정의 것. 없으면 경고하고 테마 없는 임시 설정으로 띄운다(기본 컨트롤 모양이 빠질 수 있다 → 3-1 화면 준비).
 - 루트에 붙는 USS 순서: 라이브러리 기본(`Resources/MomoiProject/Screens.uss`) → 테마 USS(DB › 화면 설정, 위에서부터). 뒤의 것이 이긴다. 화면마다 '더할 USS'(DB › 화면)는 루트가 아니라 그 화면의 트리에 붙어 그 화면 안에만 닿는다 — 겹침 층(`Overlay`)에 띄운 요소(5-4)에는 닿지 않으므로 그 요소의 클래스는 테마 USS에 둔다(UiGuide 1-2 USS 줄).
-- 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop`(블러의 옅은 어둡게) · `--momoi-ui-backdrop`(UI 배경 색) · `--momoi-ui-text`(UI 배경 위 글) · `--momoi-line-on-dark`(검정 틀 위 테 버튼) · `--momoi-accent-line`(틀 머리 띠의 선 포인트) · `--momoi-radius` · `--momoi-font-size`, 면 색(기본 화면이 쓴다) `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`, 상태 색 `--momoi-good` · `-info` · `-warn` · `-danger` · `-danger-face` · 등급 `--momoi-rarity-1`~`4`. 기본값은 라이브러리 `Screens.uss`의 `:root`(고치지 않는다 — 테마에서 덮는다). 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
+- 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop`(블러의 옅은 어둡게) · `--momoi-ui-backdrop`(UI 배경 색) · `--momoi-ui-text`(UI 배경 위 글) · `--momoi-line-on-dark`(검정 틀 위 테 버튼) · `--momoi-accent-line`(틀 머리 띠의 선 포인트) · `--momoi-radius` · `--momoi-font-size`, 면 색(기본 화면이 쓴다) `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`, 상태 색 `--momoi-good` · `-info` · `-warn` · `-danger` · `-danger-face` · 등급 `--momoi-rarity-1`~`4`. 기본값은 라이브러리 `Screens.uss`의 `:root`다. [필수] 그 파일은 고치지 않고 테마에서 덮는다. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
 - **뒷배경**: 화면 뒤의 덮개(`.momoi-backdrop` + `--plain` · `--blur` · `--ui`)를 DB › 화면의 '뒷배경'이 고른다(2-1). 블러는 `backdrop-filter: blur(10px)`. 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
-- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣거나, 개발자가 허락하면 AI가 받는다).
+- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣거나 AI가 받는다). [필수] AI가 받을 때는 먼저 개발자에게 묻는다(내려받기).
 - 화면 크기: Panel Settings가 1920×1080 기준으로 늘이고 줄인다(가로세로 반반 맞춤). UXML은 1920×1080 기준 px로 쓴다.
 
 ---
@@ -226,7 +226,7 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부른다(메뉴는 없다). �
 | `failureToast` | 실패를 알림으로 | 기본 켬 |
 | `pauseMenu` | Esc로 일시정지 메뉴 | 기본 끔 |
 
-- **AI가 이 칸을 바꿀 때**(실시간 게임의 '고르는 동안 게임 시간 멈춤' 켜기, 'Esc로 일시정지 메뉴' 켜기): 이 항목은 보통 에디터를 열 때 이미 만들어져 있다. 그래서 반영 스크립트는 새로 만들지 않고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 바꾼다 → **'적용 전'으로 남아 개발자가 Ctrl+S로 적용한다**(관례 15절). 보고의 '알릴 것'에 "DB › 화면 설정 적용(Ctrl+S)"을 적는다. 반영 스크립트는 버전마다 한 번만 도므로 "이미 켜져 있으면" 같은 검사는 필요 없다.
+- [필수] **AI가 이 칸을 바꿀 때**(실시간 게임의 '고르는 동안 게임 시간 멈춤' 켜기, 'Esc로 일시정지 메뉴' 켜기): 이 항목은 보통 에디터를 열 때 이미 만들어져 있다. 그래서 반영 스크립트는 새로 만들지 않고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 바꾼다 → **'적용 전'으로 남아 개발자가 Ctrl+S로 적용한다**(관례 15절). 보고의 '알릴 것'에 "DB › 화면 설정 적용(Ctrl+S)"을 적는다. 반영 스크립트는 버전마다 한 번만 도므로 "이미 켜져 있으면" 같은 검사는 필요 없다.
 
 ```csharp
 [DbSeed("1")]
@@ -442,7 +442,7 @@ public class BuyCard : GameAction
 
 DB › 화면 `shop`: 층 `창(메뉴)` · 아래 입력 막기 · 뒤로로 닫기. 골드가 모자라면 `BuyCard`의 `Game.Pay`가 알림을 띄운다.
 
-- **화면이 가격을 행동에 넣지 않는다**(`new BuyCard { source, price = … }`). 행동 필드는 보내는 쪽이 정하는 값이라 멀티플레이에서 상대가 가격 0을 보낼 수 있고, 가격 규칙이 화면 코드에 복사된다. 행동은 무엇을 할지(살 카드)만 받고, 가격은 원본·밸런싱 값에서 규칙이 읽는다. 화면은 같은 값을 읽어 **보이기만** 한다(30장 5-3).
+- [필수] **화면이 가격을 행동에 넣지 않는다**(`new BuyCard { source, price = … }`). 행동 필드는 보내는 쪽이 정하는 값이라 멀티플레이에서 상대가 가격 0을 보낼 수 있고, 가격 규칙이 화면 코드에 복사된다. 행동은 무엇을 할지(살 카드)만 받고, 가격은 원본·밸런싱 값에서 규칙이 읽는다. 화면은 같은 값을 읽어 **보이기만** 한다(30장 5-3).
 - 물건마다 가격이 다르면 원본에 가격을 두고(`Rules.CardData(Game, source).price`) 행동이 그것을 읽는다. 상점이 열릴 때 정해지는 가격(무작위 할인)이면 상점을 여는 행동이 판 데이터(`run.shop[i].price`)에 적고, `BuyCard`가 판 데이터에서 그 물건을 찾아 읽는다.
 
 ### 5-3. 타이틀 — 이어 하기 · 새 게임 · 슬롯 · 설정 · 종료
@@ -514,9 +514,9 @@ Game.Session.Events.SubscribeAfterAction<DamageDealt>(e => GameView.Present(done
 ### 5-6. AI가 화면 하나를 만드는 순서
 
 1. 화면 목록(기획 명세서 7절)에서 기본 화면으로 되는 것(고르기·확인·설정·슬롯·일시정지·알림)을 빼고 남은 화면마다:
-2. `Assets/MomoiProject/UI/Screens/<이름>.uxml`(USS는 프로젝트 USS 한 파일 — UiGuide 1-2), 목록이 있으면 `Assets/MomoiProject/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색은 변수(`var(--kit-…)` · `var(--momoi-…)`)로. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`. 문법·자리·크기·디자인과 UI 키트는 AI 문서 `UiGuide.md`를 따른다.
+2. `Assets/MomoiProject/UI/Screens/<이름>.uxml`(USS는 기본으로 프로젝트 USS 한 파일 — UiGuide 1-2), 목록이 있으면 `Assets/MomoiProject/UI/Items/<칸 이름>.uxml`. 1920×1080 기준. 색은 변수(`var(--kit-…)` · `var(--momoi-…)`)로. 값 칸은 binding-path, 버튼·목록 컨테이너에는 `name`. 문법·자리·크기·디자인과 UI 키트는 AI 문서 `UiGuide.md`를 따른다.
 3. DB 반영 스크립트(관례 15절, 아래 예)에 화면 항목을 더한다: `ScreenSetup.Ensure()`를 먼저 부르고, `layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/<이름>.uxml")`, 층·뒷배경·뒤로·열 씬을 정한다.
-4. Unity가 다시 읽게 한다(AI는 `Logs/MomoiProject/RunTests.request`) — 반영 스크립트가 돌아 새 항목이 저절로 적용되고, Unity가 다시 컴파일하면 `GameIds.Screen.X` 상수가 생긴다. **상수가 생기기 전에 그 상수를 쓰는 코드를 넣으면 컴파일이 막혀 반영 스크립트도 돌지 않는다.**
+4. Unity가 다시 읽게 한다(AI는 `Logs/MomoiProject/RunTests.request`) — 반영 스크립트가 돌아 새 항목이 저절로 적용되고, Unity가 다시 컴파일하면 `GameIds.Screen.X` 상수가 생긴다. [필수] **상수가 생기기 전에 그 상수를 쓰는 코드를 넣으면 컴파일이 막혀 반영 스크립트도 돌지 않는다.**
 5. 버튼·목록이 있으면 그다음 `Assets/MomoiProject/Code/Client/Screens/<이름>.cs`(`[BindTo(GameIds.Screen.X)] : GameScreen`).
 6. 그림이 필요한 곳(카드 그림·아이콘)은 `AssetRequests.Sprite(경로, 너비, 높이, 쓰는 곳)`로 임시 그림과 넣을 것 목록을 만들고 UXML·USS가 그 경로를 쓴다 — 개발자가 에셋 관리에서 진짜 그림을 넣으면 그대로 바뀐다(39장).
 

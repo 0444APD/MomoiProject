@@ -129,7 +129,7 @@ static class PrefabSeeds
 
 ### 5-2. 설치(AI)
 
-1. 먼저 묻는다: 받을 것(git 주소 두 개) · 버전 · 넣을 프로젝트.
+1. [필수] 먼저 묻는다: 받을 것(git 주소 두 개) · 버전 · 넣을 프로젝트.
 2. `Packages/manifest.json`의 `dependencies`에 두 줄을 넣는다(`<버전>` = `4.2` · `4.3` …):
    ```json
    "com.esotericsoftware.spine.spine-csharp": "https://github.com/EsotericSoftware/spine-runtimes.git?path=spine-csharp/src#<버전>",
@@ -138,7 +138,7 @@ static class PrefabSeeds
    unitypackage는 쓰지 않는다. `Assets/Spine` · `Assets/Spine Examples`가 생기기 때문이다(관례 2절).
 3. **패키지는 GBible이 저절로 받는다**(`PackageSync`). Unity는 창이 앞에 있을 때만 manifest를 다시 읽는데, GBible이 manifest가 lock 파일보다 새로우면 창이 뒤에 있어도 다시 푼다(몇 초마다 · 요청 파일을 처리하기 전 — 38장 2-4·2-5). 프로젝트 코드가 컴파일되지 않아도 돈다. 다 들어왔는지는 `Logs/Editor.log`의 `[MomoiProject] … 패키지를 다시 풉니다`와 `Packages/packages-lock.json`에 새 줄이 생겼는지로 본다.
 4. `Logs/Editor.log`에 `error CS`가 없는지 본다. 있으면 5-3.
-5. 스파인은 처음 돌 때 `Assets/Editor/SpineSettings.asset`을 만든다. 경로가 스파인 코드에 고정돼 있어 옮기지 않는다(관례의 예외 — 프로젝트와 함께 커밋).
+5. [필수] 스파인은 처음 돌 때 `Assets/Editor/SpineSettings.asset`을 만든다. 경로가 스파인 코드에 고정돼 있어 옮기지 않는다(관례의 예외 — 프로젝트와 함께 커밋).
 
 ### 5-3. 지원 범위 밖 Unity에서 옛 런타임을 쓸 때 — 들여와 고친다
 
@@ -196,7 +196,7 @@ static class PrefabSeeds
   - 0번 트랙은 바탕이다. 시작을 한 번 틀고 기본 반복을 잇는다: `SetAnimation(0, 시작, false)` → `AddAnimation(0, 반복, true, 0)`.
   - 1번 위 트랙은 덧입히기다(조종 · 표정 · 반응). 켜고 끌 때는 섞는다(`SetEmptyAnimation` · `AddEmptyAnimation` + `MixDuration`). 그냥 바꾸면 한 프레임에 튄다.
 - **애니메이션 맵핑 — 이름은 데이터.**
-  - 코드는 역할(시작 · 기본 반복 · 조종 시작 · 조종 끝 · 반응 …)만 알고, 역할마다 어느 애니메이션을 쓸지는 캐릭터의 DB 칸에 둔다(관례 18절 — 개발자가 이름을 바꾸거나 다른 애니메이션으로 갈아 끼운다).
+  - [필수] 코드는 역할(시작 · 기본 반복 · 조종 시작 · 조종 끝 · 반응 …)만 알고, 역할마다 어느 애니메이션을 쓸지는 캐릭터의 DB 칸에 둔다(관례 18절 — 개발자가 이름을 바꾸거나 다른 애니메이션으로 갈아 끼운다).
   - 애니메이션 · 뼈 · 스킨 이름은 데이터에서 읽는다: `데이터.GetSkeletonData(true)`의 `Animations` · `Bones` · `Skins`. 없는 이름이면 경고하고 첫 애니메이션으로 넘어간다.
   - 조종 뼈의 맵핑(뼈 → 따라가는 제약 → 세기를 올리고 내리는 애니메이션 → 범위)도 같은 칸에 둔다(5-7의 1).
 - **확인용 테스트 명령.** 애니메이션마다 명령 하나를 저절로 만든다(`spine.play.<이름>` — 데이터의 `Animations`를 돌며 `session.Debug.Register`). 개발자가 이름을 몰라도 테스트 패널에서 모두 틀어 본다.
@@ -207,7 +207,7 @@ static class PrefabSeeds
 조종 뼈는 다른 뼈들이 IK · transform 제약으로 따라가는 뼈다. 예: 고개와 얼굴이 따라가는 `Touch_Point`, 눈동자가 따라가는 `Touch_Eye`, 손이 따라가는 `HandFollow`. 이 뼈를 마우스로 움직인다.
 
 **원칙: 고개는 훨씬 덜 돌린다**(개발자 2026-10-15).
-- 조종 뼈의 범위를 작게 잡아 고개가 몇 도만 돌게 한다.
+- 조종 뼈의 범위를 작게 잡아 고개가 몇 도만 돌게 한다(CH0334는 약 ±5° — 아래 값).
 - 범위를 크게 잡으면 IK 목표가 목 · 머리 회전축을 넘어가는 자리에 닿는다. 그러면 고개가 갑자기 꺾이거나 뒤집힌다.
 
 1. **데이터에서 찾는다.**
@@ -223,9 +223,9 @@ static class PrefabSeeds
    - 시작할 때 `skeleton.SetToSetupPose()` → `UpdateWorldTransform(Physics.None)` → `parent.GetWorldToLocalMatrix`로 부모 행렬을 한 번 잡아 둔다.
    - 매 프레임 애니메이션이 적용된 뒤(`SkeletonAnimation.UpdateLocal`), 오프셋을 그 행렬로 바꿔 뼈의 로컬 x · y에 더한다. 애니메이션이 키를 준 뼈는 그 값에, 키가 없는 뼈는 처음 값에 더한다.
    - **지금 자세로 화면 자리를 고정하면(`bone.SetPositionSkeletonSpace`) 튄다.** 조종 뼈가 머리의 자식이면, 그 뼈가 IK로 머리를 돌리고 머리가 다시 그 뼈를 옮기는 되먹임이 생기기 때문이다.
-4. **움직임 — 부드럽게, 섞어서.**
-   - 오프셋은 `Vector2.SmoothDamp(현재, 목표, ref 속도, smoothTime, maxSpeed)`로 따라가게 하고, 뼈마다 최고 속도를 둔다.
-   - 누르면 조종 애니메이션을 위 트랙에 **섞어서** 켠다. 트랙이 비어 있으면 `SetEmptyAnimation(트랙, 0)` → `AddAnimation(…).MixDuration = mixTime`이다. 그냥 `SetAnimation`하면 IK 세기가 한 프레임에 올라 잡는 순간 고개가 확 돈다.
+4. **움직임 — 부드럽게(`SmoothDamp`), 섞어서(`MixDuration`).**
+   - 오프셋은 `Vector2.SmoothDamp(현재, 목표, ref 속도, smoothTime, maxSpeed)`로 따라가게 하고(CH0334: `smoothTime` 0.25), 뼈마다 최고 속도를 둔다.
+   - 누르면 조종 애니메이션을 위 트랙에 **섞어서** 켠다. 트랙이 비어 있으면 `SetEmptyAnimation(트랙, 0)` → `AddAnimation(…).MixDuration = mixTime`이다(CH0334: 0.3초). 그냥 `SetAnimation`하면 IK 세기가 한 프레임에 올라 잡는 순간 고개가 확 돈다.
 5. **놓으면** 끝 애니메이션 + `AddEmptyAnimation`(같은 섞임 시간)을 튼다. 오프셋이 0으로 돌아오면 뼈를 원래 값으로 되돌린다(키가 없는 뼈는 옮긴 값이 남기 때문이다).
 6. **범위 정하기.**
    - 고개 뼈: 방향마다 자리를 옮겨 가며 고개 각도를 재고, 각도가 갑자기 뛰기 전까지로 정한다. 그 안에서 원칙대로 작게 잡는다.

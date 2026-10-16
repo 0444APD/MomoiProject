@@ -23,7 +23,7 @@
 
 ## 1. 준비
 
-1. **패키지**: `Packages/manifest.json`의 `dependencies`에 Steamworks.NET을 넣는다(버전 태그를 고정한다. 내려받기라 AI는 먼저 묻는다 — 관례 0절).
+1. **패키지**: `Packages/manifest.json`의 `dependencies`에 Steamworks.NET을 넣는다(버전 태그를 고정한다). [필수] 내려받기라 AI는 먼저 묻는다(관례 0절).
    ```json
    "com.rlabrecque.steamworks.net": "https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net#2025.164.1"
    ```
@@ -57,6 +57,7 @@
 - API Name = 도전과제 ID. 다르면 **도전과제 이름(ID와 다를 때)** 표에 (도전과제 · Steam 이름)을 적는다.
 - Steamworks에 그 이름이 없으면 경고 한 번("Steam 도전과제 'X'을(를) 달성하지 못했습니다…"). GBible 쪽 달성은 그대로다.
 - 미리보기(33장)에서는 도전과제가 달성되지 않으므로 Steam에도 올라가지 않는다.
+- **멀티**: 도전과제는 Steam 계정 것이다(40장 1-1). 서버가 사람마다 판정하고 알림(`AchievementUnlocked` — `Player` = 단 사람)을 그 사람에게만 보내면, 그 사람 화면이 Steam에 올린다(이 화면의 플레이어가 단 것만 — 혼자 하기 · 방장 · 클라이언트 모두, 40장 1-14). 클라이언트는 켤 때 맞추기(이미 단 것 올리기)를 하지 않는다(서버 것).
 
 ### 2-4. 로그 → Steam 통계
 
@@ -94,7 +95,7 @@
 | `string Language` | Steam 클라이언트 언어(BCP-47, 없으면 `null`). |
 | `void StoreNow()` | 모아 둔 통계·도전과제를 다음 프레임에 바로 올린다(보통은 저절로). |
 
-게임 규칙은 Steam을 모른다: 도전과제·통계는 GBible의 도전과제·로그로 만들고, Steam은 그것을 따라 올라간다.
+[필수] 게임 규칙은 Steam을 모른다: 도전과제·통계는 GBible의 도전과제·로그로 만들고, Steam은 그것을 따라 올라간다.
 
 **친구 방(멀티)**: `SteamLobby.Create(인원)`·`Invite()`·`Join(로비)`·`Leave()` — Steam 로비 + Steam Datagram Relay로 방장에게 접속한다(사설 호스트 멀티, 40장). Steam이 준비되면 `GameNet.Rooms`가 Steam 로비로 바뀌므로 화면은 `GameNet.CreateRoom`·`InviteToRoom`만 불러도 된다.
 
