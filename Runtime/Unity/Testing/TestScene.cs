@@ -27,6 +27,7 @@ namespace GBible
     public sealed class TestScene : MonoBehaviour
     {
         [Tooltip("시작할 테스트 상황(Assets/MomoiProject/Data/Tests — 개발 빌드에도 같이 들어간다). 비우거나 불러오지 못하면 새 판")] public string scenario = "";
+        [Tooltip("이 테스트 씬이 복사해 온 게임 씬의 이름(TestSceneSetup이 넣는다). DB › 화면의 '열 씬'에 이 이름이 있으면 테스트 씬에서도 그 화면이 열린다")] public string sourceScene = "";
         [Tooltip("글자 시드. 비우면 상황의 시드(상황이 없으면 무작위)")] public string seed = "";
         [Tooltip("켜면 'test' 슬롯에서 돈다 — 개발자의 실제 저장(기본 슬롯)을 건드리지 않는다")] public bool separateSlot = true;
         [Tooltip("시작할 때의 게임 속도"), Range(0f, 8f)] public float speed = 1f;

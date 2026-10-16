@@ -19,6 +19,14 @@ namespace GBible.Dialogue
         public static event Action Ended;
         public static event Action<string> Signaled;
 
+        // 대사가 열려 있는 동안 게임 입력을 막는다(GameView.Busy가 참 — 화면 버튼의 행동이 무시된다). 걸으면서 듣는 대사처럼 막지 않을 게임은 거짓으로.
+        public static bool BlocksInput = true;
+
+        // 행동이 연 다이얼로그(결과 '다이얼로그 재생')가 이미 열린 대사가 있을 때 기다리는 줄 — 앞 대사가 끝나면 차례로 연다(끊지 않는다).
+        // 코드에서 바로 부른 Play는 기다리지 않고 지금 대사를 바꾼다.
+        static readonly Queue<(string dialogue, string entry)> Waiting = new Queue<(string dialogue, string entry)>();
+        public static int WaitingCount => Waiting.Count;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
@@ -27,11 +35,14 @@ namespace GBible.Dialogue
             Started = null;
             Ended = null;
             Signaled = null;
+            BlocksInput = true;
+            Waiting.Clear();
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         static void HookSessions()
         {
+            GameView.AddBusy(() => BlocksInput && IsPlaying);
             GBibleRuntime.Started += Prepare;
             Prepare(GBibleRuntime.Session);
             // 멀티 서버: 플레이어가 들어오면 그 사람의 진행 칸(주인만 보는 칸)을 둔다 — 판을 불러온 뒤 저장된 진행이 그 사람에게 간다.
@@ -60,7 +71,20 @@ namespace GBible.Dialogue
             if (request == null || !Application.isPlaying || !ReferenceEquals(session, GBibleRuntime.Session)) return;
             // 멀티: 그 행동을 한 플레이어 화면에서만 연다(서버는 그 사람에게만 보낸다 — 방장 화면에서는 방장 것만). 0이면 모두.
             if (request.player != 0 && request.player != session.LocalPlayer) return;
-            Play(request.dialogue, string.IsNullOrEmpty(request.entryId) ? "start" : request.entryId);
+            var entry = string.IsNullOrEmpty(request.entryId) ? "start" : request.entryId;
+            // 이미 열린 대사가 있으면(같은 행동이 대화를 둘 요청 — 마지막 칸 이벤트 + 엔딩 …) 끝난 뒤 차례로.
+            if (IsPlaying || Waiting.Count > 0) Waiting.Enqueue((request.dialogue, entry));
+            else Play(request.dialogue, entry);
+        }
+
+        // 대사가 끝나면 기다리던 다음 대사를 연다.
+        static void PlayNextWaiting()
+        {
+            while (Waiting.Count > 0 && !IsPlaying)
+            {
+                var (dialogue, entry) = Waiting.Dequeue();
+                if (Play(dialogue, entry)) return;
+            }
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -106,7 +130,11 @@ namespace GBible.Dialogue
         {
             _player = player;
             player.Signaled += signal => Signaled?.Invoke(signal);
-            player.onEnded.AddListener(() => Ended?.Invoke());
+            player.onEnded.AddListener(() =>
+            {
+                Ended?.Invoke();
+                PlayNextWaiting();
+            });
         }
 
         public static bool Play(string dialogueId, string entryId = "start")
@@ -133,6 +161,7 @@ namespace GBible.Dialogue
 
         public static void Stop()
         {
+            Waiting.Clear();
             if (_player != null) _player.Stop();
         }
     }

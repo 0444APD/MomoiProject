@@ -33,7 +33,10 @@ namespace GBible.EditorTools
             {
                 var holder = new GameObject("[테스트]");
                 SceneManager.MoveGameObjectToScene(holder, scene);
-                holder.AddComponent<TestScene>().scenario = scenario ?? "";
+                var test = holder.AddComponent<TestScene>();
+                test.scenario = scenario ?? "";
+                // 복사해 온 게임 씬 이름: 그 씬의 '열 씬' 화면(HUD 등)이 테스트 씬에서도 열리게.
+                test.sourceScene = string.IsNullOrEmpty(copyFrom) ? "" : Path.GetFileNameWithoutExtension(copyFrom);
             }
             EditorSceneManager.SaveScene(scene);
             if (SceneManager.sceneCount > 1) EditorSceneManager.CloseScene(scene, true);

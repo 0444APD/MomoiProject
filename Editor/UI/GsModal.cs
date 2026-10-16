@@ -78,7 +78,7 @@ namespace GBible.EditorTools.UI
     // 확인 창. 변경 목록([이전] › [현재])을 함께 보여줄 수 있다.
     public static class GsDialog
     {
-        public static GsModal Show(VisualElement host, string title, string message, IList<FieldChange> changes, params DialogButton[] buttons)
+        public static GsModal Show(VisualElement host, string title, string message, IList<DraftFieldChange> changes, params DialogButton[] buttons)
         {
             var box = Gs.Box("gs-dialog");
             box.Add(Gs.Label(title, "gs-title"));
@@ -114,7 +114,7 @@ namespace GBible.EditorTools.UI
             return modal;
         }
 
-        public static GsModal Confirm(VisualElement host, string title, string message, string confirmText, Action onConfirm, IList<FieldChange> changes = null) =>
+        public static GsModal Confirm(VisualElement host, string title, string message, string confirmText, Action onConfirm, IList<DraftFieldChange> changes = null) =>
             Show(host, title, message, changes,
                  new DialogButton("취소", GsButtonKind.Ghost, null),
                  new DialogButton(confirmText, GsButtonKind.Primary, onConfirm));

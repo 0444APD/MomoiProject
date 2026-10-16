@@ -567,14 +567,25 @@ namespace GBible
             if (mode == LoadSceneMode.Single) ShowForScene(scene.name);
         }
 
-        // '열 씬'이 있는 화면: 그 씬이면 열고, 아니면 닫는다.
+        // '열 씬'이 있는 화면: 그 씬이면 열고, 아니면 닫는다. 이름 끝의 *는 앞부분이 같은 씬 모두(Dungeon* = Dungeon1 · DungeonBoss …).
+        // 테스트 씬이면 그 씬이 복사해 온 게임 씬(TestScene.sourceScene)의 이름으로도 본다 — 게임 씬의 HUD가 테스트 씬에서도 열린다.
         static void ShowForScene(string scene)
         {
+            var test = UnityEngine.Object.FindFirstObjectByType<TestScene>();
+            var source = test != null ? test.sourceScene : null;
             foreach (var screen in Data.Values.Where(s => s.scenes.Count > 0).ToList())
             {
-                if (screen.scenes.Contains(scene)) Open(screen.Id);
+                if (screen.scenes.Any(name => SceneMatches(name, scene) || SceneMatches(name, source))) Open(screen.Id);
                 else Close(screen.Id);
             }
+        }
+
+        static bool SceneMatches(string pattern, string scene)
+        {
+            if (string.IsNullOrEmpty(pattern) || string.IsNullOrEmpty(scene)) return false;
+            return pattern.EndsWith("*", StringComparison.Ordinal)
+                ? scene.StartsWith(pattern.Substring(0, pattern.Length - 1), StringComparison.Ordinal)
+                : pattern == scene;
         }
 
         static GameScreen MakeController(string id)

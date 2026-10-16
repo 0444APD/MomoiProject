@@ -36,7 +36,7 @@ namespace GBible.Data
         [FieldLabel("아래 입력 막기"), Tooltip("창: 켜면 열린 동안 아래 층 화면을 누를 수 없습니다. 팝업은 늘 막고, 바탕·알림은 막지 않습니다")] public bool blockInput = true;
         [FieldLabel("뒤로(Esc)로 닫기")] public bool closeOnBack = true;
         [FieldLabel("열린 동안 게임 시간 멈춤")] public bool pauseTime;
-        [FieldLabel("열 씬"), Tooltip("이 씬이 열리면 저절로 열고, 다른 씬이 열리면 닫습니다. 비우면 코드(GameScreens.Open)나 '게임이 켜지면 열기'로")] public List<string> scenes = new List<string>();
+        [FieldLabel("열 씬"), Tooltip("이 씬이 열리면 저절로 열고, 다른 씬이 열리면 닫습니다(이름 끝의 *는 앞부분이 같은 씬 모두 — Dungeon*). 테스트 씬에서는 그 테스트 씬이 복사해 온 게임 씬 이름으로도 봅니다. 비우면 코드(GameScreens.Open)나 '게임이 켜지면 열기'로")] public List<string> scenes = new List<string>();
         [FieldLabel("게임이 켜지면 열기")] public bool openOnStart;
 
         public override void ValidateData(IValidationContext context)

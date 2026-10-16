@@ -20,27 +20,27 @@ namespace GBible.EditorTools
         public static int Count => Rows().Count;
 
         // 저장 안 된 변경을 한 줄씩(확인 창·사이드바용).
-        public static List<FieldChange> Rows()
+        public static List<DraftFieldChange> Rows()
         {
-            var rows = new List<FieldChange>();
+            var rows = new List<DraftFieldChange>();
             foreach (var change in EditorDatabase.Staging.Changes())
             {
                 var kind = CodexStaging.KindText(change.Kind);
                 if (change.Kind == PendingKind.Modified)
-                    rows.AddRange(change.Fields.Select(f => new FieldChange
+                    rows.AddRange(change.Fields.Select(f => new DraftFieldChange
                     {
                         Path = f.Path, Label = $"{kind} · {change.Label} › {f.Label}", Old = f.Old, New = f.New, OldObject = f.OldObject, NewObject = f.NewObject,
                     }));
                 else
-                    rows.Add(new FieldChange
+                    rows.Add(new DraftFieldChange
                     {
                         Label = $"{kind} · {change.Label}",
                         Old = change.Kind == PendingKind.Added ? "(없음)" : change.Item.DisplayName,
                         New = change.Kind == PendingKind.Added ? change.Item.DisplayName : "(삭제)",
                     });
             }
-            if (ClassRegistry.IsDirty) rows.Add(new FieldChange { Label = "클래스 설정", Old = "", New = "클래스 파일 위치 기억이 바뀜" });
-            if (CodexFolders.IsDirty) rows.Add(new FieldChange { Label = "DB 폴더", Old = "", New = "폴더 만들기·옮기기·지우기" });
+            if (ClassRegistry.IsDirty) rows.Add(new DraftFieldChange { Label = "클래스 설정", Old = "", New = "클래스 파일 위치 기억이 바뀜" });
+            if (CodexFolders.IsDirty) rows.Add(new DraftFieldChange { Label = "DB 폴더", Old = "", New = "폴더 만들기·옮기기·지우기" });
             return rows;
         }
 

@@ -7,7 +7,7 @@ using UnityEditor;
 
 namespace GBible.EditorTools
 {
-    public sealed class FieldChange
+    public sealed class DraftFieldChange
     {
         public string Path;
         public string Label;
@@ -23,18 +23,18 @@ namespace GBible.EditorTools
     // 화면(상세 패널)에 보일 변경 목록은 보이는 칸만 본다.
     public static class DraftDiff
     {
-        public static List<FieldChange> Compute(SerializedObject original, SerializedObject draft, ICollection<string> exclude = null, bool hidden = false)
+        public static List<DraftFieldChange> Compute(SerializedObject original, SerializedObject draft, ICollection<string> exclude = null, bool hidden = false)
         {
             original.Update();
             draft.Update();
-            var changes = new List<FieldChange>();
+            var changes = new List<DraftFieldChange>();
             foreach (var property in hidden ? AllTopLevel(draft) : PropertyUtil.TopLevel(draft))
             {
                 if (exclude != null && exclude.Contains(property.propertyPath)) continue;
                 var before = original.FindProperty(property.propertyPath);
                 if (before != null && Fingerprint(before) == Fingerprint(property)) continue;
                 var field = PropertyUtil.GetField(property, out _);
-                changes.Add(new FieldChange
+                changes.Add(new DraftFieldChange
                 {
                     Path = property.propertyPath,
                     Label = GsPropertyEditor.LabelOf(property, field),

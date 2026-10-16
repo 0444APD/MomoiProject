@@ -56,7 +56,7 @@ namespace GBible.EditorTools.UI
         readonly UnityEngine.Object _baseline;
         readonly SerializedObject _baselineObject;
         GsModal _modal;
-        List<FieldChange> _changes = new List<FieldChange>();
+        List<DraftFieldChange> _changes = new List<DraftFieldChange>();
 
         VisualElement _media;
         Label _initial;
@@ -74,7 +74,7 @@ namespace GBible.EditorTools.UI
 
         public UnityEngine.Object Target => _target;
         internal SerializedObject Draft => _draftObject;
-        internal IReadOnlyList<FieldChange> Changes => _changes;
+        internal IReadOnlyList<DraftFieldChange> Changes => _changes;
 
         GsDetailPanel(VisualElement host, UnityEngine.Object target, DetailOptions options)
         {

@@ -21,7 +21,7 @@ namespace GBible.EditorTools
         public PendingKind Kind;
         public GameData Item;
         public string Label;
-        public List<FieldChange> Fields = new List<FieldChange>();
+        public List<DraftFieldChange> Fields = new List<DraftFieldChange>();
     }
 
     // DB의 변경을 Unity 에셋에 바로 쓰지 않고 모아 두는 곳. 저장(Ctrl+S)할 때 적용하거나 되돌린다.
@@ -194,9 +194,9 @@ namespace GBible.EditorTools
 
         static bool Differs(GameData original, GameData copy) => original != null && copy != null && FieldsOf(original, copy).Count > 0;
 
-        static List<FieldChange> FieldsOf(GameData original, GameData copy)
+        static List<DraftFieldChange> FieldsOf(GameData original, GameData copy)
         {
-            if (original == null || copy == null) return new List<FieldChange>();
+            if (original == null || copy == null) return new List<DraftFieldChange>();
             var before = new SerializedObject(original);
             var after = new SerializedObject(copy);
             var orderBefore = before.FindProperty("order");
@@ -209,14 +209,14 @@ namespace GBible.EditorTools
             if (ordered) own.Add("order");
             if (original is INestedData) own.Add("parent");
             var fields = DraftDiff.Compute(before, after, own, hidden: true);
-            if (original.Id != copy.Id) fields.Insert(0, new FieldChange { Path = "id", Label = "ID", Old = original.Id, New = copy.Id });
+            if (original.Id != copy.Id) fields.Insert(0, new DraftFieldChange { Path = "id", Label = "ID", Old = original.Id, New = copy.Id });
             if (orderOld != orderNew)
-                fields.Add(new FieldChange { Path = "order", Label = "순서", Old = orderOld.ToString(), New = orderNew.ToString() });
+                fields.Add(new DraftFieldChange { Path = "order", Label = "순서", Old = orderOld.ToString(), New = orderNew.ToString() });
             // DB 목록의 폴더·상위 그룹(숨은 칸이라 위의 비교에 들지 않는다).
             if (original.Folder != copy.Folder)
-                fields.Add(new FieldChange { Path = "folder", Label = "폴더", Old = Place(original.Folder), New = Place(copy.Folder) });
+                fields.Add(new DraftFieldChange { Path = "folder", Label = "폴더", Old = Place(original.Folder), New = Place(copy.Folder) });
             if (original is INestedData nestedBefore && copy is INestedData nestedAfter && (nestedBefore.Parent ?? "") != (nestedAfter.Parent ?? ""))
-                fields.Add(new FieldChange { Path = "parent", Label = "상위 그룹", Old = Place(nestedBefore.Parent), New = Place(nestedAfter.Parent) });
+                fields.Add(new DraftFieldChange { Path = "parent", Label = "상위 그룹", Old = Place(nestedBefore.Parent), New = Place(nestedAfter.Parent) });
             return fields;
 
             static string Place(string path) => string.IsNullOrEmpty(path) ? "(맨 위)" : path;

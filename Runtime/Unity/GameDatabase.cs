@@ -143,6 +143,13 @@ namespace GBible.Data
             developmentSeed = Math.Max(0, seed);
         }
 
+        // 하나만 바꿀 때(나머지 칸은 그대로): Undo 방식(과 보관 수). 읽기는 History · HistoryLimit.
+        public void EditorSetHistory(HistoryMode history, int? historyLimit = null)
+        {
+            this.history = history;
+            if (historyLimit.HasValue) this.historyLimit = Math.Max(0, historyLimit.Value);
+        }
+
         public void EditorAddRename(string dataType, string oldId, string newId)
         {
             if (string.IsNullOrEmpty(oldId) || string.IsNullOrEmpty(newId) || oldId == newId) return;

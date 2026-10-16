@@ -170,8 +170,29 @@ namespace GBible
         // 남은 연출이 있다(재생 중 포함).
         public static bool IsPresenting => _running || Steps.Count > 0;
 
-        // 입력을 막아야 할 때: 연출 재생 중이거나 선택을 기다리는 중.
-        public static bool Busy => IsPresenting || (GBibleRuntime.Game?.IsWaiting ?? false);
+        // 입력을 막아야 할 때: 연출 재생 중이거나 선택을 기다리는 중, 또는 모듈 · 프로젝트가 더한 때(다이얼로그가 열려 있는 동안 …).
+        public static bool Busy => IsPresenting || (GBibleRuntime.Game?.IsWaiting ?? false) || BusyByOthers();
+
+        // '입력을 막아야 하는 때'를 더한다(다이얼로그 모듈: 대사가 열려 있는 동안). 플레이를 시작할 때마다 비워지므로 AfterAssembliesLoaded에서 더한다.
+        public static void AddBusy(Func<bool> busy)
+        {
+            if (busy != null && !BusyChecks.Contains(busy)) BusyChecks.Add(busy);
+        }
+
+        static readonly List<Func<bool>> BusyChecks = new List<Func<bool>>();
+
+        static bool BusyByOthers()
+        {
+            for (var i = 0; i < BusyChecks.Count; i++)
+            {
+                try { if (BusyChecks[i]()) return true; }
+                catch (Exception e) { Debug.LogException(e); }
+            }
+            return false;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetBusyChecks() => BusyChecks.Clear();
 
         // 대기열이 비었을 때(마지막 연출이 끝난 순간).
         public static event Action Presented;
