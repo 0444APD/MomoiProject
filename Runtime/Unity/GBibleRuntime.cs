@@ -253,9 +253,14 @@ namespace GBible
             _runSaveMode = RunSaveMode.OnQuit;
             _runSaver = null;
             _slot = null;
+            _ownProfile = false;
+            _shareProfile = null;
             _playTime = 0;
             _host = null;
             SlotSummary = null;
+            // 고스트(비동기 대전) 기본 저장소: 이 기기의 저장 폴더 아래. 프로젝트가 서버 저장소를 쓰면 AfterAssembliesLoaded에서 Ghosts.Store를 바꾼다.
+            FileGhostStore.Folder = Path.Combine(Application.persistentDataPath, "MomoiProject", "ghosts");
+            Ghosts.Store = new FileGhostStore();
             StartAsClient = null;
             Quitting = null;
             _preparedWarnings = false;
