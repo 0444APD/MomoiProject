@@ -77,8 +77,9 @@ namespace GBible.Tests
             Assert.IsNotEmpty(Only().guid);
             Assert.AreEqual(AssetRequests.State.Placeholder, AssetRequests.StateOf(Only()));
 
-            var moved = Root + "/Art/Fire/fireball.png";
-            AssetTools.EnsureFolder(Root + "/Art/Fire");
+            // 옮길 폴더 이름은 요청 파일 이름과 겹치지 않게(대소문자만 다른 폴더가 남아 있으면 Windows가 같은 폴더로 본다).
+            var moved = Root + "/Art/Moved/fireball.png";
+            AssetTools.EnsureFolder(Root + "/Art/Moved");
             Assert.AreEqual("", AssetDatabase.MoveAsset(requested, moved));
 
             Assert.AreEqual(moved, AssetRequests.Sprite(requested, 4, 4, "파이어볼"), "반영 스크립트가 다시 돌아도 옮긴 자리");

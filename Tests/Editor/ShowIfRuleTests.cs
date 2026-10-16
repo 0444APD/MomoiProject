@@ -78,11 +78,11 @@ namespace GBible.Tests
             var table = Make<WeightTableData>("table1");
             table.entries.Add(new WeightTableEntry { item = "table1x", weight = 0, weightBalance = "balance1" });
             var issues = DataValidator.Validate(new List<GameData> { table }).Where(i => i.Asset == table).Select(i => i.Message).ToList();
-            Assert.IsFalse(issues.Any(m => m.Contains("무게가 모두 0")), string.Join("\n", issues));
+            Assert.IsFalse(issues.Any(m => m.Contains("모두 0")), string.Join("\n", issues));
 
             table.entries[0].weightBalance = "";
             issues = DataValidator.Validate(new List<GameData> { table }).Where(i => i.Asset == table).Select(i => i.Message).ToList();
-            Assert.IsTrue(issues.Any(m => m.Contains("무게가 모두 0")));
+            Assert.IsTrue(issues.Any(m => m.Contains("모두 0")), string.Join("\n", issues));   // "무게·%가 모두 0이라 아무것도 나오지 않습니다."
         }
 
         [Test]
