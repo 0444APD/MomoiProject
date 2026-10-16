@@ -103,6 +103,38 @@ namespace GBible
         // 이 프로그램을 쓰는 플레이어의 번호(싱글이면 0). 멀티: 클라이언트는 받은 번호, 방장은 자기 번호.
         // 화면 코드가 "내 것"을 고를 때 쓰고, Do가 actorId를 비워 둔 행동에 채운다(서버는 받은 행동의 actorId를 보낸 사람 번호로 덮는다).
         public int LocalPlayer { get; set; }
+
+        // 잠시 이 플레이어로(플레이어마다 데이터 'hand'를 그 사람의 몫으로 푼다 — 행동 안의 actorId보다 먼저). 끝나면 Dispose로 되돌린다.
+        //   using (session.ActingAs(2)) { … }   // 서버 검사(Validate) · 패시브 효과의 결과(그 가진 쪽의 플레이어)가 쓴다
+        public IDisposable ActingAs(int player)
+        {
+            var previous = _actingAs;
+            _actingAs = player;
+            return new ActingScope(this, previous);
+        }
+
+        int _actingAs;
+
+        sealed class ActingScope : IDisposable
+        {
+            readonly GameSession _session;
+            readonly int _previous;
+            bool _done;
+
+            public ActingScope(GameSession session, int previous)
+            {
+                _session = session;
+                _previous = previous;
+            }
+
+            public void Dispose()
+            {
+                if (_done) return;
+                _done = true;
+                _session._actingAs = _previous;
+            }
+        }
+
         // 지금 게임의 저장 버전: 옵션의 값과 등록한 변환의 가장 높은 버전 중 큰 쪽.
         public int SaveVersion => Math.Max(Options.SaveVersion, Options.Migrations.LatestVersion);
         // 저장 파일에 함께 남길 데이터 구조(키·필드 경로 → 형식). 불러올 때 호환 여부를 판단하는 데 쓴다.
@@ -203,7 +235,8 @@ namespace GBible
             Rewind = new RewindSystem(this);
             // 처리를 클래스 안에 쓴 행동(Run)은 등록 없이 실행한다. 실행 직전에 참조 필드(id가 있는 객체)를 지금 데이터의 객체로 다시 찾는다.
             // 플레이어마다 따로인 플레이어 데이터('army' → 'army:<번호>')의 번호: 행동 안이면 그 행동을 한 사람, 밖이면 이 화면의 플레이어.
-            Data.CurrentPlayer = () => Actions.CurrentActor != 0 ? Actions.CurrentActor : LocalPlayer;
+            // ActingAs(번호)로 잠시 정할 수 있다(서버 검사 Validate = 보낸 사람, 패시브 효과의 결과 = 그 가진 쪽의 플레이어).
+            Data.CurrentPlayer = () => _actingAs != 0 ? _actingAs : Actions.CurrentActor != 0 ? Actions.CurrentActor : LocalPlayer;
             Actions.SelfRun = action => action.RunIn(Game);
             Actions.Prepare = action => ActionReferences.Resolve(action, Game);
 

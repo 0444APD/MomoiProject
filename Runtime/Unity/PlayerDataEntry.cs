@@ -71,6 +71,8 @@ namespace GBible.Data
             }
             foreach (var problem in DataModel.Validate(type)) context.Error("담을 수 없는 필드: " + problem);
             if (!TryParseDefault(type, out _, out var error)) context.Error(error);
+            if (perPlayer && zone != DataZone.Session)
+                context.Error("'플레이어마다'는 판(Session) 구역만 됩니다 — 프로필은 기기마다 하나라 각자 자기 프로필을 씁니다(매치가 끝나도 남길 값은 '매칭 계정에 남김').");
             var kind = DataModel.Of(type).Kind;
             if (kind != DataKind.Scalar && kind != DataKind.Enum && !string.IsNullOrEmpty(defaultValue))
                 context.Warning("클래스·컬렉션 형식은 기본값 글자를 쓰지 않습니다(클래스의 초기값을 씁니다).");

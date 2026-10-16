@@ -163,12 +163,14 @@ namespace GBible
         }
 
         // 몇 개 가졌나. holder를 비우면 모든 가진 쪽의 합. 놓인 것마다면 holder = 요소 하나(그 요소의 레벨). 침묵한 가진 쪽은 0.
+        // 가진 목록이 플레이어마다 데이터면 holder를 비웠을 때 지금 플레이어의 몫만 센다(남의 것과 합치지 않는다).
         public int Owned(string id, object holder = null)
         {
             var definition = Find(id);
             if (definition == null) return 0;
             var total = 0;
-            foreach (var (parent, collection) in Collections(definition))
+            var onlyKey = holder == null && _session.Data.IsPerPlayer(definition.OwnerKey) ? _session.Data.Resolve(definition.OwnerKey) : null;
+            foreach (var (parent, collection) in Collections(definition, onlyKey))
             {
                 if (holder == null || ReferenceEquals(parent, holder) || SameId(parent, holder))
                 {
@@ -331,7 +333,21 @@ namespace GBible
             };
             // 효과 배율을 고치는 패시브 효과 자신은 배율을 거치지 않는다(같은 의도를 다시 만들어 끝없이 돈다).
             context.Power = moment.Event is PowerIntent ? 1 : PowerOf(definition.Id, holder);
-            _session.Triggers.RunOutcomes(outcomes, context, "Passive");
+            // 가진 목록이 플레이어마다 데이터면 결과의 플레이어마다 키('gold')는 그 가진 쪽 플레이어의 몫이다(행동한 사람의 것이 아니라).
+            var player = PlayerOf(definition, holder);
+            using (player != 0 ? _session.ActingAs(player) : null)
+                _session.Triggers.RunOutcomes(outcomes, context, "Passive");
+        }
+
+        // 가진 쪽이 든 플레이어마다 키의 플레이어 번호(가진 목록이 플레이어마다 데이터가 아니면 0).
+        int PlayerOf(PassiveDefinition definition, object holder)
+        {
+            if (holder == null || !_session.Data.IsPerPlayer(definition.OwnerKey)) return 0;
+            foreach (var key in _session.Data.KeysOfAllPlayers(definition.OwnerKey).ToList())
+                foreach (var (parent, collection) in Collections(definition, key))
+                    if (ReferenceEquals(parent, holder) || (collection is IList list && list.Cast<object>().Any(e => ReferenceEquals(e, holder))))
+                        return PlayerDataStore.PlayerOfKey(key);
+            return 0;
         }
 
         // 의도 '효과 배율'을 한 번 거친 배율.

@@ -99,8 +99,6 @@ namespace GBible
             Options = options ?? new NetServerOptions();
             if (session.Role == SessionRole.Client) throw new InvalidOperationException("[MomoiProject] 클라이언트 세션으로는 서버를 열 수 없습니다.");
             session.Role = SessionRole.Server;
-            // 혼자 하기 세션이 방이 되면(방장 · 화면 없는 서버) 혼자 하기의 플레이어마다 몫(0번)을 지운다 — 몫은 들어오는 사람(방장 포함)마다 새로 생긴다.
-            if (!session.Data.InTransaction) session.Data.RemovePlayer(0);
             session.Data.Synced += OnSynced;
             session.Data.Changed += OnChanged;
             session.Data.KeyDefined += OnKeyChanged;
@@ -143,7 +141,13 @@ namespace GBible
             var player = new NetPlayer { Id = _nextPlayerId++, Name = string.IsNullOrEmpty(name) ? "방장" : name, Account = "local:" + name, Connection = -1, Connected = true, IsLocal = true };
             _players.Add(player);
             _session.LocalPlayer = player.Id;
-            _session.Data.AddPlayer(player.Id);
+            // 플레이어마다 데이터: 혼자 하기 세션이 방이 되면 방장이 혼자 하기의 몫(0번)을 이어받는다(방장 번호의 몫으로 옮김).
+            if (!_session.Data.InTransaction)
+            {
+                _session.Data.AddPlayer(player.Id);
+                if (_players.Count(p => p.IsLocal) == 1) _session.Data.MovePlayer(0, player.Id);
+            }
+            foreach (var key in _projections.Keys.ToList()) RefreshProjection(key, player.Id);   // 방장 눈 녹화가 투영 모습을 받게
             PlayerJoined?.Invoke(player);
             BroadcastPlayers();
             return player;
@@ -160,7 +164,7 @@ namespace GBible
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 투영할 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
             _projections[key] = view ?? throw new ArgumentNullException(nameof(view));
             if (_session.Data.IsDefined(key)) _session.Data.SetVisibility(key, DataVisibility.Server);
-            foreach (var player in _players.Where(p => !p.IsLocal)) RefreshProjection(key, player.Id);
+            foreach (var player in _players) RefreshProjection(key, player.Id);
         }
 
         public void Project<T>(string key, Func<int, T, T> view) where T : class => Project(key, (player, value) => view(player, value as T));
@@ -189,11 +193,12 @@ namespace GBible
         bool IsProjectionKey(string key) => WireName(key) != key;
 
         // 행동이 끝나기 직전: 투영 키를 모두 다시 만든다(원래 키가 아직 없으면 건너뛴다 — 생기면 그때).
+        // 방장도 만든다: 방장 화면은 원래 키를 읽지만, 방장 눈 녹화(AddRecorder(방장 번호))는 방장 몫의 투영으로 받는다.
         void UpdateProjections()
         {
             if (_projections.Count == 0) return;
             foreach (var key in _projections.Keys.ToList())
-                foreach (var player in _players.Where(p => !p.IsLocal))
+                foreach (var player in _players)
                     RefreshProjection(key, player.Id);
         }
 
@@ -426,6 +431,14 @@ namespace GBible
             _transport.Dispose();
             _started = false;
             if (_session.Role == SessionRole.Server) _session.Role = SessionRole.Local;
+            // 방장이 방을 닫으면 혼자 하기로: 방장의 플레이어마다 몫을 0번으로 되돌리고 남의 몫은 지운다(이어 하는 판 · 저장에 없는 플레이어가 남지 않게).
+            var host = _players.FirstOrDefault(p => p.IsLocal);
+            if (host != null && !_session.Data.InTransaction)
+            {
+                foreach (var other in _players.Where(p => p != host)) _session.Data.RemovePlayer(other.Id);
+                _session.Data.MovePlayer(host.Id, 0);
+                if (_session.LocalPlayer == host.Id) _session.LocalPlayer = 0;
+            }
         }
 
         // ── 받기 ───────────────────────────────────────────────
@@ -527,6 +540,8 @@ namespace GBible
             peer.NeedsScan = true;
             _session.Journal.Append(JournalKind.System, "Net", $"{player}이(가) 들어왔습니다.");
             // 플레이어마다 따로인 데이터 · 투영 키는 들어오는 사람 몫을 만들어 둔다(처음 모습이 다음 묶음에 간다).
+            // 방장이 없는 서버(화면 없는 서버)가 혼자 하기 세션에서 열렸으면 그 0번 몫은 첫 사람이 들어올 때 지운다(없는 플레이어가 끼지 않게).
+            if (!_session.Data.InTransaction && !_players.Any(p => p.IsLocal)) _session.Data.RemovePlayer(0);
             _session.Data.AddPlayer(player.Id);
             foreach (var key in _projections.Keys.ToList()) RefreshProjection(key, player.Id);
             PlayerJoined?.Invoke(player);
@@ -606,8 +621,12 @@ namespace GBible
                         if (Validate != null)
                         {
                             // 받은 행동의 참조 필드(유닛 · 카드 …)는 id만 든 껍데기다 — 검사 코드가 주인 · 칸 같은 값을 읽게 지금 서버 데이터의 객체로 먼저 바꿔 넣는다.
-                            ActionReferences.Resolve(action, _session.Game);
-                            refused = Validate(peer.Player, action);
+                            // 검사 안에서 플레이어마다 데이터('hand')는 보낸 사람의 몫이다.
+                            using (_session.ActingAs(peer.Player.Id))
+                            {
+                                ActionReferences.Resolve(action, _session.Game);
+                                refused = Validate(peer.Player, action);
+                            }
                         }
                     }
                     catch (GameFailure failure) { refused = failure.Message; }

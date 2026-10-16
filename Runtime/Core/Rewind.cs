@@ -90,6 +90,7 @@ namespace GBible
         {
             RequireAction("RewindKey");
             if (!_session.Data.IsDefined(key)) throw new ArgumentException($"[MomoiProject] 플레이어 데이터 '{key}'가 없습니다.");
+            key = _session.Data.Resolve(key);   // 플레이어마다 데이터('hand')면 지금 플레이어의 몫
             var trees = TreesOf(marksBack);
             if (trees.TryGetValue(key, out var tree)) Restore(key, tree);
             else _session.Data.ResetKey(key);

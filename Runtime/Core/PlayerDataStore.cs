@@ -358,9 +358,12 @@ namespace GBible
         public Func<int> CurrentPlayer;
 
         // account: 매칭 계정에 남긴다(재화 · 해금 · 로스터) — 매칭큐 서버(NetHub)가 방을 열 때 그 사람 계정에서 읽고, 매치가 끝나면 계정에 다시 쓴다.
+        // 판(Session) 구역만 된다 — 프로필(Meta)은 기기마다 하나라 각자 자기 프로필을 쓴다(방장의 프로필에 남의 몫을 저장하지 않게). 매치가 끝나도 남길 값은 account.
         public void DefinePerPlayer(string key, DataZone zone, Type type, object defaultValue, string label = null, bool ownerOnly = false, bool account = false)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
+            if (zone != DataZone.Session)
+                throw new ArgumentException($"[MomoiProject] 플레이어마다 데이터 '{key}'는 판(Session) 구역만 됩니다. 프로필은 기기마다 하나라 각자 자기 프로필을 쓰고, 매치가 끝나도 남길 값은 '매칭 계정에 남김'으로 둡니다.", nameof(zone));
             _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly, Account = account };
         }
 
@@ -379,19 +382,74 @@ namespace GBible
         }
 
         // 계정에 남은 글(JSON)을 그 플레이어 몫에 넣는다(행동 밖 — 방을 열 때). 몫이 없으면 만든다. 읽지 못하면 거짓(값은 그대로).
+        // 다른 세션에서 온 값이라 요소 번호($id)는 버린다 — 이 세션의 같은 번호 객체(남의 몫)를 덮지 않게 새 객체로 들인다.
         public bool ImportAccountValue(string key, int player, string json)
         {
             if (string.IsNullOrEmpty(json) || !IsPerPlayer(key)) return false;
             AddPlayer(player);
             var concrete = KeyFor(key, player);
             object tree;
-            try { tree = MiniJson.Deserialize(json); }
+            try { tree = StripElementIds(MiniJson.Deserialize(json)); }
             catch (FormatException) { return false; }
             var slot = GetSlot(concrete);
-            var value = slot.DataType != null ? FromTree(concrete, tree) : ScalarFromTree(concrete, tree);
-            if (value == null && slot.DataType != null) return false;
-            Set(concrete, value);
-            return true;
+            try
+            {
+                if (slot.DataType != null)
+                {
+                    var value = FromTree(concrete, tree);
+                    if (value == null) return false;
+                    Set(concrete, value);
+                    return true;
+                }
+                if (!TryNormalize(ReadScalar(slot, tree), out var scalar) || (slot.ValueType != null && scalar != null && !slot.ValueType.IsInstanceOfType(scalar) && !IsNumberType(slot.ValueType, scalar))) return false;
+                Set(concrete, scalar);
+                return true;
+            }
+            catch (Exception e) when (e is ArgumentException || e is InvalidCastException || e is FormatException || e is OverflowException)
+            {
+                return false;   // 형식이 맞지 않는 값(숫자 칸에 참/거짓 …)
+            }
+        }
+
+        static bool IsNumberType(Type declared, object value) =>
+            value is double && (declared == typeof(int) || declared == typeof(long) || declared == typeof(float) || declared == typeof(double));
+
+        static object StripElementIds(object tree)
+        {
+            switch (tree)
+            {
+                case Dictionary<string, object> map:
+                    map.Remove("$id");
+                    foreach (var pair in map.ToList()) map[pair.Key] = StripElementIds(pair.Value);
+                    return map;
+                case List<object> list:
+                    for (int i = 0; i < list.Count; i++) list[i] = StripElementIds(list[i]);
+                    return list;
+                default:
+                    return tree;
+            }
+        }
+
+        // 몫을 옮긴다(행동 밖): from의 값을 to의 몫에 넣고 from의 몫을 지운다. 혼자 하기 세션이 방장이 될 때(0 → 방장 번호) · 방을 닫을 때(방장 번호 → 0).
+        public void MovePlayer(int from, int to)
+        {
+            if (from == to) return;
+            if (_active != null) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 플레이어 몫을 옮길 수 없습니다.");
+            if (!_perPlayer.Keys.Any(k => _slots.ContainsKey(KeyFor(k, from)))) return;
+            AddPlayer(to);
+            foreach (var key in _perPlayer.Keys.ToList())
+            {
+                var source = KeyFor(key, from);
+                if (_slots.ContainsKey(source)) Set(KeyFor(key, to), Get(source));
+            }
+            RemovePlayer(from);
+        }
+
+        // 'army:2' → 2(플레이어마다 키의 몫이 아니면 0).
+        public static int PlayerOfKey(string key)
+        {
+            var colon = key?.LastIndexOf(':') ?? -1;
+            return colon > 0 && int.TryParse(key.Substring(colon + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var player) ? player : 0;
         }
 
         // 그 플레이어 몫의 실제 키 이름.
@@ -1724,6 +1782,7 @@ namespace GBible
         // 키 하나를 기본값으로(행동 안이면 그 행동의 변경).
         public void ResetKey(string key)
         {
+            key = Resolve(key);
             var slot = GetSlot(key);
             if (slot.DataType != null || !Equals(slot.Value, slot.Default)) Set(key, slot.Default);
         }
@@ -1819,7 +1878,8 @@ namespace GBible
             var colon = key?.LastIndexOf(':') ?? -1;
             if (colon > 0 && IsPerPlayer(key.Substring(0, colon)))
                 throw new InvalidOperationException($"[MomoiProject] 플레이어마다 키 '{key.Substring(0, colon)}'의 플레이어 {key.Substring(colon + 1)} 몫이 아직 없습니다. 몫은 플레이어가 들어올 때 생깁니다 — " +
-                    "매칭 방의 새 판 행동처럼 들어오기 전에 도는 곳에서는 쓰지 말고, 정원이 다 들어온 뒤(RoomReady · PlayerJoined)에 채우세요.");
+                    "들어오기 전에 도는 곳(매칭 방의 새 판 행동)에서는 쓰지 않습니다. 시스템 행동 · 서버 쪽 코드(RoomReady · PlayerJoined)는 지금 플레이어가 없으므로 몫을 적어 씁니다: " +
+                    $"PlayerDataStore.KeyFor(\"{key.Substring(0, colon)}\", 번호) · KeysOfAllPlayers.");
             throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 플레이어 데이터 '{key}'입니다. DB 창의 플레이어 데이터에 등록하거나 Define으로 먼저 등록하세요.");
         }
 

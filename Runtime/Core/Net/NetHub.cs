@@ -680,7 +680,11 @@ namespace GBible
                 if (!saved.TryGetValue(id, out var entry) || !(entry is Dictionary<string, object> values)) continue;
                 foreach (var pair in values)
                     if (pair.Value is string json && !data.ImportAccountValue(pair.Key, player.Id, json))
-                        Say($"매치 {room.MatchId}: 저장해 둔 '{pair.Key}'(플레이어 {player.Id}) 값을 읽지 못했습니다.");
+                    {
+                        // 읽지 못한 값은 처음 값으로 남으므로, 매치가 끝나도 그 계정에 쓰지 않는다(처음 값으로 덮어 잃지 않게).
+                        Say($"매치 {room.MatchId}: 저장해 둔 '{pair.Key}'(플레이어 {player.Id}) 값을 읽지 못했습니다(이 매치가 끝나도 계정 값을 쓰지 않습니다).");
+                        if (!string.IsNullOrEmpty(player.Account)) room.AccountUnread.Add(player.Account);
+                    }
             }
         }
 
