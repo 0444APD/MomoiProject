@@ -187,6 +187,7 @@ TimeSpan away = Game.Now - profile.lastSeen;               // 꺼 둔 시간(오
 - 행동 밖(씬 코드)에서는 부를 때의 지금 시각이다. 화면의 "남은 시간" 표시에 쓴다.
 - 규칙(행동·Block·트리거 결과)에서는 `DateTime.Now`·`DateTime.UtcNow`를 쓰지 않는다. `Game.Now`를 쓴다.
 - 플레이어 데이터에 시각을 적을 때는 `DateTime` 필드(또는 `long` 밀리초)에 `Game.Now`를 넣는다. 저장·Undo가 그대로 따라간다.
+- **기간 한정(이벤트 시작·끝 날짜)**: DB에는 날짜 칸이 없다. DB 종류에 UTC 글자 칸(`2026-11-01T00:00:00Z`)을 두고, 규칙이 `DateTime.Parse(글자, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)`로 읽어 `Game.Now`와 비교한다. 형식 검사는 그 DB 종류의 `ValidateData(IValidationContext context)`에서 한다(읽지 못하면 `context.Error(…)` — 개발자가 잘못 적으면 DB 검증에 뜬다).
 
 ### 2.12 날짜 번호: `Game.Day` · `Game.Week`
 

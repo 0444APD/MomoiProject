@@ -59,7 +59,7 @@
 > [!note]- 시험
 > - **혼자**: 테스트 씬 › 컴포넌트 '테스트 씬' › 멀티플레이 = 시험 모드(지연 0.1 이상). 서버를 이 프로그램 안에 띄우고 이 화면은 클라이언트가 된다 — 싱글에서 숨는 문제(`Do` 직후 결과 읽기)가 드러난다. 모니터 머리에서 '서버' 세션을 고르면 서버 쪽 데이터·타임라인이 보인다.
 > - **두 컴퓨터**: 테스트 패널(F1) › 멀티 › 방 생성·방 참가(직접 접속). 매칭큐는 매칭큐 서버 + 매칭 찾기로 로컬에서 끝까지(40장 2절).
-> - **규칙 테스트**: 코어의 `NetServer`·`NetClient`·`MemoryNetwork`로 서버 하나·클라이언트 둘을 띄워 단언한다(40장 3-2).
+> - **규칙 테스트**: 플레이어마다 데이터는 `session.Data.DefinePerPlayer(…)` + `AddPlayer(1)`·`AddPlayer(2)` + 행동의 `actorId`·`using (session.ActingAs(번호))`. 서버·클라이언트를 함께 띄우려면 코어의 `MemoryNetwork { Manual = true }` + `NetServer` + `NetClient`(40장 3-2, 관례 12절).
 > - 서버 빌드는 같은 Unity 프로젝트의 Dedicated Server 빌드다(40장 1-9). 서버 중개(`NetServer`·`NetHub`)는 엔진 없는 코어라 테스트에서도 같은 코드가 돈다 — 규칙이 Unity API를 쓰지 않는 까닭이다(관례 1절).
 
 ## 2. 기능 로직(Rules)이 지킬 것
@@ -69,7 +69,7 @@
 - 행동·이벤트의 필드는 생성 코드가 쓸 수 있는 것만 둔다: `[Serializable]` 클래스, 중첩 컬렉션·`HashSet`·readonly 필드·자동 속성·`object` 칸 없음, `#if UNITY_EDITOR` 필드 없음. 보내지 않을 값이면 `[NonSerialized]`. 어기면 행동은 보내기 전에 실패하고 이벤트는 빠진다. 이벤트는 `[GameEvent]` 클래스다(구조체는 보낼 수 없다).
 - 난수는 `Game.Random`만 쓴다.
 - `GBibleRuntime`(정적 입구)을 부르지 않는다. 받은 것을 쓴다: Block은 물려받은 `Game`, `[BindTo]` 함수는 컨텍스트의 `c.Game`, 등록 코드는 매개변수 `session`. static 게임 상태를 두지 않는다.
-- 누가 한 행동인지는 행동의 `actorId`로 본다. `Do`가 비어 있으면 이 프로그램의 번호(`session.LocalPlayer`, 싱글 0)로 채우고, 서버는 보낸 사람 번호로 덮으므로 규칙은 그대로 믿는다. "할 수 있는가"(내 차례·내 유닛)는 서버 규칙 `Validate`가 거절 글로 막는다(Multiplayer.md).
+- 누가 한 행동인지는 행동의 `actorId`로 본다. `Do`가 비어 있으면 이 프로그램의 번호(`session.LocalPlayer`, 싱글 0)로 채우고, 서버는 보낸 사람 번호로 덮으므로 규칙은 그대로 믿는다. "할 수 있는가"(내 차례·내 유닛)는 기본으로 행동 안의 `Game.Fail`로 막는다(Undo·규칙 테스트에 함께 든다). 행동을 돌리기 전에 막아야 할 때만 서버 규칙 `Validate`가 그 규칙 함수를 불러 거절한다 — 같은 검사를 두 곳에 쓰지 않는다(Multiplayer.md, 40장 1-1).
 
 DB 항목(패시브 효과·상태 효과·도전과제·로그·액티브 효과 …)은 라이브러리가 세션마다 DB로 등록하므로 카드 던전의 유물(패시브 효과)은 매치마다 따로 돈다. 프로젝트가 직접 등록하는 규칙(직접 만든 DB 종류의 감시 — 04장 8절의 `RelicRules.Register`, 행동 처리기, 규칙이 받는 이벤트, 틱 규칙)은 받은 세션으로 등록하는 함수로 Rules에 둔다.
 
@@ -89,7 +89,7 @@ public static void Register(GameSession session, IEnumerable<RelicData> relics)
 **어디서 부르나 — `Bootstrap.RegisterRules` 한 곳.** `RegisterRules`는 `GBibleRuntime.SessionCreated`에 연결되어 **모든 세션**(싱글·방장·서버 빌드의 화면 세션, `GBibleRuntime.CreateSession()`으로 따로 만든 시험 모드의 서버와 봇·매칭큐의 방)이 DB로 만들어진 직후, 새 판 행동보다 먼저 온다([01장](01-StartProject.md) 4절). 그래서 규칙 쪽 등록은 여기 한 줄이면 모든 세션에서 돈다.
 
 - `Started`는 화면 세션에만 온다. 규칙 등록을 `Started`에 두면 시험 모드 서버·매칭큐 방에서 그 규칙이 빠진다.
-- 같은 세션에 두 번 등록하면 두 번 발동한다. `GameNet.ServerStarted`·`RoomStarting`에서 등록 함수를 다시 부르지 않는다. 거기서는 서버 객체가 있어야 거는 서버 규칙(`server.Validate`·플레이어별 키·공개 범위)만 건다(4절 접힌 칸).
+- 같은 세션에 두 번 등록하면 두 번 발동한다. `GameNet.ServerStarted`·`RoomStarting`에서 등록 함수를 다시 부르지 않는다. 거기서는 서버 객체가 있어야 거는 서버 규칙(`server.Validate`·투영 `server.Project`·녹화)만 건다(4절 접힌 칸). 플레이어마다 키는 DB 칸이 정의한다.
 
 > [!note]- 규칙별로 왜 그런가
 > | 규칙 | 지키지 않으면 |
@@ -118,7 +118,7 @@ public static void Register(GameSession session, IEnumerable<RelicData> relics)
 - 입력은 행동으로만 보낸다. 화면 버튼은 `GameScreens.Do(() => new 행동 { … })`(화면 코드에서는 `OnClick`)으로 — 연출·선택 대기 중(`GameView.Busy`)이면 막고, 플레이어용 실패(싱글의 `GameFailure`·멀티의 서버 거절)를 같은 알림으로 띄운다. 값을 직접 바꾸지 않는다.
 - `Do` 바로 뒤에서 결과를 읽지 않는다. 바뀐 곳 알림(화면 연결 binding-path·`GameView.Redraw`·`Data.Changed`)과 이벤트를 받고 그린다.
 - 연출용 이벤트는 `session.Events.SubscribeAfterAction<T>`로 받는다. 행동이 성공한 뒤에만 오고([06장](06-Presentation.md) 3절), 클라이언트에서는 서버가 보낸 이벤트가 이쪽으로만 온다. 받는 함수에서 값을 바꾸지 않는다.
-- "내 것"은 `session.LocalPlayer`로 고른다(내 핸드 = `Game.Get<Hand>("hand:" + Game.Session.LocalPlayer)` — 키 글자로 읽는다. 생성 접근자 `Game.Data()`에는 DB에 정의한 키만 있다).
+- "내 것"은 플레이어마다 데이터의 이름 그대로 읽는다: 내 핸드 = `Game.Get<Hand>("hand")`(생성 접근자 `Game.Data()`도 같다) — 행동 밖이면 이 화면 플레이어의 몫(`hand:번호`)으로 풀린다. binding-path·`GameView.Redraw` 키에도 `hand`를 그대로 적는다(이 화면 몫이 바뀌면 그린다). 내 번호는 매치마다 바뀌므로 화면이 번호를 붙잡아 두지 않는다(필요하면 `Game.Session.LocalPlayer`를 그때그때, 40장 1-2).
 
 카드 던전의 카드 누르기:
 
@@ -137,16 +137,16 @@ GameScreens.Do(() => new PlayCard { card = card, target = target });
 
 - **판 저장**: 클라이언트는 판을 저장하지 않는다(판 저장이 저절로 꺼진다). 방장·화면 없는 서버는 화면 세션이라 DB › Bootstrap의 판 저장대로 저장하고, 매칭큐 서버는 진행 중인 매치를 `NetHubOptions.SaveMatchEachAction`으로 저장한다(40장 1-6). 프로필(메타 구역)은 각자 자기 것이고 보내지 않는다(공개 범위 기본 `Server`). 매칭큐의 계정 값(재화·점수)은 서버 저장소(`NetAccount.values`)에 두고 클라이언트 값을 믿지 않는다.
 - **Undo**: 멀티에는 플레이어가 누르는 무르기가 없다(클라이언트의 `Undo`는 경고만). "n턴 되돌리기" 같은 기믹은 되감기다: 턴 시작 행동에서 `Game.MarkRewind()`, 기믹 행동에서 `Game.Rewind`·`RewindKey`·`RewindEntity`(40장 1-4). 싱글은 지금처럼 `session.Undo()`.
-- **플레이어가 여럿**: 플레이어마다 칸을 둔다(목록 `players[]` 또는 키 `hand:1`·`hand:2`). 남에게 숨길 것은 플레이어별 키 + `session.Data.SetVisibility(키, DataVisibility.Owner, 번호)` — 키 하나 안의 일부만 숨길 수는 없다. 숨길 이벤트는 `IOwnedEvent`(주인만 받음), 서버 규칙끼리만 쓰는 이벤트는 `[GameEvent(ServerOnly = true)]`.
+- **플레이어가 여럿**: 플레이어마다 칸을 둔다 — 판에 하나인 목록 `players[]`, 또는 DB › 플레이어 데이터의 '플레이어마다'(실제 키 `hand:1`·`hand:2`, 코드는 `hand` 그대로). 남에게 숨길 것은 그 칸의 '그 사람에게만 보임'(Owner), 그 사람에게도 숨길 것(덱 순서)은 '서버만'. 키 하나 안의 일부만 숨길 것(안개 속 유닛·덮인 카드)은 투영 `server.Project`(+ 상태 효과·보정은 `HideStatuses`, 40장 1-2). 숨길 이벤트는 `IOwnedEvent`(주인만 받음), 서버 규칙끼리만 쓰는 이벤트는 `[GameEvent(ServerOnly = true)]`.
 
 > [!note]- 플레이어가 여럿일 때 더
-> - 플레이어별 키 정의·공개 범위·`Validate`는 서버 객체가 필요하므로 서버가 준비될 때 건다(친구 방·시험 모드 `GameNet.ServerStarted`, 매칭큐 `GameNet.RoomStarting`, 첫 턴은 `GameNet.RoomReady` — 40장 4-1 예제). 감시·처리기 같은 규칙 등록은 여기가 아니라 `Bootstrap.RegisterRules`다(2절).
+> - 플레이어마다 키는 DB › 플레이어 데이터의 칸으로 정의한다('플레이어마다' + '그 사람에게만 보임' · '서버만(그 사람에게도 숨김)' · 매칭큐면 '매칭 계정에 남김') — 몫은 플레이어가 들어올 때 서버가 만든다. 서버 객체가 필요한 것(`Validate`·투영·녹화)만 서버가 준비될 때 건다(친구 방·시험 모드 `GameNet.ServerStarted`, 매칭큐 `GameNet.RoomStarting`, 첫 턴은 `GameNet.RoomReady` — 40장 4-1 예제). 감시·처리기 같은 규칙 등록은 여기가 아니라 `Bootstrap.RegisterRules`다(2절).
 > - 행동의 `Visibility`(`Public`·`Private`·`Developer`)는 모니터 행동 탭의 표시일 뿐이다. 남에게 숨기는 것은 데이터 키의 공개 범위로 한다.
 > - 매칭큐의 승패는 규칙이 정하고 `GameNet.Hub.EndMatch(room, NetMatchResult[])`로 알린다(행동 안이 아니라 행동 뒤에 — 예: 결정 이벤트를 `SubscribeAfterAction`으로 받아서).
 
 > [!note]- 다른 장르라면
-> - **턴제 경쟁(매칭큐)**: 완전 서버 권한이다. 재화·인벤토리·구매 내역은 서버 저장소에만 두고, 경쟁 매치의 난수 시드는 서버만 가진다. 카드 던전의 규칙 그대로 행동만 보내고, 차례 검사는 `Validate`, 핸드는 플레이어별 키 + `Owner`.
-> - **실시간 친구 방(사설 호스트)**: 방장의 세션이 서버 역할을 하고, 방장이 나가면 판이 끝난다(이어받기 없음). 묶음은 틱마다 간다. 위치·속도처럼 매 프레임 바뀌는 값은 플레이어 데이터가 아니라 `NetTransformSync`(entityId를 모든 프로그램에서 같게, owner = 플레이어 번호)로, 규칙 값(체력·점수)만 플레이어 데이터로 둔다. 맞힘은 클라이언트가 판정 보고 행동으로 보내고 방장의 규칙이 확인한다.
+> - **턴제 경쟁(매칭큐)**: 완전 서버 권한이다. 재화·인벤토리·구매 내역은 서버 저장소에만 두고, 경쟁 매치의 난수 시드는 서버만 가진다. 카드 던전의 규칙 그대로 행동만 보내고, 차례 검사는 행동 안(돌리기 전에 막을 것만 `Validate`), 핸드는 '플레이어마다' + '그 사람에게만 보임', 덱 순서는 '서버만'. 재화·컬렉션은 계정 값이고 매치 밖에서 바꾸는 길(상점·덱 편성)은 지금 없다 — 묻는다.
+> - **실시간 친구 방(사설 호스트)**: 방장의 세션이 서버 역할을 하고, 방장이 나가면 판이 끝난다(이어받기 없음). 묶음은 틱마다 간다. 위치·속도처럼 매 프레임 바뀌는 값은 플레이어 데이터가 아니라 `NetTransformSync`(entityId를 모든 프로그램에서 같게, owner = 플레이어 번호)로, 규칙 값(체력·점수)만 플레이어 데이터로 둔다. 맞힘은 클라이언트가 판정 보고 행동으로 보내고 방장의 규칙이 확인한다(그 행동 안에서 사거리·쿨다운·살아 있나를 판 데이터로 검사). 적은 `owner = 0`(방장 화면이 움직이고 공격 결정도 방장 화면의 AI가 판정 보고 행동으로 — 40장 4-2).
 
 ## 5. 체크리스트
 
@@ -157,7 +157,7 @@ GameScreens.Do(() => new PlayCard { card = card, target = target });
 - [ ] Rules 코드에 `GBibleRuntime` 정적 입구와 static 게임 상태가 없다.
 - [ ] 규칙 쪽 등록(직접 만든 DB 종류의 감시·행동 처리기·규칙이 받는 이벤트·틱 규칙)은 모두 `Bootstrap.RegisterRules`에서 한 번 불리고, `Started`·`ServerStarted`·`RoomStarting`에서 다시 부르지 않는다.
 - [ ] UI는 `Do` 직후 결과를 읽지 않고 알림을 받아 그린다. 연출은 `SubscribeAfterAction`으로 받고, 받는 함수는 값을 바꾸지 않는다.
-- [ ] 플레이어가 여럿이면 플레이어마다 칸이 있고, 남에게 숨길 값은 플레이어별 키 + `Owner`다. 규칙은 `actorId`로 누가 했는지 본다.
+- [ ] 플레이어가 여럿이면 플레이어마다 칸이 있고(DB '플레이어마다'), 남에게 숨길 값은 '그 사람에게만 보임'·'서버만', 한 키 안의 일부는 투영이다. 규칙은 `actorId`로 누가 했는지 본다.
 - [ ] 멀티 프로젝트면 테스트 씬의 시험 모드(지연 0.1 이상)로 한 번 돌려 봤다.
 
 > [!note]- 더 보기

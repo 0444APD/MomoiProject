@@ -308,6 +308,7 @@ DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해진다. S
 | ID | 버튼 이름 | 결과 |
 |---|---|---|
 | `goldPlus100` | 골드 +100 | 플레이어 데이터에 주기: run › gold +100 |
+| `pityTo89` | 천장 89로 | 플레이어 데이터에 주기: run › pity, 값 `89`(숫자 칸에 값을 적으면 증감 대신 그 값으로 정한다 — 12장 2-2) |
 | `turnDamage30` | 한 턴 30 피해 | 이벤트 쏘기: `TurnEnded` (turn = 1, damage = 30) — 그 이벤트를 받는 로그·도전과제·트리거가 반응 |
 | `killAll` | 적 모두 처치 | 코드(`[BindTo]`, 아래) |
 
@@ -335,7 +336,9 @@ public static class DebugCode
 }
 ```
 
-**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 등록 자리는 `Client/Bootstrap.cs`(`20-Setup.md` 4절): 판 데이터를 바꾸는 명령은 `RegisterRules`(`GBibleRuntime.SessionCreated` — 멀티 서버 세션에도 온다. 클라이언트가 누른 명령은 서버 세션에서 돈다), 화면만 쓰는 명령(시간 배속 등)은 `Started`(화면 세션에만). 동작은 그대로 불리므로, 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 불러야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
+**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 등록 자리는 `Client/Bootstrap.cs`(`20-Setup.md` 4절): 판 데이터를 바꾸는 명령은 `RegisterRules`(`GBibleRuntime.SessionCreated` — 멀티 서버 세션에도 온다), 화면만 쓰는 명령(시간 배속·봇 조종 등)은 `Started`(화면 세션에만). 동작은 그대로 불리므로, 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 불러야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
+
+**멀티에서 명령이 도는 곳**(40장 3-1): `Started`에서 등록한 명령은 이 화면(클라이언트)에서 돈다 — 서버로 넘기지 않는다(서버 세션에는 `Started`가 오지 않아 같은 명령이 없다). `RegisterRules`에서 등록한 명령과 DB › 개발 명령은 클라이언트가 누르면 서버에서 **누른 사람으로**(`ActingAs`) 돈다 — DB 결과 Block과 코드가 쓰는 플레이어마다 이름(`bag`)도 누른 사람의 몫이다. 시험 모드의 봇에게 시키는 명령은 `Started`에서 `GameNet.ExtraClients[0].Session.Do(…)`(봇의 번호로 서버에 간다).
 
 ```csharp
 // Client/Bootstrap.cs(시작 설정이 만든 파일)의 두 함수

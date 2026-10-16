@@ -42,7 +42,13 @@ static void Art()
 ```
 
 - 이미 파일이 있으면(개발자가 옮겼거나 확장자를 바꿨어도 — GUID로 찾는다) 임시 에셋을 만들지 않는다(개발자가 넣은 것을 덮지 않는다). 같은 경로를 다시 부르면 설명만 고친다. 그래서 반영 스크립트가 다시 돌아도 안전하다.
-- 임시 에셋을 화면·DB가 바로 쓰게 둔다(스프라이트 칸에 그 경로의 에셋을 넣는다). 진짜 파일이 들어와도 연결을 다시 할 필요가 없다. 함수는 지금 경로를 돌려준다.
+- 임시 에셋을 화면·DB가 바로 쓰게 둔다(스프라이트 칸에 그 경로의 에셋을 넣는다). 진짜 파일이 들어와도 연결을 다시 할 필요가 없다. 함수는 지금 경로를 돌려준다(임시 그림은 그 자리에서 가져오므로 바로 읽힌다). 원본 인스턴스의 스프라이트 칸에 넣는 예(새 항목을 만들 때 — 04장 1.1):
+  ```csharp
+  var art = AssetRequests.Sprite("Assets/Dev/Art/Cards/fireball.png", 256, 256, "카드 '파이어볼' 그림");
+  var data = (InstanceData)EditorDatabase.Staging.Add(typeof(InstanceData), "fireball");
+  data.instanceType = typeof(CardDef).FullName;
+  data.value = new CardDef { cost = 1, art = AssetDatabase.LoadAssetAtPath<Sprite>(art) };   // CardDef.art: Sprite 칸
+  ```
 - 임시 그림은 Sprite(한 장짜리)로 가져온다. 임시 소리 길이는 `seconds`(기본 0.5초).
 
 **프리팹 만들기** — 개발자가 말로 준 양식대로(예: 캐릭터 = 몸 스프라이트 + 애니메이터(대기 · 걷기 · 공격) + 발밑 원 충돌체). 리소스 경로는 개발자가 둔 자리(없으면 위 `AssetRequests`로 임시 자리를 먼저).

@@ -42,12 +42,14 @@
   - 받은 바뀐 곳은 **행동 밖 변경**으로 적용된다 → `Data.Changed`·`DataChanged`·화면 연결(binding-path)이 싱글과 똑같이 알림을 받는다.
   - 받은 이벤트는 **`SubscribeAfterAction`으로 받는 쪽에만** 온다(`EventBus.PublishRemote`). `Subscribe`·`SubscribeAll`(규칙 쪽)에는 오지 않는다 — 규칙은 서버에서 이미 돌았다.
   - 하지 않는 것: Undo(경고만), 조건 판정(트리거·도전과제), 시간 규칙(상태 효과·패시브 효과 주기·예약). 시계는 받은 묶음의 서버 시각으로 맞춘다.
-  - `Game.Preview`(미리보기)는 이쪽 데이터로 돈다(난수 시드가 서버와 달라 확률은 어긋날 수 있다).
+  - `Game.Preview`(미리보기)는 이쪽 데이터로 돈다(난수 시드가 서버와 달라 확률은 어긋날 수 있다). `Game.Preview`·`Game.CanDo`도 `Do`처럼 `actorId`를 비워 둔 행동에 이 화면의 플레이어 번호를 채운다 — 미리보기 안의 `hand`가 내 몫이다.
   - 이벤트 안의 객체 필드는 **이쪽 데이터의 같은 객체**를 가리킨다(서버가 객체 번호로 보낸다). 이쪽이 받지 못한 데이터(숨긴 키)의 객체면 `null`.
 - **서버·방장**(`SessionRole.Server`)
   - 받은 행동의 `actorId`를 **보낸 사람 번호로 덮고** `utc`·`tick`을 지운다(속일 수 없게).
   - `[SystemAction]`이 붙은 행동(예약·주기·선택 효과·개발자 편집)은 클라이언트가 보내도 실행하지 않는다.
-  - `NetServer.Validate(플레이어, 행동)`이 거절 글을 돌려주면 실행하지 않는다(내 차례가 아님 등). 검사 코드가 예외를 내도 거절로 돌려준다("행동 검사 중 오류: …" — 결과가 오지 않아 클라이언트가 기다리기만 하지 않게).
+  - `NetServer.Validate(플레이어, 행동)`이 거절 글을 돌려주면 실행하지 않는다(내 차례가 아님 등). 검사 코드가 예외를 내도 거절로 돌려준다("행동 검사 중 오류: …" — 결과가 오지 않아 클라이언트가 기다리기만 하지 않게). `Validate`는 보낸 사람으로 돈다(`ActingAs` — 안의 `hand`가 그 사람 몫). 안에서 던진 `Game.Fail(키, …)`은 키·인자도 클라이언트로 가서(`NetActionFailure.Key`·`Args`) 받는 쪽 언어로 번역되고, 글자를 돌려주면 그 글자 그대로 간다.
+  - **차례·주인 검사의 자리**: 서버가 `actorId`를 보낸 사람으로 덮으므로 행동 안의 `Game.Fail`로도 검사된다(Undo·규칙 테스트에 함께 든다). 기본은 행동 안(규칙 함수)에 둔다. `Validate`는 행동을 돌리기 전에 막아야 할 때(남의 유닛을 움직이려 함 · 돌리기 비싼 행동)만 쓰고, 그때도 같은 검사를 두 곳에 쓰지 않는다 — `Validate`가 그 규칙 함수를 불러 재사용한다.
+  - **방 주인**: `NetServer.Owner` = 방장(이 프로그램의 플레이어)이 있으면 방장, 없으면(시험 모드·화면 없는 서버) 들어와 있는 사람 가운데 번호가 가장 작은 사람. "방장만 하는 행동"(던전 시작·강퇴)은 `Validate`에서 `player != server.Owner`로 막는다(3-1 예).
   - **검사 코드가 보는 행동의 참조 필드는 서버 데이터의 진짜 객체다.** 받은 행동의 대상(유닛·카드)은 id만 든 껍데기로 오지만, `Validate`를 부르기 전에 서버가 지금 데이터의 객체로 바꿔 넣는다(`ActionReferences.Resolve`). 그래서 `action.unit.owner`·`action.card.cost` 같은 값을 그대로 읽어 검사한다(3-1 예). 그 사이 대상이 사라졌으면 플레이어용 실패 "대상이 이미 없습니다."(`momoi.fail.targetGone`, 02장 2.2)가 거절 글로 간다.
   - 묶음: 마지막으로 보낸 뒤의 바뀐 곳·이벤트를 키의 공개 범위대로 사람마다 골라 보낸다. 미리보기·실패한 행동의 이벤트는 보내지 않는다. 방장의 미리보기(`Game.Preview`)는 객체의 네트워크 번호를 바꾸지 않는다(`Mirror.KeepIds`) — 클라이언트는 같은 인스턴스를 그대로 가리킨다. 실패한 행동을 되돌릴 때도 번호를 지키므로, 실패 뒤에도 같은 객체는 같은 인스턴스로 간다.
   - 데이터 변경은 받는 쪽에 보낼 것(`Data.Synced`)에 먼저 넣고 그다음 이쪽 알림(`Data.Changed`)을 부른다. 알림을 받은 코드가 다른 데이터를 바꿔도 받는 쪽에는 차례가 뒤바뀌어 가지 않는다.
@@ -59,7 +61,7 @@
   - 받은 이름은 제어 문자를 빼고 앞뒤 공백을 지운 뒤 32자로 자른다(`NetProtocol.CleanName` — 화면·기록·계정 키에 쓰인다).
   - WebSocket 전송: 메시지 하나는 32MB까지(조각을 이어 붙인 전체도). 받기 버퍼는 실제로 온 만큼 잡는다(머리에 적힌 길이만큼 미리 잡지 않는다). 제어 프레임(핑·퐁·닫기)은 125바이트까지. 보낼 대기열(WebSocket 핑에 전송이 스스로 하는 퐁 포함)이 8192개를 넘으면(받는 쪽이 멈춤) 연결을 닫고 끊김(`Disconnected`)으로 알린다. 연결 알림(`Connected`)은 그 연결에서 받은 것보다 늘 먼저 온다(악수 바로 뒤에 온 Hello도 잃지 않는다).
 - **내 번호**: `session.LocalPlayer`(싱글 0). 클라이언트는 서버가 준 번호, 방장은 자기 번호. `Do`가 `actorId`를 비워 둔 행동에 채운다.
-- **클라이언트의 자기 프로필**: 들어갈 때(`GameNet.Join` — 화면 세션을 클라이언트로 다시 만든다) 클라이언트 세션도 이 기기 슬롯의 `profile.json`(메타 구역)을 불러온다. 서버의 메타 키는 기본 `Server`라 오지 않으므로(1-2), 접속 중에도 `Game.Data().Profile`은 **내 프로필**이다 — 해금·설정 같은 값을 읽어 화면에 보일 수 있다. 하지만 클라이언트의 `Do`는 행동 밖이면 모두 서버로 가서 **서버 세션의 프로필**(방장 자신의 것, 화면 없는 서버·매칭 방은 빈 것)을 바꾸므로, 접속 중에는 내 프로필을 바꾸는 행동이 내 쪽에 남지 않는다(로비의 장비·상점도 마찬가지). 판 저장은 하지 않고(판은 서버가 가진다), 나오거나 끌 때 내 프로필만 그대로 저장한다. 경기 결과로 남는 값(재화·해금·로스터)은 프로필이 아니라 매칭큐의 **계정 값**에 둔다(1-6 '계정 값' — 서버가 방을 열 때 읽고 매치가 끝나면 쓴다). 친구 방(방장)에는 계정 저장소가 없다 — 경기 결과를 남겨야 하는 친구 대전이면 명세서 단계에서 묻는다(매칭큐의 종류 글자로 할지, AI/Multiplayer.md).
+- **클라이언트의 자기 프로필**: 들어갈 때(`GameNet.Join` — 화면 세션을 클라이언트로 다시 만든다) 클라이언트 세션도 이 기기 슬롯의 `profile.json`(메타 구역)을 불러온다. 서버의 메타 키는 기본 `Server`라 오지 않으므로(1-2), 접속 중에도 `Game.Data().Profile`은 **내 프로필**이다 — 해금·설정 같은 값을 읽어 화면에 보일 수 있다. 하지만 클라이언트의 `Do`는 행동 밖이면 모두 서버로 가서 **서버 세션의 프로필**(방장 자신의 것, 화면 없는 서버·매칭 방은 빈 것)을 바꾸므로, 접속 중에는 내 프로필을 바꾸는 행동이 내 쪽에 남지 않는다(로비의 장비·상점도 마찬가지). 판 저장은 하지 않고(판은 서버가 가진다), 나오거나 끌 때 내 프로필만 그대로 저장한다. 경기 결과로 남는 값(재화·해금·로스터)은 프로필이 아니라 매칭큐의 **계정 값**에 둔다(1-6 '계정 값' — 서버가 방을 열 때 읽고 매치가 끝나면 쓴다). 친구 방(방장)에는 계정 저장소가 없다 — 경기 결과를 남겨야 하는 친구 대전이면 명세서 단계에서 묻는다(매칭큐의 종류 글자로 할지, AI/Multiplayer.md). 친구 방 협동에서 **참가자에게 남는 진행**(해금·금화·도전과제)도 지금 라이브러리에 길이 없다 — 참가자의 행동은 방장 세션의 프로필을 바꾸고, 그 값을 참가자 프로필로 내려보내는 부품은 없다. 그런 보상이 있으면 묻는다(진행 매뉴얼 5-3).
 
 ### 1-2. 공개 범위
 
@@ -70,8 +72,8 @@
 | `$schedule`(예약) · `$rewind`(Undo 지점) | `Server` |
 
 - 정하기: `session.Data.SetVisibility("hand:2", DataVisibility.Owner, owner: 2)`. 공개 범위는 **키 단위**다. 숨기는 길은 둘이다.
-- **플레이어마다 데이터**(사람마다 따로인 것 — 핸드·편성·지갑): DB › 플레이어 데이터의 '플레이어마다'(`perPlayer`)를 켜면 실제 키가 `hand:1`·`hand:2` …로 나뉜다. '그 사람에게만 보임'(`ownerOnly`)을 켜면 그 사람에게만 간다(Owner). **판(Session) 구역만 된다** — 프로필은 기기마다 하나라 각자 자기 프로필을 쓰고, 매치가 끝나도 남길 값은 '매칭 계정에 남김'(1-6).
-  - 게임 코드·DB Block은 **`hand` 그대로** 읽고 쓴다: 행동 안이면 그 행동을 한 플레이어(`actorId`)의 몫, 행동 밖이면 이 화면의 플레이어(`LocalPlayer`)의 몫이다. 서버 검사(`Validate`) 안에서는 보낸 사람의 몫, 패시브 효과의 결과는 그 가진 쪽 플레이어의 몫이다(남의 유물이 발동해도 금화는 그 주인에게). 잠시 다른 플레이어로 읽으려면 `using (session.ActingAs(2)) { … }`. 특정 플레이어의 몫은 `PlayerDataStore.KeyFor("hand", 2)`(= `"hand:2"`), 모든 몫은 `session.Data.KeysOfAllPlayers("hand")`(번호순).
+- **플레이어마다 데이터**(사람마다 따로인 것 — 핸드·편성·지갑): DB › 플레이어 데이터의 '플레이어마다'(`perPlayer`)를 켜면 실제 키가 `hand:1`·`hand:2` …로 나뉜다. '그 사람에게만 보임'(`ownerOnly`)을 켜면 그 사람에게만 간다(Owner). '서버만(그 사람에게도 숨김)'(`serverOnly`)을 켜면 아무에게도 보내지 않는다(Server — 덱 순서·뽑을 카드처럼 서버 규칙만 읽는 것, '그 사람에게만 보임'보다 먼저). **판(Session) 구역만 된다** — 프로필은 기기마다 하나라 각자 자기 프로필을 쓰고, 매치가 끝나도 남길 값은 '매칭 계정에 남김'(1-6).
+  - 게임 코드·DB Block은 **`hand` 그대로** 읽고 쓴다: 행동 안이면 그 행동을 한 플레이어(`actorId`)의 몫, 행동 밖이면 이 화면의 플레이어(`LocalPlayer`)의 몫이다. 서버 검사(`Validate`) 안에서는 보낸 사람의 몫, 패시브 효과의 결과는 그 가진 쪽 플레이어의 몫이다(남의 유물이 발동해도 금화는 그 주인에게). 잠시 다른 플레이어로 읽고 쓰려면 `using (session.ActingAs(2)) { … }`(`IDisposable` — 행동 안의 `actorId`보다 먼저. `ActingAs(0)`은 바꾸지 않는다 — 위의 기본 해석 그대로). 특정 플레이어의 몫은 `PlayerDataStore.KeyFor("hand", 2)`(= `"hand:2"`), 모든 몫은 `session.Data.KeysOfAllPlayers("hand")`(번호순).
   - 몫은 플레이어가 들어올 때 생긴다: 혼자 하기는 시작할 때 0번 하나, 서버는 들어오는 사람마다. 혼자 하기 세션이 방장이 되면 방장이 0번 몫을 이어받고(방장 번호의 몫으로 옮김), 방을 닫으면 다시 0번으로 돌아온다(남의 몫은 지운다). 화면 없는 서버는 첫 사람이 들어올 때 0번 몫을 지운다. 혼자 하기 녹화는 몫을 건드리지 않는다.
   - 행동 밖에서 도는 규칙(조건 충족 트리거·도전과제·상태 효과 주기·예약)은 이 화면의 플레이어 몫을 본다. 서버에서 플레이어마다 조건이 필요하면 이벤트 트리거 + 가진 쪽 필드(17장)나 행동 안의 규칙으로.
   - 그래서 몫을 채우는 일(카드 나누기·처음 편성)은 모두 들어온 뒤에 한다 — 매칭큐는 `RoomReady`, 친구 방은 방장이 누르는 판 시작 행동이나 `server.PlayerJoined`(행동 밖이라 `server.Session.Do(행동)`). 시스템 행동·서버 쪽 코드는 지금 플레이어가 없으므로(0번) 몫을 적는다(`KeyFor`·`KeysOfAllPlayers`). 매칭 방의 새 판 행동처럼 들어오기 전에 도는 곳에서 `hand`를 쓰면 "플레이어마다 키 'hand'의 플레이어 0 몫이 아직 없습니다" 오류다.
@@ -85,6 +87,11 @@
 - 이벤트는 기본으로 모두에게 간다. 숨길 이벤트는 둘 중 하나로:
   - 주인만: 이벤트 클래스가 `IOwnedEvent`를 구현한다(`int Owner => player;`) — 그 플레이어(와 모두 보는 녹화)에게만 간다. `Owner`가 0이면 모두에게.
   - 서버만: `[GameEvent("…", ServerOnly = true)]` — 클라이언트에 보내지 않는다(서버 규칙끼리 주고받는 이벤트).
+- **플레이어마다 데이터를 화면·투영·표·테스트에서**:
+  - 화면: binding-path·`GameView.Redraw` 키·`ViewList`·`ElementList`에 `hand`를 그대로 적는다 — 이 화면 플레이어의 몫(`hand:2`)이 바뀌면 그린다. 내 번호는 매치마다 바뀌므로 화면 코드가 `OnOpen`에서 번호를 붙잡아 두지 않는다(`Game.Session.LocalPlayer`를 쓸 때마다 읽는다).
+  - 남에게는 개수만(상대 핸드 장수·비밀 개수): 기본은 판에 하나인 공개 키의 칸(`players[번호].handCount` 같은)을 핸드를 바꾸는 그 행동 안에서 함께 고친다. 투영을 쓰려면 몫 키마다 건다 — `server.PlayerJoined += p => server.Project<Hand>(PlayerDataStore.KeyFor("hand", p.Id), (viewer, hand) => viewer == p.Id ? hand : new Hand { count = hand.cards.Count });`(그때 '그 사람에게만 보임'은 끈다 — 보낼 모습은 투영이 정한다). 둘 중 고른 것을 보고한다.
+  - 가중치 표의 뺄 목록이 플레이어마다 키면 사람마다 뽑을 때 `using (session.ActingAs(번호)) { … Game.Roll(…) … }` 안에서 뽑는다(시스템 행동·서버 쪽 코드의 지금 플레이어는 0번이다).
+  - 서버만 아는 것(덱 순서): '서버만' 칸. 규칙 테스트는 관례 12절·38장 4절(`DefinePerPlayer`·`AddPlayer`·`actorId`·`ActingAs`).
 
 ### 1-3. 되돌리기와 되감기
 
@@ -121,18 +128,22 @@
 - 매치 중에 끊겼다 다시 접속하면 로비를 거치지 않고 그 매치의 같은 자리로 들어가 지금 모습을 받는다.
 - 진행 중인 매치를 저장한다(`NetHubOptions.SaveMatchEachAction`): 행동이 있었던 방만 `MatchSaveSeconds`(기본 2초, 0 = 행동마다)마다 한 번, 방이 준비될 때·서버를 닫을 때는 바로. 서버를 다시 켜면 `ResumeOpenMatches`로 다시 열고, 플레이어가 다시 접속하면 이어 간다. 이미 시작했던 매치면 정원이 다 돌아와도 `RoomReady`를 다시 쏘지 않는다(첫 턴을 다시 시작하지 않고 저장된 판에서 이어 간다). `ReadySeconds` 안에 다 돌아오지 않으면 없던 것으로.
 - `EndMatch`를 같은 방에 두 번 불러도 한 번만 반영한다(결과에 같은 사람이 두 번 들어와도 한 번만 센다).
+- 준비가 끝난 방(`RoomReady`를 쏜 뒤)은 모두 나가도 닫히지 않는다 — 다시 접속하면 같은 자리로 이어 간다. 1인 방(보관함·연습 — 정원 1인 매칭)은 `room.Server.PlayerLeft`에서 `GameNet.Hub.EndMatch(room, 결과)`로 닫는다(빈 결과면 점수는 그대로, 계정 값은 쓴다).
+- 매칭은 `GameNet.CreateMatchmaker = players => new MyMatchmaker(players)`(`Func<int, INetMatchmaker>`, 비우면 `LocalMatchmaker { PlayersPerMatch = 인원 }`)로 바꾼다 — `StartMatchServer`·명령줄 `-momoi-matchserver`·테스트 패널의 매칭큐 서버가 모두 이것을 쓴다(종류(모드)마다 정원이 다른 매칭).
 - `GameNet.StartMatchServer`가 만드는 방 세션은 Undo 이력과 바뀐 곳의 사람용 문장(기록·모니터용)을 만들지 않는다(`Data.RecordHistory`·`DescribeChanges`를 끔 — 서버 한 대가 방 수십 개를 돌린다). 되감기 기믹(1-4)은 이력이 아니라 지점 데이터를 쓰므로 그대로 된다.
 - 점수: Elo(K=32, 여럿이면 둘씩 짝지어 나눔). 같은 등수 = 무승부.
 - **계정 값**(재화·해금·로스터 — 매치가 끝나도 남는 그 사람의 값): DB › 플레이어 데이터에서 '플레이어마다' + '매칭 계정에 남김'(`onAccount`)을 켠다(구역은 판 `Session`).
   - 방이 열릴 때 그 사람 계정(`NetAccount.values[ID]` = 그 몫의 저장 트리 JSON)에서 읽어 그 사람 몫에 넣는다(없으면 처음 값). 매치가 끝나면(`EndMatch` — 결과에 없는 사람도) 그 몫을 계정에 다시 쓴다.
+  - 처음 값은 그 형식의 초기값이다(클래스는 필드 초기값, 단순 값은 DB '기본값'). 첫 접속 지급(시작 카드·시작 재화)은 DB가 아니라 서버 규칙으로 준다: `RoomReady`에서 받은 적 없는 사람에게 주는 행동을 돌리고, 받음 표시 칸(`starterGiven` 같은)을 계정 값 안에 둔다.
   - 규칙은 다른 플레이어 데이터처럼 행동 안에서 읽고 쓴다. 클라이언트는 행동만 보내므로 값을 고칠 수 없다.
   - 매치 도중과 취소된 매치(정원이 다 오지 않음)는 계정에 쓰지 않는다. 서버를 다시 켜면 매치 저장에 든 값(그동안 바뀐 것)으로 이어 간다.
   - 방을 열 때(이어 열 때도) 계정 값을 읽지 못한 계정(저장소 오류·깨진 값·형식이 맞지 않는 값)은 그 매치가 끝나도 계정 값을 쓰지 않는다(처음 값으로 덮어 잃지 않게 — 점수·전적은 반영한다). 들일 때 요소 번호는 버리고 새 객체로 들인다(다른 계정의 객체와 섞이지 않게).
-  - 매치 밖(로비)에서 계정 값을 바꾸는 길(상점·구매)은 아직 없다. 그런 게임이면 묻는다.
+  - 매치 밖(로비)에서 계정 값을 바꾸는 길(상점·구매·덱 편성)은 아직 없다. 그런 게임이면 묻는다(명세서 0절 · 진행 매뉴얼 5-3).
+- **계정 키**(같은 계정 = 같은 자리·같은 계정 값): 입장 확인이 정한다. 가짜 인증(`FakeAuthenticator`)은 기기 번호가 오면 `name:이름@기기`, 없으면 `name:이름`. 직접 접속(입장 확인이 계정을 정하지 않음)은 기기 + 이름이다 — 기기 번호 `GameNet.DeviceId`(이 기기에 한 번 만들어 설정 파일에 두는 무작위 글자, Hello에 실린다 — 규격 2)라 다른 컴퓨터의 같은 이름이 한 자리로 잇지 않는다. Steam 방은 `steam:<SteamID>`(1-7).
 
 | 창구 | 가짜(지금) | 진짜(출시, 계정 준비 뒤) |
 |---|---|---|
-| 인증 `INetAuthenticator` | `FakeAuthenticator`(이름을 믿음 — 입장 표는 보지 않는다) | `SteamWebAuthenticator`(Steam 인증 티켓 → Web API, 퍼블리셔 키는 서버만) |
+| 인증 `INetAuthenticator` | `FakeAuthenticator`(이름을 믿음 — 입장 표는 보지 않는다. 계정은 `name:이름@기기`) | `SteamWebAuthenticator`(Steam 인증 티켓 → Web API, 퍼블리셔 키는 서버만) |
 | 매칭 `INetMatchmaker` | `LocalMatchmaker`(실력 폭 `BaseWindow` + 초당 `WidenPerSecond`, `MaxWaitSeconds`를 넘기면 아무나와) | AWS GameLift FlexMatch 어댑터(아직 — AWS 계정 준비 뒤) |
 | 저장 `INetPlayerStore` | `FilePlayerStore`(폴더의 accounts/·matches/ JSON) | PostgreSQL·Redis 어댑터(아직 — 계정 준비 뒤) |
 
@@ -142,8 +153,9 @@
 - `SteamLobby.Create(4)` → Steam 로비(친구만)를 만들고 이 프로그램이 방장(`GameNet.Host` + `SteamServerTransport`). `SteamLobby.Invite()` = 친구 초대 창.
 - 친구가 초대를 받거나(게임 참가) `+connect_lobby`로 게임을 켜면 그 로비에 들어가 방장에게 접속(`SteamClientTransport` — Steam Datagram Relay, NAT 통과).
 - 방장이 나가면 판이 끝난다(모두 연결이 끊기고 `GameNet.Closed`). **방장 이어받기는 하지 않는다** — 한 번 만든 방은 끝까지 그 방장이 맡는다(2026-10-06 결정).
-- 방장은 접속한 사람을 SteamID로 알아본다(계정 키 `steam:<SteamID>`) — 이름이 바뀌어도 다시 접속하면 같은 자리.
-- 매 순간 움직이는 것: `NetTransformSync`(주인이 보내고 나머지는 보간, 방장이 중계). 판정(피해·드롭·상태 효과)은 방장의 규칙이 한다 — 위치는 그 재료다. 받는 쪽(방장 포함)은 보낸 사람이 주인인 물체만 움직인다(보낸 사람 번호는 서버가 붙인다 — 남의 캐릭터를 옮길 수 없다). 방장·서버가 보낸 것(보낸 사람 0)은 모두 받는다.
+- 방장은 접속한 사람을 SteamID로 알아본다(계정 키 `steam:<SteamID>`) — 이름이 바뀌어도 다시 접속하면 같은 자리. 게임이 `ServerStarted`에서 건 입장 확인(`server.Admit` — 던전 중 막기 등)을 먼저 돌리고, 받아들였을 때 계정만 `steam:<SteamID>`로 정한다(게임의 입장 확인을 덮어쓰지 않는다).
+- 매 순간 움직이는 것: `NetTransformSync`(주인이 보내고 나머지는 보간, 방장이 중계). 판정(피해·드롭·상태 효과)은 방장의 규칙이 한다 — 위치는 그 재료다. 받는 쪽(방장 포함)은 보낸 사람이 주인인 물체만 움직인다(보낸 사람 번호는 서버가 붙인다 — 남의 캐릭터를 옮길 수 없다). 방장·서버가 보낸 것(보낸 사람 0)은 모두 받는다. 주인 0(`owner = 0` — 방장·서버가 모는 것: 적·움직이는 함정)은 방장 화면이 움직이고, 시험 모드에서는 이 화면(서버와 같은 프로그램의 클라이언트)이 방장 대신 움직인다.
+- 연출만 나누는 신호(데이터를 바꾸지 않는 것 — 공격 예고 깜빡임·이모트): `NetServer.SendStream(채널, 바이트, 길이, to: 한 사람만, from: 보낸 사람 번호)`·`NetClient.SendStream(채널, 바이트, 시작, 개수)` → 받는 쪽 `StreamReceived`. 늦거나 빠질 수 있는 전송이라 규칙 값에 쓰지 않는다(판정·값은 행동으로). 채널 1은 `NetTransformSync`가 쓴다(`NetTransformSync.Channel`). 클라이언트가 보낸 것은 `NetServerOptions.RelayStreams`(기본 켬)면 다른 사람에게도 간다.
 
 ### 1-8. 전송
 
@@ -191,7 +203,7 @@
 
 | 자리 | 지금(사설) | 실제 | 바꾸는 법 |
 |---|---|---|---|
-| 입장 표 `GameNet.TokenSource` | 없음(이름 = 계정) | Steam 웹 API용 인증 티켓(`SteamTickets.Request`) | Steam 모듈이 Steam이 준비되면 스스로 넣는다 |
+| 입장 표 `GameNet.TokenSource` | 없음(기기 + 이름 = 계정, `GameNet.DeviceId`) | Steam 웹 API용 인증 티켓(`SteamTickets.Request`) | Steam 모듈이 Steam이 준비되면 스스로 넣는다 |
 | 방 창구 `GameNet.Rooms`(`INetRoomProvider`) | `DirectRoomProvider`(직접 접속 · 주소 복사) | `SteamRoomProvider`(로비 · 릴레이 · 친구 초대) | Steam 모듈이 스스로 바꾼다 |
 | 인증 확인 `INetAuthenticator` | `FakeAuthenticator` | `SteamWebAuthenticator(퍼블리셔 키, App ID)` | 서버 빌드의 `StartMatchServer(auth: …)` |
 | 매칭 `INetMatchmaker` | `LocalMatchmaker` | AWS GameLift FlexMatch 어댑터(아직) | `StartMatchServer(matchmaker: …)` |
@@ -217,7 +229,7 @@
 - **테스트 패널(F1) › 리플레이**: 녹화 켜기 · 저장 · 틀기(지금·지난 녹화, 저장한 파일 5개). 트는 중에는 위치 막대 · 재생·멈춤 · 한 칸 · 배속 · 그만 보기.
   - 클라이언트일 때 Undo·새 판·테스트 상황은 판을 가진 쪽(서버)에서 한다(시험 모드는 이 프로그램 안의 서버, 남의 서버면 개발 명령으로).
 - **모니터 머리**: 멀티(시험 모드·방장·매칭큐 서버)이면 세션을 고른다 — 서버 · 이 화면(클라이언트) · 화면 없는 클라이언트 · 방마다.
-- 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(`entityId` — 모든 프로그램에서 같게, 비우면 오브젝트 이름) · 주인(`owner` — 플레이어 번호, 0 = 방장·서버) · 초당 보내는 횟수(`sendRate`, 기본 20) · 늦게 그리기(`delay`, 기본 0.1초) · 회전(`syncRotation`).
+- 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(`entityId` — 모든 프로그램에서 같게, 비우면 오브젝트 이름) · 주인(`owner` — 플레이어 번호, 0 = 방장·서버가 모는 것, 시험 모드에서는 이 화면이 움직인다) · 초당 보내는 횟수(`sendRate`, 기본 20) · 늦게 그리기(`delay`, 기본 0.1초) · 회전(`syncRotation`).
 
 ## 3. 코드로 쓰는 법
 
@@ -241,13 +253,21 @@ GameNet.PlayReplay(GameNet.LastReplay);                      // 틀기 → GameN
 GameNet.ServerStarted += server => server.Validate = (player, action) =>
     !IsMyTurn(server.Session, player.Id) ? "내 차례가 아닙니다."
     : action is MoveUnit move && move.unit.owner != player.Id ? "내 유닛이 아닙니다."   // move.unit은 서버 데이터의 진짜 객체(1-1)
+    : action is StartDungeon && player != server.Owner ? "방장만 시작할 수 있습니다."    // 방 주인(1-1)
     : null;
 GameNet.RoomStarting += room => SetupPlayers(room.Session, room.Server.Players);
 GameNet.RoomReady += room => room.Session.Do(new StartFirstTurn());
 GameNet.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 2, Place = 1 }, new NetMatchResult { Player = 1, Place = 2 } });
+
+GameNet.MatchFound += found => GameScreens.Open(GameIds.Screen.MatchFound);  // 매칭큐 로비 알림(이 화면의 클라이언트 것 — 다시 접속해도 이어진다):
+GameNet.MatchEnded += end => GameScreens.Open(GameIds.Screen.Lobby);         //   LobbyChanged · MatchFound · MatchCancelled · MatchEnded
+GameNet.CreateMatchmaker = players => new MyMatchmaker(players);              // 매칭 바꾸기(1-6)
+var device = GameNet.DeviceId;                                               // 이 기기의 번호(계정 키 = 기기 + 이름, 1-6)
 ```
 
-`ServerStarted`·`RoomStarting`에는 서버 객체가 있어야 하는 것(`Validate`·플레이어별 키·공개 범위·녹화)만 둔다. 게임 규칙 등록(행동 처리기·고유 기능 감시·규칙이 받는 이벤트·틱 규칙)은 `Client/Bootstrap.cs`의 `RegisterRules`(`GBibleRuntime.SessionCreated`)가 맡는다 — 방장·화면 없는 서버(화면 세션)도, `GBibleRuntime.CreateSession()`으로 따로 만드는 시험 모드의 서버와 봇·매칭큐의 방 세션도 DB로 만들어진 직후 이것을 받는다(새 판 행동·`ServerStarted`·`RoomStarting`보다 먼저). 같은 등록 함수를 여기서 또 부르면 두 번 발동한다(20장 4절). `GameNet`의 이 이벤트들은 세션이 아니라 static이고 플레이마다 비워지므로 `Bootstrap`의 `Hook`(`AfterAssembliesLoaded`)에서 `+=`한다 — `Started` 안에서 걸면 화면 세션이 다시 만들어질 때마다(슬롯 바꾸기·멀티 들어가기) 받는 쪽이 쌓인다.
+`ServerStarted`·`RoomStarting`에는 서버 객체가 있어야 하는 것(`Validate`·투영·공개 범위·녹화)만 둔다(플레이어마다 키는 DB 칸이 정의하고 서버가 몫을 만든다, 1-2). 게임 규칙 등록(행동 처리기·고유 기능 감시·규칙이 받는 이벤트·틱 규칙)은 `Client/Bootstrap.cs`의 `RegisterRules`(`GBibleRuntime.SessionCreated`)가 맡는다 — 방장·화면 없는 서버(화면 세션)도, `GBibleRuntime.CreateSession()`으로 따로 만드는 시험 모드의 서버와 봇·매칭큐의 방 세션도 DB로 만들어진 직후 이것을 받는다(새 판 행동·`ServerStarted`·`RoomStarting`보다 먼저). 같은 등록 함수를 여기서 또 부르면 두 번 발동한다(20장 4절). `GameNet`의 이 이벤트들은 세션이 아니라 static이고 플레이마다 비워지므로 `Bootstrap`의 `Hook`(`AfterAssembliesLoaded`)에서 `+=`한다 — `Started` 안에서 걸면 화면 세션이 다시 만들어질 때마다(슬롯 바꾸기·멀티 들어가기) 받는 쪽이 쌓인다. 서버 규칙의 몸통(`Validate` 검사·`RoomReady`의 시작·투영 등록)은 Rules의 등록 함수(예: `ServerRules.Attach(NetServer server)`)에 두고 `Hook`에서는 그것을 `GameNet` 이벤트에 잇기만 한다 — 규칙 테스트 어셈블리는 Client를 보지 않으므로, 테스트가 같은 함수를 부를 수 있게(관례 12절).
+
+개발 명령의 자리: `Started`에서 등록한 명령(배속·봇 조종)은 이 화면(클라이언트)에서 돈다 — 서버로 넘기지 않는다. 데이터를 바꾸는 명령은 `RegisterRules`(`SessionCreated`)에서 등록하거나 DB › 개발 명령으로 두고, 그것은 클라이언트가 누르면 서버에서 **누른 사람으로**(`ActingAs`) 돈다(22장 7절).
 
 명령줄(빌드 여러 개를 띄워 시험·서버 빌드): `-momoi-server [포트]` · `-momoi-matchserver [포트] -momoi-players 인원` · `-momoi-host [포트] -momoi-name 이름` · `-momoi-join 주소 -momoi-name 이름`. 서버 빌드는 `-batchmode -nographics`와 함께.
 
@@ -272,13 +292,13 @@ hub.ResumeOpenMatches();
 | 멤버 | 하는 일 |
 |---|---|
 | `NetServer.Start` · `Update(dt)` · `Receive` · `Flush` | 열기 · 받기+시간+보내기 · 받기만 · 보내기만 |
-| `NetServer.AddLocalPlayer(이름)` · `Reserve(계정, 이름)` · `FindPlayer` · `FindAccount` · `Kick` · `Players` | 방장 · 자리 예약 · 찾기 · 강퇴 |
+| `NetServer.AddLocalPlayer(이름)` · `Reserve(계정, 이름)` · `FindPlayer` · `FindAccount` · `Kick` · `Players` · `Owner` | 방장 · 자리 예약 · 찾기 · 강퇴 · 방 주인(1-1) |
 | `NetServer.Admit` · `Validate` · `PlayerJoined` · `PlayerLeft` · `StreamReceived` · `SendStream` | 입장 확인 · 행동 검사 · 알림 · 실시간 바이트 |
 | `NetServer.AddRecorder(리플레이, 눈)` · `RemoveRecorder` · `NetServer.StartLocalRecording(세션, out 리플레이)` | 녹화(서버 쪽 · 혼자 하는 판) |
 | `NetServerOptions` | `MaxPlayers` · `GameVersion` · `DriveClock` · `TimeSyncInterval` · `AllowDeveloperCommands` · `RelayStreams` · `TimeoutSeconds` · `ByeOnClose` · `MaxMessagesPerSecond` |
 | `NetClient.Connect` · `Update` · `Disconnect` · `State` · `PlayerId` · `Players` · `RoundTrip` · `PendingActions` | 접속 · 상태 |
 | `NetClient.Joined` · `Closed` · `ActionFailed` · `PlayersChanged` · `RunDeveloperCommand` · `SendStream` · `StreamReceived` | 알림 · 서버 개발 명령 · 실시간 바이트 |
-| `NetClient.Token` · `TimeoutSeconds` · `ServerClosed` · `Reached` · `ClearOnJoin` · `Drop()` | 입장 표 · 끊김 판단 · 다시 접속 |
+| `NetClient.Token` · `Device` · `TimeoutSeconds` · `ServerClosed` · `Reached` · `ClearOnJoin` · `Drop()` | 입장 표 · 기기 번호(계정 키, 1-6) · 끊김 판단 · 다시 접속 |
 | `NetClient.StartRecording(이어 쌓을 녹화)` · `StopRecording` · `Recording` | 녹화(내가 본 것) |
 | `NetReplay.Save` · `Load` · `ToBytes` · `FromBytes` · `Duration` · `Source` / `NetReplayPlayer(세션, 리플레이)` · `Update` · `Seek` · `Step` · `Speed` · `Playing` | 리플레이 |
 | `IOwnedEvent` · `[GameEvent(ServerOnly = true)]` | 주인만 받는 이벤트 · 서버만 아는 이벤트 |
@@ -287,7 +307,7 @@ hub.ResumeOpenMatches();
 | `NetHubOptions` | `AcceptSeconds` · `GameVersion` · `AllowDeveloperCommands` · `SaveMatchEachAction` · `MatchSaveSeconds` · `ReadySeconds` · `TimeoutSeconds` |
 | `session.Data.SetVisibility(키, 범위, 주인)` · `VisibilityOf` · `IsVisibleTo` | 공개 범위 |
 | `NetServer.Project(키, view)` · `Project<T>` · `HideStatuses(보이나)` | 객체 단위 공개(투영, 1-2) |
-| `session.Data.KeysOfAllPlayers(키)` · `PlayerDataStore.KeyFor(키, 번호)` · `session.ActingAs(번호)` · `PlayerOfKey` · `IsPerPlayer` · `Resolve` · `DefinePerPlayer(…, ownerOnly, account)` · `AddPlayer` · `RemovePlayer` · `MovePlayer` · `AccountKeys` | 플레이어마다 데이터(1-2) · 계정 값(1-6). 정의·몫 만들기·옮기기는 DB 칸과 서버가 하므로 보통 앞의 셋만 쓴다 |
+| `session.Data.KeysOfAllPlayers(키)` · `PlayerDataStore.KeyFor(키, 번호)` · `session.ActingAs(번호)`(`IDisposable`, 0 = 바꾸지 않음) · `PlayerOfKey` · `IsPerPlayer` · `Resolve` · `DefinePerPlayer(…, ownerOnly, account, serverOnly)` · `AddPlayer` · `RemovePlayer` · `MovePlayer` · `AccountKeys` | 플레이어마다 데이터(1-2) · 계정 값(1-6). 정의·몫 만들기·옮기기는 DB 칸과 서버가 하므로 게임 코드는 보통 앞의 셋만 쓴다(규칙 테스트는 `DefinePerPlayer`·`AddPlayer`도 — 관례 12절) |
 | `Ghosts.Store` · `IGhostStore`(`Upload` · `Pick`) · `GhostRecord` · `FileGhostStore` | 고스트(1-13) |
 | `session.Role` · `IsClient` · `LocalPlayer` · `session.Actions.CurrentActor` | 역할·내 번호 · 지금 도는 바깥 행동의 `actorId`(행동 밖·시스템 행동이면 0) |
 | `Game.MarkRewind` · `Rewind` · `RewindKey` · `RewindEntity` · `RewindMarks` | 되감기 |
@@ -314,6 +334,8 @@ room.Session.Events.SubscribeAfterAction<MatchDecided>(e => GameNet.Hub.EndMatch
 
 화면(클라이언트)은 싱글과 같다: 내 핸드 = `Game.Get<Hand>("hand")`(이 화면의 플레이어 몫), 카드 내기 = `GameScreens.Do(() => new PlayCard { card = c })`.
 
+매칭큐의 화면 흐름: 로비 ↔ 방은 접속 상태(판 데이터가 아님)라 씬 흐름(판 데이터의 씬 필드, 32장 2-6)으로 바꾸지 않는다. 로비 화면은 `GameNet` 로비 알림(`MatchFound`·`MatchCancelled`·`MatchEnded`·`LobbyChanged` — `Hook`에서 `+=`, 3-1)으로 열고 닫고, 방 안의 화면은 판 데이터로 그린다. 다음 방에 들어가면 지난 판 데이터를 비우고 새 처음 모습이 온다(저절로 — 다시 접속은 `ClearOnJoin`).
+
 ### 4-2. 친구 협동(사설 호스트) — 내 캐릭터는 각자, 판정은 방장
 
 ```csharp
@@ -323,13 +345,27 @@ GameNet.CreateRoom(4);  GameNet.InviteToRoom();
 var sync = hero.AddComponent<NetTransformSync>();
 sync.entityId = "hero:" + playerId;
 sync.owner = playerId;
-// 맞혔다는 판정은 방장이: 클라이언트는 '판정 보고 행동'을 보내고 방장의 규칙이 확인해 피해를 준다.
+// 맞혔다는 판정은 방장이: 클라이언트는 '판정 보고 행동'을 보내고 방장의 규칙(그 행동의 Run)이 확인해 피해를 준다.
+// '확인' = 그 행동의 값(사거리 · 쿨다운 · 대상이 살아 있나)을 판 데이터로 검사한다(안 맞으면 Game.Fail — 1-1 '차례·주인 검사의 자리').
 GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
+
+// 적(방장이 모는 것): 주인 0 — 방장 화면이 움직이고, 시험 모드에서는 이 화면이 움직인다(1-7).
+var enemySync = enemyObject.AddComponent<NetTransformSync>();
+enemySync.entityId = "enemy:" + enemy.id;
+enemySync.owner = 0;
+// 적의 공격 결정: 방장 화면의 AI 컴포넌트가 정한다(enemySync.IsMine일 때만 생각한다) → 판정 보고 행동으로 보낸다(방장의 행동 —
+//   Validate에서 player != server.Owner면 거절, 쿨다운은 행동 안에서 검사).
+GameScreens.Do(() => new EnemyAttack { enemy = enemy, skill = "slam" });
+// 맞음 판정: 맞은 쪽 화면이 판정 보고 행동으로(내 캐릭터가 맞았다 — actorId가 맞은 사람).
+GameScreens.Do(() => new ReportHurt { enemy = enemy, skill = "slam" });
+// 데이터를 바꾸지 않는 연출 신호(공격 예고 깜빡임)만 나누려면 SendStream · StreamReceived(1-7).
 ```
 
 ### 4-3. 혼자 시험(시험 모드)
 
 테스트 씬 › 멀티플레이 = 시험 모드, 지연 0.15. 플레이하면 이 화면은 클라이언트다. 행동을 하고 0.15초 뒤에 결과가 오는지, 기다리는 동안 화면이 이상하지 않은지 본다. 모니터 머리에서 '서버'를 고르면 서버 쪽 데이터·타임라인이 보인다.
+
+매칭큐 게임을 시험 모드로 돌릴 때: 시험 모드는 매칭큐 서버(`NetHub`) 없이 서버 하나라 `RoomReady`·계정 값이 없다. 그래서 매칭큐 게임의 시작은 "정원이 다 들어오면" 함수 하나(예: `ServerRules.BeginMatch(server)`)로 두고, 매칭큐는 `RoomReady`에서, 시험 모드·친구 방은 `server.PlayerJoined`에서 인원이 차면 같은 함수를 부른다(시작 경로를 둘로 쓰지 않는다).
 
 ## 5. 주의할 점 · 자주 하는 실수
 
@@ -341,10 +377,10 @@ GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
 - **이벤트는 `[GameEvent]` 클래스로.** 구조체 이벤트는 보낼 수 없다(서버 기록에 경고).
 - **행동·이벤트의 필드는 생성 코드가 쓸 수 있는 것만.** 중첩 컬렉션·`KeyValuePair`·`HashSet`·readonly 필드·자동 속성·`object` 칸은 쓰지 않는다 — 행동은 보내기 전에 실패하고, 이벤트는 빠진다(1-1). 보내지 않을 값이면 `[NonSerialized]`.
 - **주고받는 클래스에 `#if UNITY_EDITOR` 필드를 두지 않는다**(에디터와 빌드의 필드 차례가 달라진다).
-- **숨길 정보는 '플레이어마다' + '그 사람에게만 보임'으로, 한 키 안의 일부(안개 속 유닛)는 투영(`server.Project`)으로**(1-2). 숨길 이벤트(카드를 뽑음)는 `IOwnedEvent`로.
-- **서버 쪽 코드(시스템 행동·`RoomReady`·`Validate`)에서 플레이어마다 데이터는 몫을 적어 읽는다**(`KeyFor("hand", player.Id)`·`KeysOfAllPlayers`). `hand`만 적으면 지금 플레이어(서버는 0번 — 몫이 없다)를 찾는다.
+- **숨길 정보는 '플레이어마다' + '그 사람에게만 보임'으로(그 사람에게도 숨길 덱 순서는 '서버만'), 한 키 안의 일부(안개 속 유닛)는 투영(`server.Project`)으로**(1-2). 숨길 이벤트(카드를 뽑음)는 `IOwnedEvent`로.
+- **서버 쪽 코드(시스템 행동·`RoomReady`·`PlayerJoined`)에서 플레이어마다 데이터는 몫을 적어 읽는다**(`KeyFor("hand", player.Id)`·`KeysOfAllPlayers`, 또는 `using (session.ActingAs(번호))`). `hand`만 적으면 지금 플레이어(서버는 0번 — 몫이 없다)를 찾는다. `Validate` 안은 보낸 사람으로 돌므로 `hand`가 그 사람 몫이다.
 - 매칭큐 서버의 계정 값(재화·점수)은 서버 저장소에만 있다. 클라이언트가 보낸 값을 믿지 않는다 — 바꾸는 것은 서버의 규칙(행동)이고, 남길 값은 '매칭 계정에 남김'(1-6)으로 둔다.
 - **`Validate`에서 대상을 다시 찾지 않는다.** 참조 필드는 검사 전에 이미 서버의 객체로 바뀌어 있다(1-1) — `action.unit.owner`를 그대로 읽는다.
-- **접속 중에 내 프로필을 바꾸려 하지 않는다.** 클라이언트의 행동은 서버의 프로필을 바꾼다(1-1 '클라이언트의 자기 프로필'). 프로필을 바꾸는 화면(장비·상점)은 혼자 하기 세션에서.
+- **접속 중에 내 프로필을 바꾸려 하지 않는다.** 클라이언트의 행동은 서버의 프로필을 바꾼다(1-1 '클라이언트의 자기 프로필'). 친구 방·혼자 하기 게임이면 프로필을 바꾸는 화면(장비·상점)은 혼자 하기 세션에서. 매칭큐 경쟁 게임의 재화·컬렉션은 프로필이 아니라 계정 값(1-6 — 프로필은 조작된다)이고, 매치 밖에서 계정 값을 바꾸는 길(상점·덱 편성)은 지금 없다 — 묻는다.
 - 방장이 서버 세션을 그대로 쓰므로 방장 화면은 모든 데이터를 본다(친구 방 — 숨김이 필요 없는 게임에 쓴다).
 - 직접 접속이 안 될 때: 주소·포트(기본 7777)·Windows 방화벽 허용, 같은 가상 랜에 들어와 있는지, 게임 버전이 같은지.

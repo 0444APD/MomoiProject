@@ -106,12 +106,13 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
   - 1920×1080 기준 px. 그림(스프라이트·아이콘)·글꼴은 사람이 넣는다: 그 자리는 색 상자·임시 그림으로 두고(UiGuide 1-9) 보고에 "넣을 에셋(경로·크기·쓰는 곳)"을 적는다.
 - 씬에 놓이는 것(캐릭터·카드 오브젝트)은 `GameView.Redraw(그리기, 키…)`·`ViewList`·컴포넌트 '데이터 연결'. 값이 바뀔 때마다 그리지 말고 이 도구가 프레임 끝에 한 번 그리게 한다.
 - **프리팹은 AI가 만든다**(개발자 2026-10-16). 개발자가 말로 준 양식(무엇이 붙나 — 스프라이트 · 애니메이션 · 충돌체 · 크기)대로 반영 스크립트에서 에디터 코드(`PrefabUtility.SaveAsPrefabAsset` · 애니메이션은 `AnimatorController`에 개발자가 둔 클립을 연결)로 `Assets/MomoiProject/Prefabs/`에 만들고 DB › 프리팹(`PrefabData`) 항목에 등록한다 — 화면 코드는 `Game.Entry<PrefabData>(GameIds.Prefab.X).prefab`로 읽는다(인스펙터 연결 없음, 매뉴얼 39장 3절). **개발자는 프리팹을 만지지 않는다** — 리소스(스프라이트 시트 · 애니메이션 클립)만 `Assets/Dev/Art` · `Assets/Dev/Animations`에 둔다. 양식이 바뀌거나 피드백이 오면 AI가 반영 스크립트 버전을 올려 같은 경로에 다시 만든다(GUID 그대로 — 씬에 놓인 것도 따라온다). 리소스가 아직 없으면 임시 에셋(18절)으로 자리를 만든다. 씬에 무엇을 어디 놓나(레벨)는 개발자 몫이다.
+  - 레벨이 아닌 **시스템 오브젝트**(판 그리기·끌기 입력·카메라)도 AI가 씬 파일에 놓지 않는다(씬 배치는 개발자 몫). 기본은 DB › 프리팹으로 만들고 씬이 열릴 때 코드가 만든다: `Bootstrap.Started`에서 지금 씬을 보고, 그 뒤는 `SceneManager.sceneLoaded`로 그 씬일 때 `Instantiate(Game.Entry<PrefabData>(GameIds.Prefab.X).prefab)`(다르게 하면 보고). 테스트 씬은 `TestScene.sourceScene`(복사해 온 게임 씬 이름)으로 어느 게임 씬인지 안다.
 - 연출(피해 숫자·카드 이동·쓰러짐)은 규칙이 끝난 뒤의 일이다: `session.Events.SubscribeAfterAction<이벤트>(e => GameView.Present(연출(e)))`(연결은 `Bootstrap.Started`나 화면 코드 — 3절의 규칙 등록과 나눈다). 실패한 행동의 이벤트는 오지 않는다. 연출 코드는 데이터를 바꾸지 않는다.
 - 연출 안의 시간은 `GameView.Wait`·`GameView.DeltaTime`(속도·건너뛰기를 따른다). `done()` 콜백 연출은 반드시 `done`을 부른다.
 - 입력은 `GameView.Busy`(연출 중 · 선택을 기다림 · 대사가 열려 있음(다이얼로그 `Dialogues.BlocksInput`) · 프로젝트가 `GameView.AddBusy`로 더한 때)일 때 막는다.
 - 예상 값(예상 피해·"낼 수 없음" 이유)은 화면에서 따로 계산하지 않고 `Game.Preview(행동, g => 읽기)`·`Game.CanDo(행동, out 이유)`.
 - 화면 오브젝트를 데이터 id로 찾을 때는 `GameView.Find<T>(id)`(ViewList가 등록한다), UI Toolkit 칸은 `GameView.FindElement(id)`(ElementList가 등록한다). 화면 위에 잠깐 띄우는 요소(피해 숫자)는 `GameScreens.Overlay`에(그 클래스는 테마 USS에 — 화면 USS가 닿지 않는다, UiGuide 1-2).
-- 씬 전환은 화면이 직접 하지 않는다: 판 데이터의 씬 필드를 행동이 바꾸고 씬 흐름(DB › Bootstrap)이 연다.
+- 씬 전환은 화면이 직접 하지 않는다: 판 데이터의 씬 필드를 행동이 바꾸고 씬 흐름(DB › Bootstrap)이 연다. 매칭큐의 로비 ↔ 방은 판 데이터가 아니라 접속 상태라 씬 흐름으로 바꾸지 않는다 — 로비 화면을 `GameNet` 로비 알림(`MatchFound`·`MatchEnded` …)으로 열고 닫고, 다음 방에 들어가면 판 데이터가 새로 온다(매뉴얼 40장 4-1).
 
 ## 7. 글·다국어
 
@@ -122,7 +123,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 ## 8. 데이터 구역·저장
 
 - 판(한 번의 플레이)에만 있는 것은 **Session** 구역(기본 `run` = RunState), 판이 끝나도 남는 것은 **Meta** 구역(기본 `profile` = Profile). 새 플레이어 데이터는 DB › 플레이어 데이터에 반영 스크립트로 만들고(15절) 구역을 고른다.
-- 저장은 DB › Bootstrap의 판 저장 설정대로 저절로 된다. 저장 코드를 따로 쓰지 않는다. 세이브 슬롯이 여럿이면 `GBibleRuntime.UseSlot` — 슬롯 하나 = 프로필 + 판 묶음이라 칸마다 프로필이 따로다. 세이브 칸이 여럿이고 판이 끝나도 남는 것(앨범 · 해금 · 본 엔딩)이 칸을 넘어 함께여야 하면 만들기 전에 질문으로 올린다(진행 매뉴얼 5-3).
+- 저장은 DB › Bootstrap의 판 저장 설정대로 저절로 된다. 저장 코드를 따로 쓰지 않는다. 세이브 슬롯이 여럿이면 `GBibleRuntime.UseSlot` — 기본은 슬롯 하나 = 프로필 + 판 묶음이라 칸마다 프로필이 따로다. 판이 끝나도 남는 것(앨범 · 해금 · 본 엔딩)이 칸을 넘어 함께인 게임은 Bootstrap '세이브 슬롯이 프로필을 함께 씀'(프로필 하나 + 판 N칸, 매뉴얼 31장 2-1)이다 — 세이브 칸이 여럿이면 어느 쪽인지 만들기 전에 기획 질문으로 올린다(진행 매뉴얼 5-3).
 - 플레이어 데이터에 에셋(스프라이트·프리팹·ScriptableObject) 참조를 넣지 않고 DB ID를 넣는다. DB 항목 ID가 든 글자 필드에는 `[DataRef(typeof(종류))]`를 붙인다(ID를 바꾸면 따라간다).
 - 출시 뒤 저장 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(필드 이름을 바꾸기 전에 확인).
 - 기기마다 하나인 것(음량·언어·화면·키)은 DB › 설정(`GameSettings`). 판 규칙에 영향을 주는 값은 설정에 두지 않는다.
@@ -153,6 +154,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 ## 12. 테스트·검증·보고
 
 - 규칙(행동·규칙 함수·Block)을 만들거나 고치면 `Tests`에 테스트를 하나 이상 둔다. 세션을 손으로 만든다: 플레이어 데이터 `Define`, 밸런싱 값 `session.Balance.Define`, 상태 효과 `session.Statuses.Define(StatusDefinition)` · 패시브 효과 `session.Passives.Define(PassiveDefinition)` · 가중치 표 `session.Tables.Define(WeightTableDefinition)`(DB 항목 객체를 만들었으면 `ToDefinition()`) · 액티브 효과 `session.Abilities.Define(항목.ToUsable())`, 원본 `session.DefineInstance(id, 값)`(`Game.InstancesOf<T>()`도 이것을 훑고, 사용 기능(`Usable` 필드)이 붙은 원본은 `Game.Use(인스턴스 ID, …)`로 쓸 수 있게 함께 등록된다), 규칙이 `Game.Entry`로 읽는 DB 항목은 `ScriptableObject.CreateInstance<T>()` + `EditorAssignId(id)`로 만들어 `session.Entries`·`EntriesOfType`에 넣는다(매뉴얼 17장 4-3). 시간이 흐르는 규칙(예약·상태 효과 주기·`Ticked`)은 `session.Advance(초)`로 흘린다(`EndFrame` 한 번은 8틱에서 잘린다).
+- **멀티 규칙 테스트**(명세서 0절이 '있음'): 플레이어마다 데이터는 `session.Data.DefinePerPlayer(…)`(DB 칸과 같은 것) + 몫 `AddPlayer(1)`·`AddPlayer(2)`, 행동은 `actorId = 2`, 행동 밖에서 그 사람으로는 `using (session.ActingAs(2))`. 서버·클라이언트를 함께 띄우려면 `MemoryNetwork { Manual = true }` + `NetServer` + `NetClient`(본보기 `Packages/com.momoi.gbible/Tests/Editor/PerPlayerDataTests.cs`·`NetTests.cs`, 매뉴얼 38장 4절). 서버 규칙(`Validate`·`RoomReady`의 시작·투영)은 Rules의 등록 함수(`ServerRules`)에 두고 Client의 Bootstrap `Hook`이 `GameNet` 이벤트에 잇기만 한다 — 테스트 어셈블리가 Client를 보지 않으므로 테스트가 같은 함수를 부른다.
 - 테스트는 게임처럼 행동을 실행하고 값을 본다. 플레이어용 실패는 `Assert.Throws<GameFailure>`(NUnit은 정확한 형식만 잡는다). Undo가 맞는지(`session.Undo()` 뒤 값)도 본다.
 - 코드를 고친 뒤에는 컴파일이 되는지 확인하고, Unity가 열려 있으면 콘솔 오류·DB 검증("검증 통과")을 본다. AI는 Unity 창을 볼 수 없으므로 **파일로 읽는다**: DB 상태 `Logs/MomoiProject/DbStatus.txt`(검증 오류·경고 · '적용 전' 변경 — 컴파일 뒤·DB가 바뀔 때 GBible이 다시 쓴다), Unity 로그 `Logs/Editor.log`(Unity 6.6은 프로젝트 안 — 컴파일 경고·`[MomoiProject]` 알림·DB 반영 스크립트 결과). 개발자에게 "경고가 뭐냐"고 묻기 전에 이 둘을 본다.
 - 테스트도 AI가 돌린다: Unity가 열려 있으면 `Logs/MomoiProject/RunTests.request`를 만들고 `Logs/MomoiProject/TestResults.txt`(통과·실패, 실패 메시지·호출 위치)를 읽는다(매뉴얼 38장 2-4 — Unity가 먼저 에셋을 새로 읽어 방금 쓴 코드를 컴파일한 뒤 돌린다). Unity를 연 채로 배치 모드(`-batchmode`)는 쓰지 않는다. 요청 파일이 남아 있으면 Unity가 아직 돌리지 못한 것이다(플레이 중이거나 창이 오래 멈춤) — 개발자에게 Test Runner를 누르라고 하기 전에 이것으로 한다.
@@ -207,8 +209,9 @@ static class AchievementSeeds
 
 - 함수 하나 = 주제 하나(종류 하나·콘텐츠 묶음 하나). 파일은 `Assets/MomoiProject/Code/Editor/Seeds/<주제>Seeds.cs` — 같은 주제라도 넣는 박자가 다르면(다에서 만든 행동 · Block을 쓰는 항목) 파일을 나눈다(진행 매뉴얼 6절).
 - **이미 있는 항목은 건너뛴다.** 개발자가 밸런싱한 값을 덮지 않는다. 구조(Block·참조 칸의 종류)를 고쳐야 하면 버전을 올리고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 고친다(숫자 칸은 건드리지 않는다).
+- **하나만 두는 설정 종류**(`[Database(…, Single = true)]` — 화면 설정·Steam·프로젝트의 그런 종류)는 항목이 없으면 에디터가 기본값으로 하나 만든다. 그래서 반영 스크립트는 ID로 찾아 새로 `Add`하지 않고(ID가 다르면 둘이 생긴다) 그 종류의 하나를 `EditorDatabase.Instance.OfType<T>().FirstOrDefault()`로 찾아 `EditorDatabase.Staging.Work(항목)`으로 고친다(없을 때만 `Add` — `Work`는 '적용 전'으로 남는다).
 - **지우기**는 버전을 올리고 `EditorDatabase.Staging.Remove(항목)`. 그 ID를 쓰는 코드(`GameIds` 상수)도 같이 지운다. **ID 바꾸기**는 `EditorDatabase.Staging.Rename(항목, 새 ID)`(DB 안의 가리키는 칸이 함께 바뀐다) — 코드의 상수 이름도 바꾼다.
-- **DB › 시작 파일 › Bootstrap 칸**(Undo 방식·판 저장·판 끝 이벤트·시작할 때 이어 하기·새 판 행동·고정 틱·씬 흐름)은 항목이 아니라 DB 에셋의 값이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)`로 꺼내 결정한 값(결정 기록·장르 추천)을 `EditorSet…`(참조 3-8)으로 넣고 `EditorUtility.SetDirty`·`AssetDatabase.SaveAssetIfDirty`. '적용 전'을 거치지 않고 바로 저장된다(구현 가이드 01 4절). 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 '모두 다시 돌리기'도 개발자 값을 덮지 않는다. 결정이 바뀌어 다시 넣어야 하면 개발자에게 알리고 버전을 올린다.
+- **DB › 시작 파일 › Bootstrap 칸**(Undo 방식·판 저장·판 끝 이벤트·시작할 때 이어 하기·새 판 행동·고정 틱·씬 흐름·세이브 슬롯이 프로필을 함께 씀 — 읽기 `SlotsShareProfile`, 쓰기 `EditorSetSlotsShareProfile(bool)`)은 항목이 아니라 DB 에셋의 값이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)`로 꺼내 결정한 값(결정 기록·장르 추천)을 `EditorSet…`(참조 3-8)으로 넣고 `EditorUtility.SetDirty`·`AssetDatabase.SaveAssetIfDirty`. '적용 전'을 거치지 않고 바로 저장된다(구현 가이드 01 4절). 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 '모두 다시 돌리기'도 개발자 값을 덮지 않는다. 결정이 바뀌어 다시 넣어야 하면 개발자에게 알리고 버전을 올린다.
 - **Run In Background**(창이 뒤로 가도 게임이 돈다 — DB 칸이 없는 Player Settings 값): 실시간·방치형·멀티는 같은 반영 스크립트에서 `PlayerSettings.runInBackground = true`. 틱 수·저장 간격처럼 AI가 정해 추천 승인 목록에 올린다(진행 매뉴얼 3절).
 - **밸런싱 값은 표시 이름·메모·입력 칸 주석·묶음(폴더)을 함께 만든다**(짓는 법은 `NamingGuide.md` 3절 — 확률은 %(0~100)로 두고 규칙이 100으로 나눈다). 이미 있는 항목은 비어 있는 칸만 채운다.
 - **값이 많은 것**(밸런싱 값·카드 수치·몬스터 수치·가중치 표 줄 — 숫자·글자·enum과 그 목록)은 CSV도 된다: 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`, 목록은 `entries[0].weight`). 개발자가 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. Block 칸(트리거·조건·결과)은 CSV에 없다.
@@ -252,7 +255,7 @@ static class AchievementSeeds
 
 개발자는 코드를 읽지 않는다. 에디터(DB·모니터)에서 읽고, 밸런싱 값을 바꾸고, 테스트한다. 그래서 AI가 만드는 것은 이 모양이어야 한다.
 
-- **숫자는 에디터에**(5절). 개발자가 바꿀 만한 숫자(체력·피해·비용·확률·보상 양·성장·시간)는 밸런싱 값·DB 항목의 칸·원본 인스턴스의 필드에 둔다. 코드에는 규칙 자체의 상수(덱 섞기 방식)만.
+- **숫자는 에디터에**(5절). 개발자가 바꿀 만한 숫자(체력·피해·비용·확률·보상 양·성장·시간)는 밸런싱 값·DB 항목의 칸·원본 인스턴스의 필드에 둔다. 코드에는 규칙 자체의 상수(덱 섞기 방식)만. 화면 쪽 동작의 튜닝 숫자(이동 속도·사거리·끌기를 일으키는 거리)도 같다 — 원본 인스턴스의 칸이나 밸런싱 값에 두고, 프리팹 컴포넌트 필드에 두지 않는다(프리팹은 AI가 다시 만들어 값이 덮인다 — 6절).
 - **고르는 값은 enum·키워드, 가리키는 것은 참조.** 여러 개 고르는 태그 · 이벤트 조건으로 거르는 값 · 늘거나 순서가 바뀔 목록은 키워드, 규칙 코드가 값마다 다르게 도는 닫힌 목록은 enum(DB에 저장되면 값은 끝에만 더한다 — 매뉴얼 05장). "보상으로 줄 아이템", "소환할 적", "걸 상태 효과"는 글자 ID 칸이 아니라 `[DataRef(typeof(…))]` 칸으로 둔다 — DB에서 드롭다운으로 고를 수 있다. 인스턴스를 가리키면 `[DataRef(typeof(원본 클래스))]`(그 클래스의 인스턴스만 나온다). 비우는 것이 뜻이 있는 칸(적 편성의 빈 칸, 비우면 끄는 표)은 `Optional = true`(비어도 경고가 뜨지 않는다 — 꼭 골라야 하는 칸만 경고로 남긴다).
 - **효과는 DB에서 문장으로 읽히게.** 가능하면 Block으로 조립한다(DB에 문장으로 보이고, 문장 안의 숫자·참조를 개발자가 바꾼다). 프로젝트 Block에는 `[BlockInfo("표시 이름", Sentence = "…{필드}…")]`를 붙여 문장에 칸이 드러나게 한다. `[BindTo]` 코드는 DB에서 이름·설명만 보이므로, 그 안의 숫자는 그 항목의 칸이나 밸런싱 값에서 읽는다.
 - **이름은 개발자 화면용으로.** 플레이어 데이터·DB 칸에는 `[FieldLabel("한글")]`, Block·이벤트·행동 직전 이벤트에는 한글 표시 이름 — 짓는 규칙과 개발자가 바로잡은 이름은 `NamingGuide.md`. 코드 이름(클래스·필드·함수)은 영어로, 뜻이 드러나게, 같은 일은 같은 접두어로.
@@ -291,6 +294,7 @@ GBible에는 넣지 않는다(2026-10-06 결정 — 장르마다 달라서). 필
       return picked != null && picked != root && root.Contains(picked);
   }
   ```
+  선택 기능 '입력'(Input System)을 켜지 않은 게임은 `Pointer.current.position` 대신 `Input.mousePosition`(옛 입력 — 왼쪽 아래가 원점인 것이 같다)을 넘긴다.
 - **누른 오브젝트 → 데이터.** 3D는 `Physics.Raycast(camera.ScreenPointToRay(screen), out var hit)`, 2D는 `Physics2D.OverlapPoint(camera.ScreenToWorldPoint(screen))`. 오브젝트를 만들 때(`ViewList`의 bind) 데이터 id를 담는 프로젝트 컴포넌트(`Client/DataTag.cs` — `public string id`)를 채워 두고, 맞은 것에서 `GetComponentInParent<DataTag>()` → `Game.Find<T>(id)`로 찾은 객체를 행동 필드에 넣는다.
 - **좌표 변환은 한 곳에.** 칸 단위 게임은 칸 좌표가 데이터다(매뉴얼 36장 격자). 칸 ↔ 월드 위치 변환은 Client의 함수 한 쌍(`Board.ToWorld(칸)`·`ToCell(위치)`)에만 두고 화면 코드가 모두 그것을 쓴다.
 - **이동.** 위치가 규칙 데이터인 게임(칸·턴제)은 행동이 칸을 바꾸고 화면은 그 변화를 연출로 옮긴다(Transform 보간 — `GameView.Present`). 실시간 액션은 위치가 화면 쪽이다: 방식(Transform·Rigidbody·CharacterController·NavMesh)은 명세서의 장르·조작으로 고르고, 규칙에는 판정 보고 행동만 보낸다(3절). 멀티면 움직이는 것에 `NetTransformSync`(20절).

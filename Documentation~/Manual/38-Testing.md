@@ -215,6 +215,8 @@ Assert.AreEqual(2, session.Game.Data().Arena.wave);    // 첫 틱과 10초 뒤�
 | 액티브 효과 | `session.Abilities.Define(AbilityDefinition)` | 16장 |
 | 인스턴스 원본 | `session.DefineInstance(id, 원본)` — `Instances`·`InstanceIds`를 함께 채우고, 사용 기능(`Usable` 필드)이 붙은 원본은 `Game.Use(인스턴스 ID, …)`로 쓸 수 있게 액티브 효과로도 등록한다(런타임과 같다) | 04장 |
 | DB 항목의 프로젝트 칸(`Game.Entry<T>(id)` — 상태 효과의 `stopsActing` 같은 칸) | `session.Entries = id => …`(그 ID의 항목 객체를 돌려준다 — `ScriptableObject.CreateInstance`로 만든 항목, 17장 4-3의 예) | 29장 4-2 |
+| 플레이어마다 데이터(멀티) | `session.Data.DefinePerPlayer(키, DataZone.Session, 형식, 처음 값, 이름, ownerOnly, account, serverOnly)`(DB 칸과 같은 것) → 몫 `session.Data.AddPlayer(1)`·`AddPlayer(2)` → 행동은 `new X { actorId = 2, … }`, 행동 밖에서 읽기는 `using (session.ActingAs(2)) { … }` | 40장 1-2 · 본보기 `Tests/Editor/PerPlayerDataTests.cs` |
+| 서버 · 클라이언트를 함께(멀티) | `var net = new MemoryNetwork { Manual = true };` + `new NetServer(서버 세션, net.Server())`·`server.Start()` + `new NetClient(클라이언트 세션, net.Client(), "이름")`·`client.Connect()` → `net.Advance(0.01)`·`server.Update(0.01)`·`client.Update(0.01)`을 몇 번 돌려 메시지를 흘린다. 서버 규칙(`Validate`·`RoomReady`의 시작·투영)은 Rules의 등록 함수(`ServerRules`)에 두어 테스트가 같은 함수로 건다(테스트 어셈블리는 Client를 보지 않는다) | 40장 3-2 · 본보기 `Tests/Editor/NetTests.cs` |
 
 테스트 명령은 22장(개발 명령). 결과 Block으로 조립하고 `category`로 묶는다(예: "판", "조각", "적", "상황"). 개발자가 값(몇 개·어느 인스턴스)을 바꿔야 하는 명령은 `[BindTo]`가 아니라 결과 Block으로(22장 7절 — `[BindTo]` 명령에는 값 칸이 없다).
 

@@ -29,6 +29,7 @@ DB ID는 **모든 DB 종류를 통틀어 하나**다(인스턴스 `sword`와 패
 - **대표 항목**(원본 인스턴스 · 캐릭터)이 짧은 이름을 갖는다: `sword`, `seoa`. 인스턴스 ID는 lowerCamelCase 이름 하나다(`ironSword`, `potion`) — 종류 이름(`instance.`)을 앞에 붙이지 않는다.
 - **딸린 항목**은 `대표.갈래`: `sword.fx`(그 아이템의 패시브 효과) · `seoa.profile`(스탠딩 프로필) · `seoa.talk1`(다이얼로그) · `seoa.date1`(이벤트 표 줄). 텍스트 키 `<id>.name`도 항목마다 따로 생긴다(`seoa.name` · `seoa.profile.name`).
 - 원본이 DB 항목이 아니고 판 데이터에만 있는 조각(조커처럼 원본 ID가 곧 패시브 효과를 가리키는 것)은 패시브 효과 ID를 원본 ID로 쓴다(기믹 목록 1절).
+- **ID를 종류 이름과 같게 짓지 않는다.** `GameIds`는 종류마다 안쪽 클래스(`GameIds.RunSettings`)를 두고 상수 이름을 ID에서 만들므로, ID가 종류 이름과 같으면(`runSettings` 종류 `RunSettingsData`) 상수가 클래스 이름과 겹쳐 `_2`가 붙는다(`GameIds.RunSettings.RunSettings_2`). 하나만 두는 설정 종류도 종류 이름과 다른 말로 짓는다(예: `RunSettingsData`면 `runConfig`). 라이브러리가 만드는 `screenSettings`(`GameIds.ScreenSettings.ScreenSettings_2`) · `steam`(`Steam_2`)은 알려진 예외다(고치지 않는다).
 - **키워드 ID도 모든 그룹을 통틀어 하나**다(아이템 종류 `weapon`과 피해 종류 `weapon`이 겹친다). 겹칠 수 있는 그룹은 값에 그룹 앞말을 붙인다(`dmgPhysical` · `itemWeapon` — 키워드 ID는 lowerCamelCase라 점을 쓰지 않는다, 매뉴얼 05장). 겹쳐도 경고가 없으니 더하기 전에 DB 키워드 탭에서 찾아본다.
 
 ## 2. 개발자 화면 이름의 규칙
@@ -76,7 +77,7 @@ DB ID는 **모든 DB 종류를 통틀어 하나**다(인스턴스 `sword`와 패
 | 방장·방 열기 / 들어가기 / 되감기 지점 | **방 생성** / **방 참가** / **Undo 지점** | 멀티 화면 | 2026-10-06 · GBible |
 | 씨앗 | **DB 반영 스크립트**(메뉴는 처음에 'DB 추가 메뉴') | 에디터 | 2026-10-04 · GBible |
 | 드롭 표 | **가중치 표** | DB 종류 | 2026-10-04 · GBible |
-| 도감 · 데이터베이스 창 | **DB** · DB 창 | 에디터 | 2026-10-03 · GBible |
+| 도감 · 데이터베이스 창 | **DB** · DB 창 — 개발자 화면 이름(에디터)에만. 게임 안 글(몬스터 도감 · 카드 도감)은 기획 이름 그대로 | 에디터 | 2026-10-03 · GBible |
 | 이벤트 쏘기(모니터 도구) | **이벤트 호출** | 모니터 | 2026-10-02 · GBible |
 | 맥락 | **컨텍스트**(`TriggerContext`) | 문서·화면 | 2026-10-02 · GBible |
 | 템플릿(DB 원본) | **인스턴스** | DB 종류 | 2026-10-02 · GBible |

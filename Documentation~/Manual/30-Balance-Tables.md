@@ -311,7 +311,7 @@ var max = Game.BalanceCount(GameIds.Balance.CursorPrice, run.cursors, run.gold);
 - 돌려주는 값은 `double`이다. 정수가 필요하면 곡선의 반올림을 고르거나 코드에서 `GameNumbers.RoundToInt`로 바꾼다(2-2).
 - `BalanceSum`·`BalanceCount`는 단계마다 곡선을 한 번씩 계산해 더한다(개수만큼 돈다).
 - **값이 0 이하(또는 숫자가 아님)인 단계에서 멈춘다.** 값을 매길 수 없는 가격이라 그 단계부터는 살 수 없고(`BalanceCount`) 합에도 더하지 않는다(`BalanceSum` — 음수가 되지 않는다). 곡선이 0 아래로 내려가는 것은 데이터 실수라 DB 검증이 경고한다(3-1). 내려가면 안 되는 가격은 `최솟값으로 자르기`를 켠다.
-- 숫자가 double의 끝(약 1e308)을 넘을 만큼 커지는 게임은 그 값만 `BigNumber`로 둔다(→ `36-Grid-BigNumber.md`). 밸런싱 값·`Game.Pay`·DB 숫자 칸은 double만 알므로, 그때의 가격 계산과 비용 검사는 코드로 한다.
+- 숫자가 double의 끝(약 1e308)을 넘을 만큼 커지는 게임은 그 값만 `BigNumber`로 둔다(→ `36-Grid-BigNumber.md`). 밸런싱 값·DB 숫자 칸은 double이므로 1e308을 넘는 가격은 기준 · 비율을 밸런싱 값에 두고 `BigNumber`로 계산한다. 비용은 `Game.Pay`가 큰 수 그대로 낸다(28장 2-4).
 - 값을 바꾸지 않으므로 행동 밖(화면 코드)에서 읽어도 된다. 없는 ID면 `InvalidOperationException`(2-1).
 
 ### 4-2. `session.Balance` — `BalanceSystem`
@@ -986,7 +986,7 @@ GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 && !string.IsNullOrEm
 | 최솟값·최댓값을 적었는데 자르지 않음 | `최솟값으로 자르기`·`최댓값으로 자르기`를 켜지 않았다. 자를 쪽을 켠다(2-2). |
 | 소수가 나와 체력이 1.21 | 곡선은 `double`이다. 반올림을 고르거나 코드에서 `GameNumbers.RoundToInt`(라이브러리와 같은 반올림, 2-2). |
 | `BalanceCount`가 예산이 남는데 멈춤 · `BalanceSum`이 생각보다 작음 / 경고 "곡선: N단계에서 0 이하가 됩니다…" | 가격 곡선이 그 단계에서 0 이하가 된다(단계마다 줄어드는 곡선). 값을 매길 수 없는 가격이라 그 단계부터 세지 않는다. `최솟값으로 자르기`를 켠다(4-1). |
-| 방치형 후반에 값이 `∞`가 되거나 큰 수의 끝자리가 안 맞음 | DB 숫자 칸·밸런싱 값·`Game.Pay`는 `double`이다. 약 1e308을 넘으면 ∞이고, 15~16자리를 넘는 정수는 끝자리가 정확하지 않다. 그 값은 `BigNumber`로 두고 계산·비용 검사는 코드로 한다(→ `36-Grid-BigNumber.md`). |
+| 방치형 후반에 값이 `∞`가 되거나 큰 수의 끝자리가 안 맞음 | DB 숫자 칸·밸런싱 값은 `double`이다. 약 1e308을 넘으면 ∞이고, 15~16자리를 넘는 정수는 끝자리가 정확하지 않다. 그 값은 `BigNumber`로 두고 계산은 코드로, 비용은 `Game.Pay`(큰 수 그대로 — 할인은 `CostIntent.multiplier`)로 한다(→ `36-Grid-BigNumber.md`). |
 | 천장을 걸었는데 확률이 그대로 | 줄의 `단계(플레이어 데이터)`를 비워 늘 기준 값이다. 또는 단계 값(`pity`)을 올리는 코드가 없거나 `Game.Roll` 앞에서 0으로 돌린다. 밸런싱 값의 곡선 방식이 `없음`이어도 그대로다(5-11). |
 | 플레이 중 고친 값이 지금 적에게 안 보임 | 반영은 다음에 읽을 때부터다. 이미 만든 적의 체력은 판 데이터에 들어 있다. |
 | 플레이 중 고친 값이 플레이를 끄니 사라짐 | DB의 작업본이다. 저장(Ctrl+S)해야 에셋에 남는다. |

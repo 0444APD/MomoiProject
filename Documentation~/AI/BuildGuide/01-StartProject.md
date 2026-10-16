@@ -205,7 +205,7 @@ static void Bootstrap()
 ```
 
 > [!note]- 설정 함수와 칸 자세히
-> - 함수: `EditorSetHistory(Undo 방식, 보관 수 = 그대로)`(Undo 방식 하나만 — 나머지 칸은 그대로) · `EditorSetSessionOptions(Undo 방식, 보관 수, 스냅샷 간격, 스냅샷 보관 수, 시드 고정, 시드)`(여섯 칸을 함께 — 바꾸지 않을 칸은 지금 값 `database.SnapshotInterval`·`DevelopmentSeed` …를 넘긴다) · `EditorSetSaveOptions(판 저장, 판 끝 이벤트, 프로필도 행동마다)` · `EditorSetSaveTiming(N초, 저장 이벤트)` · `EditorSetFlowOptions(Undo 끊는 이벤트, 시작할 때 이어 하기, 새 판 행동)` · `EditorSetTickRate(초당 틱 수)` · `EditorSetSceneFlow(키, 필드, 빈 값일 때 씬)`. 이벤트·행동은 형식 전체 이름(`typeof(X).FullName`)이다. 지금 값은 `GameDatabase`의 읽기 속성(`History`·`HistoryLimit`·`RunSave`·`SaveProfileEachAction`·`TickRate` … — 참조 3-8)으로 읽는다.
+> - 함수: `EditorSetHistory(Undo 방식, 보관 수 = 그대로)`(Undo 방식 하나만 — 나머지 칸은 그대로) · `EditorSetSessionOptions(Undo 방식, 보관 수, 스냅샷 간격, 스냅샷 보관 수, 시드 고정, 시드)`(여섯 칸을 함께 — 바꾸지 않을 칸은 지금 값 `database.SnapshotInterval`·`DevelopmentSeed` …를 넘긴다) · `EditorSetSaveOptions(판 저장, 판 끝 이벤트, 프로필도 행동마다)` · `EditorSetSaveTiming(N초, 저장 이벤트)` · `EditorSetFlowOptions(Undo 끊는 이벤트, 시작할 때 이어 하기, 새 판 행동)` · `EditorSetTickRate(초당 틱 수)` · `EditorSetSlotsShareProfile(bool)`(세이브 슬롯이 프로필을 함께 씀 — 매뉴얼 31장 2-1) · `EditorSetSceneFlow(키, 필드, 빈 값일 때 씬)`. 이벤트·행동은 형식 전체 이름(`typeof(X).FullName`)이다. 지금 값은 `GameDatabase`의 읽기 속성(`History`·`HistoryLimit`·`RunSave`·`SaveProfileEachAction`·`SlotsShareProfile`·`TickRate` … — 참조 3-8)으로 읽는다.
 > - Undo 방식을 "스냅샷"으로 두면 보관 수 대신 스냅샷 간격(초)·스냅샷 보관 수를 쓴다. 간격 × 개수 = 되감을 수 있는 시간.
 > - 시드는 개발 빌드에서만 고정된다. 에디터 플레이는 개발 빌드로 친다. 출시 빌드는 늘 지금 시각을 시드로 쓴다. 같은 시드에 같은 행동이면 `Game.Random`의 결과가 같다.
 > - 판 저장·판 끝 이벤트는 [10장](10-SaveAndRelease.md). 프로필은 이 설정과 상관없이 끌 때 늘 저장된다.

@@ -91,7 +91,7 @@ UXML 칸(Label·Button·ProgressBar·Toggle·Slider)의 `binding-path` 속성에
 - 키에 `:`이 든 플레이어 데이터(로그·도전과제·플레이어별 키 — `stat:kills`)는 정의된 가장 긴 앞부분을 키로 보고 나머지를 경로로 읽는다(`stat:kills`가 키로 있으면 그 값 전체).
 - 숫자는 소수 둘째 자리까지(`0.##`), 목록은 개수, 참거짓은 `True`/`False`(글로 보일 때는 텍스트 키 틀을 쓴다).
 - **enum**은 틀 없이 보일 때 텍스트 표에 **`<enum 형식 이름>.<값>`** 키(`TimeOfDay.Morning` = "아침")가 있으면 그 글(지금 언어), 없으면 코드 이름(`Morning`)이다. AI는 enum 값마다 이 키를 원문 표에 더한다(23장 1절의 반영 스크립트). 틀(`@텍스트키`·`{value}`)에 넣으면 코드 이름이 들어가므로, 틀 안에서는 `{value, select, Morning {아침} other {밤}}`(23장 3.4)로 바꾸거나 틀 없는 칸을 따로 둔다.
-- **다시 그리는 때**: 그 화면의 binding-path에 쓴 키가 바뀔 때(화면 코드의 `Watch`가 있으면 그 키), 그리고 언어가 바뀔 때. 연출 대기열이 재생 중이면 끝난 뒤(화면 코드의 `WaitForPresentation`이 거짓이면 바로).
+- **다시 그리는 때**: 그 화면의 binding-path에 쓴 키가 바뀔 때(화면 코드의 `Watch`가 있으면 그 키), 그리고 언어가 바뀔 때. 멀티의 플레이어마다 데이터는 이름 그대로(`hand:cards`) 적는다 — 이 화면 플레이어의 몫(`hand:2`)을 읽고, 그 몫이 바뀌면 다시 그린다(40장 1-2). 연출 대기열이 재생 중이면 끝난 뒤(화면 코드의 `WaitForPresentation`이 거짓이면 바로).
 - binding-path는 **화면을 열 때 UXML에 있던 칸만** 읽는다. 목록 칸(ElementList가 나중에 만드는 칸) 안의 binding-path는 쓰지 않는다 — 항목마다 값이 다르므로 목록의 bind에서 채운다.
 - 틀린 글(`:gold`, `run@`)은 없는 것으로 친다. 값을 넣다 예외가 나면 경고 "[MomoiProject] 화면 'hud'의 binding-path 'run:hero.hp': …"를 남기고 다음 칸으로 간다.
 
@@ -184,7 +184,7 @@ protected override string[] Watch => new[] { GameIds.PlayerData.Run.Id };
 - `OnRemove`의 차례가 왔을 때 목록이 이미 정리됐거나(화면을 닫음 — `GameScreen.List`로 만든 목록은 닫을 때 저절로 정리된다) 칸이 화면에서 떨어졌으면 연출 없이 바로 없애고 넘어간다(떨어진 칸에서는 `schedule`·전환이 돌지 않아 `done()`이 오지 않는다). 정리하면 사라지는 중인 칸도 치우고, 도는 연출의 `done()`을 기다리지 않는다. 연출 대기열을 버리면(`GameView.ClearPresentation`) 차례를 기다리던 칸은 그 자리에서 치운다.
 - 값이 바뀌면 bind를 다시 돈다(키를 주면 그 키가 바뀔 때만). 칸에는 `.momoi-item` 클래스가 붙는다.
 - 만든 칸은 `GameView.RegisterElement(id)`로 등록된다 → 연출이 `GameView.FindElement(id)`로 찾는다(5-4). 자리 번호로 이은 칸은 등록하지 않는다(`Find("$0")`로).
-- `OnCreate`(처음 bind 전): 칸 안의 버튼 잇기. 칸의 버튼에서 행동을 보낼 때는 `GameScreens.Do(() => …)`(Busy·실패 알림이 같다). `OnCreate`·bind가 예외를 내면 콘솔에 찍히고 그 칸·다른 칸은 계속 그린다.
+- `OnCreate`(처음 bind 전, `(칸, 항목)` — 항목은 목록의 요소 그대로: 글자 목록이면 글자, 객체 목록이면 객체): 칸 안의 버튼 잇기. 칸의 버튼에서 행동을 보낼 때는 `GameScreens.Do(() => …)`(Busy·실패 알림이 같다). `OnCreate`·bind가 예외를 내면 콘솔에 찍히고 그 칸·다른 칸은 계속 그린다.
 
 ### 2-7. 루트 · Panel Settings · 테마 · 글꼴
 
@@ -317,14 +317,16 @@ static void ScreenOptions()
 
 ```csharp
 var hand = new ElementList<string>(Q("hand"), Item("CardItem"), () => Game.Data().Run.battle.hand, BindCard, GameIds.PlayerData.Run.Id);
+// OnCreate의 둘째 인자는 항목(TItem) — 글자 목록(ElementList<string>)이면 그 글자(id), 객체 목록(ElementList<DeckCard>)이면 그 객체
 hand.OnCreate = (element, id) => element.Q<Button>("card").clicked += () => GameScreens.Do(() => new PlayCard { card = Rules.CardOf(Game, id) });
 hand.OnRemove = (element, done) => { element.AddToClassList("card--gone"); element.schedule.Execute(done).StartingIn(250); };
+// 객체 목록이면: var deck = new ElementList<DeckCard>(…); deck.OnCreate = (element, card) => element.Q<Button>("card").clicked += () => GameScreens.Do(() => new PlayCard { card = card });
 ```
 
 | 멤버 | 뜻 |
 |---|---|
 | 생성자 `(container, item, items, bind, [waitForPresentation = true,] keys…)` | `item`이 null이면 빈 `VisualElement` |
-| `OnCreate` · `OnRemove` | 2-6 |
+| `OnCreate`(`Action<VisualElement, TItem>` — 칸과 항목) · `OnRemove`(`Action<VisualElement, Action>` — 칸과 끝 알림) | 2-6 |
 | `Find(id)` · `Find(item)` · `Elements` | 칸 찾기 |
 | `Dispose()` | 칸을 모두 없애고 구독을 끊는다(`GameScreen.List`로 만들면 닫을 때 저절로) |
 
