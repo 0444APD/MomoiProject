@@ -125,7 +125,7 @@ namespace GBible
         public static event Action<string, bool> MatchCancelled;
         public static event Action<NetMatchEnd> MatchEnded;
 
-        // 사설 서버(방장 · 화면 없는 서버 · 시험 모드)의 계정 저장소 — 사람마다 남는 값(DB '계정에 남김')을 둔다(멀티의 데이터는 서버 것).
+        // 사설 서버(방장 · 화면 없는 서버 · 시험 모드)의 계정 저장소 — 사람마다 남는 값(DB '방이 끝나도 서버에 남김')을 둔다(멀티의 데이터는 서버 것).
         // 비우면 이 컴퓨터의 파일(<persistentDataPath>/MomoiProject/server — 매칭큐 서버의 기본 저장소와 같은 곳). 진짜 DB는 출시 때 여기서 바꾼다.
         public static Func<INetPlayerStore> CreateAccountStore;
 

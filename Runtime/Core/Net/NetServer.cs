@@ -118,7 +118,7 @@ namespace GBible
         public NetServerOptions Options { get; }
 
         // ── 계정 저장(사설 서버 · 방장 · 시험 모드) ───────────
-        // 멀티의 데이터는 서버 것이다(기기 = 설정만, Steam = 도전과제): 사람마다 남는 값(DB 플레이어 데이터 '플레이어마다' + '계정에 남김')을
+        // 멀티의 데이터는 서버 것이다(기기 = 설정만, Steam = 도전과제): 사람마다 남는 값(DB 플레이어 데이터 '플레이어마다' + '방이 끝나도 서버에 남김')을
         // 이 저장소의 그 사람 계정(NetAccount.values[ID])에 둔다 — 들어올 때 읽고(없으면 처음 값), 나갈 때 · AccountSaveSeconds마다 · 닫을 때 쓴다.
         // 매칭큐의 방은 매칭큐 서버(NetHub)가 계정 값을 맡으므로 비워 둔다. 비우면 계정 값을 남기지 않는다.
         public INetPlayerStore Store;
