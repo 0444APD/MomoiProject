@@ -209,10 +209,11 @@ namespace GBible.Tests
 
             var rule = Make<FieldRuleData>("rule.template", "");
             rule.previewSize = "{balance:missing} {data:run.gold} {count:nokey.items}";
-            issues = DataValidator.Validate(new List<GameData> { run, rule }).Where(i => i.Asset == rule && i.Severity == ValidationSeverity.Warning).ToList();
+            issues = DataValidator.Validate(new List<GameData> { run, rule }).Where(i => i.Asset == rule).ToList();
             var seen = string.Join("\n", issues.Select(i => i.Severity + " " + i.Message));
-            Assert.IsTrue(issues.Any(i => i.Message.Contains("'missing'")), seen);
-            Assert.IsTrue(issues.Any(i => i.Message.Contains("'nokey'")), seen);
+            // 없는 밸런싱 값은 오류(실행하면 그 행동이 실패한다), 없는 플레이어 데이터는 경고(빈 글로 넘어간다).
+            Assert.IsTrue(issues.Any(i => i.Severity == ValidationSeverity.Error && i.Message.Contains("'missing'")), seen);
+            Assert.IsTrue(issues.Any(i => i.Severity == ValidationSeverity.Warning && i.Message.Contains("'nokey'")), seen);
             Assert.IsFalse(issues.Any(i => i.Message.Contains("'run'")), "있는 플레이어 데이터는 괜찮다");
         }
     }
