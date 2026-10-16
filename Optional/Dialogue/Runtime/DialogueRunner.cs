@@ -106,8 +106,26 @@ namespace GBible.Dialogue
         // 지금 있는 곳: 다이얼로그(다른 다이얼로그로 넘어갔으면 그것)와 대사 노드(대사에 들어가기 전이면 빈 값). 멀티 서버가 값 바꾸기를 확인할 때 쓴다.
         public string at;
         public string node;
+        // 한 채널: 끼어든 다이얼로그가 끝나면 돌아갈 곳 · 기다리던 것(DialogueResumeState의 JSON — 다이얼로그 관리자가 채운다). 비면 없음.
+        public string resume = "";
 
-        public DialogueProgress Clone() => new DialogueProgress { dialogue = dialogue, entry = entry, decisions = new List<string>(decisions), lines = lines, at = at, node = node };
+        public DialogueProgress Clone() => new DialogueProgress { dialogue = dialogue, entry = entry, decisions = new List<string>(decisions), lines = lines, at = at, node = node, resume = resume };
+    }
+
+    // 한 채널의 돌아갈 곳(판 저장용). 진행 기록은 JSON 글로 담는다(형식이 서로를 품지 않게).
+    [Serializable]
+    public sealed class DialogueResumeState
+    {
+        public List<DialogueResumeFrame> frames = new List<DialogueResumeFrame>();
+        // 지금 대사 뒤에 열 것("다이얼로그|시작 ID").
+        public List<string> waiting = new List<string>();
+    }
+
+    [Serializable]
+    public sealed class DialogueResumeFrame
+    {
+        public string progress = "";
+        public List<string> waiting = new List<string>();
     }
 
     // 다이얼로그 실행기. 흐름(대사 → 선택지 → 분기 …)을 따라가며, 신호로 이어진 효과 체인을 시간에 맞춰 재생한다.

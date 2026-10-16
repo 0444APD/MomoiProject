@@ -171,6 +171,7 @@ namespace GBible.Dialogue
             var session = GBibleRuntime.Session;
             if (!saveProgress || session == null) return;
             var progress = _runner.Progress;
+            if (progress != null) progress.resume = Dialogues.ResumeJson();
             var json = progress == null ? "" : JsonUtility.ToJson(progress);
             if (session.Role == SessionRole.Local)
             {
@@ -194,15 +195,31 @@ namespace GBible.Dialogue
         // 진행 중인 다이얼로그 ID(없으면 null).
         public string CurrentDialogue => _runner?.Progress?.dialogue;
 
+        // 지금 대사의 진행 기록(한 채널의 끼어들기가 남긴다). 없으면 null.
+        internal DialogueProgress CurrentProgress => IsPlaying ? _runner.Progress : null;
+
         // 저장된 진행 기록이 있으면 그 대사부터 이어 간다(판을 불러온 뒤 부른다). 이어 가지 못하면 저장된 진행은 그대로 둔다.
-        public bool ResumeSaved()
+        public bool ResumeSaved() => ResumeSaved(out _);
+
+        // resume = 그 기록에 함께 저장된 한 채널의 돌아갈 곳(다이얼로그 관리자가 되살린다).
+        public bool ResumeSaved(out string resume)
         {
+            resume = "";
             var session = GBibleRuntime.Session;
             var key = DialogueProgressKeys.For(session, session?.LocalPlayer ?? 0);
             if (session == null || !session.Data.IsDefined(key)) return false;
             var json = session.Data.Get<string>(key);
             if (string.IsNullOrEmpty(json)) return false;
             var progress = JsonUtility.FromJson<DialogueProgress>(json);
+            resume = progress?.resume ?? "";
+            return Restore(progress);
+        }
+
+        // 진행 기록으로 그 대사에 다시 들어간다(조용히 같은 길을 밟는다 — 값 바꾸기 · 신호는 다시 하지 않는다). 한 채널이 끼어든 뒤 돌아갈 때도 쓴다.
+        public bool Restore(DialogueProgress progress)
+        {
+            if (progress == null) return false;
+            var session = GBibleRuntime.Session;
             EnsureRunner();
             _runner.Session = session;
             _runner.DefaultTypingSpeed = typingSpeed;
