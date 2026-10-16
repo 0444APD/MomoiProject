@@ -207,6 +207,75 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 사설_서버는_계정_값을_들어올_때_읽고_나갈_때_쓰며_판_저장과_새_판은_건드리지_않는다()
+        {
+            var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "momoi-acct-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var store = new FilePlayerStore(folder);
+                var saved = new NetAccount { id = "device:pcB/철수", name = "철수" };
+                saved.values["gems"] = "7";
+                store.Save(saved);
+
+                var session = NewSession();
+                session.Data.DefinePerPlayer("gems", DataZone.Session, typeof(int), 0, "보석", account: true);
+                var net = new MemoryNetwork { Manual = true, Latency = 0.01 };
+                var server = new NetServer(session, net.Server()) { Store = store };
+                server.Start();
+                var b = new NetClient(NewSession(), net.Client(), "철수") { Device = "pcB" };
+                b.Connect();
+                void Pump()
+                {
+                    for (var i = 0; i < 20; i++)
+                    {
+                        net.Advance(0.01);
+                        server.Update(0.01);
+                        b.Update(0.01);
+                    }
+                }
+                Pump();
+                var key = PlayerDataStore.KeyFor("gems", b.PlayerId);
+                Assert.AreEqual(7, session.Data.Get<int>(key), "들어올 때 계정에서");
+                session.Do(new Edit { actorId = b.PlayerId, run = g => g.Session.Data.Set("gems", g.Session.Data.Get<int>("gems") + 5) });
+                Assert.IsFalse(session.Data.Export(DataZone.Session).ContainsKey(key), "판 저장에 들지 않는다(계정 저장소가 맡는다)");
+                session.Data.ResetZone(DataZone.Session);
+                Assert.AreEqual(12, session.Data.Get<int>(key), "새 판이 계정 값을 처음 값으로 되돌리지 않는다");
+
+                b.Dispose();
+                Pump();
+                Assert.AreEqual("12", store.Load("device:pcB/철수").values["gems"], "나가면 계정에 쓴다");
+                server.Dispose();
+            }
+            finally
+            {
+                try { System.IO.Directory.Delete(folder, true); } catch (Exception) { }
+            }
+        }
+
+        [Test]
+        public void 서버의_도전과제는_사람마다_달고_그_사람에게만_알린다()
+        {
+            var session = NewSession();
+            session.Achievements.Define(new AchievementDefinition { Id = "firstKill", DisplayName = "첫 처치", When = new EventTrigger { eventType = typeof(PpKilled).FullName } });
+            var net = new MemoryNetwork { Manual = true };
+            var server = new NetServer(session, net.Server());
+            session.Data.AddPlayer(1);
+            session.Data.AddPlayer(2);
+            var told = new List<int>();
+            session.Events.Subscribe<AchievementUnlocked>(e => told.Add(e.Player));
+            var key = PlayerDataKeys.Achievement("firstKill");
+
+            session.Do(new Edit { actorId = 2, run = g => g.Session.Events.Publish(new PpKilled()) });
+            Assert.IsTrue(session.Data.Get<bool>(PlayerDataStore.KeyFor(key, 2)), "2번이 처치 — 2번이 단다");
+            Assert.IsFalse(session.Data.Get<bool>(PlayerDataStore.KeyFor(key, 1)));
+            session.Do(new Edit { actorId = 1, run = g => g.Session.Events.Publish(new PpKilled()) });
+            Assert.IsTrue(session.Data.Get<bool>(PlayerDataStore.KeyFor(key, 1)), "한 사람이 달아도 다른 사람을 위해 감시를 이어 간다");
+            session.Do(new Edit { actorId = 2, run = g => g.Session.Events.Publish(new PpKilled()) });
+            CollectionAssert.AreEqual(new[] { 2, 1 }, told, "알림은 단 사람 번호로(그 사람에게만 간다), 이미 단 사람은 다시 달지 않는다");
+            server.Dispose();
+        }
+
+        [Test]
         public void 계정_값은_형식이_맞을_때만_들이고_프로필_구역은_받지_않는다()
         {
             _session.Data.DefinePerPlayer("gems", DataZone.Session, typeof(int), 0, "보석", account: true);

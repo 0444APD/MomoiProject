@@ -79,7 +79,7 @@ namespace GBible
             var data = _session.Data;
             foreach (var key in data.Keys.ToArray())
             {
-                if (key == Key || data.ZoneOf(key) != DataZone.Session) continue;
+                if (key == Key || data.ZoneOf(key) != DataZone.Session || data.IsAccountShare(key)) continue;   // 계정 몫은 판 지점에 들지 않는다
                 if (trees.TryGetValue(key, out var tree)) Restore(key, tree);
                 else data.ResetKey(key);
             }

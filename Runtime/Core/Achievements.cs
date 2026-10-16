@@ -24,12 +24,15 @@ namespace GBible
         public IEnumerable<Outcome> AllOutcomes() => Outcomes.Concat(Rewards).Where(o => o != null);
     }
 
+    // 멀티: 그 사람에게만 간다(Player — 0이면 모두. 혼자 하기는 0). 그 사람 화면이 Steam 계정에 기록한다(GBible.Steam).
     [GameEvent("도전과제 달성")]
-    public sealed class AchievementUnlocked : IDescribable
+    public sealed class AchievementUnlocked : IDescribable, IOwnedEvent
     {
         public string Id;
         public string DisplayName;
+        public int Player;
 
+        public int Owner => Player;
         public string Describe() => $"도전과제 달성: {DisplayName}";
     }
 
@@ -44,10 +47,32 @@ namespace GBible
         readonly GameSession _session;
         // 달성 기록(달성 기록 id, 도전과제 ID, 발동한 순간). 스냅샷 되감기 후 그 구간의 달성을 유지하는 데 쓴다(결과는 그 순간 — 받은 이벤트 — 으로 다시).
         readonly List<(long entryId, string id, TriggerContext moment)> _unlocks = new List<(long, string, TriggerContext)>();
-        // 행동 안에서 발동해 바깥 행동이 끝나기를 기다리는 달성(발동한 순간과 그때의 기록 원인 — 달성 줄이 그 이벤트를 원인으로 잇게 — 와 그 행동의 번호).
-        readonly List<(string id, string reason, TriggerContext moment, long cause, long transaction)> _pending = new List<(string, string, TriggerContext, long, long)>();
+        // 행동 안에서 발동해 바깥 행동이 끝나기를 기다리는 달성(발동한 순간과 그때의 기록 원인 — 달성 줄이 그 이벤트를 원인으로 잇게 — 와 그 행동의 번호, 달성한 플레이어).
+        readonly List<(string id, string reason, TriggerContext moment, long cause, long transaction, int player)> _pending = new List<(string, string, TriggerContext, long, long, int)>();
 
         public event Action<AchievementDefinition> Unlocked;
+
+        // ── 멀티 서버: 사람마다 ───────────────────────────────
+        // 멀티의 도전과제는 Steam 계정 것이다: 서버가 사람마다 판정하고(그 행동을 한 사람 — 행동 밖이면 지금 플레이어), 달성 표시는
+        // 플레이어마다 · 그 사람에게만 보임 · 계정에 남는 칸('$achievement.ID:번호' — 이미 단 것을 다시 달지 않게), 알림은 그 사람에게만 간다.
+        // 서버(NetServer)가 만들어질 때 켠다. 조건 충족 도전과제는 행동 밖에서 평가되므로 지금 플레이어(방장)만 본다 — 사람마다는 이벤트 트리거로.
+        public bool PerPlayer { get; private set; }
+
+        public void UsePerPlayer()
+        {
+            if (PerPlayer) return;
+            PerPlayer = true;
+            foreach (var definition in _definitions.Values.ToList())
+            {
+                DefinePerPlayerKey(definition);
+                WatchCondition(definition);   // 한 번 달성해도 다른 사람을 위해 감시를 이어 간다
+            }
+        }
+
+        void DefinePerPlayerKey(AchievementDefinition definition) =>
+            _session.Data.DefinePerPlayer(PlayerDataKeys.Achievement(definition.Id), DataZone.Session, typeof(bool), false, definition.DisplayName ?? definition.Id, ownerOnly: true, account: true);
+
+        int CurrentPlayer => PerPlayer ? _session.Data.CurrentPlayer?.Invoke() ?? 0 : 0;
 
         public AchievementSystem(GameSession session)
         {
@@ -76,7 +101,8 @@ namespace GBible
             }
             _definitions[definition.Id] = definition;
             _session.Data.Define(PlayerDataKeys.Achievement(definition.Id), DataZone.Meta, false, definition.DisplayName ?? definition.Id);
-            if (!IsUnlocked(definition.Id)) WatchCondition(definition);
+            if (PerPlayer) DefinePerPlayerKey(definition);
+            if (PerPlayer || !IsUnlocked(definition.Id)) WatchCondition(definition);
         }
 
         void WatchCondition(AchievementDefinition definition)
@@ -88,7 +114,7 @@ namespace GBible
             }
             var id = definition.Id;
             _session.Triggers.Unregister(id);
-            _session.Triggers.Register(id, definition.When, repeat: false, fire: moment => Unlock(id, moment.Event != null ? EventBus.DisplayNameOf(moment.Event.GetType()) + " 받음" : "조건 충족", moment));
+            _session.Triggers.Register(id, definition.When, repeat: PerPlayer, fire: moment => Unlock(id, moment.Event != null ? EventBus.DisplayNameOf(moment.Event.GetType()) + " 받음" : "조건 충족", moment));
         }
 
         public bool IsDefined(string id) => id != null && _definitions.ContainsKey(id);
@@ -110,6 +136,9 @@ namespace GBible
         void Unlock(string id, string reason, TriggerContext moment)
         {
             var definition = Find(id) ?? throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 도전과제 '{id}'입니다.");
+            var player = CurrentPlayer;
+            // 멀티 서버에서 지금 플레이어의 몫이 없으면(화면 없는 서버의 행동 밖) 누구의 달성인지 모른다 — 달성하지 않는다.
+            if (PerPlayer && !_session.Data.IsDefined(PlayerDataKeys.Achievement(id))) return;
             if (IsUnlocked(id)) return;
             // 미리보기(해 보기만 하는 실행)에서는 달성하지 않는다(달성은 되돌리지 않는 변경이라 미리보기 뒤에도 남는다).
             // 발동한 트리거는 미리보기가 끝나면 되살아난다(TriggerSystem).
@@ -117,11 +146,11 @@ namespace GBible
             // 행동 안: 바깥 행동이 성공한 뒤에 달성한다(CommitPending). 실패하면 버려진다.
             if (_session.Data.InTransaction)
             {
-                if (!_pending.Any(p => p.id == id)) _pending.Add((id, reason, moment, _session.Journal.CurrentCause, _session.Data.ActiveTransactionId));
+                if (!_pending.Any(p => p.id == id && p.player == player)) _pending.Add((id, reason, moment, _session.Journal.CurrentCause, _session.Data.ActiveTransactionId, player));
                 return;
             }
 
-            _session.Triggers.Unregister(id);
+            if (!PerPlayer) _session.Triggers.Unregister(id);
             var entry = _session.Journal.Append(JournalKind.Achievement, "Achievements",
                 $"달성: {definition.DisplayName}" + (reason != null ? $" ({reason})" : ""), PlayerDataKeys.Achievement(id));
             _unlocks.Add((entry.Id, id, moment));
@@ -131,10 +160,14 @@ namespace GBible
             {
                 _session.Data.Set(PlayerDataKeys.Achievement(id), true);
                 GrantRewards(definition, moment);
-                _session.Events.Publish(new AchievementUnlocked { Id = id, DisplayName = definition.DisplayName });
+                _session.Events.Publish(new AchievementUnlocked { Id = id, DisplayName = definition.DisplayName, Player = player });
             }
             Unlocked?.Invoke(definition);
+            UnlockedBy?.Invoke(definition, player);
         }
+
+        // 누가 달성했나도 함께(멀티 서버 — 혼자 하기는 0). Unlocked와 같은 때.
+        public event Action<AchievementDefinition, int> UnlockedBy;
 
         // 결과 실행(Permanent 안이라 Undo 이력에는 들어가지 않는다). moment: 발동한 순간(이벤트 등), 직접 달성이면 없음.
         void GrantRewards(AchievementDefinition definition, TriggerContext moment)
@@ -150,10 +183,12 @@ namespace GBible
             if (_pending.Count == 0) return;
             var ready = _pending.ToArray();
             _pending.Clear();
-            foreach (var (id, reason, moment, cause, _) in ready)
+            foreach (var (id, reason, moment, cause, _, player) in ready)
             {
                 try
                 {
+                    // 행동이 끝난 뒤라 그 행동을 한 사람으로 되돌려 달성한다(멀티 서버).
+                    using (player != 0 ? _session.ActingAs(player) : null)
                     using (_session.Journal.Cause(cause)) Unlock(id, reason, moment);
                 }
                 catch (Exception e)
@@ -171,7 +206,7 @@ namespace GBible
             _unlocks.RemoveAll(u => !IsUnlocked(u.id));
             foreach (var definition in _definitions.Values.ToList())
             {
-                if (IsUnlocked(definition.Id))
+                if (!PerPlayer && IsUnlocked(definition.Id))
                 {
                     _session.Triggers.Unregister(definition.Id);
                     continue;

@@ -288,9 +288,15 @@ namespace GBible
             _session = session;
             if (settings.achievements)
             {
-                session.Achievements.Unlocked += definition => Unlock(settings.SteamNameOf(definition.Id));
-                foreach (var definition in session.Achievements.Definitions.ToList())
-                    if (session.Achievements.IsUnlocked(definition.Id)) Unlock(settings.SteamNameOf(definition.Id), onlyIfMissing: true);
+                // 이 화면의 플레이어가 단 것만 Steam 계정에: 혼자 하기(0) · 방장(자기 번호) · 클라이언트(서버가 그 사람에게만 보낸 알림).
+                session.Events.SubscribeAfterAction<AchievementUnlocked>(e =>
+                {
+                    if (e.Player == 0 || e.Player == session.LocalPlayer) Unlock(settings.SteamNameOf(e.Id));
+                });
+                // 혼자 하기 · 방장: 이미 단 것(오프라인에서 단 것 등)을 Steam에 맞춘다. 클라이언트는 서버 것이라 맞추지 않는다.
+                if (!session.IsClient)
+                    foreach (var definition in session.Achievements.Definitions.ToList())
+                        if (session.Achievements.IsUnlocked(definition.Id)) Unlock(settings.SteamNameOf(definition.Id), onlyIfMissing: true);
             }
             StatKeys.Clear();
             DirtyStats.Clear();

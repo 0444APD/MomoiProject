@@ -373,6 +373,14 @@ namespace GBible
 
         public IEnumerable<string> PerPlayerKeys => _perPlayer.Keys;
 
+        // 계정에 남기는 플레이어마다 키의 몫인가('gems:2'). 이 몫은 계정 저장소가 맡는다 — 판 저장 · 판 불러오기 · 새 판(ResetZone)이 건드리지 않는다
+        // (새 판이 처음 값으로 되돌려 그것이 계정에 쓰이거나, 불러온 판의 옛 번호 몫이 다른 사람에게 가지 않게).
+        public bool IsAccountShare(string key)
+        {
+            var colon = key?.LastIndexOf(':') ?? -1;
+            return colon > 0 && _perPlayer.TryGetValue(key.Substring(0, colon), out var template) && template.Account;
+        }
+
         // 매칭 계정에 남기는 플레이어마다 키(이름 순).
         public IEnumerable<string> AccountKeys => _perPlayer.Where(p => p.Value.Account).Select(p => p.Key).OrderBy(k => k, StringComparer.Ordinal).ToList();
 
@@ -1474,7 +1482,7 @@ namespace GBible
                 foreach (var pair in _slots)
                 {
                     var slot = pair.Value;
-                    if (slot.Zone != zone) continue;
+                    if (slot.Zone != zone || IsAccountShare(pair.Key)) continue;
                     var warnings = new List<string>();
                     // 메모리 안 트리(스냅샷)는 요소마다 ID를 남긴다 — 되감을 때 지금 인스턴스와 ID로 짝지어(순서가 바뀌거나 빠졌어도) 같은 인스턴스로 되돌린다.
                     result[pair.Key] = DataModel.ToTree(slot.Value, slot.DataType ?? slot.Value?.GetType() ?? typeof(object), Identity, warnings, slot.Label, keepReferences);
@@ -1503,7 +1511,7 @@ namespace GBible
             {
                 var key = pair.Key;
                 var slot = pair.Value;
-                if (slot.Zone != zone) continue;
+                if (slot.Zone != zone || IsAccountShare(key)) continue;   // 계정 몫은 스냅샷에 들지 않는다(계정 저장소가 맡는다)
                 // 그 시점에 없던 키(뒤에 처음 생긴 상태 효과·예약 …)는 처음 값으로.
                 if (!tree.TryGetValue(key, out var saved)) saved = DefaultTree(slot);
                 if (slot.DataType != null && slot.Mirror != null)
@@ -1543,6 +1551,7 @@ namespace GBible
             var pending = new List<(string key, object tree)>();
             foreach (var pair in values)
             {
+                if (IsAccountShare(pair.Key)) continue;   // 계정 몫은 계정 저장소에서(옛 판 저장에 들었어도 넣지 않는다)
                 var key = _aliases.TryGetValue(pair.Key, out var renamed) && !values.ContainsKey(renamed) ? renamed : pair.Key;
                 present.Add(key);
                 if (!_slots.TryGetValue(key, out var slot))
@@ -1844,7 +1853,7 @@ namespace GBible
             foreach (var pair in _slots.ToList())
             {
                 var slot = pair.Value;
-                if (slot.Zone != zone) continue;
+                if (slot.Zone != zone || IsAccountShare(pair.Key)) continue;
                 if (slot.DataType != null || !Equals(slot.Value, slot.Default)) Set(pair.Key, slot.Default);
             }
         }

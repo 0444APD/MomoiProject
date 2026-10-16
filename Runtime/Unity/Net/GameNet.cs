@@ -125,6 +125,19 @@ namespace GBible
         public static event Action<string, bool> MatchCancelled;
         public static event Action<NetMatchEnd> MatchEnded;
 
+        // 사설 서버(방장 · 화면 없는 서버 · 시험 모드)의 계정 저장소 — 사람마다 남는 값(DB '계정에 남김')을 둔다(멀티의 데이터는 서버 것).
+        // 비우면 이 컴퓨터의 파일(<persistentDataPath>/MomoiProject/server — 매칭큐 서버의 기본 저장소와 같은 곳). 진짜 DB는 출시 때 여기서 바꾼다.
+        public static Func<INetPlayerStore> CreateAccountStore;
+
+        static INetPlayerStore AccountStore()
+        {
+            var custom = CreateAccountStore?.Invoke();
+            if (custom != null) return custom;
+            var files = new FilePlayerStore(Path.Combine(Application.persistentDataPath, "MomoiProject", "server"));
+            files.Log += message => Debug.LogWarning("[MomoiProject] " + message);
+            return files;
+        }
+
         // 매칭큐 서버의 매칭을 만드는 곳(비우면 LocalMatchmaker { PlayersPerMatch = 인원 }). 명령줄 -momoi-matchserver · 테스트 패널의 매칭큐 서버도 이것을 쓴다 —
         // 종류(모드)마다 정원이 다른 매칭은 여기서: GameNet.CreateMatchmaker = players => new MyMatchmaker(players);
         public static Func<int, INetMatchmaker> CreateMatchmaker;
@@ -149,6 +162,7 @@ namespace GBible
             MatchCancelled = null;
             MatchEnded = null;
             CreateMatchmaker = null;
+            CreateAccountStore = null;
             TokenSource = null;
             TokenWaitSeconds = 10;
             Rooms = new DirectRoomProvider();
@@ -207,7 +221,7 @@ namespace GBible
         {
             Leave();
             var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
-            Server = new NetServer(session, transport, options ?? ServerOptions());
+            Server = new NetServer(session, transport, options ?? ServerOptions()) { Store = AccountStore() };
             WireServer(Server);
             StartServer();
             Server.AddLocalPlayer(string.IsNullOrEmpty(playerName) ? "방장" : playerName);
@@ -227,7 +241,7 @@ namespace GBible
         {
             Leave();
             var session = GBibleRuntime.Session ?? GBibleRuntime.Start();
-            Server = new NetServer(session, new WebSocketServerTransport(port), options ?? ServerOptions());
+            Server = new NetServer(session, new WebSocketServerTransport(port), options ?? ServerOptions()) { Store = AccountStore() };
             WireServer(Server);
             StartServer();
             Debug.Log($"[MomoiProject] 서버를 열었습니다 — 접속 주소: {Address}");
@@ -314,7 +328,7 @@ namespace GBible
             var net = _testNet = new MemoryNetwork { Latency = Math.Max(0, latency), Jitter = Math.Max(0, jitter) };
             IsTestMode = true;
             var serverSession = GBibleRuntime.CreateSession();
-            Server = new NetServer(serverSession, net.Server(), new NetServerOptions { AllowDeveloperCommands = true, GameVersion = Application.version });
+            Server = new NetServer(serverSession, net.Server(), new NetServerOptions { AllowDeveloperCommands = true, GameVersion = Application.version }) { Store = AccountStore() };
             WireServer(Server);
             StartServer();
             if (prepareServer != null) prepareServer(serverSession);

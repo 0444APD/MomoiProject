@@ -311,7 +311,10 @@ namespace GBible
             // 멀티 클라이언트로 다시 시작하는 중이면(GameNet.Join) 판 저장·시작할 때 이어 하기를 하지 않는다 — 판은 서버가 가진다.
             var asClient = StartAsClient;
             StartAsClient = null;
-            var session = BuildSession(database, main: true);
+            _buildingClient = asClient != null;
+            GameSession session;
+            try { session = BuildSession(database, main: true); }
+            finally { _buildingClient = false; }
             // 플레이어마다 따로인 플레이어 데이터: 싱글은 이 화면의 플레이어 몫을 만든다(멀티 클라이언트는 서버가 보낸다 · 서버는 들어올 때마다).
             if (asClient == null) session.Data.AddPlayer(session.LocalPlayer);
 
@@ -445,7 +448,8 @@ namespace GBible
                 }
                 // 출시 뒤 DB 항목 ID를 바꿨으면 저장 안의 그 ID([DataRef] 필드)를 불러올 때 새 ID로 바꾼다.
                 options.Migrations.EveryLoad = SavedIdRenames.Build(database);
-                if (main) LoadProfile(session);
+                // 멀티 클라이언트는 이 기기의 프로필을 불러오지 않는다(멀티의 데이터는 서버 것 — 기기에는 설정만).
+                if (main && !_buildingClient) LoadProfile(session);
                 // 선택 요소: 프로젝트가 템플릿에서 들인 상태 효과·패시브 효과 DB 종류(규격 IStatusData·IPassiveData). 없으면 아무것도 등록하지 않는다.
                 foreach (var status in database.Entries.OfType<IStatusData>()) session.Statuses.Define(status.ToDefinition());
                 foreach (var passive in database.Entries.OfType<IPassiveData>()) session.Passives.Define(passive.ToDefinition());
@@ -483,6 +487,9 @@ namespace GBible
         internal static Action<GameSession> StartAsClient;
 
         // 지금 세션을 멈추고(프로필 저장) 멀티 클라이언트 세션으로 다시 시작한다(GameNet.Join). setup이 Started 전에 세션을 받는다.
+        // 멀티 클라이언트 세션을 만드는 중(이 기기의 프로필을 불러오지 않는다).
+        static bool _buildingClient;
+
         internal static GameSession RestartAsClient(Action<GameSession> setup)
         {
             if (Session != null) Stop(save: true);
@@ -556,9 +563,10 @@ namespace GBible
             {
                 // 판 끝과 같은 프레임에 끄면: 판 끝 마무리(판 저장 지우기·프로필 저장)를 먼저.
                 _runSaver?.FlushEnd();
-                // 살아 있는 판만 저장한다(프로필도 함께). 멀티 클라이언트·리플레이 세션(판 저장기가 없음)의 판은 서버·녹화의 것이라 남기지 않는다.
+                // 살아 있는 판만 저장한다(프로필도 함께). 멀티 클라이언트·리플레이 세션(판 저장기가 없음)의 판은 서버·녹화의 것이라 남기지 않고,
+                // 프로필도 쓰지 않는다(불러오지 않았으니 쓰면 이 기기의 혼자 하기 프로필을 처음 값으로 덮는다).
                 if (AutoSaveRun && RunIsLive) SaveRun(Session);
-                else SaveProfile(Session);
+                else if (_runSaver != null) SaveProfile(Session);
             }
             // 받는 쪽 하나가 던져도 나머지는 받고, 세션은 끝까지 비운다(UseSlot·DeleteSlot이 중간에 끊기지 않게).
             try { InvokeEach(Stopped, Session); }

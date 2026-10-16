@@ -25,6 +25,8 @@ namespace GBible
         public bool ByeOnClose = true;
         // 연결 하나가 1초에 보낼 수 있는 메시지 수. 넘친 것은 버리고, 네 배를 넘기면 끊는다(행동을 쏟아붓는 클라이언트가 서버를 멈추지 못하게). 0이면 제한 없음.
         public int MaxMessagesPerSecond = 300;
+        // 계정 저장소(NetServer.Store)가 있을 때: 바뀐 계정 값을 이 간격(초)마다 쓴다(나갈 때 · 닫을 때는 바로). 0이면 간격 저장 없음.
+        public double AccountSaveSeconds = 10;
     }
 
     // 서버 중개(4블록의 [서버 중개]): 이 세션(서버 권한)의 행동을 받아 실행하고, 바뀐 곳·이벤트를 클라이언트에 보낸다.
@@ -99,6 +101,8 @@ namespace GBible
             Options = options ?? new NetServerOptions();
             if (session.Role == SessionRole.Client) throw new InvalidOperationException("[MomoiProject] 클라이언트 세션으로는 서버를 열 수 없습니다.");
             session.Role = SessionRole.Server;
+            // 멀티의 도전과제는 사람마다(Steam 계정 것 — 서버가 판정해 그 사람에게 알린다).
+            session.Achievements.UsePerPlayer();
             session.Data.Synced += OnSynced;
             session.Data.Changed += OnChanged;
             session.Data.KeyDefined += OnKeyChanged;
@@ -112,6 +116,76 @@ namespace GBible
 
         public GameSession Session => _session;
         public NetServerOptions Options { get; }
+
+        // ── 계정 저장(사설 서버 · 방장 · 시험 모드) ───────────
+        // 멀티의 데이터는 서버 것이다(기기 = 설정만, Steam = 도전과제): 사람마다 남는 값(DB 플레이어 데이터 '플레이어마다' + '계정에 남김')을
+        // 이 저장소의 그 사람 계정(NetAccount.values[ID])에 둔다 — 들어올 때 읽고(없으면 처음 값), 나갈 때 · AccountSaveSeconds마다 · 닫을 때 쓴다.
+        // 매칭큐의 방은 매칭큐 서버(NetHub)가 계정 값을 맡으므로 비워 둔다. 비우면 계정 값을 남기지 않는다.
+        public INetPlayerStore Store;
+        readonly HashSet<int> _accountRead = new HashSet<int>();
+        readonly HashSet<int> _accountUnread = new HashSet<int>();
+        readonly HashSet<int> _accountDirty = new HashSet<int>();
+        HashSet<string> _accountKeys;
+        double _lastAccountSave;
+
+        HashSet<string> AccountKeySet => _accountKeys ??= new HashSet<string>(_session.Data.AccountKeys, StringComparer.Ordinal);
+
+        // 들어올 때: 그 사람 계정의 값을 그 사람 몫에 넣는다(한 번만 — 다시 접속하면 서버에 남은 값 그대로). 읽지 못하면 그 사람 계정에는 쓰지 않는다.
+        void ReadAccount(NetPlayer player)
+        {
+            if (Store == null || player == null || string.IsNullOrEmpty(player.Account) || !_accountRead.Add(player.Id)) return;
+            if (AccountKeySet.Count == 0 || _session.Data.InTransaction) return;
+            NetAccount account;
+            try { account = Store.Load(player.Account); }
+            catch (Exception e)
+            {
+                _accountUnread.Add(player.Id);
+                _session.Journal.Append(JournalKind.Error, "Net", $"{player}의 계정 값을 읽지 못해 처음 값으로 둡니다(이 사람 계정에는 쓰지 않습니다): {e.Message}");
+                return;
+            }
+            foreach (var key in AccountKeySet)
+            {
+                // 계정에 없는 값은 처음 값으로(그 번호의 몫에 남아 있던 다른 사람 값이 넘어가지 않게).
+                if (account?.values == null || !account.values.TryGetValue(key, out var json))
+                {
+                    _session.Data.ResetKey(PlayerDataStore.KeyFor(key, player.Id));
+                    continue;
+                }
+                if (_session.Data.ImportAccountValue(key, player.Id, json)) continue;
+                _accountUnread.Add(player.Id);
+                _session.Journal.Append(JournalKind.Warning, "Net", $"{player}의 계정 값 '{key}'을(를) 읽지 못해 처음 값으로 둡니다(이 사람 계정에는 쓰지 않습니다).");
+            }
+            _accountDirty.Remove(player.Id);
+        }
+
+        void WriteAccount(NetPlayer player)
+        {
+            if (Store == null || player == null || string.IsNullOrEmpty(player.Account) || !_accountRead.Contains(player.Id) || _accountUnread.Contains(player.Id)) return;
+            if (AccountKeySet.Count == 0) return;
+            try
+            {
+                var account = Store.Load(player.Account) ?? new NetAccount { id = player.Account, name = player.Name };
+                account.values ??= new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var key in AccountKeySet)
+                {
+                    var json = _session.Data.ExportAccountValue(key, player.Id);
+                    if (json != null) account.values[key] = json;
+                }
+                if (string.IsNullOrEmpty(account.name)) account.name = player.Name;
+                Store.Save(account);
+                _accountDirty.Remove(player.Id);
+            }
+            catch (Exception e)
+            {
+                _session.Journal.Append(JournalKind.Error, "Net", $"{player}의 계정 값을 저장하지 못했습니다: {e.Message}");
+            }
+        }
+
+        // 지금 들어와 있던 모든 사람의 계정 값을 쓴다(닫기 전 · 개발 명령).
+        public void SaveAccounts()
+        {
+            foreach (var player in _players.ToList()) WriteAccount(player);
+        }
         public IReadOnlyList<NetPlayer> Players => _players;
 
         // 방 주인: 방장(이 프로그램의 플레이어)이 있으면 방장, 없으면(시험 모드 · 화면 없는 서버) 들어와 있는 사람 가운데 번호가 가장 작은 사람.
@@ -150,6 +224,7 @@ namespace GBible
             {
                 _session.Data.AddPlayer(player.Id);
                 if (_players.Count(p => p.IsLocal) == 1) _session.Data.MovePlayer(0, player.Id);
+                ReadAccount(player);
             }
             foreach (var key in _projections.Keys.ToList()) RefreshProjection(key, player.Id);   // 방장 눈 녹화가 투영 모습을 받게
             PlayerJoined?.Invoke(player);
@@ -249,6 +324,11 @@ namespace GBible
             Receive();
             if (Options.DriveClock) _session.EndFrame(deltaTime);
             Flush();
+            if (Store != null && _accountDirty.Count > 0 && Options.AccountSaveSeconds > 0 && Now - _lastAccountSave >= Options.AccountSaveSeconds)
+            {
+                _lastAccountSave = Now;
+                foreach (var id in _accountDirty.ToList()) WriteAccount(FindPlayer(id));
+            }
         }
 
         // 받은 메시지를 모두 처리한다.
@@ -417,6 +497,7 @@ namespace GBible
             _session.Data.VisibilityChanged -= OnKeyChanged;
             _session.Events.Published -= OnPublished;
             _session.Events.Retracted -= OnRetracted;
+            SaveAccounts();   // 닫기 전에 사람마다 계정 값을 쓴다
             _session.Actions.Executed -= OnExecuted;
             _session.Actions.TransactionAborted -= OnAborted;
             _session.Actions.Committing -= UpdateProjections;
@@ -548,6 +629,7 @@ namespace GBible
             // 방장이 없는 서버(화면 없는 서버)가 혼자 하기 세션에서 열렸으면 그 0번 몫은 첫 사람이 들어올 때 지운다(없는 플레이어가 끼지 않게).
             if (!_session.Data.InTransaction && !_players.Any(p => p.IsLocal)) _session.Data.RemovePlayer(0);
             _session.Data.AddPlayer(player.Id);
+            ReadAccount(player);
             foreach (var key in _projections.Keys.ToList()) RefreshProjection(key, player.Id);
             PlayerJoined?.Invoke(player);
             BroadcastPlayers();
@@ -734,6 +816,7 @@ namespace GBible
             peer.Player.Connected = false;
             peer.Player.Connection = -1;
             _session.Journal.Append(JournalKind.System, "Net", $"{peer.Player}이(가) 나갔습니다{(string.IsNullOrEmpty(reason) ? "" : ": " + reason)}.");
+            WriteAccount(peer.Player);   // 나가면 그 사람 계정 값을 바로 쓴다(다시 오면 서버에 남은 값으로 이어 간다)
             // 게임 코드의 오류가 받기(남은 메시지)·이어받기(새 연결의 입장)를 멈추지 않게.
             try { PlayerLeft?.Invoke(peer.Player); }
             catch (Exception e) { _session.Journal.Append(JournalKind.Error, "Net", $"PlayerLeft 처리 중 오류({peer.Player}): {e.Message}"); }
@@ -753,6 +836,12 @@ namespace GBible
             var data = _session.Data;
             if (!data.IsData(key)) _values.Add(key);
             else if (!data.IsMirroredKey(key)) _trees.Add(key);
+            // 계정 값이 바뀐 사람(간격 저장)
+            if (Store != null && key != null)
+            {
+                var colon = key.LastIndexOf(':');
+                if (colon > 0 && AccountKeySet.Contains(key.Substring(0, colon))) _accountDirty.Add(PlayerDataStore.PlayerOfKey(key));
+            }
         }
 
         void OnKeyChanged(string key) => _scanAll = true;
