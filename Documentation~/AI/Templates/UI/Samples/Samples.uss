@@ -1,91 +1,114 @@
 /* 견본 화면(Samples/*.uxml) 전용 모양 — 키트(Kit.uss)와 함께 붙인다. 프로젝트 화면은 이것을 그대로 쓰지 않고 보고 베껴 프로젝트 USS에 옮긴다. */
 
+/* ── 견본 전용 색(키트 변수에 없는 것만): 색 값은 이 블록에만 적고 아래 규칙은 var()로 쓴다(UiGuide 3-4). 키트 색과 같은 것은 var(--kit-…).
+      프로젝트로 옮길 때는 프로젝트 USS의 변수(또는 Kit.uss 변수 블록)로 옮긴다 ── */
+:root {
+    --sample-tab-ink: rgb(44, 44, 48);                 /* 가로 메뉴 A의 글(종이 위) */
+    --sample-tab-mark: rgb(150, 132, 104);             /* 가로 메뉴 B2의 위 표시 */
+    --sample-pop-spark: rgba(48, 40, 30, 0.75);        /* 팝업 머리(모래색) 위 반짝임 */
+    --sample-pop-reward: rgb(48, 49, 55);              /* 보상 칸 */
+    --sample-pop-reward-mark: rgba(255, 255, 255, 0.3);
+    --sample-pop-bullet: rgb(80, 80, 86);
+    --sample-pop-text: rgb(70, 70, 74);                /* 팝업 안판의 줄 글 */
+    --sample-on-dark-text: rgb(236, 236, 238);         /* 검정 위 작은 글 · 제목 */
+    --sample-notice-mark: rgba(255, 255, 255, 0.9);    /* 알림 원 표지의 반짝임 */
+    --sample-dim-paper: rgb(110, 108, 104);            /* 흐린 글(종이 위) */
+    --sample-label-paper: rgb(140, 134, 124);          /* 꼬리표(종이 위, 견본판) */
+    --sample-label-dark: rgb(150, 152, 160);           /* 꼬리표(검정 위, 견본판) */
+    --sample-rowname: rgb(90, 88, 84);
+    --sample-spec-glow: rgba(226, 120, 52, 0.4);       /* 요소 규격 카드의 아래 그라데이션 */
+    --sample-spec-desc: rgb(80, 79, 76);
+    --sample-fx-stat: rgb(184, 92, 86);                /* 순간 연출 견본의 수치 원 */
+    --sample-scene: rgb(58, 70, 84);                   /* 월드 장면 대신의 단색(게이지 견본) */
+    --sample-portrait-art: rgb(28, 29, 33);            /* 초상 자리 */
+}
+
 /* 가로 메뉴의 다른 방식(견본 Menus — A 글 + 고른 것에 판 · B1 비우기 · B2 위 표시 · B4 밑줄). 프로젝트가 이 방식을 고르면 프로젝트 USS로 옮긴다 */
 .sample-tabs { flex-direction: row; align-items: center; height: 52px; align-self: flex-start; }
 .sample-tabs-item { height: 52px; margin: 0; padding: 0 28px; font-size: 17px; -unity-text-align: middle-center; }
-.sample-tabs-item--dark { color: rgb(44, 44, 48); }
-.sample-tabs-item--light { color: rgb(240, 240, 242); }
-.sample-tabs-item--dim { color: rgb(170, 172, 180); }
+.sample-tabs-item--dark { color: var(--sample-tab-ink); }
+.sample-tabs-item--light { color: var(--kit-light); }
+.sample-tabs-item--dim { color: var(--kit-dim); }
 .sample-tabs-item--bold { -unity-font-style: bold; }
 .sample-tabs-on { height: 52px; justify-content: center; }
-.sample-tabs-seg { background-color: rgb(40, 41, 46); }
+.sample-tabs-seg { background-color: var(--kit-dark); }
 .sample-tabs-seg--first { border-top-left-radius: 26px; border-bottom-left-radius: 26px; padding-left: 36px; }
 .sample-tabs-seg--last { border-top-right-radius: 26px; border-bottom-right-radius: 26px; padding-right: 36px; }
-.sample-tabs--bar { background-color: rgb(40, 41, 46); border-radius: 26px; padding: 0 8px; }
+.sample-tabs--bar { background-color: var(--kit-dark); border-radius: 26px; padding: 0 8px; }
 .sample-tabs-mark-host { position: relative; }
-.sample-tabs-mark { position: absolute; top: -18px; left: 50%; width: 10px; height: 10px; margin-left: -5px; --spark-color: rgb(150, 132, 104); }
-.sample-tabs-underline { position: absolute; left: 28px; right: 28px; bottom: 9px; height: 4px; --rule-color: rgb(214, 200, 176); --rule-width: 1; }
+.sample-tabs-mark { position: absolute; top: -18px; left: 50%; width: 10px; height: 10px; margin-left: -5px; --spark-color: var(--sample-tab-mark); }
+.sample-tabs-underline { position: absolute; left: 28px; right: 28px; bottom: 9px; height: 4px; --rule-color: var(--kit-sand); --rule-width: 1; }
 
 /* ── 작은 팝업(일반 배경 앞 — 화면 일부만, 장면이 그대로): 검정 틀 + 모래색 머리 + 종이 안판 + 뒤 상자 선 포인트 ── */
-.sample-pop-pos { position: absolute; right: 96px; top: 150px; }
+.sample-pop-anchor { align-items: flex-end; justify-content: flex-start; padding: 150px 96px 0 0; }   /* 가운데 감싸개(kit-center)의 정렬만 바꿔 오른쪽 위 — 화면 오른쪽에서 96 · 위에서 150 */
 .sample-pop { width: 540px; padding: 12px; }
 .sample-pop-head { height: 52px; flex-direction: row; align-items: center; padding: 0 20px; }
 .sample-pop-head > Label { margin-left: 12px; font-size: 19px; -unity-font-style: bold; }
-.sample-pop-spark { width: 14px; height: 14px; --spark-color: rgba(48, 40, 30, 0.75); }
+.sample-pop-spark { width: 14px; height: 14px; --spark-color: var(--sample-pop-spark); }
 .sample-pop-inner { margin-top: 8px; padding: 20px 24px 24px 24px; }
 .sample-pop-section { flex-direction: row; align-items: center; margin-bottom: 12px; }
 .sample-pop-section > Label { margin-left: 8px; font-size: 16px; -unity-font-style: bold; }
-.sample-pop-section-spark { width: 12px; height: 12px; --spark-color: rgb(36, 36, 40); }
+.sample-pop-section-spark { width: 12px; height: 12px; --spark-color: var(--kit-ink); }
 .sample-pop-rewards { flex-direction: row; margin-bottom: 20px; }
-.sample-pop-reward { width: 68px; height: 68px; margin-right: 8px; border-radius: 6px; background-color: rgb(48, 49, 55); align-items: center; justify-content: center; }
-.sample-pop-reward-mark { width: 26px; height: 26px; --spark-color: rgba(255, 255, 255, 0.3); }
-.sample-pop-reward-count { position: absolute; right: 6px; bottom: 2px; font-size: 12px; -unity-font-style: bold; color: rgb(236, 236, 238); }
+.sample-pop-reward { width: 68px; height: 68px; margin-right: 8px; border-radius: 6px; background-color: var(--sample-pop-reward); align-items: center; justify-content: center; }
+.sample-pop-reward-mark { width: 26px; height: 26px; --spark-color: var(--sample-pop-reward-mark); }
+.sample-pop-reward-count { position: absolute; right: 6px; bottom: 2px; font-size: 12px; -unity-font-style: bold; color: var(--sample-on-dark-text); }
 .sample-pop-line { flex-direction: row; align-items: center; height: 28px; padding-left: 20px; }
-.sample-pop-bullet { width: 5px; height: 5px; border-radius: 3px; background-color: rgb(80, 80, 86); margin-right: 12px; }
-.sample-pop-line > Label { font-size: 15px; color: rgb(70, 70, 74); }
+.sample-pop-bullet { width: 5px; height: 5px; border-radius: 3px; background-color: var(--sample-pop-bullet); margin-right: 12px; }
+.sample-pop-line > Label { font-size: 15px; color: var(--sample-pop-text); }
 .sample-pop-foot { flex-direction: row; align-items: center; padding: 12px 4px 0 8px; }
-.sample-pop-tries { flex-grow: 1; font-size: 14px; color: rgb(170, 172, 180); }
+.sample-pop-tries { flex-grow: 1; font-size: 14px; color: var(--kit-dim); }
 
 /* ── 알림(블러 앞 — 화면 항목의 뒷배경 '블러'): 종이 판 + 원 표지 + 글 ── */
 .sample-notice { width: 760px; padding: 28px 32px 24px 28px; flex-direction: row; align-items: center; }
-.sample-notice-emblem { width: 96px; height: 96px; border-radius: 48px; background-color: rgb(34, 35, 40); align-items: center; justify-content: center; }
-.sample-notice-emblem-mark { width: 48px; height: 48px; --spark-color: rgba(255, 255, 255, 0.9); }
+.sample-notice-emblem { width: 96px; height: 96px; border-radius: 48px; background-color: var(--kit-black); align-items: center; justify-content: center; }
+.sample-notice-emblem-mark { width: 48px; height: 48px; --spark-color: var(--sample-notice-mark); }
 .sample-notice-text { flex-grow: 1; margin-left: 28px; }
-.sample-notice-caption { color: rgb(140, 136, 128); }
+.sample-notice-caption { color: var(--kit-label); }
 .sample-notice-msg { margin-top: 8px; font-size: 20px; -unity-font-style: bold; white-space: normal; }
-.sample-notice-sub { margin-top: 4px; color: rgb(110, 108, 104); }
+.sample-notice-sub { margin-top: 4px; color: var(--sample-dim-paper); }
 .sample-notice-foot { margin-top: 16px; }
 
 /* ── 나눈 화면(UI 배경 — 화면 항목의 뒷배경 'UI 배경'): 왼쪽 목록 | 가운데 칸 판 | 오른쪽 상세 ── */
 .sample-split-money { position: absolute; right: 112px; top: 36px; }
 .sample-split-grid { position: absolute; left: 372px; top: 128px; width: 760px; bottom: 48px; padding: 28px; }
 .sample-split-grid-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.sample-split-dim { font-size: 14px; color: rgb(110, 108, 104); }
+.sample-split-dim { font-size: 14px; color: var(--sample-dim-paper); }
 .sample-split-cards { flex-direction: row; flex-wrap: wrap; }
 .sample-split-grid-foot { position: absolute; left: 28px; bottom: 24px; flex-direction: row; }
 .sample-split-detail { position: absolute; left: 1156px; right: 48px; top: 128px; bottom: 48px; }
 
 /* ── 요소 규격 예(카드 — 흰 메인 패널 · 아래 20% 포인트 그라데이션 · 검은 육각 제목 · 아이콘 칸 · 앞 선 끊김 · 뒤 선 치우침) ── */
 .sample-spec-card { width: 540px; height: 760px; }
-.sample-spec-glow { position: absolute; left: 0; right: 0; top: 438px; height: 109px; background-image: url("../Textures/gradient_up.png"); -unity-background-scale-mode: stretch-to-fill; -unity-background-image-tint-color: rgba(226, 120, 52, 0.4); }
+.sample-spec-glow { position: absolute; left: 0; right: 0; top: 438px; height: 109px; background-image: url("../Textures/gradient_up.png"); -unity-background-scale-mode: stretch-to-fill; -unity-background-image-tint-color: var(--sample-spec-glow); }
 .sample-spec-hex { position: absolute; left: 64px; right: 64px; top: 516px; height: 64px; justify-content: center; align-items: center; --panel-corner: 999; }
-.sample-spec-hex-text { font-size: 22px; -unity-font-style: bold; color: rgb(240, 240, 242); }
-.sample-spec-desc { position: absolute; left: 56px; right: 56px; top: 616px; font-size: 15px; white-space: normal; -unity-text-align: upper-center; color: rgb(80, 79, 76); }
-.sample-spec-slot { position: absolute; left: 464px; width: 52px; height: 52px; border-radius: 26px; background-color: rgb(40, 41, 46); align-items: center; justify-content: center; }
+.sample-spec-hex-text { font-size: 22px; -unity-font-style: bold; color: var(--kit-light); }
+.sample-spec-desc { position: absolute; left: 56px; right: 56px; top: 616px; font-size: 15px; white-space: normal; -unity-text-align: upper-center; color: var(--sample-spec-desc); }
+.sample-spec-slot { position: absolute; left: 464px; width: 52px; height: 52px; border-radius: 26px; background-color: var(--kit-dark); align-items: center; justify-content: center; }
 .sample-spec-slot--1 { top: 24px; }
 .sample-spec-slot--2 { top: 124px; }
-.sample-spec-slot-mark { width: 22px; height: 22px; --spark-color: rgba(214, 200, 176, 0.9); }
+.sample-spec-slot-mark { width: 22px; height: 22px; --spark-color: var(--kit-accent-dark); }
 
 /* ── 견본판(Samples — 보고 베끼는 화면에만) ── */
 .sample-head { position: absolute; left: 48px; top: 32px; right: 48px; height: 64px; flex-direction: row; align-items: center; }
-.sample-title { margin: 0; padding: 0; font-size: 44px; -unity-font-style: bold; color: rgb(36, 36, 40); }
-.sample-sub { flex-shrink: 1; margin: 0 0 0 24px; padding: 0; font-size: 14px; color: rgb(110, 108, 104); white-space: normal; }
+.sample-title { margin: 0; padding: 0; font-size: 44px; -unity-font-style: bold; color: var(--kit-ink); }
+.sample-sub { flex-shrink: 1; margin: 0 0 0 24px; padding: 0; font-size: 14px; color: var(--sample-dim-paper); white-space: normal; }
 .sample-side { position: absolute; top: 128px; bottom: 48px; width: 888px; padding: 32px; }
 .sample-side--left { left: 48px; }
 .sample-side--right { right: 48px; }
 .sample-side-title { margin: 0; padding: 0; font-size: 28px; -unity-font-style: bold; }
-.kit-on-paper .sample-side-title { color: rgb(36, 36, 40); }
-.kit-on-dark .sample-side-title { color: rgb(236, 236, 238); }
-.sample-label { margin: 24px 0 8px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(140, 134, 124); }
-.kit-on-dark .sample-label { color: rgb(150, 152, 160); }
+.kit-on-paper .sample-side-title { color: var(--kit-ink); }
+.kit-on-dark .sample-side-title { color: var(--sample-on-dark-text); }
+.sample-label { margin: 24px 0 8px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: var(--sample-label-paper); }
+.kit-on-dark .sample-label { color: var(--sample-label-dark); }
 .sample-row { flex-direction: row; align-items: center; }
 .sample-row--head { height: 24px; }
 .sample-row--n { height: 60px; }
 .sample-row--s { height: 44px; }
-.sample-rowname { width: 72px; margin: 0; padding: 0; font-size: 14px; color: rgb(90, 88, 84); }
-.kit-on-dark .sample-rowname { color: rgb(170, 172, 180); }
-.sample-colname { margin: 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 1px; -unity-text-align: middle-center; color: rgb(140, 134, 124); }
-.kit-on-dark .sample-colname { color: rgb(150, 152, 160); }
+.sample-rowname { width: 72px; margin: 0; padding: 0; font-size: 14px; color: var(--sample-rowname); }
+.kit-on-dark .sample-rowname { color: var(--kit-dim); }
+.sample-colname { margin: 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 1px; -unity-text-align: middle-center; color: var(--sample-label-paper); }
+.kit-on-dark .sample-colname { color: var(--sample-label-dark); }
 .sample-cell { align-items: center; justify-content: center; }
 .sample-col--circle { width: 88px; }
 .sample-col--wide { width: 164px; }
@@ -96,10 +119,10 @@
 .sample-box--accent { width: 300px; height: 220px; margin: 16px; padding: 28px 32px; }
 .sample-name { font-size: 18px; -unity-font-style: bold; }
 .sample-note { margin-top: 4px; font-size: 13px; opacity: 0.66; }
-.sample-rowlabel { width: 1500px; margin: 24px 0 4px 24px; font-size: 13px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(110, 108, 104); }
+.sample-rowlabel { width: 1500px; margin: 24px 0 4px 24px; font-size: 13px; -unity-font-style: bold; letter-spacing: 2px; color: var(--sample-dim-paper); }
 .sample-col { width: 1000px; }
-.sample-menu-label { margin: 28px 0 28px 4px; font-size: 13px; -unity-font-style: bold; letter-spacing: 1px; color: rgb(110, 108, 104); }
-.sample-caption { margin: 0 0 16px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: rgb(140, 134, 124); }
+.sample-menu-label { margin: 28px 0 28px 4px; font-size: 13px; -unity-font-style: bold; letter-spacing: 1px; color: var(--sample-dim-paper); }
+.sample-caption { margin: 0 0 16px 0; padding: 0; font-size: 12px; -unity-font-style: bold; letter-spacing: 2px; color: var(--sample-label-paper); }
 .sample-slots { width: 640px; margin-top: 24px; flex-direction: row; flex-wrap: wrap; }
 .sample-gap { height: 24px; }
 .sample-foot { flex-grow: 1; flex-direction: row; justify-content: flex-end; align-items: flex-end; }
@@ -113,16 +136,16 @@
 .sample-fx-item-icon { width: 44px; height: 44px; color: var(--kit-ink); }
 .sample-fx-unit { width: 140px; height: 180px; padding: 10px 10px 34px 10px; border-radius: 8px; background-color: var(--kit-paper); }
 .sample-fx-unit-art { flex-grow: 1; border-radius: 6px; background-color: var(--kit-stone); }
-.sample-fx-stat { position: absolute; left: -12px; bottom: -12px; width: 40px; height: 40px; margin: 0; padding: 0; border-radius: 20px; background-color: rgb(184, 92, 86); color: var(--kit-white); font-size: 18px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.sample-fx-stat { position: absolute; left: -12px; bottom: -12px; width: 40px; height: 40px; margin: 0; padding: 0; border-radius: 20px; background-color: var(--sample-fx-stat); color: var(--kit-white); font-size: 18px; -unity-font-style: bold; -unity-text-align: middle-center; }
 .sample-fx-buff { position: absolute; left: 34px; top: 30px; width: 72px; height: 72px; color: var(--kit-white-hover); opacity: 0; }
 .sample-fx-sheen-card { width: 220px; height: 130px; padding: 16px; overflow: hidden; align-items: flex-start; }
 .sample-fx-badge { height: 30px; margin: 0; padding: 0 14px; border-radius: 15px; background-color: var(--kit-sand); color: var(--kit-sand-ink); font-size: 14px; -unity-font-style: bold; -unity-text-align: middle-center; }
 
 /* ── 견본 Gauges: 왼쪽 위 = 장면 위 상태 UI(묶는 패널 없이 여백, 초상 · 아이콘 칸만 패널), 가운데 = 게이지 경우의 수. 장면 자리는 월드 장면 대신의 단색 ── */
-.sample-gauges-scene { background-color: rgb(58, 70, 84); }
+.sample-gauges-scene { background-color: var(--sample-scene); }
 .sample-gauges-me { position: absolute; left: 48px; top: 40px; flex-direction: row; }
 .sample-gauges-portrait { width: 88px; height: 88px; padding: 8px; }
-.sample-gauges-portrait-art { flex-grow: 1; border-radius: 4px; background-color: rgb(28, 29, 33); }
+.sample-gauges-portrait-art { flex-grow: 1; border-radius: 4px; background-color: var(--sample-portrait-art); }
 .sample-gauges-me-info { margin-left: 16px; width: 320px; }
 .sample-gauges-name { margin: 0 0 8px 0; padding: 0; font-size: 16px; -unity-font-style: bold; color: var(--kit-light); }
 .sample-gauges-name--right { -unity-text-align: middle-right; }
@@ -154,7 +177,7 @@
 .sample-gauges-controls .kit-bt { margin: 0 0 8px 0; }
 
 /* ── 게이지 타격(GaugeHit — KitGauge.Hit) ── */
-.sample-hit-scene { background-color: rgb(58, 70, 84); }
+.sample-hit-scene { background-color: var(--sample-scene); }
 .sample-hit-boss { position: absolute; left: 480px; right: 480px; top: 72px; }
 .sample-hit-boss-bar { height: 24px; }
 .sample-hit-row { position: absolute; left: 260px; right: 260px; top: 340px; flex-direction: row; align-items: flex-end; justify-content: center; }
@@ -167,4 +190,4 @@
 .sample-hit-controls .kit-bt { margin: 0 6px; }
 .sample-hit-number { position: absolute; margin: 0; padding: 0; font-size: 26px; translate: -50% -100%; }
 .sample-hit-number--big { font-size: 38px; }
-.sample-hit-fx { filter: drop-shadow(0px 0px 5px rgba(255, 150, 128, 0.8)); }   /* 타격 불티는 붉은 빛 */
+.sample-hit-fx { filter: drop-shadow(0px 0px 5px rgba(255, 150, 128, 0.8)); }   /* 타격 불티는 붉은 빛 — filter의 빛 색은 변수가 닿지 않아 여기 적는다(Kit.uss .kit-fx와 같음) */

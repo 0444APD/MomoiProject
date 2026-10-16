@@ -38,6 +38,21 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 | `Assets/MomoiProject/link.xml` | 코드 줄이기 보호(시작 설정이 만든다, 8절) |
 | `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`(켠 기능, 6절), `Ids.json`(7절), `DbSeeds.json`(DB 반영 스크립트가 돈 버전, 21장 3-1), `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
 
+**게임 씬 만들기 — `GameSceneSetup.Ensure(경로, firstInBuild)`**(`GBible.EditorTools`, 에디터 전용). 시작 설정은 게임 씬을 만들지 않는다. 게임 씬은 `Assets/Dev/Scenes`에 두고(관례 2절) AI가 단계 1에서 DB 반영 스크립트로 **처음 한 번만** 만든다 — 그 뒤 배치는 개발자 몫이다. 없을 때만 빈 씬(카메라 · 빛)을 만들고(있으면 건드리지 않는다), 빌드 목록(Build Settings)에 없으면 더한다. `firstInBuild: true`면 빌드 목록 맨 앞(게임이 켜질 때 여는 씬)으로 옮긴다. 돌려주는 값은 새로 만들었는지다. 같은 스크립트에서 이어 `TestSceneSetup.Ensure(copyFrom: 그 경로)`가 방금 만든 씬을 복사해 테스트 씬을 만든다(38장 4절).
+
+```csharp
+// Assets/MomoiProject/Code/Editor/Seeds/SceneSeeds.cs — DB 반영 스크립트(관례 15절)
+[DbSeed("1")]
+static void Scenes()
+{
+    GameSceneSetup.Ensure("Assets/Dev/Scenes/Battle.unity", firstInBuild: true);   // 게임이 켜질 때 여는 씬
+    TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/Battle.unity");             // 그 씬을 복사한 테스트 씬
+}
+```
+
+- 씬이 여럿이면(타이틀 · 전투) 씬마다 한 줄, 켜질 때 여는 씬 하나만 `firstInBuild: true`. 씬 흐름(DB › Bootstrap, 32장)을 쓰면 그 뒤로는 흐름이 씬을 연다.
+- 저장하지 않은 새 씬에 바뀐 것이 있으면 만들지 못하고 "지금 열린 씬이 저장하지 않은 새 씬이라 게임 씬을(를) 만들지 못했습니다. …"를 던진다 — 반영 스크립트는 '돌았다'로 기록되지 않아, 씬을 저장하거나 닫으면 다음 컴파일 뒤 다시 돈다. 바뀐 것 없는 빈 새 씬이면 그 자리에 연다.
+
 ### 주의할 점
 
 - 패키지 폴더 안에는 게임 코드를 두지 않는다. DB의 요소 탭(클래스·이벤트)은 `Assets/MomoiProject/Code` 안의 스크립트만 보인다(폴더 경로는 보이지 않는다).
@@ -99,7 +114,7 @@ public sealed class HudView : MonoBehaviour
 
 **`GBibleRuntime.SaveProfile(session)` / `SaveRun(session)`** — 지금 상태를 파일에 쓴다. 프로필 = 메타 구역(판이 바뀌어도 남는 값), 판 = 세션 구역(이번 판)·난수·시간. `SaveRun`은 저장 직전 알림(`Saving`) → 프로필 → 판 차례로 프로필도 함께 쓴다(`06-SaveLoad.md` 2.3).
 
-**`GBibleRuntime.HasSavedRun` / `LoadRun(session)`** — 저장한 판이 있는지(빈 파일은 없는 것으로), 있으면 불러온다(성공하면 `true`, 깨졌으면 `.bak`으로 이어 간다). 판 불러오기는 자동으로 하지 않는다. 타이틀의 '이어하기' 같은 곳에서 게임이 직접 부른다.
+**`GBibleRuntime.HasSavedRun` / `LoadRun(session)`** — 저장한 판이 있는지(빈 파일은 없는 것으로), 있으면 불러온다(성공하면 `true`, 깨졌으면 `.bak`으로 이어 간다). 판 불러오기는 DB › Bootstrap의 **시작할 때 이어 하기**를 켰을 때만 저절로(`Started` 뒤, 3절 표) 하고, 아니면 타이틀의 '이어하기' 같은 곳에서 게임이 직접 부른다. 불러온 뒤 `RunLoaded`가 온다.
 
 **`GBibleRuntime.NewRun(session)`** — 새 판. 이번 판 값을 처음 값으로 되돌리고(Undo 기록도 비움) 판 저장 파일을 지우고 판 끝 상태를 푼다. 행동 밖(버튼 등)에서 부른다(`06-SaveLoad.md` 2.3).
 
@@ -178,10 +193,12 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 저장 간격(초)(N초마다일 때) | 마지막 저장에서 이만큼 지났고 그사이 행동이 있었으면 판을 저장(실제 시간, 1 이상) | 30 |
 | 판 저장 이벤트(이벤트를 받을 때일 때) | 이 이벤트를 쏜 행동이 끝난 프레임 끝에 판을 저장(행동이 실패하면 저장하지 않음) | 없음 |
 | 판 끝 이벤트 | 받은 행동이 끝나면 판 저장을 지우고 프로필을 바로 저장 | 없음 |
-| 프로필도 행동마다 저장 | 바깥 행동이 끝날 때마다 프로필도 저장(N초마다면 그 간격으로). 끄더라도 판을 저장할 때 프로필이 바뀌었으면 함께 저장한다 | 끔 |
+| 프로필도 행동마다 저장 | 바깥 행동이 끝난 프레임 끝마다 프로필도 저장 — 판 저장이 'N초마다'여도 **간격을 기다리지 않는다**(그래서 1초마다 정산 행동이 도는 방치형은 끈다, 06장 2.2). 끄더라도 판을 저장할 때 프로필이 바뀌었으면 함께 저장한다 | 끔 |
 | 시작할 때 이어 하기 + 새 판 행동(선택) | `Started` 뒤 `LoadRun`, 없으면 `session.Do(new 새 판 행동())` | 끔 |
 | 고정 틱(실시간) › 초당 틱 수 | `TickRate` | 0(끔, 턴제·카드) |
 | 씬 흐름(선택) › 플레이어 데이터 · 필드(씬 이름이 든 글자) · 빈 값일 때 씬 | `Started` 직전 `GameScenes.Follow(키, 필드, 빈 값일 때 씬)` | 쓰지 않음 |
+
+**AI가 이 값을 정할 때**(결정에 따른 판 저장·고정 틱·새 판 행동 …): 화면을 누를 수 없으므로 DB 반영 스크립트에서 `GameDatabase.Load()`의 `EditorSet…` 함수(`EditorSetSessionOptions` · `EditorSetSaveOptions` · `EditorSetSaveTiming` · `EditorSetFlowOptions` · `EditorSetTickRate` · `EditorSetSceneFlow`, 에디터 전용)로 넣고 `EditorUtility.SetDirty` + `AssetDatabase.SaveAssetIfDirty`로 저장한다(DB 항목이 아니라 '적용 전'이 없다). 칸의 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다 — 다르면 개발자(또는 시작 설정)가 고른 값이므로 그대로 두고 보고에 적는다(관례 15절).
 
 게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
 
@@ -263,7 +280,7 @@ var session = new GameSession(new SessionOptions { Seed = 7, History = HistoryMo
 
 **언제.**
 - `SessionCreated` — **규칙 쪽 등록 전부**: 행동 처리기(`session.Actions.Register`) · 프로젝트 고유 기능의 감시(`session.Triggers.Register` — Rules의 등록 함수 `XxxRules.Register(session)`) · 규칙이 이벤트를 받는 것 · 틱 규칙(`session.Ticked`) · 코드로 쓰는 개발 명령 중 규칙(데이터)을 바꾸는 것(멀티에서는 클라이언트가 누른 명령이 서버 세션에서 돈다) · 코드로만 정의하는 플레이어 데이터 · 패시브 효과·상태 효과를 코드로 직접 등록하는 것. 새 판 행동보다 먼저 온다. 여기 두면 따로 만든 서버 세션(`GBibleRuntime.CreateSession`)에서도 규칙이 돈다 — `Started`에 두면 서버 세션에서 빠진다.
-- `Started` — **화면 쪽 연결**: 연출 받기(`SubscribeAfterAction` → `GameView.Present`) · 화면 설정(`GameScreens.Reroll` 등) · `GameSettings.Changed` · `GameInput.Use` · 화면만 쓰는 개발 명령(시간 배속 등) · 켤 때 정산(`Settle`)처럼 화면 세션에서 한 번 할 일. 화면 세션에서 `SessionCreated` 다음에 온다(프로필은 그 전에 불러와 있고, 그 사이 `GBibleRuntime.Session` 설정 · 씬 흐름 · 화면 준비 — 2절 7~11). 판 불러오기('시작할 때 이어 하기')는 `Started` 뒤다.
+- `Started` — **화면 쪽 연결**: 연출 받기(`SubscribeAfterAction` → `GameView.Present`) · 화면 설정(`GameScreens.Reroll` 등) · `GameSettings.Changed` · `GameInput.Use` · 화면만 쓰는 개발 명령(시간 배속 등) · 프로필만 보는 켤 때 일(일일 초기화 — 07장 4.11)처럼 화면 세션에서 한 번 할 일. 화면 세션에서 `SessionCreated` 다음에 온다(프로필은 그 전에 불러와 있고, 그 사이 `GBibleRuntime.Session` 설정 · 씬 흐름 · 화면 준비 — 2절 7~11). **판 불러오기('시작할 때 이어 하기')는 `Started` 뒤다** — 판 데이터를 보는 켤 때 일(오프라인 정산)은 `Started`가 아니라 `RunLoaded`(이어 하기)와 새 판 행동(처음)에 둔다(07장 4.7).
 - 둘 다 화면 세션이 새로 만들어질 때마다 다시 온다: 슬롯을 바꾸거나 지울 때(`UseSlot`·`DeleteSlot`, 31장), 멀티에 들어가고 나올 때(`GameNet.Join`·`Leave`, 40장). 등록은 세션마다이므로 그대로 두면 되고, 세션이 아닌 static 이벤트(`GameSettings.Changed` 등)에 거는 것만 `-=` 뒤 `+=`.
 - `Stopping` — 끄기 전에 마지막 값을 행동으로 남길 때. `Stopped` — 끝낼 때 외부 서비스에 알릴 때.
 

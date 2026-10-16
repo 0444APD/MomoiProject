@@ -48,6 +48,7 @@
   - 받은 행동의 `actorId`를 **보낸 사람 번호로 덮고** `utc`·`tick`을 지운다(속일 수 없게).
   - `[SystemAction]`이 붙은 행동(예약·주기·선택 효과·개발자 편집)은 클라이언트가 보내도 실행하지 않는다.
   - `NetServer.Validate(플레이어, 행동)`이 거절 글을 돌려주면 실행하지 않는다(내 차례가 아님 등). 검사 코드가 예외를 내도 거절로 돌려준다("행동 검사 중 오류: …" — 결과가 오지 않아 클라이언트가 기다리기만 하지 않게).
+  - **검사 코드가 보는 행동의 참조 필드는 서버 데이터의 진짜 객체다.** 받은 행동의 대상(유닛·카드)은 id만 든 껍데기로 오지만, `Validate`를 부르기 전에 서버가 지금 데이터의 객체로 바꿔 넣는다(`ActionReferences.Resolve`). 그래서 `action.unit.owner`·`action.card.cost` 같은 값을 그대로 읽어 검사한다(3-1 예). 그 사이 대상이 사라졌으면 플레이어용 실패 "대상이 이미 없습니다."(`momoi.fail.targetGone`, 02장 2.2)가 거절 글로 간다.
   - 묶음: 마지막으로 보낸 뒤의 바뀐 곳·이벤트를 키의 공개 범위대로 사람마다 골라 보낸다. 미리보기·실패한 행동의 이벤트는 보내지 않는다. 방장의 미리보기(`Game.Preview`)는 객체의 네트워크 번호를 바꾸지 않는다(`Mirror.KeepIds`) — 클라이언트는 같은 인스턴스를 그대로 가리킨다. 실패한 행동을 되돌릴 때도 번호를 지키므로, 실패 뒤에도 같은 객체는 같은 인스턴스로 간다.
   - 데이터 변경은 받는 쪽에 보낼 것(`Data.Synced`)에 먼저 넣고 그다음 이쪽 알림(`Data.Changed`)을 부른다. 알림을 받은 코드가 다른 데이터를 바꿔도 받는 쪽에는 차례가 뒤바뀌어 가지 않는다.
   - 보낼 수 없는 이벤트(생성 코드로 쓸 수 없는 필드가 있음)는 빼고 기록에 Error("이벤트 'X'을(를) 클라이언트에 보낼 수 없어 뺐습니다: …", 형식마다 한 번)를 남긴다. 행동은 성공한다.
@@ -58,6 +59,7 @@
   - 받은 이름은 제어 문자를 빼고 앞뒤 공백을 지운 뒤 32자로 자른다(`NetProtocol.CleanName` — 화면·기록·계정 키에 쓰인다).
   - WebSocket 전송: 메시지 하나는 32MB까지(조각을 이어 붙인 전체도). 받기 버퍼는 실제로 온 만큼 잡는다(머리에 적힌 길이만큼 미리 잡지 않는다). 제어 프레임(핑·퐁·닫기)은 125바이트까지. 보낼 대기열(WebSocket 핑에 전송이 스스로 하는 퐁 포함)이 8192개를 넘으면(받는 쪽이 멈춤) 연결을 닫고 끊김(`Disconnected`)으로 알린다. 연결 알림(`Connected`)은 그 연결에서 받은 것보다 늘 먼저 온다(악수 바로 뒤에 온 Hello도 잃지 않는다).
 - **내 번호**: `session.LocalPlayer`(싱글 0). 클라이언트는 서버가 준 번호, 방장은 자기 번호. `Do`가 `actorId`를 비워 둔 행동에 채운다.
+- **클라이언트의 자기 프로필**: 들어갈 때(`GameNet.Join` — 화면 세션을 클라이언트로 다시 만든다) 클라이언트 세션도 이 기기 슬롯의 `profile.json`(메타 구역)을 불러온다. 서버의 메타 키는 기본 `Server`라 오지 않으므로(1-2), 접속 중에도 `Game.Data().Profile`은 **내 프로필**이다 — 해금·설정 같은 값을 읽어 화면에 보일 수 있다. 하지만 클라이언트의 `Do`는 행동 밖이면 모두 서버로 가서 **서버 세션의 프로필**(방장 자신의 것, 화면 없는 서버·매칭 방은 빈 것)을 바꾸므로, 접속 중에는 내 프로필을 바꾸는 행동이 내 쪽에 남지 않는다(로비의 장비·상점도 마찬가지). 판 저장은 하지 않고(판은 서버가 가진다), 나오거나 끌 때 내 프로필만 그대로 저장한다. 경기 결과를 내 프로필에 남기는 길(보상·해금)은 라이브러리에 정해진 것이 없다 — 매칭큐의 계정 값은 서버 저장소에만 있고 게임 규칙이 읽고 쓰지 못한다(`NetMatchResult`는 번호·등수뿐). 그런 게임이면 명세서 단계에서 묻는다.
 
 ### 1-2. 공개 범위
 
@@ -209,7 +211,10 @@ GameNet.Reconnecting += n => ShowSpinner();                  // 다시 접속(Au
 GameNet.RecordReplays = true;                                // 리플레이 녹화 → LastReplay · SaveReplay()
 GameNet.PlayReplay(GameNet.LastReplay);                      // 틀기 → GameNet.Replay.Seek(30) · StopReplay()
 
-GameNet.ServerStarted += server => server.Validate = (player, action) => IsMyTurn(server.Session, player.Id, action) ? null : "내 차례가 아닙니다.";
+GameNet.ServerStarted += server => server.Validate = (player, action) =>
+    !IsMyTurn(server.Session, player.Id) ? "내 차례가 아닙니다."
+    : action is MoveUnit move && move.unit.owner != player.Id ? "내 유닛이 아닙니다."   // move.unit은 서버 데이터의 진짜 객체(1-1)
+    : null;
 GameNet.RoomStarting += room => SetupPlayers(room.Session, room.Server.Players);
 GameNet.RoomReady += room => room.Session.Do(new StartFirstTurn());
 GameNet.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 2, Place = 1 }, new NetMatchResult { Player = 1, Place = 2 } });
@@ -271,7 +276,10 @@ GameNet.RoomStarting += room =>
         data.Define("hand:" + player.Id, DataZone.Session, new Hand(), $"{player.Name}의 핸드");
         data.SetVisibility("hand:" + player.Id, DataVisibility.Owner, player.Id);   // 남의 핸드는 오지 않는다
     }
-    room.Server.Validate = (player, action) => room.Session.Game.Data().Run.turnPlayer == player.Id ? null : "내 차례가 아닙니다.";
+    room.Server.Validate = (player, action) =>
+        room.Session.Game.Data().Run.turnPlayer != player.Id ? "내 차례가 아닙니다."
+        : action is PlayCard play && !room.Session.Game.Get<Hand>("hand:" + player.Id).cards.Contains(play.card) ? "내 핸드의 카드가 아닙니다."   // play.card = 서버 데이터의 객체
+        : null;
 };
 GameNet.RoomReady += room => room.Session.Do(new StartMatch());
 // 규칙이 승패를 정하면(서버의 행동 안이 아니라 행동 뒤에 — 예: 이벤트를 SubscribeAfterAction으로 받아):
@@ -309,5 +317,7 @@ GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
 - **주고받는 클래스에 `#if UNITY_EDITOR` 필드를 두지 않는다**(에디터와 빌드의 필드 차례가 달라진다).
 - **숨길 정보는 플레이어마다 키를 나누고 Owner로.** 키 하나 안의 일부만 숨길 수는 없다. 숨길 이벤트(카드를 뽑음)는 `IOwnedEvent`로.
 - 매칭큐 서버의 계정 값(재화·점수)은 서버 저장소에만 있다. 클라이언트가 보낸 값을 믿지 않는다 — 바꾸는 것은 서버의 규칙(행동)이다.
+- **`Validate`에서 대상을 다시 찾지 않는다.** 참조 필드는 검사 전에 이미 서버의 객체로 바뀌어 있다(1-1) — `action.unit.owner`를 그대로 읽는다.
+- **접속 중에 내 프로필을 바꾸려 하지 않는다.** 클라이언트의 행동은 서버의 프로필을 바꾼다(1-1 '클라이언트의 자기 프로필'). 프로필을 바꾸는 화면(장비·상점)은 혼자 하기 세션에서.
 - 방장이 서버 세션을 그대로 쓰므로 방장 화면은 모든 데이터를 본다(친구 방 — 숨김이 필요 없는 게임에 쓴다).
 - 직접 접속이 안 될 때: 주소·포트(기본 7777)·Windows 방화벽 허용, 같은 가상 랜에 들어와 있는지, 게임 버전이 같은지.

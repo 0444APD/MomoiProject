@@ -206,7 +206,8 @@ var smooth = session.Clock.Time + session.TickAlpha / session.Options.TickRate; 
 | `const int GameSession.MaxTicksPerFrameAtSpeed` | 배속을 반영한 한도의 상한(128) |
 | `double GameSession.HostSpeed` | 호스트의 배속(기본 1). 한 프레임 한도만 늘린다(시간은 `deltaTime`에 이미 배속이 들어 있다). Unity에서는 `GameTime`이 매 프레임 맞춘다 |
 | `int GameSession.TickLimit` | 이번 프레임의 한도 = `MaxTicksPerFrame` × 올림(`HostSpeed`), 최대 `MaxTicksPerFrameAtSpeed`(1 아래는 1로 본다) |
-| `void GameSession.EndFrame(double deltaTime)` | 호스트가 매 프레임 부른다. 세션을 직접 만들면 직접 부른다(서버·테스트) |
+| `void GameSession.EndFrame(double deltaTime)` | 호스트가 매 프레임 부른다. 세션을 직접 만들면 직접 부른다(서버). 한 번에 `TickLimit`틱까지만 돈다 |
+| `void GameSession.Advance(double seconds)` | 규칙 테스트·도구용: 그 초만큼 한 틱씩 끝까지 `EndFrame`을 부른다(한도에 잘리지 않는다). `EndFrame(1.0)`은 30틱 게임에서 8틱뿐이다(2-1). 고정 틱이 꺼져 있으면 `EndFrame(초)` 한 번 |
 
 - `Ticked`는 세션의 이벤트다. 슬롯을 바꾸면 세션이 새로 만들어지므로(31장) 새 세션마다 다시 건다. 틱 규칙은 Rules의 등록 함수(`ArenaRules.Register(session)`)에 두고, 연결은 `Client/Bootstrap.cs`의 `RegisterRules`(`GBibleRuntime.SessionCreated`) 한 곳에서 그 함수를 부른다(17장 2-6, 5-1). `RegisterRules`는 새 세션마다(슬롯을 바꿔도 · 멀티 서버 세션에도) 불린다.
 
@@ -319,6 +320,8 @@ static void RegisterRules(GameSession session)   // Bootstrap — GBibleRuntime.
 }
 ```
 
+- **적은 판 데이터의 가벼운 목록이다**(`arena.foes` — id·hp와 기믹이 읽는 칸만, 위치·속도는 화면 쪽). 적에게 상태 효과(화상·얼림)·DB 기믹(패시브 효과·액티브 효과의 대상)이 걸리는 게임은 이렇게 둔다 — 상태 효과·대상 Block은 플레이어 데이터 안의 객체(id)에만 걸린다(29장). 걸리는 것이 없는 순수 탄막·보석·이펙트만 화면 쪽 오브젝트 풀이다(5-7). 적 목록은 HUD가 보는 키(`run`)와 다른 키(`arena`)에 둔다(5-7 '화면 다시 그리기').
+- 규칙 테스트는 세션을 만들고 `ArenaRules.Register(session)`을 부른 뒤 `session.Advance(10.5)`로 시간을 흘려 웨이브를 본다(4-1 — `EndFrame`을 직접 부르면 한도 8틱에서 잘린다, 38장 4절).
 - 규칙 파일에 `[RuntimeInitializeOnLoadMethod]`와 `GBibleRuntime.SessionCreated +=`를 따로 두지 않는다. 연결이 파일마다 흩어지고, 서버·테스트는 세션을 직접 만든 뒤 `ArenaRules.Register(session)`을 부를 길이 없어진다.
 - 웨이브는 30fps 기기와 144fps 기기에서 같은 틱에 나온다. 되감기(스냅샷)·판 저장도 시계와 `nextWaveAt`이 함께 돌아가 맞는다.
 - 같은 일은 시간 예약으로도 된다: `SpawnWave.Run` 끝에 `Game.ScheduleAfter(간격, new SpawnWave())`(29장 2-5). 시간 예약도 틱마다 확인되므로 결과가 같다. 틱 받는 쪽은 "체력이 절반 이하면 분노"처럼 조건을 매 틱 보는 규칙에 맞다.
@@ -485,10 +488,13 @@ slime,슬라임,14,4,4,,neutral
 |---|---|
 | 충돌·투사체·히트박스·미니게임 판정 | 화면(MonoBehaviour)이 판정하고 결과(누가 누구를 맞혔나·성공했나)만 행동으로 보낸다 = **판정 보고 행동**. 규칙은 결과로만 데이터를 바꾼다 |
 | 한 틱에 맞음 여러 번 | 틱마다 묶어 행동 하나(`Strike { hits }`, 아래). 적 40마리를 한 번에 맞혀도 행동 하나 |
+| 묶음 안의 대상 | **id 글자**로 두고(`Hit { foeId }`) 행동 안에서 목록에서 찾아 **없는 것은 건너뛴다**. 객체 참조 필드(`List<ArenaFoe>`)로 두면 보낸 사이 하나만 사라져도(같은 틱에 먼저 쓰러짐) 실행 직전 다시 찾기에서 묶음 전체가 실패한다(플레이어용 실패 `momoi.fail.targetGone`, 02장 2.2) |
 | 위치·속도 | 화면 쪽이다(판 데이터에 넣지 않는다). 한 번 정해지는 위치(던진 폭탄이 터질 자리)만 행동 필드로 넘긴다 |
-| `Game.Find` · `Game.All` | 플레이어 데이터를 훑고 행동 안에서 그 키를 한 번 Sync한다. 한 행동에서 같은 객체를 여러 번 찾지 말고 한 번 꺼내 변수로. 행동 필드는 객체로 둔다(실행 직전에 한 번 찾는다) |
+| `Game.Find` · `Game.All` | 플레이어 데이터를 훑고 행동 안에서 그 키를 한 번 Sync한다. 한 행동에서 같은 객체를 여러 번 찾지 말고 한 번 꺼내 변수로. 하나를 가리키는 행동 필드는 객체로 둔다(실행 직전에 한 번 찾는다) |
 | 개체 여럿 만들기 | `Game.NewIds(접두어, n)`(번호를 한 번만 쓴다, 5-1) |
-| 개체 수백(투사체·경험치 보석·탄막) | 플레이어 데이터에 넣지 않는다. 화면 쪽 **오브젝트 풀**로 두고, 규칙에는 수(모은 보석 수·남은 탄)와 결과(맞음·주움)만 |
+| 적 · 투사체에 상태 효과(화상·얼림)나 DB 기믹이 걸림 | 판 데이터의 **가벼운 목록**(id · 원본 ID · hp · 그 기믹이 읽는 칸만 — 위치는 화면 쪽, 5-1의 `arena.foes`). 상태 효과·대상 Block은 플레이어 데이터 안의 객체에만 걸린다 |
+| 걸리는 것이 없는 개체 수백(순수 탄막·경험치 보석·이펙트) | 플레이어 데이터에 넣지 않는다. 화면 쪽 **오브젝트 풀**로 두고, 규칙에는 수(모은 보석 수·남은 탄)와 결과(맞음·주움)만 |
+| 화면 다시 그리기 | 틱마다 바뀌는 키(적 목록 `arena`)와 HUD가 보는 키(레벨·경험치·골드 `run`)를 나눈다. 한 키 안의 무엇이 바뀌어도 그 키를 보는 화면 전체가 다시 그려진다 — 같은 키면 HUD가 초당 30번(35장 2-3 `Watch`) |
 | 시간에 따라 바뀌는 값 | 틱마다 행동하지 않는다. 시각을 적어 두고 그때만(5-1) |
 | 판 저장 | DB › Bootstrap 판 저장을 '행동마다 저장(턴제)' 대신 **'N초마다 저장(실시간·방치형)'**. '저장 간격(초)'(기본 30, 실제 시간)이 지났고 판 데이터가 바뀌었을 때만 저장하고, 끌 때도 저장한다(06장) |
 | 연출 | `GameView.Present`는 차례로 하나씩 돌고 그동안 `Busy`라 입력이 막힌다. 실시간은 `GameView.Play`(32장 2-2·5-9) |
@@ -517,7 +523,7 @@ public class Strike : GameAction
         foreach (var hit in hits)
         {
             var foe = arena.foes.Find(f => f.id == hit.foeId);          // 목록에서 직접(맞은 수만큼 Game.Find를 부르지 않는다)
-            if (foe == null) continue;                                   // 같은 틱에 먼저 쓰러졌다
+            if (foe == null) continue;                                   // 같은 틱에 먼저 쓰러졌다 — 건너뛴다(묶음 전체를 실패시키지 않는다)
             ArenaRules.Damage(Game, arena, foe, hit.backstab ? power * 2 : power);
         }
     }
@@ -604,6 +610,9 @@ public class HeroHitbox : MonoBehaviour
 | 서버·테스트에서 틱 규칙이 안 돎 | 규칙 파일이 `[RuntimeInitializeOnLoadMethod]`·`GBibleRuntime.Started +=`로 스스로 걸었다(Unity 클라이언트에서만 돈다). 등록 함수(`ArenaRules.Register(session)`)로 바꾸고 `Bootstrap.RegisterRules`(`GBibleRuntime.SessionCreated` — 모든 세션)에서 부른다. 규칙 테스트는 세션을 만든 뒤 직접 부른다(5-1). |
 | 멀티 클라이언트에서 `Ticked`가 오지 않음 | 정상이다. 클라이언트 세션은 시간 규칙을 돌리지 않는다(서버가 돌린다, 2-1). 화면 쪽 일(틱 묶음 보내기)은 `Update`에서(5-7). |
 | 휘두를 때마다 프레임이 떨어지고 타임라인이 금방 참 | 충돌마다 `Game.Do`를 불렀다. 닿은 적을 모았다가 틱마다 행동 하나로 보낸다(`Strike { hits }`, 5-7). |
+| 판정 보고가 가끔 통째로 실패("대상이 이미 없습니다.") | 묶음의 대상을 객체 참조 필드로 넣었다. 하나가 먼저 쓰러지면 다시 찾기에서 묶음 전체가 실패한다. id 글자로 두고 없는 것을 건너뛴다(5-7). |
+| 규칙 테스트에서 `EndFrame(1.0)`을 불렀는데 1초 규칙이 안 돎 | 한 번에 한도(8틱)까지만 돈다. `session.Advance(1.0)`(4-1). |
+| 적에게 화상·얼림 상태 효과를 걸 수 없음 | 적을 화면 쪽 오브젝트로만 두었다. 상태 효과는 판 데이터의 객체에만 걸린다 — 적을 판 데이터의 가벼운 목록으로(5-1·5-7). |
 | 실시간 게임이 행동이 많은 순간마다 끊김 | 판 저장이 '행동마다 저장'이라 행동이 끝난 프레임마다 파일을 쓴다. 'N초마다 저장(실시간·방치형)'으로(5-7). |
 | 투사체·보석이 많아지면 느려짐 | 투사체·보석을 판 데이터의 목록에 넣었다(Sync·저장이 개수만큼). 화면 쪽 오브젝트 풀로 옮기고 규칙에는 수와 결과만(5-7). |
 | 실시간인데 입력이 자꾸 막힘 | 연출을 `GameView.Present`로 넣었다. 대기열이 차례로 도는 동안 `Busy`라 입력 창구가 막는다. `GameView.Play`로(32장 2-2). |

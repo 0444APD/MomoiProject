@@ -168,7 +168,7 @@ run.gold += 10;              // 행동 안이면 그냥 고친다 — 행동이 
 
 > [!note]- `Game.Data().Run`이라는 이름과 GameIds가 생기는 때
 > - `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`는 DB가 바뀌어 적용될 때(개발자의 Ctrl+S, 반영 스크립트의 새 항목 자동 적용) 다시 만들어진다. 직접 고치지 않는다.
-> - 새 상수는 **그 뒤 Unity가 다시 컴파일해야** 코드에서 보인다. 그래서 반영 스크립트로 새 항목을 넣은 같은 응답에서 그 상수를 쓰는 코드를 쓰지 않는다: 반영 스크립트를 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다(관례 15절).
+> - 새 상수는 **그 뒤 Unity가 다시 컴파일해야** 코드에서 보인다. 그래서 반영 스크립트와 그 상수를 쓰는 코드를 한꺼번에 넣지 않고 한 응답 안에서 두 박자로 나눈다: 형식·반영 스크립트를 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다(관례 15절 — Unity가 닫혀 있으면 첫 박자에서 멈추고 열어 달라고 한다).
 > - 이름은 ID의 첫 글자를 대문자로, 점으로 나뉜 조각을 이어 붙인다: `run` → `Run`, `bestFloor` → `BestFloor`, `boss.dragon` → `BossDragon`. 다른 이름을 원하면 ID를 바꾼다(05장 8절).
 > - 구역은 저장 파일과 같다. `Session`은 이번 판(`run.json`), `Meta`는 프로필(`profile.json`). 무엇을 어느 쪽에 둘지는 [02장](02-DesignToCode.md) 3절.
 
@@ -186,7 +186,7 @@ Bootstrap은 게임이 켜질 때 가장 먼저 도는 곳이다. 설정과 코�
 | 판 저장 | 행동마다 저장(턴제) | 이어 하기용 판 파일을 언제 쓰나([10장](10-SaveAndRelease.md)) |
 | 판 끝 이벤트 | `RunEnded` | 받으면 판 저장을 지우고 프로필을 바로 저장 |
 
-AI는 이 값을 반영 스크립트에서 정한다. DB 에셋을 꺼내 `EditorSet…` 함수로 넣고, **처음 값(기본값)일 때만** 바꾼다(개발자가 바꾼 값을 덮지 않는다).
+AI는 이 값을 반영 스크립트에서 정한다. DB 에셋을 꺼내 `EditorSet…` 함수로 **결정한 값**(결정 기록·장르 추천)을 넣는다. 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 모두 다시 돌리기`도 개발자 값을 덮지 않는다(관례 15절).
 
 ```csharp
 [DbSeed("1")]
@@ -194,8 +194,11 @@ static void Bootstrap()
 {
     var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
     if (database == null) return;
-    if (database.RunSave == RunSaveMode.OnQuit)
-        database.EditorSetSaveOptions(RunSaveMode.AfterEachAction, typeof(RunEnded).FullName, database.SaveProfileEachAction);
+    var defaults = ScriptableObject.CreateInstance<GameDatabase>();               // 기본값과 같을 때만 넣는다(개발자가 고른 값은 그대로)
+    if (database.RunSave == defaults.RunSave && database.RunEndEvent == defaults.RunEndEvent)
+        database.EditorSetSaveOptions(RunSaveMode.AfterEachAction, typeof(RunEnded).FullName, profileEachAction: false);
+    else Debug.Log("[MomoiProject] Bootstrap 판 저장은 개발자가 고른 값 그대로 둡니다(결정 기록과 다르면 보고).");
+    Object.DestroyImmediate(defaults);
     EditorUtility.SetDirty(database);
     AssetDatabase.SaveAssetIfDirty(database);
 }
@@ -209,6 +212,7 @@ static void Bootstrap()
 > - **선택 칸**: **Undo 끊는 이벤트**(그 이벤트를 쏜 행동이 끝나면 Undo 기록을 비운다 — 예: 턴 끝, [07장](07-GenreRecipes.md) 2절), **시작할 때 이어 하기** + **새 판 행동**(타이틀 화면 없이 바로 판으로 들어가는 게임, [03장](03-GameLoop.md) 3절), **초당 틱 수**(실시간), **씬 흐름**(03장 9절). 비워 두면 아무 일도 하지 않는다.
 > - **고급**(접혀 있음): 기록 보관 줄 수, 개발 빌드의 Modify 누락 검사. 보통 그대로 둔다.
 > - 이 값들은 게임이 켜질 때 `SessionOptions`에 먼저 들어간다. 코드(`Configure`)가 같은 값을 바꾸면 코드가 이기고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다.
+> - **Run In Background**(창이 뒤로 가도 게임이 돈다)는 Bootstrap 칸이 아니라 Player Settings다. 실시간·방치형·멀티는 같은 반영 스크립트에서 `PlayerSettings.runInBackground = true;`. 틱 수·저장 간격처럼 AI가 정해 추천 승인 목록에 올린다(진행 매뉴얼 3절).
 
 **코드**: `Assets/MomoiProject/Code/Client/Bootstrap.cs`. 시작 설정이 만든 세 함수가 있다.
 
@@ -232,7 +236,7 @@ static void Bootstrap()
 |---|---|
 | 화면 세션 전체에 걸 연출 받기 | `session.Events.SubscribeAfterAction<T>(e => GameView.Present(…))`(화면 하나에 딸린 연출은 그 화면 코드의 `OnOpen`, [06장](06-Presentation.md) 3절) |
 | 화면·기기 설정·입력 연결 | `GameScreens.Reroll = …` · `GameSettings.Changed += …` · `GameInput.Use(…)`([10장](10-SaveAndRelease.md) 1절) |
-| 화면 세션에서 한 번 할 일 | 켤 때 정산(`session.Do(new Settle())` — `Settle`은 게임이 만든 행동) · 화면만 쓰는 시간 배속 명령 |
+| 화면 세션에서 한 번 할 일 | 화면만 쓰는 시간 배속 명령 · 판을 불러온 뒤 할 일의 연결(`GBibleRuntime.RunLoaded` — 정적 알림이라 `-=` 뒤 `+=`). 켤 때 정산(`Settle` — 게임이 만든 행동)은 여기서 바로 하지 않는다: 판은 `Started` 다음에 불러오므로(시작할 때 이어 하기) 이어 하기는 `RunLoaded`에서, 새 판은 새 판 행동 안에서 정산한다(매뉴얼 07장 4.7) |
 
 카드 던전은 유물을 패시브 효과로 만들고(라이브러리가 DB에서 등록한다, [04장](04-AddingContent.md) 8절) 연출을 화면 코드에 두므로 세 함수가 모두 비어 있다. 패시브 효과로 안 되는 DB 종류를 직접 만들면 그 감시 연결을 `RegisterRules`에 한 줄 둔다.
 

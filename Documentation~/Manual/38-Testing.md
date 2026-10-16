@@ -26,8 +26,10 @@
 
 | 하고 싶은 일 | 만드는 것 |
 |---|---|
-| 런타임에 원하는 모양을 만들어 시험 | 테스트 씬 + 테스트 명령(주입: 인스턴스 넣기·자원 주기·패시브 효과 얻기·상태 효과 걸기·적 만들기 / 발동: 이벤트 쏘기·행동 실행) |
+| 런타임에 원하는 모양을 만들어 시험 | 테스트 씬 + 테스트 명령(주입: 인스턴스 넣기·자원 주기·패시브 효과 얻기·상태 효과 걸기·적 만들기 / 발동: 이벤트 쏘기 — 모두 결과 Block. 행동 실행은 Block이 없어 `[BindTo]` 함수의 `c.Game.Do(…)`, 22장 7절) |
 | 같은 장면을 다시 열기 | 테스트 상황 저장 → 테스트 씬의 시작 상황 · 패널 · 모니터 › 명령 |
+| 꺼 둔 시간·날짜 넘김(오프라인 보상·일일 초기화) | 개발 명령 '시간 › 현실 시각 +1시간 / +1일 / 지금으로'(`TestClock`, 22장 7절) · 규칙 테스트는 `RealClock`(07장 4.9) |
+| 규칙 테스트에서 게임 시간 흘리기(예약·상태 효과 주기·`Ticked`) | `session.Advance(초)`(4절) |
 | 밸런스 숫자(승률·평균 턴) | `TestScenarios.Simulate` + 결과 CSV |
 | 버그 재현 | 개발자가 저장한 상황 → 규칙 테스트(코드로 같은 상황) |
 
@@ -47,9 +49,9 @@
 
 ### 2-2. 테스트 상황(`TestScenarios`)
 
-- `Save(session, 이름)`: `{ kind, name, savedAt, run = session.ExportRun(), meta = session.ExportMeta() }`를 JSON으로. 에디터는 `Assets/MomoiProject/Data/Tests/`(프로젝트와 함께 커밋), 개발 빌드는 `<persistentDataPath>/MomoiProject/Tests/`.
+- `Save(session, 이름)`: `{ kind, name, savedAt, realNow, run = session.ExportRun(), meta = session.ExportMeta() }`를 JSON으로. `realNow`는 그 순간의 `Game.Now`(옮긴 현실 시각 포함)다. 에디터는 `Assets/MomoiProject/Data/Tests/`(프로젝트와 함께 커밋), 개발 빌드는 `<persistentDataPath>/MomoiProject/Tests/`.
 - 개발 빌드에는 에디터의 상황이 같이 들어간다: 개발 빌드를 만들 때 `Assets/MomoiProject/Data/Tests/*.json`을 빌드의 `StreamingAssets/MomoiProject/Tests/`에 넣는다(`TestScenarios.BundledFolder`, 읽기 전용 — 프로젝트의 `Assets/StreamingAssets`는 건드리지 않는다). 출시 빌드에는 넣지 않는다. 개발 빌드의 목록·불러오기는 기기에 저장한 것과 이것을 함께 보고, 같은 이름이면 기기에 저장한 것을 쓴다. 저장·지우기는 기기 쪽만. Android·WebGL은 StreamingAssets를 파일로 열 수 없어 기기에 저장한 것만 보인다.
-- `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`). 없거나 읽지 못하면 저널에 이유를 남기고 `false`(던지지 않는다). 프로필을 불러온 뒤 판에서 실패하면 프로필도 되돌린다(`false`면 프로필이 바뀌지 않는다 — 반쪽 상태가 판 저장으로 슬롯에 남지 않게).
+- `Load(session, 이름, seed = null)`: 프로필 → 판 순서로 불러온다(`ImportMeta` → `ImportRun`). Undo 이력은 비워진다. `seed`를 주면 불러온 뒤 난수만 그 시드로(`Random.Reseed`). 파일에 `realNow`가 있으면 현실 시각을 그 순간으로 맞춘다(`TestClock.SetNow` — 며칠 뒤 열어도 꺼 둔 시간·날짜 번호가 저장할 때와 같다, 개발 빌드·에디터에서만. `realNow`가 없는 옛 파일은 지금 시각 그대로). 끝에 `GBibleRuntime.NotifyRunLoaded(session)` — 화면이 판 데이터로 다시 맞춘다(`RunLoaded`). 없거나 읽지 못하면 저널에 이유를 남기고 `false`(던지지 않는다). 프로필을 불러온 뒤 판에서 실패하면 프로필도 되돌린다(`false`면 프로필이 바뀌지 않는다 — 반쪽 상태가 판 저장으로 슬롯에 남지 않게).
 - 행동 밖에서 부른다(행동 안이면 `Save`는 `ExportRun`이, `Load`는 스스로 예외).
 
 ### 2-3. 자동 시뮬레이션(`TestScenarios.Simulate`)
@@ -149,17 +151,21 @@ wait 1.2
 
 ## 3. 에디터에서 쓰는 법
 
-- 메뉴 **MomoiProject › 테스트 씬 열기**(테스트 씬은 AI가 `TestSceneSetup.Ensure`로 만든다).
+- 메뉴 **MomoiProject › 테스트 씬 열기**(테스트 씬은 AI가 `TestSceneSetup.Ensure`로 만든다 — 게임 씬을 복사하므로 **게임 씬을 먼저** `GameSceneSetup.Ensure`로 만든다, 4절·20장 1절).
 - 테스트 씬의 오브젝트 '[테스트]' › 컴포넌트 **테스트 씬**: 시작 상황(드롭다운 — '(새 판)' + 저장된 상황 목록, 파일이 없는 이름은 '(없음) 이름'과 경고) · 시드 · 따로 슬롯 · 속도 · 패널 펼침 · 패널 키 · 멀티플레이(혼자·시험 모드·방 생성·방 참가, 지연·흔들림·화면 없는 클라이언트 수·포트·주소·이름 — 40장).
-- 플레이 → **테스트 패널**(F1, 접으면 왼쪽 위 '테스트(F1)' 버튼): 시간(×0.5·×1·×2·×4·멈춤) · Undo · 새 판 · 멀티(시험 모드·방 생성·방 참가·매칭큐 — 클라이언트일 때 Undo·새 판·테스트 상황은 서버에서) · 리플레이(녹화·저장·틀기 — 40장 1-11) · 테스트 상황(지금 저장·불러오기) · 테스트 명령(분류별 버튼).
+- 플레이 → **테스트 패널**(F1, 접으면 왼쪽 위 '테스트(F1)' 버튼): 시간(×0.5·×1·×2·×4·멈춤 — 현실 시각 옮기기는 테스트 명령의 '시간' 분류) · Undo · 새 판 · 멀티(시험 모드·방 생성·방 참가·매칭큐 — 클라이언트일 때 Undo·새 판·테스트 상황은 서버에서) · 리플레이(녹화·저장·틀기 — 40장 1-11) · 테스트 상황(지금 저장·불러오기) · 테스트 명령(분류별 버튼).
 - 모니터 › **명령** 탭에도 **테스트 상황** 패널(지금 저장·불러오기)이 있다(22장).
 
 ## 4. 코드로 쓰는 법
 
 ```csharp
-// 테스트 씬 만들기(DB 반영 스크립트에서 — 관례 15·19절). 이미 있으면 건너뛴다.
+// 게임 씬 → 테스트 씬(DB 반영 스크립트 하나에서 이 차례로 — 관례 15·19절, 20장 1절). 둘 다 이미 있으면 건너뛴다.
 [DbSeed("1")]
-static void TestScene() => TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/Battle.unity", scenario: "보스 직전");
+static void Scenes()
+{
+    GameSceneSetup.Ensure("Assets/Dev/Scenes/Battle.unity", firstInBuild: true);                  // 빈 게임 씬 + 빌드 목록
+    TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/Battle.unity", scenario: "보스 직전");      // 방금 만든 씬을 복사
+}
 
 // 테스트 상황
 TestScenarios.Save(session, "보스 직전");
@@ -182,10 +188,22 @@ TestScenarios.SaveReport(report);                   // Tests/Reports/보스 직�
 | `Simulate(session, 상황, runs, step, measure, maxSteps = 1000, firstSeed = 1)` | 자동 시뮬레이션 → `TestReport` |
 | `SaveReport(report, 이름)` | CSV(엑셀용 UTF-8 BOM, RFC 4180 — 쉼표·따옴표·줄바꿈이 든 칸은 따옴표로 감싼다) |
 | `TestReport.Runs` · `Columns` · `Average(열)` · `Min` · `Max` · `Failures` · `ToText()` · `ToCsv()` | 결과 |
-| `TestSceneSetup.Ensure(path, copyFrom, scenario)` (에디터) | 테스트 씬 만들기: `copyFrom` 씬을 복사(없으면 빈 씬)하고 '[테스트]' 오브젝트에 `TestScene`. 이미 있으면 건너뛴다(거짓). 저장하지 않은 새 씬이 열려 있으면 예외 — 반영 스크립트가 기록되지 않아 씬을 저장·닫은 뒤 다음 컴파일에서 다시 돈다 |
+| `GameSceneSetup.Ensure(path, firstInBuild = false)` (에디터) | 게임 씬 만들기: 없을 때만 빈 씬(카메라·빛) + 빌드 목록에 더하기(`firstInBuild`면 맨 앞). 만들었으면 참(20장 1절) |
+| `TestSceneSetup.Ensure(path, copyFrom, scenario)` (에디터) | 테스트 씬 만들기: `copyFrom` 씬을 복사(그 파일이 없으면 빈 씬 — 게임 씬을 먼저 만든다)하고 '[테스트]' 오브젝트에 `TestScene`. 이미 있으면 건너뛴다(거짓). 저장하지 않은 새 씬에 바뀐 것이 있으면 예외 — 반영 스크립트가 기록되지 않아 씬을 저장·닫은 뒤 다음 컴파일에서 다시 돈다 |
 | `GBibleRuntime.UseSlot(슬롯, remember: false)` · `NotifyRunLoaded(session)` | 기억하지 않는 슬롯 · 판을 불러온 알림 |
+| `TestClock.Offset` · `Shift(시간)` · `SetNow(utc)` · `Reset()` · `Now` | 테스트용 현실 시각 옮기기(개발 빌드·에디터에서 `Game.Now`에 얹힌다, 플레이를 시작할 때마다 0). 개발 명령·테스트 상황이 부른다. 규칙은 읽지 않는다(`Game.Now`만) |
+| `GameSession.Advance(초)` | 규칙 테스트·도구용: 게임 시간을 그만큼 흘린다(아래) |
 
-테스트 명령은 22장(개발 명령). 결과 Block으로 조립하고 `category`로 묶는다(예: "판", "조각", "적", "상황").
+**규칙 테스트에서 시간 흘리기 — `session.Advance(초)`.** 고정 틱이면 한 틱씩 끝까지 `EndFrame`을 불러 시간 규칙(시간 예약·상태 효과의 주기·시간 지속·패시브 효과 `pulse`·`Ticked`)이 실제 플레이처럼 돈다. `EndFrame(1.0)`을 직접 부르면 한 프레임 한도(`TickLimit` — 보통 8틱)에서 잘려 30틱 게임에서 1초가 아니라 8틱만 흐른다(33장 2-1). 고정 틱이 꺼져 있으면 `EndFrame(초)` 한 번과 같다.
+
+```csharp
+var session = new GameSession(new SessionOptions { TickRate = 30 });
+// … Define · 밸런싱 값(waveInterval 10) · 등록 함수 ArenaRules.Register(session)(33장 5-1) …
+session.Advance(10.5);                                 // 315틱을 다 돈다 — EndFrame(10.5) 한 번이면 8틱뿐
+Assert.AreEqual(2, session.Game.Data().Arena.wave);    // 첫 틱과 10초 뒤에 한 번씩
+```
+
+테스트 명령은 22장(개발 명령). 결과 Block으로 조립하고 `category`로 묶는다(예: "판", "조각", "적", "상황"). 개발자가 값(몇 개·어느 인스턴스)을 바꿔야 하는 명령은 `[BindTo]`가 아니라 결과 Block으로(22장 7절 — `[BindTo]` 명령에는 값 칸이 없다).
 
 ## 5. 상황별 예제
 
@@ -204,7 +222,7 @@ TestScenarios.SaveReport(report);                   // Tests/Reports/보스 직�
 - 테스트 상황은 저장할 때의 데이터 구조로 남는다. 데이터 클래스가 바뀌면 오래된 상황은 불러올 때 경고·빈 값이 생길 수 있다 — 다시 저장한다(출시 뒤 저장 변환처럼 맞추지 않는다).
 - 테스트 씬에서 '따로 슬롯'을 끄면 개발자의 실제 저장으로 돈다(판 저장이 덮일 수 있다).
 - 시뮬레이션의 `step`에서 플레이어의 선택 대기(`Game.Ask`)가 생기면 답(`Game.Answer`)까지 `step`이 해야 한다. 안 하면 그 자리에서 멈춘다(`maxSteps`까지 헛돈다).
-- 시뮬레이션은 현실 시각(`Game.Now`)을 고정하지 않는다 — 회차마다 지금 시각이다. 현실 시각으로 계산하는 규칙(오프라인 보상·일일 초기화)은 회차마다 결과가 조금 다를 수 있으니, 그런 숫자는 `measure`로 재지 않거나 `step`이 정한 값으로 시험한다(게임 안 시간 `session.Clock`·난수는 시드대로 같다).
+- 시뮬레이션은 회차마다 상황을 불러오므로 현실 시각(`Game.Now`)이 상황을 저장한 순간에서 시작한다(2-2 `realNow`). 회차 안에서는 현실 시간이 실제로 흐르므로, 현실 시각으로 계산하는 규칙(오프라인 보상·일일 초기화)의 숫자는 `step`이 `TestClock.Shift`로 시각을 정해 옮기며 시험한다(게임 안 시간 `session.Clock`·난수는 시드대로 같다).
 - 테스트 명령·패널은 출시 빌드에 없다. 게임 기능(치트 코드 등)으로 쓰지 않는다.
 - **Unity Test Runner로 규칙 테스트를 돌릴 때**: 에디터·게임은 평소 테스트 어셈블리의 형식(`[BindTo]`·키워드·Mirror 비교 코드)을 훑지 않는다(DB 창·검증에 테스트용 형식이 섞이지 않게). Test Runner의 실행 하나가 도는 동안만 넣는다 — 그동안 테스트가 게임 세션을 만들어도 빠지지 않는다(`GameAssemblies.KeepTests`, 에디터 `TestRuns`가 실행 시작·끝에 켜고 끈다. PlayMode 테스트가 도메인을 다시 읽어도 그대로). Test Framework 패키지(`com.unity.test-framework` 1.1 이상)가 있을 때만 돈다(`GBIBLE_TEST_FRAMEWORK` — `GBible.Editor.asmdef`의 versionDefines).
 - 테스트 어셈블리에는 Mirror 비교 코드 생성 경고를 내지 않는다(일부러 다루지 못하는 형식을 담아 시험하기도 하므로). 콘솔에는 게임 코드의 경고만 나온다.

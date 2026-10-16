@@ -217,11 +217,21 @@ object original = Game.Session.Instances?.Invoke("ironSword");
 var def = (GearItem)Game.Session.Instances(owned.gear);   // owned: 판 객체(3.1의 OwnedGear). 고정 값(가격·그림)은 원본에서
 ```
 
-`Func<string, object>`이다. 인스턴스 ID를 넣으면 **원본** 객체를 준다(없으면 `null`). `GBibleRuntime`이 게임 시작 때 DB 데이터로 채운다. 세션을 직접 만든 규칙 테스트는 직접 넣는다. 원본 읽기는 규칙 함수 하나(`Rules`, AI 관례 3절)에 모아 행동·Block이 같은 길로 읽게 한다.
+`Func<string, object>`이다. 인스턴스 ID를 넣으면 **원본** 객체를 준다(없으면 `null`). `GBibleRuntime`이 게임 시작 때 DB 데이터로 채운다. 원본 읽기는 규칙 함수 하나(`Rules`, AI 관례 3절)에 모아 행동·Block이 같은 길로 읽게 한다.
+
+**한 클래스의 원본 모두: `Game.InstancesOf<T>()`** — 상점 진열·보상 후보·"모든 무기"처럼 그 클래스의 원본을 전부 훑을 때. `(id, value)` 짝을 DB 목록 차례로 준다(읽기만). `T`의 하위 클래스 원본도 들어간다.
 
 ```csharp
-var originals = new Dictionary<string, object> { ["ironSword"] = new Item { name = "철검", price = 120 } };
-session.Instances = id => originals.TryGetValue(id, out var v) ? v : null;
+foreach (var (id, weapon) in Game.InstancesOf<Weapon>())     // DB › 인스턴스 중 값이 Weapon인 것
+    if (weapon.tier <= unlockedTier) pool.Add(id);            // 후보 풀 → Game.Roll(풀, …)(30장 4-4)
+```
+
+`Game.Entries<InstanceData>()`를 걸러 쓰지 않는다(인스턴스 원본을 훑는 길은 이것 하나). ID 목록만은 `session.InstanceIds`(`Func<IEnumerable<string>>`, 런타임이 채운다).
+
+**규칙 테스트**(세션을 직접 만든다)는 `session.DefineInstance(id, 원본)`으로 원본을 넣는다 — `Instances`·`InstanceIds`를 함께 채우므로 `CopyInstance`·`InstancesOf`가 런타임처럼 돈다. `session.Instances = …`를 직접 넣으면 `InstancesOf`가 빈 목록이다.
+
+```csharp
+session.DefineInstance("ironSword", new Item { name = "철검", price = 120 });   // 정의한 차례가 InstancesOf의 차례
 ```
 
 원본은 읽기만 한다. 고치면 이후 모든 사본이 바뀌고, 에디터 플레이 중에는 DB 에셋 값까지 바뀔 수 있다.
@@ -450,7 +460,7 @@ public class Card
 
 턴 수·중첩·만료가 있는 버프는 인스턴스 사본으로 직접 리스트를 만들지 않고 DB › 상태 효과로 만든다(29장 — 지속·중첩·스탯 보정·턴마다의 효과·Undo가 들어 있다). `Game.ApplyStatus(hero, GameIds.Status.Rage)`.
 
-행동에서 DB 원본(인스턴스)을 가리킬 때는 객체가 아니라 `[DataRef]` 글자 ID로 둔다. 원본은 플레이어 데이터가 아니라서 참조 필드로 넣으면 "찾을 수 없습니다"로 실패한다([02-Actions-Undo.md](02-Actions-Undo.md) 2.2).
+행동에서 DB 원본(인스턴스)을 가리킬 때는 객체가 아니라 `[DataRef]` 글자 ID로 둔다. 원본은 플레이어 데이터가 아니라서 참조 필드로 넣으면 "대상이 이미 없습니다"(`momoi.fail.targetGone`)로 실패한다([02-Actions-Undo.md](02-Actions-Undo.md) 2.2).
 
 ---
 
@@ -459,6 +469,7 @@ public class Card
 | 증상 | 원인과 해결 |
 |---|---|
 | 원본 값이 게임 중에 바뀜 | `session.Instances`로 받은 원본을 고쳤다. 원본은 읽기만 하고, 바뀌는 값은 판 객체에 둔다. |
+| 규칙 테스트에서 `InstancesOf`가 비어 있음 | `session.Instances = …`로 직접 넣었다. `session.DefineInstance(id, 원본)`으로 넣는다(2.7). |
 | 판 데이터에 이름·가격·그림이 복사돼 개발자가 고친 값이 진행 중인 판에 안 먹음 | 원본을 통째로 판에 넣었다. 판 객체에는 원본 ID + 바뀌는 값만 두고 고정 값은 원본에서 읽는다(맨 위 '꼭 지킬 것'). |
 | 불러온 뒤 아이콘이 비어 있음·저장할 때 "저장할 수 없는 참조입니다" 경고 | 스프라이트 필드가 있는 원본을 사본으로 판 데이터에 넣었다. 에셋 참조는 원본에만 두고 판 객체에는 원본 ID를 둔다(01장 8절). |
 | 같은 아이템 두 개가 서로 값을 공유 | 같은 사본을 두 곳에 넣었다. 넣을 때마다 `CopyInstance`를 따로 부른다. |

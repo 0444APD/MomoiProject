@@ -758,6 +758,7 @@ static void WatchDaily(GameSession session, DailyMissionData mission)
 - 날짜는 `DateTime.Now`가 아니라 `Game.Day`로 본다. 행동 안에서는 그 행동이 시작한 시각 하나라서 Undo·다시 돌리기·멀티플레이에서 같은 날로 읽힌다. 시간대는 `SessionOptions.TimeZone`(비우면 이 컴퓨터, 07장).
 - 화면의 "오늘 남은 횟수"도 같은 비교로 읽는다: `log.day != Game.Day(4)`이면 오늘은 아직 0번이다(행동 밖의 `Game.Day`는 지금 시각).
 - 주마다 초기화는 `Game.Week(초기화 시각)`로 같은 모양이다.
+- 날마다 임무 N개를 뽑아 진행을 세고 다 하면 받는 **일일 임무**는 새 DB 종류 없이 인스턴스 + 가중치 표 + 프로필로 된다(07장 4.11). 이 절은 "발동마다 결과, 하루 N번까지"인 미션이다.
 - `Permanent()` 없이 실행하면, 이벤트를 쏜 행동 안에서 발동한 미션의 횟수·보상은 그 행동의 Undo 단위가 된다(Undo하면 함께 돌아간다).
 
 ### 4-2. 단계 퀘스트(`List<TriggerRule>`)
@@ -810,13 +811,20 @@ session.Triggers.Register("bonus", when, repeat: true, fire: m => session.Trigge
 
 값을 직접 바꾼 뒤 조건 잎을 검사하게 하려면 `session.Triggers.Flush()`를 부른다(행동으로 바꾸면 자동).
 
-규칙이 `Game.Entry`·`Game.Entries`로 DB 항목을 읽으면 테스트가 항목을 넣어 준다(`ScriptableObject.CreateInstance<QuestData>()`로 만들고 칸을 채운다 — ID는 에디터 도구만 붙이므로 사전의 키로 찾게 한다):
+규칙이 `Game.Entry`·`Game.Entries`로 DB 항목을 읽으면 테스트가 항목을 넣어 준다. 항목은 `ScriptableObject.CreateInstance<QuestData>()`로 만들고 **`EditorAssignId("ID")`로 ID를 붙인 뒤** 칸을 채운다 — ID는 에디터 도구만 붙이는데(`#if UNITY_EDITOR`), 프로젝트 규칙 테스트(EditMode, 어셈블리 `MomoiProject.Tests`는 `GBible.Unity`를 참조한다)는 에디터에서 도므로 이것을 쓸 수 있다. 그러면 3-1처럼 `quest.Id`를 읽는 코드가 테스트에서도 그대로 돈다.
 
 ```csharp
-var quests = new Dictionary<string, object> { ["quest.first"] = firstQuest };
-session.Entries = id => id != null && quests.TryGetValue(id, out var q) ? q : null;
-session.EntriesOfType = type => quests.Values.Where(type.IsInstanceOfType);
+var first = ScriptableObject.CreateInstance<QuestData>();
+first.EditorAssignId("quest.first");
+first.trigger = when;
+var quests = new List<QuestData> { first };
+session.Entries = id => quests.FirstOrDefault(q => q.Id == id);
+session.EntriesOfType = type => quests.Where(type.IsInstanceOfType);
+QuestRules.Register(session, quests);
+// 테스트 끝(finally)에서 Object.DestroyImmediate(first)
 ```
+
+인스턴스 원본(DB › 인스턴스)은 이렇게 넣지 않고 `session.DefineInstance(id, 원본)`(04장 2.7).
 
 ---
 

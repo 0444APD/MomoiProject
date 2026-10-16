@@ -922,8 +922,9 @@ public class RerollReward : GameAction
     }
 }
 
-// Client 시작 코드(Bootstrap.Started)에서 한 번: 기본 고르기 창이 '가중치 표에서 고르기'로 만든 선택에 '다시 뽑기' 버튼을 보인다(null이면 숨김)
-GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;
+// Client 시작 코드(Bootstrap.Started)에서 한 번: 기본 고르기 창은 행동을 돌려주는 모든 선택에 '다시 뽑기' 버튼을 보인다(null이면 숨김)
+// — 표로 만든 선택(table이 있다)만 고른다. 코드로 Ask한 선택에도 돌려주면 RerollChoice가 false라 누를 때 실패한다(29장 4-10b)
+GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 && !string.IsNullOrEmpty(choice.table) ? new RerollReward { choice = choice.id } : null;
 ```
 
 - 고르기 창을 직접 만들었으면 버튼은 `GameScreens.Do(() => new RerollReward { choice = Game.Choice.id }, whileChoosing: true)`로 보낸다. 보통의 `OnClick`·`GameScreens.Do`는 선택을 기다리는 동안 행동을 보내지 않는다(29장 4-10b).

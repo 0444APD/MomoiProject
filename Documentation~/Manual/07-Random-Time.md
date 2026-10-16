@@ -232,6 +232,7 @@ public static class ClockSetup
 - 비우면 싱글 게임은 플레이어마다 자기 지역 시각으로 날이 바뀐다(싱글은 이대로 둔다). 멀티플레이(세션이 서버·클라이언트)는 서버·클라이언트 모두 UTC로 세고(판정과 미리보기가 다른 날을 세지 않게), 처음 셀 때 타임라인에 경고를 한 번 남긴다 — 멀티는 시간대를 정한다.
 - 모든 플레이어가 같은 순간에 초기화돼야 하면(서버 이벤트·랭킹) 시간대를 정한다. 시간대 이름(`FindSystemTimeZoneById`)은 Windows·모바일이 달라서, 위처럼 고정 차이로 만든다.
 - DB › Bootstrap에 칸은 없다. `Configuring`에서, 세션을 직접 만들면 `new SessionOptions { … }`에서 정한다.
+- 개발 빌드·에디터에서는 `GBibleRuntime`이 `Configuring` 뒤에 이 시계 위로 테스트용 옮김(`TestClock.Offset` — 개발 명령 '시간 › 현실 시각 +1시간 / +1일 / 지금으로', 4.7)을 더한다(출시 빌드에서는 얹지 않는다). 규칙은 `TestClock`을 직접 읽지 않는다(`Game.Now`·`Game.Day`만).
 
 ### 2.14 게임 시계와 현실 시각 고르기
 
@@ -509,47 +510,94 @@ public static class SeedCheck
 
 ### 4.7 방치형: 오프라인 보상
 
+**정산** = 마지막으로 정산한 현실 시각부터 지금(`Game.Now`)까지의 생산을 더하고 그 시각을 지금으로 옮기는 행동 하나다. 켜 둔 동안은 1초마다, 이어 할 때·끌 때 한 번씩 같은 행동을 부른다. 쿠키를 쓰는 행동(사기)은 규칙 함수 `IdleRules.Settle`을 먼저 부른다.
+
+**에디터**(DB 항목은 AI가 반영 스크립트로 — 관례 15절)
+
+- DB › 플레이어 데이터 `run`(세션 구역 = 환생 한 주기): 아래 `RunState`. 마지막 정산 시각도 판 데이터라 판 저장에 쿠키와 함께 남는다(따로 저장되면 어긋난다).
+- DB › 밸런싱 값 `offlineMaxHours` `8`(꺼 둔 시간 상한(시간)) · `onlineGapSeconds` `5`(켜 둔 것으로 볼 정산 간격(초) — 넘는 몫은 꺼 둔 시간).
+- DB › 시작 파일 › Bootstrap: 시작할 때 이어 하기 켬, 새 판 행동 `StartRun`, 판 저장 'N초마다 저장', **프로필도 행동마다 저장은 끔**(켜면 1초마다 정산이 매초 프로필을 쓴다 — N초마다 판 저장이 바뀐 프로필도 함께 저장한다, 06장 2.2).
+
 ```csharp
+// Assets/MomoiProject/Code/Rules/Idle.cs
 using System;
 using GBible;
-using UnityEngine;
+using GBible.Ids;
 
 [Serializable]
-public class IdleProfile
+public class RunState                              // 플레이어 데이터 run(세션 구역)
 {
     public double cookies;
     public double perSecond = 1;
-    public DateTime lastSeen;                 // 마지막으로 정산한 현실 시각(UTC)
+    public DateTime lastSettled;                   // 마지막으로 정산한 현실 시각(UTC)
+}
+
+[Serializable, BlockInfo("새 판")]
+public class StartRun : GameAction                 // DB › Bootstrap '새 판 행동'
+{
+    protected override void Run()
+    {
+        Game.Data().Run.lastSettled = Game.Now;    // 새 판은 지금부터 센다(꺼 둔 시간이 없다)
+        // … 시작 건물·화폐
+    }
 }
 
 [Serializable, BlockInfo("정산")]
 public class Settle : GameAction
 {
-    public const double MaxSeconds = 8 * 3600;   // 오프라인은 최대 8시간까지
-
-    protected override void Run()
-    {
-        var profile = Game.All<IdleProfile>()[0];
-        var now = Game.Now;
-        if (profile.lastSeen == default) { profile.lastSeen = now; return; }        // 처음 켠 날: 시각만
-        var seconds = Math.Max(0, Math.Min((now - profile.lastSeen).TotalSeconds, MaxSeconds));   // 시계를 뒤로 돌렸으면 0
-        profile.cookies += seconds * profile.perSecond;
-        profile.lastSeen = now;
-    }
+    protected override void Run() => IdleRules.Settle(Game);
 }
 
-public static class IdleBoot
+public static class IdleRules
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook()
+    public static void Settle(GameApi game)
     {
-        GBibleRuntime.Started += session => session.Do(new Settle());    // 켤 때: 꺼 둔 시간만큼
-        GBibleRuntime.Stopping += session => session.Do(new Settle());   // 끌 때: 저장 전에 마지막 시각을 남긴다
+        var run = game.Data().Run;
+        var now = game.Now;
+        if (run.lastSettled == default) { run.lastSettled = now; return; }          // 시각이 비었으면 시각만(5절 마지막 줄)
+        var elapsed = Math.Max(0, (now - run.lastSettled).TotalSeconds);           // 시계를 뒤로 돌렸으면 0
+        var online = Math.Min(elapsed, game.Balance(GameIds.Balance.OnlineGapSeconds));                          // 켜 둔 몫
+        var offline = Math.Min(elapsed - online, game.Balance(GameIds.Balance.OfflineMaxHours) * 3600);           // 넘는 몫 = 꺼 둔 시간(상한까지)
+        run.cookies += (online + offline) * run.perSecond;
+        run.lastSettled = now;
+    }
+
+    // 켜 둔 동안 1초마다 정산(Bootstrap.RegisterRules에서 부른다 — 33장 5-1의 등록 함수 모양)
+    public static void Register(GameSession session)
+    {
+        var wait = 0.0;                            // 세션마다 따로(규칙에 static 상태를 두지 않는다)
+        session.Ticked += dt =>
+        {
+            wait += dt;
+            if (wait < 1) return;                  // 틱마다 행동하지 않는다(33장 5-1)
+            wait = 0;
+            session.Do(new Settle());
+        };
     }
 }
 ```
 
-`IdleProfile`은 메타 구역 플레이어 데이터다. 켜 둔 동안의 생산도 같은 행동을 1초마다 실행해 더한다(쿠키를 쓰는 행동은 먼저 정산한다). 강제 종료되면 `Stopping`이 오지 않으므로, 마지막으로 **저장된** 정산 시각부터 다시 센다. 진행을 자주 남기려면 DB › Bootstrap의 **프로필도 행동마다 저장**을 켠다(`06-SaveLoad.md` 2.2).
+```csharp
+// Assets/MomoiProject/Code/Client/Bootstrap.cs(시작 설정이 만든 파일)에 더한다
+static void Hook()
+{
+    GBibleRuntime.Configuring += Configure;
+    GBibleRuntime.SessionCreated += RegisterRules;
+    GBibleRuntime.Started += Started;
+    GBibleRuntime.RunLoaded += session => session.Do(new Settle());   // 이어 하기(켤 때)·판 불러오기: 꺼 둔 시간만큼
+    GBibleRuntime.Stopping += session => session.Do(new Settle());    // 끌 때: 저장 전에 마지막 시각을 남긴다
+}
+
+static void RegisterRules(GameSession session)
+{
+    IdleRules.Register(session);
+}
+```
+
+- **켤 때 정산 자리는 `RunLoaded`와 새 판 행동이다**(`Started`가 아니다). `Started`는 프로필만 불러온 뒤에 오고, '시작할 때 이어 하기'는 그 **뒤에** 판 저장을 불러온다(`RunLoaded`) — 저장이 없으면 새 판 행동을 돌린다(20장 3절). `Started`에서 정산하면 판이 아직 처음 값이라 시각만 적히고, 곧 불러온 판이 그것을 덮는다.
+- **켜 둔 시간과 꺼 둔 시간의 경계**: 켜 둔 동안은 정산이 1초마다 돌아 간격이 `onlineGapSeconds`를 넘지 않는다. 넘는 몫은 그 사이 게임이 돌지 않은 시간(꺼 둠·일시정지·백그라운드에서 멈춤 — Run In Background를 끄면 창이 뒤에 있을 때 프레임이 멈춘다)이라 꺼 둔 시간으로 센다. 꺼 둔 몫에 다른 배율(예: 50%)을 쓰는 게임이면 그 배율도 밸런싱 값으로 두고 `offline`에 곱한다.
+- 강제 종료되면 `Stopping`이 오지 않는다. 다음에 켜면 마지막으로 **저장된** 판(쿠키와 정산 시각이 함께 저장됨)부터 다시 세므로 두 번 더하지 않는다.
+- **시험**: 플레이 중 개발 명령 **시간 › 현실 시각 +1시간**(테스트 패널·모니터 명령 탭, 22장)을 누르면 다음 정산이 한 시간을 꺼 둔 시간으로 더한다. **+1일**이면 상한에서 잘리는지 본다. **현실 시각 지금으로**는 되돌린다(뒤로 간 시간은 0). 옮긴 시각은 개발 빌드·에디터에서만 `Game.Now`에 얹히고 플레이를 멈추면 돌아온다(`TestClock`, 38장). 테스트 상황은 저장한 순간의 현실 시각을 남기고 불러올 때 그 시각으로 맞추므로, 며칠 뒤 열어도 오프라인 보상이 끼지 않는다. 규칙 테스트는 4.9처럼 `RealClock`을 정해 두고 옮긴다.
 
 ### 4.8 일일·주간 초기화(새벽 4시)
 
@@ -648,6 +696,88 @@ public static class RunStarter
 - 일일 도전의 점수·완료는 프로필(메타 구역)에 날짜 번호와 함께 남긴다. 판 데이터는 새 판마다 지워진다.
 - `NewRun`은 행동 안에서 부를 수 없다. 버튼·화면 코드에서 부르고, 판 내용은 그 뒤 행동으로 만든다(06장 2.3).
 
+### 4.11 일일 임무: 날마다 N개 뽑기 · 진행 · 받기
+
+새 기능 없이 있는 부품으로 조립한다: 날짜 번호(`Game.Day`, 2.12) + 가중치 표로 N개 뽑기(`Game.Roll`, 30장) + 프로필의 오늘 진행 + 받기 행동. 임무 하나하나(무엇을 몇 번 · 보상)는 원본(DB › 인스턴스, 04장)이라 개발자가 DB에서 고친다.
+
+**에디터**: 원본 클래스 `DailyQuest`의 인스턴스들 · DB › 가중치 표 `dailyQuests`(줄 = 임무 인스턴스, 무게) · 밸런싱 값 `dailyCount` `3`(하루 임무 수) · `dailyResetHour` `4`(바뀌는 시각(시)).
+
+```csharp
+// Assets/MomoiProject/Code/Rules/Daily.cs
+using System;
+using System.Collections.Generic;
+using GBible;
+using GBible.Ids;
+
+[KeywordGroup("임무 목표")]
+public static class QuestGoal { public const string Kill = "kill"; public const string Craft = "craft"; }
+
+[Serializable]
+public class DailyQuest                                        // 원본(DB › 인스턴스)
+{
+    [Keyword(typeof(QuestGoal))] public string goal = QuestGoal.Kill;
+    public int count = 10;
+    public int reward = 50;
+}
+
+[Serializable]
+public class DailyEntry                                        // 오늘 뽑힌 임무 하나(프로필)
+{
+    public string id;
+    [DataRef(typeof(DailyQuest))] public string quest;
+    public int done;
+    public bool claimed;
+}
+
+// Profile(메타 구역)에: public long dailyDay = -1; public List<DailyEntry> daily = new List<DailyEntry>(); public int gems;
+
+public static class DailyRules
+{
+    // 날이 바뀌었으면 오늘 임무를 새로 뽑는다. 행동 안에서(켤 때 · 진행 · 받기 앞).
+    public static void Refresh(GameApi game)
+    {
+        var p = game.Data().Profile;
+        var today = game.Day((int)game.Balance(GameIds.Balance.DailyResetHour));
+        if (p.dailyDay == today) return;
+        p.dailyDay = today;
+        p.daily.Clear();
+        foreach (var quest in game.Roll(GameIds.WeightTable.DailyQuests, (int)game.Balance(GameIds.Balance.DailyCount), unique: true))
+            p.daily.Add(new DailyEntry { id = game.NewId("daily"), quest = quest });
+    }
+
+    public static void Progress(GameApi game, string goal, int amount = 1)
+    {
+        Refresh(game);
+        foreach (var entry in game.Data().Profile.daily)
+            if (((DailyQuest)game.Session.Instances(entry.quest)).goal == goal) entry.done += amount;
+    }
+
+    // Bootstrap.RegisterRules에서: 진행을 세는 이벤트를 받는다(그 이벤트를 쏜 행동 안이라 같이 Undo·저장된다)
+    public static void Register(GameSession session) =>
+        session.Events.Subscribe<EnemyKilled>(e => Progress(session.Game, QuestGoal.Kill));   // EnemyKilled: 프로젝트 이벤트
+}
+
+[Serializable, BlockInfo("오늘 임무 확인")]
+public class RefreshDaily : GameAction { protected override void Run() => DailyRules.Refresh(Game); }
+
+[Serializable, BlockInfo("일일 임무 받기")]
+public class ClaimDaily : GameAction
+{
+    public DailyEntry entry;                                   // 참조 필드(02장 2.2)
+    protected override void Run()
+    {
+        var quest = (DailyQuest)Game.Session.Instances(entry.quest);
+        if (entry.claimed || entry.done < quest.count) throw Game.Fail("fail.dailyNotDone", "아직 끝나지 않은 임무입니다.");
+        entry.claimed = true;
+        Game.Data().Profile.gems += quest.reward;
+    }
+}
+```
+
+- 켤 때(`Started` — 프로필은 이때 이미 불러와 있다)와 임무 화면을 열 때 `RefreshDaily`를 보낸다. 켜 둔 채 초기화 시각을 넘기면 다음 진행·확인에서 새로 뽑힌다. 날이 바뀌어 지난 임무가 사라진 뒤 그 칸의 받기를 누르면 "대상이 이미 없습니다"(02장 2.2)다.
+- 뽑기는 가중치 표라 "해금한 뒤에만 나오는 임무"는 표 줄의 조건으로, 임무 수를 늘리는 기믹은 밸런싱 값으로 둔다. 같은 날에는 다시 뽑지 않으므로 뽑은 목록이 프로필에 남는다(진행·받음과 함께 저장).
+- 시험: 개발 명령 **시간 › 현실 시각 +1일**(4.7)로 다음 날 임무가 새로 뽑히는지 본다. 규칙 테스트는 4.9처럼 `RealClock`을 옮긴다.
+
 ---
 
 ## 5. 주의할 점 · 자주 하는 실수
@@ -674,3 +804,4 @@ public static class RunStarter
 | `Game.Now`가 옛 시각 | 같은 행동 객체를 두 번 `Do`했다(실패한 것을 다시 `Do`한 것 포함). `utc`는 이미 값이 있으면 그대로 쓴다. `Do`할 때마다 `new`로 만든다(미리보기가 찍은 시각은 지워지므로 괜찮다). |
 | 행동 안에서 `Game.Now`가 흐르지 않음 | 의도된 동작이다. 행동 하나는 한 순간이다. |
 | 처음 켰더니 오프라인 보상이 엄청남 | `DateTime` 필드의 처음 값(`default`, 0001년)부터 쟀다. 처음이면 시각만 적는다(4.7). |
+| 이어 하기로 켰는데 오프라인 보상이 한 박자 늦게·엉뚱하게 들어옴 | 켤 때 정산을 `GBibleRuntime.Started`에 걸었다. 판은 `Started` 뒤에 불러온다 — `RunLoaded`와 새 판 행동에서 한다(4.7). |

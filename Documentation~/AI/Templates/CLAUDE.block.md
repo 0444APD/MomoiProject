@@ -17,13 +17,13 @@
 - **개발자가 바꿀 것은 에디터에**: 숫자는 밸런싱 값·DB 칸·인스턴스 필드, 참조는 드롭다운(`[DataRef]`). 코드에 숫자를 적지 않는다(관례 18절).
 - **테스트할 수 있게**: 테스트 씬·테스트 명령·테스트 상황을 함께 만든다(관례 19절).
 - **멀티**(명세서 0절이 있음): `{{GBIBLE}}/Documentation~/AI/Multiplayer.md`를 읽고 4블록 규칙대로 — 판정은 행동 안·플레이어별 칸·숨길 것은 Owner 키·서버 규칙(Validate)·연출은 SubscribeAfterAction·실시간 움직임은 NetTransformSync(관례 20절, 매뉴얼 40장).
-- 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity API를 쓰지 않는다. 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
+- 규칙(`Assets/MomoiProject/Code/Rules`)은 Unity의 씬·실행 API(MonoBehaviour·GameObject·Time·Input·Physics)를 쓰지 않는다(데이터용 Unity 형식 — DB 종류·Sprite 칸 — 은 된다, 관례 1절). 화면·입력·연출은 `Assets/MomoiProject/Code/Client`, UI는 `Assets/MomoiProject/UI`(UXML·USS) + DB › 화면.
 - **화면은 `{{GBIBLE}}/Documentation~/AI/UiGuide.md`대로**(모든 프로젝트 공통): 문법(클래스로만 모양 · 텍스트 키 · 창은 가운데 감싸개 · 월드 장면과 UI 나누기) · 레이아웃(1920×1080, 위 띠·아래 띠 자리, 모바일처럼 크지 않게) · 디자인(차가운 검정 + 종이 흰색, 매트·플랫 — 그림자·빛남 없음, 패널 면은 단색 + 아주 옅은 조각, 패널 모양 4가지(직각·약간 둥근·모서리 자름·알약)와 선·둥글기·각의 변칙, 패널 2중첩까지, 기울인 패널·물건 소품 없음, 뒷배경 3가지 — DB › 화면 '뒷배경' 칸, 블러는 알림만, 장면 위 UI(HUD · 상태)는 묶는 패널 없이 여백으로 — 스프라이트를 품은 요소만 패널 · 게이지는 KitGauge(둥근 모양 없음) · 홀로 놓이는 글은 강조 숫자(글꼴 외곽선 · 그림자)) · UI 키트(`{{GBIBLE}}/Documentation~/AI/Templates/UI/` — 키트 USS · KitPanel 등 코드 · 견본 화면 — 프리팹 아님)를 복사해 짠다. 개발자는 화면마다 전체 레이아웃 참고 그림만 주고 세부 배치는 묻지 않는다.
 - 있는 기능부터 찾는다(Reference.md). 새로 만들기 전에 매뉴얼 `00-Index.md`의 "상황별로 찾기".
 - 상태 효과·패시브 효과·액티브 효과는 선택 요소다: 쓰면 템플릿(`{{GBIBLE}}/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 들이고, 칸이 모자라면 그 클래스에 더한다(프로젝트 변경 — 묻지 않고 보고만).
 - 개발자에게 보이는 이름(DB·칸·Block·메뉴·밸런싱 값)은 `{{GBIBLE}}/Documentation~/AI/NamingGuide.md`대로 짓는다 — '바로잡은 이름' 표를 먼저 본다. 밸런싱 값은 표시 이름·메모·입력 칸 주석·묶음을 함께. 개발자가 이름을 바로잡으면 그 표에 더한다.
 - 기믹(효과 문장)은 `{{GBIBLE}}/Documentation~/AI/GimmickCatalog.md`의 갈래로 쪼개 만든다. 조각이 놓이는 메인 룰은 그 문서 1절의 모양으로.
-- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 돈다)나 CSV로 만든다. 새 항목은 저절로 적용되고, 이미 있는 항목을 고치거나 지우거나 ID를 바꾼 것만 '적용 전'으로 남아 개발자가 Ctrl+S로 적용한다. 새 항목의 `GameIds` 상수는 반영 스크립트가 돈 뒤 다시 컴파일돼야 생긴다 — 그 상수를 쓰는 코드는 그다음에 쓴다(관례 15절).
+- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 돈다)나 CSV로 만든다. 새 항목은 저절로 적용되고, 이미 있는 항목을 고치거나 지우거나 ID를 바꾼 것만 '적용 전'으로 남아 개발자가 Ctrl+S로 적용한다. 새 항목의 `GameIds` 상수는 반영 스크립트가 돈 뒤 다시 컴파일돼야 생긴다 — 한 응답 안에서 두 박자로: 형식·반영 스크립트 → `RunTests.request`로 새로 읽고 상수가 생길 때까지 기다림 → 상수를 쓰는 코드(관례 15절). Unity가 닫혀 있으면 첫 박자에서 멈추고 열어 달라고 한다.
 - 응답을 끝낼 때 훅(`.claude/hooks/compile-check.ps1`)이 프로젝트 코드를 컴파일한다. 오류가 나오면 고친 뒤 끝낸다.
 - Unity 상태는 파일로 읽는다: DB 검증·'적용 전' 변경은 `Logs/MomoiProject/DbStatus.txt`, Unity 로그(컴파일 경고·DB 반영 스크립트 결과)는 `Logs/Editor.log`. 규칙 테스트는 `Logs/MomoiProject/RunTests.request`를 만들면 Unity가 돌려 `Logs/MomoiProject/TestResults.txt`에 쓴다(Unity를 연 채로 배치 모드는 쓰지 않는다).
 - 답은 진행 매뉴얼 13절 양식: 진행 답은 제목(답 · 진행한 것 · 이슈·버그 한 줄씩 · 질문 — `Q번호.` + 추천·이유, 표 없이 · 알릴 것 — 할 일·결정·확인 기다리는 것·단계)으로 나누고 길게 늘이지 않는다. 할 말이 없는 제목은 통째로 뺀다("없습니다"도 쓰지 않음). 개발자의 질문·요청에는 그에 맞게 답한다.

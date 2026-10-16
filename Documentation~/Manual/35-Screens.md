@@ -124,7 +124,14 @@ protected override void Tick(float deltaTime)
 - `List<T>("container", Item("CardItem"), () => 목록, (칸, 항목) => …, 키…)`: 목록 칸(2-6). 닫으면 저절로 정리된다.
 - `Item("이름")`: 목록 칸 UXML을 **파일 이름**(확장자 없이)으로 찾는다 — DB › 화면의 '목록 칸 UXML', 또는 화면 UXML에 `<ui:Template name="CardItem" src="../Items/CardItem.uxml" />`로 적은 것(`name` 속성이 아니라 `src`의 파일 이름). 없으면 예외 "[MomoiProject] 화면 'shop'에 목록 칸 UXML 'GoodsItem'이 없습니다(DB › 화면 › 목록 칸 UXML).".
 - `Own(구독)`: 닫을 때 `Dispose`할 것(이벤트 구독·`GameView.Redraw` …).
-- `Watch`: 다시 그릴 키. 기본(null)은 binding-path에 쓴 키들(그것도 없으면 어느 값이 바뀌어도), 빈 배열이면 어느 값이 바뀌어도. `new[] { GameIds.PlayerData.Run.Id }`처럼 정한다.
+- `Watch`: 다시 그릴 플레이어 데이터 키. 기본(null)은 binding-path에 쓴 키들(그것도 없으면 어느 값이 바뀌어도), 빈 배열이면 어느 값이 바뀌어도. 정하면 binding-path 칸도 이 키가 바뀔 때만 다시 채운다. 바탕은 `protected internal virtual`이고, 프로젝트 화면 코드(다른 어셈블리 `MomoiProject.Client`)에서는 **`protected override`**로 덮는다 — `public override`·`protected internal override`로 쓰면 CS0507(접근 한정자를 바꿀 수 없음). `WaitForPresentation`·`OnOpen`·`Draw`·`Tick`·`OnClose`도 같다.
+
+```csharp
+protected override string[] Watch => new[] { GameIds.PlayerData.Run.Id };
+```
+
+- **다시 그리기는 키 단위다.** 그 키 안의 어느 값이 바뀌어도 그 키를 보는 화면 전체(binding-path · `Draw` · 키를 준 목록의 bind)가 그 프레임 끝에 다시 그려진다. 실시간 게임에서 판정 보고 행동이 틱마다 바꾸는 데이터(적 목록·hp)를 HUD가 보는 키(레벨·경험치·골드의 `run`)에 함께 두면 HUD가 틱마다(초당 30번) 다시 그려진다. 틱마다 바뀌는 것은 다른 플레이어 데이터 키에 두고(33장 5-1의 `arena`), HUD의 `Watch`·binding-path·목록 키는 느리게 바뀌는 키만 본다(33장 5-7). 시간처럼 매 프레임 바뀌는 칸은 `Draw`가 아니라 `Tick`에서 게임 시계를 읽어 그린다.
+- **시간 서식(`03:25`)은 binding-path로 안 된다.** binding-path의 숫자는 `0.##`이고 텍스트 틀의 `{t, time}`은 `DateTime`만 받는다(23장 3.2). 초를 분:초로 보이려면 화면 코드(`Tick`)에서 나눠 텍스트 키에 넣는다: `_time.text = Texts.Get("hud.time", ("m", (int)(t / 60)), ("s", (int)(t % 60)));`(텍스트 `hud.time` = `{m, number, 00}:{s, number, 00}`, `t` = 게임 시계에서 잰 초).
 - 다른 DB 항목(액티브 효과·결과)에 붙는 `[BindTo]`와 같은 어트리뷰트다. 화면에 잇는 클래스는 `GameScreen`을 상속하고 매개변수 없는 생성자가 있어야 한다(아니면 게임이 켜질 때 경고하고 코드 없는 화면으로 연다).
 
 ### 2-4. 입력 → 행동
@@ -142,7 +149,7 @@ protected override void Tick(float deltaTime)
 
 | ID (`GameScreens.…`) | 층 · 뒤로 | 하는 일 | 여는 법 |
 |---|---|---|---|
-| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글·후보 버튼. 후보 버튼 안에 텍스트 `<후보 id>.desc`가 있으면 설명 글(`.momoi-option__desc`). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. `GameScreens.Reroll`을 정하면 표로 만든 선택에 '다시 뽑기'(29장 4-10b). 틀린 답(답하기 실패)은 '실패를 알림으로'를 따른다(켜면 알림, 끄면 경고 로그) | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로'). 연 프레임에 바로 그린다(빈 창이 한 프레임 보이지 않는다) |
+| `Choice` (`momoi.choice`) | 팝업 · 닫히지 않음 · 시간 멈춤('고르는 동안 게임 시간 멈춤'을 켰을 때) | 지금 기다리는 선택(`Game.Choice`)의 안내 글(텍스트 키면 번역)·후보 버튼. 후보 버튼 안에 설명 글(`.momoi-option__desc` — 후보의 `detail`, 비면 텍스트 `<후보 id>.desc`, 둘 다 없으면 없음). 하나만 고르면 누르는 즉시 답하고, 여럿이면 고른 뒤 확인. 최소 0이면 건너뛰기. `GameScreens.Reroll`이 그 선택에 행동을 돌려주면 '다시 뽑기'(표로 만든 선택이든 코드 풀이든 — 29장 4-10b). 틀린 답(답하기 실패)은 '실패를 알림으로'를 따른다(켜면 알림, 끄면 경고 로그) | **저절로**: 선택 대기가 생기면 열리고 없어지면 닫힌다(DB › 화면 설정 '고르기 창 저절로'). 연 프레임에 바로 그린다(빈 창이 한 프레임 보이지 않는다) |
 | `Confirmation` (`momoi.confirm`) | 팝업 · 아니오 | 글 + 예/아니오 | `GameScreens.Confirm(글, 예, 아니오)` |
 | `Settings` (`momoi.settings`) | 창 · 닫기 · **UI 배경** | **나눈 화면**(`ScreenUi.Split` — 왼쪽 = 분류 목록, 비운 분류는 '일반' · 오른쪽 = 고른 분류의 항목). 켜기/끄기 → 토글, 숫자 → 슬라이더(0~1이면 %), 선택지 → 드롭다운(언어·해상도는 자동 목록), 글 → 입력칸. 바꾸면 바로 `GameSettings.Set`(저장·적용). 슬라이더는 끄는 동안 적용만 하고(`Set(id, 값, save: false)`) 놓을 때·포커스를 잃을 때·창을 닫을 때 `settings.json`에 쓴다(`GameSettings.Flush()`). '기본값으로'(확인 후 `ResetAll`) | `GameScreens.Open(GameScreens.Settings)` |
 | `Slots` (`momoi.slots`) | 창 · 닫기 · **UI 배경** | **나눈 화면** — 왼쪽 = 세이브 슬롯 목록(이름 + 요약 · 지금 슬롯 표시, 처음 고른 줄은 지금 슬롯) · 오른쪽 = 고른 슬롯의 요약(`GBibleRuntime.SlotSummary`) · 플레이 시간(지금 슬롯은 저장 뒤 흐른 시간까지) · 저장한 때(`yyyy-MM-dd HH:mm`). '이 슬롯으로' → `UseSlot` 후 `picked`. '지우기'(확인 후 — 지금 슬롯 · 빈 슬롯은 없음) | `GameScreens.Open(GameScreens.Slots, new SlotsRequest { count = 3, picked = … })` |
@@ -151,7 +158,7 @@ protected override void Tick(float deltaTime)
 
 - 모양은 테마 USS의 변수(2-7)와 클래스로 바꾼다: `.momoi-panel`(가운데 판) · `.momoi-title` · `.momoi-hint` · `.momoi-section` · `.momoi-message` · `.momoi-row` · `.momoi-button` · `.momoi-button--primary` · `.momoi-options` · `.momoi-option` · `.momoi-option--selected` · `.momoi-option__desc` · `.momoi-setting` · `.momoi-value` · `.momoi-toast` · `.momoi-backdrop`(`--plain` · `--blur` · `--ui`). 화면마다 판에 `.momoi-choice` · `.momoi-confirm` · `.momoi-settings` · `.momoi-slots` · `.momoi-pause`가 붙는다(설정 · 세이브 슬롯은 종이 안판에).
 - **나눈 화면**(설정 · 세이브 슬롯, `ScreenUi.Split` — UiGuide 2-3 · 키트 견본 `SplitScreen`의 짜임): `.momoi-split`(뿌리) · `-head` · `-home` · `-title`(왼쪽 위 제목) · `-close`(오른쪽 위 닫기) · `-nav`(왼쪽 목록) · `.momoi-nav-item`(`--on` 고른 줄 · `--current` 지금 슬롯) · `-dot` · `-text` · `-sub` · `.momoi-split-frame`(검정 틀) · `-frame-head` · `-mark` · `-frame-title` · `-rule`(선 포인트) · `-count` · `-inner`(종이 안판) · `-foot`(버튼 줄) · `.momoi-button--line`(틀 위 테 버튼) · `--light`(틀 위 흰 버튼) · `.momoi-slot-summary` · `.momoi-slot-fact`(`-name` · `-value`). 기본 화면은 프로젝트의 키트 코드(KitPanel)를 쓰지 않아 면은 단색이다. 프로젝트 화면에서 같은 짜임이 필요하면 `ScreenUi.Split` · `NavItem`을 써도 된다.
-- **고르기 창의 설명 글**: 후보마다 텍스트 표에 `<후보 id>.desc`를 넣으면 버튼 안 이름 아래에 보인다(레벨업 특성 "불꽃 칼날" + "공격에 화상 1"). 키가 없으면 이름만 보인다. 이름은 선택 대기의 보일 글이다(비우면 `<id>.name`, 29장).
+- **고르기 창의 설명 글**: 후보마다 텍스트 표에 `<후보 id>.desc`를 넣으면 버튼 안 이름 아래에 보인다(레벨업 특성 "불꽃 칼날" + "공격에 화상 1"). 같은 후보의 설명이 때마다 달라야 하면(무기 레벨마다) 후보의 `detail`에 그 키를 넣는다(`ChoiceCandidate.detail`, 29장 4-11 — `<id>.desc`보다 먼저). 둘 다 없으면 이름만 보인다. 이름은 선택 대기의 보일 글이다(비우면 `<id>.name`, 29장).
 - **고르는 동안 게임 시간 멈춤**(DB › 화면 설정, 기본 끔): 켜면 기본 고르기 창이 떠 있는 동안 `GameTime.Pause`로 게임 시간을 멈춘다. 실시간 게임의 레벨업 선택에서 켠다(고르는 동안 적이 움직이지 않는다). `Time.timeScale`이라 시간 예약·초 지속·고정 틱과 함께 **연출도 멈춘다** → 턴제는 끈다. 화면 코드의 `Tick`(실제 시간)은 계속 돈다.
 - **바꾸기**: 같은 ID로 DB › 화면 항목을 만들면 그 항목이 쓰인다. `[BindTo("momoi.settings")]` 클래스가 없으면 기본 코드가 그 UXML 위에 그린다(USS만 바꾸고 싶을 때). 통째로 바꾸려면 `[BindTo]`로 코드도 잇는다.
 - **고르기 창을 바꿨을 때 '고르기 창 저절로'**: 같은 ID(`momoi.choice`)로 바꿨으면 **켜 둔다** — 저절로 여는 것이 이 ID라, 끄면 열리지 않는다. 다른 ID로 따로 만들어 직접 열 때만 끈다(켜 두면 기본 창과 둘 다 뜬다). 같은 ID의 DB 항목에서는 그 항목의 칸이 쓰인다: 층은 `팝업`, '뒤로(Esc)로 닫기'는 끈다(켜 두면 Esc로 닫혀도 선택 대기가 남아 다음 프레임에 다시 열린다), 시간 멈춤은 '고르는 동안 게임 시간 멈춤' 대신 그 항목의 '열린 동안 게임 시간 멈춤'이다.
@@ -191,7 +198,7 @@ protected override void Tick(float deltaTime)
 
 ### 3-1. 화면 준비 — `ScreenSetup.Ensure()`
 
-AI가 화면 DB 반영 스크립트 맨 앞에서 부르고, 시작 설정을 마친 프로젝트는 에디터를 열 때도 저절로 돈다(메뉴는 없다). 이미 있으면 건너뛴다:
+AI가 화면 DB 반영 스크립트 맨 앞에서 부른다(메뉴는 없다). 시작 설정을 마친 프로젝트는 에디터를 열 때(DB 정리 — 반영 스크립트를 먼저 돌린 뒤) **DB › 화면 설정 항목이 없으면** 이것을 불러 항목을 바로 저장한다('적용 전' 없이). 파일·항목이 이미 있으면 건너뛴다:
 
 | 만드는 것 | 뜻 |
 |---|---|
@@ -199,7 +206,9 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부르고, 시작 설정을 �
 | `Assets/MomoiProject/UI/PanelSettings.asset` | 1920×1080 기준 화면 맞춤 + 위 테마 |
 | `Assets/MomoiProject/UI/Theme.uss` | 프로젝트 테마(2-7의 변수). 색·크기를 여기서 고친다 |
 | `Assets/MomoiProject/UI/Screens/` · `Assets/MomoiProject/UI/Items/` | 화면 UXML·USS, 목록 칸 UXML을 둘 폴더 |
-| DB › 화면 설정 `screenSettings` | 위 Panel Settings·테마가 연결된 항목(새 항목이라 저절로 적용). 항목이 이미 있는데 Panel Settings·테마 연결만 빠졌으면 그 칸만 채운 작업본('적용 전' — 개발자가 Ctrl+S) |
+| DB › 화면 설정 `screenSettings` | 위 Panel Settings·테마가 연결된 항목. 반영 스크립트에서 새로 만들면 새 항목이라 저절로 적용, 에디터를 열 때 만들면 바로 저장. 항목이 이미 있는데 Panel Settings·테마 연결만 빠졌으면 그 칸만 채운 작업본('적용 전' — 개발자가 Ctrl+S) |
+
+- 라이브러리 `ScreenSetup.cs` 머리 주석의 "Assets/UI" · "항목을 적용 전으로 만든다"는 옛 설명이다. 자리는 `Assets/MomoiProject/UI`, 적용은 위 표대로다.
 
 ### 3-2. DB › 화면 설정(사이드바 개발 그룹 — 항목 하나, 없으면 에디터가 '화면 준비'와 같이 저절로 만든다)
 
@@ -213,6 +222,21 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부르고, 시작 설정을 �
 | `pauseWhileChoosing` | 고르는 동안 게임 시간 멈춤 | 기본 끔. 실시간 게임의 레벨업 선택에서 켠다. `Time.timeScale`이라 연출도 멈춘다 → 턴제는 끈다(2-5) |
 | `failureToast` | 실패를 알림으로 | 기본 켬 |
 | `pauseMenu` | Esc로 일시정지 메뉴 | 기본 끔 |
+
+- **AI가 이 칸을 바꿀 때**(실시간 게임의 '고르는 동안 게임 시간 멈춤' 켜기, 'Esc로 일시정지 메뉴' 켜기): 이 항목은 보통 에디터를 열 때 이미 만들어져 있다. 그래서 반영 스크립트는 새로 만들지 않고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 바꾼다 → **'적용 전'으로 남아 개발자가 Ctrl+S로 적용한다**(관례 15절). 보고의 '알릴 것'에 "DB › 화면 설정 적용(Ctrl+S)"을 적는다. 반영 스크립트는 버전마다 한 번만 도므로 "이미 켜져 있으면" 같은 검사는 필요 없다.
+
+```csharp
+[DbSeed("1")]
+static void ScreenOptions()
+{
+    ScreenSetup.Ensure();                                                   // 없으면 새 항목(작업 중인 것도 DB 목록에 보인다)
+    var settings = EditorDatabase.Instance.OfType<ScreenSettingsData>().First();
+    var work = (ScreenSettingsData)EditorDatabase.Staging.Work(settings);   // 이미 있던 항목이면 작업본(적용 전), 방금 만든 새 항목이면 그대로(저절로 적용)
+    work.pauseWhileChoosing = true;                                         // 레벨업 고르는 동안 시간 멈춤
+    work.pauseMenu = true;                                                  // Esc로 일시정지 메뉴
+    EditorDatabase.Staging.Touch();
+}
+```
 
 - 항목은 하나만 둔다(둘 이상이면 첫 항목). 검증: Panel Settings가 비면 경고, 글꼴 · 글꼴 에셋이 둘 다 비면 경고("글꼴이 비어 있습니다. 한글이 든 글꼴(TTF·OTF)이나 글꼴 에셋을 넣지 않으면 기기에 따라 한글이 빈 네모로 보입니다."), 테마 USS에 빈 칸이 있으면 오류.
 
@@ -272,10 +296,10 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부르고, 시작 설정을 �
 |---|---|
 | `Id` · `Root` · `Argument` · `Data` · `IsOpen` | 2-3 |
 | `Game` | `GBibleRuntime.Game` |
-| `virtual string[] Watch` | 다시 그릴 키(기본 null = binding-path의 키들, 빈 배열 = 아무 키나) |
-| `virtual bool WaitForPresentation` | 연출이 끝난 뒤에 그리나(기본 참) |
-| `virtual OnOpen()` · `Draw()` · `OnClose()` | 열 때 · 그릴 때 · 닫을 때 |
-| `virtual Tick(float deltaTime)` | 열려 있는 동안 매 프레임 끝. `deltaTime`은 실제 시간(초, 일시정지와 상관없이). 쿨다운 원·타이머처럼 시간에 따라 바뀌는 칸. 데이터는 바꾸지 않는다(2-3) |
+| `string[] Watch` | 다시 그릴 키(기본 null = binding-path의 키들, 빈 배열 = 아무 키나, 2-3) |
+| `bool WaitForPresentation` | 연출이 끝난 뒤에 그리나(기본 참) |
+| `OnOpen()` · `Draw()` · `OnClose()` | 열 때 · 그릴 때 · 닫을 때 |
+| `Tick(float deltaTime)` | 열려 있는 동안 매 프레임 끝. `deltaTime`은 실제 시간(초, 일시정지와 상관없이). 쿨다운 원·타이머처럼 시간에 따라 바뀌는 칸. 데이터는 바꾸지 않는다(2-3) |
 | `Close()` | 이 화면 닫기 |
 | `T Q<T>(name)` · `VisualElement Q(name)` | 이름으로 찾기(없으면 예외) |
 | `OnClick(name 또는 Button, Func<GameAction>)` | 버튼 → 행동 |
@@ -283,6 +307,8 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부르고, 시작 설정을 �
 | `ElementList<T> List<T>(container, item, items, bind, keys…)` | 목록 칸 |
 | `VisualTreeAsset Item(name)` | 목록 칸 UXML 찾기 |
 | `T Own<T>(T disposable)` | 닫을 때 정리 |
+
+`Watch` · `WaitForPresentation` · `OnOpen` · `Draw` · `Tick` · `OnClose`는 `protected internal virtual`이다. 프로젝트 화면 코드는 `protected override`로 덮는다(2-3 — 다른 어셈블리라 `public`·`protected internal`로 쓰면 CS0507).
 
 ### 4-3. `ElementList<TItem>`
 
@@ -533,9 +559,11 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 | 고르기 창이 두 개 뜬다(프로젝트 것과 기본 것) | 프로젝트가 **다른 ID**로 고르기 화면을 만들었다. 그때만 '고르기 창 저절로'를 끈다. 같은 ID(`momoi.choice`)로 바꾸면 하나만 뜬다(2-5). |
 | 고르기 창을 같은 ID로 바꿨더니 열리지 않는다 | '고르기 창 저절로'를 껐다. 저절로 여는 것이 `momoi.choice`라 켜 둔다(2-5). |
 | 바꾼 고르기 창이 Esc로 닫혔다가 바로 다시 뜬다 | 같은 ID의 DB 항목에서 '뒤로(Esc)로 닫기'가 켜져 있다(기본 켬). 선택 대기가 남아 있어 다음 프레임에 다시 열린다. 끈다. |
-| 실시간 레벨업 고르기 중에 적이 계속 움직인다 | DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다(같은 ID로 바꾼 창이면 그 항목의 '열린 동안 게임 시간 멈춤'). |
+| 실시간 레벨업 고르기 중에 적이 계속 움직인다 | DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다(같은 ID로 바꾼 창이면 그 항목의 '열린 동안 게임 시간 멈춤'). 반영 스크립트로 켰는데 그대로면 '적용 전'이다 — 개발자가 Ctrl+S(3-2). |
+| 실시간 HUD가 틱마다 다시 그려져 느리다 | 틱마다 바뀌는 데이터(적 목록)가 HUD가 보는 키에 함께 있다. 다른 플레이어 데이터 키로 나누고 `Watch`·binding-path·목록 키를 느린 키로(2-3). |
+| `Watch`를 덮었더니 CS0507 | `public override`·`protected internal override`로 썼다. 프로젝트에서는 `protected override`(2-3). |
 | 턴제에서 고르기 창이 뜨면 피해 숫자·카드 연출이 멈춘다 | '고르는 동안 게임 시간 멈춤'이 켜져 있다(`Time.timeScale`이라 연출도 멈춘다). 턴제는 끈다. |
-| 고르기 창 후보에 설명이 없다 | 텍스트 표에 `<후보 id>.desc`가 없다. 키를 넣는다(2-5). |
+| 고르기 창 후보에 설명이 없다 | 후보의 `detail`이 비었고 텍스트 표에 `<후보 id>.desc`도 없다. 키를 넣는다(2-5). |
 | 쿨다운 원이 데이터가 바뀔 때만 움직인다 | `Draw`에서 그렸다. `Draw`는 값이 바뀔 때만 돈다. 시간에 따라 바뀌는 칸은 `Tick`(2-3). |
 | 일시정지했는데 쿨다운 숫자가 계속 준다 | `Tick`의 `deltaTime`(실제 시간)을 쌓았다. 게임 시간 쿨다운은 그때마다 게임 시계(`Game.Session.Clock.Time`)에서 남은 시간을 계산한다. |
 | 타이틀 '새 게임' 뒤 '이어 하기'가 예전 판을 연다 | `StartRun`만 보냈다. `GBibleRuntime.NewRun(session)` 다음 `Game.Do(new StartRun())`(행동 밖, 5-3). |

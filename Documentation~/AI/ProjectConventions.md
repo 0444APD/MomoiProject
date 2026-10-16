@@ -26,9 +26,9 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 
 ## 1. 폴더·어셈블리, 데이터와 코드
 
-- `Assets/MomoiProject/Code/Rules`(어셈블리 `MomoiProject.Rules`): 게임 규칙 전부 — 데이터 클래스(RunState·Profile·원본 클래스), 행동, 규칙 함수(`Rules`), 이벤트·행동 직전 이벤트, Block, `[BindTo]` 함수. **화면 API(MonoBehaviour·GameObject·씬·입력)를 쓰지 않는다.** 서버·테스트에서도 같은 코드가 돈다.
+- `Assets/MomoiProject/Code/Rules`(어셈블리 `MomoiProject.Rules`): 게임 규칙 전부 — 데이터 클래스(RunState·Profile·원본 클래스), 행동, 규칙 함수(`Rules`), 이벤트·행동 직전 이벤트, Block, `[BindTo]` 함수. **씬·실행 API(MonoBehaviour·GameObject·씬·`Time`·`Input`·`Physics`·`UnityEngine.Random`)를 쓰지 않는다.** 데이터에 쓰는 Unity 형식은 된다 — DB 종류(`GameData` = ScriptableObject — 선택 요소 템플릿)·에셋 칸(`Sprite`)·어트리뷰트(`[SerializeField]`). 서버·테스트에서도 같은 코드가 돈다.
 - `Assets/MomoiProject/Code/Client`: 화면·입력·연출·사운드. 규칙은 바꾸지 않고 행동만 보낸다.
-- `Assets/MomoiProject/Code/Editor`: 에디터 도구만. `Assets/MomoiProject/Code/Tests`: 규칙 테스트(Rules만 참조).
+- `Assets/MomoiProject/Code/Editor`: 에디터 도구만. `Assets/MomoiProject/Code/Tests`: 규칙 테스트(EditMode — 어셈블리 `MomoiProject.Tests`가 Rules·GBible.Core·GBible.Unity를 참조하고 Client는 참조하지 않는다. 에디터 전용이라 `#if UNITY_EDITOR` 멤버(`GameData.EditorAssignId`)도 쓴다).
 - 생성 파일 `GameIds.cs`는 손대지 않는다(DB를 저장하면 다시 만들어진다). 자리는 플레이어 데이터 형식이 든 어셈블리 폴더의 `Generated/` — 시작 설정을 한 프로젝트는 `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`(형식이 Assembly-CSharp에 있으면 `Assets/MomoiProject/Generated/`).
 - 파일 하나에 주제 하나: `Actions/BattleActions.cs`, `Rules/Rules.cs`, `Events/Events.cs`, `Events/Intents.cs`, `Cards/CardBlocks.cs` …
 - **데이터는 DB, 동작은 코드.**
@@ -50,7 +50,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 - 폴더·파일 이름(만드는 것 모두 — `Assets/MomoiProject/Code`·`Assets/MomoiProject/UI`·`Assets/Dev/Art` …)은 영어. 한글은 쓰지 않는다.
 - `Assets/Dev`는 개발자 폴더다(안의 폴더 = DB 'Dev' 탭). 요청받을 때만 만들거나 바꾼다. 예외: 넣을 에셋 자리(`AssetRequests`)는 `Assets/Dev/Art`·`Dev/Audio`·`Dev/Fonts` … — 개발자가 진짜 파일을 넣는 곳이다.
 - AI가 쓰는 것은 모두 `Assets/MomoiProject/` 아래: 코드 `Code/`(Rules·Client·Editor·Tests — 키워드 그룹은 `Rules/Keywords/`, 데이터 클래스와 같은 어셈블리여야 참조된다), 화면 `UI/`, 테스트 씬 `Scenes/Test.unity`. `Assets` 바로 아래에 새 폴더를 만들지 않는다.
-- 게임 씬은 `Assets/Dev/Scenes`에 둔다(개발자가 레벨을 배치한다). AI가 게임 씬을 처음 만들 때만 여기에 만들고, 그 뒤 배치는 개발자 몫이다. Unity 기본 `Assets/Scenes`는 시작 설정·에디터를 열 때 여기로 옮겨진다.
+- 게임 씬은 `Assets/Dev/Scenes`에 둔다(개발자가 레벨을 배치한다). AI가 게임 씬을 처음 만들 때만 여기에 만들고(반영 스크립트에서 `GameSceneSetup.Ensure("Assets/Dev/Scenes/<이름>.unity", firstInBuild: true)` — 없을 때만 빈 씬(카메라·빛)을 만들고 빌드 목록에 넣는다, 19절), 그 뒤 배치는 개발자 몫이다. Unity 기본 `Assets/Scenes`는 시작 설정·에디터를 열 때 여기로 옮겨진다.
 - **개발자 화면 이름(한글)은 `NamingGuide.md`(명명 가이드라인)를 따른다** — 먼저 4절 '바로잡은 이름' 표를 본다(왼쪽 말은 쓰지 않는다). 개발자가 이름을 바로잡으면 프로젝트의 화면 글·DB 이름·문서를 모두 바꾸고, 결정 기록에 적고, 그 표에 한 줄 더한다(라이브러리 커밋 — 진행 매뉴얼 2절).
 - 기획 명세서에 없는 **새 개념**(새 DB 종류·새 시스템)의 이름만 사람에게 확인한다. 이벤트·행동 직전 이벤트·행동·Block 같은 나머지는 이 규칙대로 짓고 보고만 한다.
 
@@ -58,13 +58,13 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 
 - 플레이어 데이터를 바꾸는 코드는 **행동의 `Run`과 그 안에서 부르는 규칙 함수·Block·`[BindTo]`에만** 있다. 화면 코드는 읽기만 하고, 바꿀 때는 `Game.Do(new 행동 { … })`.
 - 규칙 함수는 `public static class Rules`의 static 함수다(첫 인자 `GameApi game`). 행동·Block·`[BindTo]`가 같은 함수를 불러서 계산이 한 곳에만 있다.
-- 행동 필드에는 객체를 넣는다(`new PlayCard { card = deckCard, target = enemy }`). 기록·전송에는 id만 남고 실행 직전에 지금 객체로 다시 찾는다. 행동 안에서 새 개체를 만들면 id는 `Game.NewId("접두어")`(여럿이면 `Game.NewIds`). id는 플레이어 데이터 전체에서 하나다(형식이 달라도 겹치지 않게 — 접두어로).
+- 행동 필드에는 객체를 넣는다(`new PlayCard { card = deckCard, target = enemy }`). 기록·전송에는 id만 남고 실행 직전에 지금 객체로 다시 찾는다(보낸 사이 그 대상이 사라졌으면 플레이어용 실패 `momoi.fail.targetGone` "대상이 이미 없습니다." — 행동은 아무것도 바꾸지 않고 취소된다). 행동 안에서 새 개체를 만들면 id는 `Game.NewId("접두어")`(여럿이면 `Game.NewIds`). id는 플레이어 데이터 전체에서 하나다(형식이 달라도 겹치지 않게 — 접두어로).
 - 한 행동 안에서 같은 객체를 `Game.Find`로 여러 번 찾지 않는다(찾을 때마다 데이터 전체를 훑는다). 한 번 찾아 변수로.
 - 행동은 실패하면 바꾼 것이 모두 취소된다. 그러니 검사를 미리 다 하려고 애쓰지 말고, 안 되는 순간 던진다(플레이어용이면 `Game.Fail`, 5절). 행동 안에서 다른 행동을 불러도 된다(바깥 행동의 일부가 된다). 행동 안에서 쏜 이벤트를 받은 규칙·트리거 결과가 던져도 그 행동 전체가 취소된다.
 - **메인 룰**(조각이 자리에 놓이고 정해진 순서로 발동하는 게임의 뼈대)은 기믹 목록 1절의 모양으로 만든다: 조각 = 판 데이터의 객체 목록(고유 `id` + 원본 ID 필드), 자리 = 목록 + 줄 길이(`Placement`), 순서 = 메인 룰 행동이 단계마다 이벤트를 쏘거나 자리 순서로 돌며 `Game.TryUse`. 메인 룰 코드는 단계·순서·공식(스탯 변환 같은 계산식)만 갖고, 조각 하나하나의 효과는 DB(패시브 효과·액티브 효과)에 둔다 — 조각은 공식이 읽는 값(비율 스탯·필드)에 보정을 더할 뿐이다. 반응을 발동이 끝난 뒤로 미루는 대기열도 메인 룰이다(기믹 목록 3절).
 - 행동은 빨리 끝난다. 기다리지 않는다(애니메이션·플레이어 선택·시간 경과를 행동 안에서 기다리지 않는다 → 6·10·11절).
 - 난수는 `Game.Random("흐름 이름")`만 쓴다. `UnityEngine.Random`·`System.Random`·`DateTime`·`Time`은 규칙에서 쓰지 않는다(재현·Undo·멀티가 깨진다). 현실 시각은 `Game.Now`(행동에 기록된다)·날짜 번호 `Game.Day(초기화 시각)`, 게임 시간은 `session.Clock`.
-- **판정 보고 행동**: 물리·충돌·투사체·미니게임처럼 화면이 정하는 판정은 화면(Client)이 하고, 그 결과(누가 누구를 맞혔나·잡았나·성공)를 행동 하나로 보낸다(실시간이면 틱마다 묶어 `Strike { hits }`). 규칙은 결과로만 데이터를 바꾼다. 위치·속도는 화면 쪽이고, 한 번 정해지는 값(폭발 지점)은 행동 필드로 넘긴다.
+- **판정 보고 행동**: 물리·충돌·투사체·미니게임처럼 화면이 정하는 판정은 화면(Client)이 하고, 그 결과(누가 누구를 맞혔나·잡았나·성공)를 행동 하나로 보낸다(실시간이면 틱마다 묶어 `Strike { hits }`). 묶음 안의 대상은 객체가 아니라 **id 글자**로 두고, 행동 안에서 지금 없는 것은 건너뛴다 — 같은 틱에 먼저 쓰러진 하나 때문에 묶음 전체가 targetGone으로 실패하지 않게. 규칙은 결과로만 데이터를 바꾼다. 위치·속도는 화면 쪽이고, 한 번 정해지는 값(폭발 지점)은 행동 필드로 넘긴다.
 - static 전역 상태를 규칙에 두지 않는다(세션마다 따로 돌아야 한다). 필요한 값은 플레이어 데이터에.
 - **코드로 거는 규칙 등록**(행동 처리기 `session.Actions.Register` · 고유 기능 감시 `session.Triggers.Register` · 규칙이 이벤트를 받는 것 · 틱 규칙 `session.Ticked`)은 Rules의 등록 함수(`XxxRules.Register(GameSession session)`)에 두고, `Client/Bootstrap.cs`의 `RegisterRules`(`GBibleRuntime.SessionCreated` — 화면 세션·멀티 서버·시험 모드·매칭 방까지 모든 세션)에서 한 번 부른다. 규칙 테스트는 세션을 만든 뒤 같은 함수를 부른다. 화면 연결(연출 받기·화면 설정)만 `Bootstrap.Started`(화면 세션에만 온다)에. 기능마다 `[RuntimeInitializeOnLoadMethod]`를 따로 두지 않는다(매뉴얼 20장 4절·17장 2-6).
 - 실행 중 리플렉션 금지: 데이터 클래스는 그 클래스·부모·안쪽 클래스·리스트 요소까지 모두 `[Serializable]`, 이벤트는 `[GameEvent]`, 행동 직전 이벤트는 `[Intent]`. 컬렉션은 `List<T>`·`T[]`·`Dictionary<K, V>`(키는 글자·정수·enum).
@@ -137,7 +137,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 
 - 턴제: 턴은 행동(`EndTurn`)과 이벤트(`TurnEnded`)로 흐른다. "N턴 동안/N턴 뒤"는 상태 효과(이벤트 횟수 지속·끝날 때 결과)로, 코드에서 나중에 할 일은 `Game.ScheduleOn<이벤트>(횟수, 행동)`.
 - 실시간: DB › Bootstrap의 고정 틱을 켠다. 시간 지속은 상태 효과(게임 시간, 주기(초)로 N초마다 결과), 가진 동안 N초마다는 패시브 효과 '주기(초)'(멈추기·앞당기기·리셋이 있는 카운터는 조각 필드 + 틱 행동), 나중 일은 `Game.ScheduleAfter(초, 행동)`. 틱마다의 가벼운 규칙은 `session.Ticked`에서 `Game.Do`로. 이동·물리는 화면 쪽 자유 영역이고, 규칙에 필요한 결과(맞음·주움)만 행동으로 보낸다(3절 판정 보고 행동).
-  - 실시간 예산(매뉴얼 33장): 판 저장은 '행동마다' 대신 'N초마다', 연출은 `GameView.Play`(대기열 밖, 입력을 막지 않음), 개체 수백(투사체·보석)은 화면 쪽 오브젝트 풀로 두고 규칙에는 수와 결과만.
+  - 실시간 예산(매뉴얼 33장): 판 저장은 '행동마다' 대신 'N초마다', 연출은 `GameView.Play`(대기열 밖, 입력을 막지 않음), 개체 수백(투사체·보석)은 화면 쪽 오브젝트 풀로 두고 규칙에는 수와 결과만. 단 상태 효과(화상·얼림)나 DB 기믹이 걸리는 적·투사체는 판 데이터의 가벼운 목록(id·원본·hp·필요한 칸 — 위치는 화면 쪽)에 둔다(상태 효과는 판 데이터 객체에만 걸린다 — 구현 가이드 07 6절 서바이버).
 - 부가 기능(현실 시간·게임 안 달력·칸 단위 맵·큰 수·되감기·시드 …)은 명세서 6절에 표시된 것만 붙인다(참조 문서 2-6). 현실 시각은 규칙에서 `Game.Now`·`Game.Day`만 쓴다.
 - 조각의 자리(한 줄·격자·보드)는 `Placement`(목록 + 줄 길이). 목록 순서 = 발동 순서이므로, 순서가 열 우선인 보드(와일드프로스트)는 목록을 열 우선으로 담는다. 칸 단위로 움직이는 맵은 `Grid`.
 - 보드·줄의 조각 자리는 '칸', 아이템 컨테이너의 한 칸은 '슬롯'(아이템 슬롯), 세이브는 '세이브 슬롯'이라 부른다(명명 가이드라인 5-7).
@@ -145,14 +145,14 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 
 ## 11. 플레이어 선택
 
-- 행동 도중 플레이어가 골라야 하면(카드 1장 버리기·보상 3개 중 1개) 기다리지 않고 `Game.Ask(안내, 후보, new 이어서할행동())`. 고른 뒤 할 일은 모두 이어서 할 행동(`[Chosen]` 필드)에 쓴다. DB에서는 결과 '선택 요구'(판에 있는 것에서)·'가중치 표에서 고르기'(DB 원본에서).
+- 행동 도중 플레이어가 골라야 하면(카드 1장 버리기·보상 3개 중 1개) 기다리지 않고 `Game.Ask(안내, 후보, new 이어서할행동())`. 고른 뒤 할 일은 모두 이어서 할 행동(`[Chosen]` 필드)에 쓴다. 안내 글은 텍스트 키(7절 — 기본 고르기 창이 그때 언어로 번역한다), 후보마다 다른 설명(레벨별 설명)은 `new ChoiceCandidate(id, 이름, detail)`(글 또는 텍스트 키, 비면 `<id>.desc`). DB에서는 결과 '선택 요구'(판에 있는 것에서)·'가중치 표에서 고르기'(DB 원본에서).
 - 뽑기의 후보(풀)는 저장하지 않고 뽑을 때 만든다: 진행·해금은 가중치 표 줄의 조건, 판에서 만들어진 것은 목록 줄, 가진 것은 뺄 목록, 규칙이 계산한 후보는 `Game.Roll(풀, …, stream: "쓰는 곳 이름")`.
 - 화면은 `Game.Choice`를 보여 주고 `Game.Answer`로 답한다. 기다리는 동안 입력은 `GameView.Busy`로 막힌다.
-- 다시 뽑기는 행동 하나(비용·남은 횟수를 내고 `Game.RerollChoice(선택 id)`). 후보 수를 늘리는 기믹은 '가중치 표에서 고르기'의 '후보 수에 더할 숫자'.
+- 다시 뽑기는 행동 하나: 비용·남은 횟수를 내고, 표로 만든 선택이면 `Game.RerollChoice(선택 id)`, 코드 풀로 만든 선택이면 `Game.CancelChoice(선택 id)` 뒤 새 후보로 다시 `Game.Ask`. 기본 고르기 창의 '다시 뽑기' 버튼은 `GameScreens.Reroll`(`Bootstrap.Started`에서)이 행동을 돌려주는 모든 선택에 보인다. 후보 수를 늘리는 기믹은 '가중치 표에서 고르기'의 '후보 수에 더할 숫자'.
 
 ## 12. 테스트·검증·보고
 
-- 규칙(행동·규칙 함수·Block)을 만들거나 고치면 `Tests`에 테스트를 하나 이상 둔다. 세션을 손으로 만든다: 플레이어 데이터 `Define`, 밸런싱 값 `session.Balance.Define`, 상태 효과 `session.Statuses.Define`, 원본 `session.Instances`.
+- 규칙(행동·규칙 함수·Block)을 만들거나 고치면 `Tests`에 테스트를 하나 이상 둔다. 세션을 손으로 만든다: 플레이어 데이터 `Define`, 밸런싱 값 `session.Balance.Define`, 상태 효과 `session.Statuses.Define`, 원본 `session.DefineInstance(id, 값)`(`Game.InstancesOf<T>()`도 이것을 훑는다), 규칙이 `Game.Entry`로 읽는 DB 항목은 `ScriptableObject.CreateInstance<T>()` + `EditorAssignId(id)`로 만들어 `session.Entries`·`EntriesOfType`에 넣는다(매뉴얼 17장 4-3). 시간이 흐르는 규칙(예약·상태 효과 주기·`Ticked`)은 `session.Advance(초)`로 흘린다(`EndFrame` 한 번은 8틱에서 잘린다).
 - 테스트는 게임처럼 행동을 실행하고 값을 본다. 플레이어용 실패는 `Assert.Throws<GameFailure>`(NUnit은 정확한 형식만 잡는다). Undo가 맞는지(`session.Undo()` 뒤 값)도 본다.
 - 코드를 고친 뒤에는 컴파일이 되는지 확인하고, Unity가 열려 있으면 콘솔 오류·DB 검증("검증 통과")을 본다. AI는 Unity 창을 볼 수 없으므로 **파일로 읽는다**: DB 상태 `Logs/MomoiProject/DbStatus.txt`(검증 오류·경고 · '적용 전' 변경 — 컴파일 뒤·DB가 바뀔 때 GBible이 다시 쓴다), Unity 로그 `Logs/Editor.log`(Unity 6.6은 프로젝트 안 — 컴파일 경고·`[MomoiProject]` 알림·DB 반영 스크립트 결과). 개발자에게 "경고가 뭐냐"고 묻기 전에 이 둘을 본다.
 - 테스트도 AI가 돌린다: Unity가 열려 있으면 `Logs/MomoiProject/RunTests.request`를 만들고 `Logs/MomoiProject/TestResults.txt`(통과·실패, 실패 메시지·호출 위치)를 읽는다(매뉴얼 38장 2-4 — Unity가 먼저 에셋을 새로 읽어 방금 쓴 코드를 컴파일한 뒤 돌린다). Unity를 연 채로 배치 모드(`-batchmode`)는 쓰지 않는다. 요청 파일이 남아 있으면 Unity가 아직 돌리지 못한 것이다(플레이 중이거나 창이 오래 멈춤) — 개발자에게 Test Runner를 누르라고 하기 전에 이것으로 한다.
@@ -181,7 +181,12 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 AI는 Unity 창을 누를 수 없다. DB 항목은 **DB 반영 스크립트**로 만든다: `Assets/MomoiProject/Code/Editor`의 static 함수(매개변수 없음)에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝나고 에디터가 한가해질 때 GBible이 저절로 한 번 돌린다(버전이 바뀐 것만 다시 — 기록 `ProjectSettings/MomoiProject/DbSeeds.json`).
 
 - **새 항목(`Staging.Add`)은 저절로 적용된다**(무엇이 들어왔는지는 콘솔·DB 창 알림). **이미 있는 항목의 고치기(`Work`)·지우기(`Remove`)·ID 바꾸기(`Rename`)만 '적용 전'으로 남고**, 개발자가 읽어 보고 Ctrl+S로 적용한다 — 개발자가 만지던 항목을 말없이 바꾸지 않게. '적용 전'이 남은 버전은 적용했을 때 "돌았다"로 기록된다(버리면 다음 컴파일 뒤 다시 돈다). 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 — 새 항목은 바로 적용`을 끄면 새 항목도 '적용 전'으로 둔다(`ProjectSettings/MomoiProject/DbSeedOptions.json`).
-- **`GameIds` 상수는 한 박자 늦게 생긴다**: 반영 스크립트가 돌아 새 항목이 적용되고 → Unity가 다시 컴파일한 뒤에야 `GameIds.cs`에 상수가 생긴다. 그 상수를 쓰는 코드(화면의 `[BindTo(GameIds.Screen.X)]` 등)를 반영 스크립트와 함께 넣으면 컴파일이 깨져 반영 스크립트도 돌지 않는다. 순서: 반영 스크립트·UXML을 먼저 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 그 상수를 쓰는 코드를 쓴다. 기다리지 않고 같은 응답에서 쓰는 규칙 코드는 상수 대신 반영 스크립트의 ID 글자로 읽고(`Game.Entry<T>(id)` 등), 상수가 생기면 상수로 바꾼다(2절).
+- **`GameIds` 상수는 한 박자 늦게 생긴다**: 반영 스크립트가 돌아 새 항목이 적용되고 → Unity가 다시 컴파일한 뒤에야 `GameIds.cs`에 상수(와 `Game.Data()`의 새 키 접근자)가 생긴다. 그 상수를 쓰는 코드를 반영 스크립트와 함께 넣으면 컴파일이 깨져 반영 스크립트도 돌지 않는다. 그래서 **한 응답 안에서 두 박자로** 나눈다(Unity가 열려 있을 때):
+  1. (가) 상수 없이 컴파일되는 것: 데이터 클래스·원본 클래스·이벤트·행동 직전 이벤트·UXML과 반영 스크립트(프로젝트 형식은 `typeof(X)`로, ID는 그 스크립트 안의 글자로).
+  2. (나) `Logs/MomoiProject/RunTests.request`를 만들어 Unity에 새로 읽기를 부르고, `GameIds.cs`를 다시 읽어 상수가 생길 때까지 기다린다(Unity는 요청을 받으면 새로 읽어 컴파일하고 테스트를 돌린 뒤 요청 파일을 지운다 — 지워지지 않고 남으면 Unity가 닫혔거나 플레이 중·멈춘 것, 12절. 요청이 지워졌는데 상수가 아직 없으면 잠시 뒤 다시 읽고(반영 스크립트는 컴파일 뒤 에디터가 한가해질 때 돈다), 그래도 없으면 `Logs/Editor.log`에서 반영 스크립트 오류를 본다).
+  3. (다) 상수를 쓰는 것: 규칙 함수·행동·Block·`[BindTo]`·화면 코드 → 테스트(12절).
+
+  반영 스크립트가 형식으로 쓰는 프로젝트 Block·행동(개발 명령의 결과 등)이 새 상수를 써야 하면, 그 반영 스크립트는 (다) 뒤에 넣고 (나)를 한 번 더 돈다. Unity가 닫혀 있으면 (가)에서 응답을 끝내고 개발자에게 Unity를 열어 달라고 한다(반영 스크립트는 Unity가 돌린다). 상수 대신 ID 글자를 코드에 쓰지 않는다(2절).
 
 ```csharp
 // Assets/MomoiProject/Code/Editor/Seeds/AchievementSeeds.cs
@@ -206,7 +211,8 @@ static class AchievementSeeds
 - 함수 하나 = 주제 하나(종류 하나·콘텐츠 묶음 하나). 파일은 `Assets/MomoiProject/Code/Editor/Seeds/<주제>Seeds.cs`.
 - **이미 있는 항목은 건너뛴다.** 개발자가 밸런싱한 값을 덮지 않는다. 구조(Block·참조 칸의 종류)를 고쳐야 하면 버전을 올리고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 고친다(숫자 칸은 건드리지 않는다).
 - **지우기**는 버전을 올리고 `EditorDatabase.Staging.Remove(항목)`. 그 ID를 쓰는 코드(`GameIds` 상수)도 같이 지운다. **ID 바꾸기**는 `EditorDatabase.Staging.Rename(항목, 새 ID)`(DB 안의 가리키는 칸이 함께 바뀐다) — 코드의 상수 이름도 바꾼다.
-- **DB › 시작 파일 › Bootstrap 칸**(Undo 방식·판 저장·판 끝 이벤트·시작할 때 이어 하기·새 판 행동·고정 틱·씬 흐름)은 항목이 아니라 DB 에셋의 값이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)`로 꺼내 **처음 값일 때만** `EditorSet…`(참조 3-8)으로 넣고 `EditorUtility.SetDirty`. '적용 전'을 거치지 않고 바로 저장된다(구현 가이드 01 4절).
+- **DB › 시작 파일 › Bootstrap 칸**(Undo 방식·판 저장·판 끝 이벤트·시작할 때 이어 하기·새 판 행동·고정 틱·씬 흐름)은 항목이 아니라 DB 에셋의 값이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)`로 꺼내 결정한 값(결정 기록·장르 추천)을 `EditorSet…`(참조 3-8)으로 넣고 `EditorUtility.SetDirty`·`AssetDatabase.SaveAssetIfDirty`. '적용 전'을 거치지 않고 바로 저장된다(구현 가이드 01 4절). 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 '모두 다시 돌리기'도 개발자 값을 덮지 않는다. 결정이 바뀌어 다시 넣어야 하면 개발자에게 알리고 버전을 올린다.
+- **Run In Background**(창이 뒤로 가도 게임이 돈다 — DB 칸이 없는 Player Settings 값): 실시간·방치형·멀티는 같은 반영 스크립트에서 `PlayerSettings.runInBackground = true`. 틱 수·저장 간격처럼 AI가 정해 추천 승인 목록에 올린다(진행 매뉴얼 3절).
 - **밸런싱 값은 표시 이름·메모·입력 칸 주석·묶음(폴더)을 함께 만든다**(짓는 법은 `NamingGuide.md` 3절 — 확률은 %(0~100)로 두고 규칙이 100으로 나눈다). 이미 있는 항목은 비어 있는 칸만 채운다.
 - **값이 많은 것**(밸런싱 값·카드 수치·몬스터 수치·가중치 표 줄 — 숫자·글자·enum과 그 목록)은 CSV도 된다: 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`, 목록은 `entries[0].weight`). 개발자가 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. Block 칸(트리거·조건·결과)은 CSV에 없다.
 - 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 모두 다시 돌리기`가 모든 스크립트를 다시 돌린다(이미 있는 항목은 건너뛰므로 안전하다).
@@ -225,8 +231,10 @@ static class AchievementSeeds
 5. 프로젝트 고유 기능(DB에서 읽고 값을 바꿀 종류 — 패시브 효과·상태 효과로 안 될 때만, 0절)이 필요하면 DB 종류 클래스 + 감시 등록(Rules의 등록 함수 → `Bootstrap.RegisterRules`, 3절).
 6. 설정 DB 항목(Bootstrap·런 설정 같은 흐름에 꼭 필요한 것 — 15절)과 밸런싱 값 이름(18절 — 바꿀 숫자는 모두 에디터에).
 7. 테스트(12절) — 흐름 하나(판 시작부터 전투 승리까지)가 행동만으로 끝까지 도는지(데이터는 테스트 코드가 만든다). 메인 룰은 자리 순서가 결과를 바꾸는 경우를 하나 넣는다.
-8. 게임 씬(빈 씬, `Assets/Dev/Scenes`) → 테스트 씬(그 씬을 복사)·기본 테스트 명령(19절).
+8. 게임 씬(`GameSceneSetup.Ensure(경로, firstInBuild: true)` — 빈 씬 + 빌드 목록, `Assets/Dev/Scenes`) → 같은 반영 스크립트에서 이어 테스트 씬(`TestSceneSetup.Ensure(copyFrom: 그 경로)`)·기본 테스트 명령(19절).
 9. 보고(12절).
+
+한 응답 안에서는 15절의 두 박자로 나눈다: 2·3의 형식(데이터·이벤트·행동 직전 이벤트)과 6·8의 반영 스크립트 → 새로 읽기 → 3·4의 규칙 함수·행동·Block → 7 테스트.
 
 단계 2 — UI·샘플(진행 매뉴얼 7절):
 
@@ -260,8 +268,8 @@ static class AchievementSeeds
 
 개발자는 런타임에 원하는 상황을 만들어 기믹·밸런스·버그를 시험한다. AI는 프로젝트마다 그 환경을 만든다.
 
-- **테스트 씬**: 단계 1에서 반영 스크립트로 `TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/게임씬.unity", scenario: "")`를 부른다 — 게임 씬을 복사해 `Assets/MomoiProject/Scenes/Test.unity`를 만들고 컴포넌트 `TestScene`(시작할 테스트 상황 · 시드 · 따로 슬롯 · 시간 배속 · 테스트 패널)을 붙인다. 테스트 씬이 이미 있으면 건너뛰고 `copyFrom`이 없으면 빈 씬으로 만들므로, **게임 씬을 먼저 만든다**. 플레이하면 그 상황으로 바로 시작하고, 게임 화면 위에 테스트 패널(테스트 명령 버튼 · 상황 저장·불러오기 · 시간 · Undo)이 뜬다(개발 빌드·에디터에서만).
-- **테스트 명령** = DB › 개발 명령(`DebugCommandData`) 항목: 주입(인스턴스를 목록에 넣기 · 자원 주기 · 패시브 효과 얻기 · 상태 효과 걸기 · 적 만들기)과 발동(이벤트 쏘기 · 행동 실행)을 결과 Block으로 조립한다. 문장 안의 값(어느 인스턴스·몇 개·어느 대상)은 개발자가 드롭다운으로 바꾼다. Block으로 안 되는 것만 `[BindTo]`. 모두 행동으로 돌아 Undo·기록이 남는다. 반영 스크립트로 만들고 분류(`category`)로 묶는다(예: "판", "조각", "적", "상황").
+- **테스트 씬**: 단계 1에서 한 반영 스크립트로 `GameSceneSetup.Ensure("Assets/Dev/Scenes/게임씬.unity", firstInBuild: true)`(게임 씬 — 없을 때만 빈 씬, 빌드 목록에 넣는다) 다음 `TestSceneSetup.Ensure(copyFrom: "Assets/Dev/Scenes/게임씬.unity", scenario: "")`를 부른다 — 게임 씬을 복사해 `Assets/MomoiProject/Scenes/Test.unity`를 만들고 컴포넌트 `TestScene`(시작할 테스트 상황 · 시드 · 따로 슬롯 · 시간 배속 · 테스트 패널)을 붙인다. 테스트 씬이 이미 있으면 건너뛰고 `copyFrom`이 없으면 빈 씬으로 만들므로, **게임 씬을 먼저 만든다**. 플레이하면 그 상황으로 바로 시작하고, 게임 화면 위에 테스트 패널(테스트 명령 버튼 · 상황 저장·불러오기 · 시간 · Undo)이 뜬다(개발 빌드·에디터에서만).
+- **테스트 명령** = DB › 개발 명령(`DebugCommandData`) 항목: 주입(인스턴스를 목록에 넣기 · 자원 주기 · 패시브 효과 얻기 · 상태 효과 걸기 · 적 만들기)과 발동(이벤트 쏘기)을 결과 Block으로 조립한다. 문장 안의 값(어느 인스턴스·몇 개·어느 대상)은 개발자가 드롭다운으로 바꾼다. 프로젝트 행동 실행처럼 기본 Block이 없는 것만 그 항목의 `[BindTo]`(안에서 `Game.Do(new 행동())`) — `[BindTo]` 명령에는 개발자가 바꿀 값 칸이 없으므로, 값이 필요한 명령은 프로젝트 결과 Block(값 칸이 있는 `Reward`)으로 만든다. 모두 행동으로 돌아 Undo·기록이 남는다. 반영 스크립트로 만들고 분류(`category`)로 묶는다(예: "판", "조각", "적", "상황").
 - **테스트 상황** = 지금 플레이어 데이터·시드·게임 시각을 이름 붙여 저장한 파일(`TestScenarios`, `Assets/MomoiProject/Data/Tests/`). 개발자가 패널이나 모니터에서 저장하고, AI는 명세서 13절·버그 보고의 상황을 테스트 명령으로 만들어 두고 저장 방법을 알린다. 규칙 테스트는 같은 상황을 코드로 다시 만든다.
 - **로직 샘플(단계 2)과 요청으로 더한 조각마다** 얻기·쓰기·걸기 테스트 명령을 만든다. 버그 보고를 받으면 같은 상황을 테스트 상황·규칙 테스트로 재현한 뒤 고친다.
 - 테스트 도구는 출시 빌드에 들어가지 않는다(`session.Debug.Enabled`가 거짓이면 명령이 생기지 않고, `TestScene`은 개발 빌드에서만 패널을 띄운다).

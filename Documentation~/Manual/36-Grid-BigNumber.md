@@ -130,7 +130,11 @@
 - `Pow(값, 지수)`: 작은 수는 double의 거듭제곱 그대로다(2^3 = 8, 5^2 = 25 정확히 — 넘치면 가수 × 10^지수로). 음수의 거듭제곱은 예외("[MomoiProject] 큰 수: 음수의 거듭제곱은 지원하지 않습니다."). 0^0 = 1, 0^p = 0.
 - `Floor`: 1e300 아래는 소수를 버린다(음의 무한대 쪽, −1.5 → −2). 그 위는 그대로(소수가 없다).
 - `[Serializable]` 구조체라 플레이어 데이터 필드·목록(`List<BigNumber>`)에 그냥 둔다. 판 저장·Undo·Mirror(Sync)가 다른 필드처럼 따라온다.
-- **`Game.Pay`와 DB의 숫자 칸은 기본 숫자 형식(`int`·`long`·`double` …) 필드만 안다.** `Game.Pay(키, "cookies", …)`는 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)."로 프로그래머 실수가 된다. DB Block의 숫자 비교·증감도 큰 수 필드에 쓰지 않는다. 큰 수의 비용은 코드로 검사하고 뺀다: `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7).
+- **`Game.Pay`와 DB의 숫자 칸은 기본 숫자 형식(`int`·`long`·`double` …) 필드만 안다**(지금 라이브러리의 한계). `Game.Pay(키, "cookies", …)`는 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)."로 프로그래머 실수가 된다. DB Block의 숫자 비교·증감도 큰 수 필드에 쓰지 않는다. 큰 수의 비용은 코드로 검사하고 뺀다: `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7). 이 길은 비용 행동 직전 이벤트(28장 2-4)도 거치지 않으므로, 할인 같은 비용 기믹이 필요하면 큰 수 비용을 내는 규칙 함수 하나에 프로젝트 행동 직전 이벤트 자리를 둔다(관례 4절).
+- **DB 칸에서 보이고 고치기** — 큰 수 전용 칸 모양은 없다. 원본(DB › 인스턴스)·프로젝트 DB 종류의 `BigNumber` 필드는 DB에 숫자 칸 두 개 `m`·`e`로 보이고, 값은 **m × 10^e**로 읽힌다(셈·비교할 때 맞추므로 어느 모양으로 적어도 된다: `m 1.5 · e 400` = 1.5e400, `m 1500 · e 0` = 1500). 코드에서 `m`·`e`를 직접 고치지 않는 것(위)과 다르다. 고르는 법:
+  - 1e308 안에서 끝나는 값(대부분의 원본 가격·생산량) → `double` 칸(숫자 칸 하나, `1.5e40`처럼 지수로 적어도 된다). 규칙이 읽을 때 `BigNumber`로 저절로 바뀐다.
+  - 1e308을 넘는 원본 값 → `BigNumber` 칸(`m`·`e`). 글로 적게 하고 싶으면 글자 칸 + 규칙에서 `BigNumber.Parse`(지수·짧은 단위 `3.2K`, 2-8 — 한국어 단위는 못 읽는다).
+  - 밸런싱 값·곡선은 `double`이다(큰 수 밸런싱 값은 없다). 1e308을 넘는 가격은 기준·비율을 밸런싱 값에 두고 `BigNumber.Pow`로 계산한다(5-7 끝).
 
 ### 2-8. 큰 수를 글로 — `ToString` · `Parse`
 
@@ -234,7 +238,7 @@ caveMap,#####,#...#,#.#.#,#####,,
 ### 3-3. 모니터에서 확인하기
 
 - **데이터** 탭: 개체의 `x`·`y`, 칸 딕셔너리(키 `"3,4"`)가 보인다. 큰 수 필드는 구조체라 `m`·`e` 두 필드로 보인다(담는 모양은 2-7).
-- 큰 수에는 DB › 개발 명령의 '플레이어 데이터에 주기'를 쓸 수 없다(숫자 칸이 아니다). AI가 개발 명령 항목을 반영 스크립트로 만들고 그 ID에 `[BindTo]`로 코드를 잇는다(관례 19절).
+- 큰 수에는 DB › 개발 명령의 '플레이어 데이터에 주기'를 쓸 수 없다(숫자 칸이 아니다). 늘 같은 양이면 AI가 개발 명령 항목을 반영 스크립트로 만들고 그 ID에 `[BindTo]`로 코드를 잇는다(관례 19절). 주는 양을 개발자가 바꿔야 하면 `[BindTo]`에는 값 칸이 없으므로 양 칸이 있는 프로젝트 결과 Block('큰 수 주기')을 만들어 명령의 결과 칸에 넣는다(22장 7절).
 
 ```csharp
 [BindTo(GameIds.DebugCommand.CookiesX1000)]
@@ -744,16 +748,9 @@ public static class Bakery
     }
 }
 
-// 1초마다 굽는다(시간 예약으로 이어 간다. 판을 시작할 때 Game.ScheduleAfter(1, new Bake()) 한 번)
-[Serializable, BlockInfo("굽기")]
-public class Bake : GameAction
-{
-    protected override void Run()
-    {
-        Game.Data().Run.cookies += Bakery.Cps(Game);
-        Game.ScheduleAfter(1, new Bake());
-    }
-}
+// 생산은 07장 4.7의 정산(IdleRules.Settle — 1초마다 · 이어 할 때 · 끌 때, 켜 둔 시간과 꺼 둔 시간을 함께)이 더한다.
+// 그 함수의 더하는 줄을 큰 수로: run.cookies += Bakery.Cps(game) * (online + offline);
+// 게임 시계로 따로 굽지 않는다(Game.ScheduleAfter(1, …)로 구우면 정산과 두 번 더해진다).
 
 [Serializable, BlockInfo("건물 사기")]
 public class BuyBuilding : GameAction
@@ -763,6 +760,7 @@ public class BuyBuilding : GameAction
 
     protected override void Run()
     {
+        IdleRules.Settle(Game);                         // 쿠키를 쓰기 전에 먼저 정산(07장 4.7)
         var run = Game.Data().Run;
         var data = Bakery.BuildingOf(Game, building);
         run.buildings.TryGetValue(building, out var owned);
@@ -801,7 +799,8 @@ koreanLabel.text = $"{run.cookies:ko}개";                    // "1.23억개"
 
 - 쿠키 수는 1e308을 넘어도 된다(`BigNumber`). 실패 글의 값(`{have}`·`{need}`)에 큰 수를 넣으면 기본 형식(`1.23K`)으로 들어간다.
 - 클릭은 행동 하나(`Click`)다. 아주 빠른 연타는 33장 5-7처럼 틱마다 묶는다(`Click { count }`). 클릭 숫자는 `GameView.Play`로 띄운다(입력을 막지 않는다, 32장 5-9).
-- 꺼 둔 동안의 생산은 켤 때 첫 정산 행동이 `Game.Now - profile.lastSeen`으로 계산한다(07장 2.11).
+- 꺼 둔 동안의 생산도 같은 정산이 판 데이터의 마지막 정산 시각(`run.lastSettled`)부터 계산한다 — 이어 할 때(`RunLoaded`)와 새 판 행동에서, `Started`가 아니다(07장 4.7).
+- 원본 가격·생산량은 `double` 칸이면 된다(1e308 안). 그보다 큰 원본 값은 `BigNumber` 칸(DB에 `m`·`e`, 2-7).
 - DB 조건으로 "쿠키 1조 개를 모았다" 같은 도전과제를 만들려면 규칙이 자릿수 필드를 함께 둔다(`run.cookieDigits = run.cookies.IsZero ? 0 : (int)Math.Floor(run.cookies.Log10()) + 1`, 1조 = 13자리). 쿠키를 바꾸는 곳을 규칙 함수 하나로 모으고 거기서 함께 고친다. DB의 숫자 비교는 그 `int` 필드를 본다.
 
 **가격이 1e308을 넘을 때** — 밸런싱 값은 double이라 `BalanceSum`이 무한대가 되면 `BigNumber`로 담을 수 없다(2-7). 그만큼 오르는 곡선이면 같은 식을 큰 수로 계산한다. 기준·비율은 그대로 밸런싱 값에서 읽는다.
@@ -843,7 +842,8 @@ public static int Affordable(BigNumber budget, double basePrice, double rate, in
 | 작물·생산 결과가 Undo나 다시 하기 뒤에 달라짐 | 딕셔너리를 도는 차례에 기대었다(난수·소수 합). 키를 정렬해 돈다(5-6·5-7). |
 | 원본 맵이 게임 중에 바뀜 | `session.Instances`의 원본을 고쳤다. 바뀌는 칸은 판 데이터의 딕셔너리로(3-1). |
 | 시트에서 맵 줄이 수식으로 바뀜 | 줄이 `=`·`+`·`-`·`@`로 시작한다. 테두리를 `#`으로(3-2). |
-| `Game.Pay`가 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)." | `Game.Pay`·DB 숫자 칸은 기본 숫자 형식 필드만 안다. `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7). |
+| `Game.Pay`가 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)." | 지금 라이브러리의 한계다: `Game.Pay`·비용 행동 직전 이벤트·DB 숫자 칸은 기본 숫자 형식 필드만 안다. `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7), 할인 기믹은 그 규칙 함수에 프로젝트 행동 직전 이벤트(2-7). |
+| DB에서 큰 수 칸이 `m`·`e` 두 칸으로 보임 | 정상이다. 값 = m × 10^e(어느 모양으로 적어도 된다). 1e308 안의 값이면 필드를 `double`로 두는 편이 읽기 쉽다(2-7). |
 | 쿠키에 1을 더해도 그대로 | 정상이다. 1e300 아래는 double 셈이라 정수는 2^53(약 9e15)까지만 정확하고, 그 위는 유효 숫자 약 15자리라 차이가 17자리를 넘으면 작은 쪽은 사라진다(2-7). |
 | "[MomoiProject] 큰 수: 무한·NaN은 담을 수 없습니다." | double 계산이 먼저 넘쳤다(1e308을 넘은 `BalanceSum`, `x / 0.0`). 넘칠 값은 처음부터 `BigNumber`로 계산한다(5-7의 `PriceSum`). |
 | "[MomoiProject] 큰 수: 0으로 나눌 수 없습니다." | 0인 `BigNumber`로 나눴다. 생산량 0일 때 "다음까지 몇 초"를 나누기 전에 `IsZero`를 본다. |
@@ -851,4 +851,4 @@ public static int Affordable(BigNumber budget, double basePrice, double rate, in
 | `BigNumber.Parse("1.23억")`이 `FormatException` | `Parse`는 지수·짧은 단위·숫자만 읽는다. 큰 수를 글로 바꿔 저장하지 않는다: 필드 그대로 두면 판 저장이 `m`·`e`를 그대로 담는다. `ToString`의 글은 소수 둘째 자리까지라 다시 읽으면 정밀도가 준다(보이기용). |
 | 진행 막대·슬라이더·'데이터 연결'의 숫자가 무한대·깨짐 | 숫자 칸은 큰 수를 float로 넣어 약 3.4e38을 넘으면 무한대다. 비율을 화면 코드에서 계산한다(2-8). |
 | DB 조건으로 쿠키 수를 비교할 수 없음 | DB의 숫자 비교는 기본 숫자 형식 필드용이다. 규칙이 자릿수 같은 `int` 필드를 함께 두고 그것을 본다(5-7). |
-| 큰 수 필드를 고쳤는데 값이 이상함 | `m`·`e`를 직접 고쳤다(1e300 아래는 m = 값·e = 0, 그 위만 가수 1~10 × 10^지수). 연산자·생성자로만 바꾼다. |
+| 큰 수 필드를 고쳤는데 값이 이상함 | 코드에서 `m`·`e`를 직접 고쳤다(값 = m × 10^e라 `x.m += 5`는 e가 400이면 5 × 10^400을 더한다). 코드에서는 연산자·생성자로만 바꾼다. |

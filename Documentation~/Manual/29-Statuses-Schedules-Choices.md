@@ -32,7 +32,7 @@
 | 선택 대기 (Choice) | 플레이어의 답을 기다리는 고르기 요구 하나(`PendingChoice`). 플레이어 데이터 `$choices`에 있다(멀티에서 답할 사람이 정해진 선택은 `$choices:번호`, 2-6). |
 | 이어서 할 행동 (then) | 고르기를 요구할 때 함께 맡기는 행동. 답이 오면 고른 것을 받아 실행된다. |
 | `[Chosen]` | 이어서 할 행동의 필드에 붙이는 어트리뷰트. 고른 것이 그 필드에 들어간다. |
-| 다시 뽑기 | 기다리는 선택의 후보를 같은 가중치 표에서 새로 뽑는 일(`Game.RerollChoice`). 결과 `가중치 표에서 고르기`로 만든 선택만 된다(4-10b). |
+| 다시 뽑기 | 기다리는 선택의 후보를 새로 뽑는 일. 결과 `가중치 표에서 고르기`로 만든 선택은 같은 표에서(`Game.RerollChoice`), 코드 풀로 `Game.Ask`한 선택은 그 행동이 선택을 취소(`Game.CancelChoice`)하고 새 후보로 다시 `Game.Ask`(4-10b). |
 | 컨텍스트 (`TriggerContext`) | 결과가 도는 순간의 정보. 상태 효과의 결과에서는 `User`가 가진 쪽, `Owner`가 상태 효과 ID다. |
 
 > **상태 효과와 키워드** — 화상·빙결 같은 상태는 키워드 목록(05장)에 글자로 두지 않고 이 장의 상태 효과(DB › 상태 효과, ID 상수는 `GameIds.Status`)로 만든다. 걸린 것은 대상의 필드가 아니라 플레이어 데이터 `$statuses`에 있다(2-4). 그래야 지속·중첩·턴마다의 효과·만료가 붙는다.
@@ -164,7 +164,7 @@ Game.ApplyStatus(적, "burn")  또는  효과 '상태 효과 걸기'
 - **지속이 다 돼서 끝나는 순서**(이벤트 횟수·게임 시간·줄이기 모두 같다): 걸린 것을 지우고 스탯 보정을 뗀다 → 끝날 때 결과 → `StatusEnded`(`expired` 참). 그래서 끝날 때 결과 안에서는 이미 풀려 있다(`Game.StatusStacks`는 0, 보정도 없다).
 - **같은 순간에 끝나는 둘**: 앞의 것의 끝날 때 결과가 뒤의 것을 풀면, 뒤의 것은 풀린 것으로 한 번 끝난다(끝날 때 결과 없이 `StatusEnded` `expired` 거짓 하나). 다시 끝나지 않는다. 앞의 것의 끝날 때 결과가 뒤의 것을 다시 걸어 지속을 갱신했으면 뒤의 것은 그때 끝나지 않고 갱신한 길이만큼 남는다.
 - **끝날 때 결과가 실패해도 시간 지속은 끝난다.** 만료 행동이 실패하면(끝날 때 결과의 비용이 모자람 등) 상태 효과마다 결과를 저장점으로 감싼 행동("상태 효과 만료(실패 감싸기)")으로 다시 끝낸다. 실패한 끝날 때 결과(또는 `StatusEnded`를 받은 반응)는 그것이 바꾼 것만 되돌리고 경고 "상태 효과 '…'(가진 쪽 id)의 끝날 때 결과가 실패해 그것이 바꾼 것만 되돌렸습니다 — (이유)"를 남긴다. 같은 실패가 매 프레임 되풀이되지 않는다. 이벤트 횟수·줄이기로 끝날 때는 그 행동 안이라, 끝날 때 결과가 실패하면 그 행동이 통째로 취소된다(02장 2.7).
-- 지속의 **가진 쪽 필드**를 고르면, 셀 이벤트의 그 필드가 가진 쪽 id일 때만 센다(예: 턴 끝 이벤트에 플레이어 id가 있으면 "내 턴이 끝날 때만"). 비우면 그 이벤트를 받을 때마다 센다.
+- 지속의 **가진 쪽 필드**를 고르면, 셀 이벤트의 그 필드 값이 가진 쪽 id와 **같을 때만** 센다. 비우면 그 이벤트를 받을 때마다 센다. 그래서 셀 이벤트에 가진 쪽 자신의 id가 실려 있어야 한다: 유닛에 건 "2턴 기절"을 그 유닛의 턴이 끝날 때만 세려면 유닛마다 턴 끝 이벤트(`UnitTurnEnded { unitId }`)를 쏘고 가진 쪽 필드를 `unitId`로 둔다. 플레이어 번호만 든 턴 끝 이벤트(`TurnEnded { player }`)로는 유닛이 가진 상태 효과를 그 유닛의 턴으로 셀 수 없다(유닛 id ≠ 플레이어 번호 — 그 이벤트로 거르면 하나도 세지 않는다).
 - 셀 이벤트는 형식이 정확히 같아야 한다(상속한 형식은 따로다).
 - 시간 만료도 행동이라 Undo된다(스냅샷 방식이면 되감기로 돌아온다).
 - 끝날 때 결과는 가진 쪽이 아직 데이터에 있을 때만 돈다. 가진 쪽이 먼저 사라졌으면(쓰러져 전투에서 빠진 적) 끝날 때 결과는 돌지 않고, 걸린 것은 그 행동이 끝나기 직전에 정리된다(2-3).
@@ -248,7 +248,7 @@ Game.ApplyStatus(적, "burn")  또는  효과 '상태 효과 걸기'
 - 후보는 id로 구별한다. 같은 id가 두 번 들어오면 하나만 남는다.
 - **여러 선택은 먼저 요구한 것부터.** `Game.Choice`가 이 프로그램이 답할 선택 가운데 맨 앞(가장 먼저 요구한 것)이다.
 - **Undo**: 답하기를 Undo하면 다시 기다린다. 요구한 행동까지 Undo하면 선택도 사라진다.
-- **다시 뽑기**: 결과 `가중치 표에서 고르기`로 만든 선택은 기다리는 동안 다른 행동 안에서 `Game.RerollChoice(선택 id)`로 후보를 새로 뽑는다. 같은 선택 id 그대로 후보만 바뀌고, `ChoiceRequested`를 다시 쏜다. 비용·남은 횟수는 부르는 행동이 정한다. 그 행동을 Undo하면 원래 후보로 돌아간다(4-10b).
+- **다시 뽑기**: 결과 `가중치 표에서 고르기`로 만든 선택은 기다리는 동안 다른 행동 안에서 `Game.RerollChoice(선택 id)`로 후보를 새로 뽑는다. 같은 선택 id 그대로 후보만 바뀌고, `ChoiceRequested`를 다시 쏜다. 코드 풀로 `Game.Ask`한 선택은 그 행동이 `Game.CancelChoice` 뒤 처음과 같은 규칙 함수로 다시 `Game.Ask`한다(새 선택 id). 비용·남은 횟수는 부르는 행동이 정한다. 그 행동을 Undo하면 원래 후보로 돌아간다(4-10b).
 - **판 저장**으로 이어진다. 불러온 뒤 그대로 답할 수 있다.
 - 기다리는 동안 다른 입력을 막는 것은 **화면의 일**이다(`Game.IsWaiting`). 시스템은 다른 행동을 막지 않는다. 화면(35장)의 **기본 고르기 창**은 선택 대기가 생기면 저절로 뜨고, `OnClick`·`GameScreens.Do`는 기다리는 동안 다른 행동을 보내지 않는다.
 - **멀티플레이 — 답할 플레이어**(`player`, 플레이어 번호 글자): 정해진 선택은 그 사람의 키 `$choices:번호`에 두고 그 주인에게만 보낸다. 남의 후보·이어서 할 행동이 다른 클라이언트에 가지 않는다. 다른 사람이 답하면 서버가 플레이어용 실패 "다른 플레이어에게 온 선택입니다."(`FailureKeys.NotYourChoice`)로 막는다.
@@ -287,7 +287,7 @@ Modifier `$mod1`, 걸린 상태 효과 `$status1`, 예약 `$schedule1`, 선택 `
 | `duration` › `kind` | 지속 › 방식 | `영구(풀 때까지)`(기본) / `이벤트 횟수` / `게임 시간(초)`(2-2) |
 | `duration` › `length` | 길이 | 이벤트 횟수 또는 초. 기본 3. 이벤트 횟수·게임 시간일 때만 보인다 |
 | `duration` › `tickEvent` | 셀 이벤트 | `[GameEvent]` 목록. 이벤트 횟수일 때만 보인다 |
-| `duration` › `holderField` | 가진 쪽 필드 | 셀 이벤트의 필드. 그 값이 가진 쪽 id인 이벤트만 센다(턴 끝의 플레이어 id → 내 턴이 끝날 때만). 비우면 "가진 쪽 모두". 이벤트 횟수일 때만 보인다 |
+| `duration` › `holderField` | 가진 쪽 필드 | 셀 이벤트의 필드. 그 값이 가진 쪽 id인 이벤트만 센다(유닛 턴 끝의 `unitId` → 그 유닛의 턴이 끝날 때만, 2-2). 비우면 "가진 쪽 모두". 이벤트 횟수일 때만 보인다 |
 | `modifiers` | 스탯 보정 | 줄마다 `attribute`(스탯(숫자 필드 이름)) · `kind`(칸: `플랫(+값)` / `퍼센트(0.2 = +20%)` / `독립 곱(0.5 = ×1.5)`) · `valuePerStack`(중첩당 값) |
 | `trigger` | 걸려 있는 동안 트리거 | `+ 블럭`: 이벤트 받기 · 조건 충족 · 행동 직전 이벤트 |
 | `holderField` | 가진 쪽 필드 | 트리거가 고른 이벤트·행동 직전 이벤트의 필드. 그 값이 가진 쪽 id일 때만 발동한다(피해의 `targetId` → 내가 맞을 때만). 비우면 "가진 쪽 모두" |
@@ -689,6 +689,7 @@ Game.Ask("자세", new[] { new ChoiceCandidate("attack", "공격"), new ChoiceCa
 | `string Ask(string prompt, IEnumerable<ChoiceCandidate> options, GameAction then, int min = 1, int max = 1, string source = null, string player = null)` | 글 선택지로 요구한다(보일 글을 직접 준다) |
 
 - 돌려주는 값은 선택 id(`$choice1` …). 후보가 없어 바로 이어 간 경우는 `null`.
+- 안내 글(`prompt`)은 **텍스트 키 또는 글**이다. 기본 고르기 창은 텍스트 표에 그 키가 있으면 지금 언어로 번역해 보이고, 없으면 적은 글 그대로 보인다(비우면 "고르기"). 플레이어에게 보일 글이라 프로젝트는 키로 쓴다(`"choice.discard"` — 관례 7절). 위 예의 한글은 모양을 보이려는 것이다.
 - `then`은 이어서 할 행동이다. `[Chosen]` 필드가 있어야 한다(4-9). 없으면 `InvalidOperationException`("[MomoiProject] 이어서 할 행동 'X'에 고른 것을 받을 [Chosen] 필드가 없습니다.").
 - `source`는 요구한 항목 ID(기록용), `player`는 답할 플레이어 번호(글자, 2-6). 생략하면 멀티에서는 이 행동을 한 플레이어, `""`면 누구나다.
 - 행동 안에서 부른다(다음 줄은 고르기 전에 실행된다, 2-6).
@@ -713,7 +714,7 @@ public class DiscardChosen : GameAction
 | 위의 `List<…>` · 배열 | 고른 것 여럿(고른 순서대로) |
 
 - 한 행동에 하나만 둔다(처음 것만 쓴다). 다른 형식이면 요구할 때 "[MomoiProject] 'X.f': [Chosen] 필드는 string, id가 있는 클래스, 그 리스트·배열이어야 합니다." 예외.
-- 객체 칸은 답하는 순간 다시 찾는다. 그 사이 후보가 데이터에서 사라졌으면 "… 'card3'을(를) 찾을 수 없습니다" 로 답하기가 실패한다. 사라질 수 있는 후보는 `string` 칸으로 받고 이어서 할 행동에서 `Game.Find`로 확인한다.
+- 객체 칸은 답하는 순간 다시 찾는다. 그 사이 후보가 데이터에서 사라졌으면 플레이어용 실패 "대상이 이미 없습니다."(`momoi.fail.targetGone`, 02장 2.2)로 답하기가 실패한다. 사라질 수 있는 후보는 `string` 칸으로 받고 이어서 할 행동에서 `Game.Find`로 확인한다.
 - 글 선택지(`ChoiceCandidate`)와 DB 원본 ID 후보는 `string` 칸으로 받는다(플레이어 데이터 객체가 아니다).
 - 이어서 할 행동의 다른 필드(수치·원본 ID·대상 객체)는 요구할 때 채워 둔다. 대상 필드는 예약처럼 id만 저장된다.
 
@@ -749,7 +750,7 @@ Game.Answer(choice.id, picked.Cast<object>().ToList());    // 목록으로
 
 ### 4-10b. 다시 뽑기 — `Game.RerollChoice`
 
-"보상 다시 뽑기(남은 횟수 1)"처럼 기다리는 선택의 후보를 새로 뽑는다. 결과 `가중치 표에서 고르기`(30장 3-3)로 만든 선택만 된다.
+"보상 다시 뽑기(남은 횟수 1)"처럼 기다리는 선택의 후보를 새로 뽑는다. `Game.RerollChoice`는 결과 `가중치 표에서 고르기`(30장 3-3)로 만든 선택(표로 만든 선택 — `table`이 있다)만 된다. 코드 풀로 `Game.Ask`한 선택(레벨업 셋 중 하나 — 후보를 규칙 함수가 `Game.Roll(풀, …)`로 만든 것)은 아래 두 번째 행동처럼 취소하고 다시 묻는다.
 
 ```csharp
 [Serializable, BlockInfo("보상 다시 뽑기")]
@@ -761,6 +762,19 @@ public class RerollReward : GameAction
     {
         Game.Pay(GameIds.PlayerData.Run.Id, "rerolls", 1, what: "reroll.name");   // 남은 횟수가 없으면 실패 → 아무것도 바뀌지 않는다
         if (!Game.RerollChoice(choice)) throw Game.Fail("fail.cannotReroll", "다시 뽑을 수 없는 선택입니다.");
+    }
+}
+
+// 코드 풀 선택: 취소하고 처음과 같은 규칙 함수로 다시 묻는다(새 선택 id, 새 후보)
+[Serializable, BlockInfo("레벨업 다시 뽑기")]
+public class RerollLevelUp : GameAction
+{
+    public string choice;
+    protected override void Run()
+    {
+        Game.Pay(GameIds.PlayerData.Run.Id, "rerolls", 1, what: "reroll.name");
+        if (!Game.CancelChoice(choice)) throw Game.Fail("fail.cannotReroll", "다시 뽑을 수 없는 선택입니다.");
+        LevelUpRules.Offer(Game);    // 레벨업 때 부른 그 함수: Game.Roll(풀, 3, unique: true, stream: "levelUp") → Game.Ask(…, source: "levelUp")
     }
 }
 
@@ -776,10 +790,21 @@ GameScreens.Do(() => new RerollReward { choice = Game.Choice.id }, whileChoosing
 | 비용 | `RerollChoice`는 비용·남은 횟수를 보지 않는다. 부르는 행동이 `Game.Pay` 등으로 정한다 |
 | 난수 | 그 표의 난수 흐름을 이어서 쓴다(30장 2-3). 같은 시드·같은 순서면 같은 후보가 나온다 |
 | Undo | 다시 뽑은 행동을 Undo하면 원래 후보로 돌아간다(낸 비용도) |
-| `false` | 표로 만든 선택이 아니거나(`Game.Ask`·`선택 요구`), 이미 답한 선택이거나, 표에서 아무것도 나오지 않았다(모두 꽝). 그때 후보는 그대로다 |
+| `false` | 표로 만든 선택이 아니거나(`Game.Ask`·`선택 요구` — 코드 풀이면 `RerollLevelUp`처럼 취소 뒤 다시 묻기), 이미 답한 선택이거나, 표에서 아무것도 나오지 않았다(모두 꽝). 그때 후보는 그대로다 |
 
 - `false`일 때 낸 비용을 되돌리려면 위처럼 `throw Game.Fail`로 행동을 실패시킨다(바꾼 것이 모두 취소된다, 30장 2-4).
-- **화면의 다시 뽑기 버튼.** 기본 고르기 창은 `GameScreens.Reroll`(선택 → 다시 뽑기 행동, null이면 숨김)을 정하면 '가중치 표에서 고르기'로 만든 선택에 '다시 뽑기' 버튼을 보인다: `GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;`(시작 코드에서 한 번). 직접 만든 고르기 창에서는 `GameScreens.Do(() => 행동, whileChoosing: true)`로 보낸다 — 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다(35장 2-4).
+- 취소 뒤 다시 묻기는 새 선택이라 선택 id가 바뀌고 `ChoiceRequested`가 새로 온다. 이어서 할 행동·안내 글·`source`는 다시 묻는 함수가 처음처럼 정한다(그래서 처음 묻는 일을 규칙 함수 하나에 둔다). Undo하면 취소·새 선택이 함께 돌아가 원래 선택이 다시 기다린다.
+- **화면의 다시 뽑기 버튼.** 기본 고르기 창은 `GameScreens.Reroll`(선택 → 다시 뽑기 행동)이 행동을 돌려주는 **모든 선택**에 '다시 뽑기' 버튼을 보인다(null이면 숨김). 표로 만든 선택과 코드 풀 선택을 `table`·`source`로 가린다(시작 코드 `Bootstrap.Started`에서 한 번):
+
+```csharp
+GameScreens.Reroll = choice =>
+    Game.Data().Run.rerolls <= 0 ? null
+    : !string.IsNullOrEmpty(choice.table) ? new RerollReward { choice = choice.id }    // 표로 만든 선택
+    : choice.source == "levelUp" ? new RerollLevelUp { choice = choice.id }           // 코드 풀(Ask의 source로 가림)
+    : null;                                                                            // 그 밖은 버튼 없음
+```
+
+  직접 만든 고르기 창에서는 `GameScreens.Do(() => 행동, whileChoosing: true)`로 보낸다 — 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다(35장 2-4).
 
 ### 4-11. `PendingChoice` · `ChoiceCandidate` · `ChoiceRequested` · `ChoiceAnswer`
 
@@ -795,7 +820,8 @@ GameScreens.Do(() => new RerollReward { choice = Game.Choice.id }, whileChoosing
 | `table` · `count` · `unique` | `가중치 표에서 고르기`로 만든 선택이면 그 표 ID · 후보 수 · 서로 다른 것만(다시 뽑기용, 4-10b). 그 밖의 선택은 `table`이 비어 있다 |
 | `wantMin` · `wantMax` | 처음 요구한 최소·최대(다시 뽑아 후보 수가 바뀔 때 기준, 4-10b) |
 
-- `ChoiceCandidate { id, label }` — 후보 하나. `new ChoiceCandidate(id, label)`에서 `label`을 비우면 보여 줄 때 그때 언어로 텍스트 표의 `<id>.name`(없으면 id)을 읽는다 — 요구한 순간에 번역해 넣지 않으므로 언어를 바꾼 뒤·불러온 뒤·다른 언어로 도는 서버에서도 보는 쪽 언어다. 화면 글은 `option.DisplayText()`(`label`이 텍스트 키면 그 번역).
+- `ChoiceCandidate { id, label, detail }` — 후보 하나. `new ChoiceCandidate(id, label, detail)`에서 `label`을 비우면 보여 줄 때 그때 언어로 텍스트 표의 `<id>.name`(없으면 id)을 읽는다 — 요구한 순간에 번역해 넣지 않으므로 언어를 바꾼 뒤·불러온 뒤·다른 언어로 도는 서버에서도 보는 쪽 언어다. 화면 글은 `option.DisplayText()`(`label`이 텍스트 키면 그 번역).
+- `detail`은 설명(글 또는 텍스트 키). 비우면 보여 줄 때 텍스트 표의 `<id>.desc`(있을 때만)를 읽는다. 같은 후보가 때마다 다른 설명을 보여야 하면(레벨업의 "단검 Lv3: 투사체 +1") 키로 넣는다: `new ChoiceCandidate("dagger", null, "dagger.lv3.desc")`. 화면 글은 `option.DetailText()`(없으면 빈 글) — 기본 고르기 창이 후보 버튼 안 이름 아래에 보인다(35장 2-5). 설명을 후보마다 정하려면 이 글 선택지 형태로 `Ask`한다(객체·id 후보 형태에는 `label` 함수만 있다).
 - `ChoiceRequested`(`[GameEvent("선택 요구")]`: `choice` · `prompt` · `player`) — 선택을 요구한 순간 쏜다(요구한 행동이 실패하면 오지 않는다). 다시 뽑기(`Game.RerollChoice`)도 같은 선택 id로 다시 쏜다. 답하기를 Undo해서 다시 기다리게 될 때·판을 불러올 때는 쏘지 않는다. 그래서 고르기 창을 여닫거나 그리는 신호로 쓰지 않는다 — 창은 데이터(`Game.IsWaiting`·`Game.Choice`)를 보고 열리고 그린다. 이 이벤트는 연출·소리·다른 규칙이 받는다(5-10).
 - `ChoiceAnswer`(`choice` · `picked`) — 답하기 행동. 공개 행동이라 타임라인·행동 탭에 "선택: card3"(고르지 않았으면 "선택: 고르지 않음")으로 남는다. 멀티플레이에서는 이 행동이 서버로 간다.
 - `session.Choices`(`ChoiceSystem`): `Ask(prompt, options, then, min, max, source, player)`(글 선택지 형태) · `Current`(= `Game.Choice`) · `All` · `Cancel(id)` · `Reroll(id)`(= `Game.RerollChoice`) · `MarkTable(id, table, count, unique, wantMin = -1, wantMax = -1)`(표로 만든 선택이라고 적어 둔다. 코드로 표에서 뽑아 `Ask`한 선택도 이것을 부르면 다시 뽑을 수 있다. `wantMin`·`wantMax`를 비우면 지금 최소·최대) · `Key`(`"$choices"`, 누구나 답하는 선택) · `KeyFor(player)`(그 플레이어의 키 `"$choices:번호"`, 비우면 `Key`) · `IsChoiceKey(key)`.
@@ -1081,7 +1107,7 @@ public class DiscardChosen : GameAction
 
 ### 5-8. 보상 3개 중 1개 — DB 원본 ID · 글 선택지
 
-> DB에서만 만들려면 결과 `가중치 표에서 고르기`(30장 3-3·5-5): 표에서 뽑아 보이고, 고른 원본 ID를 목록에 넣거나 고른 뒤 결과로 넘긴다. 결과 `선택 요구`의 후보는 판 데이터의 객체(id가 있는 것)만이라 원본 ID는 이쪽이다. 이렇게 만든 선택은 다시 뽑기(4-10b)도 된다. 아래처럼 코드로 `Game.Ask`한 선택은 그대로는 다시 뽑지 못한다(표에서 뽑아 요구했다면 `session.Choices.MarkTable`, 4-11).
+> DB에서만 만들려면 결과 `가중치 표에서 고르기`(30장 3-3·5-5): 표에서 뽑아 보이고, 고른 원본 ID를 목록에 넣거나 고른 뒤 결과로 넘긴다. 결과 `선택 요구`의 후보는 판 데이터의 객체(id가 있는 것)만이라 원본 ID는 이쪽이다. 이렇게 만든 선택은 다시 뽑기(`Game.RerollChoice`, 4-10b)도 된다. 아래처럼 코드로 `Game.Ask`한 선택은 `RerollChoice`로는 다시 뽑지 못한다 — 표에서 뽑아 요구했다면 `session.Choices.MarkTable`(4-11), 코드 풀이면 취소 뒤 다시 묻는 행동(4-10b `RerollLevelUp`).
 
 **카드 보상**: 후보가 플레이어 데이터 객체가 아니라 DB 원본 ID이므로 글 선택지로 요구하고 `string`으로 받는다.
 
@@ -1484,13 +1510,15 @@ protected override void Draw()
 | "…[Chosen] 필드는 string, id가 있는 클래스, 그 리스트·배열이어야 합니다." | `int`·id 없는 클래스 같은 형식에 붙였다. |
 | 후보를 넘겼더니 "…에 string id 필드가 없어 개체로 찾거나 가리킬 수 없습니다." | 후보 객체의 클래스에 `id`가 없다. `public string id;`를 두거나 id 글자·`ChoiceCandidate`로 넘긴다(4-8). |
 | 답하기가 "1개를 골라야 합니다(고른 것 0개)."로 실패 | 개수가 최소~최대 밖이다. 아무것도 바뀌지 않았고 선택은 그대로 기다린다. 화면이 메시지를 보여 주고 다시 고르게 한다. |
-| 고른 카드가 답하기 전에 없어져 답하기가 실패("…을(를) 찾을 수 없습니다") | `[Chosen]`이 객체 칸이면 답하는 순간 다시 찾는다. 사라질 수 있는 후보는 `string` 칸으로 받고 이어서 할 행동에서 확인한다(4-9). |
+| 고른 카드가 답하기 전에 없어져 답하기가 실패("대상이 이미 없습니다.") | `[Chosen]`이 객체 칸이면 답하는 순간 다시 찾는다. 사라질 수 있는 후보는 `string` 칸으로 받고 이어서 할 행동에서 확인한다(4-9). |
 | 답하기를 Undo했더니 고르기 창이 안 열림 | 직접 만든 창이 `ChoiceRequested`를 받아 열린다(Undo·불러오기 뒤에는 오지 않는다). 기본 고르기 창을 쓰거나 같은 ID로 바꿔 데이터(`Game.IsWaiting`·`Game.Choice`)로 열고 그린다(5-10). |
 | 고르는 중에 다른 카드가 눌림 | 시스템은 다른 행동을 막지 않는다. 버튼은 `OnClick`·`GameScreens.Do`로 보내면 저절로 막히고, `Game.Do`를 직접 부르는 입력은 `Game.IsWaiting`으로 먼저 막는다(5-10). |
 | 선택 요구의 버튼에 id만 보임 | 후보 이름은 텍스트 표의 `<id>.name`이고 없으면 id다. DB 항목 ID면 이름 키를 채운다(23장 1절). 판 안의 개체(`card3`)는 이름 키가 없다 — 코드의 `Game.Ask`는 `label`을 주고, DB `선택 요구`는 고르기 창을 바꿔 id로 객체를 찾아 그린다(5-10). |
 | 유물의 선택 요구가 기다리지 않고 지나감 | 후보가 없었다. 유물·상태 효과에는 고른 대상이 없으므로 후보 칸에 대상 Block(`모든 적` 등)을 둔다. 전투 밖이면 적이 없어 후보도 없다. |
 | 멀티플레이에서 다른 플레이어의 답이 "다른 플레이어에게 온 선택입니다."로 실패 · 고르기 창이 그 사람에게만 뜸 | 정상이다. `player`를 생략하면 그 행동을 한 플레이어에게 묻고, 그 사람의 키(`$choices:번호`)에만 간다. 누구나 답하게 하려면 `player: ""`(2-6). |
-| `Game.RerollChoice`가 `false`, 후보가 그대로 | `가중치 표에서 고르기`로 만든 선택이 아니다(`Game.Ask`·`선택 요구`는 다시 뽑지 못한다). 이미 답한 선택이다. 표에서 아무것도 나오지 않았다(모두 꽝)(4-10b). |
+| `Game.RerollChoice`가 `false`, 후보가 그대로 | `가중치 표에서 고르기`로 만든 선택이 아니다(`Game.Ask`·`선택 요구` — 코드 풀이면 `CancelChoice` 뒤 다시 `Ask`). 이미 답한 선택이다. 표에서 아무것도 나오지 않았다(모두 꽝)(4-10b). |
 | 다시 뽑기 버튼을 눌러도 아무 일이 없음 | 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다. `GameScreens.Do(() => 행동, whileChoosing: true)`, 기본 고르기 창이면 `GameScreens.Reroll`을 정한다(4-10b). |
+| 기본 고르기 창에 다시 뽑기 버튼이 없음 | `GameScreens.Reroll`을 정하지 않았거나 그 선택에 `null`을 돌려줬다(표로 만든 선택만 거르는 식이면 코드 풀 선택에는 버튼이 없다 — `source`로 가린다, 4-10b). |
+| 레벨업 후보 설명이 레벨마다 같음 | `<id>.desc` 하나만 읽힌다. 후보의 `detail`에 레벨별 키를 넣어 글 선택지로 `Ask`한다(4-11). |
 | 다시 뽑기를 했는데 남은 횟수가 줄지 않음 | `RerollChoice`는 비용을 보지 않는다. 부르는 행동이 `Game.Pay`로 낸다(4-10b). |
 | 다시 뽑았는데 후보 수에 더한 숫자가 바뀐 만큼 늘지 않음 | 다시 뽑기는 처음 요구할 때의 후보 수를 쓴다(4-10b). |
