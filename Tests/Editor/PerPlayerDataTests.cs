@@ -47,6 +47,26 @@ namespace GBible.Tests
         }
 
         [Test]
+        public void 혼자_하기_세션이_방이_되면_0번_몫은_지우고_방장은_새_몫을_받는다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            session.Data.DefinePerPlayer("army", DataZone.Session, typeof(PpArmy), new PpArmy(), "군대");
+            session.Data.AddPlayer(session.LocalPlayer);
+            session.Do(new Edit { run = g => g.Get<PpArmy>("army").gold = 9 });
+            Assert.AreEqual(9, session.Data.Get<PpArmy>("army:0").gold, "혼자 하기 = 0번 몫");
+
+            var net = new MemoryNetwork { Manual = true };
+            using (var server = new NetServer(session, net.Server()))
+            {
+                server.Start();
+                server.AddLocalPlayer("방장");
+                CollectionAssert.AreEqual(new[] { "army:1" }, session.Data.KeysOfAllPlayers("army").ToArray(), "0번 몫은 남지 않는다");
+                Assert.AreEqual(0, session.Game.Get<PpArmy>("army").gold, "방장(1번)은 처음 값");
+                Assert.DoesNotThrow(() => session.Undo(), "지운 몫을 바꾼 지난 행동도 되돌릴 수 있다(지운 키는 건너뜀)");
+            }
+        }
+
+        [Test]
         public void 패시브_효과는_모든_플레이어_몫을_훑고_같은_몫의_대상에게만_보탠다()
         {
             var banner = new PassiveDefinition { Id = "banner", OwnerKey = "army", OwnerPath = "relics", ModifierTarget = "hero" };

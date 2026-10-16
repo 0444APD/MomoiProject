@@ -99,6 +99,8 @@ namespace GBible
             Options = options ?? new NetServerOptions();
             if (session.Role == SessionRole.Client) throw new InvalidOperationException("[MomoiProject] 클라이언트 세션으로는 서버를 열 수 없습니다.");
             session.Role = SessionRole.Server;
+            // 혼자 하기 세션이 방이 되면(방장 · 화면 없는 서버) 혼자 하기의 플레이어마다 몫(0번)을 지운다 — 몫은 들어오는 사람(방장 포함)마다 새로 생긴다.
+            if (!session.Data.InTransaction) session.Data.RemovePlayer(0);
             session.Data.Synced += OnSynced;
             session.Data.Changed += OnChanged;
             session.Data.KeyDefined += OnKeyChanged;

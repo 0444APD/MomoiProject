@@ -407,6 +407,21 @@ namespace GBible
             }
         }
 
+        // 그 플레이어의 몫을 모두 지운다(행동 밖 — 혼자 하기 세션이 방이 될 때 0번 몫). 지운 키 수.
+        public int RemovePlayer(int player)
+        {
+            if (_active != null) throw new InvalidOperationException("[MomoiProject] 행동 실행 중에는 플레이어 몫을 지울 수 없습니다.");
+            var removed = 0;
+            foreach (var key in _perPlayer.Keys.Select(k => KeyFor(k, player)).ToList())
+            {
+                if (!_slots.Remove(key)) continue;
+                _lastEntry.Remove(key);
+                _visibility.Remove(key);
+                removed++;
+            }
+            return removed;
+        }
+
         // 그 이름의 모든 플레이어 몫(army:1 · army:2 …, 번호순).
         public IEnumerable<string> KeysOfAllPlayers(string key)
         {
@@ -1348,7 +1363,7 @@ namespace GBible
             {
                 var change = tx.ValueChanges[i];
                 if (change.Permanent && !includePermanent) continue;
-                var slot = _slots[change.Key];
+                if (!_slots.TryGetValue(change.Key, out var slot)) continue;   // 그 뒤 지운 키(방이 되며 지운 혼자 하기 몫)
                 var current = slot.Value;
                 if (reason == "Undo" && lastSeen.Add(change.Key) && !Equals(current, change.New)) overwritten.Add(change.Key);
                 slot.Value = change.Old;
@@ -1363,7 +1378,7 @@ namespace GBible
             {
                 var record = tx.DataChanges[i];
                 if (record.Permanent && !includePermanent) continue;
-                var slot = _slots[record.Key];
+                if (!_slots.TryGetValue(record.Key, out var slot)) continue;   // 그 뒤 지운 키
                 if (DetectUntrackedChanges) AdoptUntracked(record.Key, slot);
                 var before = slot.Shadow ?? DataModel.Clone(slot.Value, Identity);
                 slot.Value = DataModel.ApplyInPlace(slot.Value, record.Before, Identity);
