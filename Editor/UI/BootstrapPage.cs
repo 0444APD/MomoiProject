@@ -178,7 +178,7 @@ namespace GBible.EditorTools.UI
             endField.tooltip = "이 이벤트를 받으면 그 행동이 끝난 뒤 판 저장을 지우고 프로필을 바로 저장한다. 그 뒤 다른 행동이 판 데이터를 바꾸면(새 판) 다시 저장한다.";
             root.Add(endField);
             var profileField = new Toggle("프로필도 행동마다 저장") { value = profileEach };
-            profileField.tooltip = "끄면 프로필은 끌 때와 판 끝 이벤트 때만 저장된다. 진행이 거의 프로필에 있는 게임(수집형·방치형)은 켠다.";
+            profileField.tooltip = "켜면 프로필(메타 구역)을 바꾼 행동마다 프로필을 저장한다(바꾸지 않은 행동에서는 쓰지 않는다). 끄면 끌 때 · 판 끝 이벤트 때 · 판을 저장할 때 그사이 바뀌었으면 저장된다. 진행이 거의 프로필에 있는 게임(수집형 · 마을이 있는 게임)은 켠다.";
             profileField.RegisterValueChangedCallback(e => { profileEach = e.newValue; SaveRunOptions(); });
             root.Add(profileField);
 

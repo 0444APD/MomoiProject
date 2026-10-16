@@ -257,22 +257,9 @@ namespace GBible
 
         static void LogMirrorWarning(string message) => Debug.LogWarning("[MomoiProject] " + message);
 
-        // 인스턴스 값의 사용 기능(Usable 필드, 붙어 있을 때). 게임이 켜질 때만 부른다(필드 목록은 형식마다 한 번 찾아 둔다).
-        static readonly System.Collections.Generic.Dictionary<Type, System.Reflection.FieldInfo> UsableFields = new System.Collections.Generic.Dictionary<Type, System.Reflection.FieldInfo>();
+        // 인스턴스 값의 사용 기능(Usable 필드, 붙어 있을 때). 게임이 켜질 때만 부른다(Usable.Of — 필드 목록은 형식마다 한 번 찾아 둔다).
 
-        static Usable UsableOf(object value)
-        {
-            if (value == null) return null;
-            var type = value.GetType();
-            if (!UsableFields.TryGetValue(type, out var field))
-            {
-                for (var t = type; t != null && field == null; t = t.BaseType)
-                    field = t.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
-                        .FirstOrDefault(f => f.FieldType == typeof(Usable));
-                UsableFields[type] = field;
-            }
-            return field?.GetValue(value) as Usable;
-        }
+        static Usable UsableOf(object value) => Usable.Of(value);
 
         public static GameSession Start()
         {

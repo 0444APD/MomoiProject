@@ -230,6 +230,18 @@ namespace GBible.Tests
             Assert.AreEqual(20, ((TbUnit)session.CopyInstance("orc")).hp);
         }
 
+        [Serializable] public class TbPotion { public string id; public Usable usable; }
+
+        [Test]
+        public void DefineInstance는_사용_기능이_붙은_원본을_Game_Use로_쓸_수_있게_한다()
+        {
+            var session = new GameSession(new SessionOptions { Seed = 1 });
+            session.DefineInstance("potion", new TbPotion { id = "potion", usable = new Usable() });
+            session.DefineInstance("rock", new TbPotion { id = "rock" });   // 사용 기능 없음
+            Assert.DoesNotThrow(() => session.Game.Use("potion", null));
+            Assert.Throws<InvalidOperationException>(() => session.Game.Use("rock", null));
+        }
+
         [Test]
         public void 찾지_못한_참조는_행동_실패로_변경이_없다()
         {

@@ -35,5 +35,27 @@ namespace GBible
             definition.Outcomes.AddRange(then.Where(o => o != null));
             return definition;
         }
+
+        // 값(인스턴스 원본)에 붙은 사용 기능(형식의 Usable 필드 — 없거나 비었으면 null). 런타임은 게임이 켜질 때, 테스트는 DefineInstance에서 부른다
+        // (형식마다 한 번 필드를 찾아 둔다 — 실행 중에는 부르지 않는다).
+        public static Usable Of(object value)
+        {
+            if (value == null) return null;
+            var type = value.GetType();
+            System.Reflection.FieldInfo field;
+            lock (Fields)
+            {
+                if (!Fields.TryGetValue(type, out field))
+                {
+                    for (var t = type; t != null && field == null; t = t.BaseType)
+                        field = t.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
+                            .FirstOrDefault(f => f.FieldType == typeof(Usable));
+                    Fields[type] = field;
+                }
+            }
+            return field?.GetValue(value) as Usable;
+        }
+
+        static readonly Dictionary<Type, System.Reflection.FieldInfo> Fields = new Dictionary<Type, System.Reflection.FieldInfo>();
     }
 }

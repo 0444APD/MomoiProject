@@ -130,6 +130,8 @@ namespace GBible
             }
             if (!_testInstances.ContainsKey(id)) _testInstanceIds.Add(id);
             _testInstances[id] = value;
+            // 사용 기능(Usable 필드)이 붙은 원본이면 런타임처럼 Game.Use(인스턴스 ID, …)로 쓸 수 있게 등록한다.
+            if (Usable.Of(value) is Usable use) Abilities.Define(use.ToDefinition(id));
         }
 
         Dictionary<string, object> _testInstances;
