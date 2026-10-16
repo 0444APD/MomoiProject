@@ -350,6 +350,7 @@ namespace GBible
             public string Label;
             public bool OwnerOnly;
             public bool Account;
+            public bool ServerOnly;
         }
 
         readonly Dictionary<string, PerPlayerTemplate> _perPlayer = new Dictionary<string, PerPlayerTemplate>(StringComparer.Ordinal);
@@ -359,12 +360,13 @@ namespace GBible
 
         // account: 매칭 계정에 남긴다(재화 · 해금 · 로스터) — 매칭큐 서버(NetHub)가 방을 열 때 그 사람 계정에서 읽고, 매치가 끝나면 계정에 다시 쓴다.
         // 판(Session) 구역만 된다 — 프로필(Meta)은 기기마다 하나라 각자 자기 프로필을 쓴다(방장의 프로필에 남의 몫을 저장하지 않게). 매치가 끝나도 남길 값은 account.
-        public void DefinePerPlayer(string key, DataZone zone, Type type, object defaultValue, string label = null, bool ownerOnly = false, bool account = false)
+        // serverOnly: 그 사람에게도 보내지 않는다(서버 규칙만 — 덱 순서 · 숨긴 패). ownerOnly보다 먼저.
+        public void DefinePerPlayer(string key, DataZone zone, Type type, object defaultValue, string label = null, bool ownerOnly = false, bool account = false, bool serverOnly = false)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
             if (zone != DataZone.Session)
                 throw new ArgumentException($"[MomoiProject] 플레이어마다 데이터 '{key}'는 판(Session) 구역만 됩니다. 프로필은 기기마다 하나라 각자 자기 프로필을 쓰고, 매치가 끝나도 남길 값은 '매칭 계정에 남김'으로 둡니다.", nameof(zone));
-            _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly, Account = account };
+            _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly, Account = account, ServerOnly = serverOnly };
         }
 
         public bool IsPerPlayer(string key) => key != null && _perPlayer.ContainsKey(key);
@@ -465,7 +467,8 @@ namespace GBible
                 var template = pair.Value;
                 var value = template.Default == null ? null : DataModel.Clone(template.Default, null);
                 DefineOfType(concrete, template.Zone, template.Type, value, $"{template.Label} #{player}");
-                if (template.OwnerOnly) SetVisibility(concrete, DataVisibility.Owner, player);
+                if (template.ServerOnly) SetVisibility(concrete, DataVisibility.Server);
+                else if (template.OwnerOnly) SetVisibility(concrete, DataVisibility.Owner, player);
             }
         }
 

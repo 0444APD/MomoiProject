@@ -634,7 +634,13 @@ namespace GBible
                             }
                         }
                     }
-                    catch (GameFailure failure) { refused = failure.Message; }
+                    catch (GameFailure failure)
+                    {
+                        // Validate 안에서 던진 Game.Fail은 키 · 인자도 보낸다(받는 쪽이 자기 언어로).
+                        refused = failure.Text();
+                        failKey = failure.Key;
+                        failArgs = failure.Args;
+                    }
                     catch (Exception e) { refused = "행동 검사 중 오류: " + e.Message; }
                     if (refused != null) failMessage = refused;
                     else

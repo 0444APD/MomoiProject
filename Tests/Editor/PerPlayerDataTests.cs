@@ -155,11 +155,19 @@ namespace GBible.Tests
                 }
             }
             Pump();
+            Assert.IsTrue(client.Session.Game.CanDo(new PpEarn(), out _), "클라이언트 미리보기도 내 몫(army:2)으로");
             client.Session.Do(new PpEarn());
             Pump();
             Assert.AreEqual("army:2", seen, "Validate 안의 'army'는 보낸 사람(2번)의 몫");
             Assert.AreEqual(1, session.Data.Get<PpArmy>("army:2").gold);
             Assert.AreEqual(0, session.Data.Get<PpArmy>("army:1").gold);
+
+            NetActionFailure refused = null;
+            client.ActionFailed += f => refused = f;
+            server.Validate = (player, action) => throw session.Game.Fail("fail.notYourTurn", "내 차례가 아닙니다.");
+            client.Session.Do(new PpEarn());
+            Pump();
+            Assert.AreEqual("fail.notYourTurn", refused?.Key, "Validate의 Game.Fail은 키도 간다(받는 쪽 언어로)");
             client.Dispose();
             server.Dispose();
         }
@@ -206,6 +214,9 @@ namespace GBible.Tests
             Assert.IsTrue(_session.Data.ImportAccountValue("gems", 1, "5"));
             Assert.AreEqual(5, _session.Data.Get<int>("gems:1"));
             Assert.Throws<ArgumentException>(() => _session.Data.DefinePerPlayer("medals", DataZone.Meta, typeof(int), 0));
+            _session.Data.DefinePerPlayer("deck", DataZone.Session, typeof(PpArmy), new PpArmy(), "덱", serverOnly: true);
+            _session.Data.AddPlayer(3);
+            Assert.AreEqual(DataVisibility.Server, _session.Data.VisibilityOf("deck:3", out _), "서버만 — 그 사람에게도 보내지 않는다");
         }
     }
 }

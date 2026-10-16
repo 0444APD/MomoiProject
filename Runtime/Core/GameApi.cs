@@ -321,11 +321,22 @@ namespace GBible
         // 행동을 해 보고 결과만 읽는다(아무것도 남지 않음). 화면의 예상 피해·버튼을 막는 이유에 쓴다. 행동 밖에서 부른다.
         //   var hpAfter = Game.Preview(new PlayCard { card = c, target = enemy }, g => g.Find<Fighter>(enemy.id).hp);
         //   if (!Game.CanDo(new PlayCard { card = c, target = enemy }, out var why)) button.Disable(why);
-        public T Preview<T>(GameAction action, Func<GameApi, T> read) => Session.Actions.Preview(action, () => read(this));
+        // Do처럼 actorId를 비워 둔 행동에는 이 화면의 플레이어 번호를 채운다(멀티 클라이언트의 미리보기가 내 몫 — 'hand' — 을 보게).
+        public T Preview<T>(GameAction action, Func<GameApi, T> read)
+        {
+            FillActor(action);
+            return Session.Actions.Preview(action, () => read(this));
+        }
+
+        void FillActor(GameAction action)
+        {
+            if (action != null && action.actorId == 0 && !Session.Data.InTransaction) action.actorId = Session.LocalPlayer;
+        }
 
         // 지금 하면 성공하는가(해 보고 되돌린다). 실패하면 reason = 실패 글(GameFailure면 지금 언어).
         public bool CanDo(GameAction action, out string reason)
         {
+            FillActor(action);
             try
             {
                 Session.Actions.Preview<object>(action, null);

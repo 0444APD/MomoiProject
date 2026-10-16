@@ -119,6 +119,15 @@ namespace GBible
         // 이 화면의 클라이언트 연결이 끝났을 때(이유). 다시 접속하는 중에는 오지 않는다(다 실패하면 온다).
         public static event Action<string> Closed;
         public static event Action PlayersChanged;
+        // 매칭큐 로비 알림(이 화면의 클라이언트 것 — 다시 접속해 클라이언트가 새로 만들어져도 그대로 이어진다). Bootstrap의 Hook(AfterAssembliesLoaded)에서 +=.
+        public static event Action LobbyChanged;
+        public static event Action<NetMatchFound> MatchFound;
+        public static event Action<string, bool> MatchCancelled;
+        public static event Action<NetMatchEnd> MatchEnded;
+
+        // 매칭큐 서버의 매칭을 만드는 곳(비우면 LocalMatchmaker { PlayersPerMatch = 인원 }). 명령줄 -momoi-matchserver · 테스트 패널의 매칭큐 서버도 이것을 쓴다 —
+        // 종류(모드)마다 정원이 다른 매칭은 여기서: GameNet.CreateMatchmaker = players => new MyMatchmaker(players);
+        public static Func<int, INetMatchmaker> CreateMatchmaker;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -135,6 +144,11 @@ namespace GBible
             Joined = null;
             Closed = null;
             PlayersChanged = null;
+            LobbyChanged = null;
+            MatchFound = null;
+            MatchCancelled = null;
+            MatchEnded = null;
+            CreateMatchmaker = null;
             TokenSource = null;
             TokenWaitSeconds = 10;
             Rooms = new DirectRoomProvider();
@@ -259,7 +273,7 @@ namespace GBible
                 files.Log += message => Debug.LogWarning("[MomoiProject] " + message);
                 store = files;
             }
-            matchmaker ??= new LocalMatchmaker { PlayersPerMatch = Math.Max(1, playersPerMatch) };
+            matchmaker ??= CreateMatchmaker?.Invoke(Math.Max(1, playersPerMatch)) ?? new LocalMatchmaker { PlayersPerMatch = Math.Max(1, playersPerMatch) };
             Hub = new NetHub(new WebSocketServerTransport(port), room =>
             {
                 var session = GBibleRuntime.CreateSession();
@@ -372,8 +386,8 @@ namespace GBible
             NetClient created = null;
             GBibleRuntime.RestartAsClient(session => created = CreateClient(session, first, link, resume: false));
             Client = created;
-            // Started에서 등록된 개발 명령도 서버에서 돌게 한 번 더 맞춘다(위의 맞추기는 Started 전 — SessionCreated에서 등록된 것까지만 본다).
-            if (created != null) RemapDeveloperCommands(created.Session);
+            // Started에서 등록된 개발 명령은 화면 쪽 명령(배속 · 봇 조종 — 20장 4절)이라 이 화면에서 돈다(서버로 넘기지 않는다 — 서버 세션에는 Started가 오지 않아 같은 명령이 없다).
+            // 규칙(데이터)을 바꾸는 명령은 SessionCreated(RegisterRules)에서 등록한다 — 그것은 CreateClient에서 서버로 넘긴다.
             if (created != null) Connect(created, link);
             return created;
         }
@@ -408,6 +422,10 @@ namespace GBible
             {
                 if (client == Client) PlayersChanged?.Invoke();
             };
+            client.LobbyChanged += () => { if (client == Client) LobbyChanged?.Invoke(); };
+            client.MatchFound += found => { if (client == Client) MatchFound?.Invoke(found); };
+            client.MatchCancelled += (reason, requeued) => { if (client == Client) MatchCancelled?.Invoke(reason, requeued); };
+            client.MatchEnded += end => { if (client == Client) MatchEnded?.Invoke(end); };
             client.Closed += reason => OnClientClosed(client, reason);
             return client;
         }
