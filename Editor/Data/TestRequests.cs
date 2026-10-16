@@ -44,6 +44,8 @@ namespace GBible.EditorTools
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             // manifest.json이 바뀌었으면 패키지부터 다시 푼다(창이 뒤에 있으면 Unity가 저절로 풀지 않는다 — 다 들어온 뒤 다음 확인에서 이어서).
             if (PackageSync.ResolveIfChanged()) return;
+            // 기능 설정 파일을 고쳤으면 심볼 · asmdef 참조부터 맞춘다(다시 컴파일이 끝난 뒤 다음 확인에서 이어서).
+            if (GameFeatures.SyncIfChanged()) return;
 #if GBIBLE_TEST_FRAMEWORK
             if (SessionState.GetBool(RunningKey, false)) return;
             // 요청 하나에 한 번: 방금 쓴 코드가 아직 컴파일되지 않았을 수 있으니 먼저 새로 읽는다(컴파일되면 도메인을 다시 읽고 다음 확인에서 이어서).

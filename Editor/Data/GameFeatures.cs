@@ -151,6 +151,7 @@ namespace GBible.EditorTools
             else Current.enabled.Remove(feature.Id);
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath));
             File.WriteAllText(SettingsPath, JsonUtility.ToJson(Current, true));
+            SessionState.SetString(StampKey, FileStamp());
             ApplySymbols();
             Changed?.Invoke();
         }
@@ -179,11 +180,31 @@ namespace GBible.EditorTools
         static void SyncOnLoad()
         {
             _settings = null;
-            EditorApplication.delayCall += ApplySymbols;
+            SessionState.SetString(StampKey, FileStamp());
+            EditorApplication.delayCall += () => ApplySymbols();
         }
 
-        // 설정 파일에 맞게 심볼을 넣고 뺀다. 바뀐 것이 있을 때만 쓴다(다시 컴파일이 일어난다).
-        internal static void ApplySymbols()
+        const string StampKey = "MomoiProject.GameFeatures.Stamp";
+
+        static string FileStamp() => File.Exists(SettingsPath) ? File.GetLastWriteTimeUtc(SettingsPath).Ticks.ToString() : "";
+
+        // AI가 설정 파일을 고친 뒤(Play · RunTests 요청을 처리하기 전): 파일이 마지막으로 읽은 뒤 바뀌었으면 새로 읽어 심볼과 asmdef 참조를 맞춘다.
+        // 새로 읽기(AssetDatabase.Refresh)만으로는 ProjectSettings의 파일이 다시 읽히지 않는다 — 코드가 바뀌지 않았으면 도메인도 다시 뜨지 않는다.
+        // 맞추느라 다시 컴파일을 일으켰으면 참(요청 처리는 이번 확인을 건너뛰고, 컴파일이 끝난 뒤 이어서 한다).
+        public static bool SyncIfChanged()
+        {
+            var stamp = FileStamp();
+            if (SessionState.GetString(StampKey, "") == stamp) return false;
+            SessionState.SetString(StampKey, stamp);
+            _settings = null;
+            Debug.Log("[MomoiProject] 기능 설정(ProjectSettings/MomoiProject/Features.json)이 바뀌어 심볼 · 어셈블리 참조를 맞춥니다.");
+            var symbols = ApplySymbols();
+            Changed?.Invoke();   // StartSetup이 asmdef 참조를 맞춘다(바뀌면 새로 읽기)
+            return symbols || EditorApplication.isCompiling;
+        }
+
+        // 설정 파일에 맞게 심볼을 넣고 뺀다. 바뀐 것이 있을 때만 쓴다(다시 컴파일이 일어난다 — 그때 참).
+        internal static bool ApplySymbols()
         {
             var saved = false;
             foreach (var target in Targets())
@@ -222,6 +243,7 @@ namespace GBible.EditorTools
             }
             // 프로젝트 설정 파일에도 남긴다(다음에 열 때·배치 실행 때 다시 바꾸지 않도록).
             if (saved) AssetDatabase.SaveAssets();
+            return saved;
         }
 
         // 지금 고른 플랫폼, 지금 빌드 대상의 플랫폼, PC(에디터 기본), 서버(Dedicated Server).
