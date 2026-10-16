@@ -372,7 +372,7 @@ namespace GBible
             NetClient created = null;
             GBibleRuntime.RestartAsClient(session => created = CreateClient(session, first, link, resume: false));
             Client = created;
-            // Started에서 등록된 개발 명령도 서버에서 돌게 한 번 더 맞춘다(위의 맞추기는 Started 전에 돈다).
+            // Started에서 등록된 개발 명령도 서버에서 돌게 한 번 더 맞춘다(위의 맞추기는 Started 전 — SessionCreated에서 등록된 것까지만 본다).
             if (created != null) RemapDeveloperCommands(created.Session);
             if (created != null) Connect(created, link);
             return created;

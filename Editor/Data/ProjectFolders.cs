@@ -7,7 +7,7 @@ namespace GBible.EditorTools
 {
     // 프로젝트의 폴더 나눔(2026-10-06):
     //   Assets/MomoiProject/  시스템·AI가 쓰는 곳 — 개발자는 들어가지 않는다.
-    //     Code/       AI가 쓰는 코드(Rules · Client · Editor · Tests · Keywords + asmdef). DB의 요소 탭(클래스·이벤트·키워드)이 여기서 읽는다.
+    //     Code/       AI가 쓰는 코드(Rules · Client · Editor · Tests + asmdef, 키워드 그룹은 Rules/Keywords). DB의 요소 탭(클래스·이벤트·키워드)이 여기서 읽는다.
     //     Data/       DB 항목(종류마다 영어 폴더)·Resources/MomoiProject(GameDatabase·설정)·Texts·Tests(테스트 상황)
     //     UI/         화면 UXML·USS·Panel Settings·테마
     //     Generated/  생성 코드(형식이 asmdef 밖일 때의 GameIds)

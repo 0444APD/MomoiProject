@@ -38,7 +38,7 @@ namespace GBible.EditorTools
         public string InheritedFrom;
     }
 
-    // 클래스 탭의 내용: 컴파일된 클래스(코드가 원본) + 켜진 기능의 클래스.
+    // 클래스 탭의 내용: 컴파일된 클래스(코드가 원본 — 개발자가 선언한 것만, 시스템 · 기능의 클래스는 뺀다).
     // 컴파일된 형식은 TypeCache에서 읽는다. TypeCache는 컴파일할 때 Unity가 만들어 두는 목록이라,
     // 프로그래머가 코드를 고쳐도 다시 컴파일된 뒤 DB를 그릴 때 한 번 읽는 것으로 끝난다(감시·주기 검사 없음).
     public static class ClassCatalog

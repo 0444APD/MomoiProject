@@ -9,6 +9,14 @@
 - 버튼 입력을 행동으로 실행할 때
 - 행동·효과·조건 Block 안에서 다른 객체를 찾거나 난수를 쓸 때
 
+**꼭 지킬 것**(자세히는 괄호의 절)
+
+- 데이터를 바꾸는 멤버(`Set`·`Use`·`Pay`·`ApplyStatus`·`NewId` …)는 행동 안에서 쓴다. 화면 코드는 읽기(`Find`·`All`·`CanUse`·`Preview`)와 `Do`만 쓴다(02장).
+- 난수는 `Game.Random(흐름)`, 기믹이 고칠 수 있어야 하는 확률은 `Game.Chance`, 현실 시각은 `Game.Now` — `UnityEngine.Random`·`DateTime.Now`를 규칙에 쓰지 않는다(2.11·2.16).
+- `Find`·`All`은 부를 때마다 데이터를 훑는다. 한 행동 안에서 같은 객체를 여러 번 찾지 않고, 칸마다·객체마다 반복하지 않는다(2.15·3절).
+- 오래 들고 있을 것은 객체가 아니라 id로 들고 `Find`로 다시 찾는다(5절).
+- 이벤트를 화면에서 받을 때는 `SubscribeAfterAction`(2.13).
+
 ---
 
 ## 0. 용어
@@ -19,7 +27,7 @@
 | 세션 (`GameSession`) | 게임 한 판의 실행 전체. `Game.Session`으로 닿는다. |
 | 플레이어 데이터 | 세션의 저장소(`session.Data`)에 ID별로 담긴 값. 자세히는 [01-PlayerData.md](01-PlayerData.md). |
 | Mirror · Sync | 시스템이 플레이어 데이터마다 들고 있는 사본이 Mirror, 실제 값과 사본을 비교해 바뀐 곳을 기록하고 사본을 맞추는 동작이 Sync다. `Find`·`All`은 Sync한 뒤 사본을 따라가며 찾는다. |
-| Block | 에디터에서 골라 조립하는 로직 단위(조건·효과·대상·보상). Block 클래스 안에서도 `Game` 속성을 쓴다. |
+| Block | DB 항목 안에 조립하는 로직 단위(트리거·조건·결과·효과·대상). Block 클래스 안에서도 `Game` 속성을 쓴다. |
 | 행동 (`GameAction`) | 플레이어 입력 하나. Undo 한 단위. 자세히는 [02-Actions-Undo.md](02-Actions-Undo.md). |
 
 ---
@@ -37,6 +45,8 @@
 | 위치 | 쓰는 법 |
 |---|---|
 | 행동(`GameAction`)·조건(`SimpleCondition`)·효과·대상 Block 안 | 물려받은 `Game` 속성. 그 코드가 실행되는 동안만 들어 있다. |
+| `[BindTo]` 함수 | 컨텍스트의 `c.Game`(`TriggerContext`, 13장) |
+| 화면 코드(`GameScreen`) | 물려받은 `Game` 속성(= `GBibleRuntime.Game`, 35장) |
 | 씬 코드(MonoBehaviour) | `GBibleRuntime.Game` (보통 `GameApi Game => GBibleRuntime.Game;`로 줄여 둔다) |
 | 테스트·서버·시뮬레이션 | `session.Game` |
 
@@ -109,7 +119,7 @@ int gold = Game.Get<int>("player.gold");
 Game.Set("player.gold", gold + 100);
 ```
 
-숫자·글자·참거짓 같은 **단순 값** 플레이어 데이터를 ID로 읽고 바꾼다(`session.Data.Get<T>`·`Set`과 같다). 생성 코드가 있으면 `Game.Data().PlayerGold`가 더 편하다. 클래스 플레이어 데이터는 `Find`·`All`·`Game.Data()`로 객체를 꺼내 필드를 고친다.
+숫자·글자·참거짓 같은 **단순 값** 플레이어 데이터를 ID로 읽고 바꾼다(`session.Data.Get<T>`·`Set`과 같다). `Set`은 행동 안에서 부른다. 생성 코드가 있으면 `Game.Data().PlayerGold`가 더 편하다. 클래스 플레이어 데이터는 `Find`·`All`·`Game.Data()`로 객체를 꺼내 필드를 고친다.
 
 ### 2.7 `Game.Data()` — 이름으로 읽고 쓰기 (생성 코드)
 
@@ -178,7 +188,7 @@ int damage = 10 + Game.Random("damage").Range(0, 5);   // 0 이상 5 미만
 if (Game.Chance(0.25, "loot", source: GameIds.Passive.EightBall)) { … }   // 25%, 흐름을 비우면 "chance"
 ```
 
-`Game.Chance(확률, 흐름 = "chance", source, user)`는 굴리기 전에 행동 직전 이벤트 '확률'(`ChanceIntent`)을 거친다. 행운·"모든 확률 2배"가 확률을 바꾸고, 막으면 실패다. 확률이 바뀌어도 난수는 한 번만 굴린다(같은 시드면 뒤가 밀리지 않는다). 유물·패시브 효과가 고칠 수 있어야 하는 확률은 `Game.Random(…).Chance(p)` 대신 이것을 쓴다(07장 2.15).
+`Game.Chance(확률, 흐름 = "chance", source, user)`는 굴리기 전에 행동 직전 이벤트 '확률'(`ChanceIntent`)을 거친다. 행운·"모든 확률 2배"가 확률을 바꾸고, 막으면 거짓(실패를 던지지 않는다)이다. 확률이 바뀌어도 난수는 한 번만 굴린다(같은 시드면 뒤가 밀리지 않는다). 유물·패시브 효과가 고칠 수 있어야 하는 확률은 `Game.Random(…).Chance(p)` 대신 이것을 쓴다(07장 2.15).
 
 ### 2.12 `Game.NewId(prefix)` · `Game.NewIds(prefix, count)` — 새 id
 
@@ -197,12 +207,12 @@ string child = Game.NewId("u1");               // "u1_1", "u1_2", …(숫자로 
 ### 2.13 `Game.Events` — 이벤트
 
 ```csharp
-Game.Events.Publish(new EnemyKilled { enemy = "orc1" });                // 쏜다
-IDisposable sub = Game.Events.Subscribe<EnemyKilled>(e => PlayHitEffect(e.enemy));   // 받는다(연출)
-sub.Dispose();                                                            // 그만 받는다
+Game.Events.Publish(new EnemyKilled { enemy = "orc1" });                                       // 쏜다(행동 안에서)
+IDisposable sub = Game.Events.SubscribeAfterAction<EnemyKilled>(e => PlayHitEffect(e.enemy));   // 화면이 받는다(연출)
+sub.Dispose();                                                                                   // 그만 받는다
 ```
 
-`session.Events`(`EventBus`)와 같다. 이벤트를 받는 코드에서 플레이어 데이터를 바꾸면 행동 밖 변경이 되므로, 받는 쪽은 연출·UI만 한다. 이벤트 정의(`[GameEvent]`)와 쏘기·받기는 [10-Events.md](10-Events.md).
+`session.Events`(`EventBus`)와 같다. 받는 길은 둘이다: 화면 연출·UI는 `SubscribeAfterAction`(행동이 성공한 뒤에 받는다, 데이터를 바꾸지 않는다), 규칙은 `Subscribe`(행동 안에서 바로 받는다 — 거기서 바꾼 값은 그 행동의 변경, 던지면 행동 전체가 취소). 반응하는 기능(유물·도전과제·로그)은 코드로 받지 않고 DB 트리거로 만든다(11장). 자세히는 [10-Events.md](10-Events.md) 2-7.
 
 ### 2.14 `GameApi.IdOf(item)`
 
@@ -216,7 +226,7 @@ string id = GameApi.IdOf(hero);   // hero.id
 
 ### 2.15 확장 메서드로 장르 규칙 더하기
 
-`GameApi`는 `sealed`지만 확장 메서드를 붙일 수 있다. 장르마다 자주 쓰는 조회는 여기에 모은다(`Unit`은 4.0의 클래스).
+`GameApi`는 `sealed`지만 확장 메서드를 붙일 수 있다(`Unit`은 4.0의 클래스). 프로젝트의 계산·조회는 규칙 함수(`public static partial class Rules`, `Assets/MomoiProject/Code/Rules/Rules/<주제>Rules.cs`, 첫 인자 `GameApi game`)에 모아 행동·Block·`[BindTo]`가 같은 함수를 부른다(AI 관례 3절). 확장 메서드(`this GameApi game`)로 써도 같다.
 
 ```csharp
 using System;
@@ -259,7 +269,7 @@ public static class TacticsQueries
 |---|---|---|
 | `Now` · `Day(resetHour)` · `Week(resetHour, start)` | 현실 시각(UTC, 행동 안이면 그 행동이 시작한 순간), 날짜·주 번호. 규칙은 `DateTime.Now` 대신 이것 | [07](07-Random-Time.md) 2.11~2.13 |
 | `Attribute` · `AddModifier` · `RemoveModifiers` · `Modifiers` | 스탯 최종값, Modifier 붙이기·떼기 | [28](28-Attributes-Intercepts.md) |
-| `Intercept` · `Pay(key, path, 양, what, forId, user)` · `CanPay` | 행동 직전 이벤트, 비용 내기(행동 직전 이벤트 '비용 지불' 받기이 `floor`를 낮추면 빚을 낼 수 있다). `forId`(무엇을 위한 비용 — 사는 카드·쓰는 주문 ID)·`user`(내는 쪽)는 행동 직전 이벤트에 실려 행동 직전 이벤트가 거른다("행성 카드는 공짜") | [28](28-Attributes-Intercepts.md) |
+| `Intercept` · `Pay(key, path, 양, what, forId, user)` · `CanPay` | 행동 직전 이벤트 통과시키기, 비용 내기(모자라면 플레이어용 실패. 행동 직전 이벤트 '비용 지불'을 받는 쪽이 `floor`를 낮추면 빚을 낼 수 있다). `forId`(무엇을 위한 비용 — 사는 카드·쓰는 주문 ID)·`user`(내는 쪽)는 행동 직전 이벤트에 실려 받는 쪽이 거른다("행성 카드는 공짜"). `CanPay`는 행동 직전 이벤트 전 값이라 화면 미리 확인에만 | [28](28-Attributes-Intercepts.md) |
 | `TryPay(key, path, 양, forId, user)` | 낼 수 있으면 내고 `true`, 모자라면 아무것도 바꾸지 않고 `false`(실패를 던지지 않는다). 틱마다 도는 행동 안에서 "MP가 되면 쏜다" | [28](28-Attributes-Intercepts.md) |
 | `ApplyStatus(대상, id, 중첩, 출처, 길이, by)` · `RemoveStatus` · `StatusStacks` · `HasStatus` · `Statuses` | 상태 효과 걸기(길이를 비우면 상태 효과의 길이)·풀기·읽기. `by`(건 개체, 객체 또는 id)는 걸린 것의 `by`가 되고 다시 걸면 마지막에 건 쪽으로 바뀐다(처치 기여). 걸기 직전에 행동 직전 이벤트 '상태 효과 걸기'(`StatusIntent`)를 거친다. 행동 직전 이벤트가 상태 효과를 바꾸거나(화상 → 푸른 화상) 중첩·길이·최대 중첩·주기를 고치고, 막으면(면역) `ApplyStatus`는 `null`이다 | [29](29-Statuses-Schedules-Choices.md) |
 | `StatusCount(대상, 종류)` · `RemoveStatuses(대상, 종류)` | 그 종류(`StatusKind`: 버프·디버프)가 몇 가지 걸려 있나 · 그 종류를 모두 푼다(정화, 푼 가짓수) | [29](29-Statuses-Schedules-Choices.md) |
@@ -267,13 +277,15 @@ public static class TacticsQueries
 | `Owned(패시브 효과 id, 가진 쪽 = null)` | 그 패시브 효과를 몇 개(레벨) 가졌나. 가진 쪽을 비우면 모두의 합(레벨 필드가 있으면 그 합). '놓인 것마다' 패시브 효과면 가진 쪽 = 목록의 요소 하나 → 그 요소의 레벨. 레벨 0 이하인 요소와 침묵한 가진 쪽(상태 효과 '걸린 쪽의 패시브 효과를 끔')은 0으로 센다 | [17](17-Custom-Features.md) · [29](29-Statuses-Schedules-Choices.md) |
 | `BorrowPassive(패시브 효과 id, 원본)` | 빌려 쓰기: 지금 순간(트리거 결과·`[BindTo]` 안)으로 그 패시브 효과를 원본 조각의 것으로 한 번 더 낸다(Blueprint를 코드로). 결과 '빌려 쓰기'와 같다. 결과를 냈으면 `true` | [37](37-Placement.md) 4-3 · [17](17-Custom-Features.md) |
 | `ScheduleAfter` · `ScheduleOn<T>` · `CancelSchedule` · `CancelSchedules` | 예약 | [29](29-Statuses-Schedules-Choices.md) |
-| `Ask` · `Answer` · `Choice` · `CancelChoice` | 선택 대기 | [29](29-Statuses-Schedules-Choices.md) |
+| `Ask` · `Answer` · `Choice` · `Choices` · `IsWaiting` · `CancelChoice` | 선택 대기(`Ask`는 행동 안, `Answer`는 행동 밖 — 플레이어 입력) | [29](29-Statuses-Schedules-Choices.md) |
 | `RerollChoice(선택 id)` | 다시 뽑기(행동 안에서): '가중치 표에서 고르기'로 만든 선택의 후보를 같은 표·같은 후보 수로 새로 뽑는다. 표로 만든 선택이 아니면 `false`. 비용·남은 횟수는 부르는 행동이 맡는다(`Game.Pay`). Undo하면 원래 후보 | [29](29-Statuses-Schedules-Choices.md) · [30](30-Balance-Tables.md) |
 | `Balance(id)` · `Balance(id, x)` | 밸런싱 값, 곡선의 그 단계 값 | [30](30-Balance-Tables.md) |
 | `BalanceSum(id, from, count)` · `BalanceCount(id, from, budget)` | 단계 `from`부터 `count`개의 합("10개 사기"), 예산으로 단계 `from`부터 살 수 있는 개수 | [30](30-Balance-Tables.md) |
-| `Roll` · `Fail` | 가중치 표 뽑기, 플레이어용 실패 | [30](30-Balance-Tables.md) |
+| `Roll` · `Fail` | 가중치 표 뽑기(표 ID, 또는 규칙이 만든 후보 목록 + `stream`), 플레이어용 실패 | [30](30-Balance-Tables.md) |
+| `Entry<T>(id)` · `Entries<T>()` | DB 항목(프로젝트 DB 종류·선택 요소·설정 …)을 ID로 하나 / 그 형식 모두. 없거나 형식이 다르면 `null`. 원본이라 읽기만 한다. 반영 스크립트로 막 만든 항목을 `GameIds` 상수가 생기기 전에 읽을 때도 ID 글자로 이것을 쓴다. 인스턴스 원본은 `Session.Instances(id)`(04장) | [17](17-Custom-Features.md) 2-1 |
 | `World` · `WorldFlag` · `SetWorld` · `ClearWorld` | 월드 상태 | [32](32-View-Presentation-Scenes.md) |
-| `Preview` · `CanDo` · `IsPreviewing` | 행동을 해 보고 되돌리는 미리보기 | [33](33-Tick-Preview-Csv.md) |
+| `Preview` · `CanDo` · `IsPreviewing` | 행동을 해 보고 되돌리는 미리보기(예상 피해·"낼 수 없음" 이유 — 화면에서 따로 계산하지 않는다) | [33](33-Tick-Preview-Csv.md) |
+| `MarkRewind` · `Rewind` · `RewindKey` · `RewindEntity` · `RewindMarks` | 되감기 기믹(행동 안에서 지점의 모습으로 — 그 행동의 변경이라 Undo·저장·멀티에 남는다) | [40](40-Multiplayer.md) |
 
 ---
 
@@ -296,8 +308,8 @@ Game.Find<Unit>("orc1")
 
 - 사본에는 객체마다 원래 객체와 필드 값이 들어 있다. 비교 코드가 형식마다 `id` 필드의 위치를 알고 있어서 **실행 중 리플렉션 없이** 찾는다.
 - 사본은 마지막 Sync 때의 모습이라, 찾기 전에 그 키를 Sync한다. 그래서 방금 고친 id도 바로 찾힌다.
-- 예전 방식 데이터([01-PlayerData.md](01-PlayerData.md)의 6장)는 사본이 없어서 리플렉션으로 필드를 훑는다.
-- 찾는 비용은 데이터 크기에 비례한다. 매 프레임 많은 객체를 그릴 때는 `All`을 한 번 불러 리스트를 재사용하고, 객체마다 `Find`를 반복하지 않는다.
+- 예전 방식 데이터([01-PlayerData.md](01-PlayerData.md) 6절)는 사본이 없어서 리플렉션으로 필드를 훑는다.
+- 찾는 비용은 데이터 크기에 비례한다(줄이는 법은 2.15·5절).
 
 `id`는 필드(`public string id;`)든 속성(`public string Id { get; set; }`)이든 된다. 필드면 사본의 값으로, 속성이면 생성된 읽기 코드로 읽는다(둘 다 리플렉션 없음). 형식은 `string`이어야 한다.
 
@@ -347,6 +359,8 @@ public class UnitBoardView : MonoBehaviour
     public Unit Selected => Game.Find<Unit>(_selected);   // Undo·불러오기 뒤에도 지금 객체
 }
 ```
+
+이 예는 `All`·`Find`를 읽는 모양만 보인다. 씬 오브젝트를 데이터에 맞춰 그리는 일은 `ViewList`·`GameView.Redraw`(32장)가 값이 바뀐 프레임에만 하므로, 실제 화면은 매 프레임 `Update`에서 모으지 않고 그것을 쓴다.
 
 ### 4.2 전술: 주변 적에게 범위 공격
 
@@ -435,24 +449,25 @@ public static class Versus
 
 ```csharp
 using GBible;
-using UnityEngine;
-using UnityEngine.UI;
+using GBible.Ids;
+using UnityEngine.UIElements;
 
-public class SkillButton : MonoBehaviour
+// 화면 코드(35장): Assets/MomoiProject/Code/Client/Screens/SkillBar.cs, DB › 화면 skillBar
+[BindTo(GameIds.Screen.SkillBar)]
+public class SkillBar : GameScreen
 {
-    public Button button;
-    public string ability = "ability.heal";
-    public string casterId = "hero";
-    GameApi Game => GBibleRuntime.Game;
+    const string Caster = "hero";                       // 사용자는 id로 들고 있는다
+    static string Ability => GameIds.Ability.Heal;
 
-    void Update()
+    protected override void OnOpen() =>
+        OnClick("heal", () => new UseAbility { ability = Ability, user = Caster });   // Game.Use와 같은 행동. 조건이 안 맞으면 알림
+
+    protected override void Draw()                      // 값이 바뀔 때 다시 그린다
     {
-        var caster = Game?.Find<Unit>(casterId);
-        if (caster == null) return;
-        button.interactable = Game.CanUse(ability, caster, out _);
+        var button = Q<Button>("heal");
+        button.SetEnabled(Game.CanUse(Ability, Caster, out var why));   // 아무것도 바꾸지 않는 미리 검사
+        button.tooltip = why;                                           // 안 될 때 이유(지금 언어)
     }
-
-    public void OnClick() => Game.Use(ability, casterId);
 }
 ```
 

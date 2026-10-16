@@ -38,6 +38,24 @@
 
 설정은 게임이 켜질 때 `GameLanguage`가 자동으로 읽는다. 코드에서 다룰 일은 언어 바꾸기·목록 정도다(4절).
 
+**AI가 원문 키를 더할 때** — DB 반영 스크립트(관례 15절)에서 원문 표에 **없는 키만** 더한다. 이미 있는 키는 덮지 않는다(개발자가 고친 글). 텍스트 표는 DB 항목이 아니라서 '적용 전'을 거치지 않고 바로 저장된다.
+
+```csharp
+[DbSeed("1")]
+static void HudTexts()
+{
+    var table = TextSheetTools.EnsureTable(TextSheetTools.EnsureSettings().sourceLanguage);
+    var have = table.ToDictionary();
+    var add = new Dictionary<string, string>();
+    foreach (var (key, text) in new[] { ("hud.gold", "골드 {value}"), ("fail.bagFull", "인벤토리에 자리가 없습니다.") })
+        if (!have.ContainsKey(key)) add[key] = text;
+    if (add.Count == 0) return;
+    table.SetAll(add, removeOthers: false);   // 새 키는 뒤에, 다른 키는 그대로
+    EditorUtility.SetDirty(table);
+    AssetDatabase.SaveAssetIfDirty(table);
+}
+```
+
 ### 주의할 점
 
 - 표는 그 언어를 처음 쓸 때 읽는다(안 쓰는 언어의 문장을 메모리에 올리지 않는다).
@@ -273,7 +291,9 @@ burn.name (ko)   = 화상
 
 ### 코드로 쓰는 법
 
-**`GameLanguage.Set(코드)`** — 언어를 바꾸고 PlayerPrefs에 저장한다. 지원 언어 중 가장 가까운 것을 고른다(`en-US` → `en`). 저장하지 않으려면 `Set(코드, remember: false)`. 설정 화면이 있으면 DB › 설정에 적용 대상 `언어`인 칸을 두는 편이 낫다: 선택지가 지원 언어로 저절로 채워지고, 값은 설정 파일에 남는다(`31-Slots-Settings-Input.md` 5-4).
+**`GameLanguage.Set(코드)`** — 언어를 바꾸고 PlayerPrefs에 저장한다. 지원 언어 중 가장 가까운 것을 고른다(`en-US` → `en`). 저장하지 않으려면 `Set(코드, remember: false)`. **플레이어가 언어를 고르는 곳은 DB › 설정의 적용 대상 `언어` 칸**(기본 설정 화면이 그린다)으로 두고 `Set`을 직접 부르지 않는다: 선택지가 지원 언어로 저절로 채워지고, 값은 설정 파일에 남으며, 켤 때 설정에 저장된 언어가 이긴다(`31-Slots-Settings-Input.md` 2-4·5-4).
+
+**`GameLanguage.HasSavedChoice`** — `Set(remember: true)`로 남긴 언어가 있는지(없으면 기기·Steam 언어를 따라도 된다 — 34장 2-2).
 
 ```csharp
 using GBible;
@@ -290,7 +310,7 @@ foreach (var (code, nativeName) in GameLanguage.Available)
 
 **`GameLanguage.Changed`** — 언어가 바뀌었거나 표를 다시 읽었을 때. 플레이어 데이터를 함께 보여 주는 화면은 이것 대신 **`GameView.Redraw`**를 쓴다(아래 예제). 언어가 바뀌어도, 값이 바뀌어도 그 프레임 끝에 한 번 다시 그린다.
 
-**`GameView.Redraw(draw, 키…)`** — `IDisposable`을 돌려준다. 플레이어 데이터(키를 주면 그 키만, 비우면 아무 키나)가 바뀌거나 언어가 바뀌면 그 프레임 끝(`LateUpdate`, 행동 밖)에 `draw`를 **한 번만** 부른다. 등록한 프레임 끝에 처음 한 번 그린다. `Dispose`하면 그만 그린다. 연출 대기열이 재생 중이면 끝날 때까지 미룬다(기다리지 않으려면 `Redraw(draw, waitForPresentation: false, 키…)`, `32-View-Presentation-Scenes.md` 2-1).
+**`GameView.Redraw(draw, 키…)`** — 플레이어 데이터(키를 주면 그 키만, 비우면 아무 키나)나 언어가 바뀐 프레임 끝에 `draw`를 **한 번만** 부른다(처음 한 번은 등록한 프레임 끝). `IDisposable`을 돌려주고 `Dispose`하면 그만 그린다. 연출 기다리기 등 규칙은 `32-View-Presentation-Scenes.md` 2-1.
 
 > [!note]- 왜 알림마다 바로 그리지 않는가
 > 값이 바뀌었다는 알림은 한 행동에도 여러 번 온다(행동 중간의 Sync, 실패한 행동의 되돌림, Undo). 알림마다 그리면 같은 화면을 한 프레임에 여러 번 계산한다(보이는 건 프레임당 한 번이라 낭비). 그래서 표시만 해 두고 프레임 끝에 한 번 그린다. 행동 실행 중이면 다음 프레임으로 미룬다. 직접 `_dirty` 표시·`Data.Changed` 받기·`GameLanguage.Changed` 받기·`LateUpdate`를 쓰지 않는다.
@@ -303,30 +323,7 @@ foreach (var (code, nativeName) in GameLanguage.Available)
 
 ### 상황별 예제
 
-**언어 선택 드롭다운.**
-
-```csharp
-using System.Collections.Generic;
-using GBible;
-using UnityEngine;
-
-public sealed class LanguageMenu : MonoBehaviour
-{
-    readonly List<string> _codes = new List<string>();
-
-    public IEnumerable<string> Labels()
-    {
-        _codes.Clear();
-        foreach (var (code, nativeName) in GameLanguage.Available)
-        {
-            _codes.Add(code);
-            yield return nativeName;
-        }
-    }
-
-    public void OnPicked(int index) => GameLanguage.Set(_codes[index]);
-}
-```
+**언어 선택.** DB › 설정의 언어 칸 + 기본 설정 화면으로 코드 없이 한다(위 `Set`, 31장 5-4). 직접 그리는 메뉴라면 `Available`의 `nativeName`을 보이고 고른 `code`를 넘긴다.
 
 **직접 그리는 글을 값·언어에 맞춰 다시 만들기.**
 
@@ -340,7 +337,7 @@ public sealed class GoldLabel : MonoBehaviour
     public string Text { get; private set; }
     IDisposable _view;
 
-    // playerGold가 바뀌거나 언어가 바뀌면 프레임 끝에 한 번 그린다. 처음 한 번은 바로.
+    // playerGold가 바뀌거나 언어가 바뀌면 프레임 끝에 한 번 그린다. 처음 한 번은 등록한 프레임 끝에.
     void OnEnable()  => _view = GameView.Redraw(Redraw, "playerGold");
     void OnDisable() => _view?.Dispose();
 
@@ -348,7 +345,7 @@ public sealed class GoldLabel : MonoBehaviour
 }
 ```
 
-키는 `GameIds.PlayerData.X.Id`로 써도 된다. 값을 보여 주지 않고 언어만 따르는 글이면 키 없이 `GameView.Redraw(Redraw)`도 되지만, 그러면 아무 값이 바뀔 때도 다시 그린다. 그런 글은 보통 `LocalizedText`(5절)로 충분하다.
+키는 `GameIds.PlayerData.X.Id`로 써도 된다. 값 없이 언어만 따르는 글은 `Redraw`를 쓰지 않는다(키 없이 걸면 아무 값이 바뀔 때도 다시 그린다) — UI Toolkit 칸은 `binding-path="@키"`, 씬 오브젝트 글자는 `LocalizedText`(5절).
 
 ### 주의할 점
 
@@ -360,6 +357,8 @@ public sealed class GoldLabel : MonoBehaviour
 ## 5. 화면에 넣기 — `LocalizedText`
 
 **한 줄 요약.** 글자 컴포넌트(TextMeshPro, UI Text 등 `text` 속성이 있는 것) 옆에 붙이고 키와 값을 적으면, 언어가 바뀔 때마다 다시 넣는다. 코드 없이 쓴다.
+
+**UI Toolkit 화면(35장)에는 쓰지 않는다** — UXML 칸의 `binding-path="@텍스트키"`(값을 넣으면 `"run:gold@hud.gold"`)가 같은 일을 한다(35장 2-2). 이 컴포넌트는 씬 오브젝트의 TextMeshPro·UGUI 글자용이다.
 
 ### 에디터에서
 
@@ -423,6 +422,7 @@ line.3f9a0c1b2d,shopIntro,상점,상인,어서 오세요!,,반가운 말투
 
 **가져오기** — `MomoiProject → 다국어 → 시트 가져오기 (CSV)` → 파일 선택 → "어느 열을 가져올까요?" 창에서 **번역 언어만**(원문 열은 건너뜀, 원문은 에디터가 기준) / **취소** / **모든 언어**(원문 열도 덮어씀). 콘솔에 "[다국어] 가져옴: en 120개, ja 98개"와 경고가 찍힌다.
 
+- 파일은 UTF-8이어야 한다. 아니면(엑셀의 기본 CSV = CP949) 창 "CSV를 UTF-8로 저장해 주세요(Excel: CSV UTF-8). 아무것도 바꾸지 않았습니다."가 뜨고 멈춘다.
 - 열은 머리줄 **이름**으로 찾는다(대소문자·앞뒤 공백 무시). 번역가가 열 순서를 바꾸거나 메모 열을 더해도 된다. 앞으로 옮긴 열의 칸이 `#`으로 시작해도(`#1 Seller`, 메모 `#확인`) 그 줄을 읽는다.
 - **빈 칸은 기존 값을 지우지 않는다**(번역 없음으로 본다).
 - 문맥 열은 읽기 전용이라 가져올 때 무시한다. 다이얼로그 대사의 원문은 그래프가 기준이라 "모든 언어"로 가져와도 원문 표에 넣지 않는다. 원문 표에 이미 있는 이름(프로필·장소의 `<ID>.name`)은 다른 키처럼 원문 열로 덮어쓴다(원문 표에 없어 ID를 넣어 내보낸 이름 줄은 넣지 않는다 — 원문 표에서 채운다).

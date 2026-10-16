@@ -23,11 +23,12 @@ namespace GBible.EditorTools
     //     speed <배속>            게임 속도
     //     capture <이름> [배]     게임 화면을 Logs/MomoiProject/Captures/<이름>.png 로(게임 뷰 크기. 배 = 2~4면 UI를 그 배수 해상도로 다시 그려 찍는다 — 얇은 선·작은 글을 볼 때, 월드 장면은 빠짐)
     //     screens                 열린 화면 목록을 결과에 적기
+    //     net test [지연] [봇 수]  멀티 시험 모드(GameNet.StartTestMode — 이 화면이 같은 프로그램 안 서버의 클라이언트가 된다, 지연 기본 0.1초 · 봇 기본 0) · net off(혼자 하기로)
     //     testpanel off|on        테스트 씬의 패널을 숨기기·보이기(찍을 때 HUD를 가리지 않게 — 기본은 숨김)
     //     record <이름> [초] [fps]  지금부터 게임 화면을 녹화해 Captures/<이름>.mp4(기본 2초 · 30fps, 너비 1280까지) — 다음 단계는 녹화와 함께 돈다.
     //                             AI가 볼 수 있게 고르게 뽑은 칸 16개를 한 장으로 Captures/<이름>-frames.png(왼쪽 위부터, 시각은 결과에). 녹화 중 다음 record는 끝날 때까지 기다린다
     //   에디터가 1초마다 보고: 먼저 새로 읽고(방금 쓴 코드·UXML·USS — 새로 읽을 때 난 오류와 XML로 읽히지 않는 UXML은 결과 첫머리에),
-    //   열린 씬에 저장하지 않은 변경이 있거나 플레이 중이면 시작하지 않는다(결과 파일에 까닭) —
+    //   플레이 중 · 컴파일 중이면 끝날 때까지 기다리고, 열린 씬에 저장하지 않은 변경이 있으면 시작하지 않는다(결과 파일에 까닭) —
     //   같은 콘솔 오류는 처음 한 번만 적는다.
     //   플레이에 들어가 단계를 차례로 돌리고, 끝나면 플레이를 멈추고 처음 씬으로 돌아가
     //   Logs/MomoiProject/PlayResults.txt 에 단계마다 결과·찍은 그림 경로·그동안의 콘솔 오류·경고를 쓰고 요청 파일을 지운다.
@@ -283,9 +284,30 @@ namespace GBible.EditorTools
                     return TestScene.Hidden ? "테스트 패널 숨김" : "테스트 패널 보임";
                 case "screens":
                     return "열린 화면: " + string.Join(", ", GameScreens.All.Select(s => s.Id));
+                case "net":
+                    wait = Math.Max(wait, 1.0);   // 서버 · 클라이언트 세션이 서고 처음 모습을 받을 때까지
+                    return Net(arg);
                 default:
-                    return "✗ 모르는 단계(scene·scenario·wait·command·open·close·back·click·speed·capture·record·screens·testpanel)";
+                    return "✗ 모르는 단계(scene·scenario·wait·command·open·close·back·click·speed·capture·record·screens·testpanel·net)";
             }
+        }
+
+        // 멀티 시험 모드: 판정이 서버에서 돌고 결과가 지연을 두고 오는지(화면이 Do 직후 결과를 읽지 않는지) 보려고 AI가 켠다(Multiplayer.md '시험').
+        static string Net(string arg)
+        {
+            var parts = arg.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var mode = parts.Length > 0 ? parts[0] : "test";
+            if (mode == "off")
+            {
+                GameNet.Leave();
+                return "혼자 하기로";
+            }
+            if (mode != "test") return "✗ net test [지연] [봇 수] · net off";
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var latency = parts.Length > 1 && double.TryParse(parts[1], System.Globalization.NumberStyles.Float, culture, out var l) ? l : 0.1;
+            var bots = parts.Length > 2 && int.TryParse(parts[2], out var b) ? b : 0;
+            GameNet.StartTestMode(latency, extraClients: bots);
+            return GameNet.IsTestMode ? $"시험 모드(지연 {latency.ToString(culture)}초 · 봇 {bots})" : "✗ 시험 모드를 켜지 못함";
         }
 
         static string Command(GameSession session, string arg)

@@ -1,7 +1,7 @@
 # 시스템 API 설명서 (게임 코드에서 끌어다 쓰는 것)
 
 C# 기본 문법은 빼고, 이 시스템(GBible)의 형식·메서드·어트리뷰트만 설명한다.
-항목마다 **형태 → 하는 일 → 언제 쓰나 → 주의**. 예제의 `Unit`은 클래스 탭에서 만든 `[Serializable, PlayerData] class Unit { public string id; … }`.
+항목마다 **형태 → 하는 일 → 언제 쓰나 → 주의**. 예제의 `Unit`은 코드(`Assets/MomoiProject/Code/Rules`)에 둔 `[Serializable] class Unit { public string id; … }`(DB › 클래스 탭은 읽기만 한다. `[PlayerData]` 표시는 붙여도 같다). 무엇이 있는지 찾는 표는 `Documentation~/AI/Reference.md`, 기능마다 자세히는 `Manual/`.
 
 ---
 
@@ -34,7 +34,7 @@ public class Unit { public string id; public int hp; public List<string> buffs =
 Game.Data().PlayerGold += 100;                     // 단순 값: 읽고 쓰기(쓰면 기록)
 Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 안쪽을 고친다
 ```
-- 식별자 코드(`GameIds.cs`)와 함께 생성된다(`using GBible.Ids;`). 이름은 플레이어 데이터 ID의 파스칼 표기.
+- 식별자 코드(`GameIds.cs`)와 함께 생성된다(`using GBible.Ids;`). 이름은 플레이어 데이터 ID의 파스칼 표기(시작 설정의 `run` → `Game.Data().Run`).
 
 ---
 
@@ -55,7 +55,7 @@ Game.Data().PlayerInventory.slots.Add(slot);       // 클래스 값: 꺼내서 �
 - `Game.Find(Type, id)`: 형식을 실행 중에 정할 때(행동의 참조 필드를 다시 찾을 때 시스템이 쓰는 것). `GameApi.HasId(Type)`은 그 형식에 `string id`가 있는지 알려 준다.
 
 ### `GameIds` (자동 생성 상수)
-- DB의 ID가 코드 상수로 생성된다(DB를 저장하면 저절로, 네임스페이스 `GBible.Ids`).
+- DB의 ID가 코드 상수로 생성된다(DB를 저장하면 저절로, 네임스페이스 `GBible.Ids`, 파일은 플레이어 데이터 형식이 든 어셈블리의 `Generated/GameIds.cs` — 손대지 않는다). DB 반영 스크립트로 만든 새 항목의 상수는 스크립트가 돌고 **Unity가 다시 컴파일한 뒤에** 생긴다 — 같은 응답 안의 규칙 코드는 상수 대신 `Game.Entry<T>(id)`나 반영 스크립트의 ID로 읽거나, 새로 읽기(매뉴얼 38장 2-4)로 상수가 생긴 것을 본 뒤 쓴다(관례 15절).
   - 이름은 ID를 파스칼 표기로 바꾼 것(`player.gold` → `PlayerGold`, `ability.splash` → `AbilitySplash`)
   - `GameIds.PlayerData.PlayerGold` → `PlayerDataKey<int>` (형식이 붙은 플레이어 데이터 키, `.Id`가 ID 문자열)
   - `GameIds.Ability.AbilitySplash`, `GameIds.Achievement.FirstHunt` … → ID 문자열
@@ -123,15 +123,18 @@ DB의 "조건 → 보상" 기능은 모두 같은 두 칸으로 이루어진다.
 
 | 칸 | 고르는 것 |
 |---|---|
-| **트리거**(언제) | `이벤트 받기`(이벤트 + 그 값의 조건) · `조건 충족`(조건 Block) · `사용`(`Game.Use`) — `AND`·`OR`·`NOT`·괄호로 중첩 |
-| **결과**(무엇을) | `로그에 기록`(이벤트 값 × 배수) · `플레이어 데이터에 주기` · `대상에게 효과`(대상 Block + 효과 Block) · 코딩한 결과(`Reward` 상속) |
+| **트리거**(언제, `TriggerKinds`) | `이벤트 받기`(이벤트 + 그 값의 조건) · `조건 충족`(조건 Block) · `사용`(`Game.Use`) · `행동 직전 이벤트 받기`(`Game.Intercept`) — `AND`·`OR`·`NOT`·괄호로 중첩 |
+| **결과**(무엇을, `OutcomeKinds`) | `로그에 기록`(Record — 이벤트 값 × 배수) · 플레이어 데이터 쪽(PlayerData — `플레이어 데이터에 주기`·`비용 내기`·`가중치 표에서 주기`·`가중치 표에서 고르기`) · 대상 쪽(Targeted — `대상에게 효과`(대상 Block + 효과 Block)·`선택 요구`·`빌려 쓰기`) · `이벤트 쏘기`(Event) · `행동 직전 이벤트 고치기`(Intent) · 코딩한 결과(Coded — `Reward` 상속, `[BindTo]`) |
 
 | 기능 | 트리거 잠금 | 결과 잠금 |
 |---|---|---|
 | 로그(`StatData.triggers`) | 이벤트 받기 | 로그에 기록 하나로 고정(세부 칸만) |
 | 도전과제(`AchievementData`) | 이벤트 받기 · 조건 충족 | 전부 |
-| 액티브 효과(`AbilityData`) | 사용 · 조건 충족(기본 `사용`, AND로 사용 조건) | 대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과 |
-| 인스턴스의 사용 기능(`Usable` 필드) | 액티브 효과와 같음 | 액티브 효과와 같음 |
+| 개발 명령(`DebugCommandData`) | 없음(버튼) | 전부 |
+| 액티브 효과(`AbilityData` — 프로젝트 템플릿) · 인스턴스의 사용 기능(`Usable` 필드) | 사용 · 조건 충족(기본 `사용`, AND로 사용 조건) | 대상 쪽 · 플레이어 데이터 쪽 · 코딩한 결과 |
+| 패시브 효과·상태 효과(`PassiveData`·`StatusData` — 프로젝트 템플릿) | 이벤트 받기 · 조건 충족 · 행동 직전 이벤트 받기 | 전부(상태 효과의 걸릴 때·끝날 때 결과는 행동 직전 이벤트 고치기·로그 빼고) |
+
+Block 하나하나는 매뉴얼 11장(트리거·조건)·12장(결과).
 
 - **AND**: 이벤트를 받은 그 순간에 조건도 참이어야 발동한다(예: "보스 처치 받기 AND 골드 100 이상"). 서로 다른 이벤트 둘을 AND로 묶으면 같은 순간에 오지 않으니 검증이 경고한다.
 - **OR**: 어느 쪽이든 먼저 참이 되는 순간에 발동한다.
@@ -174,7 +177,7 @@ public class QuestData : GameData
 public class Damage : Effect<Unit>
 {
     public int amount = 10;                                           // 에디터 칸(액티브 효과마다 값이 다르다)
-    protected override void Apply(Unit target) { target.hp -= amount; }
+    protected override void Apply(Unit target) { target.hp -= (int)(amount * Use.Context.Power); }   // 효과 배율을 곱한다
 }
 ```
 | 물려받는 것 | 뜻 |
@@ -182,7 +185,9 @@ public class Damage : Effect<Unit>
 | `Apply(T target)` | 대상 하나에 할 일. 대상이 `T`가 아니면 불리지 않는다. 받은 객체를 그냥 고친다. |
 | `Game` | 지금 세션의 `GameApi`. |
 | `User<TUser>()` | 액티브 효과를 쓴 개체(사용자). 예: `var caster = User<Unit>();` (없거나 형식이 다르면 null) |
-| `Use` | 이번 사용 정보: `Use.Ability`(액티브 효과 정의·ID), `Use.User`, `Use.Picked`(플레이어가 고른 대상들). |
+| `Use` | 이번 사용 정보: `Use.Ability`(액티브 효과 정의·ID), `Use.User`, `Use.Picked`(플레이어가 고른 대상들), `Use.Context`(트리거 순간). |
+
+- **효과 배율**: 액티브 효과를 쓸 때·패시브 효과가 발동할 때 행동 직전 이벤트 '효과 배율'(`PowerIntent`)을 한 번 거친 값이 `Use.Context.Power`(기본 1)다. 기본 효과 Block은 스스로 곱하고, 프로젝트 효과 Block은 수치에 직접 곱한다 — 안 곱하면 "이 카드 수치 2배" 같은 기믹이 붙지 않는다(관례 4절).
 
 ### `TargetSelector<T>` — 대상 Block("누구에게")
 ```csharp
@@ -198,7 +203,7 @@ public class AddEnemiesAround : TargetSelector<Unit>
 - 기본 제공: `SelfTarget`("사용자 자신" — 나에게 부여).
 
 ### 액티브 효과 데이터
-- DB › 액티브 효과(`AbilityData`): `trigger`(기본 `사용`) + `outcomes`(결과 목록)를 에디터에서 조립(2-1).
+- DB › 액티브 효과(`AbilityData` — 라이브러리에 없고 프로젝트가 `Documentation~/AI/Templates/Elements/`에서 `Assets/MomoiProject/Code/Rules/Elements/`로 들인다): `trigger`(기본 `사용`) + `outcomes`(결과 목록)를 에디터에서 조립(2-1).
 - 코드로 정의(테스트 등): `session.Abilities.Define(new AbilityDefinition { Id = "…", When = … })` 후 `Outcomes`에 결과 추가(짧은 형태 `Targets`·`Effects`도 된다).
 
 ---
@@ -242,8 +247,8 @@ public class GrantTitle : Reward
     public override string Describe(INameResolver names) => $"칭호 {title}";
 }
 ```
-- `RewardEffect.Reversible`: 플레이어 데이터 안에서만 일어남 / `Irreversible`: 게임 밖에 영향(결제·플랫폼). 멀티플레이에서는 서버만 실행.
-- 보상 지급은 Undo 대상이 아니다(한 번 받은 보상은 유지).
+- `RewardEffect.Reversible`: 플레이어 데이터 안에서만 일어남 / `Irreversible`: 게임 밖에 영향(결제·플랫폼). 지금은 표시용이다(실행 방식은 같다).
+- 도전과제의 결과는 Undo·되감기로 취소되지 않는다(달성과 같다 — 매뉴얼 14장 2-4). 행동 안에서 도는 결과(액티브 효과·패시브 효과·상태 효과 …)가 바꾼 플레이어 데이터는 그 행동과 함께 Undo된다.
 
 ### 항목 하나의 결과를 함수로 쓰기 `[BindTo(id)]`
 특정 도전과제·로그·사용 기능이 붙은 인스턴스의 결과를 코드로 정한다. 연결된 항목의 결과 칸은 에디터에서 잠기고(보기·cs 열기), 이 함수가 결과가 된다.
@@ -284,8 +289,8 @@ Block 클래스에는 `[Serializable]`도 필수. 둘 다 계약 테스트가 �
 ### 필드에 붙이는 것 — 에디터 칸을 "고르기"로 만든다
 | 어트리뷰트 | 칸이 하는 일 |
 |---|---|
-| `[FieldLabel("설명")]` | 마우스를 올리면 보이는 설명 |
-| `[DataRef(typeof(AbilityData))]` (string 필드) | 그 DB 종류의 항목 목록에서 고르기. 키워드는 필드에 `[Keyword(typeof(그룹))]`(클래스 상세에서도 연결) |
+| `[FieldLabel("이름")]` | 편집 화면에 보일 칸 이름(한글 — `NamingGuide.md`). 없으면 필드 이름을 읽기 쉽게 바꿔 쓴다. 마우스를 올렸을 때의 설명은 `[Tooltip]` |
+| `[DataRef(typeof(AbilityData))]` (string 필드) | 그 DB 종류의 항목 목록에서 고르기(인스턴스 클래스를 주면 그 클래스의 인스턴스만, 비워도 되는 칸은 `Optional = true`). 키워드는 필드에 `[Keyword(typeof(그룹))]`(클래스 상세에서도 연결) |
 | `[PlayerDataRef]` (string) | 플레이어 데이터 목록에서 고르기 |
 | `[StatRef]` (string) | 로그 목록에서 고르기 |
 | `[AchievementRef]` (string) | 도전과제 목록에서 고르기 |
@@ -300,14 +305,14 @@ Block 클래스에는 `[Serializable]`도 필수. 둘 다 계약 테스트가 �
 ```csharp
 [GameEvent("적 처치")] public class EnemyKilled { public string unit; public int combo; public List<string> tags; }
 
-Game.Events.Publish(new EnemyKilled { unit = target.id, combo = 3 });        // 효과·행동 안에서 내기
-var sub = Game.Events.Subscribe<EnemyKilled>(e => PlayEffect(e.unit));     // 씬 코드에서 받기(연출)
+Game.Events.Publish(new EnemyKilled { unit = target.id, combo = 3 });        // 효과·행동 안에서 쏘기
+var sub = session.Events.SubscribeAfterAction<EnemyKilled>(e => GameView.Present(Burst(e.unit)));   // 화면 코드에서 받기(연출)
 sub.Dispose();                                                              // 그만 받기
 ```
 - `[GameEvent("이름")]`: DB › 이벤트 탭과 로그 규칙의 이벤트 목록에 나온다.
 - 로그(DB › 로그)는 이벤트를 규칙대로 집계한다(횟수·합계·최대, 이벤트 필드 조건으로 거르기). 도전과제는 그 로그를 본다.
-- 이벤트를 받는 쪽에서 플레이어 데이터를 바꾸지 않는다. 연출·UI만(상태를 바꿀 일은 행동·효과에서).
-- 기본 제공 이벤트: `AbilityUsed`(액티브 효과 ID·사용자·최종 대상들).
+- **받는 법이 둘이다.** 연출·UI는 `SubscribeAfterAction`(행동이 성공한 뒤에 온다 — 실패한 행동의 이벤트는 오지 않고, 멀티 클라이언트에도 온다). 여기서는 플레이어 데이터를 바꾸지 않는다. `Subscribe`는 규칙 쪽으로, 쏜 그 자리(행동 안)에서 불린다 — 바꾼 것은 그 행동의 일부가 되고 던지면 행동 전체가 취소된다. 클라이언트에서는 불리지 않는다(규칙은 서버에서 돈다). 반응하는 규칙은 되도록 DB의 트리거로 만든다(관례 9절).
+- 기본 제공 이벤트: `AbilityUsed`(액티브 효과 사용 — ID·사용자·최종 대상들) · 도전과제 달성 · 선택 요구 · 상태 효과 걸림·끝남 · 다이얼로그 재생 요청(매뉴얼 10장).
 
 ---
 
@@ -345,6 +350,7 @@ public override void ValidateData(IValidationContext context) { … } // DB 데�
 | `GBibleRuntime.Start()` | 세션을 만들고 DB 데이터(플레이어 데이터·로그·도전과제·액티브 효과·인스턴스)를 등록. 이미 있으면 그것을 준다. |
 | `GBibleRuntime.Session` / `.Game` | 지금 세션 / 그 `GameApi` |
 | `session.ExportMeta()` / `ImportMeta(json)` | 프로필(메타 구역: 계정 단위로 남는 것) 저장·불러오기 |
-| `session.ExportRun()` / `ImportRun(json)` / `NewRun()` | 이번 판(세션 구역) 저장·불러오기·새 판 |
+| `session.ExportRun()` / `ImportRun(json)` / `NewRun()` | 이번 판(세션 구역) 저장·불러오기·처음 값으로 되돌리기 |
+| `GBibleRuntime.StartNewRun(session, seed)` | 게임에서 새 판: 판 저장을 지우고 처음 값 + DB › Bootstrap의 '새 판 행동' |
 
 플레이어 데이터의 "구역"(DB › 플레이어 데이터의 칸): 메타 = 판이 바뀌어도 남음(재화·DB 해금), 세션 = 이번 판에만(유닛 위치·턴).

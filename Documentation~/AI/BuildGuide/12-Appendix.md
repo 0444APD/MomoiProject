@@ -1,12 +1,12 @@
 # 12. 부록 — 템플릿 · 체크리스트 · 기능 사용 표
 
-본문에서 쓴 것을 다시 찾기 쉽게 모은다. 복사해 시작하는 뼈대(1절), 장마다의 체크리스트(2절), 본문에서 쓰지 않은 기능(3절), 그리고 기능마다 매뉴얼 장과 이 가이드에서 쓴 절을 적은 표(4절)다.
+본문에서 쓴 것을 다시 찾기 쉽게 모은다. 복사해 시작하는 뼈대(1절), 장마다의 체크리스트가 있는 곳(2절), 본문에서 쓰지 않은 기능(3절), 기능을 찾는 곳(4절)이다.
 
 > [!note]- 이 장에서 쓰는 말
 > | 말 | 뜻 |
 > |---|---|
 > | 행동 (`GameAction`) | 플레이어 입력 하나를 담은 데이터 클래스. 행동 하나 = Undo 한 단위 = 네트워크 한 묶음. |
-> | Block | 기획자가 DB에서 골라 조립하는 로직 단위. 효과 Block(무엇을)·대상 Block(누구에게)·조건 Block(언제만)·코딩한 결과(`Reward`). |
+> | Block | DB 항목 안에서 조립하는 로직 단위. 효과 Block(무엇을)·대상 Block(누구에게)·조건 Block(언제만)·코딩한 결과(`Reward`). AI가 클래스를 만들고 DB 반영 스크립트로 항목에 넣으며, 개발자는 DB에서 문장으로 읽고 칸의 숫자·참조를 바꾼다. |
 > | Trigger · Outcome | DB 항목의 "언제(Trigger) → 무엇을(Outcome, 결과)" 두 칸. |
 > | 컨텍스트 (`TriggerContext`) | Trigger가 발동한 순간의 정보(세션·받은 이벤트·사용자·고른 대상 …). |
 > | `[BindTo]` | DB 항목 하나의 결과를 코드 함수 하나로 바꾸는 어트리뷰트. |
@@ -30,7 +30,7 @@ public class UpgradeCard : GameAction
         var data = Rules.CardData(Game, card.card);          // 원본: 읽기만
         if (card.upgraded || !data.upgradable) throw Game.Fail("fail.cannotUpgrade", "강화할 수 없는 카드입니다.");   // 실패 = 전체 취소
         var from = card.card;
-        card.card = data.upgradeTo;                          // 판 데이터는 원본 ID만 바꾼다(손패·더미가 가리키는 id는 그대로)
+        card.card = data.upgradeTo;                          // 판 데이터는 원본 ID만 바꾼다(핸드·덱이 가리키는 id는 그대로)
         card.upgraded = true;
         Game.Events.Publish(new CardUpgraded { cardId = card.id, from = from, to = card.card });
     }
@@ -53,7 +53,7 @@ public class UpgradeCard : GameAction
 > [!note]- 대상 필드 자세히
 > - 못 찾으면(사라진 카드·죽은 적) "DeckCard 'card7'을(를) 찾을 수 없습니다(행동 'UpgradeCard'의 'card')"로 행동이 실패하고 아무것도 바뀌지 않는다.
 > - id가 빈 새 객체를 넣어도 실패한다. 새 객체는 행동 안에서 `Game.NewId("접두어")`로 id를 주어 만든다.
-> - 같은 형식 안에서 id가 겹치지 않아야 한다(부모 형식으로 찾으면 그 부모를 나누는 형식끼리도).
+> - id는 플레이어 데이터 전체에서 하나여야 한다(형식이 달라도 겹치지 않게 — `Game.NewId`의 접두어로 나눈다, 관례 3절).
 > - DB 원본은 객체가 아니라 `[DataRef]` 원본 ID 글자로 둔다. Unity 객체·델리게이트는 넣지 않는다.
 > - `Describe()`를 쓰지 않으면 타임라인 글은 "Block 이름 (대상 id들)"이다(예: "카드 강화 (card7)"). 다른 문장이 필요할 때만 덮어쓴다: `public override string Describe() => $"카드 강화: {card.id}";`
 
@@ -63,19 +63,18 @@ public class UpgradeCard : GameAction
 [Serializable, BlockInfo("휴식")]
 public class Rest : GameAction
 {
-    public int percent = 30;
-
     protected override void Run()
     {
         var hero = Game.Data().Run.hero;
-        hero.hp = Math.Min(hero.maxHp, hero.hp + hero.maxHp * percent / 100);
+        var percent = Game.Balance(GameIds.Balance.RestHealPercent);   // 바꿀 숫자는 밸런싱 값(% 0~100)
+        hero.hp = Math.Min(hero.maxHp, hero.hp + (int)(hero.maxHp * percent / 100));
     }
 }
 ```
 
 > [!note]- 줄마다의 뜻
 > - 1-1과 같은 `GameAction`이다. 대상 필드가 없을 뿐이다. 필요한 객체는 `Game.Data()`·`Game.Find`·`Game.All`로 찾는다.
-> - `public int percent` — 행동이 실어 나르는 값. 숫자·글자·bool·enum·원본 ID는 값 그대로 실린다.
+> - 회복 %처럼 개발자가 바꿀 숫자는 행동 필드 기본값이 아니라 밸런싱 값으로 읽는다(관례 18절). 행동 필드에는 입력(고른 대상·고른 선택지)을 싣는다 — 숫자·글자·bool·enum·원본 ID는 값 그대로 실린다.
 > - 다른 행동 안에서 `Game.Do(new Rest())`를 부르면 바깥 행동의 일부로 실행된다(Undo는 바깥 하나).
 
 ### 1-3. 이벤트
@@ -106,7 +105,7 @@ public class GainEnergy : Effect<Hero>
     protected override void Apply(Hero target)
     {
         var battle = Game.Data().Run.battle;
-        if (battle != null) battle.energy += amount;
+        if (battle != null) battle.energy += (int)Math.Round(amount * (Use?.Context?.Power ?? 1));   // 효과 배율("수치 2배")을 곱한다
     }
 
     public override string Describe() => $"에너지 +{amount}";
@@ -114,9 +113,9 @@ public class GainEnergy : Effect<Hero>
 ```
 
 > [!note]- 줄마다의 뜻
-> - `BlockInfo` — 이름은 기획자가 고르는 목록의 글, `Category`는 묶음, `Description`은 설명, `Sentence`는 칸을 눌러 고치는 한 줄 문장(`{필드이름}` 자리가 칸이 된다).
+> - `BlockInfo` — 이름은 DB의 Block 목록에 보이는 글, `Category`는 묶음, `Description`은 설명(꼭 적는다), `Sentence`는 칸을 눌러 고치는 한 줄 문장(`{필드이름}` 자리가 칸이 된다).
 > - `Effect<Hero>` — 대상 형식. 대상 Block이 고른 객체 중 이 형식인 것에만 `Apply`가 불린다.
-> - `public int amount` — 기획자가 DB에서 정하는 수치. 필드 초기값이 기본값이다.
+> - `public int amount` — DB에서 정하는 수치(개발자가 바꾼다). 필드 초기값이 기본값이다. 프로젝트 효과 Block은 수치에 효과 배율 `Use.Context.Power`를 곱한다(관례 4절 — 기본 효과 Block은 스스로 곱한다).
 > - `Apply(Hero target)` — 대상 하나에 한 번. 값은 그냥 고친다. 사용자는 `User<Hero>()`로 받는다.
 > - `Describe()` — 결과 요약에 보일 짧은 글.
 
@@ -168,7 +167,7 @@ public static class TemplateCode
 ```
 
 > [!note]- 줄마다의 뜻
-> - `[BindTo(ID)]` — 그 ID의 DB 항목(도전과제·로그·액티브 효과·사용 기능이 붙은 인스턴스, 그리고 연결을 확인하는 프로젝트 고유 기능 — 1-8)의 결과가 이 함수가 된다. DB의 결과 칸은 잠기고 함수 이름과 `cs 열기`가 보인다. ID는 늘 `GameIds` 상수로(항목을 만들고 저장하면 생긴다).
+> - `[BindTo(ID)]` — 그 ID의 DB 항목(도전과제·로그·액티브 효과·사용 기능이 붙은 인스턴스, 그리고 연결을 확인하는 프로젝트 고유 기능 — 1-8)의 결과가 이 함수가 된다. DB의 결과 칸은 잠기고 함수 이름과 `cs 열기`가 보인다. ID는 늘 `GameIds` 상수로 — 상수는 DB 반영 스크립트가 항목을 만들고 Unity가 다시 컴파일한 뒤에 생기므로, 반영 스크립트를 먼저 넣고 `Logs/MomoiProject/RunTests.request`로 새로 읽게 한 뒤 `GameIds.cs`에 생긴 것을 보고 쓴다(관례 15절).
 > - `static void` — 필수. 접근 수준·클래스 이름은 상관없다.
 > - 매개변수는 넷 중 하나: `()` · `(이벤트 e)` · `(TriggerContext c)` · `(이벤트 e, TriggerContext c)`. 받을 이벤트는 첫 매개변수의 형식이고, 컨텍스트는 늘 마지막이다.
 > - 이벤트로 발동하는 항목이면 `(BattleWon e, TriggerContext c)`처럼 이벤트를 받는다. 조건으로 달성하는 도전과제·사용 기능·액티브 효과에는 이벤트가 없으므로 `(TriggerContext c)`만.
@@ -176,6 +175,8 @@ public static class TemplateCode
 > - 로그에 연결하면 자동 기록이 멈추므로 함수가 `c.Session.Stats.Report(c.Owner, 값)`으로 직접 기록한다.
 
 ### 1-8. 프로젝트 고유 기능(Trigger → 결과)
+
+패시브 효과(가진 동안 발동)·상태 효과(걸린 동안)로 안 되는 규칙(한 번만 발동하고 완료를 저장·하루 N번·단계 — 매뉴얼 [17장](../../Manual/17-Custom-Features.md) 0-5)일 때만 만든다(관례 0절, [04장](04-AddingContent.md) 8절).
 
 ```csharp
 [Database("축복", Group = "콘텐츠", Order = 41, IdPrefix = "blessing")]
@@ -218,12 +219,12 @@ public static class BlessingRules
     }
 }
 
-// Client/Bootstrap.cs의 Started: 연결은 한 줄
+// Client/Bootstrap.cs의 RegisterRules: 연결은 한 줄
 BlessingRules.Register(session, GameDatabase.Load()?.All<BlessingData>());
 ```
 
 > [!note]- 런타임 쪽 줄마다의 뜻
-> - 나누는 까닭 — 등록 함수(`BlessingRules.Register`)는 규칙이라 Rules에 두고, Unity 시작에 거는 연결은 Client의 Bootstrap `Started` 한 줄로 한다. 서버라면 서버가 세션을 만든 뒤 같은 함수를 부른다([04장](04-AddingContent.md) 8절의 `RelicRules`).
+> - 나누는 까닭 — 등록 함수(`BlessingRules.Register`)는 규칙이라 Rules에 두고, Unity 시작에 거는 연결은 Client의 `Bootstrap.RegisterRules` 한 줄로 한다([04장](04-AddingContent.md) 8절의 `RelicRules`). `RegisterRules`는 `GBibleRuntime.SessionCreated`에 연결되어 모든 세션(화면 세션·멀티 서버·시험 모드·매칭 방)에 오므로 서버 세션에서도 감시가 돈다. `Started`(화면 세션에만 온다)에 두지 않고, `GameNet.ServerStarted`·`RoomStarting`에서 다시 부르지도 않는다(두 번 등록하면 두 번 발동한다).
 > - `GameDatabase.Load()` — 런타임 데이터 목록. `All<T>()`로 그 종류의 항목만 넘긴다.
 > - `BoundOutcomes.Has/Create` — 기본 기능과 달리 프로젝트 기능은 `[BindTo]` 연결을 스스로 확인해야 한다. 빼먹으면 에디터는 결과 칸을 잠가 보이는데 실제로는 숨은 예전 결과가 돈다.
 > - `session.Triggers.Register(owner, when, repeat, fire)` — Trigger를 감시하다 참이 되는 순간 `fire`를 부른다. `repeat: false`면 한 번 발동하고 끝난다.
@@ -233,13 +234,14 @@ BlessingRules.Register(session, GameDatabase.Load()?.All<BlessingData>());
 
 ### 1-9. Bootstrap
 
-설정 값(Undo 방식·보관 수·스냅샷·Undo 끊는 이벤트·시드·판 저장·판 끝 이벤트·프로필도 행동마다 저장·시작할 때 이어 하기·고정 틱·씬 흐름·기록 보관 줄 수·Modify 누락 검사)은 코드가 아니라 DB › 시작 파일 › **Bootstrap** 화면에서 고른다([01장](01-StartProject.md) 4절). 코드는 시작 설정이 만든 `Client/Bootstrap.cs`(화면 위 **cs 열기**)에 있다.
+설정 값(Undo 방식·보관 수·스냅샷·Undo 끊는 이벤트·시드·판 저장·판 끝 이벤트·프로필도 행동마다 저장·시작할 때 이어 하기·고정 틱·씬 흐름·기록 보관 줄 수·Modify 누락 검사)은 코드가 아니라 DB › 시작 파일 › **Bootstrap** 화면의 칸이다. AI는 DB 반영 스크립트에서 `EditorSet…` 함수로 넣는다([01장](01-StartProject.md) 4절). 코드는 시작 설정이 만든 `Client/Bootstrap.cs`(화면 위 **cs 열기**)에 있다.
 
 ```csharp
 [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
 static void Hook()
 {
     GBibleRuntime.Configuring += Configure;
+    GBibleRuntime.SessionCreated += RegisterRules;
     GBibleRuntime.Started += Started;
 }
 
@@ -249,10 +251,15 @@ static void Configure(SessionOptions options)
     // options.Migrations.Add(4, "골드 단위 10배", state => { … });
 }
 
+static void RegisterRules(GameSession session)
+{
+    // 규칙 쪽 등록 — 모든 세션: BlessingRules.Register(session, …)  session.Actions.Register<…>(…)  session.Events.Subscribe<…>(…)  session.Ticked += …
+    // 개발 명령은 DB › 개발 › 개발 명령(결과 Block 조립, 코드가 필요하면 [BindTo]).
+}
+
 static void Started(GameSession session)
 {
-    // RelicRules.Register(session, …)  session.Actions.Register<…>(…)  session.Events.Subscribe<…>(…)
-    // 개발 명령은 DB › 개발 › 개발 명령(결과 Block 조립, 코드가 필요하면 [BindTo]).
+    // 화면 쪽 연결 — 화면 세션만: session.Events.SubscribeAfterAction<…>(e => GameView.Present(…))  GameSettings.Changed += …  GameInput.Use(…)
 }
 ```
 
@@ -260,177 +267,30 @@ static void Started(GameSession session)
 > - `AfterAssembliesLoaded` — `GBibleRuntime`은 첫 씬을 불러오기 전에 세션을 만든다. 그보다 먼저 연결해야 하므로 이 시점이다. `Awake`에서는 늦다.
 > - `Configuring` — 세션을 만들기 직전(세션은 아직 없다). 쓰는 곳은 둘이다. 출시 뒤 저장 변환 등록(`options.Migrations`, [10장](10-SaveAndRelease.md) 7절)과 조건에 따른 덮어쓰기(데모 빌드는 Undo 끄기, 게임 전체 시드 고정 — [07장](07-GenreRecipes.md) 2·4절. 일일 도전처럼 판마다 시드를 정하면 `GBibleRuntime.NewRun(session, 시드)`). 저장 변환은 반드시 여기서 등록한다(프로필을 곧바로 불러오므로). 저장 버전은 등록한 변환 중 가장 높은 번호를 따라 저절로 정해진다.
 > - 코드가 화면 값을 바꾸면 코드가 이기고, 모니터 타임라인에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 화면 칸과 `SessionOptions`의 대응은 [07장](07-GenreRecipes.md) 2절.
-> - `Started` — 세션 준비가 끝난 뒤(DB 데이터 등록·저장 불러오기 다음). 프로젝트 기능의 감시 등록 함수 호출(Rules의 `…Rules.Register`), 행동 처리기, 이벤트 받기를 등록한다. 개발 명령은 DB › 개발 › 개발 명령에 둔다(출시 빌드에서는 저절로 빠진다). 플레이어 데이터는 DB가 이미 정의했으므로 여기서 `Define`하지 않는다.
+> - `RegisterRules`(`SessionCreated`) — **모든 세션**(화면 세션 · 멀티 서버 · 시험 모드의 서버와 봇 · 매칭 방 · 서버 빌드)이 DB로 만들어진 직후(DB 정의 등록·프로필 불러오기 뒤, 새 판 행동보다 먼저). 규칙 쪽 등록 전부: 프로젝트 기능의 감시 등록 함수(Rules의 `…Rules.Register`), 행동 처리기, 규칙이 받는 이벤트, 틱 규칙, 데이터를 바꾸는 코드 개발 명령. 받은 `session`만 쓴다(`GBibleRuntime.Session`은 아직 그 세션이 아니다). 개발 명령은 되도록 DB › 개발 › 개발 명령에 둔다(출시 빌드에서는 저절로 빠진다). DB에 있는 플레이어 데이터는 이미 정의되어 있으므로 `Define`하지 않는다.
+> - `Started` — **화면 세션에만**, 준비가 끝난 뒤(`RegisterRules` → 기본 개발 명령·씬 흐름·화면 준비 다음, 시작할 때 이어 하기의 판 불러오기보다 먼저). 화면 쪽 연결: 화면 세션 전체의 연출 받기(`SubscribeAfterAction` → `GameView.Present`), `GameScreens.Reroll`·`GameSettings.Changed`·`GameInput.Use`, 화면 세션에서 한 번 할 일. 세이브 슬롯을 바꾸면(`UseSlot`) 세션이 새로 만들어져 둘 다 다시 온다 — 세션이 아닌 정적 알림(`GameSettings.Changed`)에 걸 때는 두 번 걸리지 않게 `-=` 뒤 `+=`.
+> - 예전에 만든 `Bootstrap.cs`에 `RegisterRules`가 없으면 매뉴얼 [20장](../../Manual/20-Setup.md) 4절대로 더한다.
 > - 도메인 리로드를 꺼도 매 플레이마다 다시 연결되도록 시스템이 이벤트를 비우므로, 이 연결은 매번 이렇게 한다.
 
 ---
 
 ## 2. 체크리스트 모음
 
-장마다의 체크리스트를 그대로 모았다.
+체크리스트는 장마다 마지막 절에 있다. 여기에 다시 적지 않는다(한 곳에서만 고친다).
 
-### 01. 프로젝트 시작하기
-
-- [ ] 시작 설정을 적용했다. `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`, DB › 플레이어 데이터 `run`·`profile`이 있다.
-- [ ] 쓸 선택 모듈을 켰다.
-- [ ] 규칙 코드는 Rules에, Unity에 붙는 코드는 Client에 있다.
-- [ ] `RunState`·`Profile`에 필드를 채웠다.
-- [ ] DB › 시작 파일 › Bootstrap에서 Undo 방식·보관 수·시드·판 저장을 정했다.
-- [ ] DB › 개발 › 개발 명령에 명령을 만들었고, 모니터에 고정 시드가 보이고, 그 명령 → Undo가 된다.
-
-### 02. 기획을 코드 구조로
-
-- [ ] 기획 문장마다 어느 절(데이터·구역·행동·이벤트·키워드·DB·Block·id)인지 적었다.
-- [ ] 판 값은 `RunState`, 남길 값은 `Profile`에 있고, 섞이지 않았다.
-- [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있다. 고정 값은 원본에서 읽는다.
-- [ ] 계산되는 값을 필드로 두지 않았고, 화면 상태는 MonoBehaviour 쪽이다.
-- [ ] 종류를 자식 클래스가 아니라 키워드 필드·기능 필드로 나타냈다.
-- [ ] 입력과 규칙의 한 걸음이 모두 행동이고, 필요한 정보가 필드에 있다(대상은 id가 있는 플레이어 데이터 객체로).
-- [ ] 반응할 순간이 모두 `[GameEvent]` 이벤트이고, 조건·로그가 읽을 값이 필드에 있다.
-- [ ] 찾거나 가리킬 객체에 `id`가 있고, 연결은 id 글자다.
-- [ ] 클래스 목록과 DB 항목 목록을 팀과 맞췄다.
-
-### 03. 게임 루프
-
-- [ ] 처음 뜨는 씬에 런 스크립트가 하나 있고, 입력마다 행동 하나를 보내는 창구가 있다.
-- [ ] 판을 이어 하거나 새로 여는 코드가 게임에서 한 번만 돈다.
-- [ ] 플레이어 데이터를 바꾸는 코드가 모두 행동(또는 그 안에서 불리는 Block·`[BindTo]`·규칙 함수) 안에 있다.
-- [ ] 한 입력에 따라오는 단계가 Undo 한 번에 돌아가는 것을 모니터로 확인했다.
-- [ ] 플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`, 비용은 `Game.Pay`로 던지고, 런 스크립트는 `InvalidOperationException`만 잡는다.
-- [ ] 반응할 순간마다 행동 안에서 이벤트를 쏜다.
-- [ ] 화면은 읽기·보내기·받기만 하고(연출은 `SubscribeAfterAction` → `GameView.Present`, 다시 그리기는 `GameView.Redraw`), 받은 것을 `Dispose`한다.
-- [ ] 몇 턴 동안·몇 턴 뒤의 효과는 상태 효과·예약에 맡기고, 행동 안에서 기다리지 않는다.
-- [ ] 씬 사이에 값을 static으로 넘기지 않고, 띄울 씬을 데이터로 정한다(씬이 많으면 Bootstrap의 씬 흐름).
-
-### 04. 콘텐츠 더하기
-
-- [ ] 새 항목마다 클래스 → 항목 → 이벤트 → Trigger → 결과 → 등장 → 저장 → 시험·검증을 밟았다.
-- [ ] 수치만 다른 항목에 코드를 쓰지 않았다.
-- [ ] 쓰는 순간 효과가 나는 인스턴스에 사용 기능이 붙어 있다(`[BindTo]`로 결과를 쓰는 것도).
-- [ ] 새 Block은 동작 하나만 하고 `[Serializable]`·`[BlockInfo]`가 있다. 대상 Block은 고르기만 한다.
-- [ ] `[BindTo]` 인자는 `GameIds` 상수다.
-- [ ] 판 데이터에는 원본 ID와 바뀌는 값만 들어간다.
-- [ ] 도전과제의 결과는 프로필 쪽 값에 준다.
-- [ ] 프로젝트 기능은 `BoundOutcomes`를 확인하고 `RunOutcomes`로 결과를 실행한다.
-- [ ] 항목의 ID가 게임에 나오는 자리에 들어가 있다.
-- [ ] 모니터에서 반응과 Undo를 확인했고, DB 사이드바가 "검증 통과"다.
-
-### 05. 기획자와 함께 일하기
-
-- [ ] 프로그래머가 만들 것과 기획자가 채울 것을 표로 적어 공유했다.
-- [ ] 고르는 값은 모두 키워드 그룹이고 필드에 `[Keyword]`가 있다(enum 칸이 없다).
-- [ ] 게임이 채우는 칸은 `[Hide]`, 조건부 칸은 `[ShowIf]`로 정리했다.
-- [ ] 다른 DB 항목을 가리키는 칸(원본·판 데이터 모두)에 `[DataRef]`가 있다.
-- [ ] 모든 Block에 `[BlockInfo]` 이름·분류·설명이 있고, 칸이 있는 Block에는 `Sentence`가 있다.
-- [ ] 비면 안 되는 칸에 필수, 그림 칸에 스프라이트 틀을 정했다.
-- [ ] DB 종류·Block에 필요한 `ValidateData`·`Validate`를 넣었다.
-- [ ] 코드에는 ID 문자열 대신 `GameIds`를 쓴다.
-- [ ] DB 사이드바가 "검증 통과"다.
-
-### 06. 화면과 연출
-
-- [ ] 화면 코드는 Client 폴더에 있고, 플레이어 데이터를 읽기만 한다.
-- [ ] 화면 갱신은 `GameView.Redraw`로 등록해 프레임 끝에 한 번(연출이 끝난 뒤) 그린다. 프리팹 목록은 `ViewList`, 값 하나는 컴포넌트 데이터 연결.
-- [ ] 등록·받기는 `OnEnable`, 해제(`Dispose`)는 `OnDisable`에서 한다.
-- [ ] 버튼은 행동에 넣을 값(대상 객체·원본 ID)을 쥐고 행동을 보내며, 실패 예외를 잡아 안내한다. `GameView.Busy`인 동안은 입력을 받지 않는다.
-- [ ] 예상 피해·버튼 막기는 화면에서 따로 계산하지 않고 `Game.Preview`·`Game.CanDo`로, 그릴 때 한 번 부른다.
-- [ ] 연출은 `SubscribeAfterAction`으로 받아 `GameView.Present`에 넣고, 기다리기는 `GameView.Wait`다.
-- [ ] 연출의 무작위는 `UnityEngine.Random`, 규칙의 무작위는 `Game.Random`이다.
-- [ ] 화면의 모든 글이 텍스트 키이고, DB 항목 이름은 `<ID>.name`이다. 행동의 실패 글은 `Game.Fail`의 키로 번역된다. 언어를 바꾸면 다시 그려진다.
-- [ ] 다이얼로그는 말·연출만, 규칙이 있는 일은 행동이 맡는다.
-- [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 이름·그림은 원본에서 읽는다.
-
-### 07. 장르별 설정
-
-- [ ] Bootstrap 화면에서 Undo 방식과 보관 수(또는 스냅샷 간격·보관 수)를 골랐다.
-- [ ] 되돌릴 수 있는 범위(턴 안 / 무제한 / 없음)를 정하고, 필요하면 Undo 끊는 이벤트를 골랐다.
-- [ ] 판이 끝나면 버릴 값은 `run`, 남길 값은 `profile`에 있다.
-- [ ] 규칙의 무작위는 모두 `Game.Random(이름)`이고, 용도마다 흐름 이름이 다르다.
-- [ ] 개발 빌드는 시드를 고정한다.
-- [ ] 쿨다운·지속 시간은 게임 시계 기준 시각으로 적고(또는 상태 효과·예약에 맡기고), 매 프레임 바뀌는 값은 플레이어 데이터에 넣지 않았다.
-- [ ] 실시간이면 고정 틱을 정했고, 1절 표의 "더 쓰는 부품"에서 이 장르에 맞는 것을 골랐다.
-
-### 08. 시험과 디버깅
-
-- [ ] DB › 시작 파일 › Bootstrap에서 개발 빌드 시드를 고정했다.
-- [ ] 시험 준비용 개발 명령이 DB › 개발 › 개발 명령에 있고, 누르면 행동 하나로 기록·Undo된다. 규칙을 거쳐야 하는 명령만 `[BindTo]` 코드다.
-- [ ] 버그를 보면 판을 저장하고, 저장 파일과 시드를 보고에 붙인다.
-- [ ] 타임라인에서 값 하나의 변경 원인을 따라갈 수 있다.
-- [ ] 도전과제·로그·유물의 반응을 이벤트 호출·트리거로 달성으로 확인했다. 고르기는 명령 탭의 선택 대기 패널로 확인했다.
-- [ ] 밸런싱 값·가중치 표는 플레이 중에 DB에서 고쳐 보며 맞췄다.
-- [ ] 지켜야 할 규칙(실패 취소, Undo, 같은 시드 같은 결과)이 `Assets/MomoiProject/Code/Tests`에 테스트로 있다.
-- [ ] 타임라인·콘솔에 `[MomoiProject]` 경고가 남아 있지 않다.
-
-> [!note]- 다른 장르라면
-> - **실시간 액션**: 행동 단위가 아니라 스냅샷으로 되감는다(Bootstrap의 Undo 방식 "스냅샷"). 모니터 머리에 "되감기 스냅샷 n (n초 간격)"이 보이고, **Undo**는 마지막 스냅샷으로 되감는다. 버그 직전으로 돌아가 보려면 `session.CaptureSnapshot()`을 부르는 개발 명령(`session.Debug.Register`)을 만들어 두고 그 순간 근처에서 누른다. 빠른 장면은 모니터의 **일시정지**·**1프레임**·배속(0.25× …)으로 늦춰 본다.
-> - **턴제 전술**: AI처럼 판단이 복잡한 코드는 AI가 고른 행동의 `Describe()`를 읽기 쉽게 쓴다("오크1 → 영웅 공격"). 행동 탭·타임라인만으로 AI의 선택을 따라갈 수 있다.
-> - **수집형·방치형**: 프로필이 오래 쌓이므로 명령 › 저장 › **프로필 삭제**(다음 플레이부터)와 **새 판**으로 처음 상태를 자주 시험한다. 오래된 프로필 파일을 몇 개 보관해 두었다가 출시 전 저장 변환을 시험한다.
-
-### 09. 3요소를 지키는 습관
-
-- [ ] 모든 데이터 클래스와 그 부모·안쪽·요소 클래스에 `[Serializable]`이 있다.
-- [ ] 모든 이벤트 클래스에 `[GameEvent]`가 있다.
-- [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
-- [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
-- [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 행동 직전 이벤트 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
-- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런싱 값이다.
-- [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
-- [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
-- [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction` → `GameView.Present`), `OnDisable`에서 `Dispose`한다.
-- [ ] 예상 값은 화면이 계산하지 않고 `Game.Preview`·`Game.CanDo`로 읽는다.
-- [ ] 규칙 난수는 `Game.Random`, 연출 난수는 `UnityEngine.Random`이다. 시간 규칙은 게임 시계 기준이다.
-- [ ] 게임 값을 담은 static 변수가 없고, Block·결과 코드는 `GBibleRuntime` 대신 받은 세션을 쓴다.
-- [ ] 텍스트 인자는 `("이름", 값)` 형태다.
-- [ ] 콘솔·타임라인에 "예전 방식(리플렉션)", "읽기 코드가 없어 리플렉션으로 읽습니다", "저장할 수 없는 참조입니다" 경고가 없다(있다면 이유를 안다).
-- [ ] DB › 시작 파일 › Bootstrap에서 Undo 보관 수를 정했다.
-
-> [!note]- 다른 장르라면
-> - **실시간 액션**: 위치·속도는 매 프레임 MonoBehaviour에서 움직이고, 규칙에 필요한 값(체력·쿨다운 시각·현재 칸)만 플레이어 데이터에 둔다. 입력은 여전히 행동이지만 Undo는 스냅샷 되감기(Bootstrap의 Undo 방식 "스냅샷")다. 쿨다운은 `Time.time`이 아니라 `session.Clock.Time` 기준 시각으로 적어야 되감을 때 함께 돌아간다.
-> - **시뮬레이션·방치형(유닛 수천 개)**: 객체 수가 성능을 정한다. 지금 데이터에서 다시 계산할 수 있는 값(지금 초당 생산량 등)은 저장하지 않고, 자주 바뀌는 묶음을 별도 플레이어 데이터로 나눈다. 다시 계산할 수 없는 값(환생의 근거인 누적 생산량)은 저장한다.
-
-### 10. 저장과 출시
-
-저장
-
-- [ ] 판이 끝나면 버릴 값은 `Session`, 남을 값은 `Meta` 구역이다.
-- [ ] DB › Bootstrap에서 판 저장과 판 끝 이벤트를 골랐다.
-- [ ] 끝난 판은 이어 하기가 열지 않는다(`RunState.IsActive`).
-- [ ] '이어 하기'는 `HasSavedRun`일 때만 켜지고, 불러오기 실패 때 새 판으로 넘어간다.
-- [ ] '새 판'은 `GBibleRuntime.NewRun(session)`을 행동 밖에서 부른다.
-- [ ] 세이브 칸이 여럿이면 슬롯(`UseSlot`·`SlotInfoOf`)을 쓰고, 칸에 보일 요약(`SlotSummary`)을 정했다.
-- [ ] 음량·언어·화면·키 같은 기기 설정은 DB › 설정(필요하면 선택 기능 입력)에 있고, 판 규칙에 영향을 주는 값은 설정에 두지 않았다.
-- [ ] 플레이어 데이터에 에셋 참조 대신 ID를 둔다.
-- [ ] 모니터 저장 명령으로 저장 → 끄기 → 불러오기를 해 보고 값·난수 결과가 이어지는 것을 봤다.
-
-출시 전
-
-- [ ] DB 사이드바 아래가 "검증 통과"다.
-- [ ] 콘솔에 "예전 방식(리플렉션)"·"저장할 수 없는 참조입니다"·`[BindTo]` 연결 경고가 없다(있다면 이유를 안다).
-- [ ] 저장 값 안의 DB 항목 ID 필드에 `[DataRef(종류)]`가 붙어 있다.
-- [ ] `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`에 체크가 있다.
-- [ ] 출시 뒤 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(값 계산이 필요하면 `Configure`에 `Migrations.Add`)는 것을 팀이 안다.
-
-> [!note]- 출시 전 더 볼 것
-> - 검증 오류가 있으면 빌드가 "데이터 검증 오류 n건으로 빌드를 중단합니다"로 막힌다.
-> - 필드 규칙의 필수 값이 비어 있지 않다(모니터 머리에 "필수 값 비어 있음"이 없다).
-> - 콘솔에 "읽기 코드가 없어 리플렉션으로 읽습니다"가 없다.
-> - 개발용 시드 고정과 개발 명령은 출시 빌드에서 저절로 꺼진다(개발 명령은 `session.Debug.Enabled`가 거짓이면 등록되지 않는다). 코드로 건 `session.Debug.Register`도 같으니 `if (Debug.isDebugBuild)`로 감싸지 않는다.
-> - 쓰지 않는 선택 모듈(다이얼로그·인벤토리)을 껐다.
-> - Undo 보관 수와 판 저장 설정이 출시 빌드에 맞다.
-> - `GameIds.cs`가 최신이다(DB를 저장하고 컴파일까지 끝났다).
-
-### 11. 멀티플레이 대비
-
-- [ ] 모든 입력이 `Game.Do`·`Game.Use`로 들어간다.
-- [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, 에셋·델리게이트가 없다.
-- [ ] 게임 값을 바꾸는 코드는 행동·Block·결과·`[BindTo]` 안에만 있다.
-- [ ] 규칙 난수는 모두 `Game.Random`이다.
-- [ ] Rules 코드에 `GBibleRuntime` 정적 입구와 static 게임 상태가 없다.
-- [ ] UI는 `Do` 직후 결과를 읽지 않고 알림을 받아 그린다.
-- [ ] 실패는 입력 창구 한 곳에서 받는다.
-- [ ] 이벤트를 받는 화면 코드는 값을 바꾸지 않고, 연출은 `SubscribeAfterAction`으로 받는다.
-- [ ] 플레이어가 여럿이면 `actorId`를 채우고, 남에게 숨길 값은 별도 키로 나눴다.
-- [ ] 게임 밖에 영향을 주는 결과는 `RewardEffect.Irreversible`이다.
+| 장 | 체크리스트 |
+|---|---|
+| [01. 프로젝트 시작하기](01-StartProject.md) | 6절 |
+| [02. 기획을 코드 구조로](02-DesignToCode.md) | 11절 |
+| [03. 게임 루프](03-GameLoop.md) | 10절 |
+| [04. 콘텐츠 더하기](04-AddingContent.md) | 12절 |
+| [05. 개발자와 함께 일하기](05-WorkingWithDesigners.md) | 10절 |
+| [06. 화면과 연출](06-Presentation.md) | 9절 |
+| [07. 장르별 설정](07-GenreRecipes.md) | 7절 |
+| [08. 시험과 디버깅](08-TestAndDebug.md) | 8절 |
+| [09. 3요소를 지키는 습관](09-Habits.md) | 7절 |
+| [10. 저장과 출시](10-SaveAndRelease.md) | 8절(저장 · 출시 전) |
+| [11. 멀티플레이 대비](11-MultiplayerReady.md) | 5절 |
 
 ## 3. 본문에서 쓰지 않은 기능
 
@@ -438,7 +298,7 @@ static void Started(GameSession session)
 
 ### 3-1. 처리기를 따로 등록하는 행동 — `Actions.Register`
 
-행동 클래스에는 데이터만 두고 처리 코드는 시작 코드에 둔다. 처리 코드를 행동 클래스 밖에 모으고 싶을 때(서버 쪽에서만 처리를 바꾸고 싶을 때 등) 쓴다. 01장 4절의 `Started` 표에 이름만 나온다.
+행동 클래스에는 데이터만 두고 처리 코드는 시작 코드에 둔다. 처리 코드를 행동 클래스 밖에 모으고 싶을 때(서버 쪽에서만 처리를 바꾸고 싶을 때 등) 쓴다. 01장 4절의 `RegisterRules` 표에 이름만 나온다.
 
 ```csharp
 [Serializable]
@@ -450,11 +310,11 @@ public sealed class SkipFloor : GameAction
 }
 ```
 
-`Run`을 쓰지 않고, 처리기를 `Started`에서 한 번 등록한다: `session.Actions.Register<SkipFloor>(action => session.Game.Data().Run.floor += action.floors);`. 한 형식에 처리기는 하나다. 이때도 대상 필드는 처리기가 불리기 직전에 id로 다시 찾아 넣는다. `Run`도 처리기도 없으면 "행동 'SkipFloor'의 처리기가 없습니다"로 실패한다. 대부분은 행동 클래스에 `Run`을 쓰는 것(1-1)으로 충분하다. → [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) 2.5
+`Run`을 쓰지 않고, 처리기를 `Bootstrap.RegisterRules`에서 한 번 등록한다(모든 세션 — `Started`에 두면 멀티 서버 세션에 처리기가 없다): `session.Actions.Register<SkipFloor>(action => session.Game.Data().Run.floor += action.floors);`. 한 형식에 처리기는 하나다. 이때도 대상 필드는 처리기가 불리기 직전에 id로 다시 찾아 넣는다. `Run`도 처리기도 없으면 "행동 'SkipFloor'의 처리기가 없습니다"로 실패한다. 대부분은 행동 클래스에 `Run`을 쓰는 것(1-1)으로 충분하다. → [02. 행동과 Undo](../../Manual/02-Actions-Undo.md) 2.5
 
 ### 3-2. 코딩한 결과 Block — `Reward`
 
-대상 없이 게임에 무언가를 하는 결과다. 기획자가 결과 칸의 **+ 결과 추가 › 코딩한 결과**에서 고른다.
+대상 없이 게임에 무언가를 하는 결과다. 결과 칸의 **+ 결과 추가 › 코딩한 결과**에 목록으로 나온다(AI는 반영 스크립트에서 항목의 결과 목록에 `new AddTotalGold { amount = 50 }`처럼 넣는다).
 
 ```csharp
 [Serializable, BlockInfo("누적 골드", Category = "카드 던전", Description = "프로필의 누적 골드를 늘립니다.")]
@@ -479,7 +339,7 @@ public class AddTotalGold : Reward
 
 ### 3-3. 달성·진행도·로그를 코드로 읽기
 
-도전과제 목록 화면이나 진행 막대는 세션에서 읽는다.
+도전과제 목록 화면이나 진행 게이지는 세션에서 읽는다.
 
 ```csharp
 if (session.Achievements.IsUnlocked(achievementId)) return "달성";
@@ -496,7 +356,7 @@ return session.Achievements.TryGetProgress(achievementId, out var now, out var g
 
 ### 3-4. 기록 용량과 원인 묶기 — `Journal`
 
-`session.Journal.Append`로 기록에 한 줄을 남기는 법은 [08장](08-TestAndDebug.md) 2절에서 썼다. 여러 줄을 한 원인 아래로 묶으려면 `Cause`를 쓴다.
+`session.Journal.Append(JournalKind, 시스템 이름, 글)`은 기록(모니터 타임라인)에 한 줄을 남기고 그 줄(`JournalEntry`)을 돌려준다. 여러 줄을 한 원인 아래로 묶으려면 `Cause`를 쓴다.
 
 ```csharp
 var root = session.Journal.Append(JournalKind.System, "Shop", "상점 열림");
@@ -554,7 +414,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 ### 3-10. 에디터 설정과 도구
 
-- **내 코드 범위**(창 없음 — `ProjectSettings/MomoiProject/ProjectCode.json`) — 클래스를 고르는 목록(값 형식·인스턴스 형식·필드 규칙)에 보일 폴더·네임스페이스. 플러그인 폴더의 클래스가 목록에 섞이거나 내 클래스가 안 보일 때 고친다(`ProjectSettings/MomoiProject/ProjectCode.json`).
+- **내 코드 범위**(창 없음 — `ProjectSettings/MomoiProject/ProjectCode.json`을 고친다) — 클래스를 고르는 목록(값 형식·인스턴스 형식·필드 규칙)에 보일 폴더·네임스페이스. 플러그인 폴더의 클래스가 목록에 섞이거나 내 클래스가 안 보일 때 고친다.
 - **DB › 프리팹** — 프리팹을 DB에 등록해 컴포넌트 필드를 탐색기로 고친다. 수정은 바로 적용된다(작업본을 거치지 않는다).
 - **`GameFeatures`**(에디터 코드, `GBible.EditorTools`) — 선택 기능이 켜졌는지 에디터 도구에서 확인한다: `GameFeatures.IsActive(GameFeatures.Find("dialogue"))`.
 - **`TextCatalog`** — 테스트·도구에서 텍스트 표를 따로 만들어 문장 틀을 시험한다: `new TextCatalog { SourceLanguage = "ko", Language = "ko" }` → `SetTable` → `Get`.
@@ -572,7 +432,7 @@ using (session.Journal.Cause(root.Id)) session.Journal.Append(JournalKind.System
 
 ### 3-12. 기믹 부품 — 사용·확률·상태 효과·자리·다시 뽑기
 
-카드 던전에는 없지만 조커 칸·보드·가방 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../GimmickCatalog.md)에 갈래별로 있다. 패시브 효과 쪽(놓인 것마다·가진 동안 스탯 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
+카드 던전에는 없지만 조커 칸·보드·인벤토리 격자 같은 게임에 쓰는 부품이다. 무엇에 무엇을 쓰나는 AI 문서 [기믹 목록](../GimmickCatalog.md)에 갈래별로 있다. 패시브 효과 쪽(놓인 것마다·가진 동안 스탯 보정·필드 바꾸기·빌려 쓰기)은 [04장](04-AddingContent.md) 8절 접힌 칸.
 
 - **되는 조각만 쓰기**: `Game.TryUse(id, 사용자, 대상…)`. 쓸 수 있으면 쓰고 참, 사용 조건이 안 맞으면 아무것도 하지 않고 거짓이다(실패를 던지지 않는다). 보드의 유닛을 차례로 돌며 부를 때 쓴다.
 - **기본 행동 직전 이벤트 다섯**: GBible이 행동 직전 이벤트 자리를 미리 둔 동작이다. 트리거 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`로 고친다.
@@ -594,8 +454,8 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 > [!note]- 자세히
 > - **확률**: 확률이 바뀌어도 난수는 한 번만 굴린다. 같은 시드면 뒤가 밀리지 않는다. 조건 '확률'(확률(%) · 난수 흐름)은 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. `Game.CanUse`(미리 보기)에서는 굴리지 않고 참, 이벤트 없는 조건 충족에서는 거짓이다.
 > - **상태 효과 종류**: DB › 상태 효과의 `kind`(없음·버프·디버프). 효과 '상태 효과 풀기'는 상태 효과를 비우고 종류를 고르면 그 종류를 모두 푼다. 조건 '상태 효과 검사'는 상태 효과를 비우고 종류를 고르면 그 가짓수를 비교한다.
-> - **값 틀**(행동 직전 이벤트 고치기·필드 바꾸기·이벤트 쏘기·사용자 필드 검사): `{level}`(이 결과를 가진 패시브 효과의 레벨), `{level:2/4/7}`(레벨 번째 값, 넘치면 마지막, 레벨 0이면 0), `{user:경로}`(사용자의 필드)·`{event:경로}`(받은 이벤트·행동 직전 이벤트의 필드)·`{data:키.경로}`(플레이어 데이터)·`{count:키.경로}`(목록 개수), 예전부터 있던 `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`.
-> - **자리**: 목록 하나(`List<T>`)를 칸으로 본다. 한 줄(조커 칸·손패)은 줄 길이 0, 격자(가방·보드)는 줄 길이 = 열 수다. 칸 번호 = 목록 위치, 빈 칸 = null. 좌표는 화면 기준(x 오른쪽 +, y 아래 +)이다. DB 대상 '자리로 고르기'(옆 칸·같은 줄·주변 8칸·맨 처음, '다른 목록에서 고르기'면 맞은편 보드)와 조건 '자리 검사'(맨 아래 줄·가장자리·양옆이 빈 칸 …)로 쓰고, 코드는 `Placement.Around(run.bag, artifact, 6, PlaceDirection.Left)`·`Placement.Is(run.jokers, joker, 0, PlaceSpot.First)`·석판 무늬 `Placement.Pattern(칸, 개수, 열, 무늬, 회전)`. 회전은 `Placement.Rotate`(화면 기준), `Grid` 좌표(y 위 +)에서는 `Grid.Rotate`. 둘 다 시계 방향 90°씩이다.
+> - **값 틀**(행동 직전 이벤트 고치기·필드 바꾸기·이벤트 쏘기·사용자 필드 검사의 값): `{level}`·`{level:2/4/7}`·`{user:경로}`·`{event:경로}`·`{data:키.경로}`·`{count:키.경로}`·`{user}`·`{owner}`·`{stacks}`·`{balance:ID}` — 뜻은 매뉴얼 [12장](../../Manual/12-Outcomes.md) 2-4a.
+> - **자리**: 목록 하나(`List<T>`)를 칸으로 본다. 한 줄(조커 칸·핸드)은 줄 길이 0, 격자(인벤토리·보드)는 줄 길이 = 열 수다. 칸 번호 = 목록 위치, 빈 칸 = null. 좌표는 화면 기준(x 오른쪽 +, y 아래 +)이다. DB 대상 '자리로 고르기'(옆 칸·같은 줄·주변 8칸·맨 처음, '다른 목록에서 고르기'면 맞은편 보드)와 조건 '자리 검사'(맨 아래 줄·가장자리·양옆이 빈 칸 …)로 쓰고, 코드는 `Placement.Around(run.bag, artifact, 6, PlaceDirection.Left)`·`Placement.Is(run.jokers, joker, 0, PlaceSpot.First)`·석판 무늬 `Placement.Pattern(칸, 개수, 열, 무늬, 회전)`. 회전은 `Placement.Rotate`(화면 기준), `Grid` 좌표(y 위 +)에서는 `Grid.Rotate`. 둘 다 시계 방향 90°씩이다.
 > - **후보 +1·다시 뽑기**: 결과 '가중치 표에서 고르기'의 '후보 수에 더할 숫자'(플레이어 데이터의 숫자)가 후보 수에 더해진다. 행동 안에서 `Game.RerollChoice(선택 id)`를 부르면 같은 표·같은 후보 수로 새로 뽑고 `ChoiceRequested`를 다시 쏜다. 비용·남은 횟수는 부르는 행동이 맡는다(`Game.Pay`). Undo하면 원래 후보로 돌아간다.
 > - **시드로 새 판**: `GBibleRuntime.NewRun(session, RandomStreams.SeedOf(글자))`([07장](07-GenreRecipes.md) 4절).
 
@@ -605,330 +465,11 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 
 ## 4. 기능 사용 표
 
-프로그래머·개발자가 직접 쓰는 기능과, 매뉴얼 장, 이 가이드에서 쓴 곳이다. "§" 뒤는 그 장의 절 번호다(예: 03 §6 = 3장 6절, 12 §3-4 = 이 부록 3-4). 여러 곳이면 먼저 나온 곳부터 적었다. "(언급)"은 접힌 칸이나 한 줄로만 나온 곳이다.
+기능을 찾는 표는 한 곳씩만 둔다.
 
-### 시작·설정
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 설치, `com.unity.nuget.mono-cecil` | 20 | 01 §1 |
-| 시작 설정 창(코드 폴더·asmdef·`Bootstrap.cs`·`PlayerData.cs`·DB 에셋·`run`/`profile` 자동 생성) | 20 | 01 §1 |
-| `GameDatabase`(DB 에셋) | 20 · 21 | 01 §1(시작 설정이 만든다) |
-| 선택 기능 켜기(기능 활성화), `#if GBIBLE_*` | 20 | 01 §1 |
-| 어셈블리·asmdef 참조 | 20 | 01 §2, 08 §6(Tests) |
-| DB › 시작 파일(Bootstrap 화면) · 요소 › 플레이어 데이터(cs ↗로 RunState·Profile 파일) | 20 · 21 | 01 §3·§4 |
-| Bootstrap 화면: Undo 방식·보관 수·시드 고정 | 20 · 02 · 07 | 01 §4, 07 §2·§4 |
-| Bootstrap 화면: 판 저장·판 끝 이벤트 | 20 · 06 | 01 §4, 10 §2 |
-| Bootstrap 화면 › 고급: 기록 보관 줄 수(`JournalCapacity`) | 20 · 22 | 01 §4, 07 §2, 12 §3-4 |
-| Bootstrap 화면 › 고급: Modify 누락 검사(`DetectUntrackedChanges`) | 20 · 01 | 01 §4, 07 §2, 12 §3-7 |
-| `GBibleRuntime.Session`·`Game` | 20 · 03 | 03 §3 |
-| `Configuring`·`SessionOptions`(코드로 덮어쓰기, 저장 변환) | 20 · 02 | 01 §4, 07 §2·§4, 10 §7 |
-| `HistoryMode.Snapshots`·`SnapshotInterval`·`SnapshotLimit` | 02 | 01 §4, 07 §2·§6 |
-| `HistoryMode.None` | 02 | 01 §4(데모 빌드 예), 07 §6 |
-| `CaptureSnapshot` | 02 | 07 §2·§6, 08 §8(다른 장르라면) |
-| `Started` | 20 | 01 §4 |
-| `Stopped` | 20 | 12 §3-8 |
-| `GameIds` 생성(DB 저장 때 저절로), `PlayerDataKey<T>` | 20 · 01 | 01 §3, 06 §1(`.Id`) |
-| `Game.Data()` | 01 · 03 | 01 §3 |
-| `GameDatabase.Load()`·`All<T>()` | 20 | 04 §8 |
-| `GameFeatures`(에디터 API) | 20 | 12 §3-10 |
-
-### 플레이어 데이터
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| `[Serializable]` 데이터 클래스 | 01 | 01 §3, 02 §2 |
-| `[PlayerData]` | 01 | 12 §3-7 |
-| DB › 플레이어 데이터(구역·값 형식) | 01 · 21 | 01 §3 |
-| 구역 `DataZone.Session`·`Meta` | 01 · 06 | 01 §3, 02 §3, 10 §1 |
-| `session.Data.Define`·`IsDefined` | 01 | 01 §3(언급), 08 §6 |
-| `session.Data.Get`·`Set`·`Modify` | 01 | 12 §3-7 |
-| `Changed`·`DataChanged` | 01 | 06 §1 |
-| `Synced`·`Snapshot`·`MirrorReceiver` | 01 · Coding.md | 06 §1(`Synced` 언급), 11 §1 |
-| `Permanent()` | 02 | 04 §8, 07 §2 |
-| `DescribeChanges` | 01 | 09 §6 |
-| `TransactionUndone`(저장소 이벤트) | — | 12 §3-7 |
-
-### 행동과 Undo
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| `GameAction`·`Run()` | 02 | 02 §4, 12 §1-1·§1-2 |
-| 대상 필드(id 있는 객체, 실행 직전 다시 찾기) | 02 | 02 §4, 03 §2, 06 §2, 09 §2, 11 §2, 12 §1-1 |
-| `Describe()`(기본: Block 이름 + 대상 id) | 02 | 08 §8(다른 장르라면), 12 §1-1 |
-| `Actions.Register` | 02 | 01 §4(언급), 12 §3-1 |
-| `Game.Do`·`ActionRecord` | 02 · 03 | 03 §2, 06 §1·§3 |
-| 실패 = 예외 = 전체 취소 | 02 | 03 §6 |
-| 행동 안의 행동(`Game.Do`·`Game.Use` 중첩) | 02 · 22 | 02 §4, 03 §5 |
-| `session.Undo()` | 02 | 01 §5(모니터), 03 §3 |
-| `UndoCount` | 02 | 12 §3-7 |
-| Undo 끊는 이벤트(Bootstrap), `session.ClearUndo()` | 02 · 20 | 03 §9(다른 장르라면), 07 §2 |
-| 시작할 때 이어 하기 + 새 판 행동(Bootstrap) | 06 · 20 | 01 §4, 03 §3, 10 §3 |
-| 지연 효과(상태 효과·예약에 맡기기, 코루틴에서 `Game.Do`하지 않기) | 02 · 29 | 03 §8 |
-| `actorId`·`Visibility` | 02 | 11 §4 |
-| `DeveloperEditAction` | 22 | 01 §4, 08 §2 |
-| `session.Actions.Executed`·`TransactionAborted` | 02 | 03 §2(언급) |
-| `Events.SubscribeAfterAction<T>`(성공한 행동의 이벤트만) | 10 | 06 §3, 03 §7, 09 §2, 11 §3 |
-| `GameView.Redraw`(값·언어가 바뀌면 프레임당 한 번 그리기, 연출이 끝난 뒤) | 23 · 32 | 06 §1·§4·§5 |
-
-### Game API
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| `Game.Find<T>` | 03 | 02 §9, 03 §7 |
-| `Game.All<T>()` | 03 | 06 §1(언급), 09 §6 |
-| `Game.All<T>(키)` | 03 | 12 §3-7 |
-| `Game.Find(id)`·`Game.Find(형식, id)`·`GameApi.HasId` | 03 | 12 §3-7 |
-| `Game.Use` | 03 · 16 | 03 §2, 04 §4 |
-| `Game.CanUse` | 03 · 16 | 03 §6 |
-| `Game.Random`·`RandomStream.Range` | 03 · 07 | 01 §4(언급), 07 §4 |
-| `RandomStream`의 그 밖의 뽑기(`Chance`·`NextDouble` …) | 07 | 12 §3-11 |
-| `session.Random.MasterSeed` | 07 | 08 §2 |
-| `Game.NewId` | 03 | 02 §9 |
-| `Game.Events` | 03 · 10 | 02 §5, 03 §1 |
-| `GameApi` 확장 메서드 | 03 | 09 §1(언급) |
-| `GameApi.IdOf` | 03 | 09 §3(언급) |
-
-### 인스턴스·키워드
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| DB › 인스턴스 | 04 · 21 | 02 §2, 04 §3 |
-| `session.Instances`(원본을 복사 없이 읽기) | 04 | 02 §2, 06 §1, 08 §6(테스트), 09 §4 |
-| `session.CopyInstance` | 04 | 02(용어), 12 §3-9 |
-| `[Hide]`·`[ShowIf]` | 04 | 02 §2, 05 §3 |
-| 기능 필드(`[SerializeReference]`)·`Usable` | 04 · 16 | 02 §2·§7, 04 §4 |
-| `InstanceData.CreateInstance`·`Copy` | 04 | 12 §3-9 |
-| `PlayerDataReward`(코드)·`GrantKind.Instance` | 04 · 12 | 12 §3-9 |
-| `[KeywordGroup]`·`[Keyword]` | 05 | 02 §6, 05 §2 |
-| 하위 그룹 | 05 | 12 §3-5 |
-| `Keywords`(실행 중 조회) | 05 | 12 §3-5 |
-
-### 저장
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| `GBibleRuntime.LoadRun` | 06 · 20 | 03 §3, 10 §3 |
-| `SaveRun`·`SaveProfile`·`DeleteRun`·`HasSavedRun` | 06 · 20 | 03 §3(언급), 07 §6, 10 §2·§3 |
-| 판 저장 설정(끌 때 / 행동마다 / 저장하지 않음), `AutoSaveRun`(코드로 덮어쓰기) | 06 · 20 | 01 §4, 10 §2 |
-| 판 끝 이벤트(받으면 판 저장 지우기·프로필 바로 저장) | 06 · 20 | 01 §4, 02 §3, 10 §2 |
-| `GBibleRuntime.NewRun(session)`(판 값 + 판 저장 파일 함께), `session.NewRun()`(테스트·서버) | 06 | 03 §3, 10 §3 |
-| `ExportMeta`·`ImportMeta`·`ExportRun`·`ImportRun` | 06 | 10 §3(다른 장르라면), 11 §4 |
-| `SavePath`·`RunSavePath` | 06 | 08 §1, 10 §5 |
-| 개발 중 저장 초기화, 모니터 저장 명령 | 06 · 22 | 08 §1, 10 §5 |
-| 출시됨 (저장 호환 유지) | 06 · 20 | 05 §8, 10 §6 |
-| 저장 값 안의 DB 항목 ID 자동 변환(`[DataRef]` 필드) | 06 · 21 | 02 §9(언급), 05 §8, 10 §7 |
-| DB › 개발 › 저장 변환(필드 옮김·키 이름 바꿈·키 삭제), `options.Migrations.Add`(값 계산), 저장 버전(변환을 따라 저절로) | 06 · 21 | 01 §4(언급), 10 §7 |
-| `[FormerlySerializedAs]` | 06 | 10 §5·§7 |
-| `session.Data.AddAlias` | 06 | 10 §7 |
-| `IsSaveCompatible`·`SaveSchema` | 06 | 12 §3-8 |
-
-### 이벤트·Trigger·결과
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| `[GameEvent]`·`Publish` | 10 | 02 §5 |
-| `Subscribe`·`Dispose` | 10 | 03 §7, 06 §3 |
-| `IDescribable` | 10 | 12 §3-6 |
-| `SubscribeAll`·`PublishObject`·`EventBus.Describe` | 10 | 12 §3-6 |
-| 기본 이벤트 `AchievementUnlocked` | 10 · 14 | 12 §3-3 |
-| 기본 이벤트 `AbilityUsed` | 10 · 16 | 12 §3-6 |
-| Trigger 조립(이벤트 받기·조건·사용, AND·OR·NOT) | 11 | 04 §7·§9 |
-| 필드 경로 조건(이벤트 값 조건, 플레이어 데이터 검사) | 11 | 04 §9, 06 §6(선택지 조건) |
-| `SimpleCondition` | 11 | 02 §1(판단표), 12 §1-6 |
-| `Condition`(전부 직접 쓰는 조건) | 11 | 12 §1-6(언급) |
-| `[TriggerSlot]`·`[OutcomeSlot]` | 11 · 17 | 04 §8 |
-| `session.Triggers.Register`·`RunOutcomes` | 11 · 17 | 04 §8, 11 §2 |
-| `Triggers.Watcher.EvaluateAll` | 11 · 17 | 04 §8(다른 장르라면) |
-| `TryGetProgress`(도전과제·Trigger 진행도) | 14 · 17 | 12 §3-3 |
-| 결과 '플레이어 데이터에 주기'(DB) | 12 | 04 §7 |
-| 결과 '로그에 기록'·로그 반영 규칙 | 12 · 15 | 04 §7·§8 |
-| 결과 '대상에게 효과'·`Effect<T>`·`TargetSelector<T>` | 12 · 16 | 02 §8, 04 §4·§9 |
-| 기본 대상 '사용자 자신'(`SelfTarget`) | 16 | 02 §8, 04 §4, 08 §6 |
-| `Reward`(코딩한 결과) | 12 | 02 §1(판단표), 12 §3-2 |
-| `RewardEffect` | 12 | 11 §2 |
-| 컨텍스트 `TriggerContext` | 12 · 13 | 04 §5 |
-| `[BlockInfo]`(`Category`·`Description`·`Sentence`) | 11 · 12 | 02 §4, 04 §4, 05 §5 |
-| `Validate`(조건·결과·효과·대상 Block) | 11 · 12 | 05 §7 |
-| `[BindTo]` 함수 | 13 | 04 §5 |
-| `[BindTo]` + `Reward` 클래스 | 13 | 12 §3-2 |
-| `BoundOutcomes.Has`·`Create` | 13 · 17 | 04 §8 |
-| `BoundOutcomes.Problems` | 13 | 12 §3-2 |
-
-### 스탯·행동 직전 이벤트·비용
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 스탯(숫자 필드) + Modifier: `Game.Attribute`·`AddModifier`·`RemoveModifiers`·`Modifiers` | 28 | 02 §8(언급) |
-| 효과 '스탯 보정'·'스탯 보정 떼기' | 28 · 16 · 12 | 02 §8(언급) |
-| 효과의 문법(언제 + 누구에게 + 무엇을 + 안전장치) | 28 | 02 §8(효과의 문법 칸) |
-| 행동 직전 이벤트 `[Intent]`, 규칙 함수의 행동 직전 이벤트 자리 `Game.Intercept` | 28 | 02 §8, 04 §9(가시 갑옷), 09 §1 |
-| 트리거 '행동 직전 이벤트 받기'(`InterceptTrigger`)·결과 '행동 직전 이벤트 고치기'(`ModifyIntentOutcome`) | 28 · 11 · 12 | 04 §9(가시 갑옷) |
-| `TriggerKinds.Intercept`·`OutcomeKinds.Intent`(기능 칸 잠금) | 28 · 11 | 04 §8 |
-| `Game.Pay`·`CanPay`·`CostIntent`·결과 '비용 내기' | 28 · 12 | 03 §6, 09 §1·§2, 02 §8(언급), 07 §6(방치형) |
-
-### 상태 효과·예약·선택 대기
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| DB › 상태 효과(중첩·다시 걸 때·지속·스탯 보정·걸려 있는 동안 트리거·걸릴 때·끝날 때 결과) | 29 | 04 §4(화상·독), 03 §8, 07 §6 |
-| 효과 '상태 효과 걸기'·'상태 효과 풀기' | 29 · 16 · 12 | 04 §4(화염구·독), 02 §8 |
-| `[BindTo(상태 효과 ID)]`, 결과 안에서 중첩 수 `Game.StatusStacks(c.User, c.Owner)` | 29 · 13 | 04 §4(독) |
-| `Game.ApplyStatus`·`RemoveStatus`·`HasStatus`·`Statuses`, 저장 키 `$statuses` | 29 | 04 §4(언급), 02 §2(언급), 08 §3 |
-| 예약 `Game.ScheduleAfter`·`ScheduleOn`·`CancelSchedule`·`CancelSchedules` | 29 · 02 | 03 §8, 07 §5·§6, 04 §4(언급), 09 §5(언급) |
-| 결과 '선택 요구'(`ChoiceOutcome`) | 29 · 12 | 04 §9(투척 단검) |
-| 모니터 명령 탭의 '선택 대기' 패널 | 29 · 22 | 04 §9(투척 단검), 08 §5 |
-| `Game.Choice`·`IsWaiting`(기다리는 동안 입력 막기는 화면의 일) | 29 | 04 §9(언급), 06 §2(`GameView.Busy`) |
-| `Game.Ask`·`[Chosen]`·`Game.Answer`, 이벤트 `ChoiceRequested` | 29 | 04 §9(언급), 09 §2·§5(언급) |
-
-### DB 기능
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 도전과제(DB) | 14 | 04 §7 |
-| `session.Achievements.IsUnlocked` | 14 | 12 §3-3 |
-| 로그(DB, 범위·집계) | 15 | 04 §7 |
-| `session.Stats.Report`·`Get` | 15 | 12 §1-7·§3-3 |
-| 액티브 효과(DB › 액티브 효과) | 16 | 04 §6(다른 장르라면) |
-| `AbilityDefinition`·`session.Abilities.Define` | 16 | 08 §6 |
-| DB 종류 `GameData`·`[Database]` | 17 · 21 | 02 §7, 04 §8 |
-| `ValidateData` | 17 | 04 §8, 05 §7 |
-| `[DataRef]` | 17 · 21 | 02 §2·§9, 05 §4 |
-| `[FieldLabel]` | 17 | 04 §8, 05 §3 |
-| `[PlayerDataRef]`·`[StatRef]`·`[AchievementRef]`·`[EventTypeRef]` | 11 · 12 | 05 §4 |
-| DB 저장 흐름(작업본 → Ctrl+S) | 21 | 01 §3, 05 §9 |
-| ID 바꾸기·삭제 보호 | 21 | 05 §8 |
-| 검증(사이드바 "검증 통과", 빌드 중단) | 21 | 04 §11, 05 §7 |
-| 클래스 탭(클래스 상세, `[Hide]` 토글, 필수) | 21 | 05 §3·§6 |
-| 내 코드 범위 | 21 | 12 §3-10 |
-| 프리팹 탭 | 21 | 12 §3-10 |
-| 필드 규칙(필수) | 27 | 05 §6 |
-| 스프라이트 틀·`SpriteSpecs.Get` | 27 | 05 §6 |
-
-### 모니터·디버깅
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 모니터 열기, 데이터·명령·행동 탭, Undo 버튼 | 22 | 01 §5 |
-| DB › 개발 › 개발 명령(결과 Block 조립, `[BindTo]`), 결과 Block "이벤트 쏘기" | 22 · 12 | 01 §4, 04 §10, 08 §2 |
-| `session.Debug.Register`(코드로 등록), `session.Debug.Enabled`(출시 빌드에서 꺼짐) | 22 | 08 §2 |
-| 타임라인(묶어 보기·인과 관계) | 22 | 04 §11, 08 §3 |
-| 이벤트 호출 | 22 | 04 §11, 08 §5 |
-| 도전과제·로그 테스트(트리거로 달성·강제 달성·이벤트로 더하기) | 22 | 04 §11, 08 §3·§5 |
-| `SimulateEvents`·`TrySimulateAchievement` | 22 | 08 §5 |
-| `TrySimulateStat`·`EventSimulator` | 22 | 12 §3-11 |
-| `Journal.Append` | 22 | 08 §2 |
-| `Journal.Cause` | 22 | 12 §3-4 |
-| `GameTime`(일시정지·배속·프레임 넘기기) | 07 · 22 | 06 §4, 08 §2(명령 › 시간), 08 §8(다른 장르라면) |
-| 게임 시계 `session.Clock` | 07 | 02 §2(다른 장르라면), 07 §5·§6 |
-| `session.EndFrame`(세션을 직접 만들 때) | 01 | 08 §6 |
-| EditMode 테스트, `Tools/RunCoreTests.ps1` | — | 08 §6 |
-| 경고 메시지 대응표 | 22 | 08 §7 |
-
-### 텍스트·모듈
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| `Texts.Get`·`Texts.NameOf`·문장 틀(조사·복수·용어) | 23 | 06 §5 |
-| `GameLanguage`(`Changed`) | 23 | 06 §5 |
-| `LocalizedText` | 23 | 06 §5(언급) |
-| 다국어 › 번역 검사 · 이름 키 채우기(`TextSheetTools.FillCodexNames`) | 23 | 05 §9, 08 §7(대응표) |
-| 시트(CSV) 내보내기·가져오기 | 23 | 05 §9(다른 장르라면, 언급) |
-| `TextCatalog` | 23 | 12 §3-10 |
-| 다이얼로그 그래프·스탠딩 프로필·UI 템플릿(`DialogueTemplate.Create`) | 24 | 06 §6 |
-| `Dialogues.Play`·`Signaled`·`IsPlaying`·`ResumeSaved` | 24 | 06 §6 |
-| `DialogueUIExtension` | 24 | 06 §6(다른 장르라면) |
-| 결과 '다이얼로그 재생' | 24 | 12 §3-10 |
-| 인벤토리 `Inventory` 형식 | 25 | 01 §3 |
-| 인벤토리 API(`TryRemove`·`slots` …) | 25 | 04 §6, 06 §8 |
-| 오디오 `GameAudio`(`PlayBgm`·`PlaySfx`·`SetVolume`·`VolumeChanged`) | 26 | 06 §7 |
-
-### 밸런싱 값·가중치 표·실패
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| DB › 밸런싱 값(값·곡선), `Game.Balance(id)`·`Game.Balance(id, x)` | 30 | 04 §10, 09 §1, 07 §6(수집형·방치형) |
-| DB › 가중치 표, `Game.Roll(id)`·`Game.Roll(id, n, unique)`, `session.Tables.Chances` | 30 | 04 §10, 07 §6(수집형) |
-| 결과 '가중치 표에서 주기' | 30 · 12 | 04 §10 |
-| 결과 '가중치 표에서 고르기'(`ChooseFromTableOutcome`) | 30 · 29 · 12 | 04 §10 |
-| 풀: 줄 종류 '플레이어 데이터 목록'·뺄 목록·코드 풀 `Game.Roll(풀, …)` | 30 | 04 §10 |
-| 플레이 중 DB 수정 바로 반영(밸런싱 값·가중치 표) | 30 | 08 §2, 04 §10(언급) |
-| 플레이어용 실패 `GameFailure`·`Game.Fail`, 라이브러리 키 `FailureKeys`(텍스트 표로 번역) | 30 · 23 | 03 §6, 06 §5, 09 §1, 12 §1-1, 08 §6(테스트) |
-
-### 슬롯·설정·입력
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 슬롯 `GBibleRuntime.UseSlot`·`SlotInfoOf`·`Slots`·`DeleteSlot`·`CopySlot`·`SlotSummary`·`PlayTime` | 31 | 10 §3, 07 §6(언급) |
-| DB › 설정(분류·값·적용 대상), `GameSettings`(`Number`·`Toggle`·`Set`·`All`·`Label`·`ChoicesOf`·`Changed`) | 31 | 10 §1, 06 §7(음량) |
-| 입력(선택 기능) `GameInput.Use`·`BindingText`·`Rebind`·`ResetBindings` | 31 | 10 §1 |
-| Steam(선택 기능) DB › Steam·`GameSteam.SetPresence`·도전과제·로그 → Steam 통계·Steam Cloud | 34 | 10 §6 |
-
-### 화면 연결·연출·씬·월드 상태
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 연출 대기열 `GameView.Present`·`Wait`·`DeltaTime`·`IsPresenting`·`SkipPresentation`·`PresentationSpeed`·`ClearPresentation`·`Presented` | 32 | 06 §3·§4, 03 §2, 09 §2 |
-| `GameView.Busy`(연출 중·선택 대기 중 입력 막기) | 32 | 06 §2 |
-| `GameView.Redraw(…, waitForPresentation: false, …)` | 32 | 06 §1·§4 |
-| `ViewList`(`OnRemove`·`OnCreate`), `GameView.Register`·`Find` | 32 | 06 §1(화면 연결) |
-| 컴포넌트 '데이터 연결'(`DataBinding`) | 32 | 06 §1(화면 연결) |
-| 씬 흐름(Bootstrap, `GameScenes.Follow`·`Transition`) | 32 | 03 §9, 07 §6(RPG) |
-| 월드 상태 `Game.World`·`WorldFlag`·`SetWorld`, 컴포넌트 '월드 상태 연결' | 32 | 07 §6(RPG), 03 §9(언급), 10 §3(언급) |
-| 대기열 밖 연출 `GameView.Play` | 32 | 07 §6(실시간·방치형) |
-| 화면(UI Toolkit) DB › 화면·`GameScreen`(`Tick`)·binding-path·기본 화면 | 35 | 06 §1(접힌 칸) |
-
-### 시간·저장·규칙 부품 보강
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 현실 시각 `Game.Now`·`Day`·`Week`, `SessionOptions.RealClock` | 07 | 07 §6(수집형·방치형) |
-| 판 저장 N초마다·이벤트를 받을 때, `GBibleRuntime.Saving`·`RunLoaded`·`Stopping` | 06 · 20 | 07 §1·§6, 10 |
-| 되돌리기 지점 `session.HistoryMark`·`UndoTo` | 02 | 07 §6(턴제 전술) |
-| 필드 경로 `name[키]`(딕셔너리 항목·목록의 id 요소) | 11 · 12 · 28 | 07 §6(수집형) |
-| 상태 효과 주기·걸 때 길이·`ShortenStatus`·효과 '상태 효과 줄이기'·조건 '상태 효과 검사'(쿨다운)·`StatusApplied`·`StatusEnded` | 29 · 16 | 07 §6(실시간) |
-| DB › 패시브 효과(가지고 있으면 발동), `Game.Owned` | 17 · 29 | 04 §8·§9(접힌 칸), 07 §6 |
-| 기본 대상 Block(플레이어 데이터 목록·이벤트의 개체·조건으로 거르기·무작위 n개·정렬해서 n개) | 16 | — |
-| 값 틀 `{user}`·`{owner}`·`{stacks}`·`{balance:ID}`(도발·대신 맞기)·`{level}`·`{level:2/4/7}`·`{user:경로}`·`{event:경로}`·`{data:키.경로}`·`{count:키.경로}` | 28·12 | 12 §3-12 |
-| 가중치 표 줄 무게를 밸런싱 값에서(천장) | 30 | 07 §6(수집형) |
-| `Game.BalanceSum`·`BalanceCount`, `BigNumber` | 30 · 36 | 07 §6(방치형) |
-| 격자 `Grid`·`Cell` | 36 | 07 §1·§6(턴제 전술·생활 시뮬) |
-| 판정 보고 행동(화면이 판정, 결과를 행동으로) · 실시간 예산 | 33 | 07 §6(실시간·대량 실시간) |
-
-### 기믹 부품(조각·자리·순서)
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 기믹 목록(AI 문서 `GimmickCatalog.md`), 기획 명세서(2-3 자리·4절 메인 룰과 기믹·6절 부가 기능) | — | 00, 01 §1, 07(첫 문단), 04 §8(언급) |
-| 부가 기능(대화·달력·현실 시간·칸 맵·큰 수 …, 명세서 6절에서 켜면 붙음) | — | 07 §1 |
-| 패시브 효과 '일치 필드'·'놓인 것마다'(목록 순서대로 발동)·'레벨 필드', `Game.Owned(id, 가진 쪽)` | 17 | 04 §8(접힌 칸) |
-| 패시브 효과 '가진 동안 스탯 보정'·'보정 받을 대상'(읽을 때 계산, 잃으면 저절로 빠짐) | 17 · 28 | 04 §8(접힌 칸) |
-| 결과 '빌려 쓰기'(복사·흉내, Blueprint), `Game.BorrowPassive` | 17 | 04 §8(접힌 칸) |
-| 효과 '필드 바꾸기'(조각마다 쌓이는 값, 값 틀 — 위 줄, 더하기는 × 효과 배율) | 12 | 04 §8(접힌 칸) |
-| 행동 직전 이벤트 '사용'(`times`·막기), `Game.TryUse`, 이벤트 `AbilityUsed`의 `Times` | 16 · 28 | 12 §3-12 |
-| 행동 직전 이벤트 '상태 효과 걸기'(`statusId`·`stacks`·`length`·`targetId`·막기) | 29 · 28 | 12 §3-12 |
-| 행동 직전 이벤트 '확률'·조건 '확률'·`Game.Chance` | 07 · 11 · 28 | 12 §3-12 |
-| 행동 직전 이벤트 '비용 지불'의 `floor`(빚 하한) | 28 | 12 §3-12 |
-| 상태 효과 '종류'(버프·디버프), `Game.StatusCount`·`RemoveStatuses`, '상태 효과 풀기'(종류 전부)·'상태 효과 검사'(종류) | 29 | 04 §4(언급), 12 §3-12 |
-| 대상 '자리로 고르기'(다른 목록 = 맞은편)·조건 '자리 검사' | 37 | 04 §8(언급), 12 §3-12 |
-| `Placement`(`CellOf`·`IndexOf`·`Around`·`Is`·`Pattern`·`Rotate`)·`Grid.Rotate` | 37·36 | 12 §3-12 |
-| '가중치 표에서 고르기'의 '후보 수에 더할 숫자'·`Game.RerollChoice` | 30 | 07 §6(대량 실시간), 12 §3-12 |
-| 시드로 새 판 `GBibleRuntime.NewRun(session, 시드)`·`session.NewRun(시드)`·`RandomStreams.SeedOf` | 06 · 07 | 07 §3·§4, 12 §3-12 |
-| 패시브 효과 `rules`(발동 더)·`matchVia`(원본에서 읽기)·일치 필드 글자 목록·레벨 0 꺼짐·`pulse`(주기)·스위치 패시브 효과 | 17 | 04 §8(언급) |
-| 패시브 효과 `modifierWhen`(보정 조건)·`stacking`(여럿일 때)·보정 줄 `target`·받을 대상 `party[]` | 17 · 28 | 04 §8(언급) |
-| 행동 직전 이벤트 '효과 배율'(`PowerIntent`, `Use.Context.Power`) | 16 · 28 · 12 | — |
-| 상태 효과 '걸린 쪽의 패시브 효과를 끔'·행동 직전 이벤트 '상태 효과 걸기'의 `maxStacks`·`pulse`·`byId`(처치 기여)·대상 '상태 효과로 거르기' | 29 · 16 | — |
-| `Game.TryPay`·비용 행동 직전 이벤트 `forId`·`userId` | 28 · 03 · 16 | — |
-| 조건 '사용자 필드 검사' | 11 | — |
-| 자리 '같은 열 …'(방향·자리)·기준 '없음'·`players[].칸` | 37 | — |
-
-### 고정 틱·미리보기·CSV
-
-| 기능 | 매뉴얼 | 가이드에서 쓴 곳 |
-|---|---|---|
-| 고정 틱(Bootstrap, `SessionOptions.TickRate`), `session.Ticked`·`TickAlpha` | 33 | 07 §6(실시간), 07 §2·§5, 03 §8(언급) |
-| 미리보기 `Game.Preview`·`Game.CanDo`·`Game.IsPreviewing` | 33 | 06 §2, 09 §2, 03 §6(언급), 07 §6(턴제 전술), 08 §3·§6 |
-| DB CSV 내보내기·가져오기 | 33 | 04 §10(언급), 08 §2(언급) |
+- **기능 → 쓸 것 → 매뉴얼 장**: 참조 [`Reference.md`](../Reference.md) 2절(하고 싶은 일 → 쓸 것)·3절(API 요약). 코드를 쓰기 시작할 때 끝까지 읽는 문서다.
+- **상황 → 매뉴얼 장**: 매뉴얼 [00-Index](../../Manual/00-Index.md)의 '상황별로 찾기'.
+- **이 가이드의 장 → 다루는 기능**: [00. 목차](00-Index.md)의 '읽는 순서' 표. 본문에 자리가 없었던 기능은 이 장 3절.
 
 ---
 
@@ -936,4 +477,4 @@ Game.RemoveStatuses(hero, StatusKind.Debuff);                          // 정화
 
 - [매뉴얼 목차](../../Manual/00-Index.md) — 기능별 사전
 - [../Coding.md](../../Coding.md) — 게임 코드 규칙
-- [../TestMultiplayer.md](../../TestMultiplayer.md) — 테스트용 멀티플레이 설계(보류 중)
+- [../TestMultiplayer.md](../../TestMultiplayer.md) — 테스트용 멀티플레이 설계 기록(지금 동작은 매뉴얼 [40장](../../Manual/40-Multiplayer.md))

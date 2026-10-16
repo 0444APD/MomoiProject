@@ -1,6 +1,6 @@
 // GBible UI 키트(AI/Templates/UI/Code) — 프로젝트의 Assets/MomoiProject/Code/Client/Kit/KitOutline.cs로 복사한다(네임스페이스는 프로젝트 것 — 바꾸면 UXML의 MomoiProject.KitOutline도).
 // UI 템플릿 — 라인 디자인(규격): 부모 패널(KitPanel)의 외곽을 따라 두르는 선. 개발자 양식(2026-10-13)을 그대로 칸으로 옮겼다.
-//   layer: Front(앞 — 패널 안쪽에서 외곽을 따라) · Back(뒤 — 패널 바깥에서 외곽을 따라). gap = 패널 외곽과의 간격(비우면 앞 10 · 뒤 6).
+//   layer: Front(앞 — 패널 안쪽에서 외곽을 따라) · Back(뒤 — 패널 바깥에서 외곽을 따라). gap = 패널 외곽과의 간격(비우면 앞 10 · 뒤 8).
 //   skew(뒤 선만): None(사방을 두름) · TopLeft·TopRight·BottomRight·BottomLeft(그쪽으로 gap만큼 밀린 상자 — 패널에 가려지는 곳은 그리지 않는다).
 //   weight: Strong(강 1px) · Light(약 0.5px). doubled: 두 겹(두 번째 겹은 gap 쪽으로 4px 더 — 약).
 //   cut: 변마다 빼는 구간 "left:0.2-1 right:0.66-0.78"(변의 시계 방향 비율 0~1 — 위 변은 왼→오, 오른 변은 위→아래, 아래 변은 오→왼, 왼 변은 아래→위).

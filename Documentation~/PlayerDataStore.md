@@ -180,7 +180,7 @@ public class EquipAction : GameAction
     public override string Describe() => $"장비 착용 #{itemIndex}";
 }
 
-GBibleRuntime.Started += session =>
+GBibleRuntime.SessionCreated += session =>   // 행동 처리기는 모든 세션에(멀티 서버 포함 — 시작 설정을 했으면 Bootstrap.RegisterRules 안에)
 {
     session.Actions.Register<EquipAction>(action =>
         session.Data.Modify(GameIds.PlayerData.PlayerInventory, inv => inv.items[action.itemIndex].level++));
@@ -434,7 +434,7 @@ public class SampleEquipment
 
 `GameIds.cs`는 플레이어 데이터의 값 형식이 들어 있는 어셈블리(asmdef) 폴더 아래 `Generated/`에 만들어집니다. 그래야 그 형식을 참조해 `PlayerDataKey<Inventory>`처럼 타입을 붙일 수 있습니다. 형식이 없거나 asmdef 밖(Assembly-CSharp)에 있으면 `Assets/MomoiProject/Generated/`에 만들어집니다.
 
-위치를 직접 정하려면 `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 폴더 경로를 적습니다. 그 위치에서 참조할 수 없는 형식의 키는 타입 없이 ID 문자열로만 만들어집니다. 수동으로 다시 만들려면 메뉴 `MomoiProject > 식별자 코드 다시 만들기`를 누릅니다.
+위치를 직접 정하려면 `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 폴더 경로를 적습니다. 그 위치에서 참조할 수 없는 형식의 키는 타입 없이 ID 문자열로만 만들어집니다. 수동 메뉴는 없다 — 코드에서 `GameIdsGenerator.Generate(force: true)`.
 
 ---
 

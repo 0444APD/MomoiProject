@@ -17,8 +17,8 @@
 | Modifier | 스탯 하나에 붙는 보정 한 줄: 대상 id · 필드 이름 · 칸 · 값 · 출처. 플레이어 데이터에 저장된다. 패시브 효과의 `modifiers`(가진 동안 스탯 보정)는 저장하지 않고 읽을 때 계산한다(2-2). |
 | 칸 (`ModifierKind`) | Modifier가 들어가는 자리. 플랫(`Flat`, +30) · 퍼센트(`Percent`, 0.2 = +20%) · 독립 곱(`Multiply`, 0.5 = ×1.5). |
 | 출처 (source) | Modifier를 붙인 쪽의 ID(장비·유물·액티브 효과 …). 같은 출처의 Modifier를 한꺼번에 뗀다. |
-| 행동 직전 이벤트 (Intent) | 곧 일어날 일의 내용을 담은 클래스(`DamageIntent { targetId, amount, cancelled }`). 피해·죽음처럼 장르 규칙의 행동 직전 이벤트는 프로젝트가 정한다. GBible이 직접 하는 일(사용·비용 지불·상태 효과 걸기·확률·효과 배율)의 행동 직전 이벤트는 기본 제공이다(4-14). |
-| 행동 직전 이벤트 (Intercept) | 행동 직전 이벤트를 일이 일어나기 직전에 고치거나 막는 단계. 트리거 잎 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`(또는 `[BindTo]` 코드)로 만든다. |
+| 행동 직전 이벤트 (코드 `Intent`) | 곧 일어날 일의 내용을 담은 클래스(`DamageIntent { targetId, amount, cancelled }`). 피해·죽음처럼 장르 규칙의 행동 직전 이벤트는 프로젝트가 정한다. GBible이 직접 하는 일(사용·비용 지불·상태 효과 걸기·확률·효과 배율)의 행동 직전 이벤트는 기본 제공이다(4-14). |
+| 행동 직전 이벤트 받기 (코드 `Intercept`) | 규칙 함수가 `Game.Intercept(행동 직전 이벤트)`로 통과시키는 순간, 받는 쪽이 그 내용을 고치거나 막는 단계. 받는 쪽은 트리거 잎 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`(또는 `[BindTo]` 코드)로 만든다. |
 | 규칙 함수 (중간층) | 행동·Block·`[BindTo]`가 같이 쓰는 프로젝트의 평범한 static 함수(`Rules.Damage`). 피해 계산 순서와 행동 직전 이벤트 자리가 여기 있다. |
 | 비용 (Cost) | 플레이어 데이터의 숫자를 내는 일. `Game.Pay`·`Game.TryPay`·결과 `비용 내기`. 기본 제공 행동 직전 이벤트 `CostIntent`를 거친다. |
 | 효과 배율 (Power) | 액티브 효과를 쓸 때·패시브 효과가 발동할 때 한 번 정해지는 수치 배율(기본 1). 기본 효과 Block이 수치에 곱한다. 기본 제공 행동 직전 이벤트 `효과 배율`(`PowerIntent`)로 고친다(4-14). |
@@ -56,7 +56,7 @@
 
 **문법 밖**은 둘뿐이다: **저장을 넘는 되감기**("어제 저장한 판으로 돌아가기", 되감기 지점은 세션 안에서만 있고 판 저장에 Undo 이력은 들어가지 않는다)와 **난수를 다시 굴리는 되감기**(되감으면 난수 상태도 돌아가므로, 같은 행동을 다시 하면 결정론 난수라 같은 결과가 나온다 — 07장). 같은 세션 안의 되감기는 `UndoTo`(02장)로 문법 안이다.
 
-실시간 물리·이동 자체는 화면 코드의 자유 영역이다. 물리 충돌·투사체·반사·미니게임처럼 화면이 정하는 판정은 **판정 보고 행동** 모양이면 문법 안이다: 화면(MonoBehaviour)이 판정하고 그 결과를 행동 하나로 보낸다(실시간이면 틱마다 묶어서 `Strike { hits }`). 규칙은 결과만 받아 피해·행동 직전 이벤트·이벤트를 그대로 탄다. 위치·속도는 화면 쪽에 두고(판 데이터에 넣지 않는다), 한 번 정해지는 위치(폭발 지점)만 행동 필드로 넘긴다(→ `33-Tick-Preview-Csv.md`).
+실시간 물리·이동 자체는 화면 코드의 자유 영역이다. 화면이 정하는 판정(충돌·투사체·반사·미니게임)은 위 표의 **판정 보고 행동**이면 문법 안이다: 규칙은 결과만 받아 피해·행동 직전 이벤트·이벤트를 그대로 탄다. 위치·속도는 판 데이터에 넣지 않고, 한 번 정해지는 위치(폭발 지점)만 행동 필드로 넘긴다(실시간 묶음 `Strike { hits }` → `33-Tick-Preview-Csv.md`).
 
 쪼개 보기:
 
@@ -101,9 +101,8 @@
 
 **패시브 효과의 가진 동안 스탯 보정은 어디에도 저장되지 않는다.** DB › 패시브 효과의 `modifiers`(가진 동안 스탯 보정, 17장 0-1)는 `Game.Attribute`·`Game.Modifiers`를 읽을 때마다 가진 목록을 보고 계산한다.
 
-- 유물을 가진 동안만 보이고, 잃으면 저절로 빠진다. 붙이고 떼는 코드가 없다.
-- 가진 목록이 플레이어 데이터라 Undo·저장·멀티플레이가 그대로다. 보정만 따로 남거나 빠지는 일이 없다.
-- 읽을 때 가진 쪽마다 따진다: `modifierWhen`(보정 조건)이 거짓인 가진 쪽(Fury "같은 줄에 혼자"가 아님)·레벨 0 이하·침묵한 가진 쪽(29장 `silencesPassives`)은 빠진다. 줄마다 `target`(받을 대상)을 따로 둘 수 있고, 받는 쪽 하나에 가진 쪽이 여럿이면 `stacking`(여럿일 때)이 레벨 합·값 합·가장 높은 하나를 고른다. 자세히는 17장 0-1.
+- 가진 동안만 보이고, 가진 목록(플레이어 데이터)에서 빠지면 저절로 빠진다. 붙이고 떼는 코드가 없고, Undo·저장·멀티플레이는 가진 목록을 따라온다.
+- 가진 쪽마다 `modifierWhen`(보정 조건)·레벨·침묵(29장 `silencesPassives`)·줄마다의 `target`(받을 대상)·`stacking`(여럿일 때)을 따져 계산한다(17장 0-1).
 - `Game.Modifiers(대상, 스탯)` 목록에는 저장된 것과 같은 모양으로 들어 있다(`source` = 패시브 효과 ID, `id` = `"passive:ID"`, 값 = 위 규칙으로 계산한 값). 툴팁이 그대로 읽는다.
 - `$modifiers`에는 없고, `Game.RemoveModifiers`·`session.Attributes.Remove`로 떼지지 않는다. 빼려면 가진 목록에서 그 ID를 뺀다.
 
@@ -142,9 +141,13 @@
 
 없는 플레이어 데이터·없는 필드·숫자가 아닌 필드는 "모자랍니다"가 아니라 프로그래머 실수(`InvalidOperationException`)다.
 
-경로는 딕셔너리의 키 하나를 집을 수 있다: `stock[gold]` = `stock`(`Dictionary<string, int>`)의 `gold` 키(필드 경로 `name[키]`, 11장 3-1). 재화·재료를 딕셔너리 하나에 모아 두는 게임이 그대로 쓴다. 없는 키는 0으로 보므로 양이 0보다 크면 "모자랍니다"로 실패한다(프로그래머 실수가 아니다). 목록에서 id로 고른 요소의 필드(`units[hero].mana`)도 된다. 요소마다 펼치는 `[]`(`units[].mana`)는 쓸 수 없다 — 낼 곳은 숫자 하나다. `Game.Pay`·`TryPay`면 프로그래머 실수(`InvalidOperationException` "[MomoiProject] 비용: '…'에 []가 있어 낼 곳이 하나로 정해지지 않습니다. …"), 결과 `비용 내기`면 검증 오류다. 낼 숫자의 부모가 구조체여도 프로그래머 실수다(읽은 것이 사본이라 빼도 실제 값이 바뀌지 않는다 — `[Serializable]` 클래스로 둔다).
+경로(필드 경로, 11장 3-1)로 낼 곳은 **숫자 하나**다.
 
-`Game.CanPay`는 지금 값만 본다(행동 직전 이벤트 전, 하한 0 기준). 버튼을 미리 흐리게 하는 화면용이다. 비용 0·빚 허용은 모른다.
+- 딕셔너리의 키 하나: `stock[gold]` = `stock`(`Dictionary<string, int>`)의 `gold` 키. 재화·재료를 딕셔너리 하나에 모아 두는 게임이 그대로 쓴다. 없는 키는 0으로 보므로 양이 0보다 크면 "모자랍니다"로 실패한다(프로그래머 실수가 아니다).
+- 목록에서 id로 고른 요소의 필드: `units[hero].mana`.
+- 쓸 수 없는 것: 요소마다 펼치는 `[]`(`units[].mana` — `Game.Pay`·`TryPay`는 프로그래머 실수, 결과 `비용 내기`는 검증 오류), 부모가 구조체인 숫자(읽은 것이 사본이라 빼도 실제 값이 바뀌지 않는다 — `[Serializable]` 클래스로 둔다). 오류 문장은 4-12.
+
+`Game.CanPay`는 지금 값만 본다(행동 직전 이벤트 전, 하한 0 기준). 비용 0·빚 허용은 모른다. 화면에서 그것까지 맞게 보려면 그 행동을 `Game.CanDo(행동, out 이유)`로 해 본다(행동 직전 이벤트까지 돌려 보고 안 되는 이유를 준다, 33장 2-2). 화면 코드에 "비용 0이면 …" 같은 규칙 계산을 따로 쓰지 않는다.
 
 ---
 
@@ -178,7 +181,7 @@
 
 ### 3-3. 트리거 잎 `행동 직전 이벤트 받기`
 
-Trigger 칸 `+ 블럭` → 그룹 **트리거** → `행동 직전 이벤트 받기`. 칸의 잠금에 행동 직전 이벤트가 있을 때만 나온다(3-6). 문장은 `{intentType} 행동 직전 이벤트`.
+Trigger 칸 `+ 블럭` → 그룹 **트리거** → `행동 직전 이벤트 받기`. 칸의 잠금에 행동 직전 이벤트가 있을 때만 나온다(3-6). 문장은 `{intentType} 행동 직전 이벤트 받기`.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
@@ -186,9 +189,9 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `행동 직전 이벤트 받
 | `filter` | 행동 직전 이벤트 조건 | 이벤트 조건과 같은 값 조건 식(`필드 검사` 등). 뿌리는 고른 행동 직전 이벤트다. 비우면 그 행동 직전 이벤트가 지날 때마다 |
 | `order` | 순서(작을수록 먼저) | 정수. 같으면 등록 순서 |
 
-- 요약: `피해 행동 직전 이벤트(…일 때)`. Alt를 누르면 `intercept 피해 where …`.
+- 요약: `피해 행동 직전 이벤트 받기(…일 때)`. Alt를 누르면 `intercept 피해 where …`.
 - **순간의 규칙**: 행동 직전 이벤트 잎은 그 행동 직전 이벤트가 `Game.Intercept`를 지나는 순간에만 참이다. `AND`로 조건 충족(`플레이어 데이터 검사` 등)을 붙이면 "그 상태일 때만 행동 직전 이벤트를 받아 고친다"가 된다. 이벤트 받기와 `AND`로 묶으면 같은 순간에 오지 않아 발동하지 않는다.
-- 검증 오류: "행동 직전 이벤트: 행동 직전 이벤트가 선택되지 않았습니다." / "행동 직전 이벤트: 행동 직전 이벤트 '…'을 찾을 수 없습니다(이름이 바뀌었는지 확인)." / "행동 직전 이벤트(피해) 조건: …".
+- 검증 오류: "행동 직전 이벤트 받기: 행동 직전 이벤트가 선택되지 않았습니다." / "행동 직전 이벤트 받기: 행동 직전 이벤트 '…'을 찾을 수 없습니다(이름이 바뀌었는지 확인)." / "행동 직전 이벤트 받기(피해) 조건: …".
 
 ### 3-4. 결과 `행동 직전 이벤트 고치기`
 
@@ -213,7 +216,7 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `행동 직전 이벤트 받
 | `{stacks}` | 가진 쪽에 걸린 **이 상태 효과**의 중첩(상태 효과의 결과에서만. 그 밖에서는 0) | 중첩만큼 피해 감소: `amount` `더하기` `-{stacks}`(5-10) |
 | `{level}` | 이 결과를 가진 **패시브 효과**의 레벨. 가진 쪽 기준이다(`Game.Owned(c.Owner, c.User)`와 같다). `perElement`면 그 조각의 레벨(`levelField`), 빌려 쓰는 중이면 원본 조각의 레벨. 패시브 효과가 아닌 곳(상태 효과·액티브 효과)에서는 0 | 레벨만큼 피해 감소: `amount` `더하기` `-{level}` · 레벨만큼 더 발동: 행동 직전 이벤트 `사용`의 `times` `더하기` `{level}` |
 | `{level:2/4/7}` | 레벨 번째 값. 1레벨이면 첫 값, 넘치면 마지막 값, 레벨 0이면 0. 소수도 된다(`{level:0.1/0.15/0.2}`) | 레벨 1·2·3에 −2·−4·−7: `amount` `더하기` `-{level:2/4/7}` |
-| `{balance:ID}` | 밸런싱 값 ID의 값(30장, 곡선은 보지 않는다) | `amount` `곱하기` `{balance:shieldRatio}` — 수치를 기획자가 한곳에서 고친다 |
+| `{balance:ID}` | 밸런싱 값 ID의 값(30장, 곡선은 보지 않는다) | `amount` `곱하기` `{balance:shieldRatio}` — 수치를 개발자가 한곳에서 고친다 |
 
 - 앞에 붙은 `-`는 틀과 함께 숫자 하나로 읽힌다(`-{stacks}`가 중첩 3이면 `-3`). 틀의 값이 음수면 부호가 바뀐다(`-{balance:x}`에서 x가 −2면 `2`). 합치는 것은 틀 앞의 `-`와 그 값의 부호뿐이라 틀이 펼친 글자 안·틀 밖의 `--`는 그대로다(`{data:run.title}`이 `--Dark--`면 그대로).
 - 패시브 효과의 레벨은 `{level}`·`{level:…}`로 코드 없이 읽는다. 레벨로 계산이 더 필요하면(곱한 값·한도) 결과를 코드로 쓴다(`Game.Owned(c.Owner, c.User)`, 17장 0-4).
@@ -222,11 +225,11 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `행동 직전 이벤트 받
 - 막기는 행동 직전 이벤트의 `cancelled` 필드를 참으로 만든다. 그 뒤 행동 직전 이벤트는 건너뛰고, 규칙 함수가 일을 하지 않는다.
 - 요약: `행동 직전 이벤트 amount -5`, `행동 직전 이벤트 amount ×0.5`, `행동 직전 이벤트 amount = 0`, `행동 직전 이벤트 targetId = {user}`, `행동 직전 이벤트 막기`.
 - 검증 오류: "행동 직전 이벤트 고치기: 필드를 고르세요." / "행동 직전 이벤트 고치기: 더하기·곱하기에는 숫자(또는 {stacks}·{level}·{level:2/4/7}·{balance:ID} 틀)를 적으세요."
-- 실행 경고(Journal, 출처 `Intercept`) — 아무것도 고치지 않고 알린다: "행동 직전 이벤트 고치기: 행동 직전 이벤트로 발동한 것이 아니라 고칠 행동 직전 이벤트가 없습니다." / "행동 직전 이벤트 고치기: (형식)에 cancelled 필드가 없어 막을 수 없습니다." / "행동 직전 이벤트 고치기: '(필드)'에 '(값)'를 넣을 수 없습니다(형식)."(틀이 숫자·참거짓이 아닌 글자로 펼쳐졌을 때) / "행동 직전 이벤트 고치기: '(필드)'에 쓰지 못했습니다(그 필드·키가 없습니다)." / "행동 직전 이벤트 고치기: '(필드)'의 부모가 구조체라 고칠 수 없습니다(클래스로 바꾸세요)." / "행동 직전 이벤트 고치기: '(필드)'의 부모가 비어 있어 쓰지 못했습니다(경로 중간의 값이 없습니다)."(`info.amount`의 `info`가 비었거나 `units[hero]`의 `hero`가 없을 때. 요소마다 펼치는 `[]`가 빈 목록이면 알리지 않는다)
+- 실행 경고(Journal, 출처 `Intercept`) — 아무것도 고치지 않고 알린다: "행동 직전 이벤트 고치기: 행동 직전 이벤트 받기로 발동한 것이 아니라 고칠 행동 직전 이벤트가 없습니다." / "행동 직전 이벤트 고치기: (형식)에 cancelled 필드가 없어 막을 수 없습니다." / "행동 직전 이벤트 고치기: '(형식)'에 '(필드)' 필드가 없습니다."(필드 경로가 그 행동 직전 이벤트에 없을 때) / "행동 직전 이벤트 고치기: '(필드)'에 '(값)'를 넣을 수 없습니다(형식)."(틀이 숫자·참거짓이 아닌 글자로 펼쳐졌을 때) / "행동 직전 이벤트 고치기: '(필드)'에 쓰지 못했습니다(그 필드·키가 없습니다)." / "행동 직전 이벤트 고치기: '(필드)'의 부모가 구조체라 고칠 수 없습니다(클래스로 바꾸세요)." / "행동 직전 이벤트 고치기: '(필드)'의 부모가 비어 있어 쓰지 못했습니다(경로 중간의 값이 없습니다)."(`info.amount`의 `info`가 비었거나 `units[hero]`의 `hero`가 없을 때. 요소마다 펼치는 `[]`가 빈 목록이면 알리지 않는다)
 
 ### 3-5. 결과 `비용 내기`
 
-`+ 결과 추가` → 그룹 **결과** → `비용 내기`(플레이어 데이터를 줄 수 있는 칸이면 나온다). `Game.Pay`와 같다(행동 직전 이벤트 `비용 지불` 받기을 거치고, 모자라면 그 행동 전체가 실패한다).
+`+ 결과 추가` → 그룹 **결과** → `비용 내기`(플레이어 데이터를 줄 수 있는 칸이면 나온다). `Game.Pay`와 같다(행동 직전 이벤트 `비용 지불`을 거치고, 모자라면 그 행동 전체가 실패한다).
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
@@ -245,7 +248,7 @@ Trigger 칸 `+ 블럭` → 그룹 **트리거** → `행동 직전 이벤트 받
 
 | Block | 쓸 수 있는 칸 |
 |---|---|
-| 스탯 보정 · 스탯 보정 떼기 | `대상에게 효과`를 고를 수 있는 칸 전부(액티브 효과·사용 기능·도전과제·개발 명령·프로젝트 기능) |
+| 스탯 보정 · 스탯 보정 떼기 | `대상에게 효과`를 고를 수 있는 칸 전부(액티브 효과·사용 기능·상태 효과·패시브 효과·도전과제·개발 명령·프로젝트 기능) |
 | 행동 직전 이벤트 | `[TriggerSlot]`에 `TriggerKinds.Intercept`가 있는 칸. 로그·도전과제·액티브 효과·사용 기능의 칸에는 없다 → DB › 상태 효과의 '걸려 있는 동안 트리거'(29장), DB › 패시브 효과의 '발동'(유물·특성, 17장 0절), 잠금을 연 프로젝트 기능(17장) |
 | 행동 직전 이벤트 고치기 | `[OutcomeSlot]`에 `OutcomeKinds.Intent`가 있는 칸. 행동 직전 이벤트 잎과 같은 항목에서 쓴다 |
 | 비용 내기 | `[OutcomeSlot]`에 `OutcomeKinds.PlayerData`가 있는 칸 |
@@ -262,8 +265,8 @@ public List<Outcome> outcomes = new List<Outcome>();
 ### 3-7. 모니터에서 확인하기
 
 - **Modifier**: 모니터 **데이터** 탭에서 플레이어 데이터 `$modifiers`(영구는 `$modifiers.meta`)를 펼치면 붙은 Modifier가 한 줄씩 보인다(대상·필드·칸·값·출처). 패시브 효과의 `modifiers`(가진 동안 스탯 보정)는 저장하지 않으므로 여기 없다. 가진 목록(`run › relics`)을 보거나 `Game.Modifiers`로 읽는다.
-- **행동 직전 이벤트**: 결과가 돌 때마다 Journal에 "결과: 행동 직전 이벤트 amount -5"(출처는 기능의 출처 글자, 예 `Relics`)가 남는다. 행동 탭에서 그 행동을 Undo하면 고쳐진 피해까지 돌아간다.
-- **사슬 경고**: "행동 직전 이벤트 사슬이 16단계를 넘어 끊었습니다(피해). 행동 직전 이벤트를 받는 결과가 같은 행동 직전 이벤트를 다시 만드는지 확인하세요."
+- **행동 직전 이벤트**: 결과가 돌 때마다 Journal에 "결과: 행동 직전 이벤트 amount -5"가 남는다(출처는 그 결과를 돌린 기능 — 패시브 효과면 `Passive`, 직접 등록이면 `RunOutcomes`에 준 글자). 행동 탭에서 그 행동을 Undo하면 고쳐진 피해까지 돌아간다.
+- **사슬 경고**(출처 `Triggers`): "행동 직전 이벤트 사슬이 16단계를 넘어 끊었습니다(피해). 받는 쪽의 결과가 같은 행동 직전 이벤트를 다시 만드는지 확인하세요."
 
 ---
 
@@ -388,7 +391,7 @@ public class DamageIntent
     public string sourceId;
     public string targetId;
     public int amount;
-    public bool cancelled;      // 있으면 막을 수 있다(행동 직전 이벤트 고치기 '취소')
+    public bool cancelled;      // 있으면 막을 수 있다(행동 직전 이벤트 고치기 '막기')
 }
 ```
 
@@ -396,7 +399,7 @@ public class DamageIntent
 2. **`class`** — `Game.Intercept`는 같은 객체를 고쳐서 돌려주므로 클래스여야 한다.
 3. **필드** — 행동 직전 이벤트를 받는 쪽이 고르고 고칠 값. 객체 대신 id를 둔다.
 4. **`public bool cancelled;`** — 막을 수 있게 하려면 둔다. 이름이 정확히 `cancelled`여야 한다.
-5. 장르 규칙의 행동 직전 이벤트 형식은 프로젝트가 정한다. 라이브러리가 주는 것은 GBible이 직접 하는 일의 행동 직전 이벤트 다섯이다: `UseIntent`(사용) · `CostIntent`(비용 지불) · `StatusIntent`(상태 효과 걸기) · `ChanceIntent`(확률) · `PowerIntent`(효과 배율). 필드와 쓰는 법은 4-14.
+5. 장르 규칙의 행동 직전 이벤트 형식은 프로젝트가 정한다. 자리는 규칙 어셈블리의 `Assets/MomoiProject/Code/Rules/Events/Intents.cs`(관례 1절 — Unity API 없이). 라이브러리가 주는 것은 GBible이 직접 하는 일의 행동 직전 이벤트 다섯이다: `UseIntent`(사용) · `CostIntent`(비용 지불) · `StatusIntent`(상태 효과 걸기) · `ChanceIntent`(확률) · `PowerIntent`(효과 배율). 필드와 쓰는 법은 4-14.
 
 ### 4-8. `Game.Intercept` — 규칙 함수의 행동 직전 이벤트 자리
 
@@ -428,9 +431,7 @@ var when = new InterceptTrigger
 };
 var minus5 = new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-5" };
 var block  = new ModifyIntentOutcome { op = IntentOp.Cancel };
-var taunt  = new ModifyIntentOutcome { path = "targetId", op = IntentOp.Set, value = "{user}" };     // 가진 쪽에게로
-var soak   = new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{stacks}" };   // 중첩만큼 감소
-var shell  = new ModifyIntentOutcome { path = "amount", op = IntentOp.Add, value = "-{level:2/4/7}" };   // 패시브 효과 레벨별 감소
+var taunt  = new ModifyIntentOutcome { path = "targetId", op = IntentOp.Set, value = "{user}" };     // 가진 쪽에게로(값 틀은 3-4 표 그대로 — "-{stacks}", "-{level:2/4/7}" …)
 var debt   = new ModifyIntentOutcome { path = "floor", op = IntentOp.Set, value = "-20" };          // 비용 지불: −20까지 빚
 ```
 
@@ -455,7 +456,7 @@ var debt   = new ModifyIntentOutcome { path = "floor", op = IntentOp.Set, value 
 조건 분기나 계산이 있으면 결과를 함수 하나로 쓴다(→ `13-BindTo.md`). **첫 매개변수가 행동 직전 이벤트**다.
 
 ```csharp
-[BindTo("undying")]
+[BindTo(GameIds.Passive.Undying)]
 static void Undying(DeathIntent i, TriggerContext c)
 {
     i.cancelled = true;          // 행동 직전 이벤트를 고친다 = 행동 직전 이벤트 고치기와 같다
@@ -468,7 +469,9 @@ static void Undying(DeathIntent i, TriggerContext c)
 
 ### 4-11. 직접 등록 · 기능 칸
 
-DB 항목 없이 규칙 하나를 코드로 등록할 수도 있다(시작 코드 `Started`에서 한 번).
+DB 항목 없이 규칙 하나를 코드로 등록할 수도 있다. 개발자가 DB에서 읽고 값을 바꿀 효과(유물·버프·카드 효과)는 DB 항목(패시브 효과·상태 효과)으로 만들고, 직접 등록은 어느 항목에도 속하지 않는 늘 켜진 규칙에만 쓴다(관례 0절 순서).
+
+등록 코드는 Rules의 등록 함수(`static void Register(GameSession session)`)에 두고, Client `Bootstrap.RegisterRules`(`GBibleRuntime.SessionCreated`에 연결된 함수 — 멀티 서버를 포함한 모든 세션)에서 한 번 부른다(17장 2-6, 20장 4절). 규칙 테스트는 세션을 만든 뒤 같은 함수를 부른다(부르지 않으면 그 규칙이 없다).
 
 ```csharp
 session.Triggers.Register("rule.halfDamage",
@@ -503,7 +506,7 @@ Game.Pay("party", "stock[gold]", 100, what: "gold.name"); // 딕셔너리의 키
 | `PayOutcome` | 결과 '비용 내기'(`key`·`path`·`amount`·`what`). `Run`이 `Game.Pay`를 부른다(`forId` = 이 결과를 가진 항목, `user` = 사용자) |
 
 - `path`를 비우면 값 전체(숫자 플레이어 데이터)를 낸다.
-- `path`는 필드 경로라 `stock[gold]`(딕셔너리의 키)·`units[hero].mana`(목록에서 id로 고른 요소의 필드)도 된다(11장 3-1). 없는 키는 0이라 "모자랍니다"로 실패한다. 행동 직전 이벤트 `CostIntent.path`에도 그 글자 그대로 실리므로, "골드 비용 0"으로 고치는 행동 직전 이벤트 조건은 `path 일치 stock[gold]`다.
+- `path`에 쓸 수 있는 경로는 2-4. 행동 직전 이벤트 `CostIntent.path`에는 그 글자 그대로 실리므로, "골드 비용 0"으로 고치는 행동 직전 이벤트 조건은 `path 일치 stock[gold]`다.
 - 프로그래머 실수는 `InvalidOperationException`: 없는 플레이어 데이터("[MomoiProject] 비용: 없는 플레이어 데이터 '…'입니다."), 없는 필드("[MomoiProject] 비용: 'battle'에 필드 'enrgy'가 없습니다(…)."), 숫자가 아닌 필드("[MomoiProject] 비용: 'battle › name'는 숫자 필드가 아닙니다(String)."), 요소마다 펼치는 경로("[MomoiProject] 비용: 'party › units[].mana'에 []가 있어 낼 곳이 하나로 정해지지 않습니다. 숫자 필드 하나를 가리키세요(목록의 한 요소는 [id]로)."), 구조체 안의 숫자("[MomoiProject] 비용: '…'의 부모(…)가 구조체라 낸 값을 쓸 수 없습니다. [Serializable] 클래스로 바꾸세요." — 플레이어 데이터 값 자체가 구조체인 바로 아래 필드는 된다).
 - 실패가 행동 단위로 취소되므로 행동 안에서 부른다. `TryPay`도 값을 바꾸므로 행동 안에서 부른다. 없는 플레이어 데이터·필드는 `TryPay`도 위 예외다(거짓이 아니다).
 - 플레이어에게 보일 실패의 번역·`{what}` 이름은 `30-Balance-Tables.md` 2-4·5-8.
@@ -572,7 +575,7 @@ GBible이 직접 하는 일은 그 일을 하기 직전에 아래 행동 직전 
 | `cancelled` | 막기 = 반드시 실패 |
 
 - 확률을 바꿔도 난수는 한 번만 굴린다. 같은 시드면 뒤의 결과가 밀리지 않는다(07장).
-- 조건 `확률`은 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. `Game.CanUse` 같은 미리 보기에서는 굴리지 않고 참이다(16장 2-3).
+- 조건 `확률`은 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. `Game.CanUse` 같은 미리 보기에서는 굴리지 않고 참이다(16장 2-3). 이벤트 없이 값만 보는 `조건 충족`만으로 두거나 행동 밖이면 굴리지 않고 거짓이다 — 그래서 `확률`은 이벤트 받기·행동 직전 이벤트 받기·사용 트리거와 `AND`로 쓴다.
 
 **`효과 배율`(`PowerIntent`)**
 
@@ -627,20 +630,9 @@ public class Battle
 
 [GameEvent("피해")] public class DamageDealt { public string sourceId, targetId; public int amount; }
 [GameEvent("유닛 처치")] public class UnitKilled { public string killerId, victimId; }
-
-// 유물: 프로젝트 기능(17장, 구현 가이드 04장 8절). 행동 직전 이벤트를 쓰도록 두 칸의 잠금을 열었다.
-[Database("유물", Group = "콘텐츠", Order = 40, IdPrefix = "relic")]
-public class RelicData : GameData
-{
-    [FieldLabel("발동"), SerializeReference, TriggerSlot(TriggerKinds.Event | TriggerKinds.Condition | TriggerKinds.Intercept)]
-    public Trigger trigger;
-    [FieldLabel("효과"), SerializeReference, OutcomeSlot(OutcomeKinds.PlayerData | OutcomeKinds.Coded | OutcomeKinds.Targeted | OutcomeKinds.Intent)]
-    public List<Outcome> outcomes = new List<Outcome>();
-}
-// 등록 함수 RelicRules.Register는 17장·구현 가이드 04장 8절과 같다(발동 순간 party.relics에 있을 때만 결과를 실행).
 ```
 
-- 유물은 기본 종류 **패시브 효과**(DB › 패시브 효과, 가진 목록 `party › relics`, 17장 0절)로 만들면 `RelicData`·등록 함수가 필요 없다. 아래 `DB › 유물` 예(5-4·5-5)는 DB › 패시브 효과에 그대로 옮겨도 칸이 같다(발동 = `trigger`, 효과 = `outcomes`).
+- 유물은 DB › 패시브 효과(17장 0절)로 만들고, 가진 목록은 `party › relics`(칸 `ownerKey` `party`, `ownerPath` `relics`)다. 등록 코드가 필요 없다.
 
 ### 5-1. 장비 착용·해제 — Modifier를 출처로 붙이고 뗀다
 
@@ -686,7 +678,7 @@ attackTooltip.text = string.Join("\n", Game.Modifiers(hero, nameof(Unit.attack))
 
 ### 5-2. 영구 강화 — 대장간
 
-골드를 내고 주인공 공격력 +5. 판이 끝나도 남는다.
+골드를 내고 주인공 공격력 +5. 판이 끝나도 남는다. 가격(강화 단계마다 곡선)과 오르는 양은 DB › 밸런싱 값 `smithCost`·`smithAttack`이다(30장).
 
 ```csharp
 [Serializable, BlockInfo("대장간 강화")]
@@ -695,9 +687,9 @@ public class SmithUpgrade : GameAction
     protected override void Run()
     {
         var profile = Game.Get<Profile>("profile");
-        Game.Pay("profile", "gold", 100 + profile.smithLevel * 50, what: "gold.name");     // 모자라면 여기서 실패 — 아무것도 바뀌지 않는다
+        Game.Pay("profile", "gold", Game.Balance(GameIds.Balance.SmithCost, profile.smithLevel), what: "gold.name");   // 모자라면 여기서 실패 — 아무것도 바뀌지 않는다
         profile.smithLevel++;
-        Game.AddModifier("hero", nameof(Unit.attack), ModifierKind.Flat, 5, "smith", permanent: true);
+        Game.AddModifier("hero", nameof(Unit.attack), ModifierKind.Flat, Game.Balance(GameIds.Balance.SmithAttack), "smith", permanent: true);
     }
 }
 
@@ -801,12 +793,12 @@ public class SkillDamageEffect : Effect<Unit>
 
 ### 5-4. 가시 갑옷 — 받는 피해 −5(코드 없음)
 
-**에디터**(DB › 유물 `thornArmor` — DB › 패시브 효과로 만들면 등록 코드 없이 같은 칸이다, 17장 0-3):
+**에디터**(DB › 패시브 효과 `thornArmor`, 가진 목록 `party › relics`, 17장 0-3):
 
-1. `trigger`: `+ 블럭` → `행동 직전 이벤트 받기` → 행동 직전 이벤트 `피해`. `filter`(행동 직전 이벤트 조건) `+ 블럭` → `필드 검사` → `targetId` `일치` `hero`.
-2. `outcomes`: `+ 결과 추가` → `행동 직전 이벤트 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
+1. `trigger`(발동): `+ 블럭` → `행동 직전 이벤트 받기` → 행동 직전 이벤트 `피해`. `filter`(행동 직전 이벤트 조건) `+ 블럭` → `필드 검사` → `targetId` `일치` `hero`.
+2. `outcomes`(결과): `+ 결과 추가` → `행동 직전 이벤트 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
 
-요약: `피해 행동 직전 이벤트(…일 때) → 행동 직전 이벤트 amount -5`. 주인공이 이 유물을 가진 동안 `Rules.Damage`를 지나는 피해가 5 줄어든다. 5 이하의 피해는 0이 되어 들어오지 않는다(규칙 함수의 `hit.amount <= 0`).
+요약: `피해 행동 직전 이벤트 받기(…일 때) → 행동 직전 이벤트 amount -5`. `party › relics`에 이 ID가 있는 동안 `Rules.Damage`를 지나는 주인공의 피해가 5 줄어든다. 5 이하의 피해는 0이 되어 들어오지 않는다(규칙 함수의 `hit.amount <= 0`). 가진 쪽(`party`)에 `id`가 없어 주인공은 `holderField`(가진 쪽 필드)가 아니라 조건으로 고른다(동료마다 가진 특성은 `holderField` `targetId`, 17장 0-3).
 
 **순서**: 같은 피해에 "받는 피해 반감"(행동 직전 이벤트 고치기 `amount` `곱하기` `0.5`)도 걸려 있으면, 순서가 작은 쪽이 먼저다.
 
@@ -821,12 +813,12 @@ public class SkillDamageEffect : Effect<Unit>
 
 "전투마다 한 번, 죽는 대신 체력 1로 버틴다". 한 번만이라는 분기가 있어 결과를 코드로 쓴다.
 
-**에디터**(DB › 유물 `undying`): `trigger` = `행동 직전 이벤트 받기` → 행동 직전 이벤트 `죽음`, 행동 직전 이벤트 조건 `unitId` `일치` `hero`. 결과 칸은 아래 연결 때문에 잠긴다.
+**에디터**(DB › 패시브 효과 `undying`, 가진 목록 `party › relics`): `trigger` = `행동 직전 이벤트 받기` → 행동 직전 이벤트 `죽음`, 행동 직전 이벤트 조건 `unitId` `일치` `hero`. 결과 칸은 아래 연결 때문에 잠긴다.
 
 ```csharp
 public static class RelicCode
 {
-    [BindTo("undying")]
+    [BindTo(GameIds.Passive.Undying)]
     static void Undying(DeathIntent i, TriggerContext c)
     {
         var battle = c.Session.Data.Get<Battle>("battle");
@@ -845,7 +837,7 @@ public static class RelicCode
 
 카드 "집중": 이번 턴에 내는 에너지 비용이 모두 0.
 
-**카드를 내는 행동** — 비용을 `Game.Pay`로 낸다.
+**카드를 내는 행동** — 비용을 `Game.Pay`로 낸다(에너지를 직접 빼면 행동 직전 이벤트 `비용 지불`을 거치지 않아 "비용 0"이 붙을 자리가 없다).
 
 ```csharp
 [Serializable, BlockInfo("카드 내기")]
@@ -865,38 +857,12 @@ public class PlayCard : GameAction
 }
 ```
 
-**집중 카드**(사용 기능): 결과 `플레이어 데이터에 주기 · battle` › `freeCost` = 참. 턴 끝 행동이 `battle.freeCost = false;`로 돌린다.
+**집중** — "잠깐 켜지는 행동 직전 이벤트"는 **상태 효과**로 만든다(칸까지는 `29-Statuses-Schedules-Choices.md` 5-5). DB › 상태 효과 `focus`: 트리거 `행동 직전 이벤트 받기(비용 지불; key 일치 battle, path 일치 energy)`, 결과 `행동 직전 이벤트 고치기` `막기`, 지속 `이벤트 횟수` 1(셀 이벤트 턴 끝). 카드는 사용자에게 `상태 효과 걸기`(`focus`)만 한다. 턴이 끝나면 저절로 풀리고, Undo하면 함께 돌아간다.
 
-**행동 직전 이벤트를 받는 쪽** — 늘 등록해 두고, 켜졌는지는 `battle.freeCost`로 정한다(`Started`에서 한 번).
-
-```csharp
-session.Triggers.Register("rule.freeCost",
-    new AllTrigger
-    {
-        triggers =
-        {
-            new InterceptTrigger
-            {
-                intentType = typeof(CostIntent).FullName,
-                filter = new AllFilter { filters =
-                {
-                    new FieldFilter { path = "key", op = FieldOp.Equal, value = "battle" },      // 에너지 비용만
-                    new FieldFilter { path = "path", op = FieldOp.Equal, value = "energy" },
-                } },
-            },
-            new ConditionTrigger { condition = new PlayerDataCondition { key = "battle",
-                filter = new FieldFilter { path = "freeCost", op = FieldOp.IsTrue } } },
-        },
-    },
-    repeat: true,
-    fire: moment => session.Triggers.RunOutcomes(new Outcome[] { new ModifyIntentOutcome { op = IntentOp.Cancel } }, moment, "Rules"));
-```
-
-- 행동 직전 이벤트를 고를 수 있는 프로젝트 기능의 항목으로 둔다면 같은 것을 조립한다: 발동 `행동 직전 이벤트(비용 지불; key 일치 battle, path 일치 energy)` AND `플레이어 데이터 검사(battle: freeCost 참)`, 효과 `행동 직전 이벤트 고치기` `막기`.
-- 이런 "잠깐 켜지는 행동 직전 이벤트"는 **상태 효과**로 만들면 더 짧다. DB › 상태 효과 `focus`: 트리거 `행동 직전 이벤트(비용 지불; key 일치 battle, path 일치 energy)`, 결과 `행동 직전 이벤트 고치기` `막기`, 지속 `이벤트 횟수` 1(셀 이벤트 턴 끝). 카드는 사용자에게 `상태 효과 걸기`(`focus`)만 한다. 켜졌는지 담는 `freeCost`, 턴 끝에 되돌리는 코드, 위의 등록 코드가 모두 필요 없고, 턴이 끝나면 저절로 풀린다(→ `29-Statuses-Schedules-Choices.md` 5-5).
+- 상태 효과 없이 하면 더 든다: 카드가 `battle › freeCost`를 참으로 하고, 늘 등록한 규칙(4-11 — 모양은 5-7의 `rule.echo`와 같은 `AllTrigger` = `InterceptTrigger` + `ConditionTrigger`)이 `행동 직전 이벤트 받기(비용 지불; key 일치 battle, path 일치 energy)` AND `플레이어 데이터 검사(battle: freeCost 참)`일 때 `막기`, 턴 끝 행동이 `freeCost = false`로 되돌린다.
 - 상점의 골드 비용(`profile › gold`)은 행동 직전 이벤트 조건에 걸리지 않아 그대로 낸다.
 - `forId`(무엇을 위한 비용)에 카드 원본 ID를 넘겼으므로 "이 카드만 공짜"는 행동 직전 이벤트 조건 `forId` `일치` 그 ID, "주인공이 낼 때만"은 `userId` `일치` `hero`로 거른다.
-- 버튼 미리보기: `Game.CanPay`는 행동 직전 이벤트 전 값이다. `Game.CanPay("battle", "energy", cost) || battle.freeCost`처럼 화면이 함께 본다.
+- 버튼 미리보기: `Game.CanPay`는 비용 0을 모른다. 화면은 `Game.CanDo(new PlayCard { … }, out var reason)`로 본다(2-4).
 
 ### 5-7. 다음 스킬 2회 발동 — `CastIntent { times }`
 
@@ -936,7 +902,7 @@ public class CastSkill : GameAction
 
 **메아리 카드**: 결과 `플레이어 데이터에 주기 · battle` › `echo` +1.
 
-**행동 직전 이벤트를 받는 쪽**(`Started`에서 한 번):
+**행동 직전 이벤트를 받는 쪽** — 늘 등록해 두고, 켜졌는지는 `battle.echo`로 정한다(4-11의 등록 함수에서):
 
 ```csharp
 session.Triggers.Register("rule.echo",
@@ -1040,7 +1006,7 @@ target.hp -= hit.amount;
 | 12 | −2 → 들어오지 않는다(규칙 함수의 `hit.amount <= 0`) |
 
 - `{stacks}`는 가진 쪽에 걸린 **이 상태 효과**의 중첩이다(결과를 실행하는 순간의 값). 상태 효과가 아닌 곳(패시브 효과·프로젝트 기능)에서는 0이다.
-- 중첩당 감소량을 기획자가 고치게 하려면 감소량을 밸런싱 값으로 두고 결과를 코드로 쓴다: `i.amount -= (int)(c.Game.Balance(GameIds.Balance.IronSkinPerStack) * c.Game.StatusStacks(c.User, c.Owner));`(값 틀은 곱한 값을 만들지 못한다).
+- 중첩당 감소량을 개발자가 고치게 하려면 감소량을 밸런싱 값으로 두고 결과를 코드로 쓴다: `i.amount -= (int)(c.Game.Balance(GameIds.Balance.IronSkinPerStack) * c.Game.StatusStacks(c.User, c.Owner));`(값 틀은 곱한 값을 만들지 못한다).
 - 고정 비율이면 틀 하나로 된다: `amount` `곱하기` `{balance:shieldRatio}`.
 - 패시브 효과(유물·특성)라면 같은 자리에 `-{level}`을 쓴다. 레벨이 2인 껍질은 피해를 2 줄인다(17장 0-3).
 
@@ -1063,7 +1029,7 @@ target.hp -= hit.amount;
 
 - 하한은 "낸 뒤 남는 값"과 비교한다. 카드가 없으면 하한 0이라 골드가 가격보다 적을 때 "모자랍니다"로 실패한다.
 - 행동 직전 이벤트 조건이 `profile › gold`만 고르므로 에너지 같은 다른 비용에는 빚이 생기지 않는다.
-- 버튼 미리보기는 `Game.CanPay`가 하한을 모르므로, 화면이 `gold - 가격 >= (카드가 있으면 -20, 없으면 0)`으로 본다. 카드가 있는지는 `Game.Owned(GameIds.Passive.CreditCard) > 0`.
+- 버튼 미리보기: `Game.CanPay`는 하한을 모른다. 화면은 사는 행동을 `Game.CanDo(행동, out 이유)`로 본다(2-4).
 - "골드 대신 체력으로 낸다"는 같은 자리에서 `key`·`path`를 값으로 바꾼다(낼 곳이 바뀐다).
 
 ### 5-12. 이 유닛의 수치 2배 — 효과 배율(Lumin)
@@ -1099,7 +1065,7 @@ target.hp -= hit.amount;
 | 피해 증폭 둘이 곱해짐 | 증폭 스탯(기본 0)에 퍼센트를 썼다. 증폭은 플랫(0.1 = 10%)으로 쌓아야 합이 된다(5-3). |
 | 영구 강화가 다음 판에 안 보임 | 영구 Modifier는 대상 id로 붙는다. 판마다 id가 바뀌는 개체(`Game.NewId`로 만든 적 등)에 붙였다. 판마다 같은 id(`"hero"`)에 붙인다. |
 | 이벤트를 받아 피해를 줄였는데 체력이 이미 깎여 있음 | 이벤트는 일어난 뒤에 온다. 줄이거나 막는 효과는 행동 직전 이벤트로. |
-| `+ 블럭`에 `행동 직전 이벤트 받기`가 없음 | 그 칸의 `[TriggerSlot]`에 `TriggerKinds.Intercept`가 없다. 도전과제·액티브 효과·로그 칸에는 없다. 걸려 있는 동안만 행동 직전 이벤트를 받으려면 상태 효과(29장)로, 가지고 있는 동안 행동 직전 이벤트를 받으려면 DB › 패시브 효과(17장 0절)로, 그 밖의 늘 켜진 규칙은 프로젝트 기능의 잠금에 더한다(3-6). |
+| `+ 블럭`에 `행동 직전 이벤트 받기`가 없음 | 그 칸의 `[TriggerSlot]`에 `TriggerKinds.Intercept`가 없다. 도전과제·액티브 효과·로그 칸에는 없다. 걸려 있는 동안만 행동 직전 이벤트를 받으려면 상태 효과(29장)로, 가지고 있는 동안 행동 직전 이벤트를 받으려면 DB › 패시브 효과(17장 0절)로, 그 밖의 늘 켜진 규칙은 프로젝트 기능의 잠금에 더하거나(3-6) 코드로 직접 등록한다(4-11). |
 | 행동 직전 이벤트 목록이 비어 있음 | 행동 직전 이벤트 클래스에 `[Intent]`가 없다. |
 | 행동 직전 이벤트가 걸리지 않음 | 규칙 함수가 `Game.Intercept`를 부르지 않거나, 다른 형식(상속한 형식)을 통과시켰다. 형식이 정확히 같아야 한다. 규칙 함수를 거치지 않고 `hp`를 직접 깎는 곳이 있으면 그곳은 행동 직전 이벤트를 건너뛴다. |
 | 행동 직전 이벤트 고치기가 아무 일도 하지 않음 | 규칙 함수가 돌려받은 행동 직전 이벤트가 아니라 원래 인자를 썼다(`var hit = Game.Intercept(…)` 뒤 `hit.amount`). 또는 행동 직전 이벤트가 아닌 Trigger의 결과에 넣었다(Journal 경고 "고칠 행동 직전 이벤트가 없습니다"). |
@@ -1107,8 +1073,9 @@ target.hp -= hit.amount;
 | 순서에 따라 결과가 바뀜 | 같은 행동 직전 이벤트에 여럿이 걸리면 순서(`order`)가 작은 것부터다. 같은 순서면 등록(DB) 순서에 기대게 되므로, 결과가 달라지는 조합에는 서로 다른 순서를 준다(5-4). |
 | 막힌 시전에도 충전이 빠짐 | 행동 직전 이벤트 밖의 값을 바꾸는 행동 직전 이벤트가 막는 행동 직전 이벤트보다 먼저 돌았다. 그런 행동 직전 이벤트는 순서를 크게 둔다(5-7). 체력·골드 같은 게임 값은 행동 직전 이벤트를 받는 쪽에서 바꾸지 말고 행동 직전 이벤트에 실어 규칙 함수가 바꾼다(5-5). |
 | "행동 직전 이벤트 사슬이 16단계를 넘어 끊었습니다" | 행동 직전 이벤트 결과가 같은 행동 직전 이벤트를 다시 만든다(행동 직전 이벤트 안에서 `Rules.Damage`를 부르는 등). 끊긴 뒤의 행동 직전 이벤트는 적용되지 않는다. |
-| 버튼은 켜져 있는데 누르면 실패 | `Game.CanUse`는 결과(비용 내기)를 모른다. 사용 조건에 `플레이어 데이터 검사`(≥)를 둔다. |
-| 비용 0인데 `CanPay`가 거짓 | `CanPay`는 행동 직전 이벤트 전 값이다. 화면이 비용 0 상태를 함께 본다(5-6). |
+| 버튼은 켜져 있는데 누르면 실패 | `Game.CanUse`는 결과(비용 내기)를 모른다. 사용 조건에 `플레이어 데이터 검사`(≥)를 두거나, 그 행동을 `Game.CanDo`로 해 본다(3-5). |
+| 비용 0·빚 허용인데 `CanPay`가 거짓 | `CanPay`는 행동 직전 이벤트 전 값(하한 0)이다. 화면은 `Game.CanDo(행동, out 이유)`로 본다(2-4). 화면 코드에 비용 0·하한 계산을 따로 쓰지 않는다. |
+| 규칙 테스트에서만 직접 등록한 규칙이 걸리지 않음 | 등록은 등록 함수를 부른 세션에만 있다. 테스트가 세션을 만든 뒤 같은 등록 함수를 부른다(4-11). |
 | 사용·비용·상태 효과 걸기·확률·수치 배율 행동 직전 이벤트를 받으려고 프로젝트 행동 직전 이벤트를 만듦 | GBible이 이미 행동 직전 이벤트 자리를 둔 일이다(기본 행동 직전 이벤트 `사용`·`비용 지불`·`상태 효과 걸기`·`확률`·`효과 배율`, 4-14). 기본 행동 직전 이벤트에 없는 것(다른 액티브 효과로 바꾸기 등)이 필요할 때만 프로젝트 행동 직전 이벤트를 둔다(5-7). |
 | 효과 배율을 2배로 했는데 어떤 수치는 그대로 | 그 수치를 가진 프로젝트 Block이 `Use.Context.Power`(결과·`[BindTo]`는 `c.Power`)를 곱하지 않는다. 또는 상태 효과의 결과·패시브 효과의 가진 동안 보정이라 배율이 없다(4-14). |
 | "행성 카드는 공짜"를 걸었는데 행성 카드도 돈을 냄 | `Game.Pay`를 부를 때 `forId`를 넘기지 않았다(빈 글자). 사는 카드의 ID를 `forId`로 넘긴다. 결과 `비용 내기`는 이 결과를 가진 항목 ID를 넘긴다(4-12). |
@@ -1122,8 +1089,7 @@ target.hp -= hit.amount;
 | `{user}`로 대상을 바꿨더니 아무도 맞지 않음 | 가진 쪽에 id가 없어(`party › relics`의 `party`) `{user}`가 빈 글자가 되었다. 가진 목록을 id가 있는 개체 안에 두거나 값을 직접 적는다. |
 | 패시브 효과 유물을 잃었는데 보정을 떼는 코드를 찾음 | 패시브 효과의 `modifiers`(가진 동안 스탯 보정)는 읽을 때 계산한다(2-2). 가진 목록에서 빼면 빠진다. `RemoveModifiers`로는 떼지지 않는다. |
 | `$modifiers`에 패시브 효과 보정이 안 보임 | 저장하지 않는 보정이다. `Game.Modifiers(대상)`에는 `source` = 패시브 효과 ID로 보인다. |
-| 빚을 허용했는데 `CanPay`가 거짓 | `CanPay`는 행동 직전 이벤트 전, 하한 0 기준이다. 화면이 하한을 함께 본다(5-11). |
-| 빚 하한을 바꿨는데 다른 비용까지 빚이 됨 | 행동 직전 이벤트 `비용 지불` 받기의 행동 직전 이벤트 조건(`key`·`path`)을 비웠다. 낼 곳을 고른다(5-11). |
+| 빚 하한을 바꿨는데 다른 비용까지 빚이 됨 | `행동 직전 이벤트 받기`(비용 지불)의 행동 직전 이벤트 조건(`key`·`path`)을 비웠다. 낼 곳을 고른다(5-11). |
 | 행동 직전 이벤트 `사용`의 `ability`를 바꿨는데 원래 액티브 효과가 나감 | `ability`·`userId`는 거르기용이다. 다른 액티브 효과로 바꾸려면 프로젝트 행동 직전 이벤트를 둔다(5-7). |
 | 경로 `stock[gold]`로 냈는데 골드가 있는데도 "모자랍니다" | 그 키가 없다(없는 키는 0, 2-4). 키 이름이 대소문자까지 같은지 본다. |
 | 비용 경로에 "…[]가 있어 낼 곳이 하나로 정해지지 않습니다" (예외·검증 오류) | `units[].mana`처럼 요소마다 펼치는 경로다. 낼 곳은 숫자 하나다. 그 요소를 id로 고른다(`units[hero].mana`, 2-4). |

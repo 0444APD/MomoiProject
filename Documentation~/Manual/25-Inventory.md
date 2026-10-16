@@ -1,17 +1,17 @@
 # 25. 인벤토리 시스템 (선택 모듈)
 
-인벤토리는 "칸의 리스트"다. 칸 하나에 어떤 아이템이 몇 개 들어 있는지를 담고, 겹치기·칸 수 제한·넣기·빼기를 해 준다. 아이템은 프로젝트가 코드로 정의한 클래스의 **인스턴스**(DB › 인스턴스)이고, 칸에는 그 인스턴스의 ID가 들어간다. 모듈 위치는 `Optional/Inventory`(어셈블리 `GBible.Inventory`, 네임스페이스 `GBible.InventorySystem`).
+인벤토리는 "슬롯의 리스트"다. 슬롯 하나에 어떤 아이템이 몇 개 들어 있는지를 담고, 겹치기·슬롯 수 제한·넣기·빼기를 해 준다. 아이템은 프로젝트가 코드로 정의한 클래스의 **인스턴스**(DB › 인스턴스)이고, 슬롯에는 그 인스턴스의 ID가 들어간다. 모듈 위치는 `Optional/Inventory`(어셈블리 `GBible.Inventory`, 네임스페이스 `GBible.InventorySystem`).
 
-지금 있는 것은 데이터와 규칙뿐이다. 슬롯 UI, 장비 칸, 드래그 규칙, 기본 제공 아이템 기능은 **지원하지 않는다**(프로젝트가 만든다).
+지금 있는 것은 데이터와 규칙뿐이다. 슬롯 UI, 장비 슬롯, 드래그 규칙, 기본 제공 아이템 기능은 **지원하지 않는다**(프로젝트가 만든다 — UI는 35장 `List<T>`, 옮기기·고정 자리는 37장 자리, 관례 21절).
 
 ## 이 문서에서 쓰는 말
 
 | 말 | 뜻 |
 |---|---|
-| 칸(`InventorySlot`) | 아이템 ID 하나와 개수. |
-| 인벤토리(`Inventory`) | 칸 리스트 + 칸 수 제한. |
-| 인스턴스 | DB › 인스턴스에서 만든, 클래스의 원본 객체 하나(포션, 철검 …). 예전 이름은 템플릿. |
-| 겹치기 최대 수(maxStack) | 한 칸에 들어가는 최대 개수. 아이템마다 다르므로 넣을 때마다 넘긴다. |
+| 슬롯(`InventorySlot`) | 아이템 ID 하나와 개수. |
+| 인벤토리(`Inventory`) | 슬롯 리스트 + 슬롯 수 제한. |
+| 인스턴스 | DB › 인스턴스에서 만든, 클래스의 원본 객체 하나(포션, 철검 …). |
+| 겹치기 최대 수(maxStack) | 한 슬롯에 들어가는 최대 개수. 아이템마다 다르므로 넣을 때마다 넘긴다. |
 | 행동 | `Game.Do`로 실행하는 플레이어 입력 하나. Undo 한 단위. |
 | 컨텍스트(`TriggerContext`) | 결과가 실행되는 순간의 정보: `Owner`(트리거를 가진 항목 ID), `User`(사용자), `Picked`(고른 대상), `Game`. |
 
@@ -19,20 +19,21 @@
 
 ## 1. 켜기와 준비
 
-**한 줄 요약.** 기능을 켜고, 아이템 클래스를 코드로 쓰고, 인스턴스를 만들고, 인벤토리를 플레이어 데이터로 등록한다.
+**한 줄 요약.** 기능을 켜고, 아이템 클래스를 코드로 쓰고, 인스턴스를 만들고, 인벤토리를 둘 곳(판·프로필 필드 또는 플레이어 데이터)을 정한다.
 
 ### 에디터에서
 
-1. `MomoiProject → DB` → 사이드바 "인벤토리 시스템" 그룹의 **기능 활성화** → **켜기**(스크립팅 심볼 `GBIBLE_INVENTORY`). 이 기능은 탭을 만들지 않는다.
+1. **켜기**(선택 기능 ID `inventory`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `inventory`를 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "인벤토리 시스템" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_INVENTORY`와 프로젝트 asmdef 참조(`GBible.Inventory` — 선택 기능 중 이것만 Rules·Tests에도 들어간다)가 저절로 맞춰진다(`20-Setup.md` 6절). `Inventory` 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다. 이 기능은 탭을 만들지 않는다.
 2. 아이템 클래스를 코드로 쓴다(2절). 저장·컴파일하면 DB › 클래스에 보인다.
-3. DB › **인스턴스** → **+ 새로 만들기** → ID(예: `instance.potion`) → **instanceType**에 아이템 클래스를 고르고 값을 채운다. 아이템마다 반복한다.
-4. DB › **플레이어 데이터** → **+ 새로 만들기** → ID(예: `player.inventory`), **zone**(이번 판이면 `Session`, 계정에 남으면 `Meta`), **valueType**에 `Inventory`(기능을 켜면 목록에 나온다).
-5. 저장(Ctrl+S). `GameIds.PlayerData.PlayerInventory`(`PlayerDataKey<Inventory>`)가 생긴다.
-6. 플레이 중 모니터 › 데이터에서 칸을 열어 보면 칸의 **item** 칸이 인스턴스 목록 드롭다운이다(`[DataRef(typeof(InstanceData))]`).
+3. DB › **인스턴스**에 아이템마다 항목을 만든다: ID(예: `instance.potion`), **instanceType** = 아이템 클래스, **value** = 값. AI는 DB 반영 스크립트로 만든다(관례 15절).
+4. 인벤토리를 둘 곳을 정한다.
+   - **판·프로필 클래스의 필드**(`RunState`에 `public Inventory bag = new Inventory();`, 4.6): 키를 따로 만들지 않는다. 판에만 있는 인벤토리는 `RunState`, 판이 끝나도 남는 창고는 `Profile`(관례 8절).
+   - **플레이어 데이터 키 하나**: DB › **플레이어 데이터**에 ID(예: `player.inventory`), **zone**(이번 판이면 `Session`, 계정에 남으면 `Meta`), **valueType** = `GBible.InventorySystem.Inventory`(기능을 켜면 목록에 나온다). 반영 스크립트가 돌고 Unity가 다시 컴파일하면 `GameIds.PlayerData.PlayerInventory`(`PlayerDataKey<Inventory>`)가 생긴다.
+5. 플레이 중 모니터 › 데이터에서 슬롯을 열어 보면 슬롯의 **item** 칸이 인스턴스 목록 드롭다운이다(`[DataRef(typeof(InstanceData))]`).
 
 ### 주의할 점
 
-- 칸 수(`capacity`)의 처음 값은 클래스 초기값(0 = 제한 없음)이다. 처음부터 제한하려면 3.6절처럼 코드에서 정한다.
+- 슬롯 수(`capacity`)의 처음 값은 0(= 제한 없음)이다. 제한은 3.6절.
 - 기능을 끄면 `Inventory` 형식을 쓰는 플레이어 데이터는 값 형식을 찾지 못해 검증 오류가 난다.
 
 ---
@@ -96,19 +97,19 @@ public class Item
 ```
 
 - `InventorySlot.item`: 인스턴스 ID(`[DataRef(typeof(InstanceData))]`).
-- `Inventory.capacity`: 칸 수, `0`이면 제한 없음.
-- `Inventory.slots`: 칸 리스트(앞에서부터).
+- `Inventory.capacity`: 슬롯 수, `0`이면 제한 없음.
+- `Inventory.slots`: 슬롯 리스트(앞에서부터).
 
 ### 3.2 꺼내기
 
-행동(`GameAction`) 안에서는 꺼내서 바로 고친다.
+**고치는 것은 행동(`GameAction`) 안에서만**(관례 3절). 행동 안에서는 꺼내서 바로 고친다.
 
 ```csharp
 var inventory = Game.Get<Inventory>("player.inventory");
 // 또는 생성 코드: Game.Data().PlayerInventory
 ```
 
-행동 밖(씬 코드)에서 고칠 때는 `Modify`로 감싸 한 번의 변경으로 기록한다.
+행동 밖에서 고치는 `Modify`는 Undo 단위가 없고 멀티에서 서버로 가지 않으므로, 개발 도구·테스트 준비에서만 쓴다(한 번의 변경으로 기록된다).
 
 ```csharp
 GBibleRuntime.Session.Data.Modify<Inventory>("player.inventory", inv => inv.Add("instance.potion", 1, 99));
@@ -116,7 +117,7 @@ GBibleRuntime.Session.Data.Modify<Inventory>("player.inventory", inv => inv.Add(
 
 ### 3.3 `CountOf(itemId)` · `Has(itemId, count = 1)`
 
-모든 칸의 개수 합 / 그만큼 있는지.
+모든 슬롯의 개수 합 / 그만큼 있는지.
 
 ```csharp
 int potions = inventory.CountOf("instance.potion");
@@ -125,29 +126,31 @@ bool canPay = inventory.Has("instance.goblinEar", 5);
 
 ### 3.4 `Add(itemId, count, maxStack)` → 남은 개수
 
-같은 아이템의 덜 찬 칸부터 채우고, 남으면 새 칸을 만든다. 칸이 모자라 못 넣은 개수를 돌려준다(다 들어가면 0).
+같은 아이템의 덜 찬 슬롯부터 채우고, 남으면 새 슬롯을 만든다. 슬롯이 모자라 못 넣은 개수를 돌려준다(다 들어가면 0).
 
 ```csharp
-int left = inventory.Add("instance.potion", 150, 99);   // 99 + 51 두 칸, left = 0
+int left = inventory.Add("instance.potion", 150, 99);   // 99 + 51 두 슬롯, left = 0
 ```
 
 ### 3.5 `RoomFor(itemId, maxStack)` — 넣을 수 있는 개수
 
-값을 바꾸지 않고 미리 센다. 칸 수 제한이 없으면 `int.MaxValue`.
+값을 바꾸지 않고 미리 센다. 슬롯 수 제한이 없으면 `int.MaxValue`.
 
 ```csharp
-if (inventory.RoomFor("instance.ironSword", 1) < 1) { /* 가방이 가득 참 */ }
+if (inventory.RoomFor("instance.ironSword", 1) < 1) { /* 인벤토리가 가득 참 */ }
 ```
 
-### 3.6 `capacity` — 칸 수 제한
+### 3.6 `capacity` — 슬롯 수 제한
+
+슬롯 수는 개발자가 바꿀 숫자라 밸런싱 값으로 두고(관례 18절), 판 시작 행동(또는 인벤토리를 늘리는 행동) 안에서 넣는다.
 
 ```csharp
-GBibleRuntime.Session.Data.Modify<Inventory>("player.inventory", inv => inv.capacity = 20);
+inventory.capacity = (int)Game.Balance(GameIds.Balance.BagSlots);   // 행동의 Run 안. bagSlots = DB › 밸런싱 값(예)
 ```
 
 ### 3.7 `Remove(itemId, count = 1)` → 실제로 뺀 개수
 
-뒤쪽 칸부터 줄이고 빈 칸은 없앤다. 모자라면 있는 만큼만 뺀다.
+뒤쪽 슬롯부터 줄이고 빈 슬롯은 없앤다. 모자라면 있는 만큼만 뺀다.
 
 ```csharp
 int removed = inventory.Remove("instance.potion", 3);
@@ -163,7 +166,7 @@ if (!inventory.TryRemove("instance.goblinEar", 5)) { /* 재료 부족 */ }
 
 ### 3.9 아이템 정보 읽기
 
-칸에는 ID만 있다. 원본(읽기 전용)은 `session.Instances(id)`, 고쳐 쓸 사본은 `session.CopyInstance(id)`로 얻는다.
+슬롯에는 ID만 있다. 원본(읽기 전용)은 `session.Instances(id)`, 고쳐 쓸 사본은 `session.CopyInstance(id)`로 얻는다.
 
 ```csharp
 var item = GBibleRuntime.Session.Instances?.Invoke(slot.item) as Item;   // 원본: 고치지 않는다
@@ -193,7 +196,7 @@ public sealed class BuyItem : GameAction
                    ?? throw new InvalidOperationException($"[상점] 없는 아이템 '{item}'입니다.");   // 화면이 막았어야 하는 일(프로그래머 실수)
         var inventory = Game.Get<Inventory>("player.inventory");
         if (inventory.RoomFor(item, info.maxStack) < count)
-            throw Game.Fail("fail.bagFull", "가방에 자리가 없습니다.");                              // 플레이어에게 보일 실패
+            throw Game.Fail("fail.bagFull", "인벤토리에 자리가 없습니다.");                          // 플레이어에게 보일 실패
         Game.Pay("player.gold", null, info.price * count, what: "gold.name");                       // 모자라면 "골드이(가) 모자랍니다(30 / 50)."
         inventory.Add(item, count, info.maxStack);
     }
@@ -201,18 +204,14 @@ public sealed class BuyItem : GameAction
     public override string Describe() => $"{item} ×{count} 사기";
 }
 
-// 씬 코드(버튼). UI Toolkit 화면이면 OnClick("buy", () => new BuyItem { … })만으로 실패 글이 알림으로 뜬다(35장 2-4).
-public void OnBuyClicked()
-{
-    try { GBibleRuntime.Game.Do(new BuyItem { item = "instance.potion", count = 3 }); }
-    catch (GameFailure f) { toast.text = f.Message; }     // toast: 알림 글자(TMP_Text). 지금 언어의 실패 글
-}
+// 화면 코드(GameScreen.OnOpen): 누르면 행동을 보내고, 플레이어용 실패(GameFailure)의 글은 알림으로 뜬다(35장 2-4).
+OnClick("buy", () => new BuyItem { item = "instance.potion", count = 3 });
 ```
 
-- 안 될 때 조용히 `return`하지 않고 던진다. 행동이 실패하면 그때까지 바꾼 것이 모두 취소되므로(가방에 넣은 뒤 골드가 모자라도 가방이 돌아간다) 검사 순서를 맞출 필요가 없고, 플레이어는 이유를 본다. 조용히 끝내면 행동이 "성공"으로 남아 Undo 한 칸을 차지하고 아무 글도 뜨지 않는다.
+- 안 될 때 조용히 `return`하지 않고 던진다. 행동이 실패하면 그때까지 바꾼 것이 모두 취소되므로(인벤토리에 넣은 뒤 골드가 모자라도 인벤토리가 돌아간다) 검사 순서를 맞출 필요가 없고, 플레이어는 이유를 본다. 조용히 끝내면 행동이 "성공"으로 남아 Undo 한 칸을 차지하고 아무 글도 뜨지 않는다.
 - 골드는 직접 빼지 않고 `Game.Pay(키, 경로, 양, what: 이름)`. 모자라면 플레이어용 실패를 던지고, 비용을 고치는 행동 직전 이벤트("상점 가격 −20%")가 이 자리에 붙는다(28장 2-4). 단순 값 플레이어 데이터(`player.gold`)면 경로는 `null`이다. `what`에는 텍스트 키(`gold.name` = "골드")를 준다(30장 2-4).
 
-### 4.2 전리품: 가방이 차면 남은 것을 바닥에
+### 4.2 전리품: 인벤토리가 차면 남은 것을 바닥에
 
 ```csharp
 using System;
@@ -316,7 +315,7 @@ public sealed class DeliverQuestItems : GameAction
     protected override void Run()
     {
         if (!Game.Get<Inventory>("player.inventory").TryRemove(item, count))
-            throw Game.Fail("fail.questItems", "{item}이(가) {count}개 있어야 합니다.", ("item", item), ("count", count));
+            throw Game.Fail("fail.questItems", "{item:이} {count}개 있어야 합니다.", ("item", item), ("count", count));
         Game.Set("player.gold", Game.Get<int>("player.gold") + rewardGold);
     }
 }
@@ -325,31 +324,33 @@ public sealed class DeliverQuestItems : GameAction
 - 모자라면 던진다. `TryRemove`가 거짓이면 아무것도 바뀌지 않았고, 던지면 행동이 실패로 끝나 화면이 이유를 보인다. 값 `{item}`에 인스턴스 ID를 넣으면 틀이 지금 언어의 이름(`<ID>.name`)으로 바꾼다(23장).
 - 재료가 한 아이템이 아니라 여럿이면 하나씩 `TryRemove`하고 모자란 곳에서 던진다. 앞에서 뺀 재료는 행동 실패로 함께 돌아간다.
 
-### 4.5 가방 화면 그리기 (읽기만)
+### 4.5 인벤토리 화면 그리기 (읽기만)
+
+화면은 UI Toolkit 화면 코드의 목록(35장 2-3·2-6)으로 그린다. 슬롯에는 `id`가 없어 목록 칸은 자리 번호로 이어진다.
 
 ```csharp
 using GBible;
+using GBible.Ids;
 using GBible.InventorySystem;
-using UnityEngine;
+using UnityEngine.UIElements;
 
-public sealed class BagView : MonoBehaviour
+[BindTo(GameIds.Screen.Bag)]                       // DB › 화면 'bag' + UI/Screens/Bag.uxml(목록 칸 UXML 'BagSlot')
+public class BagScreen : GameScreen
 {
-    void OnEnable()
-    {
-        var session = GBibleRuntime.Session;
-        var inventory = session.Data.Get<Inventory>("player.inventory");
-        foreach (var slot in inventory.slots)
+    protected override void OnOpen() =>
+        List("slots", Item("BagSlot"), () => Game.Get<Inventory>("player.inventory").slots, (cell, slot) =>
         {
-            var item = session.Instances?.Invoke(slot.item) as Item;
-            Debug.Log($"{Texts.NameOf(slot.item)} ×{slot.count} (아이콘 {(item?.icon != null ? item.icon.name : "없음")})");
-        }
-    }
+            var item = Game.Session.Instances?.Invoke(slot.item) as Item;     // 원본 — 읽기만
+            cell.Q<Label>("name").text = Texts.NameOf(slot.item);
+            cell.Q<Label>("count").text = slot.count.ToString();
+            if (item?.icon != null) cell.Q("icon").style.backgroundImage = new StyleBackground(item.icon);
+        }, "player.inventory");                     // 이 키가 바뀌면 다시 그린다
 }
 ```
 
-### 4.6 여러 가방(장비창·창고)
+### 4.6 여러 인벤토리(장비창·창고)
 
-인벤토리는 값 형식이므로 플레이어 데이터를 여러 개 만들면 된다(`player.inventory`, `player.storage`). 또는 프로젝트 클래스 안에 필드로 둔다.
+인벤토리는 값 형식이므로 플레이어 데이터를 여러 개 만들면 된다(`player.inventory`, `player.storage`). 또는 프로젝트 클래스(판·프로필) 안에 필드로 둔다.
 
 ```csharp
 using System;
@@ -363,7 +364,7 @@ public class PlayerBags
 }
 ```
 
-이 클래스를 플레이어 데이터의 값 형식으로 고르면 처음 값부터 칸 수가 정해진다.
+이 클래스를 플레이어 데이터의 값 형식으로 고르면 처음 값부터 슬롯 수가 정해진다. 개발자가 바꿀 수이면 숫자를 적지 않고 판 시작 행동에서 밸런싱 값으로 넣는다(3.6).
 
 ---
 
@@ -374,7 +375,7 @@ public class PlayerBags
 - **원본 인스턴스 고치기**: `session.Instances(id)`가 돌려주는 객체는 DB 에셋의 원본이다. 고치지 않는다. 고쳐 쓸 것은 `CopyInstance`.
 - **maxStack 불일치**: `Add`·`RoomFor`는 넘긴 `maxStack`만 본다. 아이템 클래스의 값(예: `Item.maxStack`)을 일관되게 넘긴다.
 - **잘못된 값**: 빈 ID나 0 이하 개수로 `Add`하면 아무것도 바꾸지 않고 넘긴 개수를 그대로 돌려준다(0 이하면 0). 0 이하로 `Remove`하면 0.
-- **인스턴스 ID 바꾸기**: 칸은 인스턴스 ID 글자를 담는다. DB에서 인스턴스 ID를 바꾸면 에셋 안의 `[DataRef]` 참조는 따라가지만, 저장된 판·프로필(`run.json`·`profile.json`)의 칸 값은 출시됨 상태에서 바꾼 경우에만 불러올 때 새 ID로 바뀐다(런타임이 ID 이름 변경 이력으로 `[DataRef]` 필드를 고친다). 개발 중에 바꿨다면 모니터의 **새 판**으로 판을 지우고 시험한다.
-- **보상 블록 "플레이어 데이터에 주기"로 칸 더하기**: 겹치기 규칙(`Add`)을 거치지 않는다. 겹쳐 넣으려면 `Add`를 부르는 코딩한 결과를 만든다(4.3의 방식).
-- **안 될 때 조용히 `return`**: 행동이 성공으로 남고 플레이어는 이유를 모른다. 플레이어용이면 `throw Game.Fail(…)`, 비용이면 `Game.Pay(…, what: …)`(4.1·4.4).
-- **이 인벤토리의 한계**: 칸은 앞에서부터 채우고 빈 칸은 없애는 목록이라 **고정 칸**(3번 칸에 두기)·**칸 옮기기**(드래그로 자리 바꾸기)·**칸마다의 정보**(품질·내구도·강화 수치)가 없다. 필요하면 프로젝트 클래스에 목록 필드로 직접 둔다(`[Serializable] class BagSlot { public string item; public int count; public int quality; }`의 `List<BagSlot>` 또는 칸 번호 → 칸 딕셔너리).
+- **인스턴스 ID 바꾸기**: 슬롯은 인스턴스 ID 글자를 담는다. DB에서 인스턴스 ID를 바꾸면 에셋 안의 `[DataRef]` 참조는 따라가지만, 저장된 판·프로필(`run.json`·`profile.json`)의 슬롯 값은 출시됨 상태에서 바꾼 경우에만 불러올 때 새 ID로 바뀐다(런타임이 ID 이름 변경 이력으로 `[DataRef]` 필드를 고친다). 개발 중에 바꿨다면 모니터 › 명령 탭의 **새 판**(22장 7절)으로 판을 지우고 시험한다.
+- **보상 블록 "플레이어 데이터에 주기"로 슬롯 더하기**: 겹치기 규칙(`Add`)을 거치지 않는다. 겹쳐 넣으려면 `Add`를 부르는 코딩한 결과를 만든다(4.3의 방식).
+- **안 될 때 조용히 `return`**: 하지 않는다(4.1).
+- **이 인벤토리의 한계**: 슬롯은 앞에서부터 채우고 빈 슬롯은 없애는 목록이라 **고정 슬롯**(3번 슬롯에 두기)·**슬롯 옮기기**(드래그로 자리 바꾸기)·**슬롯마다의 정보**(품질·내구도·강화 수치)가 없다. 필요하면 프로젝트 클래스에 목록 필드로 직접 둔다(`[Serializable] class BagSlot { public string item; public int count; public int quality; }`의 `List<BagSlot>` + 자리 `Placement`, 37장). 슬롯 수·겹치기·장비 슬롯·옮기는 법이 명세서에 없으면 만들기 전에 묻는다(관례 21절).

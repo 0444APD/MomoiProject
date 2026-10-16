@@ -2,7 +2,11 @@
 
 **한 줄 요약**: 액티브 효과는 "쓰는 순간" 발동하는 기능(스킬, 아이템 사용 효과, 버프 발동)이다. Trigger = **사용**(+ 원하면 AND로 사용 조건), 결과 = 대상에게 효과 · 플레이어 데이터에 주기 · 코딩한 결과. 게임 코드는 `Game.Use(ID, 사용자, 대상들)` 한 줄로 쓰고(되는 것만 쓰려면 `Game.TryUse`), 그 전체가 행동 하나라 Undo 한 번에 되돌아간다. **사용 기능**(`Usable`)은 같은 것을 아이템 같은 인스턴스에 필드로 붙이는 형태다.
 
-> **선택 요소**: 액티브 효과의 DB 종류(데이터 칸 클래스)는 GBible에 없다 — 쓰는 프로젝트가 템플릿 `Documentation~/AI/Templates/Elements/AbilityData.cs.txt`를 `Assets/MomoiProject/Code/Rules/Elements/AbilityData.cs`로 들인다(AI가 단계 1에서). 칸이 더 필요하면 그 클래스에 더한다(프로젝트 변경). 엔진(이 장의 동작·기본 Block·`Game` 함수)은 GBible에 있고, 이 장의 칸 설명은 템플릿 그대로일 때다. 들이지 않은 프로젝트에는 탭·기본 Block이 보이지 않는다(AI 문서 Reference 4-1).
+> **선택 요소 — 무엇이 엔진이고 무엇이 템플릿인가**(AI 문서 Reference 4-1)
+> - **템플릿(프로젝트 것)**: DB › 액티브 효과의 DB 종류 `AbilityData`. GBible에 없고, 쓰는 프로젝트가 `Documentation~/AI/Templates/Elements/AbilityData.cs.txt`를 `Assets/MomoiProject/Code/Rules/Elements/AbilityData.cs`(네임스페이스 `MomoiProject`)로 들인다(AI가 단계 1에서). 칸은 `trigger`·`outcomes`·`failText`·`icon`(1-1). 칸이 더 필요하면(마나 비용 …) 그 클래스에 더한다 — 프로젝트 변경, 묻지 않고 보고만. 더한 칸은 엔진이 모르므로 프로젝트 규칙이 `Game.Entry<AbilityData>(id)`로 읽는다.
+> - **규격**: `IUsableData.ToUsable()` → `AbilityDefinition`(`Id`·`DisplayName`·`When`·`FailText`·`Outcomes`, 2-7). 게임이 켜질 때 이 규격을 붙인 DB 항목을 모두 `session.Abilities`에 등록한다. 다른 칸에서 액티브 효과를 가리킬 때는 `[DataRef(typeof(IUsableData))]`.
+> - **엔진(GBible)**: `Game.Use`·`TryUse`·`CanUse`, 행동 `UseAbility`, 행동 직전 이벤트 `사용`·`효과 배율`, 이벤트 `액티브 효과 사용`, 대상·효과 Block, 그리고 **사용 기능 `Usable`**(2-8 — 템플릿 없이도 인스턴스에 붙여 `Game.Use`로 쓴다).
+> - 템플릿을 들이지 않은 프로젝트에는 DB › 액티브 효과 탭이 없다(들여도 항목이 없으면 숨는다). 2-5의 상태 효과 Block은 **상태 효과** 템플릿을 들였을 때만 고르는 목록에 나온다.
 
 **언제 쓰는가**
 
@@ -34,31 +38,24 @@
 
 ### 1-1. 액티브 효과 만들기(DB › 액티브 효과)
 
-1. `MomoiProject → DB` → 사이드바 **DB** 그룹의 **액티브 효과** 탭 → 목록 줄의 **`+ 액티브 효과`**. 제목(= ID)을 짓는다(예: `fireball`).
-2. `trigger`(툴팁 "트리거"): 기본으로 `사용` 하나가 들어 있다(요약 "사용할 때").
-   - 사용 조건을 붙이려면 `+ 블럭` → **조건 충족** 그룹의 조건 Block(예: 프로젝트가 만든 `사용자 체력 있음`, 기본 제공 `상태 효과 검사` — 쿨다운 3-12)을 더한다. `사용`과 `AND`로 이어진다.
-   - 이 칸에서 고를 수 있는 것은 `사용`과 조건 충족뿐이다.
-3. `outcomes`(툴팁 "결과"): `+ 결과 추가` →
-   - `대상에게 효과` → `+ 대상 추가`(비우면 고른 대상 그대로) → `+ 효과 추가`. 기본 제공 대상 Block(`사용자 자신`, 그리고 `플레이어 데이터 목록`·`이벤트의 개체`·`조건으로 거르기`·`상태 효과로 거르기`·`무작위 n개`·`정렬해서 n개`, 2-6)으로 "체력이 가장 낮은 적", "불 속성 적 중 무작위 2"를 코드 없이 고른다(3-11). 기본 제공 효과 `스탯 보정`·`스탯 보정 떼기`(분류 "스탯")로 버프를 코드 없이 만든다(3-10). 독·보호막처럼 몇 턴 동안 이어지는 효과와 쿨다운은 `상태 효과 걸기`·`상태 효과 풀기`·`상태 효과 줄이기`(분류 "상태 효과", → `29-Statuses-Schedules-Choices.md`, 쿨다운은 3-12).
-   - `선택 요구` → 후보 중에서 플레이어가 고르게 하고, 고른 것마다 효과를 준다(→ `29-Statuses-Schedules-Choices.md` 3-3).
-   - `플레이어 데이터에 주기 · …` → 필드와 값.
-   - 코딩한 결과(`Reward` 클래스).
-4. `failText`(툴팁 "쓸 수 없을 때 글 / 사용 조건이 맞지 않을 때 플레이어에게 보일 글. 텍스트 키(fail.needEnergy)면 번역된 글, 아니면 그 글 그대로({ability}·{condition} 틀). 비우면 기본 글"): 사용 조건이 거짓일 때 `Game.Use`의 실패 글이자 `Game.CanUse`의 이유(2-1·2-3). 예: `마나가 모자라 {ability}을(를) 쓸 수 없습니다.` 또는 텍스트 키 `fail.needMana`. 비우면 기본 글 "{ability}: 사용 조건을 만족하지 않습니다({condition})."이다.
-5. `icon`(툴팁 "아이콘"): 스킬 버튼에 그릴 `Sprite`. 규칙은 쓰지 않고 화면 코드가 읽는다(3-7).
-6. 검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다. '+ 결과 추가'로 무엇을 할지 더하세요."
+항목 추가·삭제와 트리거·결과 Block 조립은 DB에서 잠겨 있다(21장 3-1). **AI가 DB 반영 스크립트로 만든다**(관례 15절): `EditorDatabase.Staging.Add(typeof(AbilityData), "fireball")`로 항목을 만들고 아래 칸을 채운다(Block은 2절·3절의 형식, 결과는 `12-Outcomes.md` 3절). 코드에서 ID는 `GameIds.Ability.…`. 개발자는 `MomoiProject → DB` → 사이드바 **DB** 그룹의 **액티브 효과** 탭에서 읽고 문장 안의 값만 바꾼다. 칸(템플릿 그대로일 때):
 
-결과를 코드로 쓰려면 `[BindTo("fireball")]`(→ `13-BindTo.md`). 연결되면 결과 칸이 잠긴다.
+| 칸 | 툴팁 | 내용 |
+|---|---|---|
+| `trigger` | 트리거 | 기본 `사용` 하나("사용할 때"). 사용 조건은 조건 충족 Block을 `사용`과 `AND`로 잇는다(기본 `사용자 필드 검사`·`상태 효과 검사` — 쿨다운 3-12, 또는 프로젝트 조건 2-9). 고를 수 있는 것은 `사용`과 조건 충족뿐 |
+| `outcomes` | 결과 | 대상에게 효과(기본 대상 Block 2-6 · 기본 효과 Block 2-5 · 프로젝트 Block) · 선택 요구(`29-Statuses-Schedules-Choices.md` 3-3) · 플레이어 데이터에 주기 · 비용 내기 · 가중치 표 · 코딩한 결과(`Reward`) |
+| `failText` | 쓸 수 없을 때 글 | 사용 조건이 거짓일 때 플레이어에게 보일 글. 텍스트 키(`fail.needMana`)나 글(`{ability}`·`{condition}` 틀). 비우면 기본 글 — 규칙은 2-1 |
+| `icon` | 아이콘 | 스킬 버튼에 그릴 `Sprite`. 규칙은 쓰지 않고 화면 코드가 읽는다(3-7) |
+
+검증 경고: "트리거에 '사용'이 없습니다. 쓰는 순간과 상관없이 조건만으로 쓸 수 있는지가 정해집니다." / "결과가 없습니다(써도 아무 일도 일어나지 않습니다)." 결과를 코드로 쓰려면 `[BindTo(GameIds.Ability.Fireball)]`(→ `13-BindTo.md`) — 연결되면 결과 칸이 잠긴다.
 
 ### 1-2. 인스턴스에 사용 기능 붙이기(DB › 인스턴스)
 
-먼저 코드에서 아이템 클래스에 사용 기능 필드를 둔다(2-8).
+먼저 코드에서 아이템 클래스에 사용 기능 필드를 둔다(2-8). 기능 필드 붙이기·떼기도 구조라 잠겨 있으므로, AI가 DB 반영 스크립트에서 인스턴스(예: `potion`, 형식 `Item`)의 값에 `usable = new Usable { … }`을 넣는다(`04-Instances.md`). 구조 편집을 열면 DB › 인스턴스 상세의 값 탐색기 아래 **`+ 기능`** → `usable`로 붙이는 모습이 보인다.
 
-1. `MomoiProject → DB` → **인스턴스** 탭 → **`+ 인스턴스`** → 제목(= 인스턴스 ID, 예: `potion`)을 짓는다.
-2. `instanceType`(툴팁 "형식")에서 아이템 클래스(`Item`)를 고른다. 값(`value`)이 새로 만들어진다.
-3. 값 탐색기 아래 **`+ 기능`**을 누르고 목록에서 `usable`(오른쪽 작은 글씨: 형식 이름)을 고른다. 사용 기능이 붙고 그 칸이 보인다. 줄의 빼기로 다시 뗀다.
-4. 사용 기능의 트리거(`when`)는 기본 `사용`이다. `failText`(툴팁 "쓸 수 없을 때 글(텍스트 키 또는 글, 비우면 기본 글)")는 액티브 효과의 `failText`와 같다(1-1).
-
-> 인스턴스 값 안의 사용 기능(`when`·`then`)은 액티브 효과 탭과 같은 트리거·결과 편집기로 그려진다. 결과를 코드로 쓰려면 `[BindTo(인스턴스 ID)]`를 붙인다(그러면 결과 칸은 잠기고 연결된 함수 이름·cs 열기가 보인다). 여러 아이템이 같은 효과를 나눠 쓰면 아이템이 **액티브 효과 ID를 가리키게** 하고 그 액티브 효과를 DB › 액티브 효과에서 조립해도 된다(3-5, 3-6).
+- 사용 기능의 칸: `when`(트리거, 기본 `사용`) · `then`(결과) · `failText`(쓸 수 없을 때 글) — 액티브 효과의 `trigger`·`outcomes`·`failText`와 같은 편집기·규칙이다.
+- 결과를 코드로 쓰려면 `[BindTo(인스턴스 ID)]`(결과 칸이 잠기고 연결된 함수 이름·cs 열기가 보인다).
+- 여러 아이템이 같은 효과를 나눠 쓰면 아이템이 **액티브 효과 ID를 가리키게** 하고 그 액티브 효과를 DB › 액티브 효과에 두어도 된다(3-5, 3-6).
 
 ### 1-3. 모니터에서 확인하기
 
@@ -118,7 +115,7 @@ bool ok2 = Game.CanUse("fireball", caster, new object[] { target }, out var reas
 - Trigger(사용 조건)만 검사하고 아무것도 바꾸지 않는다. 버튼을 미리 흐리게 할 때 쓴다.
 - 미리 보기라 조건 `확률`을 굴리지 않고 참으로 본다(난수를 쓰지 않는다). 그래서 `CanUse`가 참이어도 실제로 쓸 때 확률이 빗나갈 수 있다(2-10).
 - 행동 직전 이벤트 `사용`의 행동 직전 이벤트(봉인·침묵)도 보지 않는다. 봉인 중인지 버튼에 보이려면 그 상태를 사용 조건(`상태 효과 검사` 등)으로도 둔다.
-- 이유 글자: 없는 ID면 "'…'은(는) 쓸 수 있는 액티브 효과·아이템이 아닙니다.", 조건이 거짓이면 `Game.Use`가 던지는 실패와 같은 글이다(지금 언어). 쓸 수 없을 때 글(`failText`)이 있으면 그 글, 비었으면 `FailureKeys.CannotUse`의 글(기본 문장 "{ability}: 사용 조건을 만족하지 않습니다({condition}).")이다(2-1). 텍스트 표에서 번역한 글이 툴팁에도 그대로 보인다.
+- 이유 글자: 없는 ID면 "'…'은(는) 쓸 수 있는 액티브 효과·아이템이 아닙니다.", 조건이 거짓이면 `Game.Use`가 던지는 실패와 같은 글(`failText` 또는 기본 글, 2-1)을 지금 언어로 번역한 것이다.
 
 ### 2-4. `UseAbility` — 액티브 효과 사용 행동(데이터)
 
@@ -160,29 +157,20 @@ public class AddEnemiesAround : TargetSelector<Unit>
 }
 ```
 
-| 효과 Block(`Effect<T>`)에서 | 뜻 |
-|---|---|
-| `Apply(T target)` | 대상 하나에 할 일(대상이 `T`가 아니면 불리지 않는다) |
-| `User<TUser>()` | 사용자를 형식으로. 예: `var caster = User<Unit>();` |
-| `Use.Ability` | 실행 중인 액티브 효과 정의(`AbilityDefinition`: `Id`, `DisplayName` …) |
-| `Use.User` / `Use.Picked` / `Use.Context` | 사용자 / 고른 대상 / 컨텍스트 |
-| `Game` | `GameApi` |
+물려받는 멤버(`Apply` · `User<TUser>()` · `Use` · `Game` · `Select`)는 `12-Outcomes.md` 3-5·3-6. 액티브 효과에서 실행 중이면 `Use.Ability`가 그 정의(`AbilityDefinition`: `Id`, `DisplayName` …)다(다른 기능의 결과면 `null`).
 
-| 대상 Block(`TargetSelector<T>`)에서 | 뜻 |
-|---|---|
-| `Select(IEnumerable<T> targets, T user)` | 앞 대상들과 사용자를 받아 다음 대상들을 돌려준다(고르기만) |
-| `Game`, `Use` | 효과 Block과 같다 |
+- 피해·회복처럼 장르의 핵심 동사인 효과는 `Apply`에서 값을 직접 바꾸지 않고 규칙 함수(`Rules.Damage(Game, 사용자, 대상, 양)` — 행동 직전 이벤트 자리가 있는 것, 관례 4절)를 부른다. 그래야 반사·면역 같은 기믹이 붙는다. 위 `Damage`는 문법만 보이는 예다. 수치에는 효과 배율을 곱한다(2-12).
 
 기본 제공 `SelfTarget`(`사용자 자신`): 고른 대상을 버리고 사용자 하나를 낸다. 장르 공통의 나머지 기본 대상 Block은 2-6.
 
-기본 제공 효과 Block(→ `28-Attributes-Intercepts.md` 3-1·3-2, `29-Statuses-Schedules-Choices.md` 3-2):
+기본 제공 효과 Block — `필드 바꾸기`(`12-Outcomes.md` 2-4a)와 아래 다섯(→ `28-Attributes-Intercepts.md` 3-1·3-2, `29-Statuses-Schedules-Choices.md` 3-2. 상태 효과 셋은 상태 효과 템플릿을 들인 프로젝트에서만):
 
 | 효과 | 코드 형식 | 하는 일 |
 |---|---|---|
 | 스탯 보정 | `AttributeModifierEffect` | 대상의 숫자 필드에 Modifier를 붙인다(`attribute`·`kind`·`value`·`permanent`). 출처 = 이 액티브 효과 ID(인스턴스면 인스턴스 ID). 값 × 효과 배율(2-12) |
 | 스탯 보정 떼기 | `RemoveModifiersEffect` | 대상에서 그 출처의 Modifier를 모두 뗀다(`source`, 비우면 이 액티브 효과 ID) |
 | 상태 효과 걸기 | `ApplyStatusEffect` | 대상에게 상태 효과(DB › 상태 효과)를 건다(`status`·`stacks`·`length`). 이미 걸려 있으면 그 상태 효과의 다시 걸 때 규칙(중첩·갱신)을 따른다. 중첩 × 효과 배율(반올림, 최소 1), 건 개체 = 사용자 |
-| 상태 효과 풀기 | `RemoveStatusEffect` | 대상의 상태 효과를 푼다(`status`·`stacks`, 0이면 모두). 끝날 때 결과는 돌지 않는다 |
+| 상태 효과 풀기 | `RemoveStatusEffect` | 대상의 상태 효과를 푼다(`status`·`stacks`, 0이면 모두). `status`를 비우고 `kind`(종류)를 고르면 그 종류(디버프 …)를 모두 푼다(정화). 끝날 때 결과는 돌지 않는다 |
 | 상태 효과 줄이기 | `ShortenStatusEffect` | 대상의 상태 효과의 남은 지속을 줄인다(`status`·`amount`). 다 되면 끝난다. 쿨다운 −1(3-12) |
 
 ### 2-6. 기본 대상 Block — 목록 · 이벤트 · 거르기 · 상태 효과 · 무작위 · 정렬
@@ -192,7 +180,7 @@ public class AddEnemiesAround : TargetSelector<Unit>
 | 화면 이름 | 코드 형식 | 칸 | 하는 일 |
 |---|---|---|---|
 | 사용자 자신 | `SelfTarget` | — | 앞 대상을 버리고 사용자(상태 효과·패시브 효과면 가진 쪽) 하나 |
-| 플레이어 데이터 목록 | `DataListTarget` | `key`(플레이어 데이터) · `path`(필드(목록), 비우면 값 전체) | **앞 대상을 버리고** 그 목록의 요소 모두. 요소가 id 글자면 그 id의 개체를 찾는다(손패 `battle.hand` 같은 id 목록). 경로 끝이 목록이 아니라 id 글자 하나(`battle.targetId`)면 그 개체 하나 |
+| 플레이어 데이터 목록 | `DataListTarget` | `key`(플레이어 데이터) · `path`(필드(목록), 비우면 값 전체) | **앞 대상을 버리고** 그 목록의 요소 모두. 요소가 id 글자면 그 id의 개체를 찾는다(핸드 `battle.hand` 같은 id 목록). 경로 끝이 목록이 아니라 id 글자 하나(`battle.targetId`)면 그 개체 하나 |
 | 이벤트의 개체 | `EventFieldTarget` | `field`(이벤트 필드(id 또는 개체)) | 받은 이벤트(행동 직전 이벤트 포함)의 그 필드가 가리키는 개체. 글자면 그 id의 개체, 객체면 그대로(id가 있는 것만), 목록이면 요소마다. 예: 피해 이벤트의 `sourceId` = 때린 쪽(반사), `targetId` = 맞은 쪽 |
 | 조건으로 거르기 | `FilterTarget` | `path`(필드) · `op`(비교, `FieldOp`) · `value`(값) | 앞 대상 중 필드 검사가 참인 것만. 비교는 값 조건과 같다(`hp 이하 10`, `element 일치 fire`, `tags 포함 boss`, 11장 3-2) |
 | 상태 효과로 거르기 | `StatusFilterTarget` | `status`(상태 효과) · `kind`(종류(상태 효과를 비웠을 때)) · `op`(비교 `>=` `<=` `>` `<` `==`) · `stacks`(중첩(종류면 가짓수)) | 앞 대상 중 그 상태 효과의 중첩 비교가 참인 것만. 걸려 있지 않으면 0이다. "독에 걸린 적 모두" = `poison` `>=` `1`, "디버프가 없는 아군" = `status` 비우고 `kind` 디버프 `<=` `0`. 조건 `상태 효과 검사`(29장)와 같은 비교 |
@@ -314,19 +302,12 @@ foreach (var card in hand) Game.TryUse(card.ability, hero);  // 되는 것만 �
 - 행동 직전 이벤트 `사용`이 막았거나 `times`를 0으로 만들었을 때도 `false`다(결과를 내지 않았으므로).
 - 조건을 한 번만 검사한다. 조건 `확률`도 한 번만 굴린다. 미리 `CanUse`로 묻고 다시 `Use`하는 두 번 검사가 아니다.
 - 없는 ID는 그대로 예외다(프로그래머 실수).
-- 조각을 차례로 돌며 "되는 것만 발동"할 때 쓴다: 손패의 카드마다, 조커 칸의 조커마다, 보드의 유닛마다.
+- 조각을 차례로 돌며 "되는 것만 발동"할 때 쓴다: 핸드의 카드마다, 조커 칸의 조커마다, 보드의 유닛마다.
 - 행동 하나 안에서 부른다(점수 계산 행동, 턴 끝 행동 …). 행동 밖에서 부르면 부를 때마다 행동 하나가 되고, 쓰지 못한 것도 값이 바뀌지 않은 Undo 한 단위로 남는다.
 
 **확률이 든 액티브 효과는 `TryUse`로.** `Game.Use`는 확률이 빗나가면 사용 조건 실패를 던지고 행동이 취소된다. 행동이 취소되면 난수도 그 전으로 돌아가므로, 같은 상태에서 다시 `Use`하면 같은 수가 나와 또 빗나간다. `TryUse`는 빗나가도 행동이 끝나므로 굴린 난수가 남고, 다음에는 다음 수를 굴린다.
 
-**비용도 "되면 낸다"면 `Game.TryPay`.** 결과 `비용 내기`·`Game.Pay`는 모자라면 실패를 던져 바깥 행동 전체가 취소된다. 틱 묶음 행동(33장 5-7) 안에서 "MP가 되면 주문을 쓴다"처럼 모자란 것이 정상인 비용은 `Game.TryPay(key, path, 양, forId, user)`로 낸다. 낼 수 있으면 내고 `true`, 모자라면 **아무것도 바꾸지 않고** `false`다(실패를 던지지 않는다). 행동 직전 이벤트 `비용 지불` 받기은 그대로 거친다(`forId` = 무엇을 위한 비용, `user` = 내는 쪽).
-
-```csharp
-// 틱 묶음 행동 안: 지팡이마다 MP가 되면 주문을 쓰고, 모자라면 그 지팡이만 건너뛴다
-foreach (var wand in run.wands)
-    if (Game.TryPay("run", "mana", wand.cost, forId: wand.spell, user: wand))
-        Game.Use(wand.spell, wand);
-```
+**비용도 "되면 낸다"면 `Game.TryPay`.** 결과 `비용 내기`·`Game.Pay`는 모자라면 실패를 던져 바깥 행동 전체가 취소된다. 틱 묶음 행동 안에서 "MP가 되면 주문을 쓴다"처럼 모자란 것이 정상인 비용은 `Game.TryPay`(모자라면 아무것도 바꾸지 않고 `false`)로 내고, 참일 때만 `Game.Use`한다(`28-Attributes-Intercepts.md` 2-4·4-12, 37장 5-6).
 
 ### 2-11. 행동 직전 이벤트 `사용` — 두 번 발동 · 봉인
 
@@ -370,7 +351,7 @@ public class Damage : Effect<Unit>
     protected override void Apply(Unit target)
     {
         var power = Use?.Context?.Power ?? 1;                         // 효과 배율(기본 1)
-        target.hp -= (int)Math.Round(amount * power);
+        target.hp -= (int)Math.Round(amount * power);                  // 게임에서는 규칙 함수(Rules.Damage …)에 이 양을 넘긴다(2-5)
     }
 }
 ```
@@ -446,7 +427,7 @@ public class SpendMana : Effect<Unit>
 ### 3-4. 포션(사용 기능 + `[BindTo]`)
 
 1. 코드: 위의 `Item` 클래스.
-2. DB › 인스턴스 `potion`: 형식 `Item`, `+ 기능` → `usable`.
+2. DB › 인스턴스 `potion`: 형식 `Item`, 값의 `usable`에 사용 기능(1-2 — AI가 반영 스크립트로).
 3. 결과를 코드로:
 
 ```csharp
@@ -457,7 +438,7 @@ public static class ItemUses
     {
         var bag = c.Session.Data.Get<Party>("party").bag;
         if (!bag.TryGetValue(c.Owner, out var count) || count <= 0)
-            throw new InvalidOperationException("포션이 없습니다.");   // 행동이 중단되고 아무것도 바뀌지 않는다
+            throw c.Game.Fail("fail.noPotion", "포션이 없습니다.");   // 플레이어용 실패 — 행동이 중단되고 아무것도 바뀌지 않는다
         bag[c.Owner] = count - 1;
         if (c.User is Unit u) u.hp = Math.Min(u.maxHp, u.hp + 30);
     }
@@ -466,7 +447,7 @@ public static class ItemUses
 
 4. 게임 코드: `Game.Use("potion", hero);` — 회복과 개수 줄이기가 한 행동이라 Undo 한 번에 함께 돌아간다.
 
-결과 코드에서 예외를 던지면 그 사용 행동 전체가 취소된다. 단, `Game.CanUse`는 Trigger만 보므로 이 검사를 모른다. 버튼을 미리 흐리게 하려면 가방 개수를 UI 코드가 직접 보거나 3-6의 방식으로 사용 조건 Block을 쓴다.
+결과 코드에서 예외(플레이어에게 보일 것은 `Game.Fail`, 관례 5절)를 던지면 그 사용 행동 전체가 취소된다. 단, `Game.CanUse`는 Trigger만 보므로 이 검사를 모른다. 버튼을 미리 흐리게 하려면 가방 개수를 UI 코드가 직접 보거나 3-6의 방식으로 사용 조건 Block을 쓴다.
 
 ### 3-5. 아이템이 액티브 효과를 가리키게 하기(에디터에서 전부 조립)
 
@@ -477,7 +458,7 @@ using GBible.Data;
 public class Consumable
 {
     public string id;
-    [DataRef(typeof(AbilityData))] public string ability;   // DB › 액티브 효과 목록에서 고르는 칸
+    [DataRef(typeof(IUsableData))] public string ability;   // DB › 액티브 효과 목록에서 고르는 칸(규격으로 가리킨다)
     public int maxStack = 10;
 }
 
@@ -507,61 +488,45 @@ public class InBag : SimpleCondition
 
 ### 3-7. 사용 버튼 상태
 
+화면은 UI Toolkit 화면 코드(`GameScreen`, 35장)로 짠다. UXML에 `name="fireball"`인 Button과 그 안의 아이콘 칸 `fireball-icon`이 있다고 본다.
+
 ```csharp
-public class SkillButton : MonoBehaviour
+[BindTo(GameIds.Screen.BattleHud)]
+public class BattleHud : GameScreen
 {
-    public string abilityId;
-    public UnityEngine.UI.Button button;
-    string _casterId;
+    const string Skill = GameIds.Ability.Fireball;
+    string _casterId, _targetId;   // 사용자·대상은 객체가 아니라 id로 들고 있는다(Undo·불러오기 뒤에는 다른 인스턴스일 수 있다)
 
-    public void Bind(string casterId) => _casterId = casterId;
-
-    void Update()
+    protected override void OnOpen()
     {
-        var game = GBibleRuntime.Game;
-        if (game == null || _casterId == null) return;
-        button.interactable = game.CanUse(abilityId, _casterId, out _);
+        OnClick("fireball", () => new UseAbility { ability = Skill, user = _casterId, targets = { _targetId } });   // Busy면 무시, 플레이어용 실패는 알림
+        var icon = Game.Entry<AbilityData>(Skill)?.icon;   // 그림은 정의(AbilityDefinition)에 없다 — DB 항목(템플릿 칸 icon)에서
+        if (icon != null) Q("fireball-icon").style.backgroundImage = new StyleBackground(icon);
     }
 
-    public void OnClick(Unit target)
+    protected override void Draw()   // 플레이어 데이터가 바뀌면 프레임 끝에 한 번
     {
-        try { GBibleRuntime.Game.Use(abilityId, _casterId, target); }
-        catch (InvalidOperationException e) { Debug.Log(e.Message); }
+        var button = Q<Button>("fireball");
+        button.SetEnabled(Game.CanUse(Skill, _casterId, out var why));
+        button.tooltip = why ?? "";   // 쓸 수 없는 이유 = failText(2-3)
     }
 }
 ```
 
-(사용자는 오래 들고 있지 말고 id로 들고 있는다. Undo·불러오기 뒤에는 다른 인스턴스일 수 있다.)
-
-버튼 그림은 DB › 액티브 효과의 `icon`이다. 액티브 효과 정의(`AbilityDefinition`)에는 그림이 없으므로 DB 항목(`GBible.Data.AbilityData`)에서 읽는다.
-
-```csharp
-// Start 등에서 한 번
-var data = GameDatabase.Load().All<AbilityData>().FirstOrDefault(a => a.Id == abilityId);
-if (data != null) iconImage.sprite = data.icon;      // iconImage: UnityEngine.UI.Image
-```
-
 ### 3-8. 액티브 효과 사용 연출
 
+연출은 행동이 성공한 뒤에 받는다(`SubscribeAfterAction`, `10-Events.md` 2-7).
+
 ```csharp
-IDisposable _sub = GBibleRuntime.Game.Events.Subscribe<AbilityUsed>(e =>
+IDisposable _sub = GBibleRuntime.Game.Events.SubscribeAfterAction<AbilityUsed>(e =>
 {
-    foreach (var id in e.Targets) PlayHitEffect(id);        // 효과를 받은 최종 대상들
+    foreach (var id in e.Targets) PlayHitEffect(id);        // 효과를 받은 최종 대상들(Times = 낸 횟수)
 });
 ```
 
 ### 3-9. 결과를 함수로: 고른 대상에게 튕기는 번개
 
-```csharp
-[BindTo("chainLightning")]
-static void ChainLightning(TriggerContext c)
-{
-    var damage = 20;
-    foreach (var t in c.Picked.OfType<Unit>()) { t.hp -= damage; damage = damage * 7 / 10; }
-}
-```
-
-DB › 액티브 효과 `chainLightning`의 트리거는 에디터에서 그대로 정하고(사용 조건 포함), 결과만 코드다.
+액티브 효과 ID에 `[BindTo]` 함수를 붙이면 결과만 코드가 되고, 트리거(사용 조건 포함)는 DB 항목 그대로다. 고른 대상은 `c.Picked`, 배율은 `c.Power`. 예제는 `13-BindTo.md` 3-7. 함수 안의 숫자(첫 피해·감소율)는 코드에 적지 않고 밸런싱 값이나 그 항목의 칸에서 읽는다(관례 18절).
 
 ### 3-10. 버프: 사용자 공격력 +20%(코드 없음)
 
@@ -688,6 +653,7 @@ public class ScoreHand : GameAction
 - **조각을 차례로 쓰려고 `CanUse` 뒤에 `Use`를 부른다.** 조건을 두 번 검사하고, 확률 조건이면 미리 보기와 실제가 다르다. `TryUse` 한 번으로 쓴다.
 - **`TryUse`를 행동 밖에서 반복한다.** 부를 때마다 행동 하나, Undo 한 단위가 된다(쓰지 못한 것도). 점수 계산 같은 행동 하나 안에서 부른다.
 - **두 번 발동하는 액티브 효과의 결과에 비용을 둔다.** 행동 직전 이벤트 `사용`의 `times`만큼 결과 전체가 되풀이되어 `비용 내기`도 두 번 낸다. 한 번만 낼 비용은 부르는 행동이 낸다(2-11).
-- **소모(마나 −3)를 `필드 바꾸기`로 둔다.** `더하기` 값에는 효과 배율이 곱해져 수치 2배가 걸리면 소모도 2배다. 소모는 `비용 내기`·`Game.Pay`·`Game.TryPay`(배율과 상관없다)나 프로젝트 효과 Block으로 둔다(2-12).
-- **틱 묶음 행동 안에서 `Game.Pay`로 낸다.** 모자라면 실패가 던져져 그 틱의 다른 일까지 취소된다. 모자란 것이 정상인 비용은 `Game.TryPay`(2-10).
+- **소모(마나 −3)를 `필드 바꾸기`로 둔다.** `더하기` 값에는 효과 배율이 곱해져 수치 2배가 걸리면 소모도 2배다. 소모는 `비용 내기`·`Game.Pay`·`Game.TryPay`(배율과 상관없다, 2-10)나 프로젝트 효과 Block으로 둔다(2-12).
+- **연출을 `Subscribe`로 받는다.** 실패한 행동의 `액티브 효과 사용`도 받고 멀티 클라이언트에서는 불리지 않는다. 연출은 `SubscribeAfterAction`(3-8).
+- **템플릿 칸과 엔진 정의를 섞는다.** `icon`이나 프로젝트가 더한 칸(마나 비용 …)은 `AbilityDefinition`·`Use.Ability`에 없다. 규칙·화면 코드가 `Game.Entry<AbilityData>(id)`로 DB 항목에서 읽는다(맨 위 선택 요소, 3-7).
 - **행동 직전 이벤트 `사용`의 `ability`를 바꿔 다른 액티브 효과로 바꾸려 한다.** 거르기용이라 원래 액티브 효과가 쓰인다. 다른 액티브 효과로 바꾸려면 규칙 함수에 프로젝트 행동 직전 이벤트를 둔다(`28-Attributes-Intercepts.md` 5-7).

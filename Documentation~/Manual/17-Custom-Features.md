@@ -1,17 +1,13 @@
 # 17. 프로젝트 고유 기능 만들기(퀘스트 예)
 
-**한 줄 요약**: 먼저 기본 종류 **패시브 효과**(DB › 패시브 효과)로 되는지 본다. 유물·특성·패시브 스킬·조커처럼 "가지고 있으면 발동"하는 것(순간마다 다른 결과, 쌓았다가 쓰는 카운터, N초마다 포함), "가진 동안 공격력 +2"처럼 가진 동안 붙는 스탯은 코드 없이 패시브 효과로 만든다(0절). 그 밖에 로그·도전과제·액티브 효과처럼 "Trigger → 결과" 구조를 가진 기능(퀘스트·일일 미션·튜토리얼 단계)은 프로젝트가 직접 만들 수 있다. DB 종류 클래스에 `Trigger` 필드와 `List<Outcome>` 필드를 두고 `[TriggerSlot]`·`[OutcomeSlot]` 표시만 붙이면 같은 편집 화면·검증이 붙고, 런타임에서는 `session.Triggers.Register`로 감시하고 `RunOutcomes`로 결과를 실행한다.
+**한 줄 요약**: 먼저 기본 종류 **패시브 효과**(DB › 패시브 효과)로 되는지 본다 — "가지고 있으면 발동"하는 것과 가진 동안 붙는 스탯은 코드 없이 패시브 효과로 만든다(0절). 패시브 효과에 없는 규칙(한 번만·하루 한도·단계·선행)이 있는 "Trigger → 결과" 기능(퀘스트·일일 미션·튜토리얼 단계)만 프로젝트 DB 종류로 만든다: 클래스에 `Trigger` 필드와 `List<Outcome>` 필드를 두고 `[TriggerSlot]`·`[OutcomeSlot]`을 붙이면 같은 편집 화면·검증이 붙고, 런타임에서는 `session.Triggers.Register`로 감시하고 `RunOutcomes`로 결과를 실행한다(1절부터).
 
 > **선택 요소**: 패시브 효과의 DB 종류(데이터 칸 클래스)는 GBible에 없다 — 쓰는 프로젝트가 템플릿 `Documentation~/AI/Templates/Elements/PassiveData.cs.txt`를 `Assets/MomoiProject/Code/Rules/Elements/PassiveData.cs`로 들인다(AI가 단계 1에서). 칸이 더 필요하면 그 클래스에 더한다(프로젝트 변경). 엔진(이 장의 동작·기본 Block·`Game` 함수)은 GBible에 있고, 이 장의 칸 설명은 템플릿 그대로일 때다. 들이지 않은 프로젝트에는 탭·기본 Block이 보이지 않는다(AI 문서 Reference 4-1).
 
 **언제 쓰는가**
 
-- 유물·특성·장비 효과·축복처럼 가진 목록에 있는 동안 발동하는 것 → 기본 종류 패시브 효과(0절). 새 DB 종류를 만들지 않는다.
-- 조커·참·보드 유닛처럼 **놓인 칸 순서대로** 발동하는 조각, 옆 조각을 따라 하는 조각(Blueprint) → 패시브 효과 `perElement`(놓인 것마다)·결과 '빌려 쓰기'(0-1).
-- 유물을 가진 동안 공격력 +2(레벨마다 다름), "같은 줄에 혼자면 +3" → 패시브 효과 `modifiers`(가진 동안 스탯 보정)·`modifierWhen`(보정 조건)(0-1).
-- 같은 조각이 순간마다 다른 일을 한다(손을 낼 때 쌓고 점수 때 쓰기), N초마다 돈다 → 패시브 효과 `rules`(발동 더)·`pulse`(주기)(0-1).
-- 퀘스트, 일일 미션, 튜토리얼 단계, 이벤트 기간 보상처럼 "언제(조건) → 무엇을(보상)"을 기획자가 DB에서 항목마다 조립해야 하는 기능(1절부터).
-- 기본 기능(도전과제 = 한 번, 로그 = 숫자 기록, 패시브 효과 = 가진 동안 매번)과 진행·저장·반복 규칙이 달라서 직접 다뤄야 할 때.
+- 유물·특성·장비 효과·축복·조커·보드 유닛처럼 가진 목록에 있는 동안 발동하는 것(놓인 순서대로·따라 하기·가진 동안 스탯·순간마다 다른 결과·N초마다 포함) → 기본 종류 패시브 효과(0절의 표). 새 DB 종류를 만들지 않는다.
+- 퀘스트, 일일 미션, 튜토리얼 단계, 이벤트 기간 보상처럼 "언제(조건) → 무엇을(보상)"을 항목마다 조립하는데, 진행·저장·반복 규칙이 기본 기능(도전과제 = 한 번, 로그 = 숫자 기록, 패시브 효과 = 가진 동안 매번)과 다른 것 → 프로젝트 DB 종류(1절부터, 경계는 0-5).
 
 이 문서에서 쓰는 용어:
 
@@ -23,7 +19,7 @@
 | 감시 | `session.Triggers`가 Trigger를 지켜보다가 참이 되는 순간 등록한 함수를 부르는 것(`Register`). |
 | TriggerContext (컨텍스트) | 발동한 순간의 정보(`Owner`·`Event` …). |
 | Permanent | `session.Data.Permanent()` 안의 변경은 Undo 이력에 들어가지 않는다(도전과제 달성이 쓰는 방식). |
-| 패시브 효과 | DB › 패시브 효과의 항목 하나: 가진 목록 · `matchField`(일치 필드) · `matchVia`(원본에서 읽기) · `perElement`(놓인 것마다) · `levelField`(레벨 필드) · 발동(Trigger) · 가진 쪽 필드 · 결과 · `rules`(발동 더) · `pulse`(주기) · `modifiers`(가진 동안 스탯 보정) · `modifierTarget`(보정 받을 대상) · `modifierWhen`(보정 조건) · `stacking`(여럿일 때) · 아이콘. 코드 형식 `PassiveData`(DB), `PassiveDefinition`(실행 중). ID 상수는 `GameIds.Passive.X`. |
+| 패시브 효과 | DB › 패시브 효과의 항목 하나("가지고 있으면 발동"). 칸은 0-2. 코드 형식 `PassiveData`(DB — 프로젝트가 템플릿에서 들인 클래스), `PassiveDefinition`(실행 중). ID 상수는 `GameIds.Passive.X`. |
 | 가진 목록 | 플레이어 데이터 안의 ID 목록·객체 목록·ID → 레벨 딕셔너리(`run › relics`, `run › jokers`, `run › perks`). 패시브 효과 ID가 들어 있으면 가진 것이다. |
 | 가진 쪽 | 가진 목록을 품은 객체(`run`, `hero`, 동료마다). 패시브 효과의 결과가 그 쪽을 사용자로 돈다. `perElement`(놓인 것마다)를 켜면 목록의 요소 하나하나(조커 하나)가 가진 쪽이다. |
 | 조각 | 객체 목록의 요소 하나(조커 칸의 조커 하나). 조각마다 고유 `id`와, 어떤 패시브 효과인지 가리키는 필드(`joker`, 또는 원본 인스턴스 ID `card`)를 둔다. |
@@ -68,7 +64,7 @@
 - **`levelField`(레벨 필드)**: 요소의 이 숫자 필드가 그 요소의 레벨이다(`{ joker: "plusMult", level: 3 }`). 비우면 요소 하나 = 1. ID 목록·딕셔너리에는 쓰지 않는다(딕셔너리는 값이 곧 레벨).
 - **레벨이 0 이하인 요소는 꺼진 것이다.** 발동도 보정도 없고 `Game.Owned`에서 0이며, 빌려 쓰기로도 빌리지 못한다. 제약으로 잠깐 꺼지는 조각을 레벨 0으로 둔다. 그래서 원작 레벨이 ★0부터인 게임은 레벨 필드 = ★ + 1(꺼지면 0)로 둔다.
 - **가진 쪽** = 그 목록을 품은 객체. `run › relics`면 `run`(판 하나에 하나), `run › hero.perks`면 `hero`, 앞마디에 `[]`를 쓴 `run › party[].traits`면 그 목록을 가진 동료마다다.
-- **결과의 컨텍스트**: `User` = 가진 쪽(놓인 것마다면 그 요소), `Picked` = 가진 쪽 하나, `Owner` = 패시브 효과 ID, `Event` = 받은 이벤트(행동 직전 이벤트 포함), `IsIntercept`, `Power` = 효과 배율. 결과 `대상에게 효과`의 대상을 비우거나 `사용자 자신`이면 가진 쪽이다. 가진 쪽이 `run`처럼 싸우는 개체가 아니면 대상 Block으로 고른다(기본 대상 Block 16장 2-6, 또는 프로젝트의 `주인공` Block — 가이드 04장 9절).
+- **결과의 컨텍스트**: `User` = 가진 쪽(놓인 것마다면 그 요소), `Picked` = 가진 쪽 하나, `Owner` = 패시브 효과 ID, `Event` = 받은 이벤트(행동 직전 이벤트 포함), `IsIntercept`, `Power` = 효과 배율. 결과 `대상에게 효과`의 대상을 비우거나 `사용자 자신`이면 가진 쪽이다. 가진 쪽이 `run`처럼 싸우는 개체가 아니면 대상 Block으로 고른다(기본 대상 Block 16장 2-6, 또는 프로젝트의 `주인공` Block — AI 문서 `BuildGuide/04-AddingContent.md` 9절).
 - **효과 배율**: 발동할 때마다(가진 쪽마다) 행동 직전 이벤트 `효과 배율`(`PowerIntent { ownerId = 패시브 효과 ID, userId = 가진 쪽 id, multiplier = 1 }`)을 한 번 거쳐 `Power`에 둔다. 기본 효과 Block이 곱한다(`필드 바꾸기`의 더하기 값 · `상태 효과 걸기`의 중첩 · `스탯 보정`의 값, 16장 2-12). 행동 직전 이벤트 '효과 배율'을 받는 패시브 효과 자신의 결과는 배율을 거치지 않는다(같은 행동 직전 이벤트를 다시 만들어 끝없이 돌지 않게).
 - **가진 쪽 필드**: 이벤트·행동 직전 이벤트의 그 필드가 가진 쪽 id일 때만 발동한다("내가 맞을 때만" = 피해 행동 직전 이벤트의 `targetId`). 가진 쪽에 `id`가 있어야 한다. `run`처럼 id가 없는 가진 쪽이면 이 칸을 채운 패시브 효과는 발동하지 않으므로 행동 직전 이벤트 조건(`targetId 일치 hero`)으로 거른다.
 - **침묵**: 가진 쪽(조커·유닛처럼 `id`가 있는 것)에 '걸린 쪽의 패시브 효과를 끔'(`silencesPassives`) 상태 효과가 걸려 있으면 그 가진 쪽의 패시브 효과는 발동·보정이 모두 없고 `Game.Owned`도 0이다(Ink·디버프된 조커·봉인, 29장). 침묵한 조각은 빌려 쓰기로도 빌리지 못한다. 액티브 효과까지 막으려면 행동 직전 이벤트 `사용` 막기를 함께 건다(16장 2-11).
@@ -136,26 +132,28 @@
 
 ### 0-2. 에디터에서 — DB › 패시브 효과
 
-`MomoiProject → DB` → 사이드바 **DB** 그룹의 **패시브 효과** 탭 → **+ 새로 만들기** → ID(접두어 `passive`, 예: `thornArmor`). 저장하면 `GameIds.Passive.ThornArmor`가 생긴다.
+`MomoiProject → DB` → 사이드바 **DB** 그룹의 **패시브 효과** 탭. 로직 쪽 종류라 항목·Block 조립은 AI가 DB 반영 스크립트로 한다(`EditorDatabase.Staging.Add(typeof(PassiveData), "thornArmor")`, 접두어 `passive`, 21장 3-1). 새 항목은 저절로 적용되어 `GameIds.Passive.ThornArmor`가 생긴다(Unity가 다시 컴파일한 뒤 — 20장 7절). 개발자는 문장 안의 값을 바꾼다.
+
+칸 이름표는 변수 이름이고, 마우스를 올리면 툴팁(아래 표의 이름 + 짧은 설명 — 뜻은 0-1)이 보인다.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
-| `ownerKey` | 가진 목록(플레이어 데이터) / 이 ID가 들어 있으면 가진 것 | 기본 `run` |
-| `ownerPath` | 필드(목록·딕셔너리) / ID 목록·id가 있는 객체 목록·ID → 레벨 딕셔너리. 앞마디에 []를 쓰면 가진 쪽이 여럿(party[].traits) | 기본 `relics`. 비우면 값 전체 |
-| `matchField` | 일치 필드(객체 목록) / 객체 목록에서 요소의 이 필드(글자·글자 목록)에 이 패시브 효과 ID가 있으면 가진 것입니다(예: run.jokers의 joker, 유닛의 traits). 비우면 요소 자신(ID 글자)·요소의 id | 요소의 글자·글자 목록 필드 이름(`joker`, `traits`) |
-| `matchVia` | 원본에서 읽기 / 일치 필드가 원본(DB › 인스턴스) ID를 담을 때, 그 원본의 이 필드(글자·글자 목록)에 패시브 효과 ID가 있으면 가진 것입니다(예: 원본 Card의 passives). 비우면 일치 필드를 그대로 비교 | 원본 클래스의 필드 이름(`passives`). 보통 비운다 |
-| `perElement` | 놓인 것마다 / 켜면 가진 쪽이 목록의 요소 하나하나입니다(결과의 사용자 = 그 요소). 같은 목록을 보는 '놓인 것마다' 패시브 효과는 목록 순서(자리)대로 발동합니다 | 끔(기본) / 켬 |
-| `levelField` | 레벨 필드 / 요소의 이 숫자 필드가 레벨입니다({level}·Game.Owned·'레벨마다' 보정). 비우면 요소 하나 = 1 | 요소의 숫자 필드 이름(`level`). 0 이하면 그 요소는 꺼진다 |
+| `ownerKey` | 가진 목록(플레이어 데이터) | 기본 `run` |
+| `ownerPath` | 필드(목록·딕셔너리) | 기본 `relics`. 비우면 값 전체. 앞마디에 `[]`를 쓰면 가진 쪽이 여럿(`party[].traits`) |
+| `matchField` | 일치 필드(객체 목록) | 요소의 글자·글자 목록 필드 이름(`joker`, `traits`). 비우면 요소 자신(ID 글자)·요소의 `id` |
+| `matchVia` | 원본에서 읽기 | 원본 클래스의 필드 이름(`passives`). 보통 비운다 |
+| `perElement` | 놓인 것마다 | 끔(기본) / 켬 |
+| `levelField` | 레벨 필드 | 요소의 숫자 필드 이름(`level`). 비우면 요소 하나 = 1. 0 이하면 그 요소는 꺼진다 |
 | `trigger` | 발동 | `+ 블럭`: 이벤트 받기 · 조건 충족 · 행동 직전 이벤트. 보정·주기만 쓰면 비운다 |
-| `holderField` | 가진 쪽 필드 / 이벤트·행동 직전 이벤트의 이 필드가 가진 쪽 id일 때만 발동합니다(예: 피해 행동 직전 이벤트의 targetId → 가진 쪽이 맞을 때만) | 트리거가 고른 이벤트·행동 직전 이벤트의 필드. 비우면 "가진 쪽 모두". `rules`의 줄에도 쓰인다 |
+| `holderField` | 가진 쪽 필드 | 트리거가 고른 이벤트·행동 직전 이벤트의 필드(`targetId`). 비우면 "가진 쪽 모두". `rules`의 줄에도 쓰인다 |
 | `outcomes` | 결과 | 결과 종류 전부(행동 직전 이벤트 고치기·빌려 쓰기 포함). 주기도 이 칸을 낸다 |
-| `rules` | 발동 더(다른 순간) / 같은 패시브 효과가 다른 순간에 다른 결과를 낼 때 줄마다 트리거 + 결과(손을 낼 때 쌓기 · 버릴 때 빼기 · 점수 때 내기). 가진 쪽 필드·놓인 것마다 순서는 위와 같다 | 줄을 더하고 줄마다 트리거(이벤트 받기 · 조건 충족 · 행동 직전 이벤트)·결과를 조립한다 |
-| `pulse` | 주기(초) / 0보다 크면 가진 동안 이 초(게임 시간)마다 가진 쪽마다 결과를 냅니다(트리거 없이도). 레벨별 주기가 있으면 그것 | 기본 0(주기 없음) |
+| `rules` | 발동 더(다른 순간) | 줄마다 트리거(이벤트 받기 · 조건 충족 · 행동 직전 이벤트)·결과 |
+| `pulse` | 주기(초) | 기본 0(주기 없음) |
 | `pulseByLevel` | 레벨별 주기(초, 1레벨부터) | `2`, `1`처럼 레벨마다 한 칸. 넘치면 마지막 값. 있으면 `pulse`보다 먼저 |
-| `modifiers` | 가진 동안 스탯 보정 / 가진 동안만 붙는 보정입니다(잃으면 저절로 빠짐). 받는 쪽 = 가진 쪽(놓인 것마다면 그 요소) 또는 아래 '보정 받을 대상' | 줄마다 아래 표의 칸 |
-| `modifierTarget` | 보정 받을 대상 / 가진 목록 플레이어 데이터 안의 객체 경로(예: hero, 모든 동료면 party[]). 비우면 가진 쪽. 보정 줄의 받을 대상이 있으면 그 줄은 그것 | 비우면 "가진 쪽"(`perElement`면 그 요소) |
-| `modifierWhen` | 보정 조건 / 참일 때만 보정이 붙습니다(읽을 때 가진 쪽마다 검사, 사용자 = 가진 쪽). 예: 자리 검사 '같은 줄에 혼자'(Fury), 체력 절반 이하. 비우면 늘 | `+ 블럭`: 조건 충족만 |
-| `stacking` | 여럿일 때 / 받는 쪽 하나에 가진 쪽이 여럿일 때: 레벨을 더해 한 번 / 가진 쪽마다 값을 더함(같은 아티팩트 둘) / 가장 높은 레벨 하나만([고유]) | `레벨을 더해 한 번`(기본) / `가진 쪽마다 값을 더함` / `가장 높은 레벨 하나만` |
+| `modifiers` | 가진 동안 스탯 보정 | 줄마다 아래 표의 칸 |
+| `modifierTarget` | 보정 받을 대상 | 객체 경로(`hero`, 모든 동료면 `party[]`). 비우면 "가진 쪽"(`perElement`면 그 요소) |
+| `modifierWhen` | 보정 조건 | `+ 블럭`: 조건 충족만. 비우면 늘 |
+| `stacking` | 여럿일 때 | `레벨을 더해 한 번`(기본) / `가진 쪽마다 값을 더함` / `가장 높은 레벨 하나만` |
 | `icon` | 아이콘 | `Sprite`. 규칙은 보지 않는다. 화면 코드가 유물 줄·특성 창에 그린다 |
 
 `modifiers` 한 줄(`PassiveModifier`)의 칸:
@@ -169,7 +167,7 @@
 | `byLevel` | 레벨별 값(1레벨부터, 비우면 위 값) | `2`, `3`, `4`, `6`처럼 레벨마다 한 칸. 넘치면 마지막 값. 있으면 `value`·`perLevel`보다 먼저 |
 | `target` | 받을 대상(비우면 패시브 효과의 보정 받을 대상) | 이 줄만 받는 쪽 경로(`hero`, `party[]`) |
 
-- 결과를 코드로 쓰려면 그 ID에 `[BindTo]`(결과 칸 `outcomes`가 잠긴다, 13장. `rules`의 결과는 그대로 돈다). 패시브 효과는 기본 종류라 라이브러리가 연결을 스스로 확인한다(2-8의 `BoundOutcomes` 확인이 필요 없다).
+- 결과를 코드로 쓰려면 그 ID에 `[BindTo]`(결과 칸 `outcomes`가 잠긴다, 13장. `rules`의 결과는 그대로 돈다). 템플릿의 `PassiveData.ToDefinition()`이 연결을 확인하므로 2-8의 `BoundOutcomes` 확인을 따로 쓰지 않는다.
 - 결과 `빌려 쓰기`: `+ 결과 추가` → 그룹 **결과** → `빌려 쓰기`. 칸 `targets`(툴팁 "빌릴 조각")에 대상 Block을 넣는다. 요약 `빌려 쓰기: …`. 검증 오류: "빌려 쓰기: 빌릴 조각을 고르는 대상 Block을 넣으세요(예: 자리로 고르기 — 오른쪽)." / "빌려 쓰기: 비어 있는 Block이 있습니다(스크립트가 지워졌을 수 있음)."
 - 검증 오류: "가진 목록의 플레이어 데이터를 고르세요." / "발동 더 N번째 줄에 트리거가 없습니다." / "주기(초)는 0 이상이어야 합니다(0 = 주기 없음)." / "가진 동안 스탯 보정 N번째 줄의 스탯(숫자 필드 이름)이 비어 있습니다." / "비어 있는 결과 칸이 있습니다(스크립트가 지워졌을 수 있음)." 경고: "결과가 없습니다."(발동이 있는데 결과가 없을 때) / "발동(트리거)도 주기도 없어 결과가 돌지 않습니다. 가진 동안 스탯 보정만 쓰려면 결과를 비우세요."(결과만 있을 때) / "레벨별 주기(초)가 모두 0이라 어느 레벨에서도 주기 결과가 돌지 않습니다(…)." 발동·결과·보정·주기가 모두 없는 스위치 패시브 효과는 오류가 아니다.
 - 스탯 칸은 글자라 필드 이름 오타를 검증이 잡지 못한다. 오타가 있으면 규칙·화면이 읽는 스탯(`attack`)과 이름이 달라 보정이 붙지 않는다.
@@ -193,7 +191,7 @@
 2. `trigger`: `행동 직전 이벤트 받기` → 행동 직전 이벤트 `피해`, 행동 직전 이벤트 조건 `targetId` `일치` `hero`.
 3. `outcomes`: `행동 직전 이벤트 고치기` → 필드 `amount`, 방법 `더하기`, 값 `-5`.
 
-가진 쪽(`run`)에 id가 없으므로 "주인공이 맞을 때만"은 가진 쪽 필드가 아니라 행동 직전 이벤트 조건으로 정한다. 등록 코드는 없다. `run.relics`에 `thornArmor`를 넣으면 그때부터 줄어든다.
+"주인공이 맞을 때만"은 가진 쪽(`run`)에 id가 없어 가진 쪽 필드가 아니라 행동 직전 이벤트 조건으로 정한다(0-1). 등록 코드는 없다. `run.relics`에 `thornArmor`를 넣으면 그때부터 줄어든다.
 
 **동료 특성 — '중갑': 그 동료가 받는 피해 −2** — 동료가 있는 게임이라고 본다: `run › party`(`List<Unit>`, 동료마다 `id`), 동료마다 `traits`(`List<string>`).
 
@@ -227,7 +225,7 @@ static void Bloodlust(EnemyKilled e, TriggerContext c)
 
 `{level}`은 이 결과를 가진 패시브 효과의 레벨이다(가진 쪽 기준, `Game.Owned(c.Owner, c.User)`와 같다). 레벨 2면 피해 5가 3이 된다. 레벨마다 정한 값이면 `-{level:2/4/7}`이다. 레벨 1이면 −2, 2면 −4, 3 이상이면 −7(넘치면 마지막 값), 0이면 0이다(28장 3-4).
 
-**조커 — 놓인 순서대로(+4 배수 · ×2 배수)** — 조커가 있는 게임이라고 본다. 조커 칸은 객체 목록이고, 메인 룰(손패 점수 함수)이 점수를 내기 직전에 행동 직전 이벤트 `점수`를 행동 직전 이벤트에 통과시킨다.
+**조커 — 놓인 순서대로(+4 배수 · ×2 배수)** — 조커가 있는 게임이라고 본다. 조커 칸은 객체 목록이고, 메인 룰(핸드 점수 함수)이 점수를 내기 직전에 행동 직전 이벤트 `점수`를 행동 직전 이벤트에 통과시킨다.
 
 ```csharp
 [Serializable] public class Joker { public string id; public string joker; public int level = 1; public int mult; }   // 조각: 고유 id + 원본(패시브 효과) ID
@@ -249,9 +247,7 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 | `timesMult` · `plusMult` | 1 × 2 + 4 = 6 |
 | `plusMult` · `timesMult` · `plusMult` | (1 + 4) × 2 + 4 = 14 |
 
-- 두 패시브 효과가 같은 목록(`run › jokers`)을 보므로 DB 순서가 아니라 칸 순서로 섞여서 돈다. 같은 조커 둘은 각자 돈다.
-- 행동 직전 이벤트 잎의 순서(`order`)는 같게 둔다(기본 0). 다르면 순서가 먼저다.
-- 이벤트 받기(점수 단계마다 쏘는 이벤트)로 만들어도 같은 칸 순서로 돈다.
+- 두 패시브 효과가 같은 목록을 보므로 DB 순서가 아니라 칸 순서로 섞여서 돈다(0-1 `perElement`). 행동 직전 이벤트 잎의 순서(`order`)는 같게 둔다(기본 0). 다르면 순서가 먼저다.
 - 조각마다 레벨이 있으면 `levelField` `level`, 값 `{level:4/8/12}`처럼 쓴다. `{level}`은 그 조각의 레벨이다.
 
 **힘의 부적 — 가진 동안 공격력 +2 / +3 / +4 / +6(레벨별, 코드 없음)** — 유물에 레벨이 있는 게임이라 `run › relics`를 ID → 레벨 딕셔너리(`Dictionary<string, int>`)로 둔다고 본다. 주인공 `hero`(id `hero`)에는 숫자 필드 `attack`(기본 10)이 있다.
@@ -267,8 +263,7 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 | 4 | 16 |
 | 7 | 16(넘치면 마지막 값) |
 
-- 가진 쪽이 `run`이라(id가 없고 싸우는 개체가 아니다) `modifierTarget`(보정 받을 대상)을 `hero`로 정한다. 가진 목록이 `run › hero.relics`면 가진 쪽이 주인공이라 비워도 된다.
-- 유물을 잃으면(`relics`에서 키를 빼면) 그 순간부터 보정이 없다. 떼는 코드가 없다.
+- 가진 쪽 `run`에는 id가 없어 `modifierTarget`(보정 받을 대상)을 `hero`로 정한다(가진 목록이 `run › hero.relics`면 비워도 된다). 유물을 잃으면 그 순간부터 보정이 없다(떼는 코드 없음, 0-1).
 - 툴팁: `Game.Modifiers(hero, "attack")`에 출처 `strengthCharm`인 줄이 보인다.
 - 레벨마다 같은 양이면 `value` `2` + `perLevel` 켬(2 / 4 / 6 / 8 …)이다.
 
@@ -285,10 +280,8 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 | `brainstorm` · `plusMult` | 1 + 4 = 5(맨 왼쪽이 자기 자신이라 빌리지 않는다) |
 | `plusMult` · `brainstorm` | 1 + 4 + 4 = 9 |
 
-- Blueprint는 자기 칸 차례에 오른쪽 조커의 패시브 효과를 낸다. 결과의 사용자는 원본 조커라 `{level}`은 원본의 레벨이다.
-- 쌓이는 조커(점수마다 자기 `mult` +1, 효과 `필드 바꾸기`)를 빌려 써도 원본의 `mult`는 원본 차례에 한 번만 오른다. 빌려 쓰는 중에는 원본 자신의 필드를 바꾸지 않는다.
-- Blueprint와 Brainstorm이 서로를 가리켜도 고리를 끊어 끝난다.
-- 따라 할 조커가 다른 순간(턴 끝 이벤트 등)에 돈다면 Blueprint의 `trigger`를 `OR`로 묶어 그 순간도 받게 한다. 원본의 발동이 그 순간에 거짓이면 아무것도 내지 않는다.
+- Blueprint는 자기 칸 차례에 오른쪽 조커의 패시브 효과를 낸다. 사용자(`{level}`)는 원본 조커, 원본 자신의 쌓이는 필드는 바꾸지 않음, 서로 가리키는 고리는 끊음 — 규칙은 0-1 빌려 쓰기.
+- 따라 할 조커가 다른 순간(턴 끝 이벤트 등)에 돈다면 Blueprint의 `trigger`를 `OR`로 묶어 그 순간도 받게 한다.
 
 **Green Joker — 손을 낼 때 배수 +1 · 버릴 때 −1 · 점수 때 쌓인 배수를 더한다(코드 없음, `rules`)** — 위 조커 형식(`Joker.mult`). 메인 룰이 손을 낼 때 이벤트 `손 냄`, 버릴 때 `버림`을 쏘고, 그 뒤 점수를 행동 직전 이벤트 `점수`로 행동 직전 이벤트에 통과시킨다고 본다.
 
@@ -319,13 +312,13 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 - 유닛을 옮기면 다음에 읽을 때 저절로 붙고 빠진다(저장하지 않고 읽을 때 검사).
 - "체력이 절반 이하일 때만"처럼 계산이 든 조건은 프로젝트 조건 Block(11장 4절)으로 둔다.
 
-**같은 아티팩트 둘 — 사본마다 값을 더한다(`stacking`)** — 가방 `run › bag`(`List<Artifact>`, `Artifact { id, artifact, level }`), 주인공 `hero`에 `attack`.
+**같은 아티팩트 둘 — 사본마다 값을 더한다(`stacking`)** — 인벤토리 `run › bag`(`List<Artifact>`, `Artifact { id, artifact, level }`), 주인공 `hero`에 `attack`.
 
 1. DB › 패시브 효과 `whetstone`: 가진 목록 `run › bag`, `matchField` `artifact`, `perElement` 켬, `levelField` `level`.
 2. `modifiers` 한 줄: `attack` `플랫(+값)`, `byLevel` `3`, `6`, `10`. `modifierTarget` `hero`.
 3. `stacking` `가진 쪽마다 값을 더함`.
 
-| 가방의 `whetstone` | 레벨을 더해 한 번 | 가진 쪽마다 값을 더함 | 가장 높은 레벨 하나만 |
+| 인벤토리의 `whetstone` | 레벨을 더해 한 번 | 가진 쪽마다 값을 더함 | 가장 높은 레벨 하나만 |
 |---|---|---|---|
 | 레벨 2 하나 | +6 | +6 | +6 |
 | 레벨 2 · 레벨 3 | +10(레벨 5, 넘치면 마지막 값) | 6 + 10 = +16 | +10 |
@@ -339,8 +332,7 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 2. `pulseByLevel` `5`, `3`.
 3. `outcomes`: `플레이어 데이터에 주기 · run` › `gold` 증감 `1`.
 
-- 게임 시각 5·10·15초 …(레벨 2면 3·6·9초 …)에 행동 "패시브 효과 주기"로 낸다. 얻은 때부터 세지 않는다.
-- 놓인 것마다 패시브 효과면 조각마다 자기 레벨의 주기로, 가진 쪽마다 따로 낸다.
+- 게임 시각 5·10·15초 …(레벨 2면 3·6·9초 …)에 행동 "패시브 효과 주기"로 낸다. 얻은 때부터 세지 않는다(0-1 `pulse`).
 
 **원본에서 읽기 — 판 데이터에는 원본 ID만(Foxee)** — 보드 조각은 원본 ID만 들고, 패시브 효과 목록은 원본 카드에 둔다.
 
@@ -356,7 +348,7 @@ public class ScoreIntent { public double chips; public double mult = 1; public b
 - 조각 하나에 패시브 효과 둘이 붙는다. 원본의 `passives`를 고치면 이미 놓인 조각도 따른다(판 데이터에 복사하지 않았으므로).
 - 가격·등급 같은 고정 값도 원본에 둔다(0-5).
 - 참(Charm)이 조각에 더한 키워드는 다른 패시브 효과의 `matchField` `traits`(글자 목록)로 함께 쓴다.
-- 서버·테스트처럼 세션을 직접 만들면 `session.Instances = id => …`(원본 ID → 원본 객체)를 넣는다.
+- 서버·테스트처럼 세션을 직접 만들면 `session.Instances = id => …`(원본 ID → 원본 객체)를 넣는다(게임에서는 런타임이 DB › 인스턴스로 채운다).
 
 ### 0-4. 코드로 — `Game.Owned` · `Game.BorrowPassive` · `PassiveDefinition` · `session.Passives`
 
@@ -396,7 +388,7 @@ foreach (var passive in GameDatabase.Load().All<PassiveData>()) session.Passives
 ```
 
 - `PassiveData.ToDefinition()`은 그 ID에 `[BindTo]`가 있으면 `Outcomes`를 그 코드로 바꾼다(`Rules`는 그대로).
-- `matchVia`(원본에서 읽기)는 `GameSession.Instances`(`Func<string, object>`, 원본 ID → 원본 객체)로 원본을 찾는다. 게임(Unity)에서는 런타임이 DB › 인스턴스로 채운다.
+- `matchVia`(원본에서 읽기)는 `GameSession.Instances`(`Func<string, object>`)로 원본을 찾는다(0-1).
 - 패시브 효과의 레벨은 값 틀 `{level}`·`{level:2/4/7}`, 조각의 필드는 `{user:경로}`(12장 2-4a)로 코드 없이 읽는다. 코드에서는 `Game.Owned(c.Owner, c.User)`·`((Joker)c.User).mult`다. 값 틀 `{stacks}`는 상태 효과의 중첩이라 패시브 효과에서는 0이다.
 - 효과 배율은 `c.Power`다(기본 1). `[BindTo]` 코드가 수치를 직접 바꾸면 배율도 직접 곱한다(16장 2-12).
 - 빌려 쓰는 중인지는 컨텍스트의 `c.IsBorrowed`다. `빌려 쓰기`가 막아 주는 것은 효과 `필드 바꾸기`뿐이다. `[BindTo]` 코드가 원본 조각의 쌓이는 값을 직접 바꾼다면 `if (c.IsBorrowed) …`로 직접 거른다.
@@ -413,7 +405,7 @@ foreach (var passive in GameDatabase.Load().All<PassiveData>()) session.Passives
 | 반응이 다 끝난 뒤에 도는 일(발동 대기열, 연쇄를 모아 한 번에 정산) | 메인 룰(행동 코드)이나 프로젝트 Block. 패시브 효과의 결과는 받은 순간 그 자리에서 돈다 |
 | 계산·분기가 든 결과(최대 체력에서 멈춤, 두 값을 곱함) | 결과를 `[BindTo]`로(0-3 `bloodlust`), 또는 프로젝트 효과·결과 Block |
 | 주기를 멈추거나 앞당기거나 처음부터 다시 센다 | 조각의 필드 + 틱 행동·이벤트(`rules` 한 줄이 받아 필드를 바꾼다). `pulse`는 시계 기준이다 |
-| 항목에 칸(가격·등급·설명)을 더한다 | `PassiveData`에는 칸을 더할 수 없다. 고정 값은 DB › 인스턴스 원본에 두고 조각은 원본 ID, 패시브 효과는 `matchVia`(원본에서 읽기)로 찾는다(0-3). 이름·설명은 텍스트 표(`<ID>.name`·`<ID>.desc`), 수치는 밸런싱 값(`{balance:ID}`)·`{level:2/4/7}`·`byLevel`로도 된다. 꼭 한 항목에 있어야 하면 DB 종류를 만든다(1절부터) |
+| 항목에 칸(가격·등급·마나 비용)을 더한다 | 프로젝트의 `PassiveData`(템플릿 사본)에 칸을 더한다 — 프로젝트 변경이라 묻지 않고 보고만 한다(AI 문서 Reference 4-1). 엔진은 `ToDefinition()`이 넘기는 칸만 보므로, 더한 칸은 프로젝트 규칙이 그 항목에서 직접 읽는다(`Game.Entry<PassiveData>(id)`, 2-1). 조각마다 다른 고정 값(카드 가격)은 DB › 인스턴스 원본에 두고 `matchVia`(원본에서 읽기)로 찾는다(0-3). 이름·설명은 텍스트 표(`<ID>.name`·`<ID>.desc`) |
 
 ---
 
@@ -422,7 +414,7 @@ foreach (var passive in GameDatabase.Load().All<PassiveData>()) session.Passives
 코드(2장)를 쓰고 컴파일하면:
 
 1. `MomoiProject → DB` 사이드바에 `[Database]`에서 정한 이름의 탭(예: **진행** 그룹의 **퀘스트**)이 생긴다.
-2. `+ 퀘스트`로 항목을 만들고 제목(= ID)을 짓는다. DB ID는 모든 종류에서 하나뿐이다(퀘스트 ID가 도전과제 ID와 겹칠 수 없다).
+2. 로직 쪽 종류라(구조 잠금, 21장 3-1) 항목 추가·삭제·ID 바꾸기와 Block 조립은 AI가 DB 반영 스크립트로 한다(`EditorDatabase.Staging.Add(typeof(QuestData), "quest.slimes")`). 개발자는 문장 안의 값을 바꾼다. 개발자가 항목을 늘리고 줄여야 하는 종류(레벨 배치)만 `[Database(…, DeveloperAuthored = true)]`로 연다. DB ID는 모든 종류에서 하나뿐이다(퀘스트 ID가 도전과제 ID와 겹칠 수 없다).
 3. Trigger 필드(`trigger`)는 한 줄 식 편집기로, 결과 필드(`outcomes`)는 결과 목록 편집기로 그려진다. `+ 블럭`·`+ 결과 추가` 목록에는 필드의 잠금에 있는 종류만 나온다.
 4. 검증(잠금 밖 종류, 비어 있는 칸, 플레이어 데이터 경로, 읽을 이벤트가 없는 반영할 값 …)이 기본 기능과 같은 규칙으로 돈다. 클래스의 `ValidateData`로 기능 고유의 검사를 더할 수 있다.
 5. 결과를 코드로 쓰려면 `[BindTo(퀘스트 ID)]`. 에디터는 그 항목의 결과 칸을 잠그고 연결된 코드를 보인다. 런타임에서 그것을 결과로 쓰는 일은 기능 코드가 한다(2-8).
@@ -448,9 +440,10 @@ public class QuestData : GameData
 | `[Database]` 인자 | 뜻 |
 |---|---|
 | 첫 값 | 탭 이름 |
-| `Group` | 사이드바 그룹(기본 기능은 `선언`·`진행`·`DB`·`개발`을 쓴다) |
+| `Group` | 사이드바 그룹(비우면 `데이터`. 기본 종류는 `요소`·`DB`·`개발`을 쓴다. `DB` 그룹의 로직 종류는 항목이 없으면 탭이 숨는다) |
 | `Order` | 그룹 안 순서 |
 | `IdPrefix` | 새 항목 ID 앞부분(없으면 클래스 이름에서) |
+| `DeveloperAuthored` · `Single` · `HideWhenEmpty` · `Hidden` · `Page` | 21장 1절 |
 
 `GameData`가 ID(`Id`)와 검증 훅(`ValidateData`)을 준다. 표시 이름 필드는 따로 두지 않는다(ID가 이름이다).
 
@@ -509,7 +502,7 @@ public override void ValidateData(IValidationContext context)
 | 무엇 | 어디 | 왜 |
 |---|---|---|
 | **등록 함수** — 세션과 DB 항목을 받아 감시를 등록하는 함수(`QuestRules.Register(session, quests)`) | Rules(규칙 코드) | 게임 규칙이라 서버에서도 그대로 쓴다. 서버는 세션을 직접 만든 뒤 같은 함수를 부른다 |
-| **연결** — Unity가 켜질 때 그 함수를 부르는 한 줄 | Client의 `Bootstrap.Started` | Unity 시작 방식(`GBibleRuntime.Started`)은 클라이언트에만 있다 |
+| **연결** — Unity가 켜질 때 그 함수를 부르는 한 줄 | Client의 `Bootstrap.RegisterRules` | Unity 시작 방식(`GBibleRuntime.SessionCreated` — 모든 세션)은 클라이언트에만 있다 |
 
 ```csharp
 // Rules 쪽: 등록 함수(Unity 시작 방식을 모른다)
@@ -519,44 +512,13 @@ public static class QuestRules
 }
 
 // Client의 Bootstrap.cs: 연결 한 줄
-static void Started(GameSession session)
+static void RegisterRules(GameSession session)
 {
     QuestRules.Register(session, GameDatabase.Load()?.All<QuestData>());
 }
 ```
 
-`Bootstrap.Started`는 `GBibleRuntime.Started`에 연결된 함수다(`20-Setup.md` 4절). 세션이 준비된 뒤(플레이어 데이터·로그·액티브 효과·도전과제 정의와 프로필 불러오기가 끝난 뒤) 불린다. 기능마다 자기 `[RuntimeInitializeOnLoadMethod]`와 `Started +=`를 따로 두지 않는다. 그러면 연결이 여러 파일에 흩어지고, 서버에서 같은 등록을 부를 길이 없다.
-
-> [!note]- 예: 카드 던전의 유물
-> 유물은 기본 종류 패시브 효과(0절)로 등록 코드 없이 만들 수 있다. 아래는 프로젝트 기능의 등록 함수 모양을 보이는 예다(패시브 효과에 없는 규칙을 더할 때 이 모양에서 시작한다).
->
-> ```csharp
-> // Rules/Relics/Relics.cs
-> public static class RelicRules
-> {
->     public static void Register(GameSession session, IEnumerable<RelicData> relics)
->     {
->         if (relics == null) return;
->         foreach (var relic in relics)
->         {
->             var id = relic.Id;
->             IEnumerable<Outcome> outcomes = BoundOutcomes.Has(id) ? BoundOutcomes.Create(id) : relic.outcomes;
->             session.Triggers.Register(id, relic.trigger, repeat: true, fire: moment =>
->             {
->                 var run = session.Game.Data().Run;
->                 if (run == null || !run.relics.Contains(id)) return;   // 가지고 있을 때만
->                 session.Triggers.RunOutcomes(outcomes, moment, "Relics");
->             });
->         }
->     }
-> }
->
-> // Client/Bootstrap.cs
-> static void Started(GameSession session)
-> {
->     RelicRules.Register(session, GameDatabase.Load()?.All<RelicData>());
-> }
-> ```
+`Bootstrap.RegisterRules`는 `GBibleRuntime.SessionCreated`에 연결된 함수다(`20-Setup.md` 4절). **모든 세션**(화면 세션 · 멀티 서버 · 시험 모드 · 매칭 방)이 DB로 만들어진 직후(플레이어 데이터·로그·액티브 효과·도전과제 정의가 끝난 뒤, 새 판 행동보다 먼저) 불린다. `Started`(화면 세션에만 온다)에 두면 멀티 서버 세션에서 감시가 빠진다. 기능마다 자기 `[RuntimeInitializeOnLoadMethod]`와 `SessionCreated +=`를 따로 두지 않는다 — 연결이 여러 파일에 흩어지고, 테스트에서 같은 등록을 부를 길이 없다. 등록 함수의 전체 모양은 3-1.
 
 ### 2-7. 감시 등록: `session.Triggers.Register(owner, when, repeat, fire)`
 
@@ -580,7 +542,7 @@ session.Triggers.Register(quest.Id, quest.trigger, repeat: false, fire: moment =
 | `orderedHolders` · `orderGroup` | 가진 쪽과 그 자리(`(holder, order)`)를 돌려주는 함수와 묶음 이름. 같은 묶음 이름의 항목끼리는 등록 순서가 아니라 자리가 작은 것부터 섞여서 발동한다(패시브 효과 `perElement`(놓인 것마다), 0-1). 행동 직전 이벤트는 같은 순서(`order`) 칸 안에서 섞는다 |
 
 - 등록할 때 이미 참인 조건은 값이 다시 바뀌기 전까지 발동하지 않는다. 시작할 때 소급하려면 등록을 마친 뒤 `session.Triggers.Watcher.EvaluateAll()`을 부른다.
-- 그 밖에: `Unregister(owner)`, `IsRegistered(owner)`.
+- 그 밖에: `Unregister(owner)`, `IsRegistered(owner)`, `Touch(owner)`(그 조건 감시를 다음 Flush에서 다시 평가 — 불러온 뒤 새로 감시를 시작했을 때).
 
 ### 2-8. 결과 실행: `RunOutcomes` + `[BindTo]` 확인
 
@@ -591,7 +553,7 @@ session.Triggers.RunOutcomes(outcomes, moment, "Quests");
 ```
 
 - `RunOutcomes(결과들, 컨텍스트, 출처)`는 결과를 차례로 실행하고, 결과마다 Journal에 "결과: …"(출처 `Quests`)를 남긴다. 결과가 꺼낸 객체를 고쳐도 기록된다.
-- `[BindTo]` 연결은 기본 기능(도전과제·로그·액티브 효과·개발 명령)만 스스로 확인한다. 프로젝트 기능은 `BoundOutcomes.Has(id)`로 직접 확인해 바꿔 써야 한다. 확인하지 않으면 에디터에는 결과 칸이 잠겨 보이는데 실제로는 숨은 예전 결과가 돈다.
+- `[BindTo]` 연결은 기본 기능(도전과제·로그·개발 명령)과 템플릿에서 들인 선택 요소(액티브 효과·상태 효과·패시브 효과의 `ToDefinition`·`ToUsable`)만 스스로 확인한다. 프로젝트 기능은 `BoundOutcomes.Has(id)`로 직접 확인해 바꿔 써야 한다. 확인하지 않으면 에디터에는 결과 칸이 잠겨 보이는데 실제로는 숨은 예전 결과가 돈다.
 
 ### 2-9. 완료 저장과 Undo: 플레이어 데이터 + `Permanent`
 
@@ -710,11 +672,13 @@ public static class QuestRules
     }
 }
 
-// ── 연결(Client/Bootstrap.cs의 Started에 한 줄) ──────────────────
+// ── 연결(Client/Bootstrap.cs의 RegisterRules에 한 줄 — 2-6) ─────────
 // QuestRules.Register(session, GameDatabase.Load()?.All<QuestData>());
 ```
 
 ### 3-2. 에디터에서 퀘스트 조립
+
+DB에 보이는 모양이다. 항목과 Block은 AI가 DB 반영 스크립트로 조립하고(1절), 개발자는 문장 안의 값(5 · 100 · 보상 인스턴스)을 바꾼다.
 
 | 퀘스트 ID | `requires` | `trigger` | `outcomes` |
 |---|---|---|---|
@@ -829,11 +793,11 @@ static void WatchStep(GameSession session, ChainQuestData quest)
 }
 ```
 
-에디터에서는 `steps`의 `+ 추가`로 단계를 더하고, 단계마다 트리거·결과를 조립한다.
+`steps`의 단계(규칙 줄)를 더하고 단계마다 트리거·결과를 조립하는 것은 구조라 AI가 DB 반영 스크립트로 한다(21장 3-1). 에디터에서는 단계마다 문장 안의 값을 바꾼다.
 
 ### 4-3. Unity 없이(서버·테스트)
 
-DB 없이도 같은 API로 돈다. 등록 함수를 Rules에 둔 기능은 서버가 세션을 만든 뒤 같은 함수(`QuestRules.Register(session, quests)`)를 부르면 된다. 아래는 Trigger·결과를 코드로 만들어 직접 등록하는 예다.
+DB 없이도 같은 API로 돈다. 등록 함수를 Rules에 둔 기능은 서버가 세션을 만든 뒤 같은 함수(`QuestRules.Register(session, quests)`)를 부르면 된다(Unity 안의 멀티 서버·방 세션은 `Bootstrap.RegisterRules`가 이미 부른다 — 2-6, 또 부르지 않는다). 아래는 Trigger·결과를 코드로 만들어 직접 등록하는 예다.
 
 ```csharp
 var session = new GameSession();
@@ -877,4 +841,4 @@ session.EntriesOfType = type => quests.Values.Where(type.IsInstanceOfType);
 - **`fire` 안에서 결과를 직접 부른다.** `outcome.Run(…)`을 직접 부르지 말고 `RunOutcomes`를 쓴다. 그래야 컨텍스트(`Current`)가 결과·조건 Block에 보이고 Journal에 남는다.
 - **`fire` 안에서 행동을 실행할 때**: 이벤트는 대개 행동 안에서 쏘이므로 `fire`도 행동 안에서 불린다. 여기서 부른 `Game.Do`·`Game.Use`는 그 행동의 일부로 실행된다. 조건 충족으로 발동하면(행동이 끝난 뒤) 새 행동이 된다.
 - **로그에 기록을 허락하고 로그 칸을 비운다.** 프로젝트 기능에서 로그에 기록의 로그 칸을 비우면 그 항목 ID는 로그가 아니라 아무것도 기록하지 않고 경고만 남는다. `OutcomeKinds.Record`를 허락한다면 로그를 꼭 고르게 하거나 `ValidateData`로 검사한다.
-- **인스턴스 기능 필드로 트리거·결과를 둘 때**: 인스턴스 값 안의 트리거·결과도 DB와 같은 편집기로 그려진다. 다만 원본 하나에 하나씩 정하는 값이라, 여러 항목이 공유하거나 기획자가 따로 관리할 기능은 DB 종류(`GameData`)로 만든다.
+- **인스턴스 기능 필드로 트리거·결과를 둘 때**: 인스턴스 값 안의 트리거·결과도 DB와 같은 편집기로 그려진다. 다만 원본 하나에 하나씩 정하는 값이라, 여러 항목이 공유하거나 개발자가 따로 관리할 기능은 DB 종류(`GameData`)로 만든다.

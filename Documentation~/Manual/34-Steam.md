@@ -23,13 +23,13 @@
 
 ## 1. 준비
 
-1. **패키지**: `Packages/manifest.json`의 `dependencies`에 Steamworks.NET을 넣는다(버전 태그를 고정한다).
+1. **패키지**: `Packages/manifest.json`의 `dependencies`에 Steamworks.NET을 넣는다(버전 태그를 고정한다. 내려받기라 AI는 먼저 묻는다 — 관례 0절).
    ```json
    "com.rlabrecque.steamworks.net": "https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net#2025.164.1"
    ```
-   Unity가 열 때 받고, 패키지의 에디터 코드가 프로젝트 폴더에 `steam_appid.txt`(480)를 만든다.
-2. **선택 기능 켜기**: DB 창의 선택 기능에서 **Steam**을 켠다(심볼 `GBIBLE_STEAM`). Steamworks.NET이 없으면 이 기능의 코드는 컴파일되지 않는다(어셈블리 `GBible.Steam`, 심볼 `GBIBLE_STEAMWORKS`는 패키지가 있을 때 저절로).
-3. **DB › Steam**(그룹 개발)에 항목을 **하나** 만든다(여럿이면 첫 항목만 쓴다). 항목이 없으면 콘솔에 경고 하나를 남기고 Steam을 켜지 않는다.
+   Unity가 열 때 받는다. 프로젝트 폴더의 `steam_appid.txt`는 없으면 패키지의 에디터 코드와 GBible(Steam 기능이 컴파일될 때 — DB › Steam의 App ID, 없으면 480)이 만든다.
+2. **켜기**(선택 기능 ID `steam`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `steam`을 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "Steam" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_STEAM`과 프로젝트 asmdef 참조(Client·Editor에 `GBible.Steam`)가 저절로 맞춰지고(`20-Setup.md` 6절), `GameSteam`을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다. Steamworks.NET이 없으면 이 기능의 코드는 컴파일되지 않는다(어셈블리 `GBible.Steam`은 심볼 `GBIBLE_STEAMWORKS` — 패키지가 있을 때 저절로 — 도 있어야 컴파일된다).
+3. **DB › Steam**(그룹 개발) 항목은 하나만 두는 설정이라, 기능이 컴파일된 뒤 에디터가 기본값(App ID 480)으로 저절로 만든다(콘솔 "[MomoiProject] DB › Steam 항목을 기본값으로 만들었습니다(프로젝트에 하나만 두는 설정)."). 여럿이면 첫 항목만 쓴다. 항목이 없으면 게임 시작 때 경고 하나를 남기고 Steam을 켜지 않는다.
 4. 에디터·개발 빌드는 Steam 클라이언트를 켜 둔 채 실행한다. 게임이 그 계정으로 App ID에 붙는다.
 
 > 빌드 대상이 PC(Windows·macOS·Linux)가 아니면 Steamworks.NET이 꺼지고(`DISABLESTEAMWORKS`), `GameSteam`은 아무것도 하지 않는다.
@@ -38,7 +38,7 @@
 
 ### 2-1. 켜고 끄기
 
-- 세션이 시작될 때(`GBibleRuntime.Started`) 한 번 Steam을 켠다. 슬롯을 바꿔 세션이 다시 시작돼도 Steam은 다시 켜지 않고, 도전과제·통계만 새 세션에 다시 잇는다.
+- 화면 세션이 시작될 때(`GBibleRuntime.Started` — 시험 모드 서버·매칭 방처럼 따로 만든 세션에는 오지 않는다) 한 번 Steam을 켠다. 슬롯을 바꿔 세션이 다시 시작돼도 Steam은 다시 켜지 않고, 도전과제·통계만 새 세션에 다시 잇는다.
 - 화면 없는 실행(Dedicated Server 빌드·`-batchmode`로 켠 빌드 — `GBibleRuntime.IsHeadless`)에서는 켜지 않는다. 서버에는 Steam 클라이언트가 없고, 출시 빌드의 '다시 시작'이 서버를 끄지 않게 한다.
 - **Steam으로 다시 시작**(설정, 기본 켬): **출시 빌드**를 Steam 밖에서(exe를 바로) 켜면 `SteamAPI.RestartAppIfNecessary`로 Steam이 게임을 다시 켜고 지금 실행은 끝난다. App ID가 480이면 하지 않는다(Spacewar가 켜지고 이 게임은 꺼지기만 한다 — DB 검증이 경고). 에디터·개발 빌드는 하지 않고 바로 붙는다:
   - 에디터: 프로젝트 폴더의 `steam_appid.txt`.
@@ -49,7 +49,7 @@
 ### 2-2. 오버레이·언어
 
 - **오버레이가 열리면 일시정지**(기본 켬): Shift+Tab으로 Steam 오버레이가 열리면 `GameTime.Pause("Steam 오버레이")`, 닫히면 재개(다른 이유의 일시정지와 겹치면 각자 풀어야 재개 — 7장).
-- **처음 실행 언어는 Steam 언어**(기본 켬): 플레이어가 언어를 고른 적이 없으면(`GameLanguage`에 남긴 값도, 적용 대상이 언어인 설정의 저장 값도 없음) Steam 클라이언트의 언어로 시작한다(`koreana` → `ko`, `schinese` → `zh-Hans` …). 지원하지 않는 언어면 가장 가까운 언어(`LocalizationSettings`)로. 기억하지는 않는다(Steam 언어를 바꾸면 다음 실행에 따라감).
+- **처음 실행 언어는 Steam 언어**(기본 켬): 플레이어가 언어를 고른 적이 없으면(`GameLanguage.HasSavedChoice`도 `GameSettings.HasSavedLanguage`도 거짓) Steam 클라이언트의 언어로 시작한다(`koreana` → `ko`, `schinese` → `zh-Hans` …). 지원하지 않는 언어면 가장 가까운 언어(`LocalizationSettings`)로. 기억하지는 않는다(Steam 언어를 바꾸면 다음 실행에 따라감).
 
 ### 2-3. 도전과제
 
@@ -106,8 +106,8 @@
 
 ### 5-1. 처음 붙여 보기(App ID 480)
 
-1. Steam 클라이언트를 켠다. 선택 기능 Steam을 켜고 DB › Steam에 항목을 만든다(App ID 480 그대로).
-2. 플레이 → 콘솔에 경고가 없고, Steam 친구 목록에 "Spacewar 플레이 중"이 보이면 붙은 것이다. Shift+Tab으로 오버레이가 열리면 게임이 멈춘다.
+1. Steam 클라이언트를 켠다. 선택 기능 Steam을 켠다(DB › Steam 항목은 App ID 480으로 저절로 생긴다 — 1절 3).
+2. 플레이 → 콘솔에 "[MomoiProject] Steam에 붙었습니다: <Steam 이름> · App ID 480. …"이 찍히고 Steam 친구 목록에 "Spacewar 플레이 중"이 보이면 붙은 것이다. 오버레이(Shift+Tab)는 에디터에서는 뜨지 않으므로 빌드에서 확인한다(열리면 게임이 멈춘다).
 3. 480에는 이 게임의 도전과제가 없으므로 도전과제를 달성하면 "Steam 도전과제 '…'을(를) 달성하지 못했습니다" 경고가 한 번 나온다(정상). 실제 App ID로 바꾼 뒤 Steamworks에 도전과제를 만든다.
 
 ### 5-2. 도전과제 잇기
@@ -156,7 +156,7 @@ GBible의 저장은 `Application.persistentDataPath/MomoiProject/` 아래 파일
 |---|---|
 | "Steam에 붙지 못해 Steam 없이 시작합니다" | Steam 클라이언트가 꺼져 있거나, App ID(에디터는 프로젝트 폴더의 `steam_appid.txt`, 개발 빌드는 DB › Steam의 App ID)가 계정이 가진 앱이 아니다. 480은 누구나 쓸 수 있다. |
 | "Steam을 켜지 못해 Steam 없이 시작합니다: Steam 라이브러리(steam_api)를…" | Steamworks.NET 패키지의 네이티브 파일(`steam_api64.dll`·`libsteam_api.so`·`steam_api.bundle`)이 빌드에 없거나 플랫폼·CPU·버전이 맞지 않는다. 패키지 버전과 Plugins의 플랫폼 설정을 확인한다. |
-| "DB › Steam 항목이 없어 Steam을 켜지 않습니다" | 선택 기능은 켰는데 DB › Steam에 항목이 없다. 하나 만든다. |
+| "DB › Steam 항목이 없어 Steam을 켜지 않습니다" | 선택 기능은 켰는데 DB › Steam에 항목이 없다(기능이 아직 컴파일되지 않았거나 항목을 지웠다). 에디터가 다시 컴파일한 뒤 기본값으로 만든다(1절 3) — 빌드 전에 항목이 있는지 본다. |
 | 도전과제 달성 경고("달성하지 못했습니다") | Steamworks에 그 API Name이 없거나 아직 게시(Publish)하지 않았다. ID를 맞추거나 표에 적고, Steamworks에서 변경 사항을 게시한다. |
 | 통계 경고("올리지 못했습니다") | 통계 이름이 없거나 형식(INT/FLOAT)이 '정수' 칸과 다르다. |
 | exe를 바로 켰더니 꺼졌다가 Steam으로 다시 켜짐 | 출시 빌드의 '다시 시작'(2-1)이 정상으로 도는 것. 끄려면 `restartThroughSteam`을 끈다(Steam DRM이 필요 없는 배포처 등). |

@@ -23,7 +23,7 @@
 - 상태 효과·패시브 효과·액티브 효과는 선택 요소다: 쓰면 템플릿(`{{GBIBLE}}/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 들이고, 칸이 모자라면 그 클래스에 더한다(프로젝트 변경 — 묻지 않고 보고만).
 - 개발자에게 보이는 이름(DB·칸·Block·메뉴·밸런싱 값)은 `{{GBIBLE}}/Documentation~/AI/NamingGuide.md`대로 짓는다 — '바로잡은 이름' 표를 먼저 본다. 밸런싱 값은 표시 이름·메모·입력 칸 주석·묶음을 함께. 개발자가 이름을 바로잡으면 그 표에 더한다.
 - 기믹(효과 문장)은 `{{GBIBLE}}/Documentation~/AI/GimmickCatalog.md`의 갈래로 쪼개 만든다. 조각이 놓이는 메인 룰은 그 문서 1절의 모양으로.
-- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 돈다)나 CSV로 만든다. 새 항목은 저절로 적용되고, 이미 있는 항목을 고치거나 지운 것만 '적용 전'으로 남아 개발자가 Ctrl+S로 적용한다.
+- DB 항목은 DB 반영 스크립트(`Assets/MomoiProject/Code/Editor`의 `[DbSeed]` 함수 — 컴파일 뒤 저절로 돈다)나 CSV로 만든다. 새 항목은 저절로 적용되고, 이미 있는 항목을 고치거나 지우거나 ID를 바꾼 것만 '적용 전'으로 남아 개발자가 Ctrl+S로 적용한다. 새 항목의 `GameIds` 상수는 반영 스크립트가 돈 뒤 다시 컴파일돼야 생긴다 — 그 상수를 쓰는 코드는 그다음에 쓴다(관례 15절).
 - 응답을 끝낼 때 훅(`.claude/hooks/compile-check.ps1`)이 프로젝트 코드를 컴파일한다. 오류가 나오면 고친 뒤 끝낸다.
 - Unity 상태는 파일로 읽는다: DB 검증·'적용 전' 변경은 `Logs/MomoiProject/DbStatus.txt`, Unity 로그(컴파일 경고·DB 반영 스크립트 결과)는 `Logs/Editor.log`. 규칙 테스트는 `Logs/MomoiProject/RunTests.request`를 만들면 Unity가 돌려 `Logs/MomoiProject/TestResults.txt`에 쓴다(Unity를 연 채로 배치 모드는 쓰지 않는다).
 - 답은 진행 매뉴얼 13절 양식: 진행 답은 제목(답 · 진행한 것 · 이슈·버그 한 줄씩 · 질문 — `Q번호.` + 추천·이유, 표 없이 · 알릴 것 — 할 일·결정·확인 기다리는 것·단계)으로 나누고 길게 늘이지 않는다. 할 말이 없는 제목은 통째로 뺀다("없습니다"도 쓰지 않음). 개발자의 질문·요청에는 그에 맞게 답한다.

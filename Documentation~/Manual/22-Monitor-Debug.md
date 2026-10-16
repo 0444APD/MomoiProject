@@ -2,6 +2,8 @@
 
 `MomoiProject → 모니터`는 플레이 중인 세션을 들여다보고 조작하는 창이다. 무엇이 왜 바뀌었는지(통합 기록), 지금 값이 무엇인지(데이터), 도전과제·로그를 테스트로 움직이기, 이벤트 쏘기, 행동 되돌리기, 개발 명령(DB › 개발 › 개발 명령), 게임 시간 조절을 한곳에서 한다.
 
+> 모니터는 개발자가 보는 창이다. AI는 창을 볼 수 없으므로 같은 정보를 파일로 얻는다: Journal의 경고·오류는 화면 세션에서 콘솔로 나가 `Logs/Editor.log`에 남고, 규칙은 규칙 테스트(`RunTests.request`), 화면·흐름은 플레이 요청(`Play.request`)으로 확인한다(38장 2-4·2-5). AI가 만드는 것은 이 창에서 쓸 **개발 명령**(7절)과 테스트 상황이다(관례 19절).
+
 ## 이 문서에서 쓰는 말
 
 | 말 | 뜻 |
@@ -54,7 +56,7 @@
 
 ### 코드로 쓰는 법
 
-**`session.Journal.Append(종류, 시스템 이름, 메시지)`** — 기록에 직접 한 줄 남긴다. `JournalKind.Warning`·`Error`는 콘솔에도 "[MomoiProject] …"로 나간다.
+**`session.Journal.Append(종류, 시스템 이름, 메시지)`** — 기록에 직접 한 줄 남긴다. `JournalKind.Warning`·`Error`는 화면 세션이면 콘솔에도 "[MomoiProject] …"로 나간다.
 
 ```csharp
 using GBible;
@@ -198,7 +200,7 @@ var evt = EventSimulator.Create(typeof(EnemyKilled), new System.Collections.Gene
 
 ### 코드로 쓰는 법
 
-게임 코드에서는 `Game.Events.Publish(이벤트)`로 쏜다. 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
+게임 코드에서는 행동 안에서 `Game.Events.Publish(이벤트)`로 쏜다(행동 밖에서 쏘면 그 이벤트로 바뀐 로그·값이 Undo되지 않는다). 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
 
 ```csharp
 using GBible;
@@ -216,7 +218,7 @@ public sealed class KillPopup : MonoBehaviour
 ### 주의할 점
 
 - 매개변수 없는 생성자가 없는 이벤트 클래스는 만들 수 없다: "이벤트 '…'에 매개변수 없는 생성자가 없어 테스트로 만들 수 없습니다."
-- 이벤트를 받는 쪽에서는 플레이어 데이터를 바꾸지 않는다(연출·UI만). 값 변경은 행동·효과·결과에서.
+- `SubscribeAfterAction`으로 받는 쪽(연출·UI)에서는 플레이어 데이터를 바꾸지 않는다. 값을 바꾸는 반응은 트리거·결과나 `Subscribe`로 받는 규칙에서 한다(`10-Events.md` 2-7).
 
 ---
 
@@ -267,14 +269,14 @@ session.UndoTo(mark);                        // 지점 뒤를 모두 되돌린�
 | 분류 | 명령 |
 |---|---|
 | 세션 | **Undo (Undo)**, **이번 판 수치 초기화** |
-| 저장 | **프로필 저장**, **프로필 삭제**, **판 저장**, **판 불러오기**, **새 판**(`GBibleRuntime.NewRun`: 이번 판 값을 처음 값으로 + 판 저장 삭제) |
+| 저장 | **프로필 저장**, **프로필 삭제**, **판 저장**, **판 불러오기**, **새 판**(`GBibleRuntime.StartNewRun`: 이번 판 값을 처음 값으로 + 판 저장 삭제 + DB › Bootstrap의 '새 판 행동' 실행) |
 | 시간 | **일시정지 / 재개**, **1프레임 진행**, **배속 0.25**, **배속 1**, **배속 2** |
 
-DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해지고, 샘플을 켜면 "샘플" 분류(고블린 공격, 오크 공격 ×10, 상자 열기 …)가 더해진다.
+DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해진다. Steam이 연결되면 "Steam" 분류(Steam 통계·도전과제 모두 지우기, 34장)가 더해진다.
 
-**테스트 상황 패널** — 선택 대기 패널 다음에 **테스트 상황** 패널이 있다: 이름을 적고 **지금 저장**(지금 판·프로필·난수·시각 → `Assets/MomoiProject/Data/Tests/이름.json`), 저장된 상황 버튼을 누르면 **불러오기**(지금 판이 그 상황으로 바뀌고 Undo 이력은 비워진다). 테스트 씬의 시작 상황으로도 고른다(`38-Testing.md`).
+명령 탭은 위에서부터 **선택 대기 패널** → **테스트 상황 패널** → 분류별 명령 버튼이다.
 
-**선택 대기 패널** — 플레이어의 답을 기다리는 선택(`Game.Ask`·결과 `선택 요구`, `29-Statuses-Schedules-Choices.md`)이 있으면 명령 탭 **맨 위**에 선택마다 패널이 생긴다. 게임 화면(고르기 창)이 아직 없어도 여기서 고르고 답할 수 있다.
+**선택 대기 패널** — 플레이어의 답을 기다리는 선택(`Game.Ask`·결과 `선택 요구`, `29-Statuses-Schedules-Choices.md`)이 있으면 선택마다 패널이 생긴다. 게임 화면(고르기 창)이 아직 없어도 여기서 고르고 답할 수 있다.
 
 | 부분 | 내용 |
 |---|---|
@@ -284,18 +286,20 @@ DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해지고, �
 
 기다리는 선택이 여럿이면 패널도 여럿이다(먼저 요구한 것이 위). 답하거나 Undo해서 선택이 바뀌면 패널도 다시 그려진다.
 
+**테스트 상황 패널** — 이름을 적고 **지금 저장**(지금 판·프로필·난수·시각 → `Assets/MomoiProject/Data/Tests/이름.json`), 저장된 상황 버튼을 누르면 **불러오기**(지금 판이 그 상황으로 바뀌고 Undo 이력은 비워진다). 테스트 씬의 시작 상황으로도 고른다(`38-Testing.md`). 멀티 클라이언트·리플레이에서는 저장·불러오기를 할 수 없다(서버·혼자 할 때).
+
 ### 에디터에서 — DB › 개발 › 개발 명령 (`DebugCommandData`)
 
-항목 하나 = 명령 탭의 버튼 하나. DB 사이드바 그룹 **개발**에 있다(`21-Editor-Database.md`).
+항목 하나 = 명령 탭의 버튼 하나. DB 사이드바 그룹 **개발**에 있다(`21-Editor-Database.md`). 로직 쪽 종류라 항목 추가·삭제와 결과 Block 조립은 잠겨 있다 — **AI가 DB 반영 스크립트로 만든다**(관례 15·19절, `EditorDatabase.Staging.Add(typeof(DebugCommandData), "goldPlus100")`). 개발자는 문장 안의 값(어느 인스턴스·몇 개)만 바꾼다.
 
-| 칸 | 뜻 |
-|---|---|
-| 버튼 이름 | 명령 탭에 보이는 이름. 비우면 ID |
-| 분류 | 명령 탭에서 묶이는 이름(기본 "개발") |
-| 설명 | 버튼에 마우스를 올리면 보이는 글 |
-| 결과 | 결과 Block 목록: **플레이어 데이터에 주기 · 이벤트 쏘기 · 로그에 기록 · 대상에게 효과 · 코딩한 결과** 등(`12-Outcomes.md`) |
+| 칸 | 툴팁 | 뜻 |
+|---|---|---|
+| `label` | 버튼 이름 | 명령 탭에 보이는 이름. 비우면 ID |
+| `category` | 분류 | 명령 탭에서 묶이는 이름(기본 "개발") |
+| `description` | 설명 | 버튼에 마우스를 올리면 보이는 글 |
+| `outcomes` | 결과 | 결과 Block 목록(모든 종류): **플레이어 데이터에 주기 · 이벤트 쏘기 · 로그에 기록 · 대상에게 효과 · 코딩한 결과** 등(`12-Outcomes.md`) |
 
-버튼을 누르면 결과 전체가 **행동 하나**(`DeveloperEditAction`, 타임라인에 "[개발] 버튼 이름")로 실행된다. 게임 행동처럼 기록되고 머리의 Undo로 되돌린다. 결과가 하나도 없고 `[BindTo]`도 없으면 검사가 "결과가 없습니다(무엇을 할지)."를 알린다.
+버튼을 누르면 결과 전체가 **행동 하나**(`DeveloperEditAction`, 타임라인에 "[개발] 버튼 이름")로 실행된다. 게임 행동처럼 기록되고 머리의 Undo로 되돌린다. 결과가 하나도 없고 `[BindTo]`도 없으면 검증 오류 "결과가 없습니다(무엇을 할지)."가 뜬다.
 
 예(카드 던전):
 
@@ -305,11 +309,7 @@ DB › 개발 명령의 항목이 그 분류(기본 "개발")로 더해지고, �
 | `turnDamage30` | 한 턴 30 피해 | 이벤트 쏘기: `TurnEnded` (turn = 1, damage = 30) — 그 이벤트를 받는 로그·도전과제·트리거가 반응 |
 | `killAll` | 적 모두 처치 | 코드(`[BindTo]`, 아래) |
 
-> [!note]- 이벤트 쏘기 Block
-> - 칸: **이벤트**(고르기) · **값**(줄마다 필드 경로 = 값) · **횟수**(1 이상).
-> - 값은 숫자·글자·참거짓·enum 필드만. 경로 `a.b`로 안쪽 필드도 적는다. 적지 않은 필드는 이벤트 클래스의 기본값이다.
-> - 모니터 이벤트 탭(5절)이 손으로 한 번 쏘는 것이라면, 이 Block은 같은 쏘기를 버튼으로 저장해 두는 것이다.
-> - 개발 명령 말고 도전과제 보상처럼 종류 제한이 '모두'인 결과 칸에서도 쓸 수 있다(`12-Outcomes.md`).
+이벤트 쏘기 Block의 칸·규칙은 `12-Outcomes.md` 2-4b. 모니터 이벤트 탭(5절)이 손으로 한 번 쏘는 것이라면, 이 Block은 같은 쏘기를 버튼으로 저장해 두는 것이다.
 
 ### 코드로 쓰는 법
 
@@ -331,28 +331,27 @@ public static class DebugCode
 }
 ```
 
-**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 보통 `GBibleRuntime.Started`에서 등록한다(`20-Setup.md` 4절). 동작은 그대로 불리므로, 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 불러야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
+**`session.Debug.Register(분류, 이름, 동작, 설명)`** — 코드로 직접 버튼을 더한다. 같은 분류·이름이면 덮어쓴다. 등록 자리는 `Client/Bootstrap.cs`(`20-Setup.md` 4절): 판 데이터를 바꾸는 명령은 `RegisterRules`(`GBibleRuntime.SessionCreated` — 멀티 서버 세션에도 온다. 클라이언트가 누른 명령은 서버 세션에서 돈다), 화면만 쓰는 명령(시간 배속 등)은 `Started`(화면 세션에만). 동작은 그대로 불리므로, 값을 바꾸는 명령은 안에서 `session.Do(행동)`을 불러야 기록·Undo된다(DB 항목은 이것을 저절로 한다).
 
 ```csharp
-using GBible;
-using UnityEngine;
-
-public static class DebugMenu
+// Client/Bootstrap.cs(시작 설정이 만든 파일)의 두 함수
+static void RegisterRules(GameSession session)   // 모든 세션
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += session =>
-    {
-        session.Debug.Register("시간", "배속 4", () => GameTime.SetSpeed(4f));
-    };
+    session.Debug.Register("판", "Undo 전부", () => { while (session.Undo()) { } }, "되돌릴 수 있는 행동을 모두 되돌립니다.");
+}
+
+static void Started(GameSession session)         // 화면 세션에만
+{
+    session.Debug.Register("시간", "배속 4", () => GameTime.SetSpeed(4f));
 }
 ```
 
-**출시 빌드.** `session.Debug.Enabled`가 거짓이면 `Register`는 아무것도 하지 않는다. 런타임이 `Debug.isDebugBuild`로 이 값을 넣으므로, 출시 빌드에서는 DB 항목·코드 등록 모두 버튼이 생기지 않는다. 그래서 개발 명령 코드를 `if (Debug.isDebugBuild)`로 감싸지 않는다. 직접 만든 세션(테스트·서버)은 기본값 참이다.
+**출시 빌드.** `session.Debug.Enabled`가 거짓이면 `Register`는 아무것도 하지 않는다. 런타임이 `Debug.isDebugBuild`로 이 값을 넣으므로, 출시 빌드에서는 DB 항목·코드 등록 모두 버튼이 생기지 않는다. 그래서 개발 명령 코드를 `if (Debug.isDebugBuild)`로 감싸지 않는다. `GBibleRuntime`이 만드는 세션(멀티 시험 모드의 서버 포함)은 모두 이 값을 따르고, `new GameSession`으로 직접 만든 세션(규칙 테스트)은 기본값 참이다.
 
 ### 주의할 점
 
 - 명령에서 난 예외는 콘솔에 찍히고 창은 계속 동작한다.
-- 명령은 세션마다 등록된다. 플레이를 다시 시작하면 DB 항목과 `Started`에서 다시 등록된다.
+- 명령은 세션마다 등록된다. 세션이 새로 만들어지면(플레이 시작·슬롯 바꾸기) DB 항목과 `Bootstrap`의 `RegisterRules`·`Started`에서 다시 등록된다.
 - 시드는 모니터 머리에 늘 보이므로 시드를 기록하는 명령은 따로 만들지 않는다. 도전과제를 트리거로 달성하는 것은 도전과제 탭의 **트리거로 달성**(4절)을 쓴다.
 
 ---

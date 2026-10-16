@@ -101,7 +101,7 @@
 접속 → 입장 확인(INetAuthenticator) → 로비(점수·전적) → 줄(INetMatchmaker) → 성사 → 전원 수락 → 방(NetRoom) → RoomReady → … → EndMatch(결과) → 점수(Elo)·전적 저장(INetPlayerStore) → 로비
 ```
 
-- 한 계정은 한 줄·한 매치에만. 같은 계정이 다시 들어오면 옛 연결이 아직 살아 있을 때는 새 연결을 끊기만 하고(거절이 아니다 — 클라이언트가 잠시 뒤 다시 시도한다), 옛 연결이 3초 이상 조용하면 새 연결이 그 자리를 이어받는다(1-10).
+- 한 계정은 한 줄·한 매치에만. 같은 계정이 다시 들어올 때는 1-10.
 - 전원이 수락해야 방을 만든다. 수락하지 않으면(거절·시간 넘김 `AcceptSeconds`) 그 사람은 로비로, 수락한 사람은 **기다린 시간 그대로** 다시 줄.
 - 방이 만들어지면 묶인 차례대로 플레이어 번호 1, 2 …(`NetServer.Reserve`). `RoomStarting`에서 서버 규칙을 걸고, 정원이 다 들어오면 `RoomReady`(첫 턴 시작). `ReadySeconds` 안에 다 안 들어오면 매치를 없던 것으로(점수 변화 없음). 방을 열지 못하면(방 세션 만들기 실패) 수락한 사람들을 로비로 돌려보낸다(다시 줄을 세우지 않는다).
 - 로비로 돌아오면(매치 끝·취소) 결과가 오지 않은 행동은 기다리지 않는다(`NetClient.PendingActions` = 0 — 방이 닫히는 사이에 보낸 행동은 결과가 오지 않는다).
@@ -154,7 +154,7 @@
   - 같은 계정의 옛 연결이 서버에 남아 있고 3초 안에 무언가 왔으면 새 연결은 끊기만 한다("같은 계정이 아직 연결되어 있습니다 — 잠시 뒤 다시 접속합니다." — 거절이 아니라 다시 시도한다). 옛 연결이 3초 이상 조용하면(네트워크는 끊겼는데 서버가 아직 모름, `TakeoverSilence`) 새 연결이 같은 자리를 이어받고 옛 연결을 끊는다(옛 연결은 `PlayerLeft`로 알린 뒤 새 연결이 `PlayerJoined` — 들어옴·나감이 짝을 이룬다). 서버 중개(`NetServer`)와 매칭큐 로비(`NetHub`)가 같다. 방장 자신의 계정으로 들어오면 거절한다.
   - 알림: `GameNet.Reconnecting(몇 번째)`·`Reconnected`. 화면에는 알림 글이 뜬다. `Joined`는 처음 한 번만 온다.
   - 다시 접속하려면 전송을 만드는 함수로 들어간다(`GameNet.Join(() => 전송, 이름)`). `JoinDirect`·`FindMatch`·Steam 로비·시험 모드는 이미 그렇다. 전송 하나만 넘긴 `Join(전송, 이름)`은 다시 접속하지 않는다.
-  - 매칭큐: 다시 접속하면 로비를 거치지 않고 그 매치의 같은 자리로 들어간다(1-6).
+  - 매칭큐는 1-6(매치 중이면 그 매치의 같은 자리로).
 
 ### 1-11. 리플레이
 
@@ -188,7 +188,7 @@
 - **테스트 패널(F1) › 리플레이**: 녹화 켜기 · 저장 · 틀기(지금·지난 녹화, 저장한 파일 5개). 트는 중에는 위치 막대 · 재생·멈춤 · 한 칸 · 배속 · 그만 보기.
   - 클라이언트일 때 Undo·새 판·테스트 상황은 판을 가진 쪽(서버)에서 한다(시험 모드는 이 프로그램 안의 서버, 남의 서버면 개발 명령으로).
 - **모니터 머리**: 멀티(시험 모드·방장·매칭큐 서버)이면 세션을 고른다 — 서버 · 이 화면(클라이언트) · 화면 없는 클라이언트 · 방마다.
-- 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(entityId) · 주인(플레이어 번호) · 초당 보내는 횟수 · 늦게 그리기 · 회전.
+- 컴포넌트 **실시간 위치 맞추기**(`NetTransformSync`): 이름(`entityId` — 모든 프로그램에서 같게, 비우면 오브젝트 이름) · 주인(`owner` — 플레이어 번호, 0 = 방장·서버) · 초당 보내는 횟수(`sendRate`, 기본 20) · 늦게 그리기(`delay`, 기본 0.1초) · 회전(`syncRotation`).
 
 ## 3. 코드로 쓰는 법
 
@@ -214,6 +214,8 @@ GameNet.RoomStarting += room => SetupPlayers(room.Session, room.Server.Players);
 GameNet.RoomReady += room => room.Session.Do(new StartFirstTurn());
 GameNet.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 2, Place = 1 }, new NetMatchResult { Player = 1, Place = 2 } });
 ```
+
+`ServerStarted`·`RoomStarting`에는 서버 객체가 있어야 하는 것(`Validate`·플레이어별 키·공개 범위·녹화)만 둔다. 게임 규칙 등록(행동 처리기·고유 기능 감시·규칙이 받는 이벤트·틱 규칙)은 `Client/Bootstrap.cs`의 `RegisterRules`(`GBibleRuntime.SessionCreated`)가 맡는다 — 방장·화면 없는 서버(화면 세션)도, `GBibleRuntime.CreateSession()`으로 따로 만드는 시험 모드의 서버와 봇·매칭큐의 방 세션도 DB로 만들어진 직후 이것을 받는다(새 판 행동·`ServerStarted`·`RoomStarting`보다 먼저). 같은 등록 함수를 여기서 또 부르면 두 번 발동한다(20장 4절). `GameNet`의 이 이벤트들은 세션이 아니라 static이고 플레이마다 비워지므로 `Bootstrap`의 `Hook`(`AfterAssembliesLoaded`)에서 `+=`한다 — `Started` 안에서 걸면 화면 세션이 다시 만들어질 때마다(슬롯 바꾸기·멀티 들어가기) 받는 쪽이 쌓인다.
 
 명령줄(빌드 여러 개를 띄워 시험·서버 빌드): `-momoi-server [포트]` · `-momoi-matchserver [포트] -momoi-players 인원` · `-momoi-host [포트] -momoi-name 이름` · `-momoi-join 주소 -momoi-name 이름`. 서버 빌드는 `-batchmode -nographics`와 함께.
 
@@ -258,7 +260,7 @@ hub.ResumeOpenMatches();
 
 ## 4. 상황별 예제
 
-### 4-1. 턴제 대전(매칭큐) — 차례 검사·손패 숨기기·결과
+### 4-1. 턴제 대전(매칭큐) — 차례 검사·핸드 숨기기·결과
 
 ```csharp
 GameNet.RoomStarting += room =>
@@ -266,8 +268,8 @@ GameNet.RoomStarting += room =>
     var data = room.Session.Data;
     foreach (var player in room.Server.Players)
     {
-        data.Define("hand:" + player.Id, DataZone.Session, new Hand(), $"{player.Name}의 손패");
-        data.SetVisibility("hand:" + player.Id, DataVisibility.Owner, player.Id);   // 남의 손패는 오지 않는다
+        data.Define("hand:" + player.Id, DataZone.Session, new Hand(), $"{player.Name}의 핸드");
+        data.SetVisibility("hand:" + player.Id, DataVisibility.Owner, player.Id);   // 남의 핸드는 오지 않는다
     }
     room.Server.Validate = (player, action) => room.Session.Game.Data().Run.turnPlayer == player.Id ? null : "내 차례가 아닙니다.";
 };
@@ -276,7 +278,7 @@ GameNet.RoomReady += room => room.Session.Do(new StartMatch());
 room.Session.Events.SubscribeAfterAction<MatchDecided>(e => GameNet.Hub.EndMatch(room, e.results));
 ```
 
-화면(클라이언트)은 싱글과 같다: 내 손패 = `Game.Data().Get<Hand>("hand:" + Game.Session.LocalPlayer)`, 카드 내기 = `GameScreens.Do(() => new PlayCard { card = c })`.
+화면(클라이언트)은 싱글과 같다: 내 핸드 = `Game.Get<Hand>("hand:" + Game.Session.LocalPlayer)`, 카드 내기 = `GameScreens.Do(() => new PlayCard { card = c })`.
 
 ### 4-2. 친구 협동(사설 호스트) — 내 캐릭터는 각자, 판정은 방장
 
@@ -300,6 +302,7 @@ GameScreens.Do(() => new ReportHit { target = enemy, skill = "fireball" });
 - **화면 코드에서 플레이어 데이터를 직접 바꾸지 않는다**(싱글에서도 같은 규칙). 클라이언트에서 바꾸면 서버와 어긋난다.
 - **`Do` 직후 결과를 읽지 않는다.** 멀티에서는 결과가 나중에 온다 — 바뀐 곳 알림(`Data.Changed`·화면 연결)이나 `SubscribeAfterAction`으로 그린다. 시험 모드의 지연으로 미리 잡는다.
 - **연출은 `SubscribeAfterAction`으로 받는다.** `Subscribe`로 받는 연출은 클라이언트에서 불리지 않는다.
+- **규칙 등록은 `Bootstrap.RegisterRules`(`SessionCreated`)에.** `Started`는 화면 세션에만 오므로 거기 둔 규칙은 시험 모드 서버·매칭 방에서 빠진다(3-1).
 - **실패는 예외가 아니라 알림으로.** 클라이언트의 거절은 `ActionFailed`로 온다(`GameScreens.Do`는 싱글 실패와 같은 알림을 띄운다).
 - **이벤트는 `[GameEvent]` 클래스로.** 구조체 이벤트는 보낼 수 없다(서버 기록에 경고).
 - **행동·이벤트의 필드는 생성 코드가 쓸 수 있는 것만.** 중첩 컬렉션·`KeyValuePair`·`HashSet`·readonly 필드·자동 속성·`object` 칸은 쓰지 않는다 — 행동은 보내기 전에 실패하고, 이벤트는 빠진다(1-1). 보내지 않을 값이면 `[NonSerialized]`.

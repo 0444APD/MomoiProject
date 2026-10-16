@@ -1,6 +1,6 @@
 # 09. 3요소를 지키는 습관
 
-Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **멀티플레이와 연동되고 패킷 성능이 좋을 것**, **게임 중에 리플렉션 같은 무거운 작업을 하지 않을 것**. 시스템이 길은 깔아 두었다. 게임 코드는 아래 습관으로 그 길에서 벗어나지 않는다. 하나를 어기면 Undo·저장·멀티플레이 중 어딘가가 조용히 어긋난다.
+Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **멀티플레이와 연동되고 패킷 성능이 좋을 것**, **게임 중에 리플렉션 같은 무거운 작업을 하지 않을 것**. 시스템이 길은 깔아 두었다. 게임 코드는 아래 습관으로 그 길에서 벗어나지 않는다. 하나를 어기면 Undo·저장·멀티플레이 중 어딘가가 조용히 어긋난다. 규칙 목록 자체는 관례(`ProjectConventions.md`) 3~5절이 주인이고, 이 장은 카드 던전 코드로 그 이유와 흔한 실수를 보인다.
 
 > [!note]- 이 장에서 쓰는 말
 > | 말 | 뜻 |
@@ -19,13 +19,15 @@ Momoi Project의 설계는 세 가지를 지킨다: **코딩이 쉬울 것**, **
 
 바뀐 곳은 Mirror가 비교로 찾는다. 게임 코드는 특별한 형식 없이 쓴다.
 
-- 데이터는 평범한 `[Serializable]` 클래스, 목록은 `List`·배열·`Dictionary`.
+- 데이터는 평범한 `[Serializable]` 클래스, 목록은 `List`·배열·`Dictionary`. 시스템 기반 클래스 상속·래퍼 컬렉션을 만들지 않는다.
 - 값은 그냥 대입한다(`hero.hp -= 5;`). "바뀌었다"고 알리는 호출은 없다.
-- 여러 곳에서 쓰는 규칙은 static 함수로 두고, `GameApi game`을 매개변수로 받는다.
-- **규칙 함수에 행동 직전 이벤트 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 행동 직전 이벤트를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다.
+- 여러 곳에서 쓰는 규칙은 static 함수(카드 던전의 `Rules`)나 `GameApi` 확장 메서드로 두고, `GameApi game`을 매개변수로 받는다. 상태를 들고 있는 매니저 싱글턴을 두지 않는다.
+- 에디터 표시는 어트리뷰트(`[Hide]`·`[ShowIf]`·`[Keyword]`·`[BlockInfo]`)로 바꾼다. 커스텀 인스펙터를 쓰지 않는다.
+- **규칙 함수에 행동 직전 이벤트 자리를 둔다.** 피해·회복·죽음·사용·비용·뽑기처럼 장르의 핵심 규칙 함수는 일을 하기 직전에 행동 직전 이벤트를 `Game.Intercept`로 통과시키고, 돌려받은 값으로 일을 한다. 새 기믹마다 규칙 함수에 `if (hasThornArmor) …`를 더하지 않는다.
 - **비용은 `Game.Pay`로 낸다.** `Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name")`는 비용 행동 직전 이벤트를 이미 거친다(`what`은 모자랄 때 실패 글에 들어갈 이름의 텍스트 키). 직접 빼면(`battle.energy -= data.cost`) "이번 턴 비용 0" 같은 효과가 끼어들 자리가 없다.
-- **플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`.** 글은 텍스트 표로 번역된다. 없는 ID 같은 프로그래머 실수는 그냥 `InvalidOperationException`.
-- **숫자에는 이름을 붙인다.** 기획자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런싱 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전은 시작 체력·시작 골드·보상 골드를 밸런싱 값 `startHp`·`startGold`·`winGold`로 읽는다([03장](03-GameLoop.md) 4절, [04장](04-AddingContent.md) 10절).
+- **플레이어에게 보일 실패는 `throw Game.Fail(키, 기본 문장)`.** 글은 텍스트 표로 번역된다(한국어 글을 그대로 던지면 번역할 수 없다). 없는 ID 같은 프로그래밍 실수는 그냥 `InvalidOperationException`.
+- **숫자에는 이름을 붙인다.** 개발자가 바꿀 숫자(시작 체력·보상 골드·층마다 커지는 값)는 코드에 적지 않고 DB › 밸런싱 값에 두어 `Game.Balance(GameIds.Balance.X)`(곡선이면 `Game.Balance(id, 층)`)로 읽는다. 플레이 중에 고쳐도 바로 반영된다. 카드 던전은 시작 체력·시작 골드·보상 골드를 밸런싱 값 `startHp`·`startGold`·`winGold`로 읽는다([03장](03-GameLoop.md) 4절, [04장](04-AddingContent.md) 10절).
+- **몇 턴 동안·몇 턴 뒤의 효과**는 DB › 상태 효과 + 효과 `상태 효과 걸기`, 또는 예약(`Game.ScheduleOn`). 데이터 클래스에 상태 목록을 두고 `EndTurn`에서 손으로 처리하지 않는다.
 
 ```csharp
 public static void Damage(GameApi game, Fighter source, Fighter target, int amount)
@@ -43,22 +45,8 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 }
 ```
 
-> [!note]- 이럴 때 이렇게
-> | 이럴 때 | 이렇게 한다 | 하지 않는 것 |
-> |---|---|---|
-> | 여러 값을 묶는다 | 평범한 `[Serializable]` 클래스 | 시스템 기반 클래스를 상속한 데이터 |
-> | 목록이 필요하다 | `List<T>`, 배열, `Dictionary<K, V>` | 래퍼 컬렉션을 따로 만들기 |
-> | 값을 바꾼다 | `hero.hp -= 5;` 그대로 | 값을 바꿀 때마다 "바뀌었다"고 알리는 호출 |
-> | 규칙이 여러 곳에서 쓰인다 | static 함수(카드 던전의 `Rules`)나 `GameApi` 확장 메서드 | 상태를 들고 있는 매니저 싱글턴 |
-> | 에디터 표시를 바꾼다 | 어트리뷰트(`[Hide]`·`[ShowIf]`·`[Keyword]`·`[BlockInfo]`) | 커스텀 인스펙터 |
-> | 핵심 규칙(피해·회복·죽음·비용·뽑기)을 쓴다 | 일을 하기 직전에 `Game.Intercept` 자리를 둔다 | 새 기믹이 생길 때마다 규칙 함수에 `if (hasThornArmor) …`를 더하기 |
-> | 에너지·골드 같은 비용을 낸다 | `Game.Pay(키, 필드, 양)` | `if (energy < cost) throw …; energy -= cost;`(행동 직전 이벤트가 비용을 고칠 수 없다) |
-> | 플레이어에게 "할 수 없다"를 알린다 | `throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.")` | 한국어 글을 그대로 던지기(번역할 수 없다) |
-> | 기획자가 바꿀 숫자 | DB › 밸런싱 값 + `Game.Balance(GameIds.Balance.X)` | 코드에 `70`·`99`·`+15`를 적기(바꿀 때마다 프로그래머가 필요하다) |
-> | 몇 턴 동안·몇 턴 뒤의 효과 | DB › 상태 효과 + 효과 `상태 효과 걸기`, 또는 예약(`Game.ScheduleOn`) | 데이터 클래스에 상태 목록을 두고 `EndTurn`에서 손으로 처리하기 |
-
 > [!note]- 왜 행동 직전 이벤트 자리를 미리 두나
-> 이벤트(`DamageDealt`)는 일이 일어난 **뒤**에 온다. "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0"처럼 **일을 고치는 효과**는 일이 일어나기 **직전**에 끼어들어야 한다. 자리를 미리 뚫어 두면 이런 기믹을 기획 단계에서 미리 알 필요가 없다. 기획자가 DB에 유물을 더하고(트리거 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`), 규칙 함수는 그대로다.
+> 이벤트(`DamageDealt`)는 일이 일어난 **뒤**에 온다. "받는 피해 −5", "죽는 대신 체력 1", "이번 턴 비용 0"처럼 **일을 고치는 효과**는 일이 일어나기 **직전**에 끼어들어야 한다. 자리를 미리 뚫어 두면 이런 기믹을 기획 단계에서 미리 알 필요가 없다. 나중에 유물을 더할 때 DB 항목만 만들고(트리거 `행동 직전 이벤트 받기` + 결과 `행동 직전 이벤트 고치기`), 규칙 함수는 그대로다.
 > - 행동 직전 이벤트는 프로젝트가 정하는 작은 클래스다. 막을 수 있게 하려면 `cancelled`를 둔다.
 > ```csharp
 > [Serializable, Intent("피해")]
@@ -80,17 +68,17 @@ public static void Damage(GameApi game, Fighter source, Fighter target, int amou
 
 ## 2. 멀티·패킷 — 값은 행동 안에서, 행동은 데이터로
 
-멀티가 붙으면 클라이언트는 행동만 보내고, 서버가 행동을 실행해 생긴 ChangeSet을 모두에게 보낸다([11장](11-MultiplayerReady.md)). 싱글 게임에서도 지금 지켜 두면 나중에 고칠 것이 없다.
+멀티가 붙으면 클라이언트는 행동만 보내고, 서버가 행동을 실행해 생긴 바뀐 곳을 모두에게 보낸다([11장](11-MultiplayerReady.md)). 싱글 게임에서도 지금 지켜 두면 나중에 고칠 것이 없다. 어긴 결과는 5절 표에 모았다.
 
-- **게임 값은 행동(`Game.Do`)·Block·결과·`[BindTo]` 함수 안에서만 바꾼다.**
-- **행동에는 필요한 정보를 필드로 넣는다.** 대상(덱 카드·적)은 객체 그대로 넣는다. 시스템이 기록·전송에는 id만 남기고, `Run` 직전에 id로 지금 객체를 다시 찾아 넣는다.
-- **대상 클래스는 `public string id;`가 있고 플레이어 데이터 안에 있다.** Unity 객체·델리게이트·데이터 밖 객체는 행동에 넣지 않는다.
+- **게임 값은 행동(`Game.Do`)·Block·결과·`[BindTo]` 함수 안에서만 바꾼다.** 개발용 "골드 +100"도 같다 — DB › 개발 › 개발 명령은 행동 하나(`DeveloperEditAction`)로 실행된다([08장](08-TestAndDebug.md) 2절).
+- **행동에는 필요한 정보를 필드로 넣는다.** 대상(덱 카드·적)은 객체 그대로 넣는다(리스트도 된다). 시스템이 기록·전송에는 id만 남기고, `Run` 직전에 id로 지금 객체를 다시 찾아 넣는다. 그 밖에 실을 수 있는 값은 숫자·글자·bool·enum, 원본 ID 글자, id 없는 작은 클래스(값으로 복사)다.
+- **대상 클래스는 `public string id;`가 있고 플레이어 데이터 안에 있다.** Unity 객체·델리게이트·데이터 밖 객체는 행동에 넣지 않는다. 새 객체의 id는 행동 안에서 `Game.NewId("접두어")`(번호가 플레이어 데이터에 있어 Undo·저장·서버에서 같다).
 - **이벤트를 받는 쪽은 화면·연출만 한다.** 값을 고치지 않는다.
-- **규칙 난수는 `Game.Random("이름")`, 시간은 게임 시계(`session.Clock.Time`).**
+- **규칙 난수는 `Game.Random("이름")`, 시간은 게임 시계(`session.Clock.Time`).** `Time.time`·`UnityEngine.Random`은 되감기·저장·서버와 맞지 않는다(연출용 흔들림에만). 흐름 이름은 쓰임마다 나눈다(`"deck"`·`"cardTarget"`·`"loot"` — [07장](07-GenreRecipes.md) 4절).
 - **세션은 매개변수로 받는다**(`c.Game`·`session`). 게임 값을 static 변수에 두지 않는다.
 - **지연·지속 효과는 상태 효과로, 플레이어가 고르는 효과는 선택 대기로.** 행동을 멈추고 기다리지 말고, 나중의 일·고른 뒤의 일은 이어서 할 행동에 쓴다(매뉴얼 [29장](../../Manual/29-Statuses-Schedules-Choices.md)).
 - **연출은 `SubscribeAfterAction`으로 받아 `GameView.Present`에 넣는다.** 성공한 행동의 이벤트만 오고, 연출은 대기열이 차례로 튼다. 받는 쪽은 값을 바꾸지 않는다.
-- **예상 값은 `Game.Preview`로 읽는다.** "이 카드를 내면 피해 얼마", "왜 못 내나"를 화면이 따로 계산하지 않는다. 행동을 해 보고 되돌리므로 결과를 정하는 곳이 규칙 한 곳뿐이다(`Game.CanDo`도 같다).
+- **예상 값은 `Game.Preview`로 읽는다.** "이 카드를 내면 피해 얼마", "왜 못 내나"를 화면이 따로 계산하지 않는다. 행동 밖에서, 그릴 때 한 번 부른다. 행동을 해 보고 되돌리므로 결과를 정하는 곳이 규칙 한 곳뿐이다(`Game.CanDo`도 같다).
 
 ```csharp
 [Serializable, BlockInfo("카드 내기")]
@@ -104,7 +92,7 @@ public class PlayCard : GameAction
         var run = Game.Data().Run;
         var data = Rules.CardData(Game, card.card);
         var battle = run.battle ?? throw Game.Fail("fail.notInBattle", "전투 중이 아닙니다.");
-        if (!battle.hand.Contains(card.id)) throw Game.Fail("fail.notInHand", "손에 없는 카드입니다.");
+        if (!battle.hand.Contains(card.id)) throw Game.Fail("fail.notInHand", "핸드에 없는 카드입니다.");
         Game.Pay(GameIds.PlayerData.Run.Id, "battle.energy", data.cost, what: "energy.name");   // 비용: 행동 직전 이벤트('이번 턴 비용 0' 등)를 거친 뒤 모자라면 실패
 
         battle.hand.Remove(card.id);
@@ -119,7 +107,7 @@ public class PlayCard : GameAction
 }
 ```
 
-씬은 입력을 행동으로 바꿔 보내기만 한다: `Game.Do(new PlayCard { card = card, target = target })`. 화면은 데이터를 읽어 그린다.
+화면은 입력을 행동으로 바꿔 보내기만 한다: `GameScreens.Do(() => new PlayCard { card = card, target = target })`(화면 코드에서는 `OnClick`). 그리기는 데이터를 읽어서 한다.
 
 > [!note]- 대상을 객체로 넣어도 되는 이유
 > 행동은 저장·리플레이·서버 전송에 실리는 데이터다. 객체를 그대로 보낼 수는 없으므로, 시스템이 대상 필드(형식에 `string id`가 있는 클래스)를 기록·전송할 때 id만 남긴다. 실행 직전에는 그 id로 지금 데이터에서 객체를 다시 찾아 필드에 넣는다.
@@ -129,20 +117,6 @@ public class PlayCard : GameAction
 > - **타임라인·리플레이**: id로 남는다. `Describe`를 쓰지 않으면 "카드 내기 (card7, enemy2)"처럼 보인다.
 > - **못 찾으면**(죽은 적 등) "Fighter 'enemy2'을(를) 찾을 수 없습니다"로 행동이 실패하고 아무것도 바뀌지 않는다.
 > - DB 원본은 플레이어 데이터가 아니라서 찾기 대상이 아니다. 원본은 `[DataRef]` 원본 ID 글자로 넣는다(`BuyCard.source`).
-
-> [!note]- 이럴 때 이렇게(이유)
-> | 이럴 때 | 이렇게 한다 | 이유 |
-> |---|---|---|
-> | 게임 값을 바꾼다 | 행동(`Game.Do`)·Block·결과·`[BindTo]` 함수 안에서 | 행동 밖에서 바꾼 값은 Undo되지 않고, 멀티에서는 서버가 모르는 변경이 된다 |
-> | 행동이 대상을 가리킨다 | 대상 객체를 필드에 그대로(`card`·`target`, 리스트도 된다) | 시스템이 id로 기록·전송하고 실행 직전에 지금 객체로 바꿔 넣는다 |
-> | 행동이 값을 싣는다 | 숫자·글자·bool·enum, 원본 ID 글자, id 없는 작은 클래스(값으로 복사) | 행동은 데이터다. 스프라이트·MonoBehaviour·델리게이트는 실을 수 없다 |
-> | 무언가를 오래 기억한다(선택한 카드 등) | 행동에 넣을 거라면 객체 그대로 둬도 된다. 화면이 직접 읽을 때는 `Game.Data()`·`Game.Find`로 다시 꺼낸다 | 불러오기 뒤에는 쥐고 있던 객체가 옛 인스턴스일 수 있다 |
-> | 이벤트를 받아 무언가 한다 | 화면·연출만 | 받는 쪽에서 값을 바꾸면 Undo 단위와 서버 전송에서 빠진다 |
-> | 규칙에 난수가 든다 | `Game.Random("이름")` | 시드·Undo·저장·서버와 맞는 결정론 난수. 연출용 흔들림은 `UnityEngine.Random` |
-> | 화면에 예상 피해·"낼 수 없음"을 보인다 | `Game.Preview`·`Game.CanDo`(행동 밖에서, 그릴 때 한 번) | 화면이 피해 공식을 따로 가지면 규칙과 어긋나고, 멀티에서는 결과를 정하는 곳이 둘이 된다 |
-> | 시간에 따라 바뀐다(쿨다운 등) | 게임 시계(`session.Clock.Time`) 기준 시각을 플레이어 데이터에 | `Time.time`은 되감기·저장과 맞지 않는다 |
-> | 새 객체에 id가 필요하다 | `Game.NewId("접두어")` | 번호가 플레이어 데이터에 있어 Undo·저장·서버에서 같다 |
-> | 여러 세션이 돌 수 있다 | 값은 플레이어 데이터에, 세션은 매개변수(`c.Game`·`session`)로 | 서버는 매치마다 세션을 만든다. static 변수는 모든 세션이 나눠 쓴다 |
 
 > [!note]- 행동 안의 행동
 > 행동 안에서 다른 행동(`Game.Do`)이나 액티브 효과(`Game.Use`)를 부르면 바깥 행동의 일부로 그 자리에서 실행된다(카드 내기 안의 `Game.Use`, 턴 끝 안의 `DrawCards`). Undo·ChangeSet은 바깥 행동 하나로 묶이고, 안쪽이 실패하면 바깥 전체가 취소된다. 그래서 "한 입력 = 한 묶음"이 유지된다.
@@ -159,45 +133,27 @@ public class PlayCard : GameAction
 >
 > `ShowDamage` 안에서 `hp`를 고치면 안 된다. 행동이 끝난 뒤의 변경이라 Undo 단위에서 빠지고, 서버가 모르는 변경이 된다.
 
-> [!note]- 개발 명령도 행동으로
-> 개발용 "골드 +100"도 값을 직접 바꾸지 않는다. DB › 개발 › 개발 명령의 결과 Block(플레이어 데이터에 주기)으로 조립하면, 누를 때 행동 하나(`DeveloperEditAction`)로 실행되어 모니터에서 Undo되고 덮어쓰기 경고도 없다. 규칙을 거쳐야 하는 명령(적 모두 처치)만 그 ID에 `[BindTo]` 코드를 붙인다([08장](08-TestAndDebug.md) 2절).
->
-> 출시 빌드에서는 개발 명령이 저절로 빠지므로 `if (Debug.isDebugBuild)`로 감싸지 않는다.
-
-> [!note]- 난수 흐름 나누기
-> 카드 던전은 난수 흐름을 쓰임마다 나눈다: 덱 섞기 `"deck"`, 무작위 대상 `"cardTarget"`, 보상 골드 `"loot"`. 한쪽에서 뽑는 횟수가 바뀌어도(카드 효과를 고쳐 대상 뽑기가 한 번 늘어도) 다른 쪽 결과는 그대로라서, 고정 시드 재현이 덜 흔들린다.
-> ```csharp
-> var center = (int)Game.Balance(GameIds.Balance.WinGold, run.floor);   // 1층 15
-> var gold = Game.Random("loot").Range(center * 2 / 3, center * 4 / 3 + 1);   // 1층이면 10 이상 21 미만
-> ```
-
 ## 3. 리플렉션 금지 — 생성 코드가 생기는 형식만 쓴다
 
 조건의 필드 경로, 보상·로그가 읽는 이벤트 값, 저장·불러오기, `Game.Find`·`All`은 모두 생성 코드로 읽는다. 생성 코드는 `[Serializable]`(데이터)과 `[GameEvent]`(이벤트)가 붙은 형식에만 생긴다.
 
-- 데이터 클래스는 그 클래스·부모·안쪽 클래스·리스트 요소 클래스 모두 `[Serializable]`.
-- 이벤트 클래스는 `[GameEvent("표시 이름")]`.
-- 컬렉션은 `List<T>`·`T[]`·`Dictionary<K, V>`(키는 글자·정수·enum).
-- 텍스트 인자는 `Texts.Get("키", ("gold", 10))`.
+| 이럴 때 | 이렇게 한다 | 피하는 것(예전 방식이 됨) |
+|---|---|---|
+| 데이터 클래스 | 그 클래스, 안쪽 클래스, 부모 클래스, 리스트 요소 클래스 모두 `[Serializable]` | 부모에 `[Serializable]`이 없음(부모 필드가 경고 없이 기록에서 빠진다) |
+| 이벤트 | `[GameEvent("표시 이름")]` | 어트리뷰트 없는 이벤트 클래스 |
+| 컬렉션 | `List<T>`, `T[]`, `Dictionary<K, V>`(키는 글자·정수·enum) | `HashSet`·`Queue`·`Stack`·`LinkedList`, `List<List<int>>` 같은 중첩 컬렉션, `float` 키 딕셔너리 |
+| 플레이어 데이터 하나의 값 | 클래스(`RunState`) | 값 자체가 `List<T>`(클래스 하나로 감싼다) |
+| 텍스트에 값 넣기 | `Texts.Get("키", ("gold", 10))` | `Texts.Get("키", new { gold = 10 })`(익명 객체는 리플렉션으로 읽는다) |
+| 이벤트를 코드로 만든다 | `new CardPlayed { … }` | `Activator.CreateInstance`·`PublishObject`(도구·콘솔 명령에서만) |
+| 객체의 id를 읽는다 | 형식을 알면 `card.id` | 게임 루프에서 `GameApi.IdOf`를 반복(형식마다 처음 한 번 리플렉션으로 멤버를 찾는다) |
 
 붙이지 않아도 동작은 한다. 대신 리플렉션으로 읽고 한 번 경고하므로, 콘솔·타임라인의 "예전 방식(리플렉션)"·"읽기 코드가 없어 리플렉션으로 읽습니다" 경고를 놓치지 않는다.
-
-> [!note]- 이럴 때 이렇게(피할 것)
-> | 이럴 때 | 이렇게 한다 | 피하는 것(예전 방식이 됨) |
-> |---|---|---|
-> | 데이터 클래스 | 그 클래스, 안쪽 클래스, 부모 클래스, 리스트 요소 클래스 모두 `[Serializable]` | 부모에 `[Serializable]`이 없음(부모 필드가 경고 없이 기록에서 빠진다) |
-> | 이벤트 | `[GameEvent("표시 이름")]` | 어트리뷰트 없는 이벤트 클래스 |
-> | 컬렉션 | `List<T>`, `T[]`, `Dictionary<K, V>`(키는 글자·정수·enum) | `HashSet`·`Queue`·`Stack`·`LinkedList`, `List<List<int>>` 같은 중첩 컬렉션, `float` 키 딕셔너리 |
-> | 플레이어 데이터 하나의 값 | 클래스(`RunState`) | 값 자체가 `List<T>`(클래스 하나로 감싼다) |
-> | 텍스트에 값 넣기 | `Texts.Get("키", ("gold", 10))` | `Texts.Get("키", new { gold = 10 })`(익명 객체는 리플렉션으로 읽는다) |
-> | 이벤트를 코드로 만든다 | `new CardPlayed { … }` | `Activator.CreateInstance`·`PublishObject`(도구·콘솔 명령에서만) |
-> | 객체의 id를 읽는다 | 형식을 알면 `card.id` | 게임 루프에서 `GameApi.IdOf`를 반복(형식마다 처음 한 번 리플렉션으로 멤버를 찾는다) |
 
 > [!note]- 리플렉션이 남아 있는 곳
 > 게임이 켜질 때(코드 모으기, 사용 기능 찾기), 개발 도구(모니터의 이벤트 호출, 시뮬레이션), 선택 패키지 연결. 모두 게임 진행 중에 반복되는 경로가 아니다.
 
 > [!note]- 카드 던전의 클래스 점검
-> 판·프로필 데이터 클래스(`Fighter`·`Hero`·`Enemy`·`DeckCard`·`Battle`·`RunState`·`Profile`)는 모두 `[Serializable]`이고, `Hero`·`Enemy`의 부모 `Fighter`에도 붙어 있다. 손패·뽑을 더미·버린 더미는 카드 객체가 아니라 카드 id 리스트라서, 카드가 더미 사이를 옮겨 다녀도 변경분은 id 글자 몇 개다.
+> 판·프로필 데이터 클래스(`Fighter`·`Hero`·`Enemy`·`DeckCard`·`Battle`·`RunState`·`Profile`)는 모두 `[Serializable]`이고, `Hero`·`Enemy`의 부모 `Fighter`에도 붙어 있다. 핸드·덱·버려진 덱은 카드 객체가 아니라 카드 id 리스트라서, 카드가 그 사이를 옮겨 다녀도 변경분은 id 글자 몇 개다.
 > ```csharp
 > [Serializable]
 > public class Battle
@@ -231,13 +187,13 @@ public class DeckCard
 public static Card CardData(GameApi game, string card) => game.Session.Instances?.Invoke(card) as Card;
 ```
 
-화면도 같다: 손패의 그림은 `Rules.CardData(Game, deckCard.card).art`.
+화면도 같다: 핸드의 그림은 `Rules.CardData(Game, deckCard.card).art`.
 
 > [!note]- 원본을 통째로 복사하면
 > 원본 `Card`를 덱에 복사하면 이름·비용·그림(`art`)·사용 기능(`usable`)까지 장마다 들어간다.
 > - **크기**: 같은 카드 다섯 장이면 고정 값이 다섯 벌이다. Sync·판 저장·멀티의 첫 Snapshot이 그만큼 커진다.
 > - **저장**: 스프라이트는 DB 항목(`GameData`)이 아니라서 판 저장에 들어가지 않는다. 저장마다 "저장할 수 없는 참조입니다" 경고가 나고, 이어 한 뒤에는 그림이 비어 있다.
-> - **원본 수정**: 기획자가 비용을 고쳐도 이미 복사된 장은 예전 값 그대로다.
+> - **원본 수정**: DB에서 비용을 고쳐도 이미 복사된 장은 예전 값 그대로다.
 
 > [!note]- 원본 자세히
 > - `session.Instances`는 인스턴스 ID로 원본을 복사 없이 주는 함수다. 게임 중에는 읽기만 한다.
@@ -246,33 +202,26 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 
 ## 5. 하지 말 것
 
-앞 절을 어기는 흔한 실수다.
+앞 절을 어기는 흔한 실수와 생기는 일이다.
 
-- MonoBehaviour 필드에 게임 값(골드·체력·덱)을 둔다 → 플레이어 데이터에 둔다.
-- 씬 코드·코루틴·이벤트를 받는 함수에서 플레이어 데이터를 고친다 → 행동을 만들어 `Game.Do`.
-- 행동 안에서 기다린다(코루틴·`await`) → 결과를 이벤트로 쏘고 연출은 따로.
-- 실패를 조용한 `return`으로 처리한다 → 예외를 던진다(플레이어에게 보일 실패는 `throw Game.Fail(…)`).
-- 비용을 직접 뺀다 → `Game.Pay`.
-- Block·결과·`Started` 코드에서 `GBibleRuntime.Game`을 쓴다 → 받은 세션을 쓴다.
-
-> [!note]- 하지 말 것 전체와 이유
-> | 하지 말 것 | 생기는 일 | 대신 |
-> |---|---|---|
-> | MonoBehaviour 필드에 게임 값(골드·체력·덱)을 둔다 | Undo·저장·동기화에서 빠진다 | 플레이어 데이터에 둔다 |
-> | 씬 코드·코루틴·이벤트를 받는 함수에서 플레이어 데이터를 고친다 | "행동 밖 변경"으로 기록되고 Undo되지 않는다. 그 행동을 Undo하면 "행동 밖에서 바뀐 값을 덮었습니다" 경고 | 행동을 만들어 `Game.Do` |
-> | 행동 안에서 기다린다(코루틴·`await`) | 행동은 한 번에 끝나야 한다 | 결과를 이벤트로 쏘고 연출은 따로. 몇 턴·몇 초 뒤의 효과는 상태 효과·예약으로, 플레이어의 고르기는 `Game.Ask`(이어서 할 행동이 따로 돈다)로 |
-> | 행동 필드에 Unity 객체·델리게이트·데이터 밖 객체를 둔다 | id로 바꿀 수 없어 저장·리플레이·서버 전송이 안 된다 | 대상은 데이터 안의 id 있는 객체, 원본은 원본 ID |
-> | 쥐고 있던 객체를 화면이 그대로 읽는다 | 불러오기 뒤에는 옛 인스턴스를 읽는다 | 그릴 때 `Game.Data()`·`Game.Find`로 다시 꺼낸다(행동에 넣는 것은 괜찮다) |
-> | 규칙 난수에 `UnityEngine.Random` | Undo로 다시 뽑기가 되고, 시드 재현·서버 판정이 깨진다 | `Game.Random("이름")` |
-> | 연출 난수에 `Game.Random` | Undo가 모든 난수 흐름을 행동 직전으로 되돌리므로 연출 소비까지 되감기고, 규칙 결과가 연출 때문에 달라진다 | `UnityEngine.Random` |
-> | `[BindTo]` 함수·Block 안에 static 변수로 상태를 둔다 | 세션이 여러 개면 섞인다 | 플레이어 데이터 |
-> | Block·결과·`Started` 코드에서 `GBibleRuntime.Game`을 쓴다 | 서버·시뮬레이션의 다른 세션에서 틀린 세션을 만진다 | Block의 `Game` 속성, 컨텍스트의 `c.Game`, 매개변수 `session` |
-> | 실패를 조용한 `return`으로 처리한다 | "아무것도 바뀌지 않은 행동"이 Undo 이력에 한 칸 남는다 | 예외를 던진다(바뀐 것 전부 취소, 부른 쪽이 잡는다) |
-> | 매 프레임 바뀌는 위치·속도를 플레이어 데이터에 | 매 프레임 기록·ChangeSet이 쌓인다 | MonoBehaviour 쪽에 두고, 규칙에 필요한 칸 좌표만 데이터로 |
-> | 원본(인스턴스)을 통째로 복사해 판 데이터에 넣는다 | Sync·저장·전송이 커지고, 스프라이트는 저장되지 않으며, 원본을 고쳐도 반영되지 않는다 | 판 데이터에는 원본 ID와 바뀌는 값만(4절) |
-> | 다른 값으로 계산되는 값(합산 공격력)을 저장 | 두 값이 어긋날 수 있고 데이터가 커진다 | 읽을 때 계산(속성·함수) |
-> | 비용을 직접 뺀다(`energy -= cost`) | 비용을 고치는 행동 직전 이벤트(유물·상태 효과)가 무시된다 | `Game.Pay` |
-> | 연출을 손으로 만든 대기열·`WaitForSeconds`로 튼다 | `Redraw`가 연출을 기다리지 못하고, 연출 속도·건너뛰기·`Busy`가 먹지 않는다 | `GameView.Present` + `GameView.Wait` |
+| 하지 말 것 | 생기는 일 | 대신 |
+|---|---|---|
+| MonoBehaviour 필드에 게임 값(골드·체력·덱)을 둔다 | Undo·저장·동기화에서 빠진다 | 플레이어 데이터에 둔다 |
+| 씬 코드·코루틴·이벤트를 받는 함수에서 플레이어 데이터를 고친다 | "행동 밖 변경"으로 기록되고 Undo되지 않는다. 그 행동을 Undo하면 "행동 밖에서 바뀐 값을 덮었습니다" 경고. 멀티에서는 서버가 모르는 변경 | 행동을 만들어 `Game.Do` |
+| 행동 안에서 기다린다(코루틴·`await`) | 행동은 한 번에 끝나야 한다 | 결과를 이벤트로 쏘고 연출은 따로. 몇 턴·몇 초 뒤의 효과는 상태 효과·예약으로, 플레이어의 고르기는 `Game.Ask`(이어서 할 행동이 따로 돈다)로 |
+| 행동 필드에 Unity 객체·델리게이트·데이터 밖 객체를 둔다 | id로 바꿀 수 없어 저장·리플레이·서버 전송이 안 된다 | 대상은 데이터 안의 id 있는 객체, 원본은 원본 ID |
+| 쥐고 있던 객체를 화면이 그대로 읽는다 | 불러오기 뒤에는 옛 인스턴스를 읽는다 | 그릴 때 `Game.Data()`·`Game.Find`로 다시 꺼낸다(행동에 넣는 것은 괜찮다) |
+| 규칙 난수에 `UnityEngine.Random` | Undo로 다시 뽑기가 되고, 시드 재현·서버 판정이 깨진다 | `Game.Random("이름")` |
+| 연출 난수에 `Game.Random` | Undo가 모든 난수 흐름을 행동 직전으로 되돌리므로 연출 소비까지 되감기고, 규칙 결과가 연출 때문에 달라진다 | `UnityEngine.Random` |
+| `[BindTo]` 함수·Block 안에 static 변수로 상태를 둔다 | 세션이 여러 개면 섞인다 | 플레이어 데이터 |
+| Block·결과·등록 함수·`Bootstrap.RegisterRules`에서 `GBibleRuntime.Game`·`GBibleRuntime.Session`을 쓴다 | 서버·시뮬레이션의 다른 세션에서 틀린 세션을 만진다. `RegisterRules`가 불릴 때는 아직 그 세션이 아니다(화면 세션이면 null, 따로 만든 서버 세션이면 화면 세션) | Block의 `Game` 속성, 컨텍스트의 `c.Game`, 매개변수 `session` |
+| 실패를 조용한 `return`으로 처리한다 | "아무것도 바뀌지 않은 행동"이 Undo 이력에 한 칸 남는다 | 예외를 던진다(바뀐 것 전부 취소, 부른 쪽이 잡는다) |
+| 매 프레임 바뀌는 위치·속도를 플레이어 데이터에 | 매 프레임 기록·ChangeSet이 쌓인다 | MonoBehaviour 쪽에 두고, 규칙에 필요한 칸 좌표만 데이터로 |
+| 원본(인스턴스)을 통째로 복사해 판 데이터에 넣는다 | Sync·저장·전송이 커지고, 스프라이트는 저장되지 않으며, 원본을 고쳐도 반영되지 않는다 | 판 데이터에는 원본 ID와 바뀌는 값만(4절) |
+| 다른 값으로 계산되는 값(합산 공격력)을 저장 | 두 값이 어긋날 수 있고 데이터가 커진다 | 읽을 때 계산(속성·함수) |
+| 비용을 직접 뺀다(`energy -= cost`) | 비용을 고치는 행동 직전 이벤트(유물·상태 효과)가 무시된다 | `Game.Pay` |
+| 화면이 예상 피해 공식을 따로 가진다 | 규칙과 어긋나고, 멀티에서는 결과를 정하는 곳이 둘이 된다 | `Game.Preview`·`Game.CanDo` |
+| 연출을 손으로 만든 대기열·`WaitForSeconds`로 튼다 | `Redraw`가 연출을 기다리지 못하고, 연출 속도·건너뛰기·`Busy`가 먹지 않는다 | `GameView.Present` + `GameView.Wait` |
 
 ## 6. 데이터 크기·성능 기준
 
@@ -304,7 +253,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] `HashSet`·`Queue`·중첩 컬렉션·컬렉션 그대로의 플레이어 데이터 값이 없다.
 - [ ] 플레이어 데이터를 바꾸는 코드는 모두 행동·Block·결과·`[BindTo]` 안에 있다.
 - [ ] 핵심 규칙 함수(피해·회복·죽음·비용 …)에 행동 직전 이벤트 자리(`Game.Intercept`)가 있고, 비용은 `Game.Pay`로 낸다.
-- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 기획자가 바꿀 숫자는 밸런싱 값이다.
+- [ ] 플레이어에게 보일 실패는 `Game.Fail`(키 + 기본 문장)이고, 개발자가 바꿀 숫자는 밸런싱 값이다.
 - [ ] 행동의 대상 필드는 id가 있는 플레이어 데이터 객체이고, Unity 객체·델리게이트가 없다.
 - [ ] 판 데이터에는 원본 ID와 바뀌는 값만 있고, 고정 값(이름·비용·그림·사용 기능)은 원본에서 읽는다.
 - [ ] 이벤트를 받는 씬 코드는 연출·UI만 하고(`SubscribeAfterAction` → `GameView.Present`), `OnDisable`에서 `Dispose`한다.

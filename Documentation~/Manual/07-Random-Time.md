@@ -35,6 +35,7 @@
 
 플레이 중 **MomoiProject › 모니터**:
 
+- 시드 고정: DB › 시작 파일 › Bootstrap의 **개발 빌드에서 시드 고정** + **시드**(에디터 플레이는 개발 빌드다. 출시 빌드는 늘 지금 시각을 시드로 쓴다). 버그를 같은 순서로 재현할 때 켠다(2.3).
 - 위쪽 줄에 "시드 … · 틱 … · …초"가 보인다(마스터 시드, 게임 시계).
 - 위쪽 시간 조절: **일시정지**/**재개** 버튼(멈춘 이유가 툴팁에 보인다), **1프레임**(일시정지 중 한 프레임만 진행), 배속 선택 **0.25× · 0.5× · 1× · 2× · 4×**.
 - **명령** 탭의 **시간** 묶음: **일시정지 / 재개**, **1프레임 진행**(일시정지 중에만 동작), **배속 0.25**, **배속 1**, **배속 2**.
@@ -52,7 +53,7 @@
 RandomStream damage = Game.Random("damage");      // session.Random.Get("damage")와 같다
 ```
 
-처음 부를 때 그 이름의 스트림을 만들고, 그 뒤로는 같은 스트림을 준다. 스트림 시드는 마스터 시드와 이름으로 정해진다. 이름은 용도별로 나눈다("damage", "loot", "map"). 그러면 전투에서 난수를 한 번 더 뽑아도 드롭 결과는 그대로다.
+처음 부를 때 그 이름의 스트림을 만들고, 그 뒤로는 같은 스트림을 준다(빈 이름은 `ArgumentException`). 스트림 시드는 마스터 시드와 이름으로 정해진다. 이름은 쓰임 하나에 하나로 나눈다("damage", "loot", "map" — 관례 2절). 그러면 전투에서 난수를 한 번 더 뽑아도 드롭 결과는 그대로다.
 
 ### 2.2 수 뽑기: `RandomStream`
 
@@ -73,7 +74,7 @@ ulong raw = damage.NextULong();
 | `Name` | 스트림 이름 |
 | `GetState()` · `SetState(ulong[4])` · `Reseed(seed)` | 상태 꺼내기·넣기·다시 시드(도구·테스트용) |
 
-`rng.Chance(p)`는 행동 직전 이벤트를 거치지 않는다. 유물·패시브 효과("모든 확률 2배", 행운)가 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15)로 굴린다.
+`rng.Chance(p)`는 행동 직전 이벤트를 거치지 않는다. 기획에 "N% 확률로"로 나오는 확률(명중·치명타·드롭·발동 확률 — 행운·"모든 확률 2배" 같은 기믹이 닿을 수 있는 것)은 모두 `Game.Chance`(2.15)로 굴린다(관례 4절). `rng.Chance`는 맵·배치 생성처럼 기믹이 닿지 않는 내부 무작위에만 쓴다.
 
 ### 2.3 시드 정하기: `SessionOptions.Seed`
 
@@ -88,7 +89,7 @@ public static class SeedSetup
 }
 ```
 
-`GBibleRuntime`은 기본으로 현재 시각을 시드로 쓴다(플레이마다 다름). 버그 재현·리플레이처럼 게임 전체를 같은 시드로 돌리려면 `Configuring`에서 고정한다. 세션을 직접 만들면 `new GameSession(new SessionOptions { Seed = 7 })`. 판마다 시드를 정하는 시드 입력·일일 도전은 새 판을 열 때 시드를 준다(2.16).
+`GBibleRuntime`은 기본으로 현재 시각을 시드로 쓴다(플레이마다 다름). 개발 중 버그 재현은 코드 없이 DB › 시작 파일 › Bootstrap의 **개발 빌드에서 시드 고정**을 켠다(1절). 출시 빌드까지 늘 같은 시드여야 할 때만 위처럼 `Configuring`에서 정한다(코드가 Bootstrap 값을 이긴다). 세션을 직접 만들면 `new GameSession(new SessionOptions { Seed = 7 })`. 판마다 시드를 정하는 시드 입력·일일 도전은 새 판을 열 때 시드를 준다(2.16).
 
 ### 2.4 스트림 묶음: `session.Random` (`RandomStreams`)
 
@@ -110,6 +111,7 @@ double now = Game.Session.Clock.Time;    // 게임 시간(초)
 
 - `GBibleRuntime`이 매 프레임 끝(`LateUpdate`)에 `session.EndFrame(Time.deltaTime)`을 부르고, 그때 `Tick`이 1 오르고 `Time`에 `deltaTime`이 더해진다. `Time.deltaTime`은 `Time.timeScale`을 따르므로 배속·일시정지가 시계에 그대로 반영된다.
 - 고정 틱(DB › Bootstrap의 초당 틱 수, `33-Tick-Preview-Csv.md`)을 켜면 프레임마다가 아니라 틱마다 `Tick`이 1 오르고 `Time`에 1/틱 초가 더해진다(한 프레임에 여러 틱일 수 있다).
+- 시계가 한 번 흐를 때마다(행동 밖에서) 시간 규칙이 돈다: 상태 효과 주기·만료 → 패시브 효과 주기 → 시간 예약 → `session.Ticked`(29장·33장).
 - 일시정지 중(`deltaTime`이 0)에는 `EndFrame`을 부르지 않는다. 시계가 멈추고 스냅샷도 찍히지 않지만, 플레이어 데이터 Sync와 조건 평가는 계속한다.
 - 세션을 직접 만들었다면 `session.EndFrame(deltaTime)`을 직접 부른다.
 - 행동을 실행하면 그때의 `Tick`이 행동의 `tick` 필드에 적힌다. 기록(Journal)의 각 줄도 틱을 갖는다.
@@ -181,7 +183,7 @@ TimeSpan away = Game.Now - profile.lastSeen;               // 꺼 둔 시간(오
 
 - 바깥 행동이 시작할 때 시스템이 현실 시각을 한 번 찍어 행동의 `utc`(`long`, 1970-01-01부터 UTC 밀리초)에 적는다. 그 행동 안에서는 `Game.Now`가 늘 그 값이다. 안쪽 행동·트리거 결과·Block도 같은 값을 본다. 행동 하나 = 한 순간이다.
 - 이미 `utc`가 있는 행동(멀티플레이로 받은 행동, 기록에서 다시 돌리는 행동)은 그 값을 그대로 쓴다. 그래서 어디서 언제 다시 돌려도 결과가 같다.
-- 미리보기(`Game.Preview`·`CanDo`)도 시각을 찍는다.
+- 미리보기(`Game.Preview`·`CanDo`)도 시각을 찍고, 끝나면 지운다(같은 객체를 나중에 `Do`하면 그때 시각).
 - 행동 밖(씬 코드)에서는 부를 때의 지금 시각이다. 화면의 "남은 시간" 표시에 쓴다.
 - 규칙(행동·Block·트리거 결과)에서는 `DateTime.Now`·`DateTime.UtcNow`를 쓰지 않는다. `Game.Now`를 쓴다.
 - 플레이어 데이터에 시각을 적을 때는 `DateTime` 필드(또는 `long` 밀리초)에 `Game.Now`를 넣는다. 저장·Undo가 그대로 따라간다.
@@ -227,8 +229,8 @@ public static class ClockSetup
 | `RealClock` (`Func<DateTime>`) | 비움 = 이 컴퓨터의 시계(`DateTime.UtcNow`) | 현실 시각의 출처. UTC(`DateTimeKind.Utc`)를 돌려준다. 시험에서는 고정 시각(4.9), 서버·Steam 시각을 쓸 때는 그것 |
 | `TimeZone` (`TimeZoneInfo`) | 비움 = 싱글은 이 컴퓨터의 시간대, 멀티(서버·클라이언트)는 UTC | `Day`·`Week`를 셀 시간대 |
 
-- 시간대를 비우면 싱글 게임은 플레이어마다 자기 지역 시각으로 날이 바뀐다. 싱글 게임은 보통 이대로 둔다. 멀티플레이(세션이 서버·클라이언트)는 비우면 서버와 클라이언트 모두 UTC로 세고(컴퓨터마다 시간대가 달라 서버의 판정과 클라이언트의 미리보기가 다른 날을 세지 않게), 처음 셀 때 타임라인에 경고를 한 번 남긴다 — 일일 초기화를 맞출 시간대를 정한다.
-- 모든 플레이어가 같은 순간에 초기화돼야 하면(서버 이벤트·랭킹) 시간대를 정한다. 시간대 이름(`FindSystemTimeZoneById`)은 Windows·모바일이 달라서, 위처럼 고정 차이로 만드는 편이 안전하다.
+- 비우면 싱글 게임은 플레이어마다 자기 지역 시각으로 날이 바뀐다(싱글은 이대로 둔다). 멀티플레이(세션이 서버·클라이언트)는 서버·클라이언트 모두 UTC로 세고(판정과 미리보기가 다른 날을 세지 않게), 처음 셀 때 타임라인에 경고를 한 번 남긴다 — 멀티는 시간대를 정한다.
+- 모든 플레이어가 같은 순간에 초기화돼야 하면(서버 이벤트·랭킹) 시간대를 정한다. 시간대 이름(`FindSystemTimeZoneById`)은 Windows·모바일이 달라서, 위처럼 고정 차이로 만든다.
 - DB › Bootstrap에 칸은 없다. `Configuring`에서, 세션을 직접 만들면 `new SessionOptions { … }`에서 정한다.
 
 ### 2.14 게임 시계와 현실 시각 고르기
@@ -261,8 +263,8 @@ bool lucky = Game.Chance(0.1, user: hero);                                 // �
 3. 난수는 **늘 한 번** 굴린다. 확률이 바뀌거나 막혀도 같다. 그래서 같은 시드면 뒤의 결과가 밀리지 않는다.
 
 - 행동 안에서 부른다. 행동 직전 이벤트 결과가 그 행동 안에서 돈다.
-- DB에서는 조건 **'확률'**(칸: `percent`(확률(%)) · `stream`(난수 흐름(비우면 chance)))을 이벤트 받기·행동 직전 이벤트 받기·사용 트리거와 `&& AND`로 쓴다. 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. `Game.CanUse` 미리 보기에서는 굴리지 않고 참이다. 이벤트 없는 '조건 충족'만으로는 거짓이다(11장).
-- 행동 직전 이벤트 '확률'의 행동 직전 이벤트 고치기는 28장이다.
+- DB에서는 조건 **'확률'**(칸: `percent`(확률(%)) · `stream`(난수 흐름(비우면 chance)))을 이벤트 받기·행동 직전 이벤트 받기·사용 트리거와 `&& AND`로 쓴다. 굴리는 때·굴리지 않는 때는 11장 2-6.
+- 행동 직전 이벤트 '확률'을 고치는 법은 28장 4-14.
 
 ### 2.16 시드로 새 판: `NewRun(seed)` · `RandomStreams.SeedOf`
 
@@ -272,9 +274,8 @@ session.NewRun(RandomStreams.SeedOf("2026-10-05"));                  // 세션�
 GBibleRuntime.NewRun(session);                                       // 시드 없이: 난수는 이어서 흐른다
 ```
 
-- `GBibleRuntime.NewRun(session, seed)` · `session.NewRun(seed)`: 판 값을 처음 값으로 되돌린 뒤 마스터 시드를 그 시드로 바꾸고 모든 스트림을 처음 상태로 맞춘다(`session.Random.Reseed`). 같은 시드 = 같은 판이다.
-- 시드를 주지 않으면 난수를 다시 맞추지 않는다. 스트림은 앞 판에서 이어서 흐른다.
-- `RandomStreams.SeedOf(글자)`: 글자 시드를 숫자 시드로 바꾼다. 앞뒤 빈칸을 떼고 대문자로 맞춘다. `" abcd1234 "`와 `"ABCD1234"`는 같은 판이다.
+- `GBibleRuntime.NewRun(session, seed)` · `session.NewRun(seed)`: 판 값을 처음 값으로 되돌린 뒤 마스터 시드를 그 시드로 바꾸고 모든 스트림을 처음 상태로 맞춘다(`session.Random.Reseed`). 같은 시드 = 같은 판이다. 시드를 주지 않으면 스트림은 앞 판에서 이어서 흐른다.
+- `RandomStreams.SeedOf(글자)`: 앞뒤 빈칸을 떼고 대문자로 맞춘 뒤 숫자 시드로 바꾼다. `" abcd1234 "`와 `"ABCD1234"`는 같은 판이다.
 - 일일 도전 = 날짜 글자를 시드로 쓴다. 모두 같은 날 같은 판을 받는다.
 - 같은 시드여도 판을 여는 행동이 난수를 뽑는 차례가 같아야 같은 판이다. 덱·맵은 `NewRun` 바로 뒤의 새 판 행동에서 만든다.
 - 시드로 연 판도 판 저장에 마스터 시드·스트림 상태가 들어간다. 이어 하면 그 시드 그대로다(3절).
@@ -301,6 +302,8 @@ GBibleRuntime.NewRun(session);                                       // 시드 �
 
 ## 4. 상황별 예제
 
+예제는 문법을 보이려고 숫자(명중률·8시간·새벽 4시)를 코드에 적었다. 프로젝트에서는 바꿀 숫자를 DB › 밸런싱 값(`Game.Balance`, 30장)에서 읽고, 피해·회복은 규칙 함수(행동 직전 이벤트 자리, 관례 4절)를 거친다.
+
 ### 4.1 턴제: 명중·치명타·피해
 
 ```csharp
@@ -323,10 +326,9 @@ public class Slash : GameAction
 
     protected override void Run()
     {
-        var rng = Game.Random("combat");
-        if (rng.Range(0, 100) >= target.accuracy) return;            // 빗나감(난수 소비도 Undo 단위)
-        var damage = baseDamage + rng.Range(0, 4);
-        if (rng.Chance(0.15)) damage *= 2;                            // 치명타
+        if (!Game.Chance(target.accuracy / 100.0, "combat")) return;  // 빗나감(난수 소비도 Undo 단위). "명중 +10%" 기믹이 고칠 수 있다
+        var damage = baseDamage + Game.Random("combat").Range(0, 4);  // 피해 폭: 기믹이 닿지 않는 무작위
+        if (Game.Chance(0.15, "combat")) damage *= 2;                 // 치명타
         target.hp -= damage;
     }
 }
@@ -367,7 +369,7 @@ public class OpenChest : GameAction
 }
 ```
 
-"loot" 스트림만 쓰므로, 전투에서 난수를 몇 번 뽑든 상자 결과의 순서는 바뀌지 않는다.
+"loot" 스트림만 쓰므로, 전투에서 난수를 몇 번 뽑든 상자 결과의 순서는 바뀌지 않는다. 이 예는 스트림 나누기만 보인다 — 실제 드롭·보상·조우 표는 코드에 두지 않고 DB › 가중치 표 + `Game.Roll`(표마다 따로인 결정론 흐름, 30장)로 만든다.
 
 ### 4.3 맵 생성: 판 시드로 같은 맵 다시 만들기
 
@@ -457,7 +459,7 @@ public class BuffTicker : MonoBehaviour
 }
 ```
 
-일시정지 중에는 시계가 멈춰 버프 시간도 줄지 않는다. 스냅샷을 되감으면 시계와 `endsAt`이 함께 돌아간다. 만료 처리도 행동이라 되감기·기록에 함께 들어간다.
+일시정지 중에는 시계가 멈춰 버프 시간도 줄지 않는다. 스냅샷을 되감으면 시계와 `endsAt`이 함께 돌아간다. 만료 처리도 행동이라 되감기·기록에 함께 들어간다. 이 예는 `Clock.Time` 기준으로 적는 법만 보인다 — 실제 버프·쿨다운("N초 동안")은 상태 효과(게임 시간 지속, 29장)로 만든다(관례 10절).
 
 ### 4.5 메뉴·대화창 일시정지
 
@@ -655,10 +657,11 @@ public static class RunStarter
 | 리플레이·멀티에서 결과가 어긋남 | 규칙 계산에 `UnityEngine.Random`·`System.Random`을 썼다. 버전·플랫폼마다 결과가 다를 수 있다. 규칙은 `Game.Random`만 쓴다. |
 | Undo 후 연출 난수가 반복됨 | 연출에 `Game.Random`을 썼다. Undo가 모든 스트림을 되돌린다. 연출은 `UnityEngine.Random`. |
 | 전투에서 한 번 더 뽑았더니 드롭이 바뀜 | 같은 스트림을 함께 썼다. 용도별로 이름을 나눈다. |
-| 플레이마다 결과가 다름 | `GBibleRuntime`의 기본 시드는 현재 시각이다. 재현이 필요하면 `Configuring`에서 `Seed`를 고정한다. 판마다 정한 시드면 `GBibleRuntime.NewRun(session, seed)`(2.16). |
+| 플레이마다 결과가 다름 | `GBibleRuntime`의 기본 시드는 현재 시각이다. 재현이 필요하면 DB › Bootstrap의 **개발 빌드에서 시드 고정**을 켠다(2.3). 판마다 정한 시드면 `GBibleRuntime.NewRun(session, seed)`(2.16). |
 | 같은 시드로 새 판을 열었는데 판이 다름 | `NewRun`에 시드를 주지 않았다(난수가 이어서 흐른다). 또는 판을 여는 행동이 난수를 뽑는 차례가 다르다(조건에 따라 한 번 더 뽑기). 새 판 행동은 같은 차례로 뽑는다(2.16). |
 | 시드 글자의 대소문자·빈칸만 달라도 다른 판일까 걱정 | `RandomStreams.SeedOf`가 앞뒤 빈칸을 떼고 대문자로 맞춘다. 같은 판이다. |
-| "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 행동 직전 이벤트를 거치지 않는다. 고칠 수 있어야 하는 확률은 `Game.Chance`(2.15) 또는 DB 조건 '확률'. || 쿨다운이 되감기·이어하기 뒤 어긋남 | `Time.time`으로 적었다. `session.Clock.Time` 기준으로 플레이어 데이터에 적는다. |
+| "모든 확률 2배" 유물이 먹히지 않음 | 확률을 `Game.Random(…).Chance(p)`로 굴렸다. 행동 직전 이벤트를 거치지 않는다. 기획의 확률은 `Game.Chance`(2.15) 또는 DB 조건 '확률'. |
+| 쿨다운이 되감기·이어하기 뒤 어긋남 | `Time.time`으로 적었다. `session.Clock.Time` 기준으로 플레이어 데이터에 적는다. |
 | 일시정지했는데 쿨다운이 줄어듦 | `Time.unscaledTime`·`Time.realtimeSinceStartup` 같은 실제 시간을 썼다. |
 | 대화창을 닫았는데 게임이 안 움직임 | 다른 이유(메뉴 등)의 일시정지가 남아 있다. `GameTime.PausedBy`로 확인한다. 모니터의 일시정지 버튼 툴팁에도 멈춘 이유가 보인다. |
 | `StepFrame`이 아무 일도 안 함 | 일시정지 상태가 아니다. |
@@ -668,6 +671,6 @@ public static class RunStarter
 | 일시정지 중에도 쿨다운이 줄어듦 | 게임 안의 쿨다운을 `Game.Now`로 쟀다. 게임 안의 시간은 `session.Clock`, 현실 시간 규칙(스태미나·일일)만 `Game.Now`. |
 | 기기 시계를 앞으로 돌려 보상을 더 받음 | 기기 시계는 플레이어가 바꿀 수 있다. 서버·Steam 시각이 있으면 `RealClock`으로 넘긴다. 없으면 상한을 두고 뒤로 간 시간은 0으로 센다(4.7). |
 | 일일 초기화 시각이 플레이어마다 다름 | 싱글에서 `TimeZone`을 비워 각자 지역 시각으로 센다(멀티는 비우면 모두 UTC). 모두 같은 순간이어야 하면 `TimeZone`을 정한다(2.13). |
-| `Game.Now`가 옛 시각 | 같은 행동 객체를 두 번 `Do`했거나, 미리보기한 객체를 그대로 `Do`했다. `utc`는 이미 값이 있으면 그대로 쓴다. `Do`할 때마다 `new`로 만든다. |
+| `Game.Now`가 옛 시각 | 같은 행동 객체를 두 번 `Do`했다(실패한 것을 다시 `Do`한 것 포함). `utc`는 이미 값이 있으면 그대로 쓴다. `Do`할 때마다 `new`로 만든다(미리보기가 찍은 시각은 지워지므로 괜찮다). |
 | 행동 안에서 `Game.Now`가 흐르지 않음 | 의도된 동작이다. 행동 하나는 한 순간이다. |
 | 처음 켰더니 오프라인 보상이 엄청남 | `DateTime` 필드의 처음 값(`default`, 0001년)부터 쟀다. 처음이면 시각만 적는다(4.7). |

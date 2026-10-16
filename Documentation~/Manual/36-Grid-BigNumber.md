@@ -1,6 +1,6 @@
 # 36. 격자·큰 수
 
-**한 줄 요약**: 칸 단위 게임(전술·로그라이크 던전·보드·농장)은 칸 좌표 `Cell`과 `Grid`의 함수(거리·이웃·방향·이동 범위·길찾기·직선·시야·범위 모양)로 규칙을 쓴다. `Grid`는 맵을 들고 있지 않다. 맵은 게임의 데이터(바뀌지 않는 맵은 원본 인스턴스의 `rows` 글자 목록)이고, `Grid` 함수는 "이 칸에 들어가는 비용"·"이 칸이 시야를 막나"를 함수로 받는다. 플레이어 데이터에는 개체의 `x`·`y`(정수)만 두고, 칸마다의 판 값(심은 작물·부서진 벽)은 `Grid.Key(x, y)` = `"x,y"`를 키로 한 딕셔너리에 둔다. 같은 입력이면 늘 같은 길이 나와 Undo·멀티플레이·재현에서 같다. **큰 수**(`BigNumber`)는 double(약 1e308)을 넘는 방치형·인플레이션 수치를 담는 구조체다(1e300 아래는 double 값 그대로, 그 위는 가수 × 10^지수). 연산자로 평소처럼 계산하고, 플레이어 데이터에 그냥 두면 저장·Undo·Mirror가 따라오고, `ToString()`은 `"1.23K"`·`"4.56Qa"`·`"1.5e400"`이다. `Game.Pay`·DB의 숫자 칸은 double만 알아서 큰 수의 비용은 코드로 검사한다. 가격 곡선(30장)의 "10개 사기"·"살 수 있는 만큼"은 `Game.BalanceSum`·`Game.BalanceCount`다.
+**한 줄 요약**: 칸 단위 게임(전술·로그라이크 던전·보드·농장)은 칸 좌표 `Cell`과 `Grid`의 함수(거리·이웃·방향·이동 범위·길찾기·직선·시야·범위 모양)로 규칙을 쓴다. `Grid`는 맵을 들고 있지 않다. 맵은 게임의 데이터(바뀌지 않는 맵은 원본 인스턴스의 `rows` 글자 목록)이고, `Grid` 함수는 "이 칸에 들어가는 비용"·"이 칸이 시야를 막나"를 함수로 받는다. 플레이어 데이터에는 개체의 `x`·`y`(정수)만 두고, 칸마다의 판 값(심은 작물·부서진 벽)은 `Grid.Key(x, y)` = `"x,y"`를 키로 한 딕셔너리에 둔다. 같은 입력이면 늘 같은 길이 나와 Undo·멀티플레이·재현에서 같다. **큰 수**(`BigNumber`)는 double(약 1e308)을 넘는 방치형·인플레이션 수치를 담는 구조체다. 연산자로 평소처럼 계산하고, 플레이어 데이터에 그냥 두면 저장·Undo·Mirror가 따라오고, `ToString()`은 `"1.23K"`·`"4.56Qa"`·`"1.5e400"`이다. `Game.Pay`·DB의 숫자 칸은 큰 수를 모르므로 큰 수의 비용은 코드로 검사한다. 가격 곡선(30장)의 "10개 사기"·"살 수 있는 만큼"은 `Game.BalanceSum`·`Game.BalanceCount`다.
 
 **언제 쓰는가**
 
@@ -10,7 +10,7 @@
 - 농장: 밭 칸마다 작물이 자라고, 물뿌리개가 3×3에 물을 준다.
 - 방치형·클리커: 쿠키 1e60개, 초당 생산, 건물 가격 ×1.15씩, "10개 사기"(큰 수 + 가격 곡선).
 
-조각을 칸에 놓는 게임(조커 칸·손패·가방 격자·와일드프로스트 보드)은 이 장이 아니라 [37장 자리(Placement)](37-Placement.md)다. 개체가 좌표를 들고 걸어 다니면 `Grid`, 목록 위치가 곧 칸이면 `Placement`다.
+조각을 칸에 놓는 게임(조커 칸·핸드·가방 격자·와일드프로스트 보드)은 이 장이 아니라 [37장 자리(Placement)](37-Placement.md)다. 개체가 좌표를 들고 걸어 다니면 `Grid`, 목록 위치가 곧 칸이면 `Placement`다.
 
 이 문서에서 쓰는 용어:
 
@@ -26,8 +26,8 @@
 | Bresenham | 두 칸 사이의 직선을 칸들로 근사하는 방법. `Grid.Line`이 쓴다. |
 | 결정론 | 같은 입력이면 늘 같은 결과. 비용이 같은 길이 여럿이어도 늘 같은 길을 고른다. |
 | 맵 | 칸마다의 지형. 바뀌지 않는 맵은 원본 인스턴스(DB › 인스턴스)의 `rows`(글자 목록, 글자 하나 = 칸 하나), 판에서 바뀌는 칸은 플레이어 데이터의 딕셔너리(칸 키 → 값). |
-| 큰 수 (`BigNumber`) | 1e300 아래는 double 값 그대로(`m` = 값, `e` = 0), 그 위는 가수 `m`(1 ≤ \|m\| < 10, double) × 10^`e`(지수, long). `[Serializable]` 구조체. |
-| 유효 숫자 | 정확히 담기는 자릿수. 1e300 아래는 double과 같다(정수는 2^53까지 정확). 그 위는 가수가 double이라 약 15자리다. |
+| 큰 수 (`BigNumber`) | double(약 1e308)을 넘는 값도 담는 `[Serializable]` 구조체. 필드 `m`(double)·`e`(long) — 담는 모양은 2-7. |
+| 유효 숫자 | 정확히 담기는 자릿수(2-7 '정밀도'). |
 | 가격 곡선 | 곡선을 붙인 밸런싱 값(30장)에서 단계 = 이미 산 개수인 것. |
 
 ---
@@ -122,7 +122,7 @@
 
 ### 2-7. 큰 수 — `BigNumber`
 
-- **담는 모양**: 1e300 아래는 double 값 그대로 담는다(`m` = 값, `e` = 0 — `new BigNumber(1234)` → m 1234, e 0). 그 위는 가수(1 ≤ |m| < 10) × 10^`e`다(`new BigNumber(1.5, 400)` → m 1.5, e 400). 0은 m 0, e 0이다. `m`·`e`를 직접 고치지 않는다. 예전 방식으로 저장된 값(작은 값도 가수 × 10^지수)도 셈·비교할 때 맞춘다.
+- **담는 모양**: 1e300 아래는 double 값 그대로 담는다(`m` = 값, `e` = 0 — `new BigNumber(1234)` → m 1234, e 0). 그 위는 가수(1 ≤ |m| < 10) × 10^`e`다(`new BigNumber(1.5, 400)` → m 1.5, e 400). 0은 m 0, e 0이다. `m`·`e`를 직접 고치지 않는다(연산자·생성자로만).
 - `double`·`int`·`long`에서 **저절로** 바뀐다(`BigNumber x = 5;`, `run.cookies += 0.1`). 거꾸로는 명시해야 한다: `(double)x` 또는 `x.ToDouble()` — 1e308을 넘으면 ±무한대.
 - 연산자: `+` `−` `×` `÷`, 부호 `−x`, 비교 `==` `!=` `<` `>` `<=` `>=`(`CompareTo`·`Equals`도 같다).
 - **정밀도**: 1e300 아래는 double 셈 그대로라 오차가 쌓이지 않는다 — 1을 49번 더하면 정확히 49, 0.5씩 모아도 정확하고, 정수는 2^53(약 9e15)까지 정확하다(그보다 크면 double처럼 끝자리가 둥글어진다 — 쿠키 1e30개에 1을 더해도 그대로). 1e300 위는 가수가 double이라 유효 숫자 약 15자리이고, 더하기·빼기는 지수 차이가 17자리를 넘으면 작은 쪽을 버린다: 1.5e400 + 1 = 1.5e400.
@@ -130,7 +130,7 @@
 - `Pow(값, 지수)`: 작은 수는 double의 거듭제곱 그대로다(2^3 = 8, 5^2 = 25 정확히 — 넘치면 가수 × 10^지수로). 음수의 거듭제곱은 예외("[MomoiProject] 큰 수: 음수의 거듭제곱은 지원하지 않습니다."). 0^0 = 1, 0^p = 0.
 - `Floor`: 1e300 아래는 소수를 버린다(음의 무한대 쪽, −1.5 → −2). 그 위는 그대로(소수가 없다).
 - `[Serializable]` 구조체라 플레이어 데이터 필드·목록(`List<BigNumber>`)에 그냥 둔다. 판 저장·Undo·Mirror(Sync)가 다른 필드처럼 따라온다.
-- **`Game.Pay`와 DB의 숫자 칸은 double 숫자 필드만 안다.** `Game.Pay(키, "cookies", …)`는 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)."로 프로그래머 실수가 된다. DB Block의 숫자 비교·증감도 큰 수 필드에 쓰지 않는다. 큰 수의 비용은 코드로 검사하고 뺀다: `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7).
+- **`Game.Pay`와 DB의 숫자 칸은 기본 숫자 형식(`int`·`long`·`double` …) 필드만 안다.** `Game.Pay(키, "cookies", …)`는 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)."로 프로그래머 실수가 된다. DB Block의 숫자 비교·증감도 큰 수 필드에 쓰지 않는다. 큰 수의 비용은 코드로 검사하고 뺀다: `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7).
 
 ### 2-8. 큰 수를 글로 — `ToString` · `Parse`
 
@@ -147,7 +147,7 @@
 - 형식은 하나만 줘도 된다(`x.ToString("ko")` = `x.ToString("ko", null)`). 문자열 보간의 형식(`$"{x:ko}"`)도 같다.
 - binding-path(`run:cookies`, 35장)와 문장 틀의 값(`Texts.Get("hud.cookies", ("count", run.cookies))`, `Game.Fail`의 값)은 기본 형식이다.
 - `BigNumber.Parse(글)`: `"1.5e40"`(e·E) · 짧은 단위(`"3.2K"`) · 숫자(`"12345"`)를 읽는다. double로 담기는 크기는 글자 그대로 읽는다(`"1.13e2"` → 정확히 113). 비거나 공백이면 0. 한국어 단위(`"1.23억"`)는 읽지 못한다(`FormatException`).
-- binding-path의 **숫자** 칸(ProgressBar·Slider)과 컴포넌트 '데이터 연결'의 `onNumber`는 double로 바꿀 수 있는 값만 읽어 큰 수는 0이다. 막대의 비율은 화면 코드에서 `(float)(a / b).ToDouble()`로 계산한다.
+- binding-path의 **숫자** 칸(ProgressBar·Slider)과 컴포넌트 '데이터 연결'의 `onNumber`는 큰 수를 `ToDouble()`로 읽어 float로 넣는다. float 한계(약 3.4e38)를 넘으면 무한대라 막대가 깨진다. 그만큼 커질 값의 막대는 비율을 화면 코드에서 `(float)(a / b).ToDouble()`로 계산해 넣는다.
 
 ### 2-9. 가격 곡선의 합 · 개수 — `BalanceSum` · `BalanceCount`
 
@@ -169,8 +169,21 @@
 [Serializable] public class MapData { public List<string> rows = new List<string>(); }
 ```
 
-2. `MomoiProject → DB` → **인스턴스** → **+ 새로 만들기** → ID `forestMap` → **instanceType** `MapData`.
-3. `rows`에 줄을 하나씩 더하고 글자로 맵을 그린다. 글자 하나가 칸 하나다.
+2. 인스턴스 `forestMap`(형식 `MapData`)은 AI가 DB 반영 스크립트로 만든다(관례 15절). 인스턴스는 로직 쪽 종류라 DB 창에 **+ 새로 만들기**가 없다.
+
+```csharp
+// Assets/MomoiProject/Code/Editor/Seeds/MapSeeds.cs
+[DbSeed("1")]
+static void Maps()
+{
+    if (EditorDatabase.Instance.FindById("forestMap") != null) return;          // 이미 있으면 개발자가 고친 맵을 덮지 않는다
+    var map = (InstanceData)EditorDatabase.Staging.Add(typeof(InstanceData), "forestMap");
+    map.instanceType = typeof(MapData).FullName;
+    map.value = new MapData { rows = { "#########", "#..**...#", "#..#~~..#", "#..#....#", "#.......#", "#########" } };
+}
+```
+
+3. `rows`의 줄은 값이라 개발자가 DB › 인스턴스에서 더하고 고친다. 글자 하나가 칸 하나다.
 
 ```
 #########
@@ -189,13 +202,14 @@
 | `#` | 벽(맵 밖도 벽으로 본다) | 못 감 | 막는다 |
 | `=` | 밭(농장, 5-6) | 1 | 보인다 |
 
-4. 저장(Ctrl+S). `GameIds.Instance.ForestMap`이 생긴다. 판 데이터에는 맵의 ID만 둔다(`battle.map = GameIds.Instance.ForestMap`).
+4. `GameIds.Instance.ForestMap`은 반영 스크립트가 돈 뒤 Unity가 다시 컴파일하면 생긴다. 판 데이터에는 맵의 ID만 둔다(`battle.map = GameIds.Instance.ForestMap`). 개발자가 고친 줄은 적용 전 → 저장(Ctrl+S).
 
 - **좌표**: 칸 (x, y)의 글자 = `rows[y][x]`. y = 0이 첫 줄이다. `Grid.Up`(y + 1)은 rows로 보면 **다음 줄**(아래)이다. Tilemap에 그릴 때는 `new Vector3Int(x, -y, 0)`처럼 y를 뒤집어 그리면 글자 모양 그대로 보인다.
 - 줄 길이가 달라도 된다. 짧은 줄의 오른쪽은 맵 밖(벽)으로 본다(5절의 `Board.TileAt`).
-- 글자의 뜻(비용·시야)은 코드 한 곳(`Board.TerrainCost`·`BlocksSight`)에 둔다. 기획자가 비용을 고치게 하려면 글자마다 밸런싱 값을 두고 읽는다(`Game.Balance("forestCost")`).
+- 글자의 뜻(비용·시야)은 코드 한 곳(`Board.TerrainCost`·`BlocksSight`)에 둔다. 비용 숫자는 개발자가 바꿀 값이라 실제 게임에서는 글자마다 밸런싱 값을 두고 읽는다(`Game.Balance(GameIds.Balance.ForestCost)`, 관례 18절). 5절 예제는 짧게 보이려고 숫자를 적었다.
 - **판에서 바뀌는 칸**(부서진 벽·연 문·갈아 둔 밭)은 원본을 고치지 않는다(원본은 읽기만, 04장 2.7). 판 데이터에 `Dictionary<string, char>`(칸 키 → 바뀐 글자)를 두고, `TileAt`이 그것을 먼저 본다.
-- 맵이 아주 크거나 Tilemap에서 그리고 싶으면 Tilemap → `rows`로 굽는 에디터 메뉴를 프로젝트가 만든다(DB 추가 메뉴, 관례 15절).
+- **개발자가 맵을 직접 더하고 지우게 하려면**(레벨 배치가 개발자 몫이면) 인스턴스 대신 `[Database("맵", Group = "레벨", DeveloperAuthored = true)]`를 붙인 프로젝트 DB 종류에 `rows`를 둔다. 이 종류만 개발자가 항목을 추가·삭제한다(관례 18절, 21장 3-1). 그때 `Board.MapOf`는 `Game.Entry<그 종류>(id)`로 그 항목을 읽는다(원본이라 읽기만).
+- 맵이 아주 크거나 Tilemap에서 그리고 싶으면 Tilemap → `rows`로 굽는 에디터 도구를 프로젝트가 만든다(`Assets/MomoiProject/Code/Editor`).
 
 ### 3-2. 맵을 CSV로 — 시트에서 고치기
 
@@ -219,8 +233,8 @@ caveMap,#####,#...#,#.#.#,#####,,
 
 ### 3-3. 모니터에서 확인하기
 
-- **데이터** 탭: 개체의 `x`·`y`, 칸 딕셔너리(키 `"3,4"`)가 보인다. 큰 수 필드는 구조체라 `m`·`e` 두 필드로 보인다(1e300 아래는 m = 값·e = 0 — 1234 = m 1234, e 0. 그 위는 가수·지수 — 1.5e400 = m 1.5, e 400).
-- 큰 수에는 DB › 개발 명령의 '플레이어 데이터에 주기'를 쓸 수 없다(double 숫자 칸). 개발 명령 항목을 만들고 그 ID에 `[BindTo]`로 코드를 잇는다.
+- **데이터** 탭: 개체의 `x`·`y`, 칸 딕셔너리(키 `"3,4"`)가 보인다. 큰 수 필드는 구조체라 `m`·`e` 두 필드로 보인다(담는 모양은 2-7).
+- 큰 수에는 DB › 개발 명령의 '플레이어 데이터에 주기'를 쓸 수 없다(숫자 칸이 아니다). AI가 개발 명령 항목을 반영 스크립트로 만들고 그 ID에 `[BindTo]`로 코드를 잇는다(관례 19절).
 
 ```csharp
 [BindTo(GameIds.DebugCommand.CookiesX1000)]
@@ -311,13 +325,14 @@ if (run.cookies < price) throw Game.Fail("fail.noCookies", "쿠키가 모자랍�
 
 ## 5. 상황별 예제
 
-5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 행동 직전 이벤트 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런싱 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 DB › 밸런싱 값에 항목을 만들고 저장하면 생긴다.
+5-1~5-6은 아래 규칙 파일을 함께 쓴다(`Assets/MomoiProject/Code/Rules/Board.cs`). 피해는 프로젝트의 피해 규칙 함수(`Rules.Damage`, 행동 직전 이벤트 자리가 있는 것, 28장 5-3)를 부른다고 본다. 밸런싱 값 ID 상수(`GameIds.Balance.SkillPower` · `BowPower` · `HeroAttack` …)는 AI가 DB 반영 스크립트로 밸런싱 값 항목을 만들고 Unity가 다시 컴파일하면 생긴다(관례 15절). 각 예제의 **에디터**는 그 스크립트로 만들 항목이다.
 
 ```csharp
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using GBible;
+using GBible.Data;      // DataRef
 using GBible.Ids;
 
 // 맵 원본(DB › 인스턴스, 3-1). 글자 하나 = 칸 하나, rows[y][x].
@@ -334,7 +349,7 @@ public class Unit
 }
 
 // 판 데이터: RunState에 public Battle battle; 을 둔다
-[Serializable] public class Battle { public string map; public List<Unit> units = new List<Unit>(); }
+[Serializable] public class Battle { [DataRef(typeof(MapData))] public string map; public List<Unit> units = new List<Unit>(); }   // DataRef: DB에서 맵 인스턴스를 드롭다운으로
 
 public static class Board
 {
@@ -562,10 +577,10 @@ public class Shove : GameAction
 [Serializable]
 public class Dungeon                                    // RunState에 public Dungeon dungeon; 을 둔다
 {
-    public string map;
+    [DataRef(typeof(MapData))] public string map;
     public Unit hero = new Unit { id = "hero", side = "ally" };
     public List<Unit> monsters = new List<Unit>();
-    public Dictionary<string, bool> seen = new Dictionary<string, bool>();   // 본 칸(칸 키) — 안개
+    [UnityEngine.SerializeField] public Dictionary<string, bool> seen = new Dictionary<string, bool>();   // 본 칸(칸 키) — 안개. 딕셔너리 필드에는 SerializeField(관례 3절)
 }
 
 [Serializable, BlockInfo("한 칸 걷기")]
@@ -630,23 +645,23 @@ public class Step : GameAction
 밭 칸마다 작물이 있다. 칸 수만큼 객체를 미리 만들지 않고, 심은 칸만 딕셔너리에 둔다.
 
 ```csharp
-[Serializable] public class Crop { public string seed; public int days; public bool watered; }   // seed = 씨앗 원본 ID
+[Serializable] public class Crop { [DataRef(typeof(SeedData))] public string seed; public int days; public bool watered; }   // seed = 씨앗 원본 ID
 [Serializable] public class SeedData { public int growDays = 4; public string harvest; }          // 씨앗 원본(DB › 인스턴스)
 
 [Serializable]
 public class Farm                                       // RunState에 public Farm farm = new Farm(); 을 둔다
 {
-    public string map;                                  // 원본 맵(밭은 '=')
+    [DataRef(typeof(MapData))] public string map;       // 원본 맵(밭은 '=')
     public int canLevel;                                // 물뿌리개 단계: 0 = 한 칸, 1 = 3×3
-    public Dictionary<string, Crop> crops = new Dictionary<string, Crop>();   // 칸 키 "x,y" → 작물
+    [UnityEngine.SerializeField] public Dictionary<string, Crop> crops = new Dictionary<string, Crop>();   // 칸 키 "x,y" → 작물
 }
-// RunState에 public Dictionary<string, int> seeds = new Dictionary<string, int>();  — 씨앗 원본 ID → 개수
+// RunState에 [UnityEngine.SerializeField] public Dictionary<string, int> seeds = new Dictionary<string, int>();  — 씨앗 원본 ID → 개수
 
 [Serializable, BlockInfo("씨 심기")]
 public class Plant : GameAction
 {
     public int x, y;
-    [DataRef(typeof(InstanceData))] public string seed;
+    [DataRef(typeof(SeedData))] public string seed;     // SeedData 인스턴스만 고른다
 
     protected override void Run()
     {
@@ -698,7 +713,7 @@ foreach (var pair in GBibleRuntime.Game.Data().Run.farm.crops)
 
 ### 5-7. 방치형 — 쿠키(`BigNumber`) + 가격 곡선(`BalanceSum` · `BalanceCount`)
 
-**에디터**
+**에디터**(반영 스크립트로 만들 항목, 5절 앞)
 
 - DB › 밸런싱 값 `cursorPrice`: `value` `15`, 곡선 `비율로(×단계마다)`, `startX` `0`(단계 = 가진 수, 0개일 때 15), `rate` `1.15`, `rounding` `올림`(30장).
 - DB › 인스턴스 `cursor`: `BuildingData`, `cps` `0.1`, `price` `cursorPrice`.
@@ -709,9 +724,9 @@ foreach (var pair in GBibleRuntime.Game.Data().Run.farm.crops)
 ```csharp
 // RunState에 더한다
 public BigNumber cookies;                                                   // 큰 수: 연산자는 평소처럼
-public Dictionary<string, int> buildings = new Dictionary<string, int>();   // 건물 원본 ID → 가진 수
+[UnityEngine.SerializeField] public Dictionary<string, int> buildings = new Dictionary<string, int>();   // 건물 원본 ID → 가진 수
 
-[Serializable] public class BuildingData { public double cps; public string price; }   // 원본: 초당 생산 · 가격 곡선(밸런싱 값 ID)
+[Serializable] public class BuildingData { public double cps; [DataRef(typeof(BalanceData))] public string price; }   // 원본: 초당 생산 · 가격 곡선(밸런싱 값 ID)
 
 public static class Bakery
 {
@@ -743,7 +758,7 @@ public class Bake : GameAction
 [Serializable, BlockInfo("건물 사기")]
 public class BuyBuilding : GameAction
 {
-    [DataRef(typeof(InstanceData))] public string building;
+    [DataRef(typeof(BuildingData))] public string building;
     public int count = 1;                               // 0 = 살 수 있는 만큼
 
     protected override void Run()
@@ -828,12 +843,12 @@ public static int Affordable(BigNumber budget, double basePrice, double rate, in
 | 작물·생산 결과가 Undo나 다시 하기 뒤에 달라짐 | 딕셔너리를 도는 차례에 기대었다(난수·소수 합). 키를 정렬해 돈다(5-6·5-7). |
 | 원본 맵이 게임 중에 바뀜 | `session.Instances`의 원본을 고쳤다. 바뀌는 칸은 판 데이터의 딕셔너리로(3-1). |
 | 시트에서 맵 줄이 수식으로 바뀜 | 줄이 `=`·`+`·`-`·`@`로 시작한다. 테두리를 `#`으로(3-2). |
-| `Game.Pay`가 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)." | `Game.Pay`·DB 숫자 칸은 double 숫자 필드만 안다. `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7). |
+| `Game.Pay`가 "[MomoiProject] 비용: 'run › cookies'는 숫자 필드가 아닙니다(BigNumber)." | `Game.Pay`·DB 숫자 칸은 기본 숫자 형식 필드만 안다. `if (run.cookies < price) throw Game.Fail(…); run.cookies -= price;`(5-7). |
 | 쿠키에 1을 더해도 그대로 | 정상이다. 1e300 아래는 double 셈이라 정수는 2^53(약 9e15)까지만 정확하고, 그 위는 유효 숫자 약 15자리라 차이가 17자리를 넘으면 작은 쪽은 사라진다(2-7). |
 | "[MomoiProject] 큰 수: 무한·NaN은 담을 수 없습니다." | double 계산이 먼저 넘쳤다(1e308을 넘은 `BalanceSum`, `x / 0.0`). 넘칠 값은 처음부터 `BigNumber`로 계산한다(5-7의 `PriceSum`). |
 | "[MomoiProject] 큰 수: 0으로 나눌 수 없습니다." | 0인 `BigNumber`로 나눴다. 생산량 0일 때 "다음까지 몇 초"를 나누기 전에 `IsZero`를 본다. |
 | `(double)x`가 무한대 | 1e308을 넘은 값이다. 비교·계산은 `BigNumber`끼리 한다. |
 | `BigNumber.Parse("1.23억")`이 `FormatException` | `Parse`는 지수·짧은 단위·숫자만 읽는다. 큰 수를 글로 바꿔 저장하지 않는다: 필드 그대로 두면 판 저장이 `m`·`e`를 그대로 담는다. `ToString`의 글은 소수 둘째 자리까지라 다시 읽으면 정밀도가 준다(보이기용). |
-| 진행 막대·슬라이더·'데이터 연결'의 숫자가 0 | 숫자 칸은 double로 바꿀 수 있는 값만 읽는다. 비율을 화면 코드에서 계산한다(2-8). |
-| DB 조건으로 쿠키 수를 비교할 수 없음 | DB의 숫자 비교는 double 숫자 필드용이다. 규칙이 자릿수 같은 `int` 필드를 함께 두고 그것을 본다(5-7). |
+| 진행 막대·슬라이더·'데이터 연결'의 숫자가 무한대·깨짐 | 숫자 칸은 큰 수를 float로 넣어 약 3.4e38을 넘으면 무한대다. 비율을 화면 코드에서 계산한다(2-8). |
+| DB 조건으로 쿠키 수를 비교할 수 없음 | DB의 숫자 비교는 기본 숫자 형식 필드용이다. 규칙이 자릿수 같은 `int` 필드를 함께 두고 그것을 본다(5-7). |
 | 큰 수 필드를 고쳤는데 값이 이상함 | `m`·`e`를 직접 고쳤다(1e300 아래는 m = 값·e = 0, 그 위만 가수 1~10 × 10^지수). 연산자·생성자로만 바꾼다. |

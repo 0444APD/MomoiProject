@@ -29,7 +29,11 @@ namespace GBible
 
         // 세션 생성 직전: 옵션 조정(되돌리기 방식, 시드, 저장 버전 변환 등).
         public static event Action<SessionOptions> Configuring;
-        // 세션 준비 완료: 행동 처리기·디버그 명령 등록.
+        // 세션이 DB로 만들어진 직후 — 모든 세션에 온다(화면 세션 · 멀티 서버 · 시험 모드의 서버와 봇 · 매칭 방 · 서버 빌드).
+        // 프로젝트 규칙 등록(TriggerSystem.Register · Actions.Register · 고유 기능 감시 · 규칙의 SubscribeAfterAction)은 여기서 한다 —
+        // 그래야 따로 만든 서버 세션에서도 규칙이 돈다. 새 판 행동보다 먼저 온다. 화면 연결은 Started에서.
+        public static event Action<GameSession> SessionCreated;
+        // 화면 세션 준비 완료(화면 세션에만 온다 — 프로필을 불러온 뒤, 판 저장은 이 뒤에 이어 하기로): 화면 연결(연출 받기 · 화면 설정) · 화면 쪽 개발 명령(배속 등). 규칙을 바꾸는 개발 명령은 SessionCreated에서.
         public static event Action<GameSession> Started;
         public static event Action<GameSession> Stopped;
         // 판을 저장하기 직전(화면 쪽 상태 — 위치 등 — 를 판 데이터에 담을 마지막 기회. 행동 밖이므로 담을 때는 Game.Do).
@@ -227,6 +231,7 @@ namespace GBible
             // 도메인 리로드를 끈 설정(Enter Play Mode Options)에서도 이전 플레이의 상태가 남지 않게 한다.
             Session = null;
             Configuring = null;
+            SessionCreated = null;
             Started = null;
             Stopped = null;
             Saving = null;
@@ -429,6 +434,7 @@ namespace GBible
                 session.Achievements.EvaluateAll();
             }
 
+            InvokeEach(SessionCreated, session);
             return session;
         }
 

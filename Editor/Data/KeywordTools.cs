@@ -33,9 +33,20 @@ namespace GBible.EditorTools
             public string Group;
         }
 
-        // 컴파일 뒤에는 코드에서 다시 모은다.
+        // 컴파일 뒤에는 코드에서 다시 모은다. 같은 키워드 ID가 두 그룹에 있으면 알린다(막지는 않는다 — 그룹 ID 순으로 앞선 그룹의 것만 쓰인다).
         [InitializeOnLoadMethod]
-        static void ResetOnReload() => Keywords.Reset();
+        static void ResetOnReload()
+        {
+            Keywords.Reset();
+            EditorApplication.delayCall += WarnDuplicateIds;
+        }
+
+        static void WarnDuplicateIds()
+        {
+            foreach (var same in Groups().SelectMany(g => g.Keywords).GroupBy(k => k.Id, StringComparer.Ordinal).Where(s => s.Select(k => k.Group).Distinct().Count() > 1))
+                UnityEngine.Debug.LogWarning($"[MomoiProject] 키워드 ID '{same.Key}'가 여러 그룹에 있습니다({string.Join(", ", same.Select(k => k.Group).Distinct())}). " +
+                                             $"키워드 ID는 모든 그룹을 통틀어 하나여야 합니다 — 앞선 그룹({same.First().Group})의 것만 쓰입니다. 하나의 값을 바꾸세요.");
+        }
 
         public static List<Group> Groups()
         {
@@ -97,8 +108,8 @@ namespace GBible.EditorTools
         public static IEnumerable<(Type type, FieldInfo field)> FieldsLinkedTo(string group) =>
             Fields().Where(f => GroupOf(f.field) == group);
 
-        // 키워드 그룹 코드가 있는 곳(관례: Assets/MomoiProject/Code/Keywords/그룹.cs).
-        public const string Folder = ProjectFolders.Code + "/Keywords";
+        // 키워드 그룹 코드가 있는 곳(관례: Assets/MomoiProject/Code/Rules/Keywords/그룹.cs — 데이터 클래스와 같은 규칙 어셈블리여야 참조된다).
+        public const string Folder = ProjectFolders.Code + "/Rules/Keywords";
 
         // 그룹 형식이 정의된 파일(바깥 클래스 기준). 못 찾으면 null.
         public static string FileOf(Type group)

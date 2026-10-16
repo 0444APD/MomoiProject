@@ -14,7 +14,7 @@
 | `GameApi` | 게임 코드의 창구. Block 안에서는 `Game` 속성, 씬 코드에서는 `GBibleRuntime.Game`. |
 | `GameAction` | 플레이어 입력 하나(이동·사용·구매). 데이터라서 서버 전송·리플레이가 되고, 실행 한 번이 Undo 한 단위. |
 | `Block` | 에디터에서 골라 조립하는 로직 단위: `Condition`(조건), `Reward`(보상), `Effect`(효과), `TargetSelector`(대상). |
-| `Ability` | DB › 액티브 효과. 대상 Block + 효과 Block을 조립한 것(아이템 사용 효과·스킬·버프 발동). `Game.Use`로 쓴다. |
+| `Ability` | 액티브 효과 하나(`AbilityDefinition`): 대상 Block + 효과 Block을 조립한 것(아이템 사용 효과·스킬·버프 발동). `Game.Use`로 쓴다. DB 종류 `AbilityData`(DB › 액티브 효과)는 라이브러리에 없고 프로젝트가 템플릿(`Documentation~/AI/Templates/Elements/`)에서 들인다. 인스턴스의 사용 기능(`Usable`)도 같은 정의가 된다. |
 
 ## 예제 (턴제)
 
@@ -76,8 +76,8 @@ public class RunManager : MonoBehaviour
 
     public void OnClickUnit(Unit u) => _selected = u;
     public void OnClickTile(int x, int y) => Game.Do(new MoveUnit { unit = _selected, x = x, y = y });
-    public void OnClickSkill(Unit target) => Game.Use("ability.splash", _selected, target);
-    void Update() { foreach (var u in Game.All<Unit>()) { /* 그리기 */ } }
+    public void OnClickSkill(Unit target) => Game.Use(GameIds.Ability.Splash, _selected, target);   // ID는 GameIds 상수로
+    // 그리기는 GameView.Redraw·ViewList(매뉴얼 32장)로 — 값이 바뀐 프레임 끝에 한 번. Update에서 매 프레임 그리지 않는다.
 }
 ```
 
@@ -85,13 +85,13 @@ public class RunManager : MonoBehaviour
 
 1. **플레이어 데이터는 플레이어 데이터에, 클래스는 플레이어 데이터 클래스로.** 유닛·판·턴처럼 바뀌는 값은 `[Serializable]` 클래스로 플레이어 데이터에 둔다. MonoBehaviour 필드에 두면 Undo·저장·동기화에서 빠진다.
 2. **플레이어 입력은 행동으로.** 이동·사용·구매는 `GameAction`을 상속한 행동(필드 + `protected override void Run()`)으로 만들어 `Game.Do`/`Game.Use`로 실행한다(Undo 한 단위, 서버 전송·리플레이). 대상은 객체로 필드에 넣는다(`string id`가 있는 클래스면 시스템이 id로 기록하고 실행 직전에 지금 객체로 다시 찾는다). DB 원본은 `[DataRef]` 글자 ID로. 행동·효과 안에서는 객체 필드를 그냥 고친다.
-3. **로직은 한 번에 끝낸다.** 행동·효과 안에서 기다리지 않는다(코루틴·await). 연출은 끝난 결과(이벤트·Journal)를 보고 따로 재생한다.
+3. **로직은 한 번에 끝낸다.** 행동·효과 안에서 기다리지 않는다(코루틴·await). 연출은 끝난 결과를 보고 따로 재생한다(`session.Events.SubscribeAfterAction<이벤트>` — 성공한 행동의 이벤트만, 멀티 클라이언트에도 온다).
 
 그 밖: 난수는 `Game.Random`, 값을 읽으려고 오래 들고 있을 것은 id(`Game.Find`로 다시 찾기), 개체로 찾거나 행동의 대상으로 넣을 클래스에는 `public string id;`.
 
 ## 쓰기가 기록되는 방식 (Mirror)
 
-- 게임 코드는 어디서든(행동·효과·씬 코드) 필드·리스트·딕셔너리를 그냥 고친다. 시스템이 행동 시작·끝, Modify 끝, 프레임 끝에 Sync해서 바뀐 곳을 기록한다. 행동 안의 변경은 그 행동의 Undo 단위, 행동 밖의 변경은 행동 밖 변경으로 남는다(그 행동의 Undo에 섞이지 않는다).
+- 필드·리스트·딕셔너리는 감싸기 없이 그냥 고친다. 시스템이 행동 시작·끝, Modify 끝, 프레임 끝에 Sync해서 바뀐 곳을 기록한다. 행동 안의 변경은 그 행동의 Undo 단위, 행동 밖의 변경은 행동 밖 변경으로 남는다(그 행동의 Undo에 섞이지 않는다). 행동 밖에서 고쳐도 기록은 되지만 Undo·서버 전송이 없으므로 규칙은 행동 안에서만 바꾼다(관례 3절).
 - 비용은 데이터 크기에 비례하지만 생성 코드라 가볍다: 객체 2,500개(유닛 500)에서 Sync 한 번 약 0.02ms(Unity 에디터 Mono 약 0.06ms), 바뀐 것이 없으면 할당 0. 객체 10만 개에서 약 0.9ms(에디터 2.5ms) — 실시간 게임은 프레임마다 또는 서버 틱마다.
 - 되돌리기는 뒤로 기록을 거꾸로 적용한다. 리스트에서 빠졌던 객체·갈아 끼워진 객체는 원래 인스턴스로 돌아온다(게임 코드가 쥔 참조가 이어진다).
 - 같은 객체를 두 곳에서 가리켜도 된다(`slots[0] = items[3]`, 서로 가리키는 객체 포함). 사본도 하나라 변경은 한 번만(먼저 만난 자리의 경로로) 기록되고, 받는 쪽도 같은 인스턴스를 가리킨다(아래 받는 쪽). 단 같은 List·배열·Dictionary 인스턴스를 두 곳에서 가리키면 변경이 두 번 기록되어 Undo·멀티가 깨질 수 있다(경고 한 번) — 컬렉션은 한 곳에서만, 필요하면 `new List<T>(원본)`으로 복사.
@@ -105,7 +105,7 @@ public class RunManager : MonoBehaviour
 
 ## Mirror 비교 코드
 
-`GBible.CodeGen`(Unity ILPostProcessor)이 컴파일할 때마다 GBible.Core와 그것을 참조하는 어셈블리의 `[Serializable]`·`[PlayerData]`·`[GameEvent]` 클래스·구조체 안에 비교·쓰기·읽기·적용 메서드(`__gb_*`)와 멤버 읽기·쓰기(`__gb_get`·`__gb_set`)를 만든다. 게임 코드의 필드 쓰기는 고치지 않는다. 게임이 켜질 때 `Mirror.Initialize`가 한 번 모은다(리플렉션은 여기서만). 필요한 패키지: `com.unity.nuget.mono-cecil`(Burst·Collections가 함께 가져온다). Unity 버전을 올리면 코어 테스트 `MirrorTests`(생성 메서드 전체 JIT 검사 포함)로 확인한다.
+`GBible.CodeGen`(Unity ILPostProcessor)이 컴파일할 때마다 GBible.Core와 그것을 참조하는 어셈블리의 `[Serializable]`·`[PlayerData]`·`[GameEvent]` 클래스·구조체 안에 비교·쓰기·읽기·적용 메서드(`__gb_*`)와 멤버 읽기·쓰기(`__gb_get`·`__gb_set`)를 만든다. 게임 코드의 필드 쓰기는 고치지 않는다. 게임이 켜질 때 `Mirror.Initialize`가 한 번 모은다(리플렉션은 여기서만). 필요한 패키지: `com.unity.nuget.mono-cecil`(GBible `package.json`의 의존성이라 저절로 들어온다). Unity 버전을 올리면 코어 테스트 `MirrorTests`(생성 메서드 전체 JIT 검사 포함)로 확인한다.
 
 - 멤버 읽기·쓰기(`FieldAccess`): 조건·필터의 필드 경로, '플레이어 데이터에 주기', '로그에 기록'의 이벤트 값, 이벤트 기록 문장, 필수 값 검사, 저장·불러오기(`DataModel`)가 이것으로 읽고 쓴다(실행 중 리플렉션 없음). 생성 코드가 없는 형식은 리플렉션으로 읽고 한 번 경고한다(`[Serializable]`, 이벤트면 `[GameEvent]`를 붙이면 사라진다).
 - 남은 리플렉션(일부러 둠): 게임이 켜질 때(코드 모으기·형식 정보), 개발 도구(모니터의 이벤트 호출), 선택 패키지 연결(TextMeshPro 글자·Spine 색), 익명 객체로 넘긴 텍스트 인자(`Texts.Get(key, new { … })` — 리플렉션 없이 쓰려면 `("이름", 값)` 형태).

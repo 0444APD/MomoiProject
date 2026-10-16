@@ -11,7 +11,7 @@ GameLanguage.Set("en");                                             // 바꾸고
 
 ## 구성
 
-`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings`, Resources/MomoiProject), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject → 다국어`(시트 내보내기·가져오기, 번역 검사)다. 설정은 시작 설정이 만들고, DB 이름 키 채우기는 AI가 `TextSheetTools.FillCodexNames`로 한다.
+`Runtime/Core`(엔진 없음, 서버·테스트에서도 동작)의 `TextFormat`이 틀을 해석하고 채우며, `TextCatalog`가 언어별 표·현재 언어·대체 순서를 들고, `Texts`가 어디서든 부르는 입구다. `KoreanParticles`는 받침에 맞는 조사를, `PluralRules`는 언어별 복수 구분을, `Csv`·`TextSheet`는 시트 읽기·쓰기와 번역 검사를 맡는다. `Runtime/Unity/Localization`에는 설정 애셋(`LocalizationSettings` — `Assets/MomoiProject/Data/Resources/MomoiProject/LocalizationSettings.asset`), 언어별 표 애셋(`TextTable`), 시작 시 언어를 정하는 `GameLanguage`(저장된 언어 → 기기 언어 → 원문 언어), 글자 컴포넌트에 넣는 `LocalizedText`가 있다. 에디터 메뉴는 `MomoiProject › 다국어 › 시트 내보내기 (CSV)` · `시트 가져오기 (CSV)` · `번역 검사`다. 설정은 시작 설정이 만들고(언어는 시작 설정의 '언어'), DB 이름 키 채우기는 메뉴가 없어 AI가 코드(`TextSheetTools.FillCodexNames(settings)`)로 한다.
 
 ## 문장 틀 문법
 
@@ -33,8 +33,10 @@ GameLanguage.Set("en");                                             // 바꾸고
 
 ## 시트
 
-`시트 내보내기`는 `#gbible-text,1` 형식 줄, 머리줄 `key,ko,en,…,note`, 그리고 원문 표 순서의 행을 UTF-8 CSV로 쓴다. `시트 가져오기`는 머리줄의 **이름**으로 열을 찾으므로 열 순서를 바꾸거나 메모 열을 더해도 된다. 기본은 번역 언어 열만 가져오고(원문은 에디터가 기준), 빈 칸은 기존 값을 지우지 않는다. `번역 검사`는 원문 문법 오류, 번역 누락 수, 원문에 없는 키, 원문과 다른 값·용어·태그를 콘솔에 나열한다. 문맥 열(장면·화자·감정·이전 대사·글자 수 제한 등)과 대사 줄 ID 규칙은 대사 시스템과 함께 정한다.
+`시트 내보내기`는 `#gbible-text,1` 형식 줄, 머리줄 `key,ko,en,…,note`, 그리고 원문 표 순서의 행을 UTF-8 CSV로 쓴다. `시트 가져오기`는 머리줄의 **이름**으로 열을 찾으므로 열 순서를 바꾸거나 메모 열을 더해도 된다. 기본은 번역 언어 열만 가져오고(원문은 에디터가 기준), 빈 칸은 기존 값을 지우지 않는다. `번역 검사`는 원문 문법 오류, 번역 누락 수, 원문에 없는 키, 원문과 다른 값·용어·태그를 콘솔에 나열한다. 다이얼로그 시스템을 켰으면 대본(대사 키 `line.…`, 문맥 열 `dialogue`·`location`·`speaker`)도 함께 나간다(`Dialogue.md` 시트).
 
 ## 화면에 넣기
 
-`LocalizedText` 컴포넌트를 글자 컴포넌트(TextMeshPro, UI Text 등 `text` 속성이 있는 것) 옆에 붙이고 키와 값을 적는다. 언어가 바뀌면 다시 넣는다. 코드에서는 `SetArg("count", 3)`으로 값을 바꾸고, 따로 넣을 곳이 있으면 `onText` 이벤트를 쓴다.
+UI Toolkit 화면(프로젝트 UI의 기본)은 UXML의 `binding-path`로 넣는다: `@hud.endTurn`(텍스트 키 하나), `run:gold@hud.gold`(값을 그 키의 틀 `{value}`에) — 언어가 바뀌면 다시 넣는다(`ScreenBinding`, 매뉴얼 35장). 코드에서는 `Texts.Get`.
+
+`LocalizedText` 컴포넌트는 그 밖의 글자 컴포넌트(TextMeshPro, UI Text 등 `text` 속성이 있는 것) 옆에 붙이고 키와 값을 적는다. 언어가 바뀌면 다시 넣는다. 코드에서는 `SetArg("count", 3)`으로 값을 바꾸고, 따로 넣을 곳이 있으면 `onText` 이벤트를 쓴다.

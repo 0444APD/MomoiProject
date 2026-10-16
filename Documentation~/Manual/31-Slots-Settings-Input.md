@@ -2,7 +2,7 @@
 
 **한 줄 요약**: **슬롯**은 저장 묶음(프로필 + 진행 중인 판) 하나다. 슬롯마다 저장 폴더가 따로이고, `GBibleRuntime.UseSlot(이름)`으로 바꾸면 지금 슬롯을 저장하고 그 슬롯으로 세션을 새로 시작한다. **설정**(DB › 설정)은 음량·언어·전체 화면·전투 속도 같은 설정 화면의 칸이다. 값은 기기마다 하나(`settings.json`)이고 슬롯·Undo·판 저장·멀티플레이와 상관없다. **적용 대상**을 고르면 라이브러리가 켤 때와 바꿀 때 바로 적용하고, 게임 코드는 `GameSettings.Changed`를 받는다. **입력**은 선택 기능 '입력(키 바꾸기)'의 `GameInput`이 Input System의 키 바꾸기·되돌리기·저장을 맡는다. 셋 다 기기·화면 쪽 일이라 행동(규칙)이 아니다.
 
-> 설정 화면·슬롯 화면은 기본 화면으로 들어 있다(`GameScreens.Open(GameScreens.Settings)` · `GameScreens.Open(GameScreens.Slots, new SlotsRequest { … })`, [35장](35-Screens.md) 2-5). 이 장의 API는 그 화면들이 쓰는 것이고, 화면을 직접 만들 때 쓴다.
+> 설정 화면·슬롯 화면은 기본 화면으로 들어 있어 **새로 만들지 않는다**(`GameScreens.Open(GameScreens.Settings)` · `GameScreens.Open(GameScreens.Slots, new SlotsRequest { … })`, [35장](35-Screens.md) 2-5, 관례 6절). 이 장의 API는 그 화면들이 쓰는 것이고, 게임 코드는 설정 값 읽기·슬롯 요약·키 바꾸기 화면에 쓴다.
 
 **언제 쓰는가**
 
@@ -33,9 +33,9 @@
 
 | 기획 문장 | 만드는 것 |
 |---|---|
-| "타이틀에 슬롯 세 개, 각각 층·플레이 시간 표시" | `SlotInfoOf` · `SlotSummary` · `UseSlot`(5-1) |
-| "슬롯 지우기", "슬롯 복사" | `DeleteSlot` · `CopySlot`(4-1) |
-| "설정 화면: 소리·화면·게임 탭" | DB › 설정(분류) + `GameSettings.All`(5-2) |
+| "타이틀에 슬롯 세 개, 각각 층·플레이 시간 표시" | 기본 화면 `GameScreens.Slots` + `SlotSummary`(5-1) |
+| "슬롯 지우기", "슬롯 복사" | 기본 슬롯 화면의 '지우기' · `DeleteSlot` · `CopySlot`(4-1) |
+| "설정 화면: 소리·화면·게임 탭" | DB › 설정(분류) + 기본 화면 `GameScreens.Settings`(5-2) |
 | "언어 선택", "브금 음량" | 설정 + 적용 대상 `언어` · `브금 음량`(코드 없음, 5-4) |
 | "전투 연출 속도 ×1~×3" | 설정(적용 대상 없음) + `GameSettings.Changed`(5-3) |
 | "키 바꾸기, 겹치면 알림, 기본으로" | `GameInput.Rebind` · `RebindResult.Conflict` · `ResetBindings`(5-5) |
@@ -59,7 +59,7 @@
     2/  …
 ```
 
-- 기본 슬롯(`""`)은 `MomoiProject/` 바로 아래다(슬롯이 없던 때와 같은 자리). 다른 슬롯은 `MomoiProject/slots/<이름>/`이다.
+- 기본 슬롯(`""`)은 `MomoiProject/` 바로 아래다. 다른 슬롯은 `MomoiProject/slots/<이름>/`이다.
 - 슬롯 이름은 글자(한글 포함)·숫자·`-`·`_`만 쓴다. `CON`·`NUL`·`COM1` 같은 장치 이름은 안 된다. 어기면 `ArgumentException`("[MomoiProject] 슬롯 이름 'a/b'에는 글자·숫자·-·_만 쓸 수 있습니다(CON·NUL·COM1 같은 장치 이름은 안 됩니다).").
 - 슬롯 이름은 대소문자를 가리지 않는다. 폴더는 소문자로 만든다(`"A"` → `slots/a/`) — 대소문자를 가리는 파일 시스템(리눅스·맥)에서도 `"A"`와 `"a"`는 같은 슬롯이다.
 - `slot.json`(저장 시각 · 플레이 시간 · 요약 한 줄)은 프로필이나 판을 저장할 때마다 함께 쓴다. 요약 한 줄은 게임이 정한다(`GBibleRuntime.SlotSummary`, 4-1).
@@ -71,12 +71,12 @@
 
 | 하는 일 | 순서 |
 |---|---|
-| `UseSlot(이름)` | 같은 슬롯이면 아무 일도 없다. 다르면 ① 지금 세션을 끝낸다(`Stopping` → `AutoSaveRun`이고 판이 살아 있으면 판·프로필 저장(`SaveRun`), 아니면 프로필만 → `Stopped`, 06장 2.2). 행동을 한 번도 하지 않았고 그 슬롯에 저장 파일도 없던 세션(타이틀에서 막 켠 기본 슬롯)은 저장하지 않는다 → 빈 저장이 남지 않는다 ② 그 슬롯을 기억한다 ③ 세션을 새로 만든다(그 슬롯의 프로필을 불러오고 `Started`가 다시 온다) |
-| `DeleteSlot(이름)` | 세 파일을 그 `.bak`·`.tmp`와 함께 지운다(지운 슬롯이 바로 전 저장에서 되살아나지 않게). 지금 슬롯이면 **저장하지 않고** 세션을 끝내고, 지운 뒤 세션을 새로 시작한다(빈 프로필·새 판, `Started`가 다시 온다). 폴더는 남지만 `Slots()`에는 나오지 않는다 |
+| `UseSlot(이름)` | 같은 슬롯이면 아무 일도 없다. 다르면 ① 지금 세션을 끝낸다(`Stopping` → `AutoSaveRun`이고 판이 살아 있으면 판·프로필 저장(`SaveRun`), 아니면 프로필만 → `Stopped`, 06장 2.2). 행동을 한 번도 하지 않았고 그 슬롯에 저장 파일도 없던 세션(타이틀에서 막 켠 기본 슬롯)은 저장하지 않는다 → 빈 저장이 남지 않는다 ② 그 슬롯을 기억한다 ③ 세션을 새로 만든다(그 슬롯의 프로필을 불러오고 `SessionCreated`·`Started`가 다시 온다) |
+| `DeleteSlot(이름)` | 세 파일을 그 `.bak`·`.tmp`와 함께 지운다(지운 슬롯이 바로 전 저장에서 되살아나지 않게). 지금 슬롯이면 **저장하지 않고** 세션을 끝내고, 지운 뒤 세션을 새로 시작한다(빈 프로필·새 판, `SessionCreated`·`Started`가 다시 온다). 폴더는 남지만 `Slots()`에는 나오지 않는다 |
 | `CopySlot(원본, 대상)` | 원본의 세 파일을 대상에 덮어쓴다(원본에 없는 파일은 대상에서도 지운다). 원본이 지금 슬롯이면 먼저 저장한다(판이 살아 있으면 `SaveRun`, 아니면 프로필). 대상이 지금 슬롯이면(세션이 도는 중) `InvalidOperationException`("[MomoiProject] 지금 쓰는 슬롯 '1'(으)로는 복사할 수 없습니다. 다른 슬롯으로 바꾼 뒤(UseSlot) 복사하세요.") — 실행 중인 세션이 저장할 때 복사한 내용을 다시 덮기 때문이다 |
 
 - `UseSlot` 뒤의 새 세션에서 **판은 자동으로 불러오지 않는다.** 이어 하려면 `GBibleRuntime.LoadRun`을 부른다(DB › Bootstrap의 '시작할 때 이어 하기'를 켰으면 런타임이 한다).
-- 세션이 새로 만들어지면 `GameView.Redraw`·`ViewList`·컴포넌트 '데이터 연결'·'월드 상태 연결'·씬 흐름은 저절로 새 세션에 다시 붙고 모두 다시 그린다(32장). 직접 받은 이벤트(`session.Events.Subscribe…`·`session.Ticked`)는 **예전 세션** 것이라 새 세션에서 오지 않는다. 그래서 `UseSlot`은 타이틀처럼 게임 화면이 없을 때 부르고, 이벤트 연결은 `Started`에서 한다.
+- 세션이 새로 만들어지면 `GameView.Redraw`·`ViewList`·컴포넌트 '데이터 연결'·'월드 상태 연결'·씬 흐름은 저절로 새 세션에 다시 붙고 모두 다시 그린다(32장). 직접 받은 이벤트(`session.Events.Subscribe…`·`session.Ticked`)는 **예전 세션** 것이라 새 세션에서 오지 않는다. 그래서 `UseSlot`은 타이틀처럼 게임 화면이 없을 때 부르고, 이벤트 연결은 새 세션마다 다시 오는 `Client/Bootstrap.cs`의 `RegisterRules`(규칙이 받는 것·틱 규칙)·`Started`(연출 받기)에서 한다(20장 4절).
 - 하이어라키의 `[MomoiProject]` 오브젝트는 슬롯을 바꿔도 하나다.
 
 ### 2-3. 설정 값
@@ -142,7 +142,7 @@
 
 ### 3-2. DB › 설정
 
-`MomoiProject → DB` → 사이드바 **요소** 그룹의 **설정** 탭 → **+ 새로 만들기** → ID(예: `bgmVolume`). 저장하면 `GameIds.Setting.BgmVolume`이 생긴다. 항목 하나가 설정 화면의 칸 하나이고, 목록 순서가 `GameSettings.All`의 순서다.
+`MomoiProject → DB` → 사이드바 **요소** 그룹의 **설정** 탭. 항목(예: `bgmVolume`)은 AI가 DB 반영 스크립트로 만든다(개발자 화면에는 '+ 새로 만들기'가 없다 — 21장 3-1 구조 잠금). `GameIds.Setting.BgmVolume` 같은 상수는 반영 스크립트가 돌고 Unity가 다시 컴파일한 뒤에 생기므로 그 상수를 쓰는 코드는 그다음에 쓴다(관례 15절). 항목 하나가 설정 화면의 칸 하나이고, 목록 순서가 `GameSettings.All`의 순서다.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
@@ -158,15 +158,15 @@
 - 종류를 바꾸면 그 종류의 칸만 보인다(묶음 필드 안의 `[ShowIf]`, 21장 5절).
 - **칸 이름**은 텍스트 표의 `<ID>.name`이다(`GameSettings.Label`). AI가 이름 키를 채우고(`TextSheetTools.FillCodexNames`) 원문 표에서 "브금 음량"처럼 고친다(23장 1절). 선택지의 `label`에 텍스트 키를 적으면 번역된 글이 보인다.
 - 검증 오류(빌드를 막는다): "최솟값이 최댓값보다 작아야 합니다." / "단위는 0 이상이어야 합니다(0이면 연속)." / "선택지가 없습니다."(언어·해상도 제외) / "기본값 'x'이(가) 선택지에 없습니다." / "선택지 값이 겹칩니다." / "적용 대상 '브금 음량'에는 종류 '숫자(슬라이더)'만 맞습니다."(음량 = 숫자, 언어·해상도 = 선택지, 전체 화면·수직 동기화 = 켜기/끄기, 최대 프레임 = 숫자 또는 선택지)
-- 검증 경고: "음량은 0~1 사이 값입니다."(음량의 최솟값·최댓값이 0~1 밖)
+- 검증 경고: "음량은 0~1 사이 값입니다."(음량의 최솟값·최댓값이 0~1 밖) / "음량 기본값이 0입니다 — 처음 켜면 소리가 나지 않습니다(보통 1)."
 
 ### 3-3. 선택 기능 '입력(키 바꾸기)' 켜기
 
-1. Input System 패키지를 설치한다(Package Manager의 `com.unity.inputsystem`).
-2. `MomoiProject → DB` → 사이드바 아래쪽 **입력(키 바꾸기)** 그룹 → **기능 활성화**를 켠다(심볼 `GBIBLE_INPUT`, `20-Setup.md` 6절).
-3. 다시 컴파일이 끝나면 어셈블리 `GBible.Input`의 `GameInput`을 쓸 수 있다. 게임 코드를 자기 asmdef에 두었으면 References에 `GBible.Input`과 `Unity.InputSystem`을 더한다.
+1. Input System 패키지(`com.unity.inputsystem`)를 들인다(`Packages/manifest.json` — 내려받기라 AI는 먼저 묻는다, 관례 0절).
+2. **켜기**(선택 기능 ID `input`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `input`을 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "입력(키 바꾸기)" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_INPUT`과 프로젝트 asmdef 참조(Client·Editor에 `GBible.Input`)가 저절로 맞춰진다(`20-Setup.md` 6절).
+3. 그 컴파일이 끝난 뒤 `GameInput`을 쓴다. `InputAction`·`InputActionAsset` 같은 Input System 형식을 직접 쓰는 asmdef(보통 `MomoiProject.Client`)의 references에는 `Unity.InputSystem`을 손으로 더한다(저절로 더하지 않는다).
 
-탭은 생기지 않는다(DB 종류가 없는 기능). 패키지가 없으면 켜도 이 기능의 코드가 컴파일되지 않는다(`GameInput`이 없다). 이 기능을 쓰는 게임 코드는 `#if GBIBLE_INPUT`으로 감싸면 껐을 때도 컴파일된다.
+탭은 생기지 않는다(DB 종류가 없는 기능). 패키지가 없으면 켜도 이 기능의 코드가 컴파일되지 않는다(`GameInput`이 없다 — 이때는 `#if GBIBLE_INPUT` 안의 코드도 깨진다). `#if GBIBLE_INPUT`으로 감싼 코드는 기능을 껐을 때 컴파일에서 빠진다.
 
 ### 3-4. 모니터에서 확인하기
 
@@ -229,6 +229,7 @@ GameSettings.Changed += id => { if (id == GameIds.Setting.BattleSpeed) … };
 | `void Reset(string id)` | 기본값으로 |
 | `void ResetAll(string category = null)` | 그 분류(비우면 전부)를 기본값으로 |
 | `bool IsSaved(string id)` | 저장된 값이 있는지(플레이어가 바꾼 적이 있는지). 거짓이면 기본값을 쓰는 중 |
+| `bool HasSavedLanguage` | 적용 대상이 언어인 설정에 저장된 값이 있는지(34장 2-2의 Steam 언어가 본다) |
 | `IReadOnlyList<SettingData> All` | 설정 전부(DB 순서) |
 | `SettingData Find(string id)` | 설정 하나(없으면 `null`) |
 | `string Label(string id)` | 칸 이름: 텍스트 표의 `<ID>.name`(없으면 ID) |
@@ -281,11 +282,11 @@ GameInput.Rebind(endTurn, 0, result => { if (result.Conflict != null) … });
 
 ## 5. 상황별 예제
 
-예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 화면은 UI Toolkit(`UIDocument`)으로 그린다.
+예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다. 화면은 UI Toolkit 화면(35장 — UXML + DB › 화면 + `GameScreen`)이다.
 
 ```csharp
 // 플레이어 데이터 "run"(RunState, 세션 구역): floor · gold · hero · deck · battle …  IsActive = floor > 0(진행 중인 판)
-// StartRun: 새 판을 연다. RunDirector: 입력을 행동으로 보내는 씬 스크립트.
+// StartRun: 새 판을 연다.
 ```
 
 ### 5-1. 타이틀의 슬롯 3개
@@ -308,57 +309,19 @@ public static class SlotBoot
 }
 ```
 
-**슬롯 화면**:
+**슬롯 화면** — 기본 화면을 연다(목록·요약·플레이 시간·저장한 때·지우기는 기본 화면이 그린다, 35장 2-5). 타이틀 화면 코드:
 
 ```csharp
-using System;
-using GBible;
-using GBible.Ids;
-using UnityEngine;
-using UnityEngine.UIElements;
-
-public class SlotScreen : MonoBehaviour
+OnClick("start", () => GameScreens.Open(GameScreens.Slots, new SlotsRequest
 {
-    static readonly string[] Names = { "1", "2", "3" };
-    [SerializeField] UIDocument document;
-    VisualElement _list;
-
-    void OnEnable()
+    count = 3,                                             // 슬롯 "1"·"2"·"3"(이름을 정하려면 names)
+    picked = slot =>                                       // 이미 UseSlot(slot)이 끝났다 — 새 세션, Started가 다시 왔다
     {
-        _list = document.rootVisualElement.Q("slots");
-        Draw();
-    }
-
-    void Draw()
-    {
-        _list.Clear();
-        foreach (var name in Names)
-        {
-            var info = GBibleRuntime.SlotInfoOf(name);
-            var row = new VisualElement();
-            row.Add(new Label(info.IsEmpty
-                ? $"슬롯 {name} · 비어 있음"
-                : $"슬롯 {name} · {info.Summary} · {TimeSpan.FromSeconds(info.PlayTime):h\\:mm} · {info.SavedAt:g}"));
-            row.Add(new Button(() => Pick(name)) { text = info.HasRun ? "이어 하기" : "새 게임" });
-            if (!info.IsEmpty) row.Add(new Button(() => Delete(name)) { text = "지우기" });
-            _list.Add(row);
-        }
-    }
-
-    void Pick(string name)
-    {
-        GBibleRuntime.UseSlot(name);                       // 지금 슬롯을 저장하고 이 슬롯으로 세션을 새로 시작(Started가 다시 온다)
         var session = GBibleRuntime.Session;
         if (!GBibleRuntime.LoadRun(session) || !session.Game.Data().Run.IsActive)
-            session.Do(new StartRun());                     // 판이 없거나 끝난 판이면 새 판
-    }
-
-    void Delete(string name)
-    {
-        GBibleRuntime.DeleteSlot(name);                     // 지금 슬롯이면 저장하지 않고 세션을 새로 시작한다
-        Draw();
-    }
-}
+            GameScreens.Do(() => new StartRun());          // 판이 없거나 끝난 판이면 새 판
+    },
+}));
 ```
 
 - 씬 흐름(32장)을 쓰면 `LoadRun`·`StartRun`이 `run.scene`을 정해 그 씬이 저절로 열린다. 쓰지 않으면 여기서 씬을 연다.
@@ -381,103 +344,11 @@ DB › 설정(예):
 | `resolution` | 화면 | 선택지(선택지 비움) | — | 해상도 |
 | `vsync` | 화면 | 켜기/끄기 | 켬 | 수직 동기화 |
 
-**화면** — 분류마다 묶고, 종류마다 위젯 하나.
+**화면** — 기본 설정 화면을 연다: `OnClick("settings", () => GameScreens.Open(GameScreens.Settings))`. 위 표만으로 분류마다 묶고 종류마다 위젯(토글·슬라이더·드롭다운·입력칸)을 그리며, 바꾸면 바로 `GameSettings.Set`(저장·적용)한다(35장 2-5).
 
-```csharp
-using System.Collections.Generic;
-using System.Linq;
-using GBible;
-using GBible.Data;
-using UnityEngine;
-using UnityEngine.UIElements;
-
-public class SettingsScreen : MonoBehaviour
-{
-    [SerializeField] UIDocument document;
-    VisualElement _list;
-    readonly Dictionary<string, VisualElement> _widgets = new Dictionary<string, VisualElement>();
-
-    void OnEnable()
-    {
-        _list = document.rootVisualElement.Q("settings");
-        Build();
-        GameSettings.Changed += Refresh;
-        GameLanguage.Changed += Build;          // 언어를 바꾸면 칸 이름·선택지 글도 바뀐다
-    }
-
-    void OnDisable()
-    {
-        GameSettings.Changed -= Refresh;
-        GameLanguage.Changed -= Build;
-    }
-
-    void Build()
-    {
-        _list.Clear();
-        _widgets.Clear();
-        foreach (var group in GameSettings.All.GroupBy(s => s.category))     // DB 순서대로, 분류마다
-        {
-            _list.Add(new Label(group.Key));
-            foreach (var setting in group)
-            {
-                var widget = Widget(setting);
-                _widgets[setting.Id] = widget;
-                _list.Add(widget);
-            }
-            var category = group.Key;
-            _list.Add(new Button(() => GameSettings.ResetAll(category)) { text = "기본값으로" });
-        }
-    }
-
-    static VisualElement Widget(SettingData setting)
-    {
-        var id = setting.Id;
-        var label = GameSettings.Label(id);                                   // 텍스트 표의 '<ID>.name'
-        switch (setting.spec.kind)
-        {
-            case SettingKind.Toggle:
-                var toggle = new Toggle(label) { value = GameSettings.Toggle(id) };
-                toggle.RegisterValueChangedCallback(e => GameSettings.Set(id, e.newValue));
-                return toggle;
-            case SettingKind.Slider:
-                var slider = new Slider(label, (float)setting.spec.min, (float)setting.spec.max) { value = (float)GameSettings.Number(id) };
-                slider.RegisterValueChangedCallback(e => GameSettings.Set(id, e.newValue, save: false));     // 범위·단위는 Set이 맞춘다. 끄는 동안은 적용만
-                slider.RegisterCallback<PointerCaptureOutEvent>(_ => GameSettings.Flush());                  // 놓을 때 파일에 쓴다
-                slider.RegisterCallback<FocusOutEvent>(_ => GameSettings.Flush());
-                return slider;
-            case SettingKind.Choice:
-                var choices = GameSettings.ChoicesOf(id);
-                var dropdown = new DropdownField(label, choices.Select(c => c.label).ToList(), IndexOf(choices, GameSettings.Choice(id)));
-                dropdown.RegisterValueChangedCallback(_ => GameSettings.Set(id, choices[dropdown.index].value));
-                return dropdown;
-            default:
-                var text = new TextField(label) { value = GameSettings.Text(id) };
-                text.RegisterCallback<FocusOutEvent>(_ => GameSettings.Set(id, text.value));
-                return text;
-        }
-    }
-
-    // 값이 바뀌면(이 화면·기본값으로·다른 코드) 그 칸만 맞춘다. 고친 값(단위에 맞춘 슬라이더 값)이 보인다.
-    void Refresh(string id)
-    {
-        if (!_widgets.TryGetValue(id, out var widget)) return;
-        switch (widget)
-        {
-            case Toggle toggle: toggle.SetValueWithoutNotify(GameSettings.Toggle(id)); break;
-            case Slider slider: slider.SetValueWithoutNotify((float)GameSettings.Number(id)); break;
-            case DropdownField dropdown: dropdown.index = IndexOf(GameSettings.ChoicesOf(id), GameSettings.Choice(id)); break;
-            case TextField text: text.SetValueWithoutNotify(GameSettings.Text(id)); break;
-        }
-    }
-
-    static int IndexOf(IReadOnlyList<(string value, string label)> choices, string value) =>
-        System.Math.Max(0, choices.ToList().FindIndex(c => c.value == value));
-}
-```
-
-- 슬라이더를 움직이는 동안 `Set`이 여러 번 불려도 괜찮다. 같은 값이면 아무 일도 없고, `save: false`라 끄는 동안은 적용·`Changed`만 하고 놓을 때(`Flush`) 파일에 한 번 쓴다.
-- 분류 이름(`group.Key`)은 DB에 적은 글자 그대로다. 번역하려면 분류에 텍스트 키를 적고 화면에서 `Texts.Get`으로 바꾼다.
-- 적용 대상이 있는 칸(언어·음량·화면)은 이 코드만으로 바로 적용된다(5-4). 전투 속도처럼 게임 코드가 쓰는 칸은 5-3.
+- 칸 이름은 텍스트 `<설정 ID>.name`, 분류 이름은 DB에 적은 글자(텍스트 키를 적으면 번역된 글), 선택지의 `label`은 텍스트 키 또는 글이다(3-2).
+- 적용 대상이 있는 칸(언어·음량·화면)은 이것만으로 바로 적용된다(5-4). 전투 속도처럼 게임 코드가 쓰는 칸은 5-3.
+- 화면을 바꾸려면 같은 ID(`momoi.settings`)의 DB › 화면 항목을 만든다(35장 2-5 '바꾸기'). 직접 그릴 때 지킬 것: 칸 이름 `GameSettings.Label(id)`·선택지 `ChoicesOf(id)` · 슬라이더는 끄는 동안 `Set(id, 값, save: false)`(적용·`Changed`만)이고 놓을 때(`PointerCaptureOutEvent`)·포커스를 잃을 때 `GameSettings.Flush()`로 파일에 한 번 쓴다 · `GameSettings.Changed`를 받아 그 칸만 `SetValueWithoutNotify`로 맞춘다(단위에 맞춘 값이 보인다) · 언어가 바뀌면 칸 이름·선택지 글을 다시 만든다.
 
 ### 5-3. 전투 속도 — 게임 코드가 쓰는 설정
 
@@ -511,14 +382,14 @@ public static class BattleSpeedSetting
 
 ### 5-4. 언어·음량 — 적용 대상(코드 없음)
 
-- `language`(선택지, 선택지 비움, 적용 대상 `언어`): 선택지가 지원 언어(`GameLanguage.Available`의 코드 · 그 언어의 이름)로 저절로 채워진다. 고르면 `GameLanguage.Set`이 불리고, 화면 글자(`LocalizedText`·`GameView.Redraw`)가 다시 그려진다(23장).
+- `language`(선택지, 선택지 비움, 적용 대상 `언어`): 선택지가 지원 언어(`GameLanguage.Available`의 코드 · 그 언어의 이름)로 저절로 채워진다. 고르면 `GameLanguage.Set`이 불리고, 화면 글자(binding-path `@키`·`LocalizedText`·`GameView.Redraw`)가 다시 그려진다(23장).
 - `bgmVolume`(숫자 0~1, 적용 대상 `브금 음량`): 슬라이더를 움직이면 `GameAudio.SetVolume(AudioChannel.Bgm, 값, save: false)`가 불린다. 값은 설정 파일에 남고 다음에 켤 때 그 값으로 시작한다.
 - `resolution`(선택지 비움, 적용 대상 `해상도`): 선택지가 기기의 해상도 목록("1920 × 1080")으로 채워진다. 에디터에서는 적용하지 않는다(빌드에서 확인).
-- 같은 채널의 음량을 다른 곳(`GameAudio.SetVolume`)에서도 바꾸면 다음 실행 때 설정 값으로 돌아간다(2-4). 음량 슬라이더는 설정 화면 하나에만 둔다.
+- 음량 슬라이더는 설정 화면 하나에만 둔다(다른 곳의 `GameAudio.SetVolume`은 다음 실행 때 설정 값으로 돌아간다, 2-4).
 
 ### 5-5. 키 바꾸기 화면
 
-**켤 때 한 번** — 타이틀 씬의 오브젝트에 둔다.
+**켤 때 한 번** — 동작 에셋은 Input System의 **프로젝트 전체 동작**(`InputSystem.actions` — Project Settings › Input System Package의 Project-wide Actions, 보통 `Assets/InputSystem_Actions.inputactions`)을 쓴다. 씬 오브젝트 · 인스펙터 연결이 필요 없다(관례 6절). `Client/InputBoot.cs`:
 
 ```csharp
 #if GBIBLE_INPUT
@@ -526,44 +397,45 @@ using GBible;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class InputBoot : MonoBehaviour
+static class InputBoot
 {
-    [SerializeField] InputActionAsset actions;     // 프로젝트의 .inputactions
-
-    void Awake()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void Boot()
     {
-        if (GameInput.Actions == null) GameInput.Use(actions);   // 저장해 둔 키를 덮어 씌우고 켠다
+        if (GameInput.Actions == null && InputSystem.actions != null)
+            GameInput.Use(InputSystem.actions);   // 저장해 둔 키를 덮어 씌우고 켠다
     }
 }
 #endif
 ```
 
-**화면**:
+동작(맵 · 동작 이름 `Player/EndTurn` …)은 AI가 그 에셋에 더한다(.inputactions는 JSON — 개발자에게 누르게 하지 않는다). 프로젝트 전체 동작이 비어 있으면(`InputSystem.actions == null`) Project Settings에서 정해야 하므로 개발자에게 알린다.
+
+**화면** — 기본 화면이 없으므로 프로젝트 화면(35장: UXML + DB › 화면 + `GameScreen`)으로 만든다. 키 바꾸기는 기기 설정이라 행동이 아니다.
 
 ```csharp
 #if GBIBLE_INPUT
 using GBible;
-using UnityEngine;
+using GBible.Ids;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
-public class KeyBindingScreen : MonoBehaviour
+[BindTo(GameIds.Screen.KeyBindings)]          // DB › 화면 'keyBindings' + UI/Screens/KeyBindings.uxml
+public class KeyBindingScreen : GameScreen
 {
-    [SerializeField] UIDocument document;
     VisualElement _list;
     Label _message;
 
-    void OnEnable()
+    protected override void OnOpen()
     {
-        var root = document.rootVisualElement;
-        _list = root.Q("bindings");
-        _message = root.Q<Label>("bindings-message");
-        root.Q<Button>("bindings-reset").clicked += () => GameInput.ResetBindings();   // 모두 기본 키로
+        _list = Q("bindings");
+        _message = Q<Label>("bindings-message");
+        OnClick("bindings-reset", () => GameInput.ResetBindings());   // 모두 기본 키로
         GameInput.Changed += Build;
         Build();
     }
 
-    void OnDisable()
+    protected override void OnClose()
     {
         GameInput.Changed -= Build;
         GameInput.CancelRebind();            // 기다리던 바꾸기가 있으면 취소
@@ -579,6 +451,7 @@ public class KeyBindingScreen : MonoBehaviour
                 if (binding.isComposite) continue;                         // WASD 묶음 자체는 못 바꾼다 → 안의 칸을 줄마다
                 var index = i;
                 var row = new VisualElement();
+                row.AddToClassList("key-row");                             // 모양은 USS 클래스로
                 row.Add(new Label(binding.isPartOfComposite ? $"{action.name} {binding.name}" : action.name));
                 row.Add(new Button(() => Rebind(action, index)) { text = GameInput.BindingText(action, index) });
                 _list.Add(row);
@@ -587,12 +460,12 @@ public class KeyBindingScreen : MonoBehaviour
 
     void Rebind(InputAction action, int index)
     {
-        _message.text = "바꿀 키를 누르세요(Esc: 취소)";
+        _message.text = Texts.Get("menu.rebindPress");                    // "바꿀 키를 누르세요(Esc: 취소)"
         GameInput.Rebind(action, index, result =>
         {
-            if (result.Done) _message.text = "";                                          // Changed가 와서 목록을 다시 그린다
-            else if (result.Conflict != null) _message.text = $"'{result.Conflict.name}'에서 이미 쓰는 키입니다.";
-            else _message.text = "취소했습니다.";
+            if (result.Done) _message.text = "";                           // Changed가 와서 목록을 다시 그린다
+            else if (result.Conflict != null) _message.text = Texts.Get("menu.rebindConflict", ("action", result.Conflict.name));
+            else _message.text = Texts.Get("menu.rebindCancelled");
         });
     }
 }
@@ -604,8 +477,9 @@ public class KeyBindingScreen : MonoBehaviour
 ```csharp
 void Update()
 {
-    if (GameView.Busy) return;                                               // 연출·선택 대기 중에는 받지 않는다(32장)
-    if (GameInput.Find("Player/EndTurn").WasPressedThisFrame()) director.EndTurn();   // → Game.Do(new EndTurn())
+    if (GameInput.IsRebinding) return;                                       // 키를 바꾸는 중
+    if (GameInput.Find("Player/EndTurn").WasPressedThisFrame())
+        GameScreens.Do(() => new EndTurn());   // Busy(연출·선택 대기)면 무시, 플레이어용 실패는 알림(35장 2-4)
 }
 ```
 
@@ -622,7 +496,7 @@ void Update()
 | `ArgumentException`("슬롯 이름 '…'에는 글자·숫자·-·_만 쓸 수 있습니다(…).") | 이름에 `/`·공백·`.` 같은 글자가 있거나 `CON`·`NUL`·`COM1` 같은 장치 이름이다. 글자·숫자·`-`·`_`만 쓴다. |
 | 슬롯 `"A"`와 `"a"`가 같은 저장을 씀 | 정상이다. 슬롯 이름은 대소문자를 가리지 않는다(폴더는 소문자, 2-1). |
 | 슬롯을 바꿨더니 판이 처음 상태 | `UseSlot`은 판을 불러오지 않는다. `GBibleRuntime.LoadRun`을 부른다(5-1). |
-| 슬롯을 바꾼 뒤 연출·화면 일부가 반응하지 않음 | 게임 화면이 예전 세션에 직접 연결(`session.Events.Subscribe…`·`Ticked`)해 두었다. `UseSlot`은 타이틀처럼 게임 화면이 없을 때 부르고, 연결은 `Started`·`OnEnable`에서 다시 한다(2-2). `GameView.Redraw`·`ViewList`는 저절로 다시 붙는다. |
+| 슬롯을 바꾼 뒤 연출·화면 일부가 반응하지 않음 | 게임 화면이 예전 세션에 직접 연결(`session.Events.Subscribe…`·`Ticked`)해 두었다. `UseSlot`은 타이틀처럼 게임 화면이 없을 때 부르고, 연결은 `Bootstrap`의 `RegisterRules`(규칙)·`Started`(화면)나 화면의 `OnEnable`에서 다시 한다(2-2). `GameView.Redraw`·`ViewList`는 저절로 다시 붙는다. |
 | 지운 슬롯이 `Slots()`에 안 보이는데 폴더는 남음 | 정상이다. `DeleteSlot`은 세 파일만 지운다. 폴더가 비면 목록에서 빠진다. |
 | `CopySlot`이 "지금 쓰는 슬롯 '…'(으)로는 복사할 수 없습니다" | 대상이 지금 슬롯이다(실행 중인 세션이 저장할 때 다시 덮는다). 다른 슬롯으로 `UseSlot`한 뒤 복사하거나, 대상을 지금 슬롯이 아닌 곳으로 한다. |
 | 슬롯 목록의 시각이 비어 있음(`0001-01-01`) | 그 슬롯을 저장한 적이 없다(`slot.json`이 없다). `IsEmpty`·`HasRun`으로 먼저 거른다. |
@@ -632,12 +506,13 @@ void Update()
 | 음량을 바꿔도 다음 실행 때 돌아감 | 같은 채널을 `GameAudio.SetVolume`으로 바꿨는데 음량 설정이 따로 있다. 켤 때 설정 값이 적용된다. 음량은 `GameSettings.Set`으로만 바꾼다(2-4). |
 | 전체 화면·해상도가 에디터에서 안 바뀜 | 빌드에서만 적용한다(에디터 창을 건드리지 않게). 빌드로 확인한다. |
 | 처음 켤 때 기본값(전체 화면 켬 등)이 적용되지 않음 | 정상이다. 전체 화면·해상도는 저장된 값이 있을 때만 켤 때 적용한다(2-4). 플레이어가 한 번 고르면 그다음부터 켤 때마다 적용된다. |
-| 슬라이더가 0.5 단위로 튐 | 단위(`step`)가 0.5다. 연속이면 0. 화면에는 `Changed`에서 고친 값을 다시 넣는다(5-2의 `Refresh`). |
+| 슬라이더가 0.5 단위로 튐 | 단위(`step`)가 0.5다. 연속이면 0. 직접 그린 화면이면 `Changed`에서 고친 값을 다시 넣는다(5-2). |
 | 선택지 설정이 늘 첫 선택지로 돌아감 | 저장된 값이 선택지에 없다(선택지 값을 바꿨다). 기본값으로 돌아간다. |
 | 검증 오류 "적용 대상 '언어'에는 종류 '선택지'만 맞습니다." | 적용 대상과 종류가 맞지 않는다(3-2). 언어·해상도 = 선택지, 음량 = 숫자, 전체 화면·수직 동기화 = 켜기/끄기. |
 | `GameSettings.Changed`가 두 번씩 옴 | `Started`에서 `+=`만 했다. 슬롯을 바꾸면 `Started`가 다시 온다. `-=` 뒤 `+=`(5-3). |
 | "기본값으로"를 눌렀는데 키가 그대로 | `ResetAll`은 설정만 되돌린다. 키는 `GameInput.ResetBindings()`. |
-| `GameInput`이 없다는 컴파일 오류 | 선택 기능 '입력(키 바꾸기)'이 꺼져 있거나 Input System 패키지가 없다(3-3). 이 기능을 쓰는 코드는 `#if GBIBLE_INPUT`으로 감싼다. |
+| `GameInput`이 없다는 컴파일 오류 | 선택 기능 '입력(키 바꾸기)'이 꺼져 있거나(켠 직후면 다시 컴파일이 끝나지 않았다) Input System 패키지가 없다(3-3). 기능을 끈 프로젝트에서도 컴파일되게 하려면 `#if GBIBLE_INPUT`으로 감싼다 — 패키지가 없으면 감싸도 깨지므로 패키지를 들인다. |
+| `InputAction`·`InputActionAsset`이 없다는 컴파일 오류 | 그 코드의 asmdef에 `Unity.InputSystem` 참조가 없다(저절로 더하지 않는다, 3-3). |
 | `GameInput.Find`가 "입력 동작 '…'이(가) 없습니다" | `Use` 전에 불렀거나 이름이 틀렸다. `"맵/동작"`으로 쓴다. |
 | WASD를 누르자 "묶음 키(WASD 같은 composite)는 그 안의 칸 하나씩 바꿉니다" | composite 자체의 번호를 넘겼다. 그 다음 번호(Up·Down …)를 넘긴다(5-5). |
 | Esc로 바꿀 수 없음 | Esc는 바꾸기 취소 키다. 그 Esc는 창을 닫거나 일시정지 메뉴를 열지 않는다(2-5). |

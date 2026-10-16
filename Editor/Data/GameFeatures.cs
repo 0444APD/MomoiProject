@@ -83,7 +83,7 @@ namespace GBible.EditorTools
             {
                 Id = "inventory",
                 Name = "인벤토리 시스템",
-                Description = "인벤토리(칸의 리스트: 겹치기·칸 수 제한·넣기·빼기). 아이템은 프로젝트가 코드로 정의한 클래스의 인스턴스이고, 칸에는 인스턴스 ID가 들어간다. 인벤토리는 플레이어 데이터의 값 형식으로 쓴다.",
+                Description = "인벤토리(슬롯의 리스트: 겹치기·슬롯 수 제한·넣기·빼기). 아이템은 프로젝트가 코드로 정의한 클래스의 인스턴스이고, 슬롯에는 인스턴스 ID가 들어간다. 인벤토리는 플레이어 데이터의 값 형식으로 쓴다.",
                 Symbol = "GBIBLE_INVENTORY",
                 Assemblies = new[] { "GBible.Inventory" },
                 DataClasses = new[] { "GBible.InventorySystem.Inventory", "GBible.InventorySystem.InventorySlot" },

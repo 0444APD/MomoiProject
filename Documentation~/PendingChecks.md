@@ -673,12 +673,8 @@ namespace MomoiChecks
             _sceneWatch = null;
             _sceneLabel = null;
             _failFade = false;
-            GBibleRuntime.Started += session =>
-            {
-                Register(session);
-                session.Events.SubscribeAfterAction<CheckHit>(e => GameView.Present(Number(e.amount)));
-            };
-            GameNet.ServerStarted += server => Register(server.Session);   // 시험 모드·방장·서버: 클라이언트가 누른 명령은 서버에서 돈다
+            GBibleRuntime.SessionCreated += Register;   // 모든 세션(화면·시험 모드 서버·방장·서버): 클라이언트가 누른 명령은 서버 세션에서 돈다
+            GBibleRuntime.Started += session => session.Events.SubscribeAfterAction<CheckHit>(e => GameView.Present(Number(e.amount)));   // 연출은 화면 세션에만
             GameScenes.Transition = Fade;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;

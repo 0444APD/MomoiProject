@@ -11,6 +11,14 @@
 
 넣지 않는 것: 매 프레임 바뀌는 위치·속도·애니메이션 상태, 화면 상태, 다른 값으로 계산할 수 있는 값(합산 공격력 등), 게임 중에 바뀌지 않는 정의 데이터(DB 항목). 판단 기준은 "되돌리거나, 저장하거나, 기록하거나, 조건으로 검사할 일이 있는가"이다.
 
+**꼭 지킬 것**(자세히는 괄호의 절)
+
+- 어디에: 시작 설정이 만든 키 두 개에 둔다 — `run`(`RunState`, 세션 구역 = 이번 판)·`profile`(`Profile`, 메타 구역 = 판이 끝나도 남음). 값은 이 클래스(`Assets/MomoiProject/Code/Rules/PlayerData.cs`)에 필드로 더한다. 새 키가 필요하면 AI가 DB 반영 스크립트로 DB › 플레이어 데이터 항목을 만든다(1절).
+- 바꾸는 곳: 플레이어 데이터는 **행동 안에서만** 바꾼다. 행동 밖에서 고친 값은 기록되지만 Undo되지 않는다(2.8·5절).
+- 클래스: 값이 되는 클래스·안쪽 클래스·부모·리스트 요소 클래스 모두 `[Serializable]`(3절). 컬렉션은 `List<T>`·`T[]`·`Dictionary<K, V>`(4절).
+- 원본(DB 항목·인스턴스)은 넣지 않고 그 ID(`[DataRef]` 글자)와 **바뀌는 값**만 넣는다(04장). 스프라이트 같은 에셋 참조는 저장 파일에 담기지 않는다(8절).
+- 찾을 객체는 `public string id;`를 두고, id는 데이터 전체에서 하나(`Game.NewId`, 02장 2.2). 다른 키의 객체는 id로 가리키고, 같은 컬렉션 인스턴스를 두 곳에서 가리키지 않는다(5절 7).
+
 ---
 
 ## 0. 용어
@@ -26,26 +34,32 @@
 | Sync | 실제 값과 Mirror를 비교해 바뀐 곳만 기록하고 Mirror를 실제 값에 맞추는 동작. |
 | ChangeSet | Sync 한 번이 찾아낸 변경 묶음. "앞으로 기록"(새 값)과 "뒤로 기록"(옛 값)을 함께 담는다. 앞으로 기록은 멀티플레이에서 다른 쪽에 보내 같은 모습을 만들고, 뒤로 기록은 Undo에 쓴다. |
 | 비교 코드 | 컴파일할 때 `GBible.CodeGen`이 `[Serializable]` 클래스·구조체 안에 넣는 메서드(`__gb_*`). Sync는 이 코드로 필드를 비교하므로 실행 중 리플렉션이 없다. |
-| 예전 방식 | 비교 코드로 다룰 수 없는 데이터에 쓰는 느린 비교(리플렉션으로 값 전체를 복제·비교). 동작은 하지만 기록 규칙이 다르다(6장). |
+| 예전 방식 | 비교 코드로 다룰 수 없는 데이터에 쓰는 느린 비교(리플렉션으로 값 전체를 복제·비교). 동작은 하지만 기록 규칙이 다르다(6절). |
 
 ---
 
 ## 1. 에디터에서 정의하기
 
-플레이어 데이터는 보통 DB에서 만든다. 만들어 두면 게임이 시작될 때 자동으로 등록되고, 코드에서는 생성된 상수로 쓴다.
+플레이어 데이터 키는 DB › 플레이어 데이터(`PlayerDataEntry`, 사이드바 **요소** 그룹) 항목이다. 게임이 시작될 때 저절로 등록되고, 코드에서는 생성된 상수(2.3)로 쓴다.
 
-1. 메뉴 **MomoiProject › DB**을 연다.
-2. 왼쪽 사이드바의 **요소** 그룹에서 **플레이어 데이터** 탭을 고른다.
-3. 오른쪽 위 **+ 새로 만들기**를 누른다.
-4. **새 플레이어 데이터** 창에 ID를 적고 **만들기**를 누른다. ID는 영문 소문자로 시작하고 단어 사이를 대문자로 잇는다(띄어쓰기·밑줄 없음). 분류는 점(.)으로 나눈다. 예: `player.gold`, `player.inventory`, `battle.board`.
-5. 목록에서 항목을 눌러 상세를 열고 세 칸을 채운다.
-   - **구역**: `Session`(이번 판에만, 판 저장에 들어감) 또는 `Meta`(판이 바뀌어도 남음, 프로필 저장에 들어감).
-   - **값 형식**: 목록에서 고른다. 목록은 세 묶음이다.
-     - 기본 형식: 숫자 (double) · 정수 (int) · 큰 정수 (long) · 소수 (float) · 참/거짓 (bool) · 글자 (string) · 날짜·시각 (DateTime) · 시간 길이 (TimeSpan)
-     - enum: 내 코드 범위 안의 enum
-     - 데이터 클래스: 내 코드 범위 안의 공개 `[Serializable]` 클래스 중 추상 클래스가 아니고 담을 수 없는 필드가 없는 것(추가 등록 없이 자동으로 나타난다)
-   - **기본값**: 단순 값에만 쓴다. 클래스는 기본값 칸을 쓰지 않고 클래스의 초기값(필드 초기화·생성자)으로 시작한다.
-6. **저장  Ctrl+S**를 누른다. 저장하면 식별자 코드 `GameIds.cs`가 자동으로 다시 만들어진다.
+- **누가 만드나**: 시작 설정(`MomoiProject › 개발 › 시작 설정`)이 `run`(`RunState`, Session)·`profile`(`Profile`, Meta)을 만든다. 그 밖의 키는 AI가 DB 반영 스크립트로 만든다 — 이 탭의 **+ 새로 만들기**는 개발자에게 잠겨 있다(21장 3-1).
+
+```csharp
+// Assets/MomoiProject/Code/Editor/Seeds/DataSeeds.cs — [DbSeed] 함수 안(AI 관례 15절)
+if (EditorDatabase.Instance.FindById("battle.board") == null)
+{
+    var entry = (PlayerDataEntry)EditorDatabase.Staging.Add(typeof(PlayerDataEntry), "battle.board");
+    entry.zone = DataZone.Session;
+    entry.valueType = typeof(Board).FullName;      // 값 형식(형식 전체 이름)
+}
+```
+
+- **ID**: 영문 소문자로 시작하고 단어 사이를 대문자로 잇는다(띄어쓰기·밑줄 없음). 분류는 점(.)으로 나눈다. 예: `player.gold`, `battle.board`.
+- **칸 세 개**:
+  - **구역**(`zone`): `Session`(이번 판에만, 판 저장에 들어감) 또는 `Meta`(판이 바뀌어도 남음, 프로필 저장에 들어감).
+  - **값 형식**(`valueType`): 기본 형식(숫자 double · 정수 int · 큰 정수 long · 소수 float · 참/거짓 bool · 글자 string · 날짜·시각 DateTime · 시간 길이 TimeSpan) · 내 코드 범위 안의 enum · 내 코드 범위 안의 공개 `[Serializable]` 클래스 중 추상 클래스가 아니고 담을 수 없는 필드가 없는 것.
+  - **기본값**(`defaultValue`): 단순 값에만 쓴다(글자로 적는다). 클래스는 기본값 칸을 쓰지 않고 클래스의 초기값(필드 초기화·생성자)으로 시작한다.
+- **`GameIds` 상수가 생기는 때**: 새 항목이 적용되면 `GameIds.cs`가 다시 만들어지고, Unity가 다시 컴파일한 **뒤에** `GameIds.PlayerData.X`·`Game.Data().X`를 코드에서 쓸 수 있다(20장 7절). 같은 응답 안의 코드는 그 전까지 ID 글자로 읽는다.
 
 DB 검증은 값 형식을 찾을 수 없거나, 담을 수 없는 필드가 있거나, 기본값을 읽을 수 없으면 오류를 띄운다. 클래스가 비교 코드로 다뤄지지 않으면 "비교 코드로 다룰 수 없어 예전 방식(리플렉션, 더 느림)으로 비교합니다" 경고를 띄운다.
 
@@ -60,15 +74,21 @@ DB 검증은 값 형식을 찾을 수 없거나, 담을 수 없는 필드가 있
 ```csharp
 using System;
 using System.Collections.Generic;
+using GBible.Data;
 
 [Serializable]
-public class Item
+public class ItemDef                                    // 원본 클래스: DB › 인스턴스에 하나씩(04장)
 {
-    public string id;
-    public string name;
     public int price;
-    public int level = 1;
     public List<string> tags = new List<string>();
+}
+
+[Serializable]
+public class Item                                       // 판에 든 아이템 하나
+{
+    public string id;                                   // 고유 id(Game.NewId)
+    [DataRef(typeof(ItemDef))] public string item;      // 원본 ID — 가격·태그 같은 고정 값은 원본에서 읽는다
+    public int level = 1;                               // 판에서 바뀌는 값
 }
 
 [Serializable]
@@ -114,13 +134,15 @@ DB의 플레이어 데이터마다 `PlayerDataKey<값 형식>` 상수가 생긴�
 using GBible;
 using GBible.Ids;
 
-GameApi game = GBibleRuntime.Game;
-game.Data().PlayerGold += 100;                        // 단순 값: 읽고 쓰기
-int gold = game.Data().PlayerGold;
-game.Data().PlayerInventory.items.Add(new Item());    // 데이터 값: 꺼내서 안쪽을 고친다
+// 행동의 Run 안(바꾸는 것은 행동 안에서)
+Game.Data().PlayerGold += 100;                        // 단순 값: 읽고 쓰기
+Game.Data().PlayerInventory.items.Add(new Item { id = Game.NewId("item") });   // 데이터 값: 꺼내서 안쪽을 고친다
+
+// 화면 코드: 읽기만
+int gold = GBibleRuntime.Game.Data().PlayerGold;
 ```
 
-`GameIds.cs`와 함께 생성되는 확장 메서드다. 단순 값은 속성 `get`/`set`(내부적으로 `Get`/`Set`), 데이터 값은 읽기 전용 속성(실제 객체를 돌려줌)이다.
+`GameIds.cs`와 함께 생성되는 확장 메서드다(네임스페이스 `GBible.Ids`). 단순 값은 속성 `get`/`set`(내부적으로 `Get`/`Set`), 데이터 값은 읽기 전용 속성(실제 객체를 돌려줌)이다. 이름은 ID의 파스칼 표기다(`run` → `Game.Data().Run`).
 
 ### 2.5 저장소 `session.Data`의 읽기: `Get`
 
@@ -141,6 +163,8 @@ string name = data.GetString("player.name");
 
 ### 2.6 통째로 바꾸기: `Set`
 
+2.6~2.8의 쓰기도 모두 행동 안에서 한다(행동 밖이면 기록만 되고 Undo되지 않는다 — 2.8).
+
 ```csharp
 data.Set(GameIds.PlayerData.PlayerGold, 150);       // Set<T>(PlayerDataKey<T>, T)
 data.Set("player.gold", 150);                        // Set(string, object)
@@ -156,7 +180,7 @@ data.Set("player.inventory", new Inventory());      // 데이터 값: 내용을 
 data.Modify(GameIds.PlayerData.PlayerInventory, inv =>
 {
     inv.gold -= 50;
-    inv.items.Add(new Item { name = "검", level = 1 });
+    inv.items.Add(new Item { id = Game.NewId("item"), item = "ironSword" });
 });
 
 data.Modify<Inventory>("player.inventory", inv => inv.items[0].level++);
@@ -172,14 +196,14 @@ bag.gold += 10;            // 그냥 고친다
 bag.items.RemoveAt(0);
 ```
 
-비교 코드로 다뤄지는 데이터(`[Serializable]` 클래스)는 `Modify` 없이 꺼내서 그냥 고쳐도 된다. 다음 Sync 때 바뀐 곳이 기록된다. 다만 **어디서 고쳤느냐**에 따라 기록의 성격이 다르다(4장).
+비교 코드로 다뤄지는 데이터(`[Serializable]` 클래스)는 `Modify` 없이 꺼내서 그냥 고쳐도 된다. 다음 Sync 때 바뀐 곳이 기록된다. 다만 **어디서 고쳤느냐**에 따라 기록의 성격이 다르다(5절).
 
 - 행동 안에서 고침 → 그 행동의 변경. Undo로 되돌아간다.
 - 행동 밖에서 고침 → "행동 밖 변경"으로 기록된다. Undo로 되돌아가지 않는다.
 
 ### 2.9 코드로 정의하기: `Define`
 
-DB 없이 코드에서 직접 등록할 수 있다(테스트·서버·시제품, 또는 코드만 아는 내부 값).
+DB 없이 코드에서 직접 등록한다. 쓰는 곳은 규칙 테스트·서버·시제품, 또는 코드만 아는 내부 값이다. 프로젝트가 쓰는 키는 DB 항목으로 만든다(1절 — `GameIds` 상수가 생기고 개발자가 DB에서 읽는다).
 
 ```csharp
 // 1) 값으로 정의: 기본값의 형식이 이 키의 형식이 된다. 저장소가 관리하는 실제 객체를 돌려준다.
@@ -205,21 +229,7 @@ data.DefineOfType("player.bag", DataZone.Meta, typeof(Inventory), null);
 - 저장 파일을 먼저 불러온 뒤에 `Define`해도 된다. 아직 정의되지 않은 키의 저장 값은 보관했다가 정의하는 순간 적용한다. 단순 값도 정의한 형식대로 읽는다(날짜 글자 → `DateTime`).
 - 담을 수 없는 필드(함수 필드 등)가 있으면 `Define`이 어느 필드인지 적은 예외를 던진다.
 
-게임 시작과 함께 등록하려면 `GBibleRuntime.Started`에서 한다.
-
-```csharp
-using GBible;
-using UnityEngine;
-
-public static class BattleSetup
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += session =>
-    {
-        session.Data.Define("battle.board", DataZone.Session, new Board(), "전장");
-    };
-}
-```
+Unity 게임에서 시작과 함께 코드로 등록해야 하면 `GBibleRuntime.SessionCreated += session => session.Data.Define(…)`(모든 세션 — 20장 4절, 시작 설정을 했으면 `Bootstrap.RegisterRules` 안에).
 
 ### 2.10 그 밖의 저장소 멤버
 
@@ -299,7 +309,7 @@ public class Hero
 | 비어 있을 수 있는 값 | `int?` `float?` `MyEnum?` 같은 `Nullable<T>`(필드·리스트 요소) |
 | 구조체 | `[Serializable]` 구조체(필드 규칙은 클래스와 같다). 안쪽에 객체·컬렉션 필드가 없고 안쪽 구조체 필드도 이 표의 것인 것만 — 아니면 4.2 |
 | Unity 구조체 | `Vector2` `Vector3` `Vector4` `Vector2Int` `Vector3Int` `Quaternion` `Color` `Color32` `Rect` `RectInt` `Bounds` |
-| 클래스 | `[Serializable]` 클래스. 다른 클래스를 필드로 품어도 된다(256단계까지 — 그보다 깊게 겹친 값은 복제·저장이 멈추거나 경고한다). `null`도 된다. 같은 객체를 두 곳에서 가리키거나 서로 가리켜도 된다(5장 7) |
+| 클래스 | `[Serializable]` 클래스. 다른 클래스를 필드로 품어도 된다(256단계까지 — 그보다 깊게 겹친 값은 복제·저장이 멈추거나 경고한다). `null`도 된다. 같은 객체를 두 곳에서 가리키거나 서로 가리켜도 된다(5절 7) |
 | 리스트·배열 | `List<T>`, 1차원 배열 `T[]` (요소는 위의 값·구조체·클래스) |
 | 딕셔너리 | `Dictionary<K, V>`. 키 `K`는 `string`·정수 형식·`char`·`bool`·enum. 값 `V`는 위의 값·구조체·클래스 |
 | 다형성 | 추상 클래스·인터페이스·부모 클래스 형식의 필드나 리스트 요소에 자식 객체를 넣는다. 실제 객체가 `[Serializable]`이면 안쪽까지 기록된다(컬렉션은 인터페이스 형식으로 선언하지 않는다 — 4.3) |
@@ -342,7 +352,7 @@ public class Unit
 - 중첩 컬렉션(`List<List<int>>`, 값이 리스트인 딕셔너리 등). 컴파일할 때 "중첩 컬렉션·이 형식은 비교 코드로 다루지 않습니다" 경고가 난다
 - 컬렉션 클래스를 상속한 클래스(`class Deck : List<Card>`). 요소는 상속한 `List`의 안쪽 칸이라 비교 코드가 보지 못한다. 컴파일할 때 "컬렉션 클래스 …을(를) 상속해 생성 코드가 요소의 변경을 따라가지 못합니다 … 상속 대신 List<T>·Dictionary<K, V> 필드를 두세요" 경고가 나고, 행동·이벤트에 담으면 보낼 때 오류다. 상속 대신 `List<Card> cards` 필드를 둔다
 - `float`·`double`·`Guid`·`DateTime`·`DateTimeOffset`·`TimeSpan` 키 딕셔너리(저장·불러오기는 된다)
-- 안쪽에 객체·컬렉션 필드(클래스·List·배열·Dictionary)가 있는 `[Serializable]` 구조체. 구조체는 값으로 복사되므로 안쪽 변경을 따라가지 못한다. 컴파일할 때 "구조체 안의 객체·컬렉션 필드(…)는 안쪽 변경을 따라가지 못합니다. … 구조체 대신 [Serializable] 클래스로 바꾸세요." 경고가 난다. 클래스로 바꾼다(예전 방식은 느리고 `Modify`가 필요하다, 6장)
+- 안쪽에 객체·컬렉션 필드(클래스·List·배열·Dictionary)가 있는 `[Serializable]` 구조체. 구조체는 값으로 복사되므로 안쪽 변경을 따라가지 못한다. 컴파일할 때 "구조체 안의 객체·컬렉션 필드(…)는 안쪽 변경을 따라가지 못합니다. … 구조체 대신 [Serializable] 클래스로 바꾸세요." 경고가 난다. 클래스로 바꾼다(예전 방식은 느리고 `Modify`가 필요하다, 6절)
 - 쓰고 읽는 방법이 없는 구조체(`KeyValuePair<K, V>`·`(int, int)` 같은 튜플·`[Serializable]`이 없는 구조체)를 담은 칸. `[Serializable]` 구조체의 필드·요소로 들어 있어도 같다(그 구조체도 예전 방식)
 - 뿌리 값이 컬렉션 그 자체
 
@@ -409,54 +419,40 @@ public class Unit
 
 ### 7.1 RPG: 지갑 골드와 인벤토리 (DB 정의)
 
-DB에서 두 플레이어 데이터를 만든다.
+DB 반영 스크립트로 두 플레이어 데이터(1절)와 `ItemDef` 인스턴스 `ironSword`(04장)를 만든다.
 
 | ID | 구역 | 값 형식 | 기본값 |
 |---|---|---|---|
 | `player.gold` | Meta | 정수 (int) | `100` |
 | `player.inventory` | Meta | `Inventory` | (클래스 초기값) |
 
-`Item`·`Inventory`는 2.1의 클래스다.
+`ItemDef`·`Item`·`Inventory`는 2.1의 클래스다.
 
 ```csharp
 using System;
 using GBible;
+using GBible.Data;
 using GBible.Ids;
-using UnityEngine;
 
 // 구매는 플레이어 입력이므로 행동으로 만든다(Undo 한 단위).
-[Serializable]
+[Serializable, BlockInfo("아이템 사기")]
 public class BuyItem : GameAction
 {
-    public string itemName;
-    public int price;
+    [DataRef(typeof(ItemDef))] public string item;                     // 원본 ID
 
     protected override void Run()
     {
-        var data = Game.Data();
-        if (data.PlayerGold < price) throw new InvalidOperationException("골드가 부족합니다.");
-        data.PlayerGold -= price;
-        data.PlayerInventory.items.Add(new Item { id = Game.NewId("item"), name = itemName, price = price });
+        var def = (ItemDef)Game.Session.Instances(item);                // 가격은 원본에서 읽는다
+        Game.Pay(GameIds.PlayerData.PlayerGold, null, def.price);       // 모자라면 플레이어용 실패(28장 2-4)
+        Game.Data().PlayerInventory.items.Add(new Item { id = Game.NewId("item"), item = item });
     }
 }
 
-// 화면: 읽기만 한다.
-public class WalletView : MonoBehaviour
-{
-    void Update()
-    {
-        var game = GBibleRuntime.Game;
-        if (game == null) return;
-        int gold = game.Data().PlayerGold;
-        int count = game.Data().PlayerInventory.items.Count;
-        // gold, count를 UI에 그린다
-    }
-
-    public void OnClickBuy() => GBibleRuntime.Game.Do(new BuyItem { itemName = "검", price = 50 });
-}
+// 화면은 읽기만 한다: 값 칸은 UXML binding-path, 버튼은 행동을 보낸다(35장).
+//   OnClick("buy", () => new BuyItem { item = GameIds.Instance.IronSword });
 ```
 
-골드가 모자라면 행동 안에서 예외가 나고, 행동이 바꾼 것이 모두 취소된다(`Do`를 부른 쪽으로 예외가 다시 던져진다).
+골드가 모자라면 `Game.Pay`가 플레이어용 실패(`GameFailure`)를 던지고 행동이 바꾼 것이 모두 취소된다. 화면의 `OnClick`이 그 글을 알림으로 보인다(02장 2.7).
 
 ### 7.2 전술 게임: 전장과 유닛 HP (세션 구역)
 
@@ -496,7 +492,7 @@ public class Strike : GameAction
 
 전장을 DB의 `battle.board`(Session, `Board`)로 만들었거나 코드에서 `session.Data.Define("battle.board", DataZone.Session, new Board())`로 정의했다면, 행동은 `Game.Do(new Strike { target = orc, damage = 12 })`(`orc`는 전장의 `TacticsUnit` 객체)로 실행한다. Undo하면 HP와 리스트에서 빠진 유닛이 **같은 객체로** 제자리에 돌아온다.
 
-### 7.3 카드 게임: 덱·손패·카드별 사용 횟수
+### 7.3 카드 게임: 덱·핸드·카드별 사용 횟수
 
 ```csharp
 using System;
@@ -522,7 +518,7 @@ public class PlayCard : GameAction
     protected override void Run()
     {
         var state = Game.All<CardState>()[0];
-        if (!state.hand.Remove(card)) throw new InvalidOperationException("손에 없는 카드입니다.");
+        if (!state.hand.Remove(card)) throw new InvalidOperationException("핸드에 없는 카드입니다.");
         state.mana -= cost;
         state.discard.Add(card);
         state.playedCount.TryGetValue(card, out var n);
@@ -532,6 +528,8 @@ public class PlayCard : GameAction
 ```
 
 리스트 이동·딕셔너리 값 변경이 모두 한 행동의 변경으로 묶여 Undo 한 번에 돌아간다.
+
+이 예는 기록 단위를 보이려는 것이다. 실제 게임에서 비용은 `Game.Pay`(28장 2-4), 같은 카드 두 장·카드마다 강화가 있으면 글자 목록 대신 객체 목록(`DeckCard { id, card, upgraded }` — 04장)으로 둔다.
 
 ### 7.4 상태 효과 리스트(다형성)
 
@@ -615,11 +613,11 @@ session.Undo();                                                 // hp 12 (행동
 | 어떤 필드만 Undo·기록에서 빠짐 | private 필드에 `[SerializeField]`가 없다, 속성이다, `readonly`다, 또는 부모 클래스에 `[Serializable]`이 없다. |
 | 안쪽 값이 기록되지 않음 | 리스트·필드에 든 자식 객체 클래스에 `[Serializable]`이 없다. |
 | "예전 방식(리플렉션)으로 비교합니다" 경고 | 4.2의 형식이 들어 있다. 가능하면 `List`·`Dictionary`·`[Serializable]`로 바꾼다. |
-| "Modify를 거치지 않고 바뀌었습니다" 경고 | 예전 방식 데이터를 행동·`Modify` 밖에서 고쳤다(6장). |
+| "Modify를 거치지 않고 바뀌었습니다" 경고 | 예전 방식 데이터를 행동·`Modify` 밖에서 고쳤다(6절). |
 | "담을 수 없는 필드" 오류 | 함수·`object`·다차원 배열 필드가 있다. 데이터가 아니면 `[NonSerialized]`를 붙인다. |
-| 두 키가 함께 쓰던 객체가 Undo 뒤 엉뚱하거나 불러온 뒤 둘로 갈라짐 | 다른 플레이어 데이터 키끼리 같은 객체를 가리켰다(Undo가 두 번 적용되고, 키마다 따로 저장된다). 같은 객체 공유는 한 키 안에서만 된다(5장 7). 다른 키에서는 id로 가리키고 `Game.Find`로 찾는다. |
+| 두 키가 함께 쓰던 객체가 Undo 뒤 엉뚱하거나 불러온 뒤 둘로 갈라짐 | 다른 플레이어 데이터 키끼리 같은 객체를 가리켰다(Undo가 두 번 적용되고, 키마다 따로 저장된다). 같은 객체 공유는 한 키 안에서만 된다(5절 7). 다른 키에서는 id로 가리키고 `Game.Find`로 찾는다. |
 | "인터페이스·추상 컬렉션 형식은 담을 수 없습니다" | 칸을 `IList<T>`·`IDictionary<K, V>`·`IReadOnlyList<T>`로 선언했다. `List<T>`·`Dictionary<K, V>`로 바꾼다(4.3). |
-| 같은 행동인데 Undo·불러오기 뒤 결과 차례가 다름 | 규칙이 Dictionary를 훑는 순서에 기댔다. 차례가 필요하면 `List`로(5장 8). |
+| 같은 행동인데 Undo·불러오기 뒤 결과 차례가 다름 | 규칙이 Dictionary를 훑는 순서에 기댔다. 차례가 필요하면 `List`로(5절 8). |
 | 모니터 타임라인에 기록이 매 프레임 쌓임 | 매 프레임 바뀌는 값을 플레이어 데이터에 넣었다. MonoBehaviour 쪽으로 옮긴다. |
 | 스프라이트 같은 에셋 참조가 불러온 뒤 비어 있음 | 저장 파일에는 `GameData`(DB 항목) 참조만 ID로 담긴다(되감기 스냅샷은 메모리 안이라 참조를 그대로 둔다). 그 밖의 에셋 참조는 저장 파일에 담기지 않고, 저장할 때 "저장할 수 없는 참조입니다" 경고가 난다. 에셋은 DB ID나 인스턴스 쪽에 두고 플레이어 데이터에는 ID를 둔다. |
 | 오래 쥔 객체가 Undo·불러오기 뒤 엉뚱함 | Undo는 빠졌던 객체를 원래 인스턴스로 되돌리지만, 불러오기·멀티플레이 받는 쪽에서는 다른 인스턴스일 수 있다. 값을 읽으려고 오래 들고 있을 것은 id로 들고 `Game.Find`로 다시 찾는다. 행동의 참조 필드에 넣는 것은 옛 객체여도 된다(실행 직전에 같은 id의 지금 객체로 바뀐다, 02 2.2). |

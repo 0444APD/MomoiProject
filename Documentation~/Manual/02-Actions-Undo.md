@@ -10,6 +10,14 @@
 - 실시간 게임의 입력(되돌리기는 스냅샷 방식으로)
 - 실패하면 아무것도 바뀌지 않아야 하는 처리(구매·제작)
 
+**꼭 지킬 것**(자세히는 괄호의 절)
+
+- 플레이어 데이터를 바꾸는 코드는 행동의 `Run`(과 그 안에서 부르는 규칙 함수·Block·`[BindTo]`)에만 둔다. 화면·연출·코루틴·이벤트를 받는 화면 코드는 `Game.Do(new 행동 { … })`만 부른다(2.12·3절).
+- 대상(플레이어 데이터 안의 객체)은 **객체로** 필드에 넣는다 — 기록에는 id만 남고 실행 직전에 다시 찾는다. DB 원본은 `[DataRef]` 글자 필드(2.2). 새 객체는 행동 안에서 만들고 id는 `Game.NewId`.
+- 실패는 던진다: 플레이어에게 보일 것은 `throw Game.Fail("fail.키", "기본 문장")`, 프로그래머 실수는 `InvalidOperationException`. 던지면 행동이 바꾼 것이 모두 취소된다(2.7).
+- 행동은 바로 끝난다. 기다리지 않는다 — 나중 일은 상태 효과·예약, 플레이어 선택은 `Game.Ask`(29장), 연출은 끝난 뒤 `SubscribeAfterAction`(10장 2-7).
+- 되돌리기 방식(행동 단위·스냅샷·없음)과 보관 수는 DB › Bootstrap에서 정한다(2.10).
+
 ---
 
 ## 0. 용어
@@ -77,7 +85,7 @@ Game.Do(new EndTurn());
 | `[Serializable]` | 행동은 데이터다. 붙여 두어야 저장·전송·리플레이에 쓸 수 있다. |
 | `[BlockInfo("이름")]` | 모니터·타임라인에 보일 이름. 없으면 클래스 이름이 쓰인다. |
 
-등록 없이 바로 실행된다.
+등록 없이 바로 실행된다. 행동 클래스는 규칙 어셈블리(`Assets/MomoiProject/Code/Rules/Actions/<주제>Actions.cs`, Unity API 없이)에 둔다 — 서버·테스트에서도 같은 코드가 돈다(AI 관례 1절). 이름은 동사구(`PlayCard`·`EndTurn`), 표시 이름은 `[BlockInfo]`의 한글.
 
 ### 2.2 대상은 객체로: 참조 필드
 
@@ -192,48 +200,34 @@ public class OpenChest : GameAction
     protected override void Run() { /* … */ }
 }
 
-Game.Do(new OpenChest { actorId = 2 });
+Game.Do(new OpenChest());   // actorId를 비우면 session.LocalPlayer로 채운다
 ```
 
 | 멤버 | 뜻 |
 |---|---|
-| `actorId` (`int`) | 행동한 플레이어 번호. 게임 코드가 채운다. |
+| `actorId` (`int`) | 행동한 플레이어 번호. 0(비움)이면 바깥 행동의 `Do`가 `session.LocalPlayer`(싱글 0)로 채운다. 멀티 서버는 받은 행동의 값을 보낸 사람 번호로 덮는다(40장). |
 | `tick` (`long`) | 실행할 때 시스템이 게임 시계의 틱(`session.Clock.Tick`)을 적는다. |
 | `utc` (`long`) | 현실 시각(1970-01-01부터 UTC 밀리초). 바깥 행동이 시작할 때 시스템이 한 번 적고, 안쪽 행동은 같은 값이다. 이미 값이 있으면(멀티플레이로 받은 행동·다시 돌리는 행동) 그대로 둔다. 규칙에서는 `Game.Now`로 읽는다([07-Random-Time.md](07-Random-Time.md) 2.11). |
-| `Visibility` | `Public`(모두) · `Private`(본인만) · `Developer`(개발자 모니터만). 지금은 모니터 행동 탭에 표시된다. |
+| `Visibility` | `Public`(모두) · `Private`(본인만) · `Developer`(개발자 모니터만). 지금은 모니터 행동 탭에 표시만 한다 — 멀티 전송을 거르지 않는다(숨길 데이터·이벤트는 40장의 공개 범위·`IOwnedEvent`). |
 
 `utc`가 이미 있으면 그대로 쓰므로, 같은 행동 객체를 다시 `Do`하면 처음 시각이 남는다. 행동은 `Do`할 때마다 `new`로 만든다.
 
 ### 2.5 처리기를 따로 등록하는 행동: `Actions.Register`
 
-처리 코드를 행동 클래스 밖(세션 준비 코드)에 두는 방식이다. 행동 클래스는 데이터만 갖고 `Run`을 쓰지 않는다.
+처리 코드를 행동 클래스 밖(세션 준비 코드 — Unity에서는 `Client/Bootstrap.cs`의 `RegisterRules`, 멀티 서버를 포함한 모든 세션에 온다, 20장 4절)에 두는 방식이다. 행동 클래스는 데이터만 갖고 `Run`을 쓰지 않는다. 프로젝트 규칙은 `Run`에 쓴다(처리가 행동과 한 곳에 있다). 이 방식은 세션을 직접 만드는 테스트·서버에서 처리를 갈아 끼울 때 쓴다.
 
 ```csharp
-using System;
-using GBible;
-using UnityEngine;
-
 [Serializable, BlockInfo("공격")]
 public sealed class AttackUnit : GameAction
 {
     public Unit target;                                      // 참조 필드는 여기서도 똑같이 다룬다
 }
 
-public static class CombatSetup
+session.Actions.Register<AttackUnit>(action =>
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += session =>
-    {
-        session.Data.Define("battle.combo", DataZone.Session, 0, "콤보");
-        session.Actions.Register<AttackUnit>(action =>
-        {
-            // action.target은 이미 지금 데이터의 객체로 바뀌어 있다
-            var hit = session.Random.Get("combat").Chance(0.7);
-            if (hit) action.target.hp -= 5;
-            session.Data.Set("battle.combo", hit ? session.Data.GetNumber("battle.combo") + 1 : 0);
-        });
-    };
-}
+    // action.target은 이미 지금 데이터의 객체로 바뀌어 있다
+    if (session.Game.Chance(0.7, "combat")) action.target.hp -= 5;
+});
 ```
 
 - 처리기에도 실행 직전에 참조 필드를 다시 찾아 넣은 행동이 넘어온다(못 찾으면 처리기를 부르기 전에 실패).
@@ -276,11 +270,20 @@ public class Buy : GameAction
     public int price;
     protected override void Run()
     {
-        wallet.gold -= price;                                                // 먼저 깎아도
-        if (wallet.gold < 0) throw new InvalidOperationException("골드 부족"); // 예외면 깎은 것까지 되돌아간다
+        wallet.gold -= price;                                                         // 먼저 깎아도
+        if (wallet.gold < 0) throw Game.Fail("fail.gold", "골드가 모자랍니다.");     // 던지면 깎은 것까지 되돌아간다
     }
 }
 ```
+
+던지는 것은 두 가지다.
+
+| 무엇 | 던지는 것 | 부른 쪽에서 |
+|---|---|---|
+| 플레이어에게 보일 실패(모자람·조건 안 맞음·지금 못 함) | `throw Game.Fail("fail.키", "기본 문장 {값}", ("값", x))` → `GameFailure`. 텍스트 표에 키가 있으면 번역된 글(30장) | 화면 버튼 `OnClick`·`GameScreens.Do`가 잡아 알림으로 보인다(35장) |
+| 프로그래머 실수(없는 ID·잘못된 상태) | `throw new InvalidOperationException("…")` | 잡지 않고 그대로 올라간다(콘솔 오류) |
+
+비용은 직접 검사하지 않는다 — `Game.Pay`가 모자라면 `GameFailure`를 던진다(28장 2-4). `GameFailure`는 `InvalidOperationException`을 물려받으므로 `catch (InvalidOperationException)`은 둘 다 잡는다 — 플레이어용만 잡으려면 `catch (GameFailure)`.
 
 행동 안에서 예외가 나면(참조 필드를 찾지 못한 경우도, 행동 안에서 쏜 이벤트를 받는 `Subscribe`·트리거 결과가 던진 경우도 같다. [10-Events.md](10-Events.md) 2-7):
 
@@ -288,12 +291,7 @@ public class Buy : GameAction
 - 난수 스트림도 행동 전 상태로 돌린다.
 - 행동 기록의 상태는 `Failed`, 기록에 "행동 실패, 변경 취소" 오류가 남는다.
 - Undo 이력에 들어가지 않는다.
-- 예외는 `Do`를 부른 쪽으로 **다시 던져진다**. 예상되는 실패라면 부른 쪽에서 잡는다.
-
-```csharp
-try { Game.Do(new Buy { wallet = myWallet, price = 50 }); }
-catch (InvalidOperationException e) { /* "골드 부족" 안내 */ }
-```
+- 예외는 `Do`를 부른 쪽으로 **다시 던져진다**. 화면 밖에서 `Game.Do`를 부르는 코드(테스트 등)는 `catch (GameFailure f)`로 잡아 `f.Message`(지금 언어의 글)를 본다.
 
 **행동 안의 저장점: `Data.Mark()` · `Data.RollbackTo(point)`** — 행동 전체가 아니라 그 안의 한 부분만 실패 처리할 때 쓴다. `Mark()`는 지금까지의 변경을 굳혀 두고 저장점(`Savepoint`)을 돌려준다. `RollbackTo(저장점)`은 그 저장점 **뒤의 변경만** 되돌린다. 그 앞의 변경은 남고 행동은 계속되며, 되돌린 변경은 그 행동의 Undo 기록에서도 빠진다. 이벤트 예약이 실패할 때 그 예약이 바꾼 것만 되돌리는 것도 이 방식이다(`29-Statuses-Schedules-Choices.md` 2-5).
 
@@ -361,29 +359,16 @@ using (Game.Session.Data.Permanent())
 
 ### 2.10 되돌리기 방식: `SessionOptions`
 
-```csharp
-using GBible;
-using UnityEngine;
+**Unity 게임은 DB › 시작 파일 › Bootstrap에서 정한다**(코드로 같은 값을 정하지 않는다): **Undo 방식** · **Undo 보관 수**(행동 단위) · **스냅샷 간격(초)** · **스냅샷 보관 수**(스냅샷) · **Undo 끊는 이벤트(선택)**(4.2). 시작 설정이 처음 방식을 넣는다. `GBibleRuntime`이 세션을 만들 때 이 값을 `SessionOptions`에 넣는다.
 
-public static class UndoSetup
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Configuring += options =>
-    {
-        options.History = HistoryMode.Actions;   // 기본
-        options.HistoryLimit = 200;              // 0이면 무제한
-    };
-}
-```
+`GBibleRuntime.Configuring += options => …`(20장 3절)로 바꾸면 코드가 이기고, 기록에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 세션을 직접 만드는 테스트·서버는 `new GameSession(new SessionOptions { History = …, HistoryLimit = … })`.
 
-`GBibleRuntime.Configuring`은 세션을 만들기 직전에 옵션을 넘겨준다. 세션을 직접 만들 때는 `new GameSession(new SessionOptions { … })`.
-
-| 옵션 | 기본값 | 뜻 |
+| 옵션(Bootstrap 칸) | 기본값 | 뜻 |
 |---|---|---|
-| `History` | `HistoryMode.Actions` | 되돌리기 방식(아래 표) |
-| `HistoryLimit` | `0`(세션을 직접 만들 때). `GBibleRuntime`은 DB › Bootstrap의 **Undo 보관 수**를 넣고, 새 DB의 기본은 `200` | 행동 단위 방식에서 Undo할 수 있는 최대 행동 수. 0은 무제한. 넘으면 가장 오래된 행동부터 Undo할 수 없게 된다 |
-| `SnapshotInterval` | `1.0` | 스냅샷 방식의 간격(게임 시간 초) |
-| `SnapshotLimit` | `30` | 보관할 스냅샷 수 |
+| `History`(Undo 방식) | `HistoryMode.Actions` | 되돌리기 방식(아래 표) |
+| `HistoryLimit`(Undo 보관 수) | 새 DB `200`. 세션을 직접 만들면 `0` | 행동 단위 방식에서 Undo할 수 있는 최대 행동 수. 0은 무제한. 넘으면 가장 오래된 행동부터 Undo할 수 없게 된다 |
+| `SnapshotInterval`(스냅샷 간격(초)) | `1.0` | 스냅샷 방식의 간격(게임 시간 초) |
+| `SnapshotLimit`(스냅샷 보관 수) | `30` | 보관할 스냅샷 수 |
 
 | `HistoryMode` | 되돌리는 단위 | 어울리는 장르 |
 |---|---|---|
@@ -417,148 +402,41 @@ hero.hp = 1;                    // 행동 밖: 다음 Sync에 "행동 밖 변경
   - 이 경고는 클래스 데이터(Mirror로 비교하는 데이터)에만 있고, `DescribeChanges`가 켜져 있을 때(기본)만 나온다. 숫자·글자 같은 단순 값 키는 경고 없이 행동 전 값으로 덮인다.
 - 행동이 바꾼 리스트의 **구조**(더하기·빼기·순서 바꾸기)가 그 뒤 행동 밖에서 바뀌었으면 그 행동은 Undo하지 않는다(`Undo()`가 `false`). 되돌리면 번호가 밀려 엉뚱한 요소가 바뀌기 때문이다. 기록에 경고가 남는다: "Undo '행동'를 할 수 없습니다: 그 뒤 행동 밖에서 리스트 구조가 바뀌었습니다(…). … 리스트에 더하기·빼기·순서 바꾸기는 행동 안에서 하세요."
 - Undo가 도중에 실패하면(예상하지 못한 구조 변화) 예외를 던지지 않는다. 경고 "Undo '행동'를 끝까지 되돌리지 못해 일부만 되돌렸습니다: …"를 남기고 지금 모습으로 다시 맞춘다.
-- 행동 안에서 다른 행동을 `Game.Do`하거나 `Game.Use`하면, 그 행동은 **바깥 행동의 일부로 그 자리에서** 실행된다(새 Undo 단위를 만들지 않는다). 안쪽 행동의 참조 필드도 실행 직전에 다시 찾는다. Undo·변경 묶음은 바깥 행동 하나이고, 안쪽에서 실패하면 바깥 행동 전체가 취소된다. 예: 카드 내기 = 에너지 지불 + 손패 이동 + `Game.Use(카드)` + 다 쓰러졌으면 `Game.Do(new WinBattle())`.
+- 행동 안에서 다른 행동을 `Game.Do`하거나 `Game.Use`하면, 그 행동은 **바깥 행동의 일부로 그 자리에서** 실행된다(새 Undo 단위를 만들지 않는다). 안쪽 행동의 참조 필드도 실행 직전에 다시 찾는다. Undo·변경 묶음은 바깥 행동 하나이고, 안쪽에서 실패하면 바깥 행동 전체가 취소된다. 예: 카드 내기 = 에너지 지불 + 핸드 이동 + `Game.Use(카드)` + 다 쓰러졌으면 `Game.Do(new WinBattle())`.
 
 ---
 
 ## 3. 나중에 일어나는 효과 (람다·코루틴)
 
-> 게임 규칙의 지연·지속 효과(독, "3턴 뒤 폭발", "2초 뒤 폭발")는 직접 만들지 않아도 된다. 상태 효과와 예약(`Game.ScheduleAfter`·`ScheduleOn`)이 저장·Undo·대상 다시 찾기까지 맡는다(→ `29-Statuses-Schedules-Choices.md`). 이 절은 그 밖의 나중 코드(코루틴·연출 콜백)와 그 원리다.
+> 게임 규칙의 지연·지속 효과(독, "3턴 뒤 폭발", "2초 뒤 폭발")는 코루틴으로 만들지 않는다. 상태 효과와 예약(`Game.ScheduleAfter`·`ScheduleOn`)이 저장·Undo·대상 다시 찾기까지 맡는다(29장). 실시간 틱마다의 규칙은 `session.Ticked`에서 `Game.Do`(33장). 이 절은 그 밖의 나중 코드(코루틴·타이머·연출 콜백)가 지킬 것과 그 원리다.
 
 코루틴, 타이머, 트윈 완료 콜백처럼 **나중에 실행되는 코드는 어떤 행동의 바깥에서 돈다.** 행동의 `Run` 안에서 만든 람다라도 실제로 실행되는 시점에는 그 행동이 이미 끝나 있다.
 
 그 결과:
 
 1. 람다·코루틴이 고친 값은 기록되지만 **행동 밖 변경**이다. Undo되지 않는다.
-2. 행동 클래스의 `Game` 속성은 `Run`이 끝나면 `null`이다. 나중에 쓰려면 `GBibleRuntime.Game`을 쓰거나 `Run` 안에서 지역 변수로 받아 둔다.
+2. 행동 클래스의 `Game` 속성은 `Run`이 끝나면 `null`이다. 나중 코드는 `GBibleRuntime.Game`을 쓴다.
 3. 시작한 행동을 Undo해도 코루틴은 멈추지 않는다.
 4. 그 사이에 대상이 Undo·사망·불러오기로 사라졌을 수 있다.
 
-**되돌릴 수 있게 하려면 람다·코루틴 안에서 `Game.Do(...)`로 행동을 실행한다.** 그러면 지연 효과 한 번 한 번이 각각 Undo 한 단위가 된다. 람다가 쥔 객체가 옛 객체여도 행동의 참조 필드는 실행 직전에 지금 객체로 바뀐다. 다만 대상이 아예 사라졌으면 행동이 실패하므로, 실행하기 전에 `Find`로 아직 있는지 확인한다. 남은 횟수 같은 진행 상태는 플레이어 데이터에 두면 Undo·저장이 함께 따라온다.
+**나중 코드가 규칙을 진행시켜야 하면 `Game.Do(...)`로 행동을 실행한다.** 그러면 한 번 한 번이 각각 Undo 한 단위가 된다. 람다가 쥔 객체가 옛 객체여도 행동의 참조 필드는 실행 직전에 지금 객체로 바뀐다. 대상이 아예 사라졌으면 행동이 실패하므로(2.2) 먼저 `Find`로 확인한다. 남은 횟수 같은 진행 상태는 플레이어 데이터에 둔다(Undo·저장이 함께 따라온다). 연출 콜백 자체는 데이터를 바꾸지 않는다(10장 2-7).
 
 ```csharp
-using System;
-using System.Collections;
-using GBible;
-using UnityEngine;
+// Later(초, 할 일): 코루틴·타이머·트윈 완료처럼 나중에 부르는 게임 코드. u: 데이터 안의 Unit(2.2), Blast: unit의 hp를 damage만큼 깎는 행동
+Later(2f, () => u.hp -= 10);                               // 나쁨: 행동 밖 변경, Undo 안 됨. u는 데이터 밖의 옛 객체일 수 있다
 
-[Serializable]
-public class PoisonedUnit
+Later(2f, () =>                                            // 좋음: 행동 하나 = Undo 한 단위
 {
-    public string id;
-    public int hp = 30;
-    public int poisonTicks;          // 남은 횟수도 플레이어 데이터에(Undo·저장에 함께)
-}
-
-[Serializable, BlockInfo("독 걸기")]
-public class ApplyPoison : GameAction
-{
-    public PoisonedUnit unit;
-    public int ticks = 3;
-    protected override void Run() => unit.poisonTicks = ticks;
-}
-
-[Serializable, BlockInfo("독 피해")]
-public class PoisonTick : GameAction
-{
-    public PoisonedUnit unit;
-    public int damage = 2;
-    protected override void Run()
-    {
-        if (unit.poisonTicks <= 0) return;
-        unit.hp -= damage;
-        unit.poisonTicks--;
-    }
-}
-
-public class PoisonDriver : MonoBehaviour
-{
-    public void Poison(PoisonedUnit unit)
-    {
-        GBibleRuntime.Game.Do(new ApplyPoison { unit = unit, ticks = 3 });
-        StartCoroutine(Tick(unit.id));
-    }
-
-    IEnumerator Tick(string unitId)
-    {
-        while (true)
-        {
-            yield return new WaitForSeconds(1f);                  // 게임 시간(일시정지·배속을 따른다)
-            var game = GBibleRuntime.Game;
-            var unit = game?.Find<PoisonedUnit>(unitId);          // 지금 값(poisonTicks)을 보려면 지금 객체로
-            if (unit == null || unit.poisonTicks <= 0) yield break;   // Undo·사망으로 사라졌거나 끝났으면 멈춘다
-            game.Do(new PoisonTick { unit = unit });              // 한 번 한 번이 Undo 한 단위
-        }
-    }
-}
+    var game = GBibleRuntime.Game;
+    if (game?.Find<Unit>(u.id) != null) game.Do(new Blast { unit = u, damage = 10 });   // u는 실행 직전에 지금 객체로 바뀐다
+});
 ```
-
-`ApplyPoison`을 Undo하면 `poisonTicks`가 0으로 돌아가므로, 다음 틱에서 코루틴이 스스로 멈춘다.
-
-**잘못된 예** — 나중에 도는 람다 안에서 값을 직접 고친다.
-
-```csharp
-using System;
-using System.Collections.Generic;
-using GBible;
-using UnityEngine;
-
-// 게임 코드가 직접 만든 간단한 지연 실행기(시스템 기능이 아니다).
-public class DelayQueue : MonoBehaviour
-{
-    public static DelayQueue Instance;
-    readonly List<(float at, Action run)> _pending = new List<(float, Action)>();
-
-    void Awake() => Instance = this;
-    public void After(float seconds, Action run) => _pending.Add((Time.time + seconds, run));
-
-    void Update()
-    {
-        for (int i = _pending.Count - 1; i >= 0; i--)
-        {
-            if (_pending[i].at > Time.time) continue;
-            var run = _pending[i].run;
-            _pending.RemoveAt(i);
-            run();
-        }
-    }
-}
-
-[Serializable, BlockInfo("폭발")]
-public class Blast : GameAction
-{
-    public PoisonedUnit unit;
-    public int damage;
-    protected override void Run() => unit.hp -= damage;
-}
-
-[Serializable, BlockInfo("지연 폭발")]
-public class DelayedBlast : GameAction
-{
-    public PoisonedUnit unit;
-
-    protected override void Run()
-    {
-        var game = Game;   // Run이 끝나면 Game 속성은 null이 되므로 지역 변수로 받아 둔다
-        var u = unit;
-
-        // 나쁨: 2초 뒤 직접 고침 → 행동 밖 변경, Undo 안 됨. 그 사이 Undo·불러오기가 있었으면 u는 데이터 밖의 옛 객체일 수도 있다.
-        DelayQueue.Instance.After(2f, () => u.hp -= 10);
-
-        // 좋음: 2초 뒤 행동으로 실행 → 그 효과가 Undo 한 단위. u가 옛 객체여도 실행 직전에 같은 id의 지금 객체로 바뀐다.
-        DelayQueue.Instance.After(2f, () =>
-        {
-            if (game.Find<PoisonedUnit>(u.id) != null) game.Do(new Blast { unit = u, damage = 10 });
-        });
-    }
-}
-```
-
-참조 필드의 대상을 찾지 못하면 행동이 예외로 실패하므로, 지연 실행에서는 `Find`로 먼저 확인하거나 `Do`를 `try`로 감싼다.
 
 ---
 
 ## 4. 상황별 예제
+
+예제는 행동·Undo의 모양을 보이려고 숫자를 코드·필드에 적었다. 프로젝트에서는 숫자를 밸런싱 값(30장)에서 읽고, 화면 입력은 UI Toolkit 화면의 `OnClick`(35장)으로 보낸다.
 
 ### 4.1 턴제 전술: 이동 · 공격 · 턴 넘기기 · Undo 버튼
 
@@ -593,7 +471,7 @@ public class Move : GameAction
     public int x, y;
     protected override void Run()
     {
-        if (unit.acted) throw new InvalidOperationException("이미 행동했습니다.");
+        if (unit.acted) throw Game.Fail("fail.acted", "이미 행동했습니다.");   // 플레이어용 실패(2.7)
         unit.x = x;
         unit.y = y;
         unit.acted = true;
@@ -642,12 +520,13 @@ Undo하면 쓰러져 리스트에서 빠졌던 적이 같은 객체로 제자리
 
 ### 4.2 카드 게임: 턴 안에서만 되돌리기
 
-턴을 넘긴 뒤에는 그 전 행동을 되돌리지 못하게 하려면, 턴 넘기기 행동을 실행한 뒤 Undo 이력을 비운다(행동 단위 방식).
+턴을 넘긴 뒤에는 그 전 행동을 되돌리지 못하게 하려면 Undo 이력을 비운다(행동 단위 방식). 턴 끝 이벤트를 쏘는 게임은 DB › Bootstrap의 **Undo 끊는 이벤트(선택)**에 그 이벤트를 고른다(코드 없음 — 그 이벤트를 쏜 행동이 끝나면 비운다). 코드로는 행동 밖에서 `session.ClearUndo()`.
 
 ```csharp
 using System;
 using System.Collections.Generic;
 using GBible;
+using GBible.Ids;
 
 [Serializable]
 public class Duel
@@ -661,14 +540,13 @@ public class Duel
 [Serializable, BlockInfo("카드 내기")]
 public class PlayCard : GameAction
 {
-    public string card;          // 손패는 카드 이름 글자 목록이므로 그냥 값
+    public string card;          // 핸드는 카드 이름 글자 목록이므로 그냥 값
     public int cost;
     protected override void Run()
     {
         var duel = Game.All<Duel>()[0];
-        if (duel.mana < cost) throw new InvalidOperationException("마나 부족");
-        if (!duel.hand.Remove(card)) throw new InvalidOperationException("손에 없는 카드");
-        duel.mana -= cost;
+        if (!duel.hand.Remove(card)) throw new InvalidOperationException("핸드에 없는 카드");   // 화면이 막았어야 할 일 = 프로그래머 실수
+        Game.Pay(GameIds.PlayerData.Duel.Id, "mana", cost);   // 키 'duel'(Duel)의 mana. 모자라면 플레이어용 실패(28장 2-4)
         duel.field.Add(card);
     }
     public override string Describe() => $"카드 내기 {card}";
@@ -690,7 +568,7 @@ public static class DuelFlow
     public static void EndTurn(GameApi game)
     {
         game.Do(new PassTurn());
-        game.Session.ClearUndo();   // 이 시점 이전은 Undo할 수 없다(이벤트로 정해지면 DB › Bootstrap의 Undo 끊는 이벤트로 코드 없이)
+        game.Session.ClearUndo();   // 이 시점 이전은 Undo할 수 없다
     }
 }
 ```
@@ -722,8 +600,8 @@ public class Purchase : GameAction
 
     protected override void Run()
     {
-        if (!shop.stock.TryGetValue(item, out var left) || left <= 0) throw new InvalidOperationException("품절");
-        if (shop.gold < price) throw new InvalidOperationException("골드 부족");
+        if (!shop.stock.TryGetValue(item, out var left) || left <= 0) throw Game.Fail("fail.soldOut", "품절입니다.");
+        if (shop.gold < price) throw Game.Fail("fail.gold", "골드가 모자랍니다.");
         shop.gold -= price;
         shop.stock[item] = left - 1;
         shop.bag.Add(item);
@@ -742,7 +620,6 @@ public class Purchase : GameAction
 ```csharp
 using System;
 using GBible;
-using UnityEngine;
 
 [Serializable]
 public class Caster
@@ -761,24 +638,17 @@ public class CastFireball : GameAction
     protected override void Run()
     {
         var now = Game.Session.Clock.Time;
-        if (now < caster.fireballReadyAt) throw new InvalidOperationException("쿨다운 중");
-        if (caster.mp < 10) throw new InvalidOperationException("MP 부족");
+        if (now < caster.fireballReadyAt) throw Game.Fail("fail.cooldown", "아직 쓸 수 없습니다.");
+        if (caster.mp < 10) throw Game.Fail("fail.mana", "마나가 모자랍니다.");
         caster.mp -= 10;
         caster.fireballReadyAt = now + Cooldown;
     }
 }
-
-public static class RealtimeSetup
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Configuring += options =>
-    {
-        options.History = HistoryMode.Snapshots;
-        options.SnapshotInterval = 0.5;    // 0.5초마다
-        options.SnapshotLimit = 20;        // 최근 10초까지
-    };
-}
 ```
+
+DB › Bootstrap: Undo 방식 = 스냅샷, 스냅샷 간격(초) `0.5`, 스냅샷 보관 수 `20`(최근 10초까지 — 2.10).
+
+이 예는 스냅샷 되감기에서 게임 시계가 함께 돈다는 것을 보이려는 것이다. 실제 게임의 쿨다운은 상태 효과 + 조건 '상태 효과 검사'(29장), 비용은 `Game.Pay`(28장), 숫자는 밸런싱 값(30장)이다.
 
 쿨다운을 `Time.time`이 아니라 게임 시계(`session.Clock.Time`)로 적어 두면, 스냅샷을 되감을 때 시계와 `fireballReadyAt`이 함께 돌아가 쿨다운이 어긋나지 않는다. 남은 쿨다운 표시는 `caster.fireballReadyAt - Game.Session.Clock.Time`.
 
@@ -891,7 +761,7 @@ public class RewindButtons : MonoBehaviour
 | 증상 | 원인과 해결 |
 |---|---|
 | Undo해도 값이 안 돌아옴 | 행동 밖에서 고쳤다(씬 코드·코루틴·이벤트를 받는 코드). 행동으로 실행한다. `Permanent()` 안이었거나, `HistoryLimit`을 넘었거나, 방식이 `None`일 수도 있다. |
-| 지연 효과에서 `NullReferenceException` | 행동 클래스의 `Game` 속성은 `Run`이 끝나면 `null`이다. `GBibleRuntime.Game`을 쓰거나 지역 변수로 받아 둔다. |
+| 지연 효과에서 `NullReferenceException` | 행동 클래스의 `Game` 속성은 `Run`이 끝나면 `null`이다. 나중 코드는 `GBibleRuntime.Game`을 쓴다. 규칙의 지연 효과는 상태 효과·예약으로 만든다(3절). |
 | "행동 'X'의 처리기가 없습니다" | 행동 클래스에 `protected override void Run()`을 쓰지 않았고 `Actions.Register`도 하지 않았다. |
 | "X 'id'을(를) 찾을 수 없습니다(행동 'A'의 '필드')" | 참조 필드에 넣은 객체의 id가 지금 데이터에 없다(쓰러져 빠짐·Undo로 사라짐). 지연 실행이면 `Find`로 먼저 확인한다. DB 원본 객체를 넣었다면 `[DataRef]` 글자 필드로 바꾼다. |
 | "… id가 비어 있는 X입니다" | 방금 `new`로 만든 객체(데이터 밖)를 넣었다. 새 객체는 행동 안에서 만들고 id는 `Game.NewId(접두어)`로 정한다. |
@@ -906,7 +776,7 @@ public class RewindButtons : MonoBehaviour
 | Undo 뒤 "행동 밖에서 바뀐 값을 덮었습니다" 경고 | 행동이 바꾼 곳을 행동 밖에서 다시 고쳤다. 그 변경도 행동으로 만든다. |
 | Undo가 `false`이고 "리스트 구조가 바뀌었습니다" 경고 | 행동이 바꾼 리스트에 행동 밖에서 더하기·빼기·순서 바꾸기를 했다. 그 변경도 행동으로 만든다(2.12). |
 | Undo 한 번에 행동 둘이 되돌아감 | 마지막 행동이 시간 규칙(상태 효과 주기·만료, 시간 예약, 패시브 효과 주기)이라 앞 행동과 묶였다(2.8). 정상이다. |
-| 행동 안에서 기다리기(코루틴·`await`) | 행동은 한 번에 끝나야 한다. 연출은 끝난 결과(이벤트·기록)를 보고 따로 재생하고, 시간이 걸리는 효과는 3장처럼 나눈다. |
+| 행동 안에서 기다리기(코루틴·`await`) | 행동은 한 번에 끝나야 한다. 연출은 끝난 뒤 `SubscribeAfterAction`으로 받아 재생하고(10장 2-7), 시간이 걸리는 효과는 상태 효과·예약, 플레이어 선택은 `Game.Ask`(29장)로 나눈다. |
 | Undo로 좋은 난수를 다시 뽑으려 함 | Undo하면 난수 상태도 돌아가 같은 행동은 같은 결과를 낸다. |
-| 실패한 행동의 예외가 게임을 멈춤 | `Do`는 행동이 실패하면 변경을 취소한 뒤 예외를 다시 던진다. 예상되는 실패는 부르는 쪽에서 잡는다. |
+| 실패한 행동의 예외가 게임을 멈춤·알림이 안 뜸 | `Do`는 행동이 실패하면 변경을 취소한 뒤 예외를 다시 던진다. 플레이어용 실패를 `InvalidOperationException`으로 던졌다 — `throw Game.Fail(…)`(`GameFailure`)로 던져야 화면의 `OnClick`·`GameScreens.Do`가 알림으로 보인다(2.7). |
 | 행동 본문은 맞는데 행동이 실패함 | 행동 안에서 쏜 이벤트를 받는 쪽(`Subscribe`·트리거 결과)이 예외를 던졌다. 그 행동 전체가 취소된다. 모니터 행동 탭의 실패 줄에 마우스를 올려 오류를 본다([10-Events.md](10-Events.md) 2-7). |

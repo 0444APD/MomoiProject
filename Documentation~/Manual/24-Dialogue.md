@@ -20,14 +20,14 @@
 
 ## 1. 켜기와 준비
 
-**한 줄 요약.** DB 사이드바의 다이얼로그 시스템 › **기능 활성화**로 켜고, UI 템플릿을 한 번 만든다.
+**한 줄 요약.** 선택 기능 `dialogue`를 켜고, UI 템플릿을 한 번 만든다.
 
 **언제.** 대사가 있는 게임에서 처음 한 번.
 
 ### 에디터에서
 
-1. `MomoiProject → DB` → 사이드바 "다이얼로그 시스템" 그룹의 **기능 활성화** → **켜기**. 다시 컴파일되면 **스탠딩 프로필**·**장소** 탭과 메뉴 `MomoiProject → 다이얼로그 시스템 → …`가 열린다(스크립팅 심볼 `GBIBLE_DIALOGUE`, `20-Setup.md` 6절).
-2. AI가 DB 반영 스크립트에서 `GBible.EditorTools.Graph.DialogueTemplate.Create()`를 부른다(메뉴는 없다 — 다이얼로그를 켜면 프로젝트 Editor asmdef가 `GBible.Dialogue.Editor`를 저절로 참조한다). `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 화면 한 벌(프리팹 `DialogueSystem`, UXML·USS·선택지 UXML, 패널 설정·런타임 테마, 기본 UI 모션, 흰 스프라이트)과 설정 `Resources/MomoiProject/DialogueSettings`를 만든다. 설정의 **playerPrefab**이 이 프리팹으로 정해진다.
+1. **켜기**(선택 기능 ID `dialogue`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `dialogue`를 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "다이얼로그 시스템" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_DIALOGUE`와 프로젝트 asmdef 참조(Client·Editor에 `GBible.Dialogue`, Editor에 `GBible.Dialogue.Editor` — Rules에는 넣지 않는다)가 저절로 맞춰지고, **스탠딩 프로필**·**장소** 탭과 메뉴 `MomoiProject → 다이얼로그 시스템 → …`가 열린다(`20-Setup.md` 6절). 이 모듈의 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다.
+2. AI가 DB 반영 스크립트에서 `GBible.EditorTools.Graph.DialogueTemplate.Create()`를 부른다(메뉴는 없다). `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 화면 한 벌(프리팹 `DialogueSystem`, UXML·USS·선택지 UXML, 패널 설정·런타임 테마, 기본 UI 모션, 흰 스프라이트)과 설정 `Resources/MomoiProject/DialogueSettings`를 만든다. 설정의 **playerPrefab**이 비어 있으면 이 프리팹으로 정해진다. **부를 때마다 새 한 벌**(`DialogueUI 1` …)을 만들므로(설정의 playerPrefab은 그대로) 한 번만 부른다 — 'DB 반영 스크립트 모두 다시 돌리기'에도 안전하게 `if (AssetDatabase.LoadAssetAtPath<DialogueSettings>(DialogueTemplate.SettingsPath)?.playerPrefab == null) DialogueTemplate.Create();`.
 3. DB › **스탠딩 프로필**에서 화자를 만든다.
    - **expressions**: 스탠딩 목록(**스탠딩 ID** · **스프라이트**, 기본 `default` 하나).
    - **defaultExpression**: 기본 스탠딩 ID(비우면 첫 스탠딩).
@@ -38,7 +38,7 @@
 ### 주의할 점
 
 - 다이얼로그(`DialogueData`)와 연출 프리셋은 DB 사이드바에 없다. 그래프 창에서 만들고 고친다.
-- 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI › font`에 한글 TTF를 넣는다.
+- 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI › font`에 한글 TTF를(SDF 폰트 에셋이면 `fontAsset`) 넣는다.
 
 ---
 
@@ -113,7 +113,7 @@
 
 ### 상황별 예제 — 그래프 짜기
 
-**연출이 끝난 뒤 말하기(예전 Prefix 잠금).** 대사의 "진입" → 배경(진행 신호 지점 90%) → 그 "90%" 점을 대사의 "대사 시작"에 잇는다. 배경이 90% 진행될 때까지 글자가 나오지 않는다.
+**연출이 끝난 뒤 말하기.** 대사의 "진입" → 배경(진행 신호 지점 90%) → 그 "90%" 점을 대사의 "대사 시작"에 잇는다. 배경이 90% 진행될 때까지 글자가 나오지 않는다.
 
 **체인.** 배경 "완료" → 스탠딩 등장 "재생", 스탠딩 등장 "완료" → 흔들기 "재생"(시작 전 기다림 0.3초).
 
@@ -191,7 +191,7 @@ Dialogues.Play("shopIntro", "afterBuy");
 
 **`Dialogues.IsPlaying`**, **`Dialogues.Advance()`**(클릭), **`Dialogues.Choose(번호)`**(선택지, `Choices` 순서), **`Dialogues.SkipToChoice()`**, **`Dialogues.Stop()`**.
 
-**`Dialogues.Started`**(`Action<string>`, 다이얼로그 ID) · **`Ended`** · **`Signaled`**(`Action<string>`, 신호 이름) — 받는다.
+**`Dialogues.Started`**(`Action<string>`, 다이얼로그 ID) · **`Ended`** · **`Signaled`**(`Action<string>`, 신호 이름) — 받는다. 셋은 플레이를 시작할 때 비워지므로 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]` 함수에서 `+=`한다(Client). 신호를 받은 코드는 데이터를 직접 바꾸지 않고 행동(`GameScreens.Do(() => …)`)이나 화면 열기로 넘긴다.
 
 ```csharp
 Dialogues.Signaled += signal =>
@@ -389,7 +389,7 @@ public sealed class AffinityGauge : DialogueUIExtension
 - **값 바꾸기가 실패하면 그 대사에 머문다**(6절): 미리 해 보고 실패하면 떠나지 않는다. 선택지 없는 대사 뒤의 값 바꾸기가 실패할 수 있으면(돈을 내는 일 등) 그 앞에 조건 분기나 선택지 조건을 둔다 — 클릭할 때마다 실패 알림만 뜨고 넘어가지 않는다. 시작 흐름(첫 대사 전)의 값 바꾸기가 실패하면 다이얼로그를 열지 않는다.
 - **값 바꾸기에는 `Reward`만**: '바꿀 값'에는 코딩한 결과(`Reward`)만 고른다 — 기본은 '플레이어 데이터에 주기'·'다이얼로그 재생' 둘, 나머지는 프로젝트 `Reward`. '대상에게 효과'·'이벤트 쏘기'·'선택 요구'·'가중치 표에서 주기'는 고를 수 없다. 그 블록의 `Context`(트리거 순간)는 비어 있다.
 - **다이얼로그 안에서 '다이얼로그 재생'·신호**: 값 바꾸기의 '다이얼로그 재생'이나 신호를 받은 코드가 다른 다이얼로그를 열면(또는 멈추면) 끊긴 쪽의 흐름은 거기서 멈추고 새 다이얼로그가 이어 간다.
-- **씬에 재생기도 설정도 없음**: "[다이얼로그] 다이얼로그 재생기가 없습니다. 씬에 다이얼로그 UI 프리팹을 두세요(AI가 DialogueTemplate.Create로 만든다)." → AI에게 UI 템플릿을 만들어 달라고 한다.
+- **씬에 재생기도 설정도 없음**: "[다이얼로그] 다이얼로그 재생기가 없습니다. 씬에 다이얼로그 UI 프리팹을 두세요(AI가 DialogueTemplate.Create로 만든다)." → DB 반영 스크립트에서 UI 템플릿을 만든다(1절 2).
 - **시작 ID가 없음**: "[다이얼로그] '…'에 시작 ID '…'가 없습니다." → 시작 노드의 시작 ID를 확인한다. 다이얼로그 ID가 없으면 "[다이얼로그] 다이얼로그 '…'가 없습니다(시작 ID '…')."
 - **멀티플레이**(40장): 클라이언트의 값 바꾸기는 서버로 보내고, 결과가 올 때까지 흐름을 멈춘다(그동안 클릭·선택을 받지 않는다 — `WaitingForServer`). 결과가 오면 서버가 바꾼 값으로 뒤의 조건 분기·`{값}`을 보고, 거절되면 그 대사로 돌아온다(실패 알림은 `GameNet`이 낸다). 진행 기록은 플레이어마다 `dialogue.progress:<번호>`(그 플레이어만 보는 칸)에 서버가 남긴다(5.4). 서버는 받은 '값 바꾸기'가 그 플레이어가 마지막으로 알린 대사(또는 시작)에서 서버 값으로 실제로 닿는 노드인지 보고, 앞의 값 바꾸기를 건너뛰거나 같은 것을 다시 보내면 거절한다(텍스트 키 `momoi.dialogue.outOfStep`). 방장 자신의 행동은 보지 않는다. 한계: 다이얼로그를 여는 것(어느 다이얼로그·시작 ID)은 게임 코드가 정하므로 서버가 확인하지 않고, 진행 기록(자리)도 클라이언트가 보낸 것을 믿는다 — 중요한 보상은 서버 쪽 규칙(행동의 `Validate`·보상 `Reward` 안의 검사)으로 한 번 더 지킨다.
 - **문장 틀의 값 이름**: 대사 원문의 `{…}`에는 플레이어 데이터 **ID**(`{playerGold}`)나 **ID + 필드 경로**(`{run.gold}`, `{run.hero.hp}`)를 쓴다. 이름 그대로인 플레이어 데이터가 없으면 점 앞부분을 ID, 뒷부분을 그 값 안의 필드 경로(11장)로 읽는다(ID 자체에 점이 있어도 그 ID가 먼저다). 목록 펼치기(`deck[].upgraded`)는 첫 값이다. 플레이어 데이터 밖의 값(지역 변수·이벤트 값)은 넘어오지 않는다. 없는 ID·경로면 `{run.gold}`가 글자 그대로 보인다.

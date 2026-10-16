@@ -385,7 +385,7 @@ namespace GBible.EditorTools
 
         const string BootstrapCode =
 @"// 시작 설정이 만든 파일. 자유롭게 고친다.
-// 세션이 만들어지기 전(Configuring)과 만들어진 뒤(Started)에 할 일을 둔다.
+// 세션이 만들어지기 전(Configuring), 만들어진 직후(SessionCreated — 모든 세션), 화면 세션 준비가 끝난 뒤(Started)에 할 일을 둔다.
 using GBible;
 using UnityEngine;
 
@@ -398,6 +398,7 @@ namespace MomoiProject
         static void Hook()
         {
             GBibleRuntime.Configuring += Configure;
+            GBibleRuntime.SessionCreated += RegisterRules;
             GBibleRuntime.Started += Started;
         }
 
@@ -407,7 +408,13 @@ namespace MomoiProject
         {
         }
 
-        // 세션 준비가 끝난 뒤(DB 데이터 등록·저장 불러오기까지). 행동 처리기, 프로젝트 고유 기능의 감시 등록, 개발용 명령 등.
+        // 모든 세션(화면 세션 · 멀티 서버 · 시험 모드 · 매칭 방)이 DB로 만들어진 직후 — 새 판 행동보다 먼저.
+        // 규칙 쪽 등록은 모두 여기: 행동 처리기, 프로젝트 고유 기능의 감시 등록, 규칙이 받는 이벤트, 개발용 명령.
+        static void RegisterRules(GameSession session)
+        {
+        }
+
+        // 화면 세션 준비가 끝난 뒤(프로필을 불러온 뒤 — 판 저장은 이 뒤에 이어 하기로 불러온다, 화면 세션에만 온다). 화면 쪽 연결: 연출 받기 등.
         static void Started(GameSession session)
         {
         }

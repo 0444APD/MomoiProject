@@ -15,16 +15,18 @@
 
 ## 1. 동작 규칙
 
-- **관리 대상**: `Assets/` 아래 에셋 중 코드(`.cs`·`.asmdef`)·`Assets/MomoiProject/Code`·`Assets/MomoiProject/Data`·`Assets/MomoiProject/Generated`·`Plugins`·`StreamingAssets`·`Editor`·`Resources` 안·`Assets/Dev/_Unused`를 뺀 것.
+- **관리 대상**(목록 탭): `Assets/` 아래 에셋 중 시스템 폴더 `Assets/MomoiProject` 전체·`Assets/Plugins`·`Assets/StreamingAssets`·`Assets/Editor`·`Assets/Gizmos`·`Assets/TextMesh Pro`·`Assets/Settings`·`Assets/Dev/_Unused`·어디든 `Resources`·`Editor` 폴더 안·코드(`.cs`·`.asmdef`·`.asmref`)를 뺀 것.
+- **종류**는 확장자로 정한다(`AssetTools.KindOf` — 그림 png·jpg·psd … / 소리 wav·mp3·ogg … / 글꼴 ttf·otf … / 모델 · 프리팹 · 씬 · 머티리얼 · 애니메이션 · UI uxml·uss · 영상, 그 밖은 기타).
 - **가져오기**(`AssetTools.Import`): 밖의 파일·폴더를 종류별 폴더로 복사한다(폴더는 안의 파일을 하나씩, `.meta`는 빼고). 같은 이름이 있으면 `이름 1.png`처럼 번호를 붙인다.
-- **바꾸기**(`AssetTools.Replace`): 같은 종류만(그림 ↔ 그림). 확장자가 다르면 먼저 `AssetDatabase.MoveAsset`으로 확장자를 바꿔(GUID 유지) 내용을 덮는다. 넣을 것 목록에 있으면 넣음(✓)으로 표시한다.
+- **바꾸기**(`AssetTools.Replace`): 같은 종류만(그림 ↔ 그림, 기타는 같은 확장자만 — 어기면 "종류가 다릅니다"·"확장자가 다릅니다" 예외). 확장자가 다르면 먼저 `AssetDatabase.MoveAsset`으로 확장자를 바꿔(GUID 유지) 내용을 덮는다. '여러 개로 자르기'인데 잘린 칸이 하나뿐인 스프라이트는 한 장짜리로 바꾼다(옛 그림 크기로 잘리지 않게 — `SingleSprite`). 넣을 것 목록에 있으면 넣음(✓)으로 표시한다.
+- **넣을 것의 상태는 저절로 정해진다**(`AssetRequests.StateOf`): 줄마다 그 자리 에셋의 GUID를 적어 두고 지금 경로를 GUID로 찾는다(개발자가 옮기거나 확장자를 바꿔도 같은 줄 — `PathOf`). 파일이 없으면 '파일 없음', 종류가 다르면 '종류가 다릅니다', AI가 만든 임시 파일과 내용이 같으면 '아직 임시 에셋', 다르면 넣음(✓). 목록만 올린 줄(`Request`)은 맞는 종류의 파일이 생기면 넣음. 그러니 AI가 넣음 표시를 손으로 고칠 일은 없다. 파일이 없는 줄의 '파일 넣기…'는 요청한 자리에 넣은 파일의 확장자로 가져온다(`AssetRequests.Put`).
 - **쓰는 곳**(`AssetTools.UsedBy`): 모든 에셋의 의존(`AssetDatabase.GetDependencies`)을 거꾸로 묶은 표. 프로젝트가 바뀌면 다시 만든다.
 - **안 쓰는 것**(`AssetTools.Unused`): 개발자 폴더(`Assets/Dev`) 안에서, 뿌리(빌드 목록의 씬 · `Assets/Dev` 안의 모든 씬(빌드 목록에 아직 없어도) · `Assets/MomoiProject`(DB 데이터·UI·AI 씬) · `Resources` 안 · 그 밖의 DB 항목 · Addressables 항목(쓰면) · 넣을 것 목록)에서 닿지 않는 그림·소리·글꼴·모델·프리팹·머티리얼·애니메이션·영상. 코드가 든 폴더(가져온 패키지)는 보지 않는다. **코드가 경로 글자로 불러오는 것은 연결이 보이지 않는다** — 옮기기 전에 묻는 창에서 확인한다. 옮기면 `Assets/Dev/_Unused/<원래 경로>`(지우지 않음)이고, 옮긴 목록이 `MomoiProjectBackups/<시각>-unused/moves.tsv`에 남아 '마지막 옮기기 되돌리기'로 되돌린다.
 - **폴더 정돈**(`AssetTools.Misplaced` · `Tidy`): 개발자 폴더(`Assets/Dev`) 안에서 종류별 폴더 밖의 에셋을 그 폴더로 옮긴다(`MoveAsset` — GUID 유지). 하위 폴더 모양은 그대로 둔다(`Assets/Dev/Cards/Fire/a.png` → `Assets/Dev/Art/Cards/Fire/a.png`, 다른 종류 폴더 안이면 그 폴더 이름만 뺀다). `Assets/Dev` 밖(시스템 폴더·패키지·Plugins·에셋 스토어 폴더)과 코드가 든 폴더(가져온 패키지)·씬 옆 같은 이름 폴더(라이트맵 등)·`Resources`·`Editor`·Addressables 폴더 항목은 건드리지 않는다. 옮기기 전에 몇 개인지와 앞의 몇 개를 보여 묻고, 옮긴 목록(원래 경로 → 새 경로)을 `MomoiProjectBackups/<시각>-tidy/moves.tsv`에 남긴다 — '마지막 정돈 되돌리기'(`AssetTools.UndoMoves`)로 되돌린다.
 
 ## 2. 에디터에서 쓰는 법
 
-메뉴 **MomoiProject › 에셋 관리**: 탭 넣을 것 · 목록 · 안 쓰는 것 · 폴더 정돈. 탐색기에서 파일·폴더를 창에 끌어 놓으면 가져오기.
+메뉴 **MomoiProject › 에셋 관리**: 탭 넣을 것(줄마다 '파일 넣기…'·'다시 넣기…'·'위치') · 목록(종류별, '쓰는 곳 n'·'바꾸기…'·'위치') · 안 쓰는 것('찾기' → '모두 _Unused로 옮기기'·줄마다 '옮기기'·'마지막 옮기기 되돌리기') · 폴더 정돈('모두 정돈'·줄마다 '옮기기'·'마지막 정돈 되돌리기'). 탐색기에서 파일·폴더를 창에 끌어 놓으면 가져오기.
 
 ## 3. 코드로 쓰는 법(AI — DB 반영 스크립트에서)
 
@@ -38,14 +40,15 @@ static void Art()
 }
 ```
 
-- 이미 파일이 있으면 임시 에셋을 만들지 않는다(개발자가 넣은 것을 덮지 않는다). 같은 경로를 다시 부르면 설명만 고친다.
-- 임시 에셋을 화면·DB가 바로 쓰게 둔다(스프라이트 칸에 그 경로의 에셋을 넣는다). 진짜 파일이 들어와도 연결을 다시 할 필요가 없다.
+- 이미 파일이 있으면(개발자가 옮겼거나 확장자를 바꿨어도 — GUID로 찾는다) 임시 에셋을 만들지 않는다(개발자가 넣은 것을 덮지 않는다). 같은 경로를 다시 부르면 설명만 고친다. 그래서 반영 스크립트가 다시 돌아도 안전하다.
+- 임시 에셋을 화면·DB가 바로 쓰게 둔다(스프라이트 칸에 그 경로의 에셋을 넣는다). 진짜 파일이 들어와도 연결을 다시 할 필요가 없다. 함수는 지금 경로를 돌려준다.
+- 임시 그림은 Sprite(한 장짜리)로 가져온다. 임시 소리 길이는 `seconds`(기본 0.5초).
 
 | 멤버 | 하는 일 |
 |---|---|
-| `AssetRequests.Sprite(path, w, h, 쓰는 곳, 느낌)` · `Audio(path, 쓰는 곳, seconds, 느낌)` · `Request(path, 쓰는 곳, 크기, 느낌)` | 임시 에셋 + 넣을 것 |
-| `AssetRequests.Load()` · `MarkDone(path)` · `Remove(path)` | 목록 |
-| `AssetTools.Import(paths, folder)` · `Replace(asset, file)` · `UsedBy(asset)` · `Unused()` · `MoveToUnused(paths)` · `Misplaced()` · `Tidy(moves)` · `FolderFor(kind)` · `KindOf(path)` · `EnsureFolder(folder)` | 가져오기·바꾸기·찾기·옮기기 |
+| `AssetRequests.Sprite(path, w, h, 쓰는 곳, 느낌)` · `Audio(path, 쓰는 곳, seconds, 느낌)` · `Request(path, 쓰는 곳, 크기, 느낌)` | 임시 에셋 + 넣을 것(`Request`는 임시 파일 없이 목록만) |
+| `AssetRequests.Load()` · `PathOf(줄)` · `StateOf(줄)` · `Refresh()` · `Put(줄, 파일)` · `MarkDone(path)` · `Remove(path)` | 목록 · 지금 경로 · 상태 · 목록을 지금 에셋에 맞추기 · 파일 넣기 · 넣음 표시(바꾸기가 부른다) · 줄 지우기(파일은 그대로) |
+| `AssetTools.Import(paths, folder)` · `Replace(asset, file)` · `UsedBy(asset)` · `Unused()` · `MoveToUnused(paths)` · `Misplaced()` · `Tidy(moves)` · `LastMoveLog(tag)` · `UndoMoves(log)` · `FolderFor(kind)` · `KindOf(path)` · `EnsureFolder(folder)` | 가져오기·바꾸기·찾기·옮기기·되돌리기(`tag` = `"unused"`·`"tidy"`) |
 
 ## 4. 주의할 점
 

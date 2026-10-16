@@ -165,24 +165,9 @@ public sealed class SceneMusic : MonoBehaviour
 
 ### 4.2 설정 화면의 음량 슬라이더
 
-```csharp
-using GBible;
-using UnityEngine;
+**코드 없이 — DB › 설정의 음량 칸.** 플레이어가 음량을 바꾸는 곳은 DB › 설정에 종류 `숫자(슬라이더)`(0~1), 적용 대상 `브금 음량`(또는 전체·목소리·효과음·UI 음량)인 칸으로 두고, 기본 설정 화면(`GameScreens.Settings`, 35장 2-5)이 슬라이더를 그린다. 값을 바꾸면 라이브러리가 `GameAudio.SetVolume(채널, 값, save: false)`로 바로 적용하고, 값은 PlayerPrefs가 아니라 설정 파일(`settings.json`)에 남아 다음에 켤 때 그 값으로 시작한다(`31-Slots-Settings-Input.md` 2-4·5-4). 그 채널을 다른 곳에서 `GameAudio.SetVolume`으로 바꾸면 다음 실행 때 설정 값으로 돌아가므로, 음량 설정을 둔 채널은 설정(`GameSettings.Set`)으로만 바꾼다.
 
-public sealed class VolumeSlider : MonoBehaviour
-{
-    [SerializeField] AudioChannel channel = AudioChannel.Bgm;
-
-    public float Value => GameAudio.Volume(channel);
-    public void OnChanged(float value) => GameAudio.SetVolume(channel, value);   // 기기에 저장
-
-    void OnEnable() => GameAudio.VolumeChanged += Refresh;
-    void OnDisable() => GameAudio.VolumeChanged -= Refresh;
-    void Refresh(AudioChannel changed) { if (changed == channel) { /* 슬라이더 값 = Value */ } }
-}
-```
-
-**코드 없이 — DB › 설정의 음량 칸.** 설정 화면이 있으면 DB › 설정에 종류 `숫자(슬라이더)`(0~1), 적용 대상 `브금 음량`(또는 전체·목소리·효과음·UI 음량)인 칸을 둔다. 값을 바꾸면 라이브러리가 `GameAudio.SetVolume(채널, 값, save: false)`로 바로 적용하고, 값은 PlayerPrefs가 아니라 설정 파일(`settings.json`)에 남아 다음에 켤 때 그 값으로 시작한다(`31-Slots-Settings-Input.md` 2-4·5-4). 그 채널을 다른 곳에서 `GameAudio.SetVolume`으로 바꾸면 다음 실행 때 설정 값으로 돌아가므로, 음량 설정을 둔 채널은 설정(`GameSettings.Set`)으로만 바꾼다.
+설정 칸이 없는 채널을 직접 만든 슬라이더로 바꿀 때만 `GameAudio.Volume`·`SetVolume`(기기에 저장)·`VolumeChanged`(3.7)를 쓴다.
 
 ### 4.3 일시정지 메뉴에서 효과음만 끄기
 
@@ -233,6 +218,8 @@ GameAudio.PlayVoice(bossLine);
 
 ## 6. 주의할 점 / 자주 하는 실수
 
+- **규칙에서 부르지 않는다**: `GameAudio`는 화면 쪽 기능이라 행동·Block·`[BindTo]` 안에서 부르지 않고 Client 코드에서 부른다(관례 1절). 행동 결과의 효과음(맞음·획득)은 행동이 끝난 뒤의 연출(`SubscribeAfterAction` → `GameView.Present`·`Play`, 32장) 안에서 튼다 — 실패한 행동·미리보기에서는 소리가 나지 않는다.
+- **클립 자리**: 소리 파일은 개발자가 넣는다. AI는 DB 반영 스크립트에서 `AssetRequests.Audio(경로, 쓰는 곳, 초)`로 임시 무음 파일과 넣을 것을 만들고, 그 경로의 클립을 DB 칸에 넣어 코드가 읽게 한다(39장 3절).
 - **클립이 `null`**: 재생 함수는 아무것도 하지 않고 `null`을 돌려준다. 손잡이를 쓸 때 `?.`로 받는다.
 - **오래된 손잡이**: 병렬 채널은 끝난 자리를 다시 쓴다. 끝난 소리의 손잡이로 `Stop`해도 다른 소리를 멈추지 않는다(`IsPlaying`이 `false`).
 - **`handle.Source`의 `clip`·`loop`·`pitch`를 바꾸지 않는다**: 자리가 끝나는 시점은 재생을 시작할 때 클립 길이·피치로 정해진다. 바꾸면 소리가 끊기거나 자리가 다른 소리에 넘어간다. 3D 거리 같은 공간 설정만 만진다.

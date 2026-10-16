@@ -13,9 +13,9 @@
 > | 저장 트리 | 저장 직전의 중간 모습. 클래스는 "필드 이름 → 값" 딕셔너리, 리스트는 리스트, 숫자는 `double`. 변환이 이것을 고친다. |
 > | 저장 버전 | 저장 파일에 적는 정수. 등록한 변환 중 가장 높은 버전을 따라 저절로 정해진다(없으면 1). |
 > | 변환 | 예전 버전의 저장 트리를 지금 구조로 고치는 한 단계. DB › 개발 › **저장 변환** 표에 적고, 값을 계산해 고치는 것만 코드(`options.Migrations.Add`)로 쓴다. |
-> | 개발 중 / 출시됨 | 프로젝트 상태. 메뉴 `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`로 바꾼다. 개발 중에는 호환되지 않는 저장을 초기화하고(그 파일을 옆으로 옮긴다), 출시됨이면 이어받는다. |
+> | 개발 중 / 출시됨 | 프로젝트 상태. 개발자가 메뉴 `MomoiProject › 개발 › 출시됨 (저장 호환 유지)`로 바꾼다(6절). 개발 중에는 호환되지 않는 저장을 초기화하고(그 파일을 옆으로 옮긴다), 출시됨이면 이어받는다. |
 > | Undo | 마지막 행동을 되돌리는 것. Undo 이력은 저장하지 않는다. |
-> | 슬롯 | 저장 묶음(프로필 + 진행 중인 판) 하나. 세이브 칸 "1·2·3"이 슬롯 셋이다. 슬롯마다 폴더가 따로다. |
+> | 슬롯 | 저장 묶음(프로필 + 진행 중인 판) 하나. 세이브 슬롯 "1·2·3"이 슬롯 셋이다. 슬롯마다 폴더가 따로다. |
 > | 설정 | DB › 설정의 항목(음량·언어·해상도·전투 속도 …). 값은 기기마다 하나(`settings.json`)이고 슬롯·판·Undo와 상관없다. |
 
 ---
@@ -57,23 +57,19 @@ protected override void Run()
 > - 첫 승리 도전과제가 연쇄 번개 카드를 해금하는 것도 `profile.unlocked`(메타)에 쓴다. 도전과제 달성과 그 결과는 Undo되지 않으므로, 해금은 판을 되돌려도 남는다.
 
 > [!note]- 설정 — DB › 설정과 `GameSettings`(기기마다 하나)
-> DB › **설정**에 항목 하나 = 설정 칸 하나다. 칸: 분류(설정 화면의 묶음: 소리·화면·게임 …) · 값(종류 켜기/끄기·숫자(슬라이더)·선택지·글과 기본값 — 종류에 맞는 칸만 보인다) · 적용 대상.
-> - **적용 대상**을 고르면 라이브러리가 바로 적용한다: 언어, 전체·브금·목소리·효과음·UI 음량, 전체 화면, 해상도, 수직 동기화, 최대 프레임. 게임이 켜질 때 모두 적용하고, 바꿀 때 그 칸을 적용한다(전체 화면·해상도는 빌드에서만). "없음(게임 코드)"이면 게임이 읽는다.
-> - 코드: `GameSettings.Number(GameIds.Setting.BattleSpeed)`·`Toggle`·`Choice`·`Text`로 읽고, `GameSettings.Set(id, 값)`으로 바꾼다(범위·단위에 맞게 고쳐 저장 → 적용 → `GameSettings.Changed(id)`). `Reset(id)`·`ResetAll(분류)`.
-> - 설정 화면은 `GameSettings.All`(DB 순서)을 분류로 묶어 종류별로 토글·슬라이더·드롭다운을 그린다. 이름은 `GameSettings.Label(id)`(텍스트 `id.name`), 선택지는 `GameSettings.ChoicesOf(id)`(언어·해상도는 선택지를 비우면 저절로 채운다).
+> DB › **설정**에 항목 하나 = 설정 칸 하나다(분류 · 값의 종류와 기본값 · 적용 대상). **적용 대상**(언어·음량·전체 화면·해상도·수직 동기화·최대 프레임)을 고르면 라이브러리가 바로 적용하고, "없음(게임 코드)"이면 게임이 `GameSettings.Number(GameIds.Setting.BattleSpeed)`·`Toggle`·`Choice`·`Text`로 읽는다. 설정 화면은 기본 화면을 쓴다(관례 6절).
 > - 값은 `MomoiProject/settings.json` 하나다. 슬롯을 바꿔도, Undo해도, 판을 새로 열어도 그대로다. 그래서 게임 규칙에 영향을 주는 값(난이도처럼 판마다 다를 수 있는 것)은 설정이 아니라 판 데이터에 둔다.
-> - 매뉴얼 [31장](../../Manual/31-Slots-Settings-Input.md).
+> - API(`Set`·`Reset`·`All`·`Label`·`ChoicesOf`·`Changed`)는 매뉴얼 [31장](../../Manual/31-Slots-Settings-Input.md).
 
-> [!note]- 입력 — 키 바꾸기(선택 기능 '입력(키 바꾸기)')
-> DB 사이드바의 **입력(키 바꾸기)** 아래 **기능 활성화**로 켠다. Input System 패키지(`com.unity.inputsystem`)가 있어야 컴파일된다.
-> - 게임이 켜질 때 한 번 `GameInput.Use(inputActions)`(프로젝트의 `.inputactions`). 저장해 둔 키를 덮어 씌우고 켠다. Bootstrap의 `Started`에서 부르면 된다.
-> - 설정 화면: 글자는 `GameInput.BindingText(action, i)`, 누르면 `GameInput.Rebind(action, i, result => …)`(다음에 누른 키로, Esc는 취소, 같은 묶음의 다른 키와 겹치면 바꾸지 않고 `result.Conflict`). 되돌리기는 `GameInput.ResetBindings()`.
-> - 바꾼 키는 설정 파일(기기마다 하나)에 남는다.
+> [!note]- 입력 — 키 바꾸기(선택 기능 '입력')
+> 명세서 6절에서 켰으면 AI가 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `input`을 더한다. Input System 패키지(`com.unity.inputsystem`)가 있어야 컴파일된다 — 없으면 패키지를 들이는 것은 내려받기라 먼저 묻는다(관례 0절).
+> - 게임이 켜질 때 한 번 `GameInput.Use(inputActions)`(프로젝트의 `.inputactions`)를 Bootstrap의 `Started`에서 부른다. 저장해 둔 키를 덮어 씌우고 켠다. 바꾼 키는 설정 파일(기기마다 하나)에 남는다.
+> - 키 바꾸기 화면은 `GameInput.BindingText`·`Rebind`(겹치면 바꾸지 않고 `result.Conflict`)·`ResetBindings`(매뉴얼 31장).
 > - 입력을 읽는 것은 Input System 그대로다(`action.WasPressedThisFrame()`). 규칙은 입력이 아니라 행동(`Game.Do`)으로 바뀐다.
 
 ## 2. 판 저장 설정
 
-DB › 시작 파일 › **Bootstrap**의 판 저장 칸을 고른다. 코드는 쓰지 않는다.
+DB › 시작 파일 › **Bootstrap**의 판 저장 칸을 고른다. 저장 코드는 쓰지 않는다 — AI는 DB 반영 스크립트에서 `EditorSetSaveOptions`·`EditorSetSaveTiming`으로 처음 값일 때만 넣는다([01장](01-StartProject.md) 4절).
 
 | 칸 | 카드 던전 | 하는 일 |
 |---|---|---|
@@ -82,7 +78,7 @@ DB › 시작 파일 › **Bootstrap**의 판 저장 칸을 고른다. 코드는
 | 판 끝 이벤트 | `RunEnded` | 받으면 그 행동이 끝난 뒤 판 저장을 지우고 프로필을 바로 저장한다 |
 | 프로필도 행동마다 저장 | 끔 | 켜면 바깥 행동이 끝날 때마다(Undo 뒤 포함) 프로필도 저장한다(수집형·방치형). 판 저장이 "N초마다"면 그 간격으로 |
 
-프로필은 이 설정과 상관없이 끌 때 늘 저장된다. 판을 저장할 때는 언제나 저장 직전 알림(`Saving`) → 프로필 → 판 차례다. 직접 부른 `GBibleRuntime.SaveRun`·끌 때·슬롯 복사는 프로필을 늘 함께 쓰고, 자동 저장(행동마다·N초마다·이벤트)은 그사이 프로필이 바뀌었으면(쓴 스태미나·새 id 번호·`Saving`에서 바꾼 메타 값) 함께 쓴다. 판만 앞서 저장되면, 꺼진 뒤 이어 할 때 판은 지금 모습인데 프로필은 예전 모습이 되기 때문이다(판에서 쓴 메타 재화가 되살아나는 등).
+프로필은 이 설정과 상관없이 끌 때 늘 저장된다. 판을 저장할 때는 언제나 저장 직전 알림(`Saving`) → 프로필 → 판 차례다(자동 저장은 그사이 프로필이 바뀌었을 때만 프로필도 쓴다). 판만 앞서 저장되면 이어 할 때 판에서 쓴 메타 재화가 되살아나기 때문이다. 멀티 클라이언트는 판을 저장하지 않는다([11장](11-MultiplayerReady.md) 4절).
 
 > [!note]- 판 저장은 어느 것을 고르나
 > | 고를 것 | 저장 시점 | 맞는 게임 |
@@ -102,12 +98,8 @@ DB › 시작 파일 › **Bootstrap**의 판 저장 칸을 고른다. 코드는
 
 > [!note]- 판 끝 이벤트 자세히
 > - 이벤트를 쏜 행동이 **끝난 뒤**(그 프레임 끝, 행동 밖) 판 저장을 지우고 프로필을 저장한다. 그 행동이 실패해 취소되면 아무 일도 없다(판이 끝나지 않은 것이다).
-> - 그 뒤로는 판을 저장하지 않는다. 끌 때도 끝난 판은 저장하지 않는다.
-> - 다른 행동이 판 데이터(세션 구역)를 바꾸면 새 판이 시작된 것으로 보고 다시 저장한다. 판을 끝낸 행동 자신의 변경(`floor = 0` 등)은 세지 않는다.
-> - 판 저장을 불러오거나 모니터의 **새 판**을 누르면 판 끝 상태도 풀린다.
-> - 판을 끝낸 행동 바로 뒤, 같은 프레임에 `GBibleRuntime.NewRun`을 불러도 남은 프로필 저장을 먼저 한다. 결과 화면 없이 바로 새 판을 여는 게임도 그 판의 보상이 프로필에 남는다.
-> - 이벤트 클래스 이름을 바꿔 찾을 수 없으면 칸에 "찾을 수 없음: …"이 뜨고, 플레이 중 기록에 "판 끝 이벤트 '…'를 찾을 수 없습니다" 경고가 남는다. 칸을 다시 고른다.
-> - "(없음)"이면 판이 끝나도 판 저장을 지우지 않는다. 그때는 1절의 `IsActive` 같은 값으로 이어 하기가 끝난 판을 열지 않게 한다.
+> - 그 뒤로는(끌 때도) 끝난 판을 저장하지 않다가, 다른 행동이 판 데이터를 바꾸면 새 판이 시작된 것으로 보고 다시 저장한다. 판을 불러오거나 새 판(`NewRun`)을 열어도 풀린다. 같은 프레임에 새 판을 열어도 남은 프로필 저장을 먼저 한다.
+> - "(없음)"이면 판이 끝나도 판 저장을 지우지 않는다. 그때는 1절의 `IsActive` 같은 값으로 이어 하기가 끝난 판을 열지 않게 한다. 클래스 이름이 바뀌어 찾을 수 없을 때의 경고는 [08장](08-TestAndDebug.md) 7절.
 
 > [!note]- 저장은 행동 밖에서만 된다
 > 판 저장은 행동 안(`Run` 안, 이벤트를 받는 함수 안)에서는 안 된다. 부르면 "행동 실행 중에는 판을 저장할 수 없습니다" 오류가 기록에 남고 저장되지 않는다. 위 설정은 그래서 "저장할 것 있음" 표시만 남겼다가 프레임 끝(`LateUpdate`, 행동 밖)에서 저장한다. 직접 `GBibleRuntime.SaveRun`을 부를 때도 `session.Data.InTransaction`이 거짓인 곳에서 부른다.
@@ -138,53 +130,42 @@ DB › 시작 파일 › **Bootstrap**의 판 저장 칸을 고른다. 코드는
 
 ## 3. 이어 하기와 새 판
 
-런 스크립트(`RunDirector`)가 씬이 시작될 때 저장된 판이 있으면 이어 하고, 없거나 끝난 판이면 새 판을 연다.
+판을 여는 일(이어 하기 또는 새 판)은 게임에서 한 번만 돈다. 씬 스크립트(`MonoBehaviour.Start`)에 두지 않는다 — 씬을 옮길 때마다 다시 돈다([03장](03-GameLoop.md) 3절).
+
+- **타이틀 화면이 없는 게임 — 코드 없이**: DB › 시작 파일 › Bootstrap의 **시작할 때 이어 하기**를 켜고 **새 판 행동**으로 `StartRun`을 고른다(반영 스크립트의 `EditorSetFlowOptions`). 게임이 켜질 때(`Started` 다음) 저장된 판이 있으면 이어 하고, 없으면 `StartRun`을 실행한다. 판 끝 이벤트도 정해 두면 끝난 판은 지워져 있으므로 이어 하지 않는다. 새 판 행동은 매개변수 없는 생성자가 있는 행동 클래스여야 한다.
+- **타이틀 화면이 있는 게임**: **시작할 때 이어 하기**는 끄고 **새 판 행동**만 고른 뒤, 타이틀 화면 코드(DB › 화면 `title`에 `[BindTo]`한 `GameScreen`)의 버튼에서 부른다. 둘 다 행동이 아니라 화면 일이라 `OnClick`의 `Action` 쪽이다(버튼 처리 안 = 행동 밖).
 
 ```csharp
-void Start()
+protected override void OnOpen()
 {
-    // 저장된 판이 있으면 이어 하고, 없으면 새 판.
-    if (!GBibleRuntime.LoadRun(GBibleRuntime.Session) || !Game.Data().Run.IsActive) Game.Do(new StartRun());
-}
-```
-
-> [!note]- 타이틀 화면이 없는 게임: 코드 없이
-> DB › 시작 파일 › Bootstrap의 **시작할 때 이어 하기**를 켜고 **새 판 행동**으로 `StartRun`을 고르면, 게임이 켜질 때 저장된 판이 있으면 이어 하고 없으면 `StartRun`을 실행한다. 그러면 위 `Start`는 필요 없다. 판 끝 이벤트도 정해 두면 끝난 판은 지워져 있으므로 이어 하지 않는다. 새 판 행동은 매개변수 없는 생성자가 있는 행동 클래스여야 한다.
-
-타이틀·결과 화면의 버튼은 `RunSaves`에 둔다.
-
-```csharp
-public static class RunSaves
-{
-    // '이어 하기' 버튼을 켤지.
-    public static bool CanContinue => GBibleRuntime.HasSavedRun;
-
-    // '새 판': 이번 판 값과 판 저장 파일을 함께 지운 뒤(GBibleRuntime.NewRun) 새 판 행동을 실행한다.
-    public static void NewGame(GameSession session)
+    OnClick("continue", () =>
     {
-        GBibleRuntime.NewRun(session);
-        session.Do(new StartRun());
-    }
+        // 불러오기에 실패했거나 끝난 판이면 새 판으로
+        if (!GBibleRuntime.LoadRun(Game.Session) || !Game.Data().Run.IsActive) GBibleRuntime.StartNewRun(Game.Session);
+    });
+    OnClick("new", () => GBibleRuntime.StartNewRun(Game.Session));   // 판 값·Undo 기록·run.json을 지우고(NewRun) Bootstrap의 '새 판 행동'을 돌린다
 }
+
+protected override void Draw() => Q<Button>("continue").SetEnabled(GBibleRuntime.HasSavedRun);   // 이어 할 판이 있을 때만
 ```
+
+'새 판 행동'을 고르지 않았으면 `GBibleRuntime.NewRun(Game.Session)` 다음 `Game.Do(new StartRun())`이다. 판 안의 입력은 화면 코드의 `OnClick`·`GameScreens.Do`로 행동을 보낸다([06장](06-Presentation.md) 2절).
 
 > [!note]- `GBibleRuntime.NewRun`이 하는 일
-> - 세션 구역(판 값)을 정의할 때의 값으로 되돌리고 Undo 이력을 비운다. 프로필은 그대로다.
-> - 판 저장 파일 `run.json`을 지우고, 판 끝 상태도 푼다. 모니터 **명령** 탭의 **새 판**도 이것을 부른다.
+> - 세션 구역(판 값)을 정의할 때의 값으로 되돌리고 Undo 이력을 비운다. 프로필은 그대로다. 시드를 주면(`NewRun(session, 시드)`) 난수도 그 시드로 다시 맞춘다.
+> - 판 저장 파일 `run.json`을 지우고, 판 끝 상태도 푼다. 모니터 **명령** 탭의 **새 판**은 `StartNewRun`(이것 + 새 판 행동)이다.
 > - 행동 밖(버튼)에서 부른다. 행동 안에서 부르면 "행동 실행 중에는 새 판을 시작할 수 없습니다" 예외가 난다.
-> - `session.NewRun()`(파일은 건드리지 않는 쪽)은 저장 파일이 없는 테스트·서버용으로 남아 있다.
+> - `session.NewRun()`(파일은 건드리지 않는 쪽)은 저장 파일이 없는 테스트·서버용이다.
 
 > [!note]- 불러오기 자세히
-> - `LoadRun`은 실패해도 예외를 던지지 않는다. 파일이 비었거나(쓰는 도중 꺼짐) 읽지 못하면(깨짐·게임보다 새 버전 …) 원본을 `run.broken-<시각>.json`으로 옆에 남기고 바로 전 저장(`run.json.bak`)으로 이어 간다(기록 Warning "판 불러오기 실패: … — 바로 전 저장(.bak)으로 이어 갑니다"). `.bak`도 안 되면 기록에 Error를 남기고 `false`를 준다. 그러면 새 판으로 넘어간다. 프로필도 켤 때 같은 식으로 `.bak`에서 이어 간다.
-> - 저장은 늘 `.tmp`에 끝까지 쓴 뒤 바꿔 넣고 바로 전 파일을 `.bak`으로 남기므로, 쓰는 도중 꺼져도 옛 저장이 반쪽이 되지 않는다(매뉴얼 [06장](../../Manual/06-SaveLoad.md) 2.1·2.3).
-> - 불러왔는데 끝난 판이어도(`IsActive`가 거짓) 새 판으로 넘어간다. 판 끝 이벤트를 쓰면 끝난 판은 지워지므로 드물지만, 판 끝 이벤트가 없거나 직접 `SaveRun`을 부른 경우를 위해 둔다.
-> - 불러온 판은 난수 상태까지 저장한 순간과 같다. 이어 한 뒤의 덱 섞기·보상 골드도 끄기 전과 같은 결과가 나온다.
-> - Undo 이력은 불러온 시점부터 새로 쌓인다.
+> - `LoadRun`은 실패해도 예외를 던지지 않는다. 읽지 못하면 원본을 `run.broken-<시각>.json`으로 남기고 바로 전 저장(`run.json.bak`)으로 이어 가며(기록 Warning "판 불러오기 실패: … — 바로 전 저장(.bak)으로 이어 갑니다"), `.bak`도 안 되면 Error를 남기고 `false`를 준다 — 그러면 새 판으로 넘어간다(매뉴얼 [06장](../../Manual/06-SaveLoad.md) 2.1·2.3).
+> - 위 타이틀 화면 코드는 불러왔는데 끝난 판이어도(`IsActive`가 거짓 — 판 끝 이벤트가 없거나 직접 `SaveRun`을 부른 경우) 새 판으로 넘어간다. Bootstrap의 '시작할 때 이어 하기'는 `IsActive`를 보지 않고 불러오기만 하므로, 그 길을 쓰면 판 끝 이벤트를 꼭 정해 둔다.
+> - 불러온 판은 난수 상태까지 저장한 순간과 같다. Undo 이력은 불러온 시점부터 새로 쌓인다.
 
-세이브 칸이 여럿이면 **슬롯**을 쓴다. 슬롯 하나가 프로필 + 진행 중인 판 묶음이고, 위의 이어 하기·새 판 코드는 지금 슬롯에서 그대로 돈다.
+세이브 슬롯이 여럿이면 **슬롯**을 쓴다. 슬롯 하나가 프로필 + 진행 중인 판 묶음이고, 위의 이어 하기·새 판 코드는 지금 슬롯에서 그대로 돈다.
 
 > [!note]- 슬롯 — `UseSlot` · `SlotInfoOf` · `SlotSummary`
-> 슬롯마다 폴더가 따로다: `MomoiProject/slots/<이름>/profile.json·run.json·slot.json`. 이름 `""`(기본 슬롯)은 예전 자리(`MomoiProject/` 바로 아래)다. 이름에는 글자·숫자·`-`·`_`만 쓴다(`CON`·`NUL` 같은 장치 이름은 안 되고, 대소문자는 가리지 않는다 — 폴더는 소문자).
+> 슬롯마다 폴더가 따로다: `MomoiProject/slots/<이름>/profile.json·run.json·slot.json`. 이름 `""`(기본 슬롯)은 `MomoiProject/` 바로 아래다. 이름에는 글자·숫자·`-`·`_`만 쓴다(`CON`·`NUL` 같은 장치 이름은 안 되고, 대소문자는 가리지 않는다 — 폴더는 소문자). 세이브 슬롯 고르기 화면은 기본 화면을 쓴다(관례 6절).
 > ```csharp
 > // 타이틀 화면: 칸 셋을 그린다
 > foreach (var name in new[] { "1", "2", "3" })
@@ -192,7 +173,7 @@ public static class RunSaves
 >     var info = GBibleRuntime.SlotInfoOf(name);   // HasProfile·HasRun·SavedAt(지역 시각)·PlayTime(초)·Summary·IsEmpty
 >     // 버튼 글: info.IsEmpty ? 빈 칸 : 요약 + 저장 시각
 > }
-> GBibleRuntime.UseSlot("2");   // 지금 슬롯을 저장하고, 그 슬롯으로 세션을 새로 시작한다(Started가 다시 온다)
+> GBibleRuntime.UseSlot("2");   // 지금 슬롯을 저장하고, 그 슬롯으로 세션을 새로 시작한다(SessionCreated·Started가 다시 온다)
 > ```
 > - `UseSlot`은 타이틀처럼 게임 화면이 없을 때 부른다. 마지막으로 쓴 슬롯을 기억해 다음 실행 때 그 슬롯으로 시작한다.
 > - 칸에 보일 한 줄은 `GBibleRuntime.SlotSummary = session => …`로 정한다. 저장할 때마다 `slot.json`에 쓴다. 카드 던전이면 `session => $"{session.Game.Data().Run.floor}층"`.
@@ -202,23 +183,15 @@ public static class RunSaves
 > - 매뉴얼 [31장](../../Manual/31-Slots-Settings-Input.md).
 
 > [!note]- 다른 장르라면
-> RPG·수집형처럼 판 개념이 없는 게임은 대부분의 값이 메타 구역(프로필)이다. 세이브 칸은 슬롯으로 나누고, 씬에 놓인 것의 상태(연 상자·쓰러뜨린 보스)는 월드 상태(`Game.SetWorld(id, 값, permanent: true)`)로 프로필에 남긴다([07장](07-GenreRecipes.md) 6절).
+> RPG·수집형처럼 판 개념이 없는 게임은 대부분의 값이 메타 구역(프로필)이다. 세이브 슬롯은 슬롯으로 나누고, 씬에 놓인 것의 상태(연 상자·쓰러뜨린 보스)는 월드 상태(`Game.SetWorld(id, 값, permanent: true)`)로 프로필에 남긴다([07장](07-GenreRecipes.md) 6절).
 
 ## 4. 저장되지 않는 값
 
-스프라이트 같은 에셋 참조는 판 저장에 들어가지 않는다. 플레이어 데이터에는 ID를 두고, 그림·소리는 DB·인스턴스의 원본에서 읽는다.
-
-```csharp
-public static Card CardData(GameApi game, string card) => game.Session.Instances?.Invoke(card) as Card;
-```
-
-손패 화면은 `Rules.CardData(Game, deckCard.card).art`로 그림을 꺼낸다.
+스프라이트 같은 에셋 참조는 판 저장에 들어가지 않는다. 플레이어 데이터에는 ID를 두고(`[DataRef]` 글자 필드), 그림·소리는 DB·인스턴스의 원본에서 읽는다 — 핸드 화면은 `Rules.CardData(Game, deckCard.card).art`([09장](09-Habits.md) 4절).
 
 > [!note]- 왜 이어 하기에서만 드러나나
 > - 에셋 참조는 DB 항목(`GameData`)이 아니면 저장 파일에 들어가지 않는다. 판 데이터에 들어 있으면 저장할 때 "저장할 수 없는 참조입니다" 경고가 나고, 이어 한 뒤에는 비어 있다.
 > - Undo와 스냅샷 되감기는 메모리 안에서 참조를 그대로 이으므로, 이 문제는 이어 하기에서만 보인다.
-> - 카드 던전의 덱은 그래서 카드 원본을 복사하지 않고 원본 ID와 바뀌는 값만 든다(`DeckCard { id, card, upgraded }`, [09장](09-Habits.md)). 판 저장에는 원본 ID 글자만 있으므로 경고가 없고, 이어 한 뒤에도 그림이 그대로다.
-> - `session.Instances`는 인스턴스 ID로 **원본**을 복사 없이 주는 함수다. 원본은 읽기만 한다.
 
 ## 5. 개발 중 저장 시험
 
@@ -243,7 +216,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 
 ## 6. 출시 상태로 바꾸기
 
-출시 빌드를 만들기 직전에 메뉴 `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`를 누르고, 확인 창에서 **바꾸기**를 누른다. 메뉴에 체크가 생긴다.
+출시 빌드를 만들기 직전에 개발자가 메뉴 `MomoiProject › 개발 › 출시됨 (저장 호환 유지)`를 누르고, 확인 창에서 **바꾸기**를 누른다. 메뉴에 체크가 생긴다(AI는 메뉴를 누를 수 없으므로 출시 준비를 맡으면 이것을 알릴 것에 넣는다).
 
 출시됨이 되면:
 
@@ -252,13 +225,13 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - 그 밖의 구조 변경은 변환으로 이어받는다(7절).
 
 > [!note]- Steam — 도전과제·통계·Steam Cloud(선택 기능 'Steam')
-> Steam으로 내는 게임은 선택 기능 **Steam**을 켜고 DB › Steam에 항목을 하나 만든다(Steamworks.NET 패키지 필요). 게임이 켜지면 저절로 Steam에 붙는다.
+> Steam으로 내는 게임은 선택 기능 **Steam**을 켠다(AI가 `Features.json`의 `enabled`에 `steam` — Steamworks.NET 패키지 필요). 설정은 DB › 개발 › **Steam** 항목 하나(하나만 두는 설정이라 기능이 켜지면 에디터가 기본값으로 만든다). 게임이 켜지면 저절로 Steam에 붙는다.
 > - App ID: 출시 전 시험은 480(Valve의 Spacewar). 실제 App ID로 바꾸면 프로젝트 폴더의 `steam_appid.txt`도 같이 바뀐다.
 > - 도전과제: Steamworks의 API Name을 GBible 도전과제 ID와 같게 만들면 달성하는 순간 Steam에도 달성된다(다르면 DB › Steam 표에 적는다). 카드 던전의 도전과제 ID를 그대로 API Name으로 쓴다.
 > - 통계: 로그 → Steam 통계 표에 (로그 · Steam 이름 · 정수)를 적는다.
 > - 저장 동기화: 코드 없이 Steamworks › Steam Cloud의 Auto-Cloud에 `WinAppDataLocalLow` › `<회사>/<제품>/MomoiProject`, 패턴 `*.json`, 하위 폴더까지, 제외 `settings.json`(매뉴얼 [34장](../../Manual/34-Steam.md) 5-5).
-> - 출시 빌드를 exe로 바로 켜면 Steam이 다시 켜 준다(DB › Steam의 '다시 시작'). Steam이 꺼져 있으면 경고 하나를 남기고 Steam 없이 돈다.
-> - 리더보드·친구 초대(로비 초대)·멀티플레이 네트워킹은 아직 없다(매뉴얼 [34장](../../Manual/34-Steam.md) 4절).
+> - 출시 빌드를 exe로 바로 켜면 Steam이 다시 켜 준다(DB › Steam의 'Steam 밖에서 켜면 Steam으로 다시 시작'). Steam이 꺼져 있으면 경고 하나를 남기고 Steam 없이 돈다.
+> - 리더보드는 아직 없다(매뉴얼 [34장](../../Manual/34-Steam.md) 4절). 친구 초대·Steam 로비·릴레이는 멀티의 사설 호스트(매뉴얼 [40장](../../Manual/40-Multiplayer.md) 1-7).
 
 > [!note]- 출시 상태는 어디에 남나
 > 런타임 데이터 목록(`GameDatabase`)에 저장되어 빌드에 따라간다. 개발 중에 바꾼 ID는 이력이 없으므로, 출시 전의 저장(개발자 PC의 저장)은 이어받지 않는다. 플레이어에게 나간 저장만 지키면 되므로 문제 없다.
@@ -292,10 +265,10 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > | 저장 값 안의 DB 항목 ID(카드·물약·유물 …) | 지우지도 바꾸지도 않는다(5절) | 저절로(`[DataRef]` 필드·필드 규칙으로 DB 종류에 연결한 필드, 아래) |
 
 > [!note]- 저장 값 안의 DB 항목 ID가 저절로 바뀌는 조건
-> 출시 후 기획자가 카드 `strike`를 `slash`로 바꿨다고 하자. 플레이어의 저장 파일에는 덱 카드의 `"card": "strike"`가 그대로 있다. 런타임은 저장을 불러올 때(버전 변환 뒤에) 이런 글자를 새 ID로 바꾼다. 대상은 **`[DataRef(종류)]`가 붙은 `string` 필드와 `string` 리스트·배열**이다. 클래스 안 깊이 있어도, 리스트·딕셔너리 값 안에 있어도 찾는다.
+> 출시 후 카드 ID `strike`를 `slash`로 바꿨다고 하자. 플레이어의 저장 파일에는 덱 카드의 `"card": "strike"`가 그대로 있다. 런타임은 저장을 불러올 때(버전 변환 뒤에) 이런 글자를 새 ID로 바꾼다. 대상은 **`[DataRef(종류)]`가 붙은 `string` 필드와 `string` 리스트·배열**이다. 클래스 안 깊이 있어도, 리스트·딕셔너리 값 안에 있어도 찾는다.
 > ```csharp
 > [DataRef(typeof(Card))] public string card;                                          // DeckCard: 덱 카드의 원본 ID
-> [DataRef(typeof(RelicData))] public List<string> relics = new List<string>();        // RunState: 가진 유물
+> [DataRef(typeof(PassiveData))] public List<string> relics = new List<string>();      // RunState: 가진 유물(패시브 효과 ID)
 > [DataRef(typeof(Card))] public List<string> unlocked         = new List<string>();   // Profile: 해금한 카드
 > ```
 > 인벤토리 칸의 아이템 ID(`InventorySlot.item`)에는 이미 붙어 있다. `[DataRef]`도 필드 규칙 연결도 없는 필드, 딕셔너리의 **키**로 쓴 ID는 바뀌지 않는다. 그런 곳은 `[DataRef]`를 달거나 `Migrations.Add`로 직접 고친다.
@@ -321,11 +294,9 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - 버전이 2보다 작거나 키·경로가 비면 DB 검증 오류가 난다.
 
 > [!note]- 불러올 때 일어나는 일과 번호 규칙
-> - 저장 파일의 버전부터 게임 버전까지 변환이 차례로 돌고, 하나마다 기록에 "저장 데이터 변환 v1 → v2: run: hero.gold → gold"처럼 남는다.
-> - 게임보다 새 버전의 저장 파일은 거부한다(예전 게임이 새 저장을 망가뜨리지 않게).
+> - 저장 파일의 버전부터 게임 버전까지 변환이 차례로 돌고, 하나마다 기록에 "저장 데이터 변환 v1 → v2: run: hero.gold → gold"처럼 남는다. 게임보다 새 버전의 저장 파일은 거부한다.
 > - 한 번 출시한 변환(표의 줄이든 코드든)은 고치거나 지우지 않는다. 그 버전의 저장을 가진 플레이어가 아직 있을 수 있다.
-> - 번호는 2부터다(1이 처음 출시). 한 업데이트에서 여러 변환을 같은 번호로 등록해도 된다.
-> - `options.SaveVersion`은 따로 올리지 않는다. 더 높게 적어 두면 그 값이 저장 버전이 된다.
+> - 번호는 2부터다(1이 처음 출시). 한 업데이트에서 여러 변환을 같은 번호로 등록해도 된다. `options.SaveVersion`은 따로 올리지 않는다(더 높게 적으면 그 값이 저장 버전이 된다).
 
 ## 8. 체크리스트
 
@@ -337,19 +308,19 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 - [ ] 화면 쪽에만 있는 상태(위치 등)가 있으면 `Saving`에서 담고 `RunLoaded`에서 놓는다.
 - [ ] 끝난 판은 이어 하기가 열지 않는다(`RunState.IsActive`).
 - [ ] '이어 하기'는 `HasSavedRun`일 때만 켜지고, 불러오기 실패 때 새 판으로 넘어간다.
-- [ ] '새 판'은 `GBibleRuntime.NewRun(session)`을 행동 밖에서 부른다.
-- [ ] 세이브 칸이 여럿이면 슬롯(`UseSlot`·`SlotInfoOf`)을 쓰고, 칸에 보일 요약(`SlotSummary`)을 정했다.
+- [ ] '새 판'은 `GBibleRuntime.StartNewRun(session)`(새 판 행동을 고르지 않았으면 `NewRun` 뒤 판을 여는 행동)을 행동 밖에서 부른다.
+- [ ] 세이브 슬롯이 여럿이면 슬롯(`UseSlot`·`SlotInfoOf`)을 쓰고, 칸에 보일 요약(`SlotSummary`)을 정했다.
 - [ ] 음량·언어·화면·키 같은 기기 설정은 DB › 설정(필요하면 선택 기능 입력)에 있고, 판 규칙에 영향을 주는 값은 설정에 두지 않았다.
 - [ ] 플레이어 데이터에 에셋 참조 대신 ID를 둔다.
 - [ ] 모니터 저장 명령으로 저장 → 끄기 → 불러오기를 해 보고 값·난수 결과가 이어지는 것을 봤다.
 
 출시 전
 
-- [ ] DB 사이드바 아래가 "검증 통과"다.
-- [ ] 콘솔에 "예전 방식(리플렉션)"·"저장할 수 없는 참조입니다"·`[BindTo]` 연결 경고가 없다(있다면 이유를 안다).
+- [ ] DB 사이드바 아래가 "검증 통과"다(AI는 `Logs/MomoiProject/DbStatus.txt`로 본다 — '적용 전' 변경도 남아 있지 않다).
+- [ ] 콘솔(`Logs/Editor.log`)에 "예전 방식(리플렉션)"·"저장할 수 없는 참조입니다"·`[BindTo]` 연결 경고가 없다(있다면 이유를 안다).
 - [ ] 저장 값 안의 DB 항목 ID 필드에 `[DataRef(종류)]`가 붙어 있다.
-- [ ] `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`에 체크가 있다.
-- [ ] 출시 뒤 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(값 계산이 필요하면 `Configure`에 `Migrations.Add`)는 것을 팀이 안다.
+- [ ] `MomoiProject › 개발 › 출시됨 (저장 호환 유지)`에 체크가 있다(개발자가 누른다).
+- [ ] 출시 뒤 구조를 바꾸면 DB › 개발 › 저장 변환에 줄을 더한다(값 계산이 필요하면 `Configure`에 `Migrations.Add`). 한 번 출시한 변환은 고치거나 지우지 않는다.
 - [ ] Steam으로 낸다면 DB › Steam의 App ID가 실제 앱이고, 도전과제·통계 API Name이 Steamworks에 게시되어 있고, Auto-Cloud 경로를 정했다.
 
 > [!note]- 출시 전 더 볼 것
@@ -357,7 +328,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - 필드 규칙의 필수 값이 비어 있지 않다(모니터 머리에 "필수 값 비어 있음"이 없다).
 > - 콘솔에 "읽기 코드가 없어 리플렉션으로 읽습니다"가 없다.
 > - 개발용 시드 고정과 개발 명령은 출시 빌드에서 저절로 꺼진다(개발 명령은 `session.Debug.Enabled`가 거짓이면 등록되지 않는다). 코드로 건 `session.Debug.Register`도 같으니 `if (Debug.isDebugBuild)`로 감싸지 않는다.
-> - 쓰지 않는 선택 모듈(다이얼로그·인벤토리)을 껐다.
+> - 쓰지 않는 선택 기능(다이얼로그·인벤토리)이 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 없다.
 > - Undo 보관 수(새 DB 기본 200)와 판 저장 설정이 출시 빌드에 맞다.
 > - `GameIds.cs`가 최신이다(DB를 저장하고 컴파일까지 끝났다).
 
@@ -365,7 +336,7 @@ public static Card CardData(GameApi game, string card) => game.Session.Instances
 > - [06. 저장·불러오기](../../Manual/06-SaveLoad.md) — 저장 파일 모습, 저절로 일어나는 일, 판 저장 시점 전체, `Saving`·`RunLoaded`·`Stopping`, 변환 API 전체, 호환 검사
 > - [31. 슬롯·설정·입력](../../Manual/31-Slots-Settings-Input.md) — 슬롯 API, DB › 설정과 `GameSettings`, `GameInput`
 > - [34. Steam](../../Manual/34-Steam.md) — DB › Steam, 도전과제·통계·리치 프레즌스, Steam Cloud 설정
-> - [20. 시작하기](../../Manual/20-Setup.md) — 자동 시작 순서, `Configuring`·`Started`·`Stopping`·`Stopped`, Bootstrap 화면 칸, 출시 상태
+> - [20. 시작하기](../../Manual/20-Setup.md) — 자동 시작 순서, `Configuring`·`SessionCreated`·`Started`·`Stopping`·`Stopped`, Bootstrap 화면 칸, 출시 상태
 > - [07. 난수와 시간](../../Manual/07-Random-Time.md) — 판·프로필에 들어가는 난수 상태, 현실 시각(`Game.Now`)과 오프라인 보상
 > - [21. DB](../../Manual/21-Editor-Database.md) — ID 바꾸기·지우기, 검증 메시지 모음
 > - [04. 인스턴스](../../Manual/04-Instances.md) — 원본(`session.Instances`)과 사본(`CopyInstance`)

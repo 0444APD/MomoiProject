@@ -28,7 +28,7 @@
 | 잎 | 이벤트 받기 | `EventTrigger` | 고른 이벤트를 받은 그 순간, 값 조건(`filter`)도 참일 때 |
 | 잎 | 조건 충족 | `ConditionTrigger` | 안의 조건 Block(`condition`)이 그 순간 참일 때 |
 | 잎 | 사용 | `UseTrigger` | `Game.Use`로 쓰는 순간 |
-| 잎 | 행동 직전 이벤트 | `InterceptTrigger` | 고른 행동 직전 이벤트가 `Game.Intercept`를 지나는 순간(일이 일어나기 직전), 행동 직전 이벤트 조건(`filter`)도 참일 때(→ `28-Attributes-Intercepts.md`) |
+| 잎 | 행동 직전 이벤트 받기 | `InterceptTrigger` | 고른 행동 직전 이벤트가 `Game.Intercept`를 지나는 순간(일이 일어나기 직전), 행동 직전 이벤트 조건(`filter`)도 참일 때(→ `28-Attributes-Intercepts.md`) |
 | 논리 | `&& AND` | `AllTrigger` | 안의 것(`triggers`)이 **같은 순간에** 모두 참 |
 | 논리 | `\|\| OR` | `AnyTrigger` | 안의 것 중 하나가 참 |
 | 논리 | `! NOT` | `NotTrigger` | 안의 것(`trigger`)이 거짓 |
@@ -40,10 +40,11 @@
 - 그래서 `보스 처치 받기 AND 골드 100 이상` = "골드가 100 이상인 상태에서 보스 처치를 받은 순간"이다. 골드가 나중에 100이 되어도 그 순간에는 이벤트가 없으므로 발동하지 않는다.
 - 행동 직전 이벤트는 그 행동 직전 이벤트가 지나는 순간에만 참이다. 조건 충족과 `AND`로 묶으면 "그 상태일 때만 행동 직전 이벤트를 받아 고친다"가 된다. 결과의 `행동 직전 이벤트 고치기`가 그 행동 직전 이벤트를 바꾸거나 막는다.
 - `OR`는 먼저 참이 되는 쪽에서 발동한다.
-- 조건만으로 된 Trigger는 거짓 → 참이 되는 순간 발동한다. 반복하는 기능(로그, `repeat: true`)이면 다시 거짓이 된 뒤에 참이 될 때 또 발동한다(참인 동안 계속 발동하지 않는다).
+- 조건만으로 된 Trigger는 참이 되는 순간 발동한다. 등록할 때(게임이 켜질 때·항목을 정의할 때) 이미 참이면 첫 평가(Flush)에서 바로 발동한다. 반복하는 기능(로그·상태 효과·패시브 효과, `repeat: true`)이면 발동한 뒤 한 번 거짓이 되었다가 다시 참이 될 때 또 발동한다(참인 동안 계속 발동하지 않는다).
+- 반복이 아닌 것(도전과제)이 행동 안에서 발동하면 그 행동이 성공해야 굳는다. 행동이 실패하거나 미리보기(`Preview`·`CanDo`)였으면 감시가 그대로 남는다.
 - 서로 다른 이벤트 받기 둘을 `AND`로 묶으면 같은 순간에 오지 않으므로 발동하지 않는다. 검증이 경고한다.
 - `NOT` 안에 이벤트 받기·사용을 넣으면 "그 순간이 아닌 모든 때"가 되어 뜻이 흐려진다. 검증이 경고한다. 이벤트의 값을 거르려면 이벤트 받기의 조건 칸을 쓴다.
-- 조건 Block `확률`은 이벤트를 받는 순간·행동 직전 이벤트를 받는 순간·쓰는 순간에만 굴린다. 값이 바뀌어 다시 보는 순간에는 거짓이다. 그래서 이벤트 받기·행동 직전 이벤트 받기·사용과 `AND`로 묶어 쓴다(2-6).
+- 조건 Block `확률`은 이벤트·행동 직전 이벤트를 받는 순간과 쓰는 순간에만 굴린다. 이벤트 받기·행동 직전 이벤트 받기·사용과 `AND`로 묶어 쓴다(2-6).
 
 ### 기능별 잠금
 
@@ -56,6 +57,8 @@
 | 상태 효과(`StatusData.trigger`, 걸려 있는 동안 트리거) | 이벤트 받기 · 조건 충족 · 행동 직전 이벤트. 걸린 대상마다 결과가 돈다(→ `29-Statuses-Schedules-Choices.md` 2-3) |
 | 패시브 효과(`PassiveData.trigger`, 발동) | 이벤트 받기 · 조건 충족 · 행동 직전 이벤트. 가진 목록에 그 ID가 있는 쪽마다 결과가 돈다. '놓인 것마다'면 목록의 요소마다, 목록 순서로 돈다(6-1, → `17-Custom-Features.md` 0절). `rules`(발동 더)의 줄도 같은 셋을 쓴다(사용은 패시브 효과에서 발동하지 않는다). `modifierWhen`(보정 조건)은 조건 충족만 |
 | 프로젝트 기능 | 필드의 `[TriggerSlot]`이 정한다(5장). 행동 직전 이벤트는 로그·도전과제·액티브 효과·사용 기능 칸에는 없고, 상태 효과·패시브 효과와 잠금에 `Intercept`를 넣은 프로젝트 기능에서 고른다 |
+
+액티브 효과·상태 효과·패시브 효과의 DB 종류(`AbilityData`·`StatusData`·`PassiveData`)는 프로젝트가 템플릿에서 들인 클래스다(`Assets/MomoiProject/Code/Rules/Elements/`, 관례 0절). 위 잠금은 템플릿의 `[TriggerSlot]` 값이고, 그 클래스에서 바꿀 수 있다.
 
 ---
 
@@ -107,7 +110,7 @@ DB 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 �
 
 칸의 잠금에 행동 직전 이벤트가 있을 때만 `+ 블럭` 목록에 나온다(로그·도전과제·액티브 효과·사용 기능 칸에는 없다. 상태 효과의 트리거·패시브 효과의 발동과, 잠금을 연 프로젝트 기능에 있다).
 
-1. 블럭 문장 `{intentType} 행동 직전 이벤트`의 행동 직전 이벤트 칸을 눌러 행동 직전 이벤트(`[Intent]`가 붙은 클래스, 기본 제공 `비용 지불`)를 고른다.
+1. 블럭 문장 `{intentType} 행동 직전 이벤트 받기`의 행동 직전 이벤트 칸을 눌러 행동 직전 이벤트(`[Intent]`가 붙은 클래스 — 프로젝트의 것과 기본 제공 `사용`·`비용 지불`·`상태 효과 걸기`·`확률`·`효과 배율`, 28장 4-14)를 고른다.
 2. `filter`(툴팁 "행동 직전 이벤트 조건")는 이벤트 조건과 같은 식이다. 뿌리는 고른 행동 직전 이벤트다(예: `targetId` 일치 `hero`).
 3. `order`(툴팁 "순서(작을수록 먼저)"): 같은 행동 직전 이벤트에 여럿이 걸렸을 때의 차례. 같으면 등록 순서.
 
@@ -134,8 +137,7 @@ DB 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 �
 - 이벤트 받기·행동 직전 이벤트 받기·사용과 `AND`로 묶어 쓴다. "적을 처치할 때 25%로 골드 +5" = `적 처치 받기` AND `확률`(`percent`(확률(%)) 25).
 - **식의 맨 뒤에 둔다.** `AND`는 앞에서부터 검사하다 거짓이 나오면 멈춘다. 확률을 맨 뒤에 두면 앞 조건이 맞을 때만 굴린다.
 - 가진 쪽마다 검사하는 상태 효과·패시브 효과(29장 2-3, 17장 0절)는 가진 쪽마다 따로 굴린다. 같은 조커가 둘이면 두 번 굴린다.
-- **행동 직전 이벤트 `확률`을 거친다.** 굴리기 전에 기본 제공 행동 직전 이벤트 `확률`(`ChanceIntent`)을 행동 직전 이벤트에 통과시킨다. "모든 확률 2배" = 행동 직전 이벤트 `확률` 받기 → `행동 직전 이벤트 고치기` `probability` 곱하기 2. 막히면(`막기`) 실패다. 행동 직전 이벤트 필드: `probability`(0~1, 1 이상이면 반드시 성공) · `stream` · `sourceId`(이 Trigger를 가진 항목 ID) · `userId`(사용자·가진 쪽 id) · `cancelled`.
-- 확률이 바뀌어도 난수는 한 번만 굴린다. 같은 시드면 뒤의 결과가 밀리지 않는다. 결정론 흐름이라 Undo하고 다시 해도 같은 결과다(07장).
+- **행동 직전 이벤트 `확률`을 거친다**(코드의 `Game.Chance`와 같은 길, 07장 2.15). "모든 확률 2배" = 행동 직전 이벤트 `확률` 받기 → `행동 직전 이벤트 고치기` `probability` 곱하기 2. 이 조건에서 굴릴 때 `sourceId`는 이 Trigger를 가진 항목 ID, `userId`는 사용자·가진 쪽 id다. 확률이 바뀌거나 막혀도 난수는 한 번만 굴리고, Undo하고 다시 해도 같은 결과다.
 - **사용 조건에 두면** `Game.Use`는 굴려서 거짓이면 실패를 던진다(그 행동이 취소된다, 16장). 되는 것만 쓰려면 `Game.TryUse`를 쓴다. 실패를 던지지 않고 거짓을 돌려주며, 조건을 한 번만 검사하므로 한 번만 굴린다.
 - 코드에서 굴릴 때는 `Game.Chance(0.25, "loot", source: c.Owner, user: c.User)`(행동 안에서). 같은 행동 직전 이벤트를 거친다.
 - 요약: `25% 확률`. 검증 경고: "확률: 0보다 크고 100 이하로 적으세요."
@@ -149,7 +151,7 @@ DB 상세 패널에서 Trigger 필드(`trigger`, `when` 등. 칸 이름표는 �
 | `who` | 누구 | `사용자(가진 쪽)`(기본) / `이벤트의 개체`. `앞의 대상`은 검증 오류 |
 | `eventField` | 이벤트 필드(id) | `이벤트의 개체`일 때만 보인다. 받은 이벤트(행동 직전 이벤트 포함)에서 개체 id가 든 필드 |
 | `list` | 목록 | 플레이어 데이터 · 필드(목록). 예: `run › jokers`, `run › bag` |
-| `columns` | 줄 길이(0 = 한 줄) | 한 줄(조커 칸·손패)은 0, 격자(가방·보드)는 열 수 |
+| `columns` | 줄 길이(0 = 한 줄) | 한 줄(조커 칸·핸드)은 0, 격자(가방·보드)는 열 수 |
 | `spot` | 자리 | 아래 표 |
 | `index` | n(n번째 칸) | `spot`이 `n번째 칸(0부터)`일 때만 보인다 |
 | `not` | 아닐 때 참 | 켜면 그 자리가 **아닐** 때 참 |
@@ -320,8 +322,8 @@ public class AllEnemiesDown : SimpleCondition
 1. **`[Serializable]`** — 필수. Block은 DB 에셋에 저장된다.
 2. **`[BlockInfo("표시 이름")]`** — 필수. `+ 블럭` 목록에 이 이름으로 나온다.
    - `Category`: 목록의 분류(트리거 칸에서는 "조건 충족 · 분류"로 묶인다).
-   - `Description`: 목록·툴팁 설명.
-   - `Sentence`: 편집 화면의 한 줄 문장. `{필드이름}`이 누르면 바뀌는 칸이 된다. 예: `Sentence = "{team} 팀 전멸"`.
+   - `Description`: 목록·툴팁 설명. 꼭 적는다(개발자가 목록에서 읽는다 — 관례 2절. 아래 짧은 예제는 줄였다).
+   - `Sentence`: 편집 화면의 한 줄 문장. `{필드이름}`이 누르면 바뀌는 칸이 된다. 예: `Sentence = "{team} 팀 전멸"`. 개발자가 바꿀 값(기준 수·이름)은 필드로 두고 문장에 드러낸다(관례 18절).
 3. **`: SimpleCondition`** — 기반 클래스.
 4. **public 필드** — 에디터 칸이 된다(항목마다 값이 다르다). `[FieldLabel("설명")]`을 붙이면 마우스를 올렸을 때 그 글이 보인다.
 5. **`protected override bool Check()`** — 판정. 값을 바꾸지 않는다.
@@ -360,7 +362,8 @@ public class KillerIsAlly : SimpleCondition
 | `IsCheck` | '쓸 수 있나'만 미리 보는 순간(`Game.CanUse`)이면 `true`. 조건 `확률`은 이때 굴리지 않고 참이다(2-6). 난수를 쓰는 프로젝트 조건도 이 값을 보고 미리 보기에서는 굴리지 않게 쓴다 |
 | `IsBorrowed` | 다른 조각의 패시브 효과를 빌려 쓰는 순간이면 `true`(12장 2-4e). 이때 `User`는 빌려 준 원본 조각 |
 | `User` | 사용자(사용하는 순간). 상태 효과·패시브 효과의 트리거에서는 검사 중인 가진 쪽('놓인 것마다'면 그 조각) |
-| `Picked` | 플레이어가 고른 대상들(사용하는 순간, 없으면 빈 리스트) |
+| `Picked` | 플레이어가 고른 대상들(사용하는 순간, 없으면 빈 리스트). 가진 쪽마다 검사할 때는 그 가진 쪽 하나 |
+| `Power` | 효과 배율(행동 직전 이벤트 `효과 배율`을 거친 값, 기본 1). 기본 효과 Block은 수치에 곱하고, 프로젝트 효과 Block은 직접 곱한다(16장 2-12) |
 
 값이 바뀌어 다시 평가되는 순간에는 `Event`가 `null`이다. 그래서 `KillerIsAlly`는 혼자 쓰면 발동하지 않고, 이벤트 받기와 `AND`로 묶어 쓴다.
 
@@ -437,6 +440,7 @@ Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필�
 | `[TriggerSlot(TriggerKinds)]` | `Event`·`Condition`·`Use`·`Intercept`(행동 직전 이벤트)·`All`을 `\|`로 | `+ 블럭` 목록과 검증이 이 종류만 허락 |
 | `[OutcomeSlot(OutcomeKinds)]` | `Record`·`PlayerData`·`Coded`·`Targeted`·`Event`·`Intent`(행동 직전 이벤트 고치기)·`All` | `+ 결과 추가` 목록과 검증이 이 종류만 허락 |
 | `Fixed = true` | (OutcomeSlot) | 결과가 그 종류 하나로 고정. 비어 있으면 하나를 자동으로 두고 세부 칸만 고친다(추가·삭제 없음) |
+| `BindTo = false` | (OutcomeSlot, 기본 참) | 이 항목 ID에 `[BindTo]`가 있어도 코드가 이 칸을 대신하지 않는다(13장 2-11) |
 
 - `Trigger` 필드, `List<Outcome>` 필드에 직접 붙이거나, `List<TriggerRule>` 필드에 붙이면 규칙마다의 `when`·`then`에 적용된다.
 - `Trigger`·`Outcome`을 담는 필드에는 `[SerializeReference]`가 필요하다(`TriggerRule`의 `when`·`then`은 이미 붙어 있다).
@@ -472,8 +476,9 @@ Trigger·Outcome 칸이 있는 클래스(DB 항목, 인스턴스 기능)는 필�
 
 | 멤버 | 뜻 |
 |---|---|
-| `Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null, Func<TriggerContext, IEnumerable<(object holder, int order)>> orderedHolders = null, string orderGroup = null)` | 감시를 시작한다. 발동하면 `fire`(결과 실행은 부르는 쪽이 `RunOutcomes`로). `repeat`가 아니면 한 번 발동한 뒤 감시를 그만둔다. `when`이 `null`이면 아무것도 하지 않는다. `holders`를 주면 순간마다 그 목록의 객체마다 컨텍스트의 `User`를 그 객체로 두고 트리거 전체(조건 포함)를 따로 검사해, 참인 객체마다 `fire`를 부른다(상태 효과의 가진 쪽마다 검사, `29-Statuses-Schedules-Choices.md` 2-3). `orderedHolders`(가진 쪽 · 자리)와 `orderGroup`(묶음 이름)을 주면 같은 묶음의 항목끼리 가진 쪽을 모아 자리가 작은 것부터(같으면 등록 순서) 발동한다(6-1의 '놓인 것마다') |
+| `Register(string owner, Trigger when, bool repeat, Action<TriggerContext> fire, Func<TriggerContext, IEnumerable<object>> holders = null, Func<TriggerContext, IEnumerable<(object holder, int order)>> orderedHolders = null, string orderGroup = null, string item = null)` | 감시를 시작한다. 발동하면 `fire`(결과 실행은 부르는 쪽이 `RunOutcomes`로). `repeat`가 아니면 한 번 발동한 뒤 감시를 그만둔다(행동 안에서 발동했으면 그 행동이 성공할 때 — 1절). `when`이 `null`이면 아무것도 하지 않는다. `item`: 컨텍스트의 `Owner`로 보일 항목 ID(감시 키 `owner`에 종류를 붙였을 때 — 패시브 효과 `passive:<ID>` → `<ID>`, 비우면 `owner`). `holders`를 주면 순간마다 그 목록의 객체마다 컨텍스트의 `User`를 그 객체로 두고 트리거 전체(조건 포함)를 따로 검사해, 참인 객체마다 `fire`를 부른다(상태 효과의 가진 쪽마다 검사, `29-Statuses-Schedules-Choices.md` 2-3). `orderedHolders`(가진 쪽 · 자리)와 `orderGroup`(묶음 이름)을 주면 같은 묶음의 항목끼리 가진 쪽을 모아 자리가 작은 것부터(같으면 등록 순서) 발동한다(6-1의 '놓인 것마다') |
 | `Unregister(string owner)` / `IsRegistered(owner)` | 그 owner의 감시를 모두 그만둔다 / 감시 중인지 |
+| `Touch(string owner)` | 그 owner의 조건 감시를 다음 Flush에서 다시 평가하게 한다(불러온 뒤 새로 감시를 시작한 것 — 이미 참이면 그때 발동) |
 | `RunOutcomes(IEnumerable<Outcome>, TriggerContext, string source)` | 결과를 차례로 실행한다. `source`는 Journal의 출처 글자 |
 | `CanUse(owner, when, user, picked, out TriggerContext, bool checkOnly = false)` | 사용하는 순간으로 검사. `checkOnly`면 미리 보기 순간(`IsCheck`)이라 조건 `확률`을 굴리지 않는다(`Game.CanUse`가 이것). 아니면 확률을 굴린다(`Game.Use`·`TryUse`) |
 | `Test(Trigger, TriggerContext)` | 그 순간으로 검사 |
@@ -562,26 +567,18 @@ var when = new AnyTrigger
 
 ### 7-6. 코드 조건: 적 전멸 / 아군 하수인 수
 
-```csharp
-[Serializable, BlockInfo("적 전멸", Category = "전투")]
-public class AllEnemiesDown : SimpleCondition
-{
-    protected override bool Check()
-    {
-        var battle = Game.All<Battle>().FirstOrDefault();
-        return battle != null && battle.units.Where(u => u.team == "enemy").All(u => u.hp <= 0);
-    }
-}
+적 전멸은 4-1의 `AllEnemiesDown`이다. 칸 하나를 문장에 드러낸 조건:
 
-[Serializable, BlockInfo("아군 하수인 수", Category = "전투", Sentence = "아군 하수인 {count}명 이상")]
+```csharp
+[Serializable, BlockInfo("아군 하수인 수", Category = "전투", Description = "살아 있는 아군 하수인 수를 봅니다.", Sentence = "아군 하수인 {count}명 이상")]
 public class AllyCountAtLeast : SimpleCondition
 {
-    public int count = 3;
+    public int count = 3;   // DB에서 항목마다 바꾸는 칸
     protected override bool Check() => Game.All<Unit>().Count(u => u.team == "ally" && u.hp > 0) >= count;
 }
 ```
 
-`battle` 데이터가 바뀌는 행동이 끝날 때마다 자동으로 다시 평가된다.
+`Unit`이 든 플레이어 데이터가 바뀌는 행동이 끝날 때마다 자동으로 다시 평가된다(4-4).
 
 ### 7-7. 사용 조건(액티브 효과·아이템)
 
@@ -628,9 +625,9 @@ session.Triggers.Register("shopHint",
 - **`NOT`으로 이벤트를 거른다.** "보스가 아닌 처치"는 `NOT(이벤트 받기)`가 아니라 이벤트 받기의 조건 칸에 `IsBoss 거짓`(또는 `tags` 미포함 `boss`)으로 쓴다.
 - **필드 경로가 깨진다.** 이벤트·플레이어 데이터 클래스의 필드 이름을 바꾸면 경로 글자는 따라가지 않는다. DB 검증 오류("'…'에 '…' 필드가 없습니다.")가 뜬 칸을 다시 고른다.
 - **`[키]`를 컬렉션이 아닌 필드에 쓴다.** 검증 오류 "'gold'는 컬렉션이 아니라 [x]를 쓸 수 없습니다."가 뜬다(`gold[x]`). `[키]`는 딕셔너리·목록 필드에만.
-- **`확률`만으로 Trigger를 만든다.** 조건 충족만으로 된 순간에는 거짓이라 발동하지 않는다. 이벤트 받기·행동 직전 이벤트 받기·사용과 `AND`로 묶는다(2-6).
+- **`확률`만으로 Trigger를 만든다.** 조건 충족만으로 된 순간에는 거짓이라 발동하지 않는다(2-6).
 - **`확률`을 사용 조건에 두고 `Game.Use`를 부른다.** 굴려서 거짓이면 실패를 던져 그 행동이 취소된다. 되는 것만 쓰려면 `Game.TryUse`(2-6).
-- **`Game.CanUse`가 참인데 썼더니 안 됨.** 미리 보기는 `확률`을 굴리지 않고 참으로 본다. 실제로 쓸 때 굴린다(2-6).
+- **`Game.CanUse`가 참인데 썼더니 안 됨.** 미리 보기는 `확률`을 굴리지 않고 참으로 본다(2-6).
 - **`자리 검사`의 `not`(아닐 때 참)이 목록에 없을 때도 참일 거라 기대한다.** 누구를 목록에서 찾지 못하면 늘 거짓이다(2-7).
 - **'놓인 것마다' 패시브 효과가 등록 순서로 돌 거라 기대한다.** 같은 목록을 보는 것끼리는 목록 순서(왼쪽 칸부터)다(6-1).
 - **없는 키를 "0"으로 기대한다.** 읽기(조건)에서 없는 키는 0이 아니라 비어 있음이라 `materials[book] 이하 0`은 거짓이다. "없거나 0"은 `비어 있음` OR `이하 0`으로 쓴다. 쓰는 쪽(`Game.Pay`·`플레이어 데이터에 주기`)은 없는 키를 0에서 시작한다.

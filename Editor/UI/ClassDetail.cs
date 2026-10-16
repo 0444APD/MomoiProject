@@ -168,7 +168,7 @@ namespace GBible.EditorTools.UI
                 if (showIf != null)
                     row.Add(Caption(showIf.Describe() + "  [ShowIf]"));
                 if (InstanceFields.IsFeature(info))
-                    row.Add(Caption("기능 필드: 비어 있으면 그 기능이 없습니다. 인스턴스에서 '+ 기능'으로 붙입니다."));
+                    row.Add(Caption("기능 필드: 비어 있으면 그 기능이 없습니다. 기능을 붙이고 빼는 것은 AI가 DB 반영 스크립트로 합니다."));
             }
 
             if (KeywordTools.CanConnect(info))

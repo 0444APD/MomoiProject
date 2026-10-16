@@ -1,8 +1,8 @@
 # 14. 도전과제
 
-**한 줄 요약**: 도전과제는 **Trigger가 처음 참이 되는 순간 달성되고 결과를 실행하는** 한 번짜리 기능이다. 달성 상태는 프로필(메타 구역)에 저장되고, 달성과 그 결과는 Undo(행동 되돌리기)로 취소되지 않는다.
+**한 줄 요약**: 도전과제는 **Trigger가 처음 참이 되는 순간 달성되고 결과를 실행하는** 한 번짜리 기능이다. 달성 상태는 프로필(메타 구역)에 저장되고, 달성과 그 결과는 Undo(행동 되돌리기)로 취소되지 않는다. 행동 안에서 발동하면 그 행동이 성공한 뒤에 달성하고, 실패하면 달성하지 않는다(2-3·2-4).
 
-> 도전과제 탭은 항목이 없으면 DB 사이드바에서 숨는다 — 프로젝트가 항목을 더하면(AI의 DB 반영 스크립트) 나타난다.
+> 도전과제 탭(사이드바 **개발** 그룹)은 항목이 없으면 숨는다 — 프로젝트가 항목을 더하면(AI의 DB 반영 스크립트) 나타난다.
 
 **언제 쓰는가**
 
@@ -25,45 +25,27 @@
 
 ### 1-1. 도전과제 만들기
 
-1. `MomoiProject → DB` → 사이드바 **진행** 그룹의 **도전과제** 탭.
-2. 목록 맨 위 줄(또는 폴더 줄)에 마우스를 올려 **`+ 도전과제`**를 누른다. 새 항목이 생기고 상세가 열린다.
-3. 제목(= ID)을 눌러 이름을 짓는다(lowerCamelCase와 점, 예: `firstBlood`, `hunt.hunter100`).
-4. 칸을 채운다. 칸 이름표는 코드의 변수 이름이고, 마우스를 올리면 한국어 설명이 보인다.
+도전과제는 로직 쪽 종류라 항목 추가·삭제와 트리거·결과 Block 조립이 DB에서 잠겨 있다(21장 3-1). **AI가 DB 반영 스크립트로 만든다**(관례 15절): `EditorDatabase.Staging.Add(typeof(AchievementData), "firstBlood")`로 항목을 만들고 아래 칸에 2절·3절과 같은 형식의 Block을 넣는다. ID는 lowerCamelCase와 점(`firstBlood`, `hunt.hunter100`), 코드에서는 `GameIds.Achievement.…`. 개발자는 `MomoiProject → DB` → 사이드바 **개발** 그룹의 **도전과제** 탭에서 읽고 문장 안의 값(`kills >= 100`의 100 등)만 바꾼다.
 
 | 칸 | 툴팁 | 내용 |
 |---|---|---|
 | `icon` | 아이콘 | 스프라이트(UI용) |
-| `trigger` | 트리거 | 언제 달성되는지. 고를 수 있는 것: 이벤트 받기 · 조건 충족 |
-| `outcomes` | 결과 | 달성했을 때 할 일. 모든 결과 종류 |
+| `trigger` | 트리거 | 언제 달성되는지. 고를 수 있는 것: 이벤트 받기 · 조건 충족(`비교`(로그 값) · `플레이어 데이터 검사` · `도전과제 달성` · 프로젝트 조건 Block), AND·OR·NOT(→ `11-Triggers-Conditions.md`) |
+| `outcomes` | 결과 | 달성했을 때 할 일. 모든 결과 종류(→ `12-Outcomes.md`) |
 
 ### 1-2. 트리거 조립
 
-`trigger` 칸의 `+ 블럭`:
-
-- **조건 충족** 그룹의 `비교`(로그 값), `플레이어 데이터 검사`, `도전과제 달성`, 프로젝트 조건 Block.
-- **트리거** 그룹의 `이벤트 받기`(이벤트 + 값 조건).
-- `+ 논리 연산자`로 AND·OR·NOT, `+ 괄호`로 묶는다.
-
-예: `+ 블럭` → `비교` → 문장 `{stat} {op} {value}`의 단어를 하나씩 눌러 `kills` `>=` `100`.
+DB 상세에서 트리거는 문장으로 보인다(예: 조건 `비교` = `{stat} {op} {value}` → `kills >= 100`). 조립 화면(`+ 블럭` · `+ 논리 연산자` · `+ 괄호`)은 구조 편집을 열었을 때만 보인다(11장 2절).
 
 ### 1-3. 결과 고르기
 
-`outcomes` 칸의 `+ 결과 추가` → 플레이어 데이터의 필드(예: `party › gold` → 증감 `500`), `대상에게 효과`, `로그에 기록`, 코딩한 결과. 결과 칸 대신 코드로 쓰려면 `[BindTo]`(→ `13-BindTo.md`). 연결되면 이 칸은 잠기고 연결된 코드만 보인다.
+결과 칸 대신 코드로 쓰려면 `[BindTo]`(→ `13-BindTo.md`). 연결되면 이 칸은 잠기고 연결된 코드만 보인다.
 
 상세 위쪽 요약에 "트리거 …"·"결과 …" 두 줄이 보인다. 트리거가 없으면 "트리거가 없습니다(언제 달성되는지)." 오류가 뜨고 빌드가 막힌다.
 
 ### 1-4. 모니터에서 확인하기(플레이 중)
 
-`MomoiProject → 모니터` → **도전과제** 탭.
-
-- 카드마다 상태: `달성` / `미달성` / 진행도(`37 / 100`, 조건 충족 잎이 진행도를 낼 때).
-- 카드를 누르면 아래 작업 패널에 버튼이 뜬다.
-
-| 버튼 | 하는 일 |
-|---|---|
-| **트리거로 달성** | 게임과 같은 길: 부족한 로그를 이벤트로 채우고, 트리거의 이벤트를 값 조건에 맞춰 쏜다. 필요한 이벤트 전체가 행동 하나라 Undo하면 로그는 돌아가고 달성은 남는다. 사용·NOT·맞출 수 없는 값 조건이 있으면 이유를 보인다 |
-| **강제 달성** | 조건·이벤트 없이 달성 처리만 한다(결과는 실행된다) |
-| **초기화** | (달성한 카드) 달성 표시만 지우고 다시 감시한다. 로그 값은 그대로 |
+`MomoiProject → 모니터` → **도전과제** 탭: 카드마다 배지 `달성` / `진행 중`, 진행 중이면 진행도(`37 / 100`, 조건 충족 잎이 진행도를 낼 때). 카드를 누르면 아래 작업 줄에 **트리거로 달성**(게임과 같은 길로 이벤트를 쏜다 — Undo하면 로그는 돌아가고 달성은 남는다) · **강제 달성**(조건·이벤트 없이 달성만, 결과는 실행된다) · **초기화**(달성한 카드의 달성 표시만 지운다)가 뜬다. 자세히는 `22-Monitor-Debug.md` 4절.
 
 ---
 
@@ -91,7 +73,7 @@ session.Achievements.Define(def);
 | `Condition` (짧은 형태) | 조건 하나로 된 Trigger를 읽고 쓴다(`When = new ConditionTrigger { condition = … }`과 같다) |
 | `Rewards` (짧은 형태, `List<Reward>`) | 코딩한 결과만. `Outcomes` 뒤에 실행된다 |
 
-게임에서는 런타임이 시작할 때 DB의 모든 도전과제(`AchievementData.ToDefinition()`)를 정의한다. 코드로 정의하는 것은 서버·테스트·DB 밖에서 만드는 도전과제용이다.
+게임에서는 런타임이 시작할 때 DB의 모든 도전과제(`AchievementData.ToDefinition()`)를 정의한다. 게임의 도전과제는 DB 항목으로 두고(1-1 — 개발자가 읽고 값을 바꾼다), `Define`을 직접 부르는 것은 규칙 테스트·DB 밖에서 만드는 도전과제용이다. DB 항목의 `trigger`·`outcomes`에 넣는 Block은 여기의 `When`·`Outcomes`와 같은 형식이다.
 
 ### 2-2. `session.Achievements` — `AchievementSystem`
 
@@ -260,15 +242,7 @@ public static class AchievementRewards
 
 ### 3-9. 달성 연출
 
-```csharp
-public class AchievementPopup : UnityEngine.MonoBehaviour
-{
-    IDisposable _sub;
-    void OnEnable()  => _sub = GBibleRuntime.Game.Events.Subscribe<AchievementUnlocked>(e => Show(e.Id, e.DisplayName));
-    void OnDisable() => _sub?.Dispose();
-    void Show(string id, string name) { /* id로 아이콘·번역 텍스트를 찾아 띄운다 */ }
-}
-```
+연출·알림은 기본 이벤트 `AchievementUnlocked`(`Id`, `DisplayName`)를 `SubscribeAfterAction`으로 받는다(연출은 `Subscribe`로 받지 않는다, `10-Events.md` 2-7). 예는 `10-Events.md` 3-4. `Id`로 아이콘(`Game.Entry<AchievementData>(e.Id)?.icon`)·번역 이름(텍스트 `<ID>.name`)을 찾는다.
 
 ### 3-10. 진행도 UI
 

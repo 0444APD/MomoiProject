@@ -1,12 +1,12 @@
 # 32. 화면 연결·연출 대기열·씬 흐름·월드 상태
 
-**한 줄 요약**: 규칙(행동)은 즉시 끝나고 화면은 그 결과를 따라간다. **다시 그리기**(`GameView.Redraw`)는 플레이어 데이터나 언어가 바뀌면 프레임 끝에 한 번 그린다. **ViewList**는 데이터 목록(적·손패)을 프리팹 목록에, 컴포넌트 **데이터 연결**은 필드 하나(에너지)를 글자·숫자에 코드 없이 잇는다. 피해 숫자·죽는 모습 같은 연출은 **연출 대기열**(`GameView.Present`)에서 차례로 하나씩 돌고, 다시 그리기는 연출이 끝날 때까지 기다린다. 그래서 죽는 연출 전에 적이 화면에서 사라지지 않는다. 실시간 게임의 맞는 효과·피해 숫자는 대기열 밖(`GameView.Play`)에서 바로 튼다(줄 서지 않고 입력을 막지 않는다). **씬 흐름**은 판 데이터의 필드(`run.scene`)가 가리키는 씬을 화면이 따라 연다. **월드 상태**(`Game.SetWorld`)는 씬에 놓인 것(열린 상자·쓰러뜨린 보스·켜 둔 스위치)의 상태를 이름으로 기억하고, 컴포넌트 **월드 상태 연결**이 그 값대로 오브젝트를 켜고 끈다. 화면 쪽은 데이터를 읽기만 하고, 바꾸는 일은 모두 행동이다.
+**한 줄 요약**: 규칙(행동)은 즉시 끝나고 화면은 그 결과를 따라간다. **다시 그리기**(`GameView.Redraw`)는 플레이어 데이터나 언어가 바뀌면 프레임 끝에 한 번 그린다. **ViewList**는 데이터 목록(적·핸드)을 프리팹 목록에, 컴포넌트 **데이터 연결**은 필드 하나(에너지)를 글자·숫자에 코드 없이 잇는다. 피해 숫자·죽는 모습 같은 연출은 **연출 대기열**(`GameView.Present`)에서 차례로 하나씩 돌고, 다시 그리기는 연출이 끝날 때까지 기다린다. 그래서 죽는 연출 전에 적이 화면에서 사라지지 않는다. 실시간 게임의 맞는 효과·피해 숫자는 대기열 밖(`GameView.Play`)에서 바로 튼다(줄 서지 않고 입력을 막지 않는다). **씬 흐름**은 판 데이터의 필드(`run.scene`)가 가리키는 씬을 화면이 따라 연다. **월드 상태**(`Game.SetWorld`)는 씬에 놓인 것(열린 상자·쓰러뜨린 보스·켜 둔 스위치)의 상태를 이름으로 기억하고, 컴포넌트 **월드 상태 연결**이 그 값대로 오브젝트를 켜고 끈다. 화면 쪽은 데이터를 읽기만 하고, 바꾸는 일은 모두 행동이다.
 
-> UI Toolkit 화면(HUD·메뉴·팝업)은 [35장](35-Screens.md)의 DB › 화면 · `GameScreen` · binding-path로 만든다(인스펙터 연결 없음). 이 장의 `ViewList`·'데이터 연결'은 씬에 놓이는 오브젝트(캐릭터·카드 오브젝트)와 UGUI용이고, 다시 그리기·연출 대기열은 두 쪽이 함께 쓴다.
+> HUD·메뉴·팝업·떠오르는 숫자는 [35장](35-Screens.md)의 UI Toolkit 화면(DB › 화면 · `GameScreen` · binding-path · `GameScreens.Overlay`)으로 만든다 — 프로젝트에 UGUI(`UnityEngine.UI`)를 들이지 않는다(관례 21절 · UiGuide 1-8). 이 장의 `ViewList`·'데이터 연결'·'월드 상태 연결'은 씬에 놓이는 오브젝트(캐릭터·카드·상자 — SpriteRenderer 프리팹)용이고(누르기는 2D 충돌체 — 5절 머리의 `WorldPointer`), 다시 그리기·연출 대기열·`Busy`는 두 쪽이 함께 쓴다(UI Toolkit 쪽 목록은 35장 `ElementList`).
 
 **언제 쓰는가**
 
-- 체력·골드·에너지 표시, 적 목록·손패처럼 데이터를 그대로 그리는 화면(다시 그리기 · ViewList · 데이터 연결).
+- 체력·골드·에너지 표시, 적 목록·핸드처럼 데이터를 그대로 그리는 화면(다시 그리기 · ViewList · 데이터 연결).
 - 피해 숫자, 카드가 날아가는 모습, 적이 쓰러지는 모습처럼 시간을 두고 차례로 보여 줄 것(연출 대기열).
 - 연출 중에 입력을 막고, 클릭하면 빨리 넘기고, 설정에서 연출 속도를 바꿀 때(`Busy` · `SkipPresentation` · `PresentationSpeed`).
 - 실시간 게임의 맞는 효과·피해 숫자, 방치형의 클릭 숫자처럼 줄 서지 않고 바로·여럿이 겹쳐 뜨고 입력을 막지 않을 것(대기열 밖 연출, `GameView.Play`).
@@ -36,8 +36,8 @@
 ## 1. 흐름 한눈에
 
 ```
-입력(버튼)
-  └ Game.Do(카드 내기)                 데이터는 이 줄이 끝나면 이미 최종 모습(적은 전투에서 빠졌고 체력은 깎였다)
+입력(버튼 · 월드 누르기)
+  └ GameScreens.Do(카드 내기)          Busy면 무시. 아니면 Game.Do — 이 줄이 끝나면 데이터는 이미 최종 모습(적은 전투에서 빠졌고 체력은 깎였다)
 행동이 성공
   └ SubscribeAfterAction 받는 쪽        피해 · 적 처치 이벤트를 쏜 순서대로 받는다
        └ GameView.Present(피해 숫자)    대기열에 쌓인다(곧바로 재생 시작)
@@ -48,7 +48,7 @@
        └ OnRemove → 대기열에 "죽는 모습" → 끝나면 그 적의 오브젝트를 없앤다
 ```
 
-> **규칙: 화면은 데이터를 읽기만 한다.** 버튼은 행동을 보내고(`Game.Do`), 그림은 데이터에서 그린다. 화면이 데이터를 직접 고치면 Undo·저장·멀티플레이가 그 변경을 모른다.
+> **규칙: 화면은 데이터를 읽기만 한다.** 입력은 행동을 보내고(`OnClick`·`GameScreens.Do` → `Game.Do`), 그림은 데이터에서 그린다. 화면이 데이터를 직접 고치면 Undo·저장·멀티플레이가 그 변경을 모른다.
 
 > **규칙: 연출은 `SubscribeAfterAction` → `Present`.** 행동이 성공한 뒤에만 받으므로 실패해 취소된 행동의 피해 숫자가 뜨지 않는다. 바로 받는 쪽(`Events.Subscribe`)은 규칙용이다. 실패한 행동·미리보기 실행(33장)에서도 불린다.
 
@@ -73,11 +73,11 @@
 
 | 넣는 것 | 끝나는 때 |
 |---|---|
-| 코루틴 `Present(IEnumerator)` | 코루틴이 끝날 때. 안에서 `yield return` 한 코루틴도 기다린다. 한 걸음(`yield` 하나)이 실제 30초(일시정지 중은 세지 않음) 넘게 끝나지 않으면 콘솔에 경고하고 다음으로 넘어간다(아래 '진행이 멈춘 연출') |
+| 코루틴 `Present(IEnumerator)` | 코루틴이 끝날 때. 안에서 `yield return` 한 코루틴도 기다린다. 한 걸음이 멈추면 아래 '진행이 멈춘 연출' |
 | 완료 콜백 `Present(done => …)` | 연출 코드가 `done()`을 부를 때(트윈 라이브러리의 완료 콜백 등). 제한 시간(기본 실제 30초) 안에 `done()`이 오지 않으면 콘솔에 경고하고 다음으로 넘어간다 |
 | 쉬기 `Present(초)` | 그 시간이 지날 때(속도 반영) |
 
-- **남아 있는 동안**(재생 중 포함) `IsPresenting`이 참이다. `Busy`는 연출이 남아 있거나 선택을 기다리는 중(`Game.IsWaiting`, 29장)이면 참이다. 입력 창구가 `Busy`로 입력을 막는다(5-5). 시스템은 행동을 막지 않는다.
+- **남아 있는 동안**(재생 중 포함) `IsPresenting`이 참이다. `Busy`는 연출이 남아 있거나 선택을 기다리는 중(`Game.IsWaiting`, 29장)이면 참이다. 화면 입력(`OnClick`·`GameScreens.Do`)이 `Busy`면 행동을 보내지 않는다(5-5). `Game.Do` 자체는 막지 않는다.
 - 대기열이 비면(마지막 연출이 끝난 순간) `Presented` 이벤트를 쏜다.
 - **속도**: `PresentationSpeed`(기본 1, 2 = 두 배). 연출 코드는 시간을 `GameView.DeltaTime`(= `Time.deltaTime` × 속도, 건너뛰기 중이면 ×10)이나 `GameView.Wait(초)`로 잰다. 그래야 속도·건너뛰기가 먹는다. `WaitForSeconds`·`Time.deltaTime`으로 잰 연출은 속도를 따르지 않는다.
 - **건너뛰기**: `SkipPresentation()`은 남은 연출을 ×10으로 돌린다. 대기열이 비면 원래 속도로 돌아온다. 연출이 없을 때 부르면 아무 일도 없다.
@@ -89,7 +89,7 @@
 
 **대기열 밖 연출 — `GameView.Play`**
 
-대기열은 턴제에 맞춘 것이다. 실시간 게임에서 맞을 때마다 `Present`로 넣으면 피해 숫자가 줄을 서서 하나씩 늦게 뜨고, 그동안 `IsPresenting`·`Busy`가 참이라 입력 창구(`Busy`로 막는 버튼·`GameScreens.Do`)가 **입력을 계속 막는다**. 다시 그리기도 연출이 끝날 때까지 미뤄진다. 실시간 게임의 연출은 `Play`로 튼다.
+대기열은 턴제에 맞춘 것이다. 실시간 게임에서 맞을 때마다 `Present`로 넣으면 피해 숫자가 줄을 서서 하나씩 늦게 뜨고, 그동안 `IsPresenting`·`Busy`가 참이라 화면 입력(`OnClick`·`GameScreens.Do`)이 **입력을 계속 막는다**. 다시 그리기도 연출이 끝날 때까지 미뤄진다. 실시간 게임의 연출은 `Play`로 튼다.
 
 | | `Present`(대기열) | `Play`(대기열 밖) |
 |---|---|---|
@@ -118,7 +118,7 @@
 - 그릴 때마다 목록을 처음부터 훑어 항목마다:
   1. 항목의 **열쇠**를 정한다: 항목이 글자면 그 글자, `id`가 있는 객체면 `id` 필드. `id`가 없는 항목(정수 목록·`id` 없는 클래스)은 **자리 번호**(`"$0"`, `"$1"` …)다 — 순서가 바뀌면 다른 항목으로 다시 그려지고, 화면 오브젝트로 등록하지 않는다(`Find`로 찾을 수 없다). 같은 열쇠가 두 번째로 나오면 `"id#2"`, 세 번째는 `"id#3"`.
   2. 그 열쇠의 오브젝트가 없으면 프리팹을 부모 아래에 만들고, 첫 번째 것은 `GameView.Register(id)`로 등록하고, `OnCreate(view, item)`을 부른다.
-  3. 목록 순서대로 자리(sibling 순서)를 맞추고 `bind(view, item)`으로 그린다(매번).
+  3. 목록 순서대로 자리(sibling 순서)를 맞추고 `bind(view, item)`으로 그린다(매번). sibling 순서는 월드 오브젝트의 위치를 바꾸지 않는다 — 놓일 자리(`transform.localPosition`)는 `bind`가 정한다(5-2).
 - 목록에 없는 열쇠의 오브젝트는 등록을 지운 뒤 없앤다. `OnRemove`가 있으면 바로 없애지 않고 **연출 대기열에 넣어** `OnRemove(view, done)`을 부르고, `done()` 뒤에 없앤다. 차례가 왔을 때 목록이 이미 정리됐거나(`Dispose` — 씬을 떠남) 오브젝트가 없어졌으면 `OnRemove` 없이 바로 없애고 넘어간다(없어진 오브젝트의 연출은 `done()`을 부르지 못해 대기열이 30초 멈춘다). 연출 대기열을 버리면(`ClearPresentation`) 차례를 기다리던 사라짐은 그 자리에서 없앤다(도는 중인 `OnRemove`는 그 연출의 `done()`에).
 - `OnCreate`·`bind`가 예외를 내면 콘솔에 찍히고 그 오브젝트·다른 항목은 계속 그린다.
 - 목록 함수가 `null`을 돌려주면 빈 목록으로 본다(전투 밖이면 `battle?.enemies`가 `null` → 적 오브젝트를 모두 없앤다).
@@ -134,14 +134,14 @@
 | `onNumber` (`float`) | 숫자로 바꾼 값(참거짓은 1/0, 숫자 글자는 그 숫자, 못 바꾸면 0) |
 | `onBool` (`bool`) | 참거짓 값이면 그대로, 아니면 숫자가 0이 아니거나 글자가 비어 있지 않으면 참 |
 
-- 값이 목록이면 `{value}`는 **개수**다(손패 장수).
+- 값이 목록이면 `{value}`는 **개수**다(핸드 장수).
 - 필드 경로의 중간이 비어 있으면(전투 밖의 `battle.energy`) 값이 없다.
 - 기본은 연출을 기다린다(`waitForPresentation`). 켜고 끄기는 컴포넌트가 켜질 때(`OnEnable`) 정해진다.
 
 ### 2-6. 씬 흐름
 
 - `GameScenes.Follow(키, 필드, 빈 값일 때 씬)` 또는 DB › Bootstrap의 '씬 흐름(선택)'(3-1). 그 키가 바뀐 프레임 끝에 필드의 글자(씬 이름)를 읽는다.
-  - 글자가 지금 씬과 같으면 아무 일도 없다.
+  - 글자는 씬 이름(`Battle`)이나 경로(`Assets/…/Battle.unity`)다. 지금 씬과 같으면 아무 일도 없다.
   - 비어 있으면 '빈 값일 때 씬'을 연다(그것도 비면 그대로).
   - Build Settings의 씬 목록에 없는 씬이면 열지 않고 타임라인에 경고 "씬 'Battel'을(를) 열 수 없습니다(Build Settings의 씬 목록에 있는지 확인)."를 남긴다.
 - **규칙은 행동 안에서 그 필드만 바꾼다**(`run.scene = "Battle"`). 씬을 직접 열지 않는다. 그래서:
@@ -153,6 +153,7 @@
 - 전환 연출(`GameScenes.Transition`)을 넣으면 씬 열기를 그 코루틴으로 감싼다(5-7). 전환 연출이 씬 열기(`load`)를 돌리지 않고 끝나면(연출 안의 예외로 멈춤·`yield return load`를 빠뜨림) 경고 "전환 연출(GameScenes.Transition)이 씬 '…'을(를) 열지 않고 끝나 전환 없이 엽니다(…)."를 남기고 전환 없이 연다.
 - 전환 연출이 30초 넘게 나아가지 않아 대기열이 넘기면(2-2) 대기열이 빈 뒤 판 값의 씬을 다시 본다(아직 열리지 않았으면 다시 연다).
 - 슬롯을 바꾸면(31장) 런타임이 다시 따라가게 한다.
+- **테스트 씬**(컴포넌트 `TestScene`, 38장)을 플레이하는 동안은 `GameScenes.Hold`가 참이라 씬을 바꾸지 않는다 — 판 값이 다른 씬을 가리켜도 테스트 씬에 머문다. 씬 전환 자체를 확인하려면 게임 씬에서 플레이한다.
 
 ### 2-7. 월드 상태
 
@@ -188,7 +189,7 @@
 
 ### 3-2. 컴포넌트 '데이터 연결'
 
-글자(TMP_Text 등)가 있는 오브젝트에 **Add Component → MomoiProject → 데이터 연결**.
+씬에 놓인 오브젝트가 값을 따를 때 그 오브젝트(또는 부모)에 **Add Component → MomoiProject → 데이터 연결**. HUD의 글·게이지는 이것이 아니라 35장 화면의 `binding-path`다.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
@@ -196,9 +197,9 @@
 | `path` | 필드 경로(비우면 값 전체). 예: battle.energy | `battle.energy` |
 | `format` | 글자 틀. {value}가 값. 텍스트 키를 적으면 번역된 틀 | `{value} / 3`, 또는 텍스트 키 `hud.energy` |
 | `waitForPresentation` | 연출 대기열이 끝난 뒤에 바꾼다 | 기본 켬 |
-| `onText` · `onNumber` · `onBool` | (이벤트) | 인스펙터의 `+`로 대상과 속성을 고른다: `TMP_Text.text`(글자) · `Slider.value`(숫자) · `GameObject.SetActive`(참거짓) |
+| `onText` · `onNumber` · `onBool` | (이벤트) | 인스펙터의 `+`로 대상과 속성을 고른다: `GameObject.SetActive`(참거짓) · 컴포넌트의 float 속성(숫자) · string 속성(글자) |
 
-이벤트는 Unity의 UnityEvent다. **Dynamic** 쪽 속성(`text`·`value`·`SetActive`)을 고르면 보낸 값이 들어간다.
+이벤트는 Unity의 UnityEvent다. **Dynamic** 쪽 속성(`SetActive` 등)을 고르면 보낸 값이 들어간다.
 
 ### 3-3. 컴포넌트 '월드 상태 연결'
 
@@ -234,6 +235,7 @@ void OnDisable() => _view?.Dispose();
 |---|---|
 | `IDisposable Redraw(Action draw, params string[] keys)` | 키(비우면 아무 키나)·언어가 바뀌면 프레임 끝에 `draw`를 한 번. 연출을 기다린다(처음 한 번은 기다리지 않는다) |
 | `IDisposable Redraw(Action draw, bool waitForPresentation, params string[] keys)` | 기다릴지 정한다 |
+| `void RedrawAll()` | 등록된 다시 그리기를 모두 다음 프레임 끝에 다시. 플레이어 데이터·언어가 아닌 것(설정 값 등)이 바뀌어 다시 그려야 할 때 — 그런 값은 바뀌어도 다시 그리기가 오지 않는다(에디터에서 플레이 중 밸런싱 값을 고치면 GBible이 저절로 부른다) |
 
 키는 `GameIds.PlayerData.X.Id`(또는 ID 글자)다. 라이브러리의 키(`ChoiceSystem.Key`, `WorldStateSystem.SessionKey` …)도 쓴다.
 
@@ -260,7 +262,7 @@ GameView.Play(ShowHit(e));                                // 대기열 밖: 바�
 | `float DeltaTime` | 이번 프레임의 연출 시간(속도·건너뛰기 반영) |
 | `IEnumerator Wait(float seconds)` | 연출 안에서 쓰는 기다리기(`yield return GameView.Wait(0.5f)`). `WaitForSeconds` 대신 |
 | `void SkipPresentation()` | 남은 연출을 ×10으로. 대기열이 비면 원래대로 |
-| `void ClearPresentation()` | 남은 연출을 버린다. 재생 중인 것은 안쪽 코루틴까지 다음 `yield`에서 멈춘다(`finally`는 돈다). ViewList·ElementList의 차례를 기다리던 사라짐(`OnRemove`)은 바로 없앤다. 씬 흐름이 여는 중인 씬은 끝까지 연다. `Play`로 튼 것은 그대로 돈다 |
+| `void ClearPresentation()` | 남은 연출을 버린다(2-2 '버리기' — ViewList·ElementList의 차례를 기다리던 사라짐은 바로 없앤다). `Play`로 튼 것은 그대로 돈다 |
 
 ### 4-3. `GameView.Register` · `Find` — 화면 오브젝트
 
@@ -275,6 +277,8 @@ var view = GameView.Find<EnemyView>(e.targetId);                       // 연출
 | `void Unregister(string id, GameObject view = null)` | 지운다. `view`를 주면 그 오브젝트로 등록되어 있을 때만 |
 | `GameObject Find(string id)` | 찾기(없거나 없어졌으면 `null`) |
 | `T Find<T>(string id) where T : Component` | 그 오브젝트의 컴포넌트 |
+
+UI Toolkit 칸은 같은 방식으로 `GameView.RegisterElement` · `UnregisterElement` · `FindElement`(35장 4-5 — `ElementList`가 등록한다).
 
 ### 4-4. `ViewList<TItem, TView>`
 
@@ -291,13 +295,13 @@ void OnDestroy() => _enemies.Dispose();
 |---|---|
 | `ViewList(TView prefab, Transform parent, Func<IEnumerable<TItem>> items, Action<TView, TItem> bind, params string[] keys)` | 만든다(연출을 기다린다). `prefab`이 `null`이면 `ArgumentNullException` |
 | `ViewList(…, bool waitForPresentation, params string[] keys)` | 기다릴지 정한다 |
-| `Action<TView, TItem> OnCreate` | 새로 만든 직후(처음 `bind` 전). 클릭 연결 등 |
-| `Action<TView, Action> OnRemove` | 사라질 때 연출. 연출 대기열에 들어가고 `done` 뒤에 없앤다. 비우면 바로 없앤다. 차례가 왔을 때 목록이 정리됐거나 오브젝트가 없어졌으면 부르지 않는다 · 대기열을 버리면(`ClearPresentation`) 차례를 기다리던 것은 바로 없앤다 |
+| `Action<TView, TItem> OnCreate` | 새로 만든 직후(처음 `bind` 전). 누르기용 id(`DataTag`) 채우기 등(5-2) |
+| `Action<TView, Action> OnRemove` | 사라질 때 연출(대기열에서 — 2-4). 비우면 바로 없앤다 |
 | `IReadOnlyDictionary<string, TView> Views` | 지금 오브젝트들(열쇠 → 오브젝트) |
 | `TView ViewOf(string id)` · `ViewOf(TItem item)` | 그 항목의 오브젝트(없으면 `null`. `id`가 없는 항목은 `ViewOf("$0")`처럼 자리 번호로) |
-| `void Dispose()` | 그만 그리고 만든 오브젝트를 모두 없앤다(사라지는 중인 것도 — 도는 `OnRemove`의 `done`을 기다리지 않는다) |
+| `void Dispose()` | 그만 그리고 만든 오브젝트를 모두 없앤다(2-4) |
 
-- `TView`는 프리팹의 컴포넌트 형식이다(`where TView : Component`). `TItem`은 `id`가 있는 클래스 또는 `string`(글자 자체가 id). `id`가 없는 항목(`int` 목록·`id` 없는 클래스)은 자리 번호(`"$0"` …)로 잇는다 — 예외 없이 그려지지만 순서가 바뀌면 다른 항목으로 다시 그려지고 `GameView.Find`로 찾을 수 없다. 항목마다 오브젝트를 따로 두려면 `public string id;`를 더한다.
+- `TView`는 프리팹의 컴포넌트 형식이다(`where TView : Component`). `TItem`은 `id`가 있는 클래스 또는 `string`(글자 자체가 id) — `id`가 없으면 자리 번호로 이어진다(2-4 1). 항목마다 오브젝트를 따로 두려면 `public string id;`를 더한다.
 
 ### 4-5. `DataBinding` — 컴포넌트 '데이터 연결'
 
@@ -325,6 +329,7 @@ GameScenes.Loaded += scene => GameAudio.PlayBgm(MusicOf(scene));
 | `Func<IEnumerator, IEnumerator> Transition` | 씬 열기(`load`)를 감싸는 코루틴. 안에서 `yield return load`. 비우면 바로 연다 |
 | `event Action<string> Loaded` | 씬을 연 뒤(씬 이름, 전환 연출까지 끝난 뒤). 열지 못하면 쏘지 않는다 |
 | `string Current` | 지금 씬 이름(`SceneManager.GetActiveScene().name`) |
+| `bool Hold` | 참이면 씬을 바꾸지 않는다(테스트 씬이 켠다, 2-6) |
 
 - `Transition`·`Loaded`는 매 플레이 시작 때 비워진다. 플레이마다 다시 넣는다(5-7).
 - DB › Bootstrap에 씬 흐름을 정해 두면 런타임이 `Started` 직전에 `Follow`를 부른다.
@@ -368,32 +373,93 @@ Game.ClearWorld("Map.chest3");                           // 판·프로필 둘 �
 
 ## 5. 상황별 예제
 
-예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 전투 화면 중 ViewList를 쓰는 부분은 UGUI 프리팹(`MonoBehaviour`)으로 그린다.
+예제는 구현 가이드(`AI/BuildGuide/00-Index.md` '예시 게임: 카드 던전')의 형식을 쓴다. 나누기는 관례 21절 · UiGuide 1-8대로다: 씬에 놓이는 카드 · 적은 월드 오브젝트(프리팹 — SpriteRenderer · Collider2D)로 ViewList가 그리고, 누르기는 2D 충돌체 → `DataTag` → `Game.Find`로 데이터를 찾는다. HUD · 버튼 · 막 · 떠오르는 숫자는 UI Toolkit(35장 화면 · `GameScreens.Overlay`)이다.
+
+아래 파일은 프로젝트 `Assets/MomoiProject/Code/Client`에 한 번 두고 5절의 예제들이 함께 쓴다(MonoBehaviour는 파일 하나에 하나, 파일 이름 = 클래스 이름).
 
 ```csharp
+// 예제 파일들의 using
 using System;
 using System.Collections;
 using System.Linq;
 using GBible;
 using GBible.Ids;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.InputSystem;   // Input System 패키지 — Client asmdef의 references에 "Unity.InputSystem"을 더한다
+using UnityEngine.UIElements;
 
-// 데이터(Tools/GuideExample/Data/Model.cs): Fighter(id · name · hp · maxHp · block) · Enemy · DeckCard(id · card) · Battle(enemies · hand …)
+// 데이터(카드 던전): Fighter(id · hp · maxHp · block) · Enemy(+ monster) · DeckCard(id · card) · Battle(enemies · hand …)
 // 이벤트: DamageDealt(sourceId · targetId · amount) · EnemyKilled(killerId · enemyId · monster) · CardPlayed
 // Rules.Damage: 체력을 깎고 피해를 쏜 뒤, 쓰러진 적은 battle.enemies에서 빼고 적 처치를 쏜다.
 
-// 적 하나의 그림(프리팹의 컴포넌트)
+// ── Client/DataTag.cs — 데이터 id를 담는다. 프리팹에 붙이고 ViewList가 만들 때 채운다 → 누른 것에서 Game.Find<T>(id)
+public class DataTag : MonoBehaviour
+{
+    public string id;
+}
+
+// ── Client/WorldPointer.cs — 월드 누르기(관례 21절): 화면(UI Toolkit) 칸 위면 월드로 보내지 않는다
+public static class WorldPointer
+{
+    public static Vector2 Position => Pointer.current != null ? Pointer.current.position.ReadValue() : Vector2.zero;   // 화면 좌표(왼쪽 아래가 원점)
+    public static bool Pressed => Pointer.current != null && Pointer.current.press.wasPressedThisFrame;               // 이번 프레임에 눌렀다
+
+    public static bool OverScreen(Vector2 screen)
+    {
+        var root = GameScreens.Overlay?.parent;   // 화면 층들을 담은 뿌리
+        if (root?.panel == null) return false;
+        var picked = root.panel.Pick(RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(screen.x, Screen.height - screen.y)));
+        return picked != null && picked != root && root.Contains(picked);
+    }
+
+    // 그 자리의 Collider2D에서 부모 쪽으로 T를 찾는다(2D · 정사영 카메라). 화면 칸 위이거나 없으면 null
+    public static T Pick<T>(Vector2 screen) where T : Component
+    {
+        var camera = Camera.main;
+        if (camera == null || OverScreen(screen)) return null;
+        var hit = Physics2D.OverlapPoint(camera.ScreenToWorldPoint(screen));
+        return hit != null ? hit.GetComponentInParent<T>() : null;
+    }
+}
+
+// ── Client/WorldPopup.cs — 월드 자리 위로 떠오르는 강조 숫자(UiGuide 1-8 · 3-1): 겹침 층의 Label을 매 프레임 월드 → 패널 좌표로 옮긴다
+public static class WorldPopup
+{
+    public static IEnumerator Rise(string text, Vector3 at, float seconds = 0.5f, float height = 1f)
+    {
+        var overlay = GameScreens.Overlay;
+        if (overlay == null) yield break;
+        var label = new Label(text) { pickingMode = PickingMode.Ignore };
+        label.AddToClassList("cd-pop");                   // 강조 숫자(아래 둘째 줄)
+        overlay.Add(label);
+        try
+        {
+            for (float t = 0; t < seconds; t += GameView.DeltaTime)          // 속도·건너뛰기 반영
+            {
+                var camera = Camera.main;
+                if (camera == null) yield break;                              // 씬이 바뀌었다
+                var p = RuntimePanelUtils.CameraTransformWorldToPanel(overlay.panel, at + Vector3.up * (height * t / seconds), camera);
+                label.style.left = p.x;
+                label.style.top = p.y;
+                yield return null;
+            }
+        }
+        finally { label.RemoveFromHierarchy(); }          // 멈춰도(ClearPresentation · 예외) 치운다(2-2)
+    }
+}
+
+// ── Client/EnemyView.cs — 적 하나의 그림(프리팹: SpriteRenderer · Collider2D · DataTag · Animator)
 public class EnemyView : MonoBehaviour
 {
-    [SerializeField] TMP_Text nameText, hpText;
+    [SerializeField] SpriteRenderer body;
     [SerializeField] Animator animator;
+    [SerializeField] float spacing = 2.5f;                 // 적 사이(월드 단위)
 
-    public void Show(Enemy enemy)
+    public void Show(Enemy enemy, int slot)
     {
-        nameText.text = enemy.name;
-        hpText.text = $"{enemy.hp} / {enemy.maxHp}";
+        transform.localPosition = new Vector3(slot * spacing, 0f, 0f);       // 자리는 bind가 정한다(2-4)
+        var portrait = (GBibleRuntime.Game.Session.Instances?.Invoke(enemy.monster) as MonsterData)?.portrait;
+        if (portrait != null) body.sprite = portrait;                          // 원본의 그림 칸(비면 프리팹의 임시 그림)
     }
 
     public void PlayDeath(Action done) => StartCoroutine(Death(done));
@@ -406,15 +472,17 @@ public class EnemyView : MonoBehaviour
     }
 }
 
-// 카드 한 장의 그림
+// ── Client/CardView.cs — 카드 한 장의 그림(프리팹: SpriteRenderer · BoxCollider2D · DataTag)
 public class CardView : MonoBehaviour
 {
-    [SerializeField] TMP_Text titleText, costText;
+    [SerializeField] SpriteRenderer face;
+    [SerializeField] float spacing = 1.6f;                 // 핸드에서 카드 사이(월드 단위)
 
-    public void Show(DeckCard card)
+    public void Show(DeckCard card, int slot)
     {
-        titleText.text = Texts.NameOf(card.card);                                       // 원본 ID의 이름(<ID>.name)
-        costText.text = (Rules.CardData(GBibleRuntime.Game, card.card)?.cost ?? 0).ToString();
+        transform.localPosition = new Vector3(slot * spacing, 0f, 0f);
+        var art = Rules.CardData(GBibleRuntime.Game, card.card)?.art;
+        if (art != null) face.sprite = art;
     }
 
     public void FlyTo(Vector3 target, Action done) => StartCoroutine(Fly(target, done));
@@ -428,12 +496,15 @@ public class CardView : MonoBehaviour
 }
 ```
 
+- `Pointer`는 Input System 패키지다(Player Settings › Active Input Handling이 새 Input System만이면 `UnityEngine.Input`은 예외를 낸다). 프로젝트 Client asmdef는 패키지를 저절로 참조하지 않으므로 `references`에 `"Unity.InputSystem"`을 더한다(GBible이 맞추는 모듈 참조와 따로 남는다). 패키지가 없으면 들이기 전에 묻는다(내려받기 — 관례 0절).
+- `cd-pop`(강조 숫자 — `position: absolute`, `translate: -50% -100%`, 글꼴 외곽선 · 그림자, UiGuide 3-1)은 **테마 USS**(DB › 화면 설정 › 테마)에 둔다 — 겹침 층(`Overlay`) 요소의 예외(UiGuide 1-2 USS 줄): 화면 트리 밖이라 화면 항목에 붙인 USS(키트 · `UI/Screens/<프로젝트>.uss`)가 닿지 않고, 루트의 라이브러리 기본 · 테마 USS만 닿는다(35장 2-7).
+- 카드의 이름 · 비용, 적의 이름 · 체력 게이지처럼 월드 오브젝트에 붙는 글 · 칸은 UI Toolkit 칸이 화면 코드의 `Tick`에서 그 오브젝트를 따라간다(UiGuide 1-8). 핸드처럼 움직이지 않는 카드는 통째로 UI 목록(35장 5-1 `ElementList`)이어도 된다 — 이 장의 핸드는 월드 쪽 모양이다.
+
 ### 5-1. 피해 숫자 — `SubscribeAfterAction` → `Present`
 
 ```csharp
 public class DamagePopups : MonoBehaviour
 {
-    [SerializeField] TMP_Text numberPrefab;      // 떠오르는 숫자
     [SerializeField] AudioClip hitSound;
     IDisposable _onHit;
 
@@ -445,15 +516,8 @@ public class DamagePopups : MonoBehaviour
     {
         var target = GameView.Find(e.targetId);                   // ViewList·Register로 등록된 적·주인공 그림
         if (target == null) yield break;                           // 화면에 없는 대상
-        var number = Instantiate(numberPrefab, target.transform);
-        number.text = Texts.Get("popup.damage", e);                // "{amount}" — [GameEvent] 객체를 값 묶음으로
         GameAudio.PlaySfx(hitSound, pitch: UnityEngine.Random.Range(0.95f, 1.05f));   // 연출의 무작위는 UnityEngine.Random
-        for (float t = 0; t < 0.5f; t += GameView.DeltaTime)
-        {
-            number.transform.localPosition = Vector3.up * (t * 80f);
-            yield return null;
-        }
-        Destroy(number.gameObject);
+        yield return WorldPopup.Rise(Texts.Get("popup.damage", e), target.transform.position);   // "{amount}" — [GameEvent] 객체를 값 묶음으로
     }
 }
 ```
@@ -469,18 +533,18 @@ public class DamagePopups : MonoBehaviour
 public class EnemyRow : MonoBehaviour
 {
     [SerializeField] EnemyView enemyPrefab;
-    [SerializeField] Transform enemyRoot;             // Horizontal Layout Group
-    [SerializeField] TargetPicker picker;             // 대상 고르기(프로젝트 코드)
+    [SerializeField] Transform enemyRoot;             // 적이 서는 줄의 시작 자리(월드)
     ViewList<Enemy, EnemyView> _enemies;
+    static GameApi Game => GBibleRuntime.Game;
 
     void Start()
     {
         _enemies = new ViewList<Enemy, EnemyView>(enemyPrefab, enemyRoot,
-            () => GBibleRuntime.Game.Data().Run.battle?.enemies,     // 전투 밖이면 null → 모두 없앤다
-            (view, enemy) => view.Show(enemy),
+            () => Game.Data().Run.battle?.enemies,                                       // 전투 밖이면 null → 모두 없앤다
+            (view, enemy) => view.Show(enemy, Game.Data().Run.battle.enemies.IndexOf(enemy)),   // 몇 번째 자리인지는 데이터 순서로
             GameIds.PlayerData.Run.Id);
-        _enemies.OnCreate = (view, enemy) => view.GetComponent<Button>().onClick.AddListener(() => picker.Pick(enemy.id));
-        _enemies.OnRemove = (view, done) => view.PlayDeath(done);   // 사라진 적: 죽는 모습 → 없애기
+        _enemies.OnCreate = (view, enemy) => view.GetComponent<DataTag>().id = enemy.id;   // 누르기 → 데이터(5-5)
+        _enemies.OnRemove = (view, done) => view.PlayDeath(done);                           // 사라진 적: 죽는 모습 → 없애기
     }
 
     void OnDestroy() => _enemies?.Dispose();
@@ -497,21 +561,21 @@ public class EnemyRow : MonoBehaviour
 | 대기열이 빔 | — | 적 목록이 다시 그려진다: 고블린이 없다 → `OnRemove` → 죽는 모습이 대기열에 |
 | 죽는 모습 끝 | — | 고블린 그림을 없앤다. 남은 적이 자리를 채운다 |
 
-- 클릭 연결은 `OnCreate`에서 한 번 한다(`bind`는 그릴 때마다 불리므로 거기서 `AddListener`하면 겹친다).
-- 클릭은 객체가 아니라 id로 넘긴다. 행동이 실행 직전에 지금 데이터의 객체로 다시 찾는다(02장).
-- 죽는 모습이 도는 동안 그 적은 이미 등록이 지워져 `GameView.Find(id)`가 `null`이다.
+- `DataTag`는 `OnCreate`에서 한 번 채운다 — 오브젝트의 열쇠가 그 id라 사는 동안 바뀌지 않는다(`bind`에서 채워도 같은 값이다). 이벤트를 잇는 일(`+=`)은 반드시 `OnCreate`에서: `bind`는 그릴 때마다 불려 거기서 이으면 겹친다.
+- 오브젝트에는 객체가 아니라 id만 둔다. 누를 때 `Game.Find`로 지금 데이터의 객체를 찾아 행동 필드에 넣고, 행동이 실행 직전에 다시 찾는다(02장).
+- `ViewList`는 sibling 순서만 맞춘다. 월드 오브젝트의 자리는 `bind`가 정한다(`Show`의 `slot` — 고블린이 빠지면 남은 적이 다시 그려지며 자리를 채운다).
+- 죽는 모습이 도는 동안 그 적은 이미 등록이 지워져 `GameView.Find(id)`가 `null`이다. 그동안 그 그림을 눌러도 `Game.Find<Enemy>`가 `null`이라 아무것도 보내지 않는다(5-5).
 
-### 5-3. 손패 — ViewList(글자 id 목록)
+### 5-3. 핸드 — ViewList(글자 id 목록)
 
-손패(`battle.hand`)는 덱 카드 **id 글자** 목록이라 글자 자체를 열쇠로 쓴다.
+핸드(`battle.hand`)는 덱 카드 **id 글자** 목록이라 글자 자체를 열쇠로 쓴다.
 
 ```csharp
 public class HandView : MonoBehaviour
 {
     [SerializeField] CardView cardPrefab;
-    [SerializeField] Transform handRoot;
-    [SerializeField] Transform discardPile;          // 버린 더미 그림
-    [SerializeField] RunDirector director;
+    [SerializeField] Transform handRoot;             // 핸드 줄의 시작 자리(월드)
+    [SerializeField] Transform discardPile;          // 버려진 덱 그림
     ViewList<string, CardView> _hand;
     static GameApi Game => GBibleRuntime.Game;
 
@@ -519,68 +583,86 @@ public class HandView : MonoBehaviour
     {
         _hand = new ViewList<string, CardView>(cardPrefab, handRoot,
             () => Game.Data().Run.battle?.hand,
-            (view, id) => view.Show(Rules.CardOf(Game, id)),
+            (view, id) => view.Show(Rules.CardOf(Game, id), Game.Data().Run.battle.hand.IndexOf(id)),
             GameIds.PlayerData.Run.Id);
-        _hand.OnCreate = (view, id) => view.GetComponent<Button>().onClick.AddListener(() => Play(id));
-        _hand.OnRemove = (view, done) => view.FlyTo(discardPile.position, done);    // 손에서 빠진 카드는 버린 더미로 날아간다
+        _hand.OnCreate = (view, id) => view.GetComponent<DataTag>().id = id;          // 덱 카드 id — 누르면 Game.Find<DeckCard>(5-5)
+        _hand.OnRemove = (view, done) => view.FlyTo(discardPile.position, done);    // 손에서 빠진 카드는 버려진 덱으로 날아간다
     }
 
     void OnDestroy() => _hand?.Dispose();
-
-    void Play(string id)
-    {
-        var target = Rules.LivingEnemies(Game).FirstOrDefault();
-        if (!director.TryPlay(Rules.CardOf(Game, id), target, out var error)) Debug.Log(error);   // 실패 이유(30장 5-8)
-    }
 }
 ```
 
-- 새로 뽑은 카드는 만들어지고, 낸 카드·턴 끝에 버린 카드는 날아간 뒤 없어지고, 남은 카드는 자리만 바뀐다. 손패 순서가 바뀌면 그림 순서도 따라간다.
+- 카드를 내는 입력은 이 목록이 아니라 씬의 월드 누르기 한 곳(5-5)이 맡는다. 목록은 그리기와 누르기용 id(`DataTag`)까지만 한다.
+- 새로 뽑은 카드는 만들어지고, 낸 카드·턴 끝에 버린 카드는 날아간 뒤 없어지고, 남은 카드는 자리만 바뀐다. 핸드 순서가 바뀌면 그림의 자리(`slot`)도 따라간다.
 - 만든 카드 그림은 덱 카드 id로 등록된다. "이 카드를 강화" 같은 연출이 `GameView.Find<CardView>(cardId)`로 찾는다.
 - 같은 id가 여러 번 들어가는 목록(같은 유물 둘 `run.relics`)은 `"burningBlood"`, `"burningBlood#2"`처럼 따로 만들어진다. 등록(`Find`)은 첫 번째 것만이다.
 
 ### 5-4. 에너지 표시 — 데이터 연결(코드 없음)
 
-1. 전투 화면의 에너지 글자(TMP_Text) 오브젝트에 **Add Component → MomoiProject → 데이터 연결**.
-2. `key` `run`, `path` `battle.energy`, `format` `hud.energy`(텍스트 표: "에너지 {value}" / "Energy {value}").
-3. `onText`의 `+` → 같은 오브젝트의 `TMP_Text` → Dynamic string `text`.
-4. 에너지 막대가 있으면 `onNumber` → `Slider` → Dynamic float `value`.
-5. `waitForPresentation`을 끈다: 카드를 내면 피해 숫자를 기다리지 않고 에너지가 바로 준다.
+HUD의 에너지 글 · 게이지는 UI Toolkit 화면의 `binding-path`다(35장 2-2 · 5-1 — 코드 없음): `<ui:Label binding-path="run:battle.energy@hud.energy" />`(텍스트 표 `hud.energy`: "에너지 {value}" / "Energy {value}"). 카드를 내자마자 줄게 하려면 그 화면 코드에서 `protected override bool WaitForPresentation => false;` — 이 값은 화면 하나 전체에 걸리므로, 연출 뒤에 바뀔 칸(체력)과 바로 바뀔 칸(에너지)은 다른 화면 항목으로 나눈다.
 
-- 손패 장수는 `path` `battle.hand`, `format` `{value}장` — 목록이라 `{value}`가 개수다.
-- 언어를 바꾸면 `format`의 텍스트 키가 다시 번역된다.
+컴포넌트 '데이터 연결'은 **씬에 놓인 오브젝트**가 값을 따를 때다. 전투 씬 바닥의 에너지 수정(월드 오브젝트)이 에너지가 남았을 때만 빛나게:
+
+1. 수정(부모)에 **Add Component → MomoiProject → 데이터 연결**.
+2. `key` `run`, `path` `battle.energy`.
+3. `onBool`의 `+` → 빛(자식 오브젝트) → Dynamic bool `GameObject.SetActive` — 0이면 꺼진다.
+4. `waitForPresentation`을 끈다: 카드를 내면 피해 숫자를 기다리지 않고 바로 바뀐다.
+
+- 값이 목록이면 `{value}`는 개수다: 핸드 장수는 `binding-path="run:battle.hand@hud.handCount"`(데이터 연결이면 `path` `battle.hand`).
+- 언어를 바꾸면 텍스트 키 틀(`@hud.energy` · 데이터 연결의 `format`)이 다시 번역된다.
 
 ### 5-5. 입력 막기 — `GameView.Busy`
 
 ```csharp
-// RunDirector(입력 창구)
-public bool TryPlay(DeckCard card, Fighter target, out string error)
+// Client/BattleInput.cs — 전투 씬의 월드 누르기: 적을 누르면 대상으로 고르고, 카드를 누르면 고른 적(없으면 첫 적)에게 낸다
+public class BattleInput : MonoBehaviour
 {
-    error = null;
-    if (GameView.Busy) { error = Texts.Get("ui.wait"); return false; }    // 연출 중이거나 선택을 기다리는 중
-    try { Game.Do(new PlayCard { card = card, target = target }); return true; }
-    catch (GameFailure f) { error = f.Message; return false; }
+    string _targetId;        // 고른 적 — 화면에만 있는 고르기 상태(규칙 데이터가 아니다)
+
+    void Update()
+    {
+        if (!WorldPointer.Pressed) return;
+        var tag = WorldPointer.Pick<DataTag>(WorldPointer.Position);     // HUD 칸 위면 null — 월드로 보내지 않는다
+        if (tag == null) return;
+        var game = GBibleRuntime.Game;
+        if (game.Find<Enemy>(tag.id) != null) { _targetId = tag.id; return; }
+        var card = game.Find<DeckCard>(tag.id);
+        if (card == null) return;                                         // 사라지는 중인 그림(데이터에서 이미 빠졌다)
+        var target = game.Find<Enemy>(_targetId) ?? Rules.LivingEnemies(game).FirstOrDefault();
+        GameScreens.Do(() => new PlayCard { card = card, target = target });   // Busy면 무시, 플레이어용 실패("에너지가 모자랍니다")는 알림
+    }
 }
 
-public void EndTurn()
-{
-    if (!GameView.Busy) Game.Do(new EndTurn());
-}
+// BattleHud(35장 5-1)에 더한다. 턴 끝 버튼(OnClick("end-turn", () => new EndTurn()))은 Busy면 이미 무시된다.
+// 흐리게 보이는 것은 따로: Busy는 플레이어 데이터가 아니라 Draw가 따라오지 않으므로 Tick(열려 있는 동안 매 프레임)에서 본다
+Button _endTurn;
 
-// BattleHud: Busy는 플레이어 데이터가 아니라 다시 그리기가 따라오지 않는다 → 매 프레임 본다
-void Update() => _endTurnButton.SetEnabled(!GameView.Busy);
+// OnOpen 안
+_endTurn = Q<Button>("end-turn");
+
+// Tick 안(protected override void Tick(float deltaTime))
+_endTurn.SetEnabled(!GameView.Busy);
 ```
 
+- 입력은 버튼이든 월드 누르기든 `OnClick`·`GameScreens.Do`로 보낸다(35장 2-4): `Busy`(연출 중 · 선택 대기 중)면 보내지 않고, 플레이어용 실패는 알림으로 보인다. `Game.Do`를 직접 부르면 이 둘이 빠진다.
 - 연출 중에 다음 카드를 내도 규칙은 틀리지 않는다(행동은 늘 즉시 끝난다). 막는 이유는 화면이 데이터보다 늦게 따라가 플레이어가 헷갈리기 때문이다.
-- Undo 버튼도 연출 중에는 막거나, `GameView.ClearPresentation()` 뒤에 Undo한다(되돌린 데이터와 남은 연출이 섞이지 않게).
+- 월드를 누르기 전에 화면 칸 위인지 본다(`WorldPointer.OverScreen`). 보지 않으면 HUD 버튼을 누를 때 그 뒤의 카드도 함께 눌린다. 화면을 덮는 감싸개는 `picking-mode="Ignore"`여야 월드가 눌린다(35장 5-1).
+- Undo 버튼은 행동이 아니라 화면 일(`OnClick(이름, Action)`)이라 `Busy`여도 돈다 — 연출 중에는 막거나(`if (!GameView.Busy)`, 35장 5-1), `GameView.ClearPresentation()` 뒤에 Undo한다(되돌린 데이터와 남은 연출이 섞이지 않게).
+- 판을 여는 일(이어 하기 · 새 판)은 입력 코드가 아니라 DB › Bootstrap '시작할 때 이어 하기' 또는 타이틀 화면이 한다(구현 가이드 03장 3절 · 35장 5-3).
 
 ### 5-6. 연출 빠르게 — `SkipPresentation` · `PresentationSpeed`
 
 ```csharp
-// 화면 전체를 덮는 투명 버튼(연출 중에만 켠다)의 클릭
-public void OnSkipClicked() => GameView.SkipPresentation();     // 남은 연출 ×10, 비면 원래 속도
+// BattleHud(35장 5-1)에 더한다. UXML 맨 끝(다른 칸보다 위)에 화면 전체를 덮는 빈 칸: <ui:VisualElement name="skip" class="cd-full" />
+VisualElement _skip;
 
-void Update() => skipCatcher.SetActive(GameView.IsPresenting);
+// OnOpen 안 — 열 때마다 UXML에서 새 트리가 만들어지므로 콜백도 그 트리와 함께 없어진다
+_skip = Q("skip");
+_skip.RegisterCallback<PointerDownEvent>(_ => GameView.SkipPresentation());   // 남은 연출 ×10, 비면 원래 속도
+
+// Tick 안: 연출 중에만 누름을 받는다(아니면 아래의 버튼·월드로 지나간다)
+_skip.pickingMode = GameView.IsPresenting ? PickingMode.Position : PickingMode.Ignore;
 ```
 
 - 설정의 전투 속도로 늘 빠르게 하려면 `GameView.PresentationSpeed`(31장 5-3).
@@ -608,34 +690,36 @@ run.scene = "";          // 빈 값 → Title
 | 일 | `run.scene` | 열리는 씬 |
 |---|---|---|
 | 게임을 켬(판 없음) | `""` | `Title`(이미 열려 있으면 그대로) |
-| 타이틀 '새 게임' → `StartRun`(안에서 `StartBattle`) | `"Battle"` | `Battle`(한 행동 안의 마지막 값) |
+| 타이틀 '새 게임' → `NewRun` 뒤 `StartRun`(안에서 `StartBattle`, 35장 5-3) | `"Battle"` | `Battle`(한 행동 안의 마지막 값) |
 | 마지막 적 처치 → `WinBattle` | `"Map"` | 피해 숫자·죽는 모습이 끝난 뒤 `Map` |
 | `WinBattle`을 Undo | `"Battle"` | `Battle`(그 판의 전투가 그대로) |
 | 판 끝 `EndRun` | `""` | `Title` |
 | 타이틀 '이어 하기' → `LoadRun` | 저장된 값 | 그 씬 |
 
-**페이드** — 씬을 넘어 사는 오브젝트에 둔다(타이틀 씬에 하나).
+**페이드** — 막은 UI Toolkit 겹침 층(`GameScreens.Overlay` — 씬이 바뀌어도 남는다)에 잠깐 깐다. 넣는 곳은 `Bootstrap.Started`(화면 쪽 연결 — `Transition`은 매 플레이 시작 때 비워지므로 플레이마다 넣는다).
 
 ```csharp
-public class SceneFader : MonoBehaviour
+// Client/SceneFade.cs
+public static class SceneFade
 {
-    [SerializeField] CanvasGroup curtain;      // 화면을 덮는 검은 판
-
-    void Awake()
+    public static IEnumerator Fade(IEnumerator load)
     {
-        DontDestroyOnLoad(gameObject);
-        GameScenes.Transition = Fade;            // 매 플레이 시작 때 비워지므로 여기서 넣는다
-    }
-
-    IEnumerator Fade(IEnumerator load)
-    {
-        for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 4) { curtain.alpha = t; yield return null; }   // 일시정지와 상관없이
-        curtain.alpha = 1;
-        yield return load;                       // 씬 열기
-        for (float t = 1; t > 0; t -= Time.unscaledDeltaTime * 4) { curtain.alpha = t; yield return null; }
-        curtain.alpha = 0;
+        var curtain = new VisualElement { pickingMode = PickingMode.Ignore };   // 행동 입력은 여는 동안의 Busy가 막는다
+        curtain.AddToClassList("cd-curtain");                                   // 화면 전체 · 검정(테마 USS — 겹침 층 요소의 예외, UiGuide 1-2)
+        GameScreens.Overlay?.Add(curtain);
+        try
+        {
+            for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 4) { curtain.style.opacity = t; yield return null; }   // 일시정지와 상관없이
+            curtain.style.opacity = 1;
+            yield return load;                   // 씬 열기
+            for (float t = 1; t > 0; t -= Time.unscaledDeltaTime * 4) { curtain.style.opacity = t; yield return null; }
+        }
+        finally { curtain.RemoveFromHierarchy(); }   // 예외로 멈춰도 검은 막이 남지 않게
     }
 }
+
+// Client/Bootstrap.cs의 Started
+GameScenes.Transition = SceneFade.Fade;
 ```
 
 - 여는 동안(페이드 포함) `Busy`가 참이라 입력이 막힌다.
@@ -685,19 +769,23 @@ Game.SetWorld("Village.gate", "open", permanent: true);
 | 레버(부모) | `Cave.lever` | (비움) | 레버 내림 · 열린 문 | 레버 올림 · 닫힌 문 |
 | 마을 문(부모) | `Village.gate` | `open` | 열린 문 | 닫힌 문 |
 
-**클릭** — 상자(부모, 콜라이더가 있는 오브젝트)의 스크립트는 이름만 들고 행동을 보낸다.
+**클릭** — 상자(부모, Collider2D가 있는 오브젝트)는 이름만 든다. 데이터 객체가 아니라 `DataTag` 대신 월드 상태 이름이 id다. 누르기는 맵 씬의 월드 누르기 한 곳이 받아 행동을 보낸다(5절 머리의 `WorldPointer`).
 
 ```csharp
-public class ChestClick : MonoBehaviour
+// Client/Chest.cs
+public class Chest : MonoBehaviour
 {
-    [SerializeField] TMP_Text toast;                                   // 알림 글자
-    string Id => $"{gameObject.scene.name}.{gameObject.name}";         // "Map.chest3"
+    public string Id => $"{gameObject.scene.name}.{gameObject.name}";   // "Map.chest3"
+}
 
-    void OnMouseDown()
+// Client/MapInput.cs
+public class MapInput : MonoBehaviour
+{
+    void Update()
     {
-        if (GameView.Busy) return;
-        try { GBibleRuntime.Game.Do(new OpenChest { chest = Id }); }
-        catch (GameFailure f) { toast.text = f.Message; }              // "이미 연 상자입니다."(지금 언어)
+        if (!WorldPointer.Pressed) return;
+        var chest = WorldPointer.Pick<Chest>(WorldPointer.Position);    // HUD 칸 위면 null
+        if (chest != null) GameScreens.Do(() => new OpenChest { chest = chest.Id });   // Busy면 무시, "이미 연 상자입니다."(지금 언어)는 알림
     }
 }
 ```
@@ -720,18 +808,22 @@ _foes.OnCreate = (view, foe) => view.Id = foe.id;                  // 히트박�
 
 public class RealtimeHits : MonoBehaviour
 {
-    [SerializeField] TMP_Text numberPrefab;      // 떠오르는 숫자(월드 공간 TMP)
-    [SerializeField] GameObject smokePrefab;     // 쓰러진 자리에 남는 연기
+    [SerializeField] GameObject smokePrefab;     // 쓰러진 자리에 남는 연기(월드)
     IDisposable _onHit, _onKill;
 
     void OnEnable()
     {
         var events = GBibleRuntime.Session.Events;
-        _onHit = events.SubscribeAfterAction<FoeHit>(e => GameView.Play(ShowNumber(e)));
+        // 둘 다 행동 직후라 그림은 아직 있다(없애는 것은 프레임 끝) → 자리를 먼저 읽어 둔다
+        _onHit = events.SubscribeAfterAction<FoeHit>(e =>
+        {
+            var view = GameView.Find(e.foeId);
+            if (view != null) GameView.Play(WorldPopup.Rise(e.amount.ToString(), view.transform.position, 0.4f));   // 숫자는 겹침 층에 — 적이 없어져도 남는다
+        });
         _onKill = events.SubscribeAfterAction<FoeKilled>(e =>
         {
-            var view = GameView.Find(e.foeId);                              // 행동 직후라 그림은 아직 있다(없애는 것은 프레임 끝)
-            if (view != null) GameView.Play(Smoke(view.transform.position));  // 자리를 먼저 읽어 둔다
+            var view = GameView.Find(e.foeId);
+            if (view != null) GameView.Play(Smoke(view.transform.position));
         });
     }
 
@@ -739,21 +831,6 @@ public class RealtimeHits : MonoBehaviour
     {
         _onHit?.Dispose();
         _onKill?.Dispose();
-    }
-
-    IEnumerator ShowNumber(FoeHit e)
-    {
-        var target = GameView.Find(e.foeId);                  // Play는 부른 즉시 첫 yield까지 돈다 → 지금 자리
-        if (target == null) yield break;
-        var number = Instantiate(numberPrefab, target.transform.position, Quaternion.identity);   // 적의 자식이 아니다(적이 먼저 없어져도 남는다)
-        number.text = e.amount.ToString();
-        for (float t = 0; t < 0.4f; t += GameView.DeltaTime)
-        {
-            if (number == null) yield break;                  // 씬이 바뀌어 없어졌다
-            number.transform.position += Vector3.up * (GameView.DeltaTime * 2f);
-            yield return null;
-        }
-        if (number != null) Destroy(number.gameObject);
     }
 
     IEnumerator Smoke(Vector3 at)
@@ -766,7 +843,7 @@ public class RealtimeHits : MonoBehaviour
 ```
 
 - 한 틱에 적 열 마리를 맞혀도 숫자 열 개가 한꺼번에 뜬다(`Strike { hits }` 하나가 `FoeHit`을 열 번 쏜다, 33장 5-7).
-- 숫자를 적의 자식으로 만들면 적이 쓰러진 프레임 끝에 함께 없어진다. 따로 만들고 자리만 읽는다.
+- 숫자를 적에 매달면(적의 자식 · 적을 매 프레임 따라가기) 적이 쓰러진 프레임 끝에 함께 없어지거나 따라갈 곳을 잃는다. 겹침 층에 따로 만들고 자리만 읽는다(`WorldPopup.Rise`는 받은 자리에서 떠오른다).
 - 레벨업 고르기 창처럼 입력을 정말 막아야 하는 것은 선택 대기다(`Game.IsWaiting` → `Busy`, 29장·35장).
 
 ---
@@ -776,30 +853,32 @@ public class RealtimeHits : MonoBehaviour
 | 증상 | 원인과 해결 |
 |---|---|
 | 적이 죽는 연출 전에 화면에서 사라짐 | 적 목록을 기다리지 않는 다시 그리기(`waitForPresentation: false`)로 그렸거나, 연출이 대기열 밖에서 돈다(직접 `StartCoroutine`·`GameView.Play`). 턴제의 연출은 `GameView.Present`로 넣는다. 실시간이면 사라지는 것이 맞고, 죽는 모습은 자리를 읽어 두고 따로 튼다(5-9). |
-| 실시간 게임에서 버튼·스킬 입력이 자꾸 안 먹음, 피해 숫자가 줄을 서서 늦게 뜸 | 맞을 때마다 `Present`로 넣었다. 대기열은 차례로 하나씩 돌고, 그동안 `IsPresenting`·`Busy`가 참이라 입력 창구가 입력을 막는다. 실시간 연출은 `GameView.Play`(2-2, 5-9). ViewList의 `OnRemove`도 대기열이다 → 실시간 적 목록은 비운다. |
-| `Play`로 튼 숫자가 씬을 바꾼 뒤 `MissingReferenceException` | 대기열 밖 연출도 `[MomoiProject]` 오브젝트가 돌려 씬이 바뀌어도 계속 돈다. 돌면서 오브젝트가 `null`인지 본다(5-9). |
+| 실시간 게임에서 버튼·스킬 입력이 자꾸 안 먹음, 피해 숫자가 줄을 서서 늦게 뜸 | 맞을 때마다 `Present`로 넣었다. 대기열은 차례로 하나씩 돌고, 그동안 `IsPresenting`·`Busy`가 참이라 화면 입력(`OnClick`·`GameScreens.Do`)이 무시된다. 실시간 연출은 `GameView.Play`(2-2, 5-9). ViewList의 `OnRemove`도 대기열이다 → 실시간 적 목록은 비운다. |
+| `Play`로 튼 숫자가 씬을 바꾼 뒤 `MissingReferenceException` | 대기열 밖 연출도 `[MomoiProject]` 오브젝트가 돌려 씬이 바뀌어도 계속 돈다. 돌면서 씬의 오브젝트(카메라 · 연기 · 대상)가 `null`인지 본다(5절 머리의 `WorldPopup` · 5-9). |
 | "GameView.Play: 게임이 시작되지 않아 연출을 틀 수 없습니다" | 게임(호스트)이 시작되기 전에 불렀다(씬의 `Awake` 등). `GBibleRuntime.Started` 뒤에 부른다. |
 | 골드·에너지가 연출이 끝나야 바뀜 | 기본은 연출을 기다린다. 늘 지금 값이어야 하는 표시는 `waitForPresentation: false`(데이터 연결은 칸을 끈다). |
 | 실패한 카드의 피해 숫자가 뜸 | 연출을 `Events.Subscribe`(바로 받는 쪽)로 받았다. `SubscribeAfterAction`으로 받는다. |
 | 마우스를 올려 예상 피해를 볼 때 피해 숫자가 뜸 | 같은 원인. 미리보기 실행(33장)에서도 바로 받는 쪽은 불린다. |
 | 연출이 한참 멈췄다가 "연출이 30초 안에 끝나지 않아 넘어갑니다" 경고 | 완료 콜백 연출이 `done()`을 부르지 않았다(오브젝트가 먼저 없어졌거나 예외). 끝나는 길마다 `done()`을 부르거나 코루틴으로 넣는다. 원래 긴 연출이면 `Present(step, timeout: 60f)`처럼 늘린다(0 = 끝없이 기다림). 씬을 직접 떠날 때는 `ClearPresentation()`. ViewList·ElementList의 `OnRemove`는 목록을 `Dispose`하면(씬을 떠남·화면을 닫음) 기다리지 않는다 — 정리를 빠뜨리지 않았는지 본다. |
 | 연출이 한참 멈췄다가 "연출이 30초 동안 나아가지 않아 넘어갑니다" 경고 | 코루틴 연출의 `yield` 하나가 30초 넘게 끝나지 않았다. 대개 `yield return x.StartCoroutine(…)`으로 기다린 코루틴이 멈췄다(x가 없어지거나 꺼졌거나 예외 — Unity는 기다리던 쪽을 깨우지 않는다). 안쪽 연출은 `yield return Inner()`로 직접 넘긴다. 원래 긴 기다림(`WaitForSecondsRealtime(40)`)이면 `GameView.Wait`처럼 매 프레임 `yield return null`로 나누거나 완료 콜백 연출(`timeout`)로 넣는다(2-2). |
-| `ClearPresentation()` 뒤에 피해 숫자가 화면에 멈춘 채 남음 | 버리면 재생 중인 연출은 그 자리에서 멈춰 뒤의 `Destroy`가 돌지 않는다. 치우는 줄은 `try { … } finally { Destroy(…); }`에 둔다(멈출 때 `finally`는 돈다, 2-2). |
+| `ClearPresentation()` 뒤에 피해 숫자가 화면에 멈춘 채 남음 | 버리면 재생 중인 연출은 그 자리에서 멈춰 뒤의 `Destroy`가 돌지 않는다. 치우는 줄은 `try { … } finally { Destroy(…); }`(UI 요소면 `RemoveFromHierarchy()` — 5절 머리의 `WorldPopup`)에 둔다(멈출 때 `finally`는 돈다, 2-2). |
 | 경고 "전환 연출(GameScenes.Transition)이 씬 '…'을(를) 열지 않고 끝나 전환 없이 엽니다" | 전환 연출이 `load`를 돌리기 전에 예외로 멈췄거나 `yield return load`를 빠뜨렸다. 씬은 전환 없이 열린다. 콘솔의 예외를 보고 고친다(5-7). |
 | 속도·건너뛰기가 먹지 않음 | 시간을 `WaitForSeconds`·`Time.deltaTime`으로 쟀다. `GameView.Wait`·`GameView.DeltaTime`(5-6). |
 | 일시정지하니 연출이 멈춤 | `DeltaTime`은 게임 시간을 따른다. 일시정지와 상관없어야 하는 것(메뉴 페이드)은 `Time.unscaledDeltaTime`. |
-| 버튼을 누를 때마다 클릭이 여러 번 | `bind`에서 `AddListener`했다(그릴 때마다 불린다). `OnCreate`에서 한다(5-2). |
+| 버튼을 누를 때마다 클릭이 여러 번 | 목록의 `bind`에서 이벤트를 이었다(`clicked +=` 등 — `bind`는 그릴 때마다 불린다). `OnCreate`에서 한 번 잇는다(5-2 · 35장 2-6). |
+| 월드의 카드·적을 눌러도 아무 일이 없음 | 누른 자리에 UI Toolkit 칸이 있다(화면을 덮는 감싸개에 `picking-mode="Ignore"`가 빠져 `OverScreen`이 참), 프리팹에 `Collider2D`·`DataTag`가 없다(3D `Collider`는 `Physics2D`에 잡히지 않는다), 또는 `Busy`라 `GameScreens.Do`가 무시했다(5-5). |
 | ViewList 항목의 순서가 바뀌면 오브젝트가 다른 항목의 그림으로 바뀜(연출이 엉뚱한 오브젝트에서 돎) · `GameView.Find`로 안 찾힘 | 항목에 `id`가 없어 자리 번호(`"$0"` …)로 이었다(4-4). 항목 클래스에 `public string id;`를 더한다. 글자 목록이면 `ViewList<string, …>`. |
 | 같은 항목 두 개 중 하나만 `GameView.Find`로 찾힘 | 같은 id의 두 번째부터는 `"id#2"`로 만들어지고 등록은 첫 번째만이다. `ViewList.Views["id#2"]`로 찾는다. |
 | 씬을 나갔다 왔더니 ViewList 오브젝트가 남음·사라지지 않음 | `Dispose`를 부르지 않았다. `OnDestroy`에서 `Dispose`. |
 | 데이터 연결이 아무것도 안 보임 | `key`가 없는 플레이어 데이터이거나 `path`의 중간이 비었다(전투 밖의 `battle.energy`). 이벤트의 Dynamic 속성을 골랐는지도 본다(Static을 고르면 인스펙터에 적은 값이 들어간다). |
 | 데이터 연결의 글자가 `{value}` 그대로 | `format`에 `{value}`가 아닌 다른 이름을 적었다. 값 이름은 `value` 하나다. |
-| `Busy`로 막았는데 버튼이 흐려지지 않음 | `Busy`는 플레이어 데이터가 아니라 다시 그리기가 오지 않는다. `Update`에서 보거나 `Presented`를 받는다(5-5). |
+| `Busy`로 막았는데 버튼이 흐려지지 않음 | `Busy`는 플레이어 데이터가 아니라 다시 그리기(`Draw`)가 오지 않는다. 화면 코드의 `Tick`(매 프레임)에서 보거나 `Presented`를 받는다(5-5). |
 | 씬이 열리지 않고 타임라인에 "씬 '…'을(를) 열 수 없습니다" | Build Settings의 씬 목록에 없거나 이름이 다르다. |
 | 씬이 바로 바뀌지 않고 연출 뒤에 바뀜 | 정상이다. 씬 흐름은 연출이 끝난 뒤에 연다(2-6). |
+| 테스트 씬에서 판 값의 씬이 바뀌어도 씬이 안 바뀜 | 정상이다. 테스트 씬은 `GameScenes.Hold`로 제자리에 머문다(2-6). 씬 전환은 게임 씬에서 플레이해 본다. |
 | 씬을 직접 열었더니 씬 흐름이 되돌려 놓음 | 씬 흐름은 데이터의 씬을 따라간다. `SceneManager.LoadScene` 대신 행동에서 필드를 바꾼다. |
 | Undo했더니 씬이 바뀜 | 정상이다. 값이 돌아가면 씬도 돌아간다. 막으려면 'Undo 끊는 이벤트'(5-7). |
-| `Transition`·`Loaded`가 두 번째 플레이부터 안 돎 | 매 플레이 시작 때 비워진다. 플레이마다 넣는다(5-7의 `Awake`). |
+| `Transition`·`Loaded`가 두 번째 플레이부터 안 돎 | 매 플레이 시작 때 비워진다. 플레이마다 넣는다(5-7 — `Bootstrap.Started`에서). |
 | 다음 판에 상자가 다시 닫힘 | 판 값이다. 판을 넘어 남기려면 `permanent: true`. |
 | 월드 상태 연결이 자기 자신을 끄지 않음 | 자기 자신은 켜고 끄지 않는다. 부모에 붙이고 자식을 대상으로 둔다. |
 | 다른 씬의 같은 이름 오브젝트가 함께 바뀜 | 이름이 겹친다. "씬 이름.오브젝트 이름"을 쓴다. |

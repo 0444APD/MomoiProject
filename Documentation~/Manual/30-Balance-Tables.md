@@ -1,17 +1,13 @@
 # 30. 밸런싱 값·곡선·가중치 표·플레이어용 실패
 
-**한 줄 요약**: 기획자가 고치는 숫자(시작 에너지 3, 층마다 체력 +10%)는 코드에 적지 않고 **DB › 밸런싱 값**에 이름을 붙여 두고 `Game.Balance(ID)`로 읽는다. **곡선**을 붙이면 층·레벨·웨이브(**단계**)에 따라 값이 변한다(`Game.Balance(ID, 단계)`). 드롭·보상·상자처럼 "풀(후보들)에서 무게만큼의 확률로 뽑기"는 **DB › 가중치 표**에서 정하고 `Game.Roll` 또는 결과 `가중치 표에서 주기`·`가중치 표에서 고르기`(보이고 고르게 하기)로 뽑는다. 풀은 뽑는 순간에 만든다: 미리 정한 항목 + 조건(진행·도전과제) + 플레이어 데이터 목록(판에서 만들어진 것) − 뺄 목록(가진 것). 표 없이 코드에서 만든 풀은 `Game.Roll(풀, …)`. 난수는 표마다 따로인 결정론 흐름이라 Undo해도 같은 결과다. 플레이어에게 보일 실패("얼어 있어 움직일 수 없습니다")는 `throw Game.Fail(키, 기본 문장, 값…)`로 던진다. 행동 전체가 취소되고, 메시지는 텍스트 표에서 지금 언어로 만든다.
+**한 줄 요약**: 개발자가 고치는 숫자(시작 에너지 3, 층마다 체력 +10%)는 코드에 적지 않고 **DB › 밸런싱 값**에 이름을 붙여 두고 `Game.Balance(ID)`로 읽는다. **곡선**을 붙이면 층·레벨·웨이브(**단계**)에 따라 값이 변한다(`Game.Balance(ID, 단계)`). 드롭·보상·상자처럼 "풀(후보들)에서 무게만큼의 확률로 뽑기"는 **DB › 가중치 표**에서 정하고 `Game.Roll` 또는 결과 `가중치 표에서 주기`·`가중치 표에서 고르기`(보이고 고르게 하기)로 뽑는다. 풀은 뽑는 순간에 만든다: 미리 정한 항목 + 조건(진행·도전과제) + 플레이어 데이터 목록(판에서 만들어진 것) − 뺄 목록(가진 것). 표 없이 코드에서 만든 풀은 `Game.Roll(풀, …)`. 난수는 표마다 따로인 결정론 흐름이라 Undo해도 같은 결과다. 플레이어에게 보일 실패("얼어 있어 움직일 수 없습니다")는 `throw Game.Fail(키, 기본 문장, 값…)`로 던진다. 행동 전체가 취소되고, 메시지는 텍스트 표에서 지금 언어로 만든다.
 
 **언제 쓰는가**
 
-- 시작 에너지·상점 가격·엘리트 확률처럼 플레이해 보며 자주 고치는 숫자(밸런싱 값).
-- "층마다 적 체력 +10%", "레벨 n에 필요한 경험치 = 100 × n^1.5"처럼 단계에 따라 변하는 값(곡선).
-- "엘리트를 잡으면 60% 유물, 30% 물약 1~2개, 10% 꽝", "카드 보상 3장(서로 다른 카드)"(가중치 표).
-- "선택지 +1", "보상 다시 뽑기(남은 횟수 2)"처럼 보상 후보 수를 판 값으로 늘리거나 후보를 새로 뽑게 할 때(후보 수에 더할 숫자 · 다시 뽑기).
-- "가진 유물은 다시 안 나온다", "해금한 카드만 상점에 나온다", "손패에서 무작위 1장"처럼 풀이 진행·판에 따라 바뀔 때(조건·목록 줄·뺄 목록).
-- "뽑을수록 5성 확률이 오른다(천장)"처럼 무게가 진행에 따라 바뀔 때(줄의 무게를 밸런싱 값의 곡선에서).
-- "10개 사기", "살 수 있는 만큼"처럼 단계마다 오르는 가격을 한꺼번에 셀 때(`Game.BalanceSum`·`BalanceCount`).
-- "에너지가 모자랍니다", "이미 연 상자입니다"를 언어마다 다르게 보여 줄 때(플레이어용 실패).
+- 플레이해 보며 고치는 숫자(밸런싱 값), 단계(층·레벨)에 따라 변하는 값(곡선), 그 숫자를 한꺼번에 세는 "10개 사기"(`BalanceSum`·`BalanceCount`).
+- 드롭·보상·조우처럼 확률로 뽑는 것(가중치 표) — 풀이 진행·판·가진 것에 따라 바뀌거나, 무게가 진행에 따라 오르거나(천장), 후보 수를 늘리고 다시 뽑게 할 때까지.
+- "에너지가 모자랍니다"를 언어마다 다르게 보여 줄 때(플레이어용 실패).
+- 기획 문장별로 무엇을 만드나는 1절 표.
 
 이 문서에서 쓰는 용어:
 
@@ -45,7 +41,7 @@
 | "엘리트: 60% 유물, 30% 물약 1~2개, 10% 꽝" | 가중치 표 + 안쪽 표 + 개수 + 꽝(5-4) |
 | "카드 보상 3장(서로 다른 카드) 중 하나" | `Game.Roll(ID, 3, unique: true)` + 선택 대기(5-5) |
 | "유물 셋 중 하나를 골라 가진다"(코드 없이) | 결과 `가중치 표에서 고르기`(3-3, 5-5) |
-| "가진 유물은 다시 안 나온다" · "손패에서 무작위 1장" · "해금한 카드만" | 뺄 목록 · 목록 줄 · 항목 줄의 조건(5-10) |
+| "가진 유물은 다시 안 나온다" · "핸드에서 무작위 1장" · "해금한 카드만" | 뺄 목록 · 목록 줄 · 항목 줄의 조건(5-10) |
 | 표 없이 코드에서 만든 후보에서 뽑기 | `Game.Roll(풀, 개수, unique, stream)`(4-4) |
 | "천장: 뽑을수록 5성 확률이 오르고 90번째는 확정" | 가중치 표 줄의 `무게를 밸런싱 값에서`(표 곡선, 단계 = `profile.pity`)(5-11) |
 | "레벨업 보상 셋 중 하나 — 고른 패시브 효과의 레벨 +1" | 결과 `가중치 표에서 고르기`, 넣을 곳이 ID → 레벨 딕셔너리(3-3) |
@@ -58,7 +54,7 @@
 | "얼어 있어 2턴 동안 움직일 수 없습니다"(언어별) | `throw Game.Fail` + 텍스트 표(5-8) |
 | 수치 수십 개를 시트에서 한꺼번에 고친다 | DB 목록의 CSV(5-9, `33-Tick-Preview-Csv.md`) |
 
-> **규칙: 기획자가 고칠 숫자는 코드에 적지 않는다.** `battle.energy = 3`이 아니라 `battle.energy = (int)Game.Balance(GameIds.Balance.StartEnergy)`. 그러면 숫자를 바꾸는 데 프로그래머가 필요 없고, 플레이 중에도 고쳐 볼 수 있다(2-1).
+> **규칙: 개발자가 고칠 숫자는 코드에 적지 않는다.** `battle.energy = 3`이 아니라 `battle.energy = (int)Game.Balance(GameIds.Balance.StartEnergy)`. 그러면 숫자를 바꾸는 데 프로그래머가 필요 없고, 플레이 중에도 고쳐 볼 수 있다(2-1).
 
 > **규칙: 플레이어에게 보일 실패는 `Game.Fail`, 프로그래머의 실수는 `InvalidOperationException`.** "없는 카드 ID"·"전투 중이 아닌데 카드 내기"처럼 화면이 막았어야 하는 일은 플레이어에게 보일 글이 아니다.
 
@@ -103,7 +99,7 @@
 
 한 번 뽑기는 다음 순서로 돈다.
 
-1. **후보(풀)**를 모은다: 무게가 0보다 크고(숫자가 아닌 무게도 후보가 아니다 — 다른 줄은 그대로 나온다), 조건이 비었거나 **지금** 참인 줄. 줄의 `무게를 밸런싱 값에서`를 고른 줄은 무게가 그 밸런싱 값의 **지금 단계** 값이다(단계 = 고른 플레이어 데이터의 숫자, 비우면 기준 값. 천장·운·레벨에 따라 바뀌는 확률, 5-11). 목록 줄은 그 순간의 목록 요소마다 한 후보로 펼친다(요소가 글자면 그대로, id가 있는 객체면 그 id, 같은 ID는 한 번. 무게·개수는 그 줄의 값). 뺄 목록에 있는 ID는 뺀다(바깥 표의 뺄 목록은 안쪽 표에도 적용된다). 서로 다른 것만(`unique`)이면 이번 뽑기에서 이미 나온 항목도 뺀다. 안쪽 표의 줄은 서로 다른 것만이거나 뺄 목록이 있을 때, 그 표에 아직 나올 것이 남아 있을 때만 후보다.
+1. **후보(풀)**를 모은다: 무게가 0보다 크고(숫자가 아닌 무게도 후보가 아니다 — 다른 줄은 그대로 나온다), 조건이 비었거나 **지금** 참인 줄. 줄의 `무게를 밸런싱 값에서`를 고른 줄은 무게가 그 밸런싱 값의 **지금 단계** 값이다(단계 = 고른 플레이어 데이터의 숫자, 비우면 기준 값. 천장·운·레벨에 따라 바뀌는 확률, 5-11). 목록 줄은 그 순간의 목록 요소마다 한 후보로 펼친다(요소가 글자면 그대로, id가 있는 객체면 그 id, 딕셔너리면 키를 이름순으로, 같은 ID는 한 번. 무게·개수는 그 줄의 값). 뺄 목록에 있는 ID는 뺀다(ID를 읽는 법은 목록 줄과 같다. 바깥 표의 뺄 목록은 안쪽 표에도 적용된다). 서로 다른 것만(`unique`)이면 이번 뽑기에서 이미 나온 항목도 뺀다(안쪽 표는 아래 '서로 다른 것만').
 2. 몫을 정한다(`WeightTableSystem.Shares`): 고정 % 줄이 없으면 몫 = 무게, 합 = 후보의 무게 합 + 꽝 무게. 고정 % 줄(꽝도 고정 %일 수 있다)이 있으면 고정 % 줄은 적힌 %, 무게 줄은 (100 − 고정 % 합)을 무게 비율로 나누고 합 = 100. 무게 줄이 없거나 고정 % 합이 100 이상이면 고정 % 줄끼리 비율대로(무게 줄은 0). 목록 줄이 고정 %면 요소들이 그 %를 똑같이 나눈다. 합이 0 이하면 아무것도 나오지 않는다.
 3. 0~합의 난수로 하나를 고른다. 꽝 몫에 떨어지면 끝(아무것도 넣지 않는다).
 4. 고른 줄의 **개수**를 정한다: 최소와 최대가 같으면 그 수, 다르면 최소~최대 중 하나. 그 개수만큼 되풀이한다: 항목이 다른 가중치 표면 그 표에서 1~4를 다시 하고, 아니면 결과에 그 ID를 넣는다.
@@ -112,16 +108,16 @@
 - **끝없이 큰 무게**(∞ — 코드 풀의 `1 / 0` 같은 무게)의 줄은 늘 나온다(무게 ÷ 합 = 1, 여럿이면 그 줄끼리 같은 몫, 다른 줄·꽝은 0). 1e300보다 큰 무게는 1e300으로 본다(합이 double을 넘지 않게).
 - **난수는 표마다 따로인 결정론 흐름**(`Game.Random("table:" + 표 ID)`, 07장)이다. 같은 시드·같은 행동이면 같은 결과가 나오고, Undo하면 난수도 돌아가 다시 해도 같은 드롭이 나온다(Undo로 다시 뽑기를 막는다). 표를 더하거나 다른 표를 뽑아도 이 표의 결과는 바뀌지 않는다. 안쪽 표는 그 표의 흐름을 쓴다.
 - **행동 안에서 뽑는다.** 행동 밖에서 뽑으면 그 난수가 Undo·판 저장·멀티플레이와 어긋난다.
-- **서로 다른 것만**: 한 번의 `Roll` 안에서 한 번 나온 항목은 다시 후보가 되지 않는다. 안쪽 표는 그 안에 아직 나올 것이 남아 있는 동안 후보로 남고, 그 안에서 이미 나온 항목만 빠진다(등급 표 → 등급별 카드 표에서도 서로 다른 카드). 다 나온 안쪽 표는 후보에서 빠지므로, 표 전체에 서로 다른 항목이 충분하면 늘 요청한 개수가 나온다(꽝 몫은 따로). 모자라면 있는 만큼만 나온다. 개수가 2 이상인 줄은 그 개수만큼 같은 ID가 들어간다.
+- **서로 다른 것만**: 한 번의 `Roll` 안에서 한 번 나온 항목은 다시 후보가 되지 않는다. 안쪽 표는 그 안에 아직 나올 것이 남아 있는 동안 후보로 남고(뺄 목록이 있을 때도 같다), 그 안에서 이미 나온 항목만 빠진다(등급 표 → 등급별 카드 표에서도 서로 다른 카드). 다 나온 안쪽 표는 후보에서 빠지므로, 표 전체에 서로 다른 항목이 충분하면 늘 요청한 개수가 나온다(꽝 몫은 따로). 모자라면 있는 만큼만 나온다. 개수가 2 이상인 줄은 그 개수만큼 같은 ID가 들어간다.
 - 표끼리 8단계 넘게 서로를 부르면 예외(`InvalidOperationException`, "가중치 표 'a'가 8단계 넘게 서로를 부릅니다(표끼리 돌고 있는지 확인하세요).")로 그 행동이 취소된다. DB 검증은 자기 자신을 넣은 표만 잡는다.
 - **풀은 저장하지 않는다.** 뽑을 때마다 표·조건·목록에서 다시 만든다. 업데이트로 DB에 항목이나 조건을 더하면 이미 진행 중인 저장에도 바로 적용되고, 저장을 변환할 일이 없다. "해금하면 풀에 들어간다"는 해금 목록을 풀로 저장하지 말고 항목 줄의 조건(도전과제 달성·`profile.unlocked`에 있음)이나 목록 줄로 둔다.
 - **확률**(`session.Tables.Chances`, 5-7): 지금 상태로 본 후보마다 몫 ÷ 합(위 2. — 고정 % 줄이 없으면 무게 ÷ (후보 무게 합 + 꽝 무게)). 꽝 확률은 1 − (그 합)이다. 안쪽 표는 한 줄(그 표 ID)로 나온다. 서로 다른 것만·개수는 반영하지 않는다(한 번 뽑기의 확률).
 
 ### 2-4. 플레이어용 실패
 
-- `throw Game.Fail(키, 기본 문장, (이름, 값)…)`. 행동 안에서 던지면 원래 규칙대로 그 행동이 실패하고 바꾼 것이 모두 취소된다(02장). 예외는 `Game.Do`를 부른 쪽(화면 코드)으로 온다.
+- `throw Game.Fail(키, 기본 문장, (이름, 값)…)`. 행동 안에서 던지면 그 행동이 실패하고 바꾼 것이 모두 취소된다(02장). 예외는 `Game.Do`를 부른 쪽(화면 코드)으로 온다. 키는 `fail.*`(관례 2절)로 짓는다.
 - **메시지는 읽을 때마다 지금 언어로 만든다.** 텍스트 표에 그 키가 있으면 그 틀에 값을 넣고, 없으면 기본 문장(같은 `{값}` 틀 문법, `23-Text-Localization.md` 3절)을 쓰고, 둘 다 없으면 `[키]`다. 그래서 언어를 바꾼 뒤 같은 예외의 `Message`를 다시 읽으면 새 언어의 글이다.
-- `GameFailure`는 `InvalidOperationException`을 상속한다. 지금까지의 `catch (InvalidOperationException e)`도 그대로 잡고, `e.Message`가 지금 언어의 글이다.
+- `GameFailure`는 `InvalidOperationException`을 상속한다. `catch (InvalidOperationException e)`도 잡고, `e.Message`가 지금 언어의 글이다(둘을 나눠 잡을 때는 `GameFailure`를 먼저, 5-8).
 - 라이브러리가 던지는 플레이어용 실패도 이 형식이다. 그 키를 텍스트 표에 넣으면 번역된다.
 
 | `FailureKeys` | 텍스트 키 | 값 | 기본 문장 | 던지는 곳 |
@@ -137,7 +133,7 @@
 | `CannotUse` | `momoi.fail.cannotUse` | `{ability}` `{condition}` | "{ability}: 사용 조건을 만족하지 않습니다({condition})." | `Game.Use`(사용 조건이 거짓이고 그 액티브 효과·아이템의 쓸 수 없을 때 글이 비었을 때, 16장) |
 
 - `NotEnough`의 `{what}`은 낼 것의 이름이다. `Game.Pay(키, 경로, 양, what: "energy.name")`·결과 `비용 내기`의 `보일 이름`에 텍스트 키를 주면 그 키의 번역된 글, 글자를 주면 그 글자가 들어간다. 비우면 "플레이어 데이터의 이름 › 필드 경로"(예: "판 › battle.energy")라서 DB의 이름과 코드 경로가 플레이어에게 보인다 → 플레이어가 보는 비용에는 늘 이름을 준다(5-8). `{have}`·`{need}`는 이미 글자로 바꾼 숫자(소수 둘째 자리까지)다.
-- `CannotUse`의 `{ability}`는 액티브 효과·아이템의 ID다. 틀이 그 ID를 지금 언어의 이름(텍스트 표의 `<ID>.name`, 없으면 ID)으로 바꾼다. `{condition}`은 사용 조건(Trigger)의 문장(DB의 자연어 요약, 한국어)이라 번역되지 않는다. 그래서 플레이어에게 보일 글은 액티브 효과·아이템마다 **쓸 수 없을 때 글**(DB › 액티브 효과 `failText`, 사용 기능 `Usable.failText`, 16장)로 정한다: "체력이 가득 차서 {ability}을(를) 쓸 수 없습니다."처럼. 텍스트 키(`fail.fullHp`)를 적으면 텍스트 표에서 번역되고, 키가 아닌 글이면 그 글을 틀로 쓴다(`{ability}`·`{condition}`을 넣을 수 있다). 정하면 `Game.Use`의 실패도 `Game.CanUse`의 이유도 그 글이고, 비우면 이 기본 글이다. 모든 액티브 효과에 같은 글을 쓰려면 `{condition}`을 뺀 틀을 `momoi.fail.cannotUse`로 원문 표에 넣는다.
+- `CannotUse`의 `{ability}`는 액티브 효과·아이템의 ID다(틀이 지금 언어의 이름 `<ID>.name`으로 바꾼다). `{condition}`은 사용 조건의 DB 문장(한국어)이라 번역되지 않는다. 그래서 플레이어에게 보일 글은 액티브 효과·아이템마다 **쓸 수 없을 때 글**(DB › 액티브 효과 `failText`, 사용 기능 `Usable.failText` — 텍스트 키(`fail.fullHp`) 또는 틀 글, 16장 2-1)로 정한다. 정하면 `Game.Use`의 실패도 `Game.CanUse`의 이유도 그 글이다. 모든 액티브 효과에 같은 글을 쓰려면 `{condition}`을 뺀 틀을 `momoi.fail.cannotUse`로 원문 표에 넣는다.
 - 텍스트 키로 준 `{what}`과 `{ability}`의 이름도 틀과 함께 **읽을 때마다 지금 언어로** 바뀐다. 언어를 바꾼 뒤 같은 예외의 `Message`를 다시 읽으면 이름까지 새 언어다.
 - **프로그래머의 실수**(없는 ID·잘못된 필드 이름)는 그대로 `InvalidOperationException`("[MomoiProject] …")이다. 플레이어에게 보일 글이 아니다. `Game.Pay`에 없는 필드나 숫자가 아닌 필드를 주면 "모자랍니다"가 아니라 이것이다("[MomoiProject] 비용: 'run'에 필드 'battle.enrgy'가 없습니다(…).").
 
@@ -153,11 +149,11 @@
 - **줄 맨 오른쪽 ✎**: 표시 이름 · 입력 칸 주석 · 메모 · 곡선 쓰기(켜면 펼친 칸에 곡선 칸이 생긴다). ID는 코드(`GameIds`)·저장이 쓰는 이름이라 보이기만 한다.
 - 폴더(묶음)는 머리글로 보인다. 바꾼 것은 저장(Ctrl+S)할 때 적용한다.
 
-`MomoiProject → DB` → 사이드바 **DB** 그룹의 **밸런싱 값** 탭 → **+ 새로 만들기** → ID(예: `enemyHpScale`)를 짓는다. 저장하면 `GameIds.Balance.EnemyHpScale`이 생긴다. 칸 이름표는 변수 이름이고, 마우스를 올리면 `[FieldLabel]` 글자와 설명이 보인다.
+`MomoiProject → DB` → 사이드바 **DB** 그룹의 **밸런싱 값** 탭. 로직 쪽 종류라 **+ 새로 만들기**·**삭제**가 없다(21장 3-1): 항목은 AI가 DB 반영 스크립트(`[DbSeed]`, 관례 15절)로 만들고, 값과 함께 표시 이름·메모·입력 칸 주석·묶음(`EditorAssignFolder`)을 넣는다(`AI/NamingGuide.md` 3절). 개발자는 값·곡선과 ✎의 글을 고친다. 새 항목의 상수(`GameIds.Balance.EnemyHpScale`)는 반영 스크립트가 돈 뒤 Unity가 다시 컴파일해야 생기므로, 그 상수를 쓰는 코드는 그다음에 쓴다(관례 15절). 칸 이름표는 변수 이름이고, 마우스를 올리면 `[FieldLabel]` 글자와 설명이 보인다.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
-| `label` | 표시 이름 / 이 탭에 보일 이름(한글로 자유롭게). 비우면 ID | 글자 — 줄의 ✎ |
+| `label` | 표시 이름 / DB 밸런싱 값 탭에 보일 이름(한글로 자유롭게). 비우면 ID | 글자 — 줄의 ✎ |
 | `hint` | 입력 칸 주석 / 입력 칸 안에 흐리게 보일 글 | 글자 — 줄의 ✎ |
 | `value` | 값 / 곡선이 있으면 시작 단계의 값 | 숫자 |
 | `curve` › `kind` | 곡선(단계별) › 방식 | `없음(고정)`(기본) / `일정하게(+단계마다)` / `비율로(×단계마다)` / `거듭제곱(단계^지수)` / `표(점 사이를 잇기)` |
@@ -178,14 +174,14 @@
 
 ### 3-2. DB › 가중치 표
 
-같은 그룹의 **가중치 표** 탭 → **+ 새로 만들기** → ID(예: `eliteDrop`). 저장하면 `GameIds.WeightTable.EliteDrop`이 생긴다.
+같은 그룹의 **가중치 표** 탭. 밸런싱 값처럼 표는 AI가 DB 반영 스크립트로 만들고(3-1), 상수 `GameIds.WeightTable.EliteDrop`도 같은 때 생긴다. 개발자는 무게·%·개수·꽝·참조 같은 값을 고친다.
 
 | 칸 | 툴팁 | 값 |
 |---|---|---|
 | `entries` | 항목 | 항목 줄 목록(아래) |
 | `entries` › `source` | 줄 종류 | `항목 하나`(기본) / `플레이어 데이터 목록`. 고른 쪽의 칸만 보인다 |
 | `entries` › `item` | 항목 / DB 항목(인스턴스·다른 가중치 표 …). 다른 가중치 표면 그 표에서 다시 뽑는다 | DB의 모든 종류의 항목에서 고른다(인스턴스·유물·액티브 효과·상태 효과·가중치 표 …). 항목 하나일 때 |
-| `entries` › `listKey` · `listPath` | 플레이어 데이터 · 필드(목록) | 목록 줄일 때. 요소가 ID 글자거나 id가 있는 객체인 목록(`run › relics`, `run › battle.hand`) |
+| `entries` › `listKey` · `listPath` | 플레이어 데이터 · 필드(목록) | 목록 줄일 때. 요소가 ID 글자거나 id가 있는 객체인 목록(`run › relics`, `run › battle.hand`), 또는 키가 ID인 딕셔너리(`run › perks`) |
 | `entries` › `mode` | 방식 / 고정 %: 전체 중 이 %(묶음이면 묶음 전체). 무게: 고정 % 줄이 남긴 몫을 무게 비율로 | `무게(나머지를 나눔)`(기본) / `고정 %`. 고른 쪽의 칸만 보인다 |
 | `entries` › `weight` | 무게 | 방식이 무게일 때. 0 이상(기본 1). 0이면 후보가 아니다 |
 | `entries` › `percent` | %(전체 중) / 목록 줄이면 요소들이 이 %를 나눠 가진다 | 방식이 고정 %일 때. 0 이상(기본 10) |
@@ -196,11 +192,11 @@
 | `emptyMode` · `emptyWeight` · `emptyPercent` | 꽝 방식 · 꽝 무게 · 꽝 % | 꽝도 무게(나머지를 나눔)나 고정 %(전체 중 그 %). 0 이상 |
 | `exclude` | 뺄 목록 / 이 플레이어 데이터 목록에 있는 ID는 뽑히지 않습니다 | 줄마다 플레이어 데이터 · 필드(목록). 안쪽 표에도 적용된다 |
 
-- 검증 오류: "항목이 없습니다." / "항목을 고르지 않은 줄이 있습니다." / "목록 줄의 플레이어 데이터를 고르지 않았습니다." / "뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다." / "표가 자기 자신을 항목으로 가지고 있습니다." / "'healPotion': 무게는 0 이상이어야 합니다." / "'healPotion': 개수는 0 ≤ 최소 ≤ 최대여야 합니다." / "꽝 무게는 0 이상이어야 합니다." / "무게가 모두 0이라 아무것도 나오지 않습니다." 줄의 조건 Block의 검증("존재하지 않는 도전과제 'firstWn'를 참조합니다." · "'&& AND' 안에 조건이 없습니다." …)도 함께 나온다.
+- 검증 오류: "항목이 없습니다." / "항목을 고르지 않은 줄이 있습니다." / "목록 줄의 플레이어 데이터를 고르지 않았습니다." / "뺄 목록에 플레이어 데이터를 고르지 않은 줄이 있습니다." / "표가 자기 자신을 항목으로 가지고 있습니다." / "'healPotion': 무게는 0 이상이어야 합니다."(고정 % 줄이면 "%는 …") / "'healPotion': 개수는 0 ≤ 최소 ≤ 최대여야 합니다." / "꽝은 0 이상이어야 합니다." / "무게·%가 모두 0이라 아무것도 나오지 않습니다." / "고정 % 합이 100을 넘습니다(지금 N%). 무게 줄은 몫을 받지 못하고, 고정 % 줄끼리 비율대로 나눕니다." 줄의 조건 Block의 검증("존재하지 않는 도전과제 'firstWn'를 참조합니다." · "'&& AND' 안에 조건이 없습니다." …)도 함께 나온다.
+- 검증 경고: "무게 줄 없이 고정 % 합이 N%입니다. 합이 100이 되게 비율대로 맞춰 뽑습니다(남는 몫을 꽝으로 하려면 꽝을 고정 %로)."
 - **상세 위 요약 '확률'**: 줄마다 최종 %를 보인다(안쪽 표는 › 붙여 그 안의 줄까지 전체 기준으로 곱해서). 조건은 맞다고, 목록 줄은 한 줄로, 밸런싱 값은 기준값으로 본 값이다.
-- 고정 % 검증: 합이 100을 넘으면 오류("고정 % 합이 100을 넘습니다"), 무게 줄 없이 합이 100이 아니면 경고(비율대로 맞춰 뽑는다 — 남는 몫을 꽝으로 하려면 꽝을 고정 %로).
 - 조건은 그 항목 줄을 후보로 볼지만 정한다. 조건이 거짓인 줄은 확률 계산(분모)에서도 빠진다(고정 % 줄이 빠지면 그 몫은 무게 줄이 나눠 가진다).
-- 밸런싱 값에서 읽은 무게가 0 이하(또는 숫자가 아님)인 단계에서는 그 줄이 후보가 아니다. 무게 검증("무게는 0 이상이어야 합니다", "무게가 모두 0이라 …")은 `weight` 칸만 본다. 그래서 밸런싱 값을 쓰는 줄의 `weight`는 기본 1 그대로 둔다(0으로 두면 모든 줄이 그럴 때 검증 오류가 난다).
+- 밸런싱 값에서 읽은 무게가 0 이하(또는 숫자가 아님)인 단계에서는 그 줄이 후보가 아니다. 그 줄의 `weight`·`percent`는 쓰지 않으므로 기본값 그대로 둔다. 밸런싱 값을 쓰는 줄이 있으면 "무게·%가 모두 0" 검사는 하지 않고, 고정 % 합 검사는 그 줄을 세지 않는다(뽑는 순간에 정해진다).
 
 ### 3-3. 결과 `가중치 표에서 주기` · `가중치 표에서 고르기`
 
@@ -243,13 +239,13 @@
 | `then` | 고른 뒤 결과 | 고른 다음에 도는 결과. 컨텍스트의 `Picked`가 고른 원본 ID(글자)들 |
 
 - 뽑기는 요구하는 순간(그 행동 안)에 끝나고 후보는 선택 대기(`$choices`, 멀티에서는 그 행동을 한 플레이어에게 묻는 `$choices:번호` — 29장 2-6)에 남는다. 그래서 끄고 켜거나 답하기를 Undo해도 후보가 바뀌지 않는다(29장 2-6). 후보를 바꾸는 것은 다시 뽑기(아래)뿐이다.
-- **후보 수** = `count`(후보 수) + `countBonus`(후보 수에 더할 숫자)가 가리키는 숫자(반올림 — 0.5는 0에서 먼 쪽, 2-2). 합이 1보다 작으면 1이다. 플레이어 데이터를 비웠거나, 그 키가 없거나, 숫자로 읽을 수 없으면 0을 더한다. 요구하는 순간의 값을 읽으므로 그 행동 안에서 앞서 바꾼 값까지 들어간다. 요약 문장에는 `count`만 보인다.
+- **후보 수** = `count`(후보 수) + `countBonus`(후보 수에 더할 숫자)가 가리키는 숫자(반올림 — 0.5는 0에서 먼 쪽, 2-2). 합이 1보다 작으면 1이다. 플레이어 데이터를 비웠거나, 그 키가 없거나, 숫자로 읽을 수 없으면 0을 더한다. 요구하는 순간의 값을 읽으므로 그 행동 안에서 앞서 바꾼 값까지 들어간다. 요약 문장에는 `count`와 더할 숫자의 자리만 보인다(`relicPool에서 3개(+run › rewardBonus) 보여 …` — 값은 요구할 때 읽는다).
 - **보정까지 읽는다**: 그 숫자 필드가 `id`가 있는 객체의 필드면(`run` › `hero.options`의 `hero`) 필드 값이 아니라 **스탯 최종값**(`Game.Attribute`, Modifier·패시브 효과의 가진 동안 스탯 보정 포함, 28장 2-1)으로 읽는다. 그래서 "선택지 +1" 유물을 필드를 올리는 결과 대신 패시브 효과의 `modifiers`(가진 동안 스탯 보정) `options` +1로 만들면, 잃을 때 저절로 빠진다(5-13). 부모에 `id`가 없으면(`run` › `rewardBonus`의 `run`) 필드 값 그대로다.
 - **다시 뽑기**: 기다리는 동안 다른 행동 안에서 `Game.RerollChoice(선택 id)`를 부르면 같은 표·같은 후보 수·같은 `unique`로 후보를 새로 뽑는다(후보 수는 처음 요구할 때 더한 값 그대로). 선택 id는 같고 `ChoiceRequested`를 다시 쏜다(화면이 새로 그린다). 비용·남은 횟수는 부르는 행동이 정한다. 그 행동을 Undo하면 원래 후보다(4-6, 5-13, 29장 4-10b).
 - 후보 이름은 텍스트 표의 `<ID>.name`(없으면 ID). 꽝이 나와 후보가 줄면 그만큼만 보이고, 후보가 하나도 없으면 기다리지 않고 고른 뒤 결과만 돈다.
 - 덱처럼 원본 ID가 바로 들어가지 않는 목록은 `key`를 비우고 **고른 뒤 결과**에 프로젝트 결과 Block 하나(`Context.Picked`의 ID로 `DeckCard`를 만들어 넣는 `Reward`)를 둔다(5-5).
 - 요약: `relicPool에서 3개 보여 1개 고르기 run › relics에 넣기`.
-- 검증 오류: "가중치 표에서 고르기: 표를 고르세요." / "…후보 수는 1 이상이어야 합니다." / "…개수는 최소 ≤ 최대, 최대 1 이상이어야 합니다." / "…고른 것을 넣을 플레이어 데이터나 고른 뒤 결과가 있어야 합니다."
+- 검증 오류: "가중치 표에서 고르기: 표를 고르세요." / "…후보 수는 1 이상이어야 합니다." / "…개수는 최소 ≤ 최대, 최대 1 이상이어야 합니다." / "…최소 개수는 0 이상이어야 합니다." / "…고른 것을 넣을 플레이어 데이터나 고른 뒤 결과가 있어야 합니다." / "…비어 있는 Block이 있습니다(스크립트가 지워졌을 수 있음)." 고른 뒤 결과의 검증도 함께 나온다.
 
 ### 3-4. 실패 메시지 번역 — 텍스트 표
 
@@ -284,7 +280,7 @@ var max = Game.BalanceCount(GameIds.Balance.CursorPrice, run.cursors, run.gold);
 | `int BalanceCount(string id, double from, double budget)` | `budget`으로 단계 `from`부터 몇 개를 살 수 있나("살 수 있는 만큼"). 앞에서부터 더해 `budget`을 넘기 직전까지(최대 10000개까지 센다) |
 
 - 돌려주는 값은 `double`이다. 정수가 필요하면 곡선의 반올림을 고르거나 코드에서 `GameNumbers.RoundToInt`로 바꾼다(2-2).
-- `BalanceSum`·`BalanceCount`는 단계마다 곡선을 한 번씩 계산해 더한다(개수만큼 돈다). `BalanceCount`는 10000개에서 세기를 멈춘다.
+- `BalanceSum`·`BalanceCount`는 단계마다 곡선을 한 번씩 계산해 더한다(개수만큼 돈다).
 - **값이 0 이하(또는 숫자가 아님)인 단계에서 멈춘다.** 값을 매길 수 없는 가격이라 그 단계부터는 살 수 없고(`BalanceCount`) 합에도 더하지 않는다(`BalanceSum` — 음수가 되지 않는다). 곡선이 0 아래로 내려가는 것은 데이터 실수라 DB 검증이 경고한다(3-1). 내려가면 안 되는 가격은 `최솟값으로 자르기`를 켠다.
 - 숫자가 double의 끝(약 1e308)을 넘을 만큼 커지는 게임은 그 값만 `BigNumber`로 둔다(→ `36-Grid-BigNumber.md`). 밸런싱 값·`Game.Pay`·DB 숫자 칸은 double만 알므로, 그때의 가격 계산과 비용 검사는 코드로 한다.
 - 값을 바꾸지 않으므로 행동 밖(화면 코드)에서 읽어도 된다. 없는 ID면 `InvalidOperationException`(2-1).
@@ -377,7 +373,8 @@ var pick = Game.Roll(battle.enemies.Select(e => (e.id, (double)e.hp)), 1, stream
 | `WeightEntry` 필드 | 뜻 |
 |---|---|
 | `item` | 항목 ID(다른 표의 ID면 안쪽 표) |
-| `weight` | 무게(기본 1) |
+| `weight` | 무게(기본 1). `percent`가 참이면 고정 %의 % |
+| `percent` | 참이면 고정 % 줄(DB 칸 `mode` `고정 %`, 2-3) |
 | `minCount` · `maxCount` | 개수(기본 1 · 1) |
 | `condition` (`Condition`) | 맞을 때만 후보(`null`이면 늘) |
 | `listKey` · `listPath` | 비어 있지 않으면 목록 줄(그 목록의 요소마다 후보, `item`은 쓰지 않음) |
@@ -479,15 +476,15 @@ throw Game.Fail("fail.tooFar", ("range", 3));                                   
 | `Message` · `Text()` | 지금 언어의 글(읽을 때마다 다시 만든다, 2-4) |
 | `new GameFailure(key, args = null, fallback = null)` | 직접 만들 때(`Game.Fail`과 같다) |
 
-`FailureKeys`: `NotEnough` · `ChooseExactly` · `ChooseBetween` · `NotACandidate` · `ChosenTwice` · `ChoiceGone` · `CannotUse`(2-4 표). `const string`이라 텍스트 표 도구 코드에서도 쓴다.
+`FailureKeys`: `NotEnough` · `ChooseExactly` · `ChooseBetween` · `NotACandidate` · `ChosenTwice` · `ChoiceGone` · `NotYourChoice` · `RewindTooFar` · `CannotUse`(2-4 표). `const string`이라 텍스트 표 도구 코드에서도 쓴다.
 
-`Game.Pay(string key, string path, double amount, string what = null)`의 `what`은 모자랄 때 실패 글의 `{what}`에 들어갈 이름이다(텍스트 키 또는 글, 28장 4-12).
+`Game.Pay`의 `what`(모자랄 때 실패 글의 `{what}`에 들어갈 이름)은 2-4, 서명은 28장 4-12.
 
 ---
 
 ## 5. 상황별 예제
 
-예제는 구현 가이드(AI/BuildGuide)의 카드 던전 형식을 쓴다(`Tools/GuideExample`). 이 장에 필요한 부분만 옮긴다.
+예제는 구현 가이드(`AI/BuildGuide/`)의 카드 던전 형식을 쓴다. 이 장에 필요한 부분만 옮긴다.
 
 ```csharp
 using System;
@@ -509,7 +506,7 @@ using GBible.Ids;
 // WinBattle(전투 승리): 골드를 주고 다음 층으로.
 ```
 
-- ID 상수(`GameIds.Balance.EnemyHpScale`, `GameIds.WeightTable.EliteDrop` …)는 DB에 항목을 만들고 저장하면 생긴다.
+- 예제의 DB 항목(밸런싱 값·가중치 표)은 AI가 DB 반영 스크립트로 만든다. ID 상수(`GameIds.Balance.EnemyHpScale`, `GameIds.WeightTable.EliteDrop` …)는 그 스크립트가 돈 뒤 Unity가 다시 컴파일해야 생긴다(3-1).
 - 5-2는 `Profile`에 `public int level = 1, exp;`가 있다고 본다(가이드 예제에는 없다).
 
 ### 5-1. 층별 적 체력 곡선
@@ -602,14 +599,14 @@ public class BuyCard : GameAction
     {
         var run = Game.Data().Run;
         var price = (int)Game.Balance(GameIds.Balance.ShopCardPrice, run.floor);
-        if (run.gold < price) throw Game.Fail("fail.noGold", "골드가 모자랍니다({gold} / {price}).", ("gold", run.gold), ("price", price));
-        run.gold -= price;
+        Game.Pay(GameIds.PlayerData.Run.Id, "gold", price, what: "gold.name", forId: source);   // 모자라면 "골드이(가) 모자랍니다(…)" — 아무것도 바뀌지 않는다
         run.deck.Add(Rules.NewCard(Game, source));
     }
 }
 ```
 
 - 가격을 행동 안에서 계산한다. 화면이 가격을 행동에 넣어 보내면(`price` 필드) 멀티플레이에서 상대가 값을 속일 수 있다. 화면은 같은 `Game.Balance`로 표시만 한다.
+- 골드는 직접 빼지 않고 `Game.Pay`로 낸다. 그래야 행동 직전 이벤트 `비용 지불`을 거쳐 할인·빚·"이 카드만 공짜"(`forId`) 같은 효과가 붙는다(28장 2-4).
 
 ### 5-4. 엘리트 드롭 — 꽝 · 안쪽 표 · 개수
 
@@ -644,7 +641,7 @@ foreach (var id in Game.Roll(GameIds.WeightTable.EliteDrop, 1))     // 물약은
 | 물약 | 3 / 10 | `healPotion` 1개 또는 2개 |
 | 꽝 | 1 / 10 | 빈 목록 |
 
-- `Game.Roll(id)`(하나)는 첫 ID만 돌려주므로 물약이 2개 나와도 하나만 받는다. 개수가 2 이상인 줄이 있는 표는 목록 형태 `Game.Roll(id, 1)`로 받는다. 하나 형태로 뽑았는데 실제로 2개 이상이 나오면 타임라인에 경고 "가중치 표 'eliteDrop'에서 개수가 2 이상인 항목이 나와 Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요."가 표마다 한 번 남는다(세션마다).
+- `Game.Roll(id)`(하나)는 첫 ID만 돌려주므로 물약이 2개 나와도 하나만 받는다(세션마다 표마다 한 번 타임라인 경고, 6절). 개수가 2 이상인 줄이 있는 표는 목록 형태 `Game.Roll(id, 1)`로 받는다.
 - Undo하고 다시 이겨도 같은 드롭이다(2-3). 유물 풀에 유물을 더해도 `eliteDrop`의 "유물이냐 물약이냐"는 그대로이고, 유물 풀 안의 결과만 바뀐다.
 - 코드 없이 유물만 주려면 결과 `가중치 표에서 주기`(`table` `relicPool`, `key` `run`, `path` `relics`)를 쓴다. 예: DB › 개발 › 개발 명령 "유물 하나 받기"(22장 7절). `relics`는 글자 목록이라 유물 ID가 들어간다.
 
@@ -686,7 +683,7 @@ public class TakeCardReward : GameAction
 1. 도전과제·유물·개발 명령 등의 결과에 `가중치 표에서 고르기`: `table` `relicPool`, `count` `3`, `unique` 켬, `key` `run`, `path` `relics`.
 2. 요약: `relicPool에서 3개 보여 1개 고르기 run › relics에 넣기`.
 
-덱(`List<DeckCard>`)처럼 넣을 때 만들어야 하는 목록은 `key`를 비우고 고른 뒤 결과에 프로젝트 결과 Block을 하나 둔다. 그 뒤로는 기획자가 표·후보 수만 바꾼다.
+덱(`List<DeckCard>`)처럼 넣을 때 만들어야 하는 목록은 `key`를 비우고 고른 뒤 결과에 프로젝트 결과 Block을 하나 둔다. 그 뒤로는 개발자가 표·후보 수만 바꾼다.
 
 ```csharp
 [Serializable, BlockInfo("고른 카드 덱에 넣기", Category = "결과", Description = "가중치 표에서 고르기로 고른 카드 원본을 덱에 넣습니다.")]
@@ -753,7 +750,7 @@ public class PlayCard : GameAction
     {
         var run = Game.Data().Run;
         var battle = run.battle ?? throw new InvalidOperationException("전투 중이 아닙니다.");         // 화면이 막았어야 한다(프로그래머 실수)
-        if (!battle.hand.Contains(card.id)) throw new InvalidOperationException("손에 없는 카드입니다.");
+        if (!battle.hand.Contains(card.id)) throw new InvalidOperationException("핸드에 없는 카드입니다.");
 
         var frozen = Game.Statuses(run.hero).FirstOrDefault(s => s.status == GameIds.Status.Frozen);
         if (frozen != null)
@@ -781,40 +778,42 @@ public class PlayCard : GameAction
 - 원문 표에 `momoi.fail.notEnough`를 넣지 않으면 기본 문장 "{what}이(가) 모자랍니다({have} / {need})."가 쓰인다. 조사를 맞추려면 위처럼 `{what:이}`로 넣는다.
 - 선택 대기의 실패(`momoi.fail.chooseExactly` …)와 사용 조건 실패(`momoi.fail.cannotUse`, 또는 액티브 효과의 쓸 수 없을 때 글에 적은 키)도 같은 방식으로 번역한다.
 
-**화면 쪽** — 플레이어용 실패는 그대로 보여 주고, 그 밖의 실패는 개발자에게 알린다.
+**화면 쪽** — 화면 코드는 행동을 `OnClick("이름", () => 행동)`(화면 버튼, 35장 2-4)이나 `GameScreens.Do(() => 행동)`(월드를 눌렀을 때, 32장 5절)으로 보낸다. 둘 다 플레이어용 실패(`GameFailure`)를 잡아 그 글(지금 언어)을 알림으로 띄운다(DB › 화면 설정 '실패를 알림으로'를 끄면 경고 로그). 바꾼 것은 이미 모두 취소되어 있다. 프로그래머 실수(`InvalidOperationException`)는 잡지 않고 그대로 던진다 — 콘솔에 남고 플레이어에게는 보이지 않는다. 연출·선택 대기 중(`GameView.Busy`)이면 보내지 않고 거짓을 돌려준다.
 
 ```csharp
-public bool TryPlay(DeckCard card, Fighter target, out string error)
-{
-    error = null;
-    try
-    {
-        Game.Do(new PlayCard { card = card, target = target });
-        return true;
-    }
-    catch (GameFailure f)                       // 먼저 잡는다(InvalidOperationException을 상속한다)
-    {
-        error = f.Message;                      // 지금 언어의 글. 바꾼 것은 이미 모두 취소되어 있다
-        return false;
-    }
-    catch (InvalidOperationException e)
-    {
-        Debug.LogException(e);                  // 프로그래머 실수: 플레이어에게 보일 글이 아니다
-        error = Texts.Get("ui.cannotPlay");
-        return false;
-    }
-}
+// 월드의 카드를 적 위에 놓았을 때(화면 코드)
+GameScreens.Do(() => new PlayCard { card = card, target = target });
 ```
 
-- 알림 창이 떠 있는 동안 언어를 바꾸면 글자도 바뀌게 하려면, 글자 대신 `GameFailure`를 들고 있다가 다시 그릴 때 `f.Message`를 다시 읽는다.
+- 실패 글을 알림 대신 다른 곳(카드 위 말풍선)에 보이려면 직접 `try { Game.Do(…) } catch (GameFailure f) { … f.Message … }`. `GameFailure`는 `InvalidOperationException`을 상속하므로 둘을 함께 잡으면 `GameFailure`를 먼저 잡는다. 떠 있는 동안 언어를 바꿔도 글이 따라가게 하려면 글자 대신 `GameFailure`를 들고 있다가 다시 그릴 때 `f.Message`를 다시 읽는다.
 - 버튼을 미리 흐리게 하고 이유를 툴팁으로 보이려면 `Game.CanDo`(`33-Tick-Preview-Csv.md` 2-2).
+
+### 5-9. CSV로 밸런싱 값 한꺼번에 조정
+
+밸런싱 값이 수십 개가 되면 시트에서 한 번에 고치는 편이 빠르다.
+
+1. DB › 밸런싱 값 탭 → 맨 위 폴더 줄의 **CSV** → **CSV로 내보내기…** → 파일을 저장한다(UTF-8).
+2. 구글 시트·엑셀에서 연다. 한 줄 = 항목 하나(첫 칸 `id`), 칸 = `BalanceData`의 단순 필드 차례(`label` · `hint` · `value` · `curve.kind` · `curve.startX` · … · `curve.max` · `note`). 표의 점은 점이 있는 항목이 있을 때만 `curve.points[0].x` …로 나온다. 칸 규칙(목록 칸·빠지는 칸·값 읽기)은 `33-Tick-Preview-Csv.md` 2-3.
+
+```
+id,label,hint,value,curve.kind,curve.startX,curve.step,curve.rate,curve.power,curve.rounding,curve.useMin,curve.min,curve.useMax,curve.max,note
+enemyHpScale,적 체력 — 층 배율,1 = 그대로,1,Exponential,1,0,1.15,1.5,None,false,0,true,3,층마다 +15%
+expToNext,경험치 — 다음 레벨까지,,100,Power,1,0,1.1,1.8,Round,false,0,false,0,
+startEnergy,시작 에너지,,3,None,1,0,1.1,1.5,None,false,0,false,0,
+```
+
+3. 고친 뒤 CSV로 다시 받아 **CSV 가져오기…** → 결과 창("3개 고침, 0개 새로 만듦(적용 전 — Ctrl+S로 적용).")을 확인하고 저장(Ctrl+S)한다. 마음에 안 들면 **되돌리기**.
+
+- 밸런싱 값·가중치 표는 로직 쪽 종류라 CSV에 없는 ID를 적어도 새 항목이 생기지 않는다(결과 창 "없는 id N개는 건너뜀 — 새 항목은 AI가 만든다."). 새 값은 AI에게 요청한다.
+- `curve.kind`에는 코드 이름(`Exponential`)과 DB에 보이는 이름(`비율로(×단계마다)`)을 모두 적을 수 있다. 내보낼 때는 코드 이름이다.
+- 가중치 표 탭도 같다: 항목 줄은 `entries[0].…`(줄 종류·항목·방식·무게·% …)가 한 줄씩 나란히, 꽝은 `emptyMode`·`emptyWeight`·`emptyPercent`. 줄의 조건(Block)은 나오지 않으므로 DB에서 본다.
 
 ### 5-10. 풀이 바뀌는 세 가지 — 진행 · 판 · 가진 것
 
 | 풀이 바뀌는 이유 | 만드는 것 | 예 |
 |---|---|---|
 | 진행·도전과제(판이 끝나도 남음) | 항목 줄의 조건 | 연쇄 번개 줄의 조건 = 도전과제 `firstWin` 달성 / `profile.unlocked`에 `chainLightning` 있음 |
-| 판에서 만들어진 것 | 목록 줄 | "손패에서 무작위 1장" = 목록 줄 `run › battle.hand`. "이번 판에 만난 몬스터 중 하나" = 목록 줄 `run › metMonsters` |
+| 판에서 만들어진 것 | 목록 줄 | "핸드에서 무작위 1장" = 목록 줄 `run › battle.hand`. "이번 판에 만난 몬스터 중 하나" = 목록 줄 `run › metMonsters` |
 | 이미 가진 것·이미 본 것 | 뺄 목록 | 유물 풀의 뺄 목록 `run › relics`, 이벤트 풀의 뺄 목록 `run › seenEvents` |
 | 규칙이 계산한 후보·무게 | 코드 `Game.Roll(풀, …)` | 남은 체력이 많은 적일수록 잘 걸리는 저주 |
 
@@ -822,26 +821,6 @@ public bool TryPlay(DeckCard card, Fighter target, out string error)
 - 해금처럼 "프로필에 남는 진행"은 조건으로 두는 것이 기본이다. 목록 줄(`profile.unlocked`)은 해금한 것 전부를 같은 무게로 섞을 때 쓴다.
 - "한 판에 한 번만 나오는 이벤트"는 뺄 목록 `run › seenEvents` + 이벤트를 시작하는 행동이 그 ID를 목록에 넣는다. Undo하면 목록도 돌아가므로 풀도 돌아간다.
 - 확률 표시(`Chances`)도 지금의 목록·뺄 목록으로 계산한다(5-7).
-
-### 5-9. CSV로 밸런싱 값 한꺼번에 조정
-
-밸런싱 값이 수십 개가 되면 시트에서 한 번에 고치는 편이 빠르다.
-
-1. DB › 밸런싱 값 탭 → 맨 위 폴더 줄의 **CSV** → **CSV로 내보내기…** → 파일을 저장한다(UTF-8).
-2. 구글 시트·엑셀에서 연다. 한 줄 = 항목 하나(첫 칸 `id`), 칸 = `value` · `curve.kind` · `curve.startX` · `curve.step` · `curve.rate` · `curve.power` · `curve.rounding` · `curve.useMin` · `curve.min` · `curve.useMax` · `curve.max` · `note`. 표의 점(`curve.points`)은 점이 있는 항목이 있으면 점마다 칸이 된다(`curve.points[0].x` · `curve.points[1].x` … · `curve.points[0].y` …). 아래 셋은 표 곡선이 아니라 점 칸이 없다.
-
-```
-id,value,curve.kind,curve.startX,curve.step,curve.rate,curve.power,curve.rounding,curve.useMin,curve.min,curve.useMax,curve.max,note
-enemyHpScale,1,Exponential,1,0,1.15,1.5,None,false,0,true,3,층마다 +15%
-expToNext,100,Power,1,0,1.1,1.8,Round,false,0,false,0,
-startEnergy,3,None,1,0,1.1,1.5,None,false,0,false,0,
-```
-
-3. 고친 뒤 CSV로 다시 받아 **CSV 가져오기…** → 결과 창("3개 고침, 0개 새로 만듦(적용 전 — Ctrl+S로 적용).")을 확인하고 저장(Ctrl+S)한다. 마음에 안 들면 **되돌리기**.
-
-- `curve.kind`에는 코드 이름(`Exponential`)과 DB에 보이는 이름(`비율로(×단계마다)`)을 모두 적을 수 있다. 내보낼 때는 코드 이름이다.
-- 가중치 표 탭도 같다. 항목 줄은 한 줄씩 나란히 `entries[0].item` · `entries[0].weight` · `entries[0].minCount` · `entries[0].maxCount` · `entries[1].item` …, 꽝 무게는 `emptyWeight` 칸이다. 줄의 조건(Block)은 나오지 않으므로 DB에서 고친다. 시트에서 번호를 늘려 항목 줄을 더하면 새 항목 줄은 무게 1, 개수 1~1에서 시작한다(`33-Tick-Preview-Csv.md` 2-3).
-- 칸 규칙·가져오기 결과·인스턴스(카드 비용 …) 내보내기는 `33-Tick-Preview-Csv.md` 3절.
 
 ### 5-11. 천장 — 뽑을수록 오르는 확률(무게를 밸런싱 값에서)
 
@@ -886,7 +865,6 @@ public class Pull : GameAction
 - 완전히 확정하려면 다른 두 줄도 89에서 0이 되는 밸런싱 값으로 둔다(4성 점 (88, 5.1) · (89, 0), 3성 점 (88, 94.3) · (89, 0) — 무게 0인 줄은 후보가 아니다). 또는 코드에서 `pity >= 89`이면 `Game.Roll(GameIds.WeightTable.FiveStar)`로 바로 뽑는다.
 - 확률 공개 화면(`session.Tables.Chances`, 5-7)도 지금 `pity`로 계산된다.
 - 배너마다 천장을 따로 세려면 단계 경로를 `pity[limited]`처럼 딕셔너리의 키로 둔다(`Dictionary<string, int> pity`, 11장 3-1).
-- 곡선의 수치는 기획자가 DB에서 고치고, 플레이 중에도 0.5초 안에 반영된다(2-1).
 
 ### 5-12. 10개 사기 · 살 수 있는 만큼 — `BalanceSum` · `BalanceCount`
 
@@ -917,8 +895,7 @@ public class BuyCursors : GameAction
 
 - 0개에서 10개 사기 = `BalanceSum(cursorPrice, 0, 10)` = 308.
 - 골드 100으로 살 수 있는 만큼 = `BalanceCount(cursorPrice, 0, 100)` = 4(15 + 18 + 20 + 23 = 76, 다섯 번째까지면 103).
-- 버튼 글("10개 — 308")은 화면이 같은 `BalanceSum`으로 그린다. 가격은 행동 안에서 다시 계산한다(5-3과 같은 이유).
-- 가격이 double의 끝(약 1e308)을 넘을 만큼 오르는 게임은 `BigNumber`(→ `36-Grid-BigNumber.md`)와 코드의 비용 검사로 간다(4-1).
+- 버튼 글("10개 — 308")은 화면이 같은 `BalanceSum`으로 그린다. 가격은 행동 안에서 다시 계산한다(5-3과 같은 이유). double을 넘는 가격은 4-1의 `BigNumber`.
 
 ### 5-13. 선택지 +1 · 보상 다시 뽑기 — 후보 수에 더할 숫자 · `Game.RerollChoice`
 
@@ -929,7 +906,7 @@ public class BuyCursors : GameAction
 1. 엘리트 승리의 결과에 `가중치 표에서 고르기`: `table`(가중치 표) `relicPool`, `count`(후보 수) `3`, `countBonus`(후보 수에 더할 숫자) `run` › `rewardBonus`, `unique`(서로 다른 것만) 켬, `key`·`path`(고른 것을 넣을 플레이어 데이터·필드) `run` › `relics`.
 2. 상점 상품 "넓은 시야"의 결과: `플레이어 데이터에 주기 · run` › `rewardBonus` 증감 `1`.
 
-**코드** — 다시 뽑기 행동과 고르기 창의 버튼.
+**코드** — 다시 뽑기 행동과 기본 고르기 창의 버튼.
 
 ```csharp
 [Serializable, BlockInfo("보상 다시 뽑기")]
@@ -945,10 +922,11 @@ public class RerollReward : GameAction
     }
 }
 
-// 고르기 창(29장 5-10의 ChoicePanel)에 버튼 하나: 기다리는 동안이라 입력 창구를 거치지 않고 바로 보낸다
-root.Q<Button>("choice-reroll").clicked += () => { if (Game.Choice is PendingChoice c) Game.Do(new RerollReward { choice = c.id }); };
-rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
+// Client 시작 코드(Bootstrap.Started)에서 한 번: 기본 고르기 창이 '가중치 표에서 고르기'로 만든 선택에 '다시 뽑기' 버튼을 보인다(null이면 숨김)
+GameScreens.Reroll = choice => Game.Data().Run.rerolls > 0 ? new RerollReward { choice = choice.id } : null;
 ```
+
+- 고르기 창을 직접 만들었으면 버튼은 `GameScreens.Do(() => new RerollReward { choice = Game.Choice.id }, whileChoosing: true)`로 보낸다. 보통의 `OnClick`·`GameScreens.Do`는 선택을 기다리는 동안 행동을 보내지 않는다(29장 4-10b).
 
 | 순간 | 후보 | `rerolls` | `gold` |
 |---|---|---|---|
@@ -971,7 +949,7 @@ rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
 
 | 증상 | 원인과 해결 |
 |---|---|
-| "[MomoiProject] 없는 밸런싱 값 '…'입니다(DB › 밸런싱 값)." | ID 오타이거나 저장(Ctrl+S) 전 항목이다. ID는 `GameIds.Balance` 상수로 쓴다. 세션을 직접 만들면 `session.Balance.Define`이 필요하다(4-2). |
+| "[MomoiProject] 없는 밸런싱 값 '…'입니다(DB › 밸런싱 값)." | ID 오타이거나 그 항목이 DB에 없다(반영 스크립트가 돌았는지 `Logs/Editor.log`·DB 탭을 본다). ID는 `GameIds.Balance` 상수로 쓴다. 세션을 직접 만들면(서버·규칙 테스트) `session.Balance.Define`이 필요하다(4-2). |
 | 곡선을 붙였는데 층이 올라도 값이 그대로 | 단계 없이 `Game.Balance(id)`로 읽었다(곡선을 보지 않는다). `Game.Balance(id, 층)`으로 읽는다. 또는 방식이 `없음`이다. |
 | 1층 값이 기준 값과 다름 | 시작 단계가 1이 아니다. 0층부터 세면 시작 단계를 0으로(거듭제곱은 0보다 커야 한다). |
 | 표 곡선에 적은 기준 값이 무시됨 | 표는 기준 값을 쓰지 않는다. 점의 값이 곧 값이다. |
@@ -982,6 +960,7 @@ rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
 | 천장을 걸었는데 확률이 그대로 | 줄의 `단계(플레이어 데이터)`를 비워 늘 기준 값이다. 또는 단계 값(`pity`)을 올리는 코드가 없거나 `Game.Roll` 앞에서 0으로 돌린다. 밸런싱 값의 곡선 방식이 `없음`이어도 그대로다(5-11). |
 | 플레이 중 고친 값이 지금 적에게 안 보임 | 반영은 다음에 읽을 때부터다. 이미 만든 적의 체력은 판 데이터에 들어 있다. |
 | 플레이 중 고친 값이 플레이를 끄니 사라짐 | DB의 작업본이다. 저장(Ctrl+S)해야 에셋에 남는다. |
+| 밸런싱 값·가중치 표 탭에 **+ 새로 만들기**가 없음 · CSV의 새 ID가 건너뛰어짐 | 로직 쪽 종류라 항목 추가·삭제는 AI가 DB 반영 스크립트로 한다(3-1, 21장 3-1). |
 | 물약이 1~2개 나와야 하는데 늘 1개 / 경고 "…Game.Roll(id)은 첫 ID만 돌려줍니다. 개수까지 쓰려면 Game.Roll(id, 1)로 목록을 받으세요." | `Game.Roll(id)`(하나)는 첫 ID만 돌려준다(2개 이상이 나오면 표마다 한 번 이 경고). `Game.Roll(id, 1)`의 목록으로 받는다(5-4). |
 | 서로 다른 3장인데 2장만 나옴 | 꽝이 나왔거나, 표 전체(조건이 맞는 줄)에 서로 다른 항목이 3개보다 적다. 꽝 무게·조건·항목 수를 본다(2-3). |
 | 서로 다른 것만인데 같은 ID가 둘 | 그 줄의 개수(최소~최대)가 2 이상이다. 개수만큼은 같은 ID가 들어간다. |
@@ -1002,7 +981,7 @@ rerollLabel.text = $"다시 뽑기 ({Game.Data().Run.rerolls})";   // Redraw 안
 | `catch (GameFailure)`가 컴파일 오류(이미 잡힌 형식) | `catch (InvalidOperationException)`를 위에 두었다. 상속한 형식(`GameFailure`)을 먼저 둔다. |
 | `Game.Fail(…)`을 썼는데 행동이 그대로 진행 | `throw`가 없다. `Game.Fail`은 예외를 만들기만 한다. |
 | 프로그래머 실수 메시지가 플레이어에게 보임 | 화면이 모든 `InvalidOperationException`의 `Message`를 보여 준다. `GameFailure`만 보여 주고 나머지는 로그로(5-8). |
-| `countBonus`(후보 수에 더할 숫자)를 골랐는데 후보가 늘지 않음 | 그 필드가 0이거나 숫자로 읽을 수 없다(0으로 본다). 표에 서로 다른 항목이 모자라거나 꽝이 나왔다. 요약 문장은 `count`만 보이니 실제 수는 고르기 창에서 본다(3-3). 패시브 효과 보정으로 올렸다면 그 필드의 부모 객체에 `id`가 있어야 보정까지 읽는다(`id`가 없는 `run` 바로 아래 필드는 보정을 읽지 않는다). |
+| `countBonus`(후보 수에 더할 숫자)를 골랐는데 후보가 늘지 않음 | 그 필드가 0이거나 숫자로 읽을 수 없다(0으로 본다). 표에 서로 다른 항목이 모자라거나 꽝이 나왔다. 요약 문장은 더할 숫자의 자리만 보이니(`(+run › rewardBonus)`) 실제 수는 고르기 창에서 본다(3-3). 패시브 효과 보정으로 올렸다면 그 필드의 부모 객체에 `id`가 있어야 보정까지 읽는다(`id`가 없는 `run` 바로 아래 필드는 보정을 읽지 않는다). |
 | `Game.RerollChoice`가 `false` | `가중치 표에서 고르기`로 만든 선택이 아니다(`Game.Ask`·`선택 요구`). 이미 답했다. 표에서 아무것도 나오지 않았다(모두 꽝)(4-6). |
 | 다시 뽑았더니 같은 유물이 또 나옴 | 다시 뽑기는 앞 후보를 빼지 않는다. 뺄 목록으로 뺀다(5-13). |
 | 다시 뽑기 버튼이 반응하지 않음 | 보통의 `OnClick`·`GameScreens.Do`는 기다리는 동안 행동을 보내지 않는다. `GameScreens.Do(() => 행동, whileChoosing: true)`, 기본 고르기 창이면 `GameScreens.Reroll`(29장 4-10b). |

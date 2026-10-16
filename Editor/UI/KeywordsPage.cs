@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 namespace GBible.EditorTools.UI
 {
     // DB의 키워드 탭: 코드에 정의된 키워드 그룹([KeywordGroup] static class)과 키워드(const string)를 본다(읽기 전용).
-    // 코드가 원본이고 AI가 코드에서 만든다(관례: Assets/MomoiProject/Code/Keywords/그룹이름.cs). 다시 컴파일되면 그대로 보인다.
+    // 코드가 원본이고 AI가 코드에서 만든다(관례: Assets/MomoiProject/Code/Rules/Keywords/그룹이름.cs). 다시 컴파일되면 그대로 보인다.
     // 그룹 = 폴더(하위 그룹은 안쪽 클래스), 키워드 = 항목. 그룹 아래에는 이 그룹을 쓰는 필드([Keyword(typeof(그룹))])가 보인다.
     public sealed class KeywordsPage : CodexPage
     {

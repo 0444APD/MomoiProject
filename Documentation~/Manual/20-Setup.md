@@ -16,28 +16,27 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 ## 1. 설치
 
-**한 줄 요약.** 저장소 폴더를 `Assets` 아래 아무 곳에 두면 된다. 외부 에셋(Odin·DOTween)은 필요 없다.
+**한 줄 요약.** 저장소를 프로젝트의 `Packages/com.momoi.gbible`에 두고 Unity로 열면 **시작 설정** 창이 뜬다. 적용하면 코드 폴더·asmdef·DB·Claude Code 파일이 만들어진다. 외부 에셋(Odin·DOTween)은 필요 없다.
 
 **언제.** 새 프로젝트에 시스템을 들일 때 한 번.
 
 ### 에디터에서
 
 1. 저장소를 대상 프로젝트의 `Packages/com.momoi.gbible`에 복사하거나 `git clone`한다(embedded 패키지).
-2. Unity 6(6000.6.3f1에서 확인)으로 연다.
-3. 패키지 `com.unity.nuget.mono-cecil`이 프로젝트에 있는지 확인한다(Burst·Collections가 함께 가져오는 경우가 많다). 이 패키지가 있어야 컴파일할 때 플레이어 데이터 비교 코드가 만들어진다(아래 8절).
-4. 메뉴 `MomoiProject → DB`을 한 번 연다. DB 창이 열리면서 데이터 에셋 목록을 모아 런타임용 목록(`GameDatabase`)을 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`에 만든다(항목이 하나라도 있을 때).
-5. 플레이 버튼을 누른다. 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`(세션 진행)과 `[오디오]` 오브젝트가 생기면 정상이다.
+2. Unity 6(6000.6.3f1에서 확인)으로 연다. 함께 필요한 `com.unity.nuget.mono-cecil`은 `package.json`의 의존성이라 저절로 들어온다(플레이어 데이터 비교 코드를 만든다, 8절).
+3. 시작 설정을 마치지 않은 프로젝트면 **시작 설정** 창(메뉴 `MomoiProject → 개발 → 시작 설정`)이 저절로 열린다. Product Name·선택 기능·Undo 방식·언어를 고르고 적용한다. 만드는 것: `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`(asmdef `MomoiProject.*`, 네임스페이스 `MomoiProject`) · `Rules/PlayerData.cs`(`RunState`·`Profile`) · `Client/Bootstrap.cs`(`Configure` · `RegisterRules` · `Started`, 3·4절) · DB 에셋(`GameDatabase`)과 DB › 플레이어 데이터 `run`(세션 구역)·`profile`(메타 구역) · `link.xml` · Claude Code 파일(11절). 이미 있는 파일은 덮지 않으므로 다시 적용해도 안전하다. 자세히는 AI 문서 `BuildGuide/01-StartProject.md` 1절.
+4. 플레이 버튼을 누른다. 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`(세션 진행)과 `[오디오]` 오브젝트가 생기면 정상이다.
 
 만들어지는 곳:
 
 | 위치 | 내용 |
 |---|---|
-| `Assets/MomoiProject/` | 시스템·AI가 쓰는 곳(개발자는 들어가지 않는다): `Code/`(AI가 쓰는 코드 — Rules·Client·Editor·Tests·Keywords, DB 요소 탭이 여기서 읽는다) · `Data/`(아래) · `UI/`(화면 UXML·USS) · `Generated/`. 예전 자리(`Assets/Code`·`Assets/MomoiProjectData`·`Assets/UI`)는 에디터를 열 때·시작 설정 창을 열 때 저절로 옮겨진다(Unity가 읽지 않는 파일만 남은 예전 폴더는 `MomoiProjectBackups/<시각>-merge/`로). |
-| `Assets/MomoiProject/Data/` | DB 항목 에셋(종류마다 영어 폴더 — `Ability`·`PlayerData` …, 예전 한글 폴더는 열 때 저절로 옮겨진다), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
-| `Assets/Dev/` | 개발자가 노는 곳. 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다(21장 2-1). 에셋 관리의 가져오기·넣을 에셋 자리도 여기(`Dev/Art`·`Dev/Audio` …). 시스템·AI는 요청받을 때만 건드린다. |
-| `Assets/MomoiProject/Generated/GameIds.cs` | 식별자 코드(7절). 플레이어 데이터 값 형식이 asmdef 안에 있으면 그 asmdef 폴더의 `Generated/`에 생긴다. |
+| `Assets/MomoiProject/` | 시스템·AI가 쓰는 곳(개발자는 들어가지 않는다): `Code/`(AI가 쓰는 코드 — Rules·Client·Editor·Tests, 키워드 그룹은 Rules/Keywords — DB 요소 탭이 여기서 읽는다) · `Data/`(아래) · `UI/`(화면 UXML·USS) · `Scenes/Test.unity`(테스트 씬 — 반영 스크립트의 `TestSceneSetup.Ensure`가 만든다, 38장). |
+| `Assets/MomoiProject/Data/` | DB 항목 에셋(`<종류 폴더>/<ID>.asset` — 종류 폴더는 영어 `Ability`·`PlayerData` …), `Resources/MomoiProject/`(GameDatabase·다국어 설정·오디오 설정·다이얼로그 설정), `Texts/`, `DialogueUI/` |
+| `Assets/Dev/` | 개발자가 노는 곳. 안에 폴더를 만들면 DB 사이드바 'Dev' 그룹의 탭이 된다(21장 2-1). 에셋 관리의 가져오기·넣을 에셋 자리도 여기(`Dev/Art`·`Dev/Audio` …), 게임 씬은 `Dev/Scenes`. 시스템·AI는 요청받을 때만 건드린다. |
+| `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs` | 식별자 코드(7절). 자리는 플레이어 데이터 값 형식이 든 어셈블리 폴더의 `Generated/`다 — 시작 설정을 한 프로젝트는 Rules. 형식이 `Assembly-CSharp`에 있으면 `Assets/MomoiProject/Generated/`. |
 | `Assets/MomoiProject/link.xml` | 코드 줄이기 보호(시작 설정이 만든다, 8절) |
-| `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`, `Ids.json`, `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
+| `ProjectSettings/MomoiProject/` | 팀이 함께 쓰는 에디터 설정(`Features.json`(켠 기능, 6절), `Ids.json`(7절), `DbSeeds.json`(DB 반영 스크립트가 돈 버전, 21장 3-1), `CodexFolders.json`, `ProjectCode.json`, `Layouts.json` …) |
 
 ### 주의할 점
 
@@ -62,10 +61,13 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 4. `new GameSession(options)`. 이때부터 경고·오류 기록을 콘솔로도 보낸다(프로필을 불러올 때의 저장 변환·읽기 실패 경고도 콘솔에 보이게). 개발 명령은 개발 빌드에서만 받도록 `session.Debug.Enabled = Debug.isDebugBuild`.
 5. DB 데이터로 플레이어 데이터·로그·인스턴스·필드 규칙의 필수 값·상태 효과·밸런싱 값·가중치 표·액티브 효과·사용 기능이 붙은 인스턴스·도전과제·개발 명령을 세션에 등록한다. `[BindTo("ID")]`의 ID가 DB의 어느 항목에도 없으면 콘솔에 "[MomoiProject] [BindTo("…")]: 이 ID의 DB 항목이 없어 연결되지 않았습니다" 경고를 낸다(오타·지운 항목).
 6. 저장 호환 검사(개발 중이면 호환되지 않는 저장 파일만 옆으로 옮긴다 — `06-SaveLoad.md` 1.1), ID 이름 바꾸기 이력 적용, 프로필(`profile.json`) 불러오기(깨졌으면 바로 전 저장 `.bak`으로, `06-SaveLoad.md` 2.3).
-7. 기본 개발 명령(저장·시간)을 등록한다.
-8. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`). 슬롯을 바꿔 세션을 다시 만들어도 오브젝트는 하나다.
-9. Bootstrap 화면의 씬 흐름을 정해 두었으면 그 필드를 따라가기 시작한다(`GameScenes.Follow`, `32-View-Presentation-Scenes.md`).
-10. `Started` 이벤트를 쏜다(4절 — 받는 쪽을 하나씩 부르므로 하나가 예외를 던져도 나머지와 이어 하기는 계속된다). 시작할 때 이어 하기를 켰으면 그 뒤에 판을 불러오거나 새 판 행동을 실행한다.
+7. `SessionCreated` 이벤트를 쏜다(4절 — 규칙 등록 자리, 모든 세션). 이때 `GBibleRuntime.Session`은 아직 비어 있다 — 받는 쪽은 넘겨받은 세션을 쓴다.
+8. 기본 개발 명령(저장·시간)을 등록하고 `GBibleRuntime.Session`을 이 세션으로 정한다.
+9. `[MomoiProject]` 오브젝트를 만들어 매 프레임 세션을 진행시킨다(`LateUpdate`에서 `session.EndFrame`). 슬롯을 바꿔 세션을 다시 만들어도 오브젝트는 하나다.
+10. Bootstrap 화면의 씬 흐름을 정해 두었으면 그 필드를 따라가기 시작하고(`GameScenes.Follow`, `32-View-Presentation-Scenes.md`), 화면(DB › 화면 — UI Toolkit)을 준비한다(화면 없는 실행이면 건너뛴다, 35장).
+11. `Started` 이벤트를 쏜다(4절 — 화면 연결 자리, 화면 세션에만). 시작할 때 이어 하기를 켰으면 그 뒤에 판을 불러오거나 새 판 행동을 실행한다.
+
+**따로 만드는 세션** — `GBibleRuntime.CreateSession()`(멀티 시험 모드의 서버·봇, 매칭큐의 방 — 40장)은 1~7만 거친다(프로필 불러오기·저장 호환 검사는 하지 않는다). 그래서 이 세션에는 `SessionCreated`는 오고 `Started`는 오지 않는다.
 
 게임을 끝내면(`OnApplicationQuit`) `Stopping`을 쏘고, `AutoSaveRun`이 참이고 판이 살아 있으면 `SaveRun`(`Saving` → 프로필 → 판), 아니면 프로필만 저장한 뒤 `Stopped`를 쏜다(4절, `06-SaveLoad.md` 2.2).
 
@@ -133,7 +135,7 @@ public sealed class TitleMenu : MonoBehaviour
 }
 ```
 
-**중요한 순간에 바로 저장(자동 저장 지점).** 체크포인트·하루 끝처럼 이벤트로 정해지는 순간이면 보통은 Bootstrap 화면의 **판 저장**을 "이벤트를 받을 때 저장"으로 고르고 **판 저장 이벤트**를 정한다(코드 없음, `06-SaveLoad.md` 3.3). 코드로 하면 이렇다(행동 밖에서 부른다).
+**중요한 순간에 바로 저장(자동 저장 지점).** 체크포인트·하루 끝처럼 이벤트로 정해지는 순간이면 Bootstrap 화면의 **판 저장**을 "이벤트를 받을 때 저장"으로 고르고 **판 저장 이벤트**를 정한다(코드 없음, `06-SaveLoad.md` 3.3). 이벤트가 아닌 순간(메뉴의 '저장 후 종료' 버튼 등)만 코드로 부른다(행동 밖에서).
 
 ```csharp
 using GBible;
@@ -145,18 +147,7 @@ public static class Checkpoint
 }
 ```
 
-**판 자동 저장을 끄는 로그라이크.** 판이 끝나면 저장이 남지 않아야 하는 게임. 보통은 Bootstrap 화면의 **판 저장**을 "저장하지 않음"으로 고른다. 코드로 하면 이렇다.
-
-```csharp
-using GBible;
-using UnityEngine;
-
-public static class RoguelikeBoot
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.AutoSaveRun = false;
-}
-```
+**판 자동 저장을 끄는 로그라이크.** Bootstrap 화면의 **판 저장**을 "저장하지 않음"으로 고른다(코드 없음). `GBibleRuntime.AutoSaveRun = false`는 화면 값을 덮으므로 조건에 따라 바꿀 때만 쓴다(`AfterAssembliesLoaded`에서).
 
 ### 주의할 점
 
@@ -168,7 +159,7 @@ public static class RoguelikeBoot
 
 ## 3. 세션 옵션 — `Configuring`과 `SessionOptions`
 
-**한 줄 요약.** Undo 방식·보관 수·시드·판 저장 시점은 DB › 시작 파일 › Bootstrap 화면에서 정한다. 화면에 없는 옵션(저장 버전 …)이나 조건에 따른 변경은 세션을 만들기 직전의 `Configuring` 이벤트에서 코드로 바꾼다. 코드가 이긴다.
+**한 줄 요약.** Undo 방식·보관 수·시드·판 저장 시점은 DB › 시작 파일 › Bootstrap 화면에서 정한다. 화면에 없는 옵션(시간대 `TimeZone`·값을 계산하는 저장 변환 …)이나 조건에 따른 변경만 세션을 만들기 직전의 `Configuring` 이벤트에서 코드로 바꾼다. 둘 다 정하면 코드가 이긴다. **화면에 있는 칸을 코드로 같은 값으로 정하지 않는다**(개발자가 화면에서 바꿔도 먹지 않는다 — 관례 1절).
 
 **언제.** 실시간 게임이라 스냅샷 되감기를 쓸 때, 재현 가능한 고정 시드가 필요할 때, 출시 후 저장 구조를 바꿀 때.
 
@@ -179,7 +170,7 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 | 칸 | 같은 뜻의 `SessionOptions` | 기본 |
 |---|---|---|
 | Undo 방식(행동 단위·스냅샷·쓰지 않음) | `History` | 행동 단위 |
-| Undo 보관 수(행동 단위일 때) | `HistoryLimit` | 200(새 DB. 전에 만든 DB는 저장된 값 그대로, 0 = 제한 없음) |
+| Undo 보관 수(행동 단위일 때) | `HistoryLimit` | 200(0 = 제한 없음) |
 | 스냅샷 간격(초)·스냅샷 보관 수(스냅샷일 때) | `SnapshotInterval`·`SnapshotLimit` | 1초·30개 |
 | 개발 빌드에서 시드 고정 + 시드 | 개발 빌드에서만 `Seed` | 끔(지금 시각) |
 | Undo 끊는 이벤트(선택) | 그 이벤트를 쏜 바깥 행동이 끝나면 `session.ClearUndo()` | 없음 |
@@ -219,46 +210,23 @@ public static class GameOptions
 }
 ```
 
-`SessionOptions`의 칸을 하나씩 본다.
+`SessionOptions`의 칸을 하나씩 본다(`options.칸 = 값`). Bootstrap 화면에 있는 칸은 게임에서는 화면에서 정하고, 코드로는 세션을 직접 만들 때(서버·테스트) 넣는다.
 
 **`History`** — 되돌리기 방식. `HistoryMode.Actions`(기본: 행동 하나씩 Undo, 턴제·퍼즐), `HistoryMode.Snapshots`(일정 간격 스냅샷을 쌓아 하나씩 되감기, 실시간 게임), `HistoryMode.None`(되돌리기 없음, 기록 비용 없음). 어느 방식이든 게임 코드는 `session.Undo()` 하나로 되돌린다.
 
-```csharp
-options.History = HistoryMode.Snapshots;
-```
-
 **`HistoryLimit`** — `Actions` 방식에서 Undo할 수 있는 최대 행동 수. `0`이면 무제한(행동마다 바뀐 값의 이전 모습을 보관하므로 메모리가 는다). `GBibleRuntime`은 Bootstrap 화면의 **Undo 보관 수**(새 DB 기본 200)를 넣는다. 세션을 직접 만들면 기본이 `0`이다.
-
-```csharp
-options.HistoryLimit = 100;
-```
 
 **`SnapshotInterval` / `SnapshotLimit`** — `Snapshots` 방식의 간격(게임 시간 초, 기본 1)과 보관 개수(기본 30).
 
-```csharp
-options.SnapshotInterval = 0.5;
-options.SnapshotLimit = 60;
-```
-
 **`Seed`** — 난수 시드(`ulong`). 런타임은 기본으로 지금 시각(`DateTime.UtcNow.Ticks`)을 넣는다. 같은 시드 + 같은 행동이면 `Game.Random` 결과가 같다.
-
-```csharp
-options.Seed = 20261003UL;
-```
 
 **`TickRate`** — 고정 틱: 초당 틱 수(기본 0 = 끔). 켜면 게임 시간이 1/틱 초씩 일정하게 흐르고 시간 예약·상태 효과의 시간 지속·시간 조건·`session.Ticked`가 틱마다 돌아 프레임 속도와 상관없이 같은 결과가 난다(`33-Tick-Preview-Csv.md`). Bootstrap 화면 **고정 틱(실시간)**과 같다.
 
-```csharp
-options.TickRate = 30;
-```
+**`TimeZone`** · **`RealClock`** — 날짜 번호(`Game.Day`·`Week`)를 셀 시간대(비우면 싱글은 이 컴퓨터, 멀티는 UTC)와 현실 시각(`Game.Now`)의 출처(비우면 이 컴퓨터의 시계 — 시험의 고정 시각·서버 시각). 화면에 없다(`07-Random-Time.md` 2.13).
 
 **`JournalCapacity`** — 통합 기록(Journal)에 보관할 줄 수(기본 4096). 넘치면 오래된 줄부터 밀려난다. Bootstrap 화면 **고급 › 기록 보관 줄 수**와 같다.
 
 **`Migrations`** — 저장 데이터 버전 변환. 출시 후 구조를 바꾸면 변환을 등록한다(버전 2부터). 키·경로만 받는 변환(필드 옮김·키 이름 바꿈·키 삭제)은 보통 **DB › 개발 › 저장 변환** 표에 적는다. 표는 `Configuring` 직전에 버전 순서(같은 버전은 ID 글자 순서)로 여기에 등록되고, 코드는 그 뒤에 더한다. 코드로는 값을 계산해 바꾸는 `Add`만 쓰는 것이 기본이다. 저장 버전은 등록한 변환의 가장 높은 버전으로 저절로 올라간다(`session.SaveVersion`). `SaveVersion` 옵션은 최솟값이라 보통 손대지 않는다. DB 항목 ID 바꾸기는 변환 없이 런타임이 이어받는다(`06-SaveLoad.md` 1.4 · 2.7).
-
-```csharp
-options.Migrations.RenameKey(2, "gold", "playerGold");   // 저장 버전 2
-```
 
 `SaveMigrations`에는 `RenameKey(버전, 예전 키, 새 키)`, `RemoveKey(버전, 키)`, `MoveField(버전, 키, 예전 경로, 새 경로)`, 직접 고치는 `Add(버전, 설명, Action<Dictionary<string, object>>)`가 있다. 필드 이름만 바뀐 경우는 필드에 Unity의 `[FormerlySerializedAs("예전이름")]`만 달면 변환 없이 따라간다.
 
@@ -266,56 +234,11 @@ options.Migrations.RenameKey(2, "gold", "playerGold");   // 저장 버전 2
 
 ### 상황별 예제
 
-**실시간 액션 게임: 0.5초 간격 스냅샷 되감기(최근 30초).** 보통은 Bootstrap 화면에서 Undo 방식 "스냅샷", 간격 0.5, 보관 수 60을 고른다. 코드로 하면 이렇다.
+화면 칸으로 되는 것은 코드를 쓰지 않는다:
 
-```csharp
-using GBible;
-using UnityEngine;
-
-public static class ActionGameOptions
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Configuring += options =>
-    {
-        options.History = HistoryMode.Snapshots;
-        options.SnapshotInterval = 0.5;
-        options.SnapshotLimit = 60;
-    };
-}
-```
-
-**버그 재현용 고정 시드.** 개발 빌드에서만 시드를 고정한다. 보통은 Bootstrap 화면의 **개발 빌드에서 시드 고정**을 켠다. 코드로 하면 이렇다.
-
-```csharp
-using GBible;
-using UnityEngine;
-
-public static class ReplaySeed
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Configuring += options =>
-    {
-        if (Debug.isDebugBuild) options.Seed = 12345UL;
-    };
-}
-```
-
-**출시 후 구조 변경: 인벤토리의 골드를 지갑으로 옮김.** 버전 3에서 `inventory` 값의 `gold` 필드를 `wallet.gold`로 옮긴다. 보통은 DB › 개발 › 저장 변환에 두 줄(버전 2 · 키 이름 바꿈 · `gold` → `playerGold`, 버전 3 · 필드 옮김 · `inventory` · `gold` → `wallet.gold`)을 적는다. 코드로 하면 이렇다.
-
-```csharp
-using GBible;
-using UnityEngine;
-
-public static class SaveVersions
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Configuring += options =>
-    {
-        options.Migrations.RenameKey(2, "gold", "playerGold");
-        options.Migrations.MoveField(3, "inventory", "gold", "wallet.gold");
-    };
-}
-```
+- **실시간 액션 게임의 되감기(최근 30초)**: Bootstrap의 Undo 방식 "스냅샷", 간격 0.5, 보관 수 60.
+- **버그 재현용 고정 시드**: Bootstrap의 **개발 빌드에서 시드 고정** + 시드.
+- **출시 후 구조 변경(인벤토리의 골드를 지갑으로)**: DB › 개발 › 저장 변환에 두 줄 — 버전 2 · 키 이름 바꿈 · `gold` → `playerGold`, 버전 3 · 필드 옮김 · `inventory` · `gold` → `wallet.gold`. 값을 계산해야 하는 변환만 `Configuring`에서 `options.Migrations.Add(…)`(`06-SaveLoad.md` 1.4).
 
 **서버·테스트: 런타임 없이 세션 만들기.**
 
@@ -328,21 +251,25 @@ var session = new GameSession(new SessionOptions { Seed = 7, History = HistoryMo
 ### 주의할 점
 
 - `MonoBehaviour.Awake`에서 `Configuring`을 연결하면 늦다(세션이 이미 만들어졌다). 꼭 `AfterAssembliesLoaded`(또는 `BeforeSplashScreen`)에서 연결한다.
-- `Configuring` 안에서는 세션이 아직 없다. 행동 처리기·코드로 쓰는 개발 명령은 `Started`에서 등록한다(DB › 개발 › 개발 명령의 항목은 런타임이 등록한다).
+- `Configuring` 안에서는 세션이 아직 없다. 행동 처리기·코드로 쓰는 개발 명령은 `SessionCreated`(`Bootstrap.RegisterRules`)에서 등록한다(4절, DB › 개발 › 개발 명령의 항목은 런타임이 등록한다).
 - `Configuring`은 받는 쪽을 하나씩 부른다. 하나가 예외를 던지면 콘솔에 남기고 나머지 받는 쪽과 세션 만들기는 계속한다(그 받는 쪽이 바꾸려던 옵션만 빠진다).
 - 개발 중 상태에서는 키를 지우거나 형식을 바꾸면 그 저장 파일이 초기화된다(옆으로 옮겨진다). 키를 더하기만 한 경우는 그대로 이어간다.
 
 ---
 
-## 4. 시작·끝 알림 — `Started` / `Stopping` / `Stopped`
+## 4. 시작·끝 알림 — `SessionCreated` / `Started` / `Stopping` / `Stopped`
 
-**한 줄 요약.** 세션 준비가 끝나면 `Started`, 게임을 끝낼 때 저장하기 전에 `Stopping`, 저장한 뒤에 `Stopped`를 쏜다. 모두 `Action<GameSession>`이다. 판 저장 직전·판 불러온 뒤의 알림(`Saving`·`RunLoaded`)은 `06-SaveLoad.md` 2.10.
+**한 줄 요약.** 세션이 DB로 만들어지면 `SessionCreated`(**모든 세션** — 화면 세션 · 멀티 서버 · 시험 모드의 서버와 봇 · 매칭 방 · 서버 빌드), 화면 세션 준비가 끝나면 `Started`(**화면 세션에만**), 게임을 끝낼 때 저장하기 전에 `Stopping`, 저장한 뒤에 `Stopped`를 쏜다. 모두 `Action<GameSession>`이다. 판 저장 직전·판 불러온 뒤의 알림(`Saving`·`RunLoaded`)은 `06-SaveLoad.md` 2.10.
 
-**언제.** 행동 처리기·프로젝트 기능의 감시·코드로만 정의하는 플레이어 데이터를 등록할 때(`Started`), 끄기 전에 마지막 값을 행동으로 남길 때(`Stopping`), 끝낼 때 외부 서비스에 알릴 때(`Stopped`).
+**언제.**
+- `SessionCreated` — **규칙 쪽 등록 전부**: 행동 처리기(`session.Actions.Register`) · 프로젝트 고유 기능의 감시(`session.Triggers.Register` — Rules의 등록 함수 `XxxRules.Register(session)`) · 규칙이 이벤트를 받는 것 · 틱 규칙(`session.Ticked`) · 코드로 쓰는 개발 명령 중 규칙(데이터)을 바꾸는 것(멀티에서는 클라이언트가 누른 명령이 서버 세션에서 돈다) · 코드로만 정의하는 플레이어 데이터 · 패시브 효과·상태 효과를 코드로 직접 등록하는 것. 새 판 행동보다 먼저 온다. 여기 두면 따로 만든 서버 세션(`GBibleRuntime.CreateSession`)에서도 규칙이 돈다 — `Started`에 두면 서버 세션에서 빠진다.
+- `Started` — **화면 쪽 연결**: 연출 받기(`SubscribeAfterAction` → `GameView.Present`) · 화면 설정(`GameScreens.Reroll` 등) · `GameSettings.Changed` · `GameInput.Use` · 화면만 쓰는 개발 명령(시간 배속 등) · 켤 때 정산(`Settle`)처럼 화면 세션에서 한 번 할 일. 화면 세션에서 `SessionCreated` 다음에 온다(프로필은 그 전에 불러와 있고, 그 사이 `GBibleRuntime.Session` 설정 · 씬 흐름 · 화면 준비 — 2절 7~11). 판 불러오기('시작할 때 이어 하기')는 `Started` 뒤다.
+- 둘 다 화면 세션이 새로 만들어질 때마다 다시 온다: 슬롯을 바꾸거나 지울 때(`UseSlot`·`DeleteSlot`, 31장), 멀티에 들어가고 나올 때(`GameNet.Join`·`Leave`, 40장). 등록은 세션마다이므로 그대로 두면 되고, 세션이 아닌 static 이벤트(`GameSettings.Changed` 등)에 거는 것만 `-=` 뒤 `+=`.
+- `Stopping` — 끄기 전에 마지막 값을 행동으로 남길 때. `Stopped` — 끝낼 때 외부 서비스에 알릴 때.
 
 ### 코드로 쓰는 법
 
-**`Started`** — 준비된 세션을 받는다. `Configuring`과 같은 이유로 `AfterAssembliesLoaded`에서 연결한다.
+**`SessionCreated` · `Started`** — 세션을 받는다. `Configuring`과 같은 이유로 `AfterAssembliesLoaded`에서 연결한다. 시작 설정을 한 프로젝트는 `Client/Bootstrap.cs`가 이미 `Configuring`·`SessionCreated`·`Started`에 연결되어 있다(함수 `Configure` · `RegisterRules` · `Started`) — 할 일은 그 함수 안에 더하고, 기능마다 따로 `Hook`을 두지 않는다(17장 2-6). 예전에 만든 `Bootstrap.cs`에 `RegisterRules`가 없으면 `GBibleRuntime.SessionCreated += RegisterRules;`와 함수를 더하고, `Started`에 있던 규칙 등록을 옮긴다. 아래는 연결 모양이다.
 
 ```csharp
 using GBible;
@@ -351,9 +278,9 @@ using UnityEngine;
 public static class GameBoot
 {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += OnStarted;
+    static void Hook() => GBibleRuntime.SessionCreated += OnCreated;
 
-    static void OnStarted(GameSession session)
+    static void OnCreated(GameSession session)
     {
         session.Debug.Register("치트", "Undo 전부", () => { while (session.Undo()) { } }, "되돌릴 수 있는 행동을 모두 되돌립니다.");
     }
@@ -382,26 +309,7 @@ GBibleRuntime.Stopped += session => UnityEngine.Debug.Log($"기록 {session.Jour
 
 ### 상황별 예제
 
-**개발 빌드에서만 치트 명령.** DB › 플레이어 데이터에 `playerGold`(숫자)가 있다고 하자. 보통은 DB › 개발 › 개발 명령에 항목을 만들고 결과에 `플레이어 데이터에 주기 · playerGold` 증감 1000을 넣는다. 코드는 없고, 누르면 행동 하나로 실행되어 Undo된다.
-
-규칙 함수를 불러야 해서 코드로 쓸 때는 `Started`에서 등록한다. 출시 빌드에서는 런타임이 등록을 무시하므로 감싸는 검사가 없다.
-
-```csharp
-using GBible;
-using UnityEngine;
-
-public static class Cheats
-{
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-    static void Hook() => GBibleRuntime.Started += session =>
-    {
-        // 값을 바꾸는 명령은 행동으로 실행해야 기록·Undo된다(SkipToBoss는 게임이 만든 행동).
-        session.Debug.Register("치트", "보스 앞으로", () => session.Do(new SkipToBoss()));
-    };
-}
-```
-
-같은 일을 DB 항목 + `[BindTo]`로도 쓸 수 있다(`13-BindTo.md` 3-10). 그쪽은 행동으로 감싸는 일을 런타임이 한다.
+**개발 빌드에서만 치트 명령.** DB › 개발 › 개발 명령에 항목을 만들고(AI는 DB 반영 스크립트로) 결과에 `플레이어 데이터에 주기 · playerGold` 증감 1000을 넣는다. 코드는 없고, 누르면 행동 하나로 실행되어 Undo된다. 규칙 함수를 불러야 하면 같은 DB 항목에 `[BindTo]`를 붙인다(`13-BindTo.md` 3-10 — 행동으로 감싸는 일을 런타임이 한다, 관례 19절). `session.Debug.Register`로 직접 등록한 명령은 DB에 보이지 않고, 값을 바꾸려면 `() => session.Do(new 행동())`처럼 행동으로 실행해야 기록·Undo된다.
 
 **씬이 바뀌어도 남는 매니저가 세션을 늦게 받는 경우.** `Started`를 놓쳤을 수 있으면 지금 세션을 먼저 확인한다.
 
@@ -425,8 +333,10 @@ public sealed class QuestTracker : MonoBehaviour
 
 ### 주의할 점
 
-- `Started`에서 쏜 이벤트·바꾼 값도 기록에 남는다. 처음 값은 DB의 기본값으로 정하는 편이 낫다.
-- `Started`는 받는 쪽을 하나씩 부른다. 하나가 예외를 던져도 콘솔에 남기고 나머지 받는 쪽과 시작할 때 이어 하기는 계속한다(프로젝트 코드·선택 기능 하나가 시작 처리를 멈추지 않게).
+- `SessionCreated` 안에서는 넘겨받은 `session`(`session.Game`)만 쓴다. `GBibleRuntime.Session`·`GBibleRuntime.Game`은 아직 그 세션이 아니다(화면 세션이면 비어 있고, 서버 세션을 만들 때면 화면 세션이다).
+- 같은 세션에 같은 등록을 두 번 하면 두 번 발동한다. `RegisterRules`에서 부른 등록 함수를 `Started`·`GameNet.ServerStarted`·`RoomStarting`에서 또 부르지 않는다(서버 세션에도 `SessionCreated`가 이미 왔다).
+- `SessionCreated`·`Started`에서 쏜 이벤트·바꾼 값도 기록에 남는다. 처음 값은 DB의 기본값으로 정하는 편이 낫다.
+- `SessionCreated`·`Started`는 받는 쪽을 하나씩 부른다. 하나가 예외를 던져도 콘솔에 남기고 나머지 받는 쪽과 시작할 때 이어 하기는 계속한다(프로젝트 코드·선택 기능 하나가 시작 처리를 멈추지 않게).
 - `Stopping`·`Stopped`는 `OnApplicationQuit`에서 불린다. 에디터에서 플레이를 멈출 때도 불린다. 모바일에서 앱을 강제로 끄면 오지 않을 수 있으므로, 꼭 남아야 하는 값은 그때그때 행동으로 남기고 저장한다(**프로필도 행동마다 저장**).
 
 ---
@@ -435,11 +345,11 @@ public sealed class QuestTracker : MonoBehaviour
 
 **한 줄 요약.** 모든 DB 항목(`GameData`)의 목록 에셋. 에디터가 자동으로 채우고, 런타임은 `GameDatabase.Load()`로 읽는다.
 
-**언제.** 게임 코드가 DB 데이터(도전과제 목록, 스탠딩 프로필, 인스턴스 원본 …)를 직접 훑어볼 때.
+**언제.** 화면·연출 코드(Client)가 DB 데이터(도전과제 목록, 스탠딩 프로필, 인스턴스 원본 …)를 직접 훑어볼 때. 규칙 코드(Rules)는 `GameDatabase.Load()` 대신 `Game.Entry<T>(id)`·`Game.Entries<T>()`로 읽는다(서버·테스트가 세션에 항목을 넣을 수 있게, 17장 2-1).
 
 ### 에디터에서
 
-직접 편집하지 않는다. DB에서 항목을 만들고 저장(Ctrl+S)하면, 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`이다.
+직접 편집하지 않는다. DB 변경이 적용될 때(저장(Ctrl+S), DB 반영 스크립트의 새 항목 저절로 적용 — 21장 3-1), 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`이다.
 
 ### 코드로 쓰는 법
 
@@ -525,7 +435,7 @@ var copy = potion.CreateInstance();   // 깊은 사본
 3. 확인 창("기능 켜기" / "기능 끄기")에서 **켜기** 또는 **끄기**를 누른다.
 4. Unity가 다시 컴파일한다. 컴파일이 끝나면 탭·메뉴가 열린다. 꺼진 기능의 탭은 사이드바에 흐리게 보이고 들어갈 수 없다(마우스를 올리면 "'다이얼로그 시스템' 기능이 꺼져 있습니다. 위의 '기능 활성화'를 눌러 켜면 열립니다.").
 
-켜짐 상태는 `ProjectSettings/MomoiProject/Features.json`에 저장되어 팀이 함께 쓴다. 심볼은 이 파일에 맞춰 지금 고른 플랫폼, 지금 빌드 대상의 플랫폼, PC(Standalone), 서버(Dedicated Server — 심볼 칸이 PC와 따로다)에 자동으로 넣고 빼며, 다른 플랫폼으로 바꾸는 순간 그 플랫폼에도 맞춘다(서버 빌드 프로필로 바꿔도 모듈을 쓰는 게임 코드가 컴파일된다). 예전 이름의 심볼(`GAME_SYSTEMS_*`)은 `GBIBLE_*`로 바꾼다.
+켜짐 상태는 `ProjectSettings/MomoiProject/Features.json`(`{ "enabled": ["dialogue", "inventory", "input", "steam"] }` — 켠 기능의 ID만)에 저장되어 팀이 함께 쓴다. **AI는 스위치 대신 이 파일의 `enabled`에 ID를 더해 켠다**(관례 0절). 에디터가 스크립트를 다시 읽을 때(컴파일 뒤의 도메인 다시 읽기 — 파일만 고쳐서는 일어나지 않는다) 심볼과 프로젝트 asmdef 참조가 이 파일에 맞춰지고, 심볼이 바뀌면 한 번 더 컴파일된다. 그 기능의 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다 — 먼저 쓰면 컴파일이 실패해 도메인을 다시 읽지 않으므로 심볼도 맞춰지지 않는다. 입력·Steam은 외부 패키지가 있어야 컴파일된다(위 표 — 패키지를 들이는 것은 내려받기라 먼저 묻는다). 심볼은 지금 고른 플랫폼, 지금 빌드 대상의 플랫폼, PC(Standalone), 서버(Dedicated Server — 심볼 칸이 PC와 따로다)에 자동으로 넣고 빼며, 다른 플랫폼으로 바꾸는 순간 그 플랫폼에도 맞춘다.
 
 ### 코드로 쓰는 법
 
@@ -587,9 +497,10 @@ static class FeatureCheck
 
 ### 에디터에서
 
-- 자동: DB 변경을 저장(Ctrl+S)하면 다시 만든다. 내용이 같으면 파일을 건드리지 않는다.
+- 자동: DB 변경이 **적용될 때**(저장 Ctrl+S, DB 반영 스크립트의 새 항목 저절로 적용 — 21장 3-1) **적용된 항목만으로** 다시 만든다. 내용이 같으면 파일을 건드리지 않고, 바뀌면 Unity가 다시 컴파일한다. 플레이·컴파일 중이면 끝난 뒤에 만든다.
+- **AI가 새 상수를 쓰는 차례**: DB 반영 스크립트를 쓴다 → Unity가 컴파일하고 스크립트를 돌린다 → 새 항목이 적용되어 `GameIds.cs`가 다시 쓰인다 → 파일에 상수가 생긴 것을 본 뒤 그 상수를 쓰는 코드를 쓴다. 같은 응답에서 먼저 쓰면 컴파일 검사 훅(11절)과 Unity 컴파일이 "없는 이름"으로 막혀 스크립트가 돌지 못한다. 그 사이 규칙 코드가 ID를 읽어야 하면 `Game.Entry`나 반영 스크립트의 ID 글자로 읽는다(관례 15절). 고치기·지우기·ID 바꾸기는 개발자가 Ctrl+S로 적용해야 `GameIds`에 들어간다.
 - 수동 메뉴는 없다. 코드에서 다시 만들려면 `GameIdsGenerator.Generate(force: true)`(에디터).
-- 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다). 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProject/Generated/`. `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다.
+- 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다) — 시작 설정을 한 프로젝트는 `Assets/MomoiProject/Code/Rules/Generated/`. 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProject/Generated/`. asmdef 안에 한 번 만든 뒤에는 저절로 옮기지 않는다(옮길 자리가 생기면 콘솔 경고로 알린다). `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다(예전 파일은 지운다).
 
 ### 코드로 쓰는 법
 
@@ -612,7 +523,7 @@ namespace GBible.Ids
 }
 ```
 
-- **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `instance.potion` → `InstancePotion`).
+- **이름 규칙**: ID를 점·밑줄로 나눠 각 조각의 첫 글자를 대문자로 이은 것(`player.gold` → `PlayerGold`, `instance.potion` → `InstancePotion`). 이미 있던 상수는 지난 파일의 이름을 그대로 쓴다(새 항목이 생겨도 기존 상수가 다른 ID를 가리키지 않게).
 - **분류 이름**: DB 종류 클래스 이름에서 끝의 `Data`를 뺀 것(`AchievementData` → `Achievement`, `InstanceData` → `Instance`, `StatData` → `Stat`, `StatusData` → `Status`, `BalanceData` → `Balance`, `WeightTableData` → `WeightTable`, `SettingData` → `Setting`). 플레이어 데이터만 `PlayerData`. 짧은 이름이 같은 종류가 둘이면(프로젝트의 `LocationData`와 다이얼로그 모듈의 `LocationData` 등 — 네임스페이스만 다름) 전체 이름 순으로 뒤의 것에 `_2`를 붙인다(`Location_2`). `GameIds`·`SpriteSize`(스프라이트 틀이 있을 때)도 피한다.
 - **플레이어 데이터 = `PlayerDataKey<T>`**: 값 형식이 붙은 키. `.Id`가 ID 글자이고, `string`으로 바로 바뀐다(암시 변환).
 - **그 밖의 항목 = `const string`**: `[BindTo(...)]` 같은 어트리뷰트 인자에도 쓸 수 있다.
@@ -663,7 +574,7 @@ GBibleRuntime.Game.Use(GameIds.Ability.AbilityHeal, heroId, targetId);
 ### 주의할 점
 
 - 생성 파일은 직접 고치지 않는다(다시 만들면 덮인다).
-- 저장(Ctrl+S)하지 않은 DB 항목은 생성 코드에 없다. 저장한 뒤 컴파일이 끝나야 새 상수가 보인다.
+- 적용하지 않은('적용 전') DB 항목은 생성 코드에 없다. 적용한 뒤 컴파일이 끝나야 새 상수가 보인다(위 '에디터에서'의 차례).
 - 값 형식을 이 위치에서 참조할 수 없으면(예: 다른 asmdef의 클래스) 그 플레이어 데이터는 `PlayerDataKey<T>` 대신 `const string`으로 만들어지고 `Game.Data()`에도 빠진다. `Ids.json`의 `folder`를 그 형식의 asmdef 쪽으로 바꾸면 형식이 붙는다.
 - 키워드는 `GameIds`에 없다. 키워드 그룹 코드(`[KeywordGroup] static class`)의 상수가 곧 ID다.
 
@@ -718,6 +629,19 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 
 ---
 
+## 9. 설정 순서
+
+시작 설정 뒤 AI가 진행 매뉴얼의 단계 1(관례 16절)에서 하는 DB 쪽 차례다.
+
+1. 시작 설정을 적용한다(1절 — `GameDatabase`·`run`·`profile`·코드 폴더).
+2. 데이터 클래스(`RunState`·`Profile`·원본 클래스)와 키워드 그룹 코드(`Assets/MomoiProject/Code/Rules/Keywords/`, 05장 · 21장 6.1)를 쓴다.
+3. DB 반영 스크립트로 항목(플레이어 데이터·밸런싱 값·인스턴스 …)을 만든다 → 새 항목은 저절로 적용된다(21장 3-1).
+4. `GameIds.cs`에 상수가 생겼는지 파일로 본 뒤 그 상수를 쓰는 코드를 쓴다(7절).
+5. `Logs/MomoiProject/DbStatus.txt` 첫 줄이 "상태: 검증 통과"인지 본다(오류가 있으면 빌드가 막힌다). '적용 전 변경'이 남았으면 개발자에게 Ctrl+S를 부탁한다.
+6. 규칙 테스트(`Logs/MomoiProject/RunTests.request`)·플레이 둘러보기로 확인한다(38장).
+
+---
+
 ## 10. 처음 상태로 되돌리기
 
 **한 줄 요약.** 메뉴 `MomoiProject → 개발 → 처음 상태로 되돌리기…`는 프로젝트를 "막 만들고 Momoi Project와 필요한 에셋만 설치한" 상태로 되돌린다. 개발자가 더하고 바꾼 것은 모두 백업 폴더로 옮겨지고, Unity가 다시 열린다.
@@ -755,18 +679,6 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 - 큰 에셋이 많으면 옮기는 데 시간이 걸린다(같은 드라이브 안에서 옮기기라 복사보다는 빠르다).
 - 버전 관리(git 등)를 쓰면 `MomoiProjectBaseline/`은 팀이 같이 쓰도록 올리고, `MomoiProjectBackups/`는 올리지 않는 편이 낫다.
 
-## 9. 설정 순서
-
-새 프로젝트를 손으로 설정한다면 이 순서다(지금은 AI가 시작 설정 뒤 진행 매뉴얼의 단계 1에서 한다).
-
-1. DB를 한 번 연다(GameDatabase 생성).
-2. 키워드 그룹을 만들고 필드에 연결한다(`21-Editor-Database.md` 키워드 탭).
-3. 플레이어 데이터를 만든다(ID·구역·값 형식).
-4. 필요하면 스프라이트 틀, 로그, 도전과제, 인스턴스를 만든다.
-5. 저장(Ctrl+S) → `GameIds.cs`가 만들어졌는지 본다.
-6. 사이드바 아래가 "검증 통과"인지 본다(오류가 있으면 빌드가 막힌다).
-7. 플레이하며 모니터로 확인한다(`22-Monitor-Debug.md`).
-
 ---
 
 ## 11. Claude Code 파일
@@ -782,6 +694,6 @@ IL2CPP 빌드의 코드 줄이기(Player Settings › **Managed Stripping Level*
 | `Docs/Decisions.md` | 결정 기록(개발자의 답·승인으로 확정한 것을 쌓는다 — `D-n`, 답을 기다리는 추천은 '확인 기다리는 것') | 없을 때만 |
 
 - 템플릿은 패키지 `Documentation~/AI/Templates`, 컴파일 검사는 `Tools~/compile-check.ps1`이다. `{{GBIBLE}}` 자리에 프로젝트에서 본 패키지 경로(`Packages/com.momoi.gbible` 또는 `Library/PackageCache/com.momoi.gbible@…`)가 들어간다.
-- **컴파일 검사**: Unity가 만든 `.csproj`(Preferences › External Tools의 프로젝트 파일)의 참조·심볼을 빌려 `Assets` 아래 asmdef마다 그 폴더의 `.cs`를 직접 컴파일한다(Unity를 연 채로도, 방금 만든 파일도). 마지막으로 통과한 뒤 바뀐 파일·폴더가 없으면 바로 끝난다. Unity 설치 폴더는 `ProjectVersion.txt`의 버전으로 Hub 폴더에서 찾는다(못 찾으면 환경 변수 `MOMOI_UNITY_EDITOR_DATA`에 `…\Editor\Data`). csproj가 아직 없는 어셈블리는 건너뛰고 알린다. **UXML도 본다**: `Assets`·패키지 아래 모든 `.uxml`을 XML로 읽어 보고, 읽히지 않으면(흔히 주석 안의 `--`) 경로·줄과 함께 막는다 — 그런 UXML은 Unity가 가져오지 못해 화면이 예전 모습이나 빈 채로 열리고, 콘솔에는 가져올 때 한 번만(파일 이름 없이) 남는다. 같은 오류로 세 번 넘게 막지는 않는다. 손으로: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/compile-check.ps1 -Always`.
+- **컴파일 검사**: Unity가 만든 `.csproj`(Preferences › External Tools의 프로젝트 파일)의 참조·심볼을 빌려 `Assets` 아래 asmdef마다 그 폴더의 `.cs`를 직접 컴파일한다(Unity를 연 채로도, 방금 만든 파일도. asmdef 밖의 코드는 `Assembly-CSharp`·`-Editor`로, 프로젝트 안 패키지는 소스가 Unity의 DLL보다 새로울 때만). 디스크에 있는 그대로 보므로 아직 `GameIds.cs`에 없는 상수·아직 켜지지 않은 기능의 형식은 오류다(7절·6절). 마지막으로 통과한 뒤 바뀐 파일·폴더가 없으면 바로 끝난다. Unity 설치 폴더는 `ProjectVersion.txt`의 버전으로 Hub 폴더에서 찾는다(못 찾으면 환경 변수 `MOMOI_UNITY_EDITOR_DATA`에 `…\Editor\Data`). Unity·컴파일러를 못 찾으면 알리고 막지 않는다. csproj가 아직 없는 어셈블리(새 asmdef)는 건너뛰고 알린다 — Unity가 한 번 컴파일한 뒤부터 검사된다. **UXML도 본다**: `Assets`·패키지 아래 모든 `.uxml`을 XML로 읽어 보고, 읽히지 않으면(흔히 주석 안의 `--`) 경로·줄과 함께 막는다 — 그런 UXML은 Unity가 가져오지 못해 화면이 예전 모습이나 빈 채로 열리고, 콘솔에는 가져올 때 한 번만(파일 이름 없이) 남는다. 같은 오류로 세 번 넘게 막지는 않는다. 손으로: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/compile-check.ps1 -Always`.
 - **맞추지 않기**: 메뉴 `MomoiProject → 개발 → Claude Code 파일 맞추지 않기`(표시 `ProjectSettings/MomoiProject/ClaudeFiles.off`). 켜면 만들지도 고치지도 않는다. 이미 있는 파일은 그대로다.
 - `.claude/settings.json`을 읽지 못하면(손으로 쓴 JSON 오류) 건드리지 않고 콘솔에 경고한다. 그때는 `hooks.Stop`에 위 명령을 직접 넣는다.
