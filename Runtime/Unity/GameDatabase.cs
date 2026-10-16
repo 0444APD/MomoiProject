@@ -32,6 +32,8 @@ namespace GBible.Data
         [SerializeField] string runSaveEvent = "";
         // 프로필도 바깥 행동이 끝날 때마다 저장할지(수집형·방치형처럼 진행이 프로필에 있는 게임. 끄면 끌 때·판 끝에만).
         [SerializeField] bool saveProfileEachAction;
+        // 세이브 슬롯이 프로필을 함께 쓴다: 프로필(앨범 · 해금 · 본 엔딩)은 하나, 판(진행 중인 이야기)만 슬롯마다(세이브 3칸 + 공유 앨범).
+        [SerializeField] bool slotsShareProfile;
         // 선택: 이 이벤트를 받은 행동이 끝나면 Undo 기록을 비운다(예: 턴 끝 — 지난 턴으로는 되돌릴 수 없다).
         [SerializeField] string undoBoundaryEvent = "";
         // 선택: 게임이 켜질 때 저장된 판이 있으면 이어 하고, 없으면 새 판 행동을 실행한다(타이틀 화면이 없는 게임).
@@ -70,6 +72,7 @@ namespace GBible.Data
         public float RunSaveInterval => runSaveInterval;
         public string RunSaveEvent => runSaveEvent;
         public bool SaveProfileEachAction => saveProfileEachAction;
+        public bool SlotsShareProfile => slotsShareProfile;
         public string UndoBoundaryEvent => undoBoundaryEvent;
         public bool ContinueOnStart => continueOnStart;
         public int TickRate => tickRate;
@@ -119,6 +122,8 @@ namespace GBible.Data
         }
 
         public void EditorSetTickRate(int value) => tickRate = Math.Max(0, value);
+
+        public void EditorSetSlotsShareProfile(bool value) => slotsShareProfile = value;
 
         public void EditorSetSceneFlow(string key, string path, string empty)
         {

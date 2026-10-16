@@ -181,6 +181,16 @@ namespace GBible.EditorTools.UI
             profileField.tooltip = "켜면 프로필(메타 구역)을 바꾼 행동마다 프로필을 저장한다(바꾸지 않은 행동에서는 쓰지 않는다). 끄면 끌 때 · 판 끝 이벤트 때 · 판을 저장할 때 그사이 바뀌었으면 저장된다. 진행이 거의 프로필에 있는 게임(수집형 · 마을이 있는 게임)은 켠다.";
             profileField.RegisterValueChangedCallback(e => { profileEach = e.newValue; SaveRunOptions(); });
             root.Add(profileField);
+            var shareField = new Toggle("세이브 슬롯이 프로필을 함께 씀") { value = database.SlotsShareProfile };
+            shareField.tooltip = "켜면 프로필(앨범 · 해금 · 본 엔딩)은 하나이고 판(진행 중인 이야기)만 세이브 슬롯마다 따로다 — 미연시 · RPG의 '세이브 3칸 + 공유 앨범'. 끄면 슬롯마다 프로필도 따로(기본). 테스트 씬의 'test' 슬롯은 늘 자기 프로필을 쓴다.";
+            shareField.RegisterValueChangedCallback(e =>
+            {
+                Undo.RecordObject(database, "세이브 슬롯 프로필 공유 변경");
+                database.EditorSetSlotsShareProfile(e.newValue);
+                EditorUtility.SetDirty(database);
+                AssetDatabase.SaveAssetIfDirty(database);
+            });
+            root.Add(shareField);
 
             // ── 시작할 때 이어 하기(선택) ──
             Heading(root, "시작할 때 이어 하기(선택)", "타이틀 화면 없이 바로 판으로 들어가는 게임용. 게임이 켜질 때 저장된 판이 있으면 이어 하고, 없으면 새 판 행동을 실행한다. 타이틀 화면이 있는 게임은 끄고, 이어 하기 버튼에서 직접 부른다.");

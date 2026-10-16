@@ -76,7 +76,7 @@ namespace GBible
             _open = showPanel;
             // 테스트 씬에 머문다: 판 값이 다른 씬을 가리켜도 씬 흐름이 씬을 바꾸지 않는다.
             GameScenes.Hold = true;
-            if (separateSlot) GBibleRuntime.UseSlot(Slot, remember: false);
+            if (separateSlot) GBibleRuntime.UseSlot(Slot, remember: false, ownProfile: true);
             var session = GBibleRuntime.Session;
             if (session == null) return;
             ulong? fixedSeed = string.IsNullOrWhiteSpace(seed) ? (ulong?)null : RandomStreams.SeedOf(seed);

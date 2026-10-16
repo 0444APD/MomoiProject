@@ -445,7 +445,9 @@ namespace GBible
                 var after = have - need;
                 if (after < new BigNumber(cost.floor))
                 {
-                    if (!FieldOps.Near(after.ToDouble(), cost.floor)) return false;
+                    // 근사 비교는 double에 담기는 차이만(모자란 양이 1e308을 넘으면 무한대라 '가깝다'로 잘못 볼 수 있다).
+                    var gap = after.ToDouble();
+                    if (double.IsInfinity(gap) || double.IsNaN(gap) || !FieldOps.Near(gap, cost.floor)) return false;
                     after = new BigNumber(cost.floor);
                 }
                 WriteBig(cost.key, cost.path, after);

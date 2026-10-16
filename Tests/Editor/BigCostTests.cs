@@ -55,8 +55,10 @@ namespace GBible.Tests
         [Test]
         public void 주기와_검사가_큰_수_칸을_숫자로_본다()
         {
-            Do(g => new PlayerDataReward { key = "run", path = "cookies", amount = 1e300 }.Grant(g.Session));
-            Assert.IsTrue(Run.cookies > BigNumber.Parse("5e400"), "큰 수에 더했다");
+            Do(g => g.Get<BcRun>("run").cookies = BigNumber.Parse("1.5e308"));
+            Do(g => new PlayerDataReward { key = "run", path = "cookies", amount = 1.5e308 }.Grant(g.Session));
+            Assert.AreEqual(BigNumber.Parse("3e308"), Run.cookies, "double을 넘는 합도 큰 수로 담긴다");
+            Do(g => g.Get<BcRun>("run").cookies = BigNumber.Parse("5e400"));
             Assert.IsTrue(FieldOps.Test(Run, "cookies", FieldOp.AtLeast, "1e400"));
             Assert.IsFalse(FieldOps.Test(Run, "cookies", FieldOp.Less, "1e400"));
             Assert.IsTrue(FieldOps.Test(Run, "cookies", FieldOp.Greater, "1.5K"), "글자 단위(1.5K)도 읽는다");
