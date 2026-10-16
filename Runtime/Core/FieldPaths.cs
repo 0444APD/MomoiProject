@@ -538,6 +538,19 @@ namespace GBible
                 case FieldOp.IsFalse: return value is bool f && !f;
                 case FieldOp.Equal: return Same(value, target);
             }
+            // 큰 수 칸(BigNumber): 값 글자도 큰 수로 읽는다(1e400 · 1.5K).
+            if (value is BigNumber big)
+            {
+                if (!BigNumber.TryParse(target, out var bigLimit)) return false;
+                switch (op)
+                {
+                    case FieldOp.AtLeast: return big >= bigLimit;
+                    case FieldOp.AtMost: return big <= bigLimit;
+                    case FieldOp.Greater: return big > bigLimit;
+                    case FieldOp.Less: return big < bigLimit;
+                }
+                return false;
+            }
             if (!TryNumber(value, out var number) || !double.TryParse(target, NumberStyles.Float, CultureInfo.InvariantCulture, out var limit)) return false;
             switch (op)
             {
@@ -554,6 +567,7 @@ namespace GBible
             if (value == null) return string.IsNullOrEmpty(target);
             if (value is bool b) return string.Equals(target, b ? "true" : "false", StringComparison.OrdinalIgnoreCase) || target == (b ? "참" : "거짓");
             if (value is Enum e) return string.Equals(e.ToString(), target, StringComparison.Ordinal);
+            if (value is BigNumber big) return BigNumber.TryParse(target, out var other) && big == other;
             if (TryNumber(value, out var number))
                 return double.TryParse(target, NumberStyles.Float, CultureInfo.InvariantCulture, out var other) && Near(number, other);
             return string.Equals(Convert.ToString(value, CultureInfo.InvariantCulture), target, StringComparison.Ordinal);

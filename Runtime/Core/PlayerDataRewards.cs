@@ -58,7 +58,7 @@ namespace GBible
             if (type == null) return GrantKind.None;
             type = Nullable.GetUnderlyingType(type) ?? type;
             if (type == typeof(bool) || type == typeof(string) || type.IsEnum) return GrantKind.Value;
-            if (TypeResolver.IsNumeric(type)) return GrantKind.Number;
+            if (TypeResolver.IsNumeric(type) || type == typeof(BigNumber)) return GrantKind.Number;
             var info = DataModel.Of(type);
             if (info.Kind == DataKind.List || info.Kind == DataKind.Collection || info.Kind == DataKind.Array)
             {
@@ -302,6 +302,8 @@ namespace GBible
         {
             if (kind == GrantKind.Number)
             {
+                // 큰 수 칸은 큰 수로 더한다(1e308을 넘어도).
+                if ((Nullable.GetUnderlyingType(type) ?? type) == typeof(BigNumber)) return (current is BigNumber big ? big : BigNumber.Zero) + amount;
                 var before = current == null ? 0 : Convert.ToDouble(current, CultureInfo.InvariantCulture);
                 return PlayerDataGrants.ToNumber(before + amount, type);
             }
@@ -385,8 +387,13 @@ namespace GBible
                         WarnStatic(session, $"{i + 1}번째 값: '{text}'는 숫자가 아닙니다");
                         continue;
                     }
-                    var before = map.Contains(mapKey) && map[mapKey] != null ? Convert.ToDouble(map[mapKey], CultureInfo.InvariantCulture) : 0;
-                    next = PlayerDataGrants.ToNumber(before + delta, valueType);
+                    if ((Nullable.GetUnderlyingType(valueType) ?? valueType) == typeof(BigNumber))
+                        next = (map.Contains(mapKey) && map[mapKey] is BigNumber big ? big : BigNumber.Zero) + delta;
+                    else
+                    {
+                        var before = map.Contains(mapKey) && map[mapKey] != null ? Convert.ToDouble(map[mapKey], CultureInfo.InvariantCulture) : 0;
+                        next = PlayerDataGrants.ToNumber(before + delta, valueType);
+                    }
                 }
                 else next = Make(session, valueType, text, kind);
                 if (next != null) map[mapKey] = next;

@@ -64,7 +64,9 @@ namespace GBible
     {
         public string key;      // 플레이어 데이터 키
         public string path;     // 그 값 안의 숫자 필드 경로(비우면 값 전체)
-        public double amount;   // 낼 양
+        public double amount;   // 낼 양(큰 수 비용이면 1e308을 넘을 때 무한대 — big을 본다)
+        public double multiplier = 1;   // 곱할 배율(할인 0.8 · 두 배 2) — 큰 수 비용에도 그대로 맞는다. 할인 기믹은 amount보다 이것을 고친다
+        public BigNumber big;   // 큰 수 비용(Game.Pay(…, BigNumber) · 낼 곳이 BigNumber 칸)의 낼 양. 큰 수를 직접 고칠 때만 쓴다
         public double floor;    // 내고 남은 값이 이보다 작으면 실패(기본 0. 빚을 허용하면 음수 — "−20까지 빚": 값으로 바꾸기 −20)
         public string forId;    // 무엇을 위한 비용(사는 카드·쓰는 주문 ID, 비우면 모름) — "행성 카드는 공짜"가 거른다
         public string userId;   // 내는 쪽(지팡이·플레이어 id)

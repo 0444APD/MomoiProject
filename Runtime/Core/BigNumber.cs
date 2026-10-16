@@ -307,6 +307,21 @@ namespace GBible
         }
 
         // "1.5e40" · "12345" · "3.2K"(ToString 기본 형식)을 읽는다.
+        // 읽지 못하면 거짓(던지지 않는다 — 조건 · 검사의 값 글자처럼 사람이 적은 글).
+        public static bool TryParse(string text, out BigNumber value)
+        {
+            try
+            {
+                value = Parse(text);
+                return true;
+            }
+            catch (Exception e) when (e is FormatException || e is OverflowException)
+            {
+                value = Zero;
+                return false;
+            }
+        }
+
         public static BigNumber Parse(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return Zero;

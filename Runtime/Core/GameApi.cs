@@ -399,32 +399,65 @@ namespace GBible
         // forId: 무엇을 위한 비용(사는 카드·쓰는 주문 ID — "행성 카드 공짜"가 거른다), userId: 내는 쪽(지팡이·플레이어).
         public void Pay(string key, string path, double amount, string what = null, string forId = null, object user = null)
         {
-            if (!TryPayCore(key, path, amount, forId, user, out var cost, out var have))
-            {
-                // 텍스트 키면 TextKey로 넘겨 실패 글을 볼 때의 언어로 바뀌게 한다.
-                object name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? new TextKey(what) : (object)what;
-                throw new GameFailure(FailureKeys.NotEnough,
-                    TextArgs.From(("what", name), ("have", Format(have)), ("need", Format(cost.amount))),
-                    "{what}이(가) 모자랍니다({have} / {need}).");
-            }
+            if (!TryPayCore(key, path, amount, null, forId, user, out var cost, out var have, out var need)) throw NotEnough(cost, what, have, need);
+        }
+
+        // 큰 수 비용(방치형 — 1e308을 넘는 가격): 낼 곳이 BigNumber 칸이면 큰 수로 빼고, 일반 숫자 칸이면 double로 바꿔 뺀다.
+        //   Game.Pay(GameIds.PlayerData.Run.Id, "cookies", Rules.PriceOf(game, building), what: "cookies.name", forId: building.template);
+        public void Pay(string key, string path, BigNumber amount, string what = null, string forId = null, object user = null)
+        {
+            if (!TryPayCore(key, path, amount.ToDouble(), amount, forId, user, out var cost, out var have, out var need)) throw NotEnough(cost, what, have, need);
+        }
+
+        GameFailure NotEnough(CostIntent cost, string what, BigNumber have, BigNumber need)
+        {
+            // 텍스트 키면 TextKey로 넘겨 실패 글을 볼 때의 언어로 바뀌게 한다.
+            object name = string.IsNullOrEmpty(what) ? PathText(cost.key, cost.path) : Texts.Has(what) ? new TextKey(what) : (object)what;
+            return new GameFailure(FailureKeys.NotEnough,
+                TextArgs.From(("what", name), ("have", Format(have)), ("need", Format(need))),
+                "{what}이(가) 모자랍니다({have} / {need}).");
         }
 
         // 낼 수 있으면 내고 참, 모자라면 아무것도 바꾸지 않고 거짓(실패를 던지지 않는다 — 틱 묶음 행동 안에서 연계 MP처럼 "되면 한다").
-        public bool TryPay(string key, string path, double amount, string forId = null, object user = null) => TryPayCore(key, path, amount, forId, user, out _, out _);
+        public bool TryPay(string key, string path, double amount, string forId = null, object user = null) => TryPayCore(key, path, amount, null, forId, user, out _, out _, out _);
+        public bool TryPay(string key, string path, BigNumber amount, string forId = null, object user = null) => TryPayCore(key, path, amount.ToDouble(), amount, forId, user, out _, out _, out _);
 
-        bool TryPayCore(string key, string path, double amount, string forId, object user, out CostIntent cost, out double have)
+        // big: 큰 수로 낸 비용(Pay(…, BigNumber))이면 그 양. 낼 곳이 BigNumber 칸이거나 big이 있으면 큰 수로 계산하고, 아니면 예전 그대로 double로 계산한다.
+        bool TryPayCore(string key, string path, double amount, BigNumber? big, string forId, object user, out CostIntent cost, out BigNumber have, out BigNumber need)
         {
             RequireSingle(key, path);
             cost = Intercept(new CostIntent
             {
-                key = key, path = path ?? "", amount = amount, forId = forId ?? "",
+                key = key, path = path ?? "", amount = amount, big = big ?? new BigNumber(amount), forId = forId ?? "",
                 userId = user == null ? "" : user as string ?? (HasId(user.GetType()) ? IdOf(user) : ""),
             });
-            have = 0;
-            if (cost.cancelled || cost.amount <= 0) return true;
-            have = ReadNumber(cost.key, cost.path);
+            have = BigNumber.Zero;
+            need = BigNumber.Zero;
+            if (cost.cancelled) return true;
+            if (big.HasValue || IsBigField(cost.key, cost.path))
+            {
+                // 고친 쪽을 쓴다: 큰 수(big)를 고쳤으면 그것, amount를 고쳤으면 그것, 아니면 처음 양 — 그 뒤 배율.
+                var start = big ?? new BigNumber(amount);
+                var chosen = cost.big != start ? cost.big : !cost.amount.Equals(amount) ? new BigNumber(cost.amount) : start;
+                need = chosen * new BigNumber(cost.multiplier);
+                if (need <= BigNumber.Zero) return true;
+                have = ReadBig(cost.key, cost.path);
+                var after = have - need;
+                if (after < new BigNumber(cost.floor))
+                {
+                    if (!FieldOps.Near(after.ToDouble(), cost.floor)) return false;
+                    after = new BigNumber(cost.floor);
+                }
+                WriteBig(cost.key, cost.path, after);
+                return true;
+            }
+            var amountNeed = cost.amount * cost.multiplier;
+            need = new BigNumber(amountNeed);
+            if (amountNeed <= 0) return true;
+            var haveNumber = ReadNumber(cost.key, cost.path);
+            have = new BigNumber(haveNumber);
             // 아주 작은 차이는 같다고 본다(FieldOps.Near — 0.1씩 찬 0.9999999999999999로도 1을 낸다). 하한 바로 아래로 내려가면 하한으로.
-            var next = have - cost.amount;
+            var next = haveNumber - amountNeed;
             if (next < cost.floor)
             {
                 if (!FieldOps.Near(next, cost.floor)) return false;
@@ -435,7 +468,46 @@ namespace GBible
         }
 
         // 낼 수 있는지(지금 값 기준, 가로채기 전 — 화면 미리보기용). 실제 지불은 Pay가 가로채기까지 거쳐 다시 판정한다.
-        public bool CanPay(string key, string path, double amount) => FieldOps.AtLeast(ReadNumber(key, path ?? ""), amount);
+        public bool CanPay(string key, string path, double amount) =>
+            IsBigField(key, path ?? "") ? ReadBig(key, path ?? "") >= new BigNumber(amount) : FieldOps.AtLeast(ReadNumber(key, path ?? ""), amount);
+
+        public bool CanPay(string key, string path, BigNumber amount) => ReadBig(key, path ?? "") >= amount;
+
+        // 낼 곳이 큰 수(BigNumber) 칸인가.
+        bool IsBigField(string key, string path)
+        {
+            if (string.IsNullOrEmpty(key) || !Session.Data.IsDefined(key)) throw new InvalidOperationException($"[MomoiProject] 비용: 없는 플레이어 데이터 '{key}'입니다.");
+            var type = string.IsNullOrEmpty(path) ? Session.Data.TypeOf(key) : FieldPaths.TypeAt(Session.Data.TypeOf(key), path, out _);
+            if (type == null) return false;
+            return (Nullable.GetUnderlyingType(type) ?? type) == typeof(BigNumber);
+        }
+
+        BigNumber ReadBig(string key, string path)
+        {
+            if (!IsBigField(key, path)) return new BigNumber(ReadNumber(key, path));
+            var value = string.IsNullOrEmpty(path) ? Session.Data.Get(key) : FieldPaths.Resolve(Session.Data.Get(key), path).FirstOrDefault();
+            return value is BigNumber number ? number : BigNumber.Zero;
+        }
+
+        void WriteBig(string key, string path, BigNumber value)
+        {
+            if (!IsBigField(key, path))
+            {
+                WriteNumber(key, path, value.ToDouble());
+                return;
+            }
+            if (string.IsNullOrEmpty(path))
+            {
+                Session.Data.Set(key, value);
+                return;
+            }
+            FieldPaths.SplitLast(path, out var parentPath, out var member);
+            Session.Data.Modify<object>(key, root =>
+            {
+                foreach (var parent in FieldPaths.Resolve(root, parentPath).ToList())
+                    FieldPaths.Assign(parent, member, (_, type) => value);
+            });
+        }
 
         // 경로에 []가 있나(요소마다 펼치는 경로 — 값이 여럿). 비용처럼 숫자 하나에만 쓰는 곳은 받지 않는다(목록의 한 요소는 [id]로 고른다).
         internal static bool IsManyPath(string path) => !string.IsNullOrEmpty(path) && path.IndexOf(FieldPaths.Each, StringComparison.Ordinal) >= 0;
@@ -483,6 +555,7 @@ namespace GBible
         string PathText(string key, string path) => string.IsNullOrEmpty(path) ? Session.Data.LabelOf(key) : $"{Session.Data.LabelOf(key)} › {path}";
 
         static string Format(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        static string Format(BigNumber value) => Math.Abs(value.ToDouble()) < 1e15 ? Format(value.ToDouble()) : value.ToString();
 
         // 새 개체의 id(소환 등). 접두어별 번호를 플레이어 데이터 저장소에 두므로 Undo·저장·멀티플레이에서도 같다.
         // 접두어가 숫자로 끝나면 번호와의 사이에 '_'를 넣는다("u1" → "u1_1"): 그대로 붙이면 "u"의 11번과 "u1"의 1번이 둘 다 "u11"이 된다.
