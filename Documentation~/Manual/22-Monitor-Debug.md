@@ -200,7 +200,7 @@ var evt = EventSimulator.Create(typeof(EnemyKilled), new System.Collections.Gene
 
 ### 코드로 쓰는 법
 
-[필수] 게임 코드에서는 행동 안에서 `Game.Events.Publish(이벤트)`로 쏜다(행동 밖에서 쏘면 그 이벤트로 바뀐 로그·값이 Undo되지 않는다). 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
+[필수] 게임 코드에서는 플레이어 데이터를 바꾸는 받는 쪽(로그 · 트리거 결과)이 있는 이벤트를 행동 안에서 `Game.Events.Publish(이벤트)`로 쏜다(행동 밖에서 쏘면 그 이벤트로 바뀐 로그·값이 Undo되지 않는다). 연출·UI는 `SubscribeAfterAction<T>`로 받는다(성공한 행동의 이벤트만, 행동이 끝난 뒤 쏜 순서대로. 반환값을 `Dispose`하면 그만 받는다. `10-Events.md`). 같은 쏘기를 버튼으로 저장해 두려면 DB › 개발 명령의 **이벤트 쏘기** Block을 쓴다(7절).
 
 ```csharp
 using GBible;
