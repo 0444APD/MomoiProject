@@ -389,7 +389,8 @@ namespace GBible
 
         public bool CancelChoice(string choiceId) => Session.Choices.Cancel(choiceId);
         // 다시 뽑기(행동 안에서): '가중치 표에서 고르기'로 만든 선택의 후보를 같은 표에서 새로 뽑는다. 비용·남은 횟수는 부르는 행동이 맡는다.
-        //   class RerollReward : GameAction { public string choice; protected override void Run() { Game.Pay(키, "rerolls", 1); Game.RerollChoice(choice); } }
+        //   class RerollReward : GameAction { public string choice; protected override void Run() { Game.Pay(키, "rerolls", 1); if (!Game.RerollChoice(choice)) throw Game.Fail("fail.cannotReroll", "다시 뽑을 수 없습니다."); } }
+        // 표로 만든 선택이 아니면(Game.Ask) 거짓 — 위처럼 실패로 던져야 낸 비용도 돌아간다. 코드로 만든 선택은 CancelChoice 뒤 다시 Ask.
         public bool RerollChoice(string choiceId) => Session.Choices.Reroll(choiceId);
 
         // ── 비용 ───────────────────────────────────────────────
@@ -426,9 +427,11 @@ namespace GBible
         bool TryPayCore(string key, string path, double amount, BigNumber? big, string forId, object user, out CostIntent cost, out BigNumber have, out BigNumber need)
         {
             RequireSingle(key, path);
+            // 큰 수로 나타낼 수 없는 double 양(무한대 · NaN)은 big에 0을 둔다 — 그 양은 아래에서 따로 다룬다.
+            var start = big ?? (IsFinite(amount) ? new BigNumber(amount) : BigNumber.Zero);
             cost = Intercept(new CostIntent
             {
-                key = key, path = path ?? "", amount = amount, big = big ?? new BigNumber(amount), forId = forId ?? "",
+                key = key, path = path ?? "", amount = amount, big = start, forId = forId ?? "",
                 userId = user == null ? "" : user as string ?? (HasId(user.GetType()) ? IdOf(user) : ""),
             });
             have = BigNumber.Zero;
@@ -436,9 +439,23 @@ namespace GBible
             if (cost.cancelled) return true;
             if (big.HasValue || IsBigField(cost.key, cost.path))
             {
-                // 고친 쪽을 쓴다: 큰 수(big)를 고쳤으면 그것, amount를 고쳤으면 그것, 아니면 처음 양 — 그 뒤 배율.
-                var start = big ?? new BigNumber(amount);
-                var chosen = cost.big != start ? cost.big : !cost.amount.Equals(amount) ? new BigNumber(cost.amount) : start;
+                // 고친 쪽을 쓴다: 큰 수(big)를 고쳤으면 그것, amount를 고쳤으면 그것(둘 다 고쳤으면 고친 big에 amount가 바뀐 비율을 곱한다) — 그 뒤 배율.
+                var bigChanged = cost.big != start;
+                var amountChanged = !cost.amount.Equals(amount);
+                var chosen = bigChanged ? cost.big : start;
+                if (!big.HasValue && !amountChanged && !IsFinite(amount))
+                {
+                    if (double.IsPositiveInfinity(amount)) return false;   // 무한대 값은 낼 수 없다
+                    return true;                                          // NaN · 음의 무한대 = 낼 것 없음
+                }
+                if (amountChanged)
+                {
+                    if (double.IsNaN(cost.amount) || cost.amount <= 0) return true;   // 0을 곱해 공짜(무한대 × 0 = NaN 포함)
+                    if (double.IsPositiveInfinity(cost.amount)) return false;
+                    chosen = bigChanged && IsFinite(amount) && amount > 0 ? chosen * new BigNumber(cost.amount / amount) : new BigNumber(cost.amount);
+                }
+                if (double.IsNaN(cost.multiplier) || cost.multiplier <= 0) return true;
+                if (double.IsPositiveInfinity(cost.multiplier)) return false;
                 need = chosen * new BigNumber(cost.multiplier);
                 if (need <= BigNumber.Zero) return true;
                 have = ReadBig(cost.key, cost.path);
@@ -454,10 +471,10 @@ namespace GBible
                 return true;
             }
             var amountNeed = cost.amount * cost.multiplier;
-            need = new BigNumber(amountNeed);
-            if (amountNeed <= 0) return true;
+            need = ForText(amountNeed);
+            if (double.IsNaN(amountNeed) || amountNeed <= 0) return true;   // NaN = 무한대 × 0(공짜로 만든 것)
             var haveNumber = ReadNumber(cost.key, cost.path);
-            have = new BigNumber(haveNumber);
+            have = ForText(haveNumber);
             // 아주 작은 차이는 같다고 본다(FieldOps.Near — 0.1씩 찬 0.9999999999999999로도 1을 낸다). 하한 바로 아래로 내려가면 하한으로.
             var next = haveNumber - amountNeed;
             if (next < cost.floor)
@@ -475,13 +492,22 @@ namespace GBible
 
         public bool CanPay(string key, string path, BigNumber amount) => ReadBig(key, path ?? "") >= amount;
 
-        // 낼 곳이 큰 수(BigNumber) 칸인가.
+        static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
+        // 실패 글에 넣을 큰 수(무한대 · NaN은 큰 수로 나타낼 수 없다 — 글로만 쓰므로 가장 가까운 것으로).
+        static BigNumber ForText(double value) =>
+            double.IsNaN(value) ? BigNumber.Zero : double.IsPositiveInfinity(value) ? new BigNumber(1, 309) : double.IsNegativeInfinity(value) ? new BigNumber(-1, 309) : new BigNumber(value);
+
+        // 낼 곳이 큰 수(BigNumber) 칸인가. 큰 수 칸이면 부모가 구조체가 아닌지도 본다(사본에 써서 공짜가 되지 않게 — ReadNumber와 같다).
         bool IsBigField(string key, string path)
         {
             if (string.IsNullOrEmpty(key) || !Session.Data.IsDefined(key)) throw new InvalidOperationException($"[MomoiProject] 비용: 없는 플레이어 데이터 '{key}'입니다.");
             var type = string.IsNullOrEmpty(path) ? Session.Data.TypeOf(key) : FieldPaths.TypeAt(Session.Data.TypeOf(key), path, out _);
-            if (type == null) return false;
-            return (Nullable.GetUnderlyingType(type) ?? type) == typeof(BigNumber);
+            if (type == null || (Nullable.GetUnderlyingType(type) ?? type) != typeof(BigNumber)) return false;
+            FieldPaths.SplitLast(path ?? "", out var parentPath, out _);
+            if (parentPath.Length > 0 && FieldPaths.TypeAt(Session.Data.TypeOf(key), parentPath, out _) is Type parentType && parentType.IsValueType)
+                throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'의 부모({parentType.Name})가 구조체라 낸 값을 쓸 수 없습니다. [Serializable] 클래스로 바꾸세요.");
+            return true;
         }
 
         BigNumber ReadBig(string key, string path)
@@ -511,14 +537,14 @@ namespace GBible
             });
         }
 
-        // 경로에 []가 있나(요소마다 펼치는 경로 — 값이 여럿). 비용처럼 숫자 하나에만 쓰는 곳은 받지 않는다(목록의 한 요소는 [id]로 고른다).
-        internal static bool IsManyPath(string path) => !string.IsNullOrEmpty(path) && path.IndexOf(FieldPaths.Each, StringComparison.Ordinal) >= 0;
+        // 경로에 [](요소마다 펼치기)나 [필드=값](거르기)이 있나 — 값이 여럿. 비용처럼 숫자 하나에만 쓰는 곳은 받지 않는다(목록의 한 요소는 [id]로 고른다).
+        internal static bool IsManyPath(string path) => !string.IsNullOrEmpty(path) && FieldPaths.SelectsMany(path);
 
         // 비용을 낼 곳은 숫자 하나다: 요소마다 펼치는 경로면 첫 요소로 판정하고 모든 요소에 그 값을 쓰게 된다(프로그래머 실수로 막는다).
         static void RequireSingle(string key, string path)
         {
             if (IsManyPath(path))
-                throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'에 []가 있어 낼 곳이 하나로 정해지지 않습니다. 숫자 필드 하나를 가리키세요(목록의 한 요소는 [id]로).");
+                throw new InvalidOperationException($"[MomoiProject] 비용: '{key} › {path}'에 [] 또는 [필드=값]이 있어 낼 곳이 하나로 정해지지 않습니다. 숫자 필드 하나를 가리키세요(목록의 한 요소는 [id]로).");
         }
 
         double ReadNumber(string key, string path)
@@ -635,21 +661,18 @@ namespace GBible
             return last >= '0' && last <= '9' ? prefix + "_" : prefix;
         }
 
-        // 데이터 키 목록(이름순). 정의가 늘 때만 다시 만든다.
+        // 데이터 키 목록(이름순). 키가 생기거나 지워질 때만 다시 만든다(KeyVersion).
         List<string> _dataKeys;
-        int _dataKeyCount = -1;
-        int _derivedCount = -1;
+        int _dataKeyVersion = -1;
 
         // 사본 키(투영 — IsDerived)는 빼고(같은 id가 둘이 되지 않게).
         List<string> DataKeys()
         {
-            var count = Session.Data.KeyCount;
-            var derived = Session.Data.DerivedCount;
-            if (_dataKeys == null || count != _dataKeyCount || derived != _derivedCount)
+            var version = Session.Data.KeyVersion;
+            if (_dataKeys == null || version != _dataKeyVersion)
             {
                 _dataKeys = Session.Data.Keys.Where(k => Session.Data.IsData(k) && !Session.Data.IsDerived(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
-                _dataKeyCount = count;
-                _derivedCount = derived;
+                _dataKeyVersion = version;
             }
             return _dataKeys;
         }

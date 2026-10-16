@@ -111,12 +111,21 @@ namespace GBible
             CheckSlotName(slot);
             if (Session != null && SameSlot(slot, Slot) && _ownProfile == ownProfile) return;
             // 저장도 없고 행동도 한 번 없었던 세션(타이틀에서 막 켠 기본 슬롯)은 빈 저장을 남기지 않는다.
-            if (Session != null) Stop(save: Session.Actions.Log.Count > 0 || File.Exists(SavePath) || File.Exists(RunSavePath));
+            // 프로필을 함께 쓰면 공유 프로필이 있어도 이 슬롯의 저장이 있는 것은 아니다 — 슬롯의 판 · 요약으로 본다(지운 슬롯을 거쳐 가도 요약이 다시 생기지 않게).
+            if (Session != null) Stop(save: Session.Actions.Log.Count > 0 || HasOwnSave());
             _slot = slot;
             _ownProfile = ownProfile;
             if (remember) GameSettings.SetRaw(LastSlotKey, slot);
             Start();
         }
+
+        // 지금 슬롯에 그 슬롯의 저장이 있나(프로필을 함께 쓰면 공유 프로필은 세지 않는다).
+        static bool HasOwnSave() =>
+            (!SharesProfile && File.Exists(SavePath)) || File.Exists(RunSavePath) || File.Exists(Path.Combine(SlotFolder(Slot), "slot.json"));
+
+        // 프로필을 함께 쓸 때 그 슬롯 폴더의 profile.json은 그 슬롯 자신의 것인가: 기본 슬롯("")의 것은 공유 프로필이고,
+        // 다른 슬롯에 있는 것은 자기 프로필을 쓰는 슬롯(테스트 씬의 'test' — UseSlot(…, ownProfile: true))의 것이다.
+        static bool OwnsProfileFile(string slot) => !ShareProfileSetting || !SameSlot(slot, "");
 
         // 슬롯 이름은 대소문자를 가리지 않는다(Windows에서 "A"와 "a"는 같은 폴더).
         static bool SameSlot(string a, string b) => string.Equals(a ?? "", b ?? "", StringComparison.OrdinalIgnoreCase);
@@ -137,7 +146,7 @@ namespace GBible
                 Name = slot ?? "",
                 // 바꿔 넣는 사이에 꺼져 바로 전 저장(.bak)만 남은 것도 저장이 있는 것(불러오면 .bak으로 이어 간다).
                 // 프로필을 함께 쓰면 슬롯에는 판만 있다(공유 프로필은 슬롯의 것으로 세지 않는다).
-                HasProfile = !ShareProfileSetting && SafeFile.Exists(Path.Combine(folder, "profile.json")),
+                HasProfile = OwnsProfileFile(slot ?? "") && SafeFile.Exists(Path.Combine(folder, "profile.json")),
                 HasRun = HasRun(Path.Combine(folder, "run.json")),
             };
             var meta = Path.Combine(folder, "slot.json");
@@ -173,10 +182,19 @@ namespace GBible
         {
             slot ??= "";
             var current = Session != null && SameSlot(slot, Slot);
-            if (current) Stop(save: false);
+            if (current)
+            {
+                // 프로필을 함께 쓰면 이 슬롯에서 바뀐 공유 프로필(앨범 · 해금)은 남긴다 — 판 끝 마무리를 먼저 하고 프로필만 저장한 뒤 판을 지운다.
+                if (SharesProfile)
+                {
+                    _runSaver?.FlushEnd();
+                    SaveProfile(Session);
+                }
+                Stop(save: false);
+            }
             var folder = SlotFolder(slot);
-            // 바로 전 저장(.bak)·쓰다 만 파일(.tmp)도 함께(지운 슬롯이 되살아나지 않게). 프로필을 함께 쓰면 판 · 요약만 지운다(공유 프로필은 남긴다).
-            foreach (var file in ShareProfileSetting ? new[] { "run.json", "slot.json" } : new[] { "profile.json", "run.json", "slot.json" }) SafeFile.Delete(Path.Combine(folder, file));
+            // 바로 전 저장(.bak)·쓰다 만 파일(.tmp)도 함께(지운 슬롯이 되살아나지 않게). 공유 프로필(기본 슬롯 자리)은 남긴다 — 자기 프로필을 쓰는 슬롯(test)의 것은 지운다.
+            foreach (var file in OwnsProfileFile(slot) ? new[] { "profile.json", "run.json", "slot.json" } : new[] { "run.json", "slot.json" }) SafeFile.Delete(Path.Combine(folder, file));
             if (current) Start();
         }
 

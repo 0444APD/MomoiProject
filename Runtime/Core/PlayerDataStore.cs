@@ -183,6 +183,8 @@ namespace GBible
         public int HistoryLimit;
         public IEnumerable<string> Keys => _slots.Keys;
         public int KeyCount => _slots.Count;
+        // 키가 생기거나 지워지거나 사본 표시가 붙을 때마다 는다(키 목록을 들고 있는 쪽이 다시 만들 때를 안다 — 수만 보면 하나 지우고 하나 생긴 것을 놓친다).
+        public int KeyVersion { get; private set; }
         public DataIdentity Identity { get; } = new DataIdentity();
         // 예전 방식(리플렉션 비교) 데이터에서 Modify를 거치지 않은 수정을 찾아 경고한다. 값 전체를 비교하므로 출시 빌드에서는 끈다.
         public bool DetectUntrackedChanges = true;
@@ -245,6 +247,7 @@ namespace GBible
             }
             _slots.Add(key, slot);
             _keys = null;
+            KeyVersion++;
             KeyDefined?.Invoke(key);
         }
 
@@ -269,6 +272,7 @@ namespace GBible
             RefreshShadow(slot);
             _slots.Add(key, slot);
             _keys = null;
+            KeyVersion++;
             CheckRequired(key, slot);
             KeyDefined?.Invoke(key);
         }
@@ -415,6 +419,8 @@ namespace GBible
             foreach (var key in _perPlayer.Keys.Select(k => KeyFor(k, player)).ToList())
             {
                 if (!_slots.Remove(key)) continue;
+                _keys = null;
+                KeyVersion++;
                 _lastEntry.Remove(key);
                 _visibility.Remove(key);
                 removed++;
@@ -1591,7 +1597,7 @@ namespace GBible
 
         // 다른 키에서 만들어진 사본 키(멀티 서버의 투영 '<키>@<번호>'): 개체 찾기(Game.Find · All)에서 뺀다 — 같은 id가 둘이 되지 않게.
         readonly HashSet<string> _derived = new HashSet<string>(StringComparer.Ordinal);
-        public void MarkDerived(string key) { if (!string.IsNullOrEmpty(key)) _derived.Add(key); }
+        public void MarkDerived(string key) { if (!string.IsNullOrEmpty(key) && _derived.Add(key)) KeyVersion++; }
         public bool IsDerived(string key) => key != null && _derived.Contains(key);
         public int DerivedCount => _derived.Count;
 

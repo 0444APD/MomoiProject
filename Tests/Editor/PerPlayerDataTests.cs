@@ -54,6 +54,7 @@ namespace GBible.Tests
             session.Data.AddPlayer(session.LocalPlayer);
             session.Do(new Edit { run = g => g.Get<PpArmy>("army").gold = 9 });
             Assert.AreEqual(9, session.Data.Get<PpArmy>("army:0").gold, "혼자 하기 = 0번 몫");
+            Assert.IsNull(session.Game.Find("hostHero"), "찾기 목록을 한 번 만들어 둔다");
 
             var net = new MemoryNetwork { Manual = true };
             using (var server = new NetServer(session, net.Server()))
@@ -61,6 +62,8 @@ namespace GBible.Tests
                 server.Start();
                 server.AddLocalPlayer("방장");
                 CollectionAssert.AreEqual(new[] { "army:1" }, session.Data.KeysOfAllPlayers("army").ToArray(), "0번 몫은 남지 않는다");
+                session.Data.Get<PpArmy>("army:1").hero.id = "hostHero";
+                Assert.IsNotNull(session.Game.Find("hostHero"), "키 하나가 지워지고 하나가 생겨도(수는 같다) 찾기 목록을 다시 만든다");
                 Assert.AreEqual(0, session.Game.Get<PpArmy>("army").gold, "방장(1번)은 처음 값");
                 Assert.DoesNotThrow(() => session.Undo(), "지운 몫을 바꾼 지난 행동도 되돌릴 수 있다(지운 키는 건너뜀)");
             }

@@ -52,8 +52,10 @@ namespace GBible.EditorTools
             var active = SceneManager.GetActiveScene();
             var untitled = string.IsNullOrEmpty(active.path);
             // 저장하지 않은 새 씬에 바뀐 것이 있으면 Unity가 새 씬을 덧붙이지 못한다 — 까닭을 알린다(반영 스크립트면 기록되지 않아 다음 컴파일 뒤 다시 돈다).
-            if (untitled && active.isDirty)
-                throw new System.InvalidOperationException($"지금 열린 씬이 저장하지 않은 새 씬이라 {what}을(를) 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 '개발 › DB 반영 스크립트 모두 다시 돌리기') 다시 만듭니다.");
+            // 빈 새 씬 자리에 열 때(Single)는 다른 열린 씬도 닫히므로, 저장하지 않은 씬이 하나라도 있으면 만들지 않는다(개발자의 작업을 닫지 않게).
+            var dirty = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).Any(s => s.isDirty);
+            if (untitled && dirty)
+                throw new System.InvalidOperationException($"저장하지 않은 씬이 열려 있어(지금 씬이 저장하지 않은 새 씬) {what}을(를) 만들지 못했습니다. 씬을 저장하거나 닫으면 다음 컴파일 뒤(또는 메뉴 '개발 › DB 반영 스크립트 모두 다시 돌리기') 다시 만듭니다.");
             // 빈 새 씬(바뀐 것 없음)이면 그 자리에 연다 — 저장하지 않은 씬 옆에는 덧붙일 수 없다.
             var fresh = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, untitled ? NewSceneMode.Single : NewSceneMode.Additive);
             EditorSceneManager.SaveScene(fresh, path);

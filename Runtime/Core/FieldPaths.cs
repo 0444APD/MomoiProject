@@ -202,12 +202,15 @@ namespace GBible
 
         public static bool IsSelect(string step) => ToStep(step ?? "").Select != null;
 
+        // 여럿을 고르는 마디([] · [필드=값])가 있나 — 숫자 하나에만 쓰는 곳(비용)이 받지 않는다.
+        public static bool SelectsMany(string path) => !string.IsNullOrEmpty(path) && Parse(path).Any(s => s.Many || s.FilterField != null);
+
         // 마지막 마디 하나에 쓴다: 필드(생성 코드)나 딕셔너리의 키(name[키], 없던 키면 만든다). next(지금 값, 형식)이 null이면 쓰지 않는다. 썼으면 참.
         public static bool Assign(object parent, string last, Func<object, Type, object> next)
         {
             if (parent == null || string.IsNullOrEmpty(last)) return false;
             var step = ToStep(last);
-            if (step.Many || step.FilterField != null) return false;   // 여럿을 고르는 마디에는 쓰지 않는다
+            if (step.Many) return false;   // 여럿을 고르는 마디에는 쓰지 않는다([필드=값]은 딕셔너리면 그 글자 그대로의 키 — 목록이면 아래에서 쓰지 않는다)
             if (step.Select == null)
             {
                 var access = FieldAccess.Find(parent.GetType(), step.Name);
@@ -282,7 +285,8 @@ namespace GBible
                 {
                     var value = step.Name.Length == 0 ? node : Read(node, step.Name);
                     if (value == null) continue;
-                    if (step.FilterField != null)
+                    // [필드=값]: 딕셔너리에 그 글자 그대로의 키가 있으면 그 키(옛 키 'a=b'), 아니면 거르기.
+                    if (step.FilterField != null && !(value is IDictionary keyed && Pick(keyed, step.Select) != null))
                     {
                         foreach (var item in Items(value))
                             if (Matches(item, step.FilterField, step.FilterValue)) next.Add(item);
@@ -303,11 +307,12 @@ namespace GBible
         public static object Read(object target, string name) => FieldAccess.Read(target, name);
 
         // [필드=값] 고르기: 요소의 그 필드 글자가 값과 같은가(enum은 이름, 숫자는 그 글자).
+        // 거르기 [필드=값]: 조건 '같음'과 같은 규칙(숫자는 값으로 — 3 = 3.0, 참/거짓은 true · 참, 큰 수, enum은 이름).
         static bool Matches(object item, string field, string value)
         {
             if (item == null || item is string) return false;
             var read = FieldAccess.Read(item, field);
-            return read != null && string.Equals(Convert.ToString(read, CultureInfo.InvariantCulture), value, StringComparison.Ordinal);
+            return read != null && FieldOps.Same(read, value);
         }
 
         static void AddItems(object collection, List<object> into)
@@ -387,7 +392,7 @@ namespace GBible
             type = Nullable.GetUnderlyingType(type) ?? type;
             if (type == typeof(bool)) return Boolean;
             if (type.IsEnum) return Choice;
-            if (TypeResolver.IsNumeric(type)) return Numeric;
+            if (TypeResolver.IsNumeric(type) || type == typeof(BigNumber)) return Numeric;
             if (type == typeof(string)) return Text;
             if (FieldPaths.ElementTypeOf(type) != null) return Collection;
             return Presence;
@@ -562,7 +567,7 @@ namespace GBible
             return false;
         }
 
-        static bool Same(object value, string target)
+        internal static bool Same(object value, string target)
         {
             if (value == null) return string.IsNullOrEmpty(target);
             if (value is bool b) return string.Equals(target, b ? "true" : "false", StringComparison.OrdinalIgnoreCase) || target == (b ? "참" : "거짓");
@@ -587,6 +592,12 @@ namespace GBible
         {
             error = null;
             if (!NeedsValue(op)) return true;
+            if (!IsCount(op) && type != null && (Nullable.GetUnderlyingType(type) ?? type) == typeof(BigNumber))
+            {
+                if (BigNumber.TryParse(value, out _)) return true;
+                error = $"'{value}'는 숫자가 아닙니다(큰 수 — 1e400 · 1.5K처럼).";
+                return false;
+            }
             if (IsCount(op) || (type != null && TypeResolver.IsNumeric(Nullable.GetUnderlyingType(type) ?? type) && type != typeof(bool)))
             {
                 if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)) return true;

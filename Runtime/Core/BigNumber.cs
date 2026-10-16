@@ -315,9 +315,9 @@ namespace GBible
                 value = Parse(text);
                 return true;
             }
-            catch (Exception e) when (e is FormatException || e is OverflowException)
+            catch (Exception e) when (e is FormatException || e is OverflowException || e is ArgumentException)
             {
-                value = Zero;
+                value = Zero;   // "NaN" · "Infinity"(큰 수로 담을 수 없다) 포함
                 return false;
             }
         }

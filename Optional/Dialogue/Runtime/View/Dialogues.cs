@@ -44,6 +44,8 @@ namespace GBible.Dialogue
         {
             GameView.AddBusy(() => BlocksInput && IsPlaying);
             GBibleRuntime.Started += Prepare;
+            // 판을 불러오면 앞 판에서 기다리던 대사는 버린다(불러온 판의 것이 아니다).
+            GBibleRuntime.RunLoaded += _ => Waiting.Clear();
             Prepare(GBibleRuntime.Session);
             // 멀티 서버: 플레이어가 들어오면 그 사람의 진행 칸(주인만 보는 칸)을 둔다 — 판을 불러온 뒤 저장된 진행이 그 사람에게 간다.
             GameNet.ServerStarted += WatchServer;
@@ -55,6 +57,8 @@ namespace GBible.Dialogue
         static void Prepare(GameSession session)
         {
             if (session == null) return;
+            // 새 세션(슬롯 바꾸기 · 새 판 · 멀티 들어가기): 앞 세션에서 기다리던 대사는 버린다.
+            if (ReferenceEquals(session, GBibleRuntime.Session)) Waiting.Clear();
             DialoguePlayer.DefineProgress(session);
             session.Events.SubscribeAfterAction<DialoguePlayRequested>(request => OnPlayRequested(session, request));
         }
@@ -73,13 +77,16 @@ namespace GBible.Dialogue
             if (request.player != 0 && request.player != session.LocalPlayer) return;
             var entry = string.IsNullOrEmpty(request.entryId) ? "start" : request.entryId;
             // 이미 열린 대사가 있으면(같은 행동이 대화를 둘 요청 — 마지막 칸 이벤트 + 엔딩 …) 끝난 뒤 차례로.
-            if (IsPlaying || Waiting.Count > 0) Waiting.Enqueue((request.dialogue, entry));
-            else Play(request.dialogue, entry);
+            // 열린 대사가 없으면 기다리던 것부터 차례로 연다(끝 알림 없이 멈춘 대사 뒤에 줄이 막혀 있지 않게).
+            Waiting.Enqueue((request.dialogue, entry));
+            if (!IsPlaying) PlayNextWaiting();
         }
 
-        // 대사가 끝나면 기다리던 다음 대사를 연다.
+        // 대사가 끝나면 기다리던 다음 대사를 연다. 재생기가 꺼지는 중(씬을 닫음 · 끔 — 끄면서 대사를 멈춰 끝 알림이 온다)이면 열지 않는다 —
+        // 꺼지는 재생기에서 연 대사는 사라지고 게임 시간 멈춤만 남는다. 기다리던 것은 다음 요청 때 이어 연다.
         static void PlayNextWaiting()
         {
+            if (_player != null && !_player.isActiveAndEnabled) return;
             while (Waiting.Count > 0 && !IsPlaying)
             {
                 var (dialogue, entry) = Waiting.Dequeue();

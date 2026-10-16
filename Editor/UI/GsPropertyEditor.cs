@@ -341,9 +341,27 @@ namespace GBible.EditorTools.UI
         static void Remove(SerializedProperty list, int index, Action onStructure)
         {
             list.serializedObject.Update();
+            // 데이터 줄([DataRow] — 가중치 표의 항목 줄 · 보정 줄)은 개발자가 지울 수 있지만, 그 줄에 AI가 붙인 Block(조건)이 있으면 함께 사라진다 — 한 번 묻는다.
+            if (!EditorPolicy.CanEditStructureOf(list) && index >= 0 && index < list.arraySize && HasBlocks(list.GetArrayElementAtIndex(index))
+                && !EditorUtility.DisplayDialog("줄 지우기", "이 줄에는 AI가 붙인 조건(Block)이 있습니다. 줄을 지우면 조건도 함께 사라지고, 다시 더한 줄에는 조건이 없습니다(조건은 AI에게 요청합니다).", "지우기", "취소"))
+                return;
             list.DeleteArrayElementAtIndex(index);
             list.serializedObject.ApplyModifiedProperties();
             onStructure?.Invoke();
+        }
+
+        // 요소 안에 채워진 Block 칸([SerializeReference])이 있나.
+        static bool HasBlocks(SerializedProperty element)
+        {
+            var child = element.Copy();
+            var end = element.GetEndProperty();
+            if (!child.NextVisible(true)) return false;
+            while (!SerializedProperty.EqualContents(child, end))
+            {
+                if (child.propertyType == SerializedPropertyType.ManagedReference && child.managedReferenceValue != null) return true;
+                if (!child.NextVisible(true)) break;
+            }
+            return false;
         }
 
         static VisualElement RemoveButton(Action onClick)

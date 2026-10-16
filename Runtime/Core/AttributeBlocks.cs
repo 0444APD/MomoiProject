@@ -71,7 +71,7 @@ namespace GBible
         {
             if (string.IsNullOrEmpty(key)) context.Error("비용 내기: 플레이어 데이터를 고르세요.");
             if (amount < 0) context.Error("비용 내기: 양은 0 이상이어야 합니다(얻는 것은 '플레이어 데이터에 주기').");
-            if (GameApi.IsManyPath(path)) context.Error($"비용 내기: 필드 '{path}'에 []가 있어 낼 곳이 하나로 정해지지 않습니다. 낼 숫자 하나를 고르세요(목록의 그 요소는 [id]로).");
+            if (GameApi.IsManyPath(path)) context.Error($"비용 내기: 필드 '{path}'에 [] 또는 [필드=값]이 있어 낼 곳이 하나로 정해지지 않습니다. 낼 숫자 하나를 고르세요(목록의 그 요소는 [id]로).");
         }
     }
 
