@@ -93,6 +93,12 @@ namespace GBible
                 case float number: return number.ToString("0.##", CultureInfo.InvariantCulture);
                 // 시각은 이 기기의 지역 시각·지역 형식으로(UTC를 그대로 보이면 9시간 이르게 보인다).
                 case DateTime time: return (time.Kind == DateTimeKind.Utc ? time.ToLocalTime() : time).ToString("g", CultureInfo.CurrentCulture);
+                // enum: 텍스트 표에 '<형식 이름>.<값>'(TimeOfDay.Morning)이 있으면 그 글(지금 언어), 없으면 코드 이름.
+                case Enum choice:
+                {
+                    var key = choice.GetType().Name + "." + choice;
+                    return Texts.Has(key) ? Texts.Get(key) : choice.ToString();
+                }
                 case IFormattable formattable: return formattable.ToString(null, CultureInfo.InvariantCulture);
                 default: return value.ToString();
             }
