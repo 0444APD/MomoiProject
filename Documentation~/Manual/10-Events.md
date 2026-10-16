@@ -190,7 +190,7 @@ public class KillEffects : MonoBehaviour
 }
 ```
 
-- 연출 스크립트는 기본으로 `SubscribeAfterAction`을 쓴다. 행동이 성공했는지 기다리는 대기열·`Actions.Executed`/실패 처리·안쪽 행동 거르기 같은 코드를 직접 쓰지 않는다.
+- 연출 스크립트는 기본으로 `SubscribeAfterAction`을 쓴다(멀티 게임에서는 [필수] — 4블록 규칙, `AI/Multiplayer.md`). 행동이 성공했는지 기다리는 대기열·`Actions.Executed`/실패 처리·안쪽 행동 거르기 같은 코드를 직접 쓰지 않는다.
 - 한 행동에서 여러 이벤트가 오면 한꺼번에 이어서 불린다. 시간 간격을 두고 틀려면 받은 것을 큐에 넣고 `Update`에서 하나씩 꺼내면 된다(예: 3-7).
 - 돌려받는 `IDisposable`을 `Dispose()`하면 그만 받는다. 그 순간부터다: 같은 이벤트를 먼저 받은 쪽이 Dispose하면(화면을 닫음) 뒤의 그 받는 쪽은 지금 이벤트도, 모아 둔 이벤트도 받지 않는다(`Subscribe`·`SubscribeAll`도 같다). 씬 오브젝트는 `OnDisable`·`OnDestroy`에서 꼭 Dispose한다(세션은 씬보다 오래 산다).
 - `T`와 **정확히 같은 형식**의 이벤트만 받는다. `UnitKilled`를 상속한 `BossKilled`를 쏘면 `<UnitKilled>`로 받는 쪽은 받지 않는다.
