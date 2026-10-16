@@ -345,6 +345,7 @@ namespace GBible
             public object Default;
             public string Label;
             public bool OwnerOnly;
+            public bool Account;
         }
 
         readonly Dictionary<string, PerPlayerTemplate> _perPlayer = new Dictionary<string, PerPlayerTemplate>(StringComparer.Ordinal);
@@ -352,15 +353,42 @@ namespace GBible
         // 지금 플레이어 번호(행동 안이면 그 행동을 한 사람). GameSession이 정한다.
         public Func<int> CurrentPlayer;
 
-        public void DefinePerPlayer(string key, DataZone zone, Type type, object defaultValue, string label = null, bool ownerOnly = false)
+        // account: 매칭 계정에 남긴다(재화 · 해금 · 로스터) — 매칭큐 서버(NetHub)가 방을 열 때 그 사람 계정에서 읽고, 매치가 끝나면 계정에 다시 쓴다.
+        public void DefinePerPlayer(string key, DataZone zone, Type type, object defaultValue, string label = null, bool ownerOnly = false, bool account = false)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("[MomoiProject] 플레이어 데이터 ID가 비어 있습니다.", nameof(key));
-            _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly };
+            _perPlayer[key] = new PerPlayerTemplate { Zone = zone, Type = type ?? defaultValue?.GetType(), Default = defaultValue, Label = label ?? key, OwnerOnly = ownerOnly, Account = account };
         }
 
         public bool IsPerPlayer(string key) => key != null && _perPlayer.ContainsKey(key);
 
         public IEnumerable<string> PerPlayerKeys => _perPlayer.Keys;
+
+        // 매칭 계정에 남기는 플레이어마다 키(이름 순).
+        public IEnumerable<string> AccountKeys => _perPlayer.Where(p => p.Value.Account).Select(p => p.Key).OrderBy(k => k, StringComparer.Ordinal).ToList();
+
+        // 계정에 남길 글(JSON): 그 플레이어 몫의 저장 트리. 몫이 없으면 null.
+        public string ExportAccountValue(string key, int player)
+        {
+            var concrete = KeyFor(key, player);
+            return _slots.ContainsKey(concrete) ? MiniJson.Serialize(ExportTree(concrete)) : null;
+        }
+
+        // 계정에 남은 글(JSON)을 그 플레이어 몫에 넣는다(행동 밖 — 방을 열 때). 몫이 없으면 만든다. 읽지 못하면 거짓(값은 그대로).
+        public bool ImportAccountValue(string key, int player, string json)
+        {
+            if (string.IsNullOrEmpty(json) || !IsPerPlayer(key)) return false;
+            AddPlayer(player);
+            var concrete = KeyFor(key, player);
+            object tree;
+            try { tree = MiniJson.Deserialize(json); }
+            catch (FormatException) { return false; }
+            var slot = GetSlot(concrete);
+            var value = slot.DataType != null ? FromTree(concrete, tree) : ScalarFromTree(concrete, tree);
+            if (value == null && slot.DataType != null) return false;
+            Set(concrete, value);
+            return true;
+        }
 
         // 그 플레이어 몫의 실제 키 이름.
         public static string KeyFor(string key, int player) => key + ":" + player.ToString(CultureInfo.InvariantCulture);
@@ -1767,6 +1795,10 @@ namespace GBible
         Slot GetSlot(string key)
         {
             if (key != null && _slots.TryGetValue(key, out var slot)) return slot;
+            var colon = key?.LastIndexOf(':') ?? -1;
+            if (colon > 0 && IsPerPlayer(key.Substring(0, colon)))
+                throw new InvalidOperationException($"[MomoiProject] 플레이어마다 키 '{key.Substring(0, colon)}'의 플레이어 {key.Substring(colon + 1)} 몫이 아직 없습니다. 몫은 플레이어가 들어올 때 생깁니다 — " +
+                    "매칭 방의 새 판 행동처럼 들어오기 전에 도는 곳에서는 쓰지 말고, 정원이 다 들어온 뒤(RoomReady · PlayerJoined)에 채우세요.");
             throw new InvalidOperationException($"[MomoiProject] 정의되지 않은 플레이어 데이터 '{key}'입니다. DB 창의 플레이어 데이터에 등록하거나 Define으로 먼저 등록하세요.");
         }
 

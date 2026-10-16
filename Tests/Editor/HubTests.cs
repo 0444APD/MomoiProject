@@ -19,15 +19,19 @@ namespace GBible.Tests
             public readonly List<NetClient> Clients = new List<NetClient>();
             public readonly List<NetRoom> Ready = new List<NetRoom>();
 
-            public Rig(NetHubOptions options = null)
+            // 방 세션을 만드는 법(비우면 NewMatchSession).
+            public Func<GameSession> MakeSession;
+
+            public Rig(NetHubOptions options = null, Func<GameSession> makeSession = null)
             {
                 Store = new FilePlayerStore(Folder);
+                MakeSession = makeSession;
                 Open(options);
             }
 
             public void Open(NetHubOptions options = null, INetPlayerStore store = null)
             {
-                Hub = new NetHub(Net.Server(), room => NewMatchSession(), new FakeAuthenticator(), Matchmaker, store ?? Store, options) { Clock = () => Net.Now };
+                Hub = new NetHub(Net.Server(), room => (MakeSession ?? NewMatchSession)(), new FakeAuthenticator(), Matchmaker, store ?? Store, options) { Clock = () => Net.Now };
                 Hub.RoomReady += Ready.Add;
                 Hub.Start();
             }
@@ -564,6 +568,84 @@ namespace GBible.Tests
                 StartMatch(rig, a, b);
                 Assert.IsTrue(a.IsJoined);
                 Assert.AreEqual(0, a.PendingActions);
+            }
+        }
+
+        [Serializable] public class HbWallet { public int gems; public List<string> roster = new List<string>(); }
+
+        [Serializable]
+        public class HbEarn : GameAction
+        {
+            public int gems;
+            protected override void Run() => Game.Get<HbWallet>("wallet").gems += gems;
+        }
+
+        static GameSession WalletSession()
+        {
+            var session = Rig.NewMatchSession();
+            session.Data.DefinePerPlayer("wallet", DataZone.Session, typeof(HbWallet), new HbWallet(), "지갑", ownerOnly: true, account: true);
+            return session;
+        }
+
+        static HbWallet WalletOf(NetAccount account) =>
+            account.values.TryGetValue("wallet", out var json) ? DataModel.FromTree(MiniJson.Deserialize(json), typeof(HbWallet), null, null) as HbWallet : null;
+
+        [Test]
+        public void 매칭_계정에_남기는_값은_방이_열릴_때_읽고_서버를_다시_켜도_이어지고_매치가_끝나면_계정에_쓴다()
+        {
+            using (var rig = new Rig(makeSession: WalletSession))
+            {
+                var saved = new NetAccount { id = "name:영희", name = "영희" };
+                saved.values["wallet"] = "{\"gems\":7,\"roster\":[\"knight\"]}";
+                rig.Store.Save(saved);
+                var a = rig.Connect("철수");
+                var b = rig.Connect("영희");
+                var room = StartMatch(rig, a, b);
+                Assert.AreEqual(7, room.Session.Data.Get<HbWallet>("wallet:2").gems, "영희(2번) 몫은 계정에서");
+                CollectionAssert.AreEqual(new[] { "knight" }, room.Session.Data.Get<HbWallet>("wallet:2").roster);
+                Assert.AreEqual(0, room.Session.Data.Get<HbWallet>("wallet:1").gems, "계정에 없으면 처음 값");
+
+                room.Session.Do(new HbEarn { actorId = 2, gems = 5 });
+                rig.Pump();
+                Assert.AreEqual(7, WalletOf(rig.Store.Load("name:영희")).gems, "매치 중에는 계정에 쓰지 않는다");
+
+                // 서버가 꺼졌다 켜짐: 매치 안에서 바뀐 값(12)으로 이어 간다 — 계정의 옛 값(7)으로 되돌아가지 않는다.
+                rig.Hub.Dispose();
+                rig.Pump(5);
+                rig.Open();
+                Assert.AreEqual(1, rig.Hub.ResumeOpenMatches());
+                rig.Connect("철수");
+                rig.Connect("영희");
+                rig.Pump();
+                room = rig.Hub.Rooms.Single();
+                Assert.AreEqual(12, room.Session.Data.Get<HbWallet>("wallet:2").gems);
+
+                // 결과에 영희만 있어도 매치에 있던 사람은 모두 계정에 쓴다.
+                rig.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 2, Place = 1 } });
+                rig.Pump();
+                Assert.AreEqual(12, WalletOf(rig.Store.Load("name:영희")).gems, "매치가 끝나면 계정에");
+                CollectionAssert.AreEqual(new[] { "knight" }, WalletOf(rig.Store.Load("name:영희")).roster);
+                Assert.AreEqual(0, WalletOf(rig.Store.Load("name:철수"))?.gems, "결과에 없는 사람도");
+            }
+        }
+
+        [Test]
+        public void 방을_열_때_계정_값을_읽지_못한_계정은_매치가_끝나도_계정_값을_덮어쓰지_않는다()
+        {
+            using (var rig = new Rig(makeSession: WalletSession))
+            {
+                var saved = new NetAccount { id = "name:영희", name = "영희" };
+                saved.values["wallet"] = "이건 JSON이 아님";
+                rig.Store.Save(saved);
+                var a = rig.Connect("철수");
+                var b = rig.Connect("영희");
+                var room = StartMatch(rig, a, b);
+                Assert.AreEqual(0, room.Session.Data.Get<HbWallet>("wallet:2").gems, "읽지 못하면 처음 값");
+                room.Session.Do(new HbEarn { actorId = 2, gems = 5 });
+                rig.Hub.EndMatch(room, new[] { new NetMatchResult { Player = 1, Place = 1 }, new NetMatchResult { Player = 2, Place = 2 } });
+                rig.Pump();
+                Assert.AreEqual("이건 JSON이 아님", rig.Store.Load("name:영희").values["wallet"], "처음 값으로 덮어 원래 값을 잃지 않는다");
+                Assert.AreEqual(1, rig.Store.Load("name:영희").losses, "점수 · 전적은 그대로 반영");
             }
         }
     }

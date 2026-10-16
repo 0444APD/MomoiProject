@@ -16,6 +16,7 @@ namespace GBible.Data
         [FieldLabel("기본값")] public string defaultValue = "";
         [FieldLabel("플레이어마다"), Tooltip("멀티: 플레이어마다 따로 둔다(실제 키 'ID:번호'). 게임 코드 · DB Block이 이 ID를 읽고 쓰면 지금 행동을 한 플레이어의 것. 싱글은 이 화면의 플레이어 하나")] public bool perPlayer;
         [FieldLabel("그 사람에게만 보임"), ShowIf(nameof(perPlayer)), Tooltip("켜면 그 플레이어에게만 보낸다(손패 · 숨긴 편성). 끄면 모두에게")] public bool ownerOnly;
+        [FieldLabel("매칭 계정에 남김"), ShowIf(nameof(perPlayer)), Tooltip("매칭큐 서버: 방이 열릴 때 그 사람 계정에서 읽고, 매치가 끝나면 계정에 다시 쓴다(재화 · 해금 · 로스터 — 클라이언트가 고칠 수 없다). 취소된 매치는 쓰지 않는다. 싱글 · 사설 서버에서는 보통 플레이어 데이터")] public bool onAccount;
 
         public Type ValueType => TypeResolver.Find(valueType);
 
@@ -26,7 +27,7 @@ namespace GBible.Data
             if (!TryParseDefault(type, out var value, out var error)) throw new InvalidOperationException($"[MomoiProject] 플레이어 데이터 '{Id}': {error}");
             if (perPlayer)
             {
-                store.DefinePerPlayer(Id, zone, type, value ?? (DataModel.Of(type).Kind == DataKind.Scalar || DataModel.Of(type).Kind == DataKind.Enum ? null : DataModel.Create(type)), DisplayName, ownerOnly);
+                store.DefinePerPlayer(Id, zone, type, value ?? (DataModel.Of(type).Kind == DataKind.Scalar || DataModel.Of(type).Kind == DataKind.Enum ? null : DataModel.Create(type)), DisplayName, ownerOnly, onAccount);
                 return;
             }
             store.DefineOfType(Id, zone, type, value, DisplayName);

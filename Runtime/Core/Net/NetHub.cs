@@ -45,6 +45,8 @@ namespace GBible
         internal double LastSaved;
         // 서버를 다시 켜 이어 연 매치가 꺼지기 전에 이미 시작했다(RoomReady를 쏜 뒤) — 정원이 돌아와도 RoomReady를 다시 쏘지 않는다.
         internal bool WasReady;
+        // 방을 열 때 계정 값을 읽지 못한 계정(매치가 끝나도 계정 값을 쓰지 않는다 — 처음 값으로 덮어 재화를 잃지 않게).
+        internal readonly HashSet<string> AccountUnread = new HashSet<string>(StringComparer.Ordinal);
     }
 
     // 매칭큐 서버: 전송 하나로 로비(입장 확인·줄 서기·수락)와 여러 방(매치)을 돌린다. 엔진 없는 코어라 어떤 서버 프로그램에서도 같다.
@@ -52,6 +54,8 @@ namespace GBible
     //   hub.RoomStarting += room => { room.Server.Validate = 차례 검사; …플레이어별 키·공개 범위… };
     //   hub.RoomReady += room => room.Session.Do(new StartFirstTurn());
     //   매치가 끝나면(규칙이 판정): hub.EndMatch(room, 결과);
+    //   계정 값(재화 · 해금 · 로스터): DB › 플레이어 데이터의 '플레이어마다' + '매칭 계정에 남김' 칸 — 방이 열릴 때 계정에서 그 사람 몫으로 읽고,
+    //   매치가 끝나면(EndMatch) 계정에 다시 쓴다. 규칙은 다른 플레이어 데이터처럼 읽고 쓴다(클라이언트는 고칠 수 없다). 취소된 매치는 쓰지 않는다.
     //   매 틱: hub.Update(deltaTime);
     // 지키는 것: 한 계정은 한 줄·한 매치에만(다시 접속하면 그 매치로) · 전원 수락 뒤에만 방을 만든다 · 수락하지 않으면 남은 사람은 기다린 시간 그대로 다시 줄 ·
     //            정원이 다 들어와야 RoomReady · 계정·점수는 서버 저장소에만.
@@ -436,7 +440,8 @@ namespace GBible
         }
 
         // 방을 연다. savedRun이 있으면 그 판으로(서버를 다시 켰을 때 이어 하기).
-        bool OpenRoom(NetRoom room, List<(string account, string name)> players, string savedRun)
+        // savedAccounts: 이어 열 때 저장해 둔 계정 값(플레이어 번호 → 키 → JSON). 없으면 계정 저장소에서 읽는다.
+        bool OpenRoom(NetRoom room, List<(string account, string name)> players, string savedRun, Dictionary<string, object> savedAccounts = null)
         {
             room.Transport = new RoomTransport(this, room);
             GameSession session;
@@ -460,7 +465,10 @@ namespace GBible
                     : NetAdmission.Refuse("이 매치의 플레이어가 아닙니다.");
             };
             foreach (var (account, name) in players) room.Server.Reserve(account, name);
+            if (savedRun == null || savedAccounts == null) ReadAccounts(room);
+            else foreach (var player in room.Server.Players) session.Data.AddPlayer(player.Id);
             if (savedRun != null) session.ImportRun(savedRun);
+            if (savedRun != null && savedAccounts != null) RestoreAccounts(room, savedAccounts);
             room.Server.Start();
             _rooms.Add(room);
             if (Options.SaveMatchEachAction && _store != null)
@@ -534,6 +542,7 @@ namespace GBible
             if (results != null)
             {
                 var rated = new List<(NetAccount account, int place)>();
+                var playerOf = new Dictionary<string, NetPlayer>(StringComparer.Ordinal);
                 var counted = new HashSet<string>(StringComparer.Ordinal);
                 // 저장하지 않은 계정(읽지 못함·저장 실패): 등수만 알리고 점수는 저장소에 남은 그대로.
                 var unsaved = new HashSet<string>(StringComparer.Ordinal);
@@ -554,6 +563,7 @@ namespace GBible
                         unsaved.Add(account.id);
                     }
                     rated.Add((account, Math.Max(1, result.Place)));
+                    playerOf[account.id] = player;
                 }
                 var before = rated.ToDictionary(r => r.account.id, r => r.account.rating, StringComparer.Ordinal);
                 NetRating.Apply(rated);
@@ -561,6 +571,7 @@ namespace GBible
                 {
                     if (!unsaved.Contains(account.id))
                     {
+                        WriteAccountValues(room, playerOf.TryGetValue(account.id, out var owner) ? owner : null, account);
                         try { _store?.Save(account); }
                         catch (Exception e)
                         {
@@ -578,6 +589,24 @@ namespace GBible
                     var holder = _lobby.Values.FirstOrDefault(l => l.Account?.id == account.id);
                     if (holder != null) holder.Account = account;
                 }
+                // 결과에 없는 사람(등수 없음)의 계정 값도 쓴다 — 매치는 끝났으니 그동안 바뀐 재화 · 해금은 남는다.
+                if (_store != null && room.Session.Data.AccountKeys.Any())
+                    foreach (var player in room.Server.Players)
+                    {
+                        if (string.IsNullOrEmpty(player.Account) || counted.Contains(player.Account)) continue;
+                        try
+                        {
+                            var account = _store.Load(player.Account) ?? new NetAccount { id = player.Account, name = player.Name };
+                            WriteAccountValues(room, player, account);
+                            _store.Save(account);
+                            var holder = _lobby.Values.FirstOrDefault(l => l.Account?.id == account.id);
+                            if (holder != null) holder.Account = account;
+                        }
+                        catch (Exception e)
+                        {
+                            Say($"매치 {room.MatchId}: 계정 {player.Account}의 계정 값을 저장하지 못했습니다: {e.Message}");
+                        }
+                    }
             }
             foreach (var who in _lobby.Values.Where(l => l.Room == room).ToList())
             {
@@ -612,6 +641,82 @@ namespace GBible
             _lobby.Remove(connection);
         }
 
+        // ── 계정 값 ────────────────────────────────────────────
+
+        // 방을 열 때: 플레이어마다 키의 몫을 만들고, '매칭 계정에 남김' 키는 그 사람 계정의 값(values[ID] = JSON)으로 채운다(없으면 처음 값).
+        void ReadAccounts(NetRoom room)
+        {
+            var data = room.Session.Data;
+            var keys = data.AccountKeys.ToList();
+            foreach (var player in room.Server.Players)
+            {
+                data.AddPlayer(player.Id);
+                if (keys.Count == 0 || _store == null || string.IsNullOrEmpty(player.Account)) continue;
+                NetAccount account;
+                try { account = _store.Load(player.Account); }
+                catch (Exception e)
+                {
+                    Say($"매치 {room.MatchId}: 계정 {player.Account}을(를) 읽지 못해 계정 값을 처음 값으로 둡니다(이 매치가 끝나도 계정 값을 쓰지 않습니다): {e.Message}");
+                    room.AccountUnread.Add(player.Account);
+                    continue;
+                }
+                if (account?.values == null) continue;
+                foreach (var key in keys)
+                {
+                    if (!account.values.TryGetValue(key, out var json) || data.ImportAccountValue(key, player.Id, json)) continue;
+                    Say($"매치 {room.MatchId}: 계정 {player.Account}의 '{key}' 값을 읽지 못해 처음 값으로 둡니다(이 매치가 끝나도 계정 값을 쓰지 않습니다).");
+                    room.AccountUnread.Add(player.Account);
+                }
+            }
+        }
+
+        // 이어 열 때: 저장해 둔 매치 안의 계정 값으로(꺼지기 전까지 바뀐 것 — 계정에는 아직 쓰지 않았다).
+        void RestoreAccounts(NetRoom room, Dictionary<string, object> saved)
+        {
+            var data = room.Session.Data;
+            foreach (var player in room.Server.Players)
+            {
+                var id = player.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (!saved.TryGetValue(id, out var entry) || !(entry is Dictionary<string, object> values)) continue;
+                foreach (var pair in values)
+                    if (pair.Value is string json && !data.ImportAccountValue(pair.Key, player.Id, json))
+                        Say($"매치 {room.MatchId}: 저장해 둔 '{pair.Key}'(플레이어 {player.Id}) 값을 읽지 못했습니다.");
+            }
+        }
+
+        // 매치가 끝났을 때: 그 사람 몫을 계정 값으로 쓴다(방을 열 때 읽지 못한 계정은 건너뛴다).
+        void WriteAccountValues(NetRoom room, NetPlayer player, NetAccount account)
+        {
+            if (player == null || account == null || room.AccountUnread.Contains(player.Account ?? "")) return;
+            var data = room.Session?.Data;
+            if (data == null) return;
+            foreach (var key in data.AccountKeys)
+            {
+                var json = data.ExportAccountValue(key, player.Id);
+                if (json == null) continue;
+                account.values ??= new Dictionary<string, string>(StringComparer.Ordinal);
+                account.values[key] = json;
+            }
+        }
+
+        // 매치 저장에 넣을 계정 값(플레이어 번호 → 키 → JSON).
+        Dictionary<string, object> SavedAccounts(NetRoom room)
+        {
+            var data = room.Session.Data;
+            var result = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var player in room.Server.Players)
+            {
+                var values = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var key in data.AccountKeys)
+                {
+                    var json = data.ExportAccountValue(key, player.Id);
+                    if (json != null) values[key] = json;
+                }
+                result[player.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)] = values;
+            }
+            return result;
+        }
+
         // ── 저장 · 이어 하기 ───────────────────────────────────
 
         void SaveRoom(NetRoom room)
@@ -630,6 +735,8 @@ namespace GBible
                     ["ready"] = room.Ready || room.WasReady,
                     ["players"] = players,
                     ["run"] = room.Session.ExportRun(),
+                    ["accounts"] = SavedAccounts(room),
+                    ["accountUnread"] = room.AccountUnread.Select(a => (object)a).ToList(),
                 };
                 _store.SaveMatch(room.MatchId, MiniJson.Serialize(state));
             }
@@ -666,7 +773,10 @@ namespace GBible
                             room.Accounts.Add(account);
                         }
                     if (players.Count == 0) continue;
-                    if (OpenRoom(room, players, state.TryGetValue("run", out var run) ? run as string : null)) opened++;
+                    if (state.TryGetValue("accountUnread", out var unread) && unread is List<object> unreadList)
+                        foreach (var account in unreadList.OfType<string>()) room.AccountUnread.Add(account);
+                    var savedAccounts = state.TryGetValue("accounts", out var accounts) ? accounts as Dictionary<string, object> : null;
+                    if (OpenRoom(room, players, state.TryGetValue("run", out var run) ? run as string : null, savedAccounts)) opened++;
                 }
                 catch (Exception e)
                 {
