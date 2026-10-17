@@ -14,9 +14,11 @@ namespace GBible.EditorTools
     //     Rules  = 규칙(데이터·행동·이벤트·Block·[BindTo]) — GBible.Core·GBible.Unity(+ 데이터 모듈)만 참조
     //     Client = Unity 쪽(시작 설정 코드·화면·연출) — Rules + GBible + 켠 모듈
     //     Editor = 에디터 확장(Editor 전용), Tests = EditMode 규칙 테스트
-    //   그 밖: Product Name, 선택 모듈, Undo 방식(DB 에셋의 세션 옵션), 언어, 시작 파일(Bootstrap.cs·플레이어 데이터 뼈대), DB 에셋,
+    //   그 밖: Product Name, 언어, 시작 파일(Bootstrap.cs·플레이어 데이터 뼈대), DB 에셋,
     //   코드 줄이기 보호(Assets/MomoiProject/link.xml — 게임 어셈블리를 통째로 남긴다).
     // 이미 있는 파일은 덮어쓰지 않는다(다시 열어도 안전). 모듈을 켜고 끄면 asmdef 참조를 따라 맞춘다.
+    // 쓸 기능(선택 모듈)과 Undo 방식은 고르지 않는다 — AI가 단계 0(흡수)의 기획 질문으로 정해 단계 1에서
+    // Features.json · DB › Bootstrap(지금 값이 기본값일 때만)에 넣는다(개발자 2026-10-17).
     [InitializeOnLoad]
     public static class StartSetup
     {
@@ -40,8 +42,6 @@ namespace GBible.EditorTools
         public sealed class Choices
         {
             public string productName;
-            public HashSet<string> features = new HashSet<string>(StringComparer.Ordinal);
-            public HistoryMode history = HistoryMode.Actions;
             public string sourceLanguage = "ko";
             public HashSet<string> languages = new HashSet<string>(StringComparer.Ordinal) { "ko" };
         }
@@ -160,11 +160,9 @@ namespace GBible.EditorTools
         // 지금 상태로 채운 선택(창이 처음 보여 줄 값).
         public static Choices Current()
         {
-            // 예전 자리의 DB·언어 설정을 먼저 옮긴다(창이 프로젝트의 실제 Undo 방식·언어를 보여 주게 — 기본값을 보여 주면 적용이 그 값으로 덮는다).
+            // 예전 자리의 DB·언어 설정을 먼저 옮긴다(창이 프로젝트의 실제 언어를 보여 주게 — 기본값을 보여 주면 적용이 그 값으로 덮는다).
             MoveLegacyFolders();
             var choices = new Choices { productName = PlayerSettings.productName };
-            foreach (var feature in GameFeatures.All)
-                if (GameFeatures.IsEnabled(feature)) choices.features.Add(feature.Id);
             var settings = AssetDatabase.LoadAssetAtPath<LocalizationSettings>(TextSheetTools.SettingsPath);
             if (settings != null)
             {
@@ -172,8 +170,6 @@ namespace GBible.EditorTools
                 choices.languages = new HashSet<string>(settings.languages.Select(l => l.code), StringComparer.Ordinal);
             }
             choices.languages.Add(choices.sourceLanguage);
-            var database = AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath);
-            if (database != null) choices.history = database.History;
             return choices;
         }
 
@@ -187,14 +183,6 @@ namespace GBible.EditorTools
             {
                 PlayerSettings.productName = choices.productName.Trim();
                 done.Add($"Product Name: {PlayerSettings.productName}");
-            }
-
-            foreach (var feature in GameFeatures.All)
-            {
-                var wanted = choices.features.Contains(feature.Id) && feature.Installed;
-                if (GameFeatures.IsEnabled(feature) == wanted) continue;
-                GameFeatures.SetEnabled(feature, wanted);
-                done.Add($"{feature.Name}: {(wanted ? "켬" : "끔")}");
             }
 
             ApplyLanguages(choices, done);
@@ -248,13 +236,7 @@ namespace GBible.EditorTools
                 madeEntries = true;
             }
             if (madeEntries) SessionState.SetBool(RegenerateIdsKey, true);
-            // Undo 방식은 DB 에셋의 세션 옵션(DB › 시작 파일 › Bootstrap 화면과 같은 값)에 넣는다.
-            if (database.History != choices.history)
-            {
-                database.EditorSetSessionOptions(choices.history, database.HistoryLimit, database.SnapshotInterval, database.SnapshotLimit, database.FixSeedInDevelopment, database.DevelopmentSeed);
-                EditorUtility.SetDirty(database);
-                done.Add($"Undo 방식: {choices.history}");
-            }
+            // Undo 방식(DB › 시작 파일 › Bootstrap)은 기본값 그대로 둔다 — AI가 기획대로 넣는다(관례 15절 — 기본값일 때만).
 
             // 게임 씬 폴더(Unity 기본 Assets/Scenes)를 개발자 폴더로 옮긴다(개발자가 씬에 레벨을 배치한다).
             ProjectFolders.MoveScenes(done);

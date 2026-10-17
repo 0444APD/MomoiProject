@@ -6,8 +6,9 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools
 {
-    // 시작 설정 창: 새 프로젝트에서 처음 한 번 저절로 열린다(나중에는 메뉴로). 고르는 것은 Product Name·선택 모듈·Undo 방식·언어뿐이고,
+    // 시작 설정 창: 새 프로젝트에서 처음 한 번 저절로 열린다(나중에는 메뉴로). 고르는 것은 Product Name·언어뿐이고,
     // 코드 구조(Assets/MomoiProject/Code/Rules·Client·Editor·Tests + asmdef)·시작 파일·DB 에셋은 '적용'이 자동으로 만든다.
+    // 쓸 기능과 Undo 방식은 여기서 고르지 않는다 — AI가 단계 0(흡수)의 기획 질문으로 정해 단계 1에서 넣는다(개발자 2026-10-17).
     public sealed class StartSetupWindow : EditorWindow
     {
         StartSetup.Choices _choices;
@@ -44,37 +45,13 @@ namespace GBible.EditorTools
             _root.Add(Gs.Label("시작 설정", "gs-title"));
             Paragraph(StartSetup.IsDone
                 ? "이 프로젝트는 시작 설정을 마쳤습니다. 바꾸고 싶은 것만 고쳐 다시 적용할 수 있습니다(이미 있는 파일은 덮어쓰지 않습니다)."
-                : "새 프로젝트에서 한 번 하는 준비입니다. 아래 네 가지만 고르고 '적용'을 누르면 코드 폴더·asmdef·시작 파일·DB가 만들어집니다. 모두 나중에 바꿀 수 있습니다.");
+                : "새 프로젝트에서 한 번 하는 준비입니다. 게임 이름과 언어만 고르고 '적용'을 누르면 코드 폴더·asmdef·시작 파일·DB가 만들어집니다. 모두 나중에 바꿀 수 있습니다.");
+            Paragraph("쓸 기능(다이얼로그·인벤토리·입력·Steam)과 Undo 방식은 여기서 고르지 않습니다 — AI가 첫 단계(흡수)의 기획 질문으로 정해 넣습니다.");
 
             Section("Product Name", "빌드 파일·창 제목·저장 폴더에 쓰이는 게임 이름(Unity Player Settings). 언제 바꿔도 된다.");
             var product = new TextField { value = _choices.productName };
             product.RegisterValueChangedCallback(e => _choices.productName = e.newValue);
             _root.Add(product);
-
-            Section("선택 모듈", "켜면 그 기능의 코드·DB 탭·메뉴가 생긴다. 나중에 DB 사이드바 '기능 활성화'로도 켜고 끈다(asmdef 참조는 저절로 맞춰진다).");
-            foreach (var feature in GameFeatures.All)
-            {
-                var toggle = new Toggle(feature.Name) { value = _choices.features.Contains(feature.Id) };
-                toggle.SetEnabled(feature.Installed);
-                toggle.tooltip = feature.Installed ? feature.Description : "이 프로젝트에 모듈 코드가 없습니다.";
-                var id = feature.Id;
-                toggle.RegisterValueChangedCallback(e =>
-                {
-                    if (e.newValue) _choices.features.Add(id);
-                    else _choices.features.Remove(id);
-                });
-                _root.Add(toggle);
-                var caption = Gs.Label(feature.Description, "gs-caption");
-                caption.style.whiteSpace = WhiteSpace.Normal;
-                caption.style.marginLeft = 18;
-                caption.style.marginBottom = 4;
-                _root.Add(caption);
-            }
-
-            Section("Undo 방식", "턴제는 행동 단위, 실시간은 스냅샷. 나중에 DB › 시작 파일 › Bootstrap 화면에서 보관 수·시드와 함께 바꾼다.");
-            var history = new DropdownField(new[] { "행동 단위(턴제)", "스냅샷(실시간)", "쓰지 않음" }.ToList(), (int)_choices.history);
-            history.RegisterValueChangedCallback(_ => _choices.history = (HistoryMode)history.index);
-            _root.Add(history);
 
             Section("언어", "원문 언어와 지원할 언어. 나중에 다국어 설정에서 더하고 뺀다.");
             var codes = StartSetup.Languages.Select(l => $"{l.name} ({l.code})").ToList();

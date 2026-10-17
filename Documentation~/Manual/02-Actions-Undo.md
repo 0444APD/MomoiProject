@@ -359,7 +359,7 @@ using (Game.Session.Data.Permanent())
 
 ### 2.10 되돌리기 방식: `SessionOptions`
 
-**Unity 게임은 DB › 시작 파일 › Bootstrap에서 정한다**(코드로 같은 값을 정하지 않는다): **Undo 방식** · **Undo 보관 수**(행동 단위) · **스냅샷 간격(초)** · **스냅샷 보관 수**(스냅샷) · **Undo 끊는 이벤트(선택)**(4.2). 시작 설정이 처음 방식을 넣는다. `GBibleRuntime`이 세션을 만들 때 이 값을 `SessionOptions`에 넣는다.
+**Unity 게임은 DB › 시작 파일 › Bootstrap에서 정한다**(코드로 같은 값을 정하지 않는다): **Undo 방식** · **Undo 보관 수**(행동 단위) · **스냅샷 간격(초)** · **스냅샷 보관 수**(스냅샷) · **Undo 끊는 이벤트(선택)**(4.2). 처음은 기본값(행동 단위)이고, AI가 단계 1에서 기획(명세서 1절 시간 · 되돌리기)대로 넣는다. `GBibleRuntime`이 세션을 만들 때 이 값을 `SessionOptions`에 넣는다.
 
 `GBibleRuntime.Configuring += options => …`(20장 3절)로 바꾸면 코드가 이기고, 기록에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 세션을 직접 만드는 테스트·서버는 `new GameSession(new SessionOptions { History = …, HistoryLimit = … })`.
 

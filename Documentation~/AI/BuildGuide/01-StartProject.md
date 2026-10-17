@@ -18,7 +18,7 @@
 ## 1. 설치와 시작 설정
 
 1. (개발자) GBible 폴더를 프로젝트의 `Packages/com.momoi.gbible`에 넣고 Unity 6으로 연다.
-2. (개발자) 저절로 열리는 **시작 설정** 창에서 Product Name·선택 모듈·Undo 방식·언어를 고르고 **적용**한다. 모두 나중에 바꿀 수 있다.
+2. (개발자) 저절로 열리는 **시작 설정** 창에서 Product Name·언어만 고르고 **적용**한다. 쓸 기능(선택 모듈)과 Undo 방식은 고르지 않는다 — AI가 단계 0의 기획 질문으로 정해 단계 1에서 넣는다(기능은 `Features.json` — 진행 매뉴얼 6절 박자 0, Undo 방식은 DB › Bootstrap — 관례 15절, 개발자 2026-10-17).
 3. (개발자) 자료를 `Docs/Source`에 넣고 Claude Code에서 `/think-momoi`로 시작한다. 여기서부터 AI가 진행 매뉴얼의 단계대로 한다.
 
 카드 던전은 선택 모듈 둘(인벤토리·다이얼로그)을 켜고, Undo 방식은 행동 단위(턴제)를 고른다.
@@ -57,7 +57,7 @@
 > | 바꿀 것 | 어디서 |
 > |---|---|
 > | Product Name | 시작 설정 또는 Player Settings |
-> | 선택 모듈 | AI: `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 ID(`dialogue`·`inventory`·`input`·`steam`)를 더한다. 개발자: DB 사이드바 모듈 그룹의 **기능 활성화** 또는 시작 설정. 어느 쪽이든 다음 컴파일 때 스크립팅 심볼·asmdef 참조가 따라 맞는다 |
+> | 선택 모듈 | AI: `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 ID(`dialogue`·`inventory`·`input`·`steam`)를 더한다. 개발자: DB 사이드바 모듈 그룹의 **기능 활성화**(시작 설정에는 없다). 어느 쪽이든 다음 컴파일 때 스크립팅 심볼·asmdef 참조가 따라 맞는다 |
 > | Undo 방식 | DB › 시작 파일 › **Bootstrap**(4절) |
 > | 언어 | 시작 설정 또는 다국어 설정 |
 >

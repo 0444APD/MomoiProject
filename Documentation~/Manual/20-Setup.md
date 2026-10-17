@@ -24,7 +24,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 1. 저장소를 대상 프로젝트의 `Packages/com.momoi.gbible`에 복사하거나 `git clone`한다(embedded 패키지).
 2. Unity 6(6000.6.3f1에서 확인)으로 연다. 함께 필요한 `com.unity.nuget.mono-cecil`은 `package.json`의 의존성이라 저절로 들어온다(플레이어 데이터 비교 코드를 만든다, 8절).
-3. 시작 설정을 마치지 않은 프로젝트면 **시작 설정** 창(메뉴 `MomoiProject → 개발 → 시작 설정`)이 저절로 열린다. Product Name·선택 기능·Undo 방식·언어를 고르고 적용한다. 만드는 것: `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`(asmdef `MomoiProject.*`, 네임스페이스 `MomoiProject`) · `Rules/PlayerData.cs`(`RunState`·`Profile`) · `Client/Bootstrap.cs`(`Configure` · `RegisterRules` · `Started`, 3·4절) · DB 에셋(`GameDatabase`)과 DB › 플레이어 데이터 `run`(세션 구역)·`profile`(메타 구역) · `link.xml` · Claude Code 파일(11절). 이미 있는 파일은 덮지 않으므로 다시 적용해도 안전하다. 자세히는 AI 문서 `BuildGuide/01-StartProject.md` 1절.
+3. 시작 설정을 마치지 않은 프로젝트면 **시작 설정** 창(메뉴 `MomoiProject → 개발 → 시작 설정`)이 저절로 열린다. Product Name·언어만 고르고 적용한다 — 쓸 기능(6절)과 Undo 방식(3절)은 고르지 않는다: AI가 단계 0(흡수)의 기획 질문(명세서 1절 시간 · 되돌리기, 6절 부가 기능)으로 정해 단계 1에서 넣는다(개발자 2026-10-17). 만드는 것: `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`(asmdef `MomoiProject.*`, 네임스페이스 `MomoiProject`) · `Rules/PlayerData.cs`(`RunState`·`Profile`) · `Client/Bootstrap.cs`(`Configure` · `RegisterRules` · `Started`, 3·4절) · DB 에셋(`GameDatabase`)과 DB › 플레이어 데이터 `run`(세션 구역)·`profile`(메타 구역) · `link.xml` · Claude Code 파일(11절). 이미 있는 파일은 덮지 않으므로 다시 적용해도 안전하다. 자세히는 AI 문서 `BuildGuide/01-StartProject.md` 1절.
 4. 플레이 버튼을 누른다. 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`(세션 진행)과 `[오디오]` 오브젝트가 생기면 정상이다.
 
 만들어지는 곳:
@@ -200,7 +200,7 @@ DB 창 사이드바 맨 위 **시작 파일 › Bootstrap**을 누르면 세션 
 
 **AI가 이 값을 정할 때**(결정에 따른 판 저장·고정 틱·새 판 행동 …): 화면을 누를 수 없으므로 DB 반영 스크립트에서 `GameDatabase.Load()`의 `EditorSet…` 함수(`EditorSetSessionOptions` · `EditorSetSaveOptions` · `EditorSetSaveTiming` · `EditorSetFlowOptions` · `EditorSetTickRate` · `EditorSetSceneFlow`, 에디터 전용)로 넣고(Undo 방식 하나만 바꿀 때는 `EditorSetHistory(Undo 방식, 보관 수 = null)` — 다른 칸은 그대로. 묶음 함수는 묶인 칸을 모두 넘기므로 나머지는 읽기 속성 `History` · `HistoryLimit` · `SnapshotInterval` · `SnapshotLimit` · `FixSeedInDevelopment` · `DevelopmentSeed` · `RunSave` · `RunEndEvent` · `SaveProfileEachAction` · `RunSaveInterval` · `RunSaveEvent` · `UndoBoundaryEvent` · `ContinueOnStart` · `NewRunAction` · `TickRate` · `SceneKey` · `ScenePath` · `EmptyScene`으로 읽어 그대로 넘긴다) `EditorUtility.SetDirty` + `AssetDatabase.SaveAssetIfDirty`로 저장한다(DB 항목이 아니라 '적용 전'이 없다). [필수] 칸의 지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다 — 다르면 개발자(또는 시작 설정)가 고른 값이므로 그대로 두고 보고에 적는다(관례 15절).
 
-게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 시작 설정의 Undo 방식도 이 화면과 같은 값이다.
+게임이 켜질 때 이 값이 `SessionOptions`에 먼저 들어가고, 그다음 `Configuring`이 불린다. 코드가 같은 칸을 바꾸면 코드 값이 쓰이고, 모니터 **타임라인**에 "코드(Configuring)가 DB › Bootstrap의 세션 옵션을 바꿨습니다: …"가 남는다. 처음 Undo 방식은 기본값(행동 단위)이고, AI가 단계 1에서 기획대로 넣는다(시작 설정은 고르지 않는다 — 1절).
 
 출시 여부는 메뉴 `MomoiProject → 개발 → 출시됨 (저장 호환 유지)`(체크 메뉴)로 정한다. 켜고 끌 때 확인 창("출시 상태")이 뜬다.
 
