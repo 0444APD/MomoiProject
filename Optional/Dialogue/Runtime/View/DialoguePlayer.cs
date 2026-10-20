@@ -67,6 +67,8 @@ namespace GBible.Dialogue
                 stage.ui.LogSource = () => Runner.Log;
                 stage.ui.LogOpened += OnLogOpened;
                 stage.ui.LogClosed += OnLogClosed;
+                stage.ui.AutoRequested += OnAutoRequested;
+                stage.ui.SkipRequested += SkipToChoice;
             }
             GameLanguage.Changed += OnLanguageChanged;
         }
@@ -79,6 +81,8 @@ namespace GBible.Dialogue
                 stage.ui.ChoiceRequested -= OnChoice;
                 stage.ui.LogOpened -= OnLogOpened;
                 stage.ui.LogClosed -= OnLogClosed;
+                stage.ui.AutoRequested -= OnAutoRequested;
+                stage.ui.SkipRequested -= SkipToChoice;
             }
             GameLanguage.Changed -= OnLanguageChanged;
             HookClient(null);
@@ -353,6 +357,9 @@ namespace GBible.Dialogue
             Paused = false;
         }
 
+        // UI의 자동 버튼: 자동 진행을 켜고 끈다(다음 Update에서 실행기에 넘어가고, UI에 dialogue--auto가 붙는다).
+        void OnAutoRequested() => autoMode = !autoMode;
+
         void Update()
         {
             if (_runner == null) return;
@@ -360,6 +367,7 @@ namespace GBible.Dialogue
             HookClient(GameNet.Client);
             _runner.AutoMode = autoMode;
             _runner.AutoDelay = autoDelay;
+            if (stage != null && stage.ui != null) stage.ui.SetAuto(autoMode);
             if (IsPlaying && !Paused) _runner.Tick(Time.unscaledDeltaTime);
         }
     }

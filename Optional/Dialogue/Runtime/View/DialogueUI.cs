@@ -46,6 +46,8 @@ namespace GBible.Dialogue
             [Tooltip("로그 줄을 담는 ScrollView")] public string logList = "dialogue-log-list";
             public string logButton = "dialogue-log-button";
             public string logClose = "dialogue-log-close";
+            [Tooltip("자동 진행 켜고 끄기 버튼")] public string autoButton = "dialogue-auto-button";
+            [Tooltip("다음 선택지 직전까지 건너뛰기 버튼")] public string skipButton = "dialogue-skip-button";
 
             public IEnumerable<(string field, string name, bool required)> All()
             {
@@ -66,6 +68,8 @@ namespace GBible.Dialogue
                 yield return (nameof(logList), logList, false);
                 yield return (nameof(logButton), logButton, false);
                 yield return (nameof(logClose), logClose, false);
+                yield return (nameof(autoButton), autoButton, false);
+                yield return (nameof(skipButton), skipButton, false);
             }
         }
 
@@ -112,6 +116,9 @@ namespace GBible.Dialogue
         public event Action<int> ChoiceRequested;
         public event Action LogOpened;
         public event Action LogClosed;
+        // 자동 진행 버튼 · 건너뛰기 버튼(재생기가 받아 자동 진행을 켜고 끄거나 다음 선택지 직전까지 건너뛴다).
+        public event Action AutoRequested;
+        public event Action SkipRequested;
 
         // 로그 내용(다이얼로그 재생기가 실행기의 로그로 채운다).
         public Func<IReadOnlyList<DialogueLogEntry>> LogSource = () => Array.Empty<DialogueLogEntry>();
@@ -211,6 +218,16 @@ namespace GBible.Dialogue
                 e.StopPropagation();
                 CloseLog();
             });
+            Find<VisualElement>(names.autoButton, false)?.RegisterCallback<ClickEvent>(e =>
+            {
+                e.StopPropagation();
+                if (!IsLogOpen) AutoRequested?.Invoke();
+            });
+            Find<VisualElement>(names.skipButton, false)?.RegisterCallback<ClickEvent>(e =>
+            {
+                e.StopPropagation();
+                if (!IsLogOpen && !_root.ClassListContains("dialogue--choosing")) SkipRequested?.Invoke();
+            });
             _log?.RegisterCallback<ClickEvent>(e => e.StopPropagation());
             if (_log != null) _log.style.display = DisplayStyle.None;
             IsLogOpen = false;
@@ -291,8 +308,15 @@ namespace GBible.Dialogue
 
         void ClearStateClasses()
         {
-            foreach (var cls in _root.GetClasses().Where(c => c.StartsWith("dialogue--", StringComparison.Ordinal) && c != "dialogue--open").ToList())
+            foreach (var cls in _root.GetClasses().Where(c => c.StartsWith("dialogue--", StringComparison.Ordinal) && c != "dialogue--open" && c != "dialogue--auto").ToList())
                 _root.RemoveFromClassList(cls);
+        }
+
+        // 자동 진행이 켜져 있으면 루트에 dialogue--auto(자동 버튼이 켜진 모양).
+        public void SetAuto(bool on)
+        {
+            if (_root == null || _root.ClassListContains("dialogue--auto") == on) return;
+            _root.EnableInClassList("dialogue--auto", on);
         }
 
         static readonly string[] States = { "dialogue--staging", "dialogue--typing", "dialogue--waiting", "dialogue--choosing" };
