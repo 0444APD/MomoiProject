@@ -18,14 +18,19 @@ GBible을 쓰는 모든 프로젝트의 AI가 **세션을 시작할 때** 읽는
 
 ## 다음 배포
 
+(아직 없음)
+
+## 0.3.0 — 2026-10-21
+
 **바뀐 것**
 - GitHub 저장소 이름: `UnitySystem` → `MomoiProject`(2026-10-21 개발자) — 새 주소 `https://github.com/0444APD/MomoiProject.git`. 옛 주소는 GitHub가 새 주소로 이어 준다(같은 계정에 `UnitySystem` 저장소를 새로 만들면 끊긴다).
-
+- 0.2.0 항목 보충: 0.1.0 → 0.2.0 사이의 멀티 변경(통신 규격 3 · 직접 접속 계정 = 기기 + 이름 · 멀티 지침 · `Bootstrap.RegisterRules`)이 빠져 있어 0.2.0 항목의 '프로젝트에서 할 일'에 더했다.
 - UI 가이드 1-7: 장면 위 화면(바탕 층 · '아래 입력 막기' 끔)의 버튼은 `focusable="false"` — UI Toolkit이 WASD · 방향키로 포커스를 옮기고 Enter · Space로 포커스된 버튼을 눌러, 채팅 Enter가 HUD의 '나가기'를 누르던 것(MultiTest 2026-10-21).
 
 **알아 둘 것**
 - README '설치'의 주소가 바뀌었다.
 - UI 가이드 1-7의 새 줄(장면 위 버튼과 키보드 포커스).
+- 0.2.0을 이미 적용한 멀티 프로젝트: 0.2.0 항목의 '멀티 프로젝트' 보충을 읽고, 아직 하지 않은 것을 한다(빌드를 모두 새로 · '같은 이름 · 다른 기기' 규칙 테스트 · `RegisterRules`).
 
 **프로젝트에서 할 일**
 - `Packages/com.momoi.gbible`에서 원격을 새 주소로: `git remote set-url origin https://github.com/0444APD/MomoiProject.git`(서브모듈이면 게임 저장소의 `.gitmodules` url도 고치고 `git submodule sync`).
