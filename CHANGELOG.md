@@ -21,11 +21,15 @@ GBible을 쓰는 모든 프로젝트의 AI가 **세션을 시작할 때** 읽는
 **바뀐 것**
 - GitHub 저장소 이름: `UnitySystem` → `MomoiProject`(2026-10-21 개발자) — 새 주소 `https://github.com/0444APD/MomoiProject.git`. 옛 주소는 GitHub가 새 주소로 이어 준다(같은 계정에 `UnitySystem` 저장소를 새로 만들면 끊긴다).
 
+- UI 가이드 1-7: 장면 위 화면(바탕 층 · '아래 입력 막기' 끔)의 버튼은 `focusable="false"` — UI Toolkit이 WASD · 방향키로 포커스를 옮기고 Enter · Space로 포커스된 버튼을 눌러, 채팅 Enter가 HUD의 '나가기'를 누르던 것(MultiTest 2026-10-21).
+
 **알아 둘 것**
 - README '설치'의 주소가 바뀌었다.
+- UI 가이드 1-7의 새 줄(장면 위 버튼과 키보드 포커스).
 
 **프로젝트에서 할 일**
 - `Packages/com.momoi.gbible`에서 원격을 새 주소로: `git remote set-url origin https://github.com/0444APD/MomoiProject.git`(서브모듈이면 게임 저장소의 `.gitmodules` url도 고치고 `git submodule sync`).
+- 바탕 층 화면과 '아래 입력 막기'를 끈 화면의 UXML에서 `ui:Button`(키트 버튼 포함)에 `focusable="false"`를 붙인다. 글 입력 칸은 그대로. 확인: 버튼을 마우스로 누른 뒤 WASD로 움직이고 Enter · Space를 눌러도 그 버튼이 다시 눌리지 않는다.
 
 ## 0.2.0 — 2026-10-21
 
