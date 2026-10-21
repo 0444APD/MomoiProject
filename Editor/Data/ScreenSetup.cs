@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 
 namespace GBible.EditorTools
 {
-    // 화면(UI Toolkit) 준비: Assets/UI에 기본 테마(.tss)·Panel Settings·프로젝트 테마 USS를 만들고, DB › 화면 설정 항목을 적용 전으로 만든다.
+    // 화면(UI Toolkit) 준비: Assets/UI에 기본 테마(.tss)·Panel Settings·프로젝트 테마 USS·GBible 기본 글꼴 에셋(FontSetup)을 만들고, DB › 화면 설정 항목을 적용 전으로 만든다.
     // 이미 있는 파일·항목은 건너뛴다(사람이 고친 것을 덮지 않는다). AI의 DB 반영 스크립트 · 에디터 정리(Upkeep)가 부른다(ScreenSetup.Ensure()).
     // 폴더: Assets/MomoiProject/UI/Screens(화면 UXML·USS), Assets/MomoiProject/UI/Items(목록 한 칸 UXML). 화면 코드는 Assets/MomoiProject/Code/Client/Screens.
     public static class ScreenSetup
@@ -54,11 +54,15 @@ namespace GBible.EditorTools
 
             var theme = AssetDatabase.LoadAssetAtPath<StyleSheet>(ProjectThemeFile);
             var settings = EditorDatabase.Instance.OfType<ScreenSettingsData>().FirstOrDefault();
+            // 글꼴: 칸이 비었으면 GBible 기본 글꼴(Pretendard — FontSetup). 프로젝트가 넣은 글꼴은 건드리지 않는다.
+            var noFont = settings == null || (settings.font == null && settings.fontAsset == null);
+            var font = noFont ? FontSetup.Defaults(made)?.regular : null;
             if (settings == null && commit)
             {
                 settings = (ScreenSettingsData)EditorDatabase.Instance.Create(typeof(ScreenSettingsData), "screenSettings");
                 settings.panelSettings = panel;
                 if (theme != null) settings.theme.Add(theme);
+                settings.fontAsset = font;
                 EditorUtility.SetDirty(settings);
                 AssetDatabase.SaveAssetIfDirty(settings);
                 made.Add("DB › 화면 설정 'screenSettings'");
@@ -68,16 +72,18 @@ namespace GBible.EditorTools
                 settings = (ScreenSettingsData)EditorDatabase.Staging.Add(typeof(ScreenSettingsData), "screenSettings");
                 settings.panelSettings = panel;
                 if (theme != null) settings.theme.Add(theme);
+                settings.fontAsset = font;
                 EditorDatabase.Staging.Touch();
                 made.Add("DB › 화면 설정 'screenSettings'(적용 전)");
             }
-            else if (settings.panelSettings == null || (theme != null && !settings.theme.Contains(theme)))
+            else if (settings.panelSettings == null || (theme != null && !settings.theme.Contains(theme)) || font != null)
             {
                 var work = (ScreenSettingsData)EditorDatabase.Staging.Work(settings);
                 if (work.panelSettings == null) work.panelSettings = panel;
                 if (theme != null && !work.theme.Contains(theme)) work.theme.Add(theme);
+                if (font != null && work.font == null && work.fontAsset == null) work.fontAsset = font;
                 EditorDatabase.Staging.Touch();
-                made.Add($"DB › 화면 설정 '{settings.Id}'에 Panel Settings·테마 연결(적용 전)");
+                made.Add($"DB › 화면 설정 '{settings.Id}'에 Panel Settings·테마·글꼴 연결(적용 전)");
             }
             return made;
         }

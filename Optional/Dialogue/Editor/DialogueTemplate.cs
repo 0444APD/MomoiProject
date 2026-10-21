@@ -23,7 +23,7 @@ namespace GBible.EditorTools.Graph
             folder ??= UniqueFolder(Root);
             EditorDatabase.EnsureFolder(folder);
 
-            // 그림(그라데이션 띠 · 별 · 버튼 아이콘)을 USS보다 먼저 — USS의 url()이 가져올 때 찾을 수 있게.
+            // 그림(그라데이션 띠 · 버튼 아이콘)을 USS보다 먼저 — USS의 url()이 가져올 때 찾을 수 있게.
             var white = WriteWhiteSprite(folder);
             WriteImages(folder);
             var uss = WriteText(folder, "DialogueUI.uss", ShownUss(Uss));
@@ -69,7 +69,7 @@ namespace GBible.EditorTools.Graph
             };
 
             var prefab = BuildPrefab(folder, AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxml), AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(choice),
-                panel, AssetDatabase.LoadAssetAtPath<Sprite>(white), motions);
+                panel, AssetDatabase.LoadAssetAtPath<Sprite>(white), motions, FontSetup.Current()?.semiBold);
             if (registerAsDefault) RegisterDefault(prefab);
             AssetDatabase.SaveAssets();
             return prefab;
@@ -304,7 +304,33 @@ namespace GBible.EditorTools.Graph
             return new DialogueUI.MotionSlot { moment = moment, element = element, motion = motion };
         }
 
-        static GameObject BuildPrefab(string folder, VisualTreeAsset uxml, VisualTreeAsset choice, PanelSettings panel, Sprite white, List<DialogueUI.MotionSlot> motions)
+        // 글꼴: 템플릿 프리팹은 지금 쓰는 세 벌(FontSetup — 기본은 GBible의 Pretendard)의 SemiBold(대사 굵기, 굵게 = Bold — UI 가이드 1-10).
+        // 글꼴을 바꾸거나 되돌리면(FontSetup.Replace · Restore) 다이얼로그 관리자의 기본 프리팹도 따라 바꾼다.
+        [InitializeOnLoadMethod]
+        static void FollowFonts() => FontSetup.Changed += UseFonts;
+
+        static void UseFonts(FontSetup.FontSet set)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<DialogueSettings>(SettingsPath)?.playerPrefab;
+            var path = prefab == null ? null : AssetDatabase.GetAssetPath(prefab);
+            if (string.IsNullOrEmpty(path) || set?.semiBold == null) return;
+            var root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                var ui = root.GetComponentInChildren<DialogueUI>(true);
+                if (ui == null || (ui.font == null && ui.fontAsset == set.semiBold)) return;
+                ui.font = null;   // TTF 칸이 먼저 쓰이므로 비운다
+                ui.fontAsset = set.semiBold;
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+                Debug.Log($"[MomoiProject] 다이얼로그 UI 글꼴을 {set.semiBold.name}(으)로 바꿨습니다({path}).");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        static GameObject BuildPrefab(string folder, VisualTreeAsset uxml, VisualTreeAsset choice, PanelSettings panel, Sprite white, List<DialogueUI.MotionSlot> motions, UnityEngine.TextCore.Text.FontAsset font)
         {
             var root = new GameObject("DialogueSystem");
             try
@@ -319,6 +345,7 @@ namespace GBible.EditorTools.Graph
                 var ui = uiObject.AddComponent<DialogueUI>();
                 ui.choiceTemplate = choice;
                 ui.motions = motions;
+                ui.fontAsset = font;
 
                 var stageObject = new GameObject("Stage");
                 stageObject.transform.SetParent(root.transform, false);
