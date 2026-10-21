@@ -22,7 +22,7 @@ Momoi Project를 Unity 프로젝트에 넣고, 게임이 켜질 때 시스템이
 
 ### 에디터에서
 
-1. 대상 프로젝트 폴더에서 저장소를 `Packages/com.momoi.gbible`로 받는다(embedded 패키지 — 원격 `https://github.com/0444APD/UnitySystem`, 배포 브랜치 `master`): `git clone https://github.com/0444APD/UnitySystem.git Packages/com.momoi.gbible`. 게임 프로젝트가 git 저장소면 `git submodule add`로 같은 자리에. Package Manager의 git URL 설치는 쓰지 않는다(패키지가 `Library/PackageCache/…@<해시>`에 읽기 전용으로 들어가 AI가 읽는 문서 경로가 업데이트마다 바뀐다). 업데이트는 그 폴더에서 `git pull`(README '설치').
+1. 대상 프로젝트 폴더에서 저장소를 `Packages/com.momoi.gbible`로 받는다(embedded 패키지 — 원격 `https://github.com/0444APD/MomoiProject`, 배포 브랜치 `master`): `git clone https://github.com/0444APD/MomoiProject.git Packages/com.momoi.gbible`. 게임 프로젝트가 git 저장소면 `git submodule add`로 같은 자리에. Package Manager의 git URL 설치는 쓰지 않는다(패키지가 `Library/PackageCache/…@<해시>`에 읽기 전용으로 들어가 AI가 읽는 문서 경로가 업데이트마다 바뀐다). 업데이트는 그 폴더에서 `git pull`(README '설치').
 2. Unity 6(6000.6.3f1에서 확인)으로 연다. 함께 필요한 `com.unity.nuget.mono-cecil`은 `package.json`의 의존성이라 저절로 들어온다(플레이어 데이터 비교 코드를 만든다, 8절).
 3. 시작 설정을 마치지 않은 프로젝트면 **시작 설정** 창(메뉴 `MomoiProject → 개발 → 시작 설정`)이 저절로 열린다. Product Name·언어만 고르고 적용한다 — 쓸 기능(6절)과 Undo 방식(3절)은 고르지 않는다: AI가 단계 0(흡수)의 기획 질문(명세서 1절 시간 · 되돌리기, 6절 부가 기능)으로 정해 단계 1에서 넣는다(개발자 2026-10-17). 만드는 것: `Assets/MomoiProject/Code/Rules·Client·Editor·Tests`(asmdef `MomoiProject.*`, 네임스페이스 `MomoiProject`) · `Rules/PlayerData.cs`(`RunState`·`Profile`) · `Client/Bootstrap.cs`(`Configure` · `RegisterRules` · `Started`, 3·4절) · DB 에셋(`GameDatabase`)과 DB › 플레이어 데이터 `run`(세션 구역)·`profile`(메타 구역) · `link.xml` · Claude Code 파일(11절). 이미 있는 파일은 덮지 않으므로 다시 적용해도 안전하다. 자세히는 AI 문서 `BuildGuide/01-StartProject.md` 1절.
 4. 플레이 버튼을 누른다. 하이어라키의 DontDestroyOnLoad 아래에 `[MomoiProject]`(세션 진행)과 `[오디오]` 오브젝트가 생기면 정상이다.

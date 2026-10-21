@@ -17,16 +17,16 @@
 
 ## 설치
 
-대상 Unity 프로젝트 폴더(`Assets`가 있는 곳)에서 이 저장소를 **`Packages/com.momoi.gbible`** 로 받는다(embedded 패키지). 원격 `https://github.com/0444APD/UnitySystem` — 배포 브랜치 `master`.
+대상 Unity 프로젝트 폴더(`Assets`가 있는 곳)에서 이 저장소를 **`Packages/com.momoi.gbible`** 로 받는다(embedded 패키지). 원격 `https://github.com/0444APD/MomoiProject` — 배포 브랜치 `master`.
 
 ```
-git clone https://github.com/0444APD/UnitySystem.git Packages/com.momoi.gbible
+git clone https://github.com/0444APD/MomoiProject.git Packages/com.momoi.gbible
 ```
 
 게임 프로젝트가 이미 git 저장소면 서브모듈로 넣는다(게임 저장소에는 GBible 커밋 번호만 남는다).
 
 ```
-git submodule add https://github.com/0444APD/UnitySystem.git Packages/com.momoi.gbible
+git submodule add https://github.com/0444APD/MomoiProject.git Packages/com.momoi.gbible
 ```
 
 - Package Manager의 'git URL로 추가'는 쓰지 않는다 — 그렇게 넣으면 패키지가 `Library/PackageCache/com.momoi.gbible@<해시>`에 읽기 전용으로 들어가, AI가 CLAUDE.md를 따라 읽는 문서 경로가 업데이트마다 바뀌고(`Library`는 git에 올리지 않는 폴더다) 패키지를 고칠 수도 없다.

@@ -18,7 +18,14 @@ GBible을 쓰는 모든 프로젝트의 AI가 **세션을 시작할 때** 읽는
 
 ## 다음 배포
 
-(아직 없음)
+**바뀐 것**
+- GitHub 저장소 이름: `UnitySystem` → `MomoiProject`(2026-10-21 개발자) — 새 주소 `https://github.com/0444APD/MomoiProject.git`. 옛 주소는 GitHub가 새 주소로 이어 준다(같은 계정에 `UnitySystem` 저장소를 새로 만들면 끊긴다).
+
+**알아 둘 것**
+- README '설치'의 주소가 바뀌었다.
+
+**프로젝트에서 할 일**
+- `Packages/com.momoi.gbible`에서 원격을 새 주소로: `git remote set-url origin https://github.com/0444APD/MomoiProject.git`(서브모듈이면 게임 저장소의 `.gitmodules` url도 고치고 `git submodule sync`).
 
 ## 0.2.0 — 2026-10-21
 

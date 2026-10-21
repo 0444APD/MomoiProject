@@ -254,11 +254,11 @@ Unity(6000.6.3f1, Unity 6.6)용 재사용 게임 시스템 라이브러리. 목�
 - **새 기능·개념의 이름은 임의로 짓지 말고 사용자에게 확인받는다.**
 
 ### 3.2 Git
-- 저장소: `Packages/com.momoi.gbible`(예전 `Assets/Code/System`), 원격 `https://github.com/0444APD/UnitySystem`. 작업 브랜치 `rebuild`.
+- 저장소: `Packages/com.momoi.gbible`(예전 `Assets/Code/System`), 원격 `https://github.com/0444APD/MomoiProject`(2026-10-21 `UnitySystem`에서 이름 바꿈 — 옛 주소는 GitHub가 이어 준다). 작업 브랜치 `rebuild`.
 - **푸시는 사용자가 요청할 때만.** 평소에는 로컬 커밋만.
 - 커밋 작성자 `0444APD`, 메시지 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. 여러 줄 메시지는 파일로(`git commit -F`).
 - 브랜치: `master`(원격 = **배포 브랜치** — 다른 프로젝트가 받는 곳. 올릴 때는 `git push origin rebuild:master`, 빨리 감기만), `legacy`(로컬, 옛 시스템 참고용: 타임라인 기반 다이얼로그 등).
-- **다른 프로젝트에 들이기**(2026-10-21 정리): 그 프로젝트 폴더에서 `git clone https://github.com/0444APD/UnitySystem.git Packages/com.momoi.gbible`(게임 저장소가 git이면 `git submodule add`로 같은 자리). embedded 패키지라야 AI가 CLAUDE.md를 따라 `Packages/com.momoi.gbible/Documentation~`를 읽는다 — Package Manager git URL 설치는 쓰지 않는다(README '설치' · 매뉴얼 20장 1절). 실험실(`UITemplateLab`)도 이 방식이다(원격 = GitHub).
+- **다른 프로젝트에 들이기**(2026-10-21 정리): 그 프로젝트 폴더에서 `git clone https://github.com/0444APD/MomoiProject.git Packages/com.momoi.gbible`(게임 저장소가 git이면 `git submodule add`로 같은 자리). embedded 패키지라야 AI가 CLAUDE.md를 따라 `Packages/com.momoi.gbible/Documentation~`를 읽는다 — Package Manager git URL 설치는 쓰지 않는다(README '설치' · 매뉴얼 20장 1절). 실험실(`UITemplateLab`)도 이 방식이다(원격 = GitHub).
 - **배포 순서**(개발자 2026-10-21 — 업데이트 기록 `CHANGELOG.md` 맨 위 '쓰는 법'): ① 바꿀 내용을 `CHANGELOG.md` '다음 배포'에 먼저 적는다(게임 프로젝트의 `Docs/GBibleRequests.md` 요청이면 그 줄을 옮긴다) ② 고친다 · 테스트 · 실험실 확인 ③ '다음 배포'를 실제와 맞추고 버전(`0.가.나` — 프로젝트에서 할 일이 생기면 가) · 날짜를 붙이고 `package.json` `version`도 같게 → 커밋 → (요청이 있을 때) `git push origin rebuild:master` + 태그 `v버전`. 받는 프로젝트의 AI는 세션마다 받기 · 버전 비교를 하고, 다르면 새 항목의 '알아 둘 것' · '프로젝트에서 할 일'을 처리한 뒤 이어 간다(진행 매뉴얼 14절, 결정 기록 'GBible' 절). 게임 프로젝트 세션은 GBible 폴더를 코드도 문서도 고치지 않고 요청 파일로 넘긴다(14-2).
 
 ### 3.3 파일 편집 주의 (실제로 사고가 났던 것)
