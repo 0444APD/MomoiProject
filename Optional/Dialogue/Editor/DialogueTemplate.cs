@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using GBible.Dialogue;
 using UnityEditor;
 using UnityEngine;
@@ -24,7 +26,7 @@ namespace GBible.EditorTools.Graph
             // 그림(그라데이션 띠 · 별 · 버튼 아이콘)을 USS보다 먼저 — USS의 url()이 가져올 때 찾을 수 있게.
             var white = WriteWhiteSprite(folder);
             WriteImages(folder);
-            var uss = WriteText(folder, "DialogueUI.uss", Uss);
+            var uss = WriteText(folder, "DialogueUI.uss", ShownUss(Uss));
             var uxml = WriteText(folder, "DialogueUI.uxml", Uxml);
             var choice = WriteText(folder, "DialogueChoice.uxml", ChoiceUxml);
             var theme = WriteText(folder, "DialogueTheme.tss", "@import url(\"unity-theme://default\");\n");
@@ -145,9 +147,12 @@ namespace GBible.EditorTools.Graph
             (0f, 0f), (0.10f, 0.12f), (0.20f, 0.30f), (0.29f, 0.55f), (0.41f, 0.70f), (0.55f, 0.82f), (0.715f, 0.88f), (0.88f, 0.90f), (1f, 0.90f),
         };
 
+        // 글 띠의 색 — USS .dialogue-box의 -unity-background-image-tint-color와 같게 둔다(Linear 보정이 이 색으로 계산한다).
+        static readonly Color GradientTint = new Color(24 / 255f, 24 / 255f, 28 / 255f);
+
         static void WriteImages(string folder)
         {
-            WriteTexture(folder, "DialogueGradient.png", 4, 256, (x, y) => Monotone(GradientKeys, (y + 0.5f) / 256f));
+            WriteTexture(folder, "DialogueGradient.png", 4, 256, (x, y) => ShownAlpha(Monotone(GradientKeys, (y + 0.5f) / 256f), GradientTint));
             WriteTexture(folder, "DialogueSparkle.png", 64, 64, Mask(Sparkle));
             WriteTexture(folder, "DialogueIconSkip.png", 64, 64, Mask(SkipIcon));
             WriteTexture(folder, "DialogueIconAuto.png", 64, 64, Mask(AutoIcon));
@@ -207,6 +212,55 @@ namespace GBible.EditorTools.Graph
                     if (inside(x + (i + 0.5f) / 4f, y + (j + 0.5f) / 4f)) hits++;
             return hits / 16f;
         };
+
+        // ── Linear 색 공간 보정 ─────────────────────────────────
+        // 이 템플릿의 반투명 값(그라데이션 알파 · USS의 rgba)은 디자인 도구처럼 감마 값으로 섞은 모양이다.
+        // Linear 프로젝트의 UI는 Linear 값으로 섞어, 어두운 반투명이 그보다 옅게 보인다(흰 바탕 위 rgb(24,24,28) 알파 0.9 → 47이 아니라 92).
+        // 그래서 Linear 프로젝트에서는 감마 섞기와 같아 보이는 알파로 바꿔 굽는다 — 밝기 0~1의 회색 바탕들에서 오차가 가장 작은 값(차이 6/255 안팎).
+        // PanelSettings.forceGammaRendering은 sRGB 대상에 감마 값을 한 번 더 써서 더 옅어진다(2026-10-21 실험실에서 확인).
+        static bool Linear => PlayerSettings.colorSpace == ColorSpace.Linear;
+
+        static float ShownAlpha(float alpha, Color color)
+        {
+            if (!Linear || alpha <= 0f || alpha >= 1f) return alpha;
+            float lo = 0f, hi = 1f;
+            for (var i = 0; i < 40; i++)
+            {
+                var m1 = lo + (hi - lo) / 3f;
+                var m2 = hi - (hi - lo) / 3f;
+                if (BlendError(alpha, m1, color) < BlendError(alpha, m2, color)) hi = m2;
+                else lo = m1;
+            }
+            return (lo + hi) / 2f;
+        }
+
+        static float BlendError(float alpha, float shown, Color color)
+        {
+            var error = 0f;
+            for (var b = 0; b <= 10; b++)
+            {
+                var back = b / 10f;
+                for (var ch = 0; ch < 3; ch++)
+                {
+                    var want = alpha * color[ch] + (1f - alpha) * back;
+                    var got = Mathf.LinearToGammaSpace(shown * Mathf.GammaToLinearSpace(color[ch]) + (1f - shown) * Mathf.GammaToLinearSpace(back));
+                    error += (got - want) * (got - want);
+                }
+            }
+            return error;
+        }
+
+        static string ShownUss(string uss)
+        {
+            if (!Linear) return uss;
+            var shown = Regex.Replace(uss, @"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", m =>
+            {
+                var color = new Color(int.Parse(m.Groups[1].Value) / 255f, int.Parse(m.Groups[2].Value) / 255f, int.Parse(m.Groups[3].Value) / 255f);
+                var alpha = ShownAlpha(float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture), color);
+                return $"rgba({m.Groups[1].Value}, {m.Groups[2].Value}, {m.Groups[3].Value}, {alpha.ToString("0.###", CultureInfo.InvariantCulture)})";
+            });
+            return "/* Linear 색 공간: rgba의 알파를 디자인 값(감마 섞기)과 같아 보이게 바꿔 적었다(DialogueTemplate 'Linear 색 공간 보정'). */\n" + shown;
+        }
 
         // 단조 3차 보간(Fritsch–Carlson) — 열쇠 사이가 꺾이지도 넘치지도 않는다(띠에 줄무늬가 생기지 않게).
         static float Monotone((float at, float alpha)[] keys, float t)
