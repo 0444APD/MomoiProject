@@ -27,7 +27,7 @@
 ### 에디터에서
 
 1. **켜기**(선택 기능 ID `dialogue`): AI는 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 `dialogue`를 더하고(명세서 6절에 켠 것만 — 관례 0절), 개발자는 `MomoiProject → DB` 사이드바 "다이얼로그 시스템" 그룹의 **기능 활성화**를 누른다. Unity가 다시 컴파일할 때 스크립팅 심볼 `GBIBLE_DIALOGUE`와 프로젝트 asmdef 참조(Client·Editor에 `GBible.Dialogue`, Editor에 `GBible.Dialogue.Editor` — Rules에는 넣지 않는다)가 저절로 맞춰지고, **스탠딩 프로필**·**장소** 탭과 메뉴 `MomoiProject → 다이얼로그 시스템 → …`가 열린다(`20-Setup.md` 6절). 이 모듈의 형식을 쓰는 코드는 그 컴파일이 끝난 뒤에 쓴다.
-2. AI가 DB 반영 스크립트에서 `GBible.EditorTools.Graph.DialogueTemplate.Create()`를 부른다(메뉴는 없다). `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 화면 한 벌(프리팹 `DialogueSystem`, UXML·USS·선택지 UXML, 패널 설정·런타임 테마, 기본 UI 모션, 흰 스프라이트, 그림 — 글 띠 그라데이션 `DialogueGradient.exr` · 별 · 버튼 아이콘)과 설정 `Resources/MomoiProject/DialogueSettings`를 만든다. 설정의 **playerPrefab**이 비어 있으면 이 프리팹으로 정해진다. **부를 때마다 새 한 벌**(`DialogueUI 1` …)을 만들므로(설정의 playerPrefab은 그대로) 한 번만 부른다 — 'DB 반영 스크립트 모두 다시 돌리기'에도 안전하게 `if (AssetDatabase.LoadAssetAtPath<DialogueSettings>(DialogueTemplate.SettingsPath)?.playerPrefab == null) DialogueTemplate.Create();`.
+2. AI가 DB 반영 스크립트에서 `GBible.EditorTools.Graph.DialogueTemplate.Create()`를 부른다(메뉴는 없다). `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 화면 한 벌(프리팹 `DialogueSystem`, UXML·USS·선택지 UXML, 패널 설정·런타임 테마, 기본 UI 모션, 흰 스프라이트, 그림 — 글 띠 그라데이션 `DialogueGradient.exr` · 로그 버튼 아이콘)과 설정 `Resources/MomoiProject/DialogueSettings`를 만든다. 설정의 **playerPrefab**이 비어 있으면 이 프리팹으로 정해진다. **부를 때마다 새 한 벌**(`DialogueUI 1` …)을 만들므로(설정의 playerPrefab은 그대로) 한 번만 부른다 — 'DB 반영 스크립트 모두 다시 돌리기'에도 안전하게 `if (AssetDatabase.LoadAssetAtPath<DialogueSettings>(DialogueTemplate.SettingsPath)?.playerPrefab == null) DialogueTemplate.Create();`.
 3. DB › **스탠딩 프로필**에서 화자를 만든다.
    - **expressions**: 스탠딩 목록(**스탠딩 ID** · **스프라이트**, 기본 `default` 하나).
    - **defaultExpression**: 기본 스탠딩 ID(비우면 첫 스탠딩).
@@ -37,7 +37,7 @@
 
 ### 주의할 점
 
-- 템플릿의 모양: 화면 아래 전체 폭 그라데이션 글 띠 · 이름(앞에 별) · 이름 오른쪽 금색 소속(추가 글 `affiliation`) · 대사 · 오른쪽 아래 클릭 대기 별 · 오른쪽 위 둥근 버튼(건너뛰기 · 자동 진행 · 로그). 수치는 UI 가이드 1-10.
+- 템플릿의 모양 = GBible 다이얼로그 기본 디자인(개발자 2026-10-21): 화면 아래 전체 폭 그라데이션 글 띠 · 이름 · 이름 오른쪽 금색 소속(추가 글 `affiliation`) · 대사 · 오른쪽 위 둥근 로그 버튼. 장식(별)은 없고, 건너뛰기 · 자동 진행 버튼과 클릭 대기 표시는 기본에서 뺐다 — 요청이 있으면 UXML에 이름 규격의 요소(5.7)를 더하면 그 기능이 켜진다. 수치는 UI 가이드 1-10.
 - 글꼴 칸(`DialogueUI` › 글꼴)에는 SemiBold 글꼴 에셋을 넣고, 그 에셋의 굵기 표(Font Weights) 700에 Bold 에셋을 잇는다 — 대사 · 소속은 SemiBold, 이름(굵게)은 Bold로 나온다. 굵기 표가 비면 이름은 가짜 굵게로 그려진다.
 - 템플릿의 반투명 값(그라데이션 알파 · USS의 `rgba`)은 디자인 값(감마로 섞은 모양)이다. 프로젝트가 Linear 색 공간이면 `Create()`가 같아 보이는 알파로 바꿔 굽는다(USS 맨 위에 그렇게 적은 줄이 붙는다). 그 뒤 색 공간을 바꾸면 템플릿을 새로 만든다.
 - 다이얼로그(`DialogueData`)와 연출 프리셋은 DB 사이드바에 없다. 그래프 창에서 만들고 고친다.

@@ -187,7 +187,7 @@ namespace GBible.Tests
                 Assert.IsNotNull(player.stage.ui.choiceTemplate);
                 Assert.AreEqual(3, player.stage.ui.motions.Count(m => m.motion != null));
                 var names = player.stage.ui.names;
-                var leftOut = new[] { names.next, names.skipButton, names.autoButton };   // 기본 디자인(개발자 2026-10-22)이 빼 둔 선택 요소
+                var leftOut = new[] { names.next, names.skipButton, names.autoButton };   // 기본 디자인(개발자 2026-10-21)이 빼 둔 선택 요소
                 var check = DialogueTemplate.CheckNames(document.visualTreeAsset, names).Where(c => !leftOut.Contains(c.name)).ToList();
                 Assert.IsTrue(check.All(c => c.found), "없는 요소: " + string.Join(", ", check.Where(c => !c.found).Select(c => c.name)));
             }

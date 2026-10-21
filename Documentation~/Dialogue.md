@@ -47,7 +47,7 @@ runner.Start("shopIntro");
 
 ## 화면: 템플릿 프리팹
 
-`DialogueTemplate.Create()`(에디터 — AI가 DB 반영 스크립트에서 부른다, 메뉴 없음)는 `Assets/MomoiProject/Data/DialogueUI/`에 모든 기능이 연결된 한 벌을 만든다: `DialogueSystem.prefab`, `DialogueUI.uxml`·`DialogueUI.uss`(글상자·이름표·선택지·레터박스·번쩍임·검은 화면·툴팁), `DialogueChoice.uxml`(선택지 하나), 패널 설정·런타임 테마, 기본 모션 4개(열림·클릭 대기 깜빡임·선택지 나타남·고름), 흰 스프라이트. 프리팹을 씬에 놓고 `GetComponent<DialoguePlayer>().Play("다이얼로그 ID")`로 재생한다. 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI > font`에 한글 TTF를 넣는다.
+`DialogueTemplate.Create()`(에디터 — AI가 DB 반영 스크립트에서 부른다, 메뉴 없음)는 `Assets/MomoiProject/Data/DialogueUI/`에 한 벌을 만든다 — GBible 다이얼로그 기본 디자인(UI 가이드 1-10, 2026-10-21): `DialogueSystem.prefab`, `DialogueUI.uxml`·`DialogueUI.uss`(그라데이션 글 띠 · 이름과 오른쪽 소속 · 대사 · 로그 버튼 · 선택지 · 레터박스 · 번쩍임 · 검은 화면 · 툴팁), `DialogueChoice.uxml`(선택지 하나), 패널 설정·런타임 테마, 기본 모션 3개(열림·선택지 나타남·고름), 흰 스프라이트, 그림(글 띠 · 로그 아이콘). 건너뛰기 · 자동 진행 버튼과 클릭 대기 표시는 기본에서 뺐다(이름 규격 요소를 더하면 켜진다). 프리팹을 씬에 놓고 `GetComponent<DialoguePlayer>().Play("다이얼로그 ID")`로 재생한다. 한글이 네모로 보이면 UI 오브젝트의 `DialogueUI > font`에 한글 TTF를 넣는다.
 
 프리팹 구성: `DialoguePlayer`(실행기·입력·게임 시간 멈춤·신호 이벤트) › `Stage`(`DialogueStage`: 게임 카메라 앞에 배경 두 장·배경 어둡게·스탠딩·이펙트, 음악·효과음, 카메라 확대·이동·흔들기) · `UI`(`UIDocument` + `DialogueUI`).
 
