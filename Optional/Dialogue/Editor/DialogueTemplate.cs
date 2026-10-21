@@ -51,16 +51,6 @@ namespace GBible.EditorTools.Graph
                     m.move = true;
                     m.moveY = AnimationCurve.EaseInOut(0, 12, 1, 0);
                 }),
-                Slot(folder, "NextBlink", DialogueUI.Moment.Waiting, "dialogue-next", m =>
-                {
-                    m.duration = 0.6f;
-                    m.loop = UiMotion.LoopMode.PingPong;
-                    m.restoreWhenDone = true;
-                    m.opacity = true;
-                    m.opacityCurve = AnimationCurve.EaseInOut(0, 0.25f, 1, 1);
-                    m.move = true;
-                    m.moveY = AnimationCurve.EaseInOut(0, 0, 1, 4);
-                }),
                 Slot(folder, "ChoiceAppear", DialogueUI.Moment.ChoicesShown, "", m =>
                 {
                     m.duration = 0.2f;
@@ -150,32 +140,30 @@ namespace GBible.EditorTools.Graph
         // 글 띠의 색 — USS .dialogue-box의 -unity-background-image-tint-color와 같게 둔다(Linear 보정이 이 색으로 계산한다).
         static readonly Color GradientTint = new Color(24 / 255f, 24 / 255f, 28 / 255f);
 
+        // 글 띠 그림의 크기: 세로는 띠 높이(1080 기준 372px)와 1:1, 가로는 4배로 늘어난다(디더 무늬가 화면 칸에 가깝게).
+        const int GradientWidth = 480, GradientHeight = 372;
+
         static void WriteImages(string folder)
         {
-            WriteTexture(folder, "DialogueGradient.exr", 4, 256, (x, y) => ShownAlpha(Monotone(GradientKeys, (y + 0.5f) / 256f), GradientTint));
-            WriteTexture(folder, "DialogueSparkle.png", 64, 64, Mask(Sparkle));
-            WriteTexture(folder, "DialogueIconSkip.png", 64, 64, Mask(SkipIcon));
-            WriteTexture(folder, "DialogueIconAuto.png", 64, 64, Mask(AutoIcon));
+            var rows = new float[GradientHeight];
+            for (var y = 0; y < GradientHeight; y++) rows[y] = ShownAlpha(Monotone(GradientKeys, (y + 0.5f) / GradientHeight), GradientTint);
+            WriteTexture(folder, "DialogueGradient.exr", GradientWidth, GradientHeight, (x, y) => rows[y] <= 0f ? 0f : rows[y] + Dither(x, y));
             WriteTexture(folder, "DialogueIconLog.png", 64, 64, Mask(LogIcon));
         }
 
-        // 네 갈래 별(옆구리가 안으로 파인) — 이름 앞 표시 · 클릭 대기 표시.
-        static bool Sparkle(float x, float y)
-        {
-            var u = Mathf.Abs(x - 32f) / 30f;
-            var v = Mathf.Abs(y - 32f) / 30f;
-            return Mathf.Pow(u, 0.55f) + Mathf.Pow(v, 0.55f) <= 1f;
-        }
+        // 디더: Unity의 화면 출력은 8비트(Linear 값으로 저장)라, 어두운 쪽에서 1단계가 밝기 3단계쯤으로 커져 띠에 계단이 보인다.
+        // 칸마다 ±1/255의 삼각 분포 잡음을 알파에 더해 계단 경계를 흩뜨린다(흰 바탕에서 출력 1단계 — 2026-10-21 실험실에서 재서 정한 크기).
+        static float Dither(int x, int y) => (Hash01(x, y, 0x9E37) + Hash01(x, y, 0x85EB) - 1f) / 255f;
 
-        // 건너뛰기: 세모 둘(▶▶).
-        static bool SkipIcon(float x, float y) =>
-            InTriangle(x, y, 13, 19, 31, 32, 13, 45) || InTriangle(x, y, 31, 19, 49, 32, 31, 45);
-
-        // 자동 진행: 고리 안의 세모.
-        static bool AutoIcon(float x, float y)
+        static float Hash01(int x, int y, uint seed)
         {
-            var d = Mathf.Sqrt((x - 32) * (x - 32) + (y - 32) * (y - 32));
-            return (d <= 25f && d >= 21f) || InTriangle(x, y, 27, 22, 43, 32, 27, 42);
+            var h = (uint)x * 0x27D4EB2Du ^ (uint)y * 0x165667B1u ^ seed;
+            h ^= h >> 15;
+            h *= 0x2C1B3C6Du;
+            h ^= h >> 12;
+            h *= 0x297A2D39u;
+            h ^= h >> 15;
+            return (h & 0xFFFFFF) / 16777216f;
         }
 
         // 로그: 끝이 둥근 막대 셋.
@@ -192,16 +180,6 @@ namespace GBible.EditorTools.Graph
             return false;
         }
 
-        static bool InTriangle(float px, float py, float ax, float ay, float bx, float by, float cx, float cy)
-        {
-            float Side(float x1, float y1, float x2, float y2) => (px - x2) * (y1 - y2) - (x1 - x2) * (py - y2);
-            var d1 = Side(ax, ay, bx, by);
-            var d2 = Side(bx, by, cx, cy);
-            var d3 = Side(cx, cy, ax, ay);
-            var negative = d1 < 0 || d2 < 0 || d3 < 0;
-            var positive = d1 > 0 || d2 > 0 || d3 > 0;
-            return !(negative && positive);
-        }
 
         // 모양 → 가장자리를 부드럽게 한 알파(한 칸을 4×4로 나눠 센다).
         static System.Func<int, int, float> Mask(System.Func<float, float, bool> inside) => (x, y) =>
@@ -294,7 +272,7 @@ namespace GBible.EditorTools.Graph
             return (2 * u3 - 3 * u2 + 1) * keys[i].alpha + (u3 - 2 * u2 + u) * h * m[i] + (-2 * u3 + 3 * u2) * keys[i + 1].alpha + (u3 - u2) * h * m[i + 1];
         }
 
-        // alphaAt(x, y): 위에서부터의 칸 좌표 → 알파. 파일이 .exr이면 16비트(Half)로 굽는다 — 부드러운 띠는 8비트 알파의 계단이 보인다.
+        // alphaAt(x, y): 위에서부터의 칸 좌표 → 알파. 파일이 .exr이면 16비트(Half)로 굽는다 — 디더 잡음(1/255 크기)이 8비트로 깎이지 않게.
         static void WriteTexture(string folder, string file, int width, int height, System.Func<int, int, float> alphaAt)
         {
             var path = $"{folder}/{file}";
@@ -406,19 +384,16 @@ namespace GBible.EditorTools.Graph
         <ui:VisualElement name=""dialogue-box"" class=""dialogue-box"">
             <ui:VisualElement name=""dialogue-name-box"" class=""dialogue-name-box"">
                 <ui:VisualElement class=""dialogue-name-row"">
-                    <ui:VisualElement class=""dialogue-name-mark"" picking-mode=""Ignore"" />
                     <ui:Label name=""dialogue-name"" class=""dialogue-name"" text="""" />
                     <!-- 프로젝트별 추가 글 예시: 스탠딩 프로필의 추가 글 키 affiliation(소속) — 이름 오른쪽에 늘 같은 간격으로. 비어 있으면 숨는다. 필요 없으면 지운다. -->
                     <ui:Label name=""dialogue-extra-affiliation"" class=""dialogue-extra dialogue-affiliation"" text="""" />
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:Label name=""dialogue-text"" class=""dialogue-text"" text="""" enable-rich-text=""true"" />
-            <ui:VisualElement name=""dialogue-next"" class=""dialogue-next"" picking-mode=""Ignore"" />
         </ui:VisualElement>
-        <!-- 오른쪽 위 둥근 버튼: 건너뛰기(다음 선택지 직전까지) · 자동 진행 · 대사 로그. 필요 없는 버튼은 지운다. -->
+        <!-- 오른쪽 위 둥근 버튼: 대사 로그. 같은 줄에 건너뛰기(name dialogue-skip-button — 다음 선택지 직전까지) · 자동 진행(dialogue-auto-button — 켜지면 루트에 dialogue--auto)을
+             더할 수 있다(DialogueUI가 이름으로 찾는다). 클릭 대기 표시는 name dialogue-next(dialogue--waiting일 때 보이게). -->
         <ui:VisualElement class=""dialogue-menu"">
-            <ui:VisualElement name=""dialogue-skip-button"" class=""dialogue-round-button dialogue-skip-button""><ui:VisualElement class=""dialogue-icon dialogue-icon--skip"" picking-mode=""Ignore"" /></ui:VisualElement>
-            <ui:VisualElement name=""dialogue-auto-button"" class=""dialogue-round-button dialogue-auto-button""><ui:VisualElement class=""dialogue-icon dialogue-icon--auto"" picking-mode=""Ignore"" /></ui:VisualElement>
             <ui:VisualElement name=""dialogue-log-button"" class=""dialogue-round-button dialogue-log-button""><ui:VisualElement class=""dialogue-icon dialogue-icon--log"" picking-mode=""Ignore"" /></ui:VisualElement>
         </ui:VisualElement>
         <!-- 대사 로그: 로그 버튼·글상자 위로 휠을 굴리면 열린다. -->
@@ -490,7 +465,7 @@ namespace GBible.EditorTools.Graph
 .dialogue-letterbox--bottom { bottom: 0; }
 
 /* 글 띠 — 화면 아래 전체 폭, 위는 투명하고 아래로 갈수록 어두운 그라데이션(개발자 참고 그림 2026-10-20).
-   알파 곡선은 DialogueGradient.exr(흰색 + 알파, 16비트 — 8비트면 Linear 섞기에서 띠가 진다)에 들어 있고, 색은 아래 tint가 입힌다. 전체를 옅게 하려면 tint에 알파를 준다(rgba). */
+   알파 곡선은 DialogueGradient.exr(흰색 + 알파, 계단이 보이지 않게 디더를 섞었다)에 들어 있고, 색은 아래 tint가 입힌다. 전체를 옅게 하려면 tint에 알파를 준다(rgba). */
 .dialogue-box {
     position: absolute;
     left: 0;
@@ -511,7 +486,7 @@ namespace GBible.EditorTools.Graph
     translate: 0 12px;
 }
 
-/* 이름 줄: 이름 앞 네 갈래 별(글줄 왼쪽 밖에) · 이름 · 오른쪽에 소속(금색, 세로 가운데 — 이름 길이와 상관없이 같은 간격).
+/* 이름 줄: 이름 · 오른쪽에 소속(금색, 세로 가운데 — 이름 길이와 상관없이 같은 간격).
    글은 모두 아래로 옅은 그림자(참고 그림 — 밝은 바탕에서도 획이 부드럽게 읽힌다). 굵기는 DialogueUI의 글꼴 칸(SemiBold 권장 — UI 가이드 1-10). */
 .dialogue-name-box {
     flex-direction: column;
@@ -522,15 +497,6 @@ namespace GBible.EditorTools.Graph
 .dialogue-name-row {
     flex-direction: row;
     align-items: center;
-    margin-left: -32px;
-}
-
-.dialogue-name-mark {
-    width: 15px;
-    height: 15px;
-    margin-right: 17px;
-    background-image: url(""DialogueSparkle.png"");
-    -unity-background-image-tint-color: rgb(240, 243, 248);
 }
 
 .dialogue-name {
@@ -585,23 +551,7 @@ namespace GBible.EditorTools.Graph
     color: rgb(226, 228, 232);
 }
 
-/* 클릭 대기 표시: 오른쪽 아래의 네 갈래 별 */
-.dialogue-next {
-    position: absolute;
-    right: 291px;
-    bottom: 61px;
-    width: 24px;
-    height: 24px;
-    background-image: url(""DialogueSparkle.png"");
-    -unity-background-image-tint-color: rgb(243, 246, 248);
-    opacity: 0;
-}
-
-.dialogue--waiting .dialogue-next {
-    opacity: 1;
-}
-
-/* 오른쪽 위 둥근 버튼(건너뛰기 · 자동 · 로그) — 자동이 켜지면 모래색 */
+/* 오른쪽 위 둥근 버튼(로그) — 버튼을 더하면 같은 줄에 16 간격으로 선다 */
 .dialogue-menu {
     position: absolute;
     top: 28px;
@@ -635,17 +585,7 @@ namespace GBible.EditorTools.Graph
     -unity-background-image-tint-color: rgb(240, 240, 242);
 }
 
-.dialogue-icon--skip { background-image: url(""DialogueIconSkip.png""); }
-.dialogue-icon--auto { background-image: url(""DialogueIconAuto.png""); }
 .dialogue-icon--log { background-image: url(""DialogueIconLog.png""); }
-
-.dialogue--auto .dialogue-auto-button {
-    background-color: rgb(214, 200, 176);
-}
-
-.dialogue--auto .dialogue-auto-button .dialogue-icon {
-    -unity-background-image-tint-color: rgb(40, 34, 26);
-}
 
 /* 선택지 — 폴더 색 카드(고르면 강조색으로 채움, 테두리 없음) */
 .dialogue-choices {
