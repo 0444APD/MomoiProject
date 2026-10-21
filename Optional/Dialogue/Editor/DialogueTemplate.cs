@@ -408,9 +408,9 @@ namespace GBible.EditorTools.Graph
                 <ui:VisualElement class=""dialogue-name-row"">
                     <ui:VisualElement class=""dialogue-name-mark"" picking-mode=""Ignore"" />
                     <ui:Label name=""dialogue-name"" class=""dialogue-name"" text="""" />
+                    <!-- 프로젝트별 추가 글 예시: 스탠딩 프로필의 추가 글 키 affiliation(소속) — 이름 오른쪽에 늘 같은 간격으로. 비어 있으면 숨는다. 필요 없으면 지운다. -->
+                    <ui:Label name=""dialogue-extra-affiliation"" class=""dialogue-extra dialogue-affiliation"" text="""" />
                 </ui:VisualElement>
-                <!-- 프로젝트별 추가 글 예시: 스탠딩 프로필의 추가 글 키 affiliation(소속). 비어 있으면 숨는다. 필요 없으면 지운다. -->
-                <ui:Label name=""dialogue-extra-affiliation"" class=""dialogue-extra dialogue-affiliation"" text="""" />
             </ui:VisualElement>
             <ui:Label name=""dialogue-text"" class=""dialogue-text"" text="""" enable-rich-text=""true"" />
             <ui:VisualElement name=""dialogue-next"" class=""dialogue-next"" picking-mode=""Ignore"" />
@@ -511,11 +511,12 @@ namespace GBible.EditorTools.Graph
     translate: 0 12px;
 }
 
-/* 이름 줄: 이름 앞 네 갈래 별(글줄 왼쪽 밖에) · 이름 · 그 아래 소속(금색) */
+/* 이름 줄: 이름 앞 네 갈래 별(글줄 왼쪽 밖에) · 이름 · 오른쪽에 소속(금색, 세로 가운데 — 이름 길이와 상관없이 같은 간격).
+   글은 모두 아래로 옅은 그림자(참고 그림 — 밝은 바탕에서도 획이 부드럽게 읽힌다). 굵기는 DialogueUI의 글꼴 칸(SemiBold 권장 — UI 가이드 1-10). */
 .dialogue-name-box {
     flex-direction: column;
     align-items: flex-start;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .dialogue-name-row {
@@ -538,13 +539,15 @@ namespace GBible.EditorTools.Graph
     font-size: 36px;
     -unity-font-style: bold;
     color: rgb(245, 244, 246);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .dialogue-affiliation {
-    margin: 4px 0 0 0;
+    margin: 0 0 0 16px;
     padding: 0;
     font-size: 18px;
     color: rgb(235, 214, 160);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
 /* 추가 글이 비었으면 숨긴다(dialogue-extra-<키> 요소 공통) */
@@ -558,6 +561,7 @@ namespace GBible.EditorTools.Graph
     font-size: 30px;
     color: rgb(242, 242, 244);
     white-space: normal;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .dialogue--narration .dialogue-text {
