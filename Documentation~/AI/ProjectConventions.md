@@ -26,7 +26,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
   3. **그 항목 전용 `[BindTo]` 코드**(한 항목만의 특수한 결과)
   4. **중간층 확장**(규칙 함수·행동 직전 이벤트 필드·새 행동 직전 이벤트 자리)
 - **선택 기능(다이얼로그·인벤토리·입력·Steam)은 AI가 켠다** — 명세서 6절(부가 기능)에 켠 것이면 `ProjectSettings/MomoiProject/Features.json`의 `enabled`에 ID(`dialogue`·`inventory`·`input`·`steam`)를 더한다. Unity가 스크립트를 다시 컴파일하고 도메인을 다시 읽을 때 GBible이 스크립팅 심볼과 프로젝트 asmdef 참조를 맞춘다(`Features.json`만 고치면 일어나지 않는다 — 같은 박자에 다른 스크립트도 바꾼다). 그 기능의 형식을 쓰는 코드는 그 컴파일이 한 번 끝난 뒤에 쓴다(그 전에는 컴파일 검사가 그 어셈블리를 찾지 못한다 — 진행 매뉴얼 6절 박자 0). 입력·Steam은 외부 패키지(Input System·Steamworks.NET)가 있어야 켜진다. [필수] 패키지를 들이는 것은 내려받기라 먼저 묻는다.
-- [필수] GBible 자체에 없는 범용 기능이 필요하면(라이브러리를 고쳐야 하면) 고치지 않고 사람에게 알린다. 프로젝트 코드로 우회할 수 있으면 우회하고 보고한다. 화면 쪽 도구(UI·입력·카메라·이동)는 알리지 않고 프로젝트에 만든다(21절).
+- [필수] GBible 자체에 없는 범용 기능이 필요하면(라이브러리를 고쳐야 하면) 고치지 않고 사람에게 알린다 — `Docs/GBibleRequests.md`에 적는다(진행 매뉴얼 14-2: 라이브러리 세션이 고쳐 배포하고, 이 프로젝트는 세션 시작 확인으로 받는다). 프로젝트 코드로 우회할 수 있으면 우회하고 보고한다. 화면 쪽 도구(UI·입력·카메라·이동)는 알리지 않고 프로젝트에 만든다(21절).
 - **선택 요소**(상태 효과·패시브 효과·액티브 효과)는 DB 종류를 프로젝트가 가진다: 시스템 목록이 쓰기로 했으면 단계 1에서 템플릿(`Packages/com.momoi.gbible/Documentation~/AI/Templates/Elements/`)을 `Assets/MomoiProject/Code/Rules/Elements/`에 복사한다. 칸(속성·기능)이 더 필요하면 그 클래스에 더한다 — 프로젝트 변경이라 묻지 않고 보고만 한다. 엔진은 규격(`IStatusData`·`IPassiveData`·`IUsableData`)만 보므로 더한 칸은 프로젝트 규칙이 DB 항목에서 읽는다(Reference 4-1).
 
 ## 1. 폴더·어셈블리, 데이터와 코드
@@ -56,7 +56,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 - [필수] `Assets/Dev`는 개발자 폴더다(안의 폴더 = DB 'Dev' 탭). 요청받을 때만 만들거나 바꾼다. 예외: 넣을 에셋 자리(`AssetRequests`)는 `Assets/Dev/Art`·`Dev/Audio`·`Dev/Fonts` … — 개발자가 진짜 파일을 넣는 곳이다.
 - AI가 쓰는 것은 모두 `Assets/MomoiProject/` 아래: 코드 `Code/`(Rules·Client·Editor·Tests — 키워드 그룹은 `Rules/Keywords/`, 데이터 클래스와 같은 어셈블리여야 참조된다), 화면 `UI/`, 테스트 씬 `Scenes/Test.unity`. `Assets` 바로 아래에 새 폴더를 만들지 않는다.
 - [필수] 게임 씬은 `Assets/Dev/Scenes`에 둔다(개발자가 레벨을 배치한다). AI가 게임 씬을 처음 만들 때만 여기에 만들고(반영 스크립트에서 `GameSceneSetup.Ensure("Assets/Dev/Scenes/<이름>.unity", firstInBuild: true)` — 없을 때만 빈 씬(카메라·빛)을 만들고 빌드 목록에 넣는다, 19절), 그 뒤 배치는 개발자 몫이다. Unity 기본 `Assets/Scenes`는 시작 설정·에디터를 열 때 여기로 옮겨진다.
-- **개발자 화면 이름(한글)은 `NamingGuide.md`(명명 가이드라인)를 따른다**. [필수] 4절 '바로잡은 이름' 표를 먼저 보고(왼쪽 말은 쓰지 않는다), 개발자가 이름을 바로잡으면 프로젝트의 화면 글·DB 이름·문서를 모두 바꾸고, 결정 기록에 적고, 그 표에 한 줄 더한다(라이브러리 커밋 — 진행 매뉴얼 2절).
+- **개발자 화면 이름(한글)은 `NamingGuide.md`(명명 가이드라인)를 따른다**. [필수] 4절 '바로잡은 이름' 표를 먼저 보고(왼쪽 말은 쓰지 않는다), 개발자가 이름을 바로잡으면 프로젝트의 화면 글·DB 이름·문서를 모두 바꾸고, 결정 기록에 적고, 그 표에 한 줄 더한다(라이브러리 세션이면 바로 고친다 · 게임 프로젝트 세션이면 `Docs/GBibleRequests.md` 요청으로 — 진행 매뉴얼 2절 · 14-2).
 - 기획 명세서에 없는 **새 개념**(새 DB 종류·새 시스템)의 이름만 사람에게 확인한다. 이벤트·행동 직전 이벤트·행동·Block 같은 나머지는 이 규칙대로 짓고 보고만 한다.
 
 ## 3. 규칙과 화면의 경계
@@ -108,7 +108,8 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
   - 버튼 → 행동은 `OnClick("이름", () => new 행동())`(Busy면 무시, 플레이어용 실패는 알림). 화면을 여는 버튼은 `OnClick("이름", () => GameScreens.Open(…))`.
   - 데이터 목록은 `List<T>("컨테이너", Item("칸 UXML 파일 이름"), …)`(목록 칸 UXML은 `Assets/MomoiProject/UI/Items/` — 화면 항목의 '목록 칸 UXML' 칸이나 화면 UXML의 `<ui:Template>`에 있어야 `Item`이 찾는다).
   - 고르기 창·확인·설정·슬롯·일시정지·알림은 **기본 화면**을 쓰고 새로 만들지 않는다. 기본 화면의 모양은 `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수로 맞춘다(프로젝트 화면은 키트 변수 `--kit-…` — UiGuide 3-4).
-  - 1920×1080 기준 px. 그림(스프라이트·아이콘)·글꼴은 사람이 넣는다: 그 자리는 색 상자·임시 그림으로 두고(UiGuide 1-9) 보고에 "넣을 에셋(경로·크기·쓰는 곳)"을 적는다.
+  - 1920×1080 기준 px. 그림(스프라이트·아이콘)은 사람이 넣는다: 그 자리는 색 상자·임시 그림으로 두고(UiGuide 1-9) 보고에 "넣을 에셋(경로·크기·쓰는 곳)"을 적는다.
+  - **글꼴은 GBible 기본을 쓴다**(개발자 2026-10-21): 패키지의 Pretendard(SIL OFL 1.1 — Regular · SemiBold · Bold)로 `FontSetup`이 프로젝트 `Assets/MomoiProject/UI/Fonts/`에 글꼴 에셋 세 벌(굵기 표 600 · 700 연결, 만드는 값도 GBible 기본)을 만들고, 화면 준비(`ScreenSetup.Ensure` — DB › 화면 설정 '글꼴 에셋')와 다이얼로그 템플릿(`DialogueTemplate.Create` — SemiBold)이 저절로 넣는다. 글꼴을 따로 묻거나 받지 않는다. 개발자가 "이 프로젝트는 글꼴(·글꼴 설정)을 바꾼다"고 하면 개발자가 `Assets/Dev/Fonts/`에 둔 파일로 `FontSetup.Replace(regular, semiBold, bold, 설정)`를 부른다 — GBible 기본 에셋은 `Fonts/Default/`로 빼 두고(더미 — 지우지 않는다, `FontSetup.Restore`로 되돌린다) 새 글꼴이 화면 · 다이얼로그 칸을 덮는다(화면 설정은 이미 있는 항목이라 '적용 전' — Ctrl+S를 알린다). 글자 크기 · 굵기 · 그림자 같은 USS 쪽 값은 GBible 값(UI 가이드)을 지우지 않고 프로젝트 USS의 뒤쪽 절에서 덮어쓴다(템플릿 USS 끝의 프로젝트 절 — UiGuide 1-10).
 - 씬에 놓이는 것(캐릭터·카드 오브젝트)은 `GameView.Redraw(그리기, 키…)`·`ViewList`·컴포넌트 '데이터 연결'. 값이 바뀔 때마다 그리지 말고 이 도구가 프레임 끝에 한 번 그리게 한다.
 - **프리팹은 AI가 만든다**(개발자 2026-10-16). 개발자가 말로 준 양식(무엇이 붙나 — 스프라이트 · 애니메이션 · 충돌체 · 크기)대로 반영 스크립트에서 에디터 코드(`PrefabUtility.SaveAsPrefabAsset` · 애니메이션은 `AnimatorController`에 개발자가 둔 클립을 연결)로 `Assets/MomoiProject/Prefabs/`에 만들고 DB › 프리팹(`PrefabData`) 항목에 등록한다 — 화면 코드는 `Game.Entry<PrefabData>(GameIds.Prefab.X).prefab`로 읽는다(인스펙터 연결 없음, 매뉴얼 39장 3절). **개발자는 프리팹을 만지지 않는다** — 리소스(스프라이트 시트 · 애니메이션 클립)만 `Assets/Dev/Art` · `Assets/Dev/Animations`에 둔다. 양식이 바뀌거나 피드백이 오면 AI가 반영 스크립트 버전을 올려 같은 경로에 다시 만든다(GUID 그대로 — 씬에 놓인 것도 따라온다). 리소스가 아직 없으면 임시 에셋(18절)으로 자리를 만든다. [필수] 씬에 무엇을 어디 놓나(레벨)는 개발자 몫이다.
   - [필수] 레벨이 아닌 **시스템 오브젝트**(판 그리기·끌기 입력·카메라)도 AI가 씬 파일에 놓지 않는다(씬 배치는 개발자 몫). 기본은 DB › 프리팹으로 만들고 씬이 열릴 때 코드가 만든다: `Bootstrap.Started`에서 지금 씬을 보고, 그 뒤는 `SceneManager.sceneLoaded`로 그 씬일 때 `Instantiate(Game.Entry<PrefabData>(GameIds.Prefab.X).prefab)`(다르게 하면 보고). 테스트 씬은 `TestScene.sourceScene`(복사해 온 게임 씬 이름)으로 어느 게임 씬인지 안다.

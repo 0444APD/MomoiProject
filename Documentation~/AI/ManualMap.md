@@ -8,6 +8,7 @@
 
 - **코드를 쓰거나 고치는 작업을 시작할 때** → 참조 `Reference.md`를 끝까지(무엇이 있나 — 있는 기능부터 쓴다). 기능을 처음 쓰면 그 기능 장(`Manual/NN`)의 맨 위 요약 · '동작 규칙' · 마지막 '주의할 점' 절, 그리고 쓰는 API의 절.
 - **프로젝트 진행**(단계 · 질문 · 결정 기록 · 답 양식) → 진행 매뉴얼 `ProjectFlow.md` · 스킬 `/think-momoi`.
+- **세션 시작 · GBible 업데이트**(버전 확인 · 받기 · 새 항목 숙지 · 수정 요청) → 진행 매뉴얼 14절 · 업데이트 기록 `Packages/com.momoi.gbible/CHANGELOG.md`(바뀐 것 · 알아 둘 것 · 프로젝트에서 할 일).
 - **기획 명세서 읽기·채우기** → `PlanningSpecGuide.md` · 빈 양식 `PlanningSpec.md` · 채운 예시 `PlanningSpec-CardDungeon.md`.
 - **기믹(효과 문장)·메인 룰** → 기믹 목록 `GimmickCatalog.md`. 네 게임을 따라 만든 기록은 `DryRuns/`.
 - **이름 짓기**(화면 이름 · 밸런싱 값 표시 이름 · 게임 용어 · 스탯 이름) → 명명 가이드라인 `NamingGuide.md`(0절 말의 뜻 · 4절 바로잡은 이름 · 5절 게임 이름의 기본 · 6절 이름 목록).
@@ -45,15 +46,17 @@
 - 00 목차 · 01 시작 · 02 AI와 일하기 · 03 읽고 밸런싱하기 · 04 모니터 · 05 테스트 · 06 에셋 · 07 다이얼로그와 레벨 · 08 출시 · 09 문제 해결.
 
 ### 그 밖(`Documentation~/`)
+- 패키지 루트 `CHANGELOG.md`(업데이트 기록 — 배포마다 바뀐 것 · 알아 둘 것 · 프로젝트에서 할 일, 진행 매뉴얼 14절) · `README.md`(설치 · 업데이트).
 - `Architecture.md`(설계 결정 기록) · `PlayerDataStore.md` · `Localization.md` · `Dialogue.md` · `Audio.md` · `Coding.md` · `CodingSyntax.md` · `Review.md`(2026-10-01 점검) · `TestMultiplayer.md`(멀티 시험 환경 설계 기록) · `PendingChecks.md`(사람이 Unity에서 확인할 목록).
 
 ## 메뉴얼을 고치라는 지시를 받으면 — 어디에 넣나
 
-개발자가 "메뉴얼을 업데이트해라 / 이 부분·이 지시를 추가해라"라고 하면 알맞은 곳(여러 곳일 수 있다)을 골라 고치고, 지금 프로젝트와 앞으로의 모든 프로젝트가 따르게 한다.
+개발자가 "메뉴얼을 업데이트해라 / 이 부분·이 지시를 추가해라"라고 하면 알맞은 곳(여러 곳일 수 있다)을 골라 고치고, 지금 프로젝트와 앞으로의 모든 프로젝트가 따르게 한다. 게임 프로젝트 세션이면 GBible 폴더를 직접 고치지 않는다 — 지금 프로젝트는 결정 기록으로 바로 따르고, 고칠 곳은 `Docs/GBibleRequests.md`에 적어 라이브러리 세션이 아래대로 고쳐 배포한다(진행 매뉴얼 14-2).
 - 진행 순서 · 질문 · 답 양식 · 단계 → `ProjectFlow.md` (+ 스킬 틀)
 - 모든 프로젝트에서 지킬 규칙 → `ProjectConventions.md` (+ CLAUDE 틀의 요약 줄)
 - 지바이블 기능의 쓰는 법 → 그 기능 장 + `Reference.md` 표
 - 이름 → `NamingGuide.md` · 화면·UI 템플릿 → `UiGuide.md` + `Templates/UI/` · 기믹 → `GimmickCatalog.md` · 명세서 칸 → `PlanningSpecGuide.md` + `PlanningSpec.md`
 - 사람(개발자)이 읽을 운영 안내 → `Guide/` · 지바이블 개발 기록 → `HANDOVER.md`
+- 다른 프로젝트가 받아서 해야 할 일이 생기는 변경(규칙 · API · 템플릿 · CLAUDE.md 칸) → `CHANGELOG.md`의 '다음 배포'에도 적는다(바뀐 것 · 알아 둘 것 · 프로젝트에서 할 일 — 진행 매뉴얼 14절). 게임 프로젝트 세션에서 문서를 고쳤어도 같다.
 - 더하거나 고친 규칙도 '규칙의 세기'(관례 맨 위)대로 적는다 — `[필수]`는 그 기준에 드는 것만, 고르는 여지가 있는 것은 권장("기본은 …")으로, 조립 예는 `예:`로.
 - 틀(`Templates/CLAUDE.block.md` · `think-momoi.SKILL.md`)을 고쳤으면 지금 프로젝트의 `CLAUDE.md` 칸과 `.claude/skills/think-momoi/SKILL.md` 사본도 같은 줄로 맞춘다. 새 문서를 만들면 이 지도에 한 줄 더한다.

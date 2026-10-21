@@ -139,6 +139,7 @@ GBible.Unity
 | 데이터 목록 → 칸 목록 | `List<T>("컨테이너", Item("칸 UXML"), () => 목록, (칸, 항목) => …)`(`ElementList`) | 35 2-6 |
 | 고르기 창·확인·설정·슬롯·일시정지·알림 | 기본 화면: 고르기 창은 저절로, `GameScreens.Confirm`·`Open(GameScreens.Settings)`·`Open(GameScreens.Slots, new SlotsRequest{…})`·`Open(GameScreens.Pause)`·`Toast` | 35 2-5 |
 | 화면 색 · 뒷배경 · 글꼴 | `Assets/MomoiProject/UI/Theme.uss`의 `--momoi-…` 변수 · 패널 면은 UI 키트 `KitPanel` + `kit-pn-*` · 뒷배경은 DB › 화면의 '뒷배경'(`ScreenBackdrop` — 일반 배경 · 블러 · UI 배경, 클래스 `.momoi-backdrop--plain · --blur · --ui`, 변수 `--momoi-backdrop` · `--momoi-ui-backdrop`) · DB › 화면 설정 › 글꼴(TTF) 또는 글꼴 에셋(TextCore — 굵기 표, 먼저 쓴다). 규칙은 `UiGuide.md` | 35 2-7 |
+| 글꼴(기본 · 바꾸기) | 기본 = GBible Pretendard(패키지 `Fonts/Pretendard`, OFL): `FontSetup.Defaults()`(프로젝트 `Assets/MomoiProject/UI/Fonts/`에 세 벌 — `ScreenSetup.Ensure` · `DialogueTemplate.Create`가 부른다) · 지금 세 벌 `FontSetup.Current()` · 바꾸기 `FontSetup.Replace(regular, semiBold, bold, settings)`(기본은 `Fonts/Default/`로 빼 둔다) · 되돌리기 `FontSetup.Restore()` · 만드는 값 `FontSetup.AssetSettings.Default`(64 · 6 · 2048 · SDFAA) | 35 2-7 · 관례 6절 |
 | 씬에 놓인 오브젝트(캐릭터·카드) | `GameView.Redraw(그리기, 키…)`·`ViewList<항목, 컴포넌트>`(프리팹)·컴포넌트 '데이터 연결' | 32 |
 | 피해 숫자·죽는 모습을 차례로 | `SubscribeAfterAction<이벤트>(e => GameView.Present(연출))`, 연출 시간은 `GameView.Wait`·`DeltaTime`, 입력 막기 `GameView.Busy`(연출 중 · 선택 대기 · 대사가 열려 있음 · `GameView.AddBusy(() => 조건)`으로 더한 때 — 더하기는 `AfterAssembliesLoaded`에서, 플레이마다 비워진다) | 32 |
 | 실시간 맞는 효과·클릭 숫자(입력을 막지 않음) | `GameView.Play(연출)`(대기열 밖, 동시에) | 32 |

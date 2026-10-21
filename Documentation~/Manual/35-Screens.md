@@ -9,7 +9,7 @@
 - 핸드·적·상점 물건처럼 데이터 목록을 칸 목록으로(`ElementList`).
 - 선택 대기(카드 1장 버리기·보상 셋 중 하나)의 고르기 창, "정말 지울까요?", 설정 화면(DB › 설정), 세이브 슬롯, 일시정지 메뉴, "에너지가 모자랍니다" 알림(기본 화면).
 
-> 화면은 "UXML·USS 파일 + DB 항목 + 화면 코드"만으로 끝나고 인스펙터에서 연결할 것이 없다(AI가 글 파일로 쓴다). 그림(스프라이트)·글꼴·소리 같은 에셋만 사람이 넣는다. 씬에 놓이는 것(캐릭터·카드 오브젝트)은 32장의 `ViewList`·'데이터 연결'을 쓴다. 문법·레이아웃·디자인 규칙과 UI 키트는 AI 문서 `UiGuide.md` · `Templates/UI/`.
+> 화면은 "UXML·USS 파일 + DB 항목 + 화면 코드"만으로 끝나고 인스펙터에서 연결할 것이 없다(AI가 글 파일로 쓴다). 그림(스프라이트)·소리 같은 에셋만 사람이 넣는다(글꼴은 GBible 기본이 저절로 들어간다 — 2-7). 씬에 놓이는 것(캐릭터·카드 오브젝트)은 32장의 `ViewList`·'데이터 연결'을 쓴다. 문법·레이아웃·디자인 규칙과 UI 키트는 AI 문서 `UiGuide.md` · `Templates/UI/`.
 
 이 문서에서 쓰는 용어:
 
@@ -192,7 +192,7 @@ protected override string[] Watch => new[] { GameIds.PlayerData.Run.Id };
 - 루트에 붙는 USS 순서: 라이브러리 기본(`Resources/MomoiProject/Screens.uss`) → 테마 USS(DB › 화면 설정, 위에서부터). 뒤의 것이 이긴다. 화면마다 '더할 USS'(DB › 화면)는 루트가 아니라 그 화면의 트리에 붙어 그 화면 안에만 닿는다 — 겹침 층(`Overlay`)에 띄운 요소(5-4)에는 닿지 않으므로 그 요소의 클래스는 테마 USS에 둔다(UiGuide 1-2 USS 줄).
 - 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop`(블러의 옅은 어둡게) · `--momoi-ui-backdrop`(UI 배경 색) · `--momoi-ui-text`(UI 배경 위 글) · `--momoi-line-on-dark`(검정 틀 위 테 버튼) · `--momoi-accent-line`(틀 머리 띠의 선 포인트) · `--momoi-radius` · `--momoi-font-size`, 면 색(기본 화면이 쓴다) `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`, 상태 색 `--momoi-good` · `-info` · `-warn` · `-danger` · `-danger-face` · 등급 `--momoi-rarity-1`~`4`. 기본값은 라이브러리 `Screens.uss`의 `:root`다. [필수] 그 파일은 고치지 않고 테마에서 덮는다. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
 - **뒷배경**: 화면 뒤의 덮개(`.momoi-backdrop` + `--plain` · `--blur` · `--ui`)를 DB › 화면의 '뒷배경'이 고른다(2-1). 블러는 `backdrop-filter: blur(10px)`. 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
-- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. 한글을 보이려면 한글이 든 글꼴이 필요하다(사람이 넣거나 AI가 받는다). [필수] AI가 받을 때는 먼저 개발자에게 묻는다(내려받기).
+- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. **기본은 GBible 글꼴**: 화면 준비(`ScreenSetup.Ensure`)가 두 칸이 다 비었으면 패키지의 Pretendard(SIL OFL 1.1 — `Fonts/Pretendard`)로 `Assets/MomoiProject/UI/Fonts/`에 글꼴 에셋 세 벌(Regular · SemiBold · Bold — 굵기 표 600 · 700 연결)을 만들어(`FontSetup.Defaults`) '글꼴 에셋'에 넣는다(새 항목이면 바로, 이미 있는 항목이면 '적용 전'). 글꼴 에셋을 패키지가 아니라 프로젝트에 두는 것은 동적 에셋이 새 글자를 그릴 때마다 파일이 바뀌기 때문이다. **프로젝트가 글꼴을 바꾸면** `FontSetup.Replace(regular, semiBold, bold, 설정)` — GBible 기본 에셋은 `Fonts/Default/`로 빼 두고(지우지 않는다) 새 세 벌이 화면 설정 · 다이얼로그 프리팹 칸을 덮는다. `FontSetup.Restore()`가 되돌린다. 지금 쓰는 세 벌은 `FontSetup.Current()`(화면 설정의 글꼴 에셋과 그 굵기 표).
 - 화면 크기: Panel Settings가 1920×1080 기준으로 늘이고 줄인다(가로세로 반반 맞춤). UXML은 1920×1080 기준 px로 쓴다.
 
 ---
@@ -220,7 +220,7 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부른다(메뉴는 없다). �
 | `panelSettings` | Panel Settings | `Assets/MomoiProject/UI/PanelSettings.asset` |
 | `theme` | 테마 USS | 모든 화면에 붙는 USS 목록 |
 | `font` | 글꼴 | 한글이 든 TTF·OTF(굵은 글은 가짜 굵게) |
-| `fontAsset` | 글꼴 에셋 | TextCore Font Asset. 굵기 표에 굵은 글꼴 에셋을 이으면 진짜 굵은 글. 넣으면 `font`보다 먼저(2-7) |
+| `fontAsset` | 글꼴 에셋 | TextCore Font Asset. 굵기 표에 굵은 글꼴 에셋을 이으면 진짜 굵은 글. 넣으면 `font`보다 먼저. 비어 있으면 화면 준비가 GBible 기본(Pretendard)을 넣는다(2-7) |
 | `choiceWindow` | 고르기 창 저절로 | 기본 켬. 고르기 창을 같은 ID(`momoi.choice`)로 바꿨으면 켜 둔다. 다른 ID로 따로 만들었을 때만 끈다(2-5) |
 | `pauseWhileChoosing` | 고르는 동안 게임 시간 멈춤 | 기본 끔. 실시간 게임의 레벨업 선택에서 켠다. `Time.timeScale`이라 연출도 멈춘다 → 턴제는 끈다(2-5) |
 | `failureToast` | 실패를 알림으로 | 기본 켬 |
@@ -551,7 +551,7 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 | 증상 | 원인 · 고치는 법 |
 |---|---|
 | 경고 "Panel Settings가 없어 테마 없는 임시 설정으로…", 슬라이더·토글 모양이 없음 | 화면 준비(3-1)가 안 됐다. 에디터를 다시 열거나 AI에게 `ScreenSetup.Ensure()`를 부탁한다. |
-| 한글이 □로 보인다 | DB › 화면 설정 › 글꼴에 한글 글꼴이 없다. |
+| 한글이 □로 보인다 | DB › 화면 설정 › 글꼴 · 글꼴 에셋이 비었거나 한글이 없는 글꼴이다 → 반영 스크립트에서 `ScreenSetup.Ensure()`(비었으면 GBible 기본 글꼴, '적용 전'이면 Ctrl+S). |
 | "[MomoiProject] 없는 화면 'shp'입니다" | ID 오타. `GameIds.Screen` 상수를 쓴다. 반영 스크립트로 막 만든 항목이면 Unity가 다시 컴파일하기 전까지 상수가 없다(5-6 4). |
 | "화면 '…'에 목록 칸 UXML '…'이 없습니다" | `Item("이름")`의 이름이 UXML 파일 이름과 다르거나, DB › 화면의 '목록 칸 UXML'에도 화면 UXML의 `<ui:Template>`에도 없다(2-3). |
 | "화면 'shop'의 UXML에 이름(name)이 'buy'인 Button이(가) 없습니다" | UXML의 `name`과 코드의 이름이 다르다. 목록 칸 안의 버튼은 `Q`가 아니라 `element.Q<Button>()`(칸 안에서 찾기). |

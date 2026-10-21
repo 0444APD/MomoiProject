@@ -13,6 +13,7 @@
 - Unity 6 (6000.6.3f1에서 검증)
 - 외부 에셋 의존 없음(Odin Inspector, DOTween을 쓰지 않는다). 함께 필요한 Unity 패키지 `com.unity.nuget.mono-cecil`은 `package.json`의 의존성이라 저절로 들어온다.
 - git(설치 · 업데이트에 쓴다).
+- 함께 넣은 글꼴: Pretendard(Regular · SemiBold · Bold — SIL Open Font License 1.1, `Fonts/Pretendard/LICENSE.txt`). 원본 그대로 두며, 화면 · 다이얼로그의 기본 글꼴이다(매뉴얼 35장 2-7).
 
 ## 설치
 
@@ -30,7 +31,7 @@ git submodule add https://github.com/0444APD/UnitySystem.git Packages/com.momoi.
 
 - Package Manager의 'git URL로 추가'는 쓰지 않는다 — 그렇게 넣으면 패키지가 `Library/PackageCache/com.momoi.gbible@<해시>`에 읽기 전용으로 들어가, AI가 CLAUDE.md를 따라 읽는 문서 경로가 업데이트마다 바뀌고(`Library`는 git에 올리지 않는 폴더다) 패키지를 고칠 수도 없다.
 - 그다음 Unity로 열면 **시작 설정** 창이 뜬다(매뉴얼 20장 1절).
-- 업데이트: `Packages/com.momoi.gbible`에서 `git pull`(서브모듈이면 게임 저장소에서 `git submodule update --remote Packages/com.momoi.gbible` 뒤 커밋). 받은 뒤 Unity를 앞으로 가져오면 다시 컴파일된다.
+- 업데이트: `Packages/com.momoi.gbible`에서 `git pull`(서브모듈이면 게임 저장소에서 `git submodule update --remote Packages/com.momoi.gbible` 뒤 커밋). 받은 뒤 Unity를 앞으로 가져오면 다시 컴파일된다. 프로젝트의 AI가 세션을 시작할 때마다 받기 · 버전 비교를 하고, 새 버전이면 [`CHANGELOG.md`](CHANGELOG.md)(업데이트 기록)의 '알아 둘 것' · '프로젝트에서 할 일'을 처리한 뒤 이어 간다(진행 매뉴얼 14절).
 
 ## 구조
 
