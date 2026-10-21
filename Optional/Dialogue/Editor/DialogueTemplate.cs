@@ -152,7 +152,7 @@ namespace GBible.EditorTools.Graph
 
         static void WriteImages(string folder)
         {
-            WriteTexture(folder, "DialogueGradient.png", 4, 256, (x, y) => ShownAlpha(Monotone(GradientKeys, (y + 0.5f) / 256f), GradientTint));
+            WriteTexture(folder, "DialogueGradient.exr", 4, 256, (x, y) => ShownAlpha(Monotone(GradientKeys, (y + 0.5f) / 256f), GradientTint));
             WriteTexture(folder, "DialogueSparkle.png", 64, 64, Mask(Sparkle));
             WriteTexture(folder, "DialogueIconSkip.png", 64, 64, Mask(SkipIcon));
             WriteTexture(folder, "DialogueIconAuto.png", 64, 64, Mask(AutoIcon));
@@ -294,15 +294,16 @@ namespace GBible.EditorTools.Graph
             return (2 * u3 - 3 * u2 + 1) * keys[i].alpha + (u3 - 2 * u2 + u) * h * m[i] + (-2 * u3 + 3 * u2) * keys[i + 1].alpha + (u3 - u2) * h * m[i + 1];
         }
 
-        // alphaAt(x, y): 위에서부터의 칸 좌표 → 알파.
+        // alphaAt(x, y): 위에서부터의 칸 좌표 → 알파. 파일이 .exr이면 16비트(Half)로 굽는다 — 부드러운 띠는 8비트 알파의 계단이 보인다.
         static void WriteTexture(string folder, string file, int width, int height, System.Func<int, int, float> alphaAt)
         {
             var path = $"{folder}/{file}";
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            var exr = file.EndsWith(".exr");
+            var texture = new Texture2D(width, height, exr ? TextureFormat.RGBAHalf : TextureFormat.RGBA32, false);
             for (var y = 0; y < height; y++)
                 for (var x = 0; x < width; x++)
                     texture.SetPixel(x, height - 1 - y, new Color(1f, 1f, 1f, Mathf.Clamp01(alphaAt(x, y))));
-            File.WriteAllBytes(path, texture.EncodeToPNG());
+            File.WriteAllBytes(path, exr ? texture.EncodeToEXR(Texture2D.EXRFlags.None) : texture.EncodeToPNG());
             Object.DestroyImmediate(texture);
             AssetDatabase.ImportAsset(path);
             if (AssetImporter.GetAtPath(path) is TextureImporter importer)
@@ -401,7 +402,7 @@ namespace GBible.EditorTools.Graph
         <!-- 지금 장소 이름(기본 추가 글 location). 장소가 없으면 숨는다. -->
         <ui:Label name=""dialogue-extra-location"" class=""dialogue-extra dialogue-location"" text="""" picking-mode=""Ignore"" />
         <ui:VisualElement name=""dialogue-choices"" class=""dialogue-choices"" picking-mode=""Ignore"" />
-        <!-- 글 띠: 화면 아래 전체 폭, 위는 투명하고 아래로 갈수록 어두운 그라데이션(DialogueGradient.png). 이름 · 소속 · 대사는 왼쪽 18%에서 시작한다. -->
+        <!-- 글 띠: 화면 아래 전체 폭, 위는 투명하고 아래로 갈수록 어두운 그라데이션(DialogueGradient.exr). 이름 · 소속 · 대사는 왼쪽 18%에서 시작한다. -->
         <ui:VisualElement name=""dialogue-box"" class=""dialogue-box"">
             <ui:VisualElement name=""dialogue-name-box"" class=""dialogue-name-box"">
                 <ui:VisualElement class=""dialogue-name-row"">
@@ -489,7 +490,7 @@ namespace GBible.EditorTools.Graph
 .dialogue-letterbox--bottom { bottom: 0; }
 
 /* 글 띠 — 화면 아래 전체 폭, 위는 투명하고 아래로 갈수록 어두운 그라데이션(개발자 참고 그림 2026-10-20).
-   알파 곡선은 DialogueGradient.png(흰색 + 알파)에 들어 있고, 색은 아래 tint가 입힌다. 전체를 옅게 하려면 tint에 알파를 준다(rgba). */
+   알파 곡선은 DialogueGradient.exr(흰색 + 알파, 16비트 — 8비트면 Linear 섞기에서 띠가 진다)에 들어 있고, 색은 아래 tint가 입힌다. 전체를 옅게 하려면 tint에 알파를 준다(rgba). */
 .dialogue-box {
     position: absolute;
     left: 0;
@@ -498,7 +499,7 @@ namespace GBible.EditorTools.Graph
     height: 372px;
     padding: 0 349px 136px 349px;
     justify-content: flex-end;
-    background-image: url(""DialogueGradient.png"");
+    background-image: url(""DialogueGradient.exr"");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-background-image-tint-color: rgb(24, 24, 28);
     transition-property: opacity, translate;
