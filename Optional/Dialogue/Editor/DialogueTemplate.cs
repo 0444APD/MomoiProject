@@ -391,8 +391,8 @@ namespace GBible.EditorTools.Graph
             </ui:VisualElement>
             <ui:Label name=""dialogue-text"" class=""dialogue-text"" text="""" enable-rich-text=""true"" />
         </ui:VisualElement>
-        <!-- 오른쪽 위 둥근 버튼: 대사 로그. 같은 줄에 건너뛰기(name dialogue-skip-button — 다음 선택지 직전까지) · 자동 진행(dialogue-auto-button — 켜지면 루트에 dialogue--auto)을
-             더할 수 있다(DialogueUI가 이름으로 찾는다). 클릭 대기 표시는 name dialogue-next(dialogue--waiting일 때 보이게). -->
+        <!-- 오른쪽 위 둥근 버튼: 대사 로그. 같은 줄에 건너뛰기(name dialogue-skip-button, 다음 선택지 직전까지) · 자동 진행(name dialogue-auto-button, 켜지면 루트에 auto 상태 클래스)을
+             더할 수 있다(DialogueUI가 이름으로 찾는다). 클릭 대기 표시는 name dialogue-next(waiting 상태 클래스일 때 보이게). XML 주석에는 빼기 두 개를 잇달아 쓰지 않는다. -->
         <ui:VisualElement class=""dialogue-menu"">
             <ui:VisualElement name=""dialogue-log-button"" class=""dialogue-round-button dialogue-log-button""><ui:VisualElement class=""dialogue-icon dialogue-icon--log"" picking-mode=""Ignore"" /></ui:VisualElement>
         </ui:VisualElement>
