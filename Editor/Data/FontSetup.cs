@@ -71,7 +71,7 @@ namespace GBible.EditorTools
         }
 
         // 프로젝트 글꼴로 바꾼다(개발자 요청 — 관례 6절): GBible 기본 에셋을 Fonts/Default로 빼 두고, 새 글꼴로 Fonts/에 세 벌을 만들어
-        // 화면 설정 '글꼴 에셋'(이미 있는 항목이라 적용 전 — 개발자가 Ctrl+S)과 다이얼로그 글꼴을 그쪽으로 돌린다.
+        // 화면 설정 '글꼴 에셋'(작업본 — DB 반영 스크립트 안에서 부르면 돌고 나서 바로 적용된다)과 다이얼로그 글꼴을 그쪽으로 돌린다.
         // semiBold가 없으면 Regular를 쓰고, bold가 없으면 굵은 글은 가짜 굵게로 그려진다.
         public static FontSet Replace(Font regular, Font semiBold = null, Font bold = null, AssetSettings? settings = null)
         {
@@ -159,7 +159,7 @@ namespace GBible.EditorTools
                 var work = (ScreenSettingsData)EditorDatabase.Staging.Work(settings);
                 work.fontAsset = set.regular;
                 EditorDatabase.Staging.Touch();
-                Debug.Log($"[MomoiProject] DB › 화면 설정 '글꼴 에셋'을 {set.regular.name}(으)로 바꿨습니다(적용 전 — Ctrl+S로 적용).");
+                Debug.Log($"[MomoiProject] DB › 화면 설정 '글꼴 에셋'을 {set.regular.name}(으)로 바꿨습니다(반영 스크립트 안이면 돌고 나서 바로 적용, 밖이면 '적용 전' — Ctrl+S).");
             }
             Changed?.Invoke(set);
         }

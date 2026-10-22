@@ -9,11 +9,13 @@ using UnityEngine;
 namespace GBible.EditorTools
 {
     // DB 반영 스크립트: AI가 쓴 static 함수(매개변수 없음)에 [DbSeed("버전")]을 붙이면 컴파일이 끝난 뒤 저절로 한 번 돈다.
-    //   함수 안에서 EditorDatabase.Staging.Add·Work·Remove로 항목을 만들고·고치고·지운다.
-    //   **새 항목은 저절로 적용한다**(새로 들어온 것만 — 무엇이 들어왔는지는 콘솔과 DB 창 알림으로). 개발자가 Ctrl+S를 누르지 않아도 GameIds가 생긴다.
-    //   **고치기·지우기·ID 바꾸기는 '적용 전'으로 남고**, 개발자가 읽어 본 뒤 Ctrl+S로 적용한다(개발자가 만지던 항목을 말없이 바꾸지 않게).
-    //   메뉴 'MomoiProject › 개발 › DB 반영 스크립트 — 새 항목은 바로 적용'을 끄면 예전처럼 새 항목도 '적용 전'으로 둔다.
-    //   고치기·지우기가 남았으면 적용했을 때 "이 버전은 돌았다"로 기록한다(버리면 다음 컴파일 뒤 다시 돈다). 남은 것이 없으면 바로 기록.
+    //   함수 안에서 EditorDatabase.Staging.Add·Work·Remove·Rename으로 항목을 만들고·고치고·지우고·ID를 바꾼다.
+    //   **반영 스크립트가 바꾼 것은 모두 저절로 적용한다**(개발자 2026-10-22 — 새 항목 · 고치기 · 지우기 · ID 바꾸기, 반영 스크립트가 부른 도구의 고치기까지.
+    //   무엇이 들어왔는지는 콘솔과 DB 창 알림으로). 개발자가 Ctrl+S를 누르지 않아도 적용되고 GameIds가 생긴다.
+    //   단, 개발자가 고치다 저장하지 않은 작업본을 반영 스크립트도 고쳤으면(한 작업본에 섞여 AI 것만 떼어 적용할 수 없다) 이번 고치기 · 지우기는
+    //   '적용 전'으로 남기고 경고로 그 항목을 알린다(새 항목은 적용). 개발자가 고치던 다른 항목은 건드리지 않는다(그것은 개발자의 Ctrl+S).
+    //   메뉴 'MomoiProject › 개발 › DB 반영 스크립트 — 바로 적용'을 끄면 모두 '적용 전'으로 둔다.
+    //   '적용 전'이 남았으면 적용했을 때 "이 버전은 돌았다"로 기록한다(버리면 다음 컴파일 뒤 다시 돈다). 남은 것이 없으면 바로 기록.
     //   돌린 뒤 바뀐 것이 없으면(이미 있는 항목뿐 · 같은 값으로 Work만 함) 바로 기록한다. 숨은 칸([HideInInspector])만 바꿔도 바뀐 것으로 본다.
     //   내용을 바꾸면 버전을 올린다("1" → "2"). 이미 있는 항목은 건너뛰고(개발자가 맞춘 값을 덮지 않는다), 고쳐야 할 때만 Work.
     //   ID를 바꿀 때는 EditorDatabase.Staging.Rename(항목, 새 ID) — 가리키는 칸이 함께 바뀌고, 서로 바꾸기도 맞게 적용된다.
@@ -46,18 +48,18 @@ namespace GBible.EditorTools
         // 돌렸지만 아직 적용(Ctrl+S)하지 않은 것(컴파일 사이에는 유지, Unity를 닫으면 사라진다 → 다음에 다시 돈다).
         static readonly string PendingKey = LegacyNames.Session("GBible.DbSeeds.Pending");
         public const string OptionsPath = "ProjectSettings/MomoiProject/DbSeedOptions.json";
-        const string MenuAutoApply = "MomoiProject/개발/DB 반영 스크립트 — 새 항목은 바로 적용";
-        // 새 항목을 저절로 적용하는 동안: 적용 뒤의 기록(AfterCommit)은 여기서 따로 정한다.
+        const string MenuAutoApply = "MomoiProject/개발/DB 반영 스크립트 — 바로 적용";
+        // 저절로 적용하는 동안: 적용 뒤의 기록(AfterCommit)은 여기서 따로 정한다.
         static bool _autoApplying;
 
         [Serializable]
         sealed class Options
         {
-            public bool autoApplyNew = true;
+            public bool autoApplyNew = true;   // 이름은 예전 그대로(파일 호환) — 지금은 새 항목 · 고치기 · 지우기 · ID 바꾸기 모두
         }
 
-        // 새 항목은 바로 적용(기본 켬). 프로젝트 설정 파일에 두어 팀과 같다.
-        public static bool AutoApplyNew
+        // 반영 스크립트가 바꾼 것은 바로 적용(기본 켬 — 개발자 2026-10-22). 끄면 모두 '적용 전'으로 남아 Ctrl+S를 기다린다. 프로젝트 설정 파일에 두어 팀과 같다.
+        public static bool AutoApply
         {
             get
             {
@@ -72,12 +74,12 @@ namespace GBible.EditorTools
         }
 
         [MenuItem(MenuAutoApply, priority = 921)]
-        static void ToggleAutoApply() => AutoApplyNew = !AutoApplyNew;
+        static void ToggleAutoApply() => AutoApply = !AutoApply;
 
         [MenuItem(MenuAutoApply, true)]
         static bool ToggleAutoApplyCheck()
         {
-            Menu.SetChecked(MenuAutoApply, AutoApplyNew);
+            Menu.SetChecked(MenuAutoApply, AutoApply);
             return true;
         }
 
@@ -141,6 +143,8 @@ namespace GBible.EditorTools
             var addedBefore = staging.AddedNow();
             var workingBefore = staging.WorkingNow();
             var removedBefore = staging.RemovedNow();
+            // 개발자가 고치던(저장 안 한) 작업본의 모습 — 반영 스크립트가 그것까지 고치면 AI 것만 떼어 적용할 수 없다.
+            var snapshots = workingBefore.ToDictionary(o => o, staging.Snapshot);
             foreach (var (key, version, method) in seeds)
             {
                 var done = !force && (Recorded(record, key) == version || pending.Contains(key + "@" + version));
@@ -159,18 +163,31 @@ namespace GBible.EditorTools
             if (ran.Count == 0) return 0;
             SessionState.SetString(PendingKey, string.Join("\n", pending.Concat(ran).Distinct()));
             staging.Touch();
-            // 이번에 새로 만든 항목 · 고치거나 지운 항목(돌기 전부터 있던 개발자의 작업본은 세지 않는다).
+            // 이번에 새로 만든 항목 · 고친 항목(작업본 — ID 바꾸기 포함) · 지운 항목(돌기 전부터 있던 개발자의 작업본은 세지 않는다).
             var created = staging.AddedNow().Where(a => !addedBefore.Contains(a)).ToList();
-            var edited = staging.WorkingNow().Where(w => !workingBefore.Contains(w) && staging.HasPending(w)).Concat(staging.RemovedNow().Where(r => !removedBefore.Contains(r))).ToList();
-            if (created.Count > 0 && AutoApplyNew)
+            var changed = staging.WorkingNow().Where(w => !workingBefore.Contains(w) && staging.HasPending(w)).ToList();
+            var deleted = staging.RemovedNow().Where(r => !removedBefore.Contains(r)).ToList();
+            // 개발자가 고치던 작업본을 반영 스크립트도 고쳤다(한 작업본에 섞임): 이번 고치기 · 지우기는 '적용 전'으로 남긴다(새 항목은 적용).
+            var mixed = workingBefore.Where(o => o != null && staging.WorkingCopyOf(o) != null && staging.Snapshot(o) != snapshots[o]).ToList();
+            if (AutoApply && created.Count + changed.Count + deleted.Count > 0)
             {
+                var applyChanged = mixed.Count == 0 ? changed : new List<GameData>();
+                var applyDeleted = mixed.Count == 0 ? deleted : new List<GameData>();
+                var ids = created.Select(c => c.Id).Concat(applyChanged.Select(c => (staging.WorkingCopyOf(c) ?? c).Id)).Concat(applyDeleted.Select(d => d.Id)).ToList();
                 _autoApplying = true;
-                try { staging.CommitAdded(created); }
+                try { staging.CommitOnly(created, applyChanged, applyDeleted); }
                 finally { _autoApplying = false; }
-                var applied = created.Where(c => c != null && !staging.IsAdded(c)).Select(c => c.Id).ToList();
-                if (applied.Count > 0) Announce($"DB 반영 스크립트가 만든 새 항목 {applied.Count}개를 적용했습니다", applied);
                 created = created.Where(c => c != null && staging.IsAdded(c)).ToList();   // 적용하지 못한 것(겹침 등)은 '적용 전'으로 남는다
+                changed = changed.Where(c => c != null && staging.HasPending(c)).ToList();
+                deleted = deleted.Where(d => d != null && staging.RemovedNow().Contains(d)).ToList();
+                var left = new HashSet<string>(created.Select(c => c.Id).Concat(changed.Select(c => (staging.WorkingCopyOf(c) ?? c).Id)).Concat(deleted.Select(d => d.Id)));
+                var applied = ids.Where(id => !left.Contains(id)).Distinct().ToList();
+                if (applied.Count > 0) Announce($"DB 반영 스크립트가 바꾼 것 {applied.Count}개를 적용했습니다", applied);
+                if (mixed.Count > 0)
+                    Debug.LogWarning("[MomoiProject] DB 반영 스크립트가 개발자가 고치던(저장 안 한) 항목도 고쳐 이번 고치기 · 지우기를 '적용 전'으로 남겼습니다: " +
+                                     string.Join(", ", mixed.Select(o => (staging.WorkingCopyOf(o) ?? o).Id)) + " — DB에서 보고 Ctrl+S로 적용하세요.");
             }
+            var edited = changed.Concat(deleted).ToList();
             // 남은 것(고치기·지우기·적용하지 못한 새 항목)이 없으면 이 버전은 돈 것 — 기다리면 매번 다시 돈다.
             // 적용 전 새 항목이 남아 있으면(예전에 돌았던 스크립트가 만든 것일 수 있다) 적용될 때(Ctrl+S) 기록한다 — 버리면 다시 돌게.
             if (edited.Count == 0 && created.Count == 0)
