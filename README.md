@@ -59,7 +59,7 @@ git submodule add https://github.com/0444APD/MomoiProject.git Packages/com.momoi
 | **MomoiProject → 다국어** | 시트 내보내기·가져오기(CSV, 머리줄 이름으로 읽음), 번역 검사(문법·누락·값·용어·태그 차이). 설정(지원 언어·대체 순서·언어별 표)은 시작 설정이 만들고, DB 이름 키 채우기는 AI가 `TextSheetTools.FillCodexNames`로. 자세히: `Documentation~/Localization.md` |
 | **MomoiProject → 에셋 관리** | 넣을 에셋 · 가져오기 · 바꾸기 · 안 쓰는 것 · 폴더 정돈(매뉴얼 39장) |
 | **MomoiProject → 테스트 씬 열기** | 테스트 씬(AI가 `TestSceneSetup.Ensure`로 만든다)을 연다 |
-| MomoiProject → 개발 | 드물게 쓰는 것: 시작 설정 · 출시됨(저장 호환 유지) · DB 반영 스크립트 모두 다시 돌리기 · 새 항목은 바로 적용 · Claude Code 파일 지금 맞추기 · 맞추지 않기 · 처음 상태로 되돌리기 · 지금 상태를 처음 상태로 기록 · 구조 편집 열기(라이브러리 개발용) · 창 탭 막대 숨기기 |
+| MomoiProject → 개발 | 드물게 쓰는 것: 시작 설정 · 출시됨(저장 호환 유지) · DB 반영 스크립트 모두 다시 돌리기 · 바로 적용 · Claude Code 파일 지금 맞추기 · 맞추지 않기 · 처음 상태로 되돌리기 · 지금 상태를 처음 상태로 기록 · 구조 편집 열기(라이브러리 개발용) · 창 탭 막대 숨기기 |
 
 개발자가 쓰는 창만 `MomoiProject` 맨 위에 두고, 드물게 쓰는 것은 `개발` 아래에 접는다(2026-10-16 정리). 저절로 되거나 AI가 코드로 하는 일(식별자 코드 · 스프라이트 다시 굽기 · 화면 준비 · 테스트 씬 만들기 · 다이얼로그 UI 템플릿 · 이름 키 채우기)은 메뉴가 없다. 내 코드 범위는 창 없이 `ProjectSettings/MomoiProject/ProjectCode.json`. 상세 창과 키워드 연결은 메뉴가 없다: 상세 창은 DB에서 항목이나 클래스를 열 때만 탭으로 뜨고, 키워드 연결은 코드의 `[Keyword(typeof(그룹))]`다(클래스 상세에서 보기만).
 

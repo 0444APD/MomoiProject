@@ -192,7 +192,7 @@ protected override string[] Watch => new[] { GameIds.PlayerData.Run.Id };
 - 루트에 붙는 USS 순서: 라이브러리 기본(`Resources/MomoiProject/Screens.uss`) → 테마 USS(DB › 화면 설정, 위에서부터). 뒤의 것이 이긴다. 화면마다 '더할 USS'(DB › 화면)는 루트가 아니라 그 화면의 트리에 붙어 그 화면 안에만 닿는다 — 겹침 층(`Overlay`)에 띄운 요소(5-4)에는 닿지 않으므로 그 요소의 클래스는 테마 USS에 둔다(UiGuide 1-2 USS 줄).
 - 테마 변수: `--momoi-text` · `--momoi-dim` · `--momoi-panel` · `--momoi-button` · `--momoi-button-hover` · `--momoi-accent` · `--momoi-accent-text` · `--momoi-backdrop`(블러의 옅은 어둡게) · `--momoi-ui-backdrop`(UI 배경 색) · `--momoi-ui-text`(UI 배경 위 글) · `--momoi-line-on-dark`(검정 틀 위 테 버튼) · `--momoi-accent-line`(틀 머리 띠의 선 포인트) · `--momoi-radius` · `--momoi-font-size`, 면 색(기본 화면이 쓴다) `--momoi-paper`(·`-text`·`-dim`) · `--momoi-folder`(·`-text`) · `--momoi-cover`(·`-text`) · `--momoi-stone`(·`-text`) · `--momoi-colorpaper`(·`-text`), 기본 창 글 `--momoi-panel-text`, 버튼 글 `--momoi-button-text`, 상태 색 `--momoi-good` · `-info` · `-warn` · `-danger` · `-danger-face` · 등급 `--momoi-rarity-1`~`4`. 기본값은 라이브러리 `Screens.uss`의 `:root`다. [필수] 그 파일은 고치지 않고 테마에서 덮는다. 프로젝트 화면의 USS도 이 변수를 쓰면 테마 하나로 모든 화면의 색이 바뀐다.
 - **뒷배경**: 화면 뒤의 덮개(`.momoi-backdrop` + `--plain` · `--blur` · `--ui`)를 DB › 화면의 '뒷배경'이 고른다(2-1). 블러는 `backdrop-filter: blur(10px)`. 디자인 규칙(차가운 검정 + 종이 흰색, 매트·플랫, 테두리 선 강조·패널 그림자 없음)과 UI 키트는 AI 문서 `UiGuide.md` 3절 · `Templates/UI/`.
-- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. **기본은 GBible 글꼴**: 화면 준비(`ScreenSetup.Ensure`)가 두 칸이 다 비었으면 패키지의 Pretendard(SIL OFL 1.1 — `Fonts/Pretendard`)로 `Assets/MomoiProject/UI/Fonts/`에 글꼴 에셋 세 벌(Regular · SemiBold · Bold — 굵기 표 600 · 700 연결)을 만들어(`FontSetup.Defaults`) '글꼴 에셋'에 넣는다(새 항목이면 바로, 이미 있는 항목이면 '적용 전'). 글꼴 에셋을 패키지가 아니라 프로젝트에 두는 것은 동적 에셋이 새 글자를 그릴 때마다 파일이 바뀌기 때문이다. **프로젝트가 글꼴을 바꾸면** `FontSetup.Replace(regular, semiBold, bold, 설정)` — GBible 기본 에셋은 `Fonts/Default/`로 빼 두고(지우지 않는다) 새 세 벌이 화면 설정 · 다이얼로그 프리팹 칸을 덮는다. `FontSetup.Restore()`가 되돌린다. 지금 쓰는 세 벌은 `FontSetup.Current()`(화면 설정의 글꼴 에셋과 그 굵기 표).
+- **글꼴**: DB › 화면 설정 › **글꼴 에셋**(TextCore Font Asset — Create › Text Core › Font Asset, 굵기 표 Font Weights에 굵은 글꼴 에셋을 이으면 굵은 글이 진짜 굵은 글꼴)이 있으면 그것을, 없으면 **글꼴**(TTF · OTF — 굵은 글은 가짜 굵게)을 모든 화면에 쓴다. **기본은 GBible 글꼴**: 화면 준비(`ScreenSetup.Ensure`)가 두 칸이 다 비었으면 패키지의 Pretendard(SIL OFL 1.1 — `Fonts/Pretendard`)로 `Assets/MomoiProject/UI/Fonts/`에 글꼴 에셋 세 벌(Regular · SemiBold · Bold — 굵기 표 600 · 700 연결)을 만들어(`FontSetup.Defaults`) '글꼴 에셋'에 넣는다(반영 스크립트 안에서 부르면 돌고 나서 바로 적용). 글꼴 에셋을 패키지가 아니라 프로젝트에 두는 것은 동적 에셋이 새 글자를 그릴 때마다 파일이 바뀌기 때문이다. **프로젝트가 글꼴을 바꾸면** `FontSetup.Replace(regular, semiBold, bold, 설정)` — GBible 기본 에셋은 `Fonts/Default/`로 빼 두고(지우지 않는다) 새 세 벌이 화면 설정 · 다이얼로그 프리팹 칸을 덮는다. `FontSetup.Restore()`가 되돌린다. 지금 쓰는 세 벌은 `FontSetup.Current()`(화면 설정의 글꼴 에셋과 그 굵기 표).
 - 화면 크기: Panel Settings가 1920×1080 기준으로 늘이고 줄인다(가로세로 반반 맞춤). UXML은 1920×1080 기준 px로 쓴다.
 
 ---
@@ -226,7 +226,7 @@ AI가 화면 DB 반영 스크립트 맨 앞에서 부른다(메뉴는 없다). �
 | `failureToast` | 실패를 알림으로 | 기본 켬 |
 | `pauseMenu` | Esc로 일시정지 메뉴 | 기본 끔 |
 
-- [필수] **AI가 이 칸을 바꿀 때**(실시간 게임의 '고르는 동안 게임 시간 멈춤' 켜기, 'Esc로 일시정지 메뉴' 켜기): 이 항목은 보통 에디터를 열 때 이미 만들어져 있다. 그래서 반영 스크립트는 새로 만들지 않고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 바꾼다 → **'적용 전'으로 남아 개발자가 Ctrl+S로 적용한다**(관례 15절). 보고의 '알릴 것'에 "DB › 화면 설정 적용(Ctrl+S)"을 적는다. 반영 스크립트는 버전마다 한 번만 도므로 "이미 켜져 있으면" 같은 검사는 필요 없다.
+- [필수] **AI가 이 칸을 바꿀 때**(실시간 게임의 '고르는 동안 게임 시간 멈춤' 켜기, 'Esc로 일시정지 메뉴' 켜기): 이 항목은 보통 에디터를 열 때 이미 만들어져 있다. 그래서 반영 스크립트는 새로 만들지 않고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 바꾼다 → 반영 스크립트가 끝나면 **바로 적용된다**(관례 15절 — 개발자가 이 항목을 고치다 저장하지 않았으면 '적용 전'으로 남고 경고가 뜬다, 그때만 '알릴 것'에 Ctrl+S). 반영 스크립트는 버전마다 한 번만 도므로 "이미 켜져 있으면" 같은 검사는 필요 없다.
 
 ```csharp
 [DbSeed("1")]
@@ -551,7 +551,7 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 | 증상 | 원인 · 고치는 법 |
 |---|---|
 | 경고 "Panel Settings가 없어 테마 없는 임시 설정으로…", 슬라이더·토글 모양이 없음 | 화면 준비(3-1)가 안 됐다. 에디터를 다시 열거나 AI에게 `ScreenSetup.Ensure()`를 부탁한다. |
-| 한글이 □로 보인다 | DB › 화면 설정 › 글꼴 · 글꼴 에셋이 비었거나 한글이 없는 글꼴이다 → 반영 스크립트에서 `ScreenSetup.Ensure()`(비었으면 GBible 기본 글꼴, '적용 전'이면 Ctrl+S). |
+| 한글이 □로 보인다 | DB › 화면 설정 › 글꼴 · 글꼴 에셋이 비었거나 한글이 없는 글꼴이다 → 반영 스크립트에서 `ScreenSetup.Ensure()`(비었으면 GBible 기본 글꼴 — 바로 적용). |
 | "[MomoiProject] 없는 화면 'shp'입니다" | ID 오타. `GameIds.Screen` 상수를 쓴다. 반영 스크립트로 막 만든 항목이면 Unity가 다시 컴파일하기 전까지 상수가 없다(5-6 4). |
 | "화면 '…'에 목록 칸 UXML '…'이 없습니다" | `Item("이름")`의 이름이 UXML 파일 이름과 다르거나, DB › 화면의 '목록 칸 UXML'에도 화면 UXML의 `<ui:Template>`에도 없다(2-3). |
 | "화면 'shop'의 UXML에 이름(name)이 'buy'인 Button이(가) 없습니다" | UXML의 `name`과 코드의 이름이 다르다. 목록 칸 안의 버튼은 `Q`가 아니라 `element.Q<Button>()`(칸 안에서 찾기). |
@@ -564,7 +564,7 @@ static void Add(string id, string uxml, ScreenLayer layer, bool back, string sce
 | 고르기 창이 두 개 뜬다(프로젝트 것과 기본 것) | 프로젝트가 **다른 ID**로 고르기 화면을 만들었다. 그때만 '고르기 창 저절로'를 끈다. 같은 ID(`momoi.choice`)로 바꾸면 하나만 뜬다(2-5). |
 | 고르기 창을 같은 ID로 바꿨더니 열리지 않는다 | '고르기 창 저절로'를 껐다. 저절로 여는 것이 `momoi.choice`라 켜 둔다(2-5). |
 | 바꾼 고르기 창이 Esc로 닫혔다가 바로 다시 뜬다 | 같은 ID의 DB 항목에서 '뒤로(Esc)로 닫기'가 켜져 있다(기본 켬). 선택 대기가 남아 있어 다음 프레임에 다시 열린다. 끈다. |
-| 실시간 레벨업 고르기 중에 적이 계속 움직인다 | DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다(같은 ID로 바꾼 창이면 그 항목의 '열린 동안 게임 시간 멈춤'). 반영 스크립트로 켰는데 그대로면 '적용 전'이다 — 개발자가 Ctrl+S(3-2). |
+| 실시간 레벨업 고르기 중에 적이 계속 움직인다 | DB › 화면 설정 '고르는 동안 게임 시간 멈춤'을 켠다(같은 ID로 바꾼 창이면 그 항목의 '열린 동안 게임 시간 멈춤'). 반영 스크립트로 켰는데 그대로면 개발자가 그 항목을 고치다 저장하지 않아 '적용 전'으로 남은 것이다 — `DbStatus.txt`의 '적용 전'을 보고 Ctrl+S(관례 15절). |
 | 실시간 HUD가 틱마다 다시 그려져 느리다 | 틱마다 바뀌는 데이터(적 목록)가 HUD가 보는 키에 함께 있다. 다른 플레이어 데이터 키로 나누고 `Watch`·binding-path·목록 키를 느린 키로(2-3). |
 | `Watch`를 덮었더니 CS0507 | `public override`·`protected internal override`로 썼다. 프로젝트에서는 `protected override`(2-3). |
 | 턴제에서 고르기 창이 뜨면 피해 숫자·카드 연출이 멈춘다 | '고르는 동안 게임 시간 멈춤'이 켜져 있다(`Time.timeScale`이라 연출도 멈춘다). 턴제는 끈다. |

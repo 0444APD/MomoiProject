@@ -167,7 +167,7 @@ run.gold += 10;              // 행동 안이면 그냥 고친다 — 행동이 
 > 그래서 게임 코드에서 따로 정의(`session.Data.Define`)하지 않는다. `Define`은 DB 없이 세션을 손으로 만드는 규칙 테스트([08장](08-TestAndDebug.md))에서 쓴다. DB로 정의하면 `GameIds` 접근자, ID 이름 변경 이력, 저장 호환 검사가 따라온다.
 
 > [!note]- `Game.Data().Run`이라는 이름과 GameIds가 생기는 때
-> - `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`는 DB가 바뀌어 적용될 때(개발자의 Ctrl+S, 반영 스크립트의 새 항목 자동 적용) 다시 만들어진다. [필수] 직접 고치지 않는다.
+> - `Assets/MomoiProject/Code/Rules/Generated/GameIds.cs`는 DB가 바뀌어 적용될 때(개발자의 Ctrl+S, 반영 스크립트가 바꾼 것의 자동 적용) 다시 만들어진다. [필수] 직접 고치지 않는다.
 > - 새 상수는 **그 뒤 Unity가 다시 컴파일해야** 코드에서 보인다. 그래서 반영 스크립트와 그 상수를 쓰는 코드를 한꺼번에 넣지 않고 한 응답 안에서 박자로 나눈다: 형식·반영 스크립트를 넣고 → `Logs/MomoiProject/RunTests.request`로 Unity에 새로 읽기를 부르고 → `GameIds.cs`에 상수가 생긴 것을 본 뒤 이어 쓴다. 선택 기능을 켜는 박자 · 새로 읽기를 한 번 더 도는 때는 진행 매뉴얼 6절 박자 표(Unity가 닫혀 있으면 첫 박자에서 멈추고 열어 달라고 한다).
 > - 이름은 ID의 첫 글자를 대문자로, 점으로 나뉜 조각을 이어 붙인다: `run` → `Run`, `bestFloor` → `BestFloor`, `boss.dragon` → `BossDragon`. 다른 이름을 원하면 ID를 바꾼다(05장 8절).
 > - 구역은 저장 파일과 같다. `Session`은 이번 판(`run.json`), `Meta`는 프로필(`profile.json`). 무엇을 어느 쪽에 둘지는 [02장](02-DesignToCode.md) 3절.

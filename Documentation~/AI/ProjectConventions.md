@@ -188,7 +188,7 @@ GBible로 만드는 모든 프로젝트에서 AI가 지키는 규칙이다(장�
 
 AI는 Unity 창을 누를 수 없다. DB 항목은 **DB 반영 스크립트**로 만든다: `Assets/MomoiProject/Code/Editor`의 static 함수(매개변수 없음)에 `[DbSeed("버전")]`을 붙이면 컴파일이 끝나고 에디터가 한가해질 때 GBible이 저절로 한 번 돌린다(버전이 바뀐 것만 다시 — 기록 `ProjectSettings/MomoiProject/DbSeeds.json`).
 
-- **새 항목(`Staging.Add`)은 저절로 적용된다**(무엇이 들어왔는지는 콘솔·DB 창 알림). **이미 있는 항목의 고치기(`Work`)·지우기(`Remove`)·ID 바꾸기(`Rename`)만 '적용 전'으로 남고**, 개발자가 읽어 보고 Ctrl+S로 적용한다 — 개발자가 만지던 항목을 말없이 바꾸지 않게. '적용 전'이 남은 버전은 적용했을 때 "돌았다"로 기록된다(버리면 다음 컴파일 뒤 다시 돈다). 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 — 새 항목은 바로 적용`을 끄면 새 항목도 '적용 전'으로 둔다(`ProjectSettings/MomoiProject/DbSeedOptions.json`).
+- **반영 스크립트가 바꾼 것은 모두 저절로 적용된다**(개발자 2026-10-22): 새 항목(`Staging.Add`) · 고치기(`Work`) · 지우기(`Remove`) · ID 바꾸기(`Rename`), 반영 스크립트 안에서 부른 도구(`ScreenSetup.Ensure` · `FontSetup.Replace` …)의 고치기까지 — 개발자에게 Ctrl+S를 부탁하지 않는다(무엇이 바뀌었는지는 콘솔·DB 창 알림). **예외 하나**: 개발자가 DB 창에서 고치다 저장하지 않은 항목을 반영 스크립트도 고치면(한 작업본에 섞여 AI 것만 떼어 적용할 수 없다) 그 번의 고치기 · 지우기는 '적용 전'으로 남고 콘솔 경고가 그 항목을 알린다 — 그때만 보고에 Ctrl+S를 적는다(새 항목은 그때도 적용). '적용 전'이 남은 버전은 적용했을 때 "돌았다"로 기록된다(버리면 다음 컴파일 뒤 다시 돈다). 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 — 바로 적용`을 끄면 모두 '적용 전'으로 둔다(`ProjectSettings/MomoiProject/DbSeedOptions.json`).
 - **`GameIds` 상수는 한 박자 늦게 생긴다**: 반영 스크립트가 돌아 새 항목이 적용되고 → Unity가 다시 컴파일한 뒤에야 `GameIds.cs`에 상수(와 `Game.Data()`의 새 키 접근자)가 생긴다. 그 상수를 쓰는 코드를 반영 스크립트와 함께 넣으면 컴파일이 깨져 반영 스크립트도 돌지 않는다. 그래서 **한 응답 안에서 박자로** 나눈다 — 차례(0 기능 켜기 → 가 형식 · 반영 스크립트 → 나 새로 읽기 → 다 상수를 쓰는 코드 → 필요하면 나 한 번 더 → 라 테스트)와 반영 스크립트 파일을 박자별로 나누는 법은 **진행 매뉴얼 6절 박자 표**.
   - 새로 읽기(나): `Logs/MomoiProject/RunTests.request`를 만들어 Unity에 새로 읽기를 부르고, `GameIds.cs`를 다시 읽어 상수가 생길 때까지 기다린다(Unity는 요청을 받으면 새로 읽어 컴파일하고 테스트를 돌린 뒤 요청 파일을 지운다 — 지워지지 않고 남으면 Unity가 닫혔거나 플레이 중·멈춘 것, 12절. 요청이 지워졌는데 상수가 아직 없으면 잠시 뒤 다시 읽고(반영 스크립트는 컴파일 뒤 에디터가 한가해질 때 돈다), 그래도 없으면 `Logs/Editor.log`에서 반영 스크립트 오류를 본다).
   - Unity가 닫혀 있으면 첫 박자에서 응답을 끝내고 개발자에게 Unity를 열어 달라고 한다(반영 스크립트는 Unity가 돌린다). 상수 대신 ID 글자를 코드에 쓰지 않는다(2절).
@@ -215,14 +215,14 @@ static class AchievementSeeds
 
 - 함수 하나 = 주제 하나(종류 하나·콘텐츠 묶음 하나)가 기본이다. 파일은 보통 `Assets/MomoiProject/Code/Editor/Seeds/<주제>Seeds.cs` — 같은 주제라도 넣는 박자가 다르면(다에서 만든 행동 · Block을 쓰는 항목) 파일을 나눈다(진행 매뉴얼 6절).
 - [필수] **이미 있는 항목은 건너뛴다.** 개발자가 밸런싱한 값을 덮지 않는다. 구조(Block·참조 칸의 종류)를 고쳐야 하면 버전을 올리고 `EditorDatabase.Staging.Work(항목)`으로 작업본을 받아 그 칸만 고친다(숫자 칸은 건드리지 않는다).
-- **하나만 두는 설정 종류**(`[Database(…, Single = true)]` — 화면 설정·Steam·프로젝트의 그런 종류)는 항목이 없으면 에디터가 기본값으로 하나 만든다. 그래서 반영 스크립트는 ID로 찾아 새로 `Add`하지 않고(ID가 다르면 둘이 생긴다) 그 종류의 하나를 `EditorDatabase.Instance.OfType<T>().FirstOrDefault()`로 찾아 `EditorDatabase.Staging.Work(항목)`으로 고친다(없을 때만 `Add` — `Work`는 '적용 전'으로 남는다).
+- **하나만 두는 설정 종류**(`[Database(…, Single = true)]` — 화면 설정·Steam·프로젝트의 그런 종류)는 항목이 없으면 에디터가 기본값으로 하나 만든다. 그래서 반영 스크립트는 ID로 찾아 새로 `Add`하지 않고(ID가 다르면 둘이 생긴다) 그 종류의 하나를 `EditorDatabase.Instance.OfType<T>().FirstOrDefault()`로 찾아 `EditorDatabase.Staging.Work(항목)`으로 고친다(없을 때만 `Add` — 반영 스크립트 안의 `Work`도 바로 적용된다).
 - **지우기**는 버전을 올리고 `EditorDatabase.Staging.Remove(항목)`. 그 ID를 쓰는 코드(`GameIds` 상수)도 같이 지운다. **ID 바꾸기**는 `EditorDatabase.Staging.Rename(항목, 새 ID)`(DB 안의 가리키는 칸이 함께 바뀐다) — 코드의 상수 이름도 바꾼다.
 - **DB › 시작 파일 › Bootstrap 칸**(Undo 방식·판 저장·판 끝 이벤트·시작할 때 이어 하기·새 판 행동·고정 틱·씬 흐름·세이브 슬롯이 프로필을 함께 씀 — 읽기 `SlotsShareProfile`, 쓰기 `EditorSetSlotsShareProfile(bool)`)은 항목이 아니라 DB 에셋의 값이다: `AssetDatabase.LoadAssetAtPath<GameDatabase>(EditorDatabase.DatabaseAssetPath)`로 꺼내 결정한 값(결정 기록·장르 추천)을 `EditorSet…`(참조 3-8)으로 넣고 `EditorUtility.SetDirty`·`AssetDatabase.SaveAssetIfDirty`. '적용 전'을 거치지 않고 바로 저장된다(구현 가이드 01 4절). [필수] 이 값은 '적용 전'을 거치지 않으므로 **지금 값이 기본값(`ScriptableObject.CreateInstance<GameDatabase>()`의 값)일 때만 넣는다** — 기본값이 아니면 개발자가 고른 것(시작 설정 · DB 화면)이라 넣지 않고, 결정 기록과 다르면 보고에 적어 묻는다. 그래야 메뉴 '모두 다시 돌리기'도 개발자 값을 덮지 않는다. 결정이 바뀌어 다시 넣어야 하면 개발자에게 알리고 버전을 올린다.
 - **Run In Background**(창이 뒤로 가도 게임이 돈다 — DB 칸이 없는 Player Settings 값): 실시간·방치형·멀티는 같은 반영 스크립트에서 `PlayerSettings.runInBackground = true`. 틱 수·저장 간격처럼 AI가 정해 추천 승인 목록에 올린다(진행 매뉴얼 3절).
 - **밸런싱 값은 표시 이름·메모·입력 칸 주석·묶음(폴더)을 함께 만든다**(짓는 법은 `NamingGuide.md` 3절 — 확률은 %(0~100)로 두고 규칙이 100으로 나눈다). [필수] 이미 있는 항목은 비어 있는 칸만 채운다.
 - **값이 많은 것**(밸런싱 값·카드 수치·몬스터 수치·가중치 표 줄 — 숫자·글자·enum과 그 목록)은 CSV도 된다: 첫 칸 `id`, 나머지 칸 이름 = 필드 이름(묶음 필드는 `curve.step`, 목록은 `entries[0].weight`). 개발자가 그 DB 종류 탭의 **CSV › CSV 가져오기**로 넣는다. Block 칸(트리거·조건·결과)은 CSV에 없다.
 - 메뉴 `MomoiProject › 개발 › DB 반영 스크립트 모두 다시 돌리기`가 모든 스크립트를 다시 돌린다(이미 있는 항목은 건너뛰므로 안전하다).
-- 보고할 때: 저절로 적용된 새 항목 목록, '적용 전'으로 남는 고치기·지우기(있으면 Ctrl+S 요청), 확인할 것(DB 아래 "검증 통과").
+- 보고할 때: 적용된 것(새 항목 · 고치기 · 지우기 · ID 바꾸기), 개발자의 저장 안 한 작업본과 섞여 '적용 전'으로 남은 것(있을 때만 Ctrl+S 요청 — `Logs/MomoiProject/DbStatus.txt`의 '적용 전'), 확인할 것(DB 아래 "검증 통과").
 - 플레이어 데이터 `run`(RunState)·`profile`(Profile)은 시작 설정이 이미 만들었다 — 필드는 그 클래스(코드)에 더하고, 새 플레이어 데이터 키만 반영 스크립트로(`PlayerDataEntry`, 8절). 화면은 반영 스크립트에서 `ScreenSetup.Ensure()`(Panel Settings·테마·DB › 화면 설정)를 먼저 부르고, 화면 항목의 `layout`을 `AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/MomoiProject/UI/Screens/….uxml")`로 넣는다(매뉴얼 35장 5-6). 그림·글꼴·소리 에셋은 개발자가 가져온다(AI는 넣을 목록과 자리를 만든다 — 18절).
 
 ## 16. 기본 진행 순서(단계 1 시스템층 → 단계 2 UI·샘플)

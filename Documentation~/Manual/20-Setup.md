@@ -366,7 +366,7 @@ public sealed class QuestTracker : MonoBehaviour
 
 ### 에디터에서
 
-직접 편집하지 않는다. DB 변경이 적용될 때(저장(Ctrl+S), DB 반영 스크립트의 새 항목 저절로 적용 — 21장 3-1), 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`이다.
+직접 편집하지 않는다. DB 변경이 적용될 때(저장(Ctrl+S), DB 반영 스크립트가 바꾼 것의 저절로 적용 — 21장 3-1), 또는 프로젝트 창에서 `GameData` 에셋이 추가·삭제·이동되면 목록이 자동으로 맞춰진다. 에셋 위치는 `Assets/MomoiProject/Data/Resources/MomoiProject/GameDatabase.asset`이다.
 
 ### 코드로 쓰는 법
 
@@ -514,7 +514,7 @@ static class FeatureCheck
 
 ### 에디터에서
 
-- 자동: DB 변경이 **적용될 때**(저장 Ctrl+S, DB 반영 스크립트의 새 항목 저절로 적용 — 21장 3-1) **적용된 항목만으로** 다시 만든다. 내용이 같으면 파일을 건드리지 않고, 바뀌면 Unity가 다시 컴파일한다. 플레이·컴파일 중이면 끝난 뒤에 만든다.
+- 자동: DB 변경이 **적용될 때**(저장 Ctrl+S, DB 반영 스크립트가 바꾼 것의 저절로 적용 — 21장 3-1) **적용된 항목만으로** 다시 만든다. 내용이 같으면 파일을 건드리지 않고, 바뀌면 Unity가 다시 컴파일한다. 플레이·컴파일 중이면 끝난 뒤에 만든다.
 - **AI가 새 상수를 쓰는 차례**: DB 반영 스크립트를 쓴다 → Unity가 컴파일하고 스크립트를 돌린다 → 새 항목이 적용되어 `GameIds.cs`가 다시 쓰인다 → 파일에 상수가 생긴 것을 본 뒤 그 상수를 쓰는 코드를 쓴다. 같은 응답에서 먼저 쓰면 컴파일 검사 훅(11절)과 Unity 컴파일이 "없는 이름"으로 막혀 스크립트가 돌지 못한다. 그 사이 규칙 코드가 ID를 읽어야 하면 `Game.Entry`나 반영 스크립트의 ID 글자로 읽는다(관례 15절). 고치기·지우기·ID 바꾸기는 개발자가 Ctrl+S로 적용해야 `GameIds`에 들어간다.
 - 수동 메뉴는 없다. 코드에서 다시 만들려면 `GameIdsGenerator.Generate(force: true)`(에디터).
 - 위치: 플레이어 데이터의 값 형식이 들어 있는 asmdef 폴더의 `Generated/`(그래야 그 형식을 참조할 수 있다) — 시작 설정을 한 프로젝트는 `Assets/MomoiProject/Code/Rules/Generated/`. 형식이 없거나 `Assembly-CSharp`에 있으면 `Assets/MomoiProject/Generated/`. asmdef 안에 한 번 만든 뒤에는 저절로 옮기지 않는다(옮길 자리가 생기면 콘솔 경고로 알린다). `ProjectSettings/MomoiProject/Ids.json`의 `folder`에 경로를 적으면 그곳에 만든다(예전 파일은 지운다).
