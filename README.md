@@ -32,6 +32,7 @@ git submodule add https://github.com/0444APD/MomoiProject.git Packages/com.momoi
 - Package Manager의 'git URL로 추가'는 쓰지 않는다 — 그렇게 넣으면 패키지가 `Library/PackageCache/com.momoi.gbible@<해시>`에 읽기 전용으로 들어가, AI가 CLAUDE.md를 따라 읽는 문서 경로가 업데이트마다 바뀌고(`Library`는 git에 올리지 않는 폴더다) 패키지를 고칠 수도 없다.
 - 그다음 Unity로 열면 **시작 설정** 창이 뜬다(매뉴얼 20장 1절).
 - 업데이트: `Packages/com.momoi.gbible`에서 `git pull`(서브모듈이면 게임 저장소에서 `git submodule update --remote Packages/com.momoi.gbible` 뒤 커밋). 받은 뒤 Unity를 앞으로 가져오면 다시 컴파일된다. 프로젝트의 AI가 세션을 시작할 때마다 받기 · 버전 비교를 하고, 새 버전이면 [`CHANGELOG.md`](CHANGELOG.md)(업데이트 기록)의 '알아 둘 것' · '프로젝트에서 할 일'을 처리한 뒤 이어 간다(진행 매뉴얼 14절).
+- 고치기(깃 관계자 — 이 저장소에 푸시할 수 있는 사람): 게임 프로젝트 세션에서 AI에게 대화로 GBible 업데이트를 말하면, AI가 그 프로젝트의 서브모듈 `Packages/com.momoi.gbible`에서 업데이트 기록 '쓰는 법' 순서대로 고치고, 전부 마치면 커밋 · 푸시까지 한다. 커밋 작성자는 업데이트를 하는 사람의 git 이름이다(진행 매뉴얼 14-3).
 
 ## 구조
 

@@ -2,11 +2,13 @@
 
 GBible을 쓰는 모든 프로젝트의 AI가 **세션을 시작할 때** 읽는 곳이다(진행 매뉴얼 `Documentation~/AI/ProjectFlow.md` 14절). 프로젝트의 결정 기록(`Docs/Decisions.md` 'GBible' 절)에 적힌 **적용한 버전**보다 새 항목을 오래된 것부터 읽고, '알아 둘 것'을 숙지하고 '프로젝트에서 할 일'을 한 뒤 세션 일을 이어 간다.
 
-## 쓰는 법(라이브러리 쪽 — HANDOVER 3.2)
+## 쓰는 법(GBible을 고칠 때 — HANDOVER 3.2 · 진행 매뉴얼 14-3)
+
+라이브러리 세션이든, 깃 관계자가 게임 프로젝트 세션에서 대화로 업데이트를 말한 때(서브모듈 `Packages/com.momoi.gbible`, 진행 매뉴얼 14-3)든 순서는 같다.
 
 1. **먼저 적는다**: 고치기 전에 맨 위 '다음 배포'에 무엇을 왜 바꾸는지 적는다(게임 프로젝트의 수정 요청이면 그 요청 줄을 옮긴다).
-2. **고친다**: 코드 · 문서 · 테스트, 실험실(UITemplateLab) 확인.
-3. **배포한다**: '다음 배포'를 실제로 한 것과 맞추고 버전 · 날짜를 붙인다 → `package.json`의 `version`을 같은 값으로 → 커밋 → `git push origin rebuild:master` → 태그 `v버전`을 붙여 올린다(`git tag v0.2.0` · `git push origin v0.2.0`).
+2. **고친다**: 코드 · 문서 · 테스트, 실험실(UITemplateLab) 또는 그 게임 프로젝트의 Unity로 확인.
+3. **배포한다**: '다음 배포'를 실제로 한 것과 맞추고 버전 · 날짜를 붙인다 → `package.json`의 `version`을 같은 값으로 → 커밋(작성자 = 업데이트를 하는 깃 사용자의 이름 — 그 PC의 git `user.name`) → `git push origin rebuild:master` → 태그 `v버전`을 붙여 올린다(`git tag v0.2.0` · `git push origin v0.2.0`).
 
 - 버전은 `0.가.나`. **가**를 올리는 것: 프로젝트에서 할 일이 생기는 변경(규칙 · API 이름 · 템플릿 · 데이터 모양 · CLAUDE.md 칸). **나**를 올리는 것: 프로젝트에서 할 일이 없는 고침 · 문서 보충.
 - 항목마다 세 칸을 쓴다. 없는 칸은 "없음".
@@ -19,6 +21,20 @@ GBible을 쓰는 모든 프로젝트의 AI가 **세션을 시작할 때** 읽는
 ## 다음 배포
 
 (아직 없음)
+
+## 0.5.0 — 2026-10-26
+
+**바뀐 것**
+- 스킬 `/think-momoi`를 **개발자가 직접 입력하면 늘 새 프로젝트의 시작**이다(개발자 2026-10-26). 다른 세션 · 다른 프로젝트의 내용(대화 기억 · 메모리 · 다른 폴더의 결정)은 참조하지도 기억하지도 않고 새로 시작한다. 다른 프로젝트를 진행하던 세션에서 입력되면 시작하기 전에 한 번 확인 질문을 하고, 진행한다는 답을 받으면 그 뒤로는 그 세션의 구 프로젝트 기억을 완전히 배제한다. 폴더에 이전 진행(결정 기록 · 산출물)이 남아 있으면 무엇을 비울지 먼저 묻는다(지우는 것은 백업한 뒤). AI가 진행 매뉴얼에 따라 스스로 스킬을 부를 때(같은 프로젝트를 이어 하는 세션)는 지금처럼 결정 기록을 읽고 이어 간다.
+- **GBible 업데이트를 대화로**(개발자 2026-10-26): 깃 관계자(이 저장소에 푸시할 수 있는 개발자)가 게임 프로젝트 세션에서 GBible 업데이트를 말하면, 그 세션의 AI가 서브모듈 `Packages/com.momoi.gbible`에서 이 파일의 '쓰는 법' 순서대로 고치고, 전부 마치면 커밋 · 푸시까지 한다. 커밋 작성자 = 업데이트를 하는 깃 사용자의 이름(그 PC의 git `user.name` — 예: hatobato). 진행 매뉴얼 14-3(새 절). 수정 요청 파일(`Docs/GBibleRequests.md`, 14-2)은 AI가 진행 중에 찾은 것을 개발자에게 알릴 때 쓴다.
+- 세션 시작 확인(14-1): GBible이 서브모듈(내장 패키지)이 아니라 Package Manager git URL로 들어와 있으면(`Library/PackageCache/com.momoi.gbible@…`) 받기 · 고치기를 할 수 없다 — 서브모듈로 바꾸기를 권하고, 개발자의 승인을 받아 바꾼다.
+
+**알아 둘 것**
+- 진행 매뉴얼 0-1(새 절) · 14-1 · 14-2 · 14-3(새 절), 관례 0절 · 14절, 메뉴얼 지도 맨 위 '전제' · '메뉴얼을 고치라는 지시를 받으면', 스킬 틀 '시작할 때', CLAUDE 틀, HANDOVER 3.2, 이 파일 '쓰는 법'.
+
+**프로젝트에서 할 일**
+- CLAUDE.md 칸과 `.claude/skills/think-momoi/SKILL.md`: 에디터를 열 때 저절로 맞춰진다(바로 맞추려면 메뉴 'MomoiProject › 개발 › Claude Code 파일 지금 맞추기'). 확인: CLAUDE.md에 "`/think-momoi`를 개발자가 직접 입력하면 새 프로젝트" 줄이 있다.
+- GBible을 Package Manager git URL로 들인 프로젝트: 서브모듈로 바꾼다(내려받기 · 게임 저장소 커밋이 들어가므로 개발자에게 묻는다). 게임 저장소 폴더에서 `git submodule add https://github.com/0444APD/MomoiProject.git Packages/com.momoi.gbible` → `Packages/manifest.json`의 `"com.momoi.gbible"` 줄을 지운다 → Unity가 새로 읽은 뒤 `Packages/packages-lock.json`의 그 항목이 `"source": "embedded"`인지, CLAUDE.md의 문서 경로가 `Packages/com.momoi.gbible/…`인지 확인한다.
 
 ## 0.4.0 — 2026-10-22
 
